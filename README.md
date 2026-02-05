@@ -1,0 +1,281 @@
+# Vibe Coding Control Center
+
+一个专注于开发者生产力的 AI 开发工具管理套件。提供统一的界面来初始化项目、管理 AI 工具（Claude Code、OpenCode 等）以及配置开发环境。
+
+**特别说明**：
+- **Claude Code**: 可通过阿里云兼容端点使用 Qwen 模型（环境变量配置）
+- **OpenCode**: 原生支持多模型（Qwen、DeepSeek、Moonshot）
+
+## 核心特性
+
+- **菜单驱动界面**: 易用的控制中心，直观的导航
+- **项目快速初始化**: 使用最佳实践快速设置新项目
+- **智能版本管理**: 自动检测版本、支持一键更新 ⭐ 新功能
+- **配置智能合并**: MCP 配置合并而非覆盖，保留自定义设置 ⭐ 新功能
+- **安全优先**: 全面的输入验证和安全文件操作
+- **模块化设计**: 组织良好的脚本和共享工具库
+- **MCP 集成**: 支持 Model Context Protocol（网页搜索、GitHub 访问等）
+- **双工具支持**: Claude Code（官方）+ OpenCode（支持多模型，内置oh-my-opencode）
+
+## 系统要求
+
+- Unix/Linux/macOS 环境
+- Git
+- Bash 兼容的 shell（zsh 或 bash）
+- Node.js（用于 MCP 服务器）
+
+## 快速开始
+
+### 1. 安装 Claude Code
+
+```bash
+./install/install-claude.sh
+```
+
+这将会：
+- 安装 Claude CLI
+- 创建配置目录
+- 配置 MCP 服务器（GitHub、Brave Search 等）
+- 创建命令别名
+
+### 2. 安装 OpenCode（可选）
+
+```bash
+./install/install-opencode.sh
+```
+
+OpenCode 原生支持多种中国模型，无需额外配置。
+
+## 配置
+
+### API 密钥配置
+
+1. 复制模板文件：
+   ```bash
+   cp config/keys.template.env config/keys.env
+   ```
+
+2. 编辑 `config/keys.env` 并添加你的 API 密钥：
+
+   **重要**：统一使用 `ANTHROPIC_AUTH_TOKEN`，不要使用 `ANTHROPIC_API_KEY`
+
+   ```bash
+   # Claude Code（官方 Anthropic API）
+   ANTHROPIC_AUTH_TOKEN=sk-ant-xxxxx
+   ANTHROPIC_BASE_URL=https://api.anthropic.com
+   ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+
+   # 或者使用阿里云代理（中国用户）
+   ANTHROPIC_AUTH_TOKEN=sk-sp-xxxxx
+   ANTHROPIC_BASE_URL=https://coding.dashscope.aliyuncs.com/apps/anthropic
+   ANTHROPIC_MODEL=qwen3-coder-plus
+
+   # GitHub（用于 MCP）
+   GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxxx
+
+   # 其他可选的 API 密钥
+   BRAVE_API_KEY=BSAwxxxxx
+   DEEPSEEK_API_KEY=sk-xxxxx  # OpenCode 可选
+   MOONSHOT_API_KEY=sk-xxxxx  # OpenCode 可选
+   ```
+
+3. 重新加载配置：
+   ```bash
+   source ~/.zshrc  # 或 ~/.bashrc
+   ```
+
+## 使用方法
+
+### 主控制中心
+
+启动 Vibe Coding 控制中心：
+
+```bash
+./scripts/vibecoding.sh
+# 或使用别名
+vibe
+```
+
+菜单选项：
+- **IGNITION**: 初始化新项目
+- **EQUIP**: 安装/更新工具（显示当前版本，支持一键更新）⭐
+- **DIAGNOSTICS**: 检查系统状态（显示版本信息和配置状态）⭐
+
+### 快捷命令
+
+安装后可用的快捷命令：
+
+**Claude Code**:
+- `c` - 启动 Claude 交互模式
+- `ca "问题"` - 快速提问
+- `cp "目标"` - 创建计划
+- `cr` - 审查代码变更
+
+**OpenCode**:
+- `o` - 启动 OpenCode 交互模式
+- `oa "问题"` - 快速提问
+
+**其他**:
+- `vibe` - 启动控制中心
+
+### 项目初始化
+
+初始化新项目：
+
+```bash
+./install/init-project.sh [项目名称]
+```
+
+这将创建：
+- `CLAUDE.md` 模板（项目上下文）
+- Cursor 规则配置
+- 最佳实践指南
+
+### 更新已安装工具 ⭐ 新功能
+
+更新 Claude Code 或 OpenCode 到最新版本：
+
+```bash
+# 方式 1: 使用控制中心（推荐）
+./scripts/vibecoding.sh
+# 选择 "2) EQUIP"
+# 会显示当前版本，选择要更新的工具
+
+# 方式 2: 直接运行安装脚本
+./install/install-claude.sh    # 检测到已安装会询问是否更新
+./install/install-opencode.sh  # 检测到已安装会询问是否更新
+```
+
+更新流程示例：
+```
+2/6 Check & Update Claude CLI
+✓ Claude CLI already installed (version: 2.1.30)
+Do you want to update Claude CLI to the latest version? [y/N] y
+✓ Updating claude-code via Homebrew...
+★ Updated from 2.1.30 to 2.1.31
+```
+
+**配置合并**: 更新时会智能合并 MCP 配置，保留你的自定义服务器设置。
+
+## 安全特性
+
+- **输入验证**: 所有用户输入都经过验证，防止注入攻击
+- **路径验证**: 防止目录遍历攻击
+- **安全文件操作**: 安全的文件复制和写入函数
+- **环境验证**: 检查命令可用性和权限
+- **安全用户交互**: 安全的提示和确认函数
+
+## 常见问题
+
+### 故障排除
+
+1. **Claude 无法连接**:
+   - 检查 `config/keys.env` 中的 `ANTHROPIC_AUTH_TOKEN`（不是 `ANTHROPIC_API_KEY`）
+   - 确认 `ANTHROPIC_BASE_URL` 设置正确
+
+2. **权限错误**: 检查配置文件权限是否正确
+
+3. **缺少依赖**: 确保已安装 Git、Bash 和 Node.js
+
+4. **API 密钥未加载**: 运行 `source ~/.zshrc`（或你的 shell 配置文件）
+
+5. **MCP 服务器不工作**: 验证 GitHub、Brave Search 等的 API 密钥
+
+6. **环境变量冲突**:
+   - 不要混用 `ANTHROPIC_API_KEY` 和 `ANTHROPIC_AUTH_TOKEN`
+   - 统一使用 `ANTHROPIC_AUTH_TOKEN`
+
+7. **更新失败**:
+   - 确保有网络连接
+   - macOS 用户确保 Homebrew 已更新: `brew update`
+   - Linux 用户确保 npm 已更新: `npm update -g npm`
+
+8. **MCP 配置被覆盖**:
+   - 新版本支持配置合并，更新时选择 "Yes" 合并配置
+   - 如果选择了替换，可以从备份文件恢复: `~/.claude.json.backup.*`
+
+## 开发指南
+
+### 编码规范
+
+- 使用模块化、注释良好的 bash 脚本，遵循 POSIX 兼容性
+- 使用 `set -e` 实现快速失败的错误处理
+- 将通用函数分离到 `lib/utils.sh` 以便复用
+- 使用清晰的变量命名和描述性函数名
+- 包含详细注释解释复杂操作
+
+### 安全最佳实践
+
+- 始终使用 `validate_input`、`validate_path`、`validate_filename` 验证用户输入
+- 使用安全文件操作：`secure_copy`、`secure_write_file`、`secure_append_file`
+- 使用 `handle_error` trap 实现适当的错误处理和清理
+- 在执行文件操作前始终使用 `validate_path`
+
+## 项目结构
+
+```
+vibe-coding-control-center/
+├── CLAUDE.md                    # 项目上下文
+├── README.md                    # 本文档
+├── CHANGELOG.md                 # 变更日志
+├── UPGRADE_FEATURES.md          # 新功能说明
+├── config/                      # 配置文件
+│   ├── aliases.sh              # 命令别名（动态路径解析）
+│   ├── keys.env                # API 密钥（不提交）
+│   └── keys.template.env       # 密钥模板
+├── docs/                        # 文档
+│   ├── agents-guide.md         # Agent 使用指南
+│   ├── usage_advice.md         # 使用建议
+│   ├── 技术架构说明.md          # 技术架构
+│   └── 项目理解指南.md          # 项目理解
+├── install/                     # 安装脚本
+│   ├── init-project.sh         # 项目初始化
+│   ├── install-claude.sh       # Claude Code 安装
+│   └── install-opencode.sh     # OpenCode 安装
+├── lib/                         # 共享库
+│   └── utils.sh                # 统一的工具函数库（安全增强）
+├── scripts/                     # 主要脚本
+│   ├── backup-project.sh       # 项目备份
+│   └── vibecoding.sh           # 主控制中心
+└── tests/                       # 测试
+    ├── test_new_features.sh    # 版本检测和更新功能测试
+    ├── test_status_display.sh  # 状态显示功能测试
+    └── unit/
+        ├── simple_test.sh      # 简单测试
+        └── test_utils.sh       # 工具函数测试
+```
+
+## 重要说明
+
+### Claude Code vs OpenCode
+
+**Claude Code**（官方工具）:
+- 官方 Anthropic CLI 工具
+- 在中国可通过阿里云兼容端点使用 Qwen 模型
+- 需要配置环境变量：`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_BASE_URL`、`ANTHROPIC_MODEL`
+- 这是一种 workaround（无奈之举）
+
+**OpenCode**（中国原生）:
+- 专为中国环境设计
+- 原生支持多种模型（Qwen、DeepSeek、Moonshot）
+- 无需配置端点和模型，开箱即用
+- 这是正道（native solution）
+
+### 环境变量注意事项
+
+⚠️ **重要**: 统一使用 `ANTHROPIC_AUTH_TOKEN`，不要混用 `ANTHROPIC_API_KEY`，避免环境冲突。
+
+## 相关文档
+
+- **[项目理解指南](docs/项目理解指南.md)** - 深入理解项目架构和设计理念
+- **[技术架构说明](docs/技术架构说明.md)** - 详细的技术架构文档
+- **[使用建议](docs/usage_advice.md)** - 高级使用技巧和最佳实践
+- **[Agent 指南](docs/agents-guide.md)** - OpenCode Agent 系统详解
+
+## 贡献
+
+欢迎贡献！请遵循 `CLAUDE.md` 中的编码规范。
+
+## 许可证
+
+本项目开源。详见仓库许可证。

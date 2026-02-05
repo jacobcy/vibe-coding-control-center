@@ -1,0 +1,13 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell scripts should always use LF
+*.sh text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# Config files
+*.env text eol=lf
+*.json text eol=lf
+

@@ -1,0 +1,11 @@
+# Secrets
+config/keys.env
+*.env
+!config/keys.template.env
+
+# Logs
+*.log
+
+# System
+.DS_Store
+.aider*
