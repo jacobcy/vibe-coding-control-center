@@ -7,14 +7,19 @@ set -e
 
 # ================= LOAD UTILITIES =================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/utils.sh"
 
-# ================= COLORS =================
-# Colors are defined in utils.sh
+# Load all utility modules
+source "$SCRIPT_DIR/../lib/utils.sh"
+source "$SCRIPT_DIR/../lib/config.sh"
+source "$SCRIPT_DIR/../lib/i18n.sh"
+source "$SCRIPT_DIR/../lib/cache.sh"
+source "$SCRIPT_DIR/../lib/error_handling.sh"
+
 # Only define BOLD here as it's not in utils.sh
 readonly BOLD='\033[1m'
 
-# ================= HEADER =================
+# ================= COLORS =================
+# Colors are defined in utils.sh
 show_header() {
     clear
     echo -e "${PURPLE}"
