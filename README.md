@@ -16,6 +16,8 @@
 - **模块化设计**: 组织良好的脚本和共享工具库
 - **MCP 集成**: 支持 Model Context Protocol（网页搜索、GitHub 访问等）
 - **双工具支持**: Claude Code（官方）+ OpenCode（支持多模型，内置oh-my-opencode）
+- **国际化支持**: 内建多语言支持
+- **现代化架构**: 插件系统、缓存机制、高级错误处理
 
 ## 系统要求
 
@@ -23,10 +25,19 @@
 - Git
 - Bash 兼容的 shell（zsh 或 bash）
 - Node.js（用于 MCP 服务器）
+- jq（推荐，用于 JSON 操作）
 
 ## 快速开始
 
-### 1. 安装 Claude Code
+### 1. 现代化安装
+
+使用新的简化安装脚本：
+
+```bash
+./scripts/install.sh
+```
+
+或者传统的安装方式：
 
 ```bash
 ./install/install-claude.sh
@@ -157,6 +168,50 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 
 **配置合并**: 更新时会智能合并 MCP 配置，保留你的自定义服务器设置。
 
+## 测试与验证
+
+### 运行完整测试套件
+
+```bash
+# 运行所有模块的完整测试
+./scripts/test-all.sh
+```
+
+### 验证安装
+
+```bash
+# 检查系统状态
+./scripts/vibecoding.sh
+# 选择 "3) DIAGNOSTICS"
+```
+
+## 现代化架构特性
+
+### 配置管理
+- 集中式配置管理，支持环境特定设置
+- 类型安全的配置访问
+- 配置验证功能
+
+### 插件系统
+- 可扩展的插件架构
+- 插件注册和加载机制
+- 插件生命周期管理
+
+### 缓存系统
+- TTL（Time-To-Live）支持
+- 自动过期清理
+- 性能优化
+
+### 国际化支持
+- 多语言界面
+- 动态语言切换
+- 本地化消息
+
+### 高级错误处理
+- 重试机制（指数退避）
+- 断路器模式
+- 结构化错误信息
+
 ## 安全特性
 
 - **输入验证**: 所有用户输入都经过验证，防止注入攻击
@@ -164,6 +219,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 - **安全文件操作**: 安全的文件复制和写入函数
 - **环境验证**: 检查命令可用性和权限
 - **安全用户交互**: 安全的提示和确认函数
+- **修复漏洞**: 已修复 prompt_user 函数中的 eval 安全漏洞
 
 ## 常见问题
 
@@ -194,15 +250,32 @@ Do you want to update Claude CLI to the latest version? [y/N] y
    - 新版本支持配置合并，更新时选择 "Yes" 合并配置
    - 如果选择了替换，可以从备份文件恢复: `~/.claude.json.backup.*`
 
+9. **安装或更新失败**:
+   - 确保 `jq` 已安装 (用于 JSON 操作): `brew install jq` 或 `apt-get install jq`
+   - 检查网络连接和防火墙设置
+
 ## 开发指南
 
 ### 编码规范
 
 - 使用模块化、注释良好的 bash 脚本，遵循 POSIX 兼容性
-- 使用 `set -e` 实现快速失败的错误处理
-- 将通用函数分离到 `lib/utils.sh` 以便复用
+- 遵循一致的颜色方案用于用户反馈（在 utils.sh 中定义）
+- 实现错误处理使用 `set -e` 实现快速失败
+- 将通用函数分离到 `lib/utils.sh` 以供重用
 - 使用清晰的变量命名和描述性函数名
 - 包含详细注释解释复杂操作
+- 对所有用户输入和文件操作实现安全验证
+- 对常量和安全参数使用 readonly 变量
+
+### 模块开发
+
+当开发新功能时：
+
+1. 将功能组织到适当的模块中（位于 `lib/` 目录）
+2. 确保所有函数都有适当的安全验证
+3. 使用现有的日志函数
+4. 遵循现有的错误处理模式
+5. 为新功能编写测试
 
 ### 安全最佳实践
 
@@ -210,6 +283,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 - 使用安全文件操作：`secure_copy`、`secure_write_file`、`secure_append_file`
 - 使用 `handle_error` trap 实现适当的错误处理和清理
 - 在执行文件操作前始终使用 `validate_path`
+- 通过 `prompt_user_safe` 函数处理用户输入，避免使用不安全的 eval
 
 ## 项目结构
 
@@ -217,6 +291,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 vibe-coding-control-center/
 ├── CLAUDE.md                    # 项目上下文
 ├── README.md                    # 本文档
+├── MODERN_README.md             # 现代化功能说明
 ├── CHANGELOG.md                 # 变更日志
 ├── UPGRADE_FEATURES.md          # 新功能说明
 ├── config/                      # 配置文件
@@ -233,10 +308,18 @@ vibe-coding-control-center/
 │   ├── install-claude.sh       # Claude Code 安装
 │   └── install-opencode.sh     # OpenCode 安装
 ├── lib/                         # 共享库
-│   └── utils.sh                # 统一的工具函数库（安全增强）
+│   ├── utils.sh                # 统一的工具函数库（安全增强）
+│   ├── config.sh               # 集中配置管理
+│   ├── plugins.sh              # 插件系统
+│   ├── cache.sh                # 缓存系统
+│   ├── error_handling.sh       # 高级错误处理
+│   ├── i18n.sh                # 国际化支持
+│   └── testing.sh              # 测试框架
 ├── scripts/                     # 主要脚本
 │   ├── backup-project.sh       # 项目备份
-│   └── vibecoding.sh           # 主控制中心
+│   ├── vibecoding.sh           # 主控制中心
+│   ├── install.sh              # 现代化安装脚本
+│   └── test-all.sh             # 完整测试套件
 └── tests/                       # 测试
     ├── test_new_features.sh    # 版本检测和更新功能测试
     ├── test_status_display.sh  # 状态显示功能测试
