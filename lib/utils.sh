@@ -344,13 +344,39 @@ prompt_user() {
 
         # Validate input if validator is provided
         if [[ -n "$validator" ]]; then
-            if eval "$validator '$input'"; then
-                echo "$input"
-                return 0
-            else
-                log_error "Invalid input, please try again."
-                continue
-            fi
+            # Use a safe approach instead of eval to prevent command injection
+            case "$validator" in
+                "validate_input")
+                    if validate_input "$input" "false"; then
+                        echo "$input"
+                        return 0
+                    fi
+                    ;;
+                "validate_input_allow_empty")
+                    if validate_input "$input" "true"; then
+                        echo "$input"
+                        return 0
+                    fi
+                    ;;
+                "validate_path")
+                    if validate_path "$input" "Invalid path provided"; then
+                        echo "$input"
+                        return 0
+                    fi
+                    ;;
+                "validate_filename")
+                    if validate_filename "$input"; then
+                        echo "$input"
+                        return 0
+                    fi
+                    ;;
+                *)
+                    log_error "Unknown validator: $validator"
+                    return 1
+                    ;;
+            esac
+            log_error "Invalid input, please try again."
+            continue
         else
             # Basic validation for non-empty input
             if [[ -n "$input" ]]; then
