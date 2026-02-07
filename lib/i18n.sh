@@ -50,7 +50,7 @@ load_translations() {
         return 0
     else
         log_warn "Translation file not found: $translation_file, using default English"
-        return 1
+        return 0
     fi
 }
 
