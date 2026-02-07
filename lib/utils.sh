@@ -683,7 +683,7 @@ normalize_version() {
         parts+=("0")
     done
 
-    echo "${parts[0]}.${parts[1]}.${parts[2]}"
+    echo "${parts[1]}.${parts[2]}.${parts[3]}"
 }
 
 # Get the greatest version from a list
