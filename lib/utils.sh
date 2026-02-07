@@ -76,7 +76,7 @@ validate_path() {
     fi
 
     # Prevent path traversal
-    if [[ "$path" =~ \.\./ || "$path" =~ \.\.\\ ]]; then
+    if [[ "$path" == *"../"* || "$path" == *"..\\"* ]]; then
         log_error "$error_msg: Path traversal detected"
         return 1
     fi
