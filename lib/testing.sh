@@ -53,7 +53,7 @@ assert_true() {
     local condition="$1"
     local message="${2:-Assertion failed}"
 
-    ((TEST_TOTAL++))
+    ((++TEST_TOTAL))
 
     trap - ERR
     eval "$condition"
@@ -61,10 +61,10 @@ assert_true() {
 
     if [[ $status -eq 0 ]]; then
         log_success "✓ $message"
-        ((TEST_PASSED++))
+        ((++TEST_PASSED))
     else
         log_error "✗ $message"
-        ((TEST_FAILED++))
+        ((++TEST_FAILED))
     fi
 }
 
@@ -74,7 +74,7 @@ assert_false() {
     local condition="$1"
     local message="${2:-Assertion failed}"
 
-    ((TEST_TOTAL++))
+    ((++TEST_TOTAL))
 
     trap - ERR
     eval "$condition"
@@ -82,10 +82,10 @@ assert_false() {
 
     if [[ $status -ne 0 ]]; then
         log_success "✓ $message"
-        ((TEST_PASSED++))
+        ((++TEST_PASSED))
     else
         log_error "✗ $message"
-        ((TEST_FAILED++))
+        ((++TEST_FAILED))
     fi
 }
 
@@ -94,14 +94,14 @@ assert_equals() {
     local actual="$2"
     local message="${3:-Values are not equal}"
 
-    ((TEST_TOTAL++))
+    ((++TEST_TOTAL))
 
     if [[ "$expected" == "$actual" ]]; then
         log_success "✓ $message (Expected: '$expected', Got: '$actual')"
-        ((TEST_PASSED++))
+        ((++TEST_PASSED))
     else
         log_error "✗ $message (Expected: '$expected', Got: '$actual')"
-        ((TEST_FAILED++))
+        ((++TEST_FAILED))
     fi
 }
 
@@ -110,14 +110,14 @@ assert_not_equals() {
     local actual="$2"
     local message="${3:-Values should not be equal}"
 
-    ((TEST_TOTAL++))
+    ((++TEST_TOTAL))
 
     if [[ "$expected" != "$actual" ]]; then
         log_success "✓ $message (Expected: '$expected' != '$actual')"
-        ((TEST_PASSED++))
+        ((++TEST_PASSED))
     else
         log_error "✗ $message (Expected: '$expected' != '$actual')"
-        ((TEST_FAILED++))
+        ((++TEST_FAILED))
     fi
 }
 
@@ -163,12 +163,12 @@ run_test_with_timeout() {
     # Run test with timeout
     if timeout "$timeout" zsh -c "source '$SCRIPT_DIR/../lib/utils.sh'; source '$SCRIPT_DIR/../lib/testing.sh'; $test_func"; then
         log_success "✓ $test_func completed within timeout"
-        ((TEST_PASSED++))
+        ((++TEST_PASSED))
     else
         log_error "✗ $test_func timed out or failed"
-        ((TEST_FAILED++))
+        ((++TEST_FAILED))
     fi
-    ((TEST_TOTAL++))
+    ((++TEST_TOTAL))
 }
 
 # Test utilities module
