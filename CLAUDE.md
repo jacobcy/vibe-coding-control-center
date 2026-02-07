@@ -3,6 +3,9 @@
 ## Project Overview
 Vibe Coding Control Center is a collection of scripts designed to manage and configure AI development tools (Claude Code, OpenCode, etc.) with an emphasis on developer productivity and ease of use. The project provides a unified interface for initializing projects, managing AI tools, and configuring development environments.
 
+## Constitution & Principles
+This project operates under the **Vibe Coding Constitution** defined in [SOUL.md](SOUL.md). All development activities, including AI-assisted coding, follows the principles outlined in that document.
+
 ## Build & Test Commands
 - Build: `./scripts/vibecoding.sh` (starts the main control center)
 - Dev Setup: `./install/install-claude.sh` (sets up Claude Code environment)
@@ -11,7 +14,7 @@ Vibe Coding Control Center is a collection of scripts designed to manage and con
 - Quick Start: `./scripts/vibecoding.sh` → Equip → Install/Update Tools
 
 ## Tech Stack
-- **Primary Language**: Bash scripting with POSIX compliance
+- **Primary Language**: Zsh scripting
 - **Environment**: Unix/Linux/macOS
 - **Configuration**: Environment variables and shell aliasing
 - **Patterns**: Modular scripts with shared utilities, menu-driven interfaces
@@ -23,6 +26,7 @@ Vibe Coding Control Center is a collection of scripts designed to manage and con
 - `install/install-claude.sh`: Claude Code installation and setup
 - `install/install-opencode.sh`: OpenCode installation and setup
 - `docs/usage_advice.md`: Usage guidelines and best practices
+- `SOUL.md`: Core principles and constitutional rules (referenced by all contributors)
 - `lib/`: Library directory
   - `utils.sh`: Enhanced shared utility functions (security, validation, logging)
 - `config/`: Configuration directory
@@ -42,7 +46,8 @@ Vibe Coding Control Center is a collection of scripts designed to manage and con
 - **Error handling**: Comprehensive error handling with secure logging
 
 ## Coding Standards
-- Use modular, well-commented bash scripts following POSIX compliance where possible
+Adherence to the principles outlined in [SOUL.md](SOUL.md) is mandatory. Specific technical standards include:
+- Use modular, well-commented zsh scripts with portable shell practices where possible
 - Follow consistent color scheme for user feedback (defined in utils.sh)
 - Implement error handling with `set -e` for fail-fast behavior
 - Separate common functions to `lib/utils.sh` for reusability
@@ -71,6 +76,7 @@ Vibe Coding Control Center is a collection of scripts designed to manage and con
 - Secure file operations validate paths and permissions before operations
 
 ## Development Guidelines
+Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines:
 - Always source `lib/utils.sh` for shared functions (logging, validation, security helpers)
 - Follow consistent color coding pattern (defined in utils.sh)
 - Use the logging functions: `log_info`, `log_warn`, `log_error`, `log_step`, `log_success`, `log_critical`
@@ -98,13 +104,13 @@ Vibe Coding Control Center is a collection of scripts designed to manage and con
 - `$SCRIPT_DIR`: Points to the directory containing the script
 - `$HOME`: Used for storing configuration files in `~/.claude/`
 - MCP configuration handles API keys securely
-- `SHELL_RC`: Points to the appropriate shell configuration file (`.zshrc` or `.bashrc`)
+- `SHELL_RC`: Points to the zsh configuration file (`.zshrc`)
 - Constants in `lib/utils.sh` for security parameters (MAX_PATH_LENGTH, MAX_INPUT_LENGTH, etc.)
 
 ## Troubleshooting
 - If aliases aren't working: Run `source ~/.zshrc` (or appropriate shell config)
 - If API keys aren't loading: Check that `keys.env` is properly filled out and sourced
 - If MCP services aren't working: Verify that API keys in config are valid
-- For script-specific errors: Use `bash -x scriptname.sh` for detailed execution trace
+- For script-specific errors: Use `zsh -x scriptname.sh` for detailed execution trace
 - For security validation errors: Check the input validation functions in `lib/utils.sh`
 - If security functions fail: Verify that `lib/utils.sh` is properly sourced in your scripts

@@ -1,6 +1,6 @@
 # Claude Code & OpenCode 使用进阶建议
 
-完成安装和配置后，你可以使用 **Codex** 启动器作为你的统一入口。
+完成安装和配置后，你可以使用 **Vibe Coding 控制中心** 作为统一入口。
 
 ## 0. 🚀 Start Here: The Vibe Coding Launcher (`vibecoding.sh`)
 这是你的 "Vibe Coding" 控制中心。它可以一键启动新项目、安装/更新工具、以及运行环境诊断。
@@ -14,7 +14,7 @@
 ## 0.5 🔐 安全配置 (Required)
 首次使用前：
 
-1. 进入 `scripts/config` 目录。
+1. 进入仓库的 `config` 目录。
 2. 复制模板：`cp keys.template.env keys.env`
 3. 编辑 `keys.env` 填入你的 Token 和 Key。
 4. 运行 `source config/aliases.sh` 或重新运行安装脚本来生效。
@@ -33,6 +33,8 @@
 - `o`: 启动 `opencode`。
 - `oa "问题"`: 向 OpenCode 快速提问。
 - `vibe`: Start Vibe Coding Control Center (`vibecoding.sh`)
+- `x`: （可选）启动 `codex`（如已安装 OpenAI Codex CLI）。
+- `xy`: （可选）`codex --yes` 自动执行。
 
 ## 2. 增强的安全特性
 新版脚本包含多种安全增强功能：
@@ -51,7 +53,7 @@
 > 运行 `c` 进交互模式后，你可以直接说 "Generate a CLAUDE.md for this project"，它会自动扫描并创建。
 
 ## 4. 实时联网与搜索 (MCP)
-脚本已为你集成了 **Brave Search** 和 **Perplexity**。
+脚本已为你集成了 **Brave Search** 和 **Google Generative AI**（通过 MCP）。
 - 当你需要查阅最新的 API 文档（如 Next.js 15 或新的模型参数）时，直接在对话中说："Search Brave for the latest Next.js 15 routing documentation"。
 - AI 会自动调用 MCP 工具进行联网搜索，结果比训练数据更准确。
 
@@ -59,10 +61,10 @@
 - **一键修复**：遇到报错时，直接复制报错信息给 Claude，或者运行 `claude "fix the error in last command"`。
 - **Tmux 提醒**：如果你看到 "[Hook] BLOCKED" 提示，说明你在非 tmux 环境下尝试运行 dev server。这是为了防止 AI 丢失进程控制权。请按提示使用 `tmux`。
 
-## 6. Antigravity & Gemini 深度融合
-脚本已为你集成了 **Google Generative AI (Gemini)** 的 MCP 服务器。
-- **Gemini 能力注入**：通过 MCP，Claude 现在可以调用 Gemini 1.5 Pro/Flash 的能力来辅助处理超长上下文或多模态任务。
-- **多模型协作**：当你发现 Claude (Qwen) 在某些特定逻辑上卡壳时，可以试着说："Ask Gemini to analyze this complex logic"，它会通过 MCP 工具调用 Gemini 获取补充建议。
+## 6. Google Generative AI (Gemini) MCP
+如果在 `keys.env` 中配置了 `GOOGLE_GENERATIVE_AI_API_KEY`，安装脚本会生成对应 MCP 服务配置。
+- **用法示例**：`Ask Gemini to analyze this complex logic`
+- **适用场景**：超长上下文、多模态任务或复杂推理时的辅助分析
 
 ## 7. oh-my-opencode "ulw" 魔法 (Ultrawork)
 当你使用 OpenCode 时，可以在 Prompt 中加入 `ulw` 关键词：
@@ -85,7 +87,7 @@
 ## 10. 多模型切换
 如果你发现 Qwen 在处理极其复杂的逻辑（如大规模重构）时不够理想：
 - 可以使用环境变量临时切换：`ANTHROPIC_MODEL=claude-3-7-sonnet-latest claude`。
-- 如果你配置了 Antigravity Proxy，可以使用 `gemini-pro` 模型来获得极速响应。
+- OpenCode 侧可通过配置对应厂商 API Key 切换不同模型（如 DeepSeek / Moonshot）。
 
 ## 11. 安全最佳实践
 - 始终使用提供的验证函数来处理用户输入

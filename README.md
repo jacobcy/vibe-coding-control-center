@@ -23,7 +23,7 @@
 
 - Unix/Linux/macOS 环境
 - Git
-- Bash 兼容的 shell（zsh 或 bash）
+- Zsh
 - Node.js（用于 MCP 服务器）
 - jq（推荐，用于 JSON 操作）
 
@@ -92,7 +92,7 @@ OpenCode 原生支持多种中国模型，无需额外配置。
 
 3. 重新加载配置：
    ```bash
-   source ~/.zshrc  # 或 ~/.bashrc
+   source ~/.zshrc
    ```
 
 ## 使用方法
@@ -231,7 +231,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 
 2. **权限错误**: 检查配置文件权限是否正确
 
-3. **缺少依赖**: 确保已安装 Git、Bash 和 Node.js
+3. **缺少依赖**: 确保已安装 Git、Zsh 和 Node.js
 
 4. **API 密钥未加载**: 运行 `source ~/.zshrc`（或你的 shell 配置文件）
 
@@ -258,7 +258,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 
 ### 编码规范
 
-- 使用模块化、注释良好的 bash 脚本，遵循 POSIX 兼容性
+- 使用模块化、注释良好的 zsh 脚本，遵循可移植的 shell 实践
 - 遵循一致的颜色方案用于用户反馈（在 utils.sh 中定义）
 - 实现错误处理使用 `set -e` 实现快速失败
 - 将通用函数分离到 `lib/utils.sh` 以供重用
@@ -291,15 +291,16 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 vibe-coding-control-center/
 ├── CLAUDE.md                    # 项目上下文
 ├── README.md                    # 本文档
-├── MODERN_README.md             # 现代化功能说明
+├── MODERN_README.md             # 现代化功能说明（历史文档）
 ├── CHANGELOG.md                 # 变更日志
-├── UPGRADE_FEATURES.md          # 新功能说明
+├── UPGRADE_FEATURES.md          # 新功能说明（历史文档）
 ├── config/                      # 配置文件
 │   ├── aliases.sh              # 命令别名（动态路径解析）
 │   ├── keys.env                # API 密钥（不提交）
 │   └── keys.template.env       # 密钥模板
 ├── docs/                        # 文档
 │   ├── agents-guide.md         # Agent 使用指南
+│   ├── alias-helper.md         # Worktree/tmux/agent 别名指南
 │   ├── usage_advice.md         # 使用建议
 │   ├── 技术架构说明.md          # 技术架构
 │   └── 项目理解指南.md          # 项目理解
