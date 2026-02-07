@@ -37,6 +37,20 @@ echo -e "\n${CYAN}==========================================${NC}"
 echo -e "${CYAN}Testing Additional Functions${NC}"
 echo -e "${CYAN}==========================================${NC}"
 
+# Agent dev plan tests
+echo -e "\n${CYAN}==========================================${NC}"
+echo -e "${CYAN}Agent Dev Plan Tests${NC}"
+echo -e "${CYAN}==========================================${NC}"
+
+AGENT_PLAN_TESTS=1
+AGENT_PLAN_PASSED=0
+
+if zsh "$SCRIPT_DIR/../tests/test_agent_dev_plan.sh"; then
+    AGENT_PLAN_PASSED=1
+else
+    log_error "Agent dev plan tests failed"
+fi
+
 # Test new version comparison functions
 start_test_suite "Version Management"
 
@@ -157,9 +171,9 @@ echo ""
 echo "Configuration Management Tests: $CONFIG_PASSED/$CONFIG_TESTS passed"
 
 # Final summary
-TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS))
-TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED))
-TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED)))
+TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS + AGENT_PLAN_TESTS))
+TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED + AGENT_PLAN_PASSED))
+TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED) + (AGENT_PLAN_TESTS-AGENT_PLAN_PASSED)))
 
 echo -e "\n${CYAN}==========================================${NC}"
 echo -e "${CYAN}FINAL TEST RESULTS${NC}"
