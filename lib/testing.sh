@@ -57,9 +57,9 @@ assert_true() {
 
     trap - ERR
     eval "$condition"
-    local status=$?
+    local exit_code=$?
 
-    if [[ $status -eq 0 ]]; then
+    if [[ $exit_code -eq 0 ]]; then
         log_success "✓ $message"
         ((++TEST_PASSED))
     else
@@ -78,9 +78,9 @@ assert_false() {
 
     trap - ERR
     eval "$condition"
-    local status=$?
+    local exit_code=$?
 
-    if [[ $status -ne 0 ]]; then
+    if [[ $exit_code -ne 0 ]]; then
         log_success "✓ $message"
         ((++TEST_PASSED))
     else
