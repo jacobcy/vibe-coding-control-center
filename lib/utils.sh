@@ -113,9 +113,11 @@ validate_input() {
     fi
 
     # Check for control characters (excluding newlines and tabs)
-    if [[ "$input" =~ [[:cntrl:]] ]] && [[ ! "$input" =~ $'\n'|$'\t' ]]; then
-        log_error "Control characters detected in input"
-        return 1
+    if [[ "$input" =~ [[:cntrl:]] ]]; then
+        if [[ "$input" != *$'\n'* && "$input" != *$'\t'* ]]; then
+            log_error "Control characters detected in input"
+            return 1
+        fi
     fi
 
     # Check for potential command injection
