@@ -678,7 +678,8 @@ normalize_version() {
     version=$(echo "$version" | sed 's/^[vV]//')
 
     # Ensure version has at least 3 components (major.minor.patch)
-    local parts=(${version//./ })
+    local parts
+    parts=("${(@s:.:)version}")
     while [[ ${#parts[@]} -lt 3 ]]; do
         parts+=("0")
     done
