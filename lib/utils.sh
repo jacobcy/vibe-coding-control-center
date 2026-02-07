@@ -149,7 +149,7 @@ validate_filename() {
     fi
 
     # Check for suspicious patterns
-    if [[ "$filename" =~ ^\.|^/|/\.\.|\\.\\. ]]; then
+    if [[ "$filename" == .* || "$filename" == /* || "$filename" == *"/.."* || "$filename" == *"\\.."* ]]; then
         log_error "Suspicious filename pattern detected"
         return 1
     fi
