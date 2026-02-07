@@ -1,12 +1,15 @@
 # Vibe Coding Control Center
 
-一个专注于开发者生产力的 AI 开发工具管理套件。提供统一的界面来初始化项目、管理 AI 工具（Claude Code、OpenCode 等）以及配置开发环境。
+一个专注于开发者生产力的 AI 开发工具管理套件。目标是打造方便快捷的 Vibe Coding 开发环境，提供统一入口来初始化项目、管理 AI 工具（Claude / OpenCode / Codex）并配置开发环境。
 
-**特别说明**：
-- **Claude Code**: 可通过阿里云兼容端点使用 Qwen 模型（环境变量配置）
+**特别说明（目标态）**：
+- **Claude**: 通过环境变量切换端点与模型；中国环境默认中转站 `https://api.bghunt.cn`
 - **OpenCode**: 原生支持多模型（Qwen、DeepSeek、Moonshot）
+- **Codex**: 作为第三优先级工具补位使用
 
-## 核心特性
+**当前阶段**：仅进行文档准备（PRD / 技术规格 / 测试文档），不做代码改动。
+
+## 核心特性（目标态）
 
 - **菜单驱动界面**: 易用的控制中心，直观的导航
 - **项目快速初始化**: 使用最佳实践快速设置新项目
@@ -15,7 +18,9 @@
 - **安全优先**: 全面的输入验证和安全文件操作
 - **模块化设计**: 组织良好的脚本和共享工具库
 - **MCP 集成**: 支持 Model Context Protocol（网页搜索、GitHub 访问等）
-- **双工具支持**: Claude Code（官方）+ OpenCode（支持多模型，内置oh-my-opencode）
+- **多工具支持**: Claude / OpenCode / Codex（按优先级组织）
+- **环境变量一键切换**: 基于 `config/keys.env` + alias 快速切换
+- **Worktree 隔离**: 每个 agent 独立目录与 Git 身份
 - **国际化支持**: 内建多语言支持
 - **现代化架构**: 插件系统、缓存机制、高级错误处理
 
@@ -76,10 +81,10 @@ OpenCode 原生支持多种中国模型，无需额外配置。
    ANTHROPIC_BASE_URL=https://api.anthropic.com
    ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
-   # 或者使用阿里云代理（中国用户）
-   ANTHROPIC_AUTH_TOKEN=sk-sp-xxxxx
-   ANTHROPIC_BASE_URL=https://coding.dashscope.aliyuncs.com/apps/anthropic
-   ANTHROPIC_MODEL=qwen3-coder-plus
+   # 中国默认：使用中转站（无需本机代理）
+   ANTHROPIC_AUTH_TOKEN=sk-ant-xxxxx
+   ANTHROPIC_BASE_URL=https://api.bghunt.cn
+   ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
    # GitHub（用于 MCP）
    GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxxx
