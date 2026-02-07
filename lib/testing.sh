@@ -48,12 +48,18 @@ finish_test_suite() {
 
 # Assert function for testing
 assert_true() {
+    emulate -L zsh
+    set +e
     local condition="$1"
     local message="${2:-Assertion failed}"
 
     ((TEST_TOTAL++))
 
-    if eval "$condition"; then
+    trap - ERR
+    eval "$condition"
+    local status=$?
+
+    if [[ $status -eq 0 ]]; then
         log_success "✓ $message"
         ((TEST_PASSED++))
     else
@@ -63,12 +69,18 @@ assert_true() {
 }
 
 assert_false() {
+    emulate -L zsh
+    set +e
     local condition="$1"
     local message="${2:-Assertion failed}"
 
     ((TEST_TOTAL++))
 
-    if ! eval "$condition"; then
+    trap - ERR
+    eval "$condition"
+    local status=$?
+
+    if [[ $status -ne 0 ]]; then
         log_success "✓ $message"
         ((TEST_PASSED++))
     else
