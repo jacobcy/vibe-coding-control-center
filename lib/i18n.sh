@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Internationalization (i18n) System for Vibe Coding Control Center
 
 # Supported languages

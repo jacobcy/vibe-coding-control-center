@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Enhanced Error Handling and Retry Mechanism for Vibe Coding Control Center
 
 # Error code definitions
@@ -23,22 +23,22 @@ setup_error_handling() {
 # Enhanced error handler
 handle_error() {
     local exit_code=$?
-    local line_no=${BASH_LINENO[0]:-unknown}
-    local func_name=${FUNCNAME[1]:-unknown}
+    local func_name="${funcstack[2]:-${funcstack[1]:-unknown}}"
+    local file_trace="${funcfiletrace[2]:-${funcfiletrace[1]:-unknown}}"
 
-    log_error "Error in function '$func_name' at line $line_no (exit code: $exit_code)"
+    log_error "Error in function '$func_name' at $file_trace (exit code: $exit_code)"
 
     # Log stack trace if debugging is enabled
     if [[ "${DEBUG:-false}" == "true" ]]; then
         log_debug "Stack trace:"
-        for i in "${!BASH_SOURCE[@]}"; do
-            log_debug "  ${BASH_SOURCE[$i]}:${BASH_LINENO[$i-1]:-0} ${FUNCNAME[$i]}"
+        for i in {1..${#funcstack[@]}}; do
+            log_debug "  ${funcfiletrace[$i]} ${funcstack[$i]}"
         done
     fi
 
     # Store error information
     LAST_ERROR_CODE="$exit_code"
-    LAST_ERROR_MESSAGE="Error in $func_name at line $exit_code"
+    LAST_ERROR_MESSAGE="Error in $func_name at $file_trace"
 
     exit $exit_code
 }
@@ -169,7 +169,7 @@ safe_execute_with_timeout() {
     fi
 
     # Execute with timeout
-    if command timeout "$timeout_duration" bash -c "$command"; then
+    if command timeout "$timeout_duration" zsh -c "$command"; then
         return 0
     else
         local exit_code=$?

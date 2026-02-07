@@ -1,12 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # vibecoding.sh
 # Vibe Coding Control Center (formerly Codex)
 # Combines: Claude Code, OpenCode, and Project Initialization
 
+if [ -z "${ZSH_VERSION:-}" ]; then
+    if command -v zsh >/dev/null 2>&1; then
+        exec zsh -l "$0" "$@"
+    fi
+
+    echo "zsh not found. Attempting to install..." >&2
+    SUDO=""
+    if [ "$(id -u)" -ne 0 ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            SUDO="sudo"
+        else
+            echo "sudo not available; please install zsh manually." >&2
+            exit 1
+        fi
+    fi
+
+    if command -v brew >/dev/null 2>&1; then
+        brew install zsh
+    elif command -v apt-get >/dev/null 2>&1; then
+        $SUDO apt-get update && $SUDO apt-get install -y zsh
+    elif command -v dnf >/dev/null 2>&1; then
+        $SUDO dnf install -y zsh
+    elif command -v yum >/dev/null 2>&1; then
+        $SUDO yum install -y zsh
+    elif command -v pacman >/dev/null 2>&1; then
+        $SUDO pacman -Sy --noconfirm zsh
+    elif command -v apk >/dev/null 2>&1; then
+        $SUDO apk add zsh
+    else
+        echo "No supported package manager found to install zsh." >&2
+        exit 1
+    fi
+
+    if command -v zsh >/dev/null 2>&1; then
+        exec zsh -l "$0" "$@"
+    fi
+
+    echo "zsh install failed; please install zsh and re-run." >&2
+    exit 1
+fi
+
 set -e
 
 # ================= LOAD UTILITIES =================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 
 # Load all utility modules
 source "$SCRIPT_DIR/../lib/utils.sh"
@@ -17,6 +58,8 @@ source "$SCRIPT_DIR/../lib/error_handling.sh"
 
 # Only define BOLD here as it's not in utils.sh
 readonly BOLD='\033[1m'
+
+ensure_oh_my_zsh || true
 
 # ================= COLORS =================
 # Colors are defined in utils.sh
@@ -112,8 +155,6 @@ do_ignition() {
         return
     fi
 
-    # Fix for script path resolution
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     INIT_SCRIPT="$SCRIPT_DIR/../install/init-project.sh"
 
     if [ ! -f "$INIT_SCRIPT" ]; then
@@ -122,7 +163,7 @@ do_ignition() {
         return
     fi
 
-    bash "$INIT_SCRIPT" "$PROJ_NAME"
+    zsh "$INIT_SCRIPT" "$PROJ_NAME"
 
     echo -e "\n${GREEN}Ignition sequence complete.${NC}"
     read -p "Press Enter to continue..."
@@ -171,14 +212,12 @@ do_equip() {
             ;;
     esac
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
     case $CHOICE in
         1)
-            bash "$SCRIPT_DIR/../install/install-claude.sh"
+            zsh "$SCRIPT_DIR/../install/install-claude.sh"
             ;;
         2)
-            bash "$SCRIPT_DIR/../install/install-opencode.sh"
+            zsh "$SCRIPT_DIR/../install/install-opencode.sh"
             ;;
         3)
             return

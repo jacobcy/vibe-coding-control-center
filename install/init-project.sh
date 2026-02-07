@@ -1,11 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # init-project.sh
 # 用途: 初始化新项目，复制 Cursor 规则，生成 CLAUDE.md 模板
+
+if [ -z "${ZSH_VERSION:-}" ]; then
+    if command -v zsh >/dev/null 2>&1; then
+        exec zsh -l "$0" "$@"
+    fi
+    echo "zsh not found. Please run ./scripts/install.sh to install zsh." >&2
+    exit 1
+fi
 
 set -e
 
 # ================= LOAD UTILITIES =================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 source "$SCRIPT_DIR/../lib/utils.sh"
 
 # Colors for backward compatibility with existing output

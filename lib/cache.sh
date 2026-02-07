@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Cache System for Vibe Coding Control Center
 
 # Default cache directory

@@ -1,11 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # OpenCode Installation Script
 # Refactored for Security & Modularity
+
+if [ -z "${ZSH_VERSION:-}" ]; then
+    if command -v zsh >/dev/null 2>&1; then
+        exec zsh -l "$0" "$@"
+    fi
+    echo "zsh not found. Please run ./scripts/install.sh to install zsh." >&2
+    exit 1
+fi
 
 set -e
 
 # ================= SETUP =================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 source "$SCRIPT_DIR/../lib/utils.sh"
 
 log_step "1/4 Check & Update OpenCode CLI"

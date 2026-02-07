@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Plugin System for Vibe Coding Control Center
 
 # Declare associative arrays for plugin management

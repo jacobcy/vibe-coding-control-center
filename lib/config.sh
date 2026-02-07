@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Enhanced Configuration Management for Vibe Coding Control Center
 
 # Configuration variables with default values
@@ -6,7 +6,7 @@ declare -A VIBE_CONFIG
 
 # Initialize configuration values
 initialize_config() {
-    local script_dir_realpath="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir_realpath="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 
     # Base configuration
     VIBE_CONFIG[ROOT_DIR]="$script_dir_realpath"

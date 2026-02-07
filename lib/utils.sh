@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # utils.sh
 # Enhanced secure utilities for Vibe Coding scripts
 
@@ -413,13 +413,82 @@ confirm_action() {
 
 # ================= SHELL CONFIG =================
 get_shell_rc() {
-    if [[ "$SHELL" == *"zsh"* ]]; then
-        echo "$HOME/.zshrc"
-    elif [[ "$SHELL" == *"bash"* ]]; then
-        echo "$HOME/.bashrc"
-    else
-        echo "$HOME/.zshrc"  # Default to zsh
+    echo "$HOME/.zshrc"
+}
+
+install_zsh() {
+    local sudo_cmd=""
+    if [[ $EUID -ne 0 ]]; then
+        if command -v sudo &> /dev/null; then
+            sudo_cmd="sudo"
+        else
+            log_error "sudo not available; please install zsh manually"
+            return 1
+        fi
     fi
+
+    if command -v brew &> /dev/null; then
+        $sudo_cmd brew install zsh
+    elif command -v apt-get &> /dev/null; then
+        $sudo_cmd apt-get update
+        $sudo_cmd apt-get install -y zsh
+    elif command -v dnf &> /dev/null; then
+        $sudo_cmd dnf install -y zsh
+    elif command -v yum &> /dev/null; then
+        $sudo_cmd yum install -y zsh
+    elif command -v pacman &> /dev/null; then
+        $sudo_cmd pacman -Sy --noconfirm zsh
+    elif command -v apk &> /dev/null; then
+        $sudo_cmd apk add zsh
+    else
+        log_error "No supported package manager found to install zsh"
+        return 1
+    fi
+}
+
+ensure_zsh_installed() {
+    if command -v zsh &> /dev/null; then
+        return 0
+    fi
+
+    log_warn "zsh not found, attempting to install..."
+    install_zsh || return 1
+
+    if ! command -v zsh &> /dev/null; then
+        log_error "zsh installation failed"
+        return 1
+    fi
+    return 0
+}
+
+ensure_oh_my_zsh() {
+    if [[ -d "$HOME/.oh-my-zsh" ]]; then
+        log_info "Oh My Zsh already installed"
+        return 0
+    fi
+
+    if ! command -v zsh &> /dev/null; then
+        log_error "zsh is required to install Oh My Zsh"
+        return 1
+    fi
+
+    local installer_url="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+    if command -v curl &> /dev/null; then
+        RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL "$installer_url")"
+    elif command -v wget &> /dev/null; then
+        RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(wget -qO- "$installer_url")"
+    else
+        log_error "curl or wget required to install Oh My Zsh"
+        return 1
+    fi
+
+    if [[ -d "$HOME/.oh-my-zsh" ]]; then
+        log_success "Oh My Zsh installed"
+        return 0
+    fi
+
+    log_error "Oh My Zsh installation failed"
+    return 1
 }
 
 append_to_rc() {
@@ -464,16 +533,16 @@ append_to_rc() {
 # ================= ERROR HANDLING =================
 handle_error() {
     local exit_code=$?
-    local line_no=${BASH_LINENO[0]:-unknown}
-    local func_name=${FUNCNAME[1]:-unknown}
+    local func_name="${funcstack[2]:-${funcstack[1]:-unknown}}"
+    local file_trace="${funcfiletrace[2]:-${funcfiletrace[1]:-unknown}}"
 
-    log_error "Error occurred in function '$func_name' at line $line_no (exit code: $exit_code)"
+    log_error "Error occurred in function '$func_name' at $file_trace (exit code: $exit_code)"
 
     # Log stack trace if debugging is enabled
     if [[ "${DEBUG:-false}" == "true" ]]; then
         log_debug "Stack trace:"
-        for i in "${!BASH_SOURCE[@]}"; do
-            log_debug "  ${BASH_SOURCE[$i]}:${BASH_LINENO[$i-1]:-0} ${FUNCNAME[$i]}"
+        for i in {1..${#funcstack[@]}}; do
+            log_debug "  ${funcfiletrace[$i]} ${funcstack[$i]}"
         done
     fi
 
@@ -549,7 +618,7 @@ get_command_version() {
 
     # Extract version number (handles formats like "v1.2.3", "1.2.3", "version 1.2.3")
     local version
-    version=$(echo "$version_output" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n 1)
+    version=$(echo "$version_output" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?([a-zA-Z0-9_-]*)?' | head -n 1)
 
     echo "$version"
 }
@@ -564,27 +633,17 @@ version_greater_than() {
         return 1  # Equal, not greater
     fi
 
-    local IFS=.
-    local i ver1=($v1) ver2=($v2)
+    # Use a more robust version comparison that handles prerelease tags
+    local result
+    result=$(printf '%s\n%s' "$v1" "$v2" | sort -V | head -n 1)
 
-    # Fill empty positions with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
-        ver1[i]=0
-    done
-
-    for ((i=0; i<${#ver1[@]}; i++)); do
-        if [[ -z ${ver2[i]} ]]; then
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 0  # v1 > v2
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 1  # v1 < v2
-        fi
-    done
-
-    return 1  # Equal
+    if [[ "$result" == "$v2" ]]; then
+        # v2 is "smaller" in version order, so v1 > v2
+        return 0
+    else
+        # v1 is "smaller" or equal, so v1 is not greater than v2
+        return 1
+    fi
 }
 
 # Compare two semantic versions for equality
@@ -607,6 +666,36 @@ version_less_than() {
     fi
 
     return 1
+}
+
+# Normalize version string for comparison
+normalize_version() {
+    local version="$1"
+
+    # Remove prefixes like 'v', 'V', etc.
+    version=$(echo "$version" | sed 's/^[vV]//')
+
+    # Ensure version has at least 3 components (major.minor.patch)
+    local parts=(${version//./ })
+    while [[ ${#parts[@]} -lt 3 ]]; do
+        parts+=("0")
+    done
+
+    echo "${parts[0]}.${parts[1]}.${parts[2]}"
+}
+
+# Get the greatest version from a list
+get_greatest_version() {
+    local versions=("$@")
+    local greatest=""
+
+    for version in "${versions[@]}"; do
+        if [[ -z "$greatest" ]] || version_greater_than "$version" "$greatest"; then
+            greatest="$version"
+        fi
+    done
+
+    echo "$greatest"
 }
 
 # Update package via brew

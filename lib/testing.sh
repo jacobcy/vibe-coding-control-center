@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Testing Framework for Vibe Coding Control Center
 
 # Test result counters
@@ -149,7 +149,7 @@ run_test_with_timeout() {
     echo "Running test with timeout ($timeout sec): $test_func"
 
     # Run test with timeout
-    if timeout "$timeout" bash -c "source '$SCRIPT_DIR/../lib/utils.sh'; source '$SCRIPT_DIR/../lib/testing.sh'; $test_func"; then
+    if timeout "$timeout" zsh -c "source '$SCRIPT_DIR/../lib/utils.sh'; source '$SCRIPT_DIR/../lib/testing.sh'; $test_func"; then
         log_success "✓ $test_func completed within timeout"
         ((TEST_PASSED++))
     else
