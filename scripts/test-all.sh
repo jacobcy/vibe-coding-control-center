@@ -44,12 +44,20 @@ VERSION_TESTS=0
 VERSION_PASSED=0
 
 increment_counts() {
-    ((VERSION_TESTS++))
-    if [[ $? -eq 0 ]]; then
-        ((VERSION_PASSED++))
-        log_success "✓ $1"
+    emulate -L zsh
+    set +e
+    trap - ERR
+    local message="$1"
+    local condition="$2"
+
+    ((++VERSION_TESTS))
+    eval "$condition"
+    local exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+        ((++VERSION_PASSED))
+        log_success "✓ $message"
     else
-        log_error "✗ $1"
+        log_error "✗ $message"
     fi
 }
 
@@ -73,12 +81,17 @@ CACHE_TESTS=0
 CACHE_PASSED=0
 
 cache_test() {
+    emulate -L zsh
+    set +e
+    trap - ERR
     local test_name="$1"
     local condition="$2"
 
-    ((CACHE_TESTS++))
-    if eval "$condition"; then
-        ((CACHE_PASSED++))
+    ((++CACHE_TESTS))
+    eval "$condition"
+    local exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+        ((++CACHE_PASSED))
         log_success "✓ $test_name"
     else
         log_error "✗ $test_name"
