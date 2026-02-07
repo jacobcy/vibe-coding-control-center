@@ -121,7 +121,7 @@ validate_input() {
     fi
 
     # Check for potential command injection patterns
-    if [[ "$input" == *'$('* || "$input" == *'`'* || "$input" == *'&&'* || "$input" == *'||'* || "$input" == *'>'* || "$input" == *'<'* ]]; then
+    if [[ "$input" == *'$('* || "$input" == *'`'* || "$input" == *'&&'* || "$input" == *'||'* || "$input" == *';'* || "$input" == *'>'* || "$input" == *'<'* ]]; then
         log_error "Potential command injection detected in input"
         return 1
     fi

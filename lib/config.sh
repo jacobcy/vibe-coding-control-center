@@ -73,7 +73,7 @@ config_set() {
         return 1
     fi
 
-    VIBE_CONFIG["$key"]="$value"
+    VIBE_CONFIG[$key]="$value"
 }
 
 # Check if a configuration key exists
