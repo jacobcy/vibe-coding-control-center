@@ -14,12 +14,13 @@ set -e
 
 # ================= SETUP =================
 SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
-source "$SCRIPT_DIR/lib/utils.sh"
-source "$SCRIPT_DIR/lib/config.sh"
-source "$SCRIPT_DIR/lib/testing.sh"
-source "$SCRIPT_DIR/lib/cache.sh"
-source "$SCRIPT_DIR/lib/error_handling.sh"
-source "$SCRIPT_DIR/lib/i18n.sh"
+LIB_DIR="$SCRIPT_DIR/../lib"
+source "$LIB_DIR/utils.sh"
+source "$LIB_DIR/config.sh"
+source "$LIB_DIR/testing.sh"
+source "$LIB_DIR/cache.sh"
+source "$LIB_DIR/error_handling.sh"
+source "$LIB_DIR/i18n.sh"
 
 # Run the test suite
 echo -e "${CYAN}==========================================${NC}"
