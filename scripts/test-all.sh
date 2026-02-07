@@ -126,12 +126,17 @@ CONFIG_TESTS=0
 CONFIG_PASSED=0
 
 config_test() {
+    emulate -L zsh
+    set +e
+    trap - ERR
     local test_name="$1"
     local condition="$2"
 
-    ((CONFIG_TESTS++))
-    if eval "$condition"; then
-        ((CONFIG_PASSED++))
+    ((++CONFIG_TESTS))
+    eval "$condition"
+    local exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+        ((++CONFIG_PASSED))
         log_success "✓ $test_name"
     else
         log_error "✗ $test_name"
