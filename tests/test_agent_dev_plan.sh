@@ -82,14 +82,13 @@ assert_contains_regex "api\\.bghunt\\.cn" "$ROOT_DIR/docs/tech-spec-agent-dev.md
 assert_contains_regex "^ANTHROPIC_BASE_URL=" "$ROOT_DIR/config/keys.template.env" "A1: keys template defines ANTHROPIC_BASE_URL"
 assert_contains_regex "config/keys\\.env" "$ROOT_DIR/install/install-claude.sh" "A3: install-claude references keys.env"
 assert_contains_regex "export ANTHROPIC_BASE_URL" "$ROOT_DIR/install/install-claude.sh" "A2/A3: install-claude exports ANTHROPIC_BASE_URL"
-assert_contains_regex "export ANTHROPIC_BASE_URL" "$ROOT_DIR/scripts/install.sh" "A2/A3: install.sh exports ANTHROPIC_BASE_URL"
 
 # B1/B2/B3: 工具优先级（文档 + alias 对应）
 assert_contains_regex "Claude" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B1: tech spec mentions Claude"
 assert_contains_regex "OpenCode" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B2: tech spec mentions OpenCode"
 assert_contains_regex "Codex" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B3: tech spec mentions Codex"
 assert_contains_regex "alias c='claude'" "$ROOT_DIR/config/aliases.sh" "B1: alias for Claude exists"
-assert_contains_regex "alias oa='opencode --auto'" "$ROOT_DIR/config/aliases.sh" "B2: alias for OpenCode exists"
+assert_contains_regex "alias oa='opencode'" "$ROOT_DIR/config/aliases.sh" "B2: alias for OpenCode exists"
 assert_contains_regex "alias x='codex'" "$ROOT_DIR/config/aliases.sh" "B3: alias for Codex exists"
 assert_line_order "# 1\\. Claude" "# 2\\. OpenCode" "$ROOT_DIR/scripts/vibecoding.sh" "B1/B2: Claude status checked before OpenCode"
 

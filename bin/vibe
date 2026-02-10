@@ -1,0 +1,22 @@
+#!/usr/bin/env zsh
+# vibe dispatcher (git-style)
+
+set -e
+
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+
+if [[ $# -gt 0 ]]; then
+  subcmd="$1"
+  shift
+  cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
+  if [[ -x "$cmd" ]]; then
+    exec "$cmd" "$@"
+  else
+    echo "Unknown subcommand: $subcmd" >&2
+    echo "Available: $(ls -1 "${VIBE_ROOT}/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+    exit 1
+  fi
+fi
+
+# No subcommand -> run interactive control center
+exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh"

@@ -18,7 +18,7 @@ declare -A TRANSLATIONS
 # Load translations for a specific language
 load_translations() {
     local lang="${1:-$CURRENT_LOCALE}"
-    local translation_file="$VIBE_CONFIG[DOCS_DIR]/locales/${lang}.json"
+    local translation_file="$VIBE_CONFIG[CONFIG_DIR]/locales/${lang}.json"
 
     # Check if translations file exists
     if [[ -f "$translation_file" ]]; then
@@ -133,7 +133,7 @@ initialize_i18n() {
 # Create a simple English translation file if none exists
 create_default_translations() {
     local lang="${1:-en}"
-    local locales_dir="$VIBE_CONFIG[DOCS_DIR]/locales"
+    local locales_dir="$VIBE_CONFIG[CONFIG_DIR]/locales"
 
     # Create locales directory if it doesn't exist
     if ! mkdir -p "$locales_dir" 2>/dev/null; then

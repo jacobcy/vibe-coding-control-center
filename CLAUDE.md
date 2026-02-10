@@ -27,6 +27,11 @@ This project operates under the **Vibe Coding Constitution** defined in [SOUL.md
 - `install/install-opencode.sh`: OpenCode installation and setup
 - `docs/usage_advice.md`: Usage guidelines and best practices
 - `SOUL.md`: Core principles and constitutional rules (referenced by all contributors)
+- `rules.md`: Behavior rules (Behavioral laws)
+- `MEMORY.md`: Cumulative record of key decisions and context
+- `TASK.md`: High-level project tasks and history
+- `WORKFLOW.md`: Documentation of project-level workflows
+- `AGENT.md`: Agent persona and role definitions
 - `lib/`: Library directory
   - `utils.sh`: Enhanced shared utility functions (security, validation, logging)
 - `config/`: Configuration directory
@@ -49,12 +54,20 @@ This project operates under the **Vibe Coding Constitution** defined in [SOUL.md
 Adherence to the principles outlined in [SOUL.md](SOUL.md) is mandatory. Specific technical standards include:
 - Use modular, well-commented zsh scripts with portable shell practices where possible
 - Follow consistent color scheme for user feedback (defined in utils.sh)
+- **Language Protocol**:
+  - Think in English.
+  - **Always respond to the user and generate reports in Chinese.**
+- **File Protocol**:
+  - Root directory uppercase files (e.g., `SOUL.md`, `TASK.md`) are for AI context.
+  - `docs/` directory is for human-readable documentation.
+  - Audit status is tracked in `docs/audits/`.
 - Implement error handling with `set -e` for fail-fast behavior
 - Separate common functions to `lib/utils.sh` for reusability
 - Use clear variable naming with descriptive function names
 - Include detailed comments explaining complex operations
 - Implement security validations for all user inputs and file operations
 - Use readonly variables for constants and security parameters
+- **Temporary files**: Always place in `temp/` directory (already ignored by git)
 
 ## Key Features
 - Menu-driven interface for ease of use (vibecoding.sh)
@@ -89,6 +102,7 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 - Follow modular design principles: separate concerns into different files
 - Always use `validate_path` before performing file operations
 - Use `prompt_user` and `confirm_action` for secure user interactions
+- **Temporary files**: Always place in `temp/` directory (already in `.gitignore`).
 
 ## Common Tasks & Commands
 - Add new MCP server: Modify MCP configuration in install script
@@ -101,9 +115,13 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 - Run tests: `./tests/test_new_features.sh` or `./tests/test_status_display.sh`
 
 ## Important Variables
-- `$SCRIPT_DIR`: Points to the directory containing the script
-- `$HOME`: Used for storing configuration files in `~/.claude/`
-- MCP configuration handles API keys securely
+## Linked Docs
+- [SOUL.md](SOUL.md)
+- [MEMORY.md](MEMORY.md)
+- [TASK.md](TASK.md)
+- [WORKFLOW.md](WORKFLOW.md)
+- [AGENT.md](AGENT.md)
+- [RULES.md](RULES.md) (Wait, I should check if it's RULES.md or rules.md in the code)
 - `SHELL_RC`: Points to the zsh configuration file (`.zshrc`)
 - Constants in `lib/utils.sh` for security parameters (MAX_PATH_LENGTH, MAX_INPUT_LENGTH, etc.)
 

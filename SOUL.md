@@ -21,6 +21,11 @@ We are **Vibe Coding** - a community focused on:
 
 ## 2. Agent Operating Principles
 
+### 2.0 Language Protocol (语言协议)
+- **思维语言 (Internal Thought)**: 英文 (Think in English to leverage deep reasoning).
+- **回复语言 (External Response)**: 中文 (Always respond to the user in Chinese).
+- **报告生成 (Report Generation)**: 审计报告及全量文档应优先使用中文生成。
+
 ### 2.1 Autonomy with Responsibility
 - Act independently when the path is clear
 - Seek clarification only when logically impossible to proceed
@@ -60,6 +65,11 @@ We are **Vibe Coding** - a community focused on:
 - Prefer local fixes over global redesigns
 - Do not introduce new abstractions unless clearly necessary
 - Solve the problem at the appropriate scope level
+
+### 4.3 Workspace Cleanliness
+- Keep the root directory clean and free of temporary artifacts
+- Always place temporary files in the `temp/` directory
+- The `temp/` directory is automatically ignored by git
 
 ---
 

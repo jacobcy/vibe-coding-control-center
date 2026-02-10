@@ -2,7 +2,30 @@
 # utils.sh
 # Enhanced secure utilities for Vibe Coding scripts
 
-set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+# Avoid re-sourcing side effects (readonly redefinition, strict mode flip).
+if [[ -n "${VIBE_UTILS_LOADED:-}" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
+readonly VIBE_UTILS_LOADED=1
+
+# Ensure core utilities are on PATH (non-login shells may have a minimal PATH)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+is_sourced=false
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    [[ "${(%):-%N}" != "$0" ]] && is_sourced=true
+elif [[ -n "${BASH_VERSION:-}" ]]; then
+    [[ "${BASH_SOURCE[0]}" != "$0" ]] && is_sourced=true
+fi
+
+# Strict mode for non-interactive, non-sourced shells; avoid nounset in interactive shells.
+if [[ "${VIBE_UTILS_STRICT:-}" == "true" ]]; then
+    set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+elif [[ -o interactive || "$is_sourced" == "true" ]]; then
+    :
+else
+    set -euo pipefail  # Exit on error, undefined vars, and pipe failures
+fi
 
 # ================= SECURITY CONSTANTS =================
 readonly MAX_PATH_LENGTH=4096
@@ -56,6 +79,24 @@ log_step() {
 log_critical() {
     local message="$1"
     echo -e "${RED}★★★ CRITICAL: $message${NC}" >&2
+}
+
+# ================= CORE HELPERS =================
+vibe_mkdir_p() {
+    local dir="$1"
+    local mkdir_bin
+    mkdir_bin=$(command -v mkdir 2>/dev/null || true)
+    [[ -z "$mkdir_bin" ]] && mkdir_bin="/bin/mkdir"
+    "$mkdir_bin" -p "$dir"
+}
+
+vibe_chmod() {
+    local mode="$1"
+    local path="$2"
+    local chmod_bin
+    chmod_bin=$(command -v chmod 2>/dev/null || true)
+    [[ -z "$chmod_bin" ]] && chmod_bin="/bin/chmod"
+    "$chmod_bin" "$mode" "$path"
 }
 
 # ================= VALIDATION FUNCTIONS =================
@@ -134,6 +175,38 @@ validate_input() {
     return 0
 }
 
+validate_content() {
+    local content="$1"
+    local allow_empty="${2:-true}"
+
+    # Check content length
+    if [[ ${#content} -gt $MAX_INPUT_LENGTH ]]; then
+        log_error "Content too long (${#content} > $MAX_INPUT_LENGTH)"
+        return 1
+    fi
+
+    # Check for null bytes
+    if [[ "$content" == *$'\0'* ]]; then
+        log_error "Null byte detected in content"
+        return 1
+    fi
+
+    # Check for control characters (excluding newlines and tabs)
+    if [[ "$content" =~ [[:cntrl:]] ]]; then
+        if [[ "$content" != *$'\n'* && "$content" != *$'\t'* ]]; then
+            log_error "Control characters detected in content"
+            return 1
+        fi
+    fi
+
+    if [[ "$allow_empty" != "true" && -z "$content" ]]; then
+        log_error "Content cannot be empty"
+        return 1
+    fi
+
+    return 0
+}
+
 validate_filename() {
     local filename="$1"
 
@@ -176,10 +249,7 @@ check_directory_writable() {
     fi
 
     # Get absolute path
-    dir=$(realpath "$dir" 2>/dev/null) || {
-        log_error "Cannot resolve directory path: $dir"
-        return 1
-    }
+    dir="${dir:A}"
 
     if [[ ! -d "$dir" ]]; then
         log_error "Directory does not exist: $dir"
@@ -215,21 +285,13 @@ secure_copy() {
     fi
 
     # Get absolute paths to prevent path traversal
-    src=$(realpath "$src" 2>/dev/null) || {
-        log_error "Cannot resolve source path: $src"
-        return 1
-    }
-
-    dest_dir=$(dirname "$dest")
-    dest_dir=$(realpath "$dest_dir" 2>/dev/null) || {
-        log_error "Cannot resolve destination directory: $(dirname "$dest")"
-        return 1
-    }
-
-    dest="$dest_dir/$(basename "$dest")"
+    src="${src:A}"
+    dest_dir="${dest:h}"
+    dest_dir="${dest_dir:A}"
+    dest="$dest_dir/${dest:t}"
 
     # Ensure destination directory exists
-    if ! mkdir -p "$dest_dir" 2>/dev/null; then
+    if ! vibe_mkdir_p "$dest_dir" 2>/dev/null; then
         log_error "Cannot create destination directory: $dest_dir"
         return 1
     fi
@@ -260,8 +322,8 @@ secure_write_file() {
         return 1
     fi
 
-    # Validate content
-    if ! validate_input "$content" "true"; then
+    # Validate content (allow common template characters)
+    if ! validate_content "$content" "true"; then
         return 1
     fi
 
@@ -272,25 +334,26 @@ secure_write_file() {
     fi
 
     # Check if the permission is in allowed list
-    if ! echo "$ALLOWED_FILE_MODES" | grep -q "$perms"; then
-        log_warn "Unusual file permission: $perms"
-    fi
+    case " $ALLOWED_FILE_MODES " in
+        *" $perms "*)
+            ;;
+        *)
+            log_warn "Unusual file permission: $perms"
+            ;;
+    esac
 
     # Get directory and ensure it exists
-    local dirpath=$(dirname "$filepath")
-    dirpath=$(realpath "$dirpath" 2>/dev/null) || {
-        log_error "Cannot resolve directory: $dirpath"
-        return 1
-    }
+    local dirpath="${filepath:h}"
+    dirpath="${dirpath:A}"
 
-    if ! mkdir -p "$dirpath"; then
+    if ! vibe_mkdir_p "$dirpath"; then
         log_error "Cannot create directory: $dirpath"
         return 1
     fi
 
     # Write the file
     if printf '%s' "$content" > "$filepath"; then
-        chmod "$perms" "$filepath"
+        vibe_chmod "$perms" "$filepath"
         log_info "Successfully wrote file: $filepath with permissions $perms"
         return 0
     else
@@ -308,16 +371,13 @@ secure_append_file() {
         return 1
     fi
 
-    # Validate content
-    if ! validate_input "$content" "true"; then
+    # Validate content (allow common template characters)
+    if ! validate_content "$content" "true"; then
         return 1
     fi
 
     # Get absolute path
-    filepath=$(realpath "$filepath" 2>/dev/null) || {
-        log_error "Cannot resolve file path: $filepath"
-        return 1
-    }
+    filepath="${filepath:A}"
 
     # Append the content
     if printf '%s' "$content" >> "$filepath"; then
@@ -337,7 +397,12 @@ prompt_user() {
 
     while true; do
         printf "%s? %s%s %s%s%s: " "$YELLOW" "$prompt_text" "$NC" "$BLUE" "${default_value:+[default: $default_value]}" "$NC" >&2
-        read -r input
+        if [[ -t 0 ]]; then
+            read -r input
+        else
+            # Fallback for non-interactive shells (e.g., subshells, pipelines)
+            input=""
+        fi
 
         # Use default if input is empty and default is provided
         if [[ -z "$input" && -n "$default_value" ]]; then
@@ -372,6 +437,12 @@ prompt_user() {
                         return 0
                     fi
                     ;;
+                "validate_content")
+                    if validate_content "$input" "true"; then
+                        echo "$input"
+                        return 0
+                    fi
+                    ;;
                 *)
                     log_error "Unknown validator: $validator"
                     return 1
@@ -391,12 +462,28 @@ prompt_user() {
     done
 }
 
+# ================= SIMPLE PROMPTS =================
+press_enter() {
+    local message="${1:-Press Enter to continue...}"
+    if [[ -t 0 ]]; then
+        printf "%s" "$message" >&2
+        read -r _input
+    fi
+}
+
 confirm_action() {
     local prompt="${1:-Are you sure?}"
     local default_response="${2:-n}"
+    local response
 
     while true; do
-        read -r -p "${YELLOW}? $prompt [Y/n]${NC} ${BLUE}[default: $default_response]${NC}: " response
+        # Zsh-specific prompt syntax
+        local yn_hint="[Y/n]"
+        if [[ "$default_response" == "n" || "$default_response" == "N" ]]; then
+            yn_hint="[y/N]"
+        fi
+        echo -n "${YELLOW}? $prompt ${yn_hint}${NC} ${BLUE}[default: $default_response]${NC}: "
+        read -r response
         response=${response:-$default_response}
 
         case $response in
@@ -510,10 +597,7 @@ append_to_rc() {
     fi
 
     # Get absolute path
-    rc_file=$(realpath "$rc_file" 2>/dev/null) || {
-        log_error "Cannot resolve RC file path: $rc_file"
-        return 1
-    }
+    rc_file="${rc_file:A}"
 
     if [[ -f "$rc_file" ]]; then
         if grep -qF "$marker" "$rc_file" 2>/dev/null; then
@@ -551,8 +635,10 @@ handle_error() {
     exit $exit_code
 }
 
-# Set up error trap
-trap 'handle_error' ERR
+# Set up error trap only for non-interactive, non-sourced shells.
+if [[ ! -o interactive && "$is_sourced" != "true" ]]; then
+    trap 'handle_error' ERR
+fi
 
 # ================= TEMPORARY FILES =================
 create_temp_file() {
@@ -604,23 +690,28 @@ sanitize_filename() {
 
 # ================= VERSION MANAGEMENT =================
 
-# Get version of a command
+# Get version of a command (Safe version)
 get_command_version() {
     local cmd="$1"
-    local version_flag="${2:---version}"  # Default to --version
+    local version_flag="${2:---version}"
 
     if ! command -v "$cmd" &> /dev/null; then
         echo ""
-        return 1
+        return 0
     fi
 
-    # Try to get version, handle different output formats
     local version_output
-    version_output=$("$cmd" "$version_flag" 2>&1 | head -n 1)
+    # Use || true to prevent set -e from exiting on non-zero exit of version flag
+    version_output=$("$cmd" "$version_flag" 2>&1 | head -n 1) || true
 
-    # Extract version number (handles formats like "v1.2.3", "1.2.3", "version 1.2.3")
+    if [[ -z "$version_output" ]]; then
+        echo ""
+        return 0
+    fi
+
+    # Extract version number with || true to prevent grep exit code 1 from crashing
     local version
-    version=$(echo "$version_output" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?([a-zA-Z0-9_-]*)?' | head -n 1)
+    version=$(echo "$version_output" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?([a-zA-Z0-9_-]*)?' | head -n 1) || true
 
     echo "$version"
 }
@@ -783,5 +874,4 @@ merge_json_configs() {
 }
 
 # ================= EXPORTS =================
-# Export critical functions that may be needed by child processes
-export -f log_info log_warn log_error log_step
+# Functions are available when sourced in zsh; export -f is not supported.

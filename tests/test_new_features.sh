@@ -10,6 +10,38 @@ echo -e "${CYAN}========================================${NC}"
 echo -e "${BOLD}Testing New Features${NC}"
 echo -e "${CYAN}========================================${NC}"
 
+# Test 0: Plugin-style command entrypoints
+echo -e "\n${YELLOW}Test 0: Vibe Plugin Entrypoints${NC}"
+echo "-----------------------------------"
+
+BIN_DIR="$SCRIPT_DIR/../bin"
+if [[ -x "$BIN_DIR/vibe" ]]; then
+    log_success "✓ bin/vibe exists and is executable"
+else
+    log_error "✗ bin/vibe missing or not executable"
+fi
+
+for sub in chat init keys sync diagnostics equip; do
+    if [[ -x "$BIN_DIR/vibe-$sub" ]]; then
+        log_success "✓ bin/vibe-$sub exists and is executable"
+    else
+        log_error "✗ bin/vibe-$sub missing or not executable"
+    fi
+done
+
+# Check new lib modules
+if [[ -f "$SCRIPT_DIR/../lib/agents.sh" ]]; then
+    log_success "✓ lib/agents.sh exists"
+else
+    log_error "✗ lib/agents.sh missing"
+fi
+
+if [[ -f "$SCRIPT_DIR/../lib/init_project.sh" ]]; then
+    log_success "✓ lib/init_project.sh exists"
+else
+    log_error "✗ lib/init_project.sh missing"
+fi
+
 # Test 1: Version detection functions
 echo -e "\n${YELLOW}Test 1: Version Detection Functions${NC}"
 echo "-----------------------------------"
@@ -88,7 +120,7 @@ else
     log_warn "OpenCode: not installed"
 fi
 
-if [ -d "$HOME/.oh-my-opencode" ]; then
+if [ -f "$HOME/.oh-my-opencode/install.sh" ]; then
     log_info "oh-my-opencode: installed"
 else
     log_warn "oh-my-opencode: not installed"
@@ -127,4 +159,3 @@ fi
 echo -e "\n${CYAN}========================================${NC}"
 echo -e "${GREEN}Testing Complete!${NC}"
 echo -e "${CYAN}========================================${NC}"
-

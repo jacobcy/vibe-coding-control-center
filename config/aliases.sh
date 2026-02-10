@@ -14,6 +14,16 @@ VIBE_REPO="$VIBE_ROOT"
 VIBE_MAIN="$VIBE_REPO/main"
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
+# Ensure project bin is on PATH
+export PATH="$VIBE_ROOT/bin:$PATH"
+
+# Load configuration if not already loaded (for standalone alias usage)
+if [[ -f "$VIBE_ROOT/lib/config.sh" ]]; then
+    source "$VIBE_ROOT/lib/utils.sh"
+    source "$VIBE_ROOT/lib/config.sh"
+    load_user_config
+fi
+
 # ---------- Utilities ----------
 vibe_has() { command -v "$1" >/dev/null 2>&1; }
 
@@ -94,16 +104,17 @@ wt() {
 }
 
 # Create a new worktree (safe default naming)
-# usage: wtnew <branch-name> [base-branch=main] [dir-prefix=wt-]
+# usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]
 wtnew() {
   vibe_require git || return 1
 
   local branch="$1"
-  local base="${2:-main}"
-  local prefix="${3:-wt-}"
+  local agent="${2:-claude}"
+  local base="${3:-main}"
 
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch-name> [base-branch=main] [dir-prefix=wt-]"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]"
 
+  local prefix="wt-${agent}-"
   local dir="${prefix}${branch}"
   local path="$VIBE_REPO/$dir"
 
@@ -124,7 +135,31 @@ wtnew() {
     echo "✅ Created worktree: $dir -> branch $branch (base: $base)"
   fi
 
+  # Set agent identity in worktree
+  local agent_name="Agent-${agent^}" # Capitalize first letter
+  local agent_email="agent-${agent}@vibecoding.ai"
+  
+  git -C "$path" config user.name "$agent_name"
+  git -C "$path" config user.email "$agent_email"
+  echo "👤 Git identity set: $agent_name <$agent_email>"
+
   cd "$path" || return
+}
+
+# Re-sync Git identity in current worktree
+wtinit() {
+  local agent="${1:-claude}"
+  
+  if [[ ! -d ".git" && ! -f ".git" ]]; then
+    vibe_die "Not in a git repository or worktree."
+  fi
+  
+  local agent_name="Agent-${agent^}"
+  local agent_email="agent-${agent}@vibecoding.ai"
+  
+  git config user.name "$agent_name"
+  git config user.email "$agent_email"
+  echo "✅ Git identity re-synced: $agent_name <$agent_email>"
 }
 
 # Remove a worktree directory + prune
@@ -145,18 +180,26 @@ alias lg='lazygit'
 
 # Base commands
 alias c='claude'
-alias cy='claude --yes'
+alias cy='claude'
 alias x='codex'
 alias xy='codex --yes'
 
 # Start agent in current dir but protect main/master
-c_safe() { vibe_main_guard || return; claude --yes; }
+c_safe() { vibe_main_guard || return; claude; }
 x_safe() { vibe_main_guard || return; codex --yes; }
 
 # Start agent in a given worktree (cd + run)
 # usage: cwt <wt-dir> / xwt <wt-dir>
-cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude --yes; }
+cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude; }
+owt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: owt <wt-dir>"; wt "$d" || return; opencode; }
 xwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: xwt <wt-dir>"; wt "$d" || return; codex --yes; }
+
+# ---------- Endpoint Switching ----------
+alias c_cn='export ANTHROPIC_BASE_URL="https://api.bghunt.cn" && echo "🇨🇳 Claude Endpoint: China Proxy"'
+alias c_off='export ANTHROPIC_BASE_URL="https://api.anthropic.com" && echo "🌐 Claude Endpoint: Official"'
+vibe_endpoint() {
+    echo "Current Claude Endpoint: ${ANTHROPIC_BASE_URL:-$(config_get ANTHROPIC_BASE_URL)}"
+}
 
 # ---------- “One-button” Workspace Orchestration ----------
 # Create a full tmux workspace for a worktree:
@@ -193,13 +236,20 @@ vup() {
   vibe_tmux_win "$w_edit" "$dir_path" "$editor_cmd" || return 1
 
   # Agent window
-  if [[ "$agent" == "codex" ]]; then
-    vibe_require codex || return 1
-    vibe_tmux_win "$w_agent" "$dir_path" "codex --yes" || return 1
-  else
-    vibe_require claude || return 1
-    vibe_tmux_win "$w_agent" "$dir_path" "claude --yes" || return 1
-  fi
+  case "$agent" in
+    opencode)
+      vibe_require opencode || return 1
+      vibe_tmux_win "$w_agent" "$dir_path" "opencode" || return 1
+      ;;
+    codex)
+      vibe_require codex || return 1
+      vibe_tmux_win "$w_agent" "$dir_path" "codex --yes" || return 1
+      ;;
+    *)
+      vibe_require claude || return 1
+      vibe_tmux_win "$w_agent" "$dir_path" "claude" || return 1
+      ;;
+  esac
 
   # Tests/logs windows (leave as interactive shells so you can run what you want)
   vibe_tmux_win "$w_tests" "$dir_path" || return 1
@@ -218,19 +268,38 @@ vup() {
 }
 
 # One-button: create worktree + bring up tmux workspace
-# usage: vnew <branch> [agent=claude|codex] [base=main]
+# usage: vnew <branch> [agent=claude|opencode|codex] [base=main]
 vnew() {
   local branch="$1"
   local agent="${2:-claude}"
   local base="${3:-main}"
 
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent=claude|codex] [base=main]"
+  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent=claude|opencode|codex] [base=main]"
 
-  wtnew "$branch" "$base" "wt-" || return 1
-  local wt_dir="wt-$branch"
+  wtnew "$branch" "$agent" "$base" || return 1
+  local wt_dir="wt-${agent}-$branch"
   vup "$wt_dir" "$agent" || return 1
   echo "✅ All set. Your job: review/commit in lazygit window (${wt_dir}-git)."
 }
+
+# Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
+alias vibe="$VIBE_ROOT/bin/vibe"
+alias vc='vibe chat'
+
+# Claude (Priority 1)
+alias c='claude'
+alias cy='claude'
+alias ca='claude'
+alias cp='claude'
+alias cr='claude'
+
+# OpenCode (Priority 2)
+alias o='opencode'
+alias oa='opencode'
+
+# Codex (Priority 3)
+alias x='codex'
+alias xy='codex --yes'
 
 # Attach to tmux session
 alias vt='vibe_tmux_attach'
@@ -239,13 +308,6 @@ alias vt='vibe_tmux_attach'
 alias gs='git status -sb'
 alias gd='git diff'
 alias gl='git log --oneline --graph --decorate -20'
-
-# Unified vibe/agent aliases
-alias vibe='zsh "$VIBE_ROOT/scripts/vibecoding.sh"'
-alias ca='claude --auto'
-alias cp='claude --plan'
-alias cr='claude --review'
-alias oa='opencode --auto'
 
 # Optional: go main
 alias vmain="cd \"$VIBE_MAIN\""

@@ -46,6 +46,9 @@ fi
 
 set -e
 
+# Ensure core utilities are on PATH (non-login shells may have a minimal PATH)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # ================= LOAD UTILITIES =================
 SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 
@@ -55,12 +58,16 @@ source "$SCRIPT_DIR/../lib/config.sh"
 source "$SCRIPT_DIR/../lib/i18n.sh"
 source "$SCRIPT_DIR/../lib/cache.sh"
 source "$SCRIPT_DIR/../lib/error_handling.sh"
+source "$SCRIPT_DIR/../lib/agents.sh"
+source "$SCRIPT_DIR/../lib/init_project.sh"
 
-# Only define BOLD here as it's not in utils.sh
-readonly BOLD='\033[1m'
+# Load user configuration and keys
+load_user_config
+
+# Re-ensure PATH after loading user config
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 ensure_oh_my_zsh || true
-
 # ================= COLORS =================
 # Colors are defined in utils.sh
 show_header() {
@@ -105,7 +112,7 @@ check_status() {
     fi
 
     # 3. oh-my-opencode
-    if [ -d "$HOME/.oh-my-opencode" ]; then
+    if [ -f "$HOME/.oh-my-opencode/install.sh" ]; then
         log_info "oh-my-opencode : Installed"
     else
         log_warn "oh-my-opencode : Not installed"
@@ -135,38 +142,105 @@ check_status() {
 do_ignition() {
     echo -e "\n${GREEN}>> INITIALIZING NEW PROJECT <<${NC}"
 
-    # Use secure prompt with validation
-    PROJ_NAME=$(prompt_user "Enter project name (create dir) or '.' for current" "." "validate_input")
-
-    # Validate the project name for security
-    if ! validate_input "$PROJ_NAME" "false"; then
-        log_error "Invalid project name provided"
-        read -p "Press Enter to return..."
-        return
-    fi
-
-    # Sanitize the project name to prevent path traversal
-    PROJ_NAME=$(sanitize_filename "$PROJ_NAME")
-
-    # Validate path to prevent directory traversal
-    if ! validate_path "$PROJ_NAME" "Project name validation failed"; then
-        log_error "Invalid project path: $PROJ_NAME"
-        read -p "Press Enter to return..."
-        return
-    fi
-
-    INIT_SCRIPT="$SCRIPT_DIR/../install/init-project.sh"
-
-    if [ ! -f "$INIT_SCRIPT" ]; then
-        log_critical "Error: init-project.sh not found at $INIT_SCRIPT"
-        read -p "Press Enter to return..."
-        return
-    fi
-
-    zsh "$INIT_SCRIPT" "$PROJ_NAME"
+    vibe_collect_init_answers || return
+    local mode="ai"
+    vibe_init_project "$mode"
 
     echo -e "\n${GREEN}Ignition sequence complete.${NC}"
-    read -p "Press Enter to continue..."
+    press_enter "Press Enter to continue..."
+}
+
+do_init_keys() {
+    echo -e "\n${YELLOW}>> INITIALIZING API KEYS <<${NC}"
+    
+    local keys_template="$SCRIPT_DIR/../config/keys.template.env"
+    local keys_file="$SCRIPT_DIR/../config/keys.env"
+    
+    if [[ -f "$keys_file" ]]; then
+        log_info "Keys file already exists: $keys_file"
+        local confirm=$(prompt_user "Overwrite existing keys.env? (y/n)" "n")
+        if [[ "$confirm" != "y" ]]; then
+            return
+        fi
+    fi
+    
+    if [[ ! -f "$keys_template" ]]; then
+        log_error "Template not found: $keys_template"
+        press_enter "Press Enter to return..."
+        return
+    fi
+    
+    cp "$keys_template" "$keys_file"
+    log_success "Initialized $keys_file from template."
+    log_info "Please edit $keys_file with your actual API keys."
+    
+    # Try to open with editor if available
+    local editor_cmd="${EDITOR:-vim}"
+    if command -v "$editor_cmd" &> /dev/null; then
+        local edit_now=$(prompt_user "Edit $keys_file now? (y/n)" "y")
+        if [[ "$edit_now" == "y" ]]; then
+            "$editor_cmd" "$keys_file"
+            # Reload keys after editing
+            load_user_config
+        fi
+    fi
+    
+    press_enter "Press Enter to continue..."
+}
+
+do_chat() {
+    local tool
+    tool=$(vibe_select_default_tool) || return 1
+
+    case "$tool" in
+        claude)
+            claude
+            ;;
+        opencode)
+            opencode
+            ;;
+        codex)
+            codex
+            ;;
+        *)
+            log_error "Unsupported tool: $tool"
+            return 1
+            ;;
+    esac
+}
+
+do_sync_identity() {
+    echo -e "\n${YELLOW}>> SYNCING WORKSPACE IDENTITY <<${NC}"
+    
+    # Check if we are in a git repo
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        log_error "Not inside a git repository or worktree."
+        press_enter "Press Enter to return..."
+        return
+    fi
+    
+    # Identify agent type from directory name (wt-agent-branch)
+    local dir_name=$(basename "$PWD")
+    local agent="claude" # Default
+    
+    if [[ "$dir_name" =~ ^wt-([^-\ ]+)- ]]; then
+        agent="${match[1]}"
+    fi
+    
+    echo -e "Detected agent type: ${CYAN}$agent${NC}"
+    local agent_choice=$(prompt_user "Confirm agent type (claude/opencode/codex)" "$agent")
+    
+    local agent_name="Agent-${agent_choice^}"
+    local agent_email="agent-${agent_choice}@vibecoding.ai"
+    
+    git config user.name "$agent_name"
+    git config user.email "$agent_email"
+    
+    log_success "Workspace identity synced."
+    echo -e "  User Name  : $agent_name"
+    echo -e "  User Email : $agent_email"
+    
+    press_enter "Press Enter to continue..."
 }
 
 do_equip() {
@@ -207,7 +281,7 @@ do_equip() {
             ;;
         *)
             log_error "Invalid option: $CHOICE"
-            read -p "Press Enter to continue..."
+            press_enter "Press Enter to continue..."
             return
             ;;
     esac
@@ -225,7 +299,7 @@ do_equip() {
     esac
 
     echo -e "\n${GREEN}Equipping complete. Please restart terminal if new env vars were added.${NC}"
-    read -p "Press Enter to continue..."
+    press_enter "Press Enter to continue..."
 }
 
 do_diagnostics() {
@@ -242,27 +316,94 @@ do_diagnostics() {
         log_error "MCP Configuration missing"
     fi
 
-    # Check Aliases
-    # Note: Aliases are hard to check in script because they are not expanded in non-interactive shell usually.
-    # We check the RC file instead.
+    # 6. Additional Dependencies
+    echo -e "\n${BOLD}DEPENDENCIES:${NC}"
+    for cmd in tmux lazygit zsh git; do
+        if command -v "$cmd" &> /dev/null; then
+            log_info "$(printf "%-14s" "$cmd") : Found"
+        else
+            log_error "$(printf "%-14s" "$cmd") : Missing"
+        fi
+    done
+
+    # 7. Aliases Check
+    echo -e "\n${BOLD}SHELL CONFIGURATION:${NC}"
     SHELL_RC="$HOME/.zshrc"
     if [ -f "$SHELL_RC" ]; then
-        if grep -q "alias c=" "$SHELL_RC"; then
-             log_info "Alias 'c' configured in .zshrc"
-        else
-             log_warn "Alias 'c' likely missing from .zshrc"
-        fi
-
-        if grep -q "alias o=" "$SHELL_RC"; then
-             log_info "Alias 'o' configured in .zshrc"
-        else
-             log_warn "Alias 'o' likely missing from .zshrc"
-        fi
+        log_info ".zshrc found"
+        local aliases=("c" "o" "x" "vibe" "vnew" "wt")
+        for a in "${aliases[@]}"; do
+            if grep -q "alias $a=" "$SHELL_RC"; then
+                 log_info "Alias '$a' configured"
+            else
+                 log_warn "Alias '$a' likely missing"
+            fi
+        done
+    else
+        log_error ".zshrc not found"
     fi
 
     echo -e "\n${CYAN}Diagnostics complete.${NC}"
-    read -p "Press Enter to return..."
+    press_enter "Press Enter to return..."
 }
+
+# ================= CLI COMMAND HANDLING =================
+if [[ $# -gt 0 ]]; then
+    COMMAND="$1"
+    shift
+    
+    case "$COMMAND" in
+        tdd)
+            if [[ "$1" == "new" ]]; then
+                shift
+                zsh "$SCRIPT_DIR/../scripts/tdd-init.sh" "$@"
+                exit 0
+            else
+                log_error "Usage: vibe tdd new <feature-name>"
+                exit 1
+            fi
+            ;;
+        sync)
+            do_sync_identity
+            exit 0
+            ;;
+        keys)
+            do_init_keys
+            exit 0
+            ;;
+        chat)
+            do_chat
+            exit 0
+            ;;
+        equip)
+            do_equip
+            exit 0
+            ;;
+        diagnostics)
+            do_diagnostics
+            exit 0
+            ;;
+        init)
+            local mode="ai"
+            if [[ "$1" == "--local" ]]; then
+                mode="local"
+                shift
+            elif [[ "$1" == "--ai" ]]; then
+                mode="ai"
+                shift
+            fi
+            local preset_dir="${1:-}"
+            vibe_collect_init_answers "$preset_dir" || exit 1
+            vibe_init_project "$mode" || exit 1
+            exit 0
+            ;;
+        *)
+            # If command unknown, default to showing the menu but warn
+            log_warn "Unknown command: $COMMAND. Entering interactive mode..."
+            sleep 1
+            ;;
+    esac
+fi
 
 # ================= MAIN LOOP =================
 while true; do
@@ -272,7 +413,9 @@ while true; do
     echo -e "${BOLD}COMMANDS:${NC}"
     echo -e "  ${GREEN}1)${NC} ${BOLD}IGNITION${NC}    (Start New Project)"
     echo -e "  ${GREEN}2)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
-    echo -e "  ${GREEN}3)${NC} ${BOLD}DIAGNOSTICS${NC} (System Check)"
+    echo -e "  ${GREEN}3)${NC} ${BOLD}KEYS${NC}        (Initialize API Keys)"
+    echo -e "  ${GREEN}4)${NC} ${BOLD}SYNC${NC}        (Sync Workspace Identity)"
+    echo -e "  ${GREEN}5)${NC} ${BOLD}DIAGNOSTICS${NC} (System Check)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
@@ -282,7 +425,9 @@ while true; do
     case $OPTION in
         1) do_ignition ;;
         2) do_equip ;;
-        3) do_diagnostics ;;
+        3) do_init_keys ;;
+        4) do_sync_identity ;;
+        5) do_diagnostics ;;
         q|Q)
             log_success "Happy Coding!"
             exit 0

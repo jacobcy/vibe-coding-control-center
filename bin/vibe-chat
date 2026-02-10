@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+set -e
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" chat "$@"

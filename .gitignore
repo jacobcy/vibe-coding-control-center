@@ -9,3 +9,9 @@ config/keys.env
 # System
 .DS_Store
 .aider*
+
+# Temporary Vibe Artifacts
+tmpvibe-*
+vibe-init-test*
+**/var/folders/**/*vibe-init-test*
+temp/

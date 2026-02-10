@@ -21,13 +21,35 @@ initialize_config() {
     VIBE_CONFIG[TEMP_DIR]="${TMPDIR:-/tmp}"
     VIBE_CONFIG[LOG_LEVEL]="INFO"
 
-    # API configuration defaults
-    VIBE_CONFIG[ANTHROPIC_BASE_URL]="https://api.anthropic.com"
+    # API configuration defaults (China Proxy by default as per PRD)
+    VIBE_CONFIG[ANTHROPIC_BASE_URL]="https://api.bghunt.cn"
     VIBE_CONFIG[ANTHROPIC_MODEL]="claude-3-5-sonnet-20241022"
 
     # Security settings
     VIBE_CONFIG[MAX_PATH_LENGTH]=4096
     VIBE_CONFIG[MAX_INPUT_LENGTH]=10000
+}
+
+# Load API keys and secrets
+load_keys() {
+    local keys_file="$VIBE_CONFIG[CONFIG_DIR]/keys.env"
+    if [[ -f "$keys_file" ]]; then
+        # Load keys as environment variables
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line//[[:space:]]/}" ]] && continue
+            
+            # Export the key=value pair
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                # Use BASH_REMATCH style or just match array
+                local key="${match[1]}"
+                local value="${match[2]}"
+                export "$key"="$value"
+                VIBE_CONFIG["ENV_$key"]="$value"
+            fi
+        done < "$keys_file"
+    fi
 }
 
 # Load user-specific configuration
@@ -43,6 +65,9 @@ load_user_config() {
             return 1
         fi
     fi
+    
+    # Load keys as well
+    load_keys
 }
 
 # Get a configuration value

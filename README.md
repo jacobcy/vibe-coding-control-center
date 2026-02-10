@@ -7,7 +7,7 @@
 - **OpenCode**: 原生支持多模型（Qwen、DeepSeek、Moonshot）
 - **Codex**: 作为第三优先级工具补位使用
 
-**当前阶段**：仅进行文档准备（PRD / 技术规格 / 测试文档），不做代码改动。
+**当前阶段**：功能持续迭代中，以可用性与稳定性优先。
 
 ## 核心特性（目标态）
 
@@ -64,14 +64,10 @@ OpenCode 原生支持多种中国模型，无需额外配置。
 
 ## 配置
 
-### API 密钥配置
+### API 密钥配置（可选）
 
-1. 复制模板文件：
-   ```bash
-   cp config/keys.template.env config/keys.env
-   ```
-
-2. 编辑 `config/keys.env` 并添加你的 API 密钥：
+你可以用多种方式配置密钥：`config/keys.env`、系统环境变量，或工具自带的登录流程（如 `auth login`）。  
+若使用 `config/keys.env`，按以下方式填写：
 
    **重要**：统一使用 `ANTHROPIC_AUTH_TOKEN`，不要使用 `ANTHROPIC_API_KEY`
 
@@ -95,7 +91,7 @@ OpenCode 原生支持多种中国模型，无需额外配置。
    MOONSHOT_API_KEY=sk-xxxxx  # OpenCode 可选
    ```
 
-3. 重新加载配置：
+3. 重新加载配置（如果你使用了 `config/keys.env` 或别名）：
    ```bash
    source ~/.zshrc
    ```
@@ -107,8 +103,7 @@ OpenCode 原生支持多种中国模型，无需额外配置。
 启动 Vibe Coding 控制中心：
 
 ```bash
-./scripts/vibecoding.sh
-# 或使用别名
+# bin/vibe 已加入 PATH
 vibe
 ```
 
@@ -123,29 +118,31 @@ vibe
 
 **Claude Code**:
 - `c` - 启动 Claude 交互模式
-- `ca "问题"` - 快速提问
-- `cp "目标"` - 创建计划
-- `cr` - 审查代码变更
+- 单行 prompt：`claude -p "问题"`
 
 **OpenCode**:
 - `o` - 启动 OpenCode 交互模式
-- `oa "问题"` - 快速提问
+- 单行 prompt：`opencode run "问题" -m opencode/kimi-k2.5-free`
 
 **其他**:
 - `vibe` - 启动控制中心
+- `vibe init --ai` - AI 初始化（默认）
+- `vibe init --local` - 本地模板初始化
+- `vibe chat` / `vc` - 进入默认工具对话
 
 ### 项目初始化
 
 初始化新项目：
 
 ```bash
-./install/init-project.sh [项目名称]
+vibe init --ai
+vibe init --local
 ```
 
-这将创建：
-- `CLAUDE.md` 模板（项目上下文）
-- Cursor 规则配置
-- 最佳实践指南
+将生成并串联：
+- `soul.md` / `rules.md` / `agents.md` / `tasks.md`
+- `CLAUDE.md`（索引与上下文）
+- `.cursor/rules/tech-stack.mdc`
 
 ### 更新已安装工具 ⭐ 新功能
 

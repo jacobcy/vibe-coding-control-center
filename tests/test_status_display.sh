@@ -35,7 +35,7 @@ else
 fi
 
 # 3. oh-my-opencode
-if [ -d "$HOME/.oh-my-opencode" ]; then
+if [ -f "$HOME/.oh-my-opencode/install.sh" ]; then
     log_info "oh-my-opencode : Installed"
 else
     log_warn "oh-my-opencode : Not installed"
@@ -46,7 +46,7 @@ KEYS_FILE="$SCRIPT_DIR/../config/keys.env"
 if [ -f "$KEYS_FILE" ]; then
     log_info "Keys Config    : Found (keys.env)"
 else
-    log_warn "Keys Config    : Missing (config/keys.env)"
+    log_warn "Keys Config    : Missing (config/keys.env) [optional]"
 fi
 
 # 5. MCP Configuration
@@ -60,4 +60,3 @@ fi
 echo -e "\n${CYAN}========================================${NC}"
 echo -e "${GREEN}Status Display Test Complete!${NC}"
 echo -e "${CYAN}========================================${NC}"
-
