@@ -299,5 +299,11 @@ alias gs='git status -sb'
 alias gd='git diff'
 alias gl='git log --oneline --graph --decorate -20'
 
+# Unified vibe/agent aliases
+alias vibe='zsh "$VIBE_ROOT/scripts/vibecoding.sh"'
+alias cca='claude --auto'
+alias ccp='claude --plan'
+alias ccr='claude --review'
+alias oca='opencode --auto'
 # Optional: go main
 alias vmain="cd \"$VIBE_MAIN\""
