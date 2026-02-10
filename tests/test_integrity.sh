@@ -58,6 +58,9 @@ check_source_paths "$ROOT_DIR/bin/vibe-keys"
 check_source_paths "$ROOT_DIR/bin/vibe-sync"
 check_source_paths "$ROOT_DIR/bin/vibe-diagnostics"
 check_source_paths "$ROOT_DIR/bin/vibe-equip"
+check_source_paths "$ROOT_DIR/bin/vibe-doctor"
+check_source_paths "$ROOT_DIR/bin/vibe-tdd"
+check_source_paths "$ROOT_DIR/bin/vibe-env"
 
 if [[ $EXIT_CODE -eq 0 ]]; then
     log_success "Integrity test PASSED!"
