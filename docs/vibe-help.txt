@@ -1,0 +1,50 @@
+Vibe Coding Control Center - 帮助信息
+
+用法: vibe [选项] [命令]
+
+选项:
+  -h, --help     显示此帮助信息并退出
+
+主命令:
+  (无参数)       启动交互式控制中心
+  chat           启动默认 AI 工具对话模式
+  equip          安装/更新 AI 工具 (Claude, OpenCode 等)
+  env            环境与密钥管理
+  init           初始化新项目
+  keys           API 密钥管理 (已迁移到 'vibe env keys')
+  sync           同步工作区身份
+  diagnostics    系统诊断与状态检查
+  tdd new <name> 创建新的 TDD 测试套件
+
+环境管理命令 (vibe env):
+  status         显示所有工具的配置状态
+  detect         检测和验证环境配置
+  setup          交互式环境设置向导
+  inject         将密钥注入当前 shell 会话
+  switch <cn|off> 切换 Claude API 端点
+  keys show      显示已配置的 API 密钥（脱敏）
+  keys edit      编辑密钥配置文件
+  keys verify    验证 API 密钥有效性
+  mcp            配置 MCP 服务器
+
+安装命令:
+  ./scripts/install.sh   安装 Vibe Coding 控制中心
+  ./install/install-claude.sh   安装/更新 Claude Code
+  ./install/install-opencode.sh 安装/更新 OpenCode
+
+配置文件位置:
+  ~/.vibe/keys.env              - API 密钥配置
+  ~/.vibe/aliases.sh            - 命令别名
+  ~/.config/opencode/opencode.json - OpenCode 配置
+  ~/.codex/config.toml          - Codex 配置
+  ~/.claude.json                - MCP 服务器配置
+
+快捷别名:
+  vibe    - 启动控制中心
+  vc      - 进入默认 AI 工具对话
+  c       - Claude Code
+  o       - OpenCode
+  vnew    - 创建新的工作区
+  wt      - 切换工作树
+
+更多信息请访问: https://github.com/affaan-m/vibe-coding-control-center
