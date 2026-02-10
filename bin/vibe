@@ -5,6 +5,32 @@ set -e
 
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 
+# Check for help flags first
+if [[ $# -eq 1 ]] && [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    if [[ -f "$VIBE_ROOT/docs/vibe-help.txt" ]]; then
+        cat "$VIBE_ROOT/docs/vibe-help.txt"
+    else
+        echo "Vibe Coding Control Center"
+        echo ""
+        echo "Usage: vibe [options] [command]"
+        echo ""
+        echo "Options:"
+        echo "  -h, --help     Show this help message"
+        echo ""
+        echo "Commands:"
+        echo "  (no args)      Launch interactive control center"
+        echo "  chat           Start default AI tool chat"
+        echo "  equip          Install/update AI tools"
+        echo "  env            Environment and key management"
+        echo "  init           Initialize new project"
+        echo "  sync           Sync workspace identity"
+        echo "  diagnostics    System diagnostics"
+        echo ""
+        echo "Run 'vibe' without arguments for interactive mode."
+    fi
+    exit 0
+fi
+
 if [[ $# -gt 0 ]]; then
   subcmd="$1"
   shift

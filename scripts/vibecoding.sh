@@ -61,7 +61,7 @@ source "$SCRIPT_DIR/../lib/error_handling.sh"
 source "$SCRIPT_DIR/../lib/agents.sh"
 source "$SCRIPT_DIR/../lib/init_project.sh"
 
-# Load user configuration and keys
+# Load config metadata (no env export)
 load_user_config
 
 # Re-ensure PATH after loading user config
@@ -87,19 +87,7 @@ show_header() {
 check_status() {
     echo -e "\n${BOLD}SYSTEM STATUS:${NC}"
 
-    # 1. Claude
-    if command -v claude &> /dev/null; then
-        CLAUDE_VERSION=$(get_command_version "claude" "--version")
-        if [[ -n "$CLAUDE_VERSION" ]]; then
-            log_info "Claude Code    : Installed (v$CLAUDE_VERSION)"
-        else
-            log_info "Claude Code    : Installed (version unknown)"
-        fi
-    else
-        log_error "Claude Code    : Missing"
-    fi
-
-    # 2. OpenCode
+    # 1. OpenCode
     if command -v opencode &> /dev/null; then
         OPENCODE_VERSION=$(get_command_version "opencode" "--version")
         if [[ -n "$OPENCODE_VERSION" ]]; then
@@ -109,6 +97,18 @@ check_status() {
         fi
     else
         log_error "OpenCode       : Missing"
+    fi
+
+    # 2. Claude
+    if command -v claude &> /dev/null; then
+        CLAUDE_VERSION=$(get_command_version "claude" "--version")
+        if [[ -n "$CLAUDE_VERSION" ]]; then
+            log_info "Claude Code    : Installed (v$CLAUDE_VERSION)"
+        else
+            log_info "Claude Code    : Installed (version unknown)"
+        fi
+    else
+        log_warn "Claude Code    : Missing (Optional)"
     fi
 
     # 3. oh-my-opencode
@@ -247,26 +247,26 @@ do_equip() {
     echo -e "\n${YELLOW}>> EQUIPPING TOOLS (INSTALL/UPDATE) <<${NC}"
 
     # Show current versions
-    if command -v claude &> /dev/null; then
-        CLAUDE_VER=$(get_command_version "claude" "--version")
-        if [[ -n "$CLAUDE_VER" ]]; then
-            echo -e "1. Install/Update Claude Code ${CYAN}(current: v$CLAUDE_VER)${NC}"
-        else
-            echo "1. Install/Update Claude Code (installed)"
-        fi
-    else
-        echo "1. Install/Update Claude Code (not installed)"
-    fi
-
     if command -v opencode &> /dev/null; then
         OPENCODE_VER=$(get_command_version "opencode" "--version")
         if [[ -n "$OPENCODE_VER" ]]; then
-            echo -e "2. Install/Update OpenCode ${CYAN}(current: v$OPENCODE_VER)${NC}"
+            echo -e "1. Install/Update OpenCode ${CYAN}(current: v$OPENCODE_VER)${NC}"
         else
-            echo "2. Install/Update OpenCode (installed)"
+            echo "1. Install/Update OpenCode (installed)"
         fi
     else
-        echo "2. Install/Update OpenCode (not installed)"
+        echo "1. Install/Update OpenCode (not installed)"
+    fi
+
+    if command -v claude &> /dev/null; then
+        CLAUDE_VER=$(get_command_version "claude" "--version")
+        if [[ -n "$CLAUDE_VER" ]]; then
+            echo -e "2. Install/Update Claude Code ${CYAN}(current: v$CLAUDE_VER)${NC}"
+        else
+            echo "2. Install/Update Claude Code (installed)"
+        fi
+    else
+        echo "2. Install/Update Claude Code (not installed)"
     fi
 
     echo "3. Back"
@@ -288,10 +288,10 @@ do_equip() {
 
     case $CHOICE in
         1)
-            zsh "$SCRIPT_DIR/../install/install-claude.sh"
+            zsh "$SCRIPT_DIR/../install/install-opencode.sh"
             ;;
         2)
-            zsh "$SCRIPT_DIR/../install/install-opencode.sh"
+            zsh "$SCRIPT_DIR/../install/install-claude.sh"
             ;;
         3)
             return
@@ -368,7 +368,11 @@ if [[ $# -gt 0 ]]; then
             exit 0
             ;;
         keys)
-            do_init_keys
+            zsh "$SCRIPT_DIR/env-manager.sh" keys "$@"
+            exit 0
+            ;;
+        env)
+            zsh "$SCRIPT_DIR/env-manager.sh" "$@"
             exit 0
             ;;
         chat)
@@ -413,19 +417,18 @@ while true; do
     echo -e "${BOLD}COMMANDS:${NC}"
     echo -e "  ${GREEN}1)${NC} ${BOLD}IGNITION${NC}    (Start New Project)"
     echo -e "  ${GREEN}2)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
-    echo -e "  ${GREEN}3)${NC} ${BOLD}KEYS${NC}        (Initialize API Keys)"
+    echo -e "  ${GREEN}3)${NC} ${BOLD}ENV${NC}         (Environment & Keys)"
     echo -e "  ${GREEN}4)${NC} ${BOLD}SYNC${NC}        (Sync Workspace Identity)"
     echo -e "  ${GREEN}5)${NC} ${BOLD}DIAGNOSTICS${NC} (System Check)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
-    # Use secure input validation
-    OPTION=$(prompt_user "Select command (1-3, q)" "" "")
+    OPTION=$(prompt_user "Select command (1-5, q)" "" "")
 
     case $OPTION in
         1) do_ignition ;;
         2) do_equip ;;
-        3) do_init_keys ;;
+        3) zsh "$SCRIPT_DIR/env-manager.sh" ;;
         4) do_sync_identity ;;
         5) do_diagnostics ;;
         q|Q)

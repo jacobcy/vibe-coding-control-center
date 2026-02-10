@@ -10,19 +10,12 @@
 
 # ---------- Base ----------
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 VIBE_REPO="$VIBE_ROOT"
 VIBE_MAIN="$VIBE_REPO/main"
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
-# Ensure project bin is on PATH
 export PATH="$VIBE_ROOT/bin:$PATH"
-
-# Load configuration if not already loaded (for standalone alias usage)
-if [[ -f "$VIBE_ROOT/lib/config.sh" ]]; then
-    source "$VIBE_ROOT/lib/utils.sh"
-    source "$VIBE_ROOT/lib/config.sh"
-    load_user_config
-fi
 
 # ---------- Utilities ----------
 vibe_has() { command -v "$1" >/dev/null 2>&1; }
@@ -179,20 +172,19 @@ wtrm() {
 alias lg='lazygit'
 
 # Base commands
+# Base commands
 alias c='claude'
 alias cy='claude'
-alias x='codex'
-alias xy='codex --yes'
+
 
 # Start agent in current dir but protect main/master
+# Start agent in current dir but protect main/master
 c_safe() { vibe_main_guard || return; claude; }
-x_safe() { vibe_main_guard || return; codex --yes; }
 
 # Start agent in a given worktree (cd + run)
-# usage: cwt <wt-dir> / xwt <wt-dir>
+# usage: cwt <wt-dir>
 cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude; }
 owt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: owt <wt-dir>"; wt "$d" || return; opencode; }
-xwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: xwt <wt-dir>"; wt "$d" || return; codex --yes; }
 
 # ---------- Endpoint Switching ----------
 alias c_cn='export ANTHROPIC_BASE_URL="https://api.bghunt.cn" && echo "🇨🇳 Claude Endpoint: China Proxy"'
@@ -297,9 +289,7 @@ alias cr='claude'
 alias o='opencode'
 alias oa='opencode'
 
-# Codex (Priority 3)
-alias x='codex'
-alias xy='codex --yes'
+
 
 # Attach to tmux session
 alias vt='vibe_tmux_attach'

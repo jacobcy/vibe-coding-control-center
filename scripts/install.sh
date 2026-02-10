@@ -55,19 +55,48 @@ fi
 ensure_zsh_installed
 ensure_oh_my_zsh || true
 
-# ================= INSTALLATION =================
+# ================= INITIALIZE ~/.vibe/ =================
 
-log_step "Running Claude Code Installer"
-zsh "$SCRIPT_DIR/../install/install-claude.sh"
+log_step "Initializing ~/.vibe configuration directory"
+VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+VIBE_BIN="$VIBE_ROOT/bin"
+VIBE_HOME="$HOME/.vibe"
 
-log_step "Running OpenCode Installer"
-zsh "$SCRIPT_DIR/../install/install-opencode.sh"
+mkdir -p "$VIBE_HOME"
+
+if [[ -f "$VIBE_ROOT/config/keys.template.env" ]] && [[ ! -f "$VIBE_HOME/keys.env" ]]; then
+    cp "$VIBE_ROOT/config/keys.template.env" "$VIBE_HOME/keys.env"
+    chmod 600 "$VIBE_HOME/keys.env"
+    log_info "Created ~/.vibe/keys.env from template (edit with your actual keys)"
+elif [[ -f "$VIBE_HOME/keys.env" ]]; then
+    log_info "~/.vibe/keys.env already exists"
+fi
+
+cp "$VIBE_ROOT/config/aliases.sh" "$VIBE_HOME/aliases.sh"
+chmod +x "$VIBE_HOME/aliases.sh"
+log_success "Synced aliases.sh to ~/.vibe/"
+
+# ================= BOOTSTRAP 'vibe' COMMAND =================
+
+log_step "Bootstrapping 'vibe' command"
+SHELL_RC=$(get_shell_rc)
+
+RC_CONTENT="# Vibe Coding Control Center
+export PATH=\"$VIBE_BIN:\$PATH\"
+"
+
+append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
+
+chmod +x "$VIBE_BIN/vibe"
+chmod +x "$VIBE_BIN"/* 2>/dev/null || true
+log_success "'vibe' command is ready"
 
 # ================= FINAL SUMMARY =================
 log_success "Installation process completed!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
-echo "1. Run: source $SHELL_RC"
-echo "2. Edit config/keys.env if you haven't already."
-echo "3. Use 'vibe' to start the control center."
+echo "1. Run: source $SHELL_RC  (or restart your terminal)"
+echo "2. Run: 'vibe env setup' to configure API keys and environment"
+echo "3. Run: 'vibe equip' to install AI tools (Claude, OpenCode, etc.)"
+echo "4. Type 'vibe' to launch the Control Center."
 echo "----------------------------------------"
