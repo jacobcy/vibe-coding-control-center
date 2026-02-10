@@ -130,6 +130,30 @@ vibe
 - `vibe init --local` - 本地模板初始化
 - `vibe chat` / `vc` - 进入默认工具对话
 
+## 新的命令结构
+
+Vibe Coding Control Center 现在采用了 Git 风格的命令架构，提供了更清晰的命令组织：
+
+### 主要命令
+
+- `vibe` - 交互式控制中心
+- `vibe chat` - 启动默认 AI 工具聊天
+- `vibe equip` - 安装/更新 AI 工具
+- `vibe env` - 环境和密钥管理
+- `vibe init` - 初始化新项目
+- `vibe sync` - 同步工作区身份
+- `vibe diagnostics` - 运行系统诊断
+- `vibe tdd` - TDD 特性管理
+- `vibe help` - 显示帮助信息
+- `vibe -h` / `vibe --help` - 显示帮助信息
+
+### 命令特点
+
+1. **模块化设计** - 每个命令都是独立的脚本，便于维护
+2. **一致性接口** - 所有命令都支持 `-h/--help` 选项
+3. **向后兼容** - 传统的交互式界面仍然可用
+4. **易扩展性** - 轻松添加新命令只需创建新的 `vibe-*` 脚本
+
 ### 项目初始化
 
 初始化新项目：

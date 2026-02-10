@@ -15,3 +15,4 @@
 - **Shell**: zsh
 # Execution Log
 [2026-02-10] Implemented /feature-commit workflow.
+[2026-02-10] Completed /audit-and-cleanup: reorganized documentation, fixed `vibe-tdd` nounset bug, and consolidated help logic.
