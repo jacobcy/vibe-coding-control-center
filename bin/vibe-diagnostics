@@ -1,4 +1,79 @@
 #!/usr/bin/env zsh
+# vibe-diagnostics - Run comprehensive system diagnostics
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" diagnostics "$@"
+
+# Load all utility modules like the main script does
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/agents.sh"
+source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load config metadata
+load_user_config
+
+do_diagnostics() {
+    echo -e "\n${CYAN}>> RUNNING DIAGNOSTICS <<${NC}"
+    echo "Checking core connections..."
+
+    # Check MCP config
+    if [ -f "$HOME/.claude.json" ]; then
+        log_info "MCP Configuration found (.claude.json)"
+        # Count servers using grep as a simple heuristic
+        SERVER_COUNT=$(grep -o "\"command\"" "$HOME/.claude.json" | wc -l)
+        echo -e "  - Configured Servers: $SERVER_COUNT"
+    else
+        log_error "MCP Configuration missing"
+    fi
+
+    # 6. Additional Dependencies
+    echo -e "\n${BOLD}DEPENDENCIES:${NC}"
+    for cmd in tmux lazygit zsh git; do
+        if command -v "$cmd" &> /dev/null; then
+            log_info "$(printf "%-14s" "$cmd") : Found"
+        else
+            log_error "$(printf "%-14s" "$cmd") : Missing"
+        fi
+    done
+
+    # 7. Aliases Check
+    echo -e "\n${BOLD}SHELL CONFIGURATION:${NC}"
+    SHELL_RC="$HOME/.zshrc"
+    if [ -f "$SHELL_RC" ]; then
+        log_info ".zshrc found"
+        local aliases=("c" "o" "x" "vibe" "vnew" "wt")
+        for a in "${aliases[@]}"; do
+            if grep -q "alias $a=" "$SHELL_RC"; then
+                 log_info "Alias '$a' configured"
+            else
+                 log_warn "Alias '$a' likely missing"
+            fi
+        done
+    else
+        log_error ".zshrc not found"
+    fi
+
+    echo -e "\n${CYAN}Diagnostics complete.${NC}"
+}
+
+# Handle help flag
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "vibe-diagnostics - Run comprehensive system diagnostics"
+    echo ""
+    echo "Usage: vibe diagnostics"
+    echo ""
+    echo "Run diagnostic checks on system tools, dependencies, and configurations."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    exit 0
+fi
+
+# Call the diagnostics function
+do_diagnostics

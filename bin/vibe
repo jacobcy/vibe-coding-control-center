@@ -5,28 +5,52 @@ set -e
 
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 
-# Check for help flags first
+# Check for help flags or subcommand first
 if [[ $# -eq 1 ]] && [[ "$1" == "-h" || "$1" == "--help" ]]; then
     if [[ -f "$VIBE_ROOT/docs/vibe-help.txt" ]]; then
         cat "$VIBE_ROOT/docs/vibe-help.txt"
     else
         echo "Vibe Coding Control Center"
-        echo ""
-        echo "Usage: vibe [options] [command]"
-        echo ""
-        echo "Options:"
-        echo "  -h, --help     Show this help message"
-        echo ""
-        echo "Commands:"
-        echo "  (no args)      Launch interactive control center"
-        echo "  chat           Start default AI tool chat"
-        echo "  equip          Install/update AI tools"
-        echo "  env            Environment and key management"
-        echo "  init           Initialize new project"
-        echo "  sync           Sync workspace identity"
-        echo "  diagnostics    System diagnostics"
-        echo ""
-        echo "Run 'vibe' without arguments for interactive mode."
+        echo "Help file missing at docs/vibe-help.txt. Run 'vibe' for interactive mode."
+    fi
+    exit 0
+elif [[ "$1" == "help" ]]; then
+    # Implement 'vibe help' command
+    if [[ $# -eq 1 ]]; then
+        # 'vibe help' - show general help
+        if [[ -f "$VIBE_ROOT/docs/vibe-help.txt" ]]; then
+            cat "$VIBE_ROOT/docs/vibe-help.txt"
+        else
+            echo "Vibe Coding Control Center"
+            echo ""
+            echo "Usage: vibe [options] [command]"
+            echo ""
+            echo "Options:"
+            echo "  -h, --help     Show this help message"
+            echo ""
+            echo "Commands:"
+            echo "  (no args)      Launch interactive control center"
+            echo "  chat           Start default AI tool chat"
+            echo "  equip          Install/update AI tools"
+            echo "  env            Environment and key management"
+            echo "  init           Initialize new project"
+            echo "  sync           Sync workspace identity"
+            echo "  doctor         System health check"
+            echo "  tdd            TDD feature management"
+            echo ""
+            echo "Run 'vibe' without arguments for interactive mode."
+        fi
+    else
+        # 'vibe help <subcommand>' - show help for specific subcommand
+        shift  # Remove 'help' argument
+        subcmd="$1"
+        cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
+        if [[ -x "$cmd" ]]; then
+            "$cmd" --help
+        else
+            echo "Unknown subcommand: $subcmd" >&2
+            echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+        fi
     fi
     exit 0
 fi
@@ -39,7 +63,7 @@ if [[ $# -gt 0 ]]; then
     exec "$cmd" "$@"
   else
     echo "Unknown subcommand: $subcmd" >&2
-    echo "Available: $(ls -1 "${VIBE_ROOT}/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+    echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
     exit 1
   fi
 fi

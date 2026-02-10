@@ -1,4 +1,66 @@
 #!/usr/bin/env zsh
+# vibe-sync - Sync workspace identity and git configuration
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" sync "$@"
+
+# Load all utility modules like the main script does
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/agents.sh"
+source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load config metadata
+load_user_config
+
+do_sync_identity() {
+    echo -e "\n${YELLOW}>> SYNCING WORKSPACE IDENTITY <<${NC}"
+    
+    # Check if we are in a git repo
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        log_error "Not inside a git repository or worktree."
+        return 1
+    fi
+    
+    # Identify agent type from directory name (wt-agent-branch)
+    local dir_name=$(basename "$PWD")
+    local agent="claude" # Default
+    
+    if [[ "$dir_name" =~ ^wt-([^-\ ]+)- ]]; then
+        agent="${match[1]}"
+    fi
+    
+    echo -e "Detected agent type: ${CYAN}$agent${NC}"
+    local agent_choice=$(prompt_user "Confirm agent type (claude/opencode/codex)" "$agent")
+    
+    local agent_name="Agent-${agent_choice^}"
+    local agent_email="agent-${agent_choice}@vibecoding.ai"
+    
+    git config user.name "$agent_name"
+    git config user.email "$agent_email"
+    
+    log_success "Workspace identity synced."
+    echo -e "  User Name  : $agent_name"
+    echo -e "  User Email : $agent_email"
+}
+
+# Handle help flag first
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "vibe-sync - Sync workspace identity and git configuration"
+    echo ""
+    echo "Usage: vibe sync"
+    echo ""
+    echo "This command sets up git user name and email based on the current"
+    echo "directory name pattern (wt-agent-branch) or user selection."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help      Show this help message"
+    exit 0
+fi
+
+# No arguments needed for sync
+do_sync_identity

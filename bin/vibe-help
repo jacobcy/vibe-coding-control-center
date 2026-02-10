@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+# vibe-help - Display help information for vibe commands
+
+set -e
+
+show_help() {
+    echo "Vibe Coding Control Center - Help"
+    echo ""
+    echo "Usage: vibe [options] [command]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
+    echo ""
+    echo "Commands:"
+    echo "  chat           Start default AI tool chat"
+    echo "  equip          Install/update AI tools"
+    echo "  env            Environment and key management"
+    echo "  init           Initialize new project"
+    echo "  sync           Sync workspace identity"
+    echo "  doctor         System health check"
+    echo "  tdd            TDD feature management"
+    echo "  help           Show this help information"
+    echo ""
+    echo "Run 'vibe' without arguments for interactive mode."
+}
+
+if [[ $# -gt 0 ]]; then
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option for vibe-help: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+else
+    show_help
+fi

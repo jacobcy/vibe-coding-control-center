@@ -1,4 +1,57 @@
 #!/usr/bin/env zsh
+# vibe-chat - Start default AI tool chat
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" chat "$@"
+
+# Load all utility modules like the main script does
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/agents.sh"
+source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load config metadata
+load_user_config
+
+do_chat() {
+    local tool
+    tool=$(vibe_select_default_tool) || return 1
+
+    case "$tool" in
+        claude)
+            claude
+            ;;
+        opencode)
+            opencode
+            ;;
+        codex)
+            codex
+            ;;
+        *)
+            log_error "Unsupported tool: $tool"
+            return 1
+            ;;
+    esac
+}
+
+# Handle help flag
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "vibe-chat - Start default AI tool chat"
+    echo ""
+    echo "Usage: vibe chat"
+    echo ""
+    echo "Launch the default AI tool for interactive chat."
+    echo "The default tool is selected from Claude, OpenCode, or Codex."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    exit 0
+fi
+
+# Run the chat function
+do_chat
