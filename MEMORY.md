@@ -13,3 +13,5 @@
 ## System Context
 - **OS**: macOS
 - **Shell**: zsh
+# Execution Log
+[2026-02-10] Implemented /feature-commit workflow.

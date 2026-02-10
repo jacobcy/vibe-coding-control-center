@@ -2,6 +2,7 @@
 
 ## Project Workflows
 - **Audit & Cleanup**: `.agent/workflows/audit-and-cleanup.md`
+- **Feature Commit**: `.agent/workflows/feature-commit.md`
 - **Initialize**: `.agent/workflows/initialize.md`
 
 ## Standard Procedures
