@@ -16,8 +16,8 @@ vibe_tool_installed() {
 # Return installed tools in priority order
 vibe_list_installed_tools() {
     local tools=()
-    vibe_tool_installed "claude" && tools+=("claude")
     vibe_tool_installed "opencode" && tools+=("opencode")
+    vibe_tool_installed "claude" && tools+=("claude")
     vibe_tool_installed "codex" && tools+=("codex")
     echo "${tools[@]}"
 }
