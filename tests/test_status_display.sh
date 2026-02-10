@@ -10,19 +10,7 @@ echo -e "${CYAN}========================================${NC}"
 
 echo -e "\n${BOLD}SYSTEM STATUS:${NC}"
 
-# 1. Claude
-if command -v claude &> /dev/null; then
-    CLAUDE_VERSION=$(get_command_version "claude" "--version")
-    if [[ -n "$CLAUDE_VERSION" ]]; then
-        log_info "Claude Code    : Installed (v$CLAUDE_VERSION)"
-    else
-        log_info "Claude Code    : Installed (version unknown)"
-    fi
-else
-    log_error "Claude Code    : Missing"
-fi
-
-# 2. OpenCode
+# 1. OpenCode
 if command -v opencode &> /dev/null; then
     OPENCODE_VERSION=$(get_command_version "opencode" "--version")
     if [[ -n "$OPENCODE_VERSION" ]]; then
@@ -32,6 +20,18 @@ if command -v opencode &> /dev/null; then
     fi
 else
     log_error "OpenCode       : Missing"
+fi
+
+# 2. Claude
+if command -v claude &> /dev/null; then
+    CLAUDE_VERSION=$(get_command_version "claude" "--version")
+    if [[ -n "$CLAUDE_VERSION" ]]; then
+        log_info "Claude Code    : Installed (v$CLAUDE_VERSION)"
+    else
+        log_info "Claude Code    : Installed (version unknown)"
+    fi
+else
+    log_warn "Claude Code    : Missing (Optional)"
 fi
 
 # 3. oh-my-opencode

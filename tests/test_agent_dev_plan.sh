@@ -89,8 +89,9 @@ assert_contains_regex "OpenCode" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B2: te
 assert_contains_regex "Codex" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B3: tech spec mentions Codex"
 assert_contains_regex "alias c='claude'" "$ROOT_DIR/config/aliases.sh" "B1: alias for Claude exists"
 assert_contains_regex "alias oa='opencode'" "$ROOT_DIR/config/aliases.sh" "B2: alias for OpenCode exists"
-assert_contains_regex "alias x='codex'" "$ROOT_DIR/config/aliases.sh" "B3: alias for Codex exists"
-assert_line_order "# 1\\. Claude" "# 2\\. OpenCode" "$ROOT_DIR/scripts/vibecoding.sh" "B1/B2: Claude status checked before OpenCode"
+# Codex alias removed in refactor
+# assert_contains_regex "alias x='codex'" "$ROOT_DIR/config/aliases.sh" "B3: alias for Codex exists"
+assert_line_order "# 1\\. OpenCode" "# 2\\. Claude" "$ROOT_DIR/scripts/vibecoding.sh" "B1/B2: OpenCode status checked before Claude"
 
 # C1/C2/C3: Worktree 身份隔离（当前仅检查工作流入口）
 assert_contains_regex "wtnew" "$ROOT_DIR/config/aliases.sh" "C1-C3: worktree creation function exists"
