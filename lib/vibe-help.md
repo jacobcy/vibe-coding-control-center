@@ -11,7 +11,11 @@
 ## 主命令
 
 - `(无参数)` 启动交互式控制中心
-- `chat` 启动默认 AI 工具对话模式
+- `chat` 快速启动 AI 工具对话
+  - `vibe chat` - 启动交互式对话
+  - `vibe chat "问题"` - 快速问答（非交互式）
+  - `vibe chat skills` - 查看可用技能 (OpenCode)
+  - 统一命令接口：自动调用 `claude -p`、`opencode run` 或 `codex exec`
 - `config` 配置管理
 - `equip` 安装/更新 AI 工具 (Claude, OpenCode 等)
 - `env` 环境与密钥管理

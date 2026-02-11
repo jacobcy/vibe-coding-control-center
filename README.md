@@ -145,7 +145,13 @@ Vibe Coding Control Center 现在采用了 Git 风格的命令架构，提供了
 ### 主要命令
 
 - `vibe` - 交互式控制中心
-- `vibe chat` - 启动默认 AI 工具聊天
+- `vibe chat` - 快速启动 AI 工具对话
+  - 交互模式：`vibe chat` 或 `vc`
+  - 快速问答：`vibe chat "你的问题"`
+  - **高级特性 (Slash Commands)**：
+    - `vibe chat skills` 或 `vc skills` - 查看 AI 技能列表
+    - `vibe chat status` 或 `vc status` - 查看系统状态
+  - 统一接口，自动适配不同工具（claude/opencode/codex）
 - `vibe config` - 配置管理
 - `vibe equip` - 安装/更新 AI 工具
 - `vibe env` - 环境和密钥管理

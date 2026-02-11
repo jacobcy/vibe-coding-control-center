@@ -20,7 +20,7 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 | Command | Purpose | Location |
 |---------|---------|----------|
 | `vibe` | Interactive menu mode | Main script (`scripts/vibecoding.sh`) |
-| `vibe chat` | Start default AI tool chat | `bin/vibe-chat` |
+| `vibe chat` | 快速启动 AI 工具（交互或快速问答） | `bin/vibe-chat` |
 | `vibe config` | Manage Vibe Coding configuration | `bin/vibe-config` |
 | `vibe equip` | Install/update AI tools | `bin/vibe-equip` |
 | `vibe env` | Environment and key management | `bin/vibe-env` |
@@ -109,7 +109,8 @@ vibe
 
 # New command-based usage
 vibe equip              # Install/update tools
-vibe chat               # Start AI chat
+vibe chat               # Start AI chat (interactive)
+vibe chat "question"    # Quick Q&A (non-interactive)
 vibe config             # Manage configuration
 vibe init               # Initialize project
 vibe env                # Check environment

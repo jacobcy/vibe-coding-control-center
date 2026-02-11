@@ -8,7 +8,7 @@
 | `vibe` | 启动交互式控制面板 | 包含 Ignition, Equip, Keys, Sync, Diagnostics |
 | `vibe init --ai` | AI 初始化项目 | 默认模式，使用已安装工具生成文档 |
 | `vibe init --local` | 本地模板初始化项目 | 无 AI 工具时可用 |
-| `vibe chat` / `vc` | 快速进入对话 | 使用默认工具 |
+| `vibe chat` / `vc` | 快速进入对话 | 交互模式或快速问答 `vibe chat "问题"` |
 | `vibe keys` | API 密钥管理（快捷入口） | 等同 `vibe env keys` |
 | `vibe sync` | 同步当前工作区的 Git 身份 | 自动识别 Agent 类型并配置 user.name/email |
 | `vibe tdd new <name>` | **初始化 TDD 开发循环** | 自动创建分支及失败的测试模板 |

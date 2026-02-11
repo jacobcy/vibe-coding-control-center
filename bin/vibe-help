@@ -12,7 +12,7 @@ show_help() {
     echo "  -h, --help     Show this help message"
     echo ""
     echo "Commands:"
-    echo "  chat           Start default AI tool chat"
+    echo "  chat           快速启动 AI 工具（支持交互和快速问答）"
     echo "  equip          Install/update AI tools"
     echo "  env            Environment and key management"
     echo "  init           Initialize new project"

@@ -19,39 +19,90 @@ load_user_config
 
 do_chat() {
     local tool
+    local prompt="$1"
     tool=$(vibe_select_default_tool) || return 1
 
-    case "$tool" in
-        claude)
-            claude
-            ;;
-        opencode)
-            opencode
-            ;;
-        codex)
-            codex
-            ;;
-        *)
-            log_error "Unsupported tool: $tool"
-            return 1
-            ;;
-    esac
+    # Show current tool info
+    local model_info=""
+    if [[ "$tool" == "opencode" ]]; then
+        model_info="${VIBE_OPENCODE_MODEL:-default}"
+    elif [[ "$tool" == "claude" ]]; then
+        model_info="${ANTHROPIC_MODEL:-default}"
+    fi
+    
+    if [[ -n "$model_info" ]]; then
+        echo "🤖 Using AI Tool: \033[1;36m$tool\033[0m (Model: $model_info)"
+    else
+        echo "🤖 Using AI Tool: \033[1;36m$tool\033[0m"
+    fi
+
+    # 如果有参数，使用非交互式命令
+    if [[ -n "$prompt" ]]; then
+        case "$tool" in
+            claude)
+                claude -p "$prompt"
+                ;;
+            opencode)
+                if [[ -n "${VIBE_OPENCODE_MODEL:-}" ]]; then
+                    opencode run "$prompt" -m "$VIBE_OPENCODE_MODEL"
+                else
+                    opencode run "$prompt"
+                fi
+                ;;
+            codex)
+                codex exec "$prompt"
+                ;;
+            *)
+                log_error "Unsupported tool: $tool"
+                return 1
+                ;;
+        esac
+    else
+        # 无参数时启动交互模式
+        case "$tool" in
+            claude)
+                claude
+                ;;
+            opencode)
+                opencode
+                ;;
+            codex)
+                codex
+                ;;
+            *)
+                log_error "Unsupported tool: $tool"
+                return 1
+                ;;
+        esac
+    fi
 }
 
 # Handle help flag
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    echo "vibe-chat - Start default AI tool chat"
+    echo "vibe-chat - 快速启动 AI 工具对话"
     echo ""
-    echo "Usage: vibe chat"
+    echo "用法:"
+    echo "  vibe chat              启动交互式对话"
+    echo "  vibe chat \"问题\"       快速问答（非交互式）"
     echo ""
-    echo "Launch the default AI tool for interactive chat."
-    echo "The default tool is selected from Claude, OpenCode, or Codex."
+    echo "说明:"
+    echo "  自动使用默认 AI 工具 (Claude, OpenCode 或 Codex)"
+    echo "  统一的命令接口，无需记忆不同工具的命令格式"
     echo ""
-    echo "Options:"
-    echo "  -h, --help    Show this help message"
+    echo "示例:"
+    echo "  vibe chat                          # 启动交互模式"
+    echo "  vibe chat \"如何使用 git rebase\"    # 快速问答"
+    echo ""
+    echo "高级用法 (OpenCode):"
+    echo "  vibe chat skills                   # 查看可用技能"
+    echo "  vibe chat status                   # 查看状态"
+    echo "  vibe chat \"/slash_command\"       # 执行 OpenCode 斜杠命令"
+    echo ""
+    echo "选项:"
+    echo "  -h, --help    显示此帮助信息"
     echo ""
     exit 0
 fi
 
-# Run the chat function
-do_chat
+# Run the chat function with all arguments
+do_chat "$*"
