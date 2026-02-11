@@ -221,19 +221,6 @@ else
     log_error "Vibe chat tests failed"
 fi
 
-# Vibe Sync Tests
-echo -e "\n${CYAN}==========================================${NC}"
-echo -e "${CYAN}Vibe Sync Tests${NC}"
-echo -e "${CYAN}==========================================${NC}"
-SYNC_TESTS=1
-SYNC_PASSED=0
-if zsh "$SCRIPT_DIR/../tests/test_vibe_sync.sh"; then
-    log_success "Vibe sync tests passed"
-    SYNC_PASSED=1
-else
-    log_error "Vibe sync tests failed"
-fi
-
 # Vibe Equip Tests
 echo -e "\n${CYAN}==========================================${NC}"
 echo -e "${CYAN}Vibe Equip Tests${NC}"
@@ -248,9 +235,9 @@ else
 fi
 
 # Final summary
-TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS + AGENT_PLAN_TESTS + CHAT_TESTS + SYNC_TESTS + EQUIP_TESTS))
-TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED + AGENT_PLAN_PASSED + CHAT_PASSED + SYNC_PASSED + EQUIP_PASSED))
-TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED) + (AGENT_PLAN_TESTS-AGENT_PLAN_PASSED) + (CHAT_TESTS-CHAT_PASSED) + (SYNC_TESTS-SYNC_PASSED) + (EQUIP_TESTS-EQUIP_PASSED)))
+TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS + AGENT_PLAN_TESTS + CHAT_TESTS + EQUIP_TESTS))
+TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED + AGENT_PLAN_PASSED + CHAT_PASSED + EQUIP_PASSED))
+TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED) + (AGENT_PLAN_TESTS-AGENT_PLAN_PASSED) + (CHAT_TESTS-CHAT_PASSED) + (EQUIP_TESTS-EQUIP_PASSED)))
 
 echo -e "\n${CYAN}==========================================${NC}"
 echo -e "${CYAN}FINAL TEST RESULTS${NC}"

@@ -21,17 +21,33 @@ Following the PRD requirements, all development should follow a standardized Tes
    - Clean up code and documentation.
    - Final review and PR.
 
-## Using `tdd-init.sh`
+## Using `vibe flow`
 
-To start a new feature cycle, use the helper script:
+To start a new feature with TDD workflow:
+
 ```bash
-vibe tdd new <feature-name>
+# 1. Start feature workflow (creates worktree, PRD, etc.)
+vibe flow start <feature-name> --agent=claude
+
+# 2. Navigate to the worktree
+cd ../wt-claude-<feature-name>
+
+# 3. Write specification
+vibe flow spec
+
+# 4. Initialize tests (TDD Red Phase)
+vibe flow test
+
+# 5. Implement feature (TDD Green Phase)
+vibe flow dev
+
+# 6. Review and commit
+vibe flow review
 ```
-Or run directly:
-```bash
-./scripts/tdd-init.sh <feature-name>
-```
-This will:
-- Create a feature branch.
-- Generate a test template in `tests/test_<feature-name>.sh`.
-- Provide a starting point for implementation.
+
+This workflow:
+- Creates a dedicated worktree and branch
+- Generates PRD and spec documents
+- Creates test template in `tests/test_<feature-name>.sh`
+- Guides you through the TDD cycle
+- Tracks progress with workflow state

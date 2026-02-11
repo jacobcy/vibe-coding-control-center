@@ -156,9 +156,8 @@ Vibe Coding Control Center 现在采用了 Git 风格的命令架构，提供了
 - `vibe equip` - 安装/更新 AI 工具
 - `vibe env` - 环境和密钥管理
 - `vibe init` - 初始化新项目
-- `vibe sync` - 同步工作区身份
- - `vibe doctor` - 运行系统诊断（包含健康检查）
-- `vibe tdd` - TDD 特性管理
+- `vibe doctor` - 运行系统诊断（包含健康检查）
+- `vibe flow` - 特性开发工作流管理
 - `vibe help` - 显示帮助信息
 - `vibe -h` / `vibe --help` - 显示帮助信息
 

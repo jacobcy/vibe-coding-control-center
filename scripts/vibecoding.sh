@@ -107,25 +107,14 @@ if [[ $# -gt 0 ]]; then
              echo "  env            Environment and key management"
              echo "  keys           Key management"
              echo "  init           Initialize new project"
-             echo "  sync           Sync workspace identity"
              echo "  doctor         System health check (includes diagnostics)"
-             echo "  tdd            TDD feature management"
+             echo "  flow           Feature development workflow"
              echo ""
              echo "Run 'vibe' without arguments for interactive mode."
              exit 0
             ;;
-        tdd)
-            if [[ "${1:-}" == "new" ]]; then
-                shift
-                zsh "$SCRIPT_DIR/../scripts/tdd-init.sh" "$@"
-                exit 0
-            else
-                log_error "Usage: vibe tdd new <feature-name>"
-                exit 1
-            fi
-            ;;
-        sync)
-            zsh "${VIBE_ROOT}/bin/vibe-sync"
+        flow)
+            zsh "${VIBE_ROOT}/bin/vibe-flow" "$@"
             exit 0
             ;;
         keys)
@@ -173,16 +162,15 @@ while true; do
     echo -e "  ${GREEN}1)${NC} ${BOLD}IGNITION${NC}    (Start New Project)"
     echo -e "  ${GREEN}2)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
     echo -e "  ${GREEN}3)${NC} ${BOLD}ENV${NC}         (Environment & Keys)"
-    echo -e "  ${GREEN}4)${NC} ${BOLD}SYNC${NC}        (Sync Workspace Identity)"
+    echo -e "  ${GREEN}4)${NC} ${BOLD}FLOW${NC}        (Feature Development Workflow)"
     echo -e "  ${GREEN}5)${NC} ${BOLD}DOCTOR${NC}      (System Health & Diagnostics)"
     echo -e "  ${GREEN}6)${NC} ${BOLD}CHAT${NC}        (AI Tool Chat)"
     echo -e "  ${GREEN}7)${NC} ${BOLD}CONFIG${NC}      (Manage Configuration)"
     echo -e "  ${GREEN}8)${NC} ${BOLD}INIT${NC}        (Quick Project Init)"
-    echo -e "  ${GREEN}9)${NC} ${BOLD}TDD${NC}         (TDD Feature Management)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
-    OPTION=$(prompt_user "Select command (1-9, q)" "" "")
+    OPTION=$(prompt_user "Select command (1-8, q)" "" "")
 
     case $OPTION in
         1) 
@@ -196,7 +184,8 @@ while true; do
             zsh "$SCRIPT_DIR/env-manager.sh" 
             ;;
         4) 
-            zsh "${VIBE_ROOT}/bin/vibe-sync" 
+            # Flow command - feature development workflow
+            zsh "${VIBE_ROOT}/bin/vibe-flow"
             press_enter "Press Enter to continue..."
             ;;
         5) 
@@ -215,30 +204,6 @@ while true; do
             # Quick init command - reused vibe-init
             zsh "${VIBE_ROOT}/bin/vibe-init"
             press_enter "Press Enter to continue..."
-            ;;
-        9) 
-            # TDD command - show options
-            echo -e "\n${YELLOW}TDD Options:${NC}"
-            echo -e "  ${GREEN}n)${NC} ${BOLD}NEW${NC}         (Create TDD template)"
-            echo -e "  ${GREEN}b)${NC} ${BOLD}BACK${NC}        (Return to main menu)"
-            echo ""
-            
-            TDD_OPTION=$(prompt_user "Select option (n/b)" "" "")
-            
-            case $TDD_OPTION in
-                n|N) 
-                    echo -e "\n${YELLOW}Enter feature name for TDD:${NC}"
-                    FEATURE_NAME=$(prompt_user "Feature name" "")
-                    if [[ -n "$FEATURE_NAME" ]]; then
-                        zsh "$SCRIPT_DIR/../scripts/tdd-init.sh" "$FEATURE_NAME"
-                    fi
-                    ;;
-                b|B) 
-                    continue ;;  # Go back to main menu
-                *)
-                    log_warn "Invalid option: $TDD_OPTION"
-                    ;;
-            esac
             ;;
         q|Q)
             log_success "Happy Coding!"

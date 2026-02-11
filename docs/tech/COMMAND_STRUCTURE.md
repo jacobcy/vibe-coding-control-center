@@ -25,9 +25,8 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 | `vibe equip` | Install/update AI tools | `bin/vibe-equip` |
 | `vibe env` | Environment and key management | `bin/vibe-env` |
 | `vibe init` | Initialize new project | `bin/vibe-init` |
-| `vibe sync` | Sync workspace identity | `bin/vibe-sync` |
- | `vibe doctor` | System health check (includes diagnostics) | `bin/vibe-doctor` |
-| `vibe tdd` | TDD feature management | `bin/vibe-tdd` |
+| `vibe doctor` | System health check (includes diagnostics) | `bin/vibe-doctor` |
+| `vibe flow` | Feature development workflow | `bin/vibe-flow` |
 | `vibe help` | Show help information | Built into dispatcher (`bin/vibe`) |
 | `vibe -h`, `vibe --help` | Show help information | Built into dispatcher (`bin/vibe`) |
 
@@ -42,9 +41,8 @@ vibe-coding-control-center/
 │   ├── vibe-equip            # Tool installation/update command
 │   ├── vibe-env              # Environment management command
 │   ├── vibe-init             # Project initialization command
-│   ├── vibe-sync             # Workspace sync command
- │   ├── vibe-doctor           # System health check command
-│   ├── vibe-tdd              # TDD management command
+│   ├── vibe-doctor           # System health check command
+│   ├── vibe-flow             # Feature workflow command
 │   └── vibe-help             # Help command
 ├── scripts/                   # Implementation scripts
 │   ├── vibecoding.sh        # Main control center (now modular)
@@ -114,9 +112,9 @@ vibe chat "question"    # Quick Q&A (non-interactive)
 vibe config             # Manage configuration
 vibe init               # Initialize project
 vibe env                # Check environment
-vibe sync               # Sync git identity
- vibe doctor             # Run system health check (includes diagnostics)
-vibe tdd new feature    # Create TDD template
+vibe doctor             # Run system health check (includes diagnostics)
+vibe flow start feature # Start feature workflow
+vibe flow test          # Initialize TDD test
 
 # Help
 vibe help               # General help

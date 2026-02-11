@@ -16,13 +16,12 @@ else
     exit 1
 fi
 
-# 2. Verify vibe tdd
-echo -n "Testing 'vibe tdd'... "
-# We expect a usage error if we don't provide args, but not an "Unknown subcommand" error
-if vibe tdd 2>&1 | grep -q "Usage: vibe tdd new"; then
+# 2. Verify vibe flow
+echo -n "Testing 'vibe flow'... "
+if vibe flow 2>&1 | grep -q "vibe flow"; then
     echo "OK"
 else
-    echo "FAILED (likely dispatcher didn't find the shim)"
+    echo "FAILED (vibe flow command not working)"
     exit 1
 fi
 
