@@ -2,34 +2,55 @@
 
 typeset -gA VIBE_CONFIG
 
-find_vibe_home() {
-    # 1. Use VIBE_HOME if explicitly set
-    if [[ -n "${VIBE_HOME:-}" ]]; then
-        echo "$VIBE_HOME"
+# Auto-detect VIBE_ROOT (project root directory).
+# VIBE_HOME is always derived as $VIBE_ROOT/.vibe — never configured separately.
+#
+# Search order:
+#   1. This script's own location (lib/config.sh → parent = project root)
+#   2. Caller-set VIBE_ROOT (bin/vibe-* set it before sourcing us)
+#   3. PWD upward walk looking for .vibe/
+#   4. Git repository root
+#   5. $HOME (fallback — $HOME/.vibe as global config)
+_find_vibe_root() {
+    # 1. Infer from this script's own location — most reliable
+    local _dir="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+    local _root="$(cd "${_dir}/.." && pwd)"
+    if [[ -d "${_root}/.vibe" && -d "${_root}/bin" && -d "${_root}/lib" ]]; then
+        echo "${_root}"
         return
     fi
 
-    # 2. Check current directory
-    if [[ -d "$PWD/.vibe" ]]; then
-        echo "$PWD/.vibe"
+    # 2. Caller already set VIBE_ROOT (e.g. bin/vibe-env line 6)
+    if [[ -n "${VIBE_ROOT:-}" && -d "${VIBE_ROOT}/.vibe" ]]; then
+        echo "${VIBE_ROOT}"
         return
     fi
 
-    # 3. Check git root (if in a git repo)
+    # 3. Walk up from PWD looking for a .vibe directory
+    local _cur="$PWD"
+    while [[ "$_cur" != "/" ]]; do
+        if [[ -d "${_cur}/.vibe" ]]; then
+            echo "${_cur}"
+            return
+        fi
+        _cur="$(dirname "${_cur}")"
+    done
+
+    # 4. Git repository root
     if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        local git_root
-        git_root="$(git rev-parse --show-toplevel)"
-        if [[ -d "$git_root/.vibe" ]]; then
-            echo "$git_root/.vibe"
+        local _gr="$(git rev-parse --show-toplevel)"
+        if [[ -d "${_gr}/.vibe" ]]; then
+            echo "${_gr}"
             return
         fi
     fi
 
-    # 4. Fallback to user home
-    echo "$HOME/.vibe"
+    # 5. Fallback — treat $HOME as the root ($HOME/.vibe is global config)
+    echo "$HOME"
 }
 
-VIBE_HOME="$(find_vibe_home)"
+VIBE_ROOT="$(_find_vibe_root)"
+VIBE_HOME="$VIBE_ROOT/.vibe"
 
 initialize_config() {
     local script_dir_realpath="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"

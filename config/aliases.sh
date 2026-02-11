@@ -9,11 +9,9 @@
 # ======================================================
 
 # ---------- Base ----------
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
-
-# Resolve VIBE_ROOT from symlink (Zsh specific :A modifier)
-# ${(%):-%x} gives source file path, :A resolves to absolute physical path
+# Resolve VIBE_ROOT from this file's real path (symlink-safe via :A modifier)
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x:A}")/.." && pwd)"
+VIBE_HOME="$VIBE_ROOT/.vibe"
 
 VIBE_REPO="$(dirname "$VIBE_ROOT")"
 VIBE_MAIN="$VIBE_REPO/main"

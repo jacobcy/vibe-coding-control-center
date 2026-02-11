@@ -3,41 +3,34 @@
 
 set -e
 
-# context shim: auto-switch to local vibe if VIBE_ROOT is defined in local config
+# Context shim: auto-switch to the local project's vibe when a .vibe/ directory
+# is found nearby.  VIBE_ROOT is inferred from the .vibe parent — no config needed.
 if [[ -z "${VIBE_NO_SHIM}" ]]; then
-    _local_keys=""
-    if [[ -d "${PWD}/.vibe" && -f "${PWD}/.vibe/keys.env" ]]; then
-        _local_keys="${PWD}/.vibe/keys.env"
-    elif command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-         _gr="$(git rev-parse --show-toplevel 2>/dev/null)"
-         if [[ -d "${_gr}/.vibe" && -f "${_gr}/.vibe/keys.env" ]]; then
-             _local_keys="${_gr}/.vibe/keys.env"
-         fi
+    _local_vibe=""
+    # Walk up from PWD looking for .vibe/
+    _cur="$PWD"
+    while [[ "$_cur" != "/" ]]; do
+        if [[ -d "${_cur}/.vibe" ]]; then
+            _local_vibe="${_cur}"
+            break
+        fi
+        _cur="$(dirname "$_cur")"
+    done
+    # Fallback: git root
+    if [[ -z "$_local_vibe" ]] && command -v git >/dev/null 2>&1 \
+        && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        _gr="$(git rev-parse --show-toplevel 2>/dev/null)"
+        [[ -d "${_gr}/.vibe" ]] && _local_vibe="${_gr}"
     fi
 
-    if [[ -n "${_local_keys}" ]]; then
-        # 1. Try to get VIBE_ROOT from keys.env
-        _local_root="$(grep '^VIBE_ROOT=' "${_local_keys}" | cut -d= -f2- | tr -d '"' | tr -d "'")"
-        
+    if [[ -n "${_local_vibe}" ]]; then
+        _local_bin="${_local_vibe}/bin/vibe"
+        _current_script_abs="$(cd "$(dirname "${(%):-%x}")" && pwd)/$(basename "${(%):-%x}")"
 
-
-        # 3. Fallback: Assume parent of .vibe is VIBE_ROOT (Convention)
-        if [[ -z "${_local_root}" ]]; then
-            _local_home="$(dirname "${_local_keys}")"
-            _local_root="$(dirname "${_local_home}")"
-        fi
-
-        if [[ -n "${_local_root}" && -d "${_local_root}" ]]; then
-             _local_bin="${_local_root}/bin/vibe"
-             _current_script="${(%):-%x}"
-             _current_script_abs="$(cd "$(dirname "$_current_script")" && pwd)/$(basename "$_current_script")"
-             
-             # If local bin exists, is executable, and is NOT this script
-             if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" ]]; then
-                 export VIBE_NO_SHIM=1
-                 # Handover execution
-                 exec "${_local_bin}" "$@"
-             fi
+        # If local bin exists, is executable, and is NOT this script → hand over
+        if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" ]]; then
+            export VIBE_NO_SHIM=1
+            exec "${_local_bin}" "$@"
         fi
     fi
 fi

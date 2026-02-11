@@ -7,9 +7,6 @@
 
 ## Incidents & Lessons Learned
 - **[2026-02-11] Critical Incident: Unrelated Code Modification**
-  - **Event**: Removed `VIBE_HOME` user documentation from `keys.template.env` while implementing `VIBE_AGENT`.
-  - **Impact**: Obscured configuration guidance for multi-branch development, causing user confusion.
-  - **Root Cause**: Over-aggressive template cleanup without respecting existing context/intent.
   - **Correction Rule**: **NEVER modify or remove code/comments unrelated to the current feature.** Documentation is functional code for users.
 
 
@@ -44,14 +41,14 @@
 
 - **Design Principle**: "Orchestrate and integrate" rather than "reimplement and replace"
 
-## Concept Clarity (2026-02-11)
-- **VIBE_HOME vs VIBE_ROOT**:
-  - **VIBE_HOME** (`~/.vibe` or `project/.vibe`): **Configuration Center**. Stores user settings (`keys.env`), aliases, and localized config files.
-  - **VIBE_ROOT** (install dir or project root): **Runtime Core**. Stores the executable code (`bin/`, `lib/`, `scripts/`).
-  - **Relation**: `bin/vibe` auto-detects `VIBE_ROOT` from `VIBE_HOME` via `keys.env` > `vibe_root` file > parent directory inference.
+## Concept Clarity (2026-02-11, updated)
+- **Path auto-detection**: `VIBE_ROOT` and `VIBE_HOME` are **internal implementation details**, never user-configured.
+  - `VIBE_ROOT` is auto-detected from the executing script's location or by walking up from PWD to find a `.vibe/` directory.
+  - `VIBE_HOME` is always `$VIBE_ROOT/.vibe` (fixed relationship).
+  - `keys.env` only stores **user configuration** (API keys, tool selection, agent identity) — no path variables.
 
 - **Multi-Branch Development Mode**:
-  - **Mechanism**: The `vibe` command is context-aware. It checks for a local `.vibe` directory in the current working directory (or git root).
+  - **Mechanism**: The `vibe` command is context-aware. It walks up from PWD looking for a `.vibe` directory.
   - **Workflow**:
     1. Clone/Worktree a new branch.
     2. Ensure the branch has a `.vibe` folder (synced via `vibe-init` or manual setup).

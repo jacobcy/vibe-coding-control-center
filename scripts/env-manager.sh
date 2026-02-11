@@ -12,7 +12,6 @@ source "$SCRIPT_DIR/../lib/utils.sh"
 source "$SCRIPT_DIR/../lib/config.sh"
 source "$SCRIPT_DIR/../lib/config_init.sh"
 
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 KEYS_FILE="$VIBE_HOME/keys.env"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_FILE="$PROJECT_ROOT/config/keys.template.env"

@@ -11,7 +11,6 @@ source "$VIBE_ROOT/lib/config.sh"
 source "$VIBE_ROOT/lib/config_init.sh"
 source "$VIBE_ROOT/lib/i18n.sh"
 
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 KEYS_FILE="$VIBE_HOME/keys.env"
 
 # Show help
