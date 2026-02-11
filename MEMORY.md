@@ -33,5 +33,20 @@
   - Rewrote `lib/flow.sh` to leverage existing tools (`wtnew`, `vup`, `wtrm` from aliases.sh)
   - Integrated external tools: `gh` (PR management), `lazygit` (code review), `tmux` (workspace)
   - Implemented complete workflow lifecycle: start → spec → test → dev → review → pr → done
+
 - **Design Principle**: "Orchestrate and integrate" rather than "reimplement and replace"
+
+## Concept Clarity (2026-02-11)
+- **VIBE_HOME vs VIBE_ROOT**:
+  - **VIBE_HOME** (`~/.vibe` or `project/.vibe`): **Configuration Center**. Stores user settings (`keys.env`), aliases, and localized config files.
+  - **VIBE_ROOT** (install dir or project root): **Runtime Core**. Stores the executable code (`bin/`, `lib/`, `scripts/`).
+  - **Relation**: `bin/vibe` auto-detects `VIBE_ROOT` from `VIBE_HOME` via `keys.env` > `vibe_root` file > parent directory inference.
+
+- **Multi-Branch Development Mode**:
+  - **Mechanism**: The `vibe` command is context-aware. It checks for a local `.vibe` directory in the current working directory (or git root).
+  - **Workflow**:
+    1. Clone/Worktree a new branch.
+    2. Ensure the branch has a `.vibe` folder (synced via `vibe-init` or manual setup).
+    3. Running `vibe` inside that folder automatically delegates execution to **that specific branch's** `bin/vibe`.
+  - **Benefit**: Allows developing and testing different versions of Vibe core logic simultaneously in different worktrees without conflicts.
 

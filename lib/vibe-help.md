@@ -17,15 +17,13 @@
   - `vibe chat skills` - 查看可用技能 (OpenCode)
   - 统一命令接口：自动调用 `claude -p`、`opencode run` 或 `codex exec`
 - `config` **AI工具配置管理** (OpenCode, Codex配置文件)
+- `doctor` 系统健康检查（包含诊断）
 - `env` **环境变量管理** (keys.env, API keys)
 - `equip` 安装/更新 AI 工具 (Claude, OpenCode 等)
 - `flow` **特性开发工作流** (PRD → 规格 → 测试 → 开发)
 - `help` 显示帮助信息
-- `init` 初始化新项目
-- `keys` 快速访问环境变量（`vibe env show` 的别名）
-- `sync` 同步工作区身份
-- `doctor` 系统健康检查（包含诊断）
-- `tdd` TDD 功能管理
+- `init` 启动新项目 (Start New Project)
+- `keys` 快速浏览 API keys（`vibe env show` 的别名）
 
 ## 环境管理子命令 (vibe env)
 

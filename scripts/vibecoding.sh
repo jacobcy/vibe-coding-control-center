@@ -159,49 +159,43 @@ while true; do
     zsh "${VIBE_ROOT}/bin/vibe-doctor"
 
     echo -e "${BOLD}COMMANDS:${NC}"
-    echo -e "  ${GREEN}1)${NC} ${BOLD}IGNITION${NC}    (Start New Project)"
-    echo -e "  ${GREEN}2)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
-    echo -e "  ${GREEN}3)${NC} ${BOLD}ENV${NC}         (Environment & Keys)"
-    echo -e "  ${GREEN}4)${NC} ${BOLD}FLOW${NC}        (Feature Development Workflow)"
-    echo -e "  ${GREEN}5)${NC} ${BOLD}DOCTOR${NC}      (System Health & Diagnostics)"
-    echo -e "  ${GREEN}6)${NC} ${BOLD}CHAT${NC}        (AI Tool Chat)"
-    echo -e "  ${GREEN}7)${NC} ${BOLD}CONFIG${NC}      (Manage Configuration)"
-    echo -e "  ${GREEN}8)${NC} ${BOLD}INIT${NC}        (Quick Project Init)"
+    echo -e "  ${GREEN}1)${NC} ${BOLD}CHAT${NC}        (AI Tool Chat)"
+    echo -e "  ${GREEN}2)${NC} ${BOLD}CONFIG${NC}      (Manage Configuration)"
+    echo -e "  ${GREEN}3)${NC} ${BOLD}DOCTOR${NC}      (System Health & Diagnostics)"
+    echo -e "  ${GREEN}4)${NC} ${BOLD}ENV${NC}         (Environment & Keys)"
+    echo -e "  ${GREEN}5)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
+    echo -e "  ${GREEN}6)${NC} ${BOLD}FLOW${NC}        (Feature Development Workflow)"
+    echo -e "  ${GREEN}7)${NC} ${BOLD}INIT${NC}        (Start New Project)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
-    OPTION=$(prompt_user "Select command (1-8, q)" "" "")
+    OPTION=$(prompt_user "Select command (1-7, q)" "" "")
 
     case $OPTION in
         1) 
-            zsh "${VIBE_ROOT}/bin/vibe-init"
-            press_enter "Press Enter to continue..."
+            zsh "${VIBE_ROOT}/bin/vibe-chat" 
             ;;
         2) 
-            zsh "${VIBE_ROOT}/bin/vibe-equip" 
+            # Config command - launch the config manager
+            zsh "${VIBE_ROOT}/bin/vibe-config" 
             ;;
         3) 
-            zsh "$SCRIPT_DIR/env-manager.sh" 
+            # vibe-doctor --diagnostics
+            zsh "${VIBE_ROOT}/bin/vibe-doctor" --diagnostics
+            press_enter "Press Enter to return..."
             ;;
         4) 
+            zsh "$SCRIPT_DIR/env-manager.sh" 
+            ;;
+        5) 
+            zsh "${VIBE_ROOT}/bin/vibe-equip" 
+            ;;
+        6) 
             # Flow command - feature development workflow
             zsh "${VIBE_ROOT}/bin/vibe-flow"
             press_enter "Press Enter to continue..."
             ;;
-        5) 
-            # vibe-doctor --diagnostics for option 5
-            zsh "${VIBE_ROOT}/bin/vibe-doctor" --diagnostics
-            press_enter "Press Enter to return..."
-            ;;
-        6) 
-            zsh "${VIBE_ROOT}/bin/vibe-chat" 
-            ;;
         7) 
-            # Config command - launch the config manager
-            zsh "${VIBE_ROOT}/bin/vibe-config" 
-            ;;
-        8) 
-            # Quick init command - reused vibe-init
             zsh "${VIBE_ROOT}/bin/vibe-init"
             press_enter "Press Enter to continue..."
             ;;
