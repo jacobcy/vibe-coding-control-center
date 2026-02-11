@@ -41,7 +41,8 @@ Examples:
   vibe env sync                      # Sync from project config
   vibe env verify                    # Test API keys
 
-Configuration file: ~/.vibe/keys.env
+Configuration file: ~/.vibe/keys.env (Default)
+Path Resolution: Local .vibe/ > Git Root .vibe/ > User ~/.vibe/
 EOF
 }
 

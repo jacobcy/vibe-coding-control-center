@@ -49,7 +49,12 @@ fi
 # 2. Priority: Persisted Choice in keys.env
 if [[ -z "$AGENT" && -f "$KEYS_FILE" ]]; then
     AGENT=$(get_env_value "VIBE_AGENT" "$KEYS_FILE" || true)
-    if [[ -n "$AGENT" ]]; then
+    
+    # Fallback to VIBE_DEFAULT_TOOL if VIBE_AGENT is not set
+    if [[ -z "$AGENT" ]]; then
+        AGENT=$(get_env_value "VIBE_DEFAULT_TOOL" "$KEYS_FILE" || true)
+        [[ -n "$AGENT" ]] && log_info "Using agent from VIBE_DEFAULT_TOOL: $AGENT"
+    else
         log_info "Using agent from config: $AGENT"
     fi
 fi

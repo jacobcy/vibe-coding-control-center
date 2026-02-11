@@ -55,7 +55,7 @@ vibe_select_default_tool() {
     local config_default_tool=""
     local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
     if [[ -f "$vibe_home/keys.env" ]]; then
-        config_default_tool=$(grep "^VIBE_DEFAULT_TOOL=" "$vibe_home/keys.env" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//')
+        config_default_tool=$(grep "^VIBE_DEFAULT_TOOL=" "$vibe_home/keys.env" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//' || echo "")
     fi
     
     if [[ -n "$config_default_tool" ]] && vibe_tool_installed "$config_default_tool"; then
@@ -63,7 +63,17 @@ vibe_select_default_tool() {
         return 0
     fi
 
-    # Priority 3: Use first installed tool (opencode > claude > codex)
+    # Priority 3: Fallback to VIBE_AGENT identity if it matches an installed tool
+    local config_agent=""
+    if [[ -f "$vibe_home/keys.env" ]]; then
+        config_agent=$(grep "^VIBE_AGENT=" "$vibe_home/keys.env" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//' || echo "")
+    fi
+    if [[ -n "$config_agent" ]] && vibe_tool_installed "$config_agent"; then
+        echo "$config_agent"
+        return 0
+    fi
+
+    # Priority 4: Use first installed tool (opencode > claude > codex)
     echo "${installed[1]}"
 }
 
