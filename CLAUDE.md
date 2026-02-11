@@ -110,7 +110,7 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 - Add new utility function: Add to `lib/utils.sh` and source from other scripts
 - Initialize new project: Use `./install/init-project.sh [project-name]` or `ignition` alias
 - Install/update tools: Use `./scripts/vibecoding.sh` → Equip option or `vibe` alias
-- Run diagnostics: Use `./scripts/vibecoding.sh` → Diagnostics option
+ - Run diagnostics: Use `./scripts/vibecoding.sh` → Doctor option
 - Validate security: Use the validation functions from utils.sh
 - Run tests: `./tests/test_new_features.sh` or `./tests/test_status_display.sh`
 
