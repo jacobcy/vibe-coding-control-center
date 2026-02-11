@@ -151,8 +151,8 @@ case "${1:-}" in
         ;;
     
     *)
-        log_error "Unknown command: $1"
-        echo "Run 'vibe flow help' for usage."
+        echo "Unknown subcommand: $1" >&2
+        echo "Available: $(ls -1 "$VIBE_ROOT/bin/vibe-flow-*" 2>/dev/null | sed -n 's/.*vibe-flow-//p' | tr '\n' ' ') start spec test dev review pr done signature status" >&2
         exit 1
         ;;
 esac
