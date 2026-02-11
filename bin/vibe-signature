@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# vibe-sync - Synchronize Git identity in current worktree
+# vibe-signature - Manage Git user identity for current worktree
 
 set -e
 
@@ -11,9 +11,10 @@ source "$VIBE_ROOT/lib/config.sh"
 
 # Show help if requested
 if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
-    echo "vibe sync - Synchronize Git identity in current worktree"
+    echo "vibe signature - Manage Git user identity for current worktree"
     echo ""
-    echo "Usage: vibe sync [agent]"
+    echo "Usage: vibe signature [agent]"
+    echo "       vibe sign [agent]     (alias)"
     echo ""
     echo "Arguments:"
     echo "  agent       Optional agent name (claude, opencode, codex)"
@@ -24,7 +25,7 @@ fi
 
 # Ensure we are in a git repository
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    log_error "Not in a git repository. Cannot sync identity."
+    log_error "Not in a git repository. Cannot apply signature."
     exit 1
 fi
 
@@ -48,6 +49,6 @@ AGENT_EMAIL="agent-${AGENT}@vibecoding.ai"
 git config user.name "$AGENT_NAME"
 git config user.email "$AGENT_EMAIL"
 
-log_success "Git identity synchronized for agent: $AGENT"
+log_success "Git signature applied for agent: $AGENT"
 echo "  Name:  $AGENT_NAME"
 echo "  Email: $AGENT_EMAIL"

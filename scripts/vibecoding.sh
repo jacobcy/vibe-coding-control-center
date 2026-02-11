@@ -166,7 +166,7 @@ while true; do
     echo -e "  ${GREEN}5)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
     echo -e "  ${GREEN}6)${NC} ${BOLD}FLOW${NC}        (Feature Development Workflow)"
     echo -e "  ${GREEN}7)${NC} ${BOLD}INIT${NC}        (Start New Project)"
-    echo -e "  ${GREEN}8)${NC} ${BOLD}SYNC${NC}        (Sync Git Identity)"
+    echo -e "  ${GREEN}8)${NC} ${BOLD}SIGNATURE${NC}   (Git Identity Signature)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
@@ -201,7 +201,7 @@ while true; do
             press_enter "Press Enter to continue..."
             ;;
         8) 
-            zsh "${VIBE_ROOT}/bin/vibe-sync"
+            zsh "${VIBE_ROOT}/bin/vibe-signature"
             press_enter "Press Enter to continue..."
             ;;
         q|Q)

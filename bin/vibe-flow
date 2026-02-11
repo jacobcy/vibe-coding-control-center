@@ -134,6 +134,11 @@ case "${1:-}" in
         flow_cmd_done "$@"
         ;;
     
+    signature|sign)
+        shift
+        exec zsh "$VIBE_ROOT/bin/vibe-signature" "$@"
+        ;;
+    
     status)
         shift
         flow_cmd_status "$@"
