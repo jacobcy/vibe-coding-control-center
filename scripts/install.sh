@@ -60,16 +60,18 @@ ensure_oh_my_zsh || true
 log_step "Initializing ~/.vibe configuration directory"
 VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VIBE_BIN="$VIBE_ROOT/bin"
-VIBE_HOME="$HOME/.vibe"
+VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 
 mkdir -p "$VIBE_HOME"
 
-if [[ -f "$VIBE_ROOT/config/keys.template.env" ]] && [[ ! -f "$VIBE_HOME/keys.env" ]]; then
-    cp "$VIBE_ROOT/config/keys.template.env" "$VIBE_HOME/keys.env"
-    chmod 600 "$VIBE_HOME/keys.env"
-    log_info "Created ~/.vibe/keys.env from template (edit with your actual keys)"
-elif [[ -f "$VIBE_HOME/keys.env" ]]; then
+if [[ -f "$VIBE_HOME/keys.env" ]]; then
     log_info "~/.vibe/keys.env already exists"
+elif [[ -f "$VIBE_ROOT/config/keys.env" ]]; then
+    cp "$VIBE_ROOT/config/keys.env" "$VIBE_HOME/keys.env"
+    chmod 600 "$VIBE_HOME/keys.env"
+    log_success "Installed keys.env from project config"
+else
+    log_warn "No keys.env found in $VIBE_ROOT/config/. Please configure ~/.vibe/keys.env manually."
 fi
 
 cp "$VIBE_ROOT/config/aliases.sh" "$VIBE_HOME/aliases.sh"

@@ -150,7 +150,7 @@ create_default_translations() {
   "welcome_message": "Welcome to Vibe Coding Control Center!",
   "menu_option_ignition": "IGNITION (Start New Project)",
   "menu_option_equip": "EQUIP (Install/Update Tools)",
-  "menu_option_diagnostics": "DIAGNOSTICS (System Check)",
+  "menu_option_diagnostics": "DOCTOR (System Health & Diagnostics)",
   "system_status": "SYSTEM STATUS:",
   "installing_claude": "Installing Claude CLI...",
   "installing_opencode": "Installing OpenCode...",

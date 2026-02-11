@@ -48,11 +48,12 @@ check_status() {
     fi
 
     # 4. Environment
-    KEYS_FILE="$HOME/.vibe/keys.env"
+    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    KEYS_FILE="$vibe_home/keys.env"
     if [ -f "$KEYS_FILE" ]; then
-        log_info "Keys Config    : Found (~/.vibe/keys.env)"
+        log_info "Keys Config    : Found ($vibe_home/keys.env)"
     else
-        log_warn "Keys Config    : Missing (~/.vibe/keys.env)"
+        log_warn "Keys Config    : Missing ($vibe_home/keys.env)"
     fi
 
     # 5. MCP Configuration
@@ -83,7 +84,8 @@ do_init_keys() {
     echo -e "\n${YELLOW}>> INITIALIZING API KEYS <<${NC}"
     
     local keys_template="${SCRIPT_DIR:-.}/../config/keys.template.env"
-    local keys_file="$HOME/.vibe/keys.env"
+    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    local keys_file="$vibe_home/keys.env"
     
     if [[ -f "$keys_file" ]]; then
         log_info "Keys file already exists: $keys_file"

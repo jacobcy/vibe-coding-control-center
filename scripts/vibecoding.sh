@@ -77,27 +77,28 @@ if [[ $# -gt 0 ]]; then
     shift
     
     case "$COMMAND" in
-        --help|-h)
-            echo "Vibe Coding Control Center"
-            echo ""
-            echo "Usage: vibe [options] [command]"
-            echo ""
-            echo "Options:"
-            echo "  -h, --help     Show this help message"
-            echo ""
-            echo "Commands:"
-            echo "  (no args)      Launch interactive control center"
-            echo "  chat           Start default AI tool chat"
-            echo "  equip          Install/update AI tools"
-            echo "  env            Environment and key management"
-            echo "  keys           Key management"
-            echo "  init           Initialize new project"
-            echo "  sync           Sync workspace identity"
-            echo "  diagnostics    Run system diagnostics"
-            echo "  tdd            TDD feature management"
-            echo ""
-            echo "Run 'vibe' without arguments for interactive mode."
-            exit 0
+--help|-h)
+             echo "Vibe Coding Control Center"
+             echo ""
+             echo "Usage: vibe [options] [command]"
+             echo ""
+             echo "Options:"
+             echo "  -h, --help     Show this help message"
+             echo ""
+             echo "Commands:"
+             echo "  (no args)      Launch interactive control center"
+             echo "  chat           Start default AI tool chat"
+             echo "  config         Manage Vibe Coding configuration"
+             echo "  equip          Install/update AI tools"
+             echo "  env            Environment and key management"
+             echo "  keys           Key management"
+             echo "  init           Initialize new project"
+             echo "  sync           Sync workspace identity"
+             echo "  doctor         System health check (includes diagnostics)"
+             echo "  tdd            TDD feature management"
+             echo ""
+             echo "Run 'vibe' without arguments for interactive mode."
+             exit 0
             ;;
         tdd)
             if [[ "${1:-}" == "new" ]]; then
@@ -125,12 +126,15 @@ if [[ $# -gt 0 ]]; then
             do_chat
             exit 0
             ;;
+        config)
+            exec zsh "${VIBE_ROOT}/bin/vibe-config" "$@"
+            ;;
         equip)
             do_equip
             exit 0
             ;;
-        diagnostics)
-            do_diagnostics
+        doctor)
+            zsh "${VIBE_ROOT}/bin/vibe-doctor"
             exit 0
             ;;
         init)
@@ -165,18 +169,56 @@ while true; do
     echo -e "  ${GREEN}2)${NC} ${BOLD}EQUIP${NC}       (Install/Update Tools)"
     echo -e "  ${GREEN}3)${NC} ${BOLD}ENV${NC}         (Environment & Keys)"
     echo -e "  ${GREEN}4)${NC} ${BOLD}SYNC${NC}        (Sync Workspace Identity)"
-    echo -e "  ${GREEN}5)${NC} ${BOLD}DIAGNOSTICS${NC} (System Check)"
+    echo -e "  ${GREEN}5)${NC} ${BOLD}DOCTOR${NC}      (System Health & Diagnostics)"
+    echo -e "  ${GREEN}6)${NC} ${BOLD}CHAT${NC}        (AI Tool Chat)"
+    echo -e "  ${GREEN}7)${NC} ${BOLD}CONFIG${NC}      (Manage Configuration)"
+    echo -e "  ${GREEN}8)${NC} ${BOLD}INIT${NC}        (Quick Project Init)"
+    echo -e "  ${GREEN}9)${NC} ${BOLD}TDD${NC}         (TDD Feature Management)"
     echo -e "  ${RED}q)${NC} Quit"
     echo ""
 
-    OPTION=$(prompt_user "Select command (1-5, q)" "" "")
+    OPTION=$(prompt_user "Select command (1-9, q)" "" "")
 
     case $OPTION in
         1) do_ignition ;;
         2) do_equip ;;
         3) zsh "$SCRIPT_DIR/env-manager.sh" ;;
         4) do_sync_identity ;;
-        5) do_diagnostics ;;
+        5) zsh "${VIBE_ROOT}/bin/vibe-doctor" ;;
+        6) do_chat ;;
+        7) 
+            # Config command - launch the config manager
+            zsh "${VIBE_ROOT}/bin/vibe-config" ;;
+        8) 
+            # Quick init command 
+            local mode="ai"
+            vibe_collect_init_answers || continue
+            vibe_init_project "$mode" || continue
+            ;;
+        9) 
+            # TDD command - show options
+            echo -e "\n${YELLOW}TDD Options:${NC}"
+            echo -e "  ${GREEN}n)${NC} ${BOLD}NEW${NC}         (Create TDD template)"
+            echo -e "  ${GREEN}b)${NC} ${BOLD}BACK${NC}        (Return to main menu)"
+            echo ""
+            
+            TDD_OPTION=$(prompt_user "Select option (n/b)" "" "")
+            
+            case $TDD_OPTION in
+                n|N) 
+                    echo -e "\n${YELLOW}Enter feature name for TDD:${NC}"
+                    FEATURE_NAME=$(prompt_user "Feature name" "")
+                    if [[ -n "$FEATURE_NAME" ]]; then
+                        zsh "$SCRIPT_DIR/../scripts/tdd-init.sh" "$FEATURE_NAME"
+                    fi
+                    ;;
+                b|B) 
+                    continue ;;  # Go back to main menu
+                *)
+                    log_warn "Invalid option: $TDD_OPTION"
+                    ;;
+            esac
+            ;;
         q|Q)
             log_success "Happy Coding!"
             exit 0
@@ -187,4 +229,3 @@ while true; do
             ;;
     esac
 done
-
