@@ -16,3 +16,9 @@ tmpvibe-*
 vibe-init-test*
 **/var/folders/**/*vibe-init-test*
 temp/
+
+# Worktrees
+wt-*/
+
+# Vibe artifacts
+.vibe/
