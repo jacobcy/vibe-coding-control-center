@@ -1,0 +1,158 @@
+#!/usr/bin/env zsh
+# vibe-flow - Workflow orchestration for feature development
+# Main entry point for vibe flow commands
+
+set -e
+
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+
+# Load all utility modules
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh"
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/flow.sh"
+
+# Load config
+load_user_config
+
+# Show help
+show_help() {
+    cat <<EOF
+${BOLD}vibe flow${NC} - Feature development workflow orchestration
+
+${BOLD}Usage:${NC} vibe flow <command> [options]
+
+${BOLD}Commands:${NC}
+  ${CYAN}start${NC} <feature> [--agent=claude] [--base=main]
+                      Start a new feature workflow
+                      - Creates worktree and branch (via wtnew)
+                      - Sets Git identity
+                      - Generates PRD template
+                      - Initializes workflow state
+                      - Optional: Sets up tmux workspace (via vup)
+  
+  ${CYAN}spec${NC} [feature]      Create technical specification
+                      - Auto-detects feature from worktree
+                      - Generates spec from template
+                      - Links to PRD document
+  
+  ${CYAN}test${NC} [feature]      Initialize test file (TDD)
+                      - Creates test template
+                      - Runs initial test (Red Phase)
+                      - Updates workflow state
+  
+  ${CYAN}dev${NC} [feature]       Development guidance
+                      - Shows TDD cycle (Red-Green-Refactor)
+                      - Suggests agent tools (claude, opencode, codex)
+                      - Provides test running instructions
+  
+  ${CYAN}review${NC} [feature]    Code review preparation
+                      - Runs tests
+                      - Shows review checklist
+                      - Opens lazygit (if available)
+  
+  ${CYAN}pr${NC} [feature]        Create Pull Request
+                      - Generates PR description from template
+                      - Creates PR via gh (if available)
+                      - Updates workflow state
+  
+  ${CYAN}done${NC} [feature]      Complete and cleanup
+                      - Verifies tests pass
+                      - Checks PR merge status (via gh)
+                      - Archives workflow state
+                      - Removes worktree (via wtrm)
+  
+  ${CYAN}status${NC} [feature]    Show workflow status
+                      - Current phase
+                      - Progress checklist
+                      - Next steps
+
+${BOLD}Tool Integrations:${NC}
+  • ${CYAN}wtnew/vup${NC}  - Worktree and tmux workspace (from aliases.sh)
+  • ${CYAN}gh${NC}         - GitHub CLI for PR management
+  • ${CYAN}lazygit${NC}    - Interactive code review and commit
+  • ${CYAN}tmux${NC}       - Session and workspace management
+
+${BOLD}Examples:${NC}
+  vibe flow start user-auth --agent=claude
+  cd ../wt-claude-user-auth
+  vibe flow spec
+  vibe flow test
+  vibe flow dev
+
+Options:
+  -h, --help         Show this help message
+
+Workflow Phases:
+  1. 📝 PRD Creation    - Define requirements
+  2. 🏗️  Specification    - Technical design
+  3. 🧪 Testing         - Write tests (Red Phase)
+  4. 💻 Development     - Implement (Green Phase)
+  5. 🔍 Review          - Code review
+  6. 📦 Commit          - Smart commits
+  7. 🚀 PR              - Pull request
+  8. ✅ Done            - Cleanup and merge
+EOF
+}
+
+# Handle commands
+case "${1:-}" in
+    start)
+        shift
+        flow_cmd_start "$@"
+        ;;
+    
+    spec)
+        shift
+        flow_cmd_spec "$@"
+        ;;
+    
+    test)
+        shift
+        flow_cmd_test "$@"
+        ;;
+    
+    dev)
+        shift
+        flow_cmd_dev "$@"
+        ;;
+    
+    review)
+        shift
+        flow_cmd_review "$@"
+        ;;
+    
+    pr)
+        shift
+        flow_cmd_pr "$@"
+        ;;
+    
+    done)
+        shift
+        flow_cmd_done "$@"
+        ;;
+    
+    status)
+        shift
+        flow_cmd_status "$@"
+        ;;
+    
+    commit)
+        log_info "Command '$1' is coming soon!"
+        echo "This feature is planned but not yet implemented."
+        echo "Run 'vibe flow help' to see available commands."
+        exit 0
+        ;;
+    
+    -h|--help|help|"")
+        show_help
+        ;;
+    
+    *)
+        log_error "Unknown command: $1"
+        echo "Run 'vibe flow help' for usage."
+        exit 1
+        ;;
+esac
