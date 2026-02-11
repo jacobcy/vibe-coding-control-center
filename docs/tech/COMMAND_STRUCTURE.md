@@ -21,11 +21,12 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 |---------|---------|----------|
 | `vibe` | Interactive menu mode | Main script (`scripts/vibecoding.sh`) |
 | `vibe chat` | Start default AI tool chat | `bin/vibe-chat` |
+| `vibe config` | Manage Vibe Coding configuration | `bin/vibe-config` |
 | `vibe equip` | Install/update AI tools | `bin/vibe-equip` |
 | `vibe env` | Environment and key management | `bin/vibe-env` |
 | `vibe init` | Initialize new project | `bin/vibe-init` |
 | `vibe sync` | Sync workspace identity | `bin/vibe-sync` |
-| `vibe diagnostics` | Run system diagnostics | `bin/vibe-diagnostics` |
+ | `vibe doctor` | System health check (includes diagnostics) | `bin/vibe-doctor` |
 | `vibe tdd` | TDD feature management | `bin/vibe-tdd` |
 | `vibe help` | Show help information | Built into dispatcher (`bin/vibe`) |
 | `vibe -h`, `vibe --help` | Show help information | Built into dispatcher (`bin/vibe`) |
@@ -37,11 +38,12 @@ vibe-coding-control-center/
 ├── bin/                        # Command dispatchers
 │   ├── vibe                  # Main dispatcher (Git-style command handling)
 │   ├── vibe-chat             # AI chat command
+│   ├── vibe-config           # Configuration management command
 │   ├── vibe-equip            # Tool installation/update command
 │   ├── vibe-env              # Environment management command
 │   ├── vibe-init             # Project initialization command
 │   ├── vibe-sync             # Workspace sync command
-│   ├── vibe-diagnostics      # System diagnostics command
+ │   ├── vibe-doctor           # System health check command
 │   ├── vibe-tdd              # TDD management command
 │   └── vibe-help             # Help command
 ├── scripts/                   # Implementation scripts
@@ -108,10 +110,11 @@ vibe
 # New command-based usage
 vibe equip              # Install/update tools
 vibe chat               # Start AI chat
+vibe config             # Manage configuration
 vibe init               # Initialize project
 vibe env                # Check environment
 vibe sync               # Sync git identity
-vibe diagnostics        # Run diagnostics
+ vibe doctor             # Run system health check (includes diagnostics)
 vibe tdd new feature    # Create TDD template
 
 # Help
