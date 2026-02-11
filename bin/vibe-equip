@@ -1,4 +1,94 @@
 #!/usr/bin/env zsh
+# vibe-equip - Install/update AI tools
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" equip "$@"
+
+# Load all utility modules like the main script does
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/agents.sh"
+source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load config metadata
+load_user_config
+
+do_equip() {
+    echo -e "\n${YELLOW}>> EQUIPPING TOOLS (INSTALL/UPDATE) <<${NC}"
+
+    # Show current versions
+    if command -v opencode &> /dev/null; then
+        OPENCODE_VER=$(get_command_version "opencode" "--version")
+        if [[ -n "$OPENCODE_VER" ]]; then
+            echo -e "1. Install/Update OpenCode ${CYAN}(current: v$OPENCODE_VER)${NC}"
+        else
+            echo "1. Install/Update OpenCode (installed)"
+        fi
+    else
+        echo "1. Install/Update OpenCode (not installed)"
+    fi
+
+    if command -v claude &> /dev/null; then
+        CLAUDE_VER=$(get_command_version "claude" "--version")
+        if [[ -n "$CLAUDE_VER" ]]; then
+            echo -e "2. Install/Update Claude Code ${CYAN}(current: v$CLAUDE_VER)${NC}"
+        else
+            echo "2. Install/Update Claude Code (installed)"
+        fi
+    else
+        echo "2. Install/Update Claude Code (not installed)"
+    fi
+
+    echo "3. Back"
+
+    # Use secure input validation
+    CHOICE=$(prompt_user "Select option (1-3)" "" "")
+
+    # Validate the selection
+    case $CHOICE in
+        1|2|3)
+            # Valid choice, continue processing
+            ;;
+        *)
+            log_error "Invalid option: $CHOICE"
+            press_enter "Press Enter to continue..."
+            return
+            ;;
+    esac
+
+    case $CHOICE in
+        1)
+            zsh "$VIBE_ROOT/install/install-opencode.sh"
+            ;;
+        2)
+            zsh "$VIBE_ROOT/install/install-claude.sh"
+            ;;
+        3)
+            return
+            ;;
+    esac
+
+    echo -e "\n${GREEN}Equipping complete. Please restart terminal if new env vars were added.${NC}"
+    press_enter "Press Enter to continue..."
+}
+
+# Handle help flag
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "vibe-equip - Install/update AI tools"
+    echo ""
+    echo "Usage: vibe equip"
+    echo ""
+    echo "Interactively install or update AI development tools like Claude and OpenCode."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    exit 0
+fi
+
+# Run the equip function
+do_equip

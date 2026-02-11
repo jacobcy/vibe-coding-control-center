@@ -19,7 +19,7 @@ TARGET="vibe-init-test"
 # Run local init with defaults (non-interactive uses defaults)
 (
   cd "$TMP_DIR" || exit 1
-  "$BIN" --local "$TARGET" >/dev/null 2>&1
+  "$BIN" --local "$TARGET" < /dev/null >/dev/null 2>&1
 ) || {
   echo "vibe init --local failed" >&2
   exit 1
@@ -29,10 +29,10 @@ TARGET="vibe-init-test"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 required_files=(
-  "$TMP_DIR/$TARGET/soul.md"
-  "$TMP_DIR/$TARGET/rules.md"
-  "$TMP_DIR/$TARGET/agents.md"
-  "$TMP_DIR/$TARGET/tasks.md"
+  "$TMP_DIR/$TARGET/SOUL.md"
+  "$TMP_DIR/$TARGET/RULES.md"
+  "$TMP_DIR/$TARGET/AGENT.md"
+  "$TMP_DIR/$TARGET/TASK.md"
   "$TMP_DIR/$TARGET/CLAUDE.md"
   "$TMP_DIR/$TARGET/.cursor/rules/tech-stack.mdc"
   "$TMP_DIR/$TARGET/.git"

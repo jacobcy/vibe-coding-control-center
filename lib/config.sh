@@ -52,7 +52,11 @@ export_keys() {
 }
 
 load_toml_config() {
-    local toml_file="${1:-$HOME/.codex/config.toml}"
+    local toml_file="${1:-$VIBE_HOME/config.toml}"
+    # Fallback to legacy path if new path doesn't exist
+    if [[ ! -f "$toml_file" && -f "$HOME/.codex/config.toml" ]]; then
+        toml_file="$HOME/.codex/config.toml"
+    fi
     [[ -f "$toml_file" ]] || return 0
 
     while IFS= read -r line || [[ -n "$line" ]]; do

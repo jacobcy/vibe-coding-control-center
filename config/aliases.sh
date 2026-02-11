@@ -9,8 +9,17 @@
 # ======================================================
 
 # ---------- Base ----------
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
+
+if [[ -f "$VIBE_HOME/vibe_root" ]]; then
+    # Reliable way: read from installation record
+    VIBE_ROOT="$(cat "$VIBE_HOME/vibe_root")"
+else
+    # Fallback way: resolve symlink (Zsh specific :A modifier)
+    # ${(%):-%x} gives source file path, :A resolves to absolute physical path
+    VIBE_ROOT="$(cd "$(dirname "${(%):-%x:A}")/.." && pwd)"
+fi
+
 VIBE_REPO="$VIBE_ROOT"
 VIBE_MAIN="$VIBE_REPO/main"
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
@@ -99,7 +108,13 @@ wt() {
 # Create a new worktree (safe default naming)
 # usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]
 wtnew() {
-  vibe_require git || return 1
+  # Use absolute path for git to avoid PATH issues
+  local git_cmd="/usr/bin/git"
+  
+  # Check if git is available
+  if [[ ! -x "$git_cmd" ]]; then
+    vibe_die "git command not found at $git_cmd. Please install git first."
+  fi
 
   local branch="$1"
   local agent="${2:-claude}"
@@ -107,33 +122,74 @@ wtnew() {
 
   [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]"
 
+  # Check if current directory is the main worktree
+  local current_dir="$(pwd)"
+  
+  # Try to find main directory in common locations
+  local found_main=""
+  local search_paths=(
+    "$current_dir/main"           # Child directory
+    "$current_dir"                # Current directory (if it's main itself)
+    "$(dirname "$current_dir")/main"  # Sibling directory
+  )
+  
+  for path in "${search_paths[@]}"; do
+    if [[ -d "$path/.git" || -f "$path/.git" ]]; then
+      found_main="$path"
+      break
+    fi
+  done
+  
+  # If we found a main directory but we're not in it
+  if [[ -n "$found_main" && "$current_dir" != "$found_main" ]]; then
+    echo "❌ You are not in the main worktree directory"
+    echo ""
+    echo "   Current: $current_dir"
+    echo "   Found main at: $found_main"
+    echo ""
+    echo "💡 Please cd to the main worktree first:"
+    echo "   cd $found_main"
+    echo "   wtnew $branch $agent $base"
+    return 1
+  fi
+  
+  # If we didn't find main directory at all
+  if [[ -z "$found_main" ]]; then
+    echo "❌ Main worktree not found"
+    echo ""
+    echo "   Searched in:"
+    echo "   - Current directory: $current_dir"
+    echo "   - Child directory: $current_dir/main"
+    echo "   - Sibling directory: $(dirname "$current_dir")/main"
+    echo ""
+    echo "💡 Please ensure you have a main worktree set up, or cd to the correct location."
+    return 1
+  fi
+
   local prefix="wt-${agent}-"
   local dir="${prefix}${branch}"
   local path="$VIBE_REPO/$dir"
 
-  # Ensure main worktree exists as base checkout
-  [[ -d "$VIBE_MAIN/.git" || -f "$VIBE_MAIN/.git" ]] || \
-    vibe_die "Expected main worktree at: $VIBE_MAIN (run your worktree layout first)"
-
   # Create branch from base in main repo context
-  git -C "$VIBE_MAIN" fetch -p >/dev/null 2>&1 || true
-  git -C "$VIBE_MAIN" show-ref --verify --quiet "refs/heads/$branch" || \
-    git -C "$VIBE_MAIN" branch "$branch" "$base" 2>/dev/null || true
+  $git_cmd -C "$found_main" fetch -p >/dev/null 2>&1 || true
+  $git_cmd -C "$found_main" show-ref --verify --quiet "refs/heads/$branch" || \
+    $git_cmd -C "$found_main" branch "$branch" "$base" 2>/dev/null || true
 
   # Add worktree
   if [[ -e "$path" ]]; then
     echo "ℹ️  Worktree dir already exists: $dir"
   else
-    git -C "$VIBE_MAIN" worktree add "$path" "$branch" || return 1
+    $git_cmd -C "$found_main" worktree add "$path" "$branch" || return 1
     echo "✅ Created worktree: $dir -> branch $branch (base: $base)"
   fi
 
   # Set agent identity in worktree
-  local agent_name="Agent-${agent^}" # Capitalize first letter
+  # Use zsh parameter expansion for capitalization: ${(C)var} capitalizes first letter
+  local agent_name="Agent-${(C)agent}"
   local agent_email="agent-${agent}@vibecoding.ai"
   
-  git -C "$path" config user.name "$agent_name"
-  git -C "$path" config user.email "$agent_email"
+  $git_cmd -C "$path" config user.name "$agent_name"
+  $git_cmd -C "$path" config user.email "$agent_email"
   echo "👤 Git identity set: $agent_name <$agent_email>"
 
   cd "$path" || return
@@ -147,7 +203,7 @@ wtinit() {
     vibe_die "Not in a git repository or worktree."
   fi
   
-  local agent_name="Agent-${agent^}"
+  local agent_name="Agent-${(C)agent}"
   local agent_email="agent-${agent}@vibecoding.ai"
   
   git config user.name "$agent_name"

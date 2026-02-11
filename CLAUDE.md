@@ -1,7 +1,31 @@
 # Project Context: Vibe Coding Control Center
 
 ## Project Overview
-Vibe Coding Control Center is a collection of scripts designed to manage and configure AI development tools (Claude Code, OpenCode, etc.) with an emphasis on developer productivity and ease of use. The project provides a unified interface for initializing projects, managing AI tools, and configuring development environments.
+Vibe Coding Control Center is a **management and orchestration tool** for AI-assisted development environments. It provides scripts to install, configure, and manage AI development tools (Claude Code, OpenCode, Codex, etc.) with an emphasis on developer productivity and ease of use.
+
+### Core Identity: What We ARE
+We are a **configuration and environment management system** that:
+- **Installs and manages AI tools** (claude, opencode, codex)
+- **Manages working directories** (worktrees, tmux sessions)
+- **Manages environment variables** (API keys, endpoints via `keys.env`)
+- **Provides command aliases** (shortcuts for common workflows)
+- **Manages configuration files** (opencode.json, config.toml, .claude.json)
+- **Provides development templates** (PRD, Spec, PR descriptions, test templates)
+- **Orchestrates workflows** (TDD cycles, feature development lifecycle)
+
+### Core Identity: What We are NOT
+We are **NOT an AI agent implementation**. We do NOT:
+- ❌ Replace or reimplement agent functionality
+- ❌ Execute code generation or refactoring ourselves
+- ❌ Make autonomous code decisions
+- ❌ Duplicate functionality that existing tools already provide well
+
+### Design Philosophy
+**"Orchestrate and integrate, don't reimplement and replace"**
+- Leverage existing mature tools (`wtnew`, `vup`, `gh`, `lazygit`, `tmux`)
+- Provide the scaffolding and guidance
+- Let agents (claude, opencode, codex) do what they do best
+- Focus on the developer experience layer
 
 ## Constitution & Principles
 This project operates under the **Vibe Coding Constitution** defined in [SOUL.md](SOUL.md). All development activities, including AI-assisted coding, follows the principles outlined in that document.
@@ -70,14 +94,20 @@ Adherence to the principles outlined in [SOUL.md](SOUL.md) is mandatory. Specifi
 - **Temporary files**: Always place in `temp/` directory (already ignored by git)
 
 ## Key Features
-- Menu-driven interface for ease of use (vibecoding.sh)
-- Automatic configuration of AI tools with MCP support
-- Diagnostic capabilities for environment troubleshooting
-- Secure handling of API keys through templated config
-- Project initialization with best practices and Cursor rules
-- Unified command aliases for quick access (`c`, `ca`, `cp`, `cr`, `o`, `oa`, `vibe`)
-- MCP (Model Context Protocol) integration for web search and GitHub access
-- Enhanced security with input validation and secure file operations
+- **Menu-driven interface** for ease of use (vibecoding.sh)
+- **Automatic configuration** of AI tools with MCP support
+- **Diagnostic capabilities** for environment troubleshooting
+- **Secure handling of API keys** through templated config
+- **Project initialization** with best practices and Cursor rules
+- **Unified command aliases** for quick access (`c`, `ca`, `cp`, `cr`, `o`, `oa`, `vibe`)
+- **MCP (Model Context Protocol)** integration for web search and GitHub access
+- **Enhanced security** with input validation and secure file operations
+- **Worktree management** with agent identity isolation (`wtnew`, `vup`, `wtrm`)
+- **Development workflow orchestration** (`vibe flow`):
+  - Prepares development environment (worktree, docs, state)
+  - Provides TDD guidance and templates
+  - Integrates with external tools (gh, lazygit, tmux)
+  - Does NOT execute agent work - only prepares and guides
 
 ## Security Notes
 - API keys are stored in `config/keys.env` (not tracked by git) and referenced via MCP config
@@ -110,7 +140,7 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 - Add new utility function: Add to `lib/utils.sh` and source from other scripts
 - Initialize new project: Use `./install/init-project.sh [project-name]` or `ignition` alias
 - Install/update tools: Use `./scripts/vibecoding.sh` → Equip option or `vibe` alias
-- Run diagnostics: Use `./scripts/vibecoding.sh` → Diagnostics option
+ - Run diagnostics: Use `./scripts/vibecoding.sh` → Doctor option
 - Validate security: Use the validation functions from utils.sh
 - Run tests: `./tests/test_new_features.sh` or `./tests/test_status_display.sh`
 

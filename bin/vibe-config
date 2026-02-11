@@ -1,0 +1,186 @@
+#!/usr/bin/env zsh
+# vibe-config - AI tool configuration manager
+
+set -e
+
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+
+# Load all utility modules
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh"
+
+# Show AI tool configuration status
+show_config_status() {
+    echo "=== AI Tool Configuration Status ==="
+    echo ""
+    
+    echo "${BOLD}[Claude] ~/.claude.json${NC}"
+    local claude_config="$HOME/.claude.json"
+    if [[ -f "$claude_config" ]]; then
+        local srv_count=$(grep -o '"command"' "$claude_config" 2>/dev/null | wc -l | xargs || echo "0")
+        echo "  ✅ Config found ($srv_count MCP servers)"
+    else
+        echo "  ❌ Config not found"
+        echo "  → Run: vibe env mcp"
+    fi
+    
+    echo ""
+    echo "${BOLD}[OpenCode] ~/.config/opencode/opencode.json${NC}"
+    local oc_config="$HOME/.config/opencode/opencode.json"
+    if [[ -f "$oc_config" ]]; then
+        local provider_count=$(grep -o '"name"' "$oc_config" 2>/dev/null | wc -l | xargs || echo "0")
+        echo "  ✅ Config found ($provider_count providers)"
+    else
+        echo "  ❌ Config not found"
+        echo "  → Run: vibe equip (select OpenCode)"
+    fi
+    
+    echo ""
+    echo "${BOLD}[Codex] ~/.codex/config.toml${NC}"
+    local codex_config="$HOME/.codex/config.toml"
+    if [[ -f "$codex_config" ]]; then
+        local model=$(grep '^model' "$codex_config" 2>/dev/null | cut -d'"' -f2)
+        echo "  ✅ Config found${model:+ (model: $model)}"
+    else
+        echo "  ❌ Config not found"
+    fi
+    
+    echo ""
+    echo "${BOLD}Note:${NC} For environment variables (API keys), use ${CYAN}vibe env${NC}"
+}
+
+# Manage OpenCode configuration
+manage_opencode() {
+    local subcmd="${1:-show}"
+    local oc_config="$HOME/.config/opencode/opencode.json"
+    
+    case "$subcmd" in
+        show)
+            [[ -f "$oc_config" ]] || { 
+                log_error "opencode.json not found at $oc_config"
+                log_info "Run 'vibe equip' to install OpenCode"
+                return 1
+            }
+            
+            if command -v jq &>/dev/null; then
+                cat "$oc_config" | jq .
+            else
+                cat "$oc_config"
+            fi
+            ;;
+        
+        edit)
+            [[ -f "$oc_config" ]] || {
+                log_error "opencode.json not found. Run 'vibe equip' first"
+                return 1
+            }
+            ${EDITOR:-vim} "$oc_config"
+            log_success "Edited $oc_config"
+            ;;
+        
+        *)
+            echo "Usage: vibe config opencode <show|edit>"
+            return 1
+            ;;
+    esac
+}
+
+# Manage Codex configuration
+manage_codex() {
+    local subcmd="${1:-show}"
+    local codex_config="$HOME/.codex/config.toml"
+    
+    case "$subcmd" in
+        show)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found at $codex_config"
+                return 1
+            }
+            cat "$codex_config"
+            ;;
+        
+        edit)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found"
+                return 1
+            }
+            ${EDITOR:-vim} "$codex_config"
+            log_success "Edited $codex_config"
+            ;;
+        
+        model)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found"
+                return 1
+            }
+            
+            local new_model="${2:-}"
+            if [[ -n "$new_model" ]]; then
+                # Set new model
+                sed -i '' "s/^model = .*/model = \"$new_model\"/" "$codex_config"
+                log_success "Model set to: $new_model"
+            else
+                # Get current model
+                grep '^model' "$codex_config" | cut -d'"' -f2
+            fi
+            ;;
+        
+        *)
+            echo "Usage: vibe config codex <show|edit|model [name]>"
+            return 1
+            ;;
+    esac
+}
+
+# Show help
+show_help() {
+    cat << 'EOF'
+vibe config - AI tool configuration manager
+
+Usage: vibe config [command] [options]
+
+Commands:
+  (no args)              Show all AI tool configuration status
+  opencode show          Display opencode.json
+  opencode edit          Edit opencode.json
+  codex show             Display config.toml
+  codex edit             Edit config.toml
+  codex model [name]     Get/set Codex model
+
+Examples:
+  vibe config                      # Show all config status
+  vibe config opencode edit        # Edit OpenCode config
+  vibe config codex model          # Show current Codex model
+  vibe config codex model gpt-4    # Set Codex model
+
+Note: For environment variables (API keys), use 'vibe env' instead
+EOF
+}
+
+# Handle commands
+case "${1:-}" in
+    "")
+        show_config_status
+        ;;
+    
+    opencode)
+        shift
+        manage_opencode "$@"
+        ;;
+    
+    codex)
+        shift
+        manage_codex "$@"
+        ;;
+    
+    -h|--help|help)
+        show_help
+        ;;
+    
+    *)
+        log_error "Unknown command: $1"
+        echo "Run 'vibe config help' for usage"
+        exit 1
+        ;;
+esac

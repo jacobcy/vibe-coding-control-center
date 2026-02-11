@@ -8,10 +8,10 @@
 | `vibe` | 启动交互式控制面板 | 包含 Ignition, Equip, Keys, Sync, Diagnostics |
 | `vibe init --ai` | AI 初始化项目 | 默认模式，使用已安装工具生成文档 |
 | `vibe init --local` | 本地模板初始化项目 | 无 AI 工具时可用 |
-| `vibe chat` / `vc` | 快速进入对话 | 使用默认工具 |
-| `vibe keys` | 初始化 API 密钥（可选） | 仅在需要时使用 `config/keys.env` |
-| `vibe sync` | 同步当前工作区的 Git 身份 | 自动识别 Agent 类型并配置 user.name/email |
-| `vibe tdd new <name>` | **初始化 TDD 开发循环** | 自动创建分支及失败的测试模板 |
+| `vibe chat` / `vc` | 快速进入对话 | 交互模式或快速问答 `vibe chat "问题"` |
+| `vibe keys` | API 密钥管理（快捷入口） | 等同 `vibe env keys` |
+| `vibe flow start <name>` | **启动特性开发流程** | 创建工作区、PRD 文档、初始化状态 |
+| `vibe flow test` | **初始化 TDD 测试** | 创建测试模板（Red Phase） |
 
 ## 2. 工具链别名 (Agent Tools: P1 > P2 > P3)
 | 工具 | 基础命令 | 自动模式 | 计划/审查模式 |
@@ -56,4 +56,4 @@
 1. **测试 Keys**: 运行 `vibe keys`（可选），检查 `config/keys.env` 是否正确生成。
 2. **测试 Proxy**: 运行 `c_cn` 后执行 `vibe_endpoint`，确认输出为 `https://api.bghunt.cn`。
 3. **测试 Identity**: 执行 `vnew audit-test opencode`，进入新生成的 WT 目录运行 `git config user.name`，应显示 `Agent-Opencode`。
-4. **测试 TDD**: 执行 `vibe tdd new manual-audit`，检查 `tests/test_manual-audit.sh` 是否生成并具备可执行权限。
+4. **测试 Flow**: 执行 `vibe flow start test-feature`，检查是否创建工作区和 PRD 文档。

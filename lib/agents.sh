@@ -25,31 +25,14 @@ vibe_list_installed_tools() {
 # Save default tool selection
 vibe_save_default_tool() {
     local tool="$1"
-    local config_file="$VIBE_CONFIG[CONFIG_DIR]/config.local"
-    local tmp_file
 
     if ! validate_input "$tool" "false"; then
         log_warn "Skipping save of invalid tool name: $tool"
         return 1
     fi
 
-    tmp_file=$(mktemp) || return 1
-    : > "$tmp_file"
-
-    if [[ -f "$config_file" ]]; then
-        grep -vE '^(export[[:space:]]+)?VIBE_DEFAULT_TOOL=' "$config_file" > "$tmp_file" 2>/dev/null || true
-    fi
-
-    printf '%s\n' "export VIBE_DEFAULT_TOOL=\"$tool\"" >> "$tmp_file"
-    local content
-    content=$(cat "$tmp_file")
-    rm -f "$tmp_file"
-
-    if secure_write_file "$config_file" "$content" "644"; then
-        log_info "Default tool set to: $tool"
-        return 0
-    fi
-    return 1
+    # Use vibe config command to update keys.env
+    "$VIBE_ROOT/bin/vibe-config" set VIBE_DEFAULT_TOOL "$tool"
 }
 
 # Select default tool (prompt if needed)
@@ -62,35 +45,26 @@ vibe_select_default_tool() {
         return 1
     fi
 
+    # Priority 1: Environment variable
     if [[ -n "${VIBE_DEFAULT_TOOL:-}" ]] && vibe_tool_installed "$VIBE_DEFAULT_TOOL"; then
         echo "$VIBE_DEFAULT_TOOL"
         return 0
     fi
 
-    echo -e "\n${BOLD}Select default tool:${NC}"
-    local i=1
-    for t in "${installed[@]}"; do
-        echo "  $i) $t"
-        i=$((i + 1))
-    done
-
-    local choice
-    choice=$(prompt_user "Select tool (1-${#installed[@]})" "1" "")
-    if [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        log_warn "Invalid choice, defaulting to ${installed[1]}"
-        echo "${installed[1]}"
-        return 0
+    # Priority 2: keys.env configuration
+    local config_default_tool=""
+    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    if [[ -f "$vibe_home/keys.env" ]]; then
+        config_default_tool=$(grep "^VIBE_DEFAULT_TOOL=" "$vibe_home/keys.env" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//')
     fi
-    local idx=$((choice - 1))
-    if [[ $idx -lt 0 || $idx -ge ${#installed[@]} ]]; then
-        log_warn "Invalid choice, defaulting to ${installed[1]}"
-        echo "${installed[1]}"
+    
+    if [[ -n "$config_default_tool" ]] && vibe_tool_installed "$config_default_tool"; then
+        echo "$config_default_tool"
         return 0
     fi
 
-    local selected="${installed[$((idx + 1))]}"
-    vibe_save_default_tool "$selected" || true
-    echo "$selected"
+    # Priority 3: Use first installed tool (opencode > claude > codex)
+    echo "${installed[1]}"
 }
 
 # Run a single prompt with the selected tool

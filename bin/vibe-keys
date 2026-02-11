@@ -1,4 +1,15 @@
 #!/usr/bin/env zsh
+# vibe-keys - Quick access to environment variable management
+# Alias for: vibe env
+
 set -e
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" keys "$@"
+SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# If no arguments, default to show
+if [[ $# -eq 0 ]]; then
+    exec zsh "${VIBE_ROOT}/bin/vibe-env" show
+else
+    # Pass all arguments to vibe env
+    exec zsh "${VIBE_ROOT}/bin/vibe-env" "$@"
+fi

@@ -19,6 +19,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 source "$SCRIPT_DIR/../lib/utils.sh"
 source "$SCRIPT_DIR/../lib/config.sh"
+source "$SCRIPT_DIR/../lib/config_init.sh"
 source "$SCRIPT_DIR/../lib/i18n.sh"
 
 log_step "Starting Vibe Coding Control Center Installation"
@@ -60,21 +61,32 @@ ensure_oh_my_zsh || true
 log_step "Initializing ~/.vibe configuration directory"
 VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VIBE_BIN="$VIBE_ROOT/bin"
-VIBE_HOME="$HOME/.vibe"
+VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 
-mkdir -p "$VIBE_HOME"
-
-if [[ -f "$VIBE_ROOT/config/keys.template.env" ]] && [[ ! -f "$VIBE_HOME/keys.env" ]]; then
-    cp "$VIBE_ROOT/config/keys.template.env" "$VIBE_HOME/keys.env"
-    chmod 600 "$VIBE_HOME/keys.env"
-    log_info "Created ~/.vibe/keys.env from template (edit with your actual keys)"
-elif [[ -f "$VIBE_HOME/keys.env" ]]; then
-    log_info "~/.vibe/keys.env already exists"
+# Sync project configuration to user directory
+if ! sync_keys_env "$VIBE_ROOT"; then
+    log_error "Installation requires a configured keys.env"
+    log_info "Please create $VIBE_ROOT/config/keys.env and run install again"
+    exit 1
 fi
 
-cp "$VIBE_ROOT/config/aliases.sh" "$VIBE_HOME/aliases.sh"
-chmod +x "$VIBE_HOME/aliases.sh"
-log_success "Synced aliases.sh to ~/.vibe/"
+# Save VIBE_ROOT path for reference
+echo "$VIBE_ROOT" > "$VIBE_HOME/vibe_root"
+log_info "Saved project root: $VIBE_ROOT"
+
+# Create symlink to aliases.sh instead of copying
+ALIASES_LINK="$VIBE_HOME/aliases.sh"
+ALIASES_TARGET="$VIBE_ROOT/config/aliases.sh"
+
+if [[ -e "$ALIASES_LINK" || -L "$ALIASES_LINK" ]]; then
+    # Remove existing file or symlink
+    rm -f "$ALIASES_LINK"
+    log_info "Removed existing aliases.sh"
+fi
+
+# Create new symlink
+ln -s "$ALIASES_TARGET" "$ALIASES_LINK"
+log_success "Created aliases.sh symlink -> $ALIASES_TARGET"
 
 # ================= BOOTSTRAP 'vibe' COMMAND =================
 
@@ -83,6 +95,17 @@ SHELL_RC=$(get_shell_rc)
 
 RC_CONTENT="# Vibe Coding Control Center
 export PATH=\"$VIBE_BIN:\$PATH\"
+
+# Load Vibe configuration from ~/.vibe/
+if [ -f \"\$HOME/.vibe/keys.env\" ]; then
+    set -a
+    source \"\$HOME/.vibe/keys.env\"
+    set +a
+fi
+
+if [ -f \"\$HOME/.vibe/aliases.sh\" ]; then
+    source \"\$HOME/.vibe/aliases.sh\"
+fi
 "
 
 append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
@@ -95,8 +118,8 @@ log_success "'vibe' command is ready"
 log_success "Installation process completed!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
-echo "1. Run: source $SHELL_RC  (or restart your terminal)"
-echo "2. Run: 'vibe env setup' to configure API keys and environment"
-echo "3. Run: 'vibe equip' to install AI tools (Claude, OpenCode, etc.)"
-echo "4. Type 'vibe' to launch the Control Center."
+echo "1. Verify your configuration: ${CYAN}cat ~/.vibe/keys.env${NC}"
+echo "2. Reload shell: ${CYAN}source $SHELL_RC${NC} (or restart terminal)"
+echo "3. Install AI tools: ${CYAN}vibe equip${NC}"
+echo "4. Launch Control Center: ${CYAN}vibe${NC}"
 echo "----------------------------------------"

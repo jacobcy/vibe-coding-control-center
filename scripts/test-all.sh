@@ -208,10 +208,36 @@ config_test "Configuration exists check works" 'config_exists "test_config_key"'
 echo ""
 echo "Configuration Management Tests: $CONFIG_PASSED/$CONFIG_TESTS passed"
 
+# Vibe Chat Tests
+echo -e "\n${CYAN}==========================================${NC}"
+echo -e "${CYAN}Vibe Chat Tests${NC}"
+echo -e "${CYAN}==========================================${NC}"
+CHAT_TESTS=1
+CHAT_PASSED=0
+if zsh "$SCRIPT_DIR/../tests/test_vibe_chat.sh"; then
+    log_success "Vibe chat tests passed"
+    CHAT_PASSED=1
+else
+    log_error "Vibe chat tests failed"
+fi
+
+# Vibe Equip Tests
+echo -e "\n${CYAN}==========================================${NC}"
+echo -e "${CYAN}Vibe Equip Tests${NC}"
+echo -e "${CYAN}==========================================${NC}"
+EQUIP_TESTS=1
+EQUIP_PASSED=0
+if zsh "$SCRIPT_DIR/../tests/test_vibe_equip.sh"; then
+    log_success "Vibe equip tests passed"
+    EQUIP_PASSED=1
+else
+    log_error "Vibe equip tests failed"
+fi
+
 # Final summary
-TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS + AGENT_PLAN_TESTS))
-TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED + AGENT_PLAN_PASSED))
-TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED) + (AGENT_PLAN_TESTS-AGENT_PLAN_PASSED)))
+TOTAL_TESTS=$((TEST_TOTAL + VERSION_TESTS + CACHE_TESTS + CONFIG_TESTS + AGENT_PLAN_TESTS + CHAT_TESTS + EQUIP_TESTS))
+TOTAL_PASSED=$((TEST_PASSED + VERSION_PASSED + CACHE_PASSED + CONFIG_PASSED + AGENT_PLAN_PASSED + CHAT_PASSED + EQUIP_PASSED))
+TOTAL_FAILED=$((TEST_FAILED + (VERSION_TESTS-VERSION_PASSED) + (CACHE_TESTS-CACHE_PASSED) + (CONFIG_TESTS-CONFIG_PASSED) + (AGENT_PLAN_TESTS-AGENT_PLAN_PASSED) + (CHAT_TESTS-CHAT_PASSED) + (EQUIP_TESTS-EQUIP_PASSED)))
 
 echo -e "\n${CYAN}==========================================${NC}"
 echo -e "${CYAN}FINAL TEST RESULTS${NC}"
