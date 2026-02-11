@@ -37,12 +37,13 @@ fi
 
 # 4. Verify path consistency (Mocking keys.env)
 echo -n "Testing key path consistency... "
-VIBE_KEYS="$HOME/.vibe/keys.env"
+VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
+VIBE_KEYS="$VIBE_HOME/keys.env"
 mkdir -p "$(dirname "$VIBE_KEYS")"
 echo "TEST_KEY=ALIGNED" > "$VIBE_KEYS"
 
 # Check if doctor (formerly status) sees it - it should say "Found"
-if vibe doctor | grep -q "Found (~/.vibe/keys.env)"; then
+if vibe doctor | grep -q "Found ($VIBE_HOME/keys.env)"; then
     echo "OK"
 else
     echo "FAILED (doctor still looking in wrong path)"
