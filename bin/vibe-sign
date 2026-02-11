@@ -8,6 +8,7 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 # Load all utility modules
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/config_init.sh"
 
 # Show help if requested
 _cmd="${1:-}"
@@ -18,7 +19,7 @@ if [[ "$_cmd" == "-h" || "$_cmd" == "--help" || "$_cmd" == "help" ]]; then
     echo ""
     echo "Arguments:"
     echo "  agent       Optional agent name (claude, opencode, codex)"
-    echo "              If provided, it overrides detection and saves choice."
+    echo "              If provided, it updates VIBE_AGENT in your keys.env."
     echo ""
     exit 0
 fi
@@ -30,31 +31,24 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 AGENT=""
-LOCAL_AGENT_FILE=""
-
-# Find local .vibe directory to store persistence
-if [[ -d ".vibe" ]]; then
-    LOCAL_AGENT_FILE=".vibe/agent"
-elif git rev-parse --show-toplevel >/dev/null 2>&1; then
-    _gr=$(git rev-parse --show-toplevel)
-    if [[ -d "$_gr/.vibe" ]]; then
-        LOCAL_AGENT_FILE="$_gr/.vibe/agent"
-    fi
-fi
+# VIBE_HOME is already determined by lib/config.sh
+# It prioritizes local .vibe directories if in a git repo
+KEYS_FILE="$VIBE_HOME/keys.env"
 
 # 1. Priority: Explicit Argument
-if [[ -n "$1" ]]; then
+if [[ -n "${1:-}" ]]; then
     AGENT="$1"
-    # Save choice if we found a .vibe directory
-    if [[ -n "$LOCAL_AGENT_FILE" ]]; then
-        echo "$AGENT" > "$LOCAL_AGENT_FILE"
-        log_info "Saved agent preference to: $LOCAL_AGENT_FILE"
+    # Persist choice in keys.env if it exists
+    if [[ -f "$KEYS_FILE" ]]; then
+        if set_env_value "VIBE_AGENT" "$AGENT" "$KEYS_FILE"; then
+            log_info "Persisted agent choice in $KEYS_FILE"
+        fi
     fi
 fi
 
-# 2. Priority: Persisted Choice
-if [[ -z "$AGENT" && -f "$LOCAL_AGENT_FILE" ]]; then
-    AGENT=$(cat "$LOCAL_AGENT_FILE" | tr -d '[:space:]')
+# 2. Priority: Persisted Choice in keys.env
+if [[ -z "$AGENT" && -f "$KEYS_FILE" ]]; then
+    AGENT=$(get_env_value "VIBE_AGENT" "$KEYS_FILE" || true)
     if [[ -n "$AGENT" ]]; then
         log_info "Using agent from config: $AGENT"
     fi
@@ -69,7 +63,7 @@ if [[ -z "$AGENT" ]]; then
     fi
 fi
 
-# 4. Priority: Interactive Selection (if still not found or in raw main)
+# 4. Priority: Interactive Selection
 if [[ -z "$AGENT" ]]; then
     log_warn "No agent detected. Please select one:"
     echo "1) claude"
@@ -82,6 +76,13 @@ if [[ -z "$AGENT" ]]; then
         3) AGENT="codex" ;;
         *) AGENT="claude" ;;
     esac
+    
+    # Save selection
+    if [[ -f "$KEYS_FILE" ]]; then
+        if set_env_value "VIBE_AGENT" "$AGENT" "$KEYS_FILE"; then
+            log_info "Saved selection to $KEYS_FILE"
+        fi
+    fi
 fi
 
 # Set Git identity
