@@ -52,7 +52,7 @@ export_keys() {
 }
 
 load_toml_config() {
-    local toml_file="${1:-$HOME/.vibe/config.toml}"
+    local toml_file="${1:-$VIBE_HOME/config.toml}"
     # Fallback to legacy path if new path doesn't exist
     if [[ ! -f "$toml_file" && -f "$HOME/.codex/config.toml" ]]; then
         toml_file="$HOME/.codex/config.toml"
