@@ -8,16 +8,26 @@
 #   - Main branch is protected (guard)
 # ======================================================
 
-# ---------- Base ----------
-# Resolve VIBE_ROOT from this file's real path (symlink-safe via :A modifier)
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x:A}")/.." && pwd)"
-VIBE_HOME="$VIBE_ROOT/.vibe"
+# Resolve VIBE_ROOT using the shared library logic
+# This ensures consistency with how other scripts locate the root
+_aliases_dir="$(dirname "${(%):-%x:A}")"
+_lib_config="$_aliases_dir/../lib/config.sh"
+
+if [[ -f "$_lib_config" ]]; then
+    source "$_lib_config"
+    # lib/config.sh sets VIBE_ROOT and VIBE_HOME
+else
+    # Fallback if lib/config.sh is missing (should not happen in valid install)
+    VIBE_ROOT="$(cd "$_aliases_dir/.." && pwd)"
+    VIBE_HOME="$VIBE_ROOT/.vibe"
+fi
 
 VIBE_REPO="$(dirname "$VIBE_ROOT")"
 VIBE_MAIN="$VIBE_REPO/main"
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
-export PATH="$VIBE_ROOT/bin:$PATH"
+# Removed hardcoded PATH export to prevent pollution in multi-worktree setups
+# export PATH="$VIBE_ROOT/bin:$PATH"
 
 # ---------- Utilities ----------
 vibe_has() { command -v "$1" >/dev/null 2>&1; }
@@ -348,7 +358,41 @@ vnew() {
 }
 
 # Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
-alias vibe="$VIBE_ROOT/bin/vibe"
+# Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
+# Dynamic vibe command: prefers local ./bin/vibe, fallbacks to $VIBE_ROOT/bin/vibe
+vibe() {
+    local local_vibe="./bin/vibe"
+    local git_root_vibe=""
+    
+    # Check for bin/vibe in current directory
+    if [[ -x "$local_vibe" ]]; then
+        "$local_vibe" "$@"
+        return
+    fi
+
+    # Check for bin/vibe in git root
+    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local root
+        root="$(git rev-parse --show-toplevel)"
+        if [[ -x "$root/bin/vibe" ]]; then
+            git_root_vibe="$root/bin/vibe"
+            "$git_root_vibe" "$@"
+            return
+        fi
+    fi
+
+    # Fallback to the Vibe instance where this alias file is located
+    if [[ -x "$VIBE_ROOT/bin/vibe" ]]; then
+        "$VIBE_ROOT/bin/vibe" "$@"
+    else
+        echo "❌ Could not find 'vibe' executable."
+        echo "   Checked: ./bin/vibe"
+        [[ -n "$git_root_vibe" ]] && echo "   Checked: $git_root_vibe"
+        echo "   Checked: $VIBE_ROOT/bin/vibe"
+        return 1
+    fi
+}
+
 alias vc='vibe chat'
 alias vsign='vibe sign'
 alias vsig='vibe sign'
