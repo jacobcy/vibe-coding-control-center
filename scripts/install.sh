@@ -100,6 +100,41 @@ if [ -f \"$VIBE_HOME/aliases.sh\" ]; then
 fi
 "
 
+# Check if the correct path is already configured.
+# We search for the specific path string in the file.
+if grep -Fq "export PATH=\"$VIBE_BIN:\$PATH\"" "$SHELL_RC"; then
+    log_info "Correct Vibe path already present in $SHELL_RC"
+else
+    # Correct path is NOT present.
+    # Check if an OLD Vibe config exists (by marker).
+    if grep -Fq "Vibe Coding Control Center" "$SHELL_RC"; then
+        log_warn "Detected outdated Vibe configuration in $SHELL_RC"
+        log_info "Updating configuration to point to: $VIBE_BIN"
+
+        # Safely remove the old marker and the old path line.
+        # We perform operations to be safe and clean up old config.
+        # 1. Remove the marker line to allow append_to_rc to work.
+        # 2. Remove any line that looks like an old Vibe PATH export.
+        
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+             sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
+             # Updated regex to match 'refactor/bin' or any 'vibe-center/*/bin'
+             sed -i '' '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
+             # Also try to remove the source line if it looks like Vibe aliases
+             sed -i '' '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
+             # Also remove the specific Antigravity marker if present
+             sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
+        else
+             sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
+             sed -i '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
+             sed -i '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
+             sed -i '/# Added by Antigravity/d' "$SHELL_RC"
+        fi
+        
+        log_success "Removed outdated configuration."
+    fi
+fi
+
 append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
 
 chmod +x "$VIBE_BIN/vibe"

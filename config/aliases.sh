@@ -376,7 +376,7 @@ alias gd='git diff'
 alias gl='git log --oneline --graph --decorate -20'
 
 # Unified vibe/agent aliases
-alias vibe='zsh "$VIBE_ROOT/scripts/vibecoding.sh"'
+# alias vibe='zsh "$VIBE_ROOT/scripts/vibecoding.sh"'
 alias cca='claude --auto'
 alias ccp='claude --plan'
 alias ccr='claude --review'
