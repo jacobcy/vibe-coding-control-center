@@ -10,4 +10,5 @@
 
 ## Completed
 - [x] Consolidate installation scripts.
-- [x] Standardize project documentation structure.
+- [x] Standardize project documentation structure (Audit 20260210-1804).
+- [x] Clean up legacy tech debt in `bin/vibe` and `lib/config.sh`.

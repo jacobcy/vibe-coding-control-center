@@ -1,6 +1,14 @@
 # Vibe Coding Control Center
 
-一个专注于开发者生产力的 AI 开发工具管理套件。目标是打造方便快捷的 Vibe Coding 开发环境，提供统一入口来初始化项目、管理 AI 工具（Claude / OpenCode / Codex）并配置开发环境。
+一个 **AI 工具配置管理脚本集**，用于简化 Claude Code、OpenCode、Codex 等 AI 辅助编程工具的安装、配置和使用。
+
+> **项目定位**: 本项目是配置管理脚本（wrapper/helper scripts），不是 AI agent 的实现。我们通过环境变量配置外部 AI 工具，并提供便捷的 shell alias 和工作流来简化使用。
+
+**核心功能**:
+- 🔧 一键安装和配置 AI 工具（claude, opencode, codex）
+- ⚙️ 统一管理环境变量和 API 密钥
+- 🚀 提供便捷的 shell alias 和 tmux/worktree 工作流
+- 📦 集成 MCP (Model Context Protocol) 服务器配置
 
 **特别说明（目标态）**：
 - **Claude**: 通过环境变量切换端点与模型；中国环境默认中转站 `https://api.bghunt.cn`
@@ -129,6 +137,36 @@ vibe
 - `vibe init --ai` - AI 初始化（默认）
 - `vibe init --local` - 本地模板初始化
 - `vibe chat` / `vc` - 进入默认工具对话
+
+## 新的命令结构
+
+Vibe Coding Control Center 现在采用了 Git 风格的命令架构，提供了更清晰的命令组织：
+
+### 主要命令
+
+- `vibe` - 交互式控制中心
+- `vibe chat` - 快速启动 AI 工具对话
+  - 交互模式：`vibe chat` 或 `vc`
+  - 快速问答：`vibe chat "你的问题"`
+  - **高级特性 (Slash Commands)**：
+    - `vibe chat skills` 或 `vc skills` - 查看 AI 技能列表
+    - `vibe chat status` 或 `vc status` - 查看系统状态
+  - 统一接口，自动适配不同工具（claude/opencode/codex）
+- `vibe config` - 配置管理
+- `vibe equip` - 安装/更新 AI 工具
+- `vibe env` - 环境和密钥管理
+- `vibe init` - 初始化新项目
+- `vibe doctor` - 运行系统诊断（包含健康检查）
+- `vibe flow` - 特性开发工作流管理
+- `vibe help` - 显示帮助信息
+- `vibe -h` / `vibe --help` - 显示帮助信息
+
+### 命令特点
+
+1. **模块化设计** - 每个命令都是独立的脚本，便于维护
+2. **一致性接口** - 所有命令都支持 `-h/--help` 选项
+3. **向后兼容** - 传统的交互式界面仍然可用
+4. **易扩展性** - 轻松添加新命令只需创建新的 `vibe-*` 脚本
 
 ### 项目初始化
 

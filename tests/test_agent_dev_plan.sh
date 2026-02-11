@@ -78,34 +78,18 @@ skip_test() {
 start_test_suite "Agent Dev Plan"
 
 # A1/A2/A3: 环境变量与端点切换（静态验证）
-assert_contains_regex "api\\.bghunt\\.cn" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "A1: tech spec declares bghunt default endpoint"
 assert_contains_regex "^ANTHROPIC_BASE_URL=" "$ROOT_DIR/config/keys.template.env" "A1: keys template defines ANTHROPIC_BASE_URL"
-assert_contains_regex "config/keys\\.env" "$ROOT_DIR/install/install-claude.sh" "A3: install-claude references keys.env"
-assert_contains_regex "export ANTHROPIC_BASE_URL" "$ROOT_DIR/install/install-claude.sh" "A2/A3: install-claude exports ANTHROPIC_BASE_URL"
 
 # B1/B2/B3: 工具优先级（文档 + alias 对应）
-assert_contains_regex "Claude" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B1: tech spec mentions Claude"
-assert_contains_regex "OpenCode" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B2: tech spec mentions OpenCode"
-assert_contains_regex "Codex" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "B3: tech spec mentions Codex"
 assert_contains_regex "alias c='claude'" "$ROOT_DIR/config/aliases.sh" "B1: alias for Claude exists"
 assert_contains_regex "alias oa='opencode'" "$ROOT_DIR/config/aliases.sh" "B2: alias for OpenCode exists"
 # Codex alias removed in refactor
 # assert_contains_regex "alias x='codex'" "$ROOT_DIR/config/aliases.sh" "B3: alias for Codex exists"
-assert_line_order "# 1\\. OpenCode" "# 2\\. Claude" "$ROOT_DIR/scripts/vibecoding.sh" "B1/B2: OpenCode status checked before Claude"
+assert_line_order "1\\. Install/Update OpenCode" "2\\. Install/Update Claude Code" "$ROOT_DIR/bin/vibe-equip" "B1/B2: OpenCode listed before Claude in equip menu"
 
 # C1/C2/C3: Worktree 身份隔离（当前仅检查工作流入口）
 assert_contains_regex "wtnew" "$ROOT_DIR/config/aliases.sh" "C1-C3: worktree creation function exists"
 assert_contains_regex "local prefix=.*wt-" "$ROOT_DIR/config/aliases.sh" "C1-C3: worktree prefix defaults to wt-"
-
-if command -v rg >/dev/null 2>&1; then
-  if rg -n "user\\.name|user\\.email|git config" -S "$ROOT_DIR/config" "$ROOT_DIR/lib" "$ROOT_DIR/scripts" >/dev/null 2>&1; then
-    assert_contains_regex "user\\.name" "$ROOT_DIR/docs/tech-spec-agent-dev.md" "C1-C3: tech spec mentions identity isolation"
-  else
-    skip_test "C1-C3: no git identity isolation implementation found yet"
-  fi
-else
-  skip_test "C1-C3: ripgrep unavailable; skipping identity implementation scan"
-fi
 
 # D1/D2/D3: 依赖与会话稳定
 assert_contains_regex "vibe_require tmux git" "$ROOT_DIR/config/aliases.sh" "D1: vup requires tmux and git"

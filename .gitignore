@@ -5,6 +5,7 @@ config/keys.env
 
 # Logs
 *.log
+docs/audits/
 
 # System
 .DS_Store

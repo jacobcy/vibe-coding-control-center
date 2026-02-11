@@ -1,4 +1,49 @@
 #!/usr/bin/env zsh
+# vibe-init - Initialize new project
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" init "$@"
+
+# Load all utility modules like the main script does
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/cache.sh"
+source "$VIBE_ROOT/lib/error_handling.sh"
+source "$VIBE_ROOT/lib/agents.sh"
+source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load config metadata
+load_user_config
+
+# Handle help flag
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "vibe-init - Initialize new project"
+    echo ""
+    echo "Usage: vibe init [options]"
+    echo ""
+    echo "Initialize a new Vibe Coding project with templates and configurations."
+    echo ""
+    echo "Options:"
+    echo "  --ai            Use AI-powered initialization (default)"
+    echo "  --local         Use local templates only"
+    echo "  -h, --help      Show this help message"
+    echo ""
+    exit 0
+fi
+
+# Process arguments
+local mode="ai"
+if [[ "${1:-}" == "--local" ]]; then
+    mode="local"
+elif [[ "${1:-}" == "--ai" ]]; then
+    mode="ai"
+fi
+
+local preset_dir="${2:-}"
+
+vibe_collect_init_answers "$preset_dir" || exit 1
+vibe_init_project "$mode" || exit 1
+
+echo -e "\n${GREEN}Project initialization complete.${NC}"

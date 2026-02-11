@@ -2,7 +2,34 @@
 
 typeset -gA VIBE_CONFIG
 
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
+find_vibe_home() {
+    # 1. Use VIBE_HOME if explicitly set
+    if [[ -n "${VIBE_HOME:-}" ]]; then
+        echo "$VIBE_HOME"
+        return
+    fi
+
+    # 2. Check current directory
+    if [[ -d "$PWD/.vibe" ]]; then
+        echo "$PWD/.vibe"
+        return
+    fi
+
+    # 3. Check git root (if in a git repo)
+    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local git_root
+        git_root="$(git rev-parse --show-toplevel)"
+        if [[ -d "$git_root/.vibe" ]]; then
+            echo "$git_root/.vibe"
+            return
+        fi
+    fi
+
+    # 4. Fallback to user home
+    echo "$HOME/.vibe"
+}
+
+VIBE_HOME="$(find_vibe_home)"
 
 initialize_config() {
     local script_dir_realpath="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
@@ -52,7 +79,11 @@ export_keys() {
 }
 
 load_toml_config() {
-    local toml_file="${1:-$HOME/.codex/config.toml}"
+    local toml_file="${1:-$VIBE_HOME/config.toml}"
+    # Fallback to legacy path if new path doesn't exist
+    if [[ ! -f "$toml_file" && -f "$HOME/.codex/config.toml" ]]; then
+        toml_file="$HOME/.codex/config.toml"
+    fi
     [[ -f "$toml_file" ]] || return 0
 
     while IFS= read -r line || [[ -n "$line" ]]; do

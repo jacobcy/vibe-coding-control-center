@@ -10,6 +10,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 source "$SCRIPT_DIR/../lib/utils.sh"
 source "$SCRIPT_DIR/../lib/config.sh"
+source "$SCRIPT_DIR/../lib/config_init.sh"
 
 VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 KEYS_FILE="$VIBE_HOME/keys.env"
@@ -45,7 +46,7 @@ do_status() {
     echo "Config Home: $VIBE_HOME"
     echo ""
 
-    echo "${BOLD}[Claude] env vars${NC}"
+    echo "${BOLD}[API Keys] $KEYS_FILE${NC}"
     for key in ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL; do
         local val=$(read_key_from_file "$key" "$KEYS_FILE")
         if [[ -n "$val" ]] && ! is_template_value "$val"; then
@@ -56,35 +57,6 @@ do_status() {
     done
 
     echo ""
-    echo "${BOLD}[OpenCode] ~/.config/opencode/opencode.json${NC}"
-    local oc_config="$HOME/.config/opencode/opencode.json"
-    if [[ -f "$oc_config" ]]; then
-        local provider_count=$(grep -o '"name"' "$oc_config" 2>/dev/null | wc -l | tr -d ' ')
-        echo "  Config found ($provider_count providers)"
-    else
-        echo "  ${RED}Config not found${NC}"
-    fi
-
-    echo ""
-    echo "${BOLD}[Codex] ~/.codex/config.toml${NC}"
-    local codex_config="$HOME/.codex/config.toml"
-    if [[ -f "$codex_config" ]]; then
-        local model=$(grep "^model" "$codex_config" 2>/dev/null | cut -d'"' -f2)
-        echo "  Config found${model:+ (model: $model)}"
-    else
-        echo "  ${RED}Config not found${NC}"
-    fi
-
-    echo ""
-    echo "${BOLD}[MCP] ~/.claude.json${NC}"
-    if [[ -f "$HOME/.claude.json" ]]; then
-        local srv_count=$(grep -o '"command"' "$HOME/.claude.json" 2>/dev/null | wc -l | tr -d ' ')
-        echo "  Config found ($srv_count servers)"
-    else
-        echo "  ${RED}Config not found${NC}"
-    fi
-
-    echo ""
     echo "${BOLD}[Shell] $(get_shell_rc)${NC}"
     local shell_rc=$(get_shell_rc)
     if grep -qF "Vibe Coding" "$shell_rc" 2>/dev/null; then
@@ -92,6 +64,10 @@ do_status() {
     else
         echo "  ❌ Vibe configuration not injected"
     fi
+
+    echo ""
+    echo "===" 
+    echo "${BOLD}Note:${NC} For AI tool configurations, run: ${CYAN}vibe config${NC}"
 }
 
 # ================= DETECT =================
@@ -155,13 +131,12 @@ do_setup() {
     mkdir -p "$VIBE_HOME"
 
     if [[ ! -f "$KEYS_FILE" ]]; then
-        if [[ -f "$TEMPLATE_FILE" ]]; then
-            cp "$TEMPLATE_FILE" "$KEYS_FILE"
-            chmod 600 "$KEYS_FILE"
-            log_info "Created $KEYS_FILE from template"
+        # Use shared sync logic
+        if sync_keys_env "$PROJECT_ROOT"; then
+             log_success "Synced project configuration"
         else
-            log_critical "Template not found: $TEMPLATE_FILE"
-            exit 1
+             log_error "Setup requires a valid config/keys.env in your project."
+             exit 1
         fi
     fi
 
@@ -270,6 +245,7 @@ do_setup_mcp() {
 # ================= SWITCH =================
 
 do_switch() {
+    [[ -f "$KEYS_FILE" ]] || { log_error "keys.env not found"; return 1; }
     local endpoint="$1"
     case "$endpoint" in
         china|cn)

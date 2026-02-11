@@ -397,10 +397,9 @@ prompt_user() {
 
     while true; do
         printf "%s? %s%s %s%s%s: " "$YELLOW" "$prompt_text" "$NC" "$BLUE" "${default_value:+[default: $default_value]}" "$NC" >&2
-        if [[ -t 0 ]]; then
-            read -r input
+        if read -r input; then
+            :
         else
-            # Fallback for non-interactive shells (e.g., subshells, pipelines)
             input=""
         fi
 
@@ -585,10 +584,7 @@ append_to_rc() {
     local content="$2"
     local marker="$3"
 
-    # Validate inputs
-    if ! validate_input "$content" "false"; then
-        return 1
-    fi
+    # Validate marker only (content is shell config, should contain variables/commands)
     if ! validate_input "$marker" "false"; then
         return 1
     fi

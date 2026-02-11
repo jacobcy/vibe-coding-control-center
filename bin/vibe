@@ -3,30 +3,101 @@
 
 set -e
 
+# context shim: auto-switch to local vibe if VIBE_ROOT is defined in local config
+if [[ -z "${VIBE_NO_SHIM}" ]]; then
+    _local_keys=""
+    if [[ -d "${PWD}/.vibe" && -f "${PWD}/.vibe/keys.env" ]]; then
+        _local_keys="${PWD}/.vibe/keys.env"
+    elif command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+         _gr="$(git rev-parse --show-toplevel 2>/dev/null)"
+         if [[ -d "${_gr}/.vibe" && -f "${_gr}/.vibe/keys.env" ]]; then
+             _local_keys="${_gr}/.vibe/keys.env"
+         fi
+    fi
+
+    if [[ -n "${_local_keys}" ]]; then
+        # 1. Try to get VIBE_ROOT from keys.env
+        _local_root="$(grep '^VIBE_ROOT=' "${_local_keys}" | cut -d= -f2- | tr -d '"' | tr -d "'")"
+        
+        # 2. If not in keys.env, try VIBE_HOME/vibe_root file (standard install)
+        if [[ -z "${_local_root}" ]]; then
+            _local_home="$(dirname "${_local_keys}")"
+            if [[ -f "${_local_home}/vibe_root" ]]; then
+                _local_root="$(cat "${_local_home}/vibe_root")"
+            fi
+        fi
+
+        # 3. Fallback: Assume parent of .vibe is VIBE_ROOT (Convention)
+        if [[ -z "${_local_root}" ]]; then
+            _local_home="$(dirname "${_local_keys}")"
+            _local_root="$(dirname "${_local_home}")"
+        fi
+
+        if [[ -n "${_local_root}" && -d "${_local_root}" ]]; then
+             _local_bin="${_local_root}/bin/vibe"
+             _current_script="${(%):-%x}"
+             _current_script_abs="$(cd "$(dirname "$_current_script")" && pwd)/$(basename "$_current_script")"
+             
+             # If local bin exists, is executable, and is NOT this script
+             if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" ]]; then
+                 export VIBE_NO_SHIM=1
+                 # Handover execution
+                 exec "${_local_bin}" "$@"
+             fi
+        fi
+    fi
+fi
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 
-# Check for help flags first
+# Check for help flags or subcommand first
 if [[ $# -eq 1 ]] && [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    if [[ -f "$VIBE_ROOT/docs/vibe-help.txt" ]]; then
-        cat "$VIBE_ROOT/docs/vibe-help.txt"
+    if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
+        cat "$VIBE_ROOT/lib/vibe-help.md"
     else
         echo "Vibe Coding Control Center"
-        echo ""
-        echo "Usage: vibe [options] [command]"
-        echo ""
-        echo "Options:"
-        echo "  -h, --help     Show this help message"
-        echo ""
-        echo "Commands:"
-        echo "  (no args)      Launch interactive control center"
-        echo "  chat           Start default AI tool chat"
-        echo "  equip          Install/update AI tools"
-        echo "  env            Environment and key management"
-        echo "  init           Initialize new project"
-        echo "  sync           Sync workspace identity"
-        echo "  diagnostics    System diagnostics"
-        echo ""
-        echo "Run 'vibe' without arguments for interactive mode."
+        echo "Help file missing at lib/vibe-help.md. Run 'vibe' for interactive mode."
+    fi
+    exit 0
+elif [[ "$1" == "help" ]]; then
+    # Implement 'vibe help' command
+    if [[ $# -eq 1 ]]; then
+        # 'vibe help' - show general help
+        if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
+            cat "$VIBE_ROOT/lib/vibe-help.md"
+        else
+            echo "Vibe Coding Control Center"
+            echo ""
+            echo "Usage: vibe [options] [command]"
+            echo ""
+            echo "Options:"
+            echo "  -h, --help     Show this help message"
+            echo ""
+            echo "Commands:"
+            echo "  (no args)      Launch interactive control center"
+            echo "  chat           Start default AI tool chat"
+            echo "  config         Manage Vibe Coding configuration"
+            echo "  doctor         System health check (includes diagnostics)"
+            echo "  env            Environment and key management"
+            echo "  equip          Install/update AI tools"
+            echo "  flow           Feature development workflow"
+            echo "  help           Show help information"
+            echo "  init           Start New Project"
+            echo "  keys           Quick access to API keys"
+            echo ""
+            echo "Run 'vibe' without arguments for interactive mode."
+        fi
+    else
+        # 'vibe help <subcommand>' - show help for specific subcommand
+        shift  # Remove 'help' argument
+        subcmd="$1"
+        cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
+        if [[ -x "$cmd" ]]; then
+            "$cmd" --help
+        else
+            echo "Unknown subcommand: $subcmd" >&2
+            echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+        fi
     fi
     exit 0
 fi
@@ -39,7 +110,7 @@ if [[ $# -gt 0 ]]; then
     exec "$cmd" "$@"
   else
     echo "Unknown subcommand: $subcmd" >&2
-    echo "Available: $(ls -1 "${VIBE_ROOT}/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+    echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
     exit 1
   fi
 fi
