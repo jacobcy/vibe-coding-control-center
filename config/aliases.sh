@@ -39,8 +39,32 @@ vibe_require() {
 
 vibe_now() { date +"%Y-%m-%d %H:%M:%S"; }
 
+# ---------- Context Loading ----------
+# Helper to load local keys.env if present in PWD or Git root
+vibe_load_context() {
+    local ctx_home=""
+    # 1. Check current directory
+    if [[ -d "$PWD/.vibe" ]]; then
+        ctx_home="$PWD/.vibe"
+    # 2. Check git root
+    elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local gr="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [[ -d "$gr/.vibe" ]]; then
+            ctx_home="$gr/.vibe"
+        fi
+    fi
+
+    # Load keys if found (override global)
+    if [[ -n "$ctx_home" && -f "$ctx_home/keys.env" ]]; then
+        set -a
+        source "$ctx_home/keys.env"
+        set +a
+    fi
+}
+
 # ---------- tmux core ----------
 vibe_tmux_ensure() {
+  vibe_load_context
   vibe_require tmux || return 1
   if ! tmux has-session -t "$VIBE_SESSION" 2>/dev/null; then
     tmux new-session -d -s "$VIBE_SESSION" -c "$VIBE_MAIN" -n "main"
@@ -108,13 +132,12 @@ wt() {
 # Create a new worktree (safe default naming)
 # usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]
 wtnew() {
-  # Use absolute path for git to avoid PATH issues
-  local git_cmd="/usr/bin/git"
-  
-  # Check if git is available
-  if [[ ! -x "$git_cmd" ]]; then
-    vibe_die "git command not found at $git_cmd. Please install git first."
+  vibe_load_context
+  # Find git command - rely on PATH
+  if ! command -v git >/dev/null 2>&1; then
+    vibe_die "git command not found. Please ensure git is installed and in your PATH."
   fi
+  local git_cmd="git"
 
   local branch="$1"
   local agent="${2:-claude}"
@@ -235,7 +258,7 @@ alias cy='claude'
 
 # Start agent in current dir but protect main/master
 # Start agent in current dir but protect main/master
-c_safe() { vibe_main_guard || return; claude; }
+c_safe() { vibe_load_context; vibe_main_guard || return; claude; }
 
 # Start agent in a given worktree (cd + run)
 # usage: cwt <wt-dir>
@@ -318,6 +341,7 @@ vup() {
 # One-button: create worktree + bring up tmux workspace
 # usage: vnew <branch> [agent=claude|opencode|codex] [base=main]
 vnew() {
+  vibe_load_context
   local branch="$1"
   local agent="${2:-claude}"
   local base="${3:-main}"
