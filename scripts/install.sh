@@ -61,6 +61,26 @@ ensure_oh_my_zsh || true
 log_step "Initializing ~/.vibe configuration directory"
 VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VIBE_BIN="$VIBE_ROOT/bin"
+
+# Pre-check: VIBE_HOME might be defined in config/keys.env
+KEYS_FILE="$VIBE_ROOT/config/keys.env"
+if [ -f "$KEYS_FILE" ]; then
+    # Extract VIBE_HOME if defined, ignoring comments
+    # We use a simple grep/sed here to avoid sourcing the file before we are ready
+    DETECTED_HOME=$(grep -E "^[[:space:]]*VIBE_HOME=" "$KEYS_FILE" | cut -d= -f2- | sed 's/^"//;s/"$//')
+    
+    if [ -n "$DETECTED_HOME" ]; then
+        # Expand variables if any (like $VIBE_ROOT)
+        # We replace $VIBE_ROOT with the actual path
+        DETECTED_HOME="${DETECTED_HOME/\$VIBE_ROOT/$VIBE_ROOT}"
+        # We also replace ~ with HOME if needed (though bash usually handles this, we do it explicitly for safety)
+        DETECTED_HOME="${DETECTED_HOME/\~/$HOME}"
+        
+        export VIBE_HOME="$DETECTED_HOME"
+        log_info "Detected VIBE_HOME from keys.env: $VIBE_HOME"
+    fi
+fi
+
 VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 
 # Sync project configuration to user directory
@@ -70,9 +90,7 @@ if ! sync_keys_env "$VIBE_ROOT"; then
     exit 1
 fi
 
-# Save VIBE_ROOT path for reference
-echo "$VIBE_ROOT" > "$VIBE_HOME/vibe_root"
-log_info "Saved project root: $VIBE_ROOT"
+
 
 # Create symlink to aliases.sh instead of copying
 ALIASES_LINK="$VIBE_HOME/aliases.sh"
@@ -118,7 +136,7 @@ log_success "'vibe' command is ready"
 log_success "Installation process completed!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
-echo "1. Verify your configuration: ${CYAN}cat ~/.vibe/keys.env${NC}"
+echo "1. Verify your configuration: ${CYAN}cat $VIBE_HOME/keys.env${NC}"
 echo "2. Reload shell: ${CYAN}source $SHELL_RC${NC} (or restart terminal)"
 echo "3. Install AI tools: ${CYAN}vibe equip${NC}"
 echo "4. Launch Control Center: ${CYAN}vibe${NC}"
