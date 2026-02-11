@@ -28,6 +28,12 @@ mask_key() {
     fi
 }
 
+should_mask_key() {
+    local key="$1"
+    # Mask if key name contains sensitive keywords
+    [[ "$key" =~ "TOKEN" || "$key" =~ "KEY" || "$key" =~ "AUTH" || "$key" =~ "PASS" || "$key" =~ "SECRET" ]]
+}
+
 read_key_from_file() {
     local key="$1" file="$2"
     [[ -f "$file" ]] || { echo ""; return 0; }
@@ -50,7 +56,11 @@ do_status() {
     for key in ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL; do
         local val=$(read_key_from_file "$key" "$KEYS_FILE")
         if [[ -n "$val" ]] && ! is_template_value "$val"; then
-            echo "  $key = $(mask_key "$val")"
+            if should_mask_key "$key"; then
+                echo "  $key = $(mask_key "$val")"
+            else
+                echo "  $key = $val"
+            fi
         else
             echo "  $key = ${RED}[NOT SET]${NC}"
         fi
@@ -276,10 +286,18 @@ do_keys_show() {
         if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
             local key="${match[1]}"
             local val="${match[2]}"
+            # Remove quotes
+            val="${val%\"}"
+            val="${val#\"}"
+            
             if is_template_value "$val"; then
                 echo "  ${RED}$key = [NOT SET]${NC}"
             else
-                echo "  ${GREEN}$key = $(mask_key "$val")${NC}"
+                if should_mask_key "$key"; then
+                    echo "  ${GREEN}$key = $(mask_key "$val")${NC}"
+                else
+                    echo "  ${GREEN}$key = $val${NC}"
+                fi
             fi
         fi
     done < "$KEYS_FILE"

@@ -8,8 +8,9 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 # Load all utility modules
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/config_init.sh"
 
-# Show help if requested - Use safe expansion to avoid "parameter not set"
+# Show help if requested
 _cmd="${1:-}"
 if [[ "$_cmd" == "-h" || "$_cmd" == "--help" || "$_cmd" == "help" ]]; then
     echo "vibe sign - Manage Git user identity for current worktree"
@@ -18,7 +19,7 @@ if [[ "$_cmd" == "-h" || "$_cmd" == "--help" || "$_cmd" == "help" ]]; then
     echo ""
     echo "Arguments:"
     echo "  agent       Optional agent name (claude, opencode, codex)"
-    echo "              If omitted, it attempts to detect from worktree name."
+    echo "              If provided, it updates VIBE_AGENT in your keys.env."
     echo ""
     exit 0
 fi
@@ -29,16 +30,63 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
-# Detect agent from directory name or argument
-# Pattern: wt-<agent>-<branch>
-AGENT="${1:-}"
+AGENT=""
+# VIBE_HOME is already determined by lib/config.sh
+# It prioritizes local .vibe directories if in a git repo
+KEYS_FILE="$VIBE_HOME/keys.env"
+
+# 1. Priority: Explicit Argument
+if [[ -n "${1:-}" ]]; then
+    AGENT="$1"
+    # Persist choice in keys.env if it exists
+    if [[ -f "$KEYS_FILE" ]]; then
+        if set_env_value "VIBE_AGENT" "$AGENT" "$KEYS_FILE"; then
+            log_info "Persisted agent choice in $KEYS_FILE"
+        fi
+    fi
+fi
+
+# 2. Priority: Persisted Choice in keys.env
+if [[ -z "$AGENT" && -f "$KEYS_FILE" ]]; then
+    AGENT=$(get_env_value "VIBE_AGENT" "$KEYS_FILE" || true)
+    
+    # Fallback to VIBE_DEFAULT_TOOL if VIBE_AGENT is not set
+    if [[ -z "$AGENT" ]]; then
+        AGENT=$(get_env_value "VIBE_DEFAULT_TOOL" "$KEYS_FILE" || true)
+        [[ -n "$AGENT" ]] && log_info "Using agent from VIBE_DEFAULT_TOOL: $AGENT"
+    else
+        log_info "Using agent from config: $AGENT"
+    fi
+fi
+
+# 3. Priority: Directory Name Pattern
 if [[ -z "$AGENT" ]]; then
     DIR_NAME=$(basename "$(pwd)")
     if [[ "$DIR_NAME" =~ ^wt-([a-z0-9]+)- ]]; then
         AGENT="${match[1]}"
         log_info "Detected agent from directory: $AGENT"
-    else
-        AGENT="claude" # Default fallback
+    fi
+fi
+
+# 4. Priority: Interactive Selection
+if [[ -z "$AGENT" ]]; then
+    log_warn "No agent detected. Please select one:"
+    echo "1) claude"
+    echo "2) opencode"
+    echo "3) codex"
+    printf "Choice [1-3]: "
+    read -r choice
+    case "$choice" in
+        2) AGENT="opencode" ;;
+        3) AGENT="codex" ;;
+        *) AGENT="claude" ;;
+    esac
+    
+    # Save selection
+    if [[ -f "$KEYS_FILE" ]]; then
+        if set_env_value "VIBE_AGENT" "$AGENT" "$KEYS_FILE"; then
+            log_info "Saved selection to $KEYS_FILE"
+        fi
     fi
 fi
 
