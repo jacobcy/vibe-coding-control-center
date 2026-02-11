@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# vibe-config - Manage Vibe Coding configuration
+# vibe-config - AI tool configuration manager
 
 set -e
 
@@ -8,195 +8,179 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 # Load all utility modules
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
-source "$VIBE_ROOT/lib/i18n.sh" 
-source "$VIBE_ROOT/lib/cache.sh"
-source "$VIBE_ROOT/lib/error_handling.sh"
-source "$VIBE_ROOT/lib/agents.sh"
-source "$VIBE_ROOT/lib/init_project.sh"
+source "$VIBE_ROOT/lib/i18n.sh"
 
-# Load config metadata
-load_user_config
-
-CONFIG_DIR="$VIBE_ROOT/config"
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
-KEYS_FILE="$VIBE_HOME/keys.env"
-
-# Function to initialize config directory
-init_config_home() {
-    mkdir -p "$VIBE_HOME"
+# Show AI tool configuration status
+show_config_status() {
+    echo "=== AI Tool Configuration Status ==="
+    echo ""
     
-    # Copy keys template if it doesn't exist
-    if [[ -f "$CONFIG_DIR/keys.template.env" ]] && [[ ! -f "$KEYS_FILE" ]]; then
-        cp "$CONFIG_DIR/keys.template.env" "$KEYS_FILE"
-        chmod 600 "$KEYS_FILE"
-        log_success "Created keys.env from template (edit with your actual keys and config)"
-    fi
-}
-
-# Function to show current configuration
-show_config() {
-    init_config_home
-    
-    if [[ -f "$KEYS_FILE" ]]; then
-        echo -e "${CYAN}Current Configuration (from $KEYS_FILE):${NC}\n"
-        cat "$KEYS_FILE"
+    echo "${BOLD}[Claude] ~/.claude.json${NC}"
+    local claude_config="$HOME/.claude.json"
+    if [[ -f "$claude_config" ]]; then
+        local srv_count=$(grep -o '"command"' "$claude_config" 2>/dev/null | wc -l | xargs || echo "0")
+        echo "  ✅ Config found ($srv_count MCP servers)"
     else
-        echo -e "${YELLOW}Configuration file not found: $KEYS_FILE${NC}"
-        echo "Run 'vibe config init' to create it from template"
-    fi
-}
-
-# Function to update configuration
-update_config() {
-    local key="${1:-}"
-    local value="${2:-}"
-    
-    if [[ -z "$key" || -z "$value" ]]; then
-        log_error "Usage: vibe config set <key> <value>"
-        echo "Example: vibe config set VIBE_DEFAULT_TOOL opencode"
-        return 1
+        echo "  ❌ Config not found"
+        echo "  → Run: vibe env mcp"
     fi
     
-    init_config_home
-    [[ -f "$KEYS_FILE" ]] || { log_error "Configuration file not found: $KEYS_FILE"; return 1; }
-    
-    # Create a temporary file
-    local temp_file=$(mktemp)
-    
-    # Copy existing file, removing the key if it already exists
-    if [[ -f "$KEYS_FILE" ]]; then
-        grep -vE "^[[:space:]]*$key=" "$KEYS_FILE" > "$temp_file" 2>/dev/null || true
-    fi
-    
-    # Add the new key-value pair
-    echo "$key=\"$value\"" >> "$temp_file"
-    
-    # Move the temp file to the actual location
-    if secure_write_file "$KEYS_FILE" "$(cat "$temp_file")" "600"; then
-        log_success "Configuration updated: $key = $value"
+    echo ""
+    echo "${BOLD}[OpenCode] ~/.config/opencode/opencode.json${NC}"
+    local oc_config="$HOME/.config/opencode/opencode.json"
+    if [[ -f "$oc_config" ]]; then
+        local provider_count=$(grep -o '"name"' "$oc_config" 2>/dev/null | wc -l | xargs || echo "0")
+        echo "  ✅ Config found ($provider_count providers)"
     else
-        log_error "Failed to update configuration"
+        echo "  ❌ Config not found"
+        echo "  → Run: vibe equip (select OpenCode)"
     fi
     
-    rm -f "$temp_file"
+    echo ""
+    echo "${BOLD}[Codex] ~/.codex/config.toml${NC}"
+    local codex_config="$HOME/.codex/config.toml"
+    if [[ -f "$codex_config" ]]; then
+        local model=$(grep '^model' "$codex_config" 2>/dev/null | cut -d'"' -f2)
+        echo "  ✅ Config found${model:+ (model: $model)}"
+    else
+        echo "  ❌ Config not found"
+    fi
+    
+    echo ""
+    echo "${BOLD}Note:${NC} For environment variables (API keys), use ${CYAN}vibe env${NC}"
 }
 
-# Function to get a configuration value
-get_config() {
-    local key="${1:-}"
+# Manage OpenCode configuration
+manage_opencode() {
+    local subcmd="${1:-show}"
+    local oc_config="$HOME/.config/opencode/opencode.json"
     
-    if [[ -z "$key" ]]; then
-        log_error "Usage: vibe config get <key>"
-        echo "Example: vibe config get VIBE_DEFAULT_TOOL"
-        return 1
-    fi
-    
-    if [[ -f "$KEYS_FILE" ]]; then
-        local value=$(grep -E "^[[:space:]]*$key=" "$KEYS_FILE" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//')
-        if [[ -n "$value" ]]; then
-            echo "$value"
-        else
-            log_error "Key '$key' not found in configuration"
+    case "$subcmd" in
+        show)
+            [[ -f "$oc_config" ]] || { 
+                log_error "opencode.json not found at $oc_config"
+                log_info "Run 'vibe equip' to install OpenCode"
+                return 1
+            }
+            
+            if command -v jq &>/dev/null; then
+                cat "$oc_config" | jq .
+            else
+                cat "$oc_config"
+            fi
+            ;;
+        
+        edit)
+            [[ -f "$oc_config" ]] || {
+                log_error "opencode.json not found. Run 'vibe equip' first"
+                return 1
+            }
+            ${EDITOR:-vim} "$oc_config"
+            log_success "Edited $oc_config"
+            ;;
+        
+        *)
+            echo "Usage: vibe config opencode <show|edit>"
             return 1
-        fi
-    else
-        log_error "Configuration file not found: $KEYS_FILE"
-        return 1
-    fi
+            ;;
+    esac
 }
 
-# Function to list all configuration options
-list_config_options() {
-    echo "Available configuration options (stored in ~/.vibe/keys.env):"
-    echo ""
-    echo "Project Configuration:"
-    echo "  VIBE_DEFAULT_TOOL         - Default AI tool (opencode/claude/codex) [default: opencode]"
-    echo "  VIBE_OPENCODE_MODEL       - OpenCode model name [default: opencode/kimi-k2.5-free]"
-    echo "  VIBE_SESSION              - Tmux session name for worktree workflow [default: vibe]"
-    echo ""
-    echo "API Keys (Required for respective services):"
-    echo "  ANTHROPIC_AUTH_TOKEN      - Claude API token"
-    echo "  ANTHROPIC_BASE_URL        - Claude API endpoint [default: https://api.anthropic.com]"
-    echo "  ANTHROPIC_MODEL           - Claude model name [default: claude-3-5-sonnet-20241022]"
-    echo ""
-    echo "Optional API Keys:"
-    echo "  GITHUB_PERSONAL_ACCESS_TOKEN - GitHub API token (for MCP)"
-    echo "  BRAVE_API_KEY             - Brave Search API key"
-    echo "  DEEPSEEK_API_KEY          - DeepSeek API key"
-    echo "  MOONSHOT_API_KEY          - Moonshot API key"
-    echo "  GOOGLE_GENERATIVE_AI_API_KEY - Google AI API key"
-    echo ""
-    echo "Common use cases:"
-    echo "  vibe config set VIBE_DEFAULT_TOOL claude"
-    echo "  vibe config set VIBE_DEBUG true"
-    echo "  vibe config set VIBE_OPENCODE_MODEL opencode/deepseek-chat"
+# Manage Codex configuration
+manage_codex() {
+    local subcmd="${1:-show}"
+    local codex_config="$HOME/.codex/config.toml"
+    
+    case "$subcmd" in
+        show)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found at $codex_config"
+                return 1
+            }
+            cat "$codex_config"
+            ;;
+        
+        edit)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found"
+                return 1
+            }
+            ${EDITOR:-vim} "$codex_config"
+            log_success "Edited $codex_config"
+            ;;
+        
+        model)
+            [[ -f "$codex_config" ]] || {
+                log_error "config.toml not found"
+                return 1
+            }
+            
+            local new_model="${2:-}"
+            if [[ -n "$new_model" ]]; then
+                # Set new model
+                sed -i '' "s/^model = .*/model = \"$new_model\"/" "$codex_config"
+                log_success "Model set to: $new_model"
+            else
+                # Get current model
+                grep '^model' "$codex_config" | cut -d'"' -f2
+            fi
+            ;;
+        
+        *)
+            echo "Usage: vibe config codex <show|edit|model [name]>"
+            return 1
+            ;;
+    esac
 }
 
-# Function to show help
+# Show help
 show_help() {
-    echo "vibe-config - Manage Vibe Coding configuration"
-    echo ""
-    echo "Usage: vibe config <command> [options]"
-    echo ""
-    echo "Commands:"
-    echo "  show              Display current configuration"
-    echo "  get <key>         Get a specific configuration value"
-    echo "  set <key> <value> Set a configuration value"
-    echo "  list              List available configuration options"
-    echo "  init              Initialize configuration directory"
-    echo ""
-    echo "Examples:"
-    echo "  vibe config show                           # Show all config"
-    echo "  vibe config get VIBE_DEFAULT_TOOL         # Get default tool"
-    echo "  vibe config set VIBE_DEFAULT_TOOL claude  # Set default tool"
-    echo "  vibe config list                          # Show available options"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help        Show this help message"
+    cat << 'EOF'
+vibe config - AI tool configuration manager
+
+Usage: vibe config [command] [options]
+
+Commands:
+  (no args)              Show all AI tool configuration status
+  opencode show          Display opencode.json
+  opencode edit          Edit opencode.json
+  codex show             Display config.toml
+  codex edit             Edit config.toml
+  codex model [name]     Get/set Codex model
+
+Examples:
+  vibe config                      # Show all config status
+  vibe config opencode edit        # Edit OpenCode config
+  vibe config codex model          # Show current Codex model
+  vibe config codex model gpt-4    # Set Codex model
+
+Note: For environment variables (API keys), use 'vibe env' instead
+EOF
 }
 
-init_config() {
-    init_config_home
-    log_success "Configuration directory initialized at $VIBE_HOME"
-    if [[ -f "$KEYS_FILE" ]]; then
-        log_info "Edit $KEYS_FILE to configure your keys and settings"
-    else
-        log_info "Please create $KEYS_FILE to configure your keys and settings"
-    fi
-}
-
-# Handle help flag first
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    show_help
-    exit 0
-fi
-
-# Parse main command
+# Handle commands
 case "${1:-}" in
-    show)
-        show_config
-        ;;
-    get)
-        shift
-        get_config "${1:-}"
-        ;;
-    set)
-        shift
-        update_config "${1:-}" "${2:-}"
-        ;;
-    list)
-        list_config_options
-        ;;
-    init)
-        init_config
-        ;;
     "")
-        # Default behavior - show config
-        show_config
+        show_config_status
         ;;
-    *)
-        log_error "Unknown command: ${1:-}"
+    
+    opencode)
+        shift
+        manage_opencode "$@"
+        ;;
+    
+    codex)
+        shift
+        manage_codex "$@"
+        ;;
+    
+    -h|--help|help)
         show_help
+        ;;
+    
+    *)
+        log_error "Unknown command: $1"
+        echo "Run 'vibe config help' for usage"
         exit 1
         ;;
 esac

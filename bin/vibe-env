@@ -1,4 +1,138 @@
 #!/usr/bin/env zsh
+# vibe-env - Environment variable configuration manager
+
 set -e
+
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/env-manager.sh" "$@"
+
+# Load all utility modules
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/config_init.sh"
+source "$VIBE_ROOT/lib/i18n.sh"
+
+VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
+KEYS_FILE="$VIBE_HOME/keys.env"
+
+# Show help
+show_help() {
+    cat << 'EOF'
+vibe env - Environment variable configuration manager
+
+Usage: vibe env <command> [options]
+
+Commands:
+  status              Show environment status (default)
+  show                Show keys.env content (masked)
+  edit                Edit keys.env in your editor
+  get <key>           Get specific environment variable
+  set <key> <value>   Set environment variable
+  sync                Sync project's keys.env to user directory
+  detect              Detect and validate environment
+  inject              Export keys to current shell session
+  switch <cn|off>     Switch Claude API endpoint
+  verify              Verify API key validity
+
+Examples:
+  vibe env                           # Show status
+  vibe env show                      # Show all keys (masked)
+  vibe env set VIBE_DEFAULT_TOOL claude
+  vibe env get ANTHROPIC_MODEL
+  vibe env sync                      # Sync from project config
+  vibe env verify                    # Test API keys
+
+Configuration file: ~/.vibe/keys.env
+EOF
+}
+
+# Handle commands
+case "${1:-status}" in
+    status|"")
+        # Show complete environment status (delegate to env-manager.sh)
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" status
+        ;;
+    
+    show)
+        # Show keys.env content (masked)
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys show
+        ;;
+    
+    edit)
+        # Edit keys.env
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys edit
+        ;;
+    
+    get)
+        # Get specific key value
+        key="${2:-}"
+        [[ -z "$key" ]] && { log_error "Usage: vibe env get <key>"; exit 1; }
+        
+        value=$(get_env_value "$key" "$KEYS_FILE")
+        if [[ -n "$value" ]]; then
+            echo "$value"
+        else
+            log_error "Key '$key' not found in $KEYS_FILE"
+            exit 1
+        fi
+        ;;
+    
+    set)
+        # Set key=value
+        key="${2:-}"
+        value="${3:-}"
+        [[ -z "$key" || -z "$value" ]] && {
+            log_error "Usage: vibe env set <key> <value>"
+            echo "Example: vibe env set VIBE_DEFAULT_TOOL claude"
+            exit 1
+        }
+        
+        if set_env_value "$key" "$value" "$KEYS_FILE"; then
+            log_success "Updated: $key = $value"
+        else
+            log_error "Failed to update $KEYS_FILE"
+            exit 1
+        fi
+        ;;
+    
+    sync)
+        # Sync project keys.env to user directory
+        if sync_keys_env "$VIBE_ROOT"; then
+            log_info "Configuration synced to $KEYS_FILE"
+            log_info "Edit with: vibe env edit"
+        else
+            log_error "Failed to sync configuration"
+            exit 1
+        fi
+        ;;
+    
+    detect|check)
+        # Detect and validate environment
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" detect
+        ;;
+    
+    inject)
+        # Export keys to current shell session
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" inject
+        ;;
+    
+    switch)
+        # Switch Claude endpoint
+        shift
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" switch "$@"
+        ;;
+    
+    verify)
+        # Verify API key validity
+        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys verify
+        ;;
+    
+    -h|--help|help)
+        show_help
+        ;;
+    
+    *)
+        log_error "Unknown command: $1"
+        echo "Run 'vibe env help' for usage"
+        exit 1
+        ;;
+esac
