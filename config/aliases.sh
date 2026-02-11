@@ -357,8 +357,9 @@ vnew() {
 # Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
 alias vibe="$VIBE_ROOT/bin/vibe"
 alias vc='vibe chat'
-alias vsign='vibe signature'
-alias vsig='vibe signature'
+alias vsign='vibe sign'
+alias vsig='vibe sign'
+alias vmsign='vibe sign'
 
 # Claude (Priority 1)
 alias c='claude'

@@ -84,6 +84,7 @@ elif [[ "$1" == "help" ]]; then
             echo "  help           Show help information"
             echo "  init           Start New Project"
             echo "  keys           Quick access to API keys"
+            echo "  sign           Sync Git Identity"
             echo ""
             echo "Run 'vibe' without arguments for interactive mode."
         fi

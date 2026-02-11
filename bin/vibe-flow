@@ -136,7 +136,7 @@ case "${1:-}" in
     
     signature|sign)
         shift
-        exec zsh "$VIBE_ROOT/bin/vibe-signature" "$@"
+        exec zsh "$VIBE_ROOT/bin/vibe-sign" "$@"
         ;;
     
     status)
@@ -156,8 +156,8 @@ case "${1:-}" in
         ;;
     
     *)
-        log_error "Unknown command: $1"
-        echo "Run 'vibe flow help' for usage."
-        exit 1
+        echo "Unknown subcommand: $subcmd" >&2
+    echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | sed 's/signature/sign/' | tr '\n' ' ')" >&2
+    exit 1
         ;;
 esac

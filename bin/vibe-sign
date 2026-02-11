@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# vibe-signature - Manage Git user identity for current worktree
+# vibe-sign - Manage Git user identity for current worktree
 
 set -e
 
@@ -9,12 +9,12 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
 
-# Show help if requested
-if [[ "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
-    echo "vibe signature - Manage Git user identity for current worktree"
+# Show help if requested - Use safe expansion to avoid "parameter not set"
+_cmd="${1:-}"
+if [[ "$_cmd" == "-h" || "$_cmd" == "--help" || "$_cmd" == "help" ]]; then
+    echo "vibe sign - Manage Git user identity for current worktree"
     echo ""
-    echo "Usage: vibe signature [agent]"
-    echo "       vibe sign [agent]     (alias)"
+    echo "Usage: vibe sign [agent]"
     echo ""
     echo "Arguments:"
     echo "  agent       Optional agent name (claude, opencode, codex)"

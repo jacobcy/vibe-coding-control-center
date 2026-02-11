@@ -24,7 +24,7 @@
 - `help` 显示帮助信息
 - `init` 启动新项目 (Start New Project)
 - `keys` 快速浏览 API keys（`vibe env show` 的别名）
-- `signature` **同步 Git 身份** (根据 worktree 自动设置 user.name/email)
+- `sign` **同步 Git 身份** (根据 worktree 自动设置 user.name/email)
 - `doctor` 系统健康检查（包含诊断）
 
 ## 环境管理子命令 (vibe env)
