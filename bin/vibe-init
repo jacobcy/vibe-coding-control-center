@@ -18,7 +18,7 @@ source "$VIBE_ROOT/lib/init_project.sh"
 load_user_config
 
 # Handle help flag
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "vibe-init - Initialize new project"
     echo ""
     echo "Usage: vibe init [options]"
@@ -35,9 +35,9 @@ fi
 
 # Process arguments
 local mode="ai"
-if [[ "$1" == "--local" ]]; then
+if [[ "${1:-}" == "--local" ]]; then
     mode="local"
-elif [[ "$1" == "--ai" ]]; then
+elif [[ "${1:-}" == "--ai" ]]; then
     mode="ai"
 fi
 

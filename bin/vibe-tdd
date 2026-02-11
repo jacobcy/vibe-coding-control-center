@@ -19,7 +19,7 @@ load_user_config
 
 # Define the same TDD initialization function as in tdd-init.sh
 do_tdd_new() {
-    local FEATURE_NAME="$1"
+    local FEATURE_NAME="${1:-}"
     
     if [[ -z "$FEATURE_NAME" ]]; then
         log_error "Usage: vibe tdd new <feature-name>"
@@ -86,7 +86,7 @@ fi
 case "${1:-}" in
     new)
         shift
-        do_tdd_new "$1"
+        do_tdd_new "${1:-}"
         ;;
     "")
         # Default behavior
@@ -98,7 +98,7 @@ case "${1:-}" in
         echo "Run 'vibe tdd -h' for more information."
         ;;
     *)
-        log_error "Unknown subcommand: $1"
+        log_error "Unknown subcommand: ${1:-}"
         echo "Usage: vibe tdd new <feature-name>"
         echo "Run 'vibe tdd -h' for help."
         exit 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# vibe-doctor - Display system health information
+# vibe-doctor - Display system health information and run diagnostics
 
 set -e
 
@@ -71,5 +71,78 @@ check_status() {
     echo -e "${BLUE}====================================${NC}"
 }
 
-# Call the check_status function
-check_status
+# Extended diagnostics function
+do_diagnostics() {
+    echo -e "\n${CYAN}>> RUNNING COMPREHENSIVE DIAGNOSTICS <<${NC}"
+    echo "Checking core connections..."
+
+    # Check MCP config
+    if [ -f "$HOME/.claude.json" ]; then
+        log_info "MCP Configuration found (.claude.json)"
+        # Count servers using grep as a simple heuristic
+        SERVER_COUNT=$(grep -o "\"command\"" "$HOME/.claude.json" | wc -l)
+        echo -e "  - Configured Servers: $SERVER_COUNT"
+    else
+        log_error "MCP Configuration missing"
+    fi
+
+    # Additional Dependencies
+    echo -e "\n${BOLD}DEPENDENCIES:${NC}"
+    for cmd in tmux lazygit zsh git; do
+        if command -v "$cmd" &> /dev/null; then
+            log_info "$(printf "%-14s" "$cmd") : Found"
+        else
+            log_error "$(printf "%-14s" "$cmd") : Missing"
+        fi
+    done
+
+    # Aliases Check
+    echo -e "\n${BOLD}SHELL CONFIGURATION:${NC}"
+    SHELL_RC="$HOME/.zshrc"
+    if [ -f "$SHELL_RC" ]; then
+        log_info ".zshrc found"
+        local aliases=("c" "o" "x" "vibe" "vnew" "wt")
+        for a in "${aliases[@]}"; do
+            if grep -q "alias $a=" "$SHELL_RC"; then
+                 log_info "Alias '$a' configured"
+            else
+                 log_warn "Alias '$a' likely missing"
+            fi
+        done
+    else
+        log_error ".zshrc not found"
+    fi
+
+    echo -e "\n${CYAN}Diagnostics complete.${NC}"
+}
+
+# Handle help flag
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "vibe-doctor - Display system health information and run diagnostics"
+    echo ""
+    echo "Usage: vibe doctor [options]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo "  --health      Show system health status only (default)"
+    echo "  --diagnostics Show comprehensive diagnostics"
+    echo "  --all         Show both health status and diagnostics"
+    echo ""
+    echo "Examples:"
+    echo "  vibe doctor          # Health status only"
+    echo "  vibe doctor --health # Health status only"
+    echo "  vibe doctor --diagnostics # Comprehensive diagnostics"
+    echo "  vibe doctor --all    # Both health and diagnostics"
+    exit 0
+fi
+
+# Determine what to show based on arguments
+if [[ "${1:-}" == "--diagnostics" ]]; then
+    do_diagnostics
+elif [[ "${1:-}" == "--all" ]]; then
+    check_status
+    do_diagnostics
+else
+    # Default behavior or --health flag
+    check_status
+fi

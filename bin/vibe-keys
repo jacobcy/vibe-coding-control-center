@@ -1,4 +1,9 @@
 #!/usr/bin/env zsh
 set -e
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh" keys "$@"
+SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -n "${1:-}" ]]; then
+    exec zsh "${VIBE_ROOT}/scripts/env-manager.sh" keys "$@"
+else
+    exec zsh "${VIBE_ROOT}/scripts/env-manager.sh" keys
+fi

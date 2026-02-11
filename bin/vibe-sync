@@ -49,7 +49,7 @@ do_sync_identity() {
 }
 
 # Handle help flag first
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "vibe-sync - Sync workspace identity and git configuration"
     echo ""
     echo "Usage: vibe sync"

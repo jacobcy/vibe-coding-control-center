@@ -39,7 +39,7 @@ do_chat() {
 }
 
 # Handle help flag
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "vibe-chat - Start default AI tool chat"
     echo ""
     echo "Usage: vibe chat"
