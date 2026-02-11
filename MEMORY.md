@@ -5,6 +5,14 @@
 - **Status**: Maintenance & Refactoring
 - **Current Focus**: Consolidation and Technical Debt Cleanup
 
+## Incidents & Lessons Learned
+- **[2026-02-11] Critical Incident: Unrelated Code Modification**
+  - **Event**: Removed `VIBE_HOME` user documentation from `keys.template.env` while implementing `VIBE_AGENT`.
+  - **Impact**: Obscured configuration guidance for multi-branch development, causing user confusion.
+  - **Root Cause**: Over-aggressive template cleanup without respecting existing context/intent.
+  - **Correction Rule**: **NEVER modify or remove code/comments unrelated to the current feature.** Documentation is functional code for users.
+
+
 ## Key Decisions
 - **Language Protocol**: English Thought, Chinese Response (2026-02-10).
 - **Architecture**: Modular shell script architecture (`lib/`, `bin/`, `config/`).

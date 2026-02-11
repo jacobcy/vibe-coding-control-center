@@ -19,13 +19,7 @@ if [[ -z "${VIBE_NO_SHIM}" ]]; then
         # 1. Try to get VIBE_ROOT from keys.env
         _local_root="$(grep '^VIBE_ROOT=' "${_local_keys}" | cut -d= -f2- | tr -d '"' | tr -d "'")"
         
-        # 2. If not in keys.env, try VIBE_HOME/vibe_root file (standard install)
-        if [[ -z "${_local_root}" ]]; then
-            _local_home="$(dirname "${_local_keys}")"
-            if [[ -f "${_local_home}/vibe_root" ]]; then
-                _local_root="$(cat "${_local_home}/vibe_root")"
-            fi
-        fi
+
 
         # 3. Fallback: Assume parent of .vibe is VIBE_ROOT (Convention)
         if [[ -z "${_local_root}" ]]; then

@@ -11,16 +11,11 @@
 # ---------- Base ----------
 VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
 
-if [[ -f "$VIBE_HOME/vibe_root" ]]; then
-    # Reliable way: read from installation record
-    VIBE_ROOT="$(cat "$VIBE_HOME/vibe_root")"
-else
-    # Fallback way: resolve symlink (Zsh specific :A modifier)
-    # ${(%):-%x} gives source file path, :A resolves to absolute physical path
-    VIBE_ROOT="$(cd "$(dirname "${(%):-%x:A}")/.." && pwd)"
-fi
+# Resolve VIBE_ROOT from symlink (Zsh specific :A modifier)
+# ${(%):-%x} gives source file path, :A resolves to absolute physical path
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x:A}")/.." && pwd)"
 
-VIBE_REPO="$VIBE_ROOT"
+VIBE_REPO="$(dirname "$VIBE_ROOT")"
 VIBE_MAIN="$VIBE_REPO/main"
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
@@ -365,7 +360,7 @@ alias vmsign='vibe sign'
 alias c='claude'
 alias cy='claude'
 alias ca='claude'
-alias cp='claude'
+# alias cp='claude'
 alias cr='claude'
 
 # OpenCode (Priority 2)
