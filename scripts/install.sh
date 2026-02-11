@@ -22,7 +22,22 @@ source "$SCRIPT_DIR/../lib/config.sh"
 source "$SCRIPT_DIR/../lib/config_init.sh"
 source "$SCRIPT_DIR/../lib/i18n.sh"
 
-log_step "Starting Vibe Coding Control Center Installation"
+# ================= ARGUMENT PARSING =================
+MODE="global"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --local)
+            MODE="local"
+            shift
+            ;;
+        *)
+            # unknown option
+            shift
+            ;;
+    esac
+done
+
+log_step "Starting Vibe Coding Control Center Installation ($MODE mode)"
 SHELL_RC=$(get_shell_rc)
 
 # ================= PREREQUISITES =================
@@ -56,35 +71,78 @@ fi
 ensure_zsh_installed
 ensure_oh_my_zsh || true
 
-# ================= INITIALIZE ~/.vibe/ =================
+# ================= INSTALLATION =================
+SOURCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-log_step "Initializing Vibe configuration directory"
-VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-VIBE_BIN="$VIBE_ROOT/bin"
-VIBE_HOME="$VIBE_ROOT/.vibe"
+if [[ "$MODE" == "global" ]]; then
+    # Global Installation: Copy to ~/.vibe
+    INSTALL_DIR="$HOME/.vibe"
+    log_step "Initializing Vibe Global Installation in $INSTALL_DIR"
+    
+    mkdir -p "$INSTALL_DIR"
+    
+    # Copy project files
+    log_info "Copying project files to $INSTALL_DIR..."
+    for dir in bin lib scripts config; do
+        if [[ -d "$SOURCE_ROOT/$dir" ]]; then
+            rm -rf "$INSTALL_DIR/$dir"
+            cp -r "$SOURCE_ROOT/$dir" "$INSTALL_DIR/"
+        fi
+    done
+    
+    # Handle keys.env (Directly in ~/.vibe/keys.env)
+    TARGET_KEYS="$INSTALL_DIR/keys.env"
+    SOURCE_KEYS="$SOURCE_ROOT/config/keys.env"
+    TEMPLATE_KEYS="$SOURCE_ROOT/config/keys.template.env"
+    
+    if [[ ! -f "$TARGET_KEYS" ]]; then
+        if [[ -f "$SOURCE_KEYS" ]]; then
+             log_info "Initializing keys.env from local config..."
+             cp "$SOURCE_KEYS" "$TARGET_KEYS"
+             chmod 600 "$TARGET_KEYS"
+        elif [[ -f "$TEMPLATE_KEYS" ]]; then
+             log_info "Initializing keys.env from template..."
+             cp "$TEMPLATE_KEYS" "$TARGET_KEYS"
+             chmod 600 "$TARGET_KEYS"
+             log_warn "Please edit $TARGET_KEYS to add your API keys."
+        fi
+    else
+        log_info "Existing keys.env found at $TARGET_KEYS, keeping it."
+    fi
+    
+    # Symlink aliases.sh
+    # Global: ~/.vibe/aliases.sh -> ~/.vibe/config/aliases.sh
+    ln -sf "$INSTALL_DIR/config/aliases.sh" "$INSTALL_DIR/aliases.sh"
+    
+    VIBE_BIN="$INSTALL_DIR/bin"
+    VIBE_HOME_DISPLAY="$INSTALL_DIR"
 
-# Sync project configuration to user directory
-if ! sync_keys_env "$VIBE_ROOT"; then
-    log_error "Installation requires a configured keys.env"
-    log_info "Please create $VIBE_ROOT/config/keys.env and run install again"
-    exit 1
-fi
-
-
-
-# Create symlink to aliases.sh instead of copying
-ALIASES_LINK="$VIBE_HOME/aliases.sh"
-ALIASES_TARGET="$VIBE_ROOT/config/aliases.sh"
-
-if [[ -e "$ALIASES_LINK" || -L "$ALIASES_LINK" ]]; then
-    # Remove existing file or symlink
+else
+    # Local Installation: Use current directory
+    log_step "Initializing Vibe Local Installation in $SOURCE_ROOT"
+    
+    VIBE_ROOT="$SOURCE_ROOT"
+    VIBE_BIN="$VIBE_ROOT/bin"
+    VIBE_HOME="$VIBE_ROOT/.vibe"
+    
+    mkdir -p "$VIBE_HOME"
+    
+    # Sync keys to .vibe/keys.env
+    if ! sync_keys_env "$VIBE_ROOT"; then
+        log_error "Installation requires a configured keys.env"
+        log_info "Please create $VIBE_ROOT/config/keys.env and run install again"
+        exit 1
+    fi
+    
+    # Symlink aliases.sh
+    # Local: .vibe/aliases.sh -> config/aliases.sh
+    ALIASES_LINK="$VIBE_HOME/aliases.sh"
+    ALIASES_TARGET="$VIBE_ROOT/config/aliases.sh"
     rm -f "$ALIASES_LINK"
-    log_info "Removed existing aliases.sh"
+    ln -s "$ALIASES_TARGET" "$ALIASES_LINK"
+    
+    VIBE_HOME_DISPLAY="$VIBE_HOME"
 fi
-
-# Create new symlink
-ln -s "$ALIASES_TARGET" "$ALIASES_LINK"
-log_success "Created aliases.sh symlink -> $ALIASES_TARGET"
 
 # ================= BOOTSTRAP 'vibe' COMMAND =================
 
@@ -94,44 +152,28 @@ SHELL_RC=$(get_shell_rc)
 RC_CONTENT="# Vibe Coding Control Center
 export PATH=\"$VIBE_BIN:\$PATH\"
 
-# Load Vibe aliases (aliases.sh auto-detects VIBE_ROOT from its own path)
-if [ -f \"$VIBE_HOME/aliases.sh\" ]; then
-    source \"$VIBE_HOME/aliases.sh\"
+# Load Vibe aliases
+if [ -f \"$VIBE_HOME_DISPLAY/aliases.sh\" ]; then
+    source \"$VIBE_HOME_DISPLAY/aliases.sh\"
 fi
 "
 
-# Check if the correct path is already configured.
-# We search for the specific path string in the file.
-if grep -Fq "export PATH=\"$VIBE_BIN:\$PATH\"" "$SHELL_RC"; then
-    log_info "Correct Vibe path already present in $SHELL_RC"
-else
-    # Correct path is NOT present.
-    # Check if an OLD Vibe config exists (by marker).
-    if grep -Fq "Vibe Coding Control Center" "$SHELL_RC"; then
-        log_warn "Detected outdated Vibe configuration in $SHELL_RC"
-        log_info "Updating configuration to point to: $VIBE_BIN"
-
-        # Safely remove the old marker and the old path line.
-        # We perform operations to be safe and clean up old config.
-        # 1. Remove the marker line to allow append_to_rc to work.
-        # 2. Remove any line that looks like an old Vibe PATH export.
-        
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-             sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
-             # Updated regex to match 'refactor/bin' or any 'vibe-center/*/bin'
-             sed -i '' '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
-             # Also try to remove the source line if it looks like Vibe aliases
-             sed -i '' '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
-             # Also remove the specific Antigravity marker if present
-             sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
-        else
-             sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
-             sed -i '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
-             sed -i '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
-             sed -i '/# Added by Antigravity/d' "$SHELL_RC"
-        fi
-        
-        log_success "Removed outdated configuration."
+# Clean up old configuration
+if grep -Fq "Vibe Coding Control Center" "$SHELL_RC" || grep -Fq "vibe-center" "$SHELL_RC"; then
+    log_info "Updating configuration in $SHELL_RC"
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+         sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
+         sed -i '' '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
+         sed -i '' '/export PATH=".*\.vibe\/bin:$PATH"/d' "$SHELL_RC"
+         sed -i '' '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
+         sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
+    else
+         sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
+         sed -i '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
+         sed -i '/export PATH=".*\.vibe\/bin:$PATH"/d' "$SHELL_RC"
+         sed -i '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
+         sed -i '/# Added by Antigravity/d' "$SHELL_RC"
     fi
 fi
 
@@ -139,13 +181,13 @@ append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
 
 chmod +x "$VIBE_BIN/vibe"
 chmod +x "$VIBE_BIN"/* 2>/dev/null || true
-log_success "'vibe' command is ready"
+log_success "'vibe' command is ready (Mode: $MODE)"
 
 # ================= FINAL SUMMARY =================
 log_success "Installation process completed!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
-echo "1. Verify your configuration: ${CYAN}cat $VIBE_HOME/keys.env${NC}"
+echo "1. Verify your configuration: ${CYAN}cat $VIBE_HOME_DISPLAY/keys.env${NC}"
 echo "2. Reload shell: ${CYAN}source $SHELL_RC${NC} (or restart terminal)"
 echo "3. Install AI tools: ${CYAN}vibe equip${NC}"
 echo "4. Launch Control Center: ${CYAN}vibe${NC}"
