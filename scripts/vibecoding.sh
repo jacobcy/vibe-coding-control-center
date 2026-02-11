@@ -50,6 +50,7 @@ set -e
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 # ================= LOAD UTILITIES =================
+# ================= LOAD UTILITIES =================
 SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -61,7 +62,6 @@ source "$SCRIPT_DIR/../lib/cache.sh"
 source "$SCRIPT_DIR/../lib/error_handling.sh"
 source "$SCRIPT_DIR/../lib/agents.sh"
 source "$SCRIPT_DIR/../lib/init_project.sh"
-source "$SCRIPT_DIR/../lib/core_commands.sh"
 
 # Load config metadata (no env export)
 load_user_config
@@ -71,13 +71,27 @@ export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 ensure_oh_my_zsh || true
 
+# Show main header
+show_header() {
+    clear
+    echo -e "${PURPLE}"
+    echo "   ______           __          "
+    echo "  / ____/____  ____/ /__  _  __"
+    echo " / /    / __ \/ __  / _ \| |/_/"
+    echo "/ /___ / /_/ / /_/ /  __/>  <  "
+    echo "\____/ \____/\__,_/\___/_/|_|  "
+    echo -e "${NC}"
+    echo -e "${CYAN}    VIBE CODING CONTROL CENTER${NC}"
+    echo -e "${BLUE}====================================${NC}"
+}
+
 # ================= CLI COMMAND HANDLING =================
 if [[ $# -gt 0 ]]; then
     COMMAND="$1"
     shift
     
     case "$COMMAND" in
---help|-h)
+        --help|-h)
              echo "Vibe Coding Control Center"
              echo ""
              echo "Usage: vibe [options] [command]"
@@ -111,7 +125,7 @@ if [[ $# -gt 0 ]]; then
             fi
             ;;
         sync)
-            do_sync_identity
+            zsh "${VIBE_ROOT}/bin/vibe-sync"
             exit 0
             ;;
         keys)
@@ -123,14 +137,14 @@ if [[ $# -gt 0 ]]; then
             exit 0
             ;;
         chat)
-            do_chat
+            zsh "${VIBE_ROOT}/bin/vibe-chat"
             exit 0
             ;;
         config)
             exec zsh "${VIBE_ROOT}/bin/vibe-config" "$@"
             ;;
         equip)
-            do_equip
+            zsh "${VIBE_ROOT}/bin/vibe-equip"
             exit 0
             ;;
         doctor)
@@ -138,17 +152,7 @@ if [[ $# -gt 0 ]]; then
             exit 0
             ;;
         init)
-            local mode="ai"
-            if [[ "$1" == "--local" ]]; then
-                mode="local"
-                shift
-            elif [[ "$1" == "--ai" ]]; then
-                mode="ai"
-                shift
-            fi
-            local preset_dir="${1:-}"
-            vibe_collect_init_answers "$preset_dir" || exit 1
-            vibe_init_project "$mode" || exit 1
+            zsh "${VIBE_ROOT}/bin/vibe-init" "$@"
             exit 0
             ;;
         *)
@@ -162,7 +166,8 @@ fi
 # ================= MAIN LOOP =================
 while true; do
     show_header
-    check_status
+    # check_status replaced by vibe-doctor
+    zsh "${VIBE_ROOT}/bin/vibe-doctor"
 
     echo -e "${BOLD}COMMANDS:${NC}"
     echo -e "  ${GREEN}1)${NC} ${BOLD}IGNITION${NC}    (Start New Project)"
@@ -180,20 +185,36 @@ while true; do
     OPTION=$(prompt_user "Select command (1-9, q)" "" "")
 
     case $OPTION in
-        1) do_ignition ;;
-        2) do_equip ;;
-        3) zsh "$SCRIPT_DIR/env-manager.sh" ;;
-        4) do_sync_identity ;;
-        5) zsh "${VIBE_ROOT}/bin/vibe-doctor" ;;
-        6) do_chat ;;
+        1) 
+            zsh "${VIBE_ROOT}/bin/vibe-init"
+            press_enter "Press Enter to continue..."
+            ;;
+        2) 
+            zsh "${VIBE_ROOT}/bin/vibe-equip" 
+            ;;
+        3) 
+            zsh "$SCRIPT_DIR/env-manager.sh" 
+            ;;
+        4) 
+            zsh "${VIBE_ROOT}/bin/vibe-sync" 
+            press_enter "Press Enter to continue..."
+            ;;
+        5) 
+            # vibe-doctor --diagnostics for option 5
+            zsh "${VIBE_ROOT}/bin/vibe-doctor" --diagnostics
+            press_enter "Press Enter to return..."
+            ;;
+        6) 
+            zsh "${VIBE_ROOT}/bin/vibe-chat" 
+            ;;
         7) 
             # Config command - launch the config manager
-            zsh "${VIBE_ROOT}/bin/vibe-config" ;;
+            zsh "${VIBE_ROOT}/bin/vibe-config" 
+            ;;
         8) 
-            # Quick init command 
-            local mode="ai"
-            vibe_collect_init_answers || continue
-            vibe_init_project "$mode" || continue
+            # Quick init command - reused vibe-init
+            zsh "${VIBE_ROOT}/bin/vibe-init"
+            press_enter "Press Enter to continue..."
             ;;
         9) 
             # TDD command - show options
