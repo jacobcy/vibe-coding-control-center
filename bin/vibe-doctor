@@ -53,11 +53,11 @@ check_status() {
     fi
 
     # 4. Environment
-    KEYS_FILE="$HOME/.vibe/keys.env"
+    KEYS_FILE="$VIBE_HOME/keys.env"
     if [ -f "$KEYS_FILE" ]; then
-        log_info "Keys Config    : Found (~/.vibe/keys.env)"
+        log_info "Keys Config    : Found ($KEYS_FILE)"
     else
-        log_warn "Keys Config    : Missing (~/.vibe/keys.env)"
+        log_warn "Keys Config    : Missing ($KEYS_FILE)"
     fi
 
     # 5. MCP Configuration

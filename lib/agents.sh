@@ -53,7 +53,7 @@ vibe_select_default_tool() {
 
     # Priority 2: keys.env configuration
     local config_default_tool=""
-    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    local vibe_home="$VIBE_HOME"
     if [[ -f "$vibe_home/keys.env" ]]; then
         config_default_tool=$(grep "^VIBE_DEFAULT_TOOL=" "$vibe_home/keys.env" 2>/dev/null | cut -d= -f2- | sed 's/^"//;s/"$//' || echo "")
     fi

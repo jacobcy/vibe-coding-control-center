@@ -58,30 +58,10 @@ ensure_oh_my_zsh || true
 
 # ================= INITIALIZE ~/.vibe/ =================
 
-log_step "Initializing ~/.vibe configuration directory"
+log_step "Initializing Vibe configuration directory"
 VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VIBE_BIN="$VIBE_ROOT/bin"
-
-# Pre-check: VIBE_HOME might be defined in config/keys.env
-KEYS_FILE="$VIBE_ROOT/config/keys.env"
-if [ -f "$KEYS_FILE" ]; then
-    # Extract VIBE_HOME if defined, ignoring comments
-    # We use a simple grep/sed here to avoid sourcing the file before we are ready
-    DETECTED_HOME=$(grep -E "^[[:space:]]*VIBE_HOME=" "$KEYS_FILE" | cut -d= -f2- | sed 's/^"//;s/"$//')
-    
-    if [ -n "$DETECTED_HOME" ]; then
-        # Expand variables if any (like $VIBE_ROOT)
-        # We replace $VIBE_ROOT with the actual path
-        DETECTED_HOME="${DETECTED_HOME/\$VIBE_ROOT/$VIBE_ROOT}"
-        # We also replace ~ with HOME if needed (though bash usually handles this, we do it explicitly for safety)
-        DETECTED_HOME="${DETECTED_HOME/\~/$HOME}"
-        
-        export VIBE_HOME="$DETECTED_HOME"
-        log_info "Detected VIBE_HOME from keys.env: $VIBE_HOME"
-    fi
-fi
-
-VIBE_HOME="${VIBE_HOME:-$HOME/.vibe}"
+VIBE_HOME="$VIBE_ROOT/.vibe"
 
 # Sync project configuration to user directory
 if ! sync_keys_env "$VIBE_ROOT"; then
@@ -114,15 +94,9 @@ SHELL_RC=$(get_shell_rc)
 RC_CONTENT="# Vibe Coding Control Center
 export PATH=\"$VIBE_BIN:\$PATH\"
 
-# Load Vibe configuration from ~/.vibe/
-if [ -f \"\$HOME/.vibe/keys.env\" ]; then
-    set -a
-    source \"\$HOME/.vibe/keys.env\"
-    set +a
-fi
-
-if [ -f \"\$HOME/.vibe/aliases.sh\" ]; then
-    source \"\$HOME/.vibe/aliases.sh\"
+# Load Vibe aliases (aliases.sh auto-detects VIBE_ROOT from its own path)
+if [ -f \"$VIBE_HOME/aliases.sh\" ]; then
+    source \"$VIBE_HOME/aliases.sh\"
 fi
 "
 

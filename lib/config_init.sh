@@ -30,12 +30,12 @@ get_vibe_root() {
 # Usage: sync_keys_env [vibe_root_path]
 sync_keys_env() {
     local vibe_root="${1:-$(get_vibe_root)}"
-    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    local vibe_home="$VIBE_HOME"
     local keys_file="$vibe_home/keys.env"
     local project_keys="$vibe_root/config/keys.env"
     local template_keys="$vibe_root/config/keys.template.env"
     
-    # Ensure ~/.vibe exists
+    # Ensure VIBE_HOME exists
     mkdir -p "$vibe_home"
     
     # Check if project has real keys.env
@@ -78,7 +78,7 @@ sync_keys_env() {
 
 # Verify keys.env has real values (not just template placeholders)
 verify_keys_configured() {
-    local keys_file="${1:-${VIBE_HOME:-$HOME/.vibe}/keys.env}"
+    local keys_file="${1:-$VIBE_HOME/keys.env}"
     
     [[ -f "$keys_file" ]] || {
         log_warn "keys.env not found at $keys_file"
@@ -115,7 +115,7 @@ verify_keys_configured() {
 # Helper: Get a value from keys.env
 get_env_value() {
     local key="$1"
-    local keys_file="${2:-${VIBE_HOME:-$HOME/.vibe}/keys.env}"
+    local keys_file="${2:-$VIBE_HOME/keys.env}"
     
     [[ -f "$keys_file" ]] || return 1
     
@@ -129,7 +129,7 @@ get_env_value() {
 set_env_value() {
     local key="$1"
     local value="$2"
-    local keys_file="${3:-${VIBE_HOME:-$HOME/.vibe}/keys.env}"
+    local keys_file="${3:-$VIBE_HOME/keys.env}"
     
     [[ -f "$keys_file" ]] || {
         log_error "keys.env not found at $keys_file"

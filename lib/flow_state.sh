@@ -4,7 +4,7 @@
 
 # Get the flow state directory
 get_flow_state_dir() {
-    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    local vibe_home="$VIBE_HOME"
     echo "$vibe_home/flow"
 }
 
