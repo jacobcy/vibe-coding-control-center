@@ -21,6 +21,9 @@
 ## System Context
 - **OS**: macOS
 - **Shell**: zsh
+- **Tooling**:
+  - **ShellCheck**: Installed for static analysis of shell scripts (2026-02-12).
+
 # Execution Log
 [2026-02-10] Implemented /feature-commit workflow.
 [2026-02-10] Completed /audit-and-cleanup: reorganized documentation, fixed `vibe-tdd` nounset bug, and consolidated help logic.
@@ -40,6 +43,8 @@
   - Implemented complete workflow lifecycle: start → spec → test → dev → review → pr → done
 
 - **Design Principle**: "Orchestrate and integrate" rather than "reimplement and replace"
+[2026-02-12] **Tooling Update**:
+- **ShellCheck**: Validated installation and updated coding standards to mandate static analysis.
 
 ## Concept Clarity (2026-02-11, updated)
 - **Path auto-detection**: `VIBE_ROOT` and `VIBE_HOME` are **internal implementation details**, never user-configured.
@@ -54,4 +59,3 @@
     2. Ensure the branch has a `.vibe` folder (synced via `vibe-init` or manual setup).
     3. Running `vibe` inside that folder automatically delegates execution to **that specific branch's** `bin/vibe`.
   - **Benefit**: Allows developing and testing different versions of Vibe core logic simultaneously in different worktrees without conflicts.
-
