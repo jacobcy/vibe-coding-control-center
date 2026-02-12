@@ -52,10 +52,9 @@ This project operates under the **Vibe Coding Constitution** defined in [SOUL.md
 - `docs/usage_advice.md`: Usage guidelines and best practices
 - `SOUL.md`: Core principles and constitutional rules (referenced by all contributors)
 - `rules.md`: Behavior rules (Behavioral laws)
-- `MEMORY.md`: Cumulative record of key decisions and context
-- `TASK.md`: High-level project tasks and history
-- `WORKFLOW.md`: Documentation of project-level workflows
-- `AGENT.md`: Agent persona and role definitions
+- `.agent/context/memory.md`: Cumulative record of key decisions and context
+- `.agent/context/task.md`: High-level project tasks and history
+- `.agent/context/agent.md`: Agent persona and role definitions
 - `lib/`: Library directory
   - `utils.sh`: Enhanced shared utility functions (security, validation, logging)
 - `config/`: Configuration directory
@@ -147,11 +146,10 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 ## Important Variables
 ## Linked Docs
 - [SOUL.md](SOUL.md)
-- [MEMORY.md](MEMORY.md)
-- [TASK.md](TASK.md)
-- [WORKFLOW.md](WORKFLOW.md)
-- [AGENT.md](AGENT.md)
-- [RULES.md](RULES.md) (Wait, I should check if it's RULES.md or rules.md in the code)
+- [memory.md](.agent/context/memory.md)
+- [task.md](.agent/context/task.md)
+- [agent.md](.agent/context/agent.md)
+- [RULES.md](RULES.md)
 - `SHELL_RC`: Points to the zsh configuration file (`.zshrc`)
 - Constants in `lib/utils.sh` for security parameters (MAX_PATH_LENGTH, MAX_INPUT_LENGTH, etc.)
 

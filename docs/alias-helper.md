@@ -26,9 +26,10 @@
 repo/
 ├── main/            # 主分支 worktree（只做人类操作）
 ├── wt-xxx/          # 各种实验 / 功能 worktree
-└── scripts/
-├── vibe-aliases.sh
-└── alias-helper.md
+└── config/
+    └── aliases.sh
+└── docs/
+    └── alias-helper.md
 
 ---
 

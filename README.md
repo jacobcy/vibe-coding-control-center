@@ -334,6 +334,11 @@ vibe-coding-control-center/
 ├── MODERN_README.md             # 现代化功能说明（历史文档）
 ├── CHANGELOG.md                 # 变更日志
 ├── UPGRADE_FEATURES.md          # 新功能说明（历史文档）
+├── .agent/                      # Agent 配置与工作流
+│   ├── context/               # AI 上下文 (memory.md, task.md, agent.md)
+│   ├── workflows/             # 自动化工作流
+│   ├── templates/             # 提示词模板
+│   └── rules/                 # 行为规则
 ├── config/                      # 配置文件
 │   ├── aliases.sh              # 命令别名（动态路径解析）
 │   ├── keys.env                # API 密钥（不提交）
