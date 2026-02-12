@@ -12,7 +12,7 @@ This directory contains workflows that the AI agent can execute to assist with v
 | **[/feature-commit](feature-commit.md)** | Interactive Smart Commit Workflow | user invokes `/feature-commit` to stage and commit changes atomically. |
 | **[/initialize](initialize.md)** | Initialize or check project standard structure | user invokes `/initialize` to set up a new project or verify structure. |
 | **[/post-task](post-task.md)** | Post-task maintenance | user invokes `/post-task` to clean up keys, verify tests, and record progress. |
-| **[/pull-request](pull-request.md)** | Create a Pull Request | user invokes `/pull-request` to push changes and open a PR. |
+| **[/pull-request](pull-request.md)** | Create a Pull Request | user invokes `/pull-request` to analyze commits, draft a description, and open a PR. |
 | **[/release](release.md)** | Automated Release Workflow | user invokes `/release` to build, tag, and publish a new version. |
 | **[/sync-branches](sync-branches.md)** | Sync to other worktrees | user invokes `/sync-branches` to propagate current changes to other local worktrees. |
 | **[/tdd](tdd.md)** | Test-Driven Development Cycle | user invokes `/tdd` to implement features using the Red-Green-Refactor cycle. |
