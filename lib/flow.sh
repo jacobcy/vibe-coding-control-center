@@ -653,3 +653,94 @@ flow_cmd_status() {
     echo ""
     return 0
 }
+
+# =============================================================================
+# COMMAND: vibe flow rotate
+# =============================================================================
+
+flow_cmd_rotate() {
+    local new_task="$1"
+    
+    if [[ -z "$new_task" ]]; then
+        log_error "Usage: vibe flow rotate <new-task-name>"
+        return 1
+    fi
+    
+    # 1. Ensure we are in a worktree
+    # Check if .git is a file (worktree) not a dir (main repo)
+    if [[ -d ".git" ]]; then
+         log_error "This command must be run from a worktree, not the main repository."
+         return 1
+    fi
+    
+    if [[ ! -f ".git" ]]; then
+         log_error "Not a git repository."
+         return 1
+    fi
+
+    echo -e "\n🔄 Rotating to new task: $new_task\n"
+
+    # 2. Stash changes
+    log_step "Stashing uncommitted changes"
+    # Check for changes first
+    if [[ -n "$(git status --porcelain)" ]]; then
+        if git stash push -m "Rotate to $new_task: saved WIP from previous task"; then
+            log_success "Stashed changes"
+        else
+            log_error "Failed to stash changes"
+            return 1
+        fi
+    else
+        log_info "No uncommitted changes to stash"
+    fi
+
+    # 3. Get current branch
+    local old_branch=$(git branch --show-current)
+    log_info "Current branch: $old_branch"
+
+    # 4. Create new branch from main
+    log_step "Creating new branch: $new_task"
+    # Fetch main first to be up to date
+    log_info "Fetching origin/main..."
+    git fetch origin main
+    
+    # Create new branch based on origin/main
+    # We use checkout -B to force create/reset if exists (or should we fail?)
+    # User said "create new development branch", implies new.
+    if ! git checkout -b "$new_task" origin/main; then
+        log_error "Failed to create new branch $new_task"
+        return 1
+    fi
+
+    # 5. Delete old branch
+    log_step "Removing old branch: $old_branch"
+    # User requirement: "删除已完成的分支" (delete completed branch)
+    # We assume 'completed' means user is done with it, so we force delete.
+    if git branch -D "$old_branch"; then
+        log_success "Deleted $old_branch"
+    else
+        log_error "Failed to delete $old_branch"
+    fi
+
+    # 6. Pop stash
+    log_step "Applying saved changes"
+    # Check if we stashed something for this rotation
+    # Note: git stash pop applies the top stash. If we stashed above, it's at stash@{0}
+    if [[ -n "$(git stash list | grep "Rotate to $new_task")" ]]; then
+         if git stash pop; then
+             log_success "Applied changes to $new_task"
+         else
+             log_warn "Failed to pop stash (conflicts?). Manual intervention required."
+         fi
+    else
+        log_info "No specific stash found to apply."
+    fi
+
+    echo ""
+    log_success "✅ Task rotated successfully!"
+    echo "  Old branch: $old_branch (Deleted)"
+    echo "  New branch: $new_task"
+    echo ""
+    
+    return 0
+}
