@@ -7,6 +7,10 @@ This is the foundational constitution that guides all development and AI interac
 ## Project-Specific Context
 For specific implementation details and project guidelines in the current repository, refer to [CLAUDE.md](CLAUDE.md) which contains project-specific configuration, build instructions, and development workflows that follow these core principles.
 
+> **🤖 Agent Navigation**:
+> - Return to Workspace: [AGENTS.md](AGENTS.md)
+> - View Workflows: [.agent/README.md](.agent/README.md)
+
 ---
 
 ## 1. Core Identity

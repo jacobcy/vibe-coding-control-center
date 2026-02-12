@@ -68,6 +68,12 @@ ${BOLD}Commands:${NC}
                       - Current phase
                       - Progress checklist
                       - Next steps
+  
+  ${CYAN}rotate${NC} <new-task>    Rotate to new task in current worktree
+                      - Stashes uncommitted changes
+                      - Deletes current branch (cleanup)
+                      - Creates new branch from main
+                      - Applies stashed changes
 
 ${BOLD}Tool Integrations:${NC}
   • ${CYAN}wtnew/vup${NC}  - Worktree and tmux workspace (from aliases.sh)
@@ -139,6 +145,11 @@ case "${1:-}" in
         flow_cmd_status "$@"
         ;;
     
+    rotate)
+        shift
+        flow_cmd_rotate "$@"
+        ;;
+    
     commit)
         log_info "Command '$1' is coming soon!"
         echo "This feature is planned but not yet implemented."
@@ -152,7 +163,7 @@ case "${1:-}" in
     
     *)
         echo "Unknown subcommand: $1" >&2
-        echo "Available: $(ls -1 "$VIBE_ROOT/bin/vibe-flow-*" 2>/dev/null | sed -n 's/.*vibe-flow-//p' | tr '\n' ' ') start spec test dev review pr done signature status" >&2
+        # Ensure we return 1 for unknown subcommands to trigger fallback
         exit 1
         ;;
 esac
