@@ -214,4 +214,66 @@ config_get_key() {
     fi
 }
 
+open_editor() {
+    local file="$1"
+    local editor=""
+
+    # 1. Check VIBE_EDITOR from keys.env
+    load_keys
+    local vibe_editor="${VIBE_CONFIG[KEY_VIBE_EDITOR]:-}"
+    if [[ -n "$vibe_editor" ]]; then
+        # Handle cases where editor command might have spaces (e.g. "code -w")
+        # For simplicity, assume first word is command
+        local cmd="${vibe_editor%% *}"
+        if command -v "$cmd" >/dev/null 2>&1; then
+             editor="$vibe_editor"
+        else
+             log_warn "Configured editor '$vibe_editor' not found."
+        fi
+    fi
+
+    # 2. Check EDITOR env var
+    if [[ -z "$editor" && -n "${EDITOR:-}" ]]; then
+        editor="$EDITOR"
+    fi
+
+    # 3. Auto-detect popular editors (IDE first)
+    if [[ -z "$editor" ]]; then
+        if command -v code >/dev/null 2>&1; then editor="code"; fi
+    fi
+    if [[ -z "$editor" ]]; then
+        if command -v trae >/dev/null 2>&1; then editor="trae"; fi
+    fi
+    if [[ -z "$editor" ]]; then
+        if command -v cursor >/dev/null 2>&1; then editor="cursor"; fi
+    fi
+    if [[ -z "$editor" ]]; then
+        if command -v windsurf >/dev/null 2>&1; then editor="windsurf"; fi
+    fi
+    if [[ -z "$editor" ]]; then
+        if command -v vim >/dev/null 2>&1; then editor="vim"; fi
+    fi
+     if [[ -z "$editor" ]]; then
+        if command -v nano >/dev/null 2>&1; then editor="nano"; fi
+    fi
+
+    # 4. Fallback
+    if [[ -z "$editor" ]]; then
+        editor="vi"
+    fi
+
+    log_info "Opening with $editor..."
+    # Execute editor with file
+    # Use eval to handle arguments in editor string if present (e.g. "code -w")
+    # But eval is risky. Let's split string properly if needed.
+    # Zsh array splitting is safe: ${(0)editor}
+    # But better: just rely on word splitting for simple cases or shell execution
+    # For robust handling:
+    if [[ "$editor" == *" "* ]]; then
+        eval "$editor" "\"$file\""
+    else
+        "$editor" "$file"
+    fi
+}
+
 initialize_config
