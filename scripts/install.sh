@@ -23,23 +23,59 @@ source "$SCRIPT_DIR/../lib/config_init.sh"
 source "$SCRIPT_DIR/../lib/i18n.sh"
 
 # ================= ARGUMENT PARSING =================
-MODE="global"
+MODE=""
+FORCE="false"
+
+# Use a loop to parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --local)
+        --global|-g)
+            if [[ -n "$MODE" && "$MODE" != "global" ]]; then
+                log_warn "Conflicting modes specified. Overriding $MODE with global."
+            fi
+            MODE="global"
+            shift
+            ;;
+        --local|-l)
+            if [[ -n "$MODE" && "$MODE" != "local" ]]; then
+                log_warn "Conflicting modes specified. Overriding $MODE with local."
+            fi
             MODE="local"
             shift
             ;;
-        --force)
+        --force|-f)
             FORCE="true"
             shift
             ;;
         *)
-            # unknown option
+            log_warn "Unknown option: $1"
             shift
             ;;
     esac
 done
+
+# ================= INTERACTIVE MODE =================
+if [[ -z "$MODE" ]]; then
+    echo "请选择安装模式："
+    echo "1. 全局安装 (Global) - 建议在主分支 (main) 目录下使用，以便多分支同步开发。"
+    echo "2. 局部安装 (Local) - 建议在开发分支目录下使用，以避免影响其他分支。"
+    
+    while [[ -z "$MODE" ]]; do
+        printf "请输入您的选择 (1/2): "
+        read -r choice
+        case "$choice" in
+            1)
+                MODE="global"
+                ;;
+            2)
+                MODE="local"
+                ;;
+            *)
+                echo "无效的选择，请重新输入 (1 或 2)。"
+                ;;
+        esac
+    done
+fi
 
 log_step "Starting Vibe Coding Control Center Installation ($MODE mode)"
 
@@ -133,7 +169,7 @@ else
         log_info "Local install requires a prior global install to set up shell integration."
         log_info ""
         log_info "Please run from the main branch first:"
-        log_info "  cd /path/to/main && zsh scripts/install.sh"
+        log_info "  cd /path/to/main && zsh scripts/install.sh --global"
         log_info ""
         log_info "Then come back and run:"
         log_info "  zsh scripts/install.sh --local"
@@ -250,7 +286,7 @@ else
     # --- Local: do NOT modify ~/.zshrc ---
     log_info "Local install: skipping shell RC modification"
     log_info "Use 'source $VIBE_HOME/aliases.sh' in this session, or"
-    log_info "run 'install.sh' (global) from main branch to set up permanent aliases."
+    log_info "run 'install.sh --global' from main branch to set up permanent aliases."
     log_success "'vibe' command is ready (Mode: local, bin at $VIBE_BIN)"
 fi
 
@@ -266,6 +302,6 @@ if [[ "$MODE" == "global" ]]; then
 else
     echo "1. Source aliases for this session: ${CYAN}source $VIBE_HOME/aliases.sh${NC}"
     echo "2. Verify: ${CYAN}vibe --help${NC}"
-    echo "3. (Optional) Run global install from main: ${CYAN}cd main && zsh scripts/install.sh${NC}"
+    echo "3. (Optional) Run global install from main: ${CYAN}cd main && zsh scripts/install.sh --global${NC}"
 fi
 echo "----------------------------------------"
