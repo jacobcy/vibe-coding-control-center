@@ -74,8 +74,9 @@ manage_opencode() {
             [[ -f "$oc_config" ]] || {
                 log_error "opencode.json not found. Run 'vibe equip' first"
                 return 1
+                return 1
             }
-            ${EDITOR:-vim} "$oc_config"
+            open_editor "$oc_config"
             log_success "Edited $oc_config"
             ;;
         
@@ -105,7 +106,7 @@ manage_codex() {
                 log_error "config.toml not found"
                 return 1
             }
-            ${EDITOR:-vim} "$codex_config"
+            open_editor "$codex_config"
             log_success "Edited $codex_config"
             ;;
         

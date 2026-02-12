@@ -51,8 +51,43 @@ do_status() {
     echo "Config Home: $VIBE_HOME"
     echo ""
 
-    echo "${BOLD}[API Keys] $KEYS_FILE${NC}"
-    for key in ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL; do
+    local default_tool=$(read_key_from_file "VIBE_DEFAULT_TOOL" "$KEYS_FILE")
+    local active_tool="${default_tool:-claude}"  # Default to claude if not set
+    
+    echo "Active Tool: ${GREEN}$active_tool${NC}"
+    echo ""
+
+    echo "${BOLD}[Active Provider Config]${NC}"
+    
+    # Define keys to check based on active tool
+    local keys_to_check=()
+    case "$active_tool" in
+        claude)
+            keys_to_check=(ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL)
+            ;;
+        opencode)
+            keys_to_check=(VIBE_OPENCODE_API_KEY VIBE_OPENCODE_BASE_URL VIBE_OPENCODE_MODEL)
+            ;;
+        openai)
+            keys_to_check=(OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL)
+            ;;
+        deepseek)
+            keys_to_check=(DEEPSEEK_API_KEY DEEPSEEK_BASE_URL DEEPSEEK_MODEL)
+            ;;
+        moonshot)
+            keys_to_check=(MOONSHOT_API_KEY MOONSHOT_BASE_URL MOONSHOT_MODEL)
+            ;;
+        ollama)
+            keys_to_check=(OLLAMA_BASE_URL OLLAMA_MODEL)
+            ;;
+        *)
+            # Fallback or unknown tool
+            echo "  (Unknown tool '$active_tool', showing default keys)"
+            keys_to_check=(ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL)
+            ;;
+    esac
+
+    for key in "${keys_to_check[@]}"; do
         local val=$(read_key_from_file "$key" "$KEYS_FILE")
         if [[ -n "$val" ]] && ! is_template_value "$val"; then
             if should_mask_key "$key"; then
@@ -153,12 +188,12 @@ do_setup() {
     if is_template_value "$token"; then
         log_warn "API keys need to be configured"
         if confirm_action "Open $KEYS_FILE in editor?"; then
-            ${EDITOR:-vim} "$KEYS_FILE"
+            open_editor "$KEYS_FILE"
         fi
     else
         log_success "keys.env appears configured"
         if confirm_action "Edit keys.env?"; then
-            ${EDITOR:-vim} "$KEYS_FILE"
+            open_editor "$KEYS_FILE"
         fi
     fi
 
@@ -304,7 +339,7 @@ do_keys_show() {
 
 do_keys_edit() {
     [[ -f "$KEYS_FILE" ]] || { log_error "keys.env not found. Run 'vibe env setup' first."; return 1; }
-    ${EDITOR:-vim} "$KEYS_FILE"
+    open_editor "$KEYS_FILE"
     log_info "Reload shell to apply changes: source $(get_shell_rc)"
 }
 

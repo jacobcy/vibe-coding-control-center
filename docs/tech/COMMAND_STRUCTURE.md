@@ -129,3 +129,17 @@ vibe equip -h           # Help for specific command
 - All previous command-line options continue to work
 - New command-based interface provides additional flexibility
 - Subcommands are now more maintainable and testable
+
+## Command Resolution & Fallback
+
+The `vibe` command is a shell function (defined in `config/aliases.sh`) that intelligently resolves which executable to run. This ensures that you always use the most appropriate version of Vibe for your current context.
+
+### Resolution Order
+1. **Local Installation** (`./bin/vibe`): Prioritized to support development on specific branches or local overrides.
+2. **Git Root Installation** (`<git-root>/bin/vibe`): Prioritized if you are in a subdirectory of a Vibe-enabled project.
+3. **Global Installation** (`$VIBE_ROOT/bin/vibe`): The stable, globally installed version.
+
+### Fallback Mechanism
+If a command is executed using the Local or Git Root installation but fails with an "Unknown subcommand" error (e.g., when running a new command like `vibe flow rotate` inside an old branch that lacks it), the system automatically falls back to the Global Installation.
+
+This ensures that new global features are available even when working in older branches that haven't been updated yet.

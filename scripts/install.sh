@@ -110,6 +110,17 @@ fi
 ensure_zsh_installed
 ensure_oh_my_zsh || true
 
+# ================= GIT CONFIGURATION =================
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    log_step "Configuring Git Worktree Support"
+    if [[ "$(git config extensions.worktreeConfig)" != "true" ]]; then
+        log_info "Enabling extensions.worktreeConfig for better worktree isolation..."
+        git config extensions.worktreeConfig true
+    else
+        log_info "Git worktree config extension is already enabled."
+    fi
+fi
+
 # ================= INSTALLATION =================
 SOURCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 

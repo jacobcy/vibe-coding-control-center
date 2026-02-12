@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "Opened with $0"

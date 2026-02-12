@@ -43,14 +43,31 @@ do_equip() {
         echo "2. Install/Update Claude Code (not installed)"
     fi
 
-    echo "3. Back"
+    if command -v codex &> /dev/null; then
+        CODEX_VER=$(get_command_version "codex" "--version")
+        if [[ -n "$CODEX_VER" ]]; then
+            echo -e "3. Install/Update Codex CLI ${CYAN}(current: v$CODEX_VER)${NC}"
+        else
+            echo "3. Install/Update Codex CLI (installed)"
+        fi
+    else
+        echo "3. Install/Update Codex CLI (not installed)"
+    fi
+
+    if [[ -d "/Applications/Cockpit Tools.app" ]]; then
+        echo "4. Install/Update Cockpit Tools (installed)"
+    else
+        echo "4. Install/Update Cockpit Tools (not installed)"
+    fi
+
+    echo "5. Back"
 
     # Use secure input validation
-    CHOICE=$(prompt_user "Select option (1-3)" "" "")
+    CHOICE=$(prompt_user "Select option (1-5)" "" "")
 
     # Validate the selection
     case $CHOICE in
-        1|2|3)
+        1|2|3|4|5)
             # Valid choice, continue processing
             ;;
         *)
@@ -68,6 +85,12 @@ do_equip() {
             zsh "$VIBE_ROOT/install/install-claude.sh"
             ;;
         3)
+            zsh "$VIBE_ROOT/install/install-codex.sh"
+            ;;
+        4)
+            zsh "$VIBE_ROOT/install/install-cockpit.sh"
+            ;;
+        5)
             return
             ;;
     esac

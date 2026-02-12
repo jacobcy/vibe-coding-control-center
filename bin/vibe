@@ -3,6 +3,9 @@
 
 set -e
 
+# Version definition
+VIBE_VERSION="1.1.0"
+
 # Context shim: auto-switch to the local project's vibe when a .vibe/ directory
 # is found nearby.  VIBE_ROOT is inferred from the .vibe parent — no config needed.
 if [[ -z "${VIBE_NO_SHIM}" ]]; then
@@ -28,7 +31,8 @@ if [[ -z "${VIBE_NO_SHIM}" ]]; then
         _current_script_abs="$(cd "$(dirname "${(%):-%x}")" && pwd)/$(basename "${(%):-%x}")"
 
         # If local bin exists, is executable, and is NOT this script → hand over
-        if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" ]]; then
+        # We also skip this shim if VIBE_SKIP_SHIM is set, to allow the alias to control fallback
+        if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" && -z "${VIBE_SKIP_SHIM}" ]]; then
             export VIBE_NO_SHIM=1
             exec "${_local_bin}" "$@"
         fi
@@ -37,15 +41,24 @@ fi
 
 VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 
-# Check for help flags or subcommand first
-if [[ $# -eq 1 ]] && [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
-        cat "$VIBE_ROOT/lib/vibe-help.md"
-    else
-        echo "Vibe Coding Control Center"
-        echo "Help file missing at lib/vibe-help.md. Run 'vibe' for interactive mode."
-    fi
-    exit 0
+# Check for help/version flags or subcommand first
+if [[ $# -eq 1 ]]; then
+    case "$1" in
+        -h|--help)
+            if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
+                cat "$VIBE_ROOT/lib/vibe-help.md"
+            else
+                echo "Vibe Coding Control Center"
+                echo "Help file missing at lib/vibe-help.md. Run 'vibe' for interactive mode."
+            fi
+            exit 0
+            ;;
+        -v|--version|version)
+            echo "Vibe Coding Control Center v${VIBE_VERSION}"
+            echo "VIBE_ROOT: ${VIBE_ROOT}"
+            exit 0
+            ;;
+    esac
 elif [[ "$1" == "help" ]]; then
     # Implement 'vibe help' command
     if [[ $# -eq 1 ]]; then

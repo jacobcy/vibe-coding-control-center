@@ -94,8 +94,13 @@ fi
 AGENT_NAME="Agent-${(C)AGENT}"
 AGENT_EMAIL="agent-${AGENT}@vibecoding.ai"
 
-git config user.name "$AGENT_NAME"
-git config user.email "$AGENT_EMAIL"
+# Ensure worktree config is enabled for isolation
+if [[ "$(git config extensions.worktreeConfig)" != "true" ]]; then
+    git config extensions.worktreeConfig true
+fi
+
+git config --worktree user.name "$AGENT_NAME"
+git config --worktree user.email "$AGENT_EMAIL"
 
 log_success "Git signature applied for agent: $AGENT"
 echo "  Name:  $AGENT_NAME"
