@@ -2,8 +2,6 @@
 description: Interactive Smart Commit Workflow
 ---
 
-// turbo-all
-
 1. Analyze Smart Groups
 Analyze all uncommitted changes to identify logical functional groups.
 ```bash
