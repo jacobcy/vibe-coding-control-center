@@ -11,7 +11,13 @@
 | `vibe chat` / `vc` | 快速进入对话 | 交互模式或快速问答 `vibe chat "问题"` |
 | `vibe keys` | API 密钥管理（快捷入口） | 等同 `vibe env keys` |
 | `vibe flow start <name>` | **启动特性开发流程** | 创建工作区、PRD 文档、初始化状态 |
+| `vibe flow spec` | **生成技术规格** | 基于 PRD 生成技术设计文档 |
 | `vibe flow test` | **初始化 TDD 测试** | 创建测试模板（Red Phase） |
+| `vibe flow dev` | **进入开发模式** | 显示开发指引与状态 |
+| `vibe flow review` | **代码审查** | 运行测试并启动 lazygit 审查 |
+| `vibe flow pr` | **创建 PR** | 生成 PR 描述并调用 gh 创建 PR |
+| `vibe flow done` | **完成开发** | 归档状态并清理工作区 |
+| `vibe flow status` | **查看进度** | 显示当前阶段和清单状态 |
 
 ## 2. 工具链别名 (Agent Tools: P1 > P2 > P3)
 | 工具 | 基础命令 | 自动模式 | 计划/审查模式 |

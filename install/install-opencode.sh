@@ -45,27 +45,24 @@ fi
 
 # ================= 2. INSTALL EXTENSIONS =================
 log_step "2/3 Check oh-my-opencode"
-if [ -d "$HOME/.oh-my-opencode" ]; then
-    log_info "oh-my-opencode already installed"
+if [[ -f "$HOME/.config/opencode/opencode.json" ]] && grep -q "oh-my-opencode" "$HOME/.config/opencode/opencode.json"; then
+    log_info "oh-my-opencode already installed (detected in opencode.json)"
     if confirm_action "Update oh-my-opencode?"; then
-        (cd "$HOME/.oh-my-opencode" && git pull origin main 2>/dev/null) || true
-        if [ -f "$HOME/.oh-my-opencode/install.sh" ]; then
-            (cd "$HOME/.oh-my-opencode" && bash install.sh)
-            log_success "oh-my-opencode updated"
+        if check_command_exists "bun"; then
+            bunx oh-my-opencode install
+        else
+            log_warn "bun not found. Cannot update oh-my-opencode."
         fi
     fi
 else
-    if check_command_exists "git"; then
-        if git clone https://github.com/oh-my-opencode/oh-my-opencode.git "$HOME/.oh-my-opencode" 2>/dev/null; then
-            if [ -f "$HOME/.oh-my-opencode/install.sh" ]; then
-                (cd "$HOME/.oh-my-opencode" && bash install.sh)
-                log_success "oh-my-opencode installed"
-            fi
-        else
-            log_warn "Failed to clone oh-my-opencode"
+    if check_command_exists "bun"; then
+        if confirm_action "Install oh-my-opencode extension (via bunx)?"; then
+            log_info "Running bunx oh-my-opencode install..."
+            bunx oh-my-opencode install
         fi
     else
-        log_warn "git not found, skipping oh-my-opencode"
+        log_warn "bun not found. Skipping oh-my-opencode installation."
+        log_info "Please install bun first: https://bun.sh/"
     fi
 fi
 
@@ -75,4 +72,5 @@ mkdir -p "$HOME/.opencode" "$HOME/.config/opencode" 2>/dev/null || true
 log_info "OpenCode config directories ready"
 
 echo -e "\n${GREEN}OpenCode Installation Complete!${NC}"
-echo "Next: Run 'vibe env setup' to configure API keys."
+echo "Next: Configure your keys in ~/.config/opencode/opencode.json"
+echo "  → Run 'vibe config opencode edit' or edit the file manually."
