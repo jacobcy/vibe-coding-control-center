@@ -41,8 +41,14 @@ vibe flow test
 # 5. Implement feature (TDD Green Phase)
 vibe flow dev
 
-# 6. Review and commit
+# 6. Review code
 vibe flow review
+
+# 7. Create Pull Request
+vibe flow pr
+
+# 8. Complete feature (after merge)
+vibe flow done
 ```
 
 This workflow:
