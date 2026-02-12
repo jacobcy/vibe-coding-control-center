@@ -4,6 +4,23 @@
 
 **Oh My OpenCode** 是 OpenCode 的一个插件系统，提供了一套专业化的 AI Agent 架构。这些 Agent 不是简单的 AI 模型，而是带有**特定 Prompt、工具配置和职责定义的角色**，可以根据任务需求选择不同的底层模型（Claude、GPT、Qwen、Gemini 等）。
 
+> 说明：以下内容主要是 OpenCode 侧的 Agent 体系说明。若你采用本仓库的并行 worktree 工作流，请参考下方的「并行 Worktree 协作流程」。
+
+---
+
+## 并行 Worktree 协作流程（推荐）
+
+**核心原则**：每个 agent 在独立 worktree 开发并提交 PR；Claude 固定在 `main` 负责测试、审核与合并。
+
+### 最小可用流程
+1. `wtnew <feature> <agent>` 创建 worktree 并设置 Git 身份
+2. 在该 worktree 完成修改并提交 PR
+3. Claude 在 `main` 拉取并执行测试 + 审核
+4. 通过后合并并更新 `CHANGELOG.md`（如影响用户）
+
+### PR 摘要格式（必填）
+`变更摘要 | 测试说明 | 风险点`
+
 ---
 
 ## Agent 类型总览
