@@ -38,7 +38,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 log_step "Starting Vibe Coding Control Center Installation ($MODE mode)"
-SHELL_RC=$(get_shell_rc)
 
 # ================= PREREQUISITES =================
 log_step "Checking Prerequisites"
@@ -115,11 +114,23 @@ if [[ "$MODE" == "global" ]]; then
     ln -sf "$INSTALL_DIR/config/aliases.sh" "$INSTALL_DIR/aliases.sh"
     
     VIBE_BIN="$INSTALL_DIR/bin"
-    VIBE_HOME_DISPLAY="$INSTALL_DIR"
 
 else
     # Local Installation: Use current directory
     log_step "Initializing Vibe Local Installation in $SOURCE_ROOT"
+    
+    # --- Guard: require global install first ---
+    if [[ ! -f "$HOME/.vibe/loader.sh" ]]; then
+        log_error "Global installation not found."
+        log_info "Local install requires a prior global install to set up shell integration."
+        log_info ""
+        log_info "Please run from the main branch first:"
+        log_info "  cd /path/to/main && zsh scripts/install.sh"
+        log_info ""
+        log_info "Then come back and run:"
+        log_info "  zsh scripts/install.sh --local"
+        exit 1
+    fi
     
     VIBE_ROOT="$SOURCE_ROOT"
     VIBE_BIN="$VIBE_ROOT/bin"
@@ -140,8 +151,6 @@ else
     ALIASES_TARGET="$VIBE_ROOT/config/aliases.sh"
     rm -f "$ALIASES_LINK"
     ln -s "$ALIASES_TARGET" "$ALIASES_LINK"
-    
-    VIBE_HOME_DISPLAY="$VIBE_HOME"
 fi
 
 # ================= BOOTSTRAP 'vibe' COMMAND =================
@@ -149,46 +158,106 @@ fi
 log_step "Bootstrapping 'vibe' command"
 SHELL_RC=$(get_shell_rc)
 
-RC_CONTENT="# Vibe Coding Control Center
-export PATH=\"$VIBE_BIN:\$PATH\"
+chmod +x "$VIBE_BIN/vibe"
+chmod +x "$VIBE_BIN"/* 2>/dev/null || true
 
-# Load Vibe aliases
-if [ -f \"$VIBE_HOME_DISPLAY/aliases.sh\" ]; then
-    source \"$VIBE_HOME_DISPLAY/aliases.sh\"
-fi
-"
+# --- Clean up ALL old Vibe entries from shell RC (comprehensive) ---
+if [[ -f "$SHELL_RC" ]]; then
+    _need_cleanup=false
+    if grep -qE '(Vibe Coding Control Center|Load Vibe aliases|vibe-center|\.vibe/aliases\.sh|\.vibe/bin|\.vibe/loader\.sh)' "$SHELL_RC" 2>/dev/null; then
+        _need_cleanup=true
+    fi
 
-# Clean up old configuration
-if grep -Fq "Vibe Coding Control Center" "$SHELL_RC" || grep -Fq "vibe-center" "$SHELL_RC"; then
-    log_info "Updating configuration in $SHELL_RC"
-    
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-         sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
-         sed -i '' '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
-         sed -i '' '/export PATH=".*\.vibe\/bin:$PATH"/d' "$SHELL_RC"
-         sed -i '' '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
-         sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
-    else
-         sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
-         sed -i '/export PATH=".*vibe-center.*\/bin:$PATH"/d' "$SHELL_RC"
-         sed -i '/export PATH=".*\.vibe\/bin:$PATH"/d' "$SHELL_RC"
-         sed -i '/source .*\/vibe\/aliases.sh/d' "$SHELL_RC"
-         sed -i '/# Added by Antigravity/d' "$SHELL_RC"
+    if $_need_cleanup; then
+        log_info "Cleaning up old Vibe configuration from $SHELL_RC"
+
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # Remove all known Vibe markers and hardcoded paths
+            sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
+            sed -i '' '/# Load Vibe aliases/d' "$SHELL_RC"
+            sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
+            sed -i '' '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
+            sed -i '' '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
+            sed -i '' '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
+            sed -i '' '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '' '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            sed -i '' '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '' '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            sed -i '' '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '' '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            # Clean up orphaned fi and blank lines left by removed blocks
+            # (sed multi-pass to collapse consecutive blank lines)
+        else
+            sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
+            sed -i '/# Load Vibe aliases/d' "$SHELL_RC"
+            sed -i '/# Added by Antigravity/d' "$SHELL_RC"
+            sed -i '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
+            sed -i '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
+            sed -i '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
+            sed -i '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            sed -i '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            sed -i '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+            sed -i '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+        fi
+        log_info "Old Vibe configuration removed"
     fi
 fi
 
-append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
+if [[ "$MODE" == "global" ]]; then
+    # --- Global: install loader.sh + write stable entry to shell RC ---
+    
+    # Copy loader.sh to ~/.vibe/loader.sh
+    LOADER_SRC="$SOURCE_ROOT/config/loader.sh"
+    LOADER_DST="$INSTALL_DIR/loader.sh"
+    if [[ -f "$LOADER_SRC" ]]; then
+        cp "$LOADER_SRC" "$LOADER_DST"
+        chmod 644 "$LOADER_DST"
+        log_info "Installed loader.sh to $LOADER_DST"
+    else
+        log_warn "loader.sh not found at $LOADER_SRC — creating inline"
+        cat > "$LOADER_DST" << 'LOADER_EOF'
+#!/usr/bin/env zsh
+# Vibe Coding Control Center - Unified Shell Loader
+export PATH="$HOME/.vibe/bin:$PATH"
+if [[ -d "$PWD/.vibe" && -d "$PWD/bin" ]]; then
+    export PATH="$PWD/bin:$PATH"
+fi
+if [[ -f "$HOME/.vibe/aliases.sh" ]]; then
+    source "$HOME/.vibe/aliases.sh"
+fi
+LOADER_EOF
+        chmod 644 "$LOADER_DST"
+    fi
 
-chmod +x "$VIBE_BIN/vibe"
-chmod +x "$VIBE_BIN"/* 2>/dev/null || true
-log_success "'vibe' command is ready (Mode: $MODE)"
+    # Write a single stable line to shell RC
+    RC_CONTENT='# Vibe Coding Control Center
+[ -f "$HOME/.vibe/loader.sh" ] && source "$HOME/.vibe/loader.sh"
+'
+    append_to_rc "$SHELL_RC" "$RC_CONTENT" "Vibe Coding Control Center"
+    log_success "'vibe' command is ready (Mode: global)"
+
+else
+    # --- Local: do NOT modify ~/.zshrc ---
+    log_info "Local install: skipping shell RC modification"
+    log_info "Use 'source $VIBE_HOME/aliases.sh' in this session, or"
+    log_info "run 'install.sh' (global) from main branch to set up permanent aliases."
+    log_success "'vibe' command is ready (Mode: local, bin at $VIBE_BIN)"
+fi
 
 # ================= FINAL SUMMARY =================
 log_success "Installation process completed!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
-echo "1. Verify your configuration: ${CYAN}cat $VIBE_HOME_DISPLAY/keys.env${NC}"
-echo "2. Reload shell: ${CYAN}source $SHELL_RC${NC} (or restart terminal)"
-echo "3. Install AI tools: ${CYAN}vibe equip${NC}"
-echo "4. Launch Control Center: ${CYAN}vibe${NC}"
+if [[ "$MODE" == "global" ]]; then
+    echo "1. Reload shell: ${CYAN}source $SHELL_RC${NC} (or restart terminal)"
+    echo "2. Verify: ${CYAN}vibe --help${NC}"
+    echo "3. Install AI tools: ${CYAN}vibe equip${NC}"
+    echo "4. Launch Control Center: ${CYAN}vibe${NC}"
+else
+    echo "1. Source aliases for this session: ${CYAN}source $VIBE_HOME/aliases.sh${NC}"
+    echo "2. Verify: ${CYAN}vibe --help${NC}"
+    echo "3. (Optional) Run global install from main: ${CYAN}cd main && zsh scripts/install.sh${NC}"
+fi
 echo "----------------------------------------"
