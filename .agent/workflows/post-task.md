@@ -4,25 +4,27 @@ description: Post-task maintenance to cleanup and record progress
 
 // turbo-all
 
-1. Run verification tests to ensure the system is stable.
+1. Verification.
 ```bash
 if [ -d "tests" ]; then
-  ./tests/test_new_features.sh || echo "Warning: Tests failed or not found"
+  ./scripts/test-all.sh || echo "⚠️  Tests failed or not found"
+else
+  echo "No tests directory found."
 fi
 ```
 
-2. Cleanup temporary files and artifacts.
+2. Cleanup.
 ```bash
 rm -rf temp/*
-find . -name "tmpvibe*" -type d -exec rm -rf {} +
+find . -name "tmpvibe*" -type d -exec rm -rf {} + 2>/dev/null || true
 ```
 
-3. Record the necessary information to management files.
-- Update `MEMORY.md` with key decisions and new context.
-- Update `TASK.md` by marking completed items and adding new ones.
-- Update `SOUL.md` if any core principles were evolved.
+3. Update Context (CRITICAL).
+- **Update `.agent/context/memory.md`**: Record key decisions, architectural changes, and lessons learned.
+- **Update `.agent/context/task.md`**: Mark completed items `[x]`, add new items `[ ]`, and update backlog.
+- **Update `SOUL.md`**: Only if core principles have evolved.
 
-4. Log the completion.
+4. Log Completion.
 ```bash
-echo "Maintenance complete. Files cleaned and progress recorded."
+echo "Maintenance complete. Context updated and temp files cleaned."
 ```

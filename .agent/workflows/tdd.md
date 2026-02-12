@@ -5,32 +5,28 @@ description: Test-Driven Development (TDD) Cycle
 Follow this workflow to implement new features or fix bugs using TDD.
 
 ### 1. Initialize the Cycle
-Start by creating a failing test for your feature.
-// turbo
+Use `vibe flow` to start a new feature or bug fix. This will set up the environment and guide you.
 ```bash
-./scripts/vibecoding.sh tdd new <feature-name>
+vibe flow
+# Select "Start Feature" or "Start Bugfix"
 ```
-*Note: This creates `tests/test_<feature-name>.sh` with a template that is guaranteed to fail.*
 
 ### 2. Red Phase: Define Expectations
-Edit the newly created test file `tests/test_<feature-name>.sh`.
+Create or edit a test file in `tests/`.
 - Define the desired behavior.
-- Add assertions (e.g., check if a function returns expected output or a file exists).
+- Add assertions.
 - Run the test to confirm it **FAILS**:
 ```bash
-./tests/test_<feature-name>.sh
+# Example: ./tests/test_feature.sh
 ```
 
 ### 3. Green Phase: Minimum Implementation
 Write the minimum amount of code required to make the test pass.
-- Implement the logic in `lib/` or `scripts/`.
-- Run the test again until it **PASSES**:
-```bash
-./tests/test_<feature-name>.sh
-```
+- Implement logic in `lib/` or `scripts/`.
+- Run the test repeatedly until it **PASSES**.
 
 ### 4. Refactor Phase: Clean Up
-Once the test passes, improve the code quality.
+Once the test passes, improve code quality.
 - Remove duplication.
 - Improve naming.
 - Ensure the test still **PASSES**.

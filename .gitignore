@@ -22,3 +22,4 @@ wt-*/
 
 # Vibe artifacts
 .vibe/
+.claude/

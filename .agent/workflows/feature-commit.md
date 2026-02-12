@@ -4,38 +4,26 @@ description: Interactive Smart Commit Workflow
 
 // turbo-all
 
-1. Analyze changes and propose grouping.
+1. Analyze changes to identify logical groups.
 ```bash
-# This is a placeholder for the actual logic which would likely involve a script
-# For now, we will list the changes and ask the user to commit them manually or via the IDE
-# In a real implementation, this would call a python script or complex shell script to group files.
-
-echo "Analyzing changes..."
+echo "=== Git Status Analysis ==="
 git status -s
 
-echo "\n--- Suggested Grouping ---"
-echo "1. Documentation: docs/"
-echo "2. Core Logic: lib/"
-echo "3. Tests: tests/"
-echo "4. Workflow Config: .agent/workflows/"
+echo -e "\n=== Change Summary ==="
+# Group files by directory
+git status -s | awk '{print $2}' | cut -d/ -f1 | sort | uniq -c | sort -nr
 ```
 
-2. Interactive Commit Loop (Simulated).
-```bash
-# In a fully autonomous agent environment, we might use a script to actually perform the commits.
-# For this workflow, we will guide the user or the agent to perform the commits.
-# We'll use a simple loop to commit by pathspec.
+2. Generate commit plan.
+- Review the `git status` output above.
+- Propose a logical grouping for commits based on the changed files.
+- Each commit should be atomic and follow Conventional Commits (feat, fix, docs, style, refactor, test, chore).
 
-# Example: Commit documentation
-# git add docs/ && git commit -m "docs: update documentation" || echo "No docs changes"
+3. Execute Commits (Interactive Loop).
+- Use `git add <files>` and `git commit -m "<message>"` for each group.
+- **Rule**: Do not use `git add .` unless all changes are strictly related to a single feature.
 
-# Example: Commit workflows
-# git add .agent/workflows/ && git commit -m "feat: update workflows" || echo "No workflow changes"
-
-echo "To commit features, run git add <path> && git commit -m '...'"
-```
-
-3. Verification.
+4. Verify History.
 ```bash
 git log --oneline -n 5
 ```

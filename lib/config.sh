@@ -15,7 +15,8 @@ _find_vibe_root() {
     # 1. Infer from this script's own location — most reliable
     local _dir="$(cd "$(dirname "${(%):-%x}")" && pwd)"
     local _root="$(cd "${_dir}/.." && pwd)"
-    if [[ -d "${_root}/.vibe" && -d "${_root}/bin" && -d "${_root}/lib" ]]; then
+    # Check for either .vibe OR config directory to identify root
+    if [[ (-d "${_root}/.vibe" || -d "${_root}/config") && -d "${_root}/bin" && -d "${_root}/lib" ]]; then
         echo "${_root}"
         return
     fi
@@ -49,8 +50,44 @@ _find_vibe_root() {
     echo "$HOME"
 }
 
+_find_vibe_home() {
+    # 1. Caller specified override
+    if [[ -n "${VIBE_HOME_OVERRIDE:-}" ]]; then
+        echo "$VIBE_HOME_OVERRIDE"
+        return
+    fi
+
+    # 2. Walk up from PWD looking for .vibe directory (Local Project Config)
+    local _cur="$PWD"
+    while [[ "$_cur" != "/" ]]; do
+        if [[ -d "${_cur}/.vibe" ]]; then
+            echo "${_cur}/.vibe"
+            return
+        fi
+        _cur="$(dirname "${_cur}")"
+    done
+
+    # 3. Git repository root (Local Project Config)
+    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local _gr="$(git rev-parse --show-toplevel)"
+        if [[ -d "${_gr}/.vibe" ]]; then
+            echo "${_gr}/.vibe"
+            return
+        fi
+    fi
+
+    # 4. Fallback to VIBE_ROOT/.vibe (Installation Config)
+    if [[ -d "${VIBE_ROOT}/.vibe" ]]; then
+        echo "${VIBE_ROOT}/.vibe"
+        return
+    fi
+    
+    # 5. Fallback to $HOME/.vibe (Global User Config)
+    echo "$HOME/.vibe"
+}
+
 VIBE_ROOT="$(_find_vibe_root)"
-VIBE_HOME="$VIBE_ROOT/.vibe"
+VIBE_HOME="$(_find_vibe_home)"
 
 initialize_config() {
     local script_dir_realpath="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
