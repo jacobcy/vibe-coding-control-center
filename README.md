@@ -44,10 +44,27 @@
 
 ### 1. 现代化安装
 
-使用新的简化安装脚本：
+使用新的简化安装脚本（支持交互式选择和命令行参数）：
 
 ```bash
 ./scripts/install.sh
+```
+
+脚本会自动检测运行环境并提供交互式菜单：
+1. **全局安装** (Global): 安装到 `~/.vibe`，适合在主分支运行。
+2. **局部安装** (Local): 仅在当前目录配置，适合特性分支开发。
+
+也可使用命令行参数跳过交互：
+
+```bash
+# 全局安装 (Global)
+./scripts/install.sh --global
+
+# 局部安装 (Local)
+./scripts/install.sh --local
+
+# 强制更新 (覆盖配置)
+./scripts/install.sh --global --force
 ```
 
 或者传统的安装方式：
