@@ -8,6 +8,15 @@
 - 保持最小改动范围，避免无关重构。
 - 变更需要有清晰的动机与说明，便于 review。
 
+## 分支管理与保护
+
+为了维护 `main` 分支的稳定性，我们实施了严格的分支保护规则（Rulesets）。
+详细配置请参阅 [Branch Protection Rules](docs/governance/BRANCH_PROTECTION.md)。
+
+- **禁止直接提交到 main**：所有变更必须通过 PR 合并。
+- **强制代码审查**：所有 PR 必须经过至少一次 Review。
+- **自动化检查**：必须通过所有测试与静态分析。
+
 ## 提交流程
 
 1. 新建分支（避免直接在 main/master 上操作）。
