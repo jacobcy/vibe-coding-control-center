@@ -30,6 +30,10 @@ while [[ $# -gt 0 ]]; do
             MODE="local"
             shift
             ;;
+        --force)
+            FORCE="true"
+            shift
+            ;;
         *)
             # unknown option
             shift
@@ -94,9 +98,13 @@ if [[ "$MODE" == "global" ]]; then
     SOURCE_KEYS="$SOURCE_ROOT/config/keys.env"
     TEMPLATE_KEYS="$SOURCE_ROOT/config/keys.template.env"
     
-    if [[ ! -f "$TARGET_KEYS" ]]; then
+    if [[ ! -f "$TARGET_KEYS" || "$FORCE" == "true" ]]; then
+        if [[ -f "$TARGET_KEYS" ]]; then
+             log_warn "Overwriting existing keys.env due to --force"
+        fi
+
         if [[ -f "$SOURCE_KEYS" ]]; then
-             log_info "Initializing keys.env from local config..."
+             log_info "Updating keys.env from local config..."
              cp "$SOURCE_KEYS" "$TARGET_KEYS"
              chmod 600 "$TARGET_KEYS"
         elif [[ -f "$TEMPLATE_KEYS" ]]; then
@@ -106,7 +114,7 @@ if [[ "$MODE" == "global" ]]; then
              log_warn "Please edit $TARGET_KEYS to add your API keys."
         fi
     else
-        log_info "Existing keys.env found at $TARGET_KEYS, keeping it."
+        log_info "Existing keys.env found at $TARGET_KEYS, keeping it. Use --force to overwrite."
     fi
     
     # Symlink aliases.sh
