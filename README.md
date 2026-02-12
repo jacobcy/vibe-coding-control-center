@@ -10,27 +10,27 @@
 - 🚀 提供便捷的 shell alias 和 tmux/worktree 工作流
 - 📦 集成 MCP (Model Context Protocol) 服务器配置
 
-**特别说明（目标态）**：
+**特别说明（现状）**：
 - **Claude**: 通过环境变量切换端点与模型；中国环境默认中转站 `https://api.bghunt.cn`
 - **OpenCode**: 原生支持多模型（Qwen、DeepSeek、Moonshot）
 - **Codex**: 作为第三优先级工具补位使用
 
 **当前阶段**：功能持续迭代中，以可用性与稳定性优先。
 
-## 核心特性（目标态）
+## 核心特性（现状 + 目标态）
 
-- **菜单驱动界面**: 易用的控制中心，直观的导航
-- **项目快速初始化**: 使用最佳实践快速设置新项目
-- **智能版本管理**: 自动检测版本、支持一键更新 ⭐ 新功能
-- **配置智能合并**: MCP 配置合并而非覆盖，保留自定义设置 ⭐ 新功能
-- **安全优先**: 全面的输入验证和安全文件操作
-- **模块化设计**: 组织良好的脚本和共享工具库
-- **MCP 集成**: 支持 Model Context Protocol（网页搜索、GitHub 访问等）
-- **多工具支持**: Claude / OpenCode / Codex（按优先级组织）
-- **环境变量一键切换**: 基于 `config/keys.env` + alias 快速切换
-- **Worktree 隔离**: 每个 agent 独立目录与 Git 身份
-- **国际化支持**: 内建多语言支持
-- **现代化架构**: 插件系统、缓存机制、高级错误处理
+- ✅ **菜单驱动界面**: 控制中心与 Git 风格子命令
+- ✅ **项目快速初始化**: `vibe init --ai` / `vibe init --local`
+- ✅ **智能版本管理**: Claude/OpenCode 版本检测与更新
+- ✅ **配置智能合并**: MCP 配置合并并保留自定义
+- ✅ **安全优先**: 输入验证与安全文件操作
+- ✅ **模块化设计**: `bin/` + `lib/` 共享库
+- ✅ **MCP 集成**: Brave/GitHub 等服务配置
+- ✅ **多工具支持**: Claude / OpenCode / Codex（优先级）
+- ✅ **环境变量一键切换**: `config/keys.env` + aliases
+- ✅ **Worktree 隔离**: 独立目录与 Git 身份
+- ✅ **国际化支持**: i18n 支持
+- ⚪ **现代化架构**: 插件系统/缓存机制/高级错误处理（代码已存在，部分能力为后续扩展目标）
 
 ## 系统要求
 
@@ -67,7 +67,7 @@
 ./scripts/install.sh --global --force
 ```
 
-或者传统的安装方式：
+或者传统的安装方式（兼容入口）：
 
 ```bash
 ./install/install-claude.sh
@@ -98,22 +98,22 @@ OpenCode 原生支持多种中国模型，无需额外配置。
 
    ```bash
    # Claude Code（官方 Anthropic API）
-   ANTHROPIC_AUTH_TOKEN=sk-ant-xxxxx
+   ANTHROPIC_AUTH_TOKEN=<your-auth-token>
    ANTHROPIC_BASE_URL=https://api.anthropic.com
    ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
    # 中国默认：使用中转站（无需本机代理）
-   ANTHROPIC_AUTH_TOKEN=sk-ant-xxxxx
+   ANTHROPIC_AUTH_TOKEN=<your-auth-token>
    ANTHROPIC_BASE_URL=https://api.bghunt.cn
    ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
    # GitHub（用于 MCP）
-   GITHUB_PERSONAL_ACCESS_TOKEN=github_pat_xxxxx
+   GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
 
    # 其他可选的 API 密钥
-   BRAVE_API_KEY=BSAwxxxxx
-   DEEPSEEK_API_KEY=sk-xxxxx  # OpenCode 可选
-   MOONSHOT_API_KEY=sk-xxxxx  # OpenCode 可选
+   BRAVE_API_KEY=<your-brave-api-key>
+   DEEPSEEK_API_KEY=<your-deepseek-key>  # OpenCode 可选
+   MOONSHOT_API_KEY=<your-moonshot-key>  # OpenCode 可选
    ```
 
 3. 重新加载配置（如果你使用了 `config/keys.env` 或别名）：
@@ -128,8 +128,10 @@ OpenCode 原生支持多种中国模型，无需额外配置。
 启动 Vibe Coding 控制中心：
 
 ```bash
-# bin/vibe 已加入 PATH
+# bin/vibe 已加入 PATH（或使用传统方式）
 vibe
+# 或
+./scripts/vibecoding.sh
 ```
 
 菜单选项：
@@ -150,56 +152,15 @@ vibe
 - 单行 prompt：`opencode run "问题" -m opencode/kimi-k2.5-free`
 
 **其他**:
-- `vibe` - 启动控制中心
+- `vibe` - 启动控制中心（菜单模式）
 - `vibe init --ai` - AI 初始化（默认）
 - `vibe init --local` - 本地模板初始化
-- `vibe chat` / `vc` - 进入默认工具对话
 
-## 新的命令结构
+## 新的命令结构（规划中）
 
-Vibe Coding Control Center 现在采用了 Git 风格的命令架构，提供了更清晰的命令组织：
+未来版本将采用 Git 风格的命令架构，提供更清晰的命令组织。目前主要通过菜单界面和别名访问功能。
 
-### 主要命令
-
-- `vibe` - 交互式控制中心
-- `vibe chat` - 快速启动 AI 工具对话
-  - 交互模式：`vibe chat` 或 `vc`
-  - 快速问答：`vibe chat "你的问题"`
-  - **高级特性 (Slash Commands)**：
-    - `vibe chat skills` 或 `vc skills` - 查看 AI 技能列表
-    - `vibe chat status` 或 `vc status` - 查看系统状态
-  - 统一接口，自动适配不同工具（claude/opencode/codex）
-- `vibe config` - 配置管理
-- `vibe equip` - 安装/更新 AI 工具
-- `vibe env` - 环境和密钥管理
-- `vibe init` - 初始化新项目
-- `vibe doctor` - 运行系统诊断（包含健康检查）
-- `vibe flow` - 特性开发工作流管理
-- `vibe help` - 显示帮助信息
-- `vibe -h` / `vibe --help` - 显示帮助信息
-
-### 命令特点
-
-1. **模块化设计** - 每个命令都是独立的脚本，便于维护
-2. **一致性接口** - 所有命令都支持 `-h/--help` 选项
-3. **向后兼容** - 传统的交互式界面仍然可用
-4. **易扩展性** - 轻松添加新命令只需创建新的 `vibe-*` 脚本
-
-### 项目初始化
-
-初始化新项目：
-
-```bash
-vibe init --ai
-vibe init --local
-```
-
-将生成并串联：
-- `soul.md` / `rules.md` / `agents.md` / `tasks.md`
-- `CLAUDE.md`（索引与上下文）
-- `.cursor/rules/tech-stack.mdc`
-
-### 更新已安装工具 ⭐ 新功能
+## 更新已安装工具 ⭐ 新功能
 
 更新 Claude Code 或 OpenCode 到最新版本：
 
@@ -242,7 +203,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 # 选择 "3) DIAGNOSTICS"
 ```
 
-## 现代化架构特性
+## 现代化架构特性（部分为目标态）
 
 ### 配置管理
 - 集中式配置管理，支持环境特定设置
@@ -251,13 +212,13 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 
 ### 插件系统
 - 可扩展的插件架构
-- 插件注册和加载机制
-- 插件生命周期管理
+- 插件注册和加载机制（预留）
+- 插件生命周期管理（预留）
 
 ### 缓存系统
-- TTL（Time-To-Live）支持
-- 自动过期清理
-- 性能优化
+- TTL（Time-To-Live）支持（预留）
+- 自动过期清理（预留）
+- 性能优化（预留）
 
 ### 国际化支持
 - 多语言界面
@@ -265,9 +226,9 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 - 本地化消息
 
 ### 高级错误处理
-- 重试机制（指数退避）
-- 断路器模式
-- 结构化错误信息
+- 重试机制（指数退避，预留）
+- 断路器模式（预留）
+- 结构化错误信息（预留）
 
 ## 安全特性
 
@@ -315,7 +276,7 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 
 ### 编码规范
 
-- 使用模块化、注释良好的 zsh 脚本，遵循可移植的 shell 实践
+- 使用模块化、可读性良好的 zsh 脚本，遵循可移植的 shell 实践
 - 遵循一致的颜色方案用于用户反馈（在 utils.sh 中定义）
 - 实现错误处理使用 `set -e` 实现快速失败
 - 将通用函数分离到 `lib/utils.sh` 以供重用
@@ -348,11 +309,9 @@ Do you want to update Claude CLI to the latest version? [y/N] y
 vibe-coding-control-center/
 ├── CLAUDE.md                    # 项目上下文
 ├── README.md                    # 本文档
-├── MODERN_README.md             # 现代化功能说明（历史文档）
 ├── CHANGELOG.md                 # 变更日志
-├── UPGRADE_FEATURES.md          # 新功能说明（历史文档）
 ├── .agent/                      # Agent 配置与工作流
-│   ├── context/               # AI 上下文 (memory.md, task.md, agent.md)
+│   ├── context/               # AI 上下文 (memory.md, task.md, agent.md：初始化后生成)
 │   ├── workflows/             # 自动化工作流
 │   ├── templates/             # 提示词模板
 │   └── rules/                 # 行为规则
@@ -373,9 +332,8 @@ vibe-coding-control-center/
 ├── lib/                         # 共享库
 │   ├── utils.sh                # 统一的工具函数库（安全增强）
 │   ├── config.sh               # 集中配置管理
-│   ├── plugins.sh              # 插件系统
-│   ├── cache.sh                # 缓存系统
-│   ├── error_handling.sh       # 高级错误处理
+│   ├── cache.sh                # 缓存系统（预留扩展）
+│   ├── error_handling.sh       # 错误处理（预留扩展）
 │   ├── i18n.sh                # 国际化支持
 │   └── testing.sh              # 测试框架
 ├── scripts/                     # 主要脚本
