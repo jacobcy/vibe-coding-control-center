@@ -203,8 +203,6 @@ do_diagnostics() {
     echo -e "\n${CYAN}>> RUNNING COMPREHENSIVE DIAGNOSTICS <<${NC}"
     echo "Checking core connections..."
 
-    echo "Checking core connections..."
-
     # Check Connectivity first
     # (Note: keys are checked separately via --all or keys command, but kept here for legacy 'do_diagnostics' calls)
     check_connections
