@@ -5,8 +5,8 @@
 _一句话描述这个 PR 的目的。_
 
 **相关 Issue**: #{ISSUE_NUMBER} (如果有)
-**PRD 文档**: [{FEATURE_NAME}](file://{PRD_PATH})
-**技术规格**: [技术规格文档](file://{SPEC_PATH})
+**PRD 文档**: `{PRD_PATH}`
+**技术规格**: `{SPEC_PATH}`
 
 ## 变更内容
 
@@ -24,6 +24,10 @@ _一句话描述这个 PR 的目的。_
 
 - 删除废弃命令 `old-command`
 - 移除过时文件 `deprecated.sh`
+
+## 变更摘要 | 测试说明 | 风险点
+
+_示例：新增 vnew 文档说明 | 已运行 docs 校验 | 无破坏性变更_
 
 ## 测试验证
 
@@ -80,9 +84,9 @@ $ vibe flow start example
 
 ## 相关链接
 
-- PRD: [docs/prds/{FEATURE}.md](file://{PRD_PATH})
-- Spec: [docs/specs/{FEATURE}-spec.md](file://{SPEC_PATH})
-- Tests: [tests/test_{FEATURE}.sh](file://{TEST_PATH})
+- PRD: `docs/prds/{FEATURE}.md`
+- Spec: `docs/specs/{FEATURE}-spec.md`
+- Tests: `tests/test_{FEATURE}.sh`
 
 ---
 

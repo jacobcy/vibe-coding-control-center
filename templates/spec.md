@@ -4,7 +4,7 @@
 
 _简要说明技术实现方案的核心思路。_
 
-**相关 PRD**：[{FEATURE_NAME}](file://{PRD_PATH})
+**相关 PRD**：`{PRD_PATH}`
 
 ## 架构设计
 
