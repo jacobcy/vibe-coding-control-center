@@ -24,9 +24,12 @@
 ## Static Analysis (Quality Assurance)
 - **Tool**: [ShellCheck](https://github.com/koalaman/shellcheck)
 - **Requirement**: All scripts must pass `shellcheck` before submission.
+- **Zsh Compatibility**: Since ShellCheck primarily supports sh/bash, Zsh-specific features may trigger `SC1071`.
+  - **Action**: You may ignore this specific error globally or for specific files if the script explicitly requires Zsh.
+  - **Example**: `# shellcheck disable=SC1071`
 - **Usage**:
   ```bash
   # Check all scripts
-  find . -name "*.sh" -not -path "./lib/shunit2/*" -exec shellcheck {} +
+  find . -name "*.sh" -not -path "./lib/shunit2/*" -exec shellcheck -e SC1071 {} +
   ```
 - **Directives**: Use `# shellcheck disable=SCxxxx` only when necessary and with a comment explaining why.

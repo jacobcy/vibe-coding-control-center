@@ -51,7 +51,7 @@ This project operates under the **Vibe Coding Constitution** defined in [SOUL.md
 - `install/install-opencode.sh`: OpenCode installation and setup
 - `docs/usage_advice.md`: Usage guidelines and best practices
 - `SOUL.md`: Core principles and constitutional rules (referenced by all contributors)
-- `rules.md`: Behavior rules (Behavioral laws)
+- `.agent/rules/coding-standards.md`: Specific coding standards and rules
 - `.agent/context/memory.md`: Cumulative record of key decisions and context
 - `.agent/context/task.md`: High-level project tasks and history
 - `.agent/context/agent.md`: Agent persona and role definitions
@@ -145,11 +145,12 @@ Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines
 
 ## Important Variables
 ## Linked Docs
+- [AGENTS.md](AGENTS.md) - **Start Here** for Agent Workflows
 - [SOUL.md](SOUL.md)
 - [memory.md](.agent/context/memory.md)
 - [task.md](.agent/context/task.md)
 - [agent.md](.agent/context/agent.md)
-- [RULES.md](RULES.md)
+- [coding-standards.md](.agent/rules/coding-standards.md)
 - `SHELL_RC`: Points to the zsh configuration file (`.zshrc`)
 - Constants in `lib/utils.sh` for security parameters (MAX_PATH_LENGTH, MAX_INPUT_LENGTH, etc.)
 

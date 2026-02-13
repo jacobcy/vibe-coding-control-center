@@ -94,3 +94,12 @@
 - 定期更新 API 密钥并验证其有效性
 - 使用 `secure_write_file` 函数安全地写入配置文件
 - 在处理路径时始终使用 `validate_path` 函数防止路径遍历攻击
+
+## 12. 命令行故障排查与自动回退
+如果你在一个尚未包含最新 Vibe 命令（如 `vibe flow rotate`）的旧分支中工作，系统会自动回退到全局版本。
+此外，你也可以显式强制使用全局版本：
+
+- **显式全局调用**: `vibe --global flow rotate` 或 `vibe -g flow rotate`
+- **自动回退**: 当本地命令缺失时，系统会自动尝试全局命令。
+- **查看版本**: 使用 `vibe --version` 或 `vibe -v` 来确认当前执行的 Vibe 版本。
+
