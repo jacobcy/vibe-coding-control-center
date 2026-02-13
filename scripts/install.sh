@@ -224,50 +224,53 @@ chmod +x "$VIBE_BIN/vibe"
 chmod +x "$VIBE_BIN"/* 2>/dev/null || true
 
 # --- Clean up ALL old Vibe entries from shell RC (comprehensive) ---
-if [[ -f "$SHELL_RC" ]]; then
-    _need_cleanup=false
-    if grep -qE '(Vibe Coding Control Center|Load Vibe aliases|vibe-center|\.vibe/aliases\.sh|\.vibe/bin|\.vibe/loader\.sh)' "$SHELL_RC" 2>/dev/null; then
-        _need_cleanup=true
-    fi
 
-    if $_need_cleanup; then
-        log_info "Cleaning up old Vibe configuration from $SHELL_RC"
-
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            # Remove all known Vibe markers and hardcoded paths
-            sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
-            sed -i '' '/# Load Vibe aliases/d' "$SHELL_RC"
-            sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
-            sed -i '' '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
-            sed -i '' '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
-            sed -i '' '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
-            sed -i '' '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '' '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-            sed -i '' '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '' '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-            sed -i '' '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '' '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-            # Clean up orphaned fi and blank lines left by removed blocks
-            # (sed multi-pass to collapse consecutive blank lines)
-        else
-            sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
-            sed -i '/# Load Vibe aliases/d' "$SHELL_RC"
-            sed -i '/# Added by Antigravity/d' "$SHELL_RC"
-            sed -i '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
-            sed -i '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
-            sed -i '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
-            sed -i '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-            sed -i '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-            sed -i '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
-            sed -i '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
-        fi
-        log_info "Old Vibe configuration removed"
-    fi
-fi
 
 if [[ "$MODE" == "global" ]]; then
+    # --- Clean up ALL old Vibe entries from shell RC (comprehensive) ---
+    if [[ -f "$SHELL_RC" ]]; then
+        _need_cleanup=false
+        if grep -qE '(Vibe Coding Control Center|Load Vibe aliases|vibe-center|\.vibe/aliases\.sh|\.vibe/bin|\.vibe/loader\.sh)' "$SHELL_RC" 2>/dev/null; then
+            _need_cleanup=true
+        fi
+
+        if $_need_cleanup; then
+            log_info "Cleaning up old Vibe configuration from $SHELL_RC"
+
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # Remove all known Vibe markers and hardcoded paths
+                sed -i '' '/# Vibe Coding Control Center/d' "$SHELL_RC"
+                sed -i '' '/# Load Vibe aliases/d' "$SHELL_RC"
+                sed -i '' '/# Added by Antigravity/d' "$SHELL_RC"
+                sed -i '' '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
+                sed -i '' '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
+                sed -i '' '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
+                sed -i '' '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '' '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+                sed -i '' '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '' '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+                sed -i '' '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '' '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+                # Clean up orphaned fi and blank lines left by removed blocks
+                # (sed multi-pass to collapse consecutive blank lines)
+            else
+                sed -i '/# Vibe Coding Control Center/d' "$SHELL_RC"
+                sed -i '/# Load Vibe aliases/d' "$SHELL_RC"
+                sed -i '/# Added by Antigravity/d' "$SHELL_RC"
+                sed -i '/aliases\.sh auto-detects VIBE_ROOT/d' "$SHELL_RC"
+                sed -i '/export PATH=".*\.vibe\/bin:\$PATH"/d' "$SHELL_RC"
+                sed -i '/export PATH=".*vibe-center.*\/bin:\$PATH"/d' "$SHELL_RC"
+                sed -i '/source .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '/source .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+                sed -i '/\[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '/\[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+                sed -i '/if \[ -f .*\.vibe\/aliases\.sh/d' "$SHELL_RC"
+                sed -i '/if \[ -f .*\.vibe\/loader\.sh/d' "$SHELL_RC"
+            fi
+            log_info "Old Vibe configuration removed"
+        fi
+    fi
+
     # --- Global: install loader.sh + write stable entry to shell RC ---
     
     # Copy loader.sh to ~/.vibe/loader.sh
