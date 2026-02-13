@@ -42,7 +42,13 @@ pr_create() {
     git push -u origin HEAD
     
     log_info "Creating Pull Request..."
-    gh pr create --title "$title" --body "$body" --web
+    
+    # Check for web flag (default: command line creation)
+    if [[ "$1" == "--web" ]]; then
+        gh pr create --title "$title" --body "$body" --web
+    else
+        gh pr create --title "$title" --body "$body"
+    fi
 }
 
 pr_review_list() {

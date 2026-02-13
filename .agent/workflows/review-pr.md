@@ -42,7 +42,15 @@ fi
 ### 3.3 Submit Feedback
 - **Request Changes**: `gh pr review <PR> --request-changes --body "..."`
 - **Approve**: `gh pr review <PR> --approve --body "LGTM"`
+- **Self-Review (Comment)**: If you are the PR author, use comment instead of approve: `gh pr review <PR> --comment --body "LGTM (Self-review)"`
 - **Comment**: `gh pr review <PR> --comment --body "..."`
+
+### 3.4 Merge (If Authorized)
+If the PR is approved and you have permissions:
+```bash
+# Merge and delete remote branch
+gh pr merge <PR> --merge --delete-branch
+```
 
 ## 4. Verification (验证)
 - [ ] Verify review status.

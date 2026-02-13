@@ -24,6 +24,7 @@ if [ -f ".agent/lib/gh-ops.sh" ]; then
     source .agent/lib/gh-ops.sh
     # Ensure branch is pushed
     git push -u origin HEAD
+    # Pass --web to open in browser, or omit for CLI creation
     pr_create
 else
     echo "Error: .agent/lib/gh-ops.sh not found."
