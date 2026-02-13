@@ -367,11 +367,17 @@ vibe() {
     # 0. Check for explicit global flag
     if [[ "$1" == "-g" || "$1" == "--global" ]]; then
         shift
-        if [[ -x "$VIBE_ROOT/bin/vibe" ]]; then
+        local global_vibe="$HOME/.vibe/bin/vibe"
+        # Try HOME/.vibe first (Standard Global)
+        if [[ -x "$global_vibe" ]]; then
+            "$global_vibe" "$@"
+            return
+        # Fallback to VIBE_ROOT if it happens to be global or valid
+        elif [[ -x "$VIBE_ROOT/bin/vibe" ]]; then
             "$VIBE_ROOT/bin/vibe" "$@"
             return
         else
-            echo "❌ Global vibe not found at $VIBE_ROOT/bin/vibe" >&2
+            echo "❌ Global vibe not found at $global_vibe" >&2
             return 1
         fi
     fi

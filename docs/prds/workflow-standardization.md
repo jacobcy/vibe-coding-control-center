@@ -41,4 +41,4 @@ The following three workflows need support scripts and CLI integration.
 - **Documentation**: Update `.agent/workflows/*.md` to reference the new `vibe` commands instead of raw bash blocks.
 
 ## 5. Reference
-Refer to the existing [Implementation Plan](file:///Users/jacobcy/.gemini/antigravity/brain/aff82b15-0368-4158-a0a9-c79295bdfc93/implementation_plan.md) for data structures and script details.
+Refer to the existing Implementation Plan (local file) for data structures and script details.

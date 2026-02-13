@@ -28,13 +28,12 @@
 
 - `c`: 启动 `claude` 交互界面。
 - `ca "问题"`: 快速向 Claude 提问（无需进入交互模式）。
-- `cp "目标"`: 让 Claude 为你制定开发计划。
 - `cr`: 让 Claude 审查当前改动。
 - `o`: 启动 `opencode`。
 - `oa "问题"`: 向 OpenCode 快速提问。
-- `vibe`: Start Vibe Coding Control Center (`vibecoding.sh`)
+- `vibe`: Start Vibe Coding Control Center (`vibe` dispatcher -> `scripts/vibecoding.sh`)
 - `x`: （可选）启动 `codex`（如已安装 OpenAI Codex CLI）。
-- `xy`: （可选）`codex --yes` 自动执行。
+- `xy`: （可选）`codex --yes` 自动执行（如已配置）。
 
 ## 2. 增强的安全特性
 新版脚本包含多种安全增强功能：

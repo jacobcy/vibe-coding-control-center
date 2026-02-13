@@ -6,13 +6,61 @@ set -e
 # Version definition
 VIBE_VERSION="1.1.0"
 
+# Resolve VIBE_ROOT correctly, handling symlinks
+# ${0:A} in zsh resolves the absolute path of the script, following symlinks
+current_script="${0:A}"
+VIBE_ROOT="$(cd "$(dirname "$current_script")/.." && pwd)"
+
+# Global flag: -g forces execution of global ~/.vibe installation
+# This allows using stable main version features while in a branch worktree
+# Global flag: -g forces execution of global ~/.vibe installation
+# This allows using stable main version features while in a branch worktree
+# We scan all arguments to allow -g to be placed anywhere (e.g. vibe help -g)
+_new_args=()
+_force_global=0
+
+for arg in "$@"; do
+    if [[ "$arg" == "-g" ]]; then
+        _force_global=1
+    else
+        _new_args+=("$arg")
+    fi
+done
+
+if [[ "$_force_global" -eq 1 ]]; then
+    # Restore filtered arguments
+    set -- "${_new_args[@]}"
+
+    GLOBAL_VIBE="$HOME/.vibe/bin/vibe"
+    
+    # Verify global installation exists
+    if [[ ! -x "$GLOBAL_VIBE" ]]; then
+        echo "Error: Global vibe installation not found at $GLOBAL_VIBE" >&2
+        echo "Install globally first with: cd main && ./scripts/install.sh" >&2
+        exit 1
+    fi
+    
+    # Avoid infinite loop if already running from global installation
+    if [[ "$current_script" == "$GLOBAL_VIBE" ]]; then
+        # Already global, just continue normally
+        export VIBE_HOME_OVERRIDE="$HOME/.vibe"
+        :
+    else
+        # Forward to global installation
+        export VIBE_NO_SHIM=1
+        export VIBE_HOME_OVERRIDE="$HOME/.vibe"
+        # echo "DEBUG: Forwarding to $GLOBAL_VIBE with OVERRIDE=$VIBE_HOME_OVERRIDE" >&2
+        exec "$GLOBAL_VIBE" "$@"
+    fi
+fi
+
 # Context shim: auto-switch to the local project's vibe when a .vibe/ directory
-# is found nearby.  VIBE_ROOT is inferred from the .vibe parent — no config needed.
+# is found nearby.
 if [[ -z "${VIBE_NO_SHIM}" ]]; then
     _local_vibe=""
     # Walk up from PWD looking for .vibe/
     _cur="$PWD"
-    while [[ "$_cur" != "/" ]]; do
+    while [[ "$_cur" != "/" && "$_cur" != "$HOME" ]]; do
         if [[ -d "${_cur}/.vibe" ]]; then
             _local_vibe="${_cur}"
             break
@@ -23,98 +71,96 @@ if [[ -z "${VIBE_NO_SHIM}" ]]; then
     if [[ -z "$_local_vibe" ]] && command -v git >/dev/null 2>&1 \
         && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         _gr="$(git rev-parse --show-toplevel 2>/dev/null)"
-        [[ -d "${_gr}/.vibe" ]] && _local_vibe="${_gr}"
+        # Skip global ~/.vibe to avoid shim loop with global install
+        if [[ -d "${_gr}/.vibe" && "${_gr}" != "$HOME" ]]; then
+             _local_vibe="${_gr}"
+        fi
     fi
 
     if [[ -n "${_local_vibe}" ]]; then
         _local_bin="${_local_vibe}/bin/vibe"
-        _current_script_abs="$(cd "$(dirname "${(%):-%x}")" && pwd)/$(basename "${(%):-%x}")"
-
+        
         # If local bin exists, is executable, and is NOT this script → hand over
-        # We also skip this shim if VIBE_SKIP_SHIM is set, to allow the alias to control fallback
-        if [[ -x "${_local_bin}" && "${_local_bin}" != "${_current_script_abs}" && -z "${VIBE_SKIP_SHIM}" ]]; then
+        # We also skip this shim if VIBE_SKIP_SHIM is set
+        if [[ -x "${_local_bin}" && "${_local_bin}" != "${current_script}" && -z "${VIBE_SKIP_SHIM}" ]]; then
             export VIBE_NO_SHIM=1
             exec "${_local_bin}" "$@"
         fi
     fi
 fi
 
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-
-# Check for help/version flags or subcommand first
-if [[ $# -eq 1 ]]; then
-    case "$1" in
-        -h|--help)
-            if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
-                cat "$VIBE_ROOT/lib/vibe-help.md"
-            else
-                echo "Vibe Coding Control Center"
-                echo "Help file missing at lib/vibe-help.md. Run 'vibe' for interactive mode."
-            fi
-            exit 0
-            ;;
-        -v|--version|version)
-            echo "Vibe Coding Control Center v${VIBE_VERSION}"
-            echo "VIBE_ROOT: ${VIBE_ROOT}"
-            exit 0
-            ;;
-    esac
-elif [[ "$1" == "help" ]]; then
-    # Implement 'vibe help' command
-    if [[ $# -eq 1 ]]; then
-        # 'vibe help' - show general help
-        if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
-            cat "$VIBE_ROOT/lib/vibe-help.md"
-        else
-            echo "Vibe Coding Control Center"
-            echo ""
-            echo "Usage: vibe [options] [command]"
-            echo ""
-            echo "Options:"
-            echo "  -h, --help     Show this help message"
-            echo ""
-            echo "Commands:"
-            echo "  (no args)      Launch interactive control center"
-            echo "  chat           Start default AI tool chat"
-            echo "  config         Manage Vibe Coding configuration"
-            echo "  doctor         System health check (includes diagnostics)"
-            echo "  env            Environment and key management"
-            echo "  equip          Install/update AI tools"
-            echo "  flow           Feature development workflow"
-            echo "  help           Show help information"
-            echo "  init           Start New Project"
-            echo "  keys           Quick access to API keys"
-            echo "  sign           Sync Git Identity"
-            echo ""
-            echo "Run 'vibe' without arguments for interactive mode."
-        fi
+# Function to display help
+show_help() {
+    if [[ -f "$VIBE_ROOT/lib/vibe-help.md" ]]; then
+        cat "${VIBE_ROOT}/lib/vibe-help.md"
     else
-        # 'vibe help <subcommand>' - show help for specific subcommand
-        shift  # Remove 'help' argument
-        subcmd="$1"
-        cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
-        if [[ -x "$cmd" ]]; then
-            "$cmd" --help
-        else
-            echo "Unknown subcommand: $subcmd" >&2
-            echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
-        fi
+        echo "Vibe Coding Control Center"
+        echo ""
+        echo "Usage: vibe [options] [command]"
+        echo ""
+        echo "Options:"
+        echo "  -h, --help     Show this help message"
+        echo "  -v, --version  Show version information"
+        echo ""
+        echo "Commands:"
+        echo "  (no args)      Launch interactive control center"
+        echo "  chat           Start default AI tool chat"
+        echo "  config         Manage Vibe Coding configuration"
+        echo "  doctor         System health check (includes diagnostics)"
+        echo "  env            Environment and key management"
+        echo "  equip          Install/update AI tools"
+        echo "  flow           Feature development workflow"
+        echo "  help           Show help information"
+        echo "  init           Start New Project"
+        echo "  keys           Quick access to API keys"
+        echo "  sign           Sync Git Identity"
+        echo ""
+        echo "Run 'vibe' without arguments for interactive mode."
     fi
+}
+
+# Main dispatch logic
+if [[ $# -eq 0 ]]; then
+    # No args -> run interactive control center
+    exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh"
+fi
+
+ARG1="$1"
+
+# Check for flags/help using explicit if
+if [[ "$ARG1" == "-h" || "$ARG1" == "--help" || "$ARG1" == "help" ]]; then
+    if [[ "$ARG1" == "help" && $# -gt 1 ]]; then
+         # vibe help <subcommand>
+         shift
+         subcmd="$1"
+         cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
+         if [[ -x "$cmd" ]]; then
+             "$cmd" --help
+         else
+             echo "Unknown subcommand: $subcmd" >&2
+             echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+             exit 1
+         fi
+         exit 0
+    fi
+    show_help
+    exit 0
+elif [[ "$ARG1" == "-v" || "$ARG1" == "--version" || "$ARG1" == "version" ]]; then
+    echo "Vibe Coding Control Center v${VIBE_VERSION}"
+    echo "VIBE_ROOT: ${VIBE_ROOT}"
     exit 0
 fi
 
-if [[ $# -gt 0 ]]; then
-  subcmd="$1"
-  shift
-  cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
-  if [[ -x "$cmd" ]]; then
-    exec "$cmd" "$@"
-  else
-    echo "Unknown subcommand: $subcmd" >&2
-    echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
-    exit 1
-  fi
-fi
+# Handle subcommands
+subcmd="$1"
+shift
+cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
 
-# No subcommand -> run interactive control center
-exec zsh "${VIBE_ROOT}/scripts/vibecoding.sh"
+if [[ -x "$cmd" ]]; then
+    exec "$cmd" "$@"
+else
+    echo "Unknown subcommand or option: $subcmd" >&2
+    echo "Available commands: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
+    echo "See 'vibe help' for more information."
+    exit 1
+fi

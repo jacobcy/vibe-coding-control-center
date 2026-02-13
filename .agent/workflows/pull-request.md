@@ -2,29 +2,38 @@
 description: Create a Pull Request
 ---
 
-1. Analyze Changes
-Generate a summary of changes between the current branch and `origin/main`.
-```bash
-git fetch origin main
-git diff --stat origin/main...HEAD
-git log origin/main..HEAD --oneline
-```
+# Create Pull Request
 
-2. Agent Drafting
-- Based on the above analysis, draft a **Title** and **Body** for the Pull Request.
-- The Title should be concise and descriptive (e.g., following Conventional Commits).
-- The Body should explain *what* changed and *why*.
+## 1. Prerequisites (前置准备)
+- [ ] Context gathered: Check current branch and remote status.
+- [ ] Rules loaded: `git-rules.md`.
 
-3. Push current branch to origin
+## 2. Standards Check (规范检查)
+**CRITICAL**: 执行前请复核以下规则：
+// turbo
+cat .agent/rules/git-rules.md
+
+## 3. Execution (执行)
+Create the pull request.
+> [!IMPORTANT]
+> Ensure your branch is up-to-date and all changes are committed and pushed.
+
 // turbo
 ```bash
-git push -u origin HEAD
+if [ -f ".agent/lib/gh-ops.sh" ]; then
+    source .agent/lib/gh-ops.sh
+    # Ensure branch is pushed
+    git push -u origin HEAD
+    pr_create
+else
+    echo "Error: .agent/lib/gh-ops.sh not found."
+    exit 1
+fi
 ```
 
-4. Create Pull Request
-Construct the `gh pr create` command with your drafted Title and Body.
-Example:
+## 4. Verification (验证)
+- [ ] Verify the PR link is generated.
 ```bash
-gh pr create --title "feat: add amazing feature" --body "Detailed description..." --web
+gh pr view --web
 ```
-- **Ask the user** to confirm the command before running it.
+
