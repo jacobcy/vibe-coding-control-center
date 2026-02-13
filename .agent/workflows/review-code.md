@@ -33,15 +33,15 @@ fi
 ### 3.2 Contextual Analysis
 // turbo
 ```bash
-# Show staged changes or working directory changes
-if ! git diff --cached --quiet; then
-    echo "=== Staged Changes ==="
-    git diff --cached --stat
-    git diff --cached
+# Default to "all" if SCOPE is not set
+SCOPE="${SCOPE:-all}"
+
+if [ -f ".agent/lib/git-scope.sh" ]; then
+    export SCOPE
+    zsh .agent/lib/git-scope.sh
 else
-    echo "=== Working Directory Changes ==="
-    git diff --stat
-    git diff
+    echo "Error: .agent/lib/git-scope.sh not found."
+    exit 1
 fi
 ```
 

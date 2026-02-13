@@ -57,7 +57,7 @@ do_status() {
     echo "Active Tool: ${GREEN}$active_tool${NC}"
     echo ""
 
-    echo "${BOLD}[Active Provider Config]${NC}"
+    echo "${BOLD}[Active Key Status]${NC}"
     
     # Define keys to check based on active tool
     local keys_to_check=()
@@ -66,7 +66,7 @@ do_status() {
             keys_to_check=(ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL ANTHROPIC_MODEL)
             ;;
         opencode)
-            keys_to_check=(VIBE_OPENCODE_API_KEY VIBE_OPENCODE_BASE_URL VIBE_OPENCODE_MODEL)
+            keys_to_check=(VIBE_OPENCODE_MODEL)
             ;;
         openai)
             keys_to_check=(OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL)
