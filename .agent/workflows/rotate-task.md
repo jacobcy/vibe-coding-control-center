@@ -1,45 +1,39 @@
-# Workflow: Rotate Task
+---
+description: Quickly switch to a new task within an existing worktree
+---
 
-**Goal**: Quickly switch to a new task within an existing worktree, preserving uncommitted work.
+# Rotate Task Workflow
 
-## Trigger
-- User wants to start a new task in the same environment.
-- User wants to rename the current task/branch but keep changes.
-- User wants to discard the current branch history but keep the working directory state for a new attempt.
+## 1. Prerequisites (前置准备)
+- [ ] Context gathered: Check current branch and worktree.
+- [ ] Rules loaded: `git-rules.md`.
 
-## Command
-`vibe flow rotate <new-task-name>`
+## 2. Standards Check (规范检查)
+**CRITICAL**: 执行前请复核以下规则：
+// turbo
+cat .agent/rules/git-rules.md
 
-## Process
-1. **Validation**:
-   - Ensure execution within a worktree.
-   - Ensure a new task name is provided.
+## 3. Execution (执行)
+Switch to a new task while preserving uncommitted work.
+> [!IMPORTANT]
+> This workflow destroys the old branch history after stashing changes. Ensure you really want to "rotate" the context.
 
-2. **Save State**:
-   - `git stash push -m "Rotate to <new-task>"` to save uncommitted changes (index and working tree).
+### 3.1 Validation & Trigger
+Command: `vibe flow rotate <new-task-name>`
 
-3. **Reset Environment**:
-   - Record current branch name (`OLD_BRANCH`).
-   - Fetch `origin/main` to ensure latest base.
-   - Create and switch to new branch: `git checkout -b <new-task> origin/main`.
+### 3.2 Process Steps
+1.  **Save State**: `git stash push -m "Rotate to <new-task>"`
+2.  **Reset**:
+    - Fetch `origin/main`.
+    - `git checkout -b <new-task> origin/main`.
+3.  **Cleanup**: `git branch -D <OLD_BRANCH>`.
+4.  **Restore**: `git stash pop`.
 
-4. **Cleanup**:
-   - Delete the old branch: `git branch -D <OLD_BRANCH>`.
-     - *Note*: This forces deletion, assuming the user is done with the old task context.
-
-5. **Restore State**:
-   - Apply the stashed changes: `git stash pop`.
-   - Result: New branch with clean history, containing the previously uncommitted work.
-
-## Usage Example
+## 4. Verification (验证)
+- [ ] Verify new branch is active.
+- [ ] Verify stashed changes are applied.
 ```bash
-# In worktree /.../wt-claude-feature-a
-# Current branch: feature-a (with WIP changes)
-
-vibe flow rotate feature-b
-
-# Result:
-# Branch: feature-b (based on main)
-# Changes: WIP changes from feature-a are applied here
-# Branch feature-a is deleted
+git status
+git branch --show-current
 ```
+
