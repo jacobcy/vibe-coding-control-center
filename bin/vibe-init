@@ -18,7 +18,7 @@ source "$VIBE_ROOT/lib/init_project.sh"
 load_user_config
 
 # Handle help flag
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
     echo "vibe-init - Initialize new project"
     echo ""
     echo "Usage: vibe init [options]"
@@ -43,7 +43,7 @@ fi
 
 local preset_dir="${2:-}"
 
-vibe_collect_init_answers "$preset_dir" || exit 1
+vibe_collect_init_answers "$preset_dir" || exit 3
 vibe_init_project "$mode" || exit 1
 
 echo -e "\n${GREEN}Project initialization complete.${NC}"

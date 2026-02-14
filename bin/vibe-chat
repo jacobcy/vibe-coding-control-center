@@ -78,7 +78,7 @@ do_chat() {
 }
 
 # Handle help flag
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
     echo "vibe-chat - 快速启动 AI 工具对话"
     echo ""
     echo "用法:"

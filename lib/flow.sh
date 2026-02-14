@@ -701,8 +701,8 @@ flow_cmd_rotate() {
     # 4. Create new branch from main
     log_step "Creating new branch: $new_task"
     # Fetch main first to be up to date
-    log_info "Fetching origin/main..."
-    git fetch origin main
+    log_info "Fetching origin/main (and pruning)..."
+    git fetch -p origin main
     
     # Create new branch based on origin/main
     # We use checkout -B to force create/reset if exists (or should we fail?)

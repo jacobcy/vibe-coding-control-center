@@ -45,69 +45,77 @@ Path Resolution: Local .vibe/ > Git Root .vibe/ > User ~/.vibe/
 EOF
 }
 
-# Handle commands
-case "${1:-status}" in
-    status|"")
-        # Show complete environment status (delegate to env-manager.sh)
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" status
-        ;;
+# Helper: Show resolved env vars
+show_resolved_env() {
+    echo "=== Runtime Environment (Resolved) ==="
+    echo ""
     
-    show)
-        # Show keys.env content (masked)
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys show
+    # Define keys to check
+    local keys_of_interest=(
+        "ANTHROPIC_API_KEY" "ANTHROPIC_AUTH_TOKEN" "ANTHROPIC_BASE_URL" "ANTHROPIC_MODEL"
+        "OPENAI_API_KEY" "OPENAI_BASE_URL" "OPENAI_MODEL"
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+        "BRAVE_API_KEY"
+        "VIBE_DEFAULT_TOOL"
+    )
+
+    # Pre-load local keys for comparison
+    declare -A local_keys
+    if [[ -f "$KEYS_FILE" ]]; then
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                k="${match[1]}"
+                v="${match[2]}"
+                v="${v%\"}" # remove quotes
+                v="${v#\"}"
+                local_keys[$k]="$v"
+            fi
+        done < "$KEYS_FILE"
+    fi
+
+    for key in "${keys_of_interest[@]}"; do
+        # Current env value
+        local current_val="${(P)key-}"
+        local local_val="${local_keys[$key]:-}"
+        local display_val=""
+        local source_label=""
+        
+        if [[ -n "$current_val" ]]; then
+            # Mask value
+            if [[ ${#current_val} -gt 8 ]]; then
+                display_val="${current_val:0:4}...${current_val: -4}"
+            else
+                display_val="****"
+            fi
+            
+            if [[ "$current_val" == "$local_val" ]]; then
+                source_label="${GREEN}[Local]${NC}"
+            else
+                source_label="${YELLOW}[Global/Shell]${NC}"
+            fi
+            
+            printf "  %-30s %-15s %s\n" "$key" "$source_label" "$display_val"
+        else
+            # Not in env
+            if [[ -n "$local_val" ]]; then
+                printf "  %-30s %-15s %s\n" "$key" "${CYAN}[Local (Not Loaded)]${NC}" "Run 'vibe env inject'"
+            else
+                 # Only show if verbose? or skip
+                 :
+            fi
+        fi
+    done
+}
+
+# Handle commands
+case "${1:-}" in
+    "")
+        show_resolved_env
         ;;
     
     edit)
-        # Edit keys.env
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys edit
-        ;;
-    
-    get)
-        # Get specific key value
-        key="${2:-}"
-        [[ -z "$key" ]] && { log_error "Usage: vibe env get <key>"; exit 1; }
-        
-        value=$(get_env_value "$key" "$KEYS_FILE")
-        if [[ -n "$value" ]]; then
-            echo "$value"
-        else
-            log_error "Key '$key' not found in $KEYS_FILE"
-            exit 1
-        fi
-        ;;
-    
-    set)
-        # Set key=value
-        key="${2:-}"
-        value="${3:-}"
-        [[ -z "$key" || -z "$value" ]] && {
-            log_error "Usage: vibe env set <key> <value>"
-            echo "Example: vibe env set VIBE_DEFAULT_TOOL claude"
-            exit 1
-        }
-        
-        if set_env_value "$key" "$value" "$KEYS_FILE"; then
-            log_success "Updated: $key = $value"
-        else
-            log_error "Failed to update $KEYS_FILE"
-            exit 1
-        fi
-        ;;
-    
-    sync)
-        # Sync project keys.env to user directory
-        if sync_keys_env "$VIBE_ROOT"; then
-            log_info "Configuration synced to $KEYS_FILE"
-            log_info "Edit with: vibe env edit"
-        else
-            log_error "Failed to sync configuration"
-            exit 1
-        fi
-        ;;
-    
-    detect|check)
-        # Detect and validate environment
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" detect
+        # Shortcut to config edit keys
+        exec "${VIBE_ROOT}/bin/vibe-config" edit keys
         ;;
     
     inject)
@@ -115,24 +123,53 @@ case "${1:-status}" in
         exec zsh "$VIBE_ROOT/scripts/env-manager.sh" inject
         ;;
     
-    switch)
-        # Switch Claude endpoint
-        shift
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" switch "$@"
+    sync)
+        # Sync project keys.env
+        if sync_keys_env "$VIBE_ROOT"; then
+            log_info "Configuration synced to $KEYS_FILE"
+        else
+            log_error "Failed to sync configuration"
+            exit 3
+        fi
         ;;
-    
-    verify)
-        # Verify API key validity
-        exec zsh "$VIBE_ROOT/scripts/env-manager.sh" keys verify
-        ;;
-    
+        
     -h|--help|help)
-        show_help
+        cat << 'EOF'
+vibe env - Runtime environment manager
+
+Usage: vibe env [command]
+
+Commands:
+  (no args)              Show resolved environment variables with source
+  edit                   Edit local keys.env (Shortcut)
+  inject                 Inject keys.env into current shell session
+  sync                   Sync project's keys.env from template
+
+Examples:
+  vibe env                         # Show current vars
+  vibe env edit                    # Edit keys
+  vibe env inject                  # Load keys into shell
+EOF
         ;;
     
+    verify|check|detect)
+        echo "⚠️  Command moved to 'vibe check api' or 'vibe check system'"
+        exec "${VIBE_ROOT}/bin/vibe-check" api
+        ;;
+
+    keys)
+         echo "⚠️  Command deprecated. Use 'vibe env' to list or 'vibe config edit keys' to edit." >&2
+         exit 2
+         ;;
+
+    switch)
+         echo "⚠️  Command removed. Please edit keys.env directly: vibe config edit keys" >&2
+         exit 2
+         ;;
+
     *)
         log_error "Unknown command: $1"
         echo "Run 'vibe env help' for usage"
-        exit 1
+        exit 2
         ;;
 esac

@@ -2,7 +2,7 @@
 description: Cleanup local environment after task completion
 ---
 
-# Task Cleanup Protocol
+# Flow Done Workflow (Branch/Worktree Cleanup)
 
 ## 1. Prerequisites (前置准备)
 - [ ] Task status confirmed: PR merged or Issue closed.

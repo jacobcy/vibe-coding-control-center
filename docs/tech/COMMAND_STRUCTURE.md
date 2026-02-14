@@ -1,8 +1,8 @@
-# Vibe Coding Control Center - Command Structure
+# Vibe Coding Control Center - Command Structure (Implementation)
 
 ## Overview
 
-The Vibe Coding Control Center has been restructured to provide a cleaner architecture with better separation of concerns and improved command handling.
+本文档描述命令体系的**技术实现与落地结构**，不包含规范性定义。所有命令行为以 `docs/standards/COMMAND_STANDARD.md` 为唯一权威来源。
 
 ## Command Mapping
 
@@ -15,7 +15,7 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 - **Interactive mode**: Running `vibe` without arguments launches the interactive menu
 - **Command mode**: `vibe [command] [options]` executes specific commands
 
-### Available Commands
+### Available Commands (Implementation Mapping)
 
 | Command | Purpose | Location |
 |---------|---------|----------|
@@ -25,7 +25,7 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 | `vibe equip` | Install/update AI tools | `bin/vibe-equip` |
 | `vibe env` | Environment and key management | `bin/vibe-env` |
 | `vibe init` | Initialize new project | `bin/vibe-init` |
-| `vibe doctor` | System health check (includes diagnostics) | `bin/vibe-doctor` |
+| `vibe check` | System health check (includes diagnostics) | `bin/vibe-check` |
 | `vibe flow` | Feature development workflow | `bin/vibe-flow` |
 | `vibe help` | Show help information | Built into dispatcher (`bin/vibe`) |
 | `vibe -h`, `vibe --help` | Show help information | Built into dispatcher (`bin/vibe`) |
@@ -41,7 +41,7 @@ vibe-coding-control-center/
 │   ├── vibe-equip            # Tool installation/update command
 │   ├── vibe-env              # Environment management command
 │   ├── vibe-init             # Project initialization command
-│   ├── vibe-doctor           # System health check command
+│   ├── vibe-check            # System health check command
 │   ├── vibe-flow             # Feature workflow command
 │   └── vibe-help             # Help command
 ├── scripts/                   # Implementation scripts
@@ -112,7 +112,7 @@ vibe chat "question"    # Quick Q&A (non-interactive)
 vibe config             # Manage configuration
 vibe init               # Initialize project
 vibe env                # Check environment
-vibe doctor             # Run system health check (includes diagnostics)
+vibe check              # Run system health check (includes diagnostics)
 vibe flow start feature # Start feature workflow
 vibe flow test          # Initialize TDD test
 

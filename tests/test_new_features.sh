@@ -21,7 +21,7 @@ else
     log_error "✗ bin/vibe missing or not executable"
 fi
 
-for sub in chat init keys sync doctor equip; do
+for sub in chat init check equip env config alias flow help; do
     if [[ -x "$BIN_DIR/vibe-$sub" ]]; then
         log_success "✓ bin/vibe-$sub exists and is executable"
     else
