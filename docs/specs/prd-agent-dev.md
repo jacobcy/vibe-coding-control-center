@@ -5,7 +5,7 @@ Vibe Coding 希望提供一个方便快捷的 Vibe Coding 开发环境，支持�
 
 ## 目标
 1. **多工具协作**：Claude → OpenCode → Codex 优先级明确，统一入口。
-2. **中国环境默认可用**：Claude 默认走中转站 `https://api.bghunt.cn`。
+2. **中国环境默认可用**：Claude 默认走中转站 `https://api.myprovider.com  # 替换成你的中转站`。
 3. **环境变量一键切换**：通过 `config/keys.env` 与 alias 完成切换。
 4. **Worktree 隔离**：每个 agent 独立 worktree + Git 身份。
 5. **稳定会话**：依赖 tmux，lazygit 做审查。
@@ -27,7 +27,7 @@ Vibe Coding 希望提供一个方便快捷的 Vibe Coding 开发环境，支持�
 
 ## 需求清单
 - 工具优先级：Claude → OpenCode → Codex
-- 中转站默认端点：`https://api.bghunt.cn`
+- 中转站默认端点：`https://api.myprovider.com  # 替换成你的中转站`
 - 环境变量统一管理：`config/keys.env`
 - Worktree 身份隔离：user.name / user.email
 - 依赖可用性检查：git / tmux / lazygit / zsh

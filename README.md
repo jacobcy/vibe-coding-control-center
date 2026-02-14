@@ -11,7 +11,7 @@
 - 📦 集成 MCP (Model Context Protocol) 服务器配置
 
 **特别说明（现状）**：
-- **Claude**: 通过环境变量切换端点与模型；中国环境默认中转站 `https://api.bghunt.cn`
+- **Claude**: 通过环境变量切换端点与模型；中国环境默认中转站 `https://api.myprovider.com  # 替换成你的中转站`
 - **OpenCode**: 原生支持多模型（Qwen、DeepSeek、Moonshot）
 - **Codex**: 作为第三优先级工具补位使用
 
@@ -113,12 +113,12 @@
    # Claude Code（官方 Anthropic API）
    ANTHROPIC_AUTH_TOKEN=<your-auth-token>
    ANTHROPIC_BASE_URL=https://api.anthropic.com
-   ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+   ANTHROPIC_MODEL=claude-sonnet-4-5
 
    # 中国默认：使用中转站（无需本机代理）
    ANTHROPIC_AUTH_TOKEN=<your-auth-token>
-   ANTHROPIC_BASE_URL=https://api.bghunt.cn
-   ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+   ANTHROPIC_BASE_URL=https://api.myprovider.com  # 替换成你的中转站
+   ANTHROPIC_MODEL=claude-sonnet-4-5
 
    # GitHub（用于 MCP）
    GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>

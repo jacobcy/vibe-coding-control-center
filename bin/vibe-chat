@@ -41,7 +41,12 @@ do_chat() {
     if [[ -n "$prompt" ]]; then
         case "$tool" in
             claude)
-                claude -p "$prompt"
+                if ! claude -p "$prompt"; then
+                    log_error "Claude CLI execution failed."
+                    echo "💡 Tip: If you were trying to run a Vibe command (like 'flow'), please check your syntax."
+                    echo "   You might be running 'vibe chat' inadvertently."
+                    return 1
+                fi
                 ;;
             opencode)
                 if [[ -n "${VIBE_OPENCODE_MODEL:-}" ]]; then

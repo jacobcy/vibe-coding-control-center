@@ -5,7 +5,7 @@
 
 ## 总体目标
 - **多工具协作**：Claude → OpenCode → Codex 按优先级组织。
-- **中国环境默认可用**：Claude 默认通过中转站 `https://api.bghunt.cn`，无需本机代理。
+- **中国环境默认可用**：Claude 默认通过中转站 `https://api.myprovider.com  # 替换成你的中转站`，无需本机代理。
 - **环境变量一键切换**：基于 `config/keys.env` 与 alias 实现快速切换。
 - **Worktree 隔离**：每个 agent 独立 worktree + 独立 Git 身份。
 - **会话稳定**：tmux 保持会话，lazygit 负责审查。
@@ -17,7 +17,7 @@
 - **启用方式**：通过 alias 启动，并加载对应环境变量
 
 ### 2) Claude（中国默认）
-- 默认端点：`https://api.bghunt.cn`
+- 默认端点：`https://api.myprovider.com  # 替换成你的中转站`
 - 官方端点：`https://api.anthropic.com`
 - 切换方式：alias 或环境变量覆盖
 

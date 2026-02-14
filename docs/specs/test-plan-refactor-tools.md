@@ -11,7 +11,7 @@
 
 ## 关键用例（示例）
 ### A. 配置与环境变量
-- A1：默认环境下，Claude 使用 `ANTHROPIC_BASE_URL=https://api.bghunt.cn`
+- A1：默认环境下，Claude 使用 `ANTHROPIC_BASE_URL=https://api.myprovider.com  # 替换成你的中转站`
 - A2：切换 alias 后，Claude 使用 `https://api.anthropic.com`
 - A3：`config/keys.env` 变更后，alias 启动生效
 

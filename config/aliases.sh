@@ -253,7 +253,18 @@ cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" |
 owt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: owt <wt-dir>"; wt "$d" || return; opencode; }
 
 # ---------- Endpoint Switching ----------
-alias c_cn='export ANTHROPIC_BASE_URL="https://api.bghunt.cn" && echo "🇨🇳 Claude Endpoint: China Proxy"'
+# c_cn alias: Switch to custom endpoint (reads from keys.env via config_get if available, or environment)
+c_cn() {
+    local endpoint
+    # Try to get from config cache or file
+    endpoint="$(config_get ANTHROPIC_BASE_URL)"
+    # Fallback to hardcoded if not set (legacy behavior, can be removed if config is mandatory)
+    if [[ -z "$endpoint" || "$endpoint" == "https://api.anthropic.com" ]]; then
+         endpoint="${ANTHROPIC_BASE_URL_CHINA:-https://api.myprovider.com}" # Default placeholder - set this in keys.env
+    fi
+    export ANTHROPIC_BASE_URL="$endpoint"
+    echo "🇨🇳 Claude Endpoint: Custom ($endpoint)"
+}
 alias c_off='export ANTHROPIC_BASE_URL="https://api.anthropic.com" && echo "🌐 Claude Endpoint: Official"'
 vibe_endpoint() {
     echo "Current Claude Endpoint: ${ANTHROPIC_BASE_URL:-$(config_get ANTHROPIC_BASE_URL)}"

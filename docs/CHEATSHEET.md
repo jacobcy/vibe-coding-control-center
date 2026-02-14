@@ -29,7 +29,7 @@
 ## 3. 环境切换 (Endpoint Switching)
 | 命令 | 效果 | 验证方式 |
 | :--- | :--- | :--- |
-| `c_cn` | 切换到 **中国中转站** (`api.bghunt.cn`) | `vibe_endpoint` |
+| `c_cn` | 切换到 **中国中转站** (`api.myprovider.com  # 替换成你的中转站`) | `vibe_endpoint` |
 | `c_off` | 切换到 **官方原生端点** (`api.anthropic.com`) | `vibe_endpoint` |
 | `vibe_endpoint` | 查看当前正在使用的 Claude 端点 | 输出当前配置的 URL |
 
@@ -60,6 +60,6 @@
 
 ## 测试建议 (Audit Checklist)
 1. **测试 Keys**: 运行 `vibe keys`（可选），检查 `config/keys.env` 是否正确生成。
-2. **测试 Proxy**: 运行 `c_cn` 后执行 `vibe_endpoint`，确认输出为 `https://api.bghunt.cn`。
+2. **测试 Proxy**: 运行 `c_cn` 后执行 `vibe_endpoint`，确认输出为 `https://api.myprovider.com  # 替换成你的中转站`。
 3. **测试 Identity**: 执行 `vnew audit-test opencode`，进入新生成的 WT 目录运行 `git config user.name`，应显示 `Agent-Opencode`。
 4. **测试 Flow**: 执行 `vibe flow start test-feature`，检查是否创建工作区和 PRD 文档。

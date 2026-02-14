@@ -20,7 +20,7 @@
 - `ANTHROPIC_MODEL`
 
 ### 3) Claude 中国默认端点
-- 默认：`https://api.bghunt.cn`
+- 默认：`https://api.myprovider.com  # 替换成你的中转站`
 - 通过 alias/环境切换为官方：`https://api.anthropic.com`
 
 ### 4) OpenCode / Codex

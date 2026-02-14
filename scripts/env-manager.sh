@@ -293,7 +293,7 @@ do_switch() {
     local endpoint="$1"
     case "$endpoint" in
         china|cn)
-            sed -i '' "s|^ANTHROPIC_BASE_URL=.*|ANTHROPIC_BASE_URL=https://api.bghunt.cn|" "$KEYS_FILE"
+            sed -i '' "s|^ANTHROPIC_BASE_URL=.*|ANTHROPIC_BASE_URL=${CUSTOM_CN_ENDPOINT:-https://api.myprovider.com}  # 替换成你的中转站|" "$KEYS_FILE"
             echo "🇨🇳 Switched to China proxy"
             ;;
         official|off)

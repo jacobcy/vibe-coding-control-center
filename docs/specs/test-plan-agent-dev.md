@@ -11,7 +11,7 @@
 
 ## 用例清单
 ### 环境变量
-- A1：默认 Claude 端点为 `https://api.bghunt.cn`
+- A1：默认 Claude 端点为 `https://api.myprovider.com  # 替换成你的中转站`
 - A2：切换 alias 后 Claude 使用官方端点
 - A3：`config/keys.env` 更新后 alias 生效
 
