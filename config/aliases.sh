@@ -45,24 +45,8 @@ vibe_now() { date +"%Y-%m-%d %H:%M:%S"; }
 # ---------- Context Loading ----------
 # Helper to load local keys.env if present in PWD or Git root
 vibe_load_context() {
-    local ctx_home=""
-    # 1. Check current directory
-    if [[ -d "$PWD/.vibe" ]]; then
-        ctx_home="$PWD/.vibe"
-    # 2. Check git root
-    elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        local gr="$(git rev-parse --show-toplevel 2>/dev/null)"
-        if [[ -d "$gr/.vibe" ]]; then
-            ctx_home="$gr/.vibe"
-        fi
-    fi
-
-    # Load keys if found (override global)
-    if [[ -n "$ctx_home" && -f "$ctx_home/keys.env" ]]; then
-        set -a
-        source "$ctx_home/keys.env"
-        set +a
-    fi
+    # Use the centralized config loader instead of direct sourcing
+    load_configuration
 }
 
 # ---------- tmux core ----------

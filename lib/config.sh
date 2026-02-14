@@ -1,5 +1,8 @@
 #!/usr/bin/env zsh
 
+# Source the new configuration loader
+source "$(dirname "${(%):-%x}")/config_loader.sh"
+
 typeset -gA VIBE_CONFIG
 
 # Auto-detect VIBE_ROOT (project root directory).
@@ -112,28 +115,18 @@ initialize_config() {
 }
 
 load_keys() {
-    [[ -f "$VIBE_HOME/keys.env" ]] || return 0
-
-    local _lines=("${(@f)$(< "$VIBE_HOME/keys.env")}")
-    local _l
-    for _l in "${_lines[@]}"; do
-        [[ "$_l" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${_l//[[:space:]]/}" ]] && continue
-        if [[ "$_l" == *=* ]]; then
-            local _k="${_l%%=*}"
-            local _v="${_l#*=}"
-            typeset -g "VIBE_CONFIG[KEY_${_k}]"="$_v"
-        fi
-    done
+    # Use the centralized config loader for security
+    load_configuration
 }
 
 export_keys() {
-    local keys_file="$VIBE_HOME/keys.env"
-    [[ -f "$keys_file" ]] || { log_warn "keys.env not found at $keys_file"; return 1; }
+    # Use the centralized config loader for security
+    load_configuration
 
-    set -a
-    source "$keys_file"
-    set +a
+    # Export keys from the cached config values
+    for key in "${(@k)CONFIG_CACHE}"; do
+        export "$key=${CONFIG_CACHE[$key]}"
+    done
 }
 
 load_toml_config() {
