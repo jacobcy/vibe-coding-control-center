@@ -13,7 +13,11 @@ export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 is_sourced=false
 if [[ -n "${ZSH_VERSION:-}" ]]; then
-    [[ "${(%):-%N}" != "$0" ]] && is_sourced=true
+    # Zsh: Check ZSH_EVAL_CONTEXT to see if we are being sourced
+    # If it contains "file", we are sourced. If it's just "toplevel" or "cmdarg", we are main.
+    if [[ $ZSH_EVAL_CONTEXT == *file* ]]; then
+        is_sourced=true
+    fi
 elif [[ -n "${BASH_VERSION:-}" ]]; then
     [[ "${BASH_SOURCE[0]}" != "$0" ]] && is_sourced=true
 fi
@@ -224,6 +228,93 @@ validate_filename() {
     # Check for suspicious patterns
     if [[ "$filename" == .* || "$filename" == /* || "$filename" == *"/.."* || "$filename" == *"\\.."* ]]; then
         log_error "Suspicious filename pattern detected"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_secure_path() {
+    local path="$1"
+    local error_msg="${2:-Invalid path provided}"
+
+    # Check if path is empty
+    if [[ -z "$path" ]]; then
+        log_error "$error_msg: Path is empty"
+        return 1
+    fi
+
+    # Check path length
+    if [[ ${#path} -gt $MAX_PATH_LENGTH ]]; then
+        log_error "$error_msg: Path too long (${#path} > $MAX_PATH_LENGTH)"
+        return 1
+    fi
+
+    # Prevent path traversal
+    if [[ "$path" == *"../"* || "$path" == *"..\\"* ]]; then
+        log_error "$error_msg: Path traversal detected"
+        return 1
+    fi
+
+    # Check for null bytes
+    if [[ "$path" == *$'\0'* ]]; then
+        log_error "$error_msg: Null byte detected in path"
+        return 1
+    fi
+
+    # Basic path format validation (doesn't guarantee existence)
+    if [[ "$path" =~ [[:cntrl:]] ]]; then
+        log_error "$error_msg: Control characters detected in path"
+        return 1
+    fi
+
+    # Additional security check: ensure path is within allowed directories
+    local abs_path
+    if command -v realpath >/dev/null 2>&1; then
+        abs_path=$(realpath -q "$path" 2>/dev/null) || {
+            # If realpath fails, use a simple canonicalization approach
+            case "$path" in
+                /*) abs_path="$path" ;;
+                *) abs_path="$(pwd)/$path" ;;
+            esac
+        }
+    else
+        # Fallback without realpath
+        case "$path" in
+            /*) abs_path="$path" ;;
+            *) abs_path="$(pwd)/$path" ;;
+        esac
+    fi
+
+    # Define allowed directories
+    # Use Zsh modifiers for directory path to avoid external dependency on dirname
+    local script_path="${(%):-%x}"
+    local script_dir="${script_path:h}"
+    local project_root="${script_dir:h}"
+    
+    local raw_allowed_dirs=("$HOME/.vibe" "$(pwd)/config" "$(pwd)" "$project_root")
+    local allowed_dirs=()
+    
+    # Canonicalize allowed directories
+    for d in "${raw_allowed_dirs[@]}"; do
+        if command -v realpath >/dev/null 2>&1; then
+            allowed_dirs+=("$(realpath -q "$d" 2>/dev/null || echo "$d")")
+        else
+            allowed_dirs+=("$d")
+        fi
+    done
+
+    local is_allowed=false
+
+    for allowed_dir in "${allowed_dirs[@]}"; do
+        if [[ "$abs_path" == "$allowed_dir"* ]]; then
+            is_allowed=true
+            break
+        fi
+    done
+
+    if [[ "$is_allowed" == false ]]; then
+        log_error "$error_msg: Path outside allowed directories: $path"
         return 1
     fi
 
