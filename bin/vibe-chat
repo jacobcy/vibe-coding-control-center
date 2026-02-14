@@ -16,6 +16,7 @@ source "$VIBE_ROOT/lib/init_project.sh"
 
 # Load config metadata
 load_user_config
+export_keys  # Export loaded configuration to environment variables
 
 do_chat() {
     local tool

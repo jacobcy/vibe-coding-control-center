@@ -16,6 +16,7 @@ source "$VIBE_ROOT/lib/flow.sh"
 
 # Load config
 load_user_config
+export_keys  # Export loaded configuration to environment variables
 
 # Show help
 show_help() {
