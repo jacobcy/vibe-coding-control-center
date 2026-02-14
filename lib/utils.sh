@@ -777,6 +777,18 @@ sanitize_filename() {
 
 # ================= VERSION MANAGEMENT =================
 
+# Get Vibe Coding Control Center version
+get_vibe_version() {
+    local version_file="${VIBE_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}/VERSION"
+    if [[ -f "$version_file" ]]; then
+        cat "$version_file"
+    else
+        echo "0.0.0"
+    fi
+}
+
+readonly VIBE_VERSION=$(get_vibe_version)
+
 # Get version of a command (Safe version)
 get_command_version() {
     local cmd="$1"

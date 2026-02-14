@@ -10,6 +10,7 @@
 - [ ] [TASK-008] Add CI/CD pipeline configuration.
 
 ## Completed
+- [x] [TASK-012] Add integration tests for configuration loading with strict mode (set -e) to prevent regressions.
 - [x] [TASK-001] Implement new features defined in `UPGRADE_FEATURES.md`.
 - [x] [TASK-003] Update `docs/standards/COMMAND_STANDARD.md` with help/parameter/exit-code/output format norms.
 - [x] [TASK-004] Refactor `docs/tech/COMMAND_STRUCTURE.md` as implementation detail aligned to standard.

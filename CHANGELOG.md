@@ -1,5 +1,13 @@
 # 更新日志
 
+## [2.0.1] - 2026-02-14
+
+### ✨ New Features
+- **Version Management**: Added `VERSION` file as single source of truth.
+- **Release Workflow**: Added GitHub Action `.github/workflows/release.yml` for automated releases.
+- **Bump Script**: Added `.agent/lib/bump_version.sh` for easy version management.
+- **Utils Update**: Updated `lib/utils.sh` to read project version from `VERSION` file.
+
 ## [2.0.0] - 2026-02-05
 
 ### ✨ 新增功能

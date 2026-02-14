@@ -1,0 +1,98 @@
+name: Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version_bump:
+                description: "Version bump type (major, minor, patch)"
+                required: true
+                default: "patch"
+                type: choice
+                options:
+                    - patch
+                    - minor
+                    - major
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Run Tests
+              run: |
+                  # Install zsh if not present (usually present on ubuntu-latest)
+                  sudo apt-get update && sudo apt-get install -y zsh
+                  chmod +x scripts/test-all.sh
+                  zsh scripts/test-all.sh
+
+            - name: Bump Version
+              id: bump
+              run: |
+                  chmod +x .agent/lib/bump_version.sh
+                  # Run script to bump version and update changelog
+                  # Note: bump_version.sh needs to be non-interactive in CI
+                  export CI=true
+                  ./.agent/lib/bump_version.sh ${{ inputs.version_bump }}
+
+                  NEW_VERSION=$(cat VERSION)
+                  echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+            - name: Extract Release Notes
+              id: notes
+              run: |
+                  # Extract the latest version notes from CHANGELOG.md
+                  # Logic: Print from first "## [" until the next "## ["
+                  awk '/^## \[/ { if (p) { exit }; p=1; print; next } p { print }' CHANGELOG.md > RELEASE_NOTES.md
+                  cat RELEASE_NOTES.md
+
+            - name: Package Assets
+              run: |
+                  NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+                  PKG_NAME="vibe-center-v${NEW_VERSION}"
+
+                  # Create a temporary directory for packaging
+                  mkdir -p dist/$PKG_NAME
+
+                  # Copy project files (excluding git and temporary files)
+                  rsync -av --exclude='.git' --exclude='.github' --exclude='.agent' --exclude='temp' --exclude='dist' . dist/$PKG_NAME/
+
+                  # Create tarball
+                  cd dist
+                  tar -czf ../vibe-center-v${NEW_VERSION}.tar.gz $PKG_NAME
+                  cd ..
+
+                  echo "ASSET_PATH=vibe-center-v${NEW_VERSION}.tar.gz" >> $GITHUB_ENV
+
+            - name: Commit and Push
+              run: |
+                  git add VERSION CHANGELOG.md
+                  git commit -m "chore(release): bump version to ${{ steps.bump.outputs.new_version }}"
+                  git tag "v${{ steps.bump.outputs.new_version }}"
+                  git push origin main
+                  git push origin "v${{ steps.bump.outputs.new_version }}"
+
+            - name: Create Release
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: "v${{ steps.bump.outputs.new_version }}"
+                  name: "Release v${{ steps.bump.outputs.new_version }}"
+                  body_path: RELEASE_NOTES.md
+                  draft: false
+                  prerelease: false
+                  files: ${{ env.ASSET_PATH }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

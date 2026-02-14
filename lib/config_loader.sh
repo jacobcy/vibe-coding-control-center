@@ -35,12 +35,16 @@ load_configuration() {
     # Load from file with security validation
     local config_file="$DEFAULT_CONFIG_DIR/$CONFIG_FILENAME"
     if [[ -f "$config_file" ]]; then
-        validate_and_load_config "$config_file"
+        if ! validate_and_load_config "$config_file"; then
+            log_warn "Failed to load global configuration: $config_file"
+        fi
     else
         # Fallback to default location
         config_file="./config/$CONFIG_FILENAME"
         if [[ -f "$config_file" ]]; then
-            validate_and_load_config "$config_file"
+            if ! validate_and_load_config "$config_file"; then
+                log_warn "Failed to load fallback configuration: $config_file"
+            fi
         fi
     fi
 
@@ -60,7 +64,9 @@ load_configuration() {
 
     # Load project-level config if available (overrides global config)
     if [[ -n "$project_config_file" && -f "$project_config_file" ]]; then
-        validate_and_load_config "$project_config_file"
+        if ! validate_and_load_config "$project_config_file"; then
+            log_warn "Failed to load project configuration: $project_config_file"
+        fi
     fi
 
     # Mark cache as loaded

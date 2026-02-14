@@ -82,6 +82,7 @@ show_header() {
     echo "\____/ \____/\__,_/\___/_/|_|  "
     echo -e "${NC}"
     echo -e "${CYAN}    VIBE CODING CONTROL CENTER${NC}"
+    echo -e "${CYAN}             v${VIBE_VERSION}${NC}"
     echo -e "${BLUE}====================================${NC}"
 }
 
@@ -137,7 +138,7 @@ if [[ $# -gt 0 ]]; then
             exit 0
             ;;
         doctor)
-            zsh "${VIBE_ROOT}/bin/vibe-doctor"
+            zsh "${VIBE_ROOT}/bin/vibe-check"
             exit 0
             ;;
         init)
@@ -155,8 +156,8 @@ fi
 # ================= MAIN LOOP =================
 while true; do
     show_header
-    # check_status replaced by vibe-doctor
-    zsh "${VIBE_ROOT}/bin/vibe-doctor"
+    # check_status replaced by vibe-check
+    zsh "${VIBE_ROOT}/bin/vibe-check"
 
     echo -e "${BOLD}COMMANDS:${NC}"
     echo -e "  ${GREEN}1)${NC} ${BOLD}CHAT${NC}        (AI Tool Chat)"
@@ -181,8 +182,8 @@ while true; do
             zsh "${VIBE_ROOT}/bin/vibe-config" 
             ;;
         3) 
-            # vibe-doctor --diagnostics
-            zsh "${VIBE_ROOT}/bin/vibe-doctor" --diagnostics
+            # vibe-check --diagnostics
+            zsh "${VIBE_ROOT}/bin/vibe-check" --diagnostics
             press_enter "Press Enter to return..."
             ;;
         4) 
