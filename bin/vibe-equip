@@ -100,7 +100,7 @@ do_equip() {
 }
 
 # Handle help flag
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
     echo "vibe-equip - Install/update AI tools"
     echo ""
     echo "Usage: vibe equip"

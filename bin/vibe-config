@@ -88,45 +88,149 @@ except: sys.exit(1)" 2>/dev/null) && [[ -n "$providers" ]]; then
     echo "${BOLD}Note:${NC} For environment variables (API keys), use ${CYAN}vibe env${NC}"
 }
 
+# Show comprehensive config list (masked)
+show_config_list() {
+    echo "=== Configuration Values ==="
+    echo ""
+    # Keys
+    if [[ -f "$VIBE_HOME/keys.env" ]]; then
+        echo "${BOLD}[keys.env]${NC}"
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line//[[:space:]]/}" ]] && continue
+            if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+                key="${match[1]}"
+                val="${match[2]}"
+                # Remove quotes
+                val="${val%\"}"
+                val="${val#\"}"
+                
+                # Check directly for sensitive keywords in key name
+                if [[ "$key" =~ "TOKEN" || "$key" =~ "KEY" || "$key" =~ "AUTH" || "$key" =~ "PASS" || "$key" =~ "SECRET" ]]; then
+                    if [[ ${#val} -gt 8 ]]; then
+                        echo "  $key = ${val:0:4}...${val: -4}"
+                    else
+                        echo "  $key = ****"
+                    fi
+                else
+                    echo "  $key = $val"
+                fi
+            fi
+        done < "$VIBE_HOME/keys.env"
+    fi
+}
+
+do_edit() {
+    local target="$1"
+    case "$target" in
+        keys)
+            open_editor "$VIBE_HOME/keys.env"
+            ;;
+        claude)
+            open_editor "$HOME/.claude.json"
+            ;;
+        opencode)
+            open_editor "$HOME/.config/opencode/opencode.json"
+            ;;
+        codex)
+            open_editor "$HOME/.codex/config.toml"
+            ;;
+        alias)
+            open_editor "$HOME/.vibe/aliases.sh"
+            ;;
+        *)
+            log_error "Unknown edit target: $target"
+            echo "Available: keys, claude, opencode, codex, alias"
+            exit 2
+            ;;
+    esac
+}
+
 # Handle commands
-case "${1:-}" in
-    "")
-        show_config_status
+CMD="${1:-}"
+START_ARG=2
+
+if [[ -z "$CMD" ]]; then
+    show_config_status
+    exit 0
+fi
+
+case "$CMD" in
+    list)
+        show_config_list
         ;;
+    edit)
+        TARGET="${2:-}"
+        if [[ -z "$TARGET" ]]; then
+            # Legacy behavior or prompt?
+            echo "Usage: vibe config edit <target>"
+            echo "Targets: keys, claude, opencode, codex, alias"
+            exit 2
+        fi
+        do_edit "$TARGET"
+        ;;
+    
+    # Legacy direct commands mapped to edit/show or keep as shortcuts?
+    # Standard says: vibe config <target> -> show details?
+    # For now let's map them to edit if they are tools, to match old behavior but maybe we should follow standard
+    # User said: vibe config <target> is list (for that target presumably)
+    # But user also said "vibe config <target> 就是list" -> means showing layout/status/values for that target?
     
     opencode)
-        open_editor "$HOME/.config/opencode/opencode.json"
-        ;;
-    
-    codex)
-        open_editor "$HOME/.codex/config.toml"
+        # Show opencode config details?
+        # For now, let's just cat the file or open editor?
+        # Old behavior was open editor.
+        # User standard: "vibe config <target>: 显示指定目标的配置详情"
+        if [[ -f "$HOME/.config/opencode/opencode.json" ]]; then
+            cat "$HOME/.config/opencode/opencode.json"
+        else
+            echo "Config not found."
+            exit 3
+        fi
         ;;
         
     claude)
-         open_editor "$HOME/.claude.json"
-         ;;
-    
+        if [[ -f "$HOME/.claude.json" ]]; then
+            cat "$HOME/.claude.json"
+        else
+            echo "Config not found."
+            exit 3
+        fi
+        ;;
+        
+    codex)
+        if [[ -f "$HOME/.codex/config.toml" ]]; then
+            cat "$HOME/.codex/config.toml"
+        else
+            echo "Config not found."
+            exit 3
+        fi
+        ;;
+
     -h|--help|help)
         cat << 'EOF'
 vibe config - AI tool configuration manager
 
-Usage: vibe config [tool]
+Usage: vibe config [command]
 
 Commands:
-  (no args)              Show all AI tool configuration status
-  opencode               Open opencode.json in editor
-  codex                  Open config.toml in editor
-  claude                 Open .claude.json in editor
+  (no args)              Show status of all configuration files
+  list                   Show all configuration values (masked)
+  edit <target>          Edit configuration file
+                         Targets: keys, claude, opencode, codex, alias
+  <target>               Show configuration details for target
 
 Examples:
   vibe config                      # Show status
-  vibe config opencode             # Edit OpenCode config
+  vibe config list                 # Show values
+  vibe config edit keys            # Edit keys.env
+  vibe config claude               # Show .claude.json content
 EOF
         ;;
     
     *)
-        log_error "Unknown tool: $1"
-        echo "Available tools: opencode, codex, claude"
-        exit 1
+        log_error "Unknown command: $CMD"
+        echo "Run 'vibe config help' for usage"
+        exit 2
         ;;
 esac

@@ -54,14 +54,14 @@ else
     exit 1
 fi
 
-# Test 4: vibe keys (alias) 
-echo -n "Test 4: vibe keys alias... "
+# Test 4: vibe keys (deprecated)
+echo -n "Test 4: vibe keys deprecated... "
 if vibe keys >/dev/null 2>&1; then
-    echo "✅"
-else
-    echo "❌ FAILED: vibe keys returned error"
+    echo "❌ FAILED: vibe keys should return error"
     rm -rf "$TEMP_HOME"
     exit 1
+else
+    echo "✅"
 fi
 
 # Test 5: vibe env help

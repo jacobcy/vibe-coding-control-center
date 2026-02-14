@@ -1,0 +1,98 @@
+#!/usr/bin/env zsh
+# vibe-alias - Manage command aliases
+
+set -e
+
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
+
+# Load utility modules
+source "$VIBE_ROOT/lib/utils.sh"
+source "$VIBE_ROOT/lib/config.sh"
+source "$VIBE_ROOT/lib/i18n.sh" 
+
+ALIASES_FILE="$HOME/.vibe/aliases.sh"
+CUSTOM_ALIASES_FILE="$HOME/.vibe/custom_aliases.sh"
+
+# Ensure custom alias file exists
+if [[ ! -f "$CUSTOM_ALIASES_FILE" ]]; then
+    touch "$CUSTOM_ALIASES_FILE"
+fi
+
+do_list() {
+    echo "=== Vibe Aliases ==="
+    echo ""
+    
+    echo "${BOLD}[System Aliases]${NC} ($ALIASES_FILE)"
+    if [[ -f "$ALIASES_FILE" ]]; then
+        grep "^alias" "$ALIASES_FILE" | sed 's/alias //' | while read line; do
+            echo "  $line"
+        done
+    else
+        echo "  (None found)"
+    fi
+    
+    echo ""
+    echo "${BOLD}[Custom Aliases]${NC} ($CUSTOM_ALIASES_FILE)"
+    if [[ -f "$CUSTOM_ALIASES_FILE" ]]; then
+        if grep -q "^alias" "$CUSTOM_ALIASES_FILE"; then
+             grep "^alias" "$CUSTOM_ALIASES_FILE" | sed 's/alias //' | while read line; do
+                echo "  $line"
+             done
+        else
+             echo "  (None defined)"
+        fi
+    else
+        echo "  (File missing)"
+    fi
+    
+    echo ""
+    echo "Run 'vibe alias edit' to add custom aliases."
+}
+
+do_edit() {
+    open_editor "$CUSTOM_ALIASES_FILE"
+}
+
+do_inject() {
+    # Check if custom aliases is sourced in .zshrc
+    SHELL_RC="$HOME/.zshrc"
+    
+    if grep -q "source.*custom_aliases.sh" "$SHELL_RC"; then
+        log_info "Custom aliases already configured in .zshrc"
+    else
+        append_to_rc "$SHELL_RC" "source \"$CUSTOM_ALIASES_FILE\"" "Vibe Custom Aliases"
+        log_success "Added custom aliases to $SHELL_RC"
+    fi
+    
+    # Source immediately for this subshell (doesn't affect parent, but good for check)
+    source "$CUSTOM_ALIASES_FILE"
+    log_info "To apply in current shell, run: source $CUSTOM_ALIASES_FILE"
+}
+
+case "${1:-list}" in
+    list)
+        do_list
+        ;;
+    edit)
+        do_edit
+        ;;
+    inject)
+        do_inject
+        ;;
+    -h|--help|help)
+        echo "vibe alias - Manage command aliases"
+        echo ""
+        echo "Usage: vibe alias [command]"
+        echo ""
+        echo "Commands:"
+        echo "  list           List all configured aliases (default)"
+        echo "  edit           Edit custom aliases file"
+        echo "  inject         Inject aliases into shell configuration"
+        echo ""
+        ;;
+    *)
+        log_error "Unknown command: $1"
+        echo "Run 'vibe alias help' for usage"
+        exit 2
+        ;;
+esac

@@ -13,8 +13,6 @@ VIBE_ROOT="$(cd "$(dirname "$current_script")/.." && pwd)"
 
 # Global flag: -g forces execution of global ~/.vibe installation
 # This allows using stable main version features while in a branch worktree
-# Global flag: -g forces execution of global ~/.vibe installation
-# This allows using stable main version features while in a branch worktree
 # We scan all arguments to allow -g to be placed anywhere (e.g. vibe help -g)
 _new_args=()
 _force_global=0
@@ -37,7 +35,7 @@ if [[ "$_force_global" -eq 1 ]]; then
     if [[ ! -x "$GLOBAL_VIBE" ]]; then
         echo "Error: Global vibe installation not found at $GLOBAL_VIBE" >&2
         echo "Install globally first with: cd main && ./scripts/install.sh" >&2
-        exit 1
+        exit 3
     fi
     
     # Avoid infinite loop if already running from global installation
@@ -98,24 +96,22 @@ show_help() {
         echo ""
         echo "Usage: vibe [options] [command]"
         echo ""
+        echo "Core Commands:"
+        echo "  chat           Start AI assistant"
+        echo "  flow           Development workflow"
+        echo "  init           Initialize new project"
+        echo ""
+        echo "Configuration & Environment:"
+        echo "  config         Manage configuration files"
+        echo "  env            Manage environment variables"
+        echo "  check          System diagnostics & health check"
+        echo "  alias          Manage command aliases"
+        echo "  equip          Install & update tools"
+        echo ""
         echo "Options:"
+        echo "  -g, --global   Use global installation"
         echo "  -h, --help     Show this help message"
         echo "  -v, --version  Show version information"
-        echo ""
-        echo "Commands:"
-        echo "  (no args)      Launch interactive control center"
-        echo "  chat           Start default AI tool chat"
-        echo "  config         Manage Vibe Coding configuration"
-        echo "  doctor         System health check (includes diagnostics)"
-        echo "  env            Environment and key management"
-        echo "  equip          Install/update AI tools"
-        echo "  flow           Feature development workflow"
-        echo "  help           Show help information"
-        echo "  init           Start New Project"
-        echo "  keys           Quick access to API keys"
-
-        echo "  sign           Sync Git Identity"
-        echo "  status         Check system status (alias for vibe doctor status)"
         echo ""
         echo "Run 'vibe' without arguments for interactive mode."
     fi
@@ -141,7 +137,7 @@ if [[ "$ARG1" == "-h" || "$ARG1" == "--help" || "$ARG1" == "help" ]]; then
          else
              echo "Unknown subcommand: $subcmd" >&2
              echo "Available: $(ls -1 "$VIBE_ROOT/bin" | sed -n 's/^vibe-//p' | tr '\n' ' ')" >&2
-             exit 1
+             exit 2
          fi
          exit 0
     fi
@@ -157,10 +153,22 @@ fi
 subcmd="$1"
 shift
 
-# Special alias: vibe status -> vibe doctor status
-if [[ "$subcmd" == "status" ]]; then
-    exec "${VIBE_ROOT}/bin/vibe-doctor" status "$@"
-fi
+# Command Aliases & Deprecation
+case "$subcmd" in
+    status)
+        exec "${VIBE_ROOT}/bin/vibe-check" system "$@"
+        ;;
+    doctor)
+        echo "⚠️  'vibe doctor' is deprecated. Redirecting to 'vibe check'..." >&2
+        exec "${VIBE_ROOT}/bin/vibe-check" "$@"
+        ;;
+    keys)
+        echo "❌ 'vibe keys' has been removed." >&2
+        echo "   Use 'vibe config edit keys' to edit configuration." >&2
+        echo "   Use 'vibe check api' to verify connectivity." >&2
+        exit 2
+        ;;
+esac
 
 cmd="${VIBE_ROOT}/bin/vibe-${subcmd}"
 
