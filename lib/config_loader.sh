@@ -88,27 +88,8 @@ validate_and_load_config() {
         log_warn "Configuration file has loose permissions: $config_path"
     fi
 
-    # Source the configuration safely
-    local temp_vars=$(mktemp)
-    trap "rm -f '$temp_vars'" EXIT
-
-    # Read the config file line by line and export variables to temp file for validation
-    local line
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${line//[[:space:]]/}" ]] && continue
-
-        # Validate that the line is a valid assignment
-        if [[ "$line" =~ ^[A-Z_][A-Z0-9_]*= ]]; then
-            echo "$line" >> "$temp_vars"
-        fi
-    done < "$config_path"
-
-    # Source validated variables
-    source "$temp_vars"
-
-    # Store in cache by reading from the validated temp file
+    # Parse key=value pairs directly from file to cache
+    # We do NOT source the file to prevent code execution vulnerabilities
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -125,7 +106,7 @@ validate_and_load_config() {
             value="${value%\'}"
             CONFIG_CACHE[$key]="$value"
         fi
-    done < "$temp_vars"
+    done < "$config_path"
 }
 
 
