@@ -2,10 +2,16 @@
 # Enhanced configuration loader with security, caching, and validation
 # Implements secure configuration loading with centralized validation
 
-# Configuration constants
-readonly CONFIG_FILENAME="keys.env"
-readonly DEFAULT_CONFIG_DIR="$HOME/.vibe"
-readonly PROJECT_CONFIG_DIR=".vibe"
+# Configuration constants - only define if not already defined
+if [[ -z "${CONFIG_FILENAME+x}" ]]; then
+    readonly CONFIG_FILENAME="keys.env"
+fi
+if [[ -z "${DEFAULT_CONFIG_DIR+x}" ]]; then
+    readonly DEFAULT_CONFIG_DIR="$HOME/.vibe"
+fi
+if [[ -z "${PROJECT_CONFIG_DIR+x}" ]]; then
+    readonly PROJECT_CONFIG_DIR=".vibe"
+fi
 
 # Source the utility functions for logging and validation
 # Calculate script directory using parameter expansion to avoid issues with dirname
@@ -14,10 +20,18 @@ local_utils_dir="${local_script_dir%/*}"  # Get directory (equivalent to dirname
 source "$local_utils_dir/utils.sh"
 
 # Configuration cache
-declare -A CONFIG_CACHE
-CONFIG_LOADED=false
-CACHE_TIMESTAMP=0
-CACHE_TTL=300  # 5 minutes
+if [[ -z "${CONFIG_CACHE+x}" ]]; then
+    declare -A CONFIG_CACHE
+fi
+if [[ -z "${CONFIG_LOADED+x}" ]]; then
+    CONFIG_LOADED=false
+fi
+if [[ -z "${CACHE_TIMESTAMP+x}" ]]; then
+    CACHE_TIMESTAMP=0
+fi
+if [[ -z "${CACHE_TTL+x}" ]]; then
+    CACHE_TTL=300  # 5 minutes
+fi
 
 load_configuration() {
     local force_refresh=${1:-false}

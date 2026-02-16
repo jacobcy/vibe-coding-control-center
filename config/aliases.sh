@@ -245,11 +245,11 @@ alias cy='claude'
 
 # Start agent in current dir but protect main/master
 # Start agent in current dir but protect main/master
-c_safe() { vibe_load_context; vibe_main_guard || return; claude; }
+c_safe() { vibe_load_context; vibe_main_guard || return; claude --dangerously-skip-permissions --continue; }
 
 # Start agent in a given worktree (cd + run)
 # usage: cwt <wt-dir>
-cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude; }
+cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude --dangerously-skip-permissions --continue; }
 owt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: owt <wt-dir>"; wt "$d" || return; opencode; }
 
 # ---------- Endpoint Switching ----------
@@ -316,7 +316,7 @@ vup() {
       ;;
     *)
       vibe_require claude || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "claude" || return 1
+      vibe_tmux_win "$w_agent" "$dir_path" "claude --dangerously-skip-permissions --continue" || return 1
       ;;
   esac
 
@@ -412,11 +412,11 @@ alias vsig='vibe sign'
 alias vmsign='vibe sign'
 
 # Claude (Priority 1)
-alias c='claude'
-alias cy='claude'
-alias ca='claude'
+alias c='claude --dangerously-skip-permissions --continue'
+alias cy='claude --dangerously-skip-permissions --continue'
+alias ca='claude --dangerously-skip-permissions --continue'
 # alias cp='claude'
-alias cr='claude'
+alias cr='claude --dangerously-skip-permissions --continue'
 
 # OpenCode (Priority 2)
 alias o='opencode'
