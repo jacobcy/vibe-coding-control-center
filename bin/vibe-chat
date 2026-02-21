@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# vibe-chat - Start default AI tool chat
+# vibe-chat - Start default AI tool chat with natural language routing
 
 set -e
 
@@ -8,11 +8,19 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 # Load all utility modules like the main script does
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
-source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/i18n.sh"
 source "$VIBE_ROOT/lib/cache.sh"
 source "$VIBE_ROOT/lib/error_handling.sh"
 source "$VIBE_ROOT/lib/agents.sh"
 source "$VIBE_ROOT/lib/init_project.sh"
+
+# Load manager modules
+source "$VIBE_ROOT/lib/keys_manager.sh"
+source "$VIBE_ROOT/lib/tool_manager.sh"
+source "$VIBE_ROOT/lib/mcp_manager.sh"
+source "$VIBE_ROOT/lib/skill_manager.sh"
+source "$VIBE_ROOT/lib/env_manager.sh"
+source "$VIBE_ROOT/lib/chat_router.sh"
 
 # Load config metadata
 load_user_config
@@ -85,29 +93,41 @@ do_chat() {
 
 # Handle help flag
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
-    echo "vibe-chat - 快速启动 AI 工具对话"
+    echo "vibe-chat - AI 对话入口 (支持自然语言命令)"
     echo ""
     echo "用法:"
     echo "  vibe chat              启动交互式对话"
-    echo "  vibe chat \"问题\"       快速问答（非交互式）"
+    echo "  vibe chat \"消息\"      发送消息或执行命令"
     echo ""
     echo "说明:"
-    echo "  自动使用默认 AI 工具 (Claude, OpenCode 或 Codex)"
-    echo "  统一的命令接口，无需记忆不同工具的命令格式"
+    echo "  自动识别意图并路由到相应命令，或传递给 AI 工具"
     echo ""
-    echo "示例:"
-    echo "  vibe chat                          # 启动交互模式"
-    echo "  vibe chat \"如何使用 git rebase\"    # 快速问答"
+    echo "示例 - 命令模式:"
+    echo "  vibe chat 切换到 openai          # 切换密钥组"
+    echo "  vibe chat 安装 claude            # 安装工具"
+    echo "  vibe chat 添加 github mcp       # 添加 MCP"
+    echo "  vibe chat 检查状态              # 查看环境状态"
     echo ""
-    echo "高级用法 (OpenCode):"
-    echo "  vibe chat skills                   # 查看可用技能"
-    echo "  vibe chat status                   # 查看状态"
-    echo "  vibe chat \"/slash_command\"       # 执行 OpenCode 斜杠命令"
+    echo "示例 - AI 对话模式:"
+    echo "  vibe chat 如何使用 git rebase   # AI 回答问题"
+    echo "  vibe chat 帮我写个 hello world # AI 帮你写代码"
     echo ""
     echo "选项:"
     echo "  -h, --help    显示此帮助信息"
     echo ""
     exit 0
+fi
+
+# Try intent routing first
+_message="$*"
+
+if [[ -n "$_message" ]]; then
+    # Try to route the message to a command
+    if vibe_chat_route "$_message"; then
+        # Intent was handled
+        exit 0
+    fi
+    # Fall through to AI chat
 fi
 
 # Run the chat function with all arguments

@@ -1,0 +1,78 @@
+#!/usr/bin/env zsh
+# vibe-mcp - MCP server management command
+# Usage: vibe mcp <command> [args]
+
+set -e
+
+# Resolve script directory
+_vibe_mcp_script="${0:A}"
+_vibe_mcp_root="$(cd "$(dirname "$_vibe_mcp_script")/.." && pwd)"
+
+# Source dependencies
+source "${_vibe_mcp_root}/lib/config.sh"
+source "${_vibe_mcp_root}/lib/mcp_manager.sh"
+
+# Parse subcommand
+subcmd="${1:-}"
+shift || true
+
+case "$subcmd" in
+    list|ls)
+        vibe_mcp_list
+        ;;
+    add)
+        vibe_mcp_add "$@"
+        ;;
+    remove|rm)
+        vibe_mcp_remove "$@"
+        ;;
+    enable)
+        vibe_mcp_enable "$@"
+        ;;
+    disable)
+        vibe_mcp_disable "$@"
+        ;;
+    -h|--help|help)
+        cat << 'EOF'
+vibe mcp - Manage MCP servers
+
+Usage:
+  vibe mcp <command> [arguments]
+
+Commands:
+  list                      List all MCP servers
+  add <name> [--for <tool>] Add an MCP server
+  remove <name>             Remove an MCP server
+  enable <name> --for <tool>  Enable MCP for a specific tool
+  disable <name> --for <tool> Disable MCP for a specific tool
+
+Known MCP Servers:
+  github       GitHub integration - repositories, issues, PRs
+  brave-search Brave Search - web search capabilities
+  filesystem   Filesystem - file and directory operations
+  memory       Memory - persistent memory storage
+  notion       Notion - workspace integration
+
+Examples:
+  vibe mcp list
+  vibe mcp add github
+  vibe mcp add brave-search --for claude
+  vibe mcp enable filesystem --for opencode
+  vibe mcp remove github
+
+MCP servers are configured in:
+  ~/.vibe/vibe.yaml (global)
+  ~/.vibe/tools/<name>/mcp.yaml (tool-specific)
+EOF
+        ;;
+    "")
+        vibe_mcp_list
+        echo ""
+        echo "Run 'vibe mcp --help' for more commands."
+        ;;
+    *)
+        echo "Unknown command: $subcmd" >&2
+        echo "Run 'vibe mcp --help' for usage" >&2
+        exit 1
+        ;;
+esac

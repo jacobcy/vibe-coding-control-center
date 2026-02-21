@@ -1,0 +1,84 @@
+#!/usr/bin/env zsh
+# vibe-keys - Key group management command
+# Usage: vibe keys <command> [args]
+
+set -e
+
+# Resolve script directory
+_vibe_keys_script="${0:A}"
+_vibe_keys_root="$(cd "$(dirname "$_vibe_keys_script")/.." && pwd)"
+
+# Source dependencies
+source "${_vibe_keys_root}/lib/config.sh"
+source "${_vibe_keys_root}/lib/keys_manager.sh"
+
+# Parse subcommand
+subcmd="${1:-}"
+shift || true
+
+case "$subcmd" in
+    list|ls)
+        vibe_keys_list
+        ;;
+    use|switch)
+        vibe_keys_use "$@"
+        ;;
+    current|show)
+        vibe_keys_current
+        ;;
+    set)
+        vibe_keys_set "$@"
+        ;;
+    get)
+        vibe_keys_get "$@"
+        ;;
+    create|new)
+        vibe_keys_create "$@"
+        ;;
+    edit|open)
+        vibe_keys_edit "$@"
+        ;;
+    delete|rm|remove)
+        vibe_keys_delete "$@"
+        ;;
+    -h|--help|help)
+        cat << 'EOF'
+vibe keys - Manage API key groups
+
+Usage:
+  vibe keys <command> [arguments]
+
+Commands:
+  list              List all key groups
+  use <group>       Switch to a key group
+  current           Show current key group
+  set KEY=value     Set a key in current group
+  get KEY           Get a key value from current group
+  create <name>     Create a new key group
+  edit [group]      Edit a key group file (default: current)
+  delete <group>    Delete a key group
+
+Examples:
+  vibe keys list
+  vibe keys use openai
+  vibe keys set ANTHROPIC_AUTH_TOKEN=sk-ant-...
+  vibe keys get OPENAI_API_KEY
+  vibe keys create deepseek
+  vibe keys edit
+
+Key groups are stored in: ~/.vibe/keys/<name>.env
+The current group is symlinked to: ~/.vibe/keys/current
+EOF
+        ;;
+    "")
+        # No subcommand - show current status and help
+        vibe_keys_current
+        echo ""
+        echo "Run 'vibe keys --help' for more commands."
+        ;;
+    *)
+        echo "Unknown command: $subcmd" >&2
+        echo "Run 'vibe keys --help' for usage" >&2
+        exit 1
+        ;;
+esac

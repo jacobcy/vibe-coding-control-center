@@ -1,0 +1,84 @@
+#!/usr/bin/env zsh
+# vibe-skill - Skill management command
+# Usage: vibe skill <command> [args]
+
+set -e
+
+# Resolve script directory
+_vibe_skill_script="${0:A}"
+_vibe_skill_root="$(cd "$(dirname "$_vibe_skill_script")/.." && pwd)"
+
+# Source dependencies
+source "${_vibe_skill_root}/lib/config.sh"
+source "${_vibe_skill_root}/lib/skill_manager.sh"
+
+# Parse subcommand
+subcmd="${1:-}"
+shift || true
+
+case "$subcmd" in
+    list|ls)
+        vibe_skill_list
+        ;;
+    add)
+        vibe_skill_add "$@"
+        ;;
+    remove|rm)
+        vibe_skill_remove "$@"
+        ;;
+    show|get)
+        vibe_skill_show "$@"
+        ;;
+    create|new)
+        vibe_skill_create "$@"
+        ;;
+    edit|open)
+        vibe_skill_edit "$@"
+        ;;
+    -h|--help|help)
+        cat << 'EOF'
+vibe skill - Manage skills
+
+Usage:
+  vibe skill <command> [arguments]
+
+Commands:
+  list              List all skills
+  add <path> [name] Add a skill from file or URL
+  remove <name>     Remove a skill
+  show <name>       Show skill details
+  create <name>     Create a new skill template
+  edit <name>       Edit a skill
+
+Examples:
+  vibe skill list
+  vibe skill add ./my-skill.yaml
+  vibe skill add https://example.com/skill.yaml my-skill
+  vibe skill create code-review
+  vibe skill edit code-review
+  vibe skill remove old-skill
+
+Skills are stored in: ~/.vibe/skills/<name>.skill.yaml
+
+Skill File Format:
+  name: skill-name
+  description: What this skill does
+  version: "1.0"
+  triggers:
+    - "pattern1"
+    - "pattern2"
+  instructions: |
+    Your instructions here.
+EOF
+        ;;
+    "")
+        vibe_skill_list
+        echo ""
+        echo "Run 'vibe skill --help' for more commands."
+        ;;
+    *)
+        echo "Unknown command: $subcmd" >&2
+        echo "Run 'vibe skill --help' for usage" >&2
+        exit 1
+        ;;
+esac

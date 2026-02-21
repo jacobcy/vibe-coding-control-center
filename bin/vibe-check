@@ -154,12 +154,12 @@ do_check_api() {
 do_check_mcp() {
     echo -e "\n${BOLD}MCP SERVER REGISTRY CHECK:${NC}"
     local config_file="$HOME/.claude.json"
-    
+
     if [[ ! -f "$config_file" ]]; then
         log_warn "Config missing: $config_file"
         return
     fi
-    
+
     if command -v python3 &>/dev/null; then
         python3 -c '
 import json, sys, shutil, os
@@ -192,6 +192,116 @@ except Exception as e:
     fi
 }
 
+# ================= CHECK ENV =================
+
+do_check_env() {
+    echo -e "\n${BOLD}VIBE ENVIRONMENT CHECK:${NC}"
+
+    local vibe_home="${VIBE_HOME:-$HOME/.vibe}"
+    local issues=0
+
+    # 1. Check VIBE_HOME
+    echo "Environment Location: $vibe_home"
+
+    if [[ ! -d "$vibe_home" ]]; then
+        log_error "Vibe environment not found"
+        log_info "Run 'vibe env init' to initialize"
+        return 1
+    fi
+    log_success "Environment directory exists"
+
+    # 2. Check vibe.yaml
+    if [[ -f "$vibe_home/vibe.yaml" ]]; then
+        log_success "vibe.yaml found"
+
+        # Parse and show info
+        if type parse_vibe_yaml >/dev/null 2>&1; then
+            parse_vibe_yaml "$vibe_home/vibe.yaml" 2>/dev/null
+            local name=$(vibe_yaml_get name "unnamed")
+            local version=$(vibe_yaml_get version "unknown")
+            echo "  Name: $name"
+            echo "  Version: $version"
+        fi
+    else
+        log_error "vibe.yaml missing"
+        ((issues++))
+    fi
+
+    # 3. Check keys directory
+    echo ""
+    echo "Keys Configuration:"
+    if [[ -d "$vibe_home/keys" ]]; then
+        local key_count=0
+        for f in "$vibe_home/keys"/*.env(N); do
+            ((key_count += 1))
+        done
+        log_info "Key groups: $key_count"
+
+        # Check current key
+        local current_group
+        current_group=$(get_current_keys_group 2>/dev/null || echo "unknown")
+        echo "  Current: $current_group"
+
+        # Check if keys are set
+        local keys_file="$vibe_home/keys/${current_group}.env"
+        if [[ -f "$keys_file" ]]; then
+            if grep -q "ANTHROPIC_AUTH_TOKEN=$" "$keys_file" 2>/dev/null; then
+                log_warn "ANTHROPIC_AUTH_TOKEN is empty"
+            elif grep -q "ANTHROPIC_AUTH_TOKEN=" "$keys_file" 2>/dev/null; then
+                log_success "ANTHROPIC_AUTH_TOKEN configured"
+            fi
+        fi
+    else
+        log_error "Keys directory missing"
+        ((issues++))
+    fi
+
+    # 4. Check tools
+    echo ""
+    echo "Tools:"
+    if [[ -d "$vibe_home/tools" ]]; then
+        local tool_count=0
+        for tool_dir in "$vibe_home/tools"/*(N/); do
+            ((tool_count += 1))
+            local name=$(basename "$tool_dir")
+            if [[ -f "$tool_dir/enabled" ]]; then
+                echo "  $name: enabled ✓"
+            else
+                echo "  $name: disabled"
+            fi
+        done
+        if [[ $tool_count -eq 0 ]]; then
+            log_warn "No tools installed"
+        fi
+    else
+        log_warn "Tools directory not found"
+    fi
+
+    # 5. Check MCP
+    echo ""
+    echo "MCP Servers:"
+    if type vibe_yaml_get_list >/dev/null 2>&1; then
+        local mcp_list=$(vibe_yaml_get_list mcp 2>/dev/null)
+        if [[ -n "$mcp_list" ]]; then
+            for mcp in $mcp_list; do
+                echo "  $mcp ✓"
+            done
+        else
+            echo "  No MCP servers configured"
+        fi
+    else
+        echo "  (vibe.yaml not parsed)"
+    fi
+
+    # Summary
+    echo ""
+    if [[ $issues -eq 0 ]]; then
+        log_success "Environment check passed"
+    else
+        log_warn "Found $issues issue(s)"
+    fi
+}
+
 # ================= MAIN =================
 
 show_help() {
@@ -204,10 +314,12 @@ show_help() {
     echo "  system         Check system health and dependencies"
     echo "  api            Check API connectivity"
     echo "  mcp            Check MCP server status"
+    echo "  env            Check Vibe environment configuration"
     echo ""
     echo "Examples:"
     echo "  vibe check"
     echo "  vibe check api"
+    echo "  vibe check env"
     echo ""
 }
 
@@ -223,10 +335,14 @@ case "$COMMAND" in
     mcp)
         do_check_mcp
         ;;
+    env)
+        do_check_env
+        ;;
     all)
         do_check_system
         do_check_api
         do_check_mcp
+        do_check_env
         ;;
     -h|--help|help)
         show_help

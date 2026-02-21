@@ -163,10 +163,20 @@ case "$subcmd" in
         exec "${VIBE_ROOT}/bin/vibe-check" "$@"
         ;;
     keys)
-        echo "❌ 'vibe keys' has been removed." >&2
-        echo "   Use 'vibe config edit keys' to edit configuration." >&2
-        echo "   Use 'vibe check api' to verify connectivity." >&2
-        exit 2
+        # Key group management command
+        exec "${VIBE_ROOT}/bin/vibe-keys" "$@"
+        ;;
+    tool)
+        # Tool management command
+        exec "${VIBE_ROOT}/bin/vibe-tool" "$@"
+        ;;
+    mcp)
+        # MCP server management command
+        exec "${VIBE_ROOT}/bin/vibe-mcp" "$@"
+        ;;
+    skill)
+        # Skill management command
+        exec "${VIBE_ROOT}/bin/vibe-skill" "$@"
         ;;
 esac
 
