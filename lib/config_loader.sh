@@ -2,14 +2,11 @@
 # Enhanced configuration loader with security, caching, and validation
 # Implements secure configuration loading with centralized validation
 
-# Configuration constants - only define if not already defined
-if [[ -z "${CONFIG_FILENAME+x}" ]]; then
+# Guard against multiple sourcing (e.g., from aliases.sh then bin/vibe-*)
+# Check if readonly variables are already defined before re-declaring
+if [[ -z "${CONFIG_FILENAME+isset}" ]]; then
     readonly CONFIG_FILENAME="keys.env"
-fi
-if [[ -z "${DEFAULT_CONFIG_DIR+x}" ]]; then
     readonly DEFAULT_CONFIG_DIR="$HOME/.vibe"
-fi
-if [[ -z "${PROJECT_CONFIG_DIR+x}" ]]; then
     readonly PROJECT_CONFIG_DIR=".vibe"
 fi
 
