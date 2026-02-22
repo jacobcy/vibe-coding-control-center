@@ -49,7 +49,6 @@
 - /save Skill: [.agent/skills/save/SKILL.md](.agent/skills/save/SKILL.md)
 - /continue Skill: [.agent/skills/continue/SKILL.md](.agent/skills/continue/SKILL.md)
 - /check Skill: [.agent/skills/check/SKILL.md](.agent/skills/check/SKILL.md)
-- Hooks 配置: [.claude/hooks/hooks.json](.claude/hooks/hooks.json)
 - Plugin 配置: [.claude-plugin/plugin.json](.claude-plugin/plugin.json)
 
 ---

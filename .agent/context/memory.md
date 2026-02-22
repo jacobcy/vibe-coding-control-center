@@ -10,6 +10,9 @@
 |-------|-------------|--------------|
 | [vibe-architecture](memory/vibe-architecture.md) | 模块化环境架构重构 | 2026-02-22 |
 | [claude-code-usage](memory/claude-code-usage.md) | Claude Code 并行开发工作流与最佳实践 | 2026-02-22 |
+| [git-worktree](memory/git-worktree.md) | Vibe Coding + Worktree 最佳实践流程 | 2026-02-22 |
+| [cli-testing](memory/cli-testing.md) | CLI 命令测试框架和覆盖率提升 | 2026-02-22 |
+| [context-commands](memory/context-commands.md) | 上下文管理命令体系：/save, /continue, /check | 2026-02-21 |
 
 ## Incidents & Lessons Learned
 - **[2026-02-11] Critical Incident: Unrelated Code Modification**
@@ -17,14 +20,6 @@
 - **[2026-02-22] zsh Arithmetic Expression Trap**:
   - `(( var++ ))` returns exit code 1 when var is 0, triggering `set -e`
   - Solution: Use `(( var += 1 ))` or `(( ++var ))` instead
-
-
-## Topic Index
-| Topic | Last Updated | Summary |
-|-------|--------------|---------|
-| [git-worktree](memory/git-worktree.md) | 2026-02-22 | Vibe Coding + Worktree 最佳实践流程 |
-| [cli-testing](memory/cli-testing.md) | 2026-02-22 | CLI 命令测试框架和覆盖率提升 |
-| [context-commands](memory/context-commands.md) | 2026-02-21 | 上下文管理命令体系：/save, /continue, /check |
 
 ## Key Decisions
 - **Language Protocol**: English Thought, Chinese Response (2026-02-10).

@@ -11,10 +11,10 @@
 - [ ] [worktree-20260222-001] 整理完整 Worktree 工作流文档
   - Context: 来自 [memory/git-worktree.md](memory/git-worktree.md)
   - Created: 2026-02-22
-- [ ] [worktree-20260222-002] 在 main worktree 完成 PR 合并并 push 本地提交
+- [x] [worktree-20260222-002] 在 main worktree 完成 PR 合并并 push 本地提交
   - Context: PR #9 待合并，本地 main 有 3 个未 push 提交
   - Created: 2026-02-22
-  - Blocked by: 需要用户手动操作
+  - Completed: 2026-02-22 (verified workflow)
 - [ ] [context-20260221-004] 与 /learn 集成
   - Context: 来自 [memory/context-commands.md](memory/context-commands.md)
   - Created: 2026-02-21
@@ -26,8 +26,8 @@
 - [ ] [BUG-config-001] Fix config_loader.sh readonly variable conflict
   - Fixed: 2026-02-22 (added guard to check if variables already defined)
   - Result: 46/46 tests pass (100%)
-- [ ] [vibe-arch-20260222-011] ShellCheck static analysis for new library files.
-- [ ] [vibe-arch-20260222-012] Integration with existing aliases.sh commands.
+- [ ] [vibe-arch-20260221-011] ShellCheck static analysis for new library files.
+- [ ] [vibe-arch-20260221-012] Integration with existing aliases.sh commands.
   - Context: 来自 [memory/vibe-architecture.md](memory/vibe-architecture.md)
 
 ## Completed
@@ -57,14 +57,14 @@
 - [x] [TASK-009] Consolidate installation scripts.
 - [x] [TASK-010] Standardize project documentation structure (Audit 20260210-1804).
 - [x] [TASK-011] Clean up legacy tech debt in `bin/vibe` and `lib/config.sh`.
-- [x] [vibe-arch-20260222-001] 创建目录结构模板 (vibe_dir_template.sh)
+- [x] [vibe-arch-20260221-001] 创建目录结构模板 (vibe_dir_template.sh)
   - Context: 来自 [memory/vibe-architecture.md](memory/vibe-architecture.md)
-- [x] [vibe-arch-20260222-002] 实现 vibe.yaml 解析器
-- [x] [vibe-arch-20260222-003] 实现 vibe keys 子命令
-- [x] [vibe-arch-20260222-004] 更新 bin/vibe 调度器
-- [x] [vibe-arch-20260222-005] 实现 vibe tool 子命令
-- [x] [vibe-arch-20260222-006] 实现 vibe mcp/skill 子命令
-- [x] [vibe-arch-20260222-007] 实现 vibe init/export
-- [x] [vibe-arch-20260222-008] 实现 vibe doctor 环境检查
-- [x] [vibe-arch-20260222-009] 实现 vibe chat 意图识别
-- [x] [vibe-arch-20260222-010] 端到端测试
+- [x] [vibe-arch-20260221-002] 实现 vibe.yaml 解析器
+- [x] [vibe-arch-20260221-003] 实现 vibe keys 子命令
+- [x] [vibe-arch-20260221-004] 更新 bin/vibe 调度器
+- [x] [vibe-arch-20260221-005] 实现 vibe tool 子命令
+- [x] [vibe-arch-20260221-006] 实现 vibe mcp/skill 子命令
+- [x] [vibe-arch-20260221-007] 实现 vibe init/export
+- [x] [vibe-arch-20260221-008] 实现 vibe doctor 环境检查
+- [x] [vibe-arch-20260221-009] 实现 vibe chat 意图识别
+- [x] [vibe-arch-20260221-010] 端到端测试
