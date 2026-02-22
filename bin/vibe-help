@@ -20,7 +20,14 @@ show_help() {
     echo "  config         Manage configuration files"
     echo "  check          System health check"
     echo "  flow           Feature development workflow"
+    echo "  sign           Manage Git user identity for worktree"
     echo "  help           Show this help information"
+    echo ""
+    echo "Examples:"
+    echo "  vibe                         # Interactive mode"
+    echo "  vibe chat                    # Start AI chat"
+    echo "  vibe flow start my-feature   # Start new feature"
+    echo "  vibe check api               # Verify API connectivity"
     echo ""
     echo "Run 'vibe' without arguments for interactive mode."
 }
@@ -32,9 +39,9 @@ if [[ $# -gt 0 ]]; then
             exit 0
             ;;
         *)
-            echo "Unknown option for vibe-help: ${1:-}"
+            echo "Unknown option for vibe-help: ${1:-}" >&2
             show_help
-            exit 1
+            exit 2
             ;;
     esac
 else

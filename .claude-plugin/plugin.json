@@ -1,0 +1,16 @@
+{
+  "name": "vibe-center-skills",
+  "version": "1.0.0",
+  "description": "Vibe Coding Control Center - Custom skills for session management",
+  "author": {
+    "name": "jacobcy"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "session",
+    "context"
+  ],
+  "skills": ["./.agent/skills/"]
+}

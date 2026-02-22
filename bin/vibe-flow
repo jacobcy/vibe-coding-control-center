@@ -164,7 +164,7 @@ case "${1:-}" in
     
     *)
         echo "Unknown subcommand: $1" >&2
-        # Ensure we return 1 for unknown subcommands to trigger fallback
+        # Exit with 2 (user input error) for unknown subcommands to trigger fallback
         exit 2
         ;;
 esac

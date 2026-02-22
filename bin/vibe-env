@@ -134,22 +134,7 @@ case "${1:-}" in
         ;;
         
     -h|--help|help)
-        cat << 'EOF'
-vibe env - Runtime environment manager
-
-Usage: vibe env [command]
-
-Commands:
-  (no args)              Show resolved environment variables with source
-  edit                   Edit local keys.env (Shortcut)
-  inject                 Inject keys.env into current shell session
-  sync                   Sync project's keys.env from template
-
-Examples:
-  vibe env                         # Show current vars
-  vibe env edit                    # Edit keys
-  vibe env inject                  # Load keys into shell
-EOF
+        show_help
         ;;
     
     verify|check|detect)

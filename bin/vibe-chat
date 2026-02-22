@@ -21,7 +21,7 @@ export_keys  # Export loaded configuration to environment variables
 do_chat() {
     local tool
     local prompt="$1"
-    tool=$(vibe_select_default_tool) || return 1
+    tool=$(vibe_select_default_tool) || exit 1
 
     # Show current tool info
     local model_info=""
@@ -45,7 +45,7 @@ do_chat() {
                     log_error "Claude CLI execution failed."
                     echo "💡 Tip: If you were trying to run a Vibe command (like 'flow'), please check your syntax."
                     echo "   You might be running 'vibe chat' inadvertently."
-                    return 1
+                    exit 1
                 fi
                 ;;
             opencode)
@@ -60,7 +60,7 @@ do_chat() {
                 ;;
             *)
                 log_error "Unsupported tool: $tool"
-                return 1
+                exit 1
                 ;;
         esac
     else
@@ -77,7 +77,7 @@ do_chat() {
                 ;;
             *)
                 log_error "Unsupported tool: $tool"
-                return 1
+                exit 1
                 ;;
         esac
     fi
