@@ -13,6 +13,7 @@
 ## Topic Index
 | Topic | Last Updated | Summary |
 |-------|--------------|---------|
+| [git-worktree](memory/git-worktree.md) | 2026-02-22 | Vibe Coding + Worktree 最佳实践流程 |
 | [cli-testing](memory/cli-testing.md) | 2026-02-22 | CLI 命令测试框架和覆盖率提升 |
 | [context-commands](memory/context-commands.md) | 2026-02-21 | 上下文管理命令体系：/save, /continue, /check |
 
@@ -32,6 +33,11 @@
   - **ShellCheck**: Installed for static analysis of shell scripts (2026-02-12).
 
 # Execution Log
+[2026-02-22] **Git Worktree 最佳实践**:
+- **问题**: Vibe Coding 环境下 Agent 无法切换 worktree
+- **解决**: Feature 分支 rebase origin/main，提交 PR，main 分支审核合并
+- **流程**: PR #9 合并 → pull origin/main → push 本地提交
+- **新增**: git-worktree.md 主题文件
 [2026-02-22] **CLI Code Audit & Testing**:
 - **TASK-005**: 审计 CLI 命令，发现 11 个问题（退出码、帮助输出等）
 - **TASK-006**: 修复 vibe-chat (return→exit), vibe-help (exit 1→2), vibe-env (帮助统一), vibe-help (添加 sign)

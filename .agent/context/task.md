@@ -8,6 +8,13 @@
 
 ## Backlog
 
+- [ ] [worktree-20260222-001] 整理完整 Worktree 工作流文档
+  - Context: 来自 [memory/git-worktree.md](memory/git-worktree.md)
+  - Created: 2026-02-22
+- [ ] [worktree-20260222-002] 在 main worktree 完成 PR 合并并 push 本地提交
+  - Context: PR #9 待合并，本地 main 有 3 个未 push 提交
+  - Created: 2026-02-22
+  - Blocked by: 需要用户手动操作
 - [ ] [context-20260221-004] 与 /learn 集成
   - Context: 来自 [memory/context-commands.md](memory/context-commands.md)
   - Created: 2026-02-21
