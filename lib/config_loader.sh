@@ -4,9 +4,14 @@
 
 # Guard against multiple sourcing (e.g., from aliases.sh then bin/vibe-*)
 # Check if readonly variables are already defined before re-declaring
+# Each variable is checked independently to avoid unintended overwrites
 if [[ -z "${CONFIG_FILENAME+isset}" ]]; then
     readonly CONFIG_FILENAME="keys.env"
+fi
+if [[ -z "${DEFAULT_CONFIG_DIR+isset}" ]]; then
     readonly DEFAULT_CONFIG_DIR="$HOME/.vibe"
+fi
+if [[ -z "${PROJECT_CONFIG_DIR+isset}" ]]; then
     readonly PROJECT_CONFIG_DIR=".vibe"
 fi
 
