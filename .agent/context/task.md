@@ -18,6 +18,9 @@
 - [ ] [context-20260221-004] 与 /learn 集成
   - Context: 来自 [memory/context-commands.md](memory/context-commands.md)
   - Created: 2026-02-21
+- [ ] [claude-20260222-001] 整理 Claude Code 最佳实践文档
+  - Context: 来自 [memory/claude-code-usage.md](memory/claude-code-usage.md)
+  - Created: 2026-02-22
 - [ ] [TASK-007] Refactor `lib/utils.sh` into smaller modules.
 - [ ] [TASK-008] Add CI/CD pipeline configuration.
 - [ ] [BUG-config-001] Fix config_loader.sh readonly variable conflict

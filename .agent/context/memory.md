@@ -9,6 +9,7 @@
 | Topic | Description | Last Updated |
 |-------|-------------|--------------|
 | [vibe-architecture](memory/vibe-architecture.md) | 模块化环境架构重构 | 2026-02-22 |
+| [claude-code-usage](memory/claude-code-usage.md) | Claude Code 并行开发工作流与最佳实践 | 2026-02-22 |
 
 ## Incidents & Lessons Learned
 - **[2026-02-11] Critical Incident: Unrelated Code Modification**
@@ -97,6 +98,11 @@
 - Added `vibe check env` to `bin/vibe-check`
 - Created test scripts: `tests/test_vibe_keys.sh`, `tests/test_vibe_chat_intent.sh`
 - **Commit**: d10ce84 feat: implement modular Vibe environment architecture
+[2026-02-22] **Claude Code Usage Fact-Check**:
+- 核实了 Claude Code 没有原生 --worktree/--tmux/teammate 标志
+- 澄清了 Task 工具是会话内子 agent，非 tmux 并行
+- 确认项目封装的 wtnew/vup/vnew 是正确的并行开发方案
+- 解释了 tmux session/window/pane 层级结构
 
 ## Concept Clarity (2026-02-11, updated)
 - **Path auto-detection**: `VIBE_ROOT` and `VIBE_HOME` are **internal implementation details**, never user-configured.
