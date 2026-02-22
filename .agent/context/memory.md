@@ -3,11 +3,19 @@
 ## Active Context
 - **Project**: Vibe Coding Control Center
 - **Status**: Maintenance & Refactoring
-- **Current Focus**: Consolidation and Technical Debt Cleanup
+- **Current Focus**: Modular Architecture Implementation
+
+## Topic Index
+| Topic | Description | Last Updated |
+|-------|-------------|--------------|
+| [vibe-architecture](memory/vibe-architecture.md) | 模块化环境架构重构 | 2026-02-22 |
 
 ## Incidents & Lessons Learned
 - **[2026-02-11] Critical Incident: Unrelated Code Modification**
   - **Correction Rule**: **NEVER modify or remove code/comments unrelated to the current feature.** Documentation is functional code for users.
+- **[2026-02-22] zsh Arithmetic Expression Trap**:
+  - `(( var++ ))` returns exit code 1 when var is 0, triggering `set -e`
+  - Solution: Use `(( var += 1 ))` or `(( ++var ))` instead
 
 
 ## Topic Index
@@ -25,6 +33,8 @@
 - **Configuration Philosophy**: Priority on **transparency and explicit control**. Avoid excessive automation that masks configuration risks. (2026-02-11).
 - **No-Template Rule**: `keys.template.env` must NEVER be used as a fallback for user configuration. If valid config is missing, fail and prompt user for manual setup. (2026-02-11).
 - **/save Implementation Strategy**: Iterative approach - Skill → Hooks → Plugin (2026-02-21).
+- **Unified Manifest Pattern**: Use `vibe.yaml` as single configuration entry point with symlink-based key group switching. (2026-02-22).
+- **Natural Language Entry**: `vibe chat` as smart entry point with intent routing before AI fallback. (2026-02-22).
 
 ## System Context
 - **OS**: macOS
@@ -69,7 +79,7 @@
 - **Core Positioning Clarified**: Vibe Coding Control Center is a **management and orchestration tool**, NOT an agent implementation tool.
 - **What We Manage**: Tool installation, working directories, environment variables, aliases, configuration files, development prompts/templates.
 - **What We DON'T Do**: We do NOT implement or replace the work that agents (claude, opencode, codex) complete. We prepare the environment and provide guidance.
-- **Refactoring Actions**: 
+- **Refactoring Actions**:
   - Deleted duplicate `lib/worktree.sh` (188 lines) - functionality already in `aliases.sh`
   - Rewrote `lib/flow.sh` to leverage existing tools (`wtnew`, `vup`, `wtrm` from aliases.sh)
   - Integrated external tools: `gh` (PR management), `lazygit` (code review), `tmux` (workspace)
@@ -78,6 +88,15 @@
 - **Design Principle**: "Orchestrate and integrate" rather than "reimplement and replace"
 [2026-02-12] **Tooling Update**:
 - **ShellCheck**: Validated installation and updated coding standards to mandate static analysis.
+[2026-02-22] **Modular Vibe Architecture Implementation**:
+- Implemented 10 tasks across 6 phases as per implementation plan
+- Created 8 new library files: `vibe_dir_template.sh`, `keys_manager.sh`, `tool_manager.sh`, `mcp_manager.sh`, `skill_manager.sh`, `env_manager.sh`, `chat_router.sh`
+- Extended `lib/config.sh` with YAML parser supporting nested structures and lists
+- Created 4 new command entries: `bin/vibe-keys`, `bin/vibe-tool`, `bin/vibe-mcp`, `bin/vibe-skill`
+- Updated `bin/vibe` dispatcher to route new subcommands
+- Added `vibe check env` to `bin/vibe-check`
+- Created test scripts: `tests/test_vibe_keys.sh`, `tests/test_vibe_chat_intent.sh`
+- **Commit**: d10ce84 feat: implement modular Vibe environment architecture
 
 ## Concept Clarity (2026-02-11, updated)
 - **Path auto-detection**: `VIBE_ROOT` and `VIBE_HOME` are **internal implementation details**, never user-configured.
@@ -92,3 +111,9 @@
     2. Ensure the branch has a `.vibe` folder (synced via `vibe-init` or manual setup).
     3. Running `vibe` inside that folder automatically delegates execution to **that specific branch's** `bin/vibe`.
   - **Benefit**: Allows developing and testing different versions of Vibe core logic simultaneously in different worktrees without conflicts.
+
+- **New Architecture (2026-02-22)**:
+  - `~/.vibe/vibe.yaml`: Main configuration file (single entry point)
+  - `~/.vibe/keys/*.env`: Key groups with symlink for current selection
+  - `~/.vibe/tools/*/`: Tool modules with config.yaml and mcp.yaml
+  - `vibe chat`: Natural language entry with intent routing
