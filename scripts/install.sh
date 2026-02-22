@@ -168,13 +168,7 @@ if [[ "$MODE" == "global" ]]; then
     # Global: ~/.vibe/aliases.sh -> ~/.vibe/config/aliases.sh
     ln -sf "$INSTALL_DIR/config/aliases.sh" "$INSTALL_DIR/aliases.sh"
     
-    # Symlink vibe executable to ~/bin/vibe for convenience
-    if [[ ! -d "$HOME/bin" ]]; then
-        mkdir -p "$HOME/bin"
-    fi
-    ln -sf "$INSTALL_DIR/bin/vibe" "$HOME/bin/vibe"
-    log_info "Linked vibe executable to $HOME/bin/vibe"
-    
+    # vibe executable is at $INSTALL_DIR/bin/vibe (already in PATH via loader.sh)
     VIBE_BIN="$INSTALL_DIR/bin"
 
 else

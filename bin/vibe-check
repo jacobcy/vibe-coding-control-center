@@ -224,7 +224,7 @@ do_check_env() {
         fi
     else
         log_error "vibe.yaml missing"
-        ((issues++))
+        ((issues += 1))
     fi
 
     # 3. Check keys directory
@@ -253,7 +253,7 @@ do_check_env() {
         fi
     else
         log_error "Keys directory missing"
-        ((issues++))
+        ((issues += 1))
     fi
 
     # 4. Check tools
