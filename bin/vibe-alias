@@ -8,9 +8,21 @@ VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 # Load utility modules
 source "$VIBE_ROOT/lib/utils.sh"
 source "$VIBE_ROOT/lib/config.sh"
-source "$VIBE_ROOT/lib/i18n.sh" 
+source "$VIBE_ROOT/lib/i18n.sh"
 
-ALIASES_FILE="$HOME/.vibe/aliases.sh"
+# Find the actual aliases.sh file
+# Priority: 1. Current project's config/aliases.sh
+#          2. Global ~/.vibe/aliases.sh
+ALIASES_FILE=""
+ALIASES_DIR=""
+if [[ -f "$VIBE_ROOT/config/aliases.sh" ]]; then
+    ALIASES_FILE="$VIBE_ROOT/config/aliases.sh"
+    ALIASES_DIR="$VIBE_ROOT/config/aliases"
+elif [[ -f "$HOME/.vibe/aliases.sh" ]]; then
+    ALIASES_FILE="$HOME/.vibe/aliases.sh"
+    ALIASES_DIR="$HOME/.vibe/aliases"
+fi
+
 CUSTOM_ALIASES_FILE="$HOME/.vibe/custom_aliases.sh"
 
 # Ensure custom alias file exists
@@ -19,34 +31,86 @@ if [[ ! -f "$CUSTOM_ALIASES_FILE" ]]; then
 fi
 
 do_list() {
-    echo "=== Vibe Aliases ==="
+    echo "=== Vibe Aliases (Level 2) ==="
     echo ""
-    
-    echo "${BOLD}[System Aliases]${NC} ($ALIASES_FILE)"
-    if [[ -f "$ALIASES_FILE" ]]; then
-        grep "^alias" "$ALIASES_FILE" | sed 's/alias //' | while read line; do
+
+    if [[ -n "$ALIASES_FILE" ]]; then
+        echo "${BOLD}[System Aliases]${NC} ($ALIASES_FILE)"
+        echo ""
+
+        # Build list of all alias files
+        local all_files=("$ALIASES_FILE")
+        if [[ -d "$ALIASES_DIR" ]]; then
+            # Use explicit file list instead of glob to avoid subshell issues
+            local -a alias_files=(
+                "$ALIASES_DIR/claude.sh"
+                "$ALIASES_DIR/git.sh"
+                "$ALIASES_DIR/opencode.sh"
+                "$ALIASES_DIR/openspec.sh"
+                "$ALIASES_DIR/tmux.sh"
+                "$ALIASES_DIR/vibe.sh"
+                "$ALIASES_DIR/worktree.sh"
+            )
+            for f in "${alias_files[@]}"; do
+                [[ -f "$f" ]] && all_files+=("$f")
+            done
+        fi
+
+        # Group aliases by category
+        # Note: Use [a-z_]* to match aliases with underscores (e.g., cc_off, vsign)
+        echo "  ${BOLD}Vibe Commands:${NC}"
+        grep "^alias v[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        echo ""
+
+        echo "  ${BOLD}Claude Commands (cc*):${NC}"
+        grep "^alias cc[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        echo ""
+
+        echo "  ${BOLD}OpenCode Commands (oo*):${NC}"
+        grep "^alias oo[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        echo ""
+
+        echo "  ${BOLD}OpenSpec Commands (os*):${NC}"
+        grep "^alias os[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        echo ""
+
+        echo "  ${BOLD}Tmux Commands (vt*):${NC}"
+        echo "    vt              - Attach to default session"
+        echo "    vtup [session] - Create or attach to session"
+        echo "    vtdown          - Detach current session"
+        echo "    vtswitch <s>    - Switch to session"
+        echo "    vtls            - List sessions"
+        echo "    vtkill [s]      - Kill session"
+        echo ""
+
+        echo "  ${BOLD}Worktree Management (Functions):${NC}"
+        echo "    wt <dir>              - Jump to worktree directory"
+        echo "    wtls                  - List all worktrees"
+        echo "    wtnew <branch> [agent] [base] - Create new worktree"
+        echo "    wtrm <wt-dir>         - Remove worktree"
+        echo "    wtrm all              - Remove all worktrees"
+        echo "    wtinit [agent]        - Re-sync Git identity"
+        echo "    wtrenew               - Refresh current worktree"
+        echo "    vup <wt-dir> [agent]  - Setup tmux workspace"
+        echo "    vnew <branch> [agent] - Create worktree + workspace"
+        echo ""
+    else
+        echo "  ${YELLOW}No system aliases file found${NC}"
+        echo ""
+    fi
+
+    echo "${BOLD}[Custom Aliases]${NC} ($CUSTOM_ALIASES_FILE)"
+    if grep -q "^alias" "$CUSTOM_ALIASES_FILE" 2>/dev/null; then
+        grep "^alias" "$CUSTOM_ALIASES_FILE" | sed 's/alias //' | while read line; do
             echo "  $line"
         done
     else
-        echo "  (None found)"
+        echo "  (None defined)"
     fi
-    
+
     echo ""
-    echo "${BOLD}[Custom Aliases]${NC} ($CUSTOM_ALIASES_FILE)"
-    if [[ -f "$CUSTOM_ALIASES_FILE" ]]; then
-        if grep -q "^alias" "$CUSTOM_ALIASES_FILE"; then
-             grep "^alias" "$CUSTOM_ALIASES_FILE" | sed 's/alias //' | while read line; do
-                echo "  $line"
-             done
-        else
-             echo "  (None defined)"
-        fi
-    else
-        echo "  (File missing)"
-    fi
-    
-    echo ""
-    echo "Run 'vibe alias edit' to add custom aliases."
+    echo "Run 'vibe alias help' for usage guide"
+    echo "Run 'vibe alias edit' to add custom aliases"
 }
 
 do_edit() {
@@ -56,22 +120,51 @@ do_edit() {
 do_inject() {
     # Check if custom aliases is sourced in .zshrc
     SHELL_RC="$HOME/.zshrc"
-    
+
     if grep -q "source.*custom_aliases.sh" "$SHELL_RC"; then
         log_info "Custom aliases already configured in .zshrc"
     else
         append_to_rc "$SHELL_RC" "source \"$CUSTOM_ALIASES_FILE\"" "Vibe Custom Aliases"
         log_success "Added custom aliases to $SHELL_RC"
     fi
-    
+
     # Source immediately for this subshell (doesn't affect parent, but good for check)
     source "$CUSTOM_ALIASES_FILE"
     log_info "To apply in current shell, run: source $CUSTOM_ALIASES_FILE"
 }
 
+do_help() {
+    echo "vibe-alias - Manage Command Aliases"
+    echo ""
+    echo "Usage: vibe alias [command]"
+    echo ""
+    echo "Commands:"
+    echo "  list, ls      List all configured aliases (default)"
+    echo "  help          Show this help information"
+    echo "  edit          Edit custom aliases file"
+    echo "  inject        Inject aliases into shell configuration"
+    echo ""
+    echo "Examples:"
+    echo "  vibe alias              # List all aliases"
+    echo "  vibe alias list        # Same as above"
+    echo "  vibe alias edit        # Open custom aliases file"
+    echo "  vibe alias inject      # Add to .zshrc"
+    echo ""
+    echo "Quick Reference:"
+    echo "  cc*, oo*, os*    Claude, OpenCode, OpenSpec commands"
+    echo "  vc, vsign, vmain Vibe commands"
+    echo "  vt, vtup, vtdown, vtls, vtkill  Tmux commands"
+    echo "  vup, vnew        Workspace automation"
+    echo "  wt, wtnew, wtrm  Worktree management"
+    echo ""
+}
+
 case "${1:-list}" in
-    list)
+    list|ls)
         do_list
+        ;;
+    help|-h|--help)
+        do_help
         ;;
     edit)
         do_edit
@@ -79,20 +172,9 @@ case "${1:-list}" in
     inject)
         do_inject
         ;;
-    -h|--help|help)
-        echo "vibe alias - Manage command aliases"
-        echo ""
-        echo "Usage: vibe alias [command]"
-        echo ""
-        echo "Commands:"
-        echo "  list           List all configured aliases (default)"
-        echo "  edit           Edit custom aliases file"
-        echo "  inject         Inject aliases into shell configuration"
-        echo ""
-        ;;
     *)
         log_error "Unknown command: $1"
-        echo "Run 'vibe alias help' for usage"
+        do_help
         exit 2
         ;;
 esac

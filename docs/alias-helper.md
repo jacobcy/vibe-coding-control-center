@@ -35,25 +35,27 @@ repo/
 
 ---
 
-## 三、tmux 会话相关
+## 三、tmux 会话命令 (vt*)
 
-### `vt`
+### 基础命令
 
-进入（或创建）tmux 会话 `vibe`。
+```bash
+vt     # 进入（或创建）tmux 会话
+vtup   # 创建或附加到指定 session
+vtdown # 分离当前 session
+vtswitch <session>  # 切换到指定 session
+vtls   # 列出所有 session
+vtkill <session>   # 删除指定 session
+vtkill             # 删除当前 session
+```
 
 用途：
 - 所有 agent 常驻在 tmux 中
 - SSH 断线 / 关 Terminal 都不会中断任务
 
-典型用法：
-
-```bash
-vt
-```
-
 ---
 
-## 四、worktree 管理命令
+## 四、Worktree 管理命令
 
 ### `wtls`
 
@@ -85,18 +87,21 @@ wt wt-login-fix
 创建一个新的 worktree，并切换进去。
 
 默认行为：
-- 从 main 分支创建新分支
+- 从 base 分支创建新分支（默认 main）
 - worktree 目录名为 wt-<agent>-<branch>
+- 设置 git identity 为 Agent-<agent>
 
 示例：
 
 ```bash
 wtnew login-fix claude
+wtnew feature-branch opencode develop
 ```
 
 结果：
-- 创建 wt-claude-login-fix/
-- 分支名：claude/login-fix
+- 创建 wt-claude-login-fix/ 目录
+- 分支名：login-fix（从 main 分支）
+- Git identity：Agent-Claude <agent-claude@vibecoding.ai>
 
 ---
 
@@ -106,42 +111,71 @@ wtnew login-fix claude
 
 ```bash
 wtrm wt-login-fix
+wtrm all   # 删除所有 wt-* worktree
 ```
 
 ⚠️ 这是强制删除，只用于实验分支。
 
 ---
 
-## 五、Agent（Claude / OpenCode / Codex）命令
+### `wtinit [agent]`
 
-### 基础命令
+重新同步 Git identity（使用指定的 agent，默认 claude）。
 
 ```bash
-c     # claude
-o     # opencode
-x     # codex
+wtinit        # 使用 claude identity
+wtinit opencode
 ```
 
 ---
 
-### 自动执行模式（不再询问）
+### `wtrenew`
+
+刷新当前 worktree（重新初始化 Git identity）。
 
 ```bash
-cy    # claude --yes
-oca   # opencode --auto
-xy    # codex --yes (需自行确认是否存在)
+wtrenew
 ```
 
-作用：
-- 不再逐条询问命令/文件修改
-- 适合 worktree 沙盒
+---
+
+## 五、Agent（Claude / OpenCode / Codex）命令
+
+### Claude 命令 (cc*)
+
+```bash
+ccy   # claude --dangerously-skip-permissions --continue
+ccp   # claude --permission-mode plan
+```
+
+---
+
+### OpenCode 命令 (oo*)
+
+```bash
+oo    # opencode
+ooa   # opencode --continue
+```
+
+---
+
+### OpenSpec 命令 (os*)
+
+```bash
+os    # openspec
+osi   # openspec init
+osl   # openspec list
+osv   # openspec view
+osn   # openspec new
+osval # openspec validate
+```
 
 ---
 
 ### 安全模式（保护 main 分支）
 
 ```bash
-c_safe
+c_safe  # 在当前目录启动 Claude（保护 main 分支）
 ```
 
 ---
@@ -149,8 +183,8 @@ c_safe
 ### 在指定 worktree 启动 agent
 
 ```bash
-cwt <wt-dir>
-owt <wt-dir>
+cwt <wt-dir>  # Claude in worktree
+owt <wt-dir>  # OpenCode in worktree
 ```
 
 示例：
@@ -161,7 +195,16 @@ cwt wt-login-fix
 
 等价于：
 1. cd wt-login-fix
-2. claude --yes
+2. claude --dangerously-skip-permissions --continue
+
+---
+
+### Endpoint 切换
+
+```bash
+cc_cn   # 切换到自定义 endpoint（中国）
+cc_off  # 切换到官方 endpoint
+```
 
 ---
 
@@ -227,16 +270,6 @@ vnew login-fix claude
 
 ---
 
-### 常用 git alias
-
-```bash
-gs    # git status -sb
-gd    # git diff
-gl    # 最近 20 条提交图
-```
-
----
-
 ## 九、推荐练习路线（最省脑）
 
 ### Day 1：只用 vnew
@@ -261,7 +294,7 @@ vup wt-test-2 opencode
 
 ## 十、安全底线（非常重要）
 
-- ❌ 不要在 main/master 用 cy / oca / xy
+- ❌ 不要在 main/master 用 ccy / ooa
 - ✅ 所有 agent 操作都在 worktree
 - ✅ 你永远保留最终审查权
 

@@ -1,36 +1,69 @@
 #!/usr/bin/env zsh
 # ======================================================
-# Vibe Coding Aliases (Level 2)
-# Worktree × tmux × Agents (Claude/Codex) × lazygit
+# Vibe Coding Aliases (Level 2) - 主入口文件
+# ======================================================
 # Philosophy:
 #   - Agents do the work unattended (auto-approve)
 #   - You only review/commit (lazygit)
 #   - Main branch is protected (guard)
 # ======================================================
 
+# ---------- 环境变量初始化 ----------
 # Resolve VIBE_ROOT using the shared library logic
-# This ensures consistency with how other scripts locate the root
 _aliases_dir="$(dirname "${(%):-%x:A}")"
+# Resolve symlinks: if _aliases_dir ends in config, parent is the install root
+if [[ -L "${(%):-%x}" ]]; then
+    _aliases_real="$(readlink -f "${(%):-%x}" 2>/dev/null || readlink "${(%):-%x}")"
+    _aliases_dir="$(dirname "$_aliases_real")"
+fi
 _lib_config="$_aliases_dir/../lib/config.sh"
 
 if [[ -f "$_lib_config" ]]; then
     source "$_lib_config"
-    # lib/config.sh sets VIBE_ROOT and VIBE_HOME
 else
-    # Fallback if lib/config.sh is missing (should not happen in valid install)
     VIBE_ROOT="$(cd "$_aliases_dir/.." && pwd)"
     VIBE_HOME="$VIBE_ROOT/.vibe"
 fi
 
-VIBE_REPO="$(dirname "$VIBE_ROOT")"
-VIBE_MAIN="$VIBE_REPO/main"
+# Detect actual repository root from Git when inside a worktree
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    VIBE_REPO="$(git rev-parse --show-toplevel 2>/dev/null)"
+else
+    VIBE_REPO="$(dirname "$VIBE_ROOT")"
+fi
+# Determine VIBE_MAIN - could be the repo root itself or a 'main' subdirectory
+if [[ -d "$VIBE_REPO/main" && (-d "$VIBE_REPO/main/.git" || -f "$VIBE_REPO/main/.git") ]]; then
+    VIBE_MAIN="$VIBE_REPO/main"
+else
+    VIBE_MAIN="$VIBE_REPO"
+fi
 VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
-# Removed hardcoded PATH export to prevent pollution in multi-worktree setups
-# export PATH="$VIBE_ROOT/bin:$PATH"
-
-# ---------- Utilities ----------
-vibe_has() { command -v "$1" >/dev/null 2>&1; }
+# ---------- 工具函数 ----------
+# Check if a command exists (enhanced with common path fallback)
+vibe_has() {
+    local cmd="$1"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        return 0
+    fi
+    # Try common locations for specific commands
+    case "$cmd" in
+        git)
+            for path in /opt/homebrew/bin/git /usr/local/bin/git /usr/bin/git; do
+                [[ -x "$path" ]] && return 0
+            done
+            ;;
+        tmux)
+            for path in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux; do
+                [[ -x "$path" ]] && return 0
+            done
+            ;;
+        *)
+            [[ -x "/usr/bin/$cmd" || -x "/bin/$cmd" ]] && return 0
+            ;;
+    esac
+    return 1
+}
 
 vibe_die() { echo "❌ $*" >&2; return 1; }
 
@@ -42,406 +75,63 @@ vibe_require() {
 
 vibe_now() { date +"%Y-%m-%d %H:%M:%S"; }
 
-# ---------- Context Loading ----------
+# Find a command in PATH or common locations
+vibe_find_cmd() {
+    local cmd="$1"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        command -v "$cmd"
+        return 0
+    fi
+    if [[ "$cmd" == "git" ]]; then
+        for path in /opt/homebrew/bin/git /usr/local/bin/git /usr/bin/git; do
+            if [[ -x "$path" ]]; then
+                echo "$path"
+                return 0
+            fi
+        done
+    fi
+    return 1
+}
+
 # Helper to load local keys.env if present in PWD or Git root
 vibe_load_context() {
-    # Use the centralized config loader instead of direct sourcing
-    load_configuration
-}
-
-# ---------- tmux core ----------
-vibe_tmux_ensure() {
-  vibe_load_context
-  vibe_require tmux || return 1
-  if ! tmux has-session -t "$VIBE_SESSION" 2>/dev/null; then
-    tmux new-session -d -s "$VIBE_SESSION" -c "$VIBE_MAIN" -n "main"
-  fi
-}
-
-vibe_tmux_attach() {
-  vibe_tmux_ensure || return 1
-  tmux attach -t "$VIBE_SESSION"
-}
-
-# Create or focus a window
-vibe_tmux_win() {
-  # usage: vibe_tmux_win <name> <dir> [cmd...]
-  local name="$1"; shift
-  local dir="$1"; shift
-  local cmd="$*"
-
-  vibe_tmux_ensure || return 1
-
-  if tmux list-windows -t "$VIBE_SESSION" -F "#{window_name}" | grep -qx "$name"; then
-    tmux select-window -t "$VIBE_SESSION:$name"
-  else
-    if [[ -n "$cmd" ]]; then
-      tmux new-window -t "$VIBE_SESSION" -n "$name" -c "$dir" "$cmd"
+    if typeset -f load_configuration >/dev/null 2>&1; then
+        load_configuration
     else
-      tmux new-window -t "$VIBE_SESSION" -n "$name" -c "$dir"
-    fi
-  fi
-}
-
-# ---------- Git helpers ----------
-vibe_git_root() {
-  git -C "$PWD" rev-parse --show-toplevel 2>/dev/null
-}
-
-vibe_branch() {
-  git -C "$PWD" branch --show-current 2>/dev/null
-}
-
-vibe_main_guard() {
-  local br
-  br="$(vibe_branch)"
-  if [[ "$br" == "main" || "$br" == "master" ]]; then
-    echo "⚠️  You are on '$br'. Use a worktree for agent execution."
-    return 1
-  fi
-}
-
-# ---------- Worktree ----------
-# List worktrees
-alias wtls='git worktree list'
-
-# Jump to a worktree directory under repo root
-wt() {
-  local target="$1"
-  if [[ -z "$target" ]]; then
-    git -C "$VIBE_REPO" worktree list
-    return
-  fi
-  cd "$VIBE_REPO/$target" || return
-  [[ -n "$TMUX" ]] && tmux rename-window "$target"
-}
-
-# Create a new worktree (safe default naming)
-# usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]
-wtnew() {
-  vibe_load_context
-  # Find git command - rely on PATH
-  if ! command -v git >/dev/null 2>&1; then
-    vibe_die "git command not found. Please ensure git is installed and in your PATH."
-  fi
-  local git_cmd="git"
-
-  local branch="$1"
-  local agent="${2:-claude}"
-  local base="${3:-main}"
-
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]"
-
-  # Check if current directory is the main worktree
-  local current_dir="$(pwd)"
-  
-  # Try to find main directory in common locations
-  local found_main=""
-  local search_paths=(
-    "$current_dir/main"           # Child directory
-    "$current_dir"                # Current directory (if it's main itself)
-    "$(dirname "$current_dir")/main"  # Sibling directory
-  )
-  
-  for path in "${search_paths[@]}"; do
-    if [[ -d "$path/.git" || -f "$path/.git" ]]; then
-      found_main="$path"
-      break
-    fi
-  done
-  
-  # If we found a main directory but we're not in it
-  if [[ -n "$found_main" && "$current_dir" != "$found_main" ]]; then
-    echo "❌ You are not in the main worktree directory"
-    echo ""
-    echo "   Current: $current_dir"
-    echo "   Found main at: $found_main"
-    echo ""
-    echo "💡 Please cd to the main worktree first:"
-    echo "   cd $found_main"
-    echo "   wtnew $branch $agent $base"
-    return 1
-  fi
-  
-  # If we didn't find main directory at all
-  if [[ -z "$found_main" ]]; then
-    echo "❌ Main worktree not found"
-    echo ""
-    echo "   Searched in:"
-    echo "   - Current directory: $current_dir"
-    echo "   - Child directory: $current_dir/main"
-    echo "   - Sibling directory: $(dirname "$current_dir")/main"
-    echo ""
-    echo "💡 Please ensure you have a main worktree set up, or cd to the correct location."
-    return 1
-  fi
-
-  local prefix="wt-${agent}-"
-  local dir="${prefix}${branch}"
-  local path="$VIBE_REPO/$dir"
-
-  # Create branch from base in main repo context
-  $git_cmd -C "$found_main" fetch -p >/dev/null 2>&1 || true
-  $git_cmd -C "$found_main" show-ref --verify --quiet "refs/heads/$branch" || \
-    $git_cmd -C "$found_main" branch "$branch" "$base" 2>/dev/null || true
-
-  # Add worktree
-  if [[ -e "$path" ]]; then
-    echo "ℹ️  Worktree dir already exists: $dir"
-  else
-    $git_cmd -C "$found_main" worktree add "$path" "$branch" || return 1
-    echo "✅ Created worktree: $dir -> branch $branch (base: $base)"
-  fi
-
-  # Set agent identity in worktree
-  # Use zsh parameter expansion for capitalization: ${(C)var} capitalizes first letter
-  local agent_name="Agent-${(C)agent}"
-  local agent_email="agent-${agent}@vibecoding.ai"
-  
-  $git_cmd -C "$path" config user.name "$agent_name"
-  $git_cmd -C "$path" config user.email "$agent_email"
-  echo "👤 Git identity set: $agent_name <$agent_email>"
-
-  cd "$path" || return
-}
-
-# Re-sync Git identity in current worktree
-wtinit() {
-  local agent="${1:-claude}"
-  
-  if [[ ! -d ".git" && ! -f ".git" ]]; then
-    vibe_die "Not in a git repository or worktree."
-  fi
-  
-  local agent_name="Agent-${(C)agent}"
-  local agent_email="agent-${agent}@vibecoding.ai"
-  
-  git config user.name "$agent_name"
-  git config user.email "$agent_email"
-  echo "✅ Git identity re-synced: $agent_name <$agent_email>"
-}
-
-# Remove a worktree directory + prune
-# usage: wtrm <wt-dir>
-wtrm() {
-  vibe_require git || return 1
-  local dir="$1"
-  [[ -z "$dir" ]] && vibe_die "usage: wtrm <wt-dir>"
-  local path="$VIBE_REPO/$dir"
-
-  git -C "$VIBE_MAIN" worktree remove --force "$path" || return 1
-  git -C "$VIBE_MAIN" worktree prune >/dev/null 2>&1 || true
-  echo "✅ Removed worktree: $dir"
-}
-
-# ---------- Agents (Claude/Codex) ----------
-alias lg='lazygit'
-
-# Base commands
-# Base commands
-alias c='claude'
-alias cy='claude'
-
-
-# Start agent in current dir but protect main/master
-# Start agent in current dir but protect main/master
-c_safe() { vibe_load_context; vibe_main_guard || return; claude --dangerously-skip-permissions --continue; }
-
-# Start agent in a given worktree (cd + run)
-# usage: cwt <wt-dir>
-cwt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: cwt <wt-dir>"; wt "$d" || return; claude --dangerously-skip-permissions --continue; }
-owt() { local d="$1"; [[ -z "$d" ]] && vibe_die "usage: owt <wt-dir>"; wt "$d" || return; opencode; }
-
-# ---------- Endpoint Switching ----------
-# c_cn alias: Switch to custom endpoint (reads from keys.env via config_get if available, or environment)
-c_cn() {
-    local endpoint
-    # Try to get from config cache or file
-    endpoint="$(config_get ANTHROPIC_BASE_URL)"
-    # Fallback to hardcoded if not set (legacy behavior, can be removed if config is mandatory)
-    if [[ -z "$endpoint" || "$endpoint" == "https://api.anthropic.com" ]]; then
-         endpoint="${ANTHROPIC_BASE_URL_CHINA:-https://api.myprovider.com}" # Default placeholder - set this in keys.env
-    fi
-    export ANTHROPIC_BASE_URL="$endpoint"
-    echo "🇨🇳 Claude Endpoint: Custom ($endpoint)"
-}
-alias c_off='export ANTHROPIC_BASE_URL="https://api.anthropic.com" && echo "🌐 Claude Endpoint: Official"'
-vibe_endpoint() {
-    echo "Current Claude Endpoint: ${ANTHROPIC_BASE_URL:-$(config_get ANTHROPIC_BASE_URL)}"
-}
-
-# ---------- “One-button” Workspace Orchestration ----------
-# Create a full tmux workspace for a worktree:
-# windows:
-#   <wt>-edit    (your editor)
-#   <wt>-agent   (Claude/Codex auto-approve)
-#   <wt>-tests   (placeholder shell)
-#   <wt>-logs    (placeholder shell)
-#   <wt>-git     (lazygit)
-#
-# usage:
-#   vup <wt-dir> [agent=claude|codex] [editor_cmd]
-vup() {
-  vibe_require tmux git || return 1
-
-  local wt_dir="$1"
-  local agent="${2:-claude}"
-  local editor_cmd="${3:-${EDITOR:-vim}}"
-
-  [[ -z "$wt_dir" ]] && vibe_die "usage: vup <wt-dir> [agent=claude|codex] [editor_cmd]"
-
-  local dir_path="$VIBE_REPO/$wt_dir"
-  [[ -d "$dir_path" ]] || vibe_die "worktree dir not found: $dir_path"
-
-  vibe_tmux_ensure || return 1
-
-  local w_edit="${wt_dir}-edit"
-  local w_agent="${wt_dir}-agent"
-  local w_tests="${wt_dir}-tests"
-  local w_logs="${wt_dir}-logs"
-  local w_git="${wt_dir}-git"
-
-  # Editor window
-  vibe_tmux_win "$w_edit" "$dir_path" "$editor_cmd" || return 1
-
-  # Agent window
-  case "$agent" in
-    opencode)
-      vibe_require opencode || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "opencode" || return 1
-      ;;
-    codex)
-      vibe_require codex || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "codex --yes" || return 1
-      ;;
-    *)
-      vibe_require claude || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "claude --dangerously-skip-permissions --continue" || return 1
-      ;;
-  esac
-
-  # Tests/logs windows (leave as interactive shells so you can run what you want)
-  vibe_tmux_win "$w_tests" "$dir_path" || return 1
-  vibe_tmux_win "$w_logs" "$dir_path" || return 1
-
-  # lazygit window
-  vibe_require lazygit || echo "⚠️  lazygit not found; '$w_git' will open a shell"
-  if vibe_has lazygit; then
-    vibe_tmux_win "$w_git" "$dir_path" "lazygit" || return 1
-  else
-    vibe_tmux_win "$w_git" "$dir_path" || return 1
-  fi
-
-  echo "✅ tmux workspace ready for: $wt_dir (agent: $agent) @ $(vibe_now)"
-  echo "👉 attach with: vt"
-}
-
-# One-button: create worktree + bring up tmux workspace
-# usage: vnew <branch> [agent=claude|opencode|codex] [base=main]
-vnew() {
-  vibe_load_context
-  local branch="$1"
-  local agent="${2:-claude}"
-  local base="${3:-main}"
-
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent=claude|opencode|codex] [base=main]"
-
-  wtnew "$branch" "$agent" "$base" || return 1
-  local wt_dir="wt-${agent}-$branch"
-  vup "$wt_dir" "$agent" || return 1
-  echo "✅ All set. Your job: review/commit in lazygit window (${wt_dir}-git)."
-}
-
-# Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
-# Unified vibe/agent aliases (Priority: Claude -> OpenCode -> Codex)
-# Dynamic vibe command: prefers local ./bin/vibe, fallbacks to $VIBE_ROOT/bin/vibe
-vibe() {
-    local local_vibe="./bin/vibe"
-    local git_root_vibe=""
-    
-    # 0. Check for explicit global flag
-    if [[ "$1" == "-g" || "$1" == "--global" ]]; then
-        shift
-        local global_vibe="$HOME/.vibe/bin/vibe"
-        # Try HOME/.vibe first (Standard Global)
-        if [[ -x "$global_vibe" ]]; then
-            "$global_vibe" "$@"
-            return
-        # Fallback to VIBE_ROOT if it happens to be global or valid
-        elif [[ -x "$VIBE_ROOT/bin/vibe" ]]; then
-            "$VIBE_ROOT/bin/vibe" "$@"
-            return
-        else
-            echo "❌ Global vibe not found at $global_vibe" >&2
-            return 1
+        local config_loader=""
+        if [[ -f "$_aliases_dir/lib/config_loader.sh" ]]; then
+            config_loader="$_aliases_dir/lib/config_loader.sh"
+        elif [[ -f "$_aliases_dir/../lib/config_loader.sh" ]]; then
+            config_loader="$_aliases_dir/../lib/config_loader.sh"
+        fi
+        if [[ -n "$config_loader" ]]; then
+            source "$config_loader"
+            load_configuration
         fi
     fi
-
-    # Check for bin/vibe in current directory
-    if [[ -x "$local_vibe" ]]; then
-        "$local_vibe" "$@"
-        return
-    fi
-
-    # Check for bin/vibe in git root
-    if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        local root
-        root="$(git rev-parse --show-toplevel)"
-        if [[ -x "$root/bin/vibe" ]]; then
-            git_root_vibe="$root/bin/vibe"
-            "$git_root_vibe" "$@"
-            return
-        fi
-    fi
-
-    # Fallback to the Vibe instance where this alias file is located
-    if [[ -x "$VIBE_ROOT/bin/vibe" ]]; then
-        "$VIBE_ROOT/bin/vibe" "$@"
-    else
-        echo "❌ Could not find 'vibe' executable."
-        echo "   Checked: ./bin/vibe"
-        [[ -n "$git_root_vibe" ]] && echo "   Checked: $git_root_vibe"
-        echo "   Checked: $VIBE_ROOT/bin/vibe"
-        return 1
-    fi
 }
 
-alias vc='vibe chat'
-alias vsign='vibe sign'
-alias vsig='vibe sign'
-alias vmsign='vibe sign'
+# ---------- 加载分类 Aliases ----------
+# Source all category files if they exist
+_aliases_src_dir="$_aliases_dir/aliases"
 
-# Claude (Priority 1)
-alias c='claude --dangerously-skip-permissions --continue'
-alias cy='claude --dangerously-skip-permissions --continue'
-alias ca='claude --dangerously-skip-permissions --continue'
-# alias cp='claude'
-alias cr='claude --dangerously-skip-permissions --continue'
+# Load git helper functions (required by worktree.sh)
+[[ -f "$_aliases_src_dir/git.sh" ]] && source "$_aliases_src_dir/git.sh"
 
-# OpenCode (Priority 2)
-alias o='opencode'
-alias oa='opencode'
+# Load tmux functions (required by worktree.sh)
+[[ -f "$_aliases_src_dir/tmux.sh" ]] && source "$_aliases_src_dir/tmux.sh"
 
+# Load worktree commands
+[[ -f "$_aliases_src_dir/worktree.sh" ]] && source "$_aliases_src_dir/worktree.sh"
 
+# Load other categories
+[[ -f "$_aliases_src_dir/claude.sh" ]] && source "$_aliases_src_dir/claude.sh"
+[[ -f "$_aliases_src_dir/opencode.sh" ]] && source "$_aliases_src_dir/opencode.sh"
+[[ -f "$_aliases_src_dir/openspec.sh" ]] && source "$_aliases_src_dir/openspec.sh"
+[[ -f "$_aliases_src_dir/vibe.sh" ]] && source "$_aliases_src_dir/vibe.sh"
 
-# Attach to tmux session
-alias vt='vibe_tmux_attach'
-
-# Quick git
-alias gs='git status -sb'
-alias gd='git diff'
-alias gl='git log --oneline --graph --decorate -20'
-
-# Unified vibe/agent aliases
-# alias vibe='zsh "$VIBE_ROOT/scripts/vibecoding.sh"'
-alias cca='claude --auto'
-alias ccp='claude --plan'
-alias ccr='claude --review'
-alias oca='opencode --auto'
-# Optional: go main
-alias vmain="cd \"$VIBE_MAIN\""
-
-# Workflow aliases
-alias rotate-task='vibe flow rotate'
-alias vfr='vibe flow rotate'
-
+# Clean up
+unset _aliases_dir
+unset _aliases_real
+unset _aliases_src_dir
+unset _lib_config
