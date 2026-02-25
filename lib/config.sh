@@ -8,10 +8,10 @@ VIBE_ROOT="${VIBE_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}"
 export VIBE_ROOT
 
 # ── Core Directories ────────────────────────────────────
-export VIBE_BIN="$VIBE_ROOT/bin"
-export VIBE_LIB="$VIBE_ROOT/lib"
-export VIBE_CONFIG="$VIBE_ROOT/config"
-export VIBE_AGENT="$VIBE_ROOT/.agent"
+export VIBE_BIN="${VIBE_BIN:-$VIBE_ROOT/bin}"
+export VIBE_LIB="${VIBE_LIB:-$VIBE_ROOT/lib}"
+export VIBE_CONFIG="${VIBE_CONFIG:-$VIBE_ROOT/config}"
+export VIBE_AGENT="${VIBE_AGENT:-$VIBE_ROOT/.agent}"
 
 # ── Load Utils ──────────────────────────────────────────
 [[ -z "$VIBE_UTILS_LOADED" ]] && source "$VIBE_LIB/utils.sh" && VIBE_UTILS_LOADED=1

@@ -65,7 +65,7 @@ _flow_start() {
 }
 
 _flow_review() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree. Specify: vibe flow review <feature>"; return 1; }
 
   echo "\n${BOLD}${YELLOW}Pre-PR Checklist: ${feature}${NC}"
@@ -86,7 +86,7 @@ _flow_review() {
 }
 
 _flow_pr() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
   vibe_has gh || { log_error "GitHub CLI (gh) required — brew install gh"; return 1; }
 
@@ -106,7 +106,7 @@ _flow_pr() {
 }
 
 _flow_done() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
   local wt_dir; wt_dir=$(basename "$PWD")
 
@@ -156,7 +156,7 @@ _flow_sync() {
 }
 
 _flow_status() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
 
   echo "\n${BOLD}${YELLOW}Workflow Status: ${feature}${NC}"

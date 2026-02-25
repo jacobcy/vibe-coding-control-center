@@ -18,7 +18,7 @@ _keys_list() {
     if [[ ! -f "$kf" ]]; then
         log_warn "No keys.env found"
         echo "💡 Create from template: ${CYAN}vibe keys init${NC}"
-        return 1
+        return 0
     fi
 
     while IFS='=' read -r key value; do
