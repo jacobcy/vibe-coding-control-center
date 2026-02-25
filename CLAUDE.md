@@ -2,6 +2,8 @@
 
 Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥、worktree/tmux 工作流，以及 Agent 规则体系。
 
+> Entry note: The canonical root entry is `AGENTS.md`. Use this file for project context and hard rules.
+
 ## 技术栈
 - 语言：Zsh
 - 入口：`bin/vibe`
