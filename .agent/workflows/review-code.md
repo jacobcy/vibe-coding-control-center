@@ -6,12 +6,12 @@ description: Deep Static Analysis & Agentic Code Review
 
 ## 1. Prerequisites (前置准备)
 - [ ] Context gathered: Check git status, identify files to review.
-- [ ] Rules loaded: `coding-standards.md`, `architecture.md`.
+- [ ] Rules loaded: `coding-standards.md`, `patterns.md`.
 
 ## 2. Standards Check (规范检查)
 **CRITICAL**: 执行前请复核以下规则：
 // turbo
-cat .agent/rules/architecture.md .agent/rules/patterns.md .agent/rules/coding-standards.md
+cat .agent/rules/patterns.md .agent/rules/coding-standards.md
 
 ## 3. Execution (执行)
 Perform deep code review.
@@ -53,4 +53,3 @@ Act as a Senior Staff Engineer. Generate a report:
 
 ## 4. Verification (验证)
 - [ ] Verify issues are resolved (if fixes applied).
-
