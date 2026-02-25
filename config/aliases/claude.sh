@@ -42,7 +42,10 @@ cc_cn() {
 }
 
 # 切换到官方 endpoint
-alias cc_off='export ANTHROPIC_BASE_URL="https://api.anthropic.com" && echo "🌐 Claude Endpoint: Official"'
+cc_off() {
+  export ANTHROPIC_BASE_URL="https://api.anthropic.com"
+  echo "Claude Endpoint: Official"
+}
 
 # 显示当前 endpoint
 cc_endpoint() {

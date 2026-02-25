@@ -141,8 +141,8 @@ vtls() {
   fi
 
   echo "$session_list" | while read -r name attached windows; do
-    local status="${attached:+✓ (attached)}"
-    echo "   - $name ($windows windows) $status"
+    local status_icon="${attached:+✓ (attached)}"
+    echo "   - $name ($windows windows) $status_icon"
   done
 }
 

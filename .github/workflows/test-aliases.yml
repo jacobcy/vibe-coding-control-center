@@ -1,0 +1,52 @@
+name: Test Aliases
+
+on:
+  push:
+    paths:
+      - 'config/aliases.sh'
+      - 'config/aliases/**/*.sh'
+      - 'tests/test-aliases.sh'
+  pull_request:
+    paths:
+      - 'config/aliases.sh'
+      - 'config/aliases/**/*.sh'
+      - 'tests/test-aliases.sh'
+
+jobs:
+  test-aliases:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install zsh (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y zsh
+
+    - name: Check zsh version
+      run: zsh --version
+
+    - name: Run alias tests
+      shell: zsh {0}
+      run: |
+        cd $GITHUB_WORKSPACE
+        zsh tests/test-aliases.sh --quiet
+
+    - name: Run syntax check on all alias files
+      shell: zsh {0}
+      run: |
+        cd $GITHUB_WORKSPACE
+        echo "Checking syntax of all alias files..."
+        zsh -n config/aliases.sh
+        for file in config/aliases/*.sh; do
+          echo "Checking: $file"
+          zsh -n "$file"
+        done
+        echo "✓ All syntax checks passed"

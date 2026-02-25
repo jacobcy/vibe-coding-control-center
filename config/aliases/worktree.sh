@@ -9,12 +9,37 @@ alias wtls='git worktree list'
 # 跳转到 worktree 目录
 wt() {
   local target="$1"
+
+  # 无参数 = 列出 worktrees
   if [[ -z "$target" ]]; then
-    git -C "$VIBE_REPO" worktree list
+    git worktree list
     return
   fi
-  cd "$VIBE_REPO/$target" || return
-  [[ -n "$TMUX" ]] && tmux rename-window "$target"
+
+  # 从 git worktree list 中查找匹配的路径
+  local wt_path
+  wt_path="$(git worktree list --porcelain 2>/dev/null |
+    awk -v name="$target" '
+      /^worktree / {
+        path = substr($0, 10)
+        basename = path
+        sub(/.*\//, "", basename)
+        if (basename == name || path == name) {
+          print path
+          exit
+        }
+      }
+    ')"
+
+  if [[ -n "$wt_path" && -d "$wt_path" ]]; then
+    cd "$wt_path" || return
+    [[ -n "$TMUX" ]] && tmux rename-window "${target:t}"
+  else
+    echo "❌ Worktree not found: $target"
+    echo "   Available worktrees:"
+    git worktree list 2>/dev/null | sed 's/^/   /' || echo "   (unable to list)"
+    return 1
+  fi
 }
 
 # 创建新 worktree（修复路径计算）
@@ -44,7 +69,7 @@ wtnew() {
     repo_root="${current_dir}"
     # 如果当前目录不是 git 仓库，尝试向上查找
     while [[ "$repo_root" != "/" && ! -d "$repo_root/.git" && ! -f "$repo_root/.git" ]]; do
-      repo_root="$(dirname "$repo_root")"
+      repo_root="${repo_root:h}"
     done
     if [[ "$repo_root" == "/" ]]; then
       vibe_die "Could not find git repository root"
@@ -73,7 +98,8 @@ wtnew() {
 
   # 修复路径计算：使用 repo_root 的父目录放置 worktree
   # 如果 repo_root 本身就是仓库根，则在其同级目录创建 worktree
-  local parent_dir="$(dirname "$repo_root")"
+  # 使用 zsh 参数扩展替代 dirname 命令
+  local parent_dir="${repo_root:h}"
   path="$parent_dir/$dir"
 
   # Create branch from base in main repo context
@@ -180,9 +206,9 @@ wtrm() {
     if [[ "$arg" == /* ]]; then
       path="$arg"
     else
-      # 修复：直接使用 repo root，不使用父目录
+      # 修复：直接使用 repo root 的父目录
       local repo_root
-      repo_root="$(dirname "$main_dir")"
+      repo_root="${main_dir:h}"
       path="$repo_root/$arg"
     fi
 
@@ -280,8 +306,7 @@ vup() {
       local repo_root
       repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
       if [[ -n "$repo_root" ]]; then
-        local parent_dir
-        parent_dir="$(dirname "$repo_root")"
+        local parent_dir="${repo_root:h}"
         dir_path="$parent_dir/$wt_dir"
       else
         dir_path="$VIBE_REPO/$wt_dir"

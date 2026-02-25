@@ -10,7 +10,11 @@
 
 # ---------- 环境变量初始化 ----------
 # Resolve VIBE_ROOT using the shared library logic
+# Note: 不使用 local，因为 zsh 不允许在脚本顶层使用 local
 _aliases_dir="$(dirname "${(%):-%x:A}")"
+_aliases_real=""
+_lib_config=""
+
 # Resolve symlinks: if _aliases_dir ends in config, parent is the install root
 if [[ -L "${(%):-%x}" ]]; then
     _aliases_real="$(readlink -f "${(%):-%x}" 2>/dev/null || readlink "${(%):-%x}")"

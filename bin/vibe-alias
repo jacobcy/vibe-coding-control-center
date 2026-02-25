@@ -58,29 +58,64 @@ do_list() {
 
         # Group aliases by category
         # Note: Use [a-z_]* to match aliases with underscores (e.g., cc_off, vsign)
+        # Format alias output: extract name and description
+        format_aliases() {
+            local pattern="$1"
+            grep "$pattern" "${all_files[@]}" 2>/dev/null | \
+                awk -F: '{print $NF}' | \
+                sed 's/^alias //' | \
+                while IFS= read -r line; do
+                    # Extract name (before =)
+                    name="${line%%=*}"
+                    # Get description after = and remove quotes
+                    desc="${line#*=}"
+                    desc="${desc//[\'\"]/}"  # Remove all quotes
+                    # Trim long descriptions for readability
+                    if [[ ${#desc} -gt 50 ]]; then
+                        desc="${desc:0:47}..."
+                    fi
+                    [[ -n "$name" ]] && printf "    %-15s - %s\n" "$name" "$desc"
+                done
+        }
+
         echo "  ${BOLD}Vibe Commands:${NC}"
-        grep "^alias v[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        format_aliases "^alias v[a-z_]*="
         echo ""
 
-        echo "  ${BOLD}Claude Commands (cc*):${NC}"
-        grep "^alias cc[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
-        echo ""
-
-        echo "  ${BOLD}OpenCode Commands (oo*):${NC}"
-        grep "^alias oo[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        echo "  ${BOLD}AI Tools (cc*, oo*):${NC}"
+        grep -h -E "^alias cc|^alias oo" "${all_files[@]}" 2>/dev/null | \
+                sed 's/^alias //' | \
+                while IFS= read -r line; do
+                    name="${line%%=*}"
+                    desc="${line#*=}"
+                    desc="${desc//[\'\"]/}"
+                    if [[ ${#desc} -gt 50 ]]; then
+                        desc="${desc:0:47}..."
+                    fi
+                    [[ -n "$name" ]] && printf "    %-15s - %s\n" "$name" "$desc"
+                done
         echo ""
 
         echo "  ${BOLD}OpenSpec Commands (os*):${NC}"
-        grep "^alias os[a-z_]*=" "${all_files[@]}" 2>/dev/null | sed 's/alias //'
+        grep -h "^alias os" "${all_files[@]}" 2>/dev/null | \
+                sed 's/^alias //' | \
+                while IFS= read -r line; do
+                    name="${line%%=*}"
+                    desc="${line#*=}"
+                    desc="${desc//[\'\"]/}"
+                    if [[ ${#desc} -gt 50 ]]; then
+                        desc="${desc:0:47}..."
+                    fi
+                    [[ -n "$name" ]] && printf "    %-15s - %s\n" "$name" "$desc"
+                done
         echo ""
 
-        echo "  ${BOLD}Tmux Commands (vt*):${NC}"
-        echo "    vt              - Attach to default session"
+        echo "  ${BOLD}Tmux Commands:${NC}"
         echo "    vtup [session] - Create or attach to session"
         echo "    vtdown          - Detach current session"
-        echo "    vtswitch <s>    - Switch to session"
+        echo "    vtswitch <s>   - Switch to session"
         echo "    vtls            - List sessions"
-        echo "    vtkill [s]      - Kill session"
+        echo "    vtkill [s]     - Kill session"
         echo ""
 
         echo "  ${BOLD}Worktree Management (Functions):${NC}"
@@ -101,9 +136,11 @@ do_list() {
 
     echo "${BOLD}[Custom Aliases]${NC} ($CUSTOM_ALIASES_FILE)"
     if grep -q "^alias" "$CUSTOM_ALIASES_FILE" 2>/dev/null; then
-        grep "^alias" "$CUSTOM_ALIASES_FILE" | sed 's/alias //' | while read line; do
-            echo "  $line"
-        done
+        grep "^alias" "$CUSTOM_ALIASES_FILE" | \
+            sed -E "s/^alias\s+([a-z][a-z0-9_]*)=['\"](.*)['\"]/\1 \2/" | \
+            while read -r name desc; do
+                [[ -n "$name" ]] && printf "    %-15s - %s\n" "$name" "$desc"
+            done
     else
         echo "  (None defined)"
     fi
