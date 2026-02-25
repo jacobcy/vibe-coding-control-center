@@ -52,3 +52,29 @@ setup() {
   [ "$output" = "opencode" ]
   rm -rf /tmp/wt-opencode-myfeature
 }
+
+@test "6. _flow_sync returns non-zero when any merge fails" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "source-branch"; return 0 ;;
+        "worktree list --porcelain")
+          echo "worktree /tmp/wt-source"
+          echo "worktree /tmp/wt-fail"
+          return 0
+          ;;
+        "-C /tmp/wt-source branch --show-current") echo "source-branch"; return 0 ;;
+        "-C /tmp/wt-fail branch --show-current") echo "target-branch"; return 0 ;;
+        "rev-list --count target-branch..source-branch") echo "1"; return 0 ;;
+        "-C /tmp/wt-fail merge source-branch --no-edit") return 1 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_sync
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Merge failed for target-branch" ]]
+}

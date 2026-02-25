@@ -132,12 +132,13 @@ _flow_done() {
 
 _flow_sync() {
   local current_branch
+  local has_fail=0
   current_branch=$(git branch --show-current 2>/dev/null)
   [[ -z "$current_branch" ]] && { log_error "Not in a git repository"; return 1; }
   
   log_step "Syncing from source branch: ${CYAN}$current_branch${NC}"
   
-  git worktree list --porcelain | grep '^worktree' | cut -d' ' -f2 | while read -r wt_path; do
+  while read -r wt_path; do
     local wt_branch
     wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null)
     
@@ -152,9 +153,16 @@ _flow_sync() {
         log_success "  -> Synced $wt_branch"
       else
         log_error "  -> Merge failed for $wt_branch. Manual resolution required in $wt_path"
+        has_fail=1
       fi
     fi
-  done
+  done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
+
+  if [[ "$has_fail" -eq 1 ]]; then
+    log_error "Sync completed with failures."
+    return 1
+  fi
+
   log_success "Sync complete."
 }
 
