@@ -1,28 +1,17 @@
-# Engineering Patterns
+# Engineering Patterns (Supplement)
 
-## 1. Idempotency
-All scripts and workflows must be **safe to run multiple times**.
-- **Bad**: `mkdir foo` (Fails if exists)
-- **Good**: `mkdir -p foo` (Succeeds if exists)
-- **Context**: If an agent gets stuck and retries a step, it shouldn't destroy data.
+本文件定义执行模式，不重复 `SOUL.md` / `CLAUDE.md` 的治理条款。
 
-## 2. "Turbo" Mode (Auto-Run)
-- Workflows can be annotated with `// turbo` to deterimine safe-to-autorun blocks.
-- **Pattern**: If a block is purely read-only or strictly idempotent, mark it `// turbo`.
-- **Pattern**: Destructive or high-risk actions (e.g., `git push --force`) must **NEVER** be auto-run.
+## Context First
+- 开始前先读取：`git status`、`git log`、`.agent/context/*`。
+- 任何结论都需要对应证据（命令、diff、测试结果）。
 
-## 3. Context First
-Agents have no persistent memory between sessions.
-- **Pattern**: Every workflow starts by gathering context.
-- **Action**: `git status`, `git log`, `cat .agent/rules/*`.
-- **Why**: You cannot make good decisions without knowing the current state.
+## Idempotent Steps
+- 设计可重复执行步骤，避免二次执行破坏状态。
+- 对外部副作用操作加前置检查（例如分支、路径、文件存在性）。
 
-## 4. Structured Reporting
-Output must be predictable and parseable.
-- **Pattern**: Use Markdown headers for sections.
-- **Pattern**: Use checkboxes `[ ]` for actionable items.
-- **Pattern**: Explicitly state "Next Steps".
+## Fail Fast
+- 前置条件不满足立即停止，并输出明确阻塞原因。
 
-## 5. Fail Fast
-- **Shell**: Use `set -e`.
-- **Workflow**: If a prerequisite fails (e.g., "Clean git status"), stop immediately. Do not proceed to complex logic.
+## Structured Reporting
+- 输出固定结构：结论、证据、下一步。

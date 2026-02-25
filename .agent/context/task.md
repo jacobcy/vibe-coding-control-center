@@ -1,11 +1,9 @@
-# Task Status (任务追踪)
+# Task Status
 
 ## Current
-- V2 rebuild complete. All 14 tasks done.
+- 文档精简与去重（token 优化）
+  - 目标文件：`SOUL.md` `CLAUDE.md` `README.md` `.agent/context/*` `.agent/rules/*`
 
-## Completed
-- [x] Phase 1: utils.sh, config.sh, bin/vibe, check.sh
-- [x] Phase 2: keys.sh, tool.sh, keys.template.env
-- [x] Phase 3: flow.sh (dev lifecycle)
-- [x] Phase 4: Alias migration (7 files), aliases.sh loader
-- [x] Phase 5: CLAUDE.md governance, .agent/ migration, AGENTS.md
+## Recent
+- 已恢复 PR #12 内容（通过恢复 PR #13 合并到 main）
+- 已启用 main 分支保护（禁止 force push，强制 PR + 检查）
