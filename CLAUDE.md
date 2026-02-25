@@ -30,6 +30,12 @@ We are **NOT an AI agent implementation**. We do NOT:
 ## Constitution & Principles
 This project operates under the **Vibe Coding Constitution** defined in [SOUL.md](SOUL.md). All development activities, including AI-assisted coding, follows the principles outlined in that document.
 
+## Governance System
+Project governance is managed by the Vibe Skills Governance System (documented in `docs/plans/2026-02-25-vibe-skills-governance-design.md`).
+- **Configuration**: Managed in `.agent/governance.yaml`
+- **Skill Standards**: Outlined in `docs/standards/SKILL_STANDARD.md`
+- **Gatekeeping**: PR is the only compliance gate. All LOC ceilings, boundaries, and scope constraints must be checked during the Vibe Flow lifecycle.
+
 ## Build & Test Commands
 - Build: `./scripts/vibecoding.sh` (starts the main control center)
 - Dev Setup: `./install/install-claude.sh` (sets up Claude Code environment)

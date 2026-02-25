@@ -1,5 +1,5 @@
 ---
-name: check
+name: vibe-check
 description: Use when the user wants to verify project memory consistency, says "/check", "verify memory", or "check context". Validates that memory.md, task.md, and memory/ topics match actual project state.
 ---
 
@@ -42,7 +42,13 @@ task_file=".agent/context/task.md"
 - 路径是否正确
 - 内容是否与记录的描述匹配
 
-### Step 5: 输出验证报告
+### Step 5: 验证项目治理状态 (Governance)
+
+针对 Vibe Skills 治理机制进行合规与一致性检查：
+- 检查 `.agent/governance.yaml` 文件及指标预算设置是否格式正确且未被意外破坏。
+- 验证当前实际的流程状态 (vibe flow state) 是否与 memory 文件中声明的内容产生了冲突。
+
+### Step 6: 输出验证报告
 
 ```
 📋 Memory Consistency Check

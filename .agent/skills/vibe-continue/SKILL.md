@@ -1,5 +1,5 @@
 ---
-name: continue
+name: vibe-continue
 description: Use when the user wants to resume previous work, says "/continue", or starts a new session and wants to load saved context. Reads task.md and memory/ to restore state.
 ---
 
@@ -13,18 +13,20 @@ description: Use when the user wants to resume previous work, says "/continue", 
 
 ## 工作流程
 
-### Step 1: 读取任务状态
+### Step 1: 读取任务状态与 Governance 恢复
 
 ```bash
-# 读取任务文件
+# 读取任务文件与治理配置
 task_file=".agent/context/task.md"
 memory_index=".agent/context/memory.md"
+governance_file=".agent/governance.yaml"
 ```
 
 分析以下内容：
 - **Current Objectives**: 当前正在进行的任务
 - **Backlog**: 待办任务列表
 - **Completed**: 已完成任务（用于上下文）
+- **Governance Phase**: 当前处于探索期 (`exploration`) 还是收敛期 (`convergence`)。
 
 ### Step 2: 识别活动主题
 

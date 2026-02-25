@@ -1,5 +1,5 @@
 ---
-name: save
+name: vibe-save
 description: Use when the user wants to save session context, says "/save", or when ending a session and you want to preserve work state. Saves tasks, decisions, and solutions to project memory.
 ---
 
@@ -95,6 +95,12 @@ fi
 - **project_specific**: 项目特定约定
 
 如果发现可复用模式，建议运行 `/learn` 提取为全局 skill。
+
+### Step 7: 触发 Governance Hook
+
+作为 Vibe Skills 治理体系的一部分，在 `vibe flow done` 阶段将自动触发 `save` 技能：
+- 保存行为受 `.agent/governance.yaml` 的 `flow_hooks.done` 配置编排。
+- 在最后归档前，必须确保上下文沉积工作已完成。
 
 ## 文件格式
 
