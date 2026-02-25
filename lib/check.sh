@@ -53,7 +53,7 @@ vibe_check() {
         local rest="${entry#*:}"
         local cmd="${rest%%:*}"
         local flag="${rest#*:}"
-        _check_tool "$name" "$cmd" "$flag" || ((missing++))
+        _check_tool "$name" "$cmd" "$flag" || ((missing+=1))
     done
     echo ""
 

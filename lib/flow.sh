@@ -39,16 +39,7 @@ _flow_start() {
   git config user.name "Agent-${(C)agent}" 2>/dev/null
   mkdir -p docs/prds
   if [[ ! -f "docs/prds/${feature}.md" ]]; then
-    cat > "docs/prds/${feature}.md" <<EOF
-# PRD: ${feature}
-## 背景
-_TODO: 描述为什么需要这个功能_
-## 目标
-_TODO: 描述功能目标_
-## 需求清单
-- [ ] 需求1
-- [ ] 需求2
-EOF
+    printf "# PRD: %s\n## 背景\n_TODO: 描述为什么需要这个功能_\n## 目标\n_TODO: 描述功能目标_\n## 需求清单\n- [ ] 需求1\n- [ ] 需求2\n" "${feature}" > "docs/prds/${feature}.md"
     log_info "Created PRD stub: docs/prds/${feature}.md"
   fi
 
@@ -70,11 +61,14 @@ EOF
   log_success "Feature started: ${BOLD}${feature}${NC}"
   echo "  Directory : ${CYAN}$PWD${NC}"
   echo "  Branch    : ${CYAN}${branch}${NC}"
-  echo "  Next → edit PRD, develop, then: ${CYAN}vibe flow review${NC}"
+  echo ""
+  echo "${BOLD}Onboarding:${NC} ✅ 工作区已就绪"
+  echo "  为保证不产生垃圾代码，请在 AI 助手中输入: ${CYAN}/vibe-new ${feature}${NC}"
+  echo "  然后按四闸流程推进开发，完成后执行: ${CYAN}vibe flow review${NC}"
 }
 
 _flow_review() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree. Specify: vibe flow review <feature>"; return 1; }
 
   echo "\n${BOLD}${YELLOW}Pre-PR Checklist: ${feature}${NC}"
@@ -95,19 +89,16 @@ _flow_review() {
 }
 
 _flow_pr() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
   vibe_has gh || { log_error "GitHub CLI (gh) required — brew install gh"; return 1; }
 
   local title="feat(${feature}): summary"
-  local body="## Changes\n"
-  body+=$(git log --oneline main..HEAD 2>/dev/null | sed 's/^/- /')
-  body+="\n\n## Checklist\n- [ ] Tests pass\n- [ ] Docs updated\n- [ ] Code reviewed"
+  local body="## Changes\n$(git log --oneline main..HEAD 2>/dev/null | sed 's/^/- /')\n\n## Checklist\n- [ ] Tests pass\n- [ ] Docs updated\n- [ ] Code reviewed"
 
   mkdir -p temp
   echo "$body" > "temp/pr-${feature}.md"
   log_info "PR description → temp/pr-${feature}.md"
-
   echo ""
   if confirm_action "Create PR '${title}' now?"; then
     gh pr create --title "$title" --body-file "temp/pr-${feature}.md" \
@@ -117,7 +108,7 @@ _flow_pr() {
 }
 
 _flow_done() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
   local wt_dir; wt_dir=$(basename "$PWD")
 
@@ -138,8 +129,43 @@ _flow_done() {
   log_success "Worktree ${wt_dir} removed — now in: ${CYAN}$PWD${NC}"
 }
 
+_flow_sync() {
+  local current_branch
+  local has_fail=0
+  current_branch=$(git branch --show-current 2>/dev/null)
+  [[ -z "$current_branch" ]] && { log_error "Not in a git repository"; return 1; }
+  
+  log_step "Syncing from source branch: ${CYAN}$current_branch${NC}"
+  
+  while read -r wt_path; do
+    local wt_branch
+    wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null)
+    
+    [[ "$wt_branch" == "$current_branch" ]] && continue
+    
+    local behind
+    behind=$(git rev-list --count "$wt_branch".."$current_branch" 2>/dev/null || echo "0")
+    
+    if [[ "$behind" -gt 0 ]]; then
+      echo "  -> ${CYAN}$wt_branch${NC} is behind by $behind commits. Merging..."
+      if git -C "$wt_path" merge "$current_branch" --no-edit >/dev/null 2>&1; then
+        log_success "  -> Synced $wt_branch"
+      else
+        log_error "  -> Merge failed for $wt_branch. Manual resolution required in $wt_path"
+        has_fail=1
+      fi
+    fi
+  done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
+
+  if [[ "$has_fail" -eq 1 ]]; then
+    log_error "Sync completed with failures."
+    return 1
+  fi
+  log_success "Sync complete."
+}
+
 _flow_status() {
-  local feature; feature="${1:-$(_detect_feature)}"
+  local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
 
   echo "\n${BOLD}${YELLOW}Workflow Status: ${feature}${NC}"
@@ -159,20 +185,16 @@ _flow_status() {
 
 # ─── Dispatcher ─────────────────────────────────────────
 vibe_flow() {
-  local cmd="${1:-help}"; shift 2>/dev/null || true
+  local cmd="${1:-help}"; shift 1 2>/dev/null || true
   case "$cmd" in
     start)  _flow_start "$@" ;;
     review) _flow_review "$@" ;;
     pr)     _flow_pr "$@" ;;
     done)   _flow_done "$@" ;;
     status) _flow_status "$@" ;;
+    sync)   _flow_sync "$@" ;;
     *)
-      echo "Usage: vibe flow <command>"
-      echo "  start  <feature> [--agent=claude] [--base=main]  创建 worktree"
-      echo "  review [feature]   Pre-PR 检查清单 + lazygit"
-      echo "  pr     [feature]   生成 PR 并通过 gh 创建"
-      echo "  done   [feature]   清理 worktree"
-      echo "  status [feature]   查看 feature 状态"
+      printf "Usage: vibe flow <command>\n  start  <feature> [--agent=claude] [--base=main]  创建 worktree\n  review [feature]   Pre-PR 检查清单 + lazygit\n  pr     [feature]   生成 PR 并通过 gh 创建\n  done   [feature]   清理 worktree\n  status [feature]   查看 feature 状态\n  sync               同步当前分支的变更到其他所有 worktree 分支\n"
       ;;
   esac
 }

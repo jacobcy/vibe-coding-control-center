@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats-core
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bats
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Install zsh
+        run: sudo apt-get install -y zsh
+
+      - name: Run dual-layer lint
+        run: bash scripts/lint.sh
+
+      - name: Run bats tests
+        run: bats tests/
+
+      - name: Check LOC ceiling (total ≤ 1200)
+        run: |
+          total=$(find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs cat | wc -l)
+          echo "Total LOC: $total"
+          if [ "$total" -gt 1200 ]; then
+            echo "FAIL: Total LOC $total exceeds 1200 limit"
+            exit 1
+          fi
+          echo "✅ Total LOC: $total / 1200"
+
+      - name: Check per-file ceiling (≤ 200 lines each)
+        run: |
+          failed=0
+          for f in lib/*.sh bin/vibe; do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 200 ]; then
+              echo "FAIL: $f has $lines lines (limit: 200)"
+              failed=$((failed + 1))
+            else
+              echo "  ✅ $f: $lines lines"
+            fi
+          done
+          if [ "$failed" -gt 0 ]; then
+            echo "FAIL: $failed files exceed the 200-line limit"
+            exit 1
+          fi
+          echo "✅ All files within 200-line limit"
