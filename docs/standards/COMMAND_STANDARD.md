@@ -95,12 +95,12 @@
     *   `vibe chat`: 启动配置的默认 AI 工具 (Claude/OpenCode)。
     *   `vibe chat "message"`: 单次提问模式。
 
-### 3.3 `vibe equip` (工具链)
+### 3.3 `vibe tool` (工具链)
 *   核心功能：安装与升级依赖工具。
 *   **Action**:
-    *   `vibe equip`: 显示交互式菜单，选择安装 Claude, OpenCode, Gum 等工具。
-    *   `vibe equip install <tool>`: 直接安装指定工具。
-    *   `vibe equip update`: 更新所有已安装工具。
+    *   `vibe tool`: 显示交互式菜单，选择安装 Claude, OpenCode, Gum 等工具。
+    *   `vibe tool install <tool>`: 直接安装指定工具。
+    *   `vibe tool update`: 更新所有已安装工具。
 
 ### 3.4 `vibe init` (初始化)
 *   核心功能：项目脚手架与环境初始化。

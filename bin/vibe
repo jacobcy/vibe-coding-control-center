@@ -23,9 +23,9 @@ case "$command" in
         source "$VIBE_LIB/check.sh"
         vibe_check "$@"
         ;;
-    equip)
-        source "$VIBE_LIB/equip.sh"
-        vibe_equip "$@"
+    tool)
+        source "$VIBE_LIB/tool.sh"
+        vibe_tool "$@"
         ;;
     keys)
         source "$VIBE_LIB/keys.sh"
@@ -49,7 +49,7 @@ case "$command" in
         echo ""
         echo "Commands:"
         echo "  ${GREEN}check${NC}    检测开发环境（工具版本、依赖状态）"
-        echo "  ${GREEN}equip${NC}    安装/更新 AI 开发工具（claude, opencode, codex）"
+        echo "  ${GREEN}tool${NC}    安装/更新 AI 开发工具（claude, opencode, codex）"
         echo "  ${GREEN}keys${NC}     管理 API 密钥（list, set, get）"
         echo "  ${GREEN}flow${NC}     开发工作流（start, review, pr, done）"
         echo "  ${GREEN}alias${NC}    加载 shell 快捷别名"

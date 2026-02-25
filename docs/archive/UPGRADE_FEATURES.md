@@ -88,9 +88,9 @@ SYSTEM STATUS:
 ✓ MCP Config     : Found (11 servers)
 ```
 
-**Equip 菜单显示**:
+**tool 菜单显示**:
 ```
->> EQUIPPING TOOLS (INSTALL/UPDATE) <<
+>> toolPING TOOLS (INSTALL/UPDATE) <<
 1. Install/Update Claude Code (current: v2.1.31)
 2. Install/Update OpenCode (current: v1.1.51)
 3. Back
@@ -121,7 +121,7 @@ SYSTEM STATUS:
 ```bash
 # 方式 1: 使用控制中心
 ./scripts/vibecoding.sh
-# 选择 "2) EQUIP"
+# 选择 "2) tool"
 # 选择要更新的工具
 
 # 方式 2: 直接运行安装脚本

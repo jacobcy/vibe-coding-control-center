@@ -5,7 +5,7 @@
 ## 1. 核心控制台 (Main CLI)
 | 命令 | 用途 | 备注 |
 | :--- | :--- | :--- |
-| `vibe` | 启动交互式控制面板 | 包含 Ignition, Equip, Keys, Sync, Diagnostics |
+| `vibe` | 启动交互式控制面板 | 包含 Ignition, tool, Keys, Sync, Diagnostics |
 | `vibe init --ai` | AI 初始化项目 | 默认模式，使用已安装工具生成文档 |
 | `vibe init --local` | 本地模板初始化项目 | 无 AI 工具时可用 |
 | `vibe chat` / `vc` | 快速进入对话 | 交互模式或快速问答 `vibe chat "问题"` |

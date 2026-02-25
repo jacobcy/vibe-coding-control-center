@@ -8,7 +8,7 @@
 - **Run**: `./scripts/vibecoding.sh`
 - **功能**:
     - **Ignition**: 极速启动新项目（自动配置 Rules 和 Context）。
-    - **Equip**: 一键安装/更新 Claude Code 和 OpenCode。
+    - **tool**: 一键安装/更新 Claude Code 和 OpenCode。
     - **Diagnostics**: 检查 API Key 和环境状态。
 
 ## 0.5 🔐 安全配置 (Required)

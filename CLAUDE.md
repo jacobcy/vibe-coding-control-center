@@ -34,7 +34,7 @@ We do **NOT** reimplement agent functionality. See §HARD RULES below.
 - Diagnostics: `bin/vibe check`
 - Workflow: `bin/vibe flow <start|review|pr|done|status>`
 - Keys: `bin/vibe keys <list|set|get|init>`
-- Install tools: `bin/vibe equip`
+- Install tools: `bin/vibe tool`
 - Aliases: `source config/aliases.sh`
 
 ## Tech Stack
@@ -50,7 +50,7 @@ lib/
   utils.sh             # Logging, validation, command helpers
   config.sh            # VIBE_ROOT detection, keys loading
   check.sh             # Environment diagnostics
-  equip.sh             # Tool installation
+  tool.sh             # Tool installation
   keys.sh              # API key management
   flow.sh              # Dev workflow lifecycle
 config/

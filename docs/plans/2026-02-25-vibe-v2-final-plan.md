@@ -17,7 +17,7 @@
 |---|------|------|----------|---------|
 | 1 | CLI 入口 | `vibe <cmd>` | 分发到子命令，未知命令显示帮助 | 50 |
 | 2 | 环境检测 | `vibe check` | 检测 claude/opencode/codex/git/gh/tmux/jq 是否安装，报告版本 | 80 |
-| 3 | 工具安装 | `vibe equip` | 安装/更新 claude, opencode, codex | 120 |
+| 3 | 工具安装 | `vibe tool` | 安装/更新 claude, opencode, codex | 120 |
 | 4 | 密钥管理 | `vibe keys` | 从 keys.env 读写 API key，模板生成 | 60 |
 | 5 | Alias 加载 | `vibe alias` | 加载 worktree/tmux/claude/git/openspec alias | 30 |
 | 6 | 工作流 | `vibe flow start/review/pr/done` | worktree 创建→checklist→PR 生成→清理 | 180 |
@@ -110,7 +110,7 @@
 | `lib/agents.sh` | 101 | 大部分死代码 |
 | `lib/skill_manager.sh` | 245 | 过度建设 |
 | `lib/mcp_manager.sh` | 234 | 可简化到 20 行 |
-| `lib/tool_manager.sh` | 315 | 合并入 equip |
+| `lib/tool_manager.sh` | 315 | 合并入 tool |
 | **合计丢弃** | **~2,924** | |
 
 ---
@@ -129,7 +129,7 @@ v2/
 │   ├── utils.sh                 # 日志 + validate_path (~60 行)
 │   ├── config.sh                # VIBE_ROOT + keys.env 加载 (~40 行)
 │   ├── check.sh                 # 环境检测 (~80 行)
-│   ├── equip.sh                 # 工具安装 (~120 行)
+│   ├── tool.sh                 # 工具安装 (~120 行)
 │   ├── keys.sh                  # 密钥管理 (~60 行)
 │   └── flow.sh                  # 工作流核心 (~180 行)
 ├── config/
@@ -186,7 +186,7 @@ v2/
 - 验证：`source v2/lib/config.sh && echo $VIBE_ROOT`
 
 **Task 1.3**: 重写 `v2/bin/vibe` dispatcher
-- 分发到 check/equip/keys/flow/alias/help
+- 分发到 check/tool/keys/flow/alias/help
 - 目标：~50 行
 - 验证：`v2/bin/vibe help` 输出命令列表
 
@@ -205,11 +205,11 @@ v2/
 - 目标：~60 行
 - 验证：`v2/bin/vibe keys list` 显示当前配置的 key
 
-**Task 2.2**: 实现 `v2/lib/equip.sh`
+**Task 2.2**: 实现 `v2/lib/tool.sh`
 - 从 V1 install 脚本提取：安装 claude, opencode, codex
 - 合并三个脚本的共同逻辑
 - 目标：~120 行
-- 验证：`v2/bin/vibe equip` 显示可安装工具列表
+- 验证：`v2/bin/vibe tool` 显示可安装工具列表
 
 **Task 2.3**: 创建 `v2/config/keys.template.env`
 - 从 V1 复制模板
@@ -280,7 +280,7 @@ v2/bin/vibe check             # 显示环境状态
 v2/bin/vibe keys list         # 列出 API key 状态
 
 # 3. 工具安装
-v2/bin/vibe equip             # 显示工具状态
+v2/bin/vibe tool             # 显示工具状态
 
 # 4. 工作流（核心验收）
 v2/bin/vibe flow start test   # 创建 worktree

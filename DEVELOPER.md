@@ -98,7 +98,7 @@ bin/vibe flow review              # 触发代码审查
 bin/vibe flow pr                  # 创建 PR
 bin/vibe flow done                # 完成工作
 bin/vibe keys list                # 列出 API 密钥
-bin/vibe equip                    # 安装 AI 工具
+bin/vibe tool                    # 安装 AI 工具
 source config/aliases.sh          # 加载别名
 ```
 

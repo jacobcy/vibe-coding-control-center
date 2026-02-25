@@ -22,7 +22,7 @@ The main `vibe` command serves as a dispatcher and interactive control center:
 | `vibe` | Interactive menu mode | Dispatcher (`bin/vibe` -> `scripts/vibecoding.sh`) |
 | `vibe chat` | 快速启动 AI 工具（交互或快速问答） | `bin/vibe-chat` |
 | `vibe config` | Manage Vibe Coding configuration | `bin/vibe-config` |
-| `vibe equip` | Install/update AI tools | `bin/vibe-equip` |
+| `vibe tool` | Install/update AI tools | `bin/vibe-tool` |
 | `vibe env` | Environment and key management | `bin/vibe-env` |
 | `vibe init` | Initialize new project | `bin/vibe-init` |
 | `vibe check` | System health check (includes diagnostics) | `bin/vibe-check` |
@@ -38,7 +38,7 @@ vibe-coding-control-center/
 │   ├── vibe                  # Main dispatcher (Git-style command handling)
 │   ├── vibe-chat             # AI chat command
 │   ├── vibe-config           # Configuration management command
-│   ├── vibe-equip            # Tool installation/update command
+│   ├── vibe-tool            # Tool installation/update command
 │   ├── vibe-env              # Environment management command
 │   ├── vibe-init             # Project initialization command
 │   ├── vibe-check            # System health check command
@@ -106,7 +106,7 @@ New modular approach with:
 vibe
 
 # New command-based usage
-vibe equip              # Install/update tools
+vibe tool              # Install/update tools
 vibe chat               # Start AI chat (interactive)
 vibe chat "question"    # Quick Q&A (non-interactive)
 vibe config             # Manage configuration
@@ -118,9 +118,9 @@ vibe flow test          # Initialize TDD test
 
 # Help
 vibe help               # General help
-vibe help equip         # Help for specific command
+vibe help tool         # Help for specific command
 vibe -h                 # Alternative help
-vibe equip -h           # Help for specific command
+vibe tool -h           # Help for specific command
 ```
 
 ## Migration Notes
