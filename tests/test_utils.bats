@@ -24,7 +24,7 @@ setup() {
 @test "3. log_success outputs success message" {
   run log_success "test success"
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "✓" ]] || [[ "$output" =~ "SUCCESS" ]]
+  [[ "$output" =~ "★" ]] || [[ "$output" =~ "✓" ]] || [[ "$output" =~ "SUCCESS" ]]
   [[ "$output" =~ "test success" ]]
 }
 

@@ -92,7 +92,14 @@ vibe_keys() {
         set)       _keys_set "$@" ;;
         get)       _keys_get "$@" ;;
         init)      _keys_init ;;
+        help|-h|--help)
+                   echo "Usage: vibe keys <command>"
+                   echo "Commands: list | set | get | init"
+                   ;;
         *)         log_error "Unknown: vibe keys $subcmd"
-                   echo "Usage: vibe keys {list|set|get|init}" ;;
+                   echo "Usage: vibe keys <command>"
+                   echo "Commands: list | set | get | init"
+                   return 1
+                   ;;
     esac
 }
