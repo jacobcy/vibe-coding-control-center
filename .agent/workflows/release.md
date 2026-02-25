@@ -6,12 +6,12 @@ description: Automated Release Workflow
 
 ## 1. Prerequisites (前置准备)
 - [ ] Context gathered: Check git status, ensure clean working directory.
-- [ ] Rules loaded: `git-rules.md`.
+- [ ] Rules loaded: `coding-standards.md`, `patterns.md`.
 
 ## 2. Standards Check (规范检查)
 **CRITICAL**: 执行前请复核以下规则：
 // turbo
-cat .agent/rules/coding-standards.md .agent/rules/git-rules.md
+cat .agent/rules/coding-standards.md .agent/rules/patterns.md
 
 ## 3. Execution (执行)
 Perform release steps.
@@ -79,4 +79,3 @@ git push origin "v$VERSION"
 git tag --list | head -n 5
 ```
 - [ ] Verify GitHub Release workflow triggered (optional).
-

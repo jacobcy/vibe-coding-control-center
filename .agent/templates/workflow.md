@@ -11,7 +11,7 @@ description: [Short Description of Workflow]
 ## 2. Standards Check (规范检查)
 **CRITICAL**: 执行前请复核以下规则：
 // turbo
-cat .agent/rules/coding-standards.md .agent/rules/git-rules.md
+cat .agent/rules/coding-standards.md .agent/rules/patterns.md
 
 ## 3. Execution (执行)
 [具体的步骤，保留原有的脚本调用逻辑]

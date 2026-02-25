@@ -19,6 +19,8 @@
 - **`lib/`**: **技能引擎 (Skill Engine)**。包含被 Workflow 调用的核心脚本库 (`.sh`)，实现了具体的业务逻辑。
   - `gh-ops.sh`: GitHub issue 和 PR 管理。
   - `audit.sh`: 代码与文档审计。
+  - `git-scope.sh`: 变更范围分析。
+  - `bump_version.sh`: 版本发布辅助脚本。
 - **`rules/`**: 具体的编码标准和项目规则。
 - **`templates/`**: Commit, PR 等模板。
 
