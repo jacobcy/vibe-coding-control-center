@@ -68,8 +68,38 @@ wtrm() {
   _wtrm_one() {
     local p="$1" label="${1##*/}"
     [[ "$p" == "$main_dir" ]] && { echo "⚠️  Cannot remove main worktree"; return 1; }
+    
+    local branch_name=""
+    if [[ -d "$p" ]]; then
+      branch_name=$($git_cmd -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null)
+    fi
+    if [[ -z "$branch_name" ]]; then
+      branch_name=$($git_cmd -C "$main_dir" worktree list --porcelain | awk -v path="$p" '
+        /^worktree / { if ($2 == path) found=1; else found=0 }
+        /^branch / && found { sub("refs/heads/", "", $2); print $2; exit }
+      ')
+    fi
+
     if $git_cmd -C "$main_dir" worktree remove --force "$p" 2>/dev/null; then
       echo "✅ Removed: $label"
+      
+      if [[ -n "$branch_name" && "$branch_name" != "main" && "$branch_name" != "master" ]]; then
+        if $git_cmd -C "$main_dir" branch -D "$branch_name" >/dev/null 2>&1; then
+           echo "🗑️  Deleted local branch: $branch_name"
+        fi
+        if $git_cmd -C "$main_dir" ls-remote --exit-code --heads origin "$branch_name" >/dev/null 2>&1; then
+           echo -n "❓ Delete remote branch origin/$branch_name? [y/N] "
+           local response
+           read -r response
+           if [[ "$response" =~ ^[yY]$ ]]; then
+              if $git_cmd -C "$main_dir" push origin --delete "$branch_name"; then
+                 echo "🗑️  Deleted remote branch: origin/$branch_name"
+              fi
+           else
+              echo "ℹ️  Kept remote branch"
+           fi
+        fi
+      fi
     elif [[ -d "$p" ]]; then
       command rm -rf "$p"; echo "🗑️  Deleted orphan: $label"
     else

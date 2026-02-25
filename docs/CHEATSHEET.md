@@ -40,7 +40,7 @@
 | `wtnew <br> [agt]` | 创建新工作区并**自动配置 Git 身份** | `wtnew feat-ui opencode` |
 | `wt <name>` | 快速跳转到指定工作区目录 | `wt wt-claude-feat-ui` |
 | `wtinit [agt]` | 手动修复/同步当前目录的 Git 身份 | `wtinit claude` |
-| `wtrm <dir>` | 强行删除指定工作区 | 包含目录删除与 git prune |
+| `wtrm <dir>` | 删除指定工作区 | 包含目录删除，并可选择删除本地与远程关联分支 |
 
 ## 5. 编排与自动化 (Orchestration)
 | 命令 | 用途 | 备注 |
