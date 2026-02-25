@@ -22,5 +22,10 @@ wt-*/
 
 # Vibe artifacts
 .vibe/
-.claude/
 .repomix/
+
+# Tool-specific directories (symlinks only, see DEVELOPER.md)
+.agent/skills/
+.github/skills/
+.trae/
+.claude/

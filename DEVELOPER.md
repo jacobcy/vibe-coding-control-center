@@ -1,121 +1,110 @@
-# Vibe Coding Control Center 开发指南
+# Vibe Center 2.0 — 开发指南
 
-本文档旨在帮助开发者理解 Vibe 的项目架构、搭建开发环境并参与核心功能的开发。
+## 1. 项目双重身份
 
-## 1. 开发环境搭建
+本项目包含两个维度的工作（详见 [CLAUDE.md](CLAUDE.md)）：
 
-### 1.1 前置要求
+| 维度 | 内容 | 位置 | 治理标准 |
+|------|------|------|----------|
+| **Zsh CLI** | Shell 脚本，环境编排 | `bin/`, `lib/` | LOC ≤ 1,200，单文件 ≤ 200 行 |
+| **Vibe Coding Framework** | Agent 行为控制技能 | `skills/` | 清晰度、正确性、有效性 |
+
+> Shell 代码严格控制体积；技能是 Markdown 提示词，评估标准不同。
+
+## 2. 开发环境搭建
+
+### 2.1 前置要求
 - macOS / Linux
 - zsh (默认 Shell)
 - git
 
-### 1.2 本地开发安装
-为了不影响你全局安装的 Vibe (`~/.vibe`)，我们推荐使用 **本地模式** 进行开发。本地模式会将配置和运行时环境限制在当前项目目录下。
+### 2.2 Setup（技能 symlink）
+
+`.agent/skills/` 目录已 gitignore，开发者需要自行创建 symlinks：
 
 ```bash
-# 在项目根目录执行
-./scripts/install.sh --local
+# 1. 链接项目自有技能（skills/ → .agent/skills/）
+cd .agent/skills
+for skill in ../../skills/vibe-*/; do
+  name=$(basename "$skill")
+  ln -sf "$skill" "$name"
+done
+
+# 2. 链接 OpenSpec 技能（.github/skills/ → .agent/skills/）
+for skill in ../../.github/skills/openspec-*/; do
+  name=$(basename "$skill")
+  ln -sf "$skill" "$name"
+done
+
+# 3. 链接 Superpowers（可选，需先安装 superpowers）
+# 参见 https://github.com/jomifred/superpowers
+for skill in ~/.agents/skills/*/; do
+  name=$(basename "$skill")
+  [ ! -e "$name" ] && ln -sf "$skill" "$name"
+done
 ```
 
-这将会：
-1. 在当前项目下初始化 `.vibe` 目录（存放配置和临时文件）。
-2. 将当前项目的 `bin` 目录添加到你的 Shell 配置文件中（通常需要你手动 `source` 或重新打开终端，请留意脚本输出）。
-3. 确保 `vibe` 命令优先使用你当前修改的代码。
+对于 Trae 用户，在 `.trae/skills/` 做同样操作。
 
-### 1.3 验证开发环境
+### 2.3 验证
 ```bash
-# 重新加载配置
-source ~/.zshrc  # 或你的 shell 配置文件
-
-# 验证 vibe 命令路径
-which vibe
-# 输出应指向：.../vibe-center/main/bin/vibe （而不是 ~/.vibe/bin/vibe）
-
-# 检查各项指标
-vibe doctor
+bin/vibe check    # 环境诊断
+ls .agent/skills/ # 应看到 symlinks
 ```
 
-## 2. 项目架构详解
+## 3. 外部依赖
 
-### 2.1 目录结构
-*   `bin/`: **可执行入口脚本**。`vibe` 是主调度器，`vibe-chat`, `vibe-config` 等是子命令。
-*   `lib/`: **核心逻辑库**。
-    *   `config.sh`: 配置加载与路径探测（核心中的核心）。
-    *   `utils.sh`: 通用工具函数（日志、UI、系统检查）。
-    *   `agents.sh`: AI Agent 相关的抽象。
-    *   `i18n.sh`: 国际化支持。
-*   `scripts/`: **运维与安装脚本**。包含 `install.sh`, `test-all.sh`, `vibecoding.sh` (旧版入口) 等。
-*   `config/`: **默认配置模板**。包含 `keys.template.env`, `aliases.sh`。
-*   `tests/`: **测试套件**。
+本项目使用以下社区技能（**不 vendor 到仓库中**）：
 
-### 2.2 核心机制：Code vs Config
-Vibe 严格区分 **代码根目录 (`VIBE_ROOT`)** 和 **配置根目录 (`VIBE_HOME`)**。
+| 依赖 | 用途 | 安装方式 |
+|------|------|----------|
+| [Superpowers](https://github.com/jomifred/superpowers) | 通用 agent 技能（TDD、调试、头脑风暴等） | 按其文档安装到 `~/.agents/skills/` |
+| [OpenSpec](https://github.com/OpenSpec) | 结构化变更管理工作流 | 按其文档安装，symlink 到 `.github/skills/` |
+| [bats-core](https://github.com/bats-core/bats-core) | Shell 测试框架 | `brew install bats-core` |
 
-*   **VIBE_ROOT**: 代码（bin, lib）所在位置。
-    *   Global 模式下：`~/.vibe`
-    *   Local 模式下：Git 项目根目录
-    *   探测逻辑：由 `lib/config.sh` 中的 `_find_vibe_root` 处理。
+## 4. 目录结构
 
-*   **VIBE_HOME**: 用户配置文件 (`keys.env`, `config.toml`) 所在位置。
-    *   默认为 `VIBE_ROOT/.vibe`。
-    *   探测逻辑：由 `lib/config.sh` 中的 `_find_vibe_home` 处理。
-    *   **优先级**：
-        1. Caller Override (调用者强制指定)
-        2. Local Project `.vibe` (当前目录向上递归查找)
-        3. Git Root `.vibe`
-        4. Global Install `~/.vibe` (如果 `VIBE_ROOT` 指向这里)
-        5. User Home `~/.vibe` (最终兜底)
+```
+bin/vibe               # CLI 入口（~60 行）
+lib/                   # Shell 核心逻辑（受 LOC 上限约束）
+config/                # 别名、密钥模板
+skills/                # 🟢 Vibe 自有技能（tracked，规范源）
+.agent/                # Agent 工作区
+  governance.yaml      # 治理配置
+  workflows/           # 工作流定义
+  rules/               # 架构和编码规则
+  context/             # Agent 记忆和任务状态
+  skills/              # ⚠️ GITIGNORED — 纯 symlinks
+.github/skills/        # ⚠️ GITIGNORED — OpenSpec 技能 symlinks
+docs/                  # 文档、计划、审计
+tests/                 # bats-core 测试
+```
 
-这种设计使得你可以在不同项目中使用不同的 `.vibe` 配置（例如不同的 API Key），同时共用同一套 Vibe 代码；或者在开发 Vibe 本身时，完全隔离环境。
+## 5. V1 → V2 迁移说明
 
-### 2.3 命令调度 (`bin/vibe`)
-`vibe` 命令类似于 Git，它是一个调度器：
-1. **Context Shim**: 它会检测当前目录下是否有 `.vibe`。如果有，且不是当前正在运行的这个 `vibe`，它会 `exec` 切换到那个局部的 `vibe`。这保证了项目内优先使用项目内锁定的 Vibe 版本（未来特性）。
-2. **Subcommands**: `vibe foo` 会自动寻找并执行 `bin/vibe-foo`。
+V2 重构（2025-02）将 shell 代码从 14,293 行精简至 ~644 行。
+以下 V1 功能尚未移植，列入后续计划：
 
-## 3. 测试指南
+- `vibe alias list` — 列出自定义 shell 命令
+- `vibe doctor` — 更详细的环境诊断（当前用 `vibe check` 替代）
+- 配置文件管理 (opencode.json, config.toml)
 
-本项目包含完整的测试套件，确保重构和新功能不破坏现有逻辑。
+## 6. 常用命令
 
-### 3.1 运行所有测试
 ```bash
-./scripts/test-all.sh
+bin/vibe check                    # 环境诊断
+bin/vibe flow start <branch>      # 开始新功能
+bin/vibe flow review              # 触发代码审查
+bin/vibe flow pr                  # 创建 PR
+bin/vibe flow done                # 完成工作
+bin/vibe keys list                # 列出 API 密钥
+bin/vibe equip                    # 安装 AI 工具
+source config/aliases.sh          # 加载别名
 ```
 
-### 3.2 运行特定测试
+## 7. LOC 检查
+
+每次 PR 前确认 shell 代码总量：
 ```bash
-# 例如，只运行配置隔离测试
-./tests/test_config_isolation.sh
+find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs wc -l  # ≤ 1,200
 ```
-
-### 3.3 编写新测试
-测试脚本位于 `tests/` 目录。我们使用轻量级的 Shell 脚本进行测试。
-推荐参考 `tests/unit/simple_test.sh` 或 `tests/test_config_isolation.sh`。
-
-关键测试工具 (`lib/testing.sh`)：
-*   `assert_eq "expected" "actual"`
-*   `assert_contains "haystack" "needle"`
-*   `run_test "Test Name" function_name`
-
-## 4. 常见开发任务
-
-### 添加新命令
-1. 在 `bin/` 下创建 `vibe-yourcmd`。
-2. 赋予执行权限：`chmod +x bin/vibe-yourcmd`。
-3. 引用标准库头文件：
-   ```bash
-   #!/usr/bin/env zsh
-   SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
-   VIBE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-   source "$VIBE_ROOT/lib/utils.sh"
-   source "$VIBE_ROOT/lib/config.sh"
-   
-   # 你的逻辑...
-   ```
-
-### 修改配置逻辑
-配置逻辑主要在 `lib/config.sh`。修改后请务必运行 `tests/test_config_isolation.sh` 确保没有破坏路径探测逻辑。
-
-## 5. 发布流程
-目前主要通过 git tag 和 release 分支管理。
-（待完善）

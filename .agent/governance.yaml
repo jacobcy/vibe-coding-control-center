@@ -1,0 +1,49 @@
+# .agent/governance.yaml
+# Vibe Skills 治理配置
+
+version: "1.0"
+phase: convergence  # exploration | convergence
+
+# 认知阶段 (SOUL.md §2)
+cognition:
+  phase: convergence
+  last_audit: "2026-02-25"
+  audit_verdict: "rebuild"
+
+# LOC 预算
+budgets:
+  total: 1200          # lib/ + bin/ 总上限
+  file_max: 200         # 单文件上限
+  function_max: 50      # 单函数上限
+  functions_per_file: 15 # 每文件函数数上限
+
+# 执行强度
+enforcement:
+  core_dirs:            # 硬执行
+    - lib/
+    - bin/
+  advisory_dirs:        # 建议
+    - config/
+    - scripts/
+    - install/
+
+# vibe flow 钩子
+flow_hooks:
+  start:
+    - vibe-scope-gate
+  dev:
+    - vibe-boundary-check
+  test:
+    - vibe-boundary-check
+  review:
+    - vibe-rules-enforcer
+  done:
+    - vibe-save
+    - vibe-check
+
+# 阈值
+thresholds:
+  drift_warning: 20     # 偏离度警告线 (%)
+  drift_audit: 30        # 偏离度审计线 (%)
+  bloat_rebuild: 5       # 膨胀倍数 → 推倒重来
+  dead_code_max: 0       # 死代码容忍 (个)

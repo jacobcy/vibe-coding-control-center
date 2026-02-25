@@ -4,12 +4,27 @@
 Vibe Center 2.0 is a **minimalist orchestration tool** for AI-assisted development.
 It follows the "Cognition First" principle from [SOUL.md](SOUL.md).
 
-### Core Identity: What We ARE
+The project has **两个维度 (two dimensions)**，combined in one repo for convenience:
+
+### Dimension 1: Zsh CLI — Environment Orchestration
+Shell scripts that prepare and manage the AI development environment:
 - **Install & manage AI tools** (claude, opencode, codex)
 - **Manage working directories** (worktrees, tmux sessions)
 - **Manage API keys** (keys.env)
 - **Provide shell aliases** (shortcuts for common workflows)
 - **Orchestrate dev lifecycle** (start → review → PR → done)
+
+> **Governance**: Strict LOC ceiling (see §HARD RULES). Shell code must stay minimal.
+
+### Dimension 2: Vibe Coding Framework — Agent Behavior Control
+Prompt-engineered skills and workflows that control AI agent behavior:
+- **Governance skills** (scope-gate, boundary-check, rules-enforcer, drift detection)
+- **Process skills** (save, check, continue, audit)
+- **Workflow definitions** (lifecycle hooks integrated with `vibe flow`)
+- **Rules and context** (architecture principles, coding standards)
+
+> **Governance**: Different from shell code. Skills are Markdown prompts, evaluated by
+> clarity, correctness, and effectiveness — not LOC count. See `skills/` directory.
 
 ### Core Identity: What We are NOT
 We do **NOT** reimplement agent functionality. See §HARD RULES below.
@@ -42,7 +57,21 @@ config/
   aliases.sh           # Alias loader
   keys.template.env    # Key template
   aliases/             # Alias sub-files (worktree, tmux, claude, etc.)
-.agent/                # Agent workspace (skills, rules, context)
+skills/                # Vibe Coding Framework — our governance & process skills
+  vibe-scope-gate/     # Pre-flight scope validation
+  vibe-boundary-check/ # In-flight LOC/metrics check
+  vibe-rules-enforcer/ # PR compliance review
+  vibe-drift/          # Project drift detection
+  vibe-audit/          # Architecture audit
+  vibe-save/           # Save checkpoint skill
+  vibe-check/          # Quick diagnostic skill
+  vibe-continue/       # Continue workflow skill
+.agent/                # Agent workspace — rules, context, workflows (partially gitignored)
+  governance.yaml      # Governance config (thresholds, hooks)
+  workflows/           # Workflow definitions
+  rules/               # Architecture and coding rules
+  context/             # Agent memory and task state
+  skills/              # GITIGNORED — symlinks to skills/ and external skills
 ```
 
 ## Coding Standards
@@ -77,7 +106,7 @@ Any `.sh` file ≤ **200 lines**. Exceeding requires split.
 Every function must have ≥1 caller. Defined-but-unused functions are forbidden.
 
 ### Rule 4: 不做清单 (Scope Gate)
-Do NOT implement any of the following:
+Do NOT implement any of the following **in shell code** (`lib/`, `bin/`):
 - ❌ NLP intent routing / chat router
 - ❌ Circuit breaker / exponential backoff
 - ❌ TTL cache system
@@ -87,7 +116,11 @@ Do NOT implement any of the following:
 - ❌ Config migration system
 - ❌ JSON state machine
 - ❌ Shell-level injection protection (we're not a web server)
-- ❌ Shell governance tools (governance.yaml, scope-gate, etc.)
+- ❌ Shell-based governance enforcement scripts
+
+> **Note**: Agent governance skills (Markdown prompts in `skills/`) are explicitly
+> mandated by SOUL.md §2.2 and are NOT subject to this rule. They control agent
+> behavior through prompt engineering, not shell code.
 
 ### Rule 5: Tool First
 Need tests? Use `bats-core`. Need JSON? Use `jq`. Need HTTP? Use `curl`. Don't reinvent.
