@@ -2,6 +2,9 @@
 
 Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
 
+> Single Entry Policy: `AGENTS.md` is the canonical root entry for all agents.
+> If other root-level agent files exist, treat them as aliases and follow this file.
+
 ## 📍 Project Identity
 This project has **two dimensions** (see CLAUDE.md for details):
 1. **Zsh CLI** — Shell scripts for AI tool/environment management (`bin/`, `lib/`)
