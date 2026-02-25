@@ -1,33 +1,18 @@
-# Coding Standards (编码标准)
+# Coding Standards (Supplement)
 
-## Shell Scripts
-- Language: Zsh (`#!/usr/bin/env zsh`)
-- Use `set -e` in executable scripts for fail-fast
-- Source `lib/utils.sh` for shared functions
-- Quote all variables: `"$var"` not `$var`
+本文件仅保留实现细节约定；治理级约束以 `SOUL.md` 和 `CLAUDE.md` 为准。
 
-## File Limits
-- Single file: ≤ 200 lines
-- `lib/` + `bin/` total: ≤ 1,200 lines
-- `config/aliases/` total: ≤ 500 lines
+## Shell Implementation
+- 使用 `#!/usr/bin/env zsh`。
+- 可执行脚本使用 `set -e`。
+- 变量与路径必须正确引用。
+- 共用函数优先复用 `lib/utils.sh`。
 
-## Functions
-- Every function must have ≥1 caller (zero dead code)
-- Use logging helpers: `log_info`, `log_warn`, `log_error`, `log_step`, `log_success`
-- Use `vibe_die` for fatal errors, `vibe_require` for dependency checks
-- Use `validate_path` before file operations
+## Function Style
+- 函数命名使用 `snake_case`。
+- 内部函数前缀 `_`。
+- 公共输出统一走 `log_*` helper。
 
-## Naming Conventions
-- Functions: `snake_case` (e.g., `vibe_flow`, `_flow_start`)
-- Internal/private functions: prefix with `_`
-- Variables: `UPPER_CASE` for exports, `lower_case` for locals
-- Worktrees: `wt-<agent>-<feature>`
-
-## Output
-- Think in English
-- User-facing output and reports in Chinese
-- Use color constants from `utils.sh` for feedback
-
-## Commit Style
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
-- One logical change per commit
+## Delivery Discipline
+- 一次提交只做一个逻辑变更。
+- 提交前提供可验证证据（测试输出或复现实验步骤）。

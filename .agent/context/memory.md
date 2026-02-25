@@ -1,17 +1,13 @@
-# Memory (长期记忆)
+# Memory
 
-Key decisions and architectural choices for Vibe Center 2.0.
+## 关键决策
+- 2026-02-25：V2 重建，保持 `lib+bin <= 1200`。
+- 2026-02-26：PR #12 曾因主分支历史分叉从 main 消失，后通过 PR #13 恢复。
+- 2026-02-26：main 已启用分支保护，禁止 force push。
 
-## Architecture Decisions
-
-### 2026-02-25: V2 Rebuild
-- **Decision**: Rebuild from scratch with ≤1,200 line budget
-- **Rationale**: V1 grew to 5,000+ lines with significant dead code (断路器, 缓存, i18n, NLP路由)
-- **Approach**: Governance rules embedded in CLAUDE.md, not shell tools
-
-### Design Principles
-- Worktree isolation: `wt-<agent>-<feature>` naming convention
-- `vibe_main_guard` protects main/master branches from agent execution
-- `keys.env` + `.gitignore` for secret management
-- `bin/vibe` dispatcher + `lib/*.sh` modular pattern
-- `vibe flow` lifecycle: start → review → pr → done
+## 长期约束
+- 只做最小必要改动，避免无关重构。
+- 规则单一来源：
+  - 原则在 `SOUL.md`
+  - 项目硬约束在 `CLAUDE.md`
+  - 执行细则在 `.agent/rules/*`
