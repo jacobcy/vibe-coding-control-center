@@ -72,7 +72,7 @@ vibe tool
 
 使用 `vibe flow` 原接管特性开发全生命周期：
 
-- `vibe flow start <feature-name>`: 创建新分支、初始化工作任务与知识上下文。
+- `vibe flow start <feature-name>`: 创建新分支、初始化工作任务与知识上下文（会自动触发 `install.sh` 搭载环境和安装依赖）。
 - `vibe flow status`: 查看当前系统上下文与开发状态。
 - `vibe flow review`: 运行本地检查、lint 与代码审查流。
 - `vibe flow pr`: 自动打包提交变更并建立 Pull Request。

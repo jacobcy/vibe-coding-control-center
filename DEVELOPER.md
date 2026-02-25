@@ -18,33 +18,17 @@
 - zsh (默认 Shell)
 - git
 
-### 2.2 Setup（技能 symlink）
+### 2.2 Setup（自动化环境准备）
 
-`.agent/skills/` 目录已 gitignore，开发者需要自行创建 symlinks：
+`.agent/skills/` 和 `.trae/skills/` 目录已被 gitignore 忽略。
+得益于我们在 `lib/flow.sh` 加入的**生命周期钩子机制**，现在的环境准备是完全自动的：
 
-```bash
-# 1. 链接项目自有技能（skills/ → .agent/skills/）
-cd .agent/skills
-for skill in ../../skills/vibe-*/; do
-  name=$(basename "$skill")
-  ln -sf "$skill" "$name"
-done
+当你执行 `vibe flow start <feature>` 创建新分支或工作区时，系统会自动在切换后执行根目录的 `install.sh`。这会：
+1. 自动安装并配置 `openSpec` 和 `Superpowers`。
+2. 自动在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接。
+3. 自动在 `.trae/skills/` 为 Trae 编辑器用户准备相同的技能环境。
 
-# 2. 链接 OpenSpec 技能（.github/skills/ → .agent/skills/）
-for skill in ../../.github/skills/openspec-*/; do
-  name=$(basename "$skill")
-  ln -sf "$skill" "$name"
-done
-
-# 3. 链接 Superpowers（可选，需先安装 superpowers）
-# 参见 https://github.com/jomifred/superpowers
-for skill in ~/.agents/skills/*/; do
-  name=$(basename "$skill")
-  [ ! -e "$name" ] && ln -sf "$skill" "$name"
-done
-```
-
-对于 Trae 用户，在 `.trae/skills/` 做同样操作。
+只有在未使用 `vibe flow start` 而是手动 `git clone / worktree add` 的特殊情况下，你才需要手动执行一遍 `./install.sh` 来一键挂载环境。
 
 ### 2.3 验证
 ```bash

@@ -56,6 +56,16 @@ EOF
   if typeset -f vup &>/dev/null && [[ -n "${TMUX:-}" ]]; then
     vup "$wt_dir" "$agent" 2>/dev/null && log_info "tmux workspace created"
   fi
+
+  # Execute project-level post-start hook if available
+  if [[ -x "bin/setup" ]]; then
+    log_step "Executing project setup hook: bin/setup"
+    ./bin/setup || log_warn "Setup hook 'bin/setup' failed"
+  elif [[ -x "install.sh" ]]; then
+    log_step "Executing project setup hook: install.sh"
+    ./install.sh || log_warn "Setup hook 'install.sh' failed"
+  fi
+
   echo ""
   log_success "Feature started: ${BOLD}${feature}${NC}"
   echo "  Directory : ${CYAN}$PWD${NC}"
