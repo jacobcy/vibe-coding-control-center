@@ -1,163 +1,119 @@
-# Project Context: Vibe Coding Control Center
+# Project Context: Vibe Center 2.0
 
 ## Project Overview
-Vibe Coding Control Center is a **management and orchestration tool** for AI-assisted development environments. It provides scripts to install, configure, and manage AI development tools (Claude Code, OpenCode, Codex, etc.) with an emphasis on developer productivity and ease of use.
+Vibe Center 2.0 is a **minimalist orchestration tool** for AI-assisted development.
+It follows the "Cognition First" principle from [SOUL.md](SOUL.md).
 
 ### Core Identity: What We ARE
-We are a **configuration and environment management system** that:
-- **Installs and manages AI tools** (claude, opencode, codex)
-- **Manages working directories** (worktrees, tmux sessions)
-- **Manages environment variables** (API keys, endpoints via `keys.env`)
-- **Provides command aliases** (shortcuts for common workflows)
-- **Manages configuration files** (opencode.json, config.toml, .claude.json)
-- **Provides development templates** (PRD, Spec, PR descriptions, test templates)
-- **Orchestrates workflows** (TDD cycles, feature development lifecycle)
+- **Install & manage AI tools** (claude, opencode, codex)
+- **Manage working directories** (worktrees, tmux sessions)
+- **Manage API keys** (keys.env)
+- **Provide shell aliases** (shortcuts for common workflows)
+- **Orchestrate dev lifecycle** (start → review → PR → done)
 
 ### Core Identity: What We are NOT
-We are **NOT an AI agent implementation**. We do NOT:
-- ❌ Replace or reimplement agent functionality
-- ❌ Execute code generation or refactoring ourselves
-- ❌ Make autonomous code decisions
-- ❌ Duplicate functionality that existing tools already provide well
+We do **NOT** reimplement agent functionality. See §HARD RULES below.
 
-### Design Philosophy
-**"Orchestrate and integrate, don't reimplement and replace"**
-- Leverage existing mature tools (`wtnew`, `vup`, `gh`, `lazygit`, `tmux`)
-- Provide the scaffolding and guidance
-- Let agents (claude, opencode, codex) do what they do best
-- Focus on the developer experience layer
-
-## Constitution & Principles
-This project operates under the **Vibe Coding Constitution** defined in [SOUL.md](SOUL.md). All development activities, including AI-assisted coding, follows the principles outlined in that document.
-
-## Build & Test Commands
-- Build: `./scripts/vibecoding.sh` (starts the main control center)
-- Dev Setup: `./install/install-claude.sh` (sets up Claude Code environment)
-- Initialize Project: `./install/init-project.sh [project-name]`
-- Diagnostics: `./scripts/vibecoding.sh` → Diagnostics option
-- Quick Start: `./scripts/vibecoding.sh` → Equip → Install/Update Tools
+## Build & Test
+- CLI entry: `bin/vibe`
+- Diagnostics: `bin/vibe check`
+- Workflow: `bin/vibe flow <start|review|pr|done|status>`
+- Keys: `bin/vibe keys <list|set|get|init>`
+- Install tools: `bin/vibe equip`
+- Aliases: `source config/aliases.sh`
 
 ## Tech Stack
-- **Primary Language**: Zsh scripting
-- **Environment**: Unix/Linux/macOS
-- **Configuration**: Environment variables and shell aliasing
-- **Patterns**: Modular scripts with shared utilities, menu-driven interfaces
-- **Standards**: Secure coding practices, input validation, error handling
+- **Language**: Zsh scripting (macOS / Linux)
+- **Pattern**: `bin/vibe` dispatcher → `lib/*.sh` modules
+- **Aliases**: `config/aliases.sh` → `config/aliases/*.sh`
+- **Config**: `config/keys.env` (gitignored) + `keys.template.env`
 
 ## Project Structure
-- `scripts/vibecoding.sh`: Main control center with menu interface (entry point)
-- `install/init-project.sh`: Project initialization script with Cursor rules and CLAUDE.md template
-- `install/install-claude.sh`: Claude Code installation and setup
-- `install/install-opencode.sh`: OpenCode installation and setup
-- `docs/usage_advice.md`: Usage guidelines and best practices
-- `SOUL.md`: Core principles and constitutional rules (referenced by all contributors)
-- `.agent/rules/coding-standards.md`: Specific coding standards and rules
-- `.agent/context/memory.md`: Cumulative record of key decisions and context
-- `.agent/context/task.md`: High-level project tasks and history
-- `.agent/context/agent.md`: Agent persona and role definitions
-- `lib/`: Library directory
-  - `utils.sh`: Enhanced shared utility functions (security, validation, logging)
-- `config/`: Configuration directory
-  - `aliases.sh`: Command aliases for quick access (with dynamic path resolution)
-  - `keys.env`: Environment variables and API keys (local, not tracked)
-  - `keys.template.env`: Template for API keys (tracked)
-- `tests/`: Test scripts
-  - `test_new_features.sh`: Test version detection and update features
-  - `test_status_display.sh`: Test status display functionality
-
-## Security Features
-- **Input validation**: All user inputs are validated to prevent injection attacks
-- **Path validation**: Protection against directory traversal attacks
-- **Secure file operations**: Functions for safe file copying and writing
-- **Environment validation**: Checks for command availability and directory permissions
-- **Safe user interaction**: Secure prompting and confirmation functions
-- **Error handling**: Comprehensive error handling with secure logging
+```
+bin/vibe               # CLI dispatcher (~60 lines)
+lib/
+  utils.sh             # Logging, validation, command helpers
+  config.sh            # VIBE_ROOT detection, keys loading
+  check.sh             # Environment diagnostics
+  equip.sh             # Tool installation
+  keys.sh              # API key management
+  flow.sh              # Dev workflow lifecycle
+config/
+  aliases.sh           # Alias loader
+  keys.template.env    # Key template
+  aliases/             # Alias sub-files (worktree, tmux, claude, etc.)
+.agent/                # Agent workspace (skills, rules, context)
+```
 
 ## Coding Standards
-Adherence to the principles outlined in [SOUL.md](SOUL.md) is mandatory. Specific technical standards include:
-- Use modular, well-commented zsh scripts with portable shell practices where possible
-- Follow consistent color scheme for user feedback (defined in utils.sh)
-- **Language Protocol**:
-  - Think in English.
-  - **Always respond to the user and generate reports in Chinese.**
-- **File Protocol**:
-  - Root directory uppercase files (e.g., `SOUL.md`, `TASK.md`) are for AI context.
-  - `docs/` directory is for human-readable documentation.
-  - Audit status is tracked in `docs/audits/`.
-- Implement error handling with `set -e` for fail-fast behavior
-- Separate common functions to `lib/utils.sh` for reusability
-- Use clear variable naming with descriptive function names
-- Include detailed comments explaining complex operations
-- Implement security validations for all user inputs and file operations
-- Use readonly variables for constants and security parameters
-- **Temporary files**: Always place in `temp/` directory (already ignored by git)
+- Source `lib/utils.sh` for shared functions
+- Use `log_info`, `log_warn`, `log_error`, `log_step`, `log_success` for output
+- Use `validate_path` before file operations
+- Use `vibe_has`, `vibe_require`, `vibe_find_cmd` for command checks
+- Use `set -e` in scripts for fail-fast
+- Think in English, **respond to users and generate reports in Chinese**
+- Temporary files go in `temp/` (gitignored)
 
-## Key Features
-- **Menu-driven interface** for ease of use (vibecoding.sh)
-- **Automatic configuration** of AI tools with MCP support
-- **Diagnostic capabilities** for environment troubleshooting
-- **Secure handling of API keys** through templated config
-- **Project initialization** with best practices and Cursor rules
-- **Unified command aliases** for quick access (`c`, `ca`, `cp`, `cr`, `o`, `oa`, `vibe`)
-- **MCP (Model Context Protocol)** integration for web search and GitHub access
-- **Enhanced security** with input validation and secure file operations
-- **Worktree management** with agent identity isolation (`wtnew`, `vup`, `wtrm`)
-- **Development workflow orchestration** (`vibe flow`):
-  - Prepares development environment (worktree, docs, state)
-  - Provides TDD guidance and templates
-  - Integrates with external tools (gh, lazygit, tmux)
-  - Does NOT execute agent work - only prepares and guides
+## Language Protocol
+- Think in English.
+- **Always respond to the user and generate reports in Chinese.**
 
-## Security Notes
-- API keys are stored in `config/keys.env` (not tracked by git) and referenced via MCP config
-- Template file `keys.template.env` is tracked but contains placeholder values
-- Keys file is excluded from git via .gitignore
-- Template provided for easy setup without exposing credentials
-- All user inputs are validated to prevent injection attacks
-- Path traversal protection prevents unauthorized directory access
-- Secure file operations validate paths and permissions before operations
+---
 
-## Development Guidelines
-Following the principles in [SOUL.md](SOUL.md) is essential. Specific guidelines:
-- Always source `lib/utils.sh` for shared functions (logging, validation, security helpers)
-- Follow consistent color coding pattern (defined in utils.sh)
-- Use the logging functions: `log_info`, `log_warn`, `log_error`, `log_step`, `log_success`, `log_critical`
-- Validate all user inputs using `validate_input`, `validate_path`, `validate_filename`
-- Use secure file operations: `secure_copy`, `secure_write_file`, `secure_append_file`
-- Implement error handling with proper cleanup using `handle_error` trap
-- Maintain backward compatibility when modifying core functions
-- Update `usage_advice.md` when introducing new features
-- Use `set -e` at the beginning of scripts for fail-fast behavior
-- Follow modular design principles: separate concerns into different files
-- Always use `validate_path` before performing file operations
-- Use `prompt_user` and `confirm_action` for secure user interactions
-- **Temporary files**: Always place in `temp/` directory (already in `.gitignore`).
+## HARD RULES (治理规则)
 
-## Common Tasks & Commands
-- Add new MCP server: Modify MCP configuration in install script
-- Update aliases: Modify `config/aliases.sh` and re-source your shell
-- Add new utility function: Add to `lib/utils.sh` and source from other scripts
-- Initialize new project: Use `./install/init-project.sh [project-name]` or `ignition` alias
-- Install/update tools: Use `./scripts/vibecoding.sh` → Equip option or `vibe` alias
- - Run diagnostics: Use `./scripts/vibecoding.sh` → Doctor option
-- Validate security: Use the validation functions from utils.sh
-- Run tests: `./tests/test_new_features.sh` or `./tests/test_status_display.sh`
+These rules are **mandatory** for all contributors and AI agents.
 
-## Important Variables
+### Rule 1: LOC Ceiling
+`lib/` + `bin/` total lines ≤ **1,200**. Exceeding triggers an audit.
+```bash
+find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs wc -l  # must be ≤ 1,200
+```
+
+### Rule 2: Single File Limit
+Any `.sh` file ≤ **200 lines**. Exceeding requires split.
+
+### Rule 3: Zero Dead Code
+Every function must have ≥1 caller. Defined-but-unused functions are forbidden.
+
+### Rule 4: 不做清单 (Scope Gate)
+Do NOT implement any of the following:
+- ❌ NLP intent routing / chat router
+- ❌ Circuit breaker / exponential backoff
+- ❌ TTL cache system
+- ❌ i18n / multi-language support
+- ❌ Custom test framework (use bats-core)
+- ❌ Email validation
+- ❌ Config migration system
+- ❌ JSON state machine
+- ❌ Shell-level injection protection (we're not a web server)
+- ❌ Shell governance tools (governance.yaml, scope-gate, etc.)
+
+### Rule 5: Tool First
+Need tests? Use `bats-core`. Need JSON? Use `jq`. Need HTTP? Use `curl`. Don't reinvent.
+
+### Rule 6: New Feature Gate
+Before adding any feature, ask: "Does SOUL.md say we should do this?"
+If the answer is not a clear YES, don't do it.
+
+### Rule 7: PR LOC Diff
+Every PR description must include `wc -l` before/after comparison:
+```
+## LOC Diff
+Before: lib/+bin/ = XXX lines
+After:  lib/+bin/ = YYY lines
+Delta:  +/-ZZ lines
+```
+
+---
+
+## Key Variables
+- `VIBE_ROOT`: Project root directory
+- `VIBE_BIN`, `VIBE_LIB`, `VIBE_CONFIG`: Subdirectory paths
+- `VIBE_SESSION`: tmux session name (default: "vibe")
+- `VIBE_DEFAULT_TOOL`: Default agent tool (default: "claude")
+
 ## Linked Docs
-- [AGENTS.md](AGENTS.md) - **Start Here** for Agent Workflows
-- [SOUL.md](SOUL.md)
-- [memory.md](.agent/context/memory.md)
-- [task.md](.agent/context/task.md)
-- [agent.md](.agent/context/agent.md)
-- [coding-standards.md](.agent/rules/coding-standards.md)
-- `SHELL_RC`: Points to the zsh configuration file (`.zshrc`)
-- Constants in `lib/utils.sh` for security parameters (MAX_PATH_LENGTH, MAX_INPUT_LENGTH, etc.)
-
-## Troubleshooting
-- If aliases aren't working: Run `source ~/.zshrc` (or appropriate shell config)
-- If API keys aren't loading: Check that `keys.env` is properly filled out and sourced
-- If MCP services aren't working: Verify that API keys in config are valid
-- For script-specific errors: Use `zsh -x scriptname.sh` for detailed execution trace
-- For security validation errors: Check the input validation functions in `lib/utils.sh`
-- If security functions fail: Verify that `lib/utils.sh` is properly sourced in your scripts
+- [AGENTS.md](AGENTS.md) — Agent entry point
+- [SOUL.md](SOUL.md) — Constitution and principles
+- [.agent/README.md](.agent/README.md) — Agent workspace docs

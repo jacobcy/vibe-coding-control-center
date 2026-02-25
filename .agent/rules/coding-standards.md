@@ -1,35 +1,33 @@
-# Coding Standards
+# Coding Standards (编码标准)
 
-## Shell Scripting (Zsh)
-- **Shebang**: Always use `#!/bin/zsh` or `#!/usr/bin/env zsh`.
-- **Safety**: Always use `set -e` (e from error) at the start of scripts.
-- **Variables**: Use `${VAR}` syntax for variable expansion.
-- **Functions**: Use `function_name() { ... }` syntax.
-- **Conditionals**: Use `[[ ... ]]` for tests.
-- **Indentation**: 2 spaces.
+## Shell Scripts
+- Language: Zsh (`#!/usr/bin/env zsh`)
+- Use `set -e` in executable scripts for fail-fast
+- Source `lib/utils.sh` for shared functions
+- Quote all variables: `"$var"` not `$var`
+
+## File Limits
+- Single file: ≤ 200 lines
+- `lib/` + `bin/` total: ≤ 1,200 lines
+- `config/aliases/` total: ≤ 500 lines
+
+## Functions
+- Every function must have ≥1 caller (zero dead code)
+- Use logging helpers: `log_info`, `log_warn`, `log_error`, `log_step`, `log_success`
+- Use `vibe_die` for fatal errors, `vibe_require` for dependency checks
+- Use `validate_path` before file operations
 
 ## Naming Conventions
-- **Variables**: `UPPER_CASE` for globals/constants, `lower_case` for locals.
-- **Functions**: `snake_case` (e.g., `install_package`).
-- **Files**: `snake_case.sh` for scripts.
+- Functions: `snake_case` (e.g., `vibe_flow`, `_flow_start`)
+- Internal/private functions: prefix with `_`
+- Variables: `UPPER_CASE` for exports, `lower_case` for locals
+- Worktrees: `wt-<agent>-<feature>`
 
-## Error Handling
-- **Trap**: Use `trap` to catch errors and cleanup.
-- **Output**: Print clear error messages to stderr: `echo "Error: ..." >&2`.
+## Output
+- Think in English
+- User-facing output and reports in Chinese
+- Use color constants from `utils.sh` for feedback
 
-## Documentation
-- All functions must have a header comment explaining purpose, inputs, and outputs.
-- Complex logic must be commented.
-
-## Static Analysis (Quality Assurance)
-- **Tool**: [ShellCheck](https://github.com/koalaman/shellcheck)
-- **Requirement**: All scripts must pass `shellcheck` before submission.
-- **Zsh Compatibility**: Since ShellCheck primarily supports sh/bash, Zsh-specific features may trigger `SC1071`.
-  - **Action**: You may ignore this specific error globally or for specific files if the script explicitly requires Zsh.
-  - **Example**: `# shellcheck disable=SC1071`
-- **Usage**:
-  ```bash
-  # Check all scripts
-  find . -name "*.sh" -not -path "./lib/shunit2/*" -exec shellcheck -e SC1071 {} +
-  ```
-- **Directives**: Use `# shellcheck disable=SCxxxx` only when necessary and with a comment explaining why.
+## Commit Style
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
+- One logical change per commit

@@ -1,375 +1,161 @@
 #!/usr/bin/env zsh
-# ======================================================
-# Worktree 命令
-# ======================================================
+# Worktree management commands
 
-# 列出 worktrees
 alias wtls='git worktree list'
 
-# 跳转到 worktree 目录
+# Jump to a worktree by name
 wt() {
   local target="$1"
-
-  # 无参数 = 列出 worktrees
-  if [[ -z "$target" ]]; then
-    git worktree list
-    return
-  fi
-
-  # 从 git worktree list 中查找匹配的路径
+  [[ -z "$target" ]] && { git worktree list; return; }
   local wt_path
   wt_path="$(git worktree list --porcelain 2>/dev/null |
-    awk -v name="$target" '
-      /^worktree / {
-        path = substr($0, 10)
-        basename = path
-        sub(/.*\//, "", basename)
-        if (basename == name || path == name) {
-          print path
-          exit
-        }
-      }
-    ')"
-
+    awk -v name="$target" '/^worktree /{
+      path=substr($0,10); b=path; sub(/.*\//,"",b)
+      if(b==name||path==name){print path; exit}
+    }')"
   if [[ -n "$wt_path" && -d "$wt_path" ]]; then
     cd "$wt_path" || return
     [[ -n "$TMUX" ]] && tmux rename-window "${target:t}"
   else
-    echo "❌ Worktree not found: $target"
-    echo "   Available worktrees:"
-    git worktree list 2>/dev/null | sed 's/^/   /' || echo "   (unable to list)"
-    return 1
+    echo "❌ Worktree not found: $target"; git worktree list 2>/dev/null | sed 's/^/   /'; return 1
   fi
 }
 
-# 创建新 worktree（修复路径计算）
-# usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]
+# Create new worktree: wtnew <branch> [agent] [base]
 wtnew() {
-  vibe_load_context
-  # Find git command - check PATH and common locations
-  local git_cmd
-  git_cmd="$(vibe_find_cmd git)" || {
-    vibe_die "git command not found. Please ensure git is installed and in your PATH."
-    return 1
-  }
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+  local branch="$1" agent="${2:-claude}" base="${3:-main}"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [agent=claude|opencode|codex] [base=main]"
 
-  local branch="$1"
-  local agent="${2:-claude}"
-  local base="${3:-main}"
-
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch-name> [agent=claude|opencode|codex] [base-branch=main]"
-
-  # 使用 git rev-parse --show-toplevel 获取准确的仓库根
-  local current_dir="$(pwd)"
   local repo_root
+  repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
 
-  if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
-  else
-    repo_root="${current_dir}"
-    # 如果当前目录不是 git 仓库，尝试向上查找
-    while [[ "$repo_root" != "/" && ! -d "$repo_root/.git" && ! -f "$repo_root/.git" ]]; do
-      repo_root="${repo_root:h}"
-    done
-    if [[ "$repo_root" == "/" ]]; then
-      vibe_die "Could not find git repository root"
-      return 1
-    fi
+  # Must be on main/master
+  local cur_br; cur_br="$($git_cmd -C "$repo_root" branch --show-current 2>/dev/null)"
+  if [[ "$cur_br" != "main" && "$cur_br" != "master" ]]; then
+    echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
   fi
 
-  # 检查我们是否在 main 分支上
-  local current_branch
-  current_branch="$(git -C "$repo_root" branch --show-current 2>/dev/null)"
+  local dir="wt-${agent}-${branch}"
+  local path="${repo_root:h}/$dir"
 
-  if [[ "$current_branch" != "main" && "$current_branch" != "master" ]]; then
-    echo "⚠️  You are on branch '$current_branch', not main/master"
-    echo "   Current directory: $repo_root"
-    echo ""
-    echo "💡 Please switch to main/master branch first:"
-    echo "   cd $repo_root"
-    echo "   git checkout main"
-    echo "   wtnew $branch $agent $base"
-    return 1
-  fi
-
-  local prefix="wt-${agent}-"
-  local dir="${prefix}${branch}"
-  local path
-
-  # 修复路径计算：使用 repo_root 的父目录放置 worktree
-  # 如果 repo_root 本身就是仓库根，则在其同级目录创建 worktree
-  # 使用 zsh 参数扩展替代 dirname 命令
-  local parent_dir="${repo_root:h}"
-  path="$parent_dir/$dir"
-
-  # Create branch from base in main repo context
   $git_cmd -C "$repo_root" fetch -p >/dev/null 2>&1 || true
   $git_cmd -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch" || \
     $git_cmd -C "$repo_root" branch "$branch" "$base" 2>/dev/null || true
 
-  # Add worktree
   if [[ -e "$path" ]]; then
-    echo "ℹ️  Worktree dir already exists: $dir"
+    echo "ℹ️  Worktree exists: $dir"
   else
     $git_cmd -C "$repo_root" worktree add "$path" "$branch" || return 1
-    echo "✅ Created worktree: $dir -> branch $branch (base: $base)"
+    echo "✅ Created worktree: $dir -> $branch (base: $base)"
   fi
 
-  # Set agent identity in worktree
-  local agent_name="Agent-${(C)agent}"
-  local agent_email="agent-${agent}@vibecoding.ai"
-
-  $git_cmd -C "$path" config user.name "$agent_name"
-  $git_cmd -C "$path" config user.email "$agent_email"
-  echo "👤 Git identity set: $agent_name <$agent_email>"
-
+  # Set agent identity
+  local aname="Agent-${(C)agent}" aemail="agent-${agent}@vibecoding.ai"
+  $git_cmd -C "$path" config user.name "$aname"
+  $git_cmd -C "$path" config user.email "$aemail"
+  echo "👤 Identity: $aname <$aemail>"
   cd "$path" || return
 }
 
-# 删除 worktree
+# Remove worktree(s): wtrm <name|path|all>
 wtrm() {
-  local git_cmd
-  git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+  local arg="$1"; [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all>"
 
-  local arg="$1"
-  [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|absolute-path|all>"
+  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
 
-  # ====== 安全修复: 不再使用父目录计算 ======
-  # 直接使用 git worktree list 获取准确的 worktree 路径
-  local main_dir
-  main_dir="$($git_cmd -C "$PWD" rev-parse --show-toplevel 2>/dev/null)"
-
-  if [[ -z "$main_dir" ]]; then
-    vibe_die "Not in a git repository"
-    return 1
-  fi
-
-  # 验证 main_dir 是有效的 git 目录
-  if [[ ! -d "$main_dir/.git" && ! -f "$main_dir/.git" ]]; then
-    vibe_die "Not a valid git repository: $main_dir"
-    return 1
-  fi
-
-  # Helper function to remove a single worktree
   _wtrm_one() {
-    local p="$1"
-    local label="${p##*/}"
-
-    # 安全检查：确保不删除主目录
-    if [[ "$p" == "$main_dir" ]]; then
-      echo "⚠️  Cannot remove main worktree: $p"
-      return 1
-    fi
-
+    local p="$1" label="${1##*/}"
+    [[ "$p" == "$main_dir" ]] && { echo "⚠️  Cannot remove main worktree"; return 1; }
     if $git_cmd -C "$main_dir" worktree remove --force "$p" 2>/dev/null; then
-      echo "✅ Removed worktree: $label"
+      echo "✅ Removed: $label"
     elif [[ -d "$p" ]]; then
-      local rm_cmd
-      if command -v rm >/dev/null 2>&1; then
-        rm_cmd="rm"
-      elif [[ -x "/bin/rm" ]]; then
-        rm_cmd="/bin/rm"
-      elif [[ -x "/usr/bin/rm" ]]; then
-        rm_cmd="/usr/bin/rm"
-      else
-        echo "❌ rm command not found, cannot delete: $label" >&2
-        return 1
-      fi
-      $rm_cmd -rf "$p"
-      echo "🗑️  Deleted orphaned directory: $label"
+      command rm -rf "$p"; echo "🗑️  Deleted orphan: $label"
     else
       echo "⚠️  Not found: $p"
     fi
   }
 
   if [[ "$arg" == "all" ]]; then
-    local -a wt_paths=()
-    while IFS= read -r wt_path; do
-      # 跳过主 worktree
-      [[ "$wt_path" == "$main_dir" ]] && continue
-      # 只删除 wt-* 开头的 worktree
-      [[ "${wt_path##*/}" == wt-* ]] && wt_paths+=("$wt_path")
+    local -a paths=()
+    while IFS= read -r wp; do
+      [[ "$wp" == "$main_dir" ]] && continue
+      [[ "${wp##*/}" == wt-* ]] && paths+=("$wp")
     done < <($git_cmd -C "$main_dir" worktree list --porcelain | awk '/^worktree /{print $2}')
-
-    if [[ ${#wt_paths[@]} -eq 0 ]]; then
-      echo "ℹ️  No wt-* worktrees to remove"
-      return 0
-    fi
-
-    echo "🗑️  Removing ${#wt_paths[@]} worktree(s)..."
-    for wt_path in "${wt_paths[@]}"; do
-      _wtrm_one "$wt_path"
-    done
+    [[ ${#paths[@]} -eq 0 ]] && { echo "ℹ️  No wt-* worktrees"; return 0; }
+    echo "🗑️  Removing ${#paths[@]} worktree(s)..."
+    for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
-    # 解析路径：绝对路径或相对于 repo root
     local path
-    if [[ "$arg" == /* ]]; then
-      path="$arg"
-    else
-      # 修复：直接使用 repo root 的父目录
-      local repo_root
-      repo_root="${main_dir:h}"
-      path="$repo_root/$arg"
-    fi
-
-    # 安全检查：确保路径在预期范围内
-    if [[ ! "$path" =~ ^.+/wt- ]]; then
-      echo "⚠️  Worktree name must start with 'wt-': $arg"
-      echo "   Use 'wtrm all' to remove all wt-* worktrees"
-      return 1
-    fi
-
+    [[ "$arg" == /* ]] && path="$arg" || path="${main_dir:h}/$arg"
+    [[ "$path" =~ /wt- ]] || { echo "⚠️  Name must contain 'wt-': $arg"; return 1; }
     _wtrm_one "$path"
   fi
-
   $git_cmd -C "$main_dir" worktree prune >/dev/null 2>&1 || true
-  echo "🧹 Pruned stale worktree references"
 }
 
-# 同步 Git identity（重新初始化）
+# Re-sync git identity in current worktree
 wtinit() {
   local agent="${1:-claude}"
-
-  if [[ ! -d ".git" && ! -f ".git" ]]; then
-    vibe_die "Not in a git repository or worktree."
-  fi
-
-  local agent_name="Agent-${(C)agent}"
-  local agent_email="agent-${agent}@vibecoding.ai"
-
-  git config user.name "$agent_name"
-  git config user.email "$agent_email"
-  echo "✅ Git identity re-synced: $agent_name <$agent_email>"
+  [[ -d ".git" || -f ".git" ]] || vibe_die "Not in a git repo/worktree"
+  local aname="Agent-${(C)agent}" aemail="agent-${agent}@vibecoding.ai"
+  git config user.name "$aname"; git config user.email "$aemail"
+  echo "✅ Identity: $aname <$aemail>"
 }
 
-# 重新初始化/刷新（原 vfr）
+# Refresh worktree state
 wtrenew() {
-  local wt_name="${PWD##*/}"
-  echo "🔄 Refreshing worktree: $wt_name"
-
-  # 获取当前分支并重新同步 identity
-  local current_branch
-  current_branch="$(git branch --show-current 2>/dev/null)"
-  if [[ -n "$current_branch" ]]; then
-    echo "📌 Current branch: $current_branch"
-  fi
-
-  # 重新同步 git identity
-  local agent_name
-  local agent_email
-  agent_name="$(git config user.name 2>/dev/null)"
-  agent_email="$(git config user.email 2>/dev/null)"
-
-  if [[ -z "$agent_name" || -z "$agent_email" ]]; then
-    echo "⚠️  Git identity not set, using default claude"
-    wtinit claude
-  else
-    echo "✅ Git identity already set: $agent_name <$agent_email>"
-  fi
-
-  echo "✅ Worktree refreshed"
+  local wt="${PWD##*/}"; echo "🔄 Refreshing: $wt"
+  local name; name="$(git config user.name 2>/dev/null)"
+  [[ -z "$name" ]] && { wtinit claude; return; }
+  echo "✅ Identity OK: $name <$(git config user.email 2>/dev/null)>"
 }
 
-# tmux workspace（修复路径计算）
+# Set up tmux workspace for a worktree
 vup() {
-  vibe_load_context
   vibe_require tmux git || return 1
+  local wt_dir="${1:-main}" agent="${2:-claude}" editor="${3:-${EDITOR:-vim}}"
 
-  local wt_dir="${1:-main}"
-  local agent="${2:-claude}"
-  local editor_cmd="${3:-${EDITOR:-vim}}"
-
-  # 检测是否在 worktree 中
-  if [[ "$1" == "" ]] && command -v git >/dev/null 2>&1; then
-    local git_root
-    git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
-    if [[ -n "$git_root" ]]; then
-      local git_dirname="${git_root##*/}"
-      if [[ "$git_dirname" == wt-* ]]; then
-        wt_dir="$git_dirname"
-      elif [[ "$git_root" == "$VIBE_MAIN" ]]; then
-        wt_dir="main"
-      fi
-    fi
+  # Auto-detect worktree name if not specified
+  if [[ -z "$1" ]] && command -v git >/dev/null 2>&1; then
+    local gr; gr="$(git rev-parse --show-toplevel 2>/dev/null)"
+    [[ -n "$gr" ]] && { local dn="${gr##*/}"; [[ "$dn" == wt-* ]] && wt_dir="$dn"; }
   fi
 
-  # 修复路径计算：使用正确的路径
+  # Resolve path
   local dir_path
-  if [[ "$wt_dir" == "main" ]]; then
-    dir_path="$VIBE_MAIN"
+  if [[ "$wt_dir" == "main" ]]; then dir_path="$VIBE_MAIN"
+  elif [[ "$wt_dir" == /* ]]; then dir_path="$wt_dir"
   else
-    # 检查是否是绝对路径
-    if [[ "$wt_dir" == /* ]]; then
-      dir_path="$wt_dir"
-    else
-      # 使用 git worktree list 获取准确的路径
-      local repo_root
-      repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
-      if [[ -n "$repo_root" ]]; then
-        local parent_dir="${repo_root:h}"
-        dir_path="$parent_dir/$wt_dir"
-      else
-        dir_path="$VIBE_REPO/$wt_dir"
-      fi
-    fi
+    local rr; rr="$(git rev-parse --show-toplevel 2>/dev/null)"
+    dir_path="${rr:+${rr:h}/$wt_dir}"
+    [[ -z "$dir_path" ]] && dir_path="$VIBE_REPO/$wt_dir"
   fi
-
-  [[ -d "$dir_path" ]] || vibe_die "worktree dir not found: $dir_path"
+  [[ -d "$dir_path" ]] || vibe_die "Not found: $dir_path"
 
   vibe_tmux_ensure || return 1
-
-  local w_edit="${wt_dir}-edit"
-  local w_agent="${wt_dir}-agent"
-  local w_tests="${wt_dir}-tests"
-  local w_logs="${wt_dir}-logs"
-  local w_git="${wt_dir}-git"
-
-  # Editor window
-  vibe_tmux_win "$w_edit" "$dir_path" "$editor_cmd" || return 1
+  vibe_tmux_win "${wt_dir}-edit" "$dir_path" "$editor" || return 1
 
   # Agent window
   case "$agent" in
-    opencode)
-      vibe_require opencode || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "opencode" || return 1
-      ;;
-    codex)
-      vibe_require codex || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "codex --yes" || return 1
-      ;;
-    *)
-      vibe_require claude || return 1
-      vibe_tmux_win "$w_agent" "$dir_path" "claude --dangerously-skip-permissions --continue" || return 1
-      ;;
-  esac
+    opencode) vibe_require opencode; vibe_tmux_win "${wt_dir}-agent" "$dir_path" "opencode" ;;
+    codex)    vibe_require codex;    vibe_tmux_win "${wt_dir}-agent" "$dir_path" "codex --yes" ;;
+    *)        vibe_require claude;   vibe_tmux_win "${wt_dir}-agent" "$dir_path" "claude --dangerously-skip-permissions --continue" ;;
+  esac || return 1
 
-  # Tests/logs windows
-  vibe_tmux_win "$w_tests" "$dir_path" || return 1
-  vibe_tmux_win "$w_logs" "$dir_path" || return 1
-
-  # lazygit window
-  vibe_require lazygit || echo "⚠️  lazygit not found; '$w_git' will open a shell"
-  if vibe_has lazygit; then
-    vibe_tmux_win "$w_git" "$dir_path" "lazygit" || return 1
-  else
-    vibe_tmux_win "$w_git" "$dir_path" || return 1
-  fi
-
-  echo "✅ tmux workspace ready for: $wt_dir (agent: $agent) @ $(vibe_now)"
-  echo "👉 attach with: vt"
+  vibe_tmux_win "${wt_dir}-tests" "$dir_path" || return 1
+  vibe_tmux_win "${wt_dir}-logs"  "$dir_path" || return 1
+  vibe_has lazygit && vibe_tmux_win "${wt_dir}-git" "$dir_path" "lazygit" \
+                   || vibe_tmux_win "${wt_dir}-git" "$dir_path"
+  echo "✅ Workspace ready: $wt_dir (agent: $agent)"
 }
 
-# wtnew + vup 一键操作
+# One-shot: wtnew + vup
 vnew() {
-  vibe_load_context
-  local branch="$1"
-  local agent="${2:-claude}"
-  local base="${3:-main}"
-
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent=claude|opencode|codex] [base=main]"
-
+  local branch="$1" agent="${2:-claude}" base="${3:-main}"
+  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent] [base]"
   wtnew "$branch" "$agent" "$base" || return 1
-  local wt_dir="wt-${agent}-$branch"
-  vup "$wt_dir" "$agent" || return 1
-  echo "✅ All set. Your job: review/commit in lazygit window (${wt_dir}-git)."
+  vup "wt-${agent}-$branch" "$agent" || return 1
+  echo "✅ Ready. Review in lazygit window."
 }
