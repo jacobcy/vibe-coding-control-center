@@ -138,6 +138,34 @@ _flow_done() {
   log_success "Worktree ${wt_dir} removed — now in: ${CYAN}$PWD${NC}"
 }
 
+_flow_sync() {
+  local current_branch
+  current_branch=$(git branch --show-current 2>/dev/null)
+  [[ -z "$current_branch" ]] && { log_error "Not in a git repository"; return 1; }
+  
+  log_step "Syncing from source branch: ${CYAN}$current_branch${NC}"
+  
+  git worktree list --porcelain | grep '^worktree' | cut -d' ' -f2 | while read -r wt_path; do
+    local wt_branch
+    wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null)
+    
+    [[ "$wt_branch" == "$current_branch" ]] && continue
+    
+    local behind
+    behind=$(git rev-list --count "$wt_branch".."$current_branch" 2>/dev/null || echo "0")
+    
+    if [[ "$behind" -gt 0 ]]; then
+      echo "  -> ${CYAN}$wt_branch${NC} is behind by $behind commits. Merging..."
+      if git -C "$wt_path" merge "$current_branch" --no-edit >/dev/null 2>&1; then
+        log_success "  -> Synced $wt_branch"
+      else
+        log_error "  -> Merge failed for $wt_branch. Manual resolution required in $wt_path"
+      fi
+    fi
+  done
+  log_success "Sync complete."
+}
+
 _flow_status() {
   local feature; feature="${1:-$(_detect_feature)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree"; return 1; }
@@ -166,6 +194,7 @@ vibe_flow() {
     pr)     _flow_pr "$@" ;;
     done)   _flow_done "$@" ;;
     status) _flow_status "$@" ;;
+    sync)   _flow_sync "$@" ;;
     *)
       echo "Usage: vibe flow <command>"
       echo "  start  <feature> [--agent=claude] [--base=main]  创建 worktree"
@@ -173,6 +202,7 @@ vibe_flow() {
       echo "  pr     [feature]   生成 PR 并通过 gh 创建"
       echo "  done   [feature]   清理 worktree"
       echo "  status [feature]   查看 feature 状态"
+      echo "  sync               同步当前分支的变更到其他所有 worktree 分支"
       ;;
   esac
 }
