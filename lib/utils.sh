@@ -27,13 +27,6 @@ confirm_action() {
     [[ "$response" =~ ^[yY](es)?$ ]]
 }
 
-# ── Path Validation ─────────────────────────────────────
-validate_path() {
-    local path="$1"
-    [[ -z "$path" ]] && { log_error "Empty path"; return 1; }
-    [[ "$path" == *".."* ]] && { log_error "Path traversal detected: $path"; return 1; }
-    return 0
-}
 
 # ── Version ─────────────────────────────────────────────
 get_vibe_version() {
@@ -47,28 +40,7 @@ vibe_has() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Get command version (best effort)
-get_command_version() {
-    local cmd="$1" flag="${2:---version}"
-    vibe_has "$cmd" && "$cmd" "$flag" 2>&1 | head -1 || echo ""
-}
 
-# Require multiple commands or die
-vibe_require() {
-    local miss=()
-    for c in "$@"; do vibe_has "$c" || miss+=("$c"); done
-    ((${#miss[@]}==0)) || vibe_die "Missing commands: ${miss[*]}"
-}
 
-# Find command in PATH or common locations
-vibe_find_cmd() {
-    local cmd="$1"
-    command -v "$cmd" 2>/dev/null && return 0
-    for p in /opt/homebrew/bin/$cmd /usr/local/bin/$cmd /usr/bin/$cmd; do
-        [[ -x "$p" ]] && { echo "$p"; return 0; }
-    done
-    return 1
-}
 
-# Die with error message
-vibe_die() { echo "${RED}✗ $*${NC}" >&2; return 1; }
+
