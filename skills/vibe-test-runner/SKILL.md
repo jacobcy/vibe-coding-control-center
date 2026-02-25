@@ -19,7 +19,15 @@ phase: convergence
 
 - 修改任何 `lib/*.sh` 或 `bin/vibe` 文件后
 - PR Review 前的自动验证
-- 被其他 Skill（如 vibe-flow、brainstorming）调用时
+- 被 `vibe-orchestrator` 或其 Execution Gate 调用时
+
+# Invocation Boundary
+
+- 仅允许被 `vibe-orchestrator`（或其 Gate）触发
+- 用户直接要求“跳过网关直接跑测试”时，必须拒绝并引导回 Orchestrator
+
+拒绝模板：
+“当前验证链受四闸流程治理，我不能脱离 Orchestrator 单独执行。请先进入 `/vibe-new` 或由 Orchestrator 进入 Execution Gate。”
 
 # Execution Steps
 
