@@ -37,3 +37,14 @@ setup() {
   run zsh -c "source \"$VIBE_ROOT/lib/config.sh\" && source \"$VIBE_ROOT/lib/utils.sh\" && vibe_has a_command_that_does_not_exist_xyz123"
   [ "$status" -eq 1 ]
 }
+
+@test "6. helper functions required by aliases exist" {
+  run zsh -c "source \"$VIBE_ROOT/lib/config.sh\" && source \"$VIBE_ROOT/lib/utils.sh\" && type vibe_require vibe_find_cmd vibe_die"
+  [ "$status" -eq 0 ]
+}
+
+@test "7. vibe_require fails when command is missing" {
+  run zsh -c "source \"$VIBE_ROOT/lib/config.sh\" && source \"$VIBE_ROOT/lib/utils.sh\" && vibe_require definitely_missing_command_xyz"
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Missing commands" ]]
+}
