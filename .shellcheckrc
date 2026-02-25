@@ -1,0 +1,8 @@
+# .shellcheckrc
+# Zsh-specific: disable false positives for Zsh parameter expansion flags
+# SC2296: ${(%):-%x} and ${(C)var} are valid Zsh syntax
+disable=SC2296
+# SC2034: Variables in sourced files may appear unused but are used by sourcer
+disable=SC2034
+# SC1091: Cannot follow sourced files (cross-file sourcing is by design)
+disable=SC1091

@@ -17,7 +17,6 @@
   - `agent.md`: Persona 和角色定义。
 - **`workflows/`**: **用户接口 (User Interface)**。定义了 Agent 可执行的标准任务流程。
 - **`lib/`**: **技能引擎 (Skill Engine)**。包含被 Workflow 调用的核心脚本库 (`.sh`)，实现了具体的业务逻辑。
-  - `git-ops.sh`: 智能提交与分支同步。
   - `gh-ops.sh`: GitHub issue 和 PR 管理。
   - `audit.sh`: 代码与文档审计。
 - **`rules/`**: 具体的编码标准和项目规则。
@@ -41,19 +40,17 @@
 
 | Workflow | Description | Usage |
 | :--- | :--- | :--- |
-| **[/feature-commit](workflows/feature-commit.md)** | 智能提交 (Smart Commit) | 分析未提交变更，按功能分组并交互式提交。 |
-| **[/pull-request](workflows/pull-request.md)** | 创建 PR (Create PR) | 自动分析差异，草拟标题/内容，并创建 GitHub PR。 |
-| **[/sync-branches](workflows/sync-branches.md)** | 多分支同步 (Sync Worktrees) | 将当前分支的变更同步到所有其他 Worktree 分支。 |
-| **[/tdd](workflows/tdd.md)** | 测试驱动开发 (TDD Cycle) | 红-绿-重构循环的标准流程。 |
+| **[/vibe-commit](workflows/vibe-commit.md)** | 智能提交 (Smart Commit) | 由 AI 分析 `git diff`，按功能分组并交互式生成 Conventional Commits。 |
 
-## 🔍以此审查与维护 (Review & Maintenance)
+> 💡 `vibe flow sync` — 通过 CLI 将当前分支同步到所有 Worktree 分支。
+> 💡 `vibe clean` — 通过 CLI 一键清理 `temp/` 及临时文件。
+
+## 🔍 代码审查与维护 (Review & Maintenance)
 
 | Workflow | Description | Usage |
 | :--- | :--- | :--- |
-| **[/review-pr](workflows/review-pr.md)** | 审查 PR (Review PR) | 拉取 PR，运行自动化检查，提供代码审查意见。 |
 | **[/review-code](workflows/review-code.md)** | 代码审计 (Code Audit) | 运行 ShellCheck 和逻辑检查，确保代码质量。 |
 | **[/review-docs](workflows/review-docs.md)** | 文档审查 (Review Docs) | 检查 `docs/` 和 `CHANGELOG.md` 的完整性。 |
-| **[/maintenance](workflows/maintenance.md)** | 项目维护 (Maintenance) | 清理临时文件，运行深度健康检查。 |
 
 ## 🐙 GitHub Issue 管理 (Issue Ops)
 
@@ -68,7 +65,6 @@
 | :--- | :--- | :--- |
 | **[/create-workflow](workflows/create-workflow.md)** | 创建新工作流 | 引导用户创建新的 `.md` 工作流文件。 |
 | **[/release](workflows/release.md)** | 自动化发布 | 构建、打标签并发布新版本。 |
-| **[/initialize](workflows/initialize.md)** | 初始化项目 | 检查或建立标准的 .agent 目录结构。 |
 
 ---
 

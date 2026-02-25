@@ -18,7 +18,7 @@ _keys_list() {
     if [[ ! -f "$kf" ]]; then
         log_warn "No keys.env found"
         echo "💡 Create from template: ${CYAN}vibe keys init${NC}"
-        return 1
+        return 0
     fi
 
     while IFS='=' read -r key value; do
@@ -30,6 +30,7 @@ _keys_list() {
             echo "  ${GREEN}✓${NC} ${key}"
         fi
     done < "$kf"
+    return 0
 }
 
 # ── Set a Key ───────────────────────────────────────────
@@ -91,7 +92,14 @@ vibe_keys() {
         set)       _keys_set "$@" ;;
         get)       _keys_get "$@" ;;
         init)      _keys_init ;;
+        help|-h|--help)
+                   echo "Usage: vibe keys <command>"
+                   echo "Commands: list | set | get | init"
+                   ;;
         *)         log_error "Unknown: vibe keys $subcmd"
-                   echo "Usage: vibe keys {list|set|get|init}" ;;
+                   echo "Usage: vibe keys <command>"
+                   echo "Commands: list | set | get | init"
+                   return 1
+                   ;;
     esac
 }

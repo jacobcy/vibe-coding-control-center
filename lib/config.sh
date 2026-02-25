@@ -8,13 +8,18 @@ VIBE_ROOT="${VIBE_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}"
 export VIBE_ROOT
 
 # ── Core Directories ────────────────────────────────────
+# Always anchor executable/library paths to the current VIBE_ROOT to avoid
+# cross-worktree contamination from inherited shell environment variables.
 export VIBE_BIN="$VIBE_ROOT/bin"
 export VIBE_LIB="$VIBE_ROOT/lib"
-export VIBE_CONFIG="$VIBE_ROOT/config"
-export VIBE_AGENT="$VIBE_ROOT/.agent"
+export VIBE_CONFIG="${VIBE_CONFIG:-$VIBE_ROOT/config}"
+export VIBE_AGENT="${VIBE_AGENT:-$VIBE_ROOT/.agent}"
 
 # ── Load Utils ──────────────────────────────────────────
-[[ -z "$VIBE_UTILS_LOADED" ]] && source "$VIBE_LIB/utils.sh" && VIBE_UTILS_LOADED=1
+if [[ "${VIBE_UTILS_LOADED:-}" != "$VIBE_LIB/utils.sh" ]]; then
+    source "$VIBE_LIB/utils.sh"
+    VIBE_UTILS_LOADED="$VIBE_LIB/utils.sh"
+fi
 
 # ── Load Keys (if keys.env exists) ──────────────────────
 _vibe_load_keys() {
