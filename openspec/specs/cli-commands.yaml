@@ -1,0 +1,111 @@
+name: vibe-cli-commands
+version: "2.0.0"
+description: "Vibe Center 2.0 CLI Commands Specification"
+commands:
+  - name: check
+    description: "检测开发环境（工具版本、依赖状态）"
+    parameters: []
+    returns: "0 on success, 1 on failure"
+    example: "vibe check"
+  
+  - name: flow
+    description: "开发工作流"
+    subcommands:
+      - name: start
+        description: "创建 worktree"
+        parameters:
+          - name: feature
+            type: string
+            required: true
+          - name: "--agent"
+            type: string
+            required: false
+            default: "claude"
+          - name: "--base"
+            type: string
+            required: false
+            default: "main"
+        returns: "0 on success"
+        example: "vibe flow start my-feature --agent=claude"
+      - name: review
+        description: "Pre-PR 检查清单 + lazygit"
+        parameters:
+          - name: feature
+            type: string
+            required: false
+        returns: "0 on success"
+        example: "vibe flow review my-feature"
+      - name: pr
+        description: "生成 PR 并通过 gh 创建"
+        parameters:
+          - name: feature
+            type: string
+            required: false
+        returns: "0 on success"
+        example: "vibe flow pr my-feature"
+      - name: done
+        description: "清理 worktree"
+        parameters:
+          - name: feature
+            type: string
+            required: false
+        returns: "0 on success"
+        example: "vibe flow done my-feature"
+      - name: status
+        description: "查看 feature 状态"
+        parameters:
+          - name: feature
+            type: string
+            required: false
+        returns: "0 on success"
+        example: "vibe flow status"
+      - name: sync
+        description: "同步当前分支的变更到其他所有 worktree 分支"
+        parameters: []
+        returns: "0 on success"
+        example: "vibe flow sync"
+
+  - name: keys
+    description: "管理 API 密钥"
+    subcommands:
+      - name: list
+        description: "列出所有配置的 keys"
+        parameters: []
+        returns: "0 on success"
+        example: "vibe keys list"
+      - name: set
+        description: "设置 key 的值"
+        parameters:
+          - name: provider
+            type: string
+            required: true
+          - name: key_name
+            type: string
+            required: false
+        returns: "0 on success"
+        example: "vibe keys set anthropic"
+      - name: get
+        description: "获取 key 的值"
+        parameters:
+          - name: provider
+            type: string
+            required: true
+        returns: "0 on success"
+        example: "vibe keys get anthropic"
+      - name: init
+        description: "初始化 keys 配置文件"
+        parameters: []
+        returns: "0 on success"
+        example: "vibe keys init"
+
+  - name: tool
+    description: "安装/更新 AI 开发工具"
+    parameters: []
+    returns: "0 on success"
+    example: "vibe tool"
+
+  - name: clean
+    description: "清理项目临时文件"
+    parameters: []
+    returns: "0 on success"
+    example: "vibe clean"
