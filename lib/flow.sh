@@ -99,7 +99,6 @@ _flow_pr() {
   mkdir -p temp
   echo "$body" > "temp/pr-${feature}.md"
   log_info "PR description → temp/pr-${feature}.md"
-
   echo ""
   if confirm_action "Create PR '${title}' now?"; then
     gh pr create --title "$title" --body-file "temp/pr-${feature}.md" \
@@ -162,7 +161,6 @@ _flow_sync() {
     log_error "Sync completed with failures."
     return 1
   fi
-
   log_success "Sync complete."
 }
 
