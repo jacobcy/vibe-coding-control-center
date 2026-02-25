@@ -30,6 +30,7 @@ _keys_list() {
             echo "  ${GREEN}✓${NC} ${key}"
         fi
     done < "$kf"
+    return 0
 }
 
 # ── Set a Key ───────────────────────────────────────────

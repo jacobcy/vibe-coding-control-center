@@ -3,16 +3,16 @@
 # Target: ~60 lines | No dead code
 
 # ── Colors ──────────────────────────────────────────────
-RED=$'\033[0;31m'
-GREEN=$'\033[0;32m'
-YELLOW=$'\033[1;33m'
-BLUE=$'\033[0;34m'
-CYAN=$'\033[0;36m'
-BOLD=$'\033[1m'
-NC=$'\033[0m'
+: "${RED:=$'\033[0;31m'}"
+: "${GREEN:=$'\033[0;32m'}"
+: "${YELLOW:=$'\033[1;33m'}"
+: "${BLUE:=$'\033[0;34m'}"
+: "${CYAN:=$'\033[0;36m'}"
+: "${BOLD:=$'\033[1m'}"
+: "${NC:=$'\033[0m'}"
 
 # ── Logging ─────────────────────────────────────────────
-log_info()    { echo "${GREEN}✓ $1${NC}"; }
+log_info()    { echo "${GREEN}ℹ $1${NC}"; }
 log_warn()    { echo "${YELLOW}! $1${NC}" >&2; }
 log_error()   { echo "${RED}✗ $1${NC}" >&2; }
 log_step()    { echo "${BLUE}>> $1...${NC}"; }
@@ -39,7 +39,6 @@ get_vibe_version() {
 vibe_has() {
     command -v "$1" >/dev/null 2>&1
 }
-
 
 
 

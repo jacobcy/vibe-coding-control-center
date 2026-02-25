@@ -25,6 +25,12 @@ setup() {
   [[ "$output" =~ "Usage:" ]]
 }
 
+@test "4.1 vibe help mentions /vibe-new onboarding" {
+  run vibe help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "/vibe-new <feature>" ]]
+}
+
 @test "5. invalid subcommand returns error" {
   run vibe invalidcommand
   [ "$status" -eq 1 ]

@@ -61,7 +61,10 @@ _flow_start() {
   log_success "Feature started: ${BOLD}${feature}${NC}"
   echo "  Directory : ${CYAN}$PWD${NC}"
   echo "  Branch    : ${CYAN}${branch}${NC}"
-  echo "  Next → edit PRD, develop, then: ${CYAN}vibe flow review${NC}"
+  echo ""
+  echo "${BOLD}Onboarding:${NC} ✅ 工作区已就绪"
+  echo "  为保证不产生垃圾代码，请在 AI 助手中输入: ${CYAN}/vibe-new ${feature}${NC}"
+  echo "  然后按四闸流程推进开发，完成后执行: ${CYAN}vibe flow review${NC}"
 }
 
 _flow_review() {
@@ -176,7 +179,7 @@ _flow_status() {
 
 # ─── Dispatcher ─────────────────────────────────────────
 vibe_flow() {
-  local cmd="${1:-help}"; shift 2>/dev/null || true
+  local cmd="${1:-help}"; shift 1 2>/dev/null || true
   case "$cmd" in
     start)  _flow_start "$@" ;;
     review) _flow_review "$@" ;;
