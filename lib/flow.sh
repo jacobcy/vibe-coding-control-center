@@ -39,16 +39,7 @@ _flow_start() {
   git config user.name "Agent-${(C)agent}" 2>/dev/null
   mkdir -p docs/prds
   if [[ ! -f "docs/prds/${feature}.md" ]]; then
-    cat > "docs/prds/${feature}.md" <<EOF
-# PRD: ${feature}
-## 背景
-_TODO: 描述为什么需要这个功能_
-## 目标
-_TODO: 描述功能目标_
-## 需求清单
-- [ ] 需求1
-- [ ] 需求2
-EOF
+    printf "# PRD: %s\n## 背景\n_TODO: 描述为什么需要这个功能_\n## 目标\n_TODO: 描述功能目标_\n## 需求清单\n- [ ] 需求1\n- [ ] 需求2\n" "${feature}" > "docs/prds/${feature}.md"
     log_info "Created PRD stub: docs/prds/${feature}.md"
   fi
 
@@ -100,9 +91,7 @@ _flow_pr() {
   vibe_has gh || { log_error "GitHub CLI (gh) required — brew install gh"; return 1; }
 
   local title="feat(${feature}): summary"
-  local body="## Changes\n"
-  body+=$(git log --oneline main..HEAD 2>/dev/null | sed 's/^/- /')
-  body+="\n\n## Checklist\n- [ ] Tests pass\n- [ ] Docs updated\n- [ ] Code reviewed"
+  local body="## Changes\n$(git log --oneline main..HEAD 2>/dev/null | sed 's/^/- /')\n\n## Checklist\n- [ ] Tests pass\n- [ ] Docs updated\n- [ ] Code reviewed"
 
   mkdir -p temp
   echo "$body" > "temp/pr-${feature}.md"
@@ -196,13 +185,7 @@ vibe_flow() {
     status) _flow_status "$@" ;;
     sync)   _flow_sync "$@" ;;
     *)
-      echo "Usage: vibe flow <command>"
-      echo "  start  <feature> [--agent=claude] [--base=main]  创建 worktree"
-      echo "  review [feature]   Pre-PR 检查清单 + lazygit"
-      echo "  pr     [feature]   生成 PR 并通过 gh 创建"
-      echo "  done   [feature]   清理 worktree"
-      echo "  status [feature]   查看 feature 状态"
-      echo "  sync               同步当前分支的变更到其他所有 worktree 分支"
+      printf "Usage: vibe flow <command>\n  start  <feature> [--agent=claude] [--base=main]  创建 worktree\n  review [feature]   Pre-PR 检查清单 + lazygit\n  pr     [feature]   生成 PR 并通过 gh 创建\n  done   [feature]   清理 worktree\n  status [feature]   查看 feature 状态\n  sync               同步当前分支的变更到其他所有 worktree 分支\n"
       ;;
   esac
 }
