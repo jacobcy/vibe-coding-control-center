@@ -1,6 +1,9 @@
 # Task Status
 
 ## Current
+- unified-dispatcher (framework: openspec)
+  - status: planning
+  - created: 2026-02-26
 - 文档精简与去重（token 优化）
   - 目标文件：`SOUL.md` `CLAUDE.md` `README.md` `.agent/context/*` `.agent/rules/*`
 
