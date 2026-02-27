@@ -8,6 +8,14 @@
 
 ## Recent
 
+- **git-workflow-standard** (framework: none)
+  - status: completed
+  - completed: 2026-02-28
+  - 产出：
+    - `docs/standards/git-workflow-standard.md`
+    - 更新 `docs/prds/vibe-workflow-paradigm.md`
+    - 更新 `CLAUDE.md`
+
 - **docs-organization-standard** (framework: vibe-workflow)
   - status: completed
   - completed: 2026-02-28

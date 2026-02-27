@@ -172,6 +172,7 @@ Spec 完成后 → 触发 AI 刺客找茬 → 输出 Critic Report → 人类裁
 **红线：**
 - 严禁弱化断言、删减边界用例让测试变绿
 - 测试未失败（Red）→ 禁止进入 Code 层
+- **禁止 Push**：测试阶段仅允许本地操作，严禁将未通过 Audit 的代码 Push 到远端
 
 **Gate 检查**：Test Gate → 验证测试覆盖率 + 断言来源于 Spec + 测试必须失败（Red）
 
@@ -204,8 +205,10 @@ AI 修改代码 → 测试仍失败 → 重试
 - 复杂度超标 → CI 阻断 → 必须拆分重构
 - "赶进度"不是绕过理由
 - 3 次熔断后仍失败 → 必须人类介入
+- **高频 Commit**：测试变绿后，**必须主动本地 commit**（或调用 `/vibe-commit`）留档
+- **网络禁令**：本阶段**绝对禁止**任何 `git push` 或发起 PR 的企图
 
-**Gate 检查**：Code Gate → 验证测试通过（Green）+ 复杂度 + AST 约束 + 3次熔断机制
+**Gate 检查**：Code Gate → 验证测试通过（Green）+ 复杂度 + AST 约束 + 3次熔断机制 + 本地高频Commit留痕
 
 ---
 
@@ -236,13 +239,14 @@ Spec 不变量 → Code 实现 → Audit 确认
 - 拿着审计报告核对
 - 重点审查"AI 越权"
 - 反思整个需求和代码是否出于幻觉
-- 报告全绿 → Approve
+- **决议通过后**：才允许执行 `git push` 及创建指向 `main` 的 PR
+- **Post-PR**：PR合入或废弃后，必须删除相关本地分支和 Worktree 环境
 
 **红线：**
-- 任何一项红灯 → 拒绝合并
+- 任何一项红灯 → 拒绝合并，抛弃当前临时分支和 Worktree
 - 串通检测发现作恶 → 重大事故
 
-**Gate 检查**：Audit Gate → AI 审计报告 + Collusion Detector + 人类最终决议
+**Gate 检查**：Audit Gate → AI 审计报告 + Collusion Detector + 人类最终决议 + Post-PR 回收机制
 
 ---
 
