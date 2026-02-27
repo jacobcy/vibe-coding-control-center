@@ -1,5 +1,12 @@
 ---
-description: Detect project drift from original principles and requirements.
+document_type: workflow
+description: Detect and report project drift from original principles defined in SOUL.md
+author: Claude Sonnet 4.5
+created: 2025-01-24
+related_docs:
+  - SOUL.md
+  - CLAUDE.md
+  - .agent/context/memory.md
 ---
 
 # Drift Detection

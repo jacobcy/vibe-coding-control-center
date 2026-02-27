@@ -1,5 +1,10 @@
 # Vibe Center 2.0 — 开发指南
 
+> **文档定位**：本文件是开发流程和工具使用的权威指南（详见 [SOUL.md](SOUL.md) §0 文档职责分工）
+> **核心原则**：详见 [SOUL.md](SOUL.md)
+> **项目结构**：详见 [STRUCTURE.md](STRUCTURE.md)
+> **AI 规则**：详见 [CLAUDE.md](CLAUDE.md)
+
 ## 1. 项目双重身份
 
 本项目包含两个维度的工作（详见 [CLAUDE.md](CLAUDE.md)）：

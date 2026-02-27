@@ -1,8 +1,28 @@
 # Task Status
 
+# Task Status
+
 ## Current
 
 （无当前任务）
+
+## Recent
+
+- **docs-organization-standard** (framework: vibe-workflow)
+  - status: completed
+  - completed: 2026-02-28
+  - 产出：
+    - 重组 docs 目录结构，符合 doc-organization.md 标准
+    - 创建 5 个任务目录，每个包含 README.md
+    - 移动 20+ 文档到正确位置
+    - 统一文件命名为 kebab-case
+    - 清理空目录（specs/plans/reviews/tech/governance）
+  - 任务分类：
+    - `docs/tasks/2026-02-26-agent-dev-refactor/` - Agent 工具链重构（已归档）
+    - `docs/tasks/2026-02-25-vibe-v2-final/` - Vibe V2 最终方案（已归档）
+    - `docs/tasks/2026-02-21-save-command/` - Save Command 设计（已归档）
+    - `docs/tasks/2026-02-21-vibe-architecture/` - Vibe 架构设计（已归档）
+    - `docs/tasks/2026-02-26-vibe-engine/` - Vibe Engine 实现（已归档）
 
 ## Recent
 

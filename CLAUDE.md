@@ -1,8 +1,10 @@
 # Project Context: Vibe Center 2.0
 
-Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥、worktree/tmux 工作流，以及 Agent 规则体系。
+> **文档定位**：本文件提供项目上下文、技术栈和硬规则（详见 [SOUL.md](SOUL.md) §0 文档职责分工）
+> **AI 入口**：AI Agent 请先阅读 [AGENTS.md](AGENTS.md)
+> **文档结构**：详见 [docs/README.md](docs/README.md)
 
-> Entry note: The canonical root entry is `AGENTS.md`. Use this file for project context and hard rules.
+Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥、worktree/tmux 工作流，以及 Agent 规则体系。
 
 ## 技术栈
 - 语言：Zsh
@@ -56,8 +58,27 @@ Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥�
 3. vibe-orchestrator 的 Gate 0 会智能选择框架（Superpower/OpenSpec）
 4. 按四闸流程执行
 
+## 文档质量标准
+
+所有文档应遵循统一的质量标准，使用 YAML frontmatter 标记元数据。
+
+详见 **[docs/standards/doc-quality-standards.md](docs/standards/doc-quality-standards.md)**（权威标准）
+
+**核心原则**：
+- 每个文档必须有 frontmatter 元数据块
+- AI Agent 创建文档时必须用真实身份签名（如 "Claude Sonnet 4.5"）
+- 使用 `related_docs` 字段进行上下文圈定
+- 每个字段必须有实际用途，不为标准而标准
+
 ## 参考
-- `SOUL.md`
-- `AGENTS.md`
-- `.agent/README.md`
-- `.agent/rules/*`
+
+> **单一事实原则**：以下文档是各自领域的权威来源，详见 [SOUL.md](SOUL.md) §0
+
+- **[SOUL.md](SOUL.md)** — 项目宪法和核心原则（权威）
+- **[STRUCTURE.md](STRUCTURE.md)** — 项目结构定义（权威）
+- **[AGENTS.md](AGENTS.md)** — AI Agent 入口指南
+- **[docs/README.md](docs/README.md)** — 文档结构和标准
+- **[docs/standards/doc-quality-standards.md](docs/standards/doc-quality-standards.md)** — 文档质量标准（权威）
+- **[docs/standards/DOC_ORGANIZATION.md](docs/standards/DOC_ORGANIZATION.md)** — 文档组织标准详细指南
+- **[.agent/README.md](.agent/README.md)** — AI 工作流和规则
+- **[.agent/rules/*](.agent/rules/)** — 编码标准和模式

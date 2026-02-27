@@ -1,5 +1,12 @@
 ---
-description: Verify the consistency of project memory and documents.
+document_type: workflow
+description: Verify the consistency of project memory and documents
+author: Claude Sonnet 4.5
+created: 2025-01-24
+related_docs:
+  - .agent/context/memory.md
+  - .agent/context/task.md
+  - SOUL.md
 ---
 
 # Verify Memory Consistency

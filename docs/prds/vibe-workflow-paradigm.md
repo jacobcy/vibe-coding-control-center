@@ -1,45 +1,77 @@
+---
+document_type: prd
+title: Vibe Workflow Paradigm - 开发范式总览
+status: approved
+author: Claude Sonnet 4.5
+created: 2025-01-15
+last_updated: 2025-01-24
+related_docs:
+  - .agent/workflows/vibe-drift.md
+  - .agent/workflows/vibe-check.md
+  - SOUL.md
+  - CLAUDE.md
+  - docs/prds/unified-dispatcher.md
+  - docs/prds/plan-gate-enhancement.md
+  - docs/prds/spec-critic.md
+  - docs/prds/collusion-detector.md
+  - docs/prds/context-scoping.md
+---
+
 # PRD: Vibe Workflow Paradigm - 开发范式总览
 
-> 本文档是 Vibe Coding 开发范式的总 PRD，定义标准开发流程的六层结构和四闸机制。
+> 本文档是 Vibe Coding 开发范式的总 PRD，定义标准开发流程的六层结构和六闸机制。
 
 ## 架构总览
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        人类主权区                                │
-│  ┌─────────┐    ┌─────────┐    ┌─────────────────────────────┐  │
-│  │  PRD    │ →  │  Spec   │ →  │  审批 Execution Plan        │  │
-│  │ 定目标  │    │  定法律  │    │  审批 Critic Report        │  │
-│  └─────────┘    └─────────┘    │  审批 Collusion Report     │  │
-│       ↓              ↓         └─────────────────────────────┘  │
-│    Scope Gate    Plan Gate                                     │
+│                        人类主权区（立法层）                        │
+│  ┌─────────┐    ┌─────────┐    ┌──────────────────┐            │
+│  │  PRD    │ →  │  Spec   │ →  │ Execution Plan   │            │
+│  │ 定目标  │    │  定法律  │    │    圈范围        │            │
+│  └─────────┘    └─────────┘    └──────────────────┘            │
+│       ↓              ↓                   ↓                      │
+│  Scope Gate     Spec Gate          Plan Gate                   │
+│  (验证目标)    (验证契约+Critic)   (验证上下文)                  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│                        AI 执行区                                │
-│  ┌──────────────────┐    ┌─────────┐    ┌──────────────────┐   │
-│  │  Execution Plan  │ →  │  Test   │ →  │      Code        │   │
-│  │    圈定上下文    │    │  先红后绿 │    │     填实现       │   │
-│  └──────────────────┘    └─────────┘    └──────────────────┘   │
-│           ↓                   ↓                   ↓            │
-│     Execution Gate                           Review Gate       │
+│                        AI 执行区（行政层）                        │
+│  ┌─────────┐              ┌─────────┐                          │
+│  │  Test   │    →         │  Code   │                          │
+│  │ 先红Red │              │ 后绿Green│                          │
+│  └─────────┘              └─────────┘                          │
+│       ↓                        ↓                                │
+│  Test Gate              Code Gate                              │
+│ (验证覆盖率+Red)      (验证Green+复杂度+AST)                     │
+│                                                                 │
+│  🔴 3次熔断机制：Code 连续 3 次无法让 Test 变绿 → 强制中断      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│                        安全防线                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐     │
-│  │ Spec Critic │  │ 3次熔断机制 │  │ Collusion Detector  │     │
-│  │  AI 刺客    │  │ 幻觉打断   │  │    串通检测          │     │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘     │
+│                        人类决议区（执法层）                        │
+│  ┌──────────────────────────────────────────────────┐          │
+│  │              AI Audit Review                     │          │
+│  │  - 目标对齐检查                                   │          │
+│  │  - 规范遵守检查（Spec 不变量 100% 覆盖）          │          │
+│  │  - 路径一致性检查（按 Plan 执行）                 │          │
+│  │  - 架构纯洁性检查（AST + 复杂度）                 │          │
+│  └──────────────────────────────────────────────────┘          │
+│                          ↓                                      │
+│                    Audit Gate                                   │
+│          (AI 审计 + Collusion Detector + 人类决议)               │
+│                                                                 │
+│  🔴 Collusion Detector：检测 AI 编码员和审计员是否串通          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## 总原则（宪法层）
 
-1. **立法与行政分离**：人类主导立法（Plan/Spec），AI 负责行政（执行与测试），CI 与独立 AI 负责执法（熔断与审计）。
-2. **测试先行，机械卡口**：先测试，后代码。任何阶段不满足条件，CI 直接拒绝，不允许人情绕过。
+1. **立法与行政分离**：人类主导立法（PRD/Spec/Plan），AI 负责行政（Test/Code），CI 与独立 AI 负责执法（熔断与审计）。
+2. **测试先行，机械卡口**：先测试（Red），后代码（Green）。任何阶段不满足条件，CI 直接拒绝，不允许人情绕过。
 3. **隔离探索与生产**：允许在沙盒（Spike 分支）中不受限地与 AI 自由对话探索；但一旦进入生产分支，**所有沙盒代码必须抛弃**，严格按本范式重新走线。
 4. **人类只对"报告"负责，不对"源码"负责**：放弃肉眼 review 机器代码的执念，用系统和报告来治理系统。
+5. **六层六闸，层层把关**：每一层文档对应一个 Gate，Gate 不通过则阻断后续流程，确保质量收敛。
 
 ---
 
@@ -62,7 +94,7 @@
 - PRD 不完整 → 禁止进入 Spec
 - 禁止 AI 过度设计（个人脚本用航母级架构）
 
-**Gate 检查**：Scope Gate → 验证 PRD 完整性
+**Gate 检查**：Scope Gate → 验证 PRD 完整性（目标/边界/数据流/成功判据）
 
 ---
 
@@ -90,9 +122,9 @@ Spec 完成后 → 触发 AI 刺客找茬 → 输出 Critic Report → 人类裁
 
 **红线：**
 - Spec 锁定后，**绝对禁止**为了实现方便反向修改
-- 发现不通 → 废弃流程 → 回退 Plan/Spec 重新立法
+- 发现不通 → 废弃流程 → 回退 PRD/Spec 重新立法
 
-**Gate 检查**：Plan Gate → 验证 Spec 完整性 + 触发 Spec Critic
+**Gate 检查**：Spec Gate → 验证 Spec 完整性（接口契约/不变量/边界行为）+ 触发 Spec Critic
 
 ---
 
@@ -121,7 +153,7 @@ Spec 完成后 → 触发 AI 刺客找茬 → 输出 Critic Report → 人类裁
 - 无上下文圈定 → 阻断执行
 - PRD/Spec 与 Execution Plan 逻辑不一致 → 打回重做
 
-**Gate 检查**：Execution Gate 入口 → 验证上下文圈定存在
+**Gate 检查**：Plan Gate → 验证上下文圈定存在 + 任务拆分清晰
 
 ---
 
@@ -135,20 +167,13 @@ Spec 完成后 → 触发 AI 刺客找茬 → 输出 Critic Report → 人类裁
 |------|------|
 | 真理唯一 | 测试断言 100% 来源于 Spec |
 | 全面覆盖 | Normal Path + Edge Cases + Error Flow |
-| TDD 顺序 | 先 Red → 再 Green |
-
-**幻觉熔断机制：**
-
-```
-AI 修改代码 → 测试仍失败 → 重试
-                ↓
-         连续 3 次失败 → 🔴 强制中断
-                         ↓
-                    人类介入排查
-```
+| TDD 顺序 | 先 Red（测试必须失败）→ 再 Green（代码让测试通过）|
 
 **红线：**
 - 严禁弱化断言、删减边界用例让测试变绿
+- 测试未失败（Red）→ 禁止进入 Code 层
+
+**Gate 检查**：Test Gate → 验证测试覆盖率 + 断言来源于 Spec + 测试必须失败（Red）
 
 ---
 
@@ -165,21 +190,34 @@ AI 修改代码 → 测试仍失败 → 重试
 | 复杂度 | 单函数 ≤ 40 行 | 反大泥球 |
 | 复杂度 | 圈复杂度 ≤ 10 | 可读性 |
 
+**幻觉熔断机制：**
+
+```
+AI 修改代码 → 测试仍失败 → 重试
+                ↓
+         连续 3 次失败 → 🔴 强制中断
+                         ↓
+                    人类介入排查
+```
+
 **红线：**
 - 复杂度超标 → CI 阻断 → 必须拆分重构
 - "赶进度"不是绕过理由
+- 3 次熔断后仍失败 → 必须人类介入
+
+**Gate 检查**：Code Gate → 验证测试通过（Green）+ 复杂度 + AST 约束 + 3次熔断机制
 
 ---
 
 ### 第 6 层：AI Audit Review — AI 审计，人类决议
 
-**核心问题**：如何确保主权？
+**核心问题**：如何确保主权？整个流程是否出于幻觉？
 
 **审计报告内容：**
 
 | 检查项 | 问题 |
 |--------|------|
-| 目标对齐 | 代码是否偷换了 Plan 的概念？ |
+| 目标对齐 | 代码是否偷换了 PRD 的概念？ |
 | 规范遵守 | Spec 不变量是否 100% 测试覆盖且通过？ |
 | 路径一致 | 是否严格按 Execution Plan 执行？ |
 | 架构纯洁 | AST 与复杂度检查是否全绿？ |
@@ -197,11 +235,14 @@ Spec 不变量 → Code 实现 → Audit 确认
 **人类职责：**
 - 拿着审计报告核对
 - 重点审查"AI 越权"
+- 反思整个需求和代码是否出于幻觉
 - 报告全绿 → Approve
 
 **红线：**
 - 任何一项红灯 → 拒绝合并
 - 串通检测发现作恶 → 重大事故
+
+**Gate 检查**：Audit Gate → AI 审计报告 + Collusion Detector + 人类最终决议
 
 ---
 
@@ -218,28 +259,40 @@ Spec 不变量 → Code 实现 → Audit 确认
        │
        ↓
 ┌──────────────┐
-│  Scope Gate  │ → 读取 PRD → 验证目标/非目标/成功判据
+│  Scope Gate  │ → 读取 PRD → 验证目标/边界/数据流/成功判据
 │              │    缺失 → 阻断
 └──────────────┘
        │
        ↓
 ┌──────────────┐
-│  Plan Gate   │ → 读取 Spec → 验证接口/不变量/边界
+│  Spec Gate   │ → 读取 Spec → 验证接口契约/不变量/边界行为
 │              │ → 触发 Spec Critic → 人类裁决
-│              │ → 检查 Execution Plan 上下文圈定
 └──────────────┘
        │
        ↓
 ┌──────────────┐
-│ Execution    │ → 按任务执行 → 先写测试 → 再写代码
-│ Gate         │ → 3 次熔断机制
+│  Plan Gate   │ → 读取 Execution Plan → 验证上下文圈定/任务拆分
+│              │    缺失 → 阻断
 └──────────────┘
        │
        ↓
 ┌──────────────┐
-│ Review Gate  │ → vibe-rules-enforcer 合规审查
+│  Test Gate   │ → AI 编写测试 → 验证覆盖率/断言来源/必须失败(Red)
+│              │    未失败 → 阻断
+└──────────────┘
+       │
+       ↓
+┌──────────────┐
+│  Code Gate   │ → AI 编写代码 → 验证测试通过(Green)/复杂度/AST
+│              │ → 3 次熔断机制
+│              │    失败 → 人类介入
+└──────────────┘
+       │
+       ↓
+┌──────────────┐
+│  Audit Gate  │ → AI 审计报告 → 目标对齐/规范遵守/路径一致/架构纯洁
 │              │ → Collusion Detector 串通检测
-│              │ → 人类裁决 → Approve/Reject
+│              │ → 人类最终决议 → Approve/Reject
 └──────────────┘
        │
        ↓
@@ -253,15 +306,19 @@ Spec 不变量 → Code 实现 → Audit 确认
 | PRD | 文件 | 对应能力 |
 |-----|------|----------|
 | Unified Dispatcher | `docs/prds/unified-dispatcher.md` | Gate 0 智能调度 |
-| Plan Gate Enhancement | `docs/prds/plan-gate-enhancement.md` | 多源计划读取与验证 |
-| Spec Critic | `docs/prds/spec-critic.md` | AI 刺客找茬机制 |
-| Collusion Detector | `docs/prds/collusion-detector.md` | AI 串通检测机制 |
-| Context Scoping | `docs/prds/context-scoping.md` | 执行计划上下文圈定 |
+| Plan Gate Enhancement | `docs/prds/plan-gate-enhancement.md` | Spec Gate 多源计划读取与验证 |
+| Spec Critic | `docs/prds/spec-critic.md` | Spec Gate AI 刺客找茬机制 |
+| Collusion Detector | `docs/prds/collusion-detector.md` | Audit Gate AI 串通检测机制 |
+| Context Scoping | `docs/prds/context-scoping.md` | Plan Gate 执行计划上下文圈定 |
+
+**注意**：`plan-gate-enhancement.md` 实际上是 Spec Gate 的实现，命名需要后续统一。
 
 ---
 
 ## 一句话铁律
 
-> **PRD 定目标，Spec 定法律，Execution Plan 圈范围，Test 锁行为，Code 填实现，AI Audit 呈报告，Human 签决议。**
+> **PRD 定目标，Spec 定法律，Execution Plan 圈范围，Test 锁行为（先红），Code 填实现（后绿），AI Audit 呈报告，Human 签决议。**
 >
-> *（AST 管控依赖边界，复杂度熔断控制腐化，3 次重试失败强制熔断打断 AI 幻觉！）*
+> **六层六闸，层层把关：Scope Gate → Spec Gate → Plan Gate → Test Gate → Code Gate → Audit Gate**
+>
+> *（AST 管控依赖边界，复杂度熔断控制腐化，3 次重试失败强制熔断打断 AI 幻觉，Collusion Detector 防止 AI 串通作恶！）*

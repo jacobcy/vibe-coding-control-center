@@ -14,7 +14,6 @@
 - **`context/`**: 记忆与任务管理
   - `memory.md`: 长期记忆，记录关键决策和架构选择。
   - `task.md`: 当前活动任务列表。
-  - `agent.md`: Persona 和角色定义。
 - **`workflows/`**: **用户接口 (User Interface)**。定义了 Agent 可执行的标准任务流程。
 - **`lib/`**: **技能引擎 (Skill Engine)**。包含被 Workflow 调用的核心脚本库 (`.sh`)，实现了具体的业务逻辑。
   - `gh-ops.sh`: GitHub issue 和 PR 管理。

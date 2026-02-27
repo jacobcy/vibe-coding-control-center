@@ -2,7 +2,8 @@
 
 Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
 
-> Single Entry Policy: `AGENTS.md` is the canonical root entry for all agents.
+> **Single Entry Policy**: `AGENTS.md` is the canonical root entry for all agents.
+> **Single Source of Truth**: Each document has a specific responsibility. See [SOUL.md](SOUL.md) §0 for document responsibility matrix.
 > If other root-level agent files exist, treat them as aliases and follow this file.
 
 ## 📍 Project Identity
@@ -16,9 +17,14 @@ This project has **two dimensions** (see CLAUDE.md for details):
 - **Skills (runtime)**: `.agent/skills/` — symlinks, see DEVELOPER.md §Setup
 
 ## 📚 Essential Reading
-1. **[CLAUDE.md](CLAUDE.md)** — Project context, tech stack, and **HARD RULES**
-2. **[SOUL.md](SOUL.md)** — Core constitution and principles
-3. **[.agent/README.md](.agent/README.md)** — Workflows, skills, and rules
+
+> **Reading Order**: Follow this sequence for optimal understanding. Each document is the authority for its domain (see [SOUL.md](SOUL.md) §0).
+
+1. **[SOUL.md](SOUL.md)** — Core constitution and principles (authority on values and boundaries)
+2. **[STRUCTURE.md](STRUCTURE.md)** — Project structure definition (authority on file organization)
+3. **[CLAUDE.md](CLAUDE.md)** — Project context, tech stack, and **HARD RULES** (authority on technical rules)
+4. **[docs/README.md](docs/README.md)** — Documentation structure and standards (authority on documentation)
+5. **[.agent/README.md](.agent/README.md)** — Workflows, skills, and rules (authority on AI workflows)
 
 ## 🤖 Protocol
 Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
