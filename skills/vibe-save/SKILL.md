@@ -11,53 +11,77 @@ description: Use when the user wants to save session context, says "/save", or w
 
 **Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
 
+## 文件职责分离
+
+| 文件 | 职责 | 内容 |
+| ---- | ---- | ---- |
+| `memory.md` | 认知对齐目录 | 达成的概念共识、关键定义、文件目录索引 |
+| `memory/<topic>.md` | 复杂概念展开 | 深入的概念定义、设计决策（可选，按需创建） |
+| `task.md` | 任务状态 | 已完成的工作 + 待办事项 |
+
+**核心区分：**
+- `memory.md` = 认知（我们达成了什么共识）
+- `task.md` = 任务（我们做了什么、要做什么）
+
 ## 工作流程
 
 ### Step 1: 分析对话内容
 
 回顾本次会话，识别：
 
-1. **讨论的主题** - 本次对话涉及哪些技术领域？
-2. **做出的决策** - 有哪些关键的架构或设计决策？
-3. **解决的问题** - 遇到了什么问题？如何解决的？
-4. **未完成的任务** - 有哪些任务被搁置或待办？
-5. **可复用的模式** - 是否有值得记录的最佳实践？
+1. **认知对齐** - 达成了哪些概念共识？（写入 memory.md）
+2. **复杂概念** - 是否有需要深入展开的概念？（按需写入 memory/<topic>.md）
+3. **任务状态** - 完成了什么？待办是什么？（写入 task.md）
 
-### Step 2: 更新主题文件
-
-对于每个识别到的主题：
-
-```bash
-# 检查是否存在对应主题文件
-memory_file=".agent/context/memory/<topic>.md"
-
-if [[ -f "$memory_file" ]]; then
-    # 分节更新：只替换有变化的部分
-    # - 更新 Key Decisions
-    # - 添加 Problems & Solutions
-    # - 添加 Related Tasks
-    # - 更新 Last Updated
-    # - 递增 Sessions 计数
-else
-    # 创建新主题文件
-fi
-```
-
-### Step 3: 更新索引文件
+### Step 2: 更新认知对齐目录
 
 更新 `.agent/context/memory.md`：
 
-- 在 **Topic Index** 表格中添加/更新主题记录
-- 更新 **Key Decisions** 如果有新决策
-- 更新 **Execution Log** 记录本次会话
+- 在 **认知对齐目录** 中添加/更新达成的概念共识
+- 记录关键定义和术语
+- 更新文件目录索引（如有新文件类型）
 
-### Step 4: 更新任务文件
+**判断是否写入 memory.md：**
+- 是否达成了新的概念共识？→ 写入
+- 是否定义了新的术语或流程？→ 写入
+- 是否只是完成任务？→ 不写入，只更新 task.md
+
+### Step 3: 更新复杂概念（可选）
+
+对于需要深入展开的复杂概念，创建 `memory/<topic>.md`：
+
+```markdown
+# <Topic Name>
+
+## 概述
+<!-- 1-2 句概念定义 -->
+
+## 核心概念
+<!-- 概念的详细展开 -->
+
+## 设计决策
+<!-- 为什么这样设计 -->
+
+## 参考
+- 相关文件、链接等
+
+---
+Created: YYYY-MM-DD
+Last Updated: YYYY-MM-DD
+```
+
+**判断是否需要创建 topic 文件：**
+- 概念是否复杂到需要独立文档？→ 创建
+- 是否会多次引用？→ 创建
+- 是否只是简单共识？→ 不创建，保留在 memory.md 即可
+
+### Step 4: 更新任务状态
 
 更新 `.agent/context/task.md`：
 
-- 生成任务 ID: `<topic>-YYYYMMDD-NNN`
-- 添加未完成任务到 **Backlog**
-- 标记已完成的任务
+- 将 **Current** 中完成的任务移到 **Recent**
+- 更新 **Current** 为新的进行中任务
+- 添加 **Backlog** 待办事项
 
 ### Step 5: 输出摘要报告
 
@@ -66,23 +90,21 @@ fi
 ```
 📋 Session Summary
 
-📁 Topics: N
-  • <topic-1> (new/updated)
-  • <topic-2> (updated)
+🧠 认知对齐:
+  • <概念1> - 简要描述
+  • <概念2> - 简要描述
 
-✅ Tasks Added: N
-  • <topic>-YYYYMMDD-NNN: Task description
+📁 Topic 文件:
+  • memory/<topic>.md (created/updated/skipped)
 
-💡 Key Decisions: N
-  • Decision summary
+✅ 任务状态:
+  • 完成: <task-1>, <task-2>
+  • 待办: <task-3>, <task-4>
 
-🔧 Problems Solved: N
-  • Problem → Solution
-
-📂 Files Updated:
-  • .agent/context/memory/<topic>.md (created/updated)
-  • .agent/context/memory.md (index updated)
-  • .agent/context/task.md (N tasks added)
+📂 文件更新:
+  • .agent/context/memory.md
+  • .agent/context/task.md
+  • .agent/context/memory/<topic>.md (如有)
 ```
 
 ### Step 6: 分析可学习模式
@@ -102,104 +124,57 @@ fi
 - 保存行为受 `.agent/governance.yaml` 的 `flow_hooks.done` 配置编排。
 - 在最后归档前，必须确保上下文沉积工作已完成。
 
-## 文件格式
+## 示例：本次会话的保存
 
-### memory/<topic>.md
-
-```markdown
-# <Topic Name>
-
-## Summary
-<!-- 1-2 句主题概述 -->
-
-## Key Decisions
-<!-- 关于此主题的关键决策 -->
-
-## Problems & Solutions
-### <Problem 1>
-- **Issue**: ...
-- **Solution**: ...
-- **Lesson**: ...（可选，复杂问题才有）
-
-## Related Tasks
-- [ ] <topic>-YYYYMMDD-NNN: Task description
-- [x] <topic>-YYYYMMDD-NNN: Completed task
-
-## References
-- 相关文件、链接等
-
----
-Created: YYYY-MM-DD
-Last Updated: YYYY-MM-DD
-Sessions: N
-```
-
-### task.md 任务格式
+### memory.md 更新
 
 ```markdown
-- [ ] [<topic>-YYYYMMDD-NNN] Task description
-  - Context: 来自 [memory/<topic>.md](memory/<topic>.md)
-  - Created: YYYY-MM-DD
-  - Blocked by: 需要先完成 TASK-XXX（可选）
+## 2026-02-27: Vibe Workflow Paradigm（开发范式）
+
+### 核心共识
+
+**六层流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
+
+### 关键概念
+
+| 概念 | 定义 |
+| ---- | ---- |
+| PRD（认知层） | 定目标，人类主导 |
+| Spec（规范层） | 定法律，AI 刺客找茬后锁定 |
+| ... | ... |
 ```
 
-## 分节更新策略
+### task.md 更新
 
-更新现有主题文件时，使用**分节更新**：
+```markdown
+## Current
+（无当前任务）
 
-1. **读取**现有文件内容
-2. **识别**哪些部分有新内容
-3. **只替换**有变化的部分
-4. **保留**未变化的部分
-5. **更新** Last Updated 时间戳
-6. **递增** Sessions 计数
+## Recent
+- vibe-workflow-paradigm PRD 编写
+  - status: completed
+  - 产出：5 个 PRD 文件
 
-**示例:**
+## Backlog
+| 优先级 | PRD | 说明 |
+| ------ | --- | ---- |
+| P1 | test-layer | TDD 顺序、3 次熔断 |
+| ... | ... | ... |
 ```
-现有: config-system.md 有 3 个 Key Decisions, 1 个 Problem
-
-本次对话新增:
-- 1 个新 Key Decision
-- 1 个新 Problem
-
-结果:
-- Key Decisions: 3 old + 1 new = 4 total (替换此节)
-- Problems & Solutions: 1 old + 1 new = 2 total (替换此节)
-- 其他部分: 保留
-- Last Updated: 更新为当前日期
-- Sessions: 递增
-```
-
-## 任务识别类型
-
-| 类型 | 示例 | 处理方式 |
-|------|---------|----------|
-| **显式** | "帮我实现用户登录功能" | 直接提取 |
-| **隐式** | "这个问题以后再处理" | 标记为待办 |
-| **部分** | "先做 A，B 以后再说" | A 标记完成，B 待办 |
-| **阻塞** | "等 XXX 完成后才能继续" | 记录阻塞原因 |
 
 ## 与 /learn 的关系
 
 | 方面 | `/save` | `/learn` |
-|------|---------|----------|
+| ---- | ------- | -------- |
 | **目的** | 保存项目上下文 | 提取可复用模式 |
-| **存储位置** | 项目级 `.agent/context/memory/` | 全局 `~/.claude/skills/learned/` |
+| **存储位置** | 项目级 `.agent/context/` | 全局 `~/.claude/skills/learned/` |
 | **触发方式** | 手动 `/save` + Hook 提醒 | Stop Hook (自动, 需配置) |
-| **内容** | 主题、任务、决策、解决方案 | 模式、技巧、最佳实践 |
-
-**集成流程:**
-- `/save` 存储项目特定知识到 `memory/`
-- 保存后分析是否有可复用模式
-- 如有模式，建议运行 `/learn` 提取为全局 skill
+| **内容** | 认知、任务、决策 | 模式、技巧、最佳实践 |
 
 ## 设计决策
 
-1. **命名: `/save`** - 描述动作（保存上下文），而非告别
-2. **主题式组织** - 比日期式更利于检索
-3. **分节更新** - 只替换有变化的部分，实用且可靠
-4. **自动识别主题** - Agent 分析并命名主题
-5. **任务 + 上下文双追踪** - 任务在 task.md，上下文在主题文件，双向引用
-6. **问题复杂度分级记录** - 简单问题简短记录，复杂问题结构化记录
-7. **主题前缀任务 ID** - `<topic>-YYYYMMDD-NNN` 格式，可读且可追溯
-8. **与 continuous-learning 独立** - `/save` 保存项目上下文，`/learn` 提取全局模式
+1. **认知与任务分离** - memory.md 记录共识，task.md 记录任务
+2. **topic 按需创建** - 复杂概念才需要独立文档，不是强制
+3. **主题式组织** - 比日期式更利于检索
+4. **分节更新** - 只替换有变化的部分
+5. **与 /learn 独立** - `/save` 保存项目上下文，`/learn` 提取全局模式

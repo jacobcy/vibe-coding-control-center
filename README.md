@@ -35,6 +35,12 @@ vibe flow <start|review|pr|done|status|sync>
 - `.agent/` 规则、上下文、工作流
 
 ## 文档
-- `SOUL.md`：宪法级原则
-- `CLAUDE.md`：项目上下文与硬规则
-- `AGENTS.md`：Agent 入口
+
+> **单一事实原则**：每个文档有明确的职责边界，详见 [SOUL.md](SOUL.md) §0
+
+- **[SOUL.md](SOUL.md)**：项目宪法和核心原则（权威）
+- **[STRUCTURE.md](STRUCTURE.md)**：项目结构定义（权威）
+- **[CLAUDE.md](CLAUDE.md)**：项目上下文与硬规则（AI 必读）
+- **[AGENTS.md](AGENTS.md)**：AI Agent 入口指南
+- **[DEVELOPER.md](DEVELOPER.md)**：开发者指南（开发流程权威）
+- **[docs/](docs/)**：人类文档区（详见 [docs/README.md](docs/README.md)）

@@ -1,62 +1,60 @@
-# Technical Specification (Tech Spec)
+# Spec: {{TASK_TITLE}}
 
-## 1. Overview (概述)
-- **Summary**: [High-level technical approach]
-- **Background**: [Context and motivation]
-- **Assumptions**: [Key constraints and dependencies]
+> 本文档定义 {{TASK_TITLE}} 的技术规格（系统行为的法律文本）。
 
-## 2. Architecture (架构设计)
-### 2.1 System Diagram
-[Mermaid diagram or link to image]
+## 接口契约
 
-### 2.2 Component Design
-- **[Component A]**: [Responsibilities, interactions]
-- **[Component B]**: [Responsibilities, interactions]
+### 输入
 
-## 3. Data Model (数据模型)
-### 3.1 Schema Changes
-```sql
--- Example Schema
-CREATE TABLE users (
-  id INT PRIMARY KEY,
-  ...
-);
-```
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| [参数名] | [类型] | [说明] | [示例值] |
 
-### 3.2 Data Flow
-[Describe how data moves through the system]
+### 输出
 
-## 4. API Design (接口设计)
-### 4.1 [Endpoint Name]
-- **Method**: `GET` / `POST` / ...
-- **URL**: `/api/v1/...`
-- **Request Body**:
-  ```json
-  { ... }
-  ```
-- **Response**:
-  ```json
-  { ... }
-  ```
+| 字段 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| [字段名] | [类型] | [说明] | [示例值] |
 
-## 5. Implementation Plan (实施计划)
-### 5.1 Phase 1: [Name]
-- [ ] Step 1
-- [ ] Step 2
+### 错误
 
-### 5.2 Phase 2: [Name]
-- [ ] Step 1
-- [ ] Step 2
+| 错误码 | 说明 | 触发条件 |
+|--------|------|----------|
+| [错误码] | [说明] | [条件] |
 
-## 6. Security & Compliance (安全与合规)
-- **Authentication/Authorization**: [Mechanism]
-- **Data Privacy**: [Handling sensitive data]
+## 核心不变量（Invariants）
 
-## 7. Testing Strategy (测试策略)
-- **Unit Tests**: [Key areas to cover]
-- **Integration Tests**: [Critical flows]
-- **Load Testing**: [Performance benchmarks]
+**在任何情况下都必须成立的规则**：
 
-## 8. Deployment & Rollout (部署与发布)
-- **Deployment Strategy**: [Blue/Green, Canary, etc.]
-- **Rollback Plan**: [Triggers and steps]
+1. [不变量 1]
+2. [不变量 2]
+3. [不变量 3]
+
+## 边界行为
+
+### 极限输入
+
+- **空值处理**：[如何处理 null/empty]
+- **超大输入**：[如何处理超大数据]
+- **并发场景**：[如何处理并发访问]
+
+### 异常处理
+
+- **网络异常**：[超时、重试机制]
+- **数据异常**：[脏数据、格式错误]
+- **系统异常**：[磁盘满、权限不足]
+
+## 非功能约束
+
+- **性能要求**：[响应时间、吞吐量]
+- **可观测性**：[日志、监控、追踪]
+- **安全要求**：[认证、授权、加密]
+
+---
+
+## Spec Gate 验证标准
+
+- [ ] 接口契约完整（输入/输出/错误）
+- [ ] 核心不变量明确
+- [ ] 边界行为定义清晰
+- [ ] 非功能约束可验证

@@ -1,37 +1,62 @@
-# Product Requirements Document (PRD)
+---
+document_type: template
+template_for: prd
+description: Template for Product Requirements Documents (PRD) following Vibe Workflow Paradigm
+author: Claude Sonnet 4.5
+created: 2025-01-24
+last_updated: 2025-01-24
+related_docs:
+  - docs/prds/vibe-workflow-paradigm.md
+  - docs/README.md
+  - docs/standards/doc-quality-standards.md
+---
 
-## 1. Context & Scope (背景与范围)
-- **Problem Statement**: [What problem are we solving?]
-- **Target Audience**: [Who are the users?]
-- **Goals**: [What are the primary objectives?]
-- **Non-Goals**: [What are we explicitly NOT doing?]
+# PRD: {{TASK_TITLE}}
 
-## 2. User Stories (用户故事)
-| ID | As a... | I want to... | So that... | Priority |
-|----|---------|--------------|------------|----------|
-| 1  | User    | [Action]     | [Benefit]  | P0/P1/P2 |
+> 本文档定义 {{TASK_TITLE}} 的产品需求。
 
-## 3. Functional Requirements (功能需求)
-### 3.1 [Feature Name]
-- **Description**: [Details]
-- **Inputs**: [Data/Actions]
-- **Outputs**: [Results/State Changes]
-- **Edge Cases**: [Error handling, etc.]
+## 业务目标
 
-## 4. Non-Functional Requirements (非功能需求)
-- **Performance**: [Latency, throughput]
-- **Scalability**: [Growth handling]
-- **Security**: [Auth, data protection]
-- **Reliability**: [Availability, recovery]
+**核心能力**：[描述要实现的核心能力]
 
-## 5. UI/UX Design (设计规范)
-- [Link to designs/wireframes]
-- [Description of key interactions]
+**示例**：
+- 实现 Plan Gate 能读取多种格式的计划文件
+- 提供统一的文档组织标准
 
-## 6. Analytics & Metrics (数据指标)
-- **Success Metrics**: [KPIs to track]
-- **Logging**: [Events to capture]
+## 绝对边界（不做什么）
 
-## 7. Open Questions (待确认项)
-- [ ] Question 1
-- [ ] Question 2
+**明确拒绝项**：[列出不做的事情，防止 AI 过度设计]
+
+**示例**：
+- 不负责创建计划，不负责框架选择
+- 不实现自动化代码生成
+
+## 核心数据流
+
+**输入 → 处理 → 输出**：
+
+```
+[输入] → [处理逻辑] → [输出]
+```
+
+**示例**：
+```
+framework 字段 → 路径映射 → 文件内容
+```
+
+## 成功判据
+
+**如何判断成功**：[定义验收标准]
+
+**示例**：
+- 能正确读取 OpenSpec 和 Superpower 格式
+- 所有文档符合标准结构
+
+---
+
+## Scope Gate 验证标准
+
+- [ ] 业务目标明确
+- [ ] 绝对边界清晰
+- [ ] 核心数据流完整
+- [ ] 成功判据可验证

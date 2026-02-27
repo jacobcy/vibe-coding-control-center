@@ -7,7 +7,7 @@ set -e
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 
 echo "📦 Installing Superpowers..."
-npx skills add obra/superpowers -y --agent antigravity claude-code trae
+npx skills add obra/superpowers -y --agent antigravity trae
 
 echo "📦 Initializing OpenSpec..."
 if command -v openspec &> /dev/null; then
