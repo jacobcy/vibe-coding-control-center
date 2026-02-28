@@ -198,6 +198,34 @@
             ],
             "recommended": false,
             "description": "Web 设计规范，适合前端项目"
+        },
+        {
+            "name": "vibe-review-code",
+            "source": "local",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "process",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "严格审查代码变更、防止架构恶化的专业代码审查技能"
+        },
+        {
+            "name": "vibe-review-docs",
+            "source": "local",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "process",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "严格审查文档、CLAUDE 规范与 CHANGELOG 的文书审查技能"
         }
     ]
 }

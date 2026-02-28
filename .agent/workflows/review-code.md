@@ -4,52 +4,15 @@ description: Deep Static Analysis & Agentic Code Review
 
 # Code Review Protocol
 
-## 1. Prerequisites (前置准备)
-- [ ] Context gathered: Check git status, identify files to review.
-- [ ] Rules loaded: `coding-standards.md`, `patterns.md`.
+**Input**: Run `/review-code` to audit current uncommitted changes, branches, or PR contents.
 
-## 2. Standards Check (规范检查)
-**CRITICAL**: 执行前请复核以下规则：
-// turbo
-cat .agent/rules/patterns.md .agent/rules/coding-standards.md
+**Steps**
 
-## 3. Execution (执行)
-Perform deep code review.
-> [!IMPORTANT]
-> Focus on Architecture, Idempotency, and Safety.
+1. **Acknowledge the command**
+   Immediately say: "Invoking the `vibe-review-code` skill to perform an architectural and standards review."
 
-### 3.1 Automated Audit
-// turbo
-```bash
-if [ -f ".agent/lib/audit.sh" ]; then
-    source .agent/lib/audit.sh
-    check_code || echo "⚠️  Audit issues found."
-else
-    echo "Error: .agent/lib/audit.sh not found."
-    exit 1
-fi
-```
+2. **Call the underlying skill**
+   You MUST read the instructions in `skills/vibe-review-code/SKILL.md` and strictly follow its evaluation framework. You will identify the target scope (diff or PR), cross-reference with project rules in `CLAUDE.md` and `DEVELOPER.md`, and look for dead code, LOC violations, and test coverage logic.
 
-### 3.2 Contextual Analysis
-// turbo
-```bash
-# Default to "all" if SCOPE is not set
-SCOPE="${SCOPE:-all}"
-
-if [ -f ".agent/lib/git-scope.sh" ]; then
-    export SCOPE
-    zsh .agent/lib/git-scope.sh
-else
-    echo "Error: .agent/lib/git-scope.sh not found."
-    exit 1
-fi
-```
-
-### 3.3 Report Generation
-Act as a Senior Staff Engineer. Generate a report:
-- **Compliance Score**: 0-10.
-- **Critical Issues**: Must fix.
-- **Suggestions**: Nice to have.
-
-## 4. Verification (验证)
-- [ ] Verify issues are resolved (if fixes applied).
+3. **Output the Report**
+   Generate the structured Code Review Report as strictly defined in the skill, providing a Compliance Score and identifying all blocking issues.

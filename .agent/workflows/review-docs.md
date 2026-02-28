@@ -4,37 +4,15 @@ description: Review Documentation and Changelogs
 
 # Documentation Review
 
-## 1. Prerequisites (前置准备)
-- [ ] Context gathered: Identify documentation changes.
-- [ ] Rules loaded: `coding-standards.md`.
+**Input**: Run `/review-docs` to audit documentation PRs, new PRDs, or changes to project guidelines.
 
-## 2. Standards Check (规范检查)
-**CRITICAL**: 执行前请复核以下规则：
-// turbo
-cat .agent/rules/coding-standards.md
+**Steps**
 
-## 3. Execution (执行)
-Review documentation quality and completeness.
-> [!IMPORTANT]
-> Ensure `CHANGELOG.md` is updated for all user-facing changes.
+1. **Acknowledge the command**
+   Immediately say: "Invoking the `vibe-review-docs` skill to verify documentation quality and consistency."
 
-### 3.1 Automated Check
-// turbo
-```bash
-if [ -f ".agent/lib/audit.sh" ]; then
-    source .agent/lib/audit.sh
-    check_docs
-else
-    echo "Error: .agent/lib/audit.sh not found."
-    exit 1
-fi
-```
+2. **Call the underlying skill**
+   You MUST read the instructions in `skills/vibe-review-docs/SKILL.md` and strictly follow its evaluation framework. You will review markdown files for brevity, correctness, proper naming conventions (like `.agent` vs `.agents`), and ensure `CHANGELOG.md` is updated for user-facing changes.
 
-### 3.2 Manual Review
-- [ ] Is `CHANGELOG.md` updated?
-- [ ] Are `docs/` files current?
-- [ ] Check for typos and clarity.
-
-## 4. Verification (验证)
-- [ ] Verify documentation builds (if applicable) or renders correctly.
-
+3. **Output the Report**
+   Generate the structured Documentation Review Report as defined in the skill, highlighting required edits and clarity suggestions.
