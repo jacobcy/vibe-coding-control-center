@@ -4,38 +4,56 @@
 
 set -e
 
+VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
+
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 
-echo "📦 Installing Superpowers..."
-npx skills add obra/superpowers -y --agent antigravity trae
+# ── 1. Install approved skills from ~/.vibe/skills.json ──────────────────────
+if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
+  echo "📦 Installing approved skills from ~/.vibe/skills.json..."
 
+  # Project-level skills
+  agents=$(jq -r '.project.agents | join(" ")' "$VIBE_SKILLS_CONFIG")
+  jq -c '.project.packages[]' "$VIBE_SKILLS_CONFIG" | while read -r pkg; do
+    source=$(echo "$pkg" | jq -r '.source')
+    skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
+    echo "  → $source (project): $skills"
+    # shellcheck disable=SC2086
+    npx skills add "$source" --agent $agents --skill $skills -y 2>/dev/null || true
+  done
+else
+  # Fallback: install full superpowers if no config or jq not available
+  echo "📦 Installing Superpowers (fallback)..."
+  npx skills add obra/superpowers -y --agent antigravity trae
+fi
+
+# ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
 echo "📦 Initializing OpenSpec..."
 if command -v openspec &> /dev/null; then
   openspec init --tools antigravity,claude,trae
 else
-  echo -e "\033[1;33m⚠️  Warning: 'openspec' command not found. Skipping OpenSpec initialization.\033[0m"
-  echo "   Please install it globally via: pnpm add -g @openspec/tools"
+  echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
+  echo "   Install via: pnpm add -g @openspec/tools"
 fi
 
-echo "🔗 Creating symlinks for local and OpenSpec skills..."
+# ── 3. Symlink local project skills to agent directories ─────────────────────
+echo "🔗 Creating symlinks for local skills..."
 mkdir -p .agent/skills .trae/skills
 
-# 1. Link local project skills
+# Link skills/vibe-* (project-owned skills)
 for skill in skills/vibe-*/; do
-  if [ -d "$skill" ]; then
-    name=$(basename "$skill")
-    ln -sf "../../$skill" ".agent/skills/$name"
-    ln -sf "../../$skill" ".trae/skills/$name"
-  fi
+  [ -d "$skill" ] || continue
+  name=$(basename "$skill")
+  ln -sf "../../$skill" ".agent/skills/$name"
+  ln -sf "../../$skill" ".trae/skills/$name"
 done
 
-# 2. Link OpenSpec skills
+# Link .github/skills/openspec-* (OpenSpec skills)
 for skill in .github/skills/openspec-*/; do
-  if [ -d "$skill" ]; then
-    name=$(basename "$skill")
-    ln -sf "../../$skill" ".agent/skills/$name"
-    ln -sf "../../$skill" ".trae/skills/$name"
-  fi
+  [ -d "$skill" ] || continue
+  name=$(basename "$skill")
+  ln -sf "../../$skill" ".agent/skills/$name"
+  ln -sf "../../$skill" ".trae/skills/$name"
 done
 
 echo "✅ Environment setup complete!"
