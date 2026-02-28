@@ -119,7 +119,7 @@ npx skills remove <name> -g -y
 - 标注支持的 IDE 范围
 
 **持久化保存：**
-必须将这份生成的报告写入到项目文件的 `.agents/skills-handbook.md` 中保存，并给出文件链接供用户随时翻阅。如果是生成跨项目的全局报告，则提议保存至 `~/.vibe/skills-handbook.md`。
+必须将这份生成的报告写入到项目文件的 `.agent/skills-handbook.md` 中保存，并给出文件链接供用户随时翻阅。如果是生成跨项目的全局报告，则提议保存至 `~/.vibe/skills-handbook.md`。
 
 ## IDE × Agent 名称
 
