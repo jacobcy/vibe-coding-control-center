@@ -47,7 +47,7 @@ npx skills ls        # 项目级 skills
 npx skills ls -g     # 全局 skills（不含 Antigravity）
 cat ~/.vibe/skills.json # 读取跨工作区白名单（如存在）
 ```
-2. **确认 IDE**：如果上下文未指明，询问用户正在使用哪些 IDE (如 Trae, Claude Code, Antigravity)，以便后续安装时添加正确的 `--agent` 参数。
+2. **强制确认 IDE 偏好**：即使 AI 从过往记忆或 `~/.vibe/skills.json` 中获取了你的 IDE 偏好（例如 Trae, Antigravity），AI 也**必须向你明示并二次确认**："本次操作是否依然针对这些 IDE 下发生？"，以便后续组合精准的 `--agent` 参数。用户的意图随时会变，绝不能静默代替用户做决定。
 
 ### Step 2: 诊断（AI 分析）
 
@@ -129,11 +129,14 @@ npx skills remove <name> -g -y
 | Kiro | `kiro` |
 | 所有 IDE | `*` |
 
-## 用户偏好与 Registry 关系
+## 用户偏好、Registry 关系与共建讨论
 
-- **`registry.json`**：存放在本项目 `skills/vibe-skills/`，是 Vibe 团队**推荐**的技能库事实标准。AI 用它来判断要不要推荐某 skill。
-- **`~/.vibe/skills.json`**：存放在用户全局目录，是当前开发者的**个人偏好白名单**。`install.sh` 根据它自动初始化新分支。
-- **维护方式**：AI 可以在 Step 5 动态更新 `~/.vibe/skills.json`。而 `registry.json` 若需扩展，通常通过提 PR / 修改文件持久化记录。
+- **`~/.vibe/skills.json`**：存放在用户个人家目录，是当前开发者的**个人偏好白名单**。
+- **`registry.json`**：存放在本项目 `skills/vibe-skills/`，是整个 Vibe 团队**推荐的技能标准库**。
+
+**🚨 关键：Registry 的生成与演进必须是“讨论驱动”的**：
+1. **非自编自导**：如果项目首次初始化 `registry.json`，AI 绝不能单方面凭借 `CLAUDE.md` 直接生成。AI 必须先抛出**推荐草稿**，与用户讨论："基于识别到的技术栈，我建议将以下 [N] 个工具划为必装推荐，你觉得增删哪些？" 达成共识后才可生成文件。
+2. **向外扩展 (Add-to-Registry)**：当用户要求安装一个全新的第三方神器技能时，AI 必须主动发问："这个新技能很好用，是否需要纳入我们的 `registry.json` 成为项目级的团队标准？这需要配置 categories 和 level。" 经过一问一答，再提交 PR 固化知识。
 
 ## Common Mistakes
 
