@@ -19,7 +19,7 @@ if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
     skills=$(echo "$pkg" | jq -r '.skills | join(" ")')
     echo "  → $source (project): $skills"
     # shellcheck disable=SC2086
-    npx skills add "$source" --agent $agents --skill $skills -y 2>/dev/null || true
+    npx skills add "$source" --agent $agents --skill $skills -y
   done
 else
   # Fallback: install full superpowers if no config or jq not available
