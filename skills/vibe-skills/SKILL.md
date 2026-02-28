@@ -87,17 +87,20 @@ C. 是否有冷门 skill 需要清理？[y/n]
 
 ### Step 4: 执行（用户确认后）
 
+**🚨 关键隔离规则 (Claude Code vs 其他 Agent)**：
+- **对于纯 Markdown 依赖（如 Trae, Antigravity, Cline）**：统统使用 `npx skills add` 进行分发和安装。
+- **对于 Claude Code**：它拥有独立的 MCP Plugin 生态（如 `~/.claude/plugins/installed_plugins.json`）。对于第三方公共包（如 `obra/superpowers`），**禁止使用** `npx skills` 为其强行塞入低级 Markdown，必须提示用户手动使用终端原生命令：`claude plugin add superpowers`。只有我们自己写的、没有发布成插件的本地纯 Markdown 文件（如 `vibe-*`, `openspec-*`），才需要被按需链接进项目的 `.claude/skills/` 中。
+
+**执行命令参考**：
 ```bash
-# 安装到项目（适配 IDE）
+# 安装到项目（常规 IDE 适配，排除全局向 Claude 推送）
 npx skills add obra/superpowers --agent antigravity trae --skill <name> -y
 
-# 全局安装
+# 全局安装（仅限非 Claude 客户端）
 npx skills add obra/superpowers -g --agent antigravity trae --skill <name> -y
 
-# 删除项目级
+# 删除项目级或全局
 npx skills remove <name> -y
-
-# 删除全局
 npx skills remove <name> -g -y
 ```
 
@@ -120,11 +123,11 @@ npx skills remove <name> -g -y
 
 ## IDE × Agent 名称
 
-| IDE | `--agent` 值 |
-|-----|-------------|
-| Claude Code | `claude-code` |
-| Trae | `trae` |
-| Antigravity | `antigravity` |
+| IDE | `--agent` 值 | 生态特性 |
+|-----|-------------|----------|
+| Claude Code | **不适用 (通过 Plugin)** | 第三方使用原生 Plugin，非第三方才接收 Markdown 链接 |
+| Trae | `trae` | 纯 Markdown 驱动 |
+| Antigravity | `antigravity` | 纯 Markdown 驱动 |
 | Codex | `codex` |
 | Kiro | `kiro` |
 | 所有 IDE | `*` |
