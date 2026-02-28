@@ -38,7 +38,7 @@ fi
 
 # ── 3. Symlink local project skills to agent directories ─────────────────────
 echo "🔗 Creating symlinks for local skills..."
-mkdir -p .agent/skills .trae/skills
+mkdir -p .agent/skills .trae/skills .claude/skills
 
 # Link skills/vibe-* (project-owned skills)
 for skill in skills/vibe-*/; do
@@ -46,6 +46,7 @@ for skill in skills/vibe-*/; do
   name=$(basename "$skill")
   ln -sf "../../$skill" ".agent/skills/$name"
   ln -sf "../../$skill" ".trae/skills/$name"
+  ln -sf "../../$skill" ".claude/skills/$name"
 done
 
 # Link .github/skills/openspec-* (OpenSpec skills)
@@ -54,6 +55,7 @@ for skill in .github/skills/openspec-*/; do
   name=$(basename "$skill")
   ln -sf "../../$skill" ".agent/skills/$name"
   ln -sf "../../$skill" ".trae/skills/$name"
+  ln -sf "../../$skill" ".claude/skills/$name"
 done
 
 echo "✅ Environment setup complete!"
