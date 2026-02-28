@@ -43,19 +43,21 @@ mkdir -p .agent/skills .trae/skills .claude/skills
 # Link skills/vibe-* (project-owned skills)
 for skill in skills/vibe-*/; do
   [ -d "$skill" ] || continue
+  skill="${skill%/}"
   name=$(basename "$skill")
-  ln -sf "../../$skill" ".agent/skills/$name"
-  ln -sf "../../$skill" ".trae/skills/$name"
-  ln -sf "../../$skill" ".claude/skills/$name"
+  ln -sfn "../../$skill" ".agent/skills/$name"
+  ln -sfn "../../$skill" ".trae/skills/$name"
+  ln -sfn "../../$skill" ".claude/skills/$name"
 done
 
 # Link .github/skills/openspec-* (OpenSpec skills)
 for skill in .github/skills/openspec-*/; do
   [ -d "$skill" ] || continue
+  skill="${skill%/}"
   name=$(basename "$skill")
-  ln -sf "../../$skill" ".agent/skills/$name"
-  ln -sf "../../$skill" ".trae/skills/$name"
-  ln -sf "../../$skill" ".claude/skills/$name"
+  ln -sfn "../../$skill" ".agent/skills/$name"
+  ln -sfn "../../$skill" ".trae/skills/$name"
+  ln -sfn "../../$skill" ".claude/skills/$name"
 done
 
 echo "✅ Environment setup complete!"
