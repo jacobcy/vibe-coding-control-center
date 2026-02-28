@@ -1,0 +1,203 @@
+{
+    "_comment": "vibe-skills 推荐注册表。AI 读取此文件推荐适合当前项目的 skills。",
+    "_schema": "name=skill唯一名, source=npx安装包, level=global|project|either, ides=适用IDE列表, category=分类, project_types=适用项目类型, recommended=是否默认推荐",
+    "skills": [
+        {
+            "name": "systematic-debugging",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "development-workflow",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "系统性调试方法，遇到 bug 必备"
+        },
+        {
+            "name": "brainstorming",
+            "source": "obra/superpowers",
+            "level": "global",
+            "ides": [
+                "all"
+            ],
+            "category": "development-workflow",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "需求探索和功能设计，任何项目起点"
+        },
+        {
+            "name": "verification-before-completion",
+            "source": "obra/superpowers",
+            "level": "global",
+            "ides": [
+                "all"
+            ],
+            "category": "discipline",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "完成前验证，防止草率声称完成"
+        },
+        {
+            "name": "writing-skills",
+            "source": "obra/superpowers",
+            "level": "global",
+            "ides": [
+                "all"
+            ],
+            "category": "meta",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "创建新 skill 的方法论"
+        },
+        {
+            "name": "test-driven-development",
+            "source": "obra/superpowers",
+            "level": "global",
+            "ides": [
+                "all"
+            ],
+            "category": "discipline",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "TDD 工作流，适合任何项目"
+        },
+        {
+            "name": "using-git-worktrees",
+            "source": "obra/superpowers",
+            "level": "global",
+            "ides": [
+                "all"
+            ],
+            "category": "workflow",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "Git worktree 隔离开发，多任务并行"
+        },
+        {
+            "name": "executing-plans",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "orchestration",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "按计划执行任务，带检查点"
+        },
+        {
+            "name": "writing-plans",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "orchestration",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "将需求转化为详细实现计划"
+        },
+        {
+            "name": "finishing-a-development-branch",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "workflow",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "完成开发分支：merge/PR/cleanup 决策"
+        },
+        {
+            "name": "receiving-code-review",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "process",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "处理 Code Review 反馈，辨别有效建议"
+        },
+        {
+            "name": "requesting-code-review",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "process",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "发起 Code Review 前的准备和自检"
+        },
+        {
+            "name": "dispatching-parallel-agents",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "orchestration",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "并行调度多个子 Agent 执行独立任务"
+        },
+        {
+            "name": "subagent-driven-development",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "orchestration",
+            "project_types": [
+                "any"
+            ],
+            "recommended": true,
+            "description": "子 Agent 驱动的开发执行模式"
+        },
+        {
+            "name": "web-design-guidelines",
+            "source": "obra/superpowers",
+            "level": "project",
+            "ides": [
+                "all"
+            ],
+            "category": "design",
+            "project_types": [
+                "web",
+                "nextjs"
+            ],
+            "recommended": false,
+            "description": "Web 设计规范，适合前端项目"
+        }
+    ]
+}
