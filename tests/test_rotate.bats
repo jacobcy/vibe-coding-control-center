@@ -81,6 +81,16 @@ case "${MOCK_MODE:-}" in
       *) exit 1 ;;
     esac
     ;;
+  protected_branch)
+    case "$*" in
+      "rev-parse --is-inside-work-tree") exit 0 ;;
+      "check-ref-format --branch feature-safe") exit 0 ;;
+      "branch --show-current") printf 'main\n'; exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
   *)
     exit 1
     ;;
@@ -134,4 +144,13 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" =~ "New branch name matches current branch" ]]
   ! grep -q "stash push -u -m Rotate to feature-old: saved WIP" "$LOG_FILE"
+}
+
+@test "rotate rejects protected branches before stashing" {
+  write_mock_git
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=protected_branch "$TEST_DIR/rotate.sh" feature-safe
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
+  ! grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
 }

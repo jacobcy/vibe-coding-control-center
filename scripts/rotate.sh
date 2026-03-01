@@ -45,6 +45,12 @@ if [[ -z "$old_branch" ]]; then
     log_error "Not on a branch."
     exit 1
 fi
+case "$old_branch" in
+    main|master)
+        log_error "Refusing to rotate protected branch: $old_branch"
+        exit 1
+        ;;
+esac
 if [[ "$old_branch" == "$new_task" ]]; then
     log_error "New branch name matches current branch: $old_branch"
     exit 1
