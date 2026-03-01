@@ -1,8 +1,33 @@
 # Memory
 
+## Shared Memory Source
+
+- current task: `2026-03-02-cross-worktree-task-registry`
+- shared source of truth: `$(git rev-parse --git-common-dir)/vibe/tasks/2026-03-02-cross-worktree-task-registry/memory.md`
+- registry reference: `$(git rev-parse --git-common-dir)/vibe/registry.json`
+- compat layer: 在现有 skills 完成迁移前，`.agent/context/memory.md` 保留为入口索引与迁移说明，不再承载当前 task 的共享 memory 真源。
+- local boundary: 当前 worktree 的 `.vibe/` 只保存 focus/session 类缓存，不保存共享 memory 真源。
+
 ## 认知对齐目录
 
 本文档记录我们在对话中达成的**概念共识**，而非任务清单。
+
+---
+
+## 2026-03-02: Cross-Worktree Task Registry（共享任务注册表）
+
+### 迁移策略
+
+- 当前仓库的 task registry 真源固定放在 `$(git rev-parse --git-common-dir)/vibe/`。
+- 当前 task 的共享 memory 真源迁移到 `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`。
+- `.agent/context/memory.md` 继续作为 pointer/compat 层，避免一次性改动所有依赖 `.agent/context/*` 的 skill。
+- 当前 worktree 的 `.vibe/` 只保留可重建的 focus 摘要和 session 缓存，不保留共享 memory 真源。
+
+### 迁移边界
+
+- 已迁移：共享 task registry schema、worktree 绑定模型、当前 task 共享 memory 路径
+- 暂未迁移：所有直接读取 `.agent/context/*` 的 skill
+- 兼容方式：旧 skill 先读取 `.agent/context/memory.md` 作为入口索引，再逐步切换到共享真源
 
 ---
 
