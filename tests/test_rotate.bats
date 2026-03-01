@@ -27,9 +27,11 @@ case "${MOCK_MODE:-}" in
       "check-ref-format --branch feature-safe") exit 0 ;;
       "fetch origin main --quiet") exit 0 ;;
       "show-ref --verify --quiet refs/remotes/origin/main") exit 0 ;;
-      "checkout --detach HEAD --quiet") exit 0 ;;
-      "branch -D feature-old") exit 0 ;;
       "checkout -b feature-safe origin/main") exit 0 ;;
+      "branch -D feature-old") exit 0 ;;
+      "rev-parse --verify origin/feature-old") exit 0 ;;
+      "push origin --delete feature-old") exit 0 ;;
+      "branch --set-upstream-to=origin/main feature-safe") exit 0 ;;
       "stash pop") exit 0 ;;
       *) exit 1 ;;
     esac
@@ -106,6 +108,8 @@ EOF
 
   [ "$status" -eq 0 ]
   grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+  grep -q "push origin --delete feature-old" "$LOG_FILE"
+  grep -q "branch --set-upstream-to=origin/main feature-safe" "$LOG_FILE"
 }
 
 @test "rotate rejects invalid branch names before deleting current branch" {
