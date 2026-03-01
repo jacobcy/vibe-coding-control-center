@@ -133,7 +133,7 @@ Last Updated: YYYY-MM-DD
 
 ### 核心共识
 
-**六层流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
+**Vibe Guard 流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
 
 ### 关键概念
 

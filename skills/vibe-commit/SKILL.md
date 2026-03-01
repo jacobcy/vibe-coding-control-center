@@ -13,7 +13,7 @@ trigger: auto
 ## Execution Steps
 
 1. **Status Analysis**: 首先执行 `git status` 确定工作区当前修改了哪些文件。
-2. **Diff Analysis**: 接着执行 `git diff` / `git diff --cached` 获取具体的代码变更明细，并进行阅读分析。
+2. **Diff Extraction (防污染限制)**: **严禁直接向终端打印全量的 `git diff`**。如果变更过多，必须结合 `git diff --stat`，或使用 `git diff | head -n 300` 提取上下文，或要求子系统提供“修改摘要”。确保你的阅读不会发生严重的 Context 溢出与日志漫灌。
 3. **Logical Grouping**: 根据代码具体变动的领域和上下文，将文件自然分类聚类（例如：同时涉及功能A的新增归为一组、修复B的归为另一组）。
 4. **Draft Commits**: 针对每一个变更分组，草拟一个纯粹的高质量提交信息。格式必须形如：`feat: add auth logical module`。
 5. **Interactive Confirmation**: 将分类结果及草拟的提交列出来，**明确提请用户检查并确认**。

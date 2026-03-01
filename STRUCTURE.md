@@ -215,7 +215,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 | 文件 | 职责 |
 |------|------|
 | `DOC_ORGANIZATION.md` | 文档组织标准 |
-| `cognition-spec-dominion.md` | 宪法大纲：六层流程定义 |
+| `cognition-spec-dominion.md` | 宪法大纲：Vibe Guard 流程定义 |
 | `vibe-engine-design.md` | 工作流引擎设计 |
 
 #### `docs/prds/` - 全局 PRD
@@ -223,7 +223,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 **职责**：不针对特定任务的全局性产品需求文档
 
 **核心文档**：
-- `vibe-workflow-paradigm.md` - 总 PRD：六层六闸范式
+- `vibe-workflow-paradigm.md` - 总 PRD：Vibe Guard 范式
 
 #### `docs/references/` - 外部参考资料
 
@@ -239,7 +239,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 #### `docs/tasks/` - 任务文档
 
-**职责**：每个任务的完整六层文档
+**职责**：每个任务的完整 Vibe Guard 文档
 
 **命名格式**：`YYYY-MM-DD-feature-name`
 
@@ -338,7 +338,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 3. 使用 `.agent/templates/` 中的模板
 
 ### 我要理解工作流
-1. 阅读 `docs/prds/vibe-workflow-paradigm.md` - 六层六闸范式
+1. 阅读 `docs/prds/vibe-workflow-paradigm.md` - Vibe Guard 范式
 2. 阅读 `docs/standards/cognition-spec-dominion.md` - 宪法大纲
 3. 查看 `docs/tasks/` 中的示例任务
 

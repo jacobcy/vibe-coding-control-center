@@ -5,6 +5,11 @@ metadata:
   category: discipline
   triggers: evaluate, audit, refactor-or-rebuild, fork-or-build, architecture review,
     code quality, should I use this, is this worth it, project evaluation
+input_examples:
+  - prompt: "评估一下这个外部的开源项目是否可以直接复用"
+    call: "vibe-audit - track: B (External Project)"
+  - prompt: "我们的这个仓库现在这套引擎架构还要不要推翻重构"
+    call: "vibe-audit - track: A (Own Project)"
 ---
 
 # Architecture Audit

@@ -10,9 +10,9 @@
 
 ### 核心共识
 
-**六层流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
+**Vibe Guard 流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
 
-**四闸机制**：`Gate 0 Dispatcher → Scope Gate → Plan Gate → Execution Gate → Review Gate`
+**Vibe Guard 机制**：`Gate 0 Dispatcher → Scope Gate → Spec Gate → Plan Gate → Test Gate → Execution/Code Gate → Audit/Review Gate`
 
 ### 关键概念
 
