@@ -13,7 +13,7 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 - Identify what needs to be reviewed (e.g. current uncommitted diff, a specific branch, or a PR diff).
 - Fetch the diff logic:
   - If PR: Use `gh pr diff` or `gh pr view` to see the changes.
-  - If local: Use `git diff main...HEAD`.
+  - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
 
 ## 2. Review Standards (MSC Paradigm Gate)
 You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
