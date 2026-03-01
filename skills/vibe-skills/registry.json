@@ -117,7 +117,7 @@
     "project": {
         "_comment": "项目级安装：当前 repo 专属，通过 symlink 链接",
         "_agents": ["antigravity", "trae", "claude-code"],
-        "_install_method": "scripts/sync-skills.sh 或 install.sh 通过 symlink",
+        "_install_method": "vibe skills sync 或 install.sh 通过 symlink",
         "local_skills": [
             {
                 "name": "vibe-orchestrator",
