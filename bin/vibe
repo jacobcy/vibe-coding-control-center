@@ -43,6 +43,10 @@ case "$command" in
         source "$VIBE_LIB/clean.sh"
         vibe_clean "$@"
         ;;
+    skills)
+        source "$VIBE_LIB/skills.sh"
+        vibe_skills "$@"
+        ;;
     alias)
         source "$VIBE_CONFIG/aliases.sh"
         log_success "Aliases loaded"
@@ -63,6 +67,7 @@ case "$command" in
         echo "           提示：执行 vibe flow start 后，在 AI 助手中使用 /vibe-new <feature>"
         echo "  ${GREEN}task${NC}     查看跨 worktree 的任务总览"
         echo "  ${GREEN}clean${NC}    清理项目临时文件"
+        echo "  ${GREEN}skills${NC}   Skills 管理（sync, check, audit）"
         echo "  ${GREEN}alias${NC}    加载 shell 快捷别名"
         echo "  ${GREEN}version${NC}  显示版本号"
         echo "  ${GREEN}help${NC}     显示此帮助信息"
