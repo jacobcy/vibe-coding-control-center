@@ -21,6 +21,7 @@ temp/
 wt-*/
 
 # Vibe artifacts
+# Local worktree cache only; shared task truth lives in git-common-dir/vibe/
 .vibe/
 .repomix/
 

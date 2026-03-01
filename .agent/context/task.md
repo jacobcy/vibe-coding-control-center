@@ -1,10 +1,21 @@
 # Task Status
 
-# Task Status
-
 ## Current
 
-（无当前任务）
+- current task: `2026-03-02-cross-worktree-task-registry`
+- current worktree: `wt-claude-refactor`
+- shared source of truth: `$(git rev-parse --git-common-dir)/vibe/registry.json`
+- worktree binding: `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
+- local cache: `.vibe/current-task.json`, `.vibe/focus.md`, `.vibe/session.json`
+- compat note: 在所有 skills 迁移完成前，`.agent/context/task.md` 仅保留 current task 摘要和 worktree 绑定说明，不再作为 task 真源。
+- gitignore note: `.vibe/` 为本地缓存目录，必须保持忽略状态。
+
+## Task Model
+
+- 单个 worktree 同时只绑定一个 current task。
+- task 可以没有 subtask，也可以包含多个 optional subtasks。
+- 当前 worktree 只继续自己的 current task，不负责跨 worktree 选择。
+- 新任务必须先写入共享 registry，再生成本地 `.vibe/current-task.json` 指针。
 
 ## Recent
 
