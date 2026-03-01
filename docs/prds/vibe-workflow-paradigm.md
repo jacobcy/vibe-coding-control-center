@@ -19,7 +19,7 @@ related_docs:
 
 # PRD: Vibe Workflow Paradigm - 开发范式总览
 
-> 本文档是 Vibe Coding 开发范式的总 PRD，定义标准开发流程的六层结构和六闸机制。
+> 本文档是 Vibe Coding 开发范式的总 PRD，定义标准开发流程的 Vibe Guard 工作流。
 
 ## 架构总览
 
@@ -71,11 +71,11 @@ related_docs:
 2. **测试先行，机械卡口**：先测试（Red），后代码（Green）。任何阶段不满足条件，CI 直接拒绝，不允许人情绕过。
 3. **隔离探索与生产**：允许在沙盒（Spike 分支）中不受限地与 AI 自由对话探索；但一旦进入生产分支，**所有沙盒代码必须抛弃**，严格按本范式重新走线。
 4. **人类只对"报告"负责，不对"源码"负责**：放弃肉眼 review 机器代码的执念，用系统和报告来治理系统。
-5. **六层六闸，层层把关**：每一层文档对应一个 Gate，Gate 不通过则阻断后续流程，确保质量收敛。
+5. **Vibe Guard 流程，层层把关**：每一层文档对应一个 Gate，Gate 不通过则阻断后续流程，确保质量收敛。
 
 ---
 
-## 六层流程详解
+## Vibe Guard 流程详解
 
 ### 第 1 层：PRD（认知层）— 人类主导
 
@@ -323,6 +323,6 @@ Spec 不变量 → Code 实现 → Audit 确认
 
 > **PRD 定目标，Spec 定法律，Execution Plan 圈范围，Test 锁行为（先红），Code 填实现（后绿），AI Audit 呈报告，Human 签决议。**
 >
-> **六层六闸，层层把关：Scope Gate → Spec Gate → Plan Gate → Test Gate → Code Gate → Audit Gate**
+> **Vibe Guard 工作流，层层把关：Scope Gate → Spec Gate → Plan Gate → Test Gate → Code Gate → Audit Gate**
 >
 > *（AST 管控依赖边界，复杂度熔断控制腐化，3 次重试失败强制熔断打断 AI 幻觉，Collusion Detector 防止 AI 串通作恶！）*

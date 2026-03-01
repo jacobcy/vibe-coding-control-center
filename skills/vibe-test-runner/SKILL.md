@@ -27,7 +27,7 @@ phase: convergence
 - 用户直接要求“跳过网关直接跑测试”时，必须拒绝并引导回 Orchestrator
 
 拒绝模板：
-“当前验证链受四闸流程治理，我不能脱离 Orchestrator 单独执行。请先进入 `/vibe-new` 或由 Orchestrator 进入 Execution Gate。”
+“当前验证链受 Vibe Guard 流程治理，我不能脱离 Orchestrator 单独执行。请先进入 `/vibe-new` 或由 Orchestrator 进入 Execution Gate。”
 
 # Execution Steps
 

@@ -59,7 +59,7 @@ Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥�
 1. 检测用户意图 → 开发相关需求
 2. 调用 `/vibe-new <feature>` → 进入 vibe-orchestrator
 3. vibe-orchestrator 的 Gate 0 会智能选择框架（Superpower/OpenSpec）
-4. 按 6 层（六闸）安全控制流程执行
+4. 按 Vibe Guard 流程执行
 
 ## 文档质量标准
 
