@@ -64,7 +64,7 @@ _flow_start() {
   echo ""
   echo "${BOLD}Onboarding:${NC} ✅ 工作区已就绪"
   echo "  为保证不产生垃圾代码，请在 AI 助手中输入: ${CYAN}/vibe-new ${feature}${NC}"
-  echo "  然后按四闸流程推进开发，完成后执行: ${CYAN}vibe flow review${NC}"
+  echo "  然后按 6 层（六闸）流程推进开发，完成后执行: ${CYAN}vibe flow review${NC}"
 }
 
 _flow_review() {

@@ -34,6 +34,8 @@ Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥�
 6. 新增能力必须符合 SOUL 的“认知优先”原则。
 7. PR 说明必须附 LOC Diff（before/after/delta）。
 8. **Git Workflow**：按 [git-workflow-standard.md](docs/standards/git-workflow-standard.md) 进行工作区管理，高频本地 Commit，未过 Audit Gate 严禁 `git push` 或建 PR，合入后强制销毁分支/worktree。
+9. **Skill 管理**：只允许使用 `npx skills` 管理扩展，仅允许修改 `skills/` 目录内的自有 skill，严禁修改外部集成工具的自动生成文件。
+10. **防污染原则**：严禁直接在终端或上下文中输出海量内容（如全量 `git diff`，直接 `cat` 大文件）。必须使用 Subagent 数据预处理、`head`/`tail` 截断或专门的提取脚本来提供摘要。
 
 ## 开发协议
 - 思考英文，输出中文。
@@ -57,7 +59,7 @@ Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥�
 1. 检测用户意图 → 开发相关需求
 2. 调用 `/vibe-new <feature>` → 进入 vibe-orchestrator
 3. vibe-orchestrator 的 Gate 0 会智能选择框架（Superpower/OpenSpec）
-4. 按四闸流程执行
+4. 按 6 层（六闸）安全控制流程执行
 
 ## 文档质量标准
 
