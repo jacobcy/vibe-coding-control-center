@@ -18,12 +18,25 @@ description: Use when the user wants to resume previous work, says "/continue", 
 优先读取：
 
 - `.vibe/current-task.json`：当前 current task 指针
-- `$(git rev-parse --git-common-dir)/vibe/registry.json`：task 摘要、`next_step`、current subtask
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：当前 worktree 路径、branch、`dirty/clean`
-- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 详情
+- `.vibe/focus.md`：当前 worktree 的聚焦摘要缓存
+- `.vibe/session.json`：当前 worktree 的短期会话缓存
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 `schema_version`、task 摘要、`next_step`、`current_subtask_id`
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含 `schema_version`、`worktree_name`、`worktree_path`、`current_task`、branch、`dirty/clean`
+- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 详情，subtask 以 `subtask_id` 标识
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享记忆真源
 
 `.agent/context/task.md` 和 `.agent/context/memory.md` 作为兼容层保留，用于旧 skill 和入口索引。
+
+## Schema 契约
+
+`/continue` 只使用以下真实字段名：
+
+- `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
+- `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
+- `task.json`：`task_id`、`status`、`subtasks[].subtask_id`、`assigned_worktree`、`next_step`、`plan_path`
+- `.vibe/session.json`：`worktree_name`、`current_task`、`current_subtask_id`、`saved_at`
+
+不得使用旧字段名 `version`、`name`、`path`、`current_task_id`、`id`。
 
 ## 工作流程
 
@@ -32,6 +45,8 @@ description: Use when the user wants to resume previous work, says "/continue", 
 ```bash
 # 读取当前 worktree 指针和共享 task registry
 pointer_file=".vibe/current-task.json"
+focus_file=".vibe/focus.md"
+session_file=".vibe/session.json"
 task_file=".agent/context/task.md"
 memory_index=".agent/context/memory.md"
 governance_file=".agent/governance.yaml"
@@ -39,8 +54,10 @@ governance_file=".agent/governance.yaml"
 
 分析以下内容：
 - **Current Task**: 当前 worktree 绑定的任务
-- **Current Subtask**: 当前进行中的 subtask
+- **Current Subtask**: 当前进行中的 `current_subtask_id`
 - **Next Step**: 共享 registry 中记录的下一步动作
+- **Focus Summary**: `.vibe/focus.md` 中的聚焦摘要
+- **Session Cache**: `.vibe/session.json` 中最近一次保存的短期会话状态
 - **Dirty State**: 当前 worktree 是否 dirty
 - **Governance Phase**: 当前处于探索期 (`exploration`) 还是收敛期 (`convergence`)。
 
@@ -58,9 +75,10 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 为当前 task 加载：
 1. **Summary** - task 标题与摘要
 2. **Key Decisions** - 共享 memory 中的相关决策
-3. **Subtasks Summary** - subtask 状态概览
+3. **Subtasks Summary** - subtask 状态概览（按 `subtask_id`）
 4. **Next Step** - 当前下一步动作
-5. **Worktree View** - path、branch、dirty/clean
+5. **Worktree View** - `worktree_path`、branch、dirty/clean
+6. **Local Cache View** - `focus.md` / `session.json` 的摘要
 
 ### Step 4: 输出继续报告
 
@@ -79,6 +97,8 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 
 📂 Context Loaded:
   • .vibe/current-task.json
+  • .vibe/focus.md
+  • .vibe/session.json
   • $(git rev-parse --git-common-dir)/vibe/registry.json
   • $(git rev-parse --git-common-dir)/vibe/worktrees.json
   • $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json
@@ -122,6 +142,14 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 - `next_step`
 - `plan_path`
 
+### worktrees.json / registry.json 关键字段
+
+- `schema_version`
+- `worktree_name`
+- `worktree_path`
+- `current_task`
+- `current_subtask_id`
+
 ## 与 /save 的关系
 
 ```
@@ -160,6 +188,8 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 
 📂 Context Loaded:
   • .vibe/current-task.json
+  • .vibe/focus.md
+  • .vibe/session.json
   • $(git rev-parse --git-common-dir)/vibe/tasks/2026-03-02-cross-worktree-task-registry/task.json
   • $(git rev-parse --git-common-dir)/vibe/tasks/2026-03-02-cross-worktree-task-registry/memory.md
   • .agent/context/task.md

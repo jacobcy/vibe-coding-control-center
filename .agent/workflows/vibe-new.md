@@ -47,6 +47,8 @@ description: 新功能统一入口，调用 Vibe Orchestrator 执行 Vibe Guard 
    - 当前 worktree 的 current task
    - task 是否包含 subtasks
    - 下一步动作写回共享 registry，再刷新本地 `.vibe/current-task.json`
+   - 创建或刷新 `.vibe/focus.md`，写入当前 task、subtask、next step 的聚焦摘要
+   - 创建或刷新 `.vibe/session.json`，写入 `worktree_name`、`current_task`、`current_subtask_id` 与最近更新时间
 
 6. **Blocking Policy**
    任一 Gate 阻断时，停止继续执行后续 Gate，并给出恢复路径。

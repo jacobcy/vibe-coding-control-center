@@ -102,10 +102,25 @@ fi
 # ─── 6. Remove old branch after successful checkout ─────
 log_step "Removing old branch: $old_branch"
 if git branch -D "$old_branch" 2>/dev/null; then
-    log_success "Deleted $old_branch"
+    log_success "Deleted local $old_branch"
 else
     log_warn "Could not delete $old_branch"
 fi
+
+# Also delete remote branch if exists (prevents pull from bringing back old history)
+remote_branch="origin/$old_branch"
+if git rev-parse --verify "$remote_branch" &>/dev/null; then
+    log_step "Removing remote branch: $remote_branch"
+    if git push origin --delete "$old_branch" 2>/dev/null; then
+        log_success "Deleted remote $old_branch"
+    else
+        log_warn "Could not delete remote $old_branch (may not have permission)"
+    fi
+fi
+
+# Set upstream to origin/main explicitly (prevents future pull from wrong remote)
+git branch --set-upstream-to=origin/main "$new_task"
+log_info "Upstream set to origin/main"
 
 # ─── 7. Pop stash ───────────────────────────────────────
 if $stashed; then

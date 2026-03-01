@@ -16,12 +16,22 @@ description: Use when the user wants to save session context, says "/save", or w
 优先读取当前 worktree 的 `.vibe/current-task.json`，再定位共享真源：
 
 - `.vibe/current-task.json`：当前 current task 指针
-- `$(git rev-parse --git-common-dir)/vibe/registry.json`：task 摘要索引
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：worktree 绑定和 `dirty` 状态
-- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 真源
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 `schema_version`、task 摘要、`current_subtask_id`
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含 `schema_version`、`worktree_name`、`worktree_path`、`current_task` 和 `dirty` 状态
+- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 真源，subtask 以 `subtask_id` 标识
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享 memory 真源
 
 `/save` 只处理当前 worktree 绑定的 current task，不负责跨 worktree 选择。
+
+## Schema 契约
+
+`/save` 只使用以下真实字段名，不使用旧示例字段：
+
+- `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
+- `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
+- `task.json`：`task_id`、`status`、`subtasks[].subtask_id`、`assigned_worktree`、`next_step`、`plan_path`
+
+不得回退到旧字段名 `version`、`name`、`path`、`current_task_id`、`id`。
 
 ## 文件职责分离
 
@@ -56,9 +66,11 @@ description: Use when the user wants to save session context, says "/save", or w
 
 再从共享真源读取：
 
-- current task / current subtask
+- `schema_version`
+- `current_task` / `current_subtask_id`
+- `worktree_path`
 - next step
-- subtasks summary
+- subtasks summary（`subtasks[].subtask_id`）
 - shared memory 路径
 - 当前 worktree 的 `dirty/clean` 状态
 
@@ -117,8 +129,10 @@ Last Updated: YYYY-MM-DD
 ### Step 6: 回写共享 registry 并刷新本地缓存
 
 - 将 `next_step`、`status`、`current_subtask_id` 回写到共享 `registry.json` 和 `task.json`
-- 将当前 worktree 的 `dirty/clean`、`last_updated` 回写到 `worktrees.json`
-- 如有需要，刷新 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
+- 将当前 worktree 的 `dirty/clean`、`last_updated`、`worktree_path`、`current_task` 回写到 `worktrees.json`
+- 刷新 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
+- `.vibe/focus.md` 保存当前 worktree 的聚焦摘要（task、subtask、next step）
+- `.vibe/session.json` 保存当前 worktree 的短期会话缓存（`worktree_name`、`current_task`、`current_subtask_id`、时间戳）
 - `.vibe/` 仅作为本地缓存，可重建，不保存共享 memory 真源
 
 ### Step 7: 输出摘要报告
