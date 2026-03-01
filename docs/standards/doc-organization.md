@@ -20,12 +20,12 @@ related_docs:
 
 # 文档组织标准
 
-本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的六层六闸范式完全对齐。
+本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式完全对齐。
 
 ## 核心原则
 
 1. **文档即规范**：文档是唯一的真理来源，代码必须符合文档
-2. **层级对齐**：文档结构与 Vibe Workflow 六层一一对应
+2. **流程对齐**：文档结构与 Vibe Guard 流程一一对应
 3. **人工优先**：标准设计为人工操作友好，不依赖自动化工具
 4. **AI 工作区分离**：模板等 AI 工具放在 `.agent/`，人类文档放在 `docs/`
 
@@ -38,7 +38,7 @@ docs/
 │   ├── DOC_ORGANIZATION.md         # 本文档组织标准
 │   └── vibe-engine-design.md       # Vibe 工作流引擎设计
 ├── prds/                           # 产品需求文档（全局 PRD）
-│   ├── vibe-workflow-paradigm.md   # 总 PRD：六层六闸范式
+│   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
 └── tasks/                          # 任务文档（按任务组织）
     └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
@@ -109,7 +109,7 @@ audit-{YYYY-MM-DD}.md
 - audit-2024-01-15.md
 ```
 
-## 六层六闸对应关系
+## Vibe Guard 对应关系
 
 | 层级 | 文档类型 | Gate | 验证标准 |
 |------|---------|------|---------|
@@ -144,7 +144,7 @@ audit-{YYYY-MM-DD}.md
    cp .agent/templates/prd.md docs/tasks/2024-01-15-feature-name/prd-v1-initial.md
    ```
 
-5. **按六层流程逐步创建其他文档**
+5. **按 Vibe Guard 流程逐步创建其他文档**
 
 ### 更新任务状态
 
@@ -178,6 +178,6 @@ gates:
 
 ## 参考
 
-- [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - 六层六闸范式总 PRD
+- [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - Vibe Guard 范式总 PRD
 - [Cognition Spec Dominion](cognition-spec-dominion.md) - 宪法大纲
 - [Vibe Engine Design](vibe-engine-design.md) - 工作流引擎设计
