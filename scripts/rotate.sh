@@ -39,7 +39,19 @@ echo ""
 echo "🔄 Rotating to new task: ${BOLD}${new_task}${NC}"
 echo ""
 
-# ─── 1. Stash uncommitted changes ───────────────────────
+# ─── 1. Record current branch ───────────────────────────
+old_branch=$(git branch --show-current)
+if [[ -z "$old_branch" ]]; then
+    log_error "Not on a branch."
+    exit 1
+fi
+if [[ "$old_branch" == "$new_task" ]]; then
+    log_error "New branch name matches current branch: $old_branch"
+    exit 1
+fi
+log_info "Current branch: $old_branch"
+
+# ─── 2. Stash uncommitted changes ───────────────────────
 stashed=false
 log_step "Stashing uncommitted changes"
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -53,18 +65,6 @@ if [[ -n "$(git status --porcelain)" ]]; then
 else
     log_info "No uncommitted changes to stash"
 fi
-
-# ─── 2. Record current branch ───────────────────────────
-old_branch=$(git branch --show-current)
-if [[ -z "$old_branch" ]]; then
-    log_error "Not on a branch."
-    exit 1
-fi
-if [[ "$old_branch" == "$new_task" ]]; then
-    log_error "New branch name matches current branch: $old_branch"
-    exit 1
-fi
-log_info "Current branch: $old_branch"
 
 # ─── 3. Fetch latest main ───────────────────────────────
 log_step "Fetching origin/main..."

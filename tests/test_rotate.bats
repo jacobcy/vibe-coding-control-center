@@ -61,6 +61,26 @@ case "${MOCK_MODE:-}" in
       *) exit 0 ;;
     esac
     ;;
+  detached_head)
+    case "$*" in
+      "rev-parse --is-inside-work-tree") exit 0 ;;
+      "check-ref-format --branch feature-safe") exit 0 ;;
+      "branch --show-current") exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  same_branch_name)
+    case "$*" in
+      "rev-parse --is-inside-work-tree") exit 0 ;;
+      "check-ref-format --branch feature-old") exit 0 ;;
+      "branch --show-current") printf 'feature-old\n'; exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to feature-old: saved WIP") exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
   *)
     exit 1
     ;;
@@ -96,4 +116,22 @@ EOF
   [[ "$output" =~ "origin/main" ]]
   ! grep -q "checkout --detach HEAD --quiet" "$LOG_FILE"
   ! grep -q "branch -D feature-old" "$LOG_FILE"
+}
+
+@test "rotate does not stash before rejecting detached HEAD" {
+  write_mock_git
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=detached_head "$TEST_DIR/rotate.sh" feature-safe
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Not on a branch" ]]
+  ! grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+}
+
+@test "rotate does not stash before rejecting same branch name" {
+  write_mock_git
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=same_branch_name "$TEST_DIR/rotate.sh" feature-old
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "New branch name matches current branch" ]]
+  ! grep -q "stash push -u -m Rotate to feature-old: saved WIP" "$LOG_FILE"
 }
