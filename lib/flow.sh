@@ -7,6 +7,10 @@ _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.js
 _flow_task_title() { jq -r --arg task_id "$1" '.tasks[]? | select(.task_id == $task_id) | .title // empty' "$2"; }
 _flow_set_identity() { git config user.name "$1" 2>/dev/null || git config user.name "$1" || return 1; git config user.email "$1@vibe.coding" 2>/dev/null || git config user.email "$1@vibe.coding"; }
 _flow_start_usage() { echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--base=main]"; }
+_flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
+_flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
+_flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
+_flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1"; }
 
 _flow_start_worktree() {
   local feature="$1" agent="$2" base="$3" wt_dir="wt-${agent}-${feature}" branch="${agent}/${feature}"
@@ -33,15 +37,17 @@ _flow_start_task() {
   vibe_require git jq || return 1
   registry_file="$(_flow_registry_file)"; [[ -f "$registry_file" ]] || { log_error "Missing registry.json"; return 1; }
   title="$(_flow_task_title "$task_id" "$registry_file")"; [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
+  _flow_require_clean_worktree || return 1
+  _flow_require_base_ref "$base" || return 1
   branch="${agent}/${task_id}"
-  git fetch origin "$base" --quiet 2>/dev/null || true
-  git checkout -B "$branch" "origin/$base" 2>/dev/null || git checkout -B "$branch" "$base" || { log_error "Failed to switch branch"; return 1; }
+  _flow_branch_exists "$branch" && { log_error "Target branch already exists: $branch"; return 1; }
+  git checkout -b "$branch" "origin/$base" || { log_error "Failed to switch branch"; return 1; }
   _flow_set_identity "$agent" || return 1
   echo ""; log_success "Task started: ${BOLD}${task_id}${NC}"; echo "  Title     : ${title}"; echo "  Directory : ${CYAN}$PWD${NC}"; echo "  Branch    : ${CYAN}${branch}${NC}"
 }
 
 _flow_start() {
-  local feature="" task_id="" agent="claude" base="main" arg
+  local feature="" task_id="" agent="" base="main" arg
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_start_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     arg="$1"
@@ -55,6 +61,8 @@ _flow_start() {
       *) [[ -z "$feature" ]] && feature="$arg"; shift || break ;;
     esac
   done
+  [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"
+  [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
   [[ -n "$task_id" ]] && { _flow_start_task "$task_id" "$agent" "$base"; return $?; }
   [[ -n "$feature" ]] || { log_error "$(_flow_start_usage)"; return 1; }
   _flow_start_worktree "$feature" "$agent" "$base"
