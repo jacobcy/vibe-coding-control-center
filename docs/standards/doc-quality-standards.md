@@ -416,6 +416,9 @@ related_docs:
 - `draft`：草稿状态
 - `in-progress`：进行中
 - `completed`：已完成
+- **重要**：frontmatter 中的 `status` 字段是唯一真源（Single Source of Truth）
+- 正文中的"当前状态"部分应使用指引文本：`见 frontmatter \`status\` 字段（唯一真源）`
+- 不要在正文中重复或冗余状态值，避免双头真源问题
 
 **`gates`**（仅用于 task-readme）
 - 记录任务各个 Gate 的状态
@@ -526,6 +529,7 @@ related_docs:
 4. **最小侵入**：frontmatter 不影响文档正文内容
 5. **保持更新**：修改文档时同步更新 `last_updated` 字段
 6. **上下文圈定**：使用 `related_docs` 建立文档间的关联
+7. **状态字段单一真源**：对于 Task README，frontmatter 的 `status` 字段是唯一真源，正文使用指引文本而非重复状态值
 
 ### 常见问题
 
