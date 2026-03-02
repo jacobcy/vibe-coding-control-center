@@ -61,3 +61,87 @@ for skill in .github/skills/openspec-*/; do
 done
 
 echo "✅ Environment setup complete!"
+
+# ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────
+if command -v git &> /dev/null && command -v jq &> /dev/null; then
+  current_dir="$(basename "$PWD")"
+  current_feature=""
+  if [[ "$current_dir" =~ ^wt-[^-]+-(.+)$ ]]; then
+    current_feature="${BASH_REMATCH[1]}"
+  fi
+
+  common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  pending_dir="$common_dir/vibe/pending-tasks"
+
+  if [[ -n "$current_feature" && -d "$pending_dir" ]]; then
+    pending_file=""
+    while IFS= read -r candidate; do
+      if jq -e --arg feature "$current_feature" '.assigned_feature == $feature' "$candidate" >/dev/null 2>&1; then
+        pending_file="$candidate"
+        break
+      fi
+    done < <(find "$pending_dir" -maxdepth 1 -type f -name '*.json' | sort)
+
+    if [[ -n "$pending_file" ]]; then
+      task_id="$(jq -r '.task_id // empty' "$pending_file")"
+      task_title="$(jq -r '.title // .assigned_feature // "Pending Task"' "$pending_file")"
+      task_status="$(jq -r '.status // "todo"' "$pending_file")"
+
+      if [[ -n "$task_id" ]]; then
+        task_dir="docs/tasks/$task_id"
+        task_readme="$task_dir/README.md"
+        mkdir -p "$task_dir"
+
+        if [[ ! -f "$task_readme" ]]; then
+          cat > "$task_readme" <<EOF
+---
+task_id: "$task_id"
+document_type: task-readme
+title: "$task_title"
+current_layer: "plan"
+status: "$task_status"
+author: "Vibe Setup Script"
+created: "$(date +%F)"
+last_updated: "$(date +%F)"
+related_docs: []
+gates:
+  scope:
+    status: "pending"
+  spec:
+    status: "pending"
+  plan:
+    status: "pending"
+  test:
+    status: "pending"
+  code:
+    status: "pending"
+  audit:
+    status: "pending"
+---
+
+# Task: $task_title
+
+## 概述
+
+- source: $(jq -r '.source // "pending-task"' "$pending_file")
+- framework: $(jq -r '.framework // "vibe"' "$pending_file")
+- assigned feature: $current_feature
+
+## 当前状态
+
+- status: $task_status
+- created from pending task: $(basename "$pending_file")
+
+## 下一步
+
+- [ ] 进入 `/vibe-new $current_feature` 流程补齐 Gate 产物
+EOF
+          echo "📝 Migrated pending task to $task_readme"
+        fi
+
+        rm -f "$pending_file"
+        echo "🧹 Cleaned pending task file: $(basename "$pending_file")"
+      fi
+    fi
+  fi
+fi
