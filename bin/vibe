@@ -19,6 +19,10 @@ command="${1:-help}"
 shift 2>/dev/null || true
 
 case "$command" in
+    doctor)
+        source "$VIBE_LIB/doctor.sh"
+        vibe_doctor "$@"
+        ;;
     check)
         source "$VIBE_LIB/check.sh"
         vibe_check "$@"
@@ -60,7 +64,8 @@ case "$command" in
         echo "Usage: ${CYAN}vibe <command>${NC} [args]"
         echo ""
         echo "Commands:"
-        echo "  ${GREEN}check${NC}    检测开发环境（工具版本、依赖状态）"
+        echo "  ${GREEN}doctor${NC}   检测开发环境（工具版本、依赖状态）
+  ${GREEN}check${NC}    校验文件格式（json）"
         echo "  ${GREEN}tool${NC}    安装/更新 AI 开发工具（claude, opencode, codex）"
         echo "  ${GREEN}keys${NC}     管理 API 密钥（list, set, get）"
         echo "  ${GREEN}flow${NC}     开发工作流（start, review, pr, done, sync）"
