@@ -130,3 +130,32 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ "state: idle clean" ]]
 }
+
+@test "vibe_task default view includes blocked and review tasks but hides completed ones" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[{"task_id":"task-blocked","title":"Blocked Task","status":"blocked","current_subtask_id":null,"next_step":"Resolve blocker."},{"task_id":"task-review","title":"Review Task","status":"review","current_subtask_id":null,"next_step":"Address review comments."},{"task_id":"task-completed","title":"Completed Task","status":"completed","current_subtask_id":null,"next_step":"Done."}]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    vibe_task
+  '
+
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -F "task-blocked"
+  echo "$output" | grep -F "task-review"
+  ! echo "$output" | grep -F "task-completed"
+}

@@ -73,7 +73,13 @@ _vibe_task_render() {
     echo "--- Task Registry Overview ---"
     jq -r --arg show_all "$show_all" '
         (
-            [ (.tasks // [])[] | select($show_all == "1" or (.status == "in_progress" or .status == "planning" or .status == "todo")) ] |
+            [ (.tasks // [])[] | select(
+                $show_all == "1"
+                or ((.status // "") != "completed"
+                and (.status // "") != "archived"
+                and (.status // "") != "done"
+                and (.status // "") != "skipped")
+              ) ] |
             if length == 0 then
                 ["  (No tasks found matching criteria)", ""]
             else
