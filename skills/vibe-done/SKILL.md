@@ -22,8 +22,16 @@ input_examples:
 2. 根据目标 `task_id` 加载 `docs/tasks/<task_id>/README.md` 与 `$(git rev-parse --git-common-dir)/vibe/registry.json`，确保数据存在。
 
 ### Step 2: 更新任务进度
-1. 修改 `docs/tasks/<task_id>/README.md`，将 `status:` 变更为 `completed` (或通过用户指定变更为 `archived`、`skipped`)。
-2. 修改 `$(git rev-parse --git-common-dir)/vibe/registry.json` 中该 `task_id` 的 `status` 为对应的新状态。
+
+> ⚠️ **收口边界原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的元数据清算指令**。
+> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。这些文件在 `.git/` 里，不被 Git 追踪，修改它们不会产生新的 dirty 文件或 commit。
+> - **严禁修改 `docs/tasks/<task_id>/README.md`**。Task README 里的 `status` 字段是开发阶段的产物，必须在 PR 合并之前作为 commit 的一部分提交进去。如果在收口时修改它，会产生新 dirty 文件、需要新 commit、触发新 PR——陷入无法收口的死循环。
+> - 如果发现 README 里的状态还没有更新为 `completed`，应**提醒用户**在合并前补上这个 commit，而不是在这里替他修改。
+
+1. **检查 `docs/tasks/<task_id>/README.md` 的 status 字段（只读）**：
+   - 若已是 `completed`，继续下一步。
+   - 若仍是 `in_progress`，**警告用户**："该任务的 README status 尚未标记为 completed，建议在 PR 合并前补一个 commit 更新它，否则文档状态将与大盘不一致。继续收口吗？"
+2. **写入 `$(git rev-parse --git-common-dir)/vibe/registry.json`**：将该 `task_id` 的 `status` 更新为用户选择的新状态（`completed` / `archived` / `skipped`）。
 
 ### Step 3: 更新全局 Worktrees Map
 修改 `$(git rev-parse --git-common-dir)/vibe/worktrees.json`:
