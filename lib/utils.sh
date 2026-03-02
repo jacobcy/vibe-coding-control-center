@@ -16,6 +16,7 @@ export NC=$(printf '\033[0m')
 log_info()    { echo "${GREEN}ℹ $1${NC}"; }
 log_warn()    { echo "${YELLOW}! $1${NC}" >&2; }
 log_error()   { echo "${RED}✗ $1${NC}" >&2; }
+log_debug()   { [[ "${VIBE_DEBUG:-}" == "1" ]] && echo "${BLUE}◈ $1${NC}" >&2 || true; }
 log_step()    { echo "${BLUE}>> $1...${NC}"; }
 log_success() { echo "${GREEN}★ $1${NC}"; }
 
