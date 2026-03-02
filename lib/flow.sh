@@ -101,8 +101,14 @@ _flow_pr() {
   log_info "PR description → temp/pr-${feature}.md"
   echo ""
   if confirm_action "Create PR '${title}' now?"; then
-    gh pr create --title "$title" --body-file "temp/pr-${feature}.md" \
-      && log_success "PR created!" || log_error "PR creation failed"
+    if gh pr create --title "$title" --body-file "temp/pr-${feature}.md"; then
+      log_success "PR created!"
+      echo ""
+      echo "${BOLD}Task Completion Reminder:${NC} ⚠️ 不要忘记在 AI 助手中收口该任务！"
+      echo "  👉 记得将对应的任务状态更新为 ${CYAN}completed${NC}，并在 registry 大盘中同步。"
+    else
+      log_error "PR creation failed"
+    fi
   fi
   echo "\n  After merge → ${CYAN}vibe flow done${NC}"
 }
@@ -127,6 +133,8 @@ _flow_done() {
     || git worktree remove "../$wt_dir" --force 2>/dev/null \
     || { log_error "Failed to remove worktree"; return 1; }
   log_success "Worktree ${wt_dir} removed — now in: ${CYAN}$PWD${NC}"
+  echo ""
+  echo "${BOLD}Note:${NC} 若该 worktree 相关的任务还没有在大盘中结算为 completed / archived，请记得收尾清理。"
 }
 
 _flow_sync() {
