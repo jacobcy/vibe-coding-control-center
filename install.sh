@@ -97,6 +97,9 @@ if command -v git &> /dev/null && command -v jq &> /dev/null; then
     if [[ -n "$pending_file" ]]; then
       task_id="$(jq -r '.task_id // empty' "$pending_file")"
       task_title="$(jq -r '.title // .assigned_feature // "Pending Task"' "$pending_file")"
+      task_title_yaml="${task_title//$'\r'/ }"
+      task_title_yaml="${task_title_yaml//$'\n'/ }"
+      task_title_yaml="${task_title_yaml//\'/\'\'}"
       task_status="$(jq -r '.status // "todo"' "$pending_file")"
       pending_feature="$(jq -r '.assigned_feature // empty' "$pending_file")"
 
@@ -110,7 +113,7 @@ if command -v git &> /dev/null && command -v jq &> /dev/null; then
 ---
 task_id: "$task_id"
 document_type: task-readme
-title: "$task_title"
+title: '$task_title_yaml'
 current_layer: "plan"
 status: "$task_status"
 author: "Vibe Setup Script"
