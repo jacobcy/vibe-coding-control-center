@@ -38,3 +38,25 @@ Agent 在实现业务逻辑时，禁止“憋大招”。
 - **目标一**：彻底移除此开发任务对应的独立 Worktree 目录。
 - **目标二**：强制删除本地对应的开发临时分支。
 - **目的**：杜绝幽灵分支和僵尸树堆积，将环境重置为极简无状态的安全工作模式。
+
+## 3. 分支保护规则 (Branch Protection Rules)
+
+正如 [Vibe Coding 核心信念 (SOUL.md)](../../SOUL.md) 所定义，`main` 分支是项目唯一真源，必须施加严格保护伞。
+
+### 保护目标：`main` 分支
+
+在远端 (GitHub Repository Settings) 强制执行以下规则集 (Rulesets)：
+
+#### 1. 强制 Pull Request 准入
+- **合并前需提交 PR** (Require a pull request before merging): 开启。
+- **必须获得 Review 批准** (Require approvals): 至少 1 票同意。
+- **有新 Commit 需重新 Review** (Dismiss stale PR approvals): 开启。
+- **必须解决所有评论/讨论** (Resolve conversations): 开启。
+
+#### 2. 严厉的行为限制
+- **禁止强推** (Block force pushes): 开启 (绝不允许篡改 `main` 历史记录)。
+- **禁止删除主干** (Block deletions): 开启。
+
+### 实现与变更约束
+上述所有保护规则均通过 GitHub Rulesets 在代码托管平台引擎层面落地。
+任何试图变更这些规则的行为都需要持有 Admin 系统权限，且所有变动都必须同步更新于本文档中进行审计记录。
