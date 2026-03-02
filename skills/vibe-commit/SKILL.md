@@ -17,7 +17,12 @@ trigger: auto
 3. **Logical Grouping**: 根据代码具体变动的领域和上下文，将文件自然分类聚类（例如：同时涉及功能A的新增归为一组、修复B的归为另一组）。
 4. **Draft Commits**: 针对每一个变更分组，草拟一个纯粹的高质量提交信息。格式必须形如：`feat: add auth logical module`。
 5. **Interactive Confirmation**: 将分类结果及草拟的提交列出来，**明确提请用户检查并确认**。
-6. **Execution Recommendations**: 用户确认后，提供需执行的 `git add ...` 及 `git commit -m "..."` 命令供用户参考或请求代为执行。
+6. **Execution Recommendations**: 用户确认后，提取并正式执行 `git add ...` 及 `git commit -m "..."`。
+7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您自动生成并提交当前特性分支的 Pull Request？"
+   - 若用户同意，你需要收集自目标主枝（typically `main`）分化以来的所有 commit log。
+   - 自动生成高质量的 PR Title 和带有结构化、变更总结的 PR Body。
+   - 向用户展示 PR 内容，确认后执行 `gh pr create --title "$TITLE" --body "$BODY"` （如果有相关需要可提前创建临时文本传入）。
+   - 创建成功后，立刻提示用户"不要忘记在 AI 助手中收口该任务！（执行 `/vibe-done`）"。
 
 ## Expected Output Format
 ```markdown
@@ -36,6 +41,15 @@ trigger: auto
 2. `...`
 
 👉 各位，是否同意这些分类和提交信息？如果有需要调整的，请直接告诉我。确认后我可以生成执行命令为您提交。
+
+*(当 Commit 执行完毕后，预期输出：)*
+```markdown
+✅ **所有变更已成功 commit！** 
+
+当前的特性代码目前都在本地，准备好合并到主干了吗？
+我可以为您读取最近这几次提交的内容，**一键生成并提交 Pull Request (PR)** 到仓库，免去您手动跑 `vibe flow pr` 的麻烦。
+
+需要我帮您直接跑 PR 发版流程吗？
 ```
 
 ## Restrictions
