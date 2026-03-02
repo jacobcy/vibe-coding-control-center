@@ -124,6 +124,12 @@ _vibe_task_add() {
     [[ -n "$id" && -n "$title" ]] || { vibe_die "Usage: vibe task add <id> --title <title>"; return 1; }
     
     _vibe_task_ctx || return 1
+    
+    if jq -e --arg id "$id" '.tasks[]? | select(.task_id == $id)' "$REGISTRY" >/dev/null 2>&1; then
+        log_warn "Task $id already exists in registry"
+        return 0
+    fi
+    
     local tmp; tmp=$(mktemp)
     jq --arg id "$id" --arg t "$title" --arg now "$NOW" '
         .tasks += [{task_id: $id, title: $t, status: "todo", updated_at: $now}]
