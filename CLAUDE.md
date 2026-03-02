@@ -26,17 +26,46 @@ Vibe Center 是一个极简的 AI 开发编排工具：管理工具链、密钥�
 - `.agent/`: rules/context/workflows
 
 ## HARD RULES
+
+### 代码规模限制
 1. `lib/ + bin/` 总行数 <= 1200。
 2. 单个 `.sh` 文件 <= 200 行。
 3. 零死代码：函数必须有调用方。
-4. 不在 shell 层实现排除项（NLP 路由、缓存系统、i18n、自研测试框架等）。
-5. 能用现成工具就不用自造轮子（bats/jq/curl/gh）。
-6. 新增能力必须符合 SOUL 的“认知优先”原则。
-7. PR 说明必须附 LOC Diff（before/after/delta）。
-8. **Git Workflow**：按 [git-workflow-standard.md](docs/standards/git-workflow-standard.md) 进行工作区管理，高频本地 Commit，未过 Audit Gate 严禁 `git push` 或建 PR，合入后强制销毁分支/worktree。
-9. **Skill 管理**：只允许使用 `npx skills` 管理扩展，仅允许修改 `skills/` 目录内的自有 skill，严禁修改外部集成工具的自动生成文件。
-10. **防污染原则**：严禁直接在终端或上下文中输出海量内容（如全量 `git diff`，直接 `cat` 大文件）。必须使用 Subagent 数据预处理、`head`/`tail` 截断或专门的提取脚本来提供摘要。
-11. **命令体系收敛**：优先在现有命令体系上补能力，不为单一场景随意新增新的顶层命令或 Slash 命令。Shell 负责脏活与确定性状态修改，Slash 负责智能交互与编排。
+
+### Shell/Slash 职责边界
+4. **Shell 职责与限制**：
+   - 执行具体操作、脏活累活、确定性状态修改
+   - 不实现复杂能力：NLP 路由、缓存系统、i18n、自研测试框架等
+   - 优先用现成工具：bats/jq/curl/gh，不自造轮子
+
+5. **Slash 职责与边界**：
+   - 智能判断、交互编排、流程控制
+   - 内部调用 Shell 命令执行具体操作
+   - 优先使用现有 Shell 命令，只有 Shell 不具备的功能才手动 Edit
+   - 严禁为已有 Shell 命令编写 Slash 层等价功能
+
+6. **命令体系收敛**：优先在现有命令体系上补能力，不为单一场景随意新增顶层命令或 Slash 命令。
+
+### 工作流程规范
+7. **认知优先**：新增能力必须符合 SOUL 的”认知优先”原则。
+8. **Git Workflow**：按 [git-workflow-standard.md](docs/standards/git-workflow-standard.md) 进行工作区管理，   - 高频本地 Commit
+   - 未过 Audit Gate 严禁 `git push` 或建 PR
+   - 合入后强制销毁分支/worktree
+9. **Main 分支保护**：
+   - **严禁直接在 main 分支修改代码**：main 分支只接受合并请求，不接受直接提交
+   - **功能开发必须使用 feature 分支**：从 main 创建 feature 分支进行开发
+   - **确保 main 分支始终处于可部署状态**
+10. **PR 说明**：必须附 LOC Diff（before/after/delta）。
+
+### 工具与扩展管理
+10. **Skill 管理**：只允许使用 `npx skills` 管理扩展，仅允许修改 `skills/` 目录内的自有 skill，严禁修改外部集成工具的自动生成文件。
+
+### 上下文与文件管理
+11. **防污染原则**：严禁直接在终端或上下文中输出海量内容（如全量 `git diff`，直接 `cat` 大文件）。必须使用 Subagent 数据预处理、`head`/`tail` 截断或专门的提取脚本来提供摘要。
+12. **临时文件管理**：
+    - **Worktree 内临时文件**：写入 `<worktree>/temp/` 目录，该目录已加入 `.gitignore`
+    - **跨 Worktree 共享文件**：写入 `.git/shared/` 目录，用于多 worktree 间的数据共享
+    - **禁止污染项目根目录**：不得在项目根目录随意创建临时文件或调试文件
 
 ## 开发协议
 - 思考英文，输出中文。

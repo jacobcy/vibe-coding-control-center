@@ -1,9 +1,9 @@
+=== FRONTMATTER (without status) ===
 ---
 task_id: "2026-03-02-command-slash-alignment"
 document_type: task-readme
 title: "Command vs Slash Alignment"
 current_layer: "plan"
-status: "todo"
 author: "Antigravity Agent"
 created: "2026-03-02"
 last_updated: "2026-03-02"
@@ -37,6 +37,8 @@ gates:
     reason: ""
 ---
 
+=== BODY (without status line) ===
+
 # Task: Command vs Slash Alignment
 
 ## 概述
@@ -58,7 +60,6 @@ gates:
 ## 当前状态
 
 - **层级**: Plan
-- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-03-02
 
 ## Gate 进展
@@ -76,3 +77,17 @@ gates:
 
 ### Plan（执行计划层）
 - [plan-v1.md](plan-v1.md)
+
+=== GATE TABLE ===
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | ⏳ Pending | - | Review the slash/shell boundaries before implementation |
+| Spec Gate | ⏳ Pending | - | |
+| Plan Gate | ✅ Passed | 2026-03-02T10:40:00+08:00 | The analysis and plan-v1 is completed |
+| Test Gate | ⏳ Pending | - | |
+| Code Gate | ⏳ Pending | - | |
+| Audit Gate | ⏳ Pending | - | |
+
+
+=== DOC NAVIGATION ===
+## 文档导航

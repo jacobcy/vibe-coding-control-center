@@ -42,7 +42,7 @@ gates:
 ## 当前状态
 
 - **层级**: PRD（认知层）
-- **状态**: Draft
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: {{DATE}}
 
 ## Gate 进展

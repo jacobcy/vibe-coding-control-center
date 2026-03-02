@@ -1,0 +1,114 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Fault Condition** - Task README 双头真源检测
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: Scope the property to the 6 known files with status field conflicts/redundancy
+  - Write script to scan all Task README files and detect files matching `isBugCondition(input)`:
+    - File has frontmatter `status:` field
+    - File has body status field matching pattern `- \*\*状态\*\*: .+`
+  - Test assertions match Expected Behavior Properties:
+    - For high-priority conflicts: frontmatter status != body status value
+    - For medium-priority redundancy: both fields exist (maintenance burden)
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS with counterexamples:
+    - `cross-worktree-task-registry/README.md`: frontmatter=`completed`, body=`In Progress` (conflict)
+    - `session-lifecycle/README.md`: frontmatter=`completed`, body=`In Progress` (conflict)
+    - `command-slash-alignment/README.md`: frontmatter=`todo`, body=`Todo` (redundancy)
+    - Multiple archived tasks: frontmatter=`archived`, body=`Archived` (redundancy)
+  - Document counterexamples found to understand root cause
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - 非状态内容保持不变
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-status content:
+    - Read frontmatter fields (task_id, title, author, created, last_updated, gates, etc.)
+    - Read body content (headings, paragraphs, lists except status line, code blocks, links)
+    - Read Gate progress tables (scope/spec/plan/test/code/audit status rows)
+    - Read document navigation sections
+  - Write property-based tests capturing observed behavior patterns:
+    - For all files with bug condition: frontmatter fields (except status validation) remain unchanged
+    - For all files with bug condition: body content (except status line) remains unchanged
+    - For all files with bug condition: Gate progress tables remain unchanged
+    - For all files with bug condition: document navigation remains unchanged
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [-] 3. Fix Task README status field conflicts and redundancy
+
+  - [x] 3.1 Phase A: Fix high-priority conflict files
+    - Fix `docs/tasks/2026-03-02-cross-worktree-task-registry/README.md`:
+      - Locate `## 当前状态` section and `- **状态**: In Progress` line
+      - Replace with `- **状态**: 见 frontmatter \`status\` 字段（唯一真源）`
+      - Verify frontmatter `status: "completed"` exists and is correct
+    - Fix `docs/tasks/2026-03-01-session-lifecycle/README.md`:
+      - Locate `## 当前状态` section and `- **状态**: In Progress` line
+      - Replace with `- **状态**: 见 frontmatter \`status\` 字段（唯一真源）`
+      - Verify frontmatter `status: "completed"` exists and is correct
+    - _Bug_Condition: isBugCondition(input) where input.hasFrontmatterStatus() AND input.hasBodyStatusField() AND input.bodyStatusField.pattern MATCHES "- \*\*状态\*\*: .+"_
+    - _Expected_Behavior: fixedFile.bodyStatusField == "见 frontmatter \`status\` 字段（唯一真源）" AND NOT fixedFile.hasConflictingStatus()_
+    - _Preservation: Frontmatter other fields, body non-status content, Gate progress tables remain unchanged_
+    - _Requirements: 2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 3.5_
+
+  - [x] 3.2 Phase B: Fix medium-priority redundancy files
+    - Fix `docs/tasks/2026-03-02-command-slash-alignment/README.md`:
+      - Locate `## 当前状态` section and `- **状态**: Todo` line
+      - Replace with `- **状态**: 见 frontmatter \`status\` 字段（唯一真源）`
+    - Fix archived task files (统一处理):
+      - `docs/tasks/2026-02-26-agent-dev-refactor/README.md`
+      - `docs/tasks/2026-02-25-vibe-v2-final/README.md`
+      - `docs/tasks/2026-02-21-save-command/README.md`
+      - `docs/tasks/2026-02-26-vibe-engine/README.md`
+      - `docs/tasks/2026-02-21-vibe-architecture/README.md`
+      - For each: Locate `- **状态**: Archived` line and replace with `- **状态**: 见 frontmatter \`status\` 字段（唯一真源）`
+    - Note: `docs/tasks/2026-03-02-rotate-alignment/README.md` already uses correct format, skip
+    - _Bug_Condition: isBugCondition(input) where input has redundant status fields_
+    - _Expected_Behavior: fixedFile.bodyStatusField == "见 frontmatter \`status\` 字段（唯一真源）"_
+    - _Preservation: All non-status content remains unchanged_
+    - _Requirements: 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5_
+
+  - [ ] 3.3 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - 状态字段冲突和冗余已消除
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES - all files now use frontmatter as single source of truth
+    - Verify: No files have conflicting status values
+    - Verify: All body status fields use reference text or are removed
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+  - [ ] 3.4 Verify preservation tests still pass
+    - **Property 2: Preservation** - 非状态内容保持不变
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Verify: Frontmatter fields (except status validation) unchanged
+    - Verify: Body content (except status line) unchanged
+    - Verify: Gate progress tables unchanged
+    - Verify: Document navigation unchanged
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [ ] 4. Update Task README format standard documentation
+  - Document the single source of truth principle for status fields
+  - Specify frontmatter `status` as the canonical status field
+  - Provide template for body status reference: `- **状态**: 见 frontmatter \`status\` 字段（唯一真源）`
+  - Add guidance to prevent future dual-status-field issues
+  - Update task creation templates if they exist
+  - _Requirements: 2.1, 2.2_
+
+- [ ] 5. Checkpoint - Ensure all tests pass
+  - Run all exploration tests - should pass (bug fixed)
+  - Run all preservation tests - should pass (no regressions)
+  - Run unit tests if created
+  - Run integration tests if created
+  - Verify all 6+ files have been fixed correctly
+  - Ask user if questions arise

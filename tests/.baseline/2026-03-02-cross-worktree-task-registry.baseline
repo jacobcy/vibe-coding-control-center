@@ -1,9 +1,9 @@
+=== FRONTMATTER (without status) ===
 ---
 task_id: "2026-03-02-cross-worktree-task-registry"
 document_type: task-readme
 title: "Cross-Worktree Task Registry"
 current_layer: "plan"
-status: "completed"
 author: "Codex GPT-5"
 created: "2026-03-02"
 last_updated: "2026-03-02"
@@ -39,6 +39,8 @@ gates:
     reason: ""
 ---
 
+=== BODY (without status line) ===
+
 # Task: Cross-Worktree Task Registry
 
 ## 概述
@@ -50,7 +52,6 @@ gates:
 ## 当前状态
 
 - **层级**: Plan（执行计划层）
-- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-03-02
 
 ## Gate 进展
@@ -115,3 +116,17 @@ gates:
 
 - [Git Workflow & Worktree Lifecycle Standard](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)
 - [Session Checkpoint 实施计划](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md)
+
+=== GATE TABLE ===
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | Passed | 2026-03-02 | 已确认问题属于跨 worktree 任务编排，不并入现有 checkpoint 小任务 |
+| Spec Gate | Passed | 2026-03-02 | 已确认 task/subtask 模型、worktree 绑定规则与本地 `.vibe/` 缓存边界 |
+| Plan Gate | Passed | 2026-03-02 | 已生成初版实施计划 |
+| Test Gate | Pending | - | 待执行阶段定义验证命令 |
+| Code Gate | Pending | - | 待实现 |
+| Audit Gate | Pending | - | 待审计 |
+
+
+=== DOC NAVIGATION ===
+## 文档导航

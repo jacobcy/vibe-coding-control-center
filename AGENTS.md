@@ -47,3 +47,32 @@ This project uses community skills that enhance agent capabilities:
 
 Install via the respective tools, then create symlinks in `.agent/skills/`.
 See [DEVELOPER.md](DEVELOPER.md) for setup instructions.
+
+## 🔗 Kiro Integration Rules
+
+When using Kiro (AI IDE with spec workflow) for task management in this project:
+
+1. **Spec Location**: Kiro specs MUST be created in `.kiro/specs/{feature-name}/` directory
+   - Bugfix specs: `bugfix.md`, `design.md`, `tasks.md`
+   - Feature specs: `requirements.md`, `design.md`, `tasks.md`
+
+2. **Vibe Task Integration**: Each Kiro spec MUST have a corresponding Vibe task directory
+   - Create task directory: `docs/tasks/{YYYY-MM-DD-feature-name}/`
+   - Create task README: `docs/tasks/{YYYY-MM-DD-feature-name}/README.md`
+   - Link Kiro spec in README's "文档导航" section
+
+3. **Task Lifecycle**: Use `vibe task` commands to manage task lifecycle
+   - Register task: `vibe task add {task-id} --title "{title}" --status todo`
+   - Update status: `vibe task update {task-id} --status {status}`
+   - Bind to worktree: `vibe task update {task-id} --bind-current`
+   - List tasks: `vibe task list`
+
+4. **Status Synchronization**: Keep Kiro spec and Vibe task status in sync
+   - Kiro spec execution → Update `vibe task` status
+   - Task completion → Update both `.kiro/specs/` and `docs/tasks/` README
+   - Use frontmatter `status` field as single source of truth in task README
+
+5. **Documentation Standards**: Follow Vibe documentation standards
+   - Task naming: `YYYY-MM-DD-feature-name` (kebab-case)
+   - Document naming: `{layer}-v{version}-{description}.md` or `{layer}-{description}.md`
+   - Reference: [docs/standards/doc-organization.md](docs/standards/doc-organization.md)
