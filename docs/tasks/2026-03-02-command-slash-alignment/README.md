@@ -48,6 +48,13 @@ gates:
 1. **Shell 赋能 Slash (高低解耦)**: Slash 绝不应使用文本替换工具来直接操作复杂的领域数据（特别是 `.json` Registry 等结构化大盘）。底层脏活、JSON 的查询/序列化更改应该提供稳定 `vibe task update` 或类似的 Shell 接口，由 Slash (AI) 像调用 API 一样触发。 
 2. **Slash 包裹 Shell (交互升维)**: 生硬而刻板的 CLI 工作流（例如提 PR，做 Code Review）应该隐藏在能够互动的 Slash 指令（`/vibe-commit`、`/vibe-pr`）背后。
 
+## 当前收敛方向
+
+- `/vibe-new` 是唯一的任务创建智能入口，负责“当前目录开新任务”与“新目录开新任务”的模式编排。
+- `vibe task` 是 task 配置面，只保留最小 `list / add / update / remove` 子命令集合。
+- `vibe flow` 是流程推进面，负责 `start / review / pr / done`，不直接承担 task 配置写入。
+- 不新增独立的 `/vibe-rotate`；涉及 registry、worktree、`.vibe/*` 的状态修改都必须通过 shell 命令完成。
+
 ## 当前状态
 
 - **层级**: Plan

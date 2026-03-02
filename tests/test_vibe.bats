@@ -37,6 +37,12 @@ setup() {
   [[ "$output" =~ "查看跨 worktree 的任务总览" ]]
 }
 
+@test "4.4 vibe help mentions task add update remove" {
+  run vibe help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "list, add, update, remove" ]]
+}
+
 @test "4.3 vibe help does not advertise unsupported skills audit subcommand" {
   run vibe help
   [ "$status" -eq 0 ]
@@ -59,4 +65,19 @@ setup() {
   run vibe version
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Vibe" ]]
+}
+
+@test "8. vibe task help lists subcommands" {
+  run vibe task --help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Usage: vibe task" ]]
+  [[ "$output" =~ "vibe task add" ]]
+  [[ "$output" =~ "vibe task update <task-id>" ]]
+  [[ "$output" =~ "vibe task remove <task-id>" ]]
+}
+
+@test "9. vibe flow start help mentions task mode" {
+  run vibe flow start --task --help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "--task <task-id>" ]]
 }
