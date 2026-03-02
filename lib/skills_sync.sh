@@ -58,7 +58,7 @@ _vibe_skills_sync_agents_symlinks() {
 
 _vibe_skills_sync_global_superpowers() {
     local -a agents skills cmd
-    local agent skill
+    local agent skill output
     agents=(${(f)"$(_vibe_skills_global_agents)"})
     skills=(${(f)"$(_vibe_skills_superpowers)"})
     (( ${#skills[@]} )) || { vibe_die "No superpowers skills found in registry"; return 1; }
@@ -67,7 +67,11 @@ _vibe_skills_sync_global_superpowers() {
     for agent in "${agents[@]}"; do [[ "$agent" == "codex" ]] || cmd+=("$agent"); done
     for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
     cmd+=(-y)
-    "${cmd[@]}" 2>&1 | grep -E "(Installed|✓|already)" || true
+    output="$("${cmd[@]}" 2>&1)" || {
+        echo "$output" >&2
+        return 1
+    }
+    echo "$output" | grep -E "(Installed|✓|already)" || true
     log_success "全局 Superpowers 已同步"
     _vibe_skills_sync_agents_symlinks "${agents[@]}"
     log_success "各 Agent skills 已同步"
