@@ -51,7 +51,7 @@ gates:
 ## 当前状态
 
 - **层级**: Plan（执行计划层）
-- **状态**: In Progress
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-03-02
 
 ## Gate 进展

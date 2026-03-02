@@ -58,8 +58,19 @@ gates:
 ## 当前状态
 
 - **层级**: Plan
-- **状态**: Todo
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-03-02
+
+## Gate 进展
+
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | ⏳ Pending | - | Review the slash/shell boundaries before implementation |
+| Spec Gate | ⏳ Pending | - | |
+| Plan Gate | ✅ Passed | 2026-03-02T10:40:00+08:00 | The analysis and plan-v1 is completed |
+| Test Gate | ⏳ Pending | - | |
+| Code Gate | ⏳ Pending | - | |
+| Audit Gate | ⏳ Pending | - | |
 
 ## 文档导航
 

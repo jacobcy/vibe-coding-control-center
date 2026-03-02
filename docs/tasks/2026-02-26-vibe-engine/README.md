@@ -32,7 +32,7 @@ Vibe Workflow Engine 的实现，包含 Plan Provider 集成和引擎设计。
 ## 当前状态
 
 - **层级**: Review（AI 审计层）
-- **状态**: Archived（已归档，旧任务）
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-02-28
 
 ## Gate 进展

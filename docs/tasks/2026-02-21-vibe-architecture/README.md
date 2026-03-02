@@ -31,7 +31,7 @@ Vibe Coding Framework 的核心架构设计，包含设计方案和实现计划�
 ## 当前状态
 
 - **层级**: Plan（执行计划层）
-- **状态**: Archived（已归档，旧任务）
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-02-28
 
 ## Gate 进展
