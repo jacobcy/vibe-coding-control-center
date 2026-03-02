@@ -21,3 +21,6 @@ description: Interactive Smart Commit Workflow based on diff analysis to draft C
 
 4. **Provide verification and confirmation**
    Output grouped commit drafts and **ask for the user's explicit confirmation** before any commit execution.
+
+5. **Post-Commit PR Proposal**
+   Once the user's working tree is completely clean and all changes are committed, automatically ask if they would like to create a Pull Request directly. If yes, generate the PR Title and Body, ask for confirmation again, and then execute `gh pr create` with the generated contents.

@@ -3,7 +3,7 @@ task_id: "2026-03-02-cross-worktree-task-registry"
 document_type: task-readme
 title: "Cross-Worktree Task Registry"
 current_layer: "plan"
-status: "in-progress"
+status: "completed"
 author: "Codex GPT-5"
 created: "2026-03-02"
 last_updated: "2026-03-02"

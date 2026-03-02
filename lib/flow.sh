@@ -1,8 +1,5 @@
 #!/usr/bin/env zsh
-# lib/flow.sh – Development workflow lifecycle
-# Wraps: git worktree, gh pr, lazygit, tmux
-# Subcommands: start, review, pr, done, status
-
+# lib/flow.sh – Workflow lifecycle: start/review/pr/done/status/sync
 [[ -z "${VIBE_ROOT:-}" ]] && { echo "error: VIBE_ROOT not set"; return 1; }
 
 # Detect feature/agent from worktree dir (wt-<agent>-<feature>)
@@ -70,20 +67,16 @@ _flow_start() {
 _flow_review() {
   local feature="${1:-$(_detect_feature || true)}"
   [[ -z "$feature" ]] && { log_error "Not in a worktree. Specify: vibe flow review <feature>"; return 1; }
-
   echo "\n${BOLD}${YELLOW}Pre-PR Checklist: ${feature}${NC}"
   echo "  [ ] Tests pass            [ ] Error handling appropriate"
   echo "  [ ] No debug artefacts    [ ] Documentation updated"
   echo "  [ ] LOC ceiling (≤200/file)  [ ] No sensitive data"
-  echo ""
   local stats; stats=$(git diff --stat HEAD 2>/dev/null)
-  [[ -n "$stats" ]] && { echo "${BOLD}Uncommitted changes:${NC}"; echo "$stats"; echo ""; }
-
+  [[ -n "$stats" ]] && { echo "${BOLD}Uncommitted changes:${NC}"; echo "$stats"; }
   if vibe_has lazygit; then
     confirm_action "Open lazygit for code review?" && lazygit
   else
-    log_info "Tip: install lazygit for interactive review"
-    git status --short
+    log_info "Tip: install lazygit for interactive review"; git status --short
   fi
   echo "\n  Next → ${CYAN}vibe flow pr${NC}"
 }
@@ -101,8 +94,11 @@ _flow_pr() {
   log_info "PR description → temp/pr-${feature}.md"
   echo ""
   if confirm_action "Create PR '${title}' now?"; then
-    gh pr create --title "$title" --body-file "temp/pr-${feature}.md" \
-      && log_success "PR created!" || log_error "PR creation failed"
+    if gh pr create --title "$title" --body-file "temp/pr-${feature}.md"; then
+      log_success "PR created! ⚠️  Merge 后记得: /vibe-done 收口大盘 + vibe flow done 清理沙盒"
+    else
+      log_error "PR creation failed"
+    fi
   fi
   echo "\n  After merge → ${CYAN}vibe flow done${NC}"
 }
@@ -127,6 +123,7 @@ _flow_done() {
     || git worktree remove "../$wt_dir" --force 2>/dev/null \
     || { log_error "Failed to remove worktree"; return 1; }
   log_success "Worktree ${wt_dir} removed — now in: ${CYAN}$PWD${NC}"
+  log_info "Tip: 记得在 AI 助手中执行 /vibe-done 结算大盘。"
 }
 
 _flow_sync() {

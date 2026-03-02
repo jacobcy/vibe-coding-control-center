@@ -5,7 +5,7 @@ title: "Session Lifecycle - Phase 2"
 author: "Codex GPT-5"
 created: "2026-03-01"
 last_updated: "2026-03-02"
-status: planning
+status: completed
 related_docs:
   - docs/tasks/2026-03-01-session-lifecycle/README.md
   - docs/tasks/2026-03-02-cross-worktree-task-registry/plan-v1-initial.md

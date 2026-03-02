@@ -38,26 +38,65 @@ _vibe_task_missing_tasks() {
 _vibe_task_render() {
     local worktrees_file="$1"
     local registry_file="$2"
+    local show_all="$3"
 
-    echo "Vibe Task Overview"
+    echo "==== Vibe Task Overview ===="
     echo ""
+
+    echo "--- Active Worktrees ---"
     jq -r --slurpfile registry "$registry_file" '
-        .worktrees[]? as $worktree
-        | (($registry[0].tasks // []) | map(select(.task_id == $worktree.current_task)) | .[0]) as $task
-        | [
-            "- \($worktree.worktree_name // "-")",
-            "  path: \($worktree.worktree_path // "-")",
-            "  branch: \($worktree.branch // "-")",
-            "  state: \($worktree.status // "-") \(if $worktree.dirty then "dirty" else "clean" end)",
-            "  task: \($worktree.current_task // "-")",
-            "  title: \($task.title // "-")",
-            "  status: \($task.status // "-")",
-            "  current subtask: \($task.current_subtask_id // "-")",
-            "  next step: \($task.next_step // "-")",
-            ""
-          ]
-        | .[]
+        (
+            [ .worktrees[]? ] | 
+            if length == 0 then
+                ["  (No active worktrees)", ""]
+            else
+                map(
+                    . as $worktree
+                    | (($registry[0].tasks // []) | map(select(.task_id == $worktree.current_task)) | .[0]) as $task
+                    | [
+                        "- \($worktree.worktree_name // "-")",
+                        "  path: \($worktree.worktree_path // "-")",
+                        "  branch: \($worktree.branch // "-")",
+                        "  state: \($worktree.status // "-") \(if $worktree.dirty then "dirty" else "clean" end)",
+                        "  task: \($worktree.current_task // "-")",
+                        "  title: \($task.title // "-")",
+                        "  status: \($task.status // "-")",
+                        "  current subtask: \($task.current_subtask_id // "-")",
+                        "  next step: \($task.next_step // "-")",
+                        ""
+                      ]
+                ) | flatten
+            end
+        ) | .[]
     ' "$worktrees_file"
+
+    echo "--- Task Registry Overview ---"
+    jq -r --arg show_all "$show_all" '
+        (
+            [ (.tasks // [])[] | select(
+                $show_all == "1"
+                or ((.status // "") != "completed"
+                and (.status // "") != "archived"
+                and (.status // "") != "done"
+                and (.status // "") != "skipped")
+              ) ] |
+            if length == 0 then
+                ["  (No tasks found matching criteria)", ""]
+            else
+                map(
+                    [
+                        "- \(.task_id // "-")",
+                        "  title: \(.title // "-")",
+                        "  status: \(.status // "-")",
+                        "  assigned: \(.assigned_worktree // "-")",
+                        "  subtask: \(.current_subtask_id // "-")",
+                        "  next step: \(.next_step // "-")",
+                        ""
+                    ]
+                ) | flatten
+            end
+        ) | .[]
+    ' "$registry_file"
 }
 
 vibe_task() {
@@ -65,6 +104,19 @@ vibe_task() {
     local worktrees_file
     local registry_file
     local missing_tasks
+    local show_all="0"
+
+    for arg in "$@"; do
+        case "$arg" in
+            -a|--all) show_all="1" ;;
+            -h|--help) 
+                echo "Usage: vibe task [-a|--all]"
+                echo "  Show active worktrees and tasks in the registry."
+                echo "  -a, --all    Show all tasks including completed/archived."
+                return 0
+                ;;
+        esac
+    done
 
     vibe_require git jq || return 1
 
@@ -81,5 +133,5 @@ vibe_task() {
         return 1
     }
 
-    _vibe_task_render "$worktrees_file" "$registry_file"
+    _vibe_task_render "$worktrees_file" "$registry_file" "$show_all"
 }
