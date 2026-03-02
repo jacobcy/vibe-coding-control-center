@@ -249,3 +249,31 @@ JSON
   [[ "$output" =~ "already exists" ]]
   [ ! -e "$fixture/checkout-called" ]
 }
+
+@test "13. vibe flow start --task rejects remote target branch even when local refs are stale" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "fetch" && "$2" == "origin" && "$3" == "main" ]]; then return 0; fi
+      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/remotes/origin/main" ]]; then return 0; fi
+      if [[ "$1" == "show-ref" && "$2" == "--verify" ]]; then return 1; fi
+      if [[ "$1" == "ls-remote" && "$2" == "--exit-code" && "$3" == "--heads" && "$4" == "origin" && "$5" == "claude/2026-03-02-rotate-alignment" ]]; then return 0; fi
+      if [[ "$1" == "checkout" ]]; then echo "unexpected checkout" > "'"$fixture"'/checkout-called"; return 1; fi
+      return 1
+    }
+    _flow_start --task 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "already exists" ]]
+  [ ! -e "$fixture/checkout-called" ]
+}
