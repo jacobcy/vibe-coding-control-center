@@ -102,6 +102,84 @@ JSON
   [[ "$output" =~ "next step: Review the completed registry design." ]]
 }
 
+@test "vibe_task list reuses shared task overview output" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[{"worktree_name":"wt-claude-refactor","worktree_path":"/tmp/wt-claude-refactor","branch":"refactor","current_task":"2026-03-02-cross-worktree-task-registry","status":"active","dirty":true}]}
+JSON
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-cross-worktree-task-registry","title":"Cross-Worktree Task Registry","status":"done","current_subtask_id":null,"next_step":"Review the completed registry design."}]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    vibe_task list
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Task Overview" ]]
+  [[ "$output" =~ "wt-claude-refactor" ]]
+}
+
+@test "vibe_task add help prints usage" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    vibe_task add --help
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Usage: vibe task add" ]]
+}
+
+@test "vibe_task update help prints usage" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    vibe_task update --help
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Usage: vibe task update <task-id>" ]]
+}
+
+@test "vibe_task remove help prints usage" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    vibe_task remove --help
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Usage: vibe task remove <task-id>" ]]
+}
+
+@test "vibe_task update rejects missing required fields" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    vibe_task update 2026-03-02-cross-worktree-task-registry
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "No update fields provided" ]]
+}
+
 @test "vibe_task renders clean state when worktree is not dirty" {
   local fixture
   fixture="$(mktemp -d)"
