@@ -5,7 +5,6 @@ _vibe_task_now() { date +"%Y-%m-%dT%H:%M:%S%z"; }
 _vibe_task_slugify() { print -r -- "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'; }
 _vibe_task_require_file() { [[ -f "$1" ]] || { vibe_die "Missing $2: $1"; return 1; }; }
 _vibe_task_task_file() { echo "$1/vibe/tasks/$2/task.json"; }
-
 _vibe_task_usage() {
     cat <<'EOF'
 Usage: vibe task [list] [-a|--all]
@@ -14,7 +13,6 @@ Usage: vibe task [list] [-a|--all]
        vibe task remove <task-id>
 EOF
 }
-
 _vibe_task_render() {
     local worktrees_file="$1" registry_file="$2" show_all="$3"
     echo "==== Vibe Task Overview ===="; echo ""; echo "--- Active Worktrees ---"
@@ -33,7 +31,6 @@ _vibe_task_list() {
     [[ -z "$missing" ]] || { vibe_die "Task not found in registry: ${missing%%$'\n'*}"; return 1; }
     _vibe_task_render "$worktrees_file" "$registry_file" "$show_all"
 }
-
 _vibe_task_write_registry() {
     local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" assigned="$5" agent="$6" now="$7" tmp
     tmp="$(mktemp)" || return 1
@@ -47,7 +44,6 @@ _vibe_task_write_registry() {
       else . end)
     ' "$registry_file" >"$tmp" && mv "$tmp" "$registry_file"
 }
-
 _vibe_task_write_worktrees() {
     local worktrees_file="$1" target_name="$2" target_path="$3" task_id="$4" branch="$5" agent="$6" bind_current="$7" now="$8" tmp
     [[ -n "$target_name" || -n "$target_path" ]] || return 0
@@ -67,20 +63,16 @@ _vibe_task_write_worktrees() {
           end)
     ' "$worktrees_file" >"$tmp" && mv "$tmp" "$worktrees_file"
 }
-
 _vibe_task_write_task_file() {
     local common_dir="$1" registry_file="$2" task_id="$3" now="$4" task_file tmp
     local task_title task_status next_step assigned
-
     task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
     task_title="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .title // ""' "$registry_file")"
     task_status="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .status // "todo"' "$registry_file")"
     next_step="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .next_step // ""' "$registry_file")"
     assigned="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .assigned_worktree // ""' "$registry_file")"
-
     mkdir -p "$(dirname "$task_file")"
     tmp="$(mktemp)" || return 1
-
     if [[ -f "$task_file" ]]; then
         jq --arg task_id "$task_id" --arg task_title "$task_title" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg now "$now" '
           .task_id = $task_id
@@ -105,7 +97,6 @@ _vibe_task_write_task_file() {
         ' >"$tmp" && mv "$tmp" "$task_file"
     fi
 }
-
 _vibe_task_refresh_cache() {
     local common_dir="$1" registry_file="$2" task_id="$3" worktree_name="$4" now="$5" task_path title next_step subtask_json
     local vibe_dir=".vibe"; mkdir -p "$vibe_dir"; task_path="$common_dir/vibe/tasks/$task_id/task.json"
@@ -122,7 +113,6 @@ _vibe_task_refresh_cache() {
 EOF
     jq -n --arg worktree_name "$worktree_name" --arg current_task "$task_id" --arg saved_at "$now" --argjson current_subtask_id "${subtask_json:-null}" '{worktree_name:$worktree_name, current_task:$current_task, current_subtask_id:$current_subtask_id, saved_at:$saved_at}' > "$vibe_dir/session.json"
 }
-
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current=0 force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug=""
     shift $(( $# > 0 ? 1 : 0 ))
@@ -156,7 +146,6 @@ _vibe_task_update() {
     [[ "$bind_current" -eq 1 ]] && _vibe_task_refresh_cache "$common_dir" "$registry_file" "$task_id" "$target_name" "$now"
     return 0
 }
-
 _vibe_task_add() {
     local task_id="${1:-}" title="" task_status="todo" next_step="" common_dir registry_file task_file now tmp
     [[ "$task_id" == "-h" || "$task_id" == "--help" ]] && { echo "Usage: vibe task add <task-id> --title <title> [--status <status>] [--next-step <text>]"; echo "  Register a task in the shared registry."; return 0; }
@@ -191,7 +180,6 @@ _vibe_task_remove() {
     jq --arg task_id "$task_id" '.tasks |= map(select(.task_id != $task_id))' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file" || return 1
     rm -f "$task_file"; rmdir "$(dirname "$task_file")" 2>/dev/null || true
 }
-
 vibe_task() {
     local subcommand="${1:-list}"
     case "$subcommand" in
