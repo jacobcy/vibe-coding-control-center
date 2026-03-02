@@ -120,11 +120,12 @@ input_examples:
 - 按计划逐任务执行，禁止跳步
 - 执行前声明改动范围（文件数、预计行数）
 - 执行中收集验证证据（命令与输出）
-- 若入口来自 `/vibe-new`，只允许 Slash 做意图判断和最少交互；共享 registry、worktree 绑定、`.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json` 的修改必须委托给 shell 命令
-- `/vibe-new` 需要明确选择以下两种模式之一：
-  - 当前目录开新任务：调用 `vibe task update ... --bind-current` 与 `vibe flow start --task <task-id>`
-  - 新目录开新任务：调用 `vibe task` 配置任务，再调用 `vibe flow start <feature>`
-- 禁止 Slash 直接编辑 `registry.json`、`worktrees.json` 或本地 `.vibe/*`
+- 若入口来自 `/vibe-new`，只允许 Slash 做意图判断和最少交互；
+- 共享 registry、worktree 绑定、共享任务存储修改必须委托给 shell 命令：
+  - 当前目录模式：调用 `vibe task update <task-id> --bind-current`
+  - 完整流程模式：调用 `vibe flow new <feature>` 创建/切换 worktree 并初始化 context。
+- 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
+- 严禁 Slash 直接操作 `.vibe/` 缓存文件夹，应通过 CLI 读取。
 - 在进入执行前，先读取并遵循：`docs/standards/serena-usage.md`、`.github/workflows/ci.yml`
 - 质量检查必须至少覆盖：`scripts/lint.sh`、`scripts/metrics.sh`、项目相关测试命令
 - 对 `scripts/lint.sh` 与 `scripts/metrics.sh` 执行 3 次重试上限：

@@ -12,16 +12,16 @@ description: Use when the user wants to save session context, says "/save", or w
 **Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
 
 ## Shared Task Source
+ 
+1. **定位**: 根据当前目录路径 `$(pwd)` 在 `$(git rev-parse --git-common-dir)/vibe/worktrees.json` 中定位当前 `task_id`。
+2. **真源**:
+   - `registry.json`：包含 task 摘要与全局索引。
+   - `worktrees.json`：worktree 状态与 task 绑定。
+   - `shared/`：存放跨 worktree 的流程状态文件。
+ 
+**指令**: 物理层状态已通过 `vibe flow status` 自动对齐。认知层保存需调用 `vibe task update --next-step ...` 沉积当前进度。
 
-优先读取当前 worktree 的 `.vibe/current-task.json`，再定位共享真源：
-
-- `.vibe/current-task.json`：当前 current task 指针
-- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 `schema_version`、task 摘要、`current_subtask_id`
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含 `schema_version`、`worktree_name`、`worktree_path`、`current_task` 和 `dirty` 状态
-- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 真源，subtask 以 `subtask_id` 标识
-- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享 memory 真源
-
-`/save` 只处理当前 worktree 绑定的 current task，不负责跨 worktree 选择。
+`/save` 只处理当前 worktree 绑定的 current task。
 
 ## Schema 契约
 
@@ -176,7 +176,6 @@ Last Updated: YYYY-MM-DD
 
 ### Step 9: 触发 Governance Hook
 
-作为 Vibe Skills 治理体系的一部分，在 `vibe flow done` 阶段将自动触发 `save` 技能：
 - 保存行为受 `.agent/governance.yaml` 的 `flow_hooks.done` 配置编排。
 - 在最后归档前，必须确保上下文沉积工作已完成。
 

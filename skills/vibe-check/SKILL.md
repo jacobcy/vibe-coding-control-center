@@ -13,7 +13,15 @@ description: Use when the user wants to verify project memory consistency, says 
 
 ## 工作流程
 
-### Step 1: 读取记忆文件
+### Step 0: Shell-Level Audit
+ 
+ ```bash
+ vibe check
+ ```
+ 
+ 运行 `vibe check` 进行全面的 Registry、OpenSpec、任务归档以及僵尸分支审计。解释其审计结果。
+ 
+ ### Step 1: 读取记忆文件
 
 ```bash
 memory_index=".agent/context/memory.md"

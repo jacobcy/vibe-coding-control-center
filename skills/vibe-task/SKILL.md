@@ -34,16 +34,14 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 ### Step 1: 运行 CLI
 
 ```bash
-bin/vibe task
+bin/vibe task list --json
 ```
 
 目标：
 
-- 获取当前所有 worktree 的任务总览
-- 读取每个 worktree 的 `current task`
-- 读取每个 worktree 的 `current subtask`
-- 读取每个 worktree 的 `next step`
-- 读取每个 worktree 的 `dirty` / `clean` 状态
+- 获取当前所有 worktree 的任务总览（JSON 格式）
+- 包含 Registry 任务与动态 OpenSpec 桥接任务
+- 若需同步外部任务，运行 `vibe task sync`
 
 ### Step 2: 解析 CLI 输出
 
