@@ -26,17 +26,17 @@ gates:
     timestamp: "2026-03-02T00:00:00+08:00"
     reason: "已生成 plan-v1-initial.md。"
   test:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T09:30:00+08:00"
+    reason: "bats tests pass, vibe task -a verified."
   code:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T09:30:00+08:00"
+    reason: "lib/task.sh implemented with -a flag and dual-section output."
   audit:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T09:30:00+08:00"
+    reason: "Reviewed and committed in PR #21."
 ---
 
 # Task: Vibe Task Unified Entry
@@ -53,7 +53,7 @@ gates:
 ## 当前状态
 
 - **层级**: Plan（执行计划层）
-- **状态**: In Progress
+- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-03-02
 
 ## 文档导航
