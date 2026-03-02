@@ -103,7 +103,7 @@ if command -v git &> /dev/null && command -v jq &> /dev/null; then
       task_status="$(jq -r '.status // "todo"' "$pending_file")"
       pending_feature="$(jq -r '.assigned_feature // empty' "$pending_file")"
 
-      if [[ -n "$task_id" ]]; then
+      if [[ -n "$task_id" && "$task_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
         task_dir="docs/tasks/$task_id"
         task_readme="$task_dir/README.md"
         mkdir -p "$task_dir"
@@ -157,6 +157,8 @@ EOF
 
         rm -f "$pending_file"
         echo "🧹 Cleaned pending task file: $(basename "$pending_file")"
+      elif [[ -n "$task_id" ]]; then
+        echo "⚠️  Skip pending task with unsafe task_id: $task_id"
       fi
     fi
   fi

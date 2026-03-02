@@ -51,3 +51,47 @@ EOF
   [[ "$title_line" != *"O'Brien"* ]]
   [ ! -f "$fixture/.git/vibe/pending-tasks/$task_id.json" ]
 }
+
+@test "install rejects unsafe pending task_id path traversal" {
+  local fixture bin_dir home_dir unsafe_id current_dir
+  fixture="$(mktemp -d)"
+  bin_dir="$fixture/bin"
+  home_dir="$fixture/home"
+  unsafe_id="../../tmp/pwn"
+  current_dir="$(basename "$fixture")"
+
+  mkdir -p "$bin_dir" "$home_dir" "$fixture/.git/vibe/pending-tasks" "$fixture/.git/vibe" "$fixture/docs" "$fixture/skills"
+
+  cat > "$fixture/.git/vibe/worktrees.json" <<JSON
+{"schema_version":"v1","worktrees":[{"worktree_name":"$current_dir","worktree_path":"$fixture","current_task":"$unsafe_id"}]}
+JSON
+
+  cat > "$fixture/.git/vibe/pending-tasks/unsafe.json" <<'JSON'
+{"task_id":"../../tmp/pwn","title":"Unsafe Task","status":"todo","assigned_feature":"unsafe","source":"pending-task","framework":"vibe"}
+JSON
+
+  cat > "$bin_dir/git" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1 \$2" == "rev-parse --git-common-dir" ]]; then
+  echo "$fixture/.git"
+  exit 0
+fi
+exit 1
+EOF
+  cat > "$bin_dir/npx" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  cat > "$bin_dir/openspec" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec"
+
+  run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/install.sh"'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skip pending task with unsafe task_id" ]]
+  [ ! -f "$fixture/docs/tasks/../../tmp/pwn/README.md" ]
+  [ -f "$fixture/.git/vibe/pending-tasks/unsafe.json" ]
+}
