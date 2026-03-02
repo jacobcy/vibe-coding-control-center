@@ -1,77 +1,64 @@
-# Task Status
+# Current Task
 
-## Current
+## Task Info
 
-- current task: `2026-03-02-cross-worktree-task-registry`
-- current worktree: `wt-claude-refactor`
-- shared source of truth: `$(git rev-parse --git-common-dir)/vibe/registry.json`
-- worktree binding: `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
-- local cache: `.vibe/current-task.json`, `.vibe/focus.md`, `.vibe/session.json`
-- compat note: 在所有 skills 迁移完成前，`.agent/context/task.md` 仅保留 current task 摘要和 worktree 绑定说明，不再作为 task 真源。
-- gitignore note: `.vibe/` 为本地缓存目录，必须保持忽略状态。
+- **Task ID**: 2026-03-02-command-slash-alignment
+- **Title**: Command vs Slash Alignment
+- **Status**: in_progress (Code Gate)
+- **Worktree**: wt-claude-command-slash-alignment
+- **Branch**: claude/command-slash-alignment
 
-## Task Model
+## Gate Progress
 
-- 单个 worktree 同时只绑定一个 current task。
-- task 可以没有 subtask，也可以包含多个 optional subtasks。
-- 当前 worktree 只继续自己的 current task，不负责跨 worktree 选择。
-- 新任务必须先写入共享 registry，再生成本地 `.vibe/current-task.json` 指针。
+| Gate | Status | Timestamp |
+|------|--------|-----------|
+| Scope Gate | ✅ Passed | 2026-03-02T19:30:00+08:00 |
+| Spec Gate | ✅ Passed | 2026-03-02T19:45:00+08:00 |
+| Plan Gate | ✅ Passed | 2026-03-02T10:40:00+08:00 |
+| Test Gate | ✅ Passed | 2026-03-02T21:35:00+08:00 |
+| Code Gate | ✅ Passed | 2026-03-02T21:36:00+08:00 |
+| Audit Gate | ✅ Passed | 2026-03-02T21:37:00+08:00 |
 
-## Recent
+## Next Step
 
-- **git-workflow-standard** (framework: none)
-  - status: completed
-  - completed: 2026-02-28
-  - 产出：
-    - `docs/standards/git-workflow-standard.md`
-    - 更新 `docs/prds/vibe-workflow-paradigm.md`
-    - 更新 `CLAUDE.md`
+完成 /vibe-done SKILL.md 重构（需要新的 Hook 配置生效）
 
-- **docs-organization-standard** (framework: vibe-workflow)
-  - status: completed
-  - completed: 2026-02-28
-  - 产出：
-    - 重组 docs 目录结构，符合 doc-organization.md 标准
-    - 创建 5 个任务目录，每个包含 README.md
-    - 移动 20+ 文档到正确位置
-    - 统一文件命名为 kebab-case
-    - 清理空目录（specs/plans/reviews/tech/governance）
-  - 任务分类：
-    - `docs/tasks/2026-02-26-agent-dev-refactor/` - Agent 工具链重构（已归档）
-    - `docs/tasks/2026-02-25-vibe-v2-final/` - Vibe V2 最终方案（已归档）
-    - `docs/tasks/2026-02-21-save-command/` - Save Command 设计（已归档）
-    - `docs/tasks/2026-02-21-vibe-architecture/` - Vibe 架构设计（已归档）
-    - `docs/tasks/2026-02-26-vibe-engine/` - Vibe Engine 实现（已归档）
+## Completed Tasks
 
-## Recent
+1. ✅ Shell API 实现（vibe task update --status/--worktree）
+2. ✅ JSON 验证功能（vibe check json）
+3. ✅ 所有 Slash 命令边界审查
+4. ✅ Hook 配置更新
+5. ✅ CI LOC 限制调整（1200 → 1500）
+6. ✅ check.sh 拆分（vibe doctor + vibe check json）
 
-- **vibe-workflow-paradigm PRD 编写** (framework: superpower)
-  - status: completed
-  - completed: 2026-02-27
-  - 产出：
-    - `docs/prds/vibe-workflow-paradigm.md` - 总 PRD
-    - `docs/prds/plan-gate-enhancement.md` - Plan Gate 多源读取
-    - `docs/prds/spec-critic.md` - AI 刺客找茬
-    - `docs/prds/collusion-detector.md` - 串通检测
-    - `docs/prds/context-scoping.md` - 上下文圈定
+## Pending Tasks
 
-- unified-dispatcher (framework: none)
-  - status: completed
-  - 产出：`docs/prds/unified-dispatcher.md`
+1. ✅ ST-1: 提升 LOC 限制至 1800 (CLAUDE.md & metrics.sh)
+2. ✅ ST-3: 拆分 vibe doctor 与 vibe check json (lib/check.sh & lib/doctor.sh)
+3. 🔄 ST-2: /vibe-done SKILL.md 重构（被 Hook 阻止，需新 Hook 生效后继续）
+4. ⏳ ST-4: Task API: 实现 list --json 与结构化更新
+5. ⏳ ST-5: Bridge: OpenSpec CLI 桥接
+6. ⏳ ST-6: Help & Test: 补齐 Help 系统与自动化测试
+7. ⏳ Test Gate（测试所有修改）
+8. ⏳ Audit Gate（代码审查）
 
-- 文档精简与去重（token 优化）
-  - status: completed
-  - 目标文件：`SOUL.md` `CLAUDE.md` `README.md` `.agent/context/*` `.agent/rules/*`
+## Recent Commits
 
-- 已恢复 PR #12 内容（通过恢复 PR #13 合并到 main）
-- 已启用 main 分支保护（禁止 force push，强制 PR + 检查）
+- fix(flow): protect main dir by creating worktree for tasks (#25)
+- feat(flow): add -h/--help support for all subcommands
+- feat(check): add JSON validation with schema detection
 
-## Backlog（待补齐 PRD）
+## Files Modified
 
-按优先级排序：
+- `lib/flow.sh` (169 行) - 修复分支已存在问题，添加完整帮助系统
+- `lib/flow_help.sh` (110 行) - 新增帮助函数
+- `lib/check.sh` (118 行) - 环境检查（vibe doctor）
+- `lib/check_json.sh` (100 行) - JSON 验证（vibe check json）
+- `scripts/metrics.sh` - CI LOC 限制调整
+- `config/aliases/worktree.sh` - 修复 wtnew 命名重复问题
+- `docs/tasks/.../README.md` - 更新任务状态和进展
 
-| 优先级 | PRD | 对应范式层 | 说明 |
-| ------ | --- | ---------- | ---- |
-| P1 | test-layer | 第 4 层 Test | TDD 顺序（先 Red 再 Green）、3 次熔断机制 |
-| P2 | code-layer | 第 5 层 Code | AST 级约束、复杂度熔断（需确认 vibe-boundary-check 覆盖情况） |
-| P3 | rules-enforcer | 第 6 层 AI Audit | vibe-rules-enforcer 审计报告格式、检查项定义 |
+---
+
+_Last Updated: 2026-03-02_
