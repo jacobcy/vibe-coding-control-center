@@ -1,10 +1,10 @@
+=== FRONTMATTER (without status) ===
 ---
 task_id: "2026-02-25-vibe-v2-final"
 title: "Vibe V2 最终方案"
 created: "2026-02-25T00:00:00Z"
 updated: "2026-02-28T00:00:00Z"
 current_layer: "plan"
-status: "archived"
 
 gates:
   scope:
@@ -22,6 +22,8 @@ gates:
     status: "skipped"
 ---
 
+=== BODY (without status line) ===
+
 # Task: Vibe V2 最终方案
 
 ## 概述
@@ -31,7 +33,6 @@ Vibe Coding Framework V2 的最终设计方案，包含 MSC 合规性和技能�
 ## 当前状态
 
 - **层级**: Plan（执行计划层）
-- **状态**: 见 frontmatter `status` 字段（唯一真源）
 - **最后更新**: 2026-02-28
 
 ## Gate 进展
@@ -56,3 +57,17 @@ Vibe Coding Framework V2 的最终设计方案，包含 MSC 合规性和技能�
 
 - [Vibe Workflow Paradigm](../../prds/vibe-workflow-paradigm.md)
 - [文档组织标准](../../standards/doc-organization.md)
+
+=== GATE TABLE ===
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | ⏭️ Skipped | - | 旧任务，未按标准流程 |
+| Spec Gate | ⏭️ Skipped | - | |
+| Plan Gate | ✅ Passed | 2026-02-25 | |
+| Test Gate | ⏭️ Skipped | - | |
+| Code Gate | ⏭️ Skipped | - | |
+| Audit Gate | ⏭️ Skipped | - | |
+
+
+=== DOC NAVIGATION ===
+## 文档导航
