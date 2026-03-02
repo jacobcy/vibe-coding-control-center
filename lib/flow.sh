@@ -32,9 +32,32 @@ _flow_start_worktree() {
   echo "${BOLD}Onboarding:${NC} ✅ 工作区已就绪"; echo "  为保证不产生垃圾代码，请在 AI 助手中输入: ${CYAN}/vibe-new ${feature}${NC}"; echo "  然后按 Vibe Guard 流程推进开发，完成后执行: ${CYAN}vibe flow review${NC}"
 }
 
+_flow_is_main_worktree() {
+  # 检查当前目录是否是 main worktree（不是 wt-* 格式）
+  local dir
+  dir=$(basename "$PWD")
+  [[ "$dir" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0
+}
+
 _flow_start_task() {
   local task_id="$1" agent="$2" base="$3" registry_file title branch
   vibe_require git jq || return 1
+
+  # 保护 main worktree：禁止在 main 目录直接切换分支
+  if _flow_is_main_worktree; then
+    log_error "Cannot start task in main worktree"
+    echo ""
+    echo "${BOLD}Correct usage:${NC}"
+    echo "  ${CYAN}vibe flow start <feature>${NC}        Create a new worktree for feature development"
+    echo "  ${CYAN}vibe flow start --task <id>${NC}      Switch branch in existing worktree only"
+    echo ""
+    echo "${BOLD}Example:${NC}"
+    echo "  vibe flow start refactor                    # Creates wt-claude-refactor/"
+    echo "  cd ../wt-claude-refactor"
+    echo "  vibe flow start --task 2026-03-02-xxx       # Now safe to switch branches"
+    return 1
+  fi
+
   registry_file="$(_flow_registry_file)"; [[ -f "$registry_file" ]] || { log_error "Missing registry.json"; return 1; }
   title="$(_flow_task_title "$task_id" "$registry_file")"; [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
   _flow_require_clean_worktree || return 1
