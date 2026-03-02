@@ -1,0 +1,82 @@
+=== FRONTMATTER (without status) ===
+---
+task_id: "2026-02-26-agent-dev-refactor"
+title: "Agent 开发工具链重构"
+created: "2026-02-26T00:00:00Z"
+updated: "2026-02-28T00:00:00Z"
+current_layer: "test"
+
+gates:
+  scope:
+    status: "passed"
+    timestamp: "2026-02-26T10:00:00Z"
+  spec:
+    status: "passed"
+    timestamp: "2026-02-26T12:00:00Z"
+  plan:
+    status: "skipped"
+  test:
+    status: "passed"
+    timestamp: "2026-02-26T14:00:00Z"
+  code:
+    status: "skipped"
+  audit:
+    status: "skipped"
+---
+
+=== BODY (without status line) ===
+
+# Task: Agent 开发工具链重构
+
+## 概述
+
+重构 Vibe Coding 的 Agent 工具链，支持 Claude、OpenCode、Codex 三类工具的统一管理和快速切换。
+
+## 当前状态
+
+- **层级**: Test（测试层）
+- **最后更新**: 2026-02-28
+
+## Gate 进展
+
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | ✅ Passed | 2026-02-26 | |
+| Spec Gate | ✅ Passed | 2026-02-26 | |
+| Plan Gate | ⏭️ Skipped | - | 旧任务，未按标准流程 |
+| Test Gate | ✅ Passed | 2026-02-26 | |
+| Code Gate | ⏭️ Skipped | - | |
+| Audit Gate | ⏭️ Skipped | - | |
+
+## 文档导航
+
+### PRD（认知层）
+- [prd-v1-initial.md](prd-v1-initial.md) - Agent 开发方向
+- [prd-v2-refactor-tools.md](prd-v2-refactor-tools.md) - 多工具链重构
+
+### Spec（规范层）
+- [spec-v1-initial.md](spec-v1-initial.md) - Agent 开发技术规格
+- [spec-v2-refactor-tools.md](spec-v2-refactor-tools.md) - 重构工具技术规格
+
+### Test（测试层）
+- [test-strategy.md](test-strategy.md) - Agent 开发测试计划
+- [test-refactor-tools.md](test-refactor-tools.md) - 重构工具测试计划
+
+## 参考
+
+- [Vibe Workflow Paradigm](../../prds/vibe-workflow-paradigm.md)
+- [文档组织标准](../../standards/doc-organization.md)
+
+=== GATE TABLE ===
+| Gate | 状态 | 时间 | 备注 |
+|------|------|------|------|
+| Scope Gate | ✅ Passed | 2026-02-26 | |
+| Spec Gate | ✅ Passed | 2026-02-26 | |
+| Plan Gate | ⏭️ Skipped | - | 旧任务，未按标准流程 |
+| Test Gate | ✅ Passed | 2026-02-26 | |
+| Code Gate | ⏭️ Skipped | - | |
+| Audit Gate | ⏭️ Skipped | - | |
+
+
+=== DOC NAVIGATION ===
+## 文档导航
