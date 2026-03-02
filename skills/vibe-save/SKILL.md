@@ -11,6 +11,28 @@ description: Use when the user wants to save session context, says "/save", or w
 
 **Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
 
+## Shared Task Source
+
+优先读取当前 worktree 的 `.vibe/current-task.json`，再定位共享真源：
+
+- `.vibe/current-task.json`：当前 current task 指针
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 `schema_version`、task 摘要、`current_subtask_id`
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含 `schema_version`、`worktree_name`、`worktree_path`、`current_task` 和 `dirty` 状态
+- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 真源，subtask 以 `subtask_id` 标识
+- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享 memory 真源
+
+`/save` 只处理当前 worktree 绑定的 current task，不负责跨 worktree 选择。
+
+## Schema 契约
+
+`/save` 只使用以下真实字段名，不使用旧示例字段：
+
+- `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
+- `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
+- `task.json`：`task_id`、`status`、`subtasks[].subtask_id`、`assigned_worktree`、`next_step`、`plan_path`
+
+不得回退到旧字段名 `version`、`name`、`path`、`current_task_id`、`id`。
+
 ## 文件职责分离
 
 | 文件 | 职责 | 内容 |
@@ -33,7 +55,26 @@ description: Use when the user wants to save session context, says "/save", or w
 2. **复杂概念** - 是否有需要深入展开的概念？（按需写入 memory/<topic>.md）
 3. **任务状态** - 完成了什么？待办是什么？（写入 task.md）
 
-### Step 2: 更新认知对齐目录
+### Step 2: 读取当前 task 指针与共享状态
+
+先读取 `.vibe/current-task.json`，确认：
+
+- `task_id`
+- `task_path`
+- `registry_path`
+- `worktree_name`
+
+再从共享真源读取：
+
+- `schema_version`
+- `current_task` / `current_subtask_id`
+- `worktree_path`
+- next step
+- subtasks summary（`subtasks[].subtask_id`）
+- shared memory 路径
+- 当前 worktree 的 `dirty/clean` 状态
+
+### Step 3: 更新认知对齐目录
 
 更新 `.agent/context/memory.md`：
 
@@ -46,7 +87,9 @@ description: Use when the user wants to save session context, says "/save", or w
 - 是否定义了新的术语或流程？→ 写入
 - 是否只是完成任务？→ 不写入，只更新 task.md
 
-### Step 3: 更新复杂概念（可选）
+同时回写共享 memory 真源 `tasks/<task-id>/memory.md`，`.agent/context/memory.md` 仅作为入口索引和兼容层。
+
+### Step 4: 更新复杂概念（可选）
 
 对于需要深入展开的复杂概念，创建 `memory/<topic>.md`：
 
@@ -75,15 +118,24 @@ Last Updated: YYYY-MM-DD
 - 是否会多次引用？→ 创建
 - 是否只是简单共识？→ 不创建，保留在 memory.md 即可
 
-### Step 4: 更新任务状态
+### Step 5: 更新任务状态
 
 更新 `.agent/context/task.md`：
 
-- 将 **Current** 中完成的任务移到 **Recent**
-- 更新 **Current** 为新的进行中任务
-- 添加 **Backlog** 待办事项
+- 刷新 current task 摘要
+- 记录当前 worktree、next step、subtasks summary
+- 保留 `.agent/context/task.md` 为兼容层，不把它当作共享真源
 
-### Step 5: 输出摘要报告
+### Step 6: 回写共享 registry 并刷新本地缓存
+
+- 将 `next_step`、`status`、`current_subtask_id` 回写到共享 `registry.json` 和 `task.json`
+- 将当前 worktree 的 `dirty/clean`、`last_updated`、`worktree_path`、`current_task` 回写到 `worktrees.json`
+- 刷新 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
+- `.vibe/focus.md` 保存当前 worktree 的聚焦摘要（task、subtask、next step）
+- `.vibe/session.json` 保存当前 worktree 的短期会话缓存（`worktree_name`、`current_task`、`current_subtask_id`、时间戳）
+- `.vibe/` 仅作为本地缓存，可重建，不保存共享 memory 真源
+
+### Step 7: 输出摘要报告
 
 向用户展示保存结果：
 
@@ -102,12 +154,16 @@ Last Updated: YYYY-MM-DD
   • 待办: <task-3>, <task-4>
 
 📂 文件更新:
+  • $(git rev-parse --git-common-dir)/vibe/registry.json
+  • $(git rev-parse --git-common-dir)/vibe/worktrees.json
+  • $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json
+  • $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
   • .agent/context/memory.md
   • .agent/context/task.md
-  • .agent/context/memory/<topic>.md (如有)
+  • .vibe/current-task.json / .vibe/focus.md / .vibe/session.json
 ```
 
-### Step 6: 分析可学习模式
+### Step 8: 分析可学习模式
 
 分析保存的内容是否包含可复用模式：
 
@@ -118,7 +174,7 @@ Last Updated: YYYY-MM-DD
 
 如果发现可复用模式，建议运行 `/learn` 提取为全局 skill。
 
-### Step 7: 触发 Governance Hook
+### Step 9: 触发 Governance Hook
 
 作为 Vibe Skills 治理体系的一部分，在 `vibe flow done` 阶段将自动触发 `save` 技能：
 - 保存行为受 `.agent/governance.yaml` 的 `flow_hooks.done` 配置编排。
@@ -173,8 +229,8 @@ Last Updated: YYYY-MM-DD
 
 ## 设计决策
 
-1. **认知与任务分离** - memory.md 记录共识，task.md 记录任务
-2. **topic 按需创建** - 复杂概念才需要独立文档，不是强制
-3. **主题式组织** - 比日期式更利于检索
-4. **分节更新** - 只替换有变化的部分
+1. **共享真源优先** - `/save` 先读 `.vibe/current-task.json`，再回写共享 registry 与 task memory
+2. **认知与任务分离** - memory 记录共识，task 记录状态与 next step
+3. **compat 层保留** - `.agent/context/*` 暂不废弃，作为迁移过渡入口
+4. **本地缓存可重建** - `.vibe/` 只保留 focus/session 缓存，不保存共享真源
 5. **与 /learn 独立** - `/save` 保存项目上下文，`/learn` 提取全局模式

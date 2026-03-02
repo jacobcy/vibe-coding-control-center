@@ -31,6 +31,18 @@ setup() {
   [[ "$output" =~ "/vibe-new <feature>" ]]
 }
 
+@test "4.2 vibe help mentions task command" {
+  run vibe help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "查看跨 worktree 的任务总览" ]]
+}
+
+@test "4.3 vibe help does not advertise unsupported skills audit subcommand" {
+  run vibe help
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "sync, check, audit" ]]
+}
+
 @test "5. invalid subcommand returns error" {
   run vibe invalidcommand
   [ "$status" -eq 1 ]

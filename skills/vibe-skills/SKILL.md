@@ -1,22 +1,40 @@
 ---
 name: vibe-skills
 description: Use when skills are messy across IDEs, unsure which are installed globally vs project-level, need to audit/clean/recommend skills, or setting up a new worktree
-category: orchestration
-trigger: manual
+user-invokable: true
 ---
 
 # Vibe Skills Manager
 
 AI 驱动的 Skills 生命周期管理。扫描 → 诊断 → 推荐 → 确认 → 执行。
-底层操作全部委托给 `npx skills`，AI 负责分析和引导确认。
+
+## 快速命令
+
+```bash
+# 一键同步所有 skills（推荐首先执行）
+vibe skills sync
+
+# 检查各 Agent 状态
+vibe skills check
+```
+
+> 💡 完整交互式审计（诊断、推荐、确认）请直接对话使用 `/vibe-skills`
+
+## 架构概览
+
+| 组件 | 管理方式 | 目标 Agents |
+|------|---------|-------------|
+| **Superpowers** | 全局 npx skills | Antigravity, Codex, Trae |
+| **Claude Code** | Plugin 机制 | `claude plugin add superpowers` |
+| **本地 vibe-*** | Symlink | .agent/, .trae/, .claude/ |
+| **OpenSpec** | 自己管理 | 不在此 skill 范围 |
 
 ## When to Use
 
 - Skills 目录混乱，不知道装了什么、装在哪里
 - 全局或项目级 skills 数量过多，想清理冗余
-- 新 worktree 建好后，想确认 skills 是否完整，并与跨工作区白名单 (`~/.vibe/skills.json`) 同步
-- **想要发现新武器时**：不知道当前项目适合安装哪些新 skills，主动要求 AI 根据 `registry.json` 推荐
-- **需要说明书时**：想生成/更新一份当前可用 skills 的使用手册（Usage Report）
+- 新 worktree 建好后，想确认 skills 是否完整
+- 想要发现新武器时：不知道当前项目适合安装哪些新 skills
 
 ## 计数排除规则
 
