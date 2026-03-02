@@ -105,13 +105,26 @@ _vibe_task_update() {
         local wt_name; wt_name=$(basename "$PWD")
         local wt_path; wt_path="$PWD"
         jq --arg id "$task_id" --arg name "$wt_name" --arg path "$wt_path" --arg t "$NOW" '
-            .tasks |= map(if .task_id == $id then .assigned_worktree = $name else . end) |
-            .worktrees |= map(if .worktree_name == $name then .current_task = $id | .status = "active" | .last_updated = $t else . end)
+            .tasks |= map(if .task_id == $id then .assigned_worktree = $name else . end)
         ' "$REGISTRY" > "$tmp" && mv "$tmp" "$REGISTRY" # Update reg with binding
         # Separate update for worktrees.json if needed
-        jq --arg id "$task_id" --arg name "$wt_name" --arg t "$NOW" '
-            .worktrees |= map(if .worktree_name == $name then .current_task = $id | .status = "active" | .last_updated = $t else . end)
-        ' "$WORKTREES" > "$tmp" && mv "$tmp" "$WORKTREES"
+        if [[ -f "$WORKTREES" ]]; then
+            jq --arg id "$task_id" --arg name "$wt_name" --arg path "$wt_path" --arg t "$NOW" '
+                if has("worktrees") and .worktrees != null then
+                    if any(.worktrees[]; .worktree_name == $name) then
+                        .worktrees |= map(if .worktree_name == $name then .current_task = $id | .status = "active" | .last_updated = $t else . end)
+                    else
+                        .worktrees += [{worktree_name: $name, path: $path, current_task: $id, status: "active", last_updated: $t}]
+                    end
+                else
+                    .worktrees = [{worktree_name: $name, path: $path, current_task: $id, status: "active", last_updated: $t}]
+                end
+            ' "$WORKTREES" > "$tmp" && mv "$tmp" "$WORKTREES"
+        else
+            jq -n --arg id "$task_id" --arg name "$wt_name" --arg path "$wt_path" --arg t "$NOW" '
+                {worktrees: [{worktree_name: $name, path: $path, current_task: $id, status: "active", last_updated: $t}]}
+            ' > "$WORKTREES"
+        fi
     fi
     log_success "Task $task_id updated"
 }

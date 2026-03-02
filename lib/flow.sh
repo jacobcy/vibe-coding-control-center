@@ -94,7 +94,7 @@ _flow_done() {
   # 1. Cleanup Worktree (Physical layer only)
   main_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); main_dir="${main_dir%/.git}"; 
   cd "$main_dir" || return 1
-  git worktree remove "$wt_dir" --force 2>/dev/null || true
+  git worktree remove "../$wt_dir" --force 2>/dev/null || true
   
   # 2. Branch cleanup
   if [[ -n "$branch" && "$branch" != "main" ]]; then
