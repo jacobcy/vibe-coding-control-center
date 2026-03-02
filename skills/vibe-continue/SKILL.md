@@ -40,7 +40,15 @@ description: Use when the user wants to resume previous work, says "/continue", 
 
 ## 工作流程
 
-### Step 1: 读取当前 task 指针与共享状态
+### Step 0: Shell-Level Resume
+ 
+ ```bash
+ vibe flow continue
+ ```
+ 
+ 运行 `vibe flow continue` 来从共享存储中恢复任务状态与上下文。
+ 
+ ### Step 1: 恢复方案（根据记忆内容）读取当前 task 指针与共享状态
 
 ```bash
 # 读取当前 worktree 指针和共享 task registry
