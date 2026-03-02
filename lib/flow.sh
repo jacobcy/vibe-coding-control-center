@@ -40,16 +40,19 @@ _flow_start_task() {
 
   registry_file="$(_flow_registry_file)"; [[ -f "$registry_file" ]] || { log_error "No registry found"; return 1; }
   title="$(_flow_task_title "$task_id" "$registry_file")"
-  if [[ -z "$title" ]]; then
-    vibe_task add "$task_id" --title "Task started via flow" >/dev/null 2>&1
-  fi
+  [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
   
   _flow_require_clean_worktree || return 1
   _flow_require_base_ref "$base" || return 1
   branch="${agent}/${task_id}"
+  _flow_branch_exists "$branch" && { log_error "Target branch already exists: $branch"; return 1; }
   git checkout -b "$branch" "origin/$base" || return 1
   _flow_set_identity "$agent" || return 1
+  echo ""
   log_success "Started task: $task_id"
+  echo "  Title     : $title"
+  echo "  Directory : ${CYAN}$PWD${NC}"
+  echo "  Branch    : ${CYAN}${branch}${NC}"
 }
 
 _flow_start() {
@@ -63,8 +66,11 @@ _flow_start() {
       *) [[ -z "$feature" ]] && feature="$1"; shift ;;
     esac
   done
+  [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"
+  [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
   [[ -n "$task_id" ]] && { _flow_start_task "$task_id" "${agent:-claude}" "$base"; return $?; }
-  _flow_start_worktree "${feature:-new-feat}" "${agent:-claude}" "$base"
+  [[ -n "$feature" ]] || { log_error "$(_flow_start_usage)"; return 1; }
+  _flow_start_worktree "$feature" "${agent:-claude}" "$base"
 }
 
 _flow_usage() {
@@ -105,10 +111,20 @@ _flow_done() {
 }
 
 _flow_sync() {
-  local current_branch=$(git branch --show-current 2>/dev/null)
+  local current_branch has_fail=0 wt_branch behind
+  current_branch=$(git branch --show-current 2>/dev/null); [[ -z "$current_branch" ]] && { log_error "Not in a git repository"; return 1; }
   while read -r wt_path; do
-    git -C "$wt_path" merge "$current_branch" --no-edit >/dev/null 2>&1 || true
+    wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null)
+    [[ "$wt_branch" == "$current_branch" ]] && continue
+    behind=$(git rev-list --count "$wt_branch".."$current_branch" 2>/dev/null || echo "0")
+    if [[ "$behind" -gt 0 ]]; then
+      if ! git -C "$wt_path" merge "$current_branch" --no-edit >/dev/null 2>&1; then
+        log_error "Merge failed for $wt_branch"
+        has_fail=1
+      fi
+    fi
   done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
+  [[ "$has_fail" -eq 1 ]] && return 1
   log_success "Branches synced."
 }
 
@@ -117,6 +133,7 @@ _flow_status() {
   [[ "${1:-}" == "--json" ]] && { json_out=1; shift; }
 
   local feature="${1:-$(_detect_feature || true)}"
+  [[ -z "$feature" && "$json_out" -eq 0 ]] && { log_error "Not in a worktree"; return 1; }
   local current_wt; current_wt=$(basename "$PWD")
   local shared_dir; shared_dir="$(_flow_shared_dir)"
   local shared_count; shared_count=$(ls -1 "$shared_dir" 2>/dev/null | wc -l | xargs)
