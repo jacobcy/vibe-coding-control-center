@@ -4,6 +4,11 @@
 [[ -z "${VIBE_ROOT:-}" ]] && { echo "error: VIBE_ROOT not set"; return 1; }
 
 vibe_clean() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: ${CYAN}vibe clean${NC}"
+    echo "  Removes temporary files and test directories from the project root."
+    return 0
+  fi
   log_step "Cleaning project temporary files..."
   
   local count=0

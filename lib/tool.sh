@@ -116,9 +116,20 @@ vibe_tool() {
         ""|status)
             _tool_status
             ;;
+        help|-h|--help)
+            echo "Usage: ${CYAN}vibe tool <command>${NC}"
+            echo ""
+            echo "Commands:"
+            echo "  ${GREEN}status${NC}    Show installation status of AI tools"
+            echo "  ${GREEN}claude${NC}    Install/Update Claude Code"
+            echo "  ${GREEN}opencode${NC}  Install/Update OpenCode"
+            echo "  ${GREEN}codex${NC}     Install/Update Codex"
+            echo "  ${GREEN}all${NC}       Install/Update all tools"
+            ;;
         *)
             log_error "Unknown tool: $target"
-            echo "Usage: vibe tool {claude|opencode|codex|all|status}"
+            echo "Run 'vibe tool --help' for usage."
+            return 1
             ;;
     esac
 }
