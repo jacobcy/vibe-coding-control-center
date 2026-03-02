@@ -65,18 +65,30 @@ echo "✅ Environment setup complete!"
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────
 if command -v git &> /dev/null && command -v jq &> /dev/null; then
   current_dir="$(basename "$PWD")"
+  current_path="$PWD"
   current_feature=""
+  current_task_id=""
   if [[ "$current_dir" =~ ^wt-[^-]+-(.+)$ ]]; then
     current_feature="${BASH_REMATCH[1]}"
   fi
 
   common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
   pending_dir="$common_dir/vibe/pending-tasks"
+  worktrees_file="$common_dir/vibe/worktrees.json"
 
-  if [[ -n "$current_feature" && -d "$pending_dir" ]]; then
+  if [[ -f "$worktrees_file" ]]; then
+    current_task_id="$(jq -r --arg worktree_path "$current_path" --arg worktree_name "$current_dir" '
+      .worktrees[]? | select(.worktree_path == $worktree_path or .worktree_name == $worktree_name) | .current_task // empty
+    ' "$worktrees_file" | head -n 1)"
+  fi
+
+  if [[ -d "$pending_dir" ]]; then
     pending_file=""
     while IFS= read -r candidate; do
-      if jq -e --arg feature "$current_feature" '.assigned_feature == $feature' "$candidate" >/dev/null 2>&1; then
+      if jq -e --arg task_id "$current_task_id" --arg feature "$current_feature" '
+        (($task_id != "") and (.task_id == $task_id))
+        or (($task_id == "") and ($feature != "") and (.assigned_feature == $feature))
+      ' "$candidate" >/dev/null 2>&1; then
         pending_file="$candidate"
         break
       fi
@@ -86,6 +98,7 @@ if command -v git &> /dev/null && command -v jq &> /dev/null; then
       task_id="$(jq -r '.task_id // empty' "$pending_file")"
       task_title="$(jq -r '.title // .assigned_feature // "Pending Task"' "$pending_file")"
       task_status="$(jq -r '.status // "todo"' "$pending_file")"
+      pending_feature="$(jq -r '.assigned_feature // empty' "$pending_file")"
 
       if [[ -n "$task_id" ]]; then
         task_dir="docs/tasks/$task_id"
@@ -125,7 +138,7 @@ gates:
 
 - source: $(jq -r '.source // "pending-task"' "$pending_file")
 - framework: $(jq -r '.framework // "vibe"' "$pending_file")
-- assigned feature: $current_feature
+- assigned feature: ${pending_feature:-$current_feature}
 
 ## 当前状态
 
@@ -134,7 +147,7 @@ gates:
 
 ## 下一步
 
-- [ ] 进入 `/vibe-new $current_feature` 流程补齐 Gate 产物
+- [ ] 进入 `/vibe-new ${pending_feature:-$current_feature}` 流程补齐 Gate 产物
 EOF
           echo "📝 Migrated pending task to $task_readme"
         fi
