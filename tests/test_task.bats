@@ -313,6 +313,30 @@ JSON
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .next_step' "$fixture/vibe/registry.json")" = "Write tests first." ]
 }
 
+@test "vibe_task update keeps task source file aligned with registry fields" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --bind-current --next-step "Synced step."
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .next_step' "$fixture/vibe/registry.json")" = "Synced step." ]
+  [ "$(jq -r '.next_step' "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json")" = "Synced step." ]
+  [ "$(jq -r '.assigned_worktree' "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json")" = "wt-claude-refactor" ]
+}
+
 @test "vibe_task update bind-current syncs worktree binding and local cache" {
   local fixture
   fixture="$(mktemp -d)"

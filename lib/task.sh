@@ -68,6 +68,44 @@ _vibe_task_write_worktrees() {
     ' "$worktrees_file" >"$tmp" && mv "$tmp" "$worktrees_file"
 }
 
+_vibe_task_write_task_file() {
+    local common_dir="$1" registry_file="$2" task_id="$3" now="$4" task_file tmp
+    local task_title task_status next_step assigned
+
+    task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
+    task_title="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .title // ""' "$registry_file")"
+    task_status="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .status // "todo"' "$registry_file")"
+    next_step="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .next_step // ""' "$registry_file")"
+    assigned="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .assigned_worktree // ""' "$registry_file")"
+
+    mkdir -p "$(dirname "$task_file")"
+    tmp="$(mktemp)" || return 1
+
+    if [[ -f "$task_file" ]]; then
+        jq --arg task_id "$task_id" --arg task_title "$task_title" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg now "$now" '
+          .task_id = $task_id
+          | .title = (if (.title // "") == "" then $task_title else .title end)
+          | .subtasks = (.subtasks // [])
+          | .status = $task_status
+          | .assigned_worktree = (if $assigned == "" then null else $assigned end)
+          | .next_step = $next_step
+          | .updated_at = $now
+        ' "$task_file" >"$tmp" && mv "$tmp" "$task_file"
+    else
+        jq -n --arg task_id "$task_id" --arg task_title "$task_title" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg now "$now" '
+          {
+            task_id: $task_id,
+            title: $task_title,
+            status: $task_status,
+            subtasks: [],
+            assigned_worktree: (if $assigned == "" then null else $assigned end),
+            next_step: $next_step,
+            updated_at: $now
+          }
+        ' >"$tmp" && mv "$tmp" "$task_file"
+    fi
+}
+
 _vibe_task_refresh_cache() {
     local common_dir="$1" registry_file="$2" task_id="$3" worktree_name="$4" now="$5" task_path title next_step subtask_json
     local vibe_dir=".vibe"; mkdir -p "$vibe_dir"; task_path="$common_dir/vibe/tasks/$task_id/task.json"
@@ -113,6 +151,7 @@ _vibe_task_update() {
     [[ "$bind_current" -eq 1 ]] && { target_name="$(basename "$PWD")"; target_path="$PWD"; worktree="$target_name"; }
     [[ -z "$target_name" ]] && target_name="$worktree"
     _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$agent" "$now" || return 1
+    _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" || return 1
     [[ "$bind_current" -eq 1 ]] && _vibe_task_refresh_cache "$common_dir" "$registry_file" "$task_id" "$target_name" "$now"
     return 0
