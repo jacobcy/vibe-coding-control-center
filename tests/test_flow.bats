@@ -9,6 +9,15 @@ setup() {
   source "$VIBE_ROOT/lib/flow.sh"
 }
 
+make_flow_task_fixture() {
+  local fixture="$1"
+
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-rotate-alignment","title":"Rotate Workflow Refinement","status":"planning","next_step":"Implement flow start."}]}
+JSON
+}
+
 @test "1. vibe flow help outputs subcommands" {
   run vibe flow help
   [ "$status" -eq 0 ]
@@ -77,4 +86,79 @@ setup() {
   '
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Merge failed for target-branch" ]]
+}
+
+@test "7. vibe flow start --task reads task metadata in current directory mode" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "fetch" && "$2" == "origin" ]]; then return 0; fi
+      if [[ "$1" == "checkout" && "$2" == "-B" ]]; then printf "%s" "$3" > "'"$fixture"'/branch-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.name" ]]; then return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.email" ]]; then return 0; fi
+      return 1
+    }
+    _flow_start --task 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$fixture/branch-name")" = "claude/2026-03-02-rotate-alignment" ]
+  [[ "$output" =~ "Rotate Workflow Refinement" ]]
+}
+
+@test "8. vibe flow start --task accepts explicit agent for branch naming" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "fetch" && "$2" == "origin" ]]; then return 0; fi
+      if [[ "$1" == "checkout" && "$2" == "-B" ]]; then printf "%s" "$3" > "'"$fixture"'/branch-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.name" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
+      return 1
+    }
+    _flow_start --task 2026-03-02-rotate-alignment --agent codex
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$fixture/branch-name")" = "codex/2026-03-02-rotate-alignment" ]
+  [ "$(cat "$fixture/git-user-name")" = "codex" ]
+  [ "$(cat "$fixture/git-user-email")" = "codex@vibe.coding" ]
+}
+
+@test "9. vibe flow start --task fails when task is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    _flow_start --task 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Task not found" ]]
 }
