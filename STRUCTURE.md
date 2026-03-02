@@ -40,14 +40,29 @@ vibe-center/
 │
 ├── config/                      # 配置文件
 │   ├── keys/                    # API 密钥配置
-│   └── aliases/                 # 命令别名
+│   └── aliases/                 # 命令别名（V3 Execution Plane）
+│       ├── worktree.sh            # Worktree 管理
+│       ├── tmux.sh                # Tmux 会话管理
+│       ├── execution-contract.sh  # 执行结果契约
+│       └── session-recovery.sh    # 会话恢复
 │
 ├── skills/                      # 技能定义（canonical source）
-│   └── */                       # 各技能目录
+│   ├── execution-plane/         # V3 Execution Plane 技能
+│   │   ├── SKILL.md              # 技能定义
+│   │   ├── wrappers.sh           # OpenClaw 封装
+│   │   ├── README.md             # 使用指南
+│   │   └── examples/             # 示例工作流
+│   └── */                       # 其他技能
 │
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
+│   ├── rules/                   # AI 规则
+│   │   └── execution-plane.md   # Execution Plane 规则（V3）
+│   ├── execution-results/       # 执行结果存储（V3）
+│   │   ├── *.json              # 执行结果文件
+│   │   └── .gitkeep
+│   └── recovery-history.log     # 恢复历史日志（V3）
 │   │   ├── task.md              # 当前任务状态
 │   │   └── memory.md            # 长期记忆
 │   ├── rules/                   # 编码规则

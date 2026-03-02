@@ -1,7 +1,107 @@
 #!/usr/bin/env zsh
 # Worktree management commands
+# Part of V3 Execution Plane
 
-alias wtls='git worktree list'
+# V3: Enhanced worktree listing with filtering
+wtlist() {
+  local filter_owner="$1" filter_task="$2"
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+
+  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
+
+  echo "Worktrees:"
+  echo "-----------"
+
+  local count=0
+  while IFS= read -r line; do
+    local path branch
+    path=$(echo "$line" | awk '{print $1}')
+    branch=$(echo "$line" | awk '{print $3}')
+
+    # Skip main worktree
+    [[ "$path" == "$main_dir" ]] && continue
+
+    # Extract worktree name
+    local wt_name="${path##*/}"
+
+    # V3: Filter by owner if specified
+    if [[ -n "$filter_owner" ]]; then
+      # Check if worktree name starts with wt-<owner>-
+      local owner_prefix="wt-${filter_owner}-"
+      [[ "$wt_name" != "$owner_prefix"* ]] && continue
+    fi
+
+    # V3: Filter by task if specified
+    if [[ -n "$filter_task" ]]; then
+      # Check if task slug is in the name
+      [[ "$wt_name" != *"$filter_task"* ]] && continue
+    fi
+
+    # Display worktree info
+    local owner task
+    if [[ "$wt_name" =~ ^wt-([^-]+)-(.+)$ ]]; then
+      owner="${match[1]}"
+      task="${match[2]}"
+    else
+      owner="unknown"
+      task="$wt_name"
+    fi
+
+    echo "  $wt_name"
+    echo "    Owner: $owner"
+    echo "    Task: $task"
+    echo "    Branch: $branch"
+    echo "    Path: $path"
+    echo ""
+
+    ((count++))
+  done < <($git_cmd -C "$main_dir" worktree list 2>/dev/null)
+
+  echo "-----------"
+  echo "Total: $count worktree(s)"
+
+  [[ $count -eq 0 ]] && {
+    [[ -n "$filter_owner$filter_task" ]] && \
+      echo "No worktrees match filters (owner=$filter_owner, task=$filter_task)" || \
+      echo "No worktrees found (use 'wtnew' to create one)"
+  }
+}
+
+# Maintain backward compatibility
+alias wtls='wtlist'
+
+# Naming convention: wt-<owner>-<task-slug>
+# Examples: wt-claude-add-user-auth, wt-opencode-fix-bug-123
+
+# Validate worktree naming convention
+_validate_worktree_name() {
+  local name="$1"
+  [[ -z "$name" ]] && { echo "Error: Empty name"; return 1; }
+
+  # Check format: wt-<owner>-<task-slug>
+  if [[ ! "$name" =~ ^wt-[a-z0-9-]+$ ]]; then
+    echo "Error: Invalid naming format"
+    echo "Expected: wt-<owner>-<task-slug>"
+    echo "Example: wt-claude-add-user-auth"
+    echo "Got: $name"
+    return 1
+  fi
+
+  # Check minimum parts
+  local parts
+  parts=(${(s/-/)name})
+  if [[ ${#parts[@]} -lt 3 ]]; then
+    echo "Error: Name must have at least 3 parts: wt-<owner>-<task>"
+    return 1
+  fi
+
+  return 0
+}
+
+# Generate auto-suffix for naming conflicts (4 chars)
+_generate_conflict_suffix() {
+  date +%s | md5sum | cut -c1-4
+}
 
 # Jump to a worktree by name
 wt() {
@@ -22,6 +122,7 @@ wt() {
 }
 
 # Create new worktree: wtnew <branch> [agent] [base]
+# V3: Auto-naming with conflict detection
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
   local branch="$1" agent="${2:-claude}" base="${3:-main}"
@@ -36,8 +137,23 @@ wtnew() {
     echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
   fi
 
+  # V3: Generate standardized worktree name
   local dir="wt-${agent}-${branch}"
   local path="${repo_root:h}/$dir"
+
+  # V3: Validate naming convention
+  if ! _validate_worktree_name "$dir"; then
+    return 1
+  fi
+
+  # V3: Handle naming conflicts with auto-suffix
+  local suffix=""
+  if [[ -e "$path" ]]; then
+    suffix=$(_generate_conflict_suffix)
+    dir="${dir}-${suffix}"
+    path="${repo_root:h}/$dir"
+    echo "⚠️  Naming conflict detected, auto-generated suffix: $suffix"
+  fi
 
   $git_cmd -C "$repo_root" fetch -p >/dev/null 2>&1 || true
   $git_cmd -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch" || \
@@ -47,7 +163,11 @@ wtnew() {
     echo "ℹ️  Worktree exists: $dir"
   else
     $git_cmd -C "$repo_root" worktree add "$path" "$branch" || return 1
-    echo "✅ Created worktree: $dir -> $branch (base: $base)"
+    if [[ -n "$suffix" ]]; then
+      echo "✅ Created worktree: $dir -> $branch (base: $base, suffix: $suffix)"
+    else
+      echo "✅ Created worktree: $dir -> $branch (base: $base)"
+    fi
   fi
 
   # Set agent identity
@@ -56,19 +176,36 @@ wtnew() {
   $git_cmd -C "$path" config user.email "$aemail"
   echo "👤 Identity: $aname <$aemail>"
   cd "$path" || return
+
+  # V3: Write execution result
+  source "${0:a:h}/execution-contract.sh" 2>/dev/null || true
+  if type write_execution_result >/dev/null 2>&1; then
+    local task_id="${branch}"  # Use branch as task_id placeholder
+    write_execution_result "$task_id" "$dir" "${agent}-${branch}" || true
+  fi
 }
 
 # Remove worktree(s): wtrm <name|path|all>
+# V3: Enhanced with confirmation prompts
 wtrm() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local arg="$1"; [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all>"
+  local arg="$1" force="$2"
+  [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all> [--force]"
 
   local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
 
   _wtrm_one() {
     local p="$1" label="${1##*/}"
     [[ "$p" == "$main_dir" ]] && { echo "⚠️  Cannot remove main worktree"; return 1; }
-    
+
+    # V3: Confirmation prompt (unless --force)
+    if [[ "$force" != "--force" ]]; then
+      echo -n "❓ Remove worktree '$label'? [y/N] "
+      local response
+      read -r response
+      [[ ! "$response" =~ ^[yY]$ ]] && { echo "ℹ️  Skipped: $label"; return 0; }
+    fi
+
     local branch_name=""
     if [[ -d "$p" ]]; then
       branch_name=$($git_cmd -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -82,7 +219,7 @@ wtrm() {
 
     if $git_cmd -C "$main_dir" worktree remove --force "$p" 2>/dev/null; then
       echo "✅ Removed: $label"
-      
+
       if [[ -n "$branch_name" && "$branch_name" != "main" && "$branch_name" != "master" ]]; then
         if $git_cmd -C "$main_dir" branch -D "$branch_name" >/dev/null 2>&1; then
            echo "🗑️  Deleted local branch: $branch_name"
@@ -114,7 +251,7 @@ wtrm() {
       [[ "${wp##*/}" == wt-* ]] && paths+=("$wp")
     done < <($git_cmd -C "$main_dir" worktree list --porcelain | awk '/^worktree /{print $2}')
     [[ ${#paths[@]} -eq 0 ]] && { echo "ℹ️  No wt-* worktrees"; return 0; }
-    echo "🗑️  Removing ${#paths[@]} worktree(s)..."
+    echo "🗑️  Found ${#paths[@]} worktree(s)..."
     for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
     local path
@@ -123,6 +260,90 @@ wtrm() {
     _wtrm_one "$path"
   fi
   $git_cmd -C "$main_dir" worktree prune >/dev/null 2>&1 || true
+}
+
+# V3: Validate worktree integrity and git status
+wtvalidate() {
+  local wt_name="$1"
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
+
+  [[ -z "$wt_name" ]] && wt_name="${PWD##*/}"  # Default to current worktree
+
+  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
+
+  # Resolve worktree path
+  local wt_path
+  if [[ "$wt_name" == /* ]]; then
+    wt_path="$wt_name"
+  elif [[ "$wt_name" == "main" ]]; then
+    wt_path="$main_dir"
+  else
+    wt_path="${main_dir:h}/$wt_name"
+  fi
+
+  [[ -d "$wt_path" ]] || { echo "❌ Worktree not found: $wt_name"; return 1; }
+
+  echo "🔍 Validating worktree: $wt_name"
+  echo "--------------------------------"
+
+  # Check naming convention
+  echo "✓ Checking naming convention..."
+  if [[ "$wt_name" =~ ^wt- ]]; then
+    if _validate_worktree_name "$wt_name"; then
+      echo "  ✅ Naming valid"
+    else
+      echo "  ⚠️  Naming invalid (expected: wt-<owner>-<task-slug>)"
+    fi
+  else
+    echo "  ℹ️  Main worktree (no naming convention)"
+  fi
+
+  # Check git status
+  echo "✓ Checking git status..."
+  if [[ -f "$wt_path/.git" || -d "$wt_path/.git" ]]; then
+    cd "$wt_path" || return 1
+
+    # Check branch
+    local branch
+    branch=$($git_cmd rev-parse --abbrev-ref HEAD 2>/dev/null)
+    echo "  Branch: $branch"
+
+    # Check tracking
+    local tracking
+    tracking=$($git_cmd rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
+    if [[ -n "$tracking" ]]; then
+      echo "  Tracking: $tracking"
+    else
+      echo "  ⚠️  No upstream tracking"
+    fi
+
+    # Check working directory cleanliness
+    local status
+    status=$($git_cmd status --porcelain 2>/dev/null)
+    if [[ -z "$status" ]]; then
+      echo "  ✅ Working directory clean"
+    else
+      local changed
+      changed=$(echo "$status" | wc -l | tr -d ' ')
+      echo "  ⚠️  Uncommitted changes: $changed files"
+    fi
+
+    # Check git integrity
+    if $git_cmd fsck --full --quiet 2>/dev/null; then
+      echo "  ✅ Git repository integrity OK"
+    else
+      echo "  ❌ Git repository corruption detected"
+      return 1
+    fi
+  else
+    echo "  ❌ Not a git worktree"
+    return 1
+  fi
+
+  echo "--------------------------------"
+  echo "✅ Validation complete"
+
+  return 0
 }
 
 # Re-sync git identity in current worktree
