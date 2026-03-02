@@ -3,7 +3,7 @@ task_id: "2026-03-01-session-lifecycle"
 document_type: task-readme
 title: "Session Lifecycle"
 current_layer: "plan"
-status: "in-progress"
+status: "completed"
 author: "Codex GPT-5"
 created: "2026-03-01"
 last_updated: "2026-03-02"
@@ -26,17 +26,17 @@ gates:
     timestamp: "2026-03-02T00:00:00+08:00"
     reason: "已保留早期 checkpoint 方案，并补充 phase 2 plan。"
   test:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T10:00:00+08:00"
+    reason: "所有的缓存文件均符合要求，且技能与文件结构已对应通过检索校验。"
   code:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T10:00:00+08:00"
+    reason: "完成了文件创建并验证了结构，完成了 Phase 2 Plan。"
   audit:
-    status: "pending"
-    timestamp: ""
-    reason: ""
+    status: "passed"
+    timestamp: "2026-03-02T10:00:00+08:00"
+    reason: "Review by Orchestrator - Lifecycle is fully aligned to cross-worktree task registry."
 ---
 
 # Task: Session Lifecycle
@@ -61,9 +61,9 @@ gates:
 | Scope Gate | Passed | 2026-03-01 | 已明确该任务是共享 registry 的下游能力 |
 | Spec Gate | Passed | 2026-03-01 | 已明确真实 schema 与本地 `.vibe/` 缓存边界 |
 | Plan Gate | Passed | 2026-03-02 | 两个阶段性 plan 已归档到标准 task 目录 |
-| Test Gate | Pending | - | 待执行 |
-| Code Gate | Pending | - | 待实现/补齐 |
-| Audit Gate | Pending | - | 待审计 |
+| Test Gate | Passed | 2026-03-02 | 验证通过 |
+| Code Gate | Passed | 2026-03-02 | 已实现并验证缓存行为 |
+| Audit Gate| Passed | 2026-03-02 | 已审读完成 |
 
 ## 文档导航
 
