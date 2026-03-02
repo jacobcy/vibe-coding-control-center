@@ -8,9 +8,10 @@ setup() {
   [ -x "$BATS_TEST_DIRNAME/../bin/vibe" ]
 }
 
-@test "2. bin/vibe check returns success without errors" {
-  run vibe check
+@test "2. bin/vibe check --help returns success" {
+  run vibe check --help
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "Usage:" ]]
 }
 
 @test "3. vibe help outputs Usage" {

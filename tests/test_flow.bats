@@ -22,11 +22,13 @@ JSON
 @test "1. vibe flow help outputs subcommands" {
   run vibe flow help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Usage: vibe flow <command>" ]]
-  [[ "$output" =~ "start" ]]
-  [[ "$output" =~ "review" ]]
-  [[ "$output" =~ "pr" ]]
+  # Check for key parts separately (output has ANSI color codes)
+  [[ "$output" =~ "Usage:" ]]
+  [[ "$output" =~ "vibe flow" ]]
+  [[ "$output" =~ "new" ]]
   [[ "$output" =~ "done" ]]
+  [[ "$output" =~ "status" ]]
+  [[ "$output" =~ "sync" ]]
 }
 
 @test "2. vibe flow start without args returns error" {
