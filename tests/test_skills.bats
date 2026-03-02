@@ -22,7 +22,7 @@ EOF
     'cd "'"$REPO_ROOT"'/docs" && HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" ../bin/vibe skills check'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "项目级: 15 个" ]]
+  [[ "$output" =~ "项目级: 16 个" ]]
 }
 
 @test "global agent symlinks target HOME/.agents/skills for trae and kiro" {
