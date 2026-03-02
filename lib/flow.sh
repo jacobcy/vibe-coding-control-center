@@ -6,6 +6,7 @@ _detect_agent() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-([^-]+)- ]
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg task_id "$1" '.tasks[]? | select(.task_id == $task_id) | .title // empty' "$2"; }
 _flow_set_identity() { git config user.name "$1" 2>/dev/null || git config user.name "$1" || return 1; git config user.email "$1@vibe.coding" 2>/dev/null || git config user.email "$1@vibe.coding"; }
+_flow_start_usage() { echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--base=main]"; }
 
 _flow_start_worktree() {
   local feature="$1" agent="$2" base="$3" wt_dir="wt-${agent}-${feature}" branch="${agent}/${feature}"
@@ -41,20 +42,21 @@ _flow_start_task() {
 
 _flow_start() {
   local feature="" task_id="" agent="claude" base="main" arg
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_start_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     arg="$1"
     case "$arg" in
-      --task) [[ $# -ge 2 ]] || { log_error "Usage: vibe flow start <feature> [--agent=claude] [--base=main]"; return 1; }; task_id="$2"; shift 2 ;;
+      --task) [[ $# -ge 2 ]] || { log_error "$(_flow_start_usage)"; return 1; }; task_id="$2"; shift 2 ;;
       --task=*) task_id="${arg#*=}"; shift ;;
-      --agent) [[ $# -ge 2 ]] || { log_error "Usage: vibe flow start <feature> [--agent=claude] [--base=main]"; return 1; }; agent="$2"; shift 2 ;;
+      --agent) [[ $# -ge 2 ]] || { log_error "$(_flow_start_usage)"; return 1; }; agent="$2"; shift 2 ;;
       --agent=*) agent="${arg#*=}"; shift ;;
-      --base) [[ $# -ge 2 ]] || { log_error "Usage: vibe flow start <feature> [--agent=claude] [--base=main]"; return 1; }; base="$2"; shift 2 ;;
+      --base) [[ $# -ge 2 ]] || { log_error "$(_flow_start_usage)"; return 1; }; base="$2"; shift 2 ;;
       --base=*) base="${arg#*=}"; shift ;;
       *) [[ -z "$feature" ]] && feature="$arg"; shift || break ;;
     esac
   done
   [[ -n "$task_id" ]] && { _flow_start_task "$task_id" "$agent" "$base"; return $?; }
-  [[ -n "$feature" ]] || { log_error "Usage: vibe flow start <feature> [--agent=claude] [--base=main]"; return 1; }
+  [[ -n "$feature" ]] || { log_error "$(_flow_start_usage)"; return 1; }
   _flow_start_worktree "$feature" "$agent" "$base"
 }
 
@@ -120,6 +122,6 @@ vibe_flow() {
     done) _flow_done "$@" ;;
     status) _flow_status "$@" ;;
     sync) _flow_sync "$@" ;;
-    *) printf "Usage: vibe flow <command>\n  start  <feature> [--agent=claude] [--base=main]  创建 worktree\n  review [feature]   Pre-PR 检查清单 + lazygit\n  pr     [feature]   生成 PR 并通过 gh 创建\n  done   [feature]   清理 worktree\n  status [feature]   查看 feature 状态\n  sync               同步当前分支的变更到其他所有 worktree 分支\n" ;;
+    *) printf "Usage: vibe flow <command>\n  start  <feature> | --task <task-id> [--agent=claude] [--base=main]  创建或重启任务流\n  review [feature]   Pre-PR 检查清单 + lazygit\n  pr     [feature]   生成 PR 并通过 gh 创建\n  done   [feature]   清理 worktree\n  status [feature]   查看 feature 状态\n  sync               同步当前分支的变更到其他所有 worktree 分支\n" ;;
   esac
 }
