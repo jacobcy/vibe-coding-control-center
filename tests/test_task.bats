@@ -4,6 +4,19 @@ setup() {
   export VIBE_ROOT="$BATS_TEST_DIRNAME/.."
 }
 
+make_task_fixture() {
+  local fixture="$1"
+  local worktree_path="$fixture/wt-claude-refactor"
+
+  mkdir -p "$fixture/vibe" "$worktree_path"
+  cat > "$fixture/vibe/worktrees.json" <<JSON
+{"schema_version":"v1","worktrees":[{"worktree_name":"wt-claude-refactor","worktree_path":"$worktree_path","branch":"claude/old-task","current_task":"old-task","status":"active","dirty":false}]}
+JSON
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[{"task_id":"old-task","title":"Old Task","status":"done","current_subtask_id":null,"assigned_worktree":"wt-claude-refactor","next_step":"Done."},{"task_id":"2026-03-02-rotate-alignment","title":"Rotate Workflow Refinement","status":"todo","current_subtask_id":null,"assigned_worktree":null,"next_step":"Start here."}]}
+JSON
+}
+
 @test "vibe_task fails outside git repository" {
   run zsh -c '
     cd /tmp
@@ -178,6 +191,175 @@ JSON
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "No update fields provided" ]]
+}
+
+@test "vibe_task update writes status to registry" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.name" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --status planning
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .status' "$fixture/vibe/registry.json")" = "planning" ]
+}
+
+@test "vibe_task update writes next step to registry" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --next-step "Write tests first."
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .next_step' "$fixture/vibe/registry.json")" = "Write tests first." ]
+}
+
+@test "vibe_task update bind-current syncs worktree binding and local cache" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --bind-current --next-step "Stay in this worktree."
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .assigned_worktree' "$fixture/vibe/registry.json")" = "wt-claude-refactor" ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-claude-refactor") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '.task_id' "$fixture/wt-claude-refactor/.vibe/current-task.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '.current_task' "$fixture/wt-claude-refactor/.vibe/session.json")" = "2026-03-02-rotate-alignment" ]
+  grep -F "task: 2026-03-02-rotate-alignment" "$fixture/wt-claude-refactor/.vibe/focus.md"
+}
+
+@test "vibe_task update writes branch for the current worktree" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --bind-current --branch claude/2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-claude-refactor") | .branch' "$fixture/vibe/worktrees.json")" = "claude/2026-03-02-rotate-alignment" ]
+}
+
+@test "vibe_task update sets allowed agent and git identity" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.name" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --agent codex --bind-current
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .agent' "$fixture/vibe/registry.json")" = "codex" ]
+  [ "$(cat "$fixture/git-user-name")" = "codex" ]
+  [ "$(cat "$fixture/git-user-email")" = "codex@vibe.coding" ]
+}
+
+@test "vibe_task update rejects unknown agent without force" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --agent "Foo Bar" --bind-current
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Unsupported agent" ]]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .agent // empty' "$fixture/vibe/registry.json")" = "" ]
+}
+
+@test "vibe_task update force-allows custom agent and slugifies email" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.name" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-name"; return 0; fi
+      if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
+      return 1
+    }
+    vibe_task update 2026-03-02-rotate-alignment --agent "Foo Bar" -f --bind-current
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .agent' "$fixture/vibe/registry.json")" = "Foo Bar" ]
+  [ "$(cat "$fixture/git-user-name")" = "Foo Bar" ]
+  [ "$(cat "$fixture/git-user-email")" = "foo-bar@vibe.coding" ]
 }
 
 @test "vibe_task renders clean state when worktree is not dirty" {
