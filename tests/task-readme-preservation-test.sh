@@ -12,6 +12,7 @@ set -euo pipefail
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo "=== Task README Preservation Tests ==="
@@ -22,6 +23,7 @@ echo ""
 total_tests=0
 passed_tests=0
 failed_tests=0
+baseline_created=0
 
 # Test helper function
 test_preservation() {
@@ -96,11 +98,12 @@ for file in "${affected_files[@]}"; do
     
     task_name=$(basename "$(dirname "$file")")
     echo "--- Testing: $task_name ---"
-    
-    # Create baseline snapshots
+
+    # Check if baseline exists
     baseline_file="$baseline_dir/${task_name}.baseline"
-    
-    # Capture baseline: frontmatter (without status), body (without status line), gate table, doc nav
+
+    # Capture current state
+    current_snapshot=$(mktemp)
     {
         echo "=== FRONTMATTER (without status) ==="
         get_frontmatter_without_status "$file"
@@ -113,7 +116,28 @@ for file in "${affected_files[@]}"; do
         echo ""
         echo "=== DOC NAVIGATION ==="
         get_doc_navigation "$file"
-    } > "$baseline_file"
+    } > "$current_snapshot"
+
+    if [[ ! -f "$baseline_file" ]]; then
+        # First run: create baseline
+        echo -e "${YELLOW}→ Creating baseline (first run)${NC}"
+        cp "$current_snapshot" "$baseline_file"
+        baseline_created=$((baseline_created + 1))
+    else
+        # Subsequent run: compare with baseline
+        if diff -q "$baseline_file" "$current_snapshot" > /dev/null 2>&1; then
+            echo -e "${GREEN}✓${NC} Content matches baseline (no regressions)"
+        else
+            echo -e "${RED}✗${NC} Content differs from baseline (regression detected)"
+            echo -e "${RED}Diff:${NC}"
+            diff -u "$baseline_file" "$current_snapshot" | head -n 20
+            failed_tests=$((failed_tests + 1))
+            rm -f "$current_snapshot"
+            continue
+        fi
+    fi
+
+    rm -f "$current_snapshot"
     
     # Test 1: Frontmatter fields (except status) exist
     test_preservation \
@@ -163,26 +187,27 @@ for file in "${affected_files[@]}"; do
     echo ""
 done
 
-echo "=== Baseline Snapshots Created ==="
-echo "Baseline files saved to: $baseline_dir/"
-echo "These snapshots capture the current state (before fix)"
-echo "After applying the fix, re-run this script to verify preservation"
-echo ""
-
 echo "=== Test Summary ==="
-echo "Total tests: $total_tests"
-echo -e "${GREEN}Passed: $passed_tests${NC}"
-if [[ $failed_tests -gt 0 ]]; then
-    echo -e "${RED}Failed: $failed_tests${NC}"
-fi
+echo "Total files tested: ${#affected_files[@]}"
 echo ""
 
+if [[ $baseline_created -gt 0 ]]; then
+    echo -e "${BLUE}Baselines created: $baseline_created${NC}"
+    echo "Run this script again to verify preservation (baseline comparison will be performed)"
+else
+    echo -e "${GREEN}Baseline comparisons: ${#affected_files[@]}${NC}"
+fi
+
+echo ""
 if [[ $failed_tests -eq 0 ]]; then
     echo -e "${GREEN}ALL PRESERVATION TESTS PASSED${NC}"
-    echo "Baseline behavior captured successfully"
+    if [[ $baseline_created -eq 0 ]]; then
+        echo "All content matches baseline - no regressions detected"
+    fi
     exit 0
 else
-    echo -e "${RED}SOME PRESERVATION TESTS FAILED${NC}"
-    echo "Check the output above for details"
+    echo -e "${RED}PRESERVATION TESTS FAILED${NC}"
+    echo -e "${RED}Regressions detected: $failed_tests${NC}"
+    echo "Check the diff output above for details"
     exit 1
 fi
