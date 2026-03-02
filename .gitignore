@@ -27,6 +27,7 @@ wt-*/
 
 # Tool-specific directories (symlinks only, see DEVELOPER.md)
 .agent/skills/
+.github/skills/
 .github/prompts/
 .trae/
 .claude/
