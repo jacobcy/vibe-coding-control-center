@@ -197,12 +197,53 @@ _flow_pr() {
 }
 
 _flow_review() {
-  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_review_usage; return 0; }; done
+  local target=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) _flow_review_usage; return 0 ;;
+      *) target="$1"; shift ;;
+    esac
+  done
+
   vibe_require git || return 1
-  local branch; branch=$(git branch --show-current)
+  [[ -z "$target" ]] && target=$(git branch --show-current)
+
   if vibe_has gh; then
-    gh pr view "$branch" --web || { log_step "No PR found for $branch. Running local health check..."; vibe check; }
+    log_step "Fetching PR status for '$target'..."
+    local pr_info; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+      log_warn "No open PR found for '$target'. Running local health check..."
+      vibe check
+      return 0
+    fi
+
+    local number=$(echo "$pr_info" | jq -r '.number')
+    local title=$(echo "$pr_info" | jq -r '.title')
+    local state=$(echo "$pr_info" | jq -r '.state')
+    local decision=$(echo "$pr_info" | jq -r '.reviewDecision // "PENDING"')
+    local mergeable=$(echo "$pr_info" | jq -r '.mergeable')
+    local url=$(echo "$pr_info" | jq -r '.url')
+    
+    echo "${BOLD}PR #$number:${NC} $title"
+    echo "${CYAN}URL:${NC} $url"
+    echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
+    
+    # Check CI Status
+    log_step "Checking CI/Checks status..."
+    gh pr checks "$target" || log_warn "No checks found or failed to fetch."
+
+    # Final Recommendation
+    if [[ "$decision" == "APPROVED" && "$mergeable" == "MERGEABLE" ]]; then
+       log_success "Ready to merge! All criteria met."
+    elif [[ "$decision" == "CHANGES_REQUESTED" ]]; then
+       log_error "Changes requested. Please address review comments."
+    elif [[ "$state" == "MERGED" ]]; then
+       log_success "PR already merged. Time to run 'vibe flow done'."
+    else
+       log_info "PR is currently active. Wait for approvals and CI success."
+    fi
   else
+    log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."
     vibe check
   fi
 }

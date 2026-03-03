@@ -38,8 +38,11 @@ _flow_pr_usage() {
 }
 
 _flow_review_usage() {
-  echo "Usage: ${CYAN}vibe flow review${NC}"
+  echo "Usage: ${CYAN}vibe flow review${NC} [<pr-number>|<branch>]"
   echo ""
-  echo "在 Web 或终端中审阅当前分支绑定的 Pull Request。"
-  echo "如果未发现 PR，则退而求其次执行本地健康检查（vibe check）。"
+  echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性）。"
+  echo "核心职责："
+  echo "  1. 状态提取：拉取云端 PR 的评审决策 (Review Decision)"
+  echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
+  echo "  3. 合并判定：自动判断当前真源是否满足 Merge 准入条件"
 }
