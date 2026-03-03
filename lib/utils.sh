@@ -2,6 +2,9 @@
 # lib/utils.sh - Unified utilities loader
 # Loads all utility modules
 
+# shellcheck disable=SC2298
+# (Zsh-specific nested parameter expansion is valid in Zsh)
+
 # ── Load Colors ──────────────────────────────────────────
 source "${${(%):-%x}:A:h}/utils/colors.sh"
 
