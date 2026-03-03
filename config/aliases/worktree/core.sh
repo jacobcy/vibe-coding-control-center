@@ -61,17 +61,20 @@ wtnew() {
     fi
   fi
 
-  # Set agent identity (capitalize first letter for name)
-  local aname="Agent-${agent^}" aemail="agent-${agent}@vibecoding.ai"
+  # Set agent identity (capitalize first letter)
+  local aname aemail
+  # Capitalize first letter (bash/zsh compatible)
+  aname="Agent-$(echo "$agent" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
+  aemail="agent-${agent}@vibecoding.ai"
+
   $git_cmd -C "$path" config user.name "$aname"
   $git_cmd -C "$path" config user.email "$aemail"
   echo "👤 Identity: $aname <$aemail>"
   cd "$path" || return
 
-  # V3: Write execution result
-  source "${0:a:h}/../execution-contract.sh" 2>/dev/null || true
+  # V3: Write execution result (contract already loaded by parent)
   if type write_execution_result >/dev/null 2>&1; then
-    local task_id="${branch}"  # Use branch as task_id placeholder
+    local task_id="${branch}"
     write_execution_result "$task_id" "$dir" "${agent}-${branch}" || true
   fi
 }
