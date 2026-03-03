@@ -133,11 +133,14 @@ _flow_sync() {
 }
 
 _flow_pr() {
-  local bump_type=""
+  local bump_type="" pr_title="" pr_body="" version_msg=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help) _flow_pr_usage; return 0 ;;
-      --bump) bump_type="${2:-patch}"; shift 2 ;;
+      --bump)    bump_type="$2"; shift 2 ;;
+      --title)   pr_title="$2"; shift 2 ;;
+      --body)    pr_body="$2"; shift 2 ;;
+      --msg)     version_msg="$2"; shift 2 ;;
       *) shift ;;
     esac
   done
@@ -146,7 +149,19 @@ _flow_pr() {
   local branch; branch=$(git branch --show-current)
   [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
   
-  # ① Strict Sequential PR Check (using gh)
+  # ① Handle Fallbacks for Manual Execution
+  local commit_logs; commit_logs=$(git log main..HEAD --oneline)
+  [[ -z "$commit_logs" ]] && { log_warn "No new commits since main. Nothing to PR."; return 1; }
+
+  [[ -z "$bump_type" ]] && bump_type="patch"
+  [[ -z "$pr_title" ]]  && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //')
+  [[ -z "$pr_body" ]]   && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
+  if [[ -z "$version_msg" ]]; then
+     local first_msg; first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //')
+     version_msg="${first_msg} ..."
+  fi
+
+  # ② Strict Sequential PR Check (using gh)
   if vibe_has gh; then
     log_step "Checking for open PRs to main..."
     local open_prs; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
@@ -157,28 +172,27 @@ _flow_pr() {
     fi
   fi
 
-  # ② Version Management (Non-interactive)
-  if [[ -n "$bump_type" ]]; then
-    log_step "Bumping version ($bump_type)..."
-    ./scripts/bump.sh "$bump_type" || return 1
-    git add VERSION CHANGELOG.md 2>/dev/null || true
-    git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
-  fi
+  # ③ Version & Changelog Update (Non-interactive)
+  log_step "Bumping version ($bump_type) and updating CHANGELOG..."
+  ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
+  git add VERSION CHANGELOG.md 2>/dev/null || true
+  git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
 
-  # ③ Push and PR Create
+  # ④ Push and PR Create
   log_step "Pushing changes to origin/$branch"
   git push origin HEAD || return 1
   
   if vibe_has gh; then
-    log_info "GitHub CLI detected. Opening PR..."
-    if gh pr view "$branch" --web 2>/dev/null; then
-       log_success "PR submitted! Viewed in browser."
+    log_info "GitHub CLI detected. Managing PR..."
+    if gh pr view "$branch" --json number >/dev/null 2>&1; then
+       log_success "Updating existing PR..."
+       gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
     else
-       echo "💡 Tip: Creating PR with 'gh pr create'..."
-       gh pr create --fill --web || log_warn "Failed to create PR with gh, please check manually."
+       log_step "Creating new PR: $pr_title"
+       gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
     fi
   else
-    log_success "Changes pushed. Please create/view PR on your Git provider."
+    log_success "Changes pushed. Please create/view PR manually."
   fi
 }
 

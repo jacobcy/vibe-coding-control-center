@@ -35,6 +35,7 @@ echo "$new_v" > "$vfile"
 # Update CHANGELOG.md if it exists
 if [[ -f "$clfile" ]]; then
     today=$(date +"%Y-%m-%d")
+    desc="${2:-"Automated version bump and updates."}"
     # Check if this version header already exists
     if grep -q "## \[$new_v\]" "$clfile"; then
         echo "Note: Version $new_v already exists in CHANGELOG.md"
@@ -46,7 +47,8 @@ if [[ -f "$clfile" ]]; then
             echo "## [$new_v] - $today"
             echo ""
             echo "### ✨ Changed"
-            echo "- Automated version bump to $new_v"
+            # Split newlines in desc if provided as multi-line string
+            echo "$desc" | sed 's/^/- /'
             echo ""
             tail -n +3 "$clfile"
         } > "$tmp_cl"

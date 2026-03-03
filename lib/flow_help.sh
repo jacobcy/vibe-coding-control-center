@@ -25,15 +25,16 @@ _flow_start_usage() {
 }
 
 _flow_pr_usage() {
-  echo "Usage: ${CYAN}vibe flow pr${NC} [--bump <type>]"
+  echo "Usage: ${CYAN}vibe flow pr${NC} [options]"
   echo ""
   echo "提交当前工作区的修改并创建/更新 Pull Request。"
-  echo "核心逻辑："
-  echo "  1. 执行串行校验：检查是否有指向 main 的冲突 PR"
-  echo "  2. 物理执行：git push 并利用 gh pr 建立关联"
+  echo "核心职责：执行串行检查 -> 自动处理版本与 CHANGELOG -> 物理 Push -> 云端 PR 关联"
   echo ""
   echo "选项："
-  echo "  --bump <type>   自动执行版本升级 (patch|minor|major)"
+  echo "  --bump <type>    自动版本升级 (patch|minor|major, 默认: patch)"
+  echo "  --title <text>   PR 的标题 (默认: 首条 commit 标题)"
+  echo "  --body <text>    PR 的正文描述 (默认: 所有 commit 列表)"
+  echo "  --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)"
 }
 
 _flow_review_usage() {
