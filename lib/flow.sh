@@ -199,8 +199,8 @@ vibe_flow() {
     done)      shift; _flow_done "$@" ;;
     status)    shift; _flow_status "$@" ;;
     sync)      _flow_sync ;;
-    pr)        _flow_pr ;;
-    review)    _flow_review ;;
+    pr)        shift; _flow_pr "$@" ;;
+    review)    shift; _flow_review "$@" ;;
     *)         _flow_usage ;;
   esac
 }
