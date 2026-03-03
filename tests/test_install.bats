@@ -41,7 +41,7 @@ exit 0
 EOF
   chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec"
 
-  run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/install.sh"'
+  run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
 
   [ "$status" -eq 0 ]
   [ -f "$readme" ]
@@ -88,7 +88,7 @@ exit 0
 EOF
   chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec"
 
-  run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/install.sh"'
+  run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Skip pending task with unsafe task_id" ]]

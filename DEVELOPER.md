@@ -30,15 +30,15 @@
 ### 2.2 Setup（自动化环境准备）
 
 ```bash
-./install.sh
+./scripts/init.sh
 ```
 
-当你执行 `vibe flow start <feature>` 创建新工作区时，`install.sh` 会自动运行，完成以下工作：
+当你执行 `vibe flow start <feature>` 创建新工作区时，`scripts/init.sh` 会自动运行，完成以下工作：
 1. 安装并配置 `openSpec` 和 `Superpowers`
 2. 在 `.agent/skills/` 建立项目自有技能和第三方技能的符号链接
 3. 为 Trae 编辑器用户准备相同的技能环境
 
-手动创建 worktree 时需要手动运行一次 `./install.sh`。
+手动创建 worktree 时需要手动运行一次 `./scripts/init.sh`。
 
 ### 2.3 验证环境
 ```bash
@@ -196,7 +196,7 @@ bin/vibe flow start <feature-name>
 这会：
 - 创建 `wt-claude-<feature>` 目录（git worktree）
 - 切换到新分支
-- 自动运行 `install.sh` 准备环境
+- 自动运行 `scripts/init.sh` 准备环境
 - 生成 `docs/prds/<feature>.md` 的 PRD 模板
 
 ### Step 2：写 PRD（先写需求，再写代码）
