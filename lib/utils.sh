@@ -5,14 +5,24 @@
 # shellcheck disable=SC2298
 # (Zsh-specific nested parameter expansion is valid in Zsh)
 
+# ── Determine Script Directory (Bash/Zsh compatible) ───────
+# Get the directory where this script is located
+if [[ -n "$ZSH_VERSION" ]]; then
+    # Zsh: use Zsh-specific syntax
+    _utils_script_dir="${${(%):-%x}:A:h}"
+else
+    # Bash: use BASH_SOURCE
+    _utils_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 # ── Load Colors ──────────────────────────────────────────
-source "${${(%):-%x}:A:h}/utils/colors.sh"
+source "$_utils_script_dir/utils/colors.sh"
 
 # ── Load Logging ─────────────────────────────────────────
-source "${${(%):-%x}:A:h}/utils/logging.sh"
+source "$_utils_script_dir/utils/logging.sh"
 
 # ── Load Helpers ──────────────────────────────────────────
-source "${${(%):-%x}:A:h}/utils/helpers.sh"
+source "$_utils_script_dir/utils/helpers.sh"
 
 # ── Version ───────────────────────────────────────────────
 get_vibe_version() {
