@@ -8,7 +8,7 @@ setup() {
   source "$VIBE_ROOT/config/aliases/worktree.sh"
   source "$VIBE_ROOT/config/aliases/tmux.sh"
   source "$VIBE_ROOT/config/aliases/execution-contract.sh"
-  source "$VIBE_ROOT/config/aliases/session-recovery.sh
+  source "$VIBE_ROOT/config/aliases/session-recovery.sh"
 
   # Mock git commands for testing
   export VIBE_GIT_MOCK=1
