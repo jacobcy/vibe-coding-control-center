@@ -284,6 +284,7 @@ vibe_flow() {
     start|new) shift; _flow_start "$@" ;;
     done)      shift; _flow_done "$@" ;;
     status)    shift; _flow_status "$@" ;;
+    list)      shift; _flow_list "$@" ;;
     sync)      _flow_sync ;;
     pr)        shift; _flow_pr "$@" ;;
     review)    shift; _flow_review "$@" ;;

@@ -10,7 +10,8 @@ _flow_usage() {
   echo "  ${GREEN}start${NC} <feature> [--agent <name>] [--branch <ref>]   注册任务 + 创建沙盒 + 绑定"
   echo "  ${GREEN}start${NC} --task <task-id> [--agent <name>]              在当前 worktree 内领取已注册任务"
   echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
-  echo "  ${GREEN}status${NC} [<feature>]                                   查看沙盒状态与物理变动"
+  echo "  ${GREEN}status${NC} [<feature>]                                   查看当前分支状态 (默认: 当前分支)"
+  echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
   echo "  ${GREEN}sync${NC}                                                 同步当前变更至所有 worktree"
   echo "  ${GREEN}pr${NC}                                                   提交代码并打开 Pull Request"
   echo "  ${GREEN}review${NC}                                               查看 PR 或进行本地最终检查"
@@ -45,4 +46,14 @@ _flow_review_usage() {
   echo "  1. 状态提取：拉取云端 PR 的评审决策 (Review Decision)"
   echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
   echo "  3. 合并判定：自动判断当前真源是否满足 Merge 准入条件"
+}
+
+_flow_list_usage() {
+  echo "Usage: ${CYAN}vibe flow list${NC}"
+  echo ""
+  echo "查看全部分支状态（所有 worktree 的任务进度和物理变动）。"
+  echo "输出包括："
+  echo "  - 每个 worktree 的 task 绑定"
+  echo "  - 每个 worktree 的 dirty 状态"
+  echo "  - 共享上下文文件数量"
 }
