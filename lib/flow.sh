@@ -133,36 +133,36 @@ _flow_sync() {
 }
 
 _flow_pr() {
-  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_pr_usage; return 0; }; done
+  local bump_type=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) _flow_pr_usage; return 0 ;;
+      --bump) bump_type="${2:-patch}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
   vibe_require git || return 1
   local branch; branch=$(git branch --show-current)
   [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
   
   # ① Strict Sequential PR Check (using gh)
   if vibe_has gh; then
-    log_step "Checking for existing open Pull Requests to main..."
-    # Only block if there's an open PR targeting 'main' that isn't the current branch
+    log_step "Checking for open PRs to main..."
     local open_prs; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
     if [[ -n "$open_prs" ]]; then
-      log_warn "Blocking PR creation: Another open PR to 'main' detected. Vibe requires sequential merging to 'main' to avoid version/registry conflicts."
+      log_warn "Blocking: Sequential merge required. Other open PRs to 'main' detected."
       echo "$open_prs" | sed 's/^/  - /'
-      echo "💡 Tip: Merge or close existing PRs to 'main' before submitting new changes."
       return 1
     fi
   fi
 
-  # ② Version Management Check
-  if [[ -f "VERSION" ]]; then
-    local current_v; current_v=$(cat VERSION | tr -d '[:space:]')
-    echo "${CYAN}Current Project Version:${NC} $current_v"
-    if confirm_action "Bump project version and update CHANGELOG before pushing?"; then
-       echo -n "Select bump type [patch|minor|major] (default: patch): "
-       read -r bump_type
-       [[ -z "$bump_type" ]] && bump_type="patch"
-       ./scripts/bump.sh "$bump_type" || return 1
-       git add VERSION CHANGELOG.md 2>/dev/null || true
-       git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
-    fi
+  # ② Version Management (Non-interactive)
+  if [[ -n "$bump_type" ]]; then
+    log_step "Bumping version ($bump_type)..."
+    ./scripts/bump.sh "$bump_type" || return 1
+    git add VERSION CHANGELOG.md 2>/dev/null || true
+    git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
   fi
 
   # ③ Push and PR Create

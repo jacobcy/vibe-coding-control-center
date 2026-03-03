@@ -25,13 +25,15 @@ _flow_start_usage() {
 }
 
 _flow_pr_usage() {
-  echo "Usage: ${CYAN}vibe flow pr${NC}"
+  echo "Usage: ${CYAN}vibe flow pr${NC} [--bump <type>]"
   echo ""
   echo "提交当前工作区的修改并创建/更新 Pull Request。"
   echo "核心逻辑："
   echo "  1. 执行串行校验：检查是否有指向 main 的冲突 PR"
-  echo "  2. 版本与日志审计：询问并执行版本 Bump 及 CHANGELOG 更新"
-  echo "  3. 物理执行：git push 并利用 gh pr 建立关联"
+  echo "  2. 物理执行：git push 并利用 gh pr 建立关联"
+  echo ""
+  echo "选项："
+  echo "  --bump <type>   自动执行版本升级 (patch|minor|major)"
 }
 
 _flow_review_usage() {

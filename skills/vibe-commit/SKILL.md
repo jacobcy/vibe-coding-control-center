@@ -21,10 +21,11 @@ trigger: auto
 5. **Interactive Confirmation**: 将分类结果及草拟的提交列出来，**明确提请用户检查并确认**。
 6. **Execution Recommendations**: 用户确认后，提取并正式执行 `git add ...` 及 `git commit -m "..."`。
 7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您发起 Pull Request 发布流程？"
-   - **核心提醒**：向用户明确，通过执行 `vibe flow pr` (底层由 AI 调用或引导用户执行)，系统会自动进行 **版本号 Bump** 和 **串行冲突检查**。
-   - **操作流程**：
-     - 调用 `vibe flow pr` 进行物理环境检查。
-     - 自动或引导用户执行重构后的版本升级逻辑。
+   - **交互策略**：
+     - 若用户同意，询问用户本次升级的级别（`patch` / `minor` / `major`）。
+     - 根据任务的 README 设计与变更记录，预览并确认 `CHANGELOG.md` 的增补内容。
+   - **操作执行**：
+     - 确认环境无冲突后，调用物理真源命令：`vibe flow pr --bump <type>`。
    - 创建成功后，立刻提示用户"不要忘记在 AI 助手中收口该任务！（执行 `/vibe-done`）"。
 
 ## Expected Output Format
