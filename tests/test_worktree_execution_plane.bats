@@ -6,7 +6,7 @@ load test_utils
 setup() {
   setup_test_env
   # Source the worktree functions
-  source "$VIBE_ROOT/config/aliases/worktree.sh
+  source "$VIBE_ROOT/config/aliases/worktree.sh"
 }
 
 @test "validate worktree naming - valid format" {

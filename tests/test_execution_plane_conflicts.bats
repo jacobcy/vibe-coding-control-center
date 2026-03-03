@@ -5,8 +5,8 @@ load test_utils
 
 setup() {
   setup_test_env
-  source "$VIBE_ROOT/config/aliases/worktree.sh
-  source "$VIBE_ROOT/config/aliases/tmux.sh
+  source "$VIBE_ROOT/config/aliases/worktree.sh"
+  source "$VIBE_ROOT/config/aliases/tmux.sh"
 }
 
 @test "Conflict: Auto-suffix generation uniqueness" {

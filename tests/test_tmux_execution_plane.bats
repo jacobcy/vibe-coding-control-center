@@ -6,7 +6,7 @@ load test_utils
 setup() {
   setup_test_env
   # Source the tmux functions
-  source "$VIBE_ROOT/config/aliases/tmux.sh
+  source "$VIBE_ROOT/config/aliases/tmux.sh"
 }
 
 @test "validate tmux session naming - valid format" {

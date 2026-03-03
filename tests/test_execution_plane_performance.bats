@@ -6,8 +6,8 @@ load test_utils
 setup() {
   setup_test_env
   source "$VIBE_ROOT/config/aliases/session-recovery.sh
-  source "$VIBE_ROOT/config/aliases/worktree.sh
-  source "$VIBE_ROOT/config/aliases/tmux.sh
+  source "$VIBE_ROOT/config/aliases/worktree.sh"
+  source "$VIBE_ROOT/config/aliases/tmux.sh"
 }
 
 @test "Performance: Recovery time < 30 seconds" {
@@ -68,7 +68,7 @@ setup() {
 }
 
 @test "Performance: Query by task_id < 1 second" {
-  source "$VIBE_ROOT/config/aliases/execution-contract.sh
+  source "$VIBE_ROOT/config/aliases/execution-contract.sh"
 
   # Setup
   wtnew perf-query claude main || true
