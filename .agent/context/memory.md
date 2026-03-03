@@ -123,12 +123,39 @@ vibe task update <task-id> --next-step <step>
 
 ---
 
+## 2026-03-04: PR Automation and Real-time Auditing
+
+### 核心共识
+
+1. **确定性发布原则 (Tier 1 Determinism)**：
+   - `vibe flow pr` 作为物理真源，必须是无交互（Non-interactive）且参数化的。
+   - 交互意图（如选择 Bump 级别、撰写摘要）由 Tier 2 (Skills) 负责，通过 CLI 参数传递给 Tier 1。
+
+2. **核心发布三要素 (PR Metadata Tripod)**：
+   - PR 携带三个维度的元数据：`Title` (PR 标题)、`Body` (详细描述)、`Msg` (写入 CHANGELOG 的 Release Note)。
+   - 脚本支持自动 Fallback：若未传入，则从 Git Commit History 自动提取。
+
+3. **实时真源审计 (Living Auditor)**：
+   - `vibe flow review` 不再只是链接跳转，而是 CI 和 Review 状态的实时探测器。
+   - 具备“防抖”能力：支持对 PENDING 状态的 CI 进行 3x30s 的轮询等待。
+   - 具备“决策”能力：根据 `ReviewDecision` 和 `statusCheckRollup` 给出明确的 "Ready to merge" 或 "Blocked" 指令。
+
+### 关键定义
+
+| 概念 | 定义 |
+|------|------|
+| 串行发布墙 | `vibe flow pr` 强制检查指向 `main` 的 Open PR，防止版本冲突。 |
+| 自动 Patch | 手动执行无参数 PR 时，默认执行 patch 级的 version bump。 |
+| 无感审计 | 使用 `PAGER=cat` 屏蔽交互式窗口，直接将 PR 状态平铺于终端。 |
+
+---
+
 ## 相关文档
 
 - [Task README](../docs/tasks/2026-03-02-command-slash-alignment/README.md)
-- [Plan v1](../docs/tasks/2026-03-02-command-slash-alignment/plan-v1.md)
+- [PR Automation Design](#2026-03-04-pr-automation-and-real-time-auditing)
 - [Scope Gate Review](../docs/tasks/2026-03-02-command-slash-alignment/README.md) (在 README 中)
 
 ---
 
-_Last Updated: 2026-03-03_
+_Last Updated: 2026-03-04_
