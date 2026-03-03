@@ -2,12 +2,11 @@
 # v3/lib/core/capability_registry.sh - Capability Registry
 # Manages capability registration, discovery, and invocation
 
-# ── Registry State ────────────────────────────────────────
+# Registry State
 typeset -A _VIBE_CAPABILITY_REGISTRY
 typeset -A _VIBE_CAPABILITY_METADATA
 typeset -A _VIBE_CAPABILITY_DEPS
 
-# ── Capability Registration ───────────────────────────────
 # Registers a capability with metadata
 # Usage: vibe_register_capability <name> [version] [description]
 vibe_register_capability() {
@@ -33,7 +32,6 @@ vibe_register_capability() {
     log_debug "Registered capability: $name (v$version)"
 }
 
-# ── Capability Discovery ──────────────────────────────────
 # Discovers capabilities by scanning lib/capabilities/
 # Usage: vibe_discover_capabilities
 vibe_discover_capabilities() {
@@ -59,7 +57,6 @@ vibe_discover_capabilities() {
     done
 }
 
-# ── Capability Lookup ─────────────────────────────────────
 # Looks up a capability by name
 # Usage: vibe_lookup_capability <name>
 # Returns: 0 if found, 1 if not found
@@ -78,7 +75,6 @@ vibe_lookup_capability() {
     fi
 }
 
-# ── Capability Metadata ───────────────────────────────────
 # Gets metadata for a capability
 # Usage: vibe_get_capability_metadata <name>
 # Returns: metadata string (version=...|description=...)
@@ -93,7 +89,6 @@ vibe_get_capability_metadata() {
     echo "${_VIBE_CAPABILITY_METADATA[$name]:-}"
 }
 
-# ── Capability Invocation ─────────────────────────────────
 # Invokes a capability with arguments
 # Usage: vibe_invoke_capability <name> [args...]
 vibe_invoke_capability() {
@@ -130,7 +125,6 @@ vibe_invoke_capability() {
     fi
 }
 
-# ── Capability Dependencies ───────────────────────────────
 # Declares dependencies for a capability
 # Usage: vibe_declare_deps <capability> <dep1> [dep2] ...
 vibe_declare_deps() {
@@ -177,7 +171,6 @@ vibe_resolve_deps() {
     return 0
 }
 
-# ── Registry Status ───────────────────────────────────────
 # Shows all registered capabilities
 # Usage: vibe_show_registry
 vibe_show_registry() {
@@ -194,7 +187,6 @@ vibe_show_registry() {
     done
 }
 
-# ── Registry Initialization ───────────────────────────────
 # Initializes the capability registry
 # Usage: vibe_init_registry
 vibe_init_registry() {

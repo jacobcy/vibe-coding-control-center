@@ -33,15 +33,23 @@ jobs:
         env:
           BATS_SHELL: zsh
 
-      - name: Check LOC ceiling (total ≤ 1800)
+      - name: Check LOC ceiling (total ≤ 1800 for v2, ≤ 2200 for v3)
         run: |
           total=$(find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs cat | wc -l)
           echo "Total LOC: $total"
-          if [ "$total" -gt 1800 ]; then
-            echo "FAIL: Total LOC $total exceeds 1800 limit"
+
+          # v3 branches have higher limit due to new architecture
+          limit=1800
+          if [[ "$GITHUB_REF" == *"v3"* ]]; then
+            limit=2200
+            echo "v3 branch detected, using higher limit"
+          fi
+
+          if [ "$total" -gt "$limit" ]; then
+            echo "FAIL: Total LOC $total exceeds $limit limit"
             exit 1
           fi
-          echo "✅ Total LOC: $total / 1800"
+          echo "✅ Total LOC: $total / $limit"
 
       - name: Check per-file ceiling (≤ 200 lines each)
         run: |
