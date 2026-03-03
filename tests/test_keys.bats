@@ -2,13 +2,17 @@
 
 setup() {
   export PATH="$BATS_TEST_DIRNAME/../bin:$PATH"
-  export VIBE_ROOT="$BATS_TEST_DIRNAME/.."
   # Create a temp directory for safe testing without affecting actual config
   export TEMP_TEST_DIR=$(mktemp -d)
+  export VIBE_ROOT="$TEMP_TEST_DIR"
   
   # Inject overriding config into VIBE_ROOT environment variables for testing
   export VIBE_CONFIG="$TEMP_TEST_DIR/config"
   mkdir -p "$VIBE_CONFIG"
+
+  # Link bin and lib so the scripts can still be found
+  ln -s "$BATS_TEST_DIRNAME/../bin" "$VIBE_ROOT/bin"
+  ln -s "$BATS_TEST_DIRNAME/../lib" "$VIBE_ROOT/lib"
 }
 
 teardown() {

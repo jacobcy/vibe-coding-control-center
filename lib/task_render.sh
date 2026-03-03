@@ -3,22 +3,47 @@
 
 _vibe_task_render() {
     local worktrees_file="$1" registry_file="$2" openspec_tasks_file="$3" show_all="$4" current_task_id="$5"
-    echo "${BOLD}==== Vibe Task Registry ====${NC}"
+    echo "${BOLD}==== Vibe Task Registry Overview ====${NC}"
     echo ""
     jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" \
       --arg cur "$current_task_id" --arg show_all "$show_all" \
       --arg BOLD "$BOLD" --arg GREEN "$GREEN" --arg CYAN "$CYAN" --arg NC "$NC" \
       '
-      ((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all 
-      | {
-          current: ($all | map(select(.task_id == $cur))),
-          active: ($all | map(select(.task_id != $cur and ((.status // "") != "completed" and (.status // "") != "archived" and (.status // "") != "done" and (.status // "") != "skipped")))),
-          completed: ($all | map(select(.task_id != $cur and ((.status // "") == "completed" or (.status // "") == "archived" or (.status // "") == "done" or (.status // "") == "skipped"))))
-        } as $groups
+      ((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all_tasks 
+      | .worktrees as $wts
       | (
-          if ($groups.current | length) > 0 then ["\($GREEN)\($BOLD)● Current Task\($NC)", ($groups.current[] | "  - \(.task_id) \(.title) [\(.status)]\n    Next: \(.next_step // "No plan")"), ""] else [] end,
-          if ($groups.active | length) > 0 then ["\($CYAN)\($BOLD)○ Other Active Tasks\($NC)", ($groups.active[] | "  - \(.task_id) \(.title) [\(.status)]\n    Next: \(.next_step // "No plan")"), ""] else [] end,
-          if ($show_all == "1" and ($groups.completed | length) > 0) then ["\($NC)\($BOLD)◌ Completed/Archived Tasks\($NC)", ($groups.completed[] | "  - \(.task_id) \(.title) [\(.status)]"), ""] else [] end
-        ) | flatten | .[]
+          # 1. Render Worktree Groups
+          ($wts[] | 
+            (.worktree_name) as $wn |
+            (.current_task) as $ct |
+            (.tasks // []) as $ids |
+            
+            # Determine if this is the focused worktree
+            (($wts[] | select(.current_task == $cur or (.tasks // [] | index($cur) != null)) | .worktree_name) == $wn) as $is_cur_wt |
+
+            # Map to task objects
+            ($all_tasks | map(select(.task_id as $tid | $ids | index($tid) != null))) as $wt_tasks |
+
+            if ($wt_tasks | length) > 0 then
+              (if $is_cur_wt then "\($GREEN)\($BOLD)● WORKTREE: \($wn)\($NC)" else "\($CYAN)\($BOLD)○ WORKTREE: \($wn)\($NC)" end),
+              ($wt_tasks[] | 
+                (if .task_id == $ct then "  [Main] " else "  [Sub ] " end) + 
+                "\(.task_id) \(.title) [\(.status)]" +
+                (if .task_id == $cur then " \($GREEN)(focused)\($NC)" else "" end)
+              ),
+              ""
+            else empty end
+          ),
+
+          # 2. Render Unassigned Tasks
+          (($all_tasks | map(select(.assigned_worktree == null and (.task_id as $tid | ($wts | map(.tasks // []) | flatten | index($tid)) == null))) |
+            map(select($show_all == "1" or (.status != "completed" and .status != "archived" and .status != "done" and .status != "skipped")))) as $u_tasks |
+            if ($u_tasks | length) > 0 then
+              "\($NC)\($BOLD)Unassigned Tasks\($NC)",
+              ($u_tasks[] | "  - \(.task_id) \(.title) [\(.status)]"),
+              ""
+            else empty end
+          )
+        )
       )' "$worktrees_file"
 }

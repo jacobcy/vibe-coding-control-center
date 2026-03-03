@@ -7,17 +7,17 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}start${NC} <feature> [--agent <name>] [--base <ref>]   注册任务 + 创建沙盒 + 绑定"
-  echo "  ${GREEN}start${NC} --task <task-id> [--agent <name>]            在当前 worktree 内领取已注册任务"
-  echo "  ${GREEN}done${NC}                                               结项并彻底清理当前环境"
-  echo "  ${GREEN}status${NC} [<feature>]                                 查看沙盒状态与物理变动"
-  echo "  ${GREEN}sync${NC}                                               同步当前变更至所有 worktree"
+  echo "  ${GREEN}start${NC} <feature> [--agent <name>] [--branch <ref>]   注册任务 + 创建沙盒 + 绑定"
+  echo "  ${GREEN}start${NC} --task <task-id> [--agent <name>]              在当前 worktree 内领取已注册任务"
+  echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
+  echo "  ${GREEN}status${NC} [<feature>]                                   查看沙盒状态与物理变动"
+  echo "  ${GREEN}sync${NC}                                                 同步当前变更至所有 worktree"
   echo ""
   echo "Options for 'start <feature>':"
-  echo "  --agent <name>    指定 AI 身份 (默认: claude)"
-  echo "  --base <ref>      指定基础分支 (默认: main)"
+  echo "  --agent <name>     指定 AI 身份 (默认: claude)"
+  echo "  --branch <ref>     指定基础分支 (默认: main)"
 }
 
 _flow_start_usage() { 
-    echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--base=main]"
+    echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--branch=main]"
 }

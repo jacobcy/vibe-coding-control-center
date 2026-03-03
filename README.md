@@ -27,12 +27,21 @@ vibe keys <list|set|get|init>
 vibe flow <start|review|pr|done|status|sync>
 ```
 
-## 结构
-- `bin/` CLI 入口
-- `lib/` 核心模块
-- `config/` 配置与 aliases
-- `skills/` Agent 技能
-- `.agent/` 规则、上下文、工作流
+## 架构分层 (三层解耦)
+Vibe Center 3.0 推行了极其稳定的抽象分层模型：
+
+1. **Tier 3 (认知层 & 流程编排): Supervisor (Vibe Gate)**
+   - 开发流程式的宪法，如 OpenSpec 与 Vibe Gate，决定需求的进入和交付规范。
+2. **Tier 2 (胶水层 & 智能辅助): Vibe Skills (Slash Commands)**
+   - `skills/` 下的指令代理 (`/vibe-task`, `/vibe-save` 等)，纯靠只读与派发请求工作。它们包装了底层的复杂性，专门向 AI 提供上下文拼装能力。
+3. **Tier 1 (物理真源层 & 绝对执行): Shell Commands & Aliases**
+   - Vibe Shell 组 (`vibe flow`, `vibe task`) 和基于 Zsh 的 Alias 工具组 (`wtnew`)。只在这里进行数据源（`registry.json`）与分支的物理读写。
+
+## 结构目录语义
+- `bin/` & `lib/` (Tier 1): CLI 和核心执行器（物理源）
+- `config/` (Tier 1): Alias 定义及配置文件
+- `skills/` (Tier 2): Vibe Agent Slash 技能库所在处
+- `.agent/`: (Tier 3): 流程、规则和智能上下文（含跨团队共识 `memory.md` 与本地未追踪的忽略缓冲区 `task.md`）
 
 ## 文档
 

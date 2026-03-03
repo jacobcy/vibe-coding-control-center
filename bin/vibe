@@ -6,8 +6,7 @@ set -e
 
 # ── Context ─────────────────────────────────────────────
 VIBE_SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
-VIBE_ROOT="$(cd "$VIBE_SCRIPT_DIR/.." && pwd)"
-export VIBE_ROOT
+export VIBE_ROOT="${VIBE_ROOT:-$(cd "$VIBE_SCRIPT_DIR/.." && pwd)}"
 
 source "$VIBE_ROOT/lib/config.sh"
 

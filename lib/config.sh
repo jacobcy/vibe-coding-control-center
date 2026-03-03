@@ -3,16 +3,27 @@
 # Target: ~40 lines | Single source of truth for paths
 
 # ── VIBE_ROOT Detection ─────────────────────────────────
-# Always resolve from this script's location (one level up from lib/).
-# Never inherit from parent shell to prevent cross-worktree contamination.
-VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
-export VIBE_ROOT
+# Always resolve from this script's location (one level up from lib/) if not overridden.
+# Never inherit from parent shell to prevent cross-worktree contamination by default.
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    _SCRIPT_PATH="${(%):-%x}"
+else
+    _SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+fi
+_DETECTED_ROOT="$(cd "$(dirname "$_SCRIPT_PATH")/.." && pwd)"
 
-# ── Core Directories ────────────────────────────────────
-# All paths derived from VIBE_ROOT to ensure worktree isolation.
-export VIBE_BIN="$VIBE_ROOT/bin"
-export VIBE_LIB="$VIBE_ROOT/lib"
-export VIBE_CONFIG="$VIBE_ROOT/config"
+if [[ -n "${VIBE_ROOT:-}" && "$VIBE_ROOT" != "$_DETECTED_ROOT" ]]; then
+    # Overridden (likely a test or nested context)
+    export VIBE_BIN="${VIBE_BIN:-$VIBE_ROOT/bin}"
+    export VIBE_LIB="${VIBE_LIB:-$VIBE_ROOT/lib}"
+    export VIBE_CONFIG="${VIBE_CONFIG:-$VIBE_ROOT/config}"
+else
+    # Normal usage or matches - Force derivation to prevent contamination (Rule 7)
+    export VIBE_ROOT="$_DETECTED_ROOT"
+    export VIBE_BIN="$VIBE_ROOT/bin"
+    export VIBE_LIB="$VIBE_ROOT/lib"
+    export VIBE_CONFIG="$VIBE_ROOT/config"
+fi
 export VIBE_AGENT="${VIBE_AGENT:-$VIBE_ROOT/.agent}"
 
 # ── Load Utils ──────────────────────────────────────────

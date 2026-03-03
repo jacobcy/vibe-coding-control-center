@@ -16,21 +16,46 @@ _vibe_task_write_registry() {
 }
 
 _vibe_task_write_worktrees() {
-    local worktrees_file="$1" target_name="$2" target_path="$3" task_id="$4" branch="$5" agent="$6" bind_current="$7" now="$8" tmp
-    [[ -n "$target_name" || -n "$target_path" ]] || return 0
+    local worktrees_file="$1" target_name="$2" target_path="$3" task_id="$4" branch="$5" agent="$6" bind_current="$7" now="$8" unassign="$9" tmp
+    # echo "DEBUG: wt_file=$worktrees_file target=$target_name task=$task_id bind=$bind_current unassign=$unassign" >&2
     tmp="$(mktemp)" || return 1
-    jq --arg target_name "$target_name" --arg target_path "$target_path" --arg task_id "$task_id" --arg branch "$branch" --arg agent "$agent" --arg now "$now" --argjson bind_current "$bind_current" '
-      .worktrees = ((.worktrees // []) as $items | ([ $items[] | select(.worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path)) ] | length) as $hits
-        | if $hits == 0 and $bind_current then
-            $items + [{worktree_name:$target_name, worktree_path:$target_path, branch:($branch | select(. != "")), current_task:$task_id, status:"active", dirty:false, agent:($agent | select(. != "")), last_updated:$now}]
-          else
-            $items | map(if .worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path) then
-              (if $target_path != "" then .worktree_path = $target_path else . end)
-              | (if $branch != "" then .branch = $branch else . end)
-              | (if $agent != "" then .agent = $agent else . end)
-              | (if $bind_current then .current_task = $task_id | .status = "active" else . end)
+    jq --arg target_name "$target_name" --arg target_path "$target_path" --arg task_id "$task_id" \
+       --arg branch "$branch" --arg agent "$agent" --arg now "$now" \
+       --argjson bind_current "$bind_current" --argjson unassign "${unassign:-false}" '
+      .worktrees = ((.worktrees // []) as $items 
+        | if $unassign then
+            $items | map(
+              if .current_task == $task_id then .current_task = null else . end
+              | .tasks = ((.tasks // []) | map(select(. != $task_id)))
               | .last_updated = $now
-            else . end)
+            )
+          else
+            ([ $items[] | select(.worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path)) ] | length) as $hits
+            | if $hits == 0 and $bind_current then
+                $items + [{
+                  worktree_name: $target_name,
+                  worktree_path: $target_path,
+                  branch: (if $branch == "" then null else $branch end),
+                  current_task: $task_id,
+                  tasks: [$task_id],
+                  status: "active",
+                  dirty: false,
+                  agent: (if $agent == "" then null else $agent end),
+                  last_updated: $now
+                }]
+              else
+                $items | map(if .worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path) then
+                  (if $target_path != "" then .worktree_path = $target_path else . end)
+                  | .branch = (if $branch == "" then .branch else $branch end)
+                  | .agent = (if $agent == "" then .agent else $agent end)
+                  | (if $bind_current then 
+                      .current_task = $task_id 
+                      | .tasks = ((.tasks // []) as $t | if ($t | index($task_id)) == null then $t + [$task_id] else $t end)
+                      | .status = "active" 
+                    else . end)
+                  | .last_updated = $now
+                else . end)
+              end
           end)
     ' "$worktrees_file" >"$tmp" && mv "$tmp" "$worktrees_file"
 }
@@ -55,16 +80,20 @@ _vibe_task_write_task_file() {
 }
 
 _vibe_task_refresh_cache() {
-    local common_dir="$1" registry_file="$2" task_id="$3" worktree_name="$4" now="$5" task_path title next_step subtask_json
+    local common_dir="$1" registry_file="$2" task_id="$3" worktree_name="$4" now="$5" task_path title next_step subtask_json worktrees_file tasks_json
     local vibe_dir=".vibe"; mkdir -p "$vibe_dir"; task_path="$common_dir/vibe/tasks/$task_id/task.json"
+    worktrees_file="$common_dir/vibe/worktrees.json"
     title="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .title // ""' "$registry_file")"; next_step="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .next_step // ""' "$registry_file")"
     subtask_json="$(jq -c --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | (.current_subtask_id // null)' "$registry_file")"
-    jq -n --arg task_id "$task_id" --arg task_path "$task_path" --arg registry_path "$registry_file" --arg worktree_name "$worktree_name" --arg updated_at "$now" '{task_id:$task_id, task_path:$task_path, registry_path:$registry_path, worktree_name:$worktree_name, updated_at:$updated_at}' > "$vibe_dir/current-task.json"
+    tasks_json="$(jq -c --arg wt "$worktree_name" '.worktrees[]? | select(.worktree_name == $wt) | .tasks // []' "$worktrees_file" 2>/dev/null || echo "[]")"
+    jq -n --arg task_id "$task_id" --arg task_path "$task_path" --arg registry_path "$registry_file" --arg worktree_name "$worktree_name" --argjson tasks "${tasks_json:-[]}" --arg updated_at "$now" \
+       '{task_id:$task_id, tasks:$tasks, task_path:$task_path, registry_path:$registry_path, worktree_name:$worktree_name, updated_at:$updated_at}' > "$vibe_dir/current-task.json"
     cat > "$vibe_dir/focus.md" <<EOF
 # Focus
 - task: $task_id
 - title: $title
 - next_step: $next_step
 EOF
-    jq -n --arg worktree_name "$worktree_name" --arg current_task "$task_id" --arg saved_at "$now" --argjson current_subtask_id "${subtask_json:-null}" '{worktree_name:$worktree_name, current_task:$current_task, current_subtask_id:$current_subtask_id, saved_at:$saved_at}' > "$vibe_dir/session.json"
+    jq -n --arg worktree_name "$worktree_name" --arg current_task "$task_id" --argjson tasks "${tasks_json:-[]}" --arg saved_at "$now" --argjson current_subtask_id "${subtask_json:-null}" \
+       '{worktree_name:$worktree_name, current_task:$current_task, tasks:$tasks, current_subtask_id:$current_subtask_id, saved_at:$saved_at}' > "$vibe_dir/session.json"
 }

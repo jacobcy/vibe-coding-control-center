@@ -7,6 +7,7 @@
 # Load sub-modules
 source "$VIBE_LIB/flow_help.sh"
 source "$VIBE_LIB/flow_status.sh"
+source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg task_id "$1" '.tasks[]? | select(.task_id == $task_id) | .title // empty' "$2"; }
@@ -19,7 +20,7 @@ _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared";
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 
 _flow_start_worktree() {
-  local feature="$1" agent="$2" base="$3" wt_dir="wt-${agent}-${feature}"
+  local feature="$1" agent="$2" ref="$3" wt_dir="wt-${agent}-${feature}"
   vibe_require git jq || return 1
 
   # ① Pre-check: worktree directory must not already exist
@@ -43,10 +44,10 @@ _flow_start_worktree() {
   # ④ Create worktree (low-level primitive — no business logic)
   log_step "Creating worktree: $wt_dir"
   if typeset -f wtnew &>/dev/null; then
-    wtnew "$feature" "$agent" "$base" || { log_error "wtnew failed"; return 1; }
+    wtnew "$feature" "$agent" "$ref" || { log_error "wtnew failed"; return 1; }
   else
-    git fetch origin "$base" --quiet 2>/dev/null || true
-    git worktree add -b "${agent}/${feature}" "$wt_path" "$base" || { log_error "git worktree add failed"; return 1; }
+    git fetch origin "$ref" --quiet 2>/dev/null || true
+    git worktree add -b "${agent}/${feature}" "$wt_path" "$ref" || { log_error "git worktree add failed"; return 1; }
     cd "$wt_path" || return 1
   fi
 
@@ -59,34 +60,45 @@ _flow_start_worktree() {
 }
 
 _flow_start_task() {
-  local task_id="$1" agent="$2" base="$3" registry_file title branch
+  local task_id="$1" agent="$2" ref="$3" registry_file title branch
   vibe_require git jq || return 1
-  _flow_is_main_worktree && { log_error "Run this inside a feature worktree or use vibe flow new"; return 1; }
   registry_file="$(_flow_registry_file)"; title="$(_flow_task_title "$task_id" "$registry_file")"
   [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
-  _flow_require_clean_worktree || return 1; _flow_require_base_ref "$base" || return 1
+  _flow_require_clean_worktree || return 1; _flow_require_base_ref "$ref" || return 1
   branch="${agent}/${task_id}"
   _flow_branch_exists "$branch" && { log_error "Target branch already exists: $branch"; return 1; }
-  git checkout -b "$branch" "origin/$base" || return 1; _flow_set_identity "$agent" || return 1
-  log_success "Started task: $task_id"
+  git checkout -b "$branch" "origin/$ref" || return 1; _flow_set_identity "$agent" || return 1
+  log_success "Started task: $task_id ($title)"
 }
 
 _flow_start() {
-  local feature="" task_id="" agent="" base="main" arg
+  local feature="" task_id="" agent="" ref="main" arg
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_start_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --task) task_id="$2"; shift 2 ;;
       --agent) agent="$2"; shift 2 ;;
-      --base) base="$2"; shift 2 ;;
+      --branch|--base) ref="$2"; shift 2 ;;
       *) [[ -z "$feature" ]] && feature="$1"; shift ;;
     esac
   done
   [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"
   [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
-  [[ -n "$task_id" ]] && { _flow_start_task "$task_id" "${agent:-claude}" "$base"; return $?; }
+  
+  if [[ -n "$task_id" && -z "$feature" ]]; then
+    if [[ "$(_flow_is_main_worktree; echo $?)" -eq 1 ]]; then
+      # Inside a feature worktree: bind task to current
+      log_step "Binding task $task_id to current worktree"
+      _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1
+      return 0
+    else
+      # In main worktree: we need a feature name to create a new worktree
+      _flow_start_task "$task_id" "${agent:-claude}" "$ref"; return $?
+    fi
+  fi
+  
   [[ -n "$feature" ]] || { _flow_start_usage; return 1; }
-  _flow_start_worktree "$feature" "${agent:-claude}" "$base"
+  _flow_start_worktree "$feature" "${agent:-claude}" "$ref"
 }
 
 _flow_done() {

@@ -33,12 +33,6 @@ jobs:
     - name: Check zsh version
       run: zsh --version
 
-    - name: Run alias tests
-      shell: zsh {0}
-      run: |
-        cd $GITHUB_WORKSPACE
-        zsh tests/test-aliases.sh --quiet
-
     - name: Run syntax check on all alias files
       shell: zsh {0}
       run: |

@@ -16,13 +16,15 @@ _flow_status() {
 
   if (( json_out )); then
     local wts_json="[]"
+    local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
     while read -r wt_path; do
       local wt_name=$(basename "$wt_path")
       local is_dirty=0
       [[ -n "$(git -C "$wt_path" status --porcelain 2>/dev/null)" ]] && is_dirty=1
       local wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null)
-      wts_json=$(echo "$wts_json" | jq --arg n "$wt_name" --arg p "$wt_path" --arg b "$wt_branch" --argjson d "$is_dirty" \
-        '. += [{"name":$n, "path":$p, "branch":$b, "is_dirty":$d}]')
+      local wt_tasks; wt_tasks=$(jq -c --arg n "$wt_name" '.worktrees[]? | select(.worktree_name == $n) | .tasks // []' "$worktrees_file" 2>/dev/null || echo "[]")
+      wts_json=$(echo "$wts_json" | jq --arg n "$wt_name" --arg p "$wt_path" --arg b "$wt_branch" --argjson d "$is_dirty" --argjson t "$wt_tasks" \
+        '. += [{"name":$n, "path":$p, "branch":$b, "is_dirty":$d, "tasks":$t}]')
     done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
     
     jq -n --arg f "$feature" --arg f_id "$feature" --arg c "$current_wt" --argjson w "$wts_json" --argjson s "$shared_count" \
@@ -36,13 +38,21 @@ _flow_status() {
   
   # Cross-worktree scan
   echo "${CYAN}Worktree Landscape:${NC}"
+  local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
   while read -r wt_path; do
     local wt_name=$(basename "$wt_path")
     local d_count=$(git -C "$wt_path" status --porcelain 2>/dev/null | wc -l | xargs)
     local indicator="${GREEN}clean${NC}"
     [[ "$d_count" -gt 0 ]] && indicator="${YELLOW}$d_count dirty files${NC}"
-    [[ "$wt_name" == "$current_wt" ]] && wt_name="${BOLD}${wt_name}${NC} (current)"
-    printf "  - %-30s %b\n" "$wt_name" "$indicator"
+    
+    local tasks_info="$(jq -r --arg n "$wt_name" '.worktrees[]? | select(.worktree_name == $n) | .tasks // [] | join(", ")' "$worktrees_file" 2>/dev/null)"
+    local t_label=""
+    [[ -n "$tasks_info" ]] && t_label=" [tasks: ${tasks_info}]"
+
+    local marker=""
+    [[ "$wt_name" == "$current_wt" ]] && marker=" (current)"
+    
+    printf "  - %-30s %b%s\n" "${wt_name}${marker}" "$indicator" "$t_label"
   done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
 
   [[ "$shared_count" -gt 0 ]] && echo "${CYAN}Shared Context:${NC} $shared_count files in .git/vibe/shared"

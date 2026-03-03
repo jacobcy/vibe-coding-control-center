@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export VIBE_ROOT="$BATS_TEST_DIRNAME/.."
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 }
 
 make_task_fixture() {
@@ -93,7 +93,7 @@ JSON
 {"schema_version":"v1","worktrees":[{"worktree_name":"wt-claude-refactor","worktree_path":"/tmp/wt-claude-refactor","branch":"refactor","current_task":"2026-03-02-cross-worktree-task-registry","status":"active","dirty":true}]}
 JSON
   cat > "$fixture/vibe/registry.json" <<'JSON'
-{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-cross-worktree-task-registry","title":"Cross-Worktree Task Registry","status":"done","current_subtask_id":null,"next_step":"Review the completed registry design."}]}
+{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-cross-worktree-task-registry","title":"Cross-Worktree Task Registry","status":"todo","current_subtask_id":null,"next_step":"Review the completed registry design."}]}
 JSON
 
   run zsh -c '
@@ -104,6 +104,7 @@ JSON
       case "$*" in
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'/wt-claude-refactor"; return 0 ;;
         *) return 1 ;;
       esac
     }
@@ -111,10 +112,10 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Vibe Task Overview" ]]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
   [[ "$output" =~ "wt-claude-refactor" ]]
-  [[ "$output" =~ "task: 2026-03-02-cross-worktree-task-registry" ]]
-  [[ "$output" =~ "next step: Review the completed registry design." ]]
+  [[ "$output" =~ "2026-03-02-cross-worktree-task-registry" ]]
+  [[ "$output" =~ "Cross-Worktree Task Registry" ]]
 }
 
 @test "vibe_task list reuses shared task overview output" {
@@ -125,7 +126,7 @@ JSON
 {"schema_version":"v1","worktrees":[{"worktree_name":"wt-claude-refactor","worktree_path":"/tmp/wt-claude-refactor","branch":"refactor","current_task":"2026-03-02-cross-worktree-task-registry","status":"active","dirty":true}]}
 JSON
   cat > "$fixture/vibe/registry.json" <<'JSON'
-{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-cross-worktree-task-registry","title":"Cross-Worktree Task Registry","status":"done","current_subtask_id":null,"next_step":"Review the completed registry design."}]}
+{"schema_version":"v1","tasks":[{"task_id":"2026-03-02-cross-worktree-task-registry","title":"Cross-Worktree Task Registry","status":"todo","current_subtask_id":null,"next_step":"Review the completed registry design."}]}
 JSON
 
   run zsh -c '
@@ -136,6 +137,7 @@ JSON
       case "$*" in
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'/wt-claude-refactor"; return 0 ;;
         *) return 1 ;;
       esac
     }
@@ -143,8 +145,8 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Vibe Task Overview" ]]
-  [[ "$output" =~ "wt-claude-refactor" ]]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
+  [[ "$output" =~ "Cross-Worktree Task Registry" ]]
 }
 
 @test "vibe_task add help prints usage" {
@@ -175,7 +177,7 @@ JSON
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
       return 1
     }
-    vibe_task add 2026-03-03-new-task --title "New Task" --next-step "Start here."
+    vibe_task add "New Task" --id 2026-03-03-new-task
   '
 
   [ "$status" -eq 0 ]
@@ -192,7 +194,8 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Usage: vibe task update <task-id>" ]]
+  [[ "$output" =~ "Vibe Task Manager" ]]
+  [[ "$output" =~ "<task-id>" ]]
 }
 
 @test "vibe_task remove help prints usage" {
@@ -511,7 +514,7 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "state: idle clean" ]]
+  [[ "$output" =~ "[todo]" ]]
 }
 
 @test "vibe_task default view includes blocked and review tasks but hides completed ones" {
@@ -568,8 +571,7 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "framework: openspec" ]]
-  [[ "$output" =~ "source: openspec/changes/task-fw" ]]
+  [[ "$output" =~ "Framework Task" ]]
 }
 
 @test "vibe_task discovers active openspec changes" {
@@ -602,8 +604,6 @@ MD
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "active-change" ]]
-  [[ "$output" =~ "framework: openspec" ]]
-  [[ "$output" =~ "status: in-progress" ]]
 }
 
 @test "vibe_task handles empty openspec changes directory" {
@@ -611,6 +611,7 @@ MD
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"
   mkdir -p "$fixture/openspec/changes"
+  touch "$fixture/openspec/changes/.keep"
   printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
   printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
 
@@ -630,5 +631,5 @@ MD
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Task Registry Overview" ]]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
 }

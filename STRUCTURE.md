@@ -48,8 +48,8 @@ vibe-center/
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
-│   │   ├── task.md              # 当前任务状态
-│   │   └── memory.md            # 长期记忆
+│   │   ├── task.md              # [UNTRACKED] 当前 Worktree 状态草稿（.gitignore）
+│   │   └── memory.md            # [TRACKED] 跨项目长期记忆与架构共识
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
 │   │   └── patterns.md          # 设计模式
@@ -168,8 +168,8 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | 当前任务状态 | 每个任务 |
-| `memory.md` | 长期记忆和历史决策 | 重要决策时 |
+| `task.md` | **[UNTRACKED]** 当前工作树任务草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离） | 每个动作后 |
+| `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
 
 #### `.agent/rules/` - 编码规则
 

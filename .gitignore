@@ -33,3 +33,6 @@ wt-*/
 .trae/
 .claude/
 .agents/
+
+# AI Local Context (Scratchpad for current worktree only)
+.agent/context/task.md

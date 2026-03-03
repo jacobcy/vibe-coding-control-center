@@ -6,7 +6,8 @@ _vibe_task_collect_openspec_tasks() {
     [[ -d "$changes_dir" ]] || { echo '{"tasks":[]}'; return 0; }
     aggregate_file="$(mktemp)" || return 1
     echo '[]' > "$aggregate_file"
-    for change_dir in "$changes_dir"/*(N); do
+    { setopt nullglob 2>/dev/null || shopt -s nullglob 2>/dev/null; } || true
+    for change_dir in "$changes_dir"/*; do
         [[ -d "$change_dir" ]] || continue
         change_name="$(basename "$change_dir")"
         [[ "$change_name" == "archive" ]] && continue
