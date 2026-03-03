@@ -92,12 +92,70 @@ vibe task update <task-id> --next-step <step>
 
 ---
 
+## 2026-03-03: CI Test Alignment and Path Resolution
+
+### 核心共识
+
+1. **测试路径解析原则**：
+   - 必须使用绝对路径导出 `VIBE_ROOT` (`export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"`) 避免相对路径在测试层级导致模块找不到。
+   - 配置环境覆盖（如 `TEMP_TEST_DIR` 作为 `VIBE_ROOT` 时），应同时符号链接 bin 和 lib，保障工具正常寻址。
+2. **测试数据契约对齐**：
+   - Shell API (`lib/task_help.sh`) 和测试用例中的变量占位符必须强一致（如 `<id>` 统一为 `<task-id>`）。
+   - Shell 自动化 Mocks 必须模拟真实的 Git 行为，特别是对 `rev-parse --show-toplevel` 和 `rev-parse --git-common-dir`。
+
+---
+
+## 2026-03-03: Save Protocol Enhancement
+
+### 核心共识
+
+**审阅优先原则 (Review-First Principle)**：
+- 在写入任何持久化上下文（如 `memory.md`, `task.md`）之前，必须先读取并审阅已有内容。
+- 若发现已有内容陈旧、有误或与当前事实冲突，必须先进行修正，而非直接追加。
+- 目的：防止 AI 生成的上下文变成不可读的“屎山”，保持认知对齐的纯净度。
+
+### 关键定义
+
+| 概念 | 定义 |
+|------|------|
+| 审阅优先 | 在写入前进行事实检查和旧数据清理的必经步骤 |
+| 事实对齐 | 确保 `Task ID`、`Status` 等字段与物理真源（Registry）一致 |
+
+---
+
+## 2026-03-04: PR Automation and Real-time Auditing
+
+### 核心共识
+
+1. **确定性发布原则 (Tier 1 Determinism)**：
+   - `vibe flow pr` 作为物理真源，必须是无交互（Non-interactive）且参数化的。
+   - 交互意图（如选择 Bump 级别、撰写摘要）由 Tier 2 (Skills) 负责，通过 CLI 参数传递给 Tier 1。
+
+2. **核心发布三要素 (PR Metadata Tripod)**：
+   - PR 携带三个维度的元数据：`Title` (PR 标题)、`Body` (详细描述)、`Msg` (写入 CHANGELOG 的 Release Note)。
+   - 脚本支持自动 Fallback：若未传入，则从 Git Commit History 自动提取。
+
+3. **实时真源审计 (Living Auditor)**：
+   - `vibe flow review` 不再只是链接跳转，而是 CI 和 Review 状态的实时探测器。
+   - 具备“防抖”能力：支持对 PENDING 状态的 CI 进行 3x30s 的轮询等待。
+   - 具备“决策”能力：根据 `ReviewDecision` 和 `statusCheckRollup` 给出明确的 "Ready to merge" 或 "Blocked" 指令。
+
+### 关键定义
+
+| 概念 | 定义 |
+|------|------|
+| 串行发布墙 | `vibe flow pr` 强制检查指向 `main` 的 Open PR，防止版本冲突。 |
+| 自动 Patch | 手动执行无参数 PR 时，默认执行 patch 级的 version bump。 |
+| 无感审计 | 使用 `PAGER=cat` 屏蔽交互式窗口，直接将 PR 状态平铺于终端。 |
+
+---
+
 ## 相关文档
 
 - [Task README](../docs/tasks/2026-03-02-command-slash-alignment/README.md)
-- [Plan v1](../docs/tasks/2026-03-02-command-slash-alignment/plan-v1.md)
+- [PR Automation Design](#2026-03-04-pr-automation-and-real-time-auditing)
 - [Scope Gate Review](../docs/tasks/2026-03-02-command-slash-alignment/README.md) (在 README 中)
 
 ---
 
-_Last Updated: 2026-03-02_
+_Last Updated: 2026-03-04_

@@ -1,25 +1,6 @@
 ---
 task_id: "2026-02-21-save-command"
 title: "Save Command 设计"
-created: "2026-02-21T00:00:00Z"
-updated: "2026-02-28T00:00:00Z"
-current_layer: "plan"
-status: "archived"
-
-gates:
-  scope:
-    status: "skipped"
-  spec:
-    status: "skipped"
-  plan:
-    status: "passed"
-    timestamp: "2026-02-21T14:00:00Z"
-  test:
-    status: "skipped"
-  code:
-    status: "skipped"
-  audit:
-    status: "skipped"
 ---
 
 # Task: Save Command 设计

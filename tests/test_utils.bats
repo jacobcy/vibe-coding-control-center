@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export VIBE_ROOT="$BATS_TEST_DIRNAME/.."
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   # Source the utils module
   source "$VIBE_ROOT/lib/config.sh"
   source "$VIBE_ROOT/lib/utils.sh"

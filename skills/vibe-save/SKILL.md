@@ -8,6 +8,8 @@ description: Use when the user wants to save session context, says "/save", or w
 会话上下文保存命令。在会话结束前自动提取和保存有价值的信息到项目记忆系统。
 
 **核心原则:** 保存现在，延续未来。
+**审阅优先原则:** 在任何写入操作之前，必须优先审阅目标文件的已有内容。若发现已有内容存在陈旧、错误或冲突（如状态不一致、陈旧的 next_step 等），必须先进行修正对齐，然后再追加或更新本次会话的新内容。不允许无视已有错误直接堆砌新内容。
+
 
 **Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
 
@@ -42,8 +44,8 @@ description: Use when the user wants to save session context, says "/save", or w
 | `task.md` | 任务状态 | 已完成的工作 + 待办事项 |
 
 **核心区分：**
-- `memory.md` = 认知（我们达成了什么共识）
-- `task.md` = 任务（我们做了什么、要做什么）
+- `.agent/context/memory.md` = **[Tracked]** 跨项目、跨任务的人类/AI公共知识池与共识（我们达成了什么架构规约）。
+- `.agent/context/task.md` = **[Untracked]** 仅仅是当前物理环境（Worktree）中的临时草稿本和 AI 上下文切片区（我们在这个分支里做了什么、Blockers 是什么）。不被 Git 追踪。
 
 ## 工作流程
 
@@ -78,9 +80,12 @@ description: Use when the user wants to save session context, says "/save", or w
 
 更新 `.agent/context/memory.md`：
 
-- 在 **认知对齐目录** 中添加/更新达成的概念共识
-- 记录关键定义和术语
-- 更新文件目录索引（如有新文件类型）
+1. **审查**: 完整阅读 `memory.md`，检查现有的概念共识、定义和索引。
+2. **修正**: 若当前会话的结论推翻了旧共识，或发现旧记录有误，必须先修正旧内容。
+3. **更新**:
+   - 在 **认知对齐目录** 中添加/更新达成的概念共识
+   - 记录关键定义和术语
+   - 更新文件目录索引（如有新文件类型）
 
 **判断是否写入 memory.md：**
 - 是否达成了新的概念共识？→ 写入
@@ -118,13 +123,16 @@ Last Updated: YYYY-MM-DD
 - 是否会多次引用？→ 创建
 - 是否只是简单共识？→ 不创建，保留在 memory.md 即可
 
-### Step 5: 更新任务状态
+### Step 5: 更新任务状态（Un-tracked）
 
-更新 `.agent/context/task.md`：
-
-- 刷新 current task 摘要
-- 记录当前 worktree、next step、subtasks summary
-- 保留 `.agent/context/task.md` 为兼容层，不把它当作共享真源
+更新当前工作树的缓存 `.agent/context/task.md`：
+1. **审查**: 审阅已有的 `Task Info`、`Gate Progress` 和 `Completed/Pending Tasks`。
+2. **修正**: 确保 `Status`、`Worktree` 等基础信息与真实物理状态一致。若已有记录中的 blockers 已解决，应予以更新或移除。
+3. **更新**: 
+   - 刷新 current task 摘要
+   - 记录当前 worktree、next step、subtasks summary
+   - **重点记录当期疑难杂症 (Blockers) 和临时方案**，便于下个会话 `/vibe-continue` 加载。
+- 该文件在 `.gitignore` 内，不必让用户为此做出 `git add` 或提交动作。
 
 ### Step 6: 回写共享 registry 并刷新本地缓存
 

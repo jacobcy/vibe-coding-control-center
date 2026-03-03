@@ -1,9 +1,6 @@
 ---
 document_type: task
 title: Git Workflow & Worktree Lifecycle Standard
-status: planning
-author: Claude Sonnet 4.5
-created: 2026-02-28
 ---
 
 # Git Workflow & Worktree Lifecycle Standard

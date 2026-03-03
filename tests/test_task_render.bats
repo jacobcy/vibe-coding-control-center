@@ -1,0 +1,107 @@
+#!/usr/bin/env bats
+# tests/test_task_render.bats - Rendering and Query tests
+
+setup() {
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export HELPER="$BATS_TEST_DIRNAME/test_task_helper.zsh"
+}
+
+@test "render: renders shared task overview" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    mkdir -p "'"$fixture"'/wt-test-task"
+    cd "'"$fixture"'/wt-test-task"
+    vibe_task
+  '
+  echo "DEBUG STATUS: $status" >&3
+  echo "DEBUG OUTPUT: $output" >&3
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
+  [[ "$output" =~ "wt-test-task" ]]
+}
+
+@test "render: default view manages task visibility by status" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{
+  "schema_version": "v1",
+  "tasks": [
+    {"task_id":"task-blocked","title":"Blocked Task","status":"blocked"},
+    {"task_id":"task-review","title":"Review Task","status":"review"},
+    {"task_id":"task-completed","title":"Completed Task","status":"completed"}
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -F "task-blocked"
+  echo "$output" | grep -F "task-review"
+  ! echo "$output" | grep -F "task-completed"
+}
+
+@test "render: displays framework and source path when present" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{
+  "schema_version": "v1",
+  "tasks": [
+    {
+      "task_id": "fw-task",
+      "title": "Framework Task",
+      "framework": "openspec",
+      "source_path": "openspec/changes/fw-task",
+      "status": "todo"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "openspec" ]]
+  [[ "$output" =~ "openspec/changes/fw-task" ]]
+  [[ "$output" =~ "fw-task" ]]
+}
+
+@test "render: discovers active openspec changes" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/openspec/changes/active-change"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
+  cat > "$fixture/openspec/changes/active-change/tasks.md" <<'MD'
+- [ ] active subtask
+MD
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task -a
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "active-change" ]]
+}

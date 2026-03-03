@@ -25,7 +25,9 @@ description: Use when the user wants to resume previous work, says "/continue", 
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 详情，subtask 以 `subtask_id` 标识
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享记忆真源
 
-`.agent/context/task.md` 和 `.agent/context/memory.md` 作为兼容层保留，用于旧 skill 和入口索引。
+**本地工作区缓存重构**：
+- `.agent/context/memory.md` (Tracked)：作为人类与AI共享的高阶认知索引池，存放在版本控制中。
+- `.agent/context/task.md` (Untracked)：被放入 `.gitignore`。完全作为当前物理 worktree 短期进度的草稿本。如果冷启动时文件缺失，`/vibe-continue` 需要自动通过读取大盘 `registry.json` 和 `focus.md` 重新组装并拉取一份到本地。
 
 ## Schema 契约
 
@@ -87,6 +89,10 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 4. **Next Step** - 当前下一步动作
 5. **Worktree View** - `worktree_path`、branch、dirty/clean
 6. **Local Cache View** - `focus.md` / `session.json` 的摘要
+
+*如果 `.agent/context/task.md` 不存在或为空 (比如因为它是 git-ignored 被新切出来的 worktree 跳过的)*：
+  - 自动创建 `.agent/context/task.md`。
+  - 将上一步加载的 Summary / Next Step / Dirty 等从 `registry.json` 当中取得的最新状态渲染进它。
 
 ### Step 4: 输出继续报告
 

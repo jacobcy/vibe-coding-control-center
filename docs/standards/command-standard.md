@@ -83,10 +83,12 @@
 *   核心功能：规范化 Git 操作与研发流程。
 *   **Action**:
     *   `start <feature>`: 创建分支，创建 worktree，初始化 PRD 模板。
+    *   `status [<feature>]`: 查看当前分支的任务状态和文件指标（默认：当前分支）。
+    *   `list`: 查看所有 worktree 的状态和任务绑定。
+    *   `review [<pr>|<branch>]`: 检查 PR 状态、CI 结果、评审意见（实时真源审计）。
     *   `spec`: 打开/创建技术规格文档。
     *   `test`: 初始化或运行测试 (TDD)。
-    *   `review`: 启动 Lazygit 进行代码审查。
-    *   `pr`: 调用 gh cli 创建 Pull Request。
+    *   `pr`: 提交 PR（自动处理版本升级和 CHANGELOG）。
     *   `done`: 清理工作区，归档分支。
 
 ### 3.2 `vibe chat` (AI 对话)

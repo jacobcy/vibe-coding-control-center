@@ -20,24 +20,24 @@ graph TD
     classDef engine fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
     classDef tool fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff;
 
-    subgraph "UI Layer (表象层)"
+    subgraph "Tier 2: Vibe Skills Layer (胶水层 - 智能包装)"
         A1[bin/vibe flow]:::ui
-        A2[/vibe-new / /vibe-audit]:::ui
+        A2[/vibe-task / /vibe-flow / /vibe-save]:::ui
         A3[自然语言需求对话]:::ui
     end
 
-    subgraph "Workflow Engine Layer (引擎层 - The Enforcer)"
+    subgraph "Tier 3: Supervisor Layer (引擎编排层 - The Developer Vibe Gate)"
         B1{Stage 1: Scope Gate<br/>(读 SOUL.md)}:::engine
         B2{Stage 2: Plan Gate<br/>(查 PRD/Spec)}:::engine
         B3{Stage 3: Execution Gate<br/>(vibe-test-runner)}:::engine
         B4{Stage 4: Review Gate<br/>(规则审计 & Metrics)}:::engine
     end
 
-    subgraph "Tool Layer (执行层 - 无感知运行)"
-        C1[Serena AST]:::tool
+    subgraph "Tier 1: Shell Layer (物理真源层 - 无感知运行)"
+        C1[vibe 命令及 alias]:::tool
         C2[bats-core]:::tool
         C3[Shellcheck/Lint]:::tool
-        C4[OpenSpec]:::tool
+        C4[OpenSpec & Registry JSON]:::tool
     end
 
     A1 --> B1

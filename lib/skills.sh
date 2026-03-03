@@ -7,18 +7,15 @@ if [[ "${VIBE_SKILLS_SYNC_LOADED:-}" != "$VIBE_LIB/skills_sync.sh" ]]; then
 fi
 
 _skills_help() {
+    echo "${BOLD}Vibe Skills Manager${NC}"
     echo ""
-    echo "${BOLD}vibe skills${NC} - Skills 同步工具"
+    echo "Usage: ${CYAN}vibe skills <subcommand>${NC}"
     echo ""
-    echo "用法: ${CYAN}vibe skills${NC} <子命令>"
+    echo "Subcommands:"
+    echo "  ${GREEN}sync${NC}      一键同步所有 skills（Claude plugin + 全局 + 本地）"
+    echo "  ${GREEN}check${NC}     检查各 Agent skills 状态"
     echo ""
-    echo "子命令:"
-    echo "  ${GREEN}sync${NC}     一键同步所有 skills（Claude plugin + 全局 + 本地）"
-    echo "  ${GREEN}check${NC}    检查各 Agent skills 状态"
-    echo "  ${GREEN}help${NC}     显示此帮助"
-    echo ""
-    echo "💡 完整审计请使用对话命令: ${CYAN}/vibe-skills${NC}"
-    echo ""
+    echo "💡 物理同步后，建议在对话中使用 ${CYAN}/vibe-skills${NC} 进行逻辑确认。"
 }
 
 vibe_skills() {

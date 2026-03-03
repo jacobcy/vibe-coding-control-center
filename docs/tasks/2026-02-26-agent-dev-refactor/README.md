@@ -1,30 +1,9 @@
 ---
 task_id: "2026-02-26-agent-dev-refactor"
 title: "Agent 开发工具链重构"
-created: "2026-02-26T00:00:00Z"
-updated: "2026-02-28T00:00:00Z"
-current_layer: "test"
-status: "archived"
-
-gates:
-  scope:
-    status: "passed"
-    timestamp: "2026-02-26T10:00:00Z"
-  spec:
-    status: "passed"
-    timestamp: "2026-02-26T12:00:00Z"
-  plan:
-    status: "skipped"
-  test:
-    status: "passed"
-    timestamp: "2026-02-26T14:00:00Z"
-  code:
-    status: "skipped"
-  audit:
-    status: "skipped"
 ---
 
-# Task: Agent 开发工具链重构
+# Task: Agent 开发工具链构
 
 ## 概述
 

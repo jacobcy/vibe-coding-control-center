@@ -4,6 +4,30 @@
 
 set -e
 
+# --- Help ---
+_usage() {
+    echo -e "\n\033[1;36m🔧 Vibe Center - Development Worktree Setup Script\033[0m"
+    echo ""
+    echo "此脚本负责当前工作树 (Worktree) 的环境初始化，通常由 ${CYAN:-}vibe flow start${NC:-} 自动调用："
+    echo "  1. 依赖注入：根据白名单配置安装项目所需的 Agents & Skills"
+    echo "  2. 认知同步：初始化 OpenAPI 规范与对应的 Gate 产物"
+    echo "  3. 物理挂载：建立本地 Skill 到 Agent 目录的符号链接"
+    echo "  4. 任务迁移：将待处理任务同步至当前工作树的 docs/tasks 目录下"
+    echo ""
+    echo "Usage: ${CYAN:-}scripts/init.sh${NC:-} [options]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    显示此帮助信息"
+    echo ""
+    exit 0
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) _usage ;;
+    esac
+done
+
 VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
 
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"

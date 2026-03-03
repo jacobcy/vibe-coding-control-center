@@ -3,10 +3,16 @@
 # Sources config.sh (paths + utils + keys) then all alias sub-files
 
 # ── Resolve VIBE_ROOT ──────────────────────────────────
-_al_dir="$(dirname "${(%):-%x:A}")"
-[[ -L "${(%):-%x}" ]] && _al_dir="$(dirname "$(readlink -f "${(%):-%x}" 2>/dev/null || readlink "${(%):-%x}")")"
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+  _al_path="${(%):-%x:A}"
+else
+  _al_path="$(readlink -f "${BASH_SOURCE[0]:-$0}" 2>/dev/null || echo "${BASH_SOURCE[0]:-$0}")"
+fi
+_al_dir="$(dirname "$_al_path")"
 _al_lib="$_al_dir/../lib/config.sh"
-[[ -f "$_al_lib" ]] && source "$_al_lib" || { VIBE_ROOT="$(cd "$_al_dir/.." && pwd)"; }
+
+# Load config if found
+[[ -f "$_al_lib" ]] && source "$_al_lib" || VIBE_ROOT="$(cd "$_al_dir/.." && pwd)"
 
 # Detect repo root and main dir
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

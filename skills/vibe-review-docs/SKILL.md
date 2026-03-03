@@ -1,19 +1,27 @@
 ---
 name: vibe-review-docs
-description: Agentic Documentation and Changelog Review. Use when auditing documentation, PRDs, or markdown files for quality and consistency.
+description: Agentic Documentation and Changelog Review. Use when auditing entry files (CLAUDE.md, SOUL.md), docs/ directory, or checking for incorrect concepts. Use `vibe flow review` to check PR status.
 category: process
 trigger: manual
 ---
 
 # Vibe Documentation Review Protocol
 
+**核心职责**: 文档概念审查（检查错误概念和过时信息）
+
+**使用场景**:
+1. **入口文件审查**: 检查 CLAUDE.md, SOUL.md, STRUCTURE.md 等入口文件
+2. **docs/ 目录审查**: 审计 docs/ 目录下的文档质量
+3. **概念对齐**: 确保文档中的概念与代码实际状态一致
+
 When invoked to review documentation, your goal is to ensure clarity, consistency, and alignment with the Vibe Center architecture layout.
 
-## 1. Context Gathering
-- Identify modified `.md` files in the current branch or PR.
-- For PR review: use `gh pr diff --name-only` or `git diff main...HEAD --name-only`, then filter for `\.md$`.
-- For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
-- Check if `CHANGELOG.md` has been reasonably updated if there are user-facing changes in the same diff.
+## 1. Context Gathering (Align Truth)
+- **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
+- **Identify Files**: 
+  - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
+  - For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
+- **Review Context**: Check if `CHANGELOG.md` has been reasonably updated by the `vibe flow pr --bump` process.
 
 ## 2. Review Standards
 Evaluate the documentation against the following checklist:

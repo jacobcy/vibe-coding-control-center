@@ -1,12 +1,19 @@
 #!/usr/bin/env zsh
 # Vibe aliases
 
+# @desc Open Lazygit for TUI git operations
+# @featured
 alias lg='lazygit'
+# @desc Open Vibe Chat in the current context
+# @featured
 alias vc='vibe chat'
+# @desc Digitally sign a task or document
 alias vsign='vibe sign'
+# @desc Navigate to Vibe main repository root
 alias vmain="cd \"$VIBE_MAIN\""
 
-# Dynamic vibe resolver: local -> git root -> VIBE_ROOT
+# @desc Dynamic Vibe executor switcher (local/git-root/global)
+# @featured
 vibe() {
   # Explicit global flag
   if [[ "$1" == "-g" || "$1" == "--global" ]]; then

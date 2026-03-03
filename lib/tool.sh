@@ -100,6 +100,28 @@ _tool_status() {
     echo "💡 Install: ${CYAN}vibe tool <tool>${NC} or ${CYAN}vibe tool all${NC}"
 }
 
+# ── Install Core Dependencies ───────────────────────────
+_tool_deps() {
+    log_step "Core Dependencies"
+    local tools=("git" "jq" "tmux" "lazygit" "curl")
+    local missing=()
+    for t in "${tools[@]}"; do
+        vibe_has "$t" || missing+=("$t")
+    done
+
+    if ((${#missing[@]} == 0)); then
+        log_success "All core dependencies are present."
+        return 0
+    fi
+
+    log_warn "Missing: ${missing[*]}"
+    if [[ "$OSTYPE" == darwin* ]] && vibe_has brew; then
+        confirm_action "Install missing tools via Homebrew?" && brew install "${missing[@]}"
+    else
+        log_info "Please install missing tools manually: ${missing[*]}"
+    fi
+}
+
 # ── Dispatcher ──────────────────────────────────────────
 vibe_tool() {
     local target="${1:-}"
@@ -108,7 +130,9 @@ vibe_tool() {
         claude)   _tool_claude ;;
         opencode) _tool_opencode ;;
         codex)    _tool_codex ;;
+        deps)     _tool_deps ;;
         all)
+            _tool_deps
             _tool_claude
             _tool_opencode
             _tool_codex
@@ -121,10 +145,11 @@ vibe_tool() {
             echo ""
             echo "Commands:"
             echo "  ${GREEN}status${NC}    Show installation status of AI tools"
+            echo "  ${GREEN}deps${NC}      Install core system dependencies (git, jq, etc.)"
             echo "  ${GREEN}claude${NC}    Install/Update Claude Code"
             echo "  ${GREEN}opencode${NC}  Install/Update OpenCode"
             echo "  ${GREEN}codex${NC}     Install/Update Codex"
-            echo "  ${GREEN}all${NC}       Install/Update all tools"
+            echo "  ${GREEN}all${NC}       Install/Update all tools and dependencies"
             ;;
         *)
             log_error "Unknown tool: $target"

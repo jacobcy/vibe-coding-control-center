@@ -7,6 +7,8 @@ description: Use when the user wants to verify project memory consistency, says 
 
 验证项目记忆与代码实际状态的一致性。检测文档腐烂（documentation rot）并输出差异报告。
 
+**核心职责**: 检查 `.agent/` 和 `.git/` 目录的一致性，确保 task 记录和 memory 文件与实际代码状态对齐。
+
 **核心原则:** 只留最新，确保可信。
 
 **Announce at start:** "我正在使用 check 技能来验证项目记忆的一致性。"
@@ -14,12 +16,14 @@ description: Use when the user wants to verify project memory consistency, says 
 ## 工作流程
 
 ### Step 0: Shell-Level Audit
- 
+
  ```bash
  vibe check
  ```
- 
- 运行 `vibe check` 进行全面的 Registry、OpenSpec、任务归档以及僵尸分支审计。解释其审计结果。
+
+ 运行 `vibe check` 进行全面的 Registry、任务归档以及物理真源审计。解释其审计结果。
+
+ **注意**: 如果你需要检查 PR 状态、CI 结果或评审意见，请使用 `vibe flow review` 命令或 `/vibe-review-code` skill。
  
  ### Step 1: 读取记忆文件
 
@@ -38,10 +42,10 @@ task_file=".agent/context/task.md"
 
 ### Step 3: 验证任务状态
 
-对比 `task.md` 和 `memory/<topic>.md` 中的 Related Tasks：
-- 检查状态是否一致（完成/进行中/待办）
-- 识别孤任务（在 topic 中有但在 task.md 中没有）
-- 识别幽灵任务（在 task.md 中有但没有 topic 记录）
+对比 `.agent/context/task.md` 与 `.git/vibe/registry.json`（唯一真源）：
+- 检查 `registry.json` 中的 `status` 是否与 `task.md` 声明的一致。
+- 检查 `memory/<topic>.md` 中的 Related Tasks 状态是否已过期。
+- 识别孤任务或状态冲突。
 
 ### Step 4: 验证代码引用
 

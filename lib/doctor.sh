@@ -34,11 +34,14 @@ _check_tool() {
 
 # ── Main Check ──────────────────────────────────────────
 vibe_doctor() {
-    [[ "$1" == "-h" || "$1" == "--help" ]] && {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        echo "${BOLD}Vibe Environment Doctor${NC}"
+        echo ""
         echo "Usage: ${CYAN}vibe doctor${NC}"
-        echo "  Diagnoses the local environment, checking for required AI tools and API keys."
+        echo ""
+        echo "功能：检测开发环境工具版本、依赖状态及配置完整性。"
         return 0
-    }
+    fi
     local missing=0
     local total=${#_VIBE_TOOLS[@]}
 

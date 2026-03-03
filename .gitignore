@@ -19,6 +19,7 @@ temp/
 
 # Worktrees
 wt-*/
+.worktrees/
 
 # Vibe artifacts
 # Local worktree cache only; shared task truth lives in git-common-dir/vibe/
@@ -32,3 +33,6 @@ wt-*/
 .trae/
 .claude/
 .agents/
+
+# AI Local Context (Scratchpad for current worktree only)
+.agent/context/task.md

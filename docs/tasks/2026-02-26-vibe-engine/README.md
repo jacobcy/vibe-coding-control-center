@@ -1,26 +1,6 @@
 ---
 task_id: "2026-02-26-vibe-engine"
 title: "Vibe Engine 实现"
-created: "2026-02-26T00:00:00Z"
-updated: "2026-02-28T00:00:00Z"
-current_layer: "audit"
-status: "archived"
-
-gates:
-  scope:
-    status: "skipped"
-  spec:
-    status: "skipped"
-  plan:
-    status: "passed"
-    timestamp: "2026-02-26T20:00:00Z"
-  test:
-    status: "skipped"
-  code:
-    status: "skipped"
-  audit:
-    status: "passed"
-    timestamp: "2026-02-26T23:00:00Z"
 ---
 
 # Task: Vibe Engine 实现
