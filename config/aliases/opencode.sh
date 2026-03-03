@@ -4,6 +4,7 @@
 # @desc OpenCode CLI proxy
 alias oo='opencode'
 # @desc Continue last OpenCode session
+# @featured
 alias ooa='opencode --continue'
 
 # @desc Run OpenCode in a feature worktree

@@ -1,16 +1,32 @@
 #!/usr/bin/env zsh
 # Git helper functions
 
-# Get git root directory
+# @desc Get git root directory
 vibe_git_root() { git -C "$PWD" rev-parse --show-toplevel 2>/dev/null; }
 
-# Get current branch
+# @desc Get current branch
 vibe_branch() { git -C "$PWD" branch --show-current 2>/dev/null; }
 
-# Guard main/master branch from agent execution
+# @desc Guard main/master branch from agent execution
 vibe_main_guard() {
   local br; br="$(vibe_branch)"
   [[ "$br" == "main" || "$br" == "master" ]] && {
     echo "⚠️  You are on '$br'. Use a worktree for agent execution."; return 1
   }
 }
+
+# --- Common Git Aliases ---
+
+# @desc Git status
+# @featured
+alias gst='git status'
+
+# @desc Git log (pretty)
+# @featured
+alias gl='git log --oneline --graph --decorate'
+
+# @desc Quick git commit
+alias gca='git commit -a -m'
+
+# @desc Quick git push
+alias gp='git push'

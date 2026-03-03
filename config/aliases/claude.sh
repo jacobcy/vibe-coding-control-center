@@ -2,6 +2,7 @@
 # Claude aliases
 
 # @desc Claude CLI proxy — continue with full permissions
+# @featured
 alias ccy='claude --dangerously-skip-permissions --continue'
 # @desc Run Claude in planning mode
 alias ccp='claude --permission-mode plan'
@@ -9,6 +10,7 @@ alias ccp='claude --permission-mode plan'
 # --- New unified cc* commands ---
 
 # @desc Run Claude safely with main branch protection
+# @featured
 ccs() {
   vibe_main_guard || return
   claude --dangerously-skip-permissions --continue
