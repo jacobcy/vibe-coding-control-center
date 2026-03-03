@@ -1,7 +1,0 @@
-{
-  "task_id": "update-test",
-  "resolved_worktree": "wt-claude-updated",
-  "resolved_session": "claude-update-test",
-  "executor": "human",
-  "timestamp": "2026-03-03T14:13:24Z"
-}

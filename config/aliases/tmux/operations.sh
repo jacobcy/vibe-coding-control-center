@@ -28,10 +28,9 @@ tmnew() {
   tmux new-session -d -s "$session" -c "$worktree_path" -n "main"
   echo "✅ Created session: $session"
 
-  # V3: Write execution result
-  source "${0:a:h}/../execution-contract.sh" 2>/dev/null || true
+  # V3: Write execution result (contract already loaded by parent)
   if type write_execution_result >/dev/null 2>&1; then
-    local task_id="${task_slug}"  # Use task_slug as task_id
+    local task_id="${task_slug}"
     local worktree="wt-${agent}-${task_slug}"
     write_execution_result "$task_id" "$worktree" "$session" || true
   fi

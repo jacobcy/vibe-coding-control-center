@@ -61,8 +61,8 @@ wtnew() {
     fi
   fi
 
-  # Set agent identity
-  local aname="Agent-${(C)agent}" aemail="agent-${agent}@vibecoding.ai"
+  # Set agent identity (capitalize first letter for name)
+  local aname="Agent-${agent^}" aemail="agent-${agent}@vibecoding.ai"
   $git_cmd -C "$path" config user.name "$aname"
   $git_cmd -C "$path" config user.email "$aemail"
   echo "👤 Identity: $aname <$aemail>"
