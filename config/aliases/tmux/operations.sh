@@ -9,8 +9,7 @@ tmnew() {
 
   local session="${agent}-${task_slug}"
 
-  # V3: Validate naming convention
-  source "${0:a:h}/naming.sh" 2>/dev/null || true
+  # V3: Validate naming convention (naming.sh already loaded by parent)
   if type _validate_tmux_session_name >/dev/null 2>&1; then
     if ! _validate_tmux_session_name "$session"; then
       return 1

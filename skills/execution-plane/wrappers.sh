@@ -31,6 +31,66 @@ skill_wtlist() {
   local filter_owner="$1" filter_task="$2"
 
   export EXECUTOR=openclaw
+  source "$_wrappers_root/config/aliases/worktree.sh"
+
+  wtlist "$filter_owner" "$filter_task"
+}
+
+skill_wtrm() {
+  local task_slug="$1" agent="${2:-openclaw}"
+
+  export EXECUTOR=openclaw
+  source "$_wrappers_root/config/aliases/worktree.sh"
+
+  local wt_name="wt-${agent}-${task_slug}"
+  wtrm "$wt_name" --force
+}
+
+# Tmux operations wrapper
+skill_tmnew() {
+  local task_slug="$1" agent="${2:-openclaw}"
+  [[ -z "$task_slug" ]] && { echo "Usage: skill_tmnew <task-slug> [agent]"; return 1; }
+
+  export EXECUTOR=openclaw
+  echo "🤖 OpenClaw Mode: Creating tmux session..."
+
+  source "$_wrappers_root/config/aliases/tmux.sh"
+
+  tmnew "$task_slug" "$agent"
+}
+
+skill_tmkill() {
+  local task_slug="$1" agent="${2:-openclaw}"
+
+  export EXECUTOR=openclaw
+  source "$_wrappers_root/config/aliases/tmux.sh"
+
+  local session="${agent}-${task_slug}"
+  tmkill "$session" --force
+}
+
+# Environment lifecycle wrappers
+skill_prepare_environment() {
+  local task_slug="$1" agent="${2:-openclaw}" base="${3:-}"
+
+  export EXECUTOR=openclaw
+  echo "🤖 OpenClaw Mode: Preparing complete environment..."
+
+  skill_wtnew "$task_slug" "$agent" "$base"
+  skill_tmnew "$task_slug" "$agent"
+}
+
+skill_cleanup_environment() {
+  local task_slug="$1" agent="${2:-openclaw}"
+
+  export EXECUTOR=openclaw
+  echo "🤖 OpenClaw Mode: Cleaning up environment..."
+
+  skill_tmkill "$task_slug" "$agent"
+  skill_wtrm "$task_slug" "$agent"
+}
+
+  export EXECUTOR=openclaw
   source "${0:a:h}/../../config/aliases/worktree.sh"
 
   wtlist "$filter_owner" "$filter_task"

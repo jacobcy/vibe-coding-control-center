@@ -28,10 +28,7 @@ wtnew() {
   local dir="wt-${agent}-${branch}"
   local path="${repo_root:h}/$dir"
 
-  # Source naming utilities
-  source "${0:a:h}/naming.sh" 2>/dev/null || true
-
-  # V3: Validate naming convention
+  # V3: Validate naming convention (naming.sh already loaded by parent)
   if type _validate_worktree_name >/dev/null 2>&1; then
     if ! _validate_worktree_name "$dir"; then
       return 1

@@ -19,11 +19,11 @@ _validate_tmux_session_name() {
     return 1
   fi
 
-  # Check minimum parts
-  local IFS='-'
-  local -a parts
-  parts=($name)
-  if [[ ${#parts[@]} -lt 2 ]]; then
+  # Check minimum parts (must have at least agent-task)
+  # Count hyphens - need at least 1 for valid format
+  local hyphen_count
+  hyphen_count=$(echo "$name" | tr -cd '-' | wc -c)
+  if [[ $hyphen_count -lt 1 ]]; then
     echo "Error: Name must have at least 2 parts: <agent>-<task>" >&2
     return 1
   fi

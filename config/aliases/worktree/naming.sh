@@ -19,10 +19,11 @@ _validate_worktree_name() {
     return 1
   fi
 
-  # Check minimum parts
-  local parts
-  parts=(${(s/-/)"$name"})
-  if [[ ${#parts[@]} -lt 3 ]]; then
+  # Check minimum parts (must have at least wt-<owner>-<task>)
+  # Count hyphens - need at least 2 for valid format
+  local hyphen_count
+  hyphen_count=$(echo "$name" | tr -cd '-' | wc -c)
+  if [[ $hyphen_count -lt 2 ]]; then
     echo "Error: Name must have at least 3 parts: wt-<owner>-<task-slug>" >&2
     return 1
   fi
