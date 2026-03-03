@@ -136,26 +136,45 @@ pp_strategy_validate_rules() {
   fi
 }
 
-# 自定义路由规则支持（未来扩展）
+# 自定义路由规则支持（未实现）
+# TODO: 实现用户自定义路由规则覆盖默认策略
 pp_strategy_add_rule() {
-  echo "Custom rules not yet implemented - use hardcoded rules for now"
-  return 1
+  echo '{"error": "Custom rules not yet implemented", "status": "not_implemented"}' >&2
+  return 2  # 返回 2 表示"未实现"
 }
 
-# Provider 优先级配置（未来扩展）
+# Provider 优先级配置（未实现）
+# TODO: 实现基于用户配置的 provider 优先级
 pp_strategy_set_priority() {
-  echo "Priority configuration not yet implemented"
-  return 1
+  echo '{"error": "Priority configuration not yet implemented", "status": "not_implemented"}' >&2
+  return 2  # 返回 2 表示"未实现"
 }
 
 # 加载依赖
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 兼容 zsh 和 bash 的脚本目录定位
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [[ -n "${(%):-%N}" ]]; then
+  # zsh 方式
+  SCRIPT_DIR="${0:A:h}"
+else
+  # 最后的兜底
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
+
 if [[ -f "$SCRIPT_DIR/adapter-loader.sh" ]]; then
   source "$SCRIPT_DIR/adapter-loader.sh"
 fi
 
 # 入口点
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# 兼容 zsh 和 bash 的入口检测
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
+  [[ "${(%):-%N}" == "${0}" ]]
+else
+  false
+fi && {
   echo "Routing Strategy Engine - Testing..."
   pp_strategy_validate_rules
-fi
+}

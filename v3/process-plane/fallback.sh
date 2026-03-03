@@ -46,45 +46,54 @@ pp_fallback_find_available() {
   return 0
 }
 
-# pp_fallback_notify(provider_from, provider_to, reason) -> void
+# pp_fallback_notify(provider_from, provider_to, reason, task_id?) -> void
 # 通知用户降级事件
 pp_fallback_notify() {
   local provider_from="$1"
   local provider_to="$2"
   local reason="$3"
-  
+  local task_id="${4:-unknown}"  # 可选的 task_id
+
   local message="Provider fallback: $provider_from → $provider_to (reason: $reason)"
-  
+
   # 记录到日志
   echo "[FALLBACK] $message" >&2
-  
+
   # 写入降级历史
-  pp_fallback_record "$provider_from" "$provider_to" "$reason"
+  pp_fallback_record "$provider_from" "$provider_to" "$reason" "$task_id"
 }
 
-# pp_fallback_record(provider_from, provider_to, reason) -> void
+# pp_fallback_record(provider_from, provider_to, reason, task_id?) -> void
 # 记录降级历史
 pp_fallback_record() {
   local provider_from="$1"
   local provider_to="$2"
   local reason="$3"
-  
+  local task_id="${4:-unknown}"  # 可选的 task_id
+
   mkdir -p "$FALLBACK_HISTORY_DIR"
-  
+
+  # 使用纳秒确保唯一性，避免同一秒内覆盖
   local timestamp
-  timestamp=$(date +%Y%m%d_%H%M%S)
-  
+  timestamp=$(date +%Y%m%d_%H%M%S_%N)
+
+  # 如果不支持 %N（纳秒），添加随机数作为后备
+  if [[ "$timestamp" == *"%N"* ]]; then
+    timestamp="$(date +%Y%m%d_%H%M%S)_$RANDOM"
+  fi
+
   local record_file="$FALLBACK_HISTORY_DIR/fallback_${timestamp}.json"
-  
+
   cat > "$record_file" <<EOF
 {
   "timestamp": "$(date -Iseconds)",
   "from": "$provider_from",
   "to": "$provider_to",
-  "reason": "$reason"
+  "reason": "$reason",
+  "task_id": "$task_id"
 }
 EOF
-  
+
   echo "Fallback recorded: $record_file" >&2
 }
 
@@ -197,35 +206,50 @@ pp_fallback_detect_loop() {
 }
 
 # pp_fallback_limit_attempts(task_id, max_attempts) -> bool
-# 限制降级尝试次数
+# 限制特定任务的降级尝试次数
 pp_fallback_limit_attempts() {
   local task_id="$1"
   local max_attempts="${2:-3}"
-  
+
   # 检查该任务的降级历史
   local history
   history=$(pp_fallback_history 100)
-  
+
+  # 统计该 task_id 的降级次数
   local attempt_count
-  attempt_count=$(echo "$history" | jq -r '.[] | select(.to | contains("'$task_id'"))' | wc -l)
-  
+  attempt_count=$(echo "$history" | jq -r --arg task "$task_id" '[.[] | select(.task_id == $task)] | length')
+
   if [[ $attempt_count -ge $max_attempts ]]; then
     echo "true"  # 已达上限
     return 0
   fi
-  
+
   echo "false"  # 未达上限
   return 0
 }
 
 # 加载依赖
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 兼容 zsh 和 bash 的脚本目录定位
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [[ -n "${(%):-%N}" ]]; then
+  # zsh 方式
+  SCRIPT_DIR="${0:A:h}"
+else
+  # 最后的兜底
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
+
 if [[ -f "$SCRIPT_DIR/adapter-loader.sh" ]]; then
   source "$SCRIPT_DIR/adapter-loader.sh"
 fi
 
 # 入口点
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "Provider Fallback Mechanism"
-  echo "Fallback path: ${FALLBACK_PATH[*]}"
-fi
+# 兼容 zsh 和 bash 的入口检测
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
+  [[ "${(%):-%N}" == "${0}" ]]
+else
+  false
+fi && echo "Provider Fallback Mechanism" && echo "Fallback path: ${FALLBACK_PATH[*]}"

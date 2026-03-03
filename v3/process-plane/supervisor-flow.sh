@@ -335,9 +335,11 @@ sf_log() {
 # 入口点
 # ============================================
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "Supervisor Flow - Six-Layer Process Model"
-  echo "Phases: ${SUPERVISOR_PHASES[*]}"
-  echo ""
-  echo "Usage: source this file"
-fi
+# 兼容 zsh 和 bash 的入口检测
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
+  [[ "${(%):-%N}" == "${0}" ]]
+else
+  false
+fi && echo "Supervisor Flow - Six-Layer Process Model" && echo "Phases: ${SUPERVISOR_PHASES[*]}" && echo "" && echo "Usage: source this file"

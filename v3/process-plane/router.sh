@@ -149,7 +149,16 @@ pp_aggregate_status() {
 }
 
 # 加载依赖模块
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 兼容 zsh 和 bash 的脚本目录定位
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [[ -n "${(%):-%N}" ]]; then
+  # zsh 方式
+  SCRIPT_DIR="${0:A:h}"
+else
+  # 最后的兜底
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 
 # Source 策略引擎（如果存在）
 if [[ -f "$SCRIPT_DIR/strategy.sh" ]]; then
@@ -192,28 +201,13 @@ else
   }
 fi
 
-# Adapter 辅助函数（临时实现，后续会被 adapter 加载机制替换）
-pp_adapter_validate() {
-  local provider_name="$1"
-  # 检查 adapter 目录是否存在
-  [[ -d "$SCRIPT_DIR/adapters/$provider_name" ]]
-}
-
-pp_adapter_call() {
-  local provider_name="$1"
-  local action="$2"
-  shift 2
-  
-  # 调用 adapter 脚本
-  local adapter_script="$SCRIPT_DIR/adapters/$provider_name/adapter.sh"
-  
-  if [[ ! -f "$adapter_script" ]]; then
-    return 1
-  fi
-  
-  source "$adapter_script"
-  provider_adapter "$action" "$@"
-}
+# 加载 adapter-loader（统一使用真实接口）
+if [[ -f "$SCRIPT_DIR/adapter-loader.sh" ]]; then
+  source "$SCRIPT_DIR/adapter-loader.sh"
+else
+  echo "Error: adapter-loader.sh not found" >&2
+  return 1 2>/dev/null || exit 1
+fi
 
 # 状态管理（临时实现，使用文件存储）
 PP_STATE_DIR="${PP_STATE_DIR:-/tmp/vibe-process-plane-state}"
@@ -233,6 +227,11 @@ pp_state_delete() {
 }
 
 # 入口点
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  echo "Provider Router - Use pp_route/pp_start/pp_status/pp_complete functions"
-fi
+# 兼容 zsh 和 bash 的入口检测
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
+  [[ "${(%):-%N}" == "${0}" ]]
+else
+  false
+fi && echo "Provider Router - Use pp_route/pp_start/pp_status/pp_complete functions"
