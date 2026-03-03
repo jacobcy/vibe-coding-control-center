@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Worktree naming utilities
+# Worktree naming utilities and validation
 # Part of V3 Execution Plane
 
 # Naming convention: wt-<owner>-<task-slug>
@@ -20,7 +20,8 @@ _validate_worktree_name() {
   fi
 
   # Check minimum parts
-  local parts=(${(s/-/)name})
+  local parts
+  parts=(${(s/-/)name})
   if [[ ${#parts[@]} -lt 3 ]]; then
     echo "Error: Name must have at least 3 parts: wt-<owner>-<task>"
     return 1
