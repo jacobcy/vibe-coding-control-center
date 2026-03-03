@@ -19,6 +19,7 @@ temp/
 
 # Worktrees
 wt-*/
+.worktrees/
 
 # Vibe artifacts
 # Local worktree cache only; shared task truth lives in git-common-dir/vibe/
