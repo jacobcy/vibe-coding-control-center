@@ -1,11 +1,18 @@
 ---
 name: vibe-review-docs
-description: Agentic Documentation and Changelog Review. Use when auditing documentation, PRDs, or markdown files for quality and consistency.
+description: Agentic Documentation and Changelog Review. Use when auditing entry files (CLAUDE.md, SOUL.md), docs/ directory, or checking for incorrect concepts. Use `vibe flow review` to check PR status.
 category: process
 trigger: manual
 ---
 
 # Vibe Documentation Review Protocol
+
+**核心职责**: 文档概念审查（检查错误概念和过时信息）
+
+**使用场景**:
+1. **入口文件审查**: 检查 CLAUDE.md, SOUL.md, STRUCTURE.md 等入口文件
+2. **docs/ 目录审查**: 审计 docs/ 目录下的文档质量
+3. **概念对齐**: 确保文档中的概念与代码实际状态一致
 
 When invoked to review documentation, your goal is to ensure clarity, consistency, and alignment with the Vibe Center architecture layout.
 

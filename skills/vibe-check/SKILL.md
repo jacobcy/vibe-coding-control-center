@@ -7,6 +7,8 @@ description: Use when the user wants to verify project memory consistency, says 
 
 验证项目记忆与代码实际状态的一致性。检测文档腐烂（documentation rot）并输出差异报告。
 
+**核心职责**: 检查 `.agent/` 和 `.git/` 目录的一致性，确保 task 记录和 memory 文件与实际代码状态对齐。
+
 **核心原则:** 只留最新，确保可信。
 
 **Announce at start:** "我正在使用 check 技能来验证项目记忆的一致性。"
@@ -17,11 +19,11 @@ description: Use when the user wants to verify project memory consistency, says 
 
  ```bash
  vibe check
- # Or if in a PR branch:
- vibe flow review
  ```
 
- 运行 `vibe check` 或 `vibe flow review` 进行全面的 Registry、OpenSpec、任务归档以及物理真源审计。解释其审计结果。
+ 运行 `vibe check` 进行全面的 Registry、任务归档以及物理真源审计。解释其审计结果。
+
+ **注意**: 如果你需要检查 PR 状态、CI 结果或评审意见，请使用 `vibe flow review` 命令或 `/vibe-review-code` skill。
  
  ### Step 1: 读取记忆文件
 
