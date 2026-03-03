@@ -1,0 +1,74 @@
+#!/usr/bin/env zsh
+# lib/task_query.sh - Read/Query operations for Task module
+
+_vibe_task_collect_openspec_tasks() {
+    local repo_root="$1" changes_dir="$repo_root/openspec/changes" aggregate_file change_dir change_name tasks_file total_tasks done_tasks change_status next_step
+    [[ -d "$changes_dir" ]] || { echo '{"tasks":[]}'; return 0; }
+    aggregate_file="$(mktemp)" || return 1
+    echo '[]' > "$aggregate_file"
+    for change_dir in "$changes_dir"/*(N); do
+        [[ -d "$change_dir" ]] || continue
+        change_name="$(basename "$change_dir")"
+        [[ "$change_name" == "archive" ]] && continue
+        tasks_file="$change_dir/tasks.md"; total_tasks=0; done_tasks=0
+        if [[ -f "$tasks_file" ]]; then
+            total_tasks="$(grep -E '^- \[( |x|X)\]' "$tasks_file" | wc -l | tr -d ' ')"
+            done_tasks="$(grep -E '^- \[[xX]\]' "$tasks_file" | wc -l | tr -d ' ')"
+        fi
+        if [[ "$total_tasks" -gt 0 && "$done_tasks" -eq "$total_tasks" ]]; then
+            change_status="completed"
+        elif [[ "$done_tasks" -gt 0 ]]; then
+            change_status="in-progress"
+        else
+            change_status="todo"
+        fi
+        next_step="Continue OpenSpec change: openspec/changes/$change_name/tasks.md"
+        jq --arg task_id "$change_name" --arg title "$change_name" --arg framework "openspec" --arg source_path "openspec/changes/$change_name" --arg status "$change_status" --arg next_step "$next_step" '. += [{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,current_subtask_id:null,assigned_worktree:null,next_step:$next_step}]' "$aggregate_file" > "$aggregate_file.tmp" && mv "$aggregate_file.tmp" "$aggregate_file"
+    done
+    jq -n --slurpfile tasks "$aggregate_file" '{"tasks":($tasks[0] // [])}'
+    rm -f "$aggregate_file"
+}
+
+_vibe_task_list() {
+    local common_dir worktrees_file registry_file show_all="0" json_out="0" missing openspec_tasks_file repo_root
+    for arg in "$@"; do
+        case "$arg" in
+            -a|--all) show_all="1" ;;
+            --json) json_out="1" ;;
+            -h|--help)
+                _vibe_task_usage
+                echo "  Show active worktrees and tasks in the registry."
+                echo "  -a, --all    Show all tasks including completed/archived."
+                echo "  --json       Output merged task/worktree data as JSON."
+                return 0
+                ;;
+            *) vibe_die "Unknown list option: $arg"; return 1 ;;
+        esac
+    done
+    vibe_require git jq || return 1
+    common_dir="$(_vibe_task_common_dir)" || return 1
+    worktrees_file="$common_dir/vibe/worktrees.json"
+    registry_file="$common_dir/vibe/registry.json"
+    _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
+    _vibe_task_require_file "$registry_file" "registry.json" || return 1
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+    openspec_tasks_file="$(mktemp)" || return 1
+    _vibe_task_collect_openspec_tasks "$repo_root" > "$openspec_tasks_file"
+
+    if [[ "$json_out" == "1" ]]; then
+        jq -n --slurpfile reg "$registry_file" --slurpfile wt "$worktrees_file" --slurpfile os "$openspec_tasks_file" '{tasks: (($reg[0].tasks // []) + ($os[0].tasks // []) | unique_by(.task_id)), worktrees: ($wt[0].worktrees // [])}'
+        rm -f "$openspec_tasks_file"
+        return 0
+    fi
+
+    local cur_tid; cur_tid="$(jq -r '.task_id // empty' .vibe/current-task.json 2>/dev/null || true)"
+    if [[ -z "$cur_tid" ]]; then
+        local current_wt_path; current_wt_path=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
+        cur_tid="$(jq -r --arg p "$current_wt_path" '.worktrees[]? | select(.worktree_path == $p) | .current_task // empty' "$worktrees_file" | head -1)"
+    fi
+
+    missing="$(jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" --arg cur "$cur_tid" '((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all | [.worktrees[]? as $w | select($w.current_task != null) | select(($all | map(.task_id) | index($w.current_task)) == null) | $w.current_task] | unique[])' "$worktrees_file")" || { rm -f "$openspec_tasks_file"; return 1; }
+    [[ -z "$missing" ]] || { rm -f "$openspec_tasks_file"; vibe_die "Task not found in registry: ${missing%%$'\n'*}"; return 1; }
+    _vibe_task_render "$worktrees_file" "$registry_file" "$openspec_tasks_file" "$show_all" "$cur_tid"
+    rm -f "$openspec_tasks_file"
+}

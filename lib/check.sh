@@ -6,9 +6,13 @@ vibe_check() {
     local file="${1:-}"
     
     if [[ "$file" == "-h" || "$file" == "--help" ]]; then
-        echo "Usage: ${CYAN}vibe check [file]${NC}"
-        echo "  - With file: Validates format (currently JSON)."
-        echo "  - No file:   Performs comprehensive audit of registry, openspec, and branches."
+        echo "${BOLD}Vibe Health Checker${NC}"
+        echo ""
+        echo "Usage: ${CYAN}vibe check${NC} [file]"
+        echo ""
+        echo "Modes:"
+        echo "  ${GREEN}[file]${NC}        验证文件格式（目前支持 JSON 及其 Vibe Schema）"
+        echo "  ${GREEN}(无参数)${NC}      执行项目全要素审计（Registry、OpenSpec、归档、僵尸分支）"
         return 0
     fi
 
@@ -41,6 +45,10 @@ vibe_check() {
         if [[ -d "docs/tasks/$tid" ]]; then
             log_info "   Archiving $tid..."
             mv "docs/tasks/$tid" "$archive_dir/" 2>/dev/null
+            vibe task update "$tid" --status archived >/dev/null 2>&1
+        elif [[ -d "$archive_dir/$tid" ]]; then
+            # Folder already in archive, but status still "completed" - sync it
+            vibe task update "$tid" --status archived >/dev/null 2>&1
         fi
     done
 
@@ -53,14 +61,16 @@ vibe_check() {
     # 4. Health Check Summary
     local total; total=$(jq '.tasks | length' "$reg")
     local in_progress; in_progress=$(jq '[.tasks[] | select(.status == "in_progress" or .status == "todo")] | length' "$reg")
+    local archived; archived=$(jq '[.tasks[] | select(.status == "archived")] | length' "$reg")
     local completed; completed=$(jq '[.tasks[] | select(.status == "completed")] | length' "$reg")
-    local archived_count; archived_count=$(ls -1 "$archive_dir" 2>/dev/null | wc -l | xargs)
+    local archived_folders; archived_folders=$(ls -1 "$archive_dir" 2>/dev/null | wc -l | xargs)
 
     log_success "Audit complete."
     echo "  - Total Tasks: $total"
     echo "  - Active (Todo/In-Progress): $in_progress"
     echo "  - Completed (Pending Archive): $completed"
-    echo "  - Archived Folders: $archived_count"
+    echo "  - Archived Tasks (Registry): $archived"
+    echo "  - Archived Folders: $archived_folders"
     echo ""
     log_info "Tip: Use ${CYAN}/vibe-check (slash)${NC} for AI-assisted remediation."
 }

@@ -3,16 +3,16 @@
 # Target: ~40 lines | Single source of truth for paths
 
 # ── VIBE_ROOT Detection ─────────────────────────────────
-# Simple: resolve from script location (one level up from lib/)
-VIBE_ROOT="${VIBE_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}"
+# Always resolve from this script's location (one level up from lib/).
+# Never inherit from parent shell to prevent cross-worktree contamination.
+VIBE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 export VIBE_ROOT
 
 # ── Core Directories ────────────────────────────────────
-# Always anchor executable/library paths to the current VIBE_ROOT to avoid
-# cross-worktree contamination from inherited shell environment variables.
+# All paths derived from VIBE_ROOT to ensure worktree isolation.
 export VIBE_BIN="$VIBE_ROOT/bin"
 export VIBE_LIB="$VIBE_ROOT/lib"
-export VIBE_CONFIG="${VIBE_CONFIG:-$VIBE_ROOT/config}"
+export VIBE_CONFIG="$VIBE_ROOT/config"
 export VIBE_AGENT="${VIBE_AGENT:-$VIBE_ROOT/.agent}"
 
 # ── Load Utils ──────────────────────────────────────────

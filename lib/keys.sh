@@ -93,12 +93,18 @@ vibe_keys() {
         get)       _keys_get "$@" ;;
         init)      _keys_init ;;
         help|-h|--help)
-                   echo "Usage: vibe keys <command>"
-                   echo "Commands: list | set | get | init"
+                   echo "${BOLD}Vibe Key Manager${NC}"
+                   echo ""
+                   echo "Usage: ${CYAN}vibe keys <subcommand>${NC}"
+                   echo ""
+                   echo "Subcommands:"
+                   echo "  ${GREEN}list${NC}           列出当前 API 密钥状态"
+                   echo "  ${GREEN}set${NC} <k> <v>    设置/更新特定密钥"
+                   echo "  ${GREEN}get${NC} <k>        获取特定密钥明文"
+                   echo "  ${GREEN}init${NC}          从模板初始化 keys.env 配置文件"
                    ;;
         *)         log_error "Unknown: vibe keys $subcmd"
-                   echo "Usage: vibe keys <command>"
-                   echo "Commands: list | set | get | init"
+                   echo "Usage: vibe keys <subcommand> (list, set, get, init)"
                    return 1
                    ;;
     esac
