@@ -69,7 +69,7 @@ wtvalidate() {
     fi
 
     # Check git integrity
-    if $git_cmd fsck --full --quiet 2>/dev/null; then
+    if $git_cmd fsck --full 2>/dev/null 1>&2; then
       echo "  ✅ Git repository integrity OK"
     else
       echo "  ❌ Git repository corruption detected"

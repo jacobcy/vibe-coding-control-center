@@ -70,11 +70,13 @@ wtnew() {
   $git_cmd -C "$path" config user.name "$aname"
   $git_cmd -C "$path" config user.email "$aemail"
   echo "👤 Identity: $aname <$aemail>"
-  cd "$path" || return
 
   # V3: Write execution result (contract already loaded by parent)
   if type write_execution_result >/dev/null 2>&1; then
     local task_id="${branch}"
     write_execution_result "$task_id" "$dir" "${agent}-${branch}" || true
   fi
-}
+
+  # Return to caller's directory instead of cd
+  echo "📁 Worktree path: $path"
+  echo "💡 Use 'cd $path' to enter worktree"

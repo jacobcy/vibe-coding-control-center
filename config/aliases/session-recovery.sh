@@ -37,11 +37,11 @@ wtrecover() {
     return 1
   }
 
-  # Source execution contract
-  source "${0:a:h}/execution-contract.sh" 2>/dev/null || {
-    echo "Error: execution-contract.sh not found"
+  # Source execution contract (loaded by parent worktree.sh or tmux.sh)
+  if ! type query_by_task_id >/dev/null 2>&1; then
+    echo "Error: execution-contract.sh not loaded (must be sourced before session-recovery.sh)"
     return 1
-  }
+  fi
 
   local start_time; start_time=$(date +%s)
   local result worktree session task_id

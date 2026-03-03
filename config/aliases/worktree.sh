@@ -14,7 +14,8 @@
 if [[ -n "$VIBE_ROOT" ]]; then
   WORKTREE_MODULE_DIR="$VIBE_ROOT/config/aliases/worktree"
 else
-  WORKTREE_MODULE_DIR="${0:a:h}/worktree"
+  # Fallback: Use BASH_SOURCE or ZSH script context
+  WORKTREE_MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")" 2>/dev/null && pwd)/config/aliases/worktree"
 fi
 
 source "$WORKTREE_MODULE_DIR/naming.sh" 2>/dev/null || true

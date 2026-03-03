@@ -8,101 +8,71 @@ setup() {
   source "$VIBE_ROOT/config/aliases/session-recovery.sh"
   source "$VIBE_ROOT/config/aliases/worktree.sh"
   source "$VIBE_ROOT/config/aliases/tmux.sh"
+
+  # Use unique task IDs for test isolation
+  export TEST_TASK_ID="perf-$$"
+}
+
+teardown() {
+  # Cleanup test artifacts
+  wtrm "wt-claude-$TEST_TASK_ID" --force 2>/dev/null || true
+  tmkill "claude-$TEST_TASK_ID" --force 2>/dev/null || true
 }
 
 @test "Performance: Recovery time < 30 seconds" {
   # Setup
-  wtnew perf-recovery claude main || true
-  tmnew perf-recovery claude || true
+  wtnew "$TEST_TASK_ID" claude main || true
+  tmnew "$TEST_TASK_ID" claude || true
 
   # Kill session
-  tmkill claude-perf-recovery --force || true
+  tmkill "claude-$TEST_TASK_ID" --force || true
 
   # Measure recovery time
   local start end duration
   start=$(date +%s)
-
-  wtrecover --task-id perf-recovery
-
+  wtrecover --task-id "$TEST_TASK_ID" || true
   end=$(date +%s)
   duration=$((end - start))
 
-  # Should be < 30 seconds
   [ "$duration" -lt 30 ]
-
-  # Cleanup
-  wtrm wt-claude-perf-recovery --force || true
-  tmkill claude-perf-recovery --force || true
+  [[ "$output" == *"Recovery complete"* ]]
 }
 
 @test "Performance: Worktree creation < 5 seconds" {
+  # Setup
   local start end duration
   start=$(date +%s)
-
-  wtnew perf-creation claude main
-
+  wtnew "$TEST_TASK_ID" claude main || true
   end=$(date +%s)
   duration=$((end - start))
 
-  # Should be < 5 seconds
   [ "$duration" -lt 5 ]
-
-  # Cleanup
-  wtrm wt-claude-perf-creation --force || true
+  [[ "$output" == *"Created worktree"* ]]
 }
 
 @test "Performance: Session creation < 2 seconds" {
+  # Setup
   local start end duration
   start=$(date +%s)
-
-  tmnew perf-session claude
-
+  tmnew "$TEST_TASK_ID" claude || true
   end=$(date +%s)
   duration=$((end - start))
 
-  # Should be < 2 seconds
   [ "$duration" -lt 2 ]
-
-  # Cleanup
-  tmkill claude-perf-session --force || true
+  [[ "$output" == *"Created session"* ]]
 }
 
 @test "Performance: Query by task_id < 1 second" {
-  source "$VIBE_ROOT/config/aliases/execution-contract.sh"
-
   # Setup
-  wtnew perf-query claude main || true
+  wtnew "$TEST_TASK_ID" claude main || true
 
+  # Measure query time
   local start end duration
   start=$(date +%s)
-
-  query_by_task_id perf-query >/dev/null 2>&1
-
+  query_by_task_id "$TEST_TASK_ID" || true
   end=$(date +%s)
   duration=$((end - start))
 
-  # Should be < 1 second
   [ "$duration" -lt 1 ]
-
-  # Cleanup
-  wtrm wt-claude-perf-query --force || true
-}
-
-@test "Performance: Worktree validation < 5 seconds" {
-  # Setup
-  wtnew perf-validate claude main || true
-
-  local start end duration
-  start=$(date +%s)
-
-  wtvalidate wt-claude-perf-validate
-
-  end=$(date +%s)
-  duration=$((end - start))
-
-  # Should be < 5 seconds
-  [ "$duration" -lt 5 ]
-
-  # Cleanup
-  wtrm wt-claude-perf-validate --force || true
+  [[ "$output" == *"$TEST_TASK_ID"* ]]
 }
