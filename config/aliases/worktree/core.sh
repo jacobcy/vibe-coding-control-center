@@ -6,16 +6,22 @@
 # V3: Auto-naming with conflict detection
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local branch="$1" agent="${2:-claude}" base="${3:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [agent=claude|opencode|codex] [base=main]"
+  local branch="$1" agent="${2:-claude}" base="${3:-}"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [agent=claude|opencode|codex] [base]"
 
   local repo_root
   repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
 
-  # Must be on main/master
-  local cur_br; cur_br="$($git_cmd -C "$repo_root" branch --show-current 2>/dev/null)"
-  if [[ "$cur_br" != "main" && "$cur_br" != "master" ]]; then
-    echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
+  # Determine base branch if not specified
+  if [[ -z "$base" ]]; then
+    # Try main first, then master, then current branch
+    if $git_cmd -C "$repo_root" show-ref --verify --quiet refs/heads/main; then
+      base="main"
+    elif $git_cmd -C "$repo_root" show-ref --verify --quiet refs/heads/master; then
+      base="master"
+    else
+      base="$($git_cmd -C "$repo_root" branch --show-current 2>/dev/null)"
+    fi
   fi
 
   # V3: Generate standardized worktree name

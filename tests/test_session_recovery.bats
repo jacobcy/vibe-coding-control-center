@@ -5,7 +5,7 @@ load test_utils
 
 setup() {
   setup_test_env
-  source "$VIBE_ROOT/config/aliases/session-recovery.sh
+  source "$VIBE_ROOT/config/aliases/session-recovery.sh"
   source "$VIBE_ROOT/config/aliases/execution-contract.sh"
 }
 

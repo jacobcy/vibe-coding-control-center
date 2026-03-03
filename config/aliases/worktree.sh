@@ -21,6 +21,7 @@ source "$WORKTREE_MODULE_DIR/naming.sh" 2>/dev/null || true
 source "$WORKTREE_MODULE_DIR/validation.sh" 2>/dev/null || true
 source "$WORKTREE_MODULE_DIR/cleanup.sh" 2>/dev/null || true
 source "$WORKTREE_MODULE_DIR/navigation.sh" 2>/dev/null || true
+source "$WORKTREE_MODULE_DIR/list.sh" 2>/dev/null || true
 source "$WORKTREE_MODULE_DIR/core.sh" 2>/dev/null || true
 
 # Backward compatibility alias

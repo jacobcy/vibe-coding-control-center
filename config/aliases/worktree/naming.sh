@@ -21,9 +21,9 @@ _validate_worktree_name() {
 
   # Check minimum parts
   local parts
-  parts=(${(s/-/)name})
+  parts=(${(s/-/)"$name"})
   if [[ ${#parts[@]} -lt 3 ]]; then
-    echo "Error: Name must have at least 3 parts: wt-<owner>-<task>"
+    echo "Error: Name must have at least 3 parts: wt-<owner>-<task-slug>" >&2
     return 1
   fi
 
@@ -32,5 +32,9 @@ _validate_worktree_name() {
 
 # Generate auto-suffix for naming conflicts (4 chars)
 _generate_conflict_suffix() {
-  date +%s | md5sum | cut -c1-4
+  # Use nanoseconds + RANDOM for better uniqueness
+  local ns random
+  ns=$(date +%N 2>/dev/null || echo $RANDOM$$)
+  random=$RANDOM
+  printf "%04x" $(( (10#$ns ^ random) % 65536 ))
 }

@@ -2,16 +2,27 @@
 # Skill wrappers for OpenClaw automated execution
 # These wrappers set EXECUTOR=openclaw and call the underlying commands
 
+# Resolve VIBE_ROOT for sourcing (works when sourced or executed)
+if [[ -n "$VIBE_ROOT" ]]; then
+  _wrappers_root="$VIBE_ROOT"
+else
+  # When this file is sourced, use BASH_SOURCE or ZSH script context
+  _wrappers_root="$(cd "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")/../.." 2>/dev/null && pwd)" || {
+    # Fallback: assume we're in skills/execution-plane/
+    _wrappers_root="${0:a:h:h:h}"
+  }
+fi
+
 # Worktree operations wrapper
 skill_wtnew() {
-  local task_slug="$1" agent="${2:-openclaw}" base="${3:-main}"
+  local task_slug="$1" agent="${2:-openclaw}" base="${3:-}"
   [[ -z "$task_slug" ]] && { echo "Usage: skill_wtnew <task-slug> [agent] [base]"; return 1; }
 
   export EXECUTOR=openclaw
   echo "🤖 OpenClaw Mode: Creating worktree..."
 
   # Source worktree functions
-  source "${0:a:h}/../../config/aliases/worktree.sh"
+  source "$_wrappers_root/config/aliases/worktree.sh"
 
   wtnew "$task_slug" "$agent" "$base"
 }

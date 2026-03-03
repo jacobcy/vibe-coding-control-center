@@ -34,8 +34,14 @@ _validate_tmux_session_name() {
 # Extract agent and task from session name
 _parse_session_name() {
   local name="$1"
-  if [[ "$name" =~ ^([^-]+)-(.+)$ ]]; then
-    echo "${match[1]} ${match[2]}"
+  local agent task
+
+  # Split on first hyphen using parameter expansion (bash-compatible)
+  agent="${name%%-*}"
+  task="${name#*-}"
+
+  if [[ -n "$agent" && -n "$task" && "$agent" != "$task" ]]; then
+    echo "$agent $task"
   else
     echo "unknown $name"
   fi
