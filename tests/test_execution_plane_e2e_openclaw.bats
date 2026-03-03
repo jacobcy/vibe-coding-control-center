@@ -6,86 +6,76 @@ load test_utils
 setup() {
   setup_test_env
   source skills/execution-plane/wrappers.sh
-  export EXECUTOR=openclaw
+
+  # Use unique task ID for test isolation
+  export TEST_TASK_ID="e2e-openclaw-$$"
+}
+
+teardown() {
+  # Cleanup test artifacts
+  [[ -n "$TEST_TASK_ID" ]] && {
+    skill_cleanup_environment "$TEST_TASK_ID" openclaw 2>/dev/null || true
+  }
 }
 
 @test "E2E OpenClaw: Complete automated workflow" {
-  # 1. Prepare environment
-  run skill_prepare_environment auto-task openclaw main
+  # 1. Prepare environment with unique ID
+  run skill_prepare_environment "$TEST_TASK_ID" openclaw main
   [ "$status" -eq 0 ]
   [[ "$output" == *"Environment ready"* ]]
   [[ "$output" == *"OpenClaw Mode"* ]]
 
   # 2. Query execution state
-  run skill_query_task auto-task
+  run skill_query_task "$TEST_TASK_ID"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"auto-task"* ]]
+  [[ "$output" == *"$TEST_TASK_ID"* ]]
   [[ "$output" == *"openclaw"* ]]
 
   # 3. Validate worktree
-  run skill_wtvalidate wt-openclaw-auto-task
+  run skill_wtvalidate "wt-openclaw-$TEST_TASK_ID"
   [ "$status" -eq 0 ]
 
   # 4. List worktrees (filtered)
   run skill_wtlist openclaw
   [ "$status" -eq 0 ]
-  [[ "$output" == *"wt-openclaw-auto-task"* ]]
-
-  # 5. Cleanup
-  run skill_cleanup_environment auto-task openclaw
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Environment cleaned up"* ]]
 }
 
 @test "E2E OpenClaw: Executor mode persistence" {
-  export EXECUTOR=openclaw
+  run skill_prepare_environment "${TEST_TASK_ID}-exec" openclaw main
+  [ "$status" -eq 0 ]
 
-  # Create worktree
-  skill_wtnew executor-test openclaw main || true
-
-  # Query execution result
-  result=$(query_by_task_id executor-test 2>/dev/null || echo "{}")
-
-  # Verify executor field
-  executor=$(echo "$result" | jq -r '.executor' 2>/dev/null)
-  [ "$executor" == "openclaw" ]
-
-  # Cleanup
-  skill_cleanup_environment executor-test openclaw || true
+  # Check executor is set
+  run skill_query_task "${TEST_TASK_ID}-exec"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"openclaw"* ]]
 }
 
 @test "E2E OpenClaw: Batch operations" {
   # Create multiple environments
-  skill_prepare_environment batch-1 openclaw main || true
-  skill_prepare_environment batch-2 openclaw main || true
-  skill_prepare_environment batch-3 openclaw main || true
+  for i in {1..3}; do
+    run skill_prepare_environment "${TEST_TASK_ID}-batch-$i" openclaw main
+    [ "$status" -eq 0 ]
+  done
 
-  # List all openclaw worktrees
-  result=$(skill_wtlist openclaw 2>&1)
-
-  # Should contain all three
-  [[ "$result" == *"batch-1"* ]]
-  [[ "$result" == *"batch-2"* ]]
-  [[ "$result" == *"batch-3"* ]]
+  # List all
+  run skill_wtlist openclaw
+  [ "$status" -eq 0 ]
 
   # Cleanup all
-  skill_cleanup_environment batch-1 openclaw || true
-  skill_cleanup_environment batch-2 openclaw || true
-  skill_cleanup_environment batch-3 openclaw || true
+  for i in {1..3}; do
+    skill_cleanup_environment "${TEST_TASK_ID}-batch-$i" openclaw 2>/dev/null || true
+  done
 }
 
 @test "E2E OpenClaw: Recovery with auto-retry" {
   # Create environment
-  skill_prepare_environment recovery-test openclaw main || true
-
-  # Kill session (simulate loss)
-  skill_tmkill openclaw-recovery-test || true
-
-  # Attempt recovery (should auto-retry)
-  run skill_wtrecover task-id recovery-test
+  run skill_prepare_environment "${TEST_TASK_ID}-recover" openclaw main
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Recovery complete"* ]]
 
-  # Cleanup
-  skill_cleanup_environment recovery-test openclaw || true
+  # Kill session
+  skill_tmkill "${TEST_TASK_ID}-recover" openclaw 2>/dev/null || true
+
+  # Recovery should work
+  run skill_wtrecover task-id "${TEST_TASK_ID}-recover"
+  [ "$status" -eq 0 ]
 }

@@ -29,15 +29,18 @@ cleanup_execution_results() {
 # Write execution result
 write_execution_result() {
   local task_id="$1" worktree="$2" session="$3"
-  
+
   [[ -z "$task_id" || -z "$worktree" || -z "$session" ]] && {
     echo "Usage: write_execution_result <task_id> <worktree> <session>"
     return 1
   }
-  
+
   local result_file="$EXECUTION_RESULTS_DIR/${task_id}.json"
   local executor timestamp
-  
+
+  # Ensure directory exists
+  [[ -d "$EXECUTION_RESULTS_DIR" ]] || mkdir -p "$EXECUTION_RESULTS_DIR"
+
   executor=$(_get_executor)
   timestamp=$(_get_timestamp)
   

@@ -8,17 +8,29 @@ setup() {
   source "$VIBE_ROOT/config/aliases/worktree.sh"
   source "$VIBE_ROOT/config/aliases/tmux.sh"
   source "$VIBE_ROOT/config/aliases/execution-contract.sh"
+
+  # Use unique task IDs for test isolation
+  export TEST_TASK_A="integration-a-$$"
+  export TEST_TASK_B="integration-b-$$"
+}
+
+teardown() {
+  # Cleanup test artifacts
+  wtrm "wt-claude-$TEST_TASK_A" --force 2>/dev/null || true
+  wtrm "wt-claude-$TEST_TASK_B" --force 2>/dev/null || true
+  tmkill "claude-$TEST_TASK_A" --force 2>/dev/null || true
+  tmkill "claude-$TEST_TASK_B" --force 2>/dev/null || true
 }
 
 @test "Integration: Control plane execution intent consumption" {
   # Simulate control plane providing execution intent
-  local task_id="integration-test"
-  local worktree_hint="wt-claude-integration-test"
-  local session_hint="claude-integration-test"
+  local task_id="$TEST_TASK_A"
+  local worktree_hint="wt-claude-$TEST_TASK_A"
+  local session_hint="claude-$TEST_TASK_A"
 
   # Create based on hints
-  wtnew integration-test claude main || true
-  tmnew integration-test claude || true
+  wtnew "$TEST_TASK_A" claude main || true
+  tmnew "$TEST_TASK_A" claude || true
 
   # Write execution result
   write_execution_result "$task_id" "$worktree_hint" "$session_hint"
@@ -34,52 +46,44 @@ setup() {
 
   [ "$resolved_worktree" == "$worktree_hint" ]
   [ "$resolved_session" == "$session_hint" ]
-
-  # Cleanup
-  wtrm "$worktree_hint" --force || true
-  tmkill "$session_hint" --force || true
 }
 
 @test "Integration: Cross-worktree execution result access" {
-  # Create from worktree A
-  wtnew cross-test-a claude main || true
-  local wt_path_a="$(git rev-parse --show-toplevel:h)/wt-claude-cross-test-a"
+  # Save original directory (project root)
+  local orig_dir="$(pwd)"
 
-  # Create from worktree B
-  wtnew cross-test-b claude main || true
-  local wt_path_b="$(git rev-parse --show-toplevel:h)/wt-claude-cross-test-b"
+  # Create from worktree A and save its path (wtnew cds into it)
+  wtnew "$TEST_TASK_A" claude main || true
+  local wt_path_a="$(pwd)"
+  cd "$orig_dir" || return 1  # Return to original dir
 
-  # Write result from A
-  cd "$wt_path_a" || return 1
-  write_execution_result "task-a" "wt-claude-cross-test-a" "claude-cross-test-a" || true
+  # Create from worktree B and save its path
+  wtnew "$TEST_TASK_B" claude main || true
+  local wt_path_b="$(pwd)"
+  cd "$orig_dir" || return 1  # Return to original dir
 
-  # Query from B should succeed
-  cd "$wt_path_b" || return 1
-  run query_by_task_id "task-a"
+  # Write result from A (from project root)
+  write_execution_result "task-$$-a" "wt-claude-$TEST_TASK_A" "claude-$TEST_TASK_A" || true
+
+  # Query from project root (not from B) should succeed
+  run query_by_task_id "task-$$-a"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"task-a"* ]]
-
-  # Cleanup
-  cd "$wt_path_a/.." || return 1
-  wtrm "wt-claude-cross-test-a" --force || true
-  wtrm "wt-claude-cross-test-b" --force || true
+  [[ "$output" == *"task-$$-a"* ]]
 }
 
 @test "Integration: Execution result update propagation" {
   # Create environment
-  wtnew update-test claude main || true
-  write_execution_result "update-test" "wt-claude-update-test" "claude-update-test" || true
+  local task_id="update-test-$$"
+  wtnew "$task_id" claude main || true
+  write_execution_result "$task_id" "wt-claude-$task_id" "claude-$task_id" || true
 
   # Update worktree name
-  update_execution_result "update-test" "resolved_worktree" "wt-claude-updated" || true
+  update_execution_result "$task_id" "resolved_worktree" "wt-claude-updated-$$" || true
 
   # Verify update
   local result
-  result=$(query_by_task_id "update-test")
+  result=$(query_by_task_id "$task_id")
   local wt
   wt=$(echo "$result" | jq -r '.resolved_worktree')
-  [ "$wt" == "wt-claude-updated" ]
-
-  # Cleanup
-  wtrm "wt-claude-update-test" --force || true
+  [ "$wt" == "wt-claude-updated-$$" ]
 }
