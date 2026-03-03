@@ -23,50 +23,54 @@ query_by_task_id() {
 query_by_worktree() {
   local worktree="$1"
   [[ -z "$worktree" ]] && { echo "Usage: query_by_worktree <worktree>"; return 1; }
-  
+
   local found=0
   for json_file in "$EXECUTION_RESULTS_DIR"/*.json; do
     [[ -f "$json_file" ]] || continue
-    
+
     local wt
     wt=$(jq -r '.resolved_worktree' "$json_file" 2>/dev/null)
-    
+
     if [[ "$wt" == "$worktree" || "$wt" == *"$worktree"* ]]; then
       cat "$json_file"
       found=1
       break
     fi
   done
-  
-  [[ $found -eq 0 ]] && {
-    echo "Execution result not found for worktree: $worktree"
+
+  if [[ $found -eq 0 ]]; then
+    echo "Execution result not found for worktree: $worktree" >&2
     return 1
-  }
+  fi
+
+  return 0
 }
 
 # Query execution result by session
 query_by_session() {
   local session="$1"
   [[ -z "$session" ]] && { echo "Usage: query_by_session <session>"; return 1; }
-  
+
   local found=0
   for json_file in "$EXECUTION_RESULTS_DIR"/*.json; do
     [[ -f "$json_file" ]] || continue
-    
+
     local sess
     sess=$(jq -r '.resolved_session' "$json_file" 2>/dev/null)
-    
+
     if [[ "$sess" == "$session" ]]; then
       cat "$json_file"
       found=1
       break
     fi
   done
-  
-  [[ $found -eq 0 ]] && {
-    echo "Execution result not found for session: $session"
+
+  if [[ $found -eq 0 ]]; then
+    echo "Execution result not found for session: $session" >&2
     return 1
-  }
+  fi
+
+  return 0
 }
 
 # Update execution result

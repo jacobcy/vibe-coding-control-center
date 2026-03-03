@@ -7,6 +7,10 @@ setup_test_env() {
   export VIBE_ROOT="${BATS_TEST_DIRNAME}/.."
   export VIBE_MAIN="$VIBE_ROOT"
   export VIBE_SESSION="test-session"
+
+  # Source core libraries (required for alias functions)
+  source "$VIBE_ROOT/lib/config.sh"
+  source "$VIBE_ROOT/lib/utils.sh"
 }
 
 # Create a temporary git repository for testing
