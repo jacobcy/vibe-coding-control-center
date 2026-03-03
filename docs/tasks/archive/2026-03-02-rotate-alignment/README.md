@@ -2,8 +2,6 @@
 task_id: "2026-03-02-rotate-alignment"
 document_type: task-readme
 title: "Rotate Workflow Refinement"
-current_layer: "plan"
-status: "planning"
 author: "Antigravity Agent"
 created: "2026-03-02"
 last_updated: "2026-03-02"
@@ -12,31 +10,6 @@ related_docs:
   - lib/flow.sh
   - lib/task.sh
   - docs/standards/git-workflow-standard.md
-gates:
-  scope:
-    status: "passed"
-    timestamp: "2026-03-02T11:00:00+08:00"
-    reason: "Assessed the need to standardize rotate.sh into a first-class vibe command and slash agent action."
-  spec:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  plan:
-    status: "passed"
-    timestamp: "2026-03-02T12:40:00+08:00"
-    reason: "Plan v1 updated with in-place rotate, stable directory, and naming-model constraints."
-  test:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  code:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  audit:
-    status: "pending"
-    timestamp: ""
-    reason: ""
 ---
 
 # Task: Rotate Workflow Refinement

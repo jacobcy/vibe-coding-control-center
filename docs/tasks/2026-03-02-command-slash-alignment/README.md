@@ -2,39 +2,7 @@
 task_id: "2026-03-02-command-slash-alignment"
 document_type: task-readme
 title: "Command vs Slash Alignment"
-current_layer: "code"
-status: "in_progress"
 author: "Antigravity Agent"
-created: "2026-03-02"
-last_updated: "2026-03-02"
-related_docs:
-  - bin/vibe
-  - docs/standards/command-structure.md
-gates:
-  scope:
-    status: "passed"
-    timestamp: "2026-03-02T19:30:00+08:00"
-    reason: "Scope Gate review completed - identified boundary violations and API gaps"
-  spec:
-    status: "passed"
-    timestamp: "2026-03-02T21:20:00+08:00"
-    reason: "Refined Spec V2 created - unified Command/Slash mapping, .git/shared storage, and lifecycle flow (new, save, continue, commit, done) defined."
-  plan:
-    status: "passed"
-    timestamp: "2026-03-02T21:22:00+08:00"
-    reason: "Plan V2 expanded with storage redirection and flow lifecycle tasks."
-  test:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  code:
-    status: "in_progress"
-    timestamp: "2026-03-02T21:23:00+08:00"
-    reason: "Implementing Storage Redirection and Flow Lifecycle"
-  audit:
-    status: "pending"
-    timestamp: ""
-    reason: ""
 ---
 
 # Task: Command vs Slash Alignment

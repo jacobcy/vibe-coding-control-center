@@ -2,41 +2,6 @@
 task_id: 2026-02-28-vibe-skills
 document_type: task-readme
 title: vibe-skills — Skills 生命周期管理 Skill
-current_layer: audit
-status: completed
-author: Claude Sonnet 4
-created: 2026-02-28
-last_updated: 2026-02-28
-related_docs:
-  - CLAUDE.md
-  - skills/vibe-audit/SKILL.md
-  - .agents/skills/writing-skills/SKILL.md
-  - docs/standards/doc-quality-standards.md
-gates:
-  scope:
-    status: passed
-    timestamp: "2026-02-28T21:55:00+08:00"
-    reason: 需求通过 brainstorming 完整探讨，确认方向；发现 npx skills 已覆盖所有操作，设计大幅精简，无需自写脚本
-  spec:
-    status: passed
-    timestamp: "2026-02-28T22:10:00+08:00"
-    reason: 对话流程、限额策略、IDE映射、registry结构已细化并记录在 plan.md
-  plan:
-    status: passed
-    timestamp: "2026-02-28T22:13:00+08:00"
-    reason: 5个task实现计划已写入 docs/tasks/2026-02-28-vibe-skills/plan.md
-  test:
-    status: passed
-    timestamp: "2026-02-28T22:20:00+08:00"
-    reason: 文件存在验证、registry JSON 有效、symlink 正确、SKILL.md 字数合规
-  code:
-    status: passed
-    timestamp: "2026-02-28T22:17:00+08:00"
-    reason: SKILL.md(365w) + registry.json(14 skills) 已创建，commit 594a27e
-  audit:
-    status: passed
-    timestamp: "2026-02-28T22:22:00+08:00"
-    reason: LOC=313(SKILL.md 111行+registry 202行)，字段完整性0缺损，symlink双向健康，无死代码
 ---
 
 # vibe-skills — Skills 生命周期管理 Skill

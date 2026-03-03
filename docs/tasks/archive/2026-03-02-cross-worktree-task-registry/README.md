@@ -2,8 +2,6 @@
 task_id: "2026-03-02-cross-worktree-task-registry"
 document_type: task-readme
 title: "Cross-Worktree Task Registry"
-current_layer: "plan"
-status: "completed"
 author: "Codex GPT-5"
 created: "2026-03-02"
 last_updated: "2026-03-02"
@@ -12,31 +10,6 @@ related_docs:
   - docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md
   - .agent/context/task.md
   - .agent/context/memory.md
-gates:
-  scope:
-    status: "passed"
-    timestamp: "2026-03-02T00:00:00+08:00"
-    reason: "问题已收敛为跨 worktree 的任务绑定、选择与监控，不再是单 worktree session 恢复。"
-  spec:
-    status: "passed"
-    timestamp: "2026-03-02T00:00:00+08:00"
-    reason: "已明确关键约束：任务可选拆分 subtask；每个 worktree 同时只绑定一个当前 task；本地聚焦内容放 worktree `.vibe/` 并加入 `.gitignore`。"
-  plan:
-    status: "passed"
-    timestamp: "2026-03-02T00:00:00+08:00"
-    reason: "已生成 plan-v1-initial.md，用于定义共享任务注册表和 worktree 绑定模型。"
-  test:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  code:
-    status: "pending"
-    timestamp: ""
-    reason: ""
-  audit:
-    status: "pending"
-    timestamp: ""
-    reason: ""
 ---
 
 # Task: Cross-Worktree Task Registry

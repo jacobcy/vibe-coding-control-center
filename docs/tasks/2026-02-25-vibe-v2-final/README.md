@@ -1,25 +1,6 @@
 ---
 task_id: "2026-02-25-vibe-v2-final"
 title: "Vibe V2 最终方案"
-created: "2026-02-25T00:00:00Z"
-updated: "2026-02-28T00:00:00Z"
-current_layer: "plan"
-status: "archived"
-
-gates:
-  scope:
-    status: "skipped"
-  spec:
-    status: "skipped"
-  plan:
-    status: "passed"
-    timestamp: "2026-02-25T18:00:00Z"
-  test:
-    status: "skipped"
-  code:
-    status: "skipped"
-  audit:
-    status: "skipped"
 ---
 
 # Task: Vibe V2 最终方案

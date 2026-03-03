@@ -1,25 +1,6 @@
 ---
 task_id: "2026-02-21-vibe-architecture"
 title: "Vibe 架构设计"
-created: "2026-02-21T00:00:00Z"
-updated: "2026-02-28T00:00:00Z"
-current_layer: "plan"
-status: "archived"
-
-gates:
-  scope:
-    status: "skipped"
-  spec:
-    status: "skipped"
-  plan:
-    status: "passed"
-    timestamp: "2026-02-21T16:00:00Z"
-  test:
-    status: "skipped"
-  code:
-    status: "skipped"
-  audit:
-    status: "skipped"
 ---
 
 # Task: Vibe 架构设计
