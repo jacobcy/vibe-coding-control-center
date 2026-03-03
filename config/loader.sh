@@ -9,21 +9,16 @@
 
 # ---------- PATH ----------
 # Always add global bin as baseline
-export PATH="$HOME/.vibe/bin:$PATH"
+export PATH="${HOME}/.vibe/bin:${PATH}"
 
 # If a local .vibe exists in PWD (branch worktree), prepend its bin
-if [[ -d "$PWD/.vibe" ]]; then
-    # The project root is the parent of .vibe
-    local _vibe_local_root="$PWD"
-    if [[ -d "$_vibe_local_root/bin" ]]; then
-        export PATH="$_vibe_local_root/bin:$PATH"
-    fi
+if [[ -d "${PWD}/.vibe" && -d "${PWD}/bin" ]]; then
+    export PATH="${PWD}/bin:${PATH}"
 fi
 
 # ---------- Aliases ----------
 # Source aliases from the global install; aliases.sh internally uses
-# config.sh to auto-detect VIBE_ROOT, so the `vibe()` function will
-# dynamically resolve ./bin/vibe → git-root/bin/vibe → $VIBE_ROOT/bin/vibe.
-if [[ -f "$HOME/.vibe/aliases.sh" ]]; then
-    source "$HOME/.vibe/aliases.sh"
+# config.sh to auto-detect VIBE_ROOT.
+if [[ -f "${HOME}/.vibe/config/aliases.sh" ]]; then
+    source "${HOME}/.vibe/config/aliases.sh"
 fi

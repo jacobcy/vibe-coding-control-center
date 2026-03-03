@@ -4,6 +4,13 @@
 
 # ── Keys File Location ──────────────────────────────────
 _keys_file() {
+    # If VIBE_ROOT is the global install (~/.vibe), use it.
+    if [[ "$VIBE_ROOT" == "$HOME/.vibe" ]]; then
+        echo "$HOME/.vibe/keys.env"
+        return
+    fi
+    
+    # Otherwise check local first, then global fallback
     local f="$VIBE_CONFIG/keys.env"
     [[ -f "$f" ]] || f="${HOME}/.vibe/keys.env"
     echo "$f"
