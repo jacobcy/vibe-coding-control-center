@@ -20,6 +20,7 @@ When invoked to review documentation, your goal is to ensure clarity, consistenc
 - **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
 - **Identify Files**: 
   - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
+  - For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
 - **Review Context**: Check if `CHANGELOG.md` has been reasonably updated by the `vibe flow pr --bump` process.
 
 ## 2. Review Standards

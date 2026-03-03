@@ -22,7 +22,7 @@ else
     export VIBE_ROOT="$_DETECTED_ROOT"
     export VIBE_BIN="$VIBE_ROOT/bin"
     export VIBE_LIB="$VIBE_ROOT/lib"
-    export VIBE_CONFIG="$VIBE_ROOT/config"
+    export VIBE_CONFIG="${VIBE_CONFIG:-$VIBE_ROOT/config}"
 fi
 export VIBE_AGENT="${VIBE_AGENT:-$VIBE_ROOT/.agent}"
 

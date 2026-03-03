@@ -20,6 +20,7 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 - **Fetch Diff**: 
   - If a PR exists (opened by `flow review` or confirmed): Use `gh pr diff` to fetch the source of truth for changes.
   - If local only: Use `git diff main...HEAD`.
+- If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
 - **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
 
 ## 2. Review Standards (MSC Paradigm Gate)
