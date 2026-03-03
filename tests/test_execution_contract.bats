@@ -4,7 +4,8 @@
 load test_utils
 
 setup() {
-  source config/aliases/execution-contract.sh
+  setup_test_env
+  source "$VIBE_ROOT/config/aliases/execution-contract.sh"
   export EXECUTION_RESULTS_DIR=".agent/execution-results"
   mkdir -p "$EXECUTION_RESULTS_DIR"
 }

@@ -4,9 +4,10 @@
 load test_utils
 
 setup() {
-  source config/aliases/worktree.sh
-  source config/aliases/tmux.sh
-  source config/aliases/execution-contract.sh
+  setup_test_env
+  source "$VIBE_ROOT/config/aliases/worktree.sh
+  source "$VIBE_ROOT/config/aliases/tmux.sh
+  source "$VIBE_ROOT/config/aliases/execution-contract.sh
 }
 
 @test "Integration: Control plane execution intent consumption" {

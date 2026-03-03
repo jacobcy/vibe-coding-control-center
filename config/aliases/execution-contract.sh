@@ -8,7 +8,12 @@
 # - contract/maintenance.sh: Cleanup and maintenance utilities
 
 # Source all contract submodules
-CONTRACT_MODULE_DIR="${0:a:h}/contract"
+# Use VIBE_ROOT if available (for testing), otherwise resolve from script location
+if [[ -n "$VIBE_ROOT" ]]; then
+  CONTRACT_MODULE_DIR="$VIBE_ROOT/config/aliases/contract"
+else
+  CONTRACT_MODULE_DIR="${0:a:h}/contract"
+fi
 
 source "$CONTRACT_MODULE_DIR/validation.sh" 2>/dev/null || true
 source "$CONTRACT_MODULE_DIR/queries.sh" 2>/dev/null || true

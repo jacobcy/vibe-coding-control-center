@@ -10,7 +10,12 @@
 # - tmux/lifecycle.sh: Session termination and renaming
 
 # Source all tmux submodules
-TMUX_MODULE_DIR="${0:a:h}/tmux"
+# Use VIBE_ROOT if available (for testing), otherwise resolve from script location
+if [[ -n "$VIBE_ROOT" ]]; then
+  TMUX_MODULE_DIR="$VIBE_ROOT/config/aliases/tmux"
+else
+  TMUX_MODULE_DIR="${0:a:h}/tmux"
+fi
 
 source "$TMUX_MODULE_DIR/naming.sh" 2>/dev/null || true
 source "$TMUX_MODULE_DIR/operations.sh" 2>/dev/null || true

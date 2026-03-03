@@ -4,8 +4,9 @@
 load test_utils
 
 setup() {
-  source config/aliases/session-recovery.sh
-  source config/aliases/execution-contract.sh
+  setup_test_env
+  source "$VIBE_ROOT/config/aliases/session-recovery.sh
+  source "$VIBE_ROOT/config/aliases/execution-contract.sh
 }
 
 @test "log recovery - creates entry" {

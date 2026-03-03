@@ -10,7 +10,12 @@
 # - worktree/core.sh: Core worktree creation logic
 
 # Source all worktree submodules
-WORKTREE_MODULE_DIR="${0:a:h}/worktree"
+# Use VIBE_ROOT if available (for testing), otherwise resolve from script location
+if [[ -n "$VIBE_ROOT" ]]; then
+  WORKTREE_MODULE_DIR="$VIBE_ROOT/config/aliases/worktree"
+else
+  WORKTREE_MODULE_DIR="${0:a:h}/worktree"
+fi
 
 source "$WORKTREE_MODULE_DIR/naming.sh" 2>/dev/null || true
 source "$WORKTREE_MODULE_DIR/validation.sh" 2>/dev/null || true

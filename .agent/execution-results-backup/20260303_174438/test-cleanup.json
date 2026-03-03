@@ -1,0 +1,7 @@
+{
+  "task_id": "test-cleanup",
+  "resolved_worktree": "wt-cleanup",
+  "resolved_session": "cleanup-session",
+  "executor": "human",
+  "timestamp": "2026-03-03T09:44:38Z"
+}

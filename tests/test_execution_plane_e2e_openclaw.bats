@@ -4,6 +4,7 @@
 load test_utils
 
 setup() {
+  setup_test_env
   source skills/execution-plane/wrappers.sh
   export EXECUTOR=openclaw
 }
