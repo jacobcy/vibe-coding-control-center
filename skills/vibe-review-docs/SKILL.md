@@ -9,11 +9,11 @@ trigger: manual
 
 When invoked to review documentation, your goal is to ensure clarity, consistency, and alignment with the Vibe Center architecture layout.
 
-## 1. Context Gathering
-- Identify modified `.md` files in the current branch or PR.
-- For PR review: use `gh pr diff --name-only` or `git diff main...HEAD --name-only`, then filter for `\.md$`.
-- For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
-- Check if `CHANGELOG.md` has been reasonably updated if there are user-facing changes in the same diff.
+## 1. Context Gathering (Align Truth)
+- **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
+- **Identify Files**: 
+  - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
+- **Review Context**: Check if `CHANGELOG.md` has been reasonably updated by the `vibe flow pr --bump` process.
 
 ## 2. Review Standards
 Evaluate the documentation against the following checklist:

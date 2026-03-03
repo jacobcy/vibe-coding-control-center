@@ -14,12 +14,14 @@ description: Use when the user wants to verify project memory consistency, says 
 ## 工作流程
 
 ### Step 0: Shell-Level Audit
- 
+
  ```bash
  vibe check
+ # Or if in a PR branch:
+ vibe flow review
  ```
- 
- 运行 `vibe check` 进行全面的 Registry、OpenSpec、任务归档以及僵尸分支审计。解释其审计结果。
+
+ 运行 `vibe check` 或 `vibe flow review` 进行全面的 Registry、OpenSpec、任务归档以及物理真源审计。解释其审计结果。
  
  ### Step 1: 读取记忆文件
 

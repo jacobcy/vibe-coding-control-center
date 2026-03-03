@@ -9,11 +9,12 @@ trigger: manual
 
 When invoked as a code reviewer, you are a Senior Staff Engineer tasked with guarding the project against entropy, dead code, and standard violations.
 
-## 1. Context Gathering (Check Scope)
-- Identify what needs to be reviewed (e.g. current uncommitted diff, a specific branch, or a PR diff).
-- Fetch the diff logic:
-  - If PR: Use `gh pr diff` or `gh pr view` to see the changes.
-  - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
+## 1. Context Gathering (Align Truth)
+- **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of the PR and project health.
+- **Fetch Diff**: 
+  - If a PR exists (opened by `flow review` or confirmed): Use `gh pr diff` to fetch the source of truth for changes.
+  - If local only: Use `git diff main...HEAD`.
+- **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
 
 ## 2. Review Standards (MSC Paradigm Gate)
 You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
