@@ -210,7 +210,7 @@ _flow_review() {
 
   if vibe_has gh; then
     log_step "Fetching PR status for '$target'..."
-    local pr_info; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup 2>/dev/null)
+    local pr_info; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
     if [[ $? -ne 0 ]]; then
       log_warn "No open PR found for '$target'. Running local health check..."
       vibe check
@@ -228,19 +228,50 @@ _flow_review() {
     echo "${CYAN}URL:${NC} $url"
     echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
     
-    # Check CI Status
-    log_step "Checking CI/Checks status..."
-    gh pr checks "$target" || log_warn "No checks found or failed to fetch."
+    # ① Fetch Latest Comments
+    log_step "Fetching latest review comments..."
+    local comments; comments=$(echo "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
+    if [[ -n "$comments" ]]; then
+       echo "$comments" | sed 's/^/  💬 /'
+    else
+       echo "  (No comments found)"
+    fi
 
-    # Final Recommendation
-    if [[ "$decision" == "APPROVED" && "$mergeable" == "MERGEABLE" ]]; then
+    # ② CI/Checks Waiting Loop
+    local retry=0 ci_status="PENDING"
+    while [[ $retry -lt 3 ]]; do
+       log_step "Checking CI status (Attempt $((retry+1))/3)..."
+       # Use statusCheckRollup state if available, or call checks
+       ci_status=$(gh pr view "$target" --json statusCheckRollup -q '.statusCheckRollup[0].status // "SUCCESS"' 2>/dev/null || echo "SUCCESS")
+       local rollup_state=$(gh pr view "$target" --json statusCheckRollup -q '.statusCheckRollup[0].state // "SUCCESS"' 2>/dev/null)
+       
+       # If no checks are running, it might return empty or SUCCESS
+       [[ -z "$rollup_state" || "$rollup_state" == "null" ]] && rollup_state="SUCCESS"
+       
+       if [[ "$rollup_state" == "PENDING" || "$ci_status" == "in_progress" || "$ci_status" == "queued" ]]; then
+          log_info "CI is still running. Waiting 30s..."
+          sleep 30
+          retry=$((retry + 1))
+       else
+          # Display results without pager
+          PAGER=cat gh pr checks "$target" || true
+          break
+       fi
+    done
+
+    if [[ $retry -eq 3 ]]; then
+       log_warn "CI is taking too long. Please check manually using: ${CYAN}gh pr checks --watch${NC}"
+    fi
+
+    # ③ Final Recommendation
+    if [[ "$decision" == "APPROVED" && "$rollup_state" == "SUCCESS" ]]; then
        log_success "Ready to merge! All criteria met."
     elif [[ "$decision" == "CHANGES_REQUESTED" ]]; then
        log_error "Changes requested. Please address review comments."
     elif [[ "$state" == "MERGED" ]]; then
        log_success "PR already merged. Time to run 'vibe flow done'."
     else
-       log_info "PR is currently active. Wait for approvals and CI success."
+       log_info "PR is currently active. Target: Approval + CI Success."
     fi
   else
     log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."
