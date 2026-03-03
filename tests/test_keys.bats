@@ -22,7 +22,8 @@ teardown() {
 @test "1. vibe keys help outputs subcommands" {
   run vibe keys help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Usage: vibe keys <command>" ]]
+  [[ "$output" =~ "Usage:" ]]
+  [[ "$output" =~ "vibe keys" ]]
   [[ "$output" =~ "list" ]]
   [[ "$output" =~ "set" ]]
   [[ "$output" =~ "get" ]]

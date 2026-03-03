@@ -71,7 +71,8 @@ setup() {
 @test "8. vibe task help lists subcommands" {
   run vibe task --help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Usage: vibe task" ]]
+  [[ "$output" =~ "Usage:" ]]
+  [[ "$output" =~ "vibe task" ]]
   [[ "$output" =~ "add" ]]
   [[ "$output" =~ "update" ]]
   [[ "$output" =~ "remove" ]]

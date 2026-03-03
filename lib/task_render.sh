@@ -40,7 +40,11 @@ _vibe_task_render() {
             map(select($show_all == "1" or (.status != "completed" and .status != "archived" and .status != "done" and .status != "skipped")))) as $u_tasks |
             if ($u_tasks | length) > 0 then
               "\($NC)\($BOLD)Unassigned Tasks\($NC)",
-              ($u_tasks[] | "  - \(.task_id) \(.title) [\(.status)]"),
+              ($u_tasks[] |
+                "  - \(.task_id) \(.title) [\(.status)]" +
+                (if (.framework // "") != "" then " {\(.framework)}" else "" end) +
+                (if (.source_path // "") != "" then " <\(.source_path)>" else "" end)
+              ),
               ""
             else empty end
           )

@@ -28,10 +28,12 @@ JSON
   # Check for key parts separately (output has ANSI color codes)
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe flow" ]]
-  [[ "$output" =~ "new" ]]
+  [[ "$output" =~ "start" ]]
   [[ "$output" =~ "done" ]]
   [[ "$output" =~ "status" ]]
   [[ "$output" =~ "sync" ]]
+  [[ "$output" =~ "review" ]]
+  [[ "$output" =~ "pr" ]]
 }
 
 @test "2. vibe flow start without args returns error" {

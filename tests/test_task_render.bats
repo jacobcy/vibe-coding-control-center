@@ -82,6 +82,7 @@ JSON
   '
   [ "$status" -eq 0 ]
   [[ "$output" =~ "openspec" ]]
+  [[ "$output" =~ "openspec/changes/fw-task" ]]
   [[ "$output" =~ "fw-task" ]]
 }
 
