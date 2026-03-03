@@ -132,12 +132,73 @@ _flow_sync() {
   [[ "$has_fail" -eq 1 ]] && return 1; log_success "Branches synced."
 }
 
+_flow_pr() {
+  vibe_require git || return 1
+  local branch; branch=$(git branch --show-current)
+  [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
+  
+  # ① Strict Sequential PR Check (using gh)
+  if vibe_has gh; then
+    log_step "Checking for existing open Pull Requests to main..."
+    # Only block if there's an open PR targeting 'main' that isn't the current branch
+    local open_prs; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
+    if [[ -n "$open_prs" ]]; then
+      log_warn "Blocking PR creation: Another open PR to 'main' detected. Vibe requires sequential merging to 'main' to avoid version/registry conflicts."
+      echo "$open_prs" | sed 's/^/  - /'
+      echo "💡 Tip: Merge or close existing PRs to 'main' before submitting new changes."
+      return 1
+    fi
+  fi
+
+  # ② Version Management Check
+  if [[ -f "VERSION" ]]; then
+    local current_v; current_v=$(cat VERSION | tr -d '[:space:]')
+    echo "${CYAN}Current Project Version:${NC} $current_v"
+    if confirm_action "Bump project version and update CHANGELOG before pushing?"; then
+       echo -n "Select bump type [patch|minor|major] (default: patch): "
+       read -r bump_type
+       [[ -z "$bump_type" ]] && bump_type="patch"
+       ./scripts/bump.sh "$bump_type" || return 1
+       git add VERSION CHANGELOG.md 2>/dev/null || true
+       git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+    fi
+  fi
+
+  # ③ Push and PR Create
+  log_step "Pushing changes to origin/$branch"
+  git push origin HEAD || return 1
+  
+  if vibe_has gh; then
+    log_info "GitHub CLI detected. Opening PR..."
+    if gh pr view "$branch" --web 2>/dev/null; then
+       log_success "PR submitted! Viewed in browser."
+    else
+       echo "💡 Tip: Creating PR with 'gh pr create'..."
+       gh pr create --fill --web || log_warn "Failed to create PR with gh, please check manually."
+    fi
+  else
+    log_success "Changes pushed. Please create/view PR on your Git provider."
+  fi
+}
+
+_flow_review() {
+  vibe_require git || return 1
+  local branch; branch=$(git branch --show-current)
+  if vibe_has gh; then
+    gh pr view "$branch" --web || { log_step "No PR found for $branch. Running local health check..."; vibe check; }
+  else
+    vibe check
+  fi
+}
+
 vibe_flow() {
   case "${1:-help}" in
     start|new) shift; _flow_start "$@" ;;
     done)      shift; _flow_done "$@" ;;
     status)    shift; _flow_status "$@" ;;
     sync)      _flow_sync ;;
+    pr)        _flow_pr ;;
+    review)    _flow_review ;;
     *)         _flow_usage ;;
   esac
 }
