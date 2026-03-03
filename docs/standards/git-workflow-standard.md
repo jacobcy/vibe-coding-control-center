@@ -18,6 +18,16 @@ created: 2026-02-28
 
 ## 2. 行为准则与四模块协议
 
+### 核心命令映射
+
+| 命令 | 功能 | 使用场景 |
+|------|------|---------|
+| `vibe flow status` | 查看当前分支状态 | 检查任务进度和文件指标 |
+| `vibe flow list` | 查看所有 worktree | 全局状态概览 |
+| `vibe flow review` | 检查 PR 状态 | CI/评审审计 |
+| `vibe flow pr` | 提交 PR | 发布流程 |
+| `vibe flow done` | 清理 worktree | 任务收口 |
+
 ### 模块一：本地高频游击战 (Commit 规范)
 Agent 在实现业务逻辑时，禁止“憋大招”。
 - **时机**：在 `Test Gate` 与 `Code Gate` 的循环中，只要完成了一个逻辑单元且测试变绿（Green），**必须在当前开发分支上主动发起本地 Commit**（或请求人类运行 `/vibe-commit`）。
