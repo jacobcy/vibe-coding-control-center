@@ -38,10 +38,10 @@ task_file=".agent/context/task.md"
 
 ### Step 3: 验证任务状态
 
-对比 `task.md` 和 `memory/<topic>.md` 中的 Related Tasks：
-- 检查状态是否一致（完成/进行中/待办）
-- 识别孤任务（在 topic 中有但在 task.md 中没有）
-- 识别幽灵任务（在 task.md 中有但没有 topic 记录）
+对比 `.agent/context/task.md` 与 `.git/vibe/registry.json`（唯一真源）：
+- 检查 `registry.json` 中的 `status` 是否与 `task.md` 声明的一致。
+- 检查 `memory/<topic>.md` 中的 Related Tasks 状态是否已过期。
+- 识别孤任务或状态冲突。
 
 ### Step 4: 验证代码引用
 

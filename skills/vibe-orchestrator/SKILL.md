@@ -83,10 +83,12 @@ input_examples:
 - 决策：低置信度 → **主动询问** "这是一个复杂系统设计，建议用 OpenSpec 做完整规划，或者用 Superpower 快速验证想法，你想用哪个？"
 
 **记忆更新：**
-- 框架选择后，更新 `.agent/context/task.md`
-- 格式：`- <feature> (framework: <superpower|openspec>)`
-- 同时记录需求特征，用于 future pattern 匹配
-
+- 确定框架后，调用 `vibe task add "<title>"` 初始化任务记录：
+  - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
+  - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`
+- 记录完成后，通过 `vibe task update <task_id> --next-step "Entry: Gate 1 Scope Gate"` 标记进度。
+- 框架选择记录在 `.agent/context/task.md` 中，格式：`- <feature> (framework: <superpower|openspec>)`。
+- 同时记录需求特征，用于 future pattern 匹配。
 **选择提示模板（仅在需要询问时使用）：**
 ```
 根据你的需求分析，我建议使用 **<框架>** 方式：
@@ -122,7 +124,9 @@ input_examples:
 - 执行中收集验证证据（命令与输出）
 - 若入口来自 `/vibe-new`，只允许 Slash 做意图判断和最少交互；
 - 共享 registry、worktree 绑定、共享任务存储修改必须委托给 shell 命令：
-  - 当前目录模式：调用 `vibe task update <task-id> --bind-current`
+  - 当前目录模式：
+    1. 调用 `vibe task add <title>` (若尚未立项)
+    2. 调用 `vibe task update <task-id> --bind-current` 建立绑定关系
   - 完整流程模式：调用 `vibe flow new <feature>` 创建/切换 worktree 并初始化 context。
 - 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
 - 严禁 Slash 直接操作 `.vibe/` 缓存文件夹，应通过 CLI 读取。
