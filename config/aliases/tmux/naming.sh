@@ -20,9 +20,11 @@ _validate_tmux_session_name() {
   fi
 
   # Check minimum parts
-  local parts=(${(s/-/)name})
+  local IFS='-'
+  local -a parts
+  parts=($name)
   if [[ ${#parts[@]} -lt 2 ]]; then
-    echo "Error: Name must have at least 2 parts: <agent>-<task>"
+    echo "Error: Name must have at least 2 parts: <agent>-<task>" >&2
     return 1
   fi
 
