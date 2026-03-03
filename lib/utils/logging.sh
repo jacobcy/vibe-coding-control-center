@@ -13,4 +13,4 @@ log_success() { echo "${GREEN}★ $1${NC}"; }
 # ── Legacy Compatibility ────────────────────────────────
 # Map old names to new functions
 log_warning() { log_warn "$@"; }
-log_info()    { log_info "$@"; }
+# log_info already defined above
