@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.0-rc1] - 2026-03-04
+
+### ✨ Changed
+- Automated version bump to 2.1.0-rc1
+
 ## [2.0.1] - 2026-02-14
 
 ### ✨ New Features

@@ -36,6 +36,11 @@ input_examples:
 > - **严禁修改任何 `docs/` 下的文件**（如 Task README）。Task 状态、Gate 信息等已全部移至 `.git/vibe/registry.json`，作为唯一真源。
 
 1. **调用 `vibe task update <task_id> --status completed --unassign`**：将该 `task_id` 的 `status` 更新为用户选择的新状态（`completed` / `archived` / `skipped`），并解除 worktree 绑定。
+2. **(新) 版本发布自检**: 询问用户是否需要进行版本升级并更新 `CHANGELOG.md`。如果是，调用：
+   ```bash
+   ./scripts/bump.sh [patch|minor|major]
+   ```
+   并根据本次任务的核心变更（读取相关文档）在 `CHANGELOG.md` 中补充具体的 Feature/Fix 说明。
 
 ### Step 3: 更新全局 Worktrees Map
 修改 `$(git rev-parse --git-common-dir)/vibe/worktrees.json`:
