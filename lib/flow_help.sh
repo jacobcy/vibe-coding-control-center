@@ -23,3 +23,20 @@ _flow_usage() {
 _flow_start_usage() { 
     echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--branch=main]"
 }
+ 
++_flow_pr_usage() {
++  echo "Usage: ${CYAN}vibe flow pr${NC}"
++  echo ""
++  echo "提交当前工作区的修改并创建/更新 Pull Request。"
++  echo "核心逻辑："
++  echo "  1. 执行串行校验：检查是否有指向 main 的冲突 PR"
++  echo "  2. 版本与日志审计：询问并执行版本 Bump 及 CHANGELOG 更新"
++  echo "  3. 物理执行：git push 并利用 gh pr 建立关联"
++}
++
++_flow_review_usage() {
++  echo "Usage: ${CYAN}vibe flow review${NC}"
++  echo ""
++  echo "在 Web 或终端中审阅当前分支绑定的 Pull Request。"
++  echo "如果未发现 PR，则退而求其次执行本地健康检查（vibe check）。"
++}

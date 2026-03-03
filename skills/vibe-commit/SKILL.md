@@ -20,10 +20,11 @@ trigger: auto
 4. **Draft Commits**: 针对每一个变更分组，草拟一个纯粹的高质量提交信息。格式必须形如：`feat: add auth logical module`。
 5. **Interactive Confirmation**: 将分类结果及草拟的提交列出来，**明确提请用户检查并确认**。
 6. **Execution Recommendations**: 用户确认后，提取并正式执行 `git add ...` 及 `git commit -m "..."`。
-7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您自动生成并提交当前特性分支的 Pull Request？"
-   - 若用户同意，你需要收集自目标主枝（typically `main`）分化以来的所有 commit log。
-   - 自动生成高质量的 PR Title 和带有结构化、变更总结的 PR Body。
-   - 向用户展示 PR 内容，确认后执行 `gh pr create --title "$TITLE" --body "$BODY"` （如果有相关需要可提前创建临时文本传入）。
+7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您发起 Pull Request 发布流程？"
+   - **核心提醒**：向用户明确，通过执行 `vibe flow pr` (底层由 AI 调用或引导用户执行)，系统会自动进行 **版本号 Bump** 和 **串行冲突检查**。
+   - **操作流程**：
+     - 调用 `vibe flow pr` 进行物理环境检查。
+     - 自动或引导用户执行重构后的版本升级逻辑。
    - 创建成功后，立刻提示用户"不要忘记在 AI 助手中收口该任务！（执行 `/vibe-done`）"。
 
 ## Expected Output Format

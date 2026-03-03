@@ -133,6 +133,7 @@ _flow_sync() {
 }
 
 _flow_pr() {
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_pr_usage; return 0; }; done
   vibe_require git || return 1
   local branch; branch=$(git branch --show-current)
   [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
@@ -182,6 +183,7 @@ _flow_pr() {
 }
 
 _flow_review() {
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_review_usage; return 0; }; done
   vibe_require git || return 1
   local branch; branch=$(git branch --show-current)
   if vibe_has gh; then
