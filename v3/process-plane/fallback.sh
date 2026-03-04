@@ -232,9 +232,9 @@ pp_fallback_limit_attempts() {
 # 兼容 zsh 和 bash 的脚本目录定位
 if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-elif [[ -n "${(%):-%N}" ]]; then
-  # zsh 方式
-  SCRIPT_DIR="${0:A:h}"
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
+  # zsh 方式：使用 %x 获取当前脚本路径（即使被 source）
+  SCRIPT_DIR="${${(%):-%x}:A:h}"
 else
   # 最后的兜底
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -245,11 +245,20 @@ if [[ -f "$SCRIPT_DIR/adapter-loader.sh" ]]; then
 fi
 
 # 入口点
-# 兼容 zsh 和 bash 的入口检测
-if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
-elif [[ -n "${ZSH_VERSION:-}" ]]; then
-  [[ "${(%):-%N}" == "${0}" ]]
-else
-  false
-fi && echo "Provider Fallback Mechanism" && echo "Fallback path: ${FALLBACK_PATH[*]}"
+# 只在直接执行时运行，被 source 时不执行
+_is_main_script() {
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    # bash: BASH_SOURCE 在被 source 时与 $0 不同
+    [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+  elif [[ -n "${ZSH_VERSION:-}" ]]; then
+    # zsh: 检查 zsh_eval_context
+    [[ "${ZSH_EVAL_CONTEXT:-}" == "toplevel" ]]
+  else
+    false
+  fi
+}
+
+if _is_main_script; then
+  echo "Provider Fallback Mechanism"
+  echo "Fallback path: ${FALLBACK_PATH[*]}"
+fi

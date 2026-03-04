@@ -335,11 +335,22 @@ sf_log() {
 # 入口点
 # ============================================
 
-# 兼容 zsh 和 bash 的入口检测
-if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]]
-elif [[ -n "${ZSH_VERSION:-}" ]]; then
-  [[ "${(%):-%N}" == "${0}" ]]
-else
-  false
-fi && echo "Supervisor Flow - Six-Layer Process Model" && echo "Phases: ${SUPERVISOR_PHASES[*]}" && echo "" && echo "Usage: source this file"
+# 只在直接执行时运行，被 source 时不执行
+_is_main_script() {
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    # bash: BASH_SOURCE 在被 source 时与 $0 不同
+    [[ "${BASH_SOURCE[0]}" == "${0}" ]]
+  elif [[ -n "${ZSH_VERSION:-}" ]]; then
+    # zsh: 检查 zsh_eval_context
+    [[ "${ZSH_EVAL_CONTEXT:-}" == "toplevel" ]]
+  else
+    false
+  fi
+}
+
+if _is_main_script; then
+  echo "Supervisor Flow - Six-Layer Process Model"
+  echo "Phases: ${SUPERVISOR_PHASES[*]}"
+  echo ""
+  echo "Usage: source this file"
+fi
