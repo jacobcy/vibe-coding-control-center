@@ -46,22 +46,126 @@ vibe_tmux_dash() {
 
 # --- User commands ---
 
-# @desc Attach to the default Vibe Tmux session
-# @featured
-vt() { vibe_tmux_attach; }
+# ── Shared session finding logic ───────────────────────────────────────────
+# Returns session name(s) matching the given pattern
+# Usage: _vt_find "name" → prints session name(s)
+_vt_find() {
+  local target="$1"
+  local -a all_sessions=()
+  while IFS= read -r s; do
+    [[ -n "$s" ]] && all_sessions+=("$s")
+  done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
 
-# @desc Create or attach to a named Tmux session
-vtup() {
-  local session="${1:-$VIBE_SESSION}"
-  local old="$VIBE_SESSION"; VIBE_SESSION="$session"
-  if tmux has-session -t "$session" 2>/dev/null; then
-    echo "📎 Attaching: $session"
-  else
-    echo "🆕 Creating: $session"
-    vibe_tmux_ensure
+  [[ ${#all_sessions[@]} -eq 0 ]] && return 1
+
+  # ① Exact match
+  for s in "${all_sessions[@]}"; do
+    [[ "$s" == "$target" ]] && { echo "$s"; return 0; }
+  done
+
+  # ② Suffix match: ends with "-<target>" or "_<target>"
+  local -a candidates=()
+  for s in "${all_sessions[@]}"; do
+    [[ "$s" == *"-${target}" || "$s" == *"_${target}" ]] && candidates+=("$s")
+  done
+
+  # ③ Substring match: contains "<target>"
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    for s in "${all_sessions[@]}"; do
+      [[ "$s" == *"${target}"* ]] && candidates+=("$s")
+    done
   fi
-  tmux attach -t "$session"
-  VIBE_SESSION="$old"
+
+  printf '%s\n' "${candidates[@]}"
+}
+
+# @desc List or attach to existing Tmux sessions
+#   vt          → list all sessions
+#   vt <name>   → attach to matched session (only existing)
+# @featured
+vt() {
+  vibe_require tmux || return 1
+  local target="${1:-}"
+
+  if [[ -z "$target" ]]; then
+    # List all sessions
+    local -a sessions=()
+    while IFS= read -r s; do
+      [[ -n "$s" ]] && sessions+=("$s")
+    done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+
+    if [[ ${#sessions[@]} -eq 0 ]]; then
+      echo "ℹ️  No active sessions. Use ${CYAN}vtup${NC} to create one."
+      return 0
+    fi
+
+    echo "${BOLD}Active Sessions:${NC}"
+    for s in "${sessions[@]}"; do
+      echo "  • $s"
+    done
+    return 0
+  fi
+
+  # Smart match existing session
+  local result=$(_vt_find "$target")
+  [[ -z "$result" ]] && { echo "❌ Session not found: $target"; return 1; }
+
+  local -a matches=(${(f)result})
+  case ${#matches[@]} in
+    1) [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[1]}" || tmux attach -t "${matches[1]}" ;;
+    *)
+      echo "🔍 Multiple sessions match '${target}':"
+      local i=1 s
+      for s in "${matches[@]}"; do
+        echo "  [$i] $s"
+        (( i++ ))
+      done
+      echo -n "Enter choice [1-${#matches[@]}]: "
+      local choice; read -r choice
+      if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
+        [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[$choice]}" || tmux attach -t "${matches[$choice]}"
+      else
+        echo "❌ Invalid choice"
+      fi
+      ;;
+  esac
+}
+
+# @desc Create or attach to a session in current/specified directory
+#   vtup            → use current dir name as session
+#   vtup <rel-dir>  → use rel-dir as session (create directly)
+#   vtup /abs/path  → use dir basename as session
+# @featured
+vtup() {
+  vibe_require tmux git || return 1
+  local target="${1:-}"
+
+  local session_name dir_path
+
+  if [[ -z "$target" ]]; then
+    # No arg: use current directory name
+    dir_path="$(pwd)"
+    session_name="${dir_path##*/}"
+  elif [[ "$target" == /* ]]; then
+    # Absolute path: use basename
+    dir_path="$target"
+    session_name="${target##*/}"
+  else
+    # Relative path: use as-is
+    dir_path="$(pwd)/$target"
+    session_name="$target"
+  fi
+
+  # Check if session exists
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "📎 Attaching to: $session_name"
+    [[ -n "$TMUX" ]] && tmux switch-client -t "$session_name" || tmux attach -t "$session_name"
+  else
+    # Create new session
+    echo "🆕 Creating session: $session_name"
+    tmux new-session -d -s "$session_name" -c "$dir_path" -n "main"
+    [[ -n "$TMUX" ]] && tmux switch-client -t "$session_name" || tmux attach -t "$session_name"
+  fi
 }
 
 # @desc Detach from the current Tmux session

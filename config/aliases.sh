@@ -7,6 +7,7 @@ _v_new_loader="$_v_shim_self/../alias/loader.sh"
 
 if [[ -f "$_v_new_loader" ]]; then
   source "$_v_new_loader"
+  [[ -o interactive ]] && echo "✅ Vibe aliases loaded (source \$(vibe alias --load))"
 else
   echo "vibe: error: alias/loader.sh not found" >&2
 fi
