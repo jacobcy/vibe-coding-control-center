@@ -74,6 +74,17 @@ _vibe_task_add() {
     echo "💡 Next: Run ${CYAN}wtnew <branch>${NC} or ${CYAN}vnew <branch>${NC} to start development."
 }
 
+_vibe_task_branch_matches_any() {
+    local branch="$1"
+    shift
+    local candidate
+    for candidate in "$@"; do
+        [[ -z "$candidate" ]] && continue
+        [[ "$branch" == "$candidate" || "$branch" == */"$candidate" ]] && return 0
+    done
+    return 1
+}
+
 _vibe_task_remove() {
     local task_id="${1:-}" common_dir registry_file worktrees_file task_file tmp
     [[ "$task_id" == "-h" || "$task_id" == "--help" ]] && { echo "Usage: vibe task remove <task-id>"; return 0; }
@@ -83,15 +94,36 @@ _vibe_task_remove() {
     _vibe_task_require_file "$registry_file" "registry.json" || return 1; _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
     jq -e --arg task_id "$task_id" '.worktrees[]? | select(.current_task == $task_id or (.tasks // [] | index($task_id) != null))' "$worktrees_file" >/dev/null 2>&1 && { vibe_die "Task is still bound to a worktree: $task_id"; return 1; }
-    local indexed_branch local_branches remote_branches residual_local="" residual_remote=""
+    local indexed_branch task_title="" task_suffix="" task_slug="" local_branches="" remote_branches="" residual_local="" residual_remote=""
+    local -a branch_candidates local_matches remote_matches
     indexed_branch=$(jq -r --arg tid "$task_id" '.worktrees[]? | select(.current_task == $tid or (.tasks // [] | index($tid) != null)) | .branch // empty' "$worktrees_file" | head -1)
-    [[ -n "$indexed_branch" ]] && local_branches=$(git branch --list "$indexed_branch" "*/$task_id" | sort -u | sed 's/^[ *]*//') || local_branches=$(git branch --list "*/$task_id" | sed 's/^[ *]*//')
-    [[ -n "$indexed_branch" ]] && remote_branches=$(git branch -r --list "origin/$indexed_branch" "origin/*/$task_id" | sort -u | sed 's/^[ *]*//' | sed '/->/d') || remote_branches=$(git branch -r --list "origin/*/$task_id" | sed 's/^[ *]*//' | sed '/->/d')
+    task_title=$(jq -r --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" | head -1)
+    [[ -n "$task_title" ]] && task_slug="$(_vibe_task_slugify "$task_title")"
+    if [[ "$task_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+)$ ]]; then
+        task_suffix="${match[1]}"
+    fi
+
+    [[ -n "$indexed_branch" ]] && branch_candidates+=("$indexed_branch")
+    branch_candidates+=("$task_id")
+    [[ -n "$task_suffix" ]] && branch_candidates+=("$task_suffix")
+    [[ -n "$task_slug" ]] && branch_candidates+=("$task_slug")
+
+    while read -r lb; do
+        [[ -z "$lb" ]] && continue
+        _vibe_task_branch_matches_any "$lb" "${branch_candidates[@]}" && local_matches+=("$lb")
+    done < <(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+    while read -r rb; do
+        [[ -z "$rb" || "$rb" == "origin/HEAD" ]] && continue
+        _vibe_task_branch_matches_any "$rb" "${branch_candidates[@]}" && remote_matches+=("$rb")
+    done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin 2>/dev/null)
+
+    (( ${#local_matches[@]} > 0 )) && local_branches="$(printf '%s\n' "${local_matches[@]}" | sort -u | sed '/^$/d')"
+    (( ${#remote_matches[@]} > 0 )) && remote_branches="$(printf '%s\n' "${remote_matches[@]}" | sort -u | sed '/^$/d')"
     if [[ -n "$local_branches" || -n "$remote_branches" ]]; then
         log_warn "Branch(es) detected for this task:"
         [[ -n "$local_branches" ]] && echo "$local_branches" | sed 's/^/  - local: /'
         [[ -n "$remote_branches" ]] && echo "$remote_branches" | sed 's/^/  - remote: /'
-        if confirm_action "Try deleting these branches before removing task?"; then
+        if confirm_action "Delete these branches before removing task?"; then
             while read -r lb; do
                 [[ -z "$lb" ]] && continue
                 vibe_delete_local_branch "$lb" || residual_local+="$lb\n"
@@ -102,14 +134,15 @@ _vibe_task_remove() {
                 vibe_delete_remote_branch "$rb_name" || residual_remote+="$rb_name\n"
             done <<< "$remote_branches"
         else
-            log_warn "Skipping branch deletion by user choice."
-            residual_local="$local_branches"
-            residual_remote="$(echo "$remote_branches" | sed 's/^origin\///')"
+            vibe_die "Task removal cancelled: branch cleanup is required."
+            return 1
         fi
         if [[ -n "$residual_local" || -n "$residual_remote" ]]; then
             log_warn "Branch residue detected for task $task_id:"
             [[ -n "$residual_local" ]] && echo "$residual_local" | sed '/^$/d; s/^/  - local: /'
             [[ -n "$residual_remote" ]] && echo "$residual_remote" | sed '/^$/d; s/^/  - remote: /'
+            vibe_die "Task removal blocked: unable to delete all related branches."
+            return 1
         fi
     fi
     tmp="$(mktemp)" || return 1

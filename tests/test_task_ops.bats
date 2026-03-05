@@ -197,10 +197,10 @@ setup() {
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
         "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
-        "branch --list"*) echo "  claude/2026-03-02-rotate-alignment"; return 0 ;;
-        "branch -r --list"*) echo "  origin/claude/2026-03-02-rotate-alignment"; return 0 ;;
-        "branch -d claude/2026-03-02-rotate-alignment") echo local > "'"$local_deleted"'"; return 0 ;;
-        "push origin --delete claude/2026-03-02-rotate-alignment") echo remote > "'"$remote_deleted"'"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") echo "claude/rotate-alignment"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") echo "origin/claude/rotate-alignment"; return 0 ;;
+        "branch -d claude/rotate-alignment") echo local > "'"$local_deleted"'"; return 0 ;;
+        "push origin --delete claude/rotate-alignment") echo remote > "'"$remote_deleted"'"; return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -213,7 +213,7 @@ setup() {
   [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
 }
 
-@test "ops: remove continues and warns when local branch deletion fails" {
+@test "ops: remove fails and preserves task when branch deletion fails" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
 
@@ -227,18 +227,18 @@ setup() {
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
         "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
-        "branch --list"*) echo "  claude/2026-03-02-rotate-alignment"; return 0 ;;
-        "branch -r --list"*) return 0 ;;
-        "branch -d claude/2026-03-02-rotate-alignment") return 1 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") echo "claude/rotate-alignment"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") return 0 ;;
+        "branch -d claude/rotate-alignment") return 1 ;;
         *) return 0 ;;
       esac
     }
     vibe_task remove 2026-03-02-rotate-alignment
   '
 
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [[ "$output" =~ "Branch residue detected" ]]
-  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
+  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "1" ]
 }
 
 @test "ops: remove succeeds under errexit when no remote branch matches" {
@@ -255,8 +255,8 @@ setup() {
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
         "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
-        "branch --list"*) return 0 ;;
-        "branch -r --list"*) return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") return 0 ;;
         *) return 0 ;;
       esac
     }
