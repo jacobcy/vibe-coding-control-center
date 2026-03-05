@@ -31,11 +31,13 @@ input_examples:
  
  ### Step 1: 标记任务状态进度
 
-> ⚠️ **收口边界原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的元数据清算指令**。
-> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。这些文件在 `.git/` 里，不被 Git 追踪，修改它们不会产生新的 dirty 文件或 commit。
-> - **严禁修改任何 `docs/` 下的文件**（如 Task README）。Task 状态、Gate 信息等已全部移至 `.git/vibe/registry.json`，作为唯一真源。
+> ⚠️ **收口边界绝杀原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的终结级别元数据清算指令**。
+> - **【红线】绝对禁止修改任何业务源代码文件！** 任务此时已实质结束（可能已合并），任何试图在这里再动代码的行为都会导致无限 PR 循环。如果检查时发现代码遗留 Bug，请**直接报错并停止**，让用户新开 Task，绝不允许你擅自进行二次修复代码及提交！
+> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。修改它们不会产生新的 git dirty。
+> - **严禁修改 `docs/` 等项目内文档**。追踪大盘数据应全部收敛在 `.git/vibe/` 内。
 
-1. **调用 `vibe task update <task_id> --status completed --unassign`**：将该 `task_id` 的 `status` 更新为用户选择的新状态（`completed` / `archived` / `skipped`），并解除 worktree 绑定。
+1. **审计追责 (Accountability)**：通过 `git config user.name` 获取当前操作者的 Agent 身份，确保结项动作有明确责任人签字（记录是谁给结束的）。
+2. **调用 `vibe task update <task_id> --status completed --unassign`**：将该任务设为 `completed` / `archived` / `skipped`。
 ### Step 2: 归档合规与防丢代码检查
 
 **强制审查点：** 
@@ -54,6 +56,7 @@ input_examples:
 
 • **已锁定任务:** <Task_ID: Title>
 • **更新状态:** 从 `in_progress` -> `completed`
+• **结项操作者:** <Agent_Name>
 • **大盘注册表:** 共享状态库已同步清理。
 
 若还需要开始新探索，请 `vibe-new <feature>`。
