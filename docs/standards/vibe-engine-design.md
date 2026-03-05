@@ -123,5 +123,14 @@ graph TD
 为实现这个蓝图，我们将使用一个"大脑" Skill，串联现有的所有原子级模块：
 
 - 创建新的核心 Skill: `vibe-workflow-orchestrator`，此技能在任何上下文启动时都会被隐式或者显式触发。
-- 升级 slash 命令 `/vibe-new` 使其直接对接 Orchestrator。
 - 当 `bin/vibe flow` 相关命令在终端运行时，如果环境有 Agent 环境变量，触发 Agent 代跑流程；没有的话回退为普通输出。
+
+## 5. 终极远景：多智能体管线 (The Agent of Agents Loop)
+
+通过在底座中封装这些不可变的生命周期（如 `vibe flow review`），Vibe Center 最终将演化为能够托管异构 AI 智能体的超管基础设施（Super-Orchestrator），例如借助 `OpenClaw` 或类似底座实现完全自治的开发管线：
+
+1. **架构师 (Gemini)**：擅长无限上下文。负责通读整个代码库与高阶业务需求，在 `docs/plans/` 中输出精确到步骤的系统设计与抽象逻辑 (`plan.md`)。
+2. **执行者 (Claude)**：擅长零样本编码。作为无头(Headless)引擎被唤醒（`claude -c -p <plan> --dangerously-skip-permissions`），在隔离的 Worktree 中老老实实地落实每一行代码，不去擅自重构项目。
+3. **审计员 (Codex)**：擅长挑刺和严谨的静态分析。作为守门员拦截在提交前（`vibe flow review --local`），专门负责代码 review、找 bug 和死代码。如果退回，再发给 Claude 重新修。
+4. **总指挥 (OpenClaw / Vibe Flow Auto)**：维持整个工作区流转的 Shell 主导循环，负责调用上述 Agent，挂载和清理 Worktree 环境。
+5. **人类 (Human Approver)**：从打字员解放为终审法官，只需在 Slack/Channel 中查看汇总的 PR 与 Review 报告，点一下 "LGTM" 闭环合码。
