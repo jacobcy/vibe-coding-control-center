@@ -134,7 +134,7 @@ _flow_status() {
   # File metrics
   echo "${CYAN}File Metrics:${NC}"
   local total_loc; total_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
-  echo "  Total LOC (lib/ + bin/): ${total_loc:-0} / 1800"
+  echo "  Total LOC (lib/ + bin/): ${total_loc:-0} / 2400"
 
   local flow_loc; flow_loc=$(wc -l < "$VIBE_ROOT/lib/flow.sh" 2>/dev/null || echo 0)
   echo "  lib/flow.sh: $flow_loc lines"

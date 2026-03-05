@@ -23,6 +23,65 @@ setup() {
   [ -f "$fixture/vibe/tasks/2026-03-04-new-task/task.json" ]
 }
 
+@test "ops: vibe_task add auto-id strips path prefix from title" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task add "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md"
+  '
+  [ "$status" -eq 0 ]
+
+  local generated_id
+  generated_id="$(jq -r '.tasks[0].task_id' "$fixture/vibe/registry.json")"
+  [[ "$generated_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-2026-03-02-vibe-new-task-flow-convergence$ ]]
+  [[ ! "$generated_id" =~ docs-plans ]]
+}
+
+@test "ops: vibe_task add auto-id enforces slug max length" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task add "docs/plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md"
+  '
+  [ "$status" -eq 0 ]
+
+  local generated_id suffix
+  generated_id="$(jq -r '.tasks[0].task_id' "$fixture/vibe/registry.json")"
+  suffix="${generated_id#*-*-*-}"
+  [ "${#suffix}" -le 48 ]
+}
+
+@test "ops: vibe_task add keeps semantic slash titles when not path-like" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task add "API/Auth token refresh"
+  '
+  [ "$status" -eq 0 ]
+
+  local generated_id
+  generated_id="$(jq -r '.tasks[0].task_id' "$fixture/vibe/registry.json")"
+  [[ "$generated_id" =~ api-auth-token-refresh ]]
+}
+
 @test "ops: update writes status and next_step to registry" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
@@ -134,4 +193,90 @@ setup() {
   '
   [ "$status" -eq 1 ]
   [[ "$output" =~ "still bound to a worktree" ]]
+}
+
+@test "ops: remove prompts branch cleanup and deletes local+remote when confirmed" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local local_deleted="$fixture/local_deleted"
+  local remote_deleted="$fixture/remote_deleted"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    confirm_action() { return 0; }
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") echo "claude/rotate-alignment"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") echo "origin/claude/rotate-alignment"; return 0 ;;
+        "branch -d claude/rotate-alignment") echo local > "'"$local_deleted"'"; return 0 ;;
+        "push origin --delete claude/rotate-alignment") echo remote > "'"$remote_deleted"'"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    vibe_task remove 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 0 ]
+  [ -f "$local_deleted" ]
+  [ -f "$remote_deleted" ]
+  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
+}
+
+@test "ops: remove fails and preserves task when branch deletion fails" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    confirm_action() { return 0; }
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") echo "claude/rotate-alignment"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") return 0 ;;
+        "branch -d claude/rotate-alignment") return 1 ;;
+        *) return 0 ;;
+      esac
+    }
+    vibe_task remove 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Branch residue detected" ]]
+  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "1" ]
+}
+
+@test "ops: remove succeeds under errexit when no remote branch matches" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    set -e
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    vibe_task remove 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
 }

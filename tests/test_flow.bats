@@ -345,3 +345,105 @@ EOF
   grep -q "config user.name claude" "$calls"
   grep -q "config user.email claude@vibe.coding" "$calls"
 }
+
+@test "14. vibe flow start with path feature uses sanitized branch and prints cd next-step" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/repo"
+  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/repo"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+
+    _vibe_task_today() { echo "2026-03-05"; }
+    _vibe_task_add() { echo "$*" > "'"$fixture"'/task_add_args"; return 0; }
+    _vibe_task_update() { return 0; }
+    wtnew() {
+      echo "$1" > "'"$fixture"'/wtnew_branch"
+      mkdir -p "'"$fixture"'/wt-claude-$1"
+      return 0
+    }
+
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+
+    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$fixture/task_add_args")" =~ "--id 2026-03-05-2026-03-02-vibe-new-task-flow-convergence" ]]
+  [ "$(cat "$fixture/wtnew_branch")" = "2026-03-02-vibe-new-task-flow-convergence" ]
+  [[ "$output" =~ "cd " ]]
+  [[ "$output" =~ "vup" ]]
+}
+
+@test "15. vibe flow start rolls back task when worktree creation fails" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/repo"
+  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/repo"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+
+    _vibe_task_today() { echo "2026-03-05"; }
+    wtnew() { return 1; }
+
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "branch" ]]; then return 1; fi
+      return 0
+    }
+
+    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
+}
+
+@test "16. vibe flow start rolls back task when entering worktree fails" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/repo"
+  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/repo"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+
+    _vibe_task_today() { echo "2026-03-05"; }
+    wtnew() { return 0; }
+
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "branch" ]]; then return 1; fi
+      if [[ "$1" == "worktree" && "$2" == "remove" ]]; then return 0; fi
+      return 0
+    }
+
+    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Failed to enter worktree" ]]
+  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
+}
