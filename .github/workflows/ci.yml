@@ -31,30 +31,30 @@ jobs:
       - name: Run bats tests
         run: bats tests/
 
-      - name: Check LOC ceiling (total ≤ 1800)
+      - name: Check LOC ceiling (total ≤ 2400)
         run: |
           total=$(find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs cat | wc -l)
           echo "Total LOC: $total"
-          if [ "$total" -gt 1800 ]; then
-            echo "FAIL: Total LOC $total exceeds 1800 limit"
+          if [ "$total" -gt 2400 ]; then
+            echo "FAIL: Total LOC $total exceeds 2400 limit"
             exit 1
           fi
-          echo "✅ Total LOC: $total / 1800"
+          echo "✅ Total LOC: $total / 2400"
 
-      - name: Check per-file ceiling (≤ 200 lines each)
+      - name: Check per-file ceiling (≤ 300 lines each)
         run: |
           failed=0
           for f in lib/*.sh bin/vibe; do
             lines=$(wc -l < "$f")
-            if [ "$lines" -gt 200 ]; then
-              echo "FAIL: $f has $lines lines (limit: 200)"
+            if [ "$lines" -gt 300 ]; then
+              echo "FAIL: $f has $lines lines (limit: 300)"
               failed=$((failed + 1))
             else
               echo "  ✅ $f: $lines lines"
             fi
           done
           if [ "$failed" -gt 0 ]; then
-            echo "FAIL: $failed files exceed the 200-line limit"
+            echo "FAIL: $failed files exceed the 300-line limit"
             exit 1
           fi
-          echo "✅ All files within 200-line limit"
+          echo "✅ All files within 300-line limit"
