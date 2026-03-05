@@ -5,17 +5,51 @@
 # @featured
 alias wtls='git worktree list'
 
+# ── Shared worktree finding logic ───────────────────────────────────────────
+# Returns worktree path(s) matching the given name/pattern
+# Usage: _wt_find "name" → prints path(s)
+_wt_find() {
+  local target="$1"
+  local git_cmd; git_cmd="$(vibe_find_cmd git)" || return 1
+
+  local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)"
+  [[ -z "$main_dir" ]] && return 1
+
+  local -a all_paths=()
+  while IFS= read -r p; do
+    [[ -n "$p" ]] && all_paths+=("$p")
+  done < <($git_cmd -C "$main_dir" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+
+  [[ ${#all_paths[@]} -eq 0 ]] && return 1
+
+  # ① Exact match: full basename or absolute path
+  local p b
+  for p in "${all_paths[@]}"; do
+    b="${p##*/}"
+    [[ "$b" == "$target" || "$p" == "$target" ]] && { echo "$p"; return 0; }
+  done
+
+  # ② Suffix match: basename ends with "-<target>"
+  local -a candidates=()
+  for p in "${all_paths[@]}"; do
+    [[ "${p##*/}" == *"-${target}" ]] && candidates+=("$p")
+  done
+
+  # ③ Substring fallback: basename contains "<target>"
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    for p in "${all_paths[@]}"; do
+      [[ "${p##*/}" == *"${target}"* ]] && candidates+=("$p")
+    done
+  fi
+
+  printf '%s\n' "${candidates[@]}"
+}
+
 # @desc Jump to a specific worktree by name (e.g. wt my-feat)
 # @featured
 wt() {
   local target="$1"
   [[ -z "$target" ]] && { git worktree list; return; }
-
-  # Collect all accessible worktree paths
-  local -a all_paths=()
-  while IFS= read -r p; do [[ -d "$p" ]] && all_paths+=("$p"); done \
-    < <(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
-  [[ ${#all_paths[@]} -eq 0 ]] && { echo "❌ Not in a git repository"; return 1; }
 
   _wt_enter() {
     local p="$1" label="${1##*/}"
@@ -24,44 +58,24 @@ wt() {
     echo "→ $label"
   }
 
-  # ① Exact match: full basename or absolute path
-  local p b
-  for p in "${all_paths[@]}"; do
-    b="${p##*/}"
-    [[ "$b" == "$target" || "$p" == "$target" ]] && { _wt_enter "$p"; return; }
-  done
+  local result=$(_wt_find "$target")
+  [[ -z "$result" ]] && { echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1; }
 
-  # ② Suffix match: basename ends with "-<target>" (catches agent-feat and wt-agent-feat)
-  local -a candidates=()
-  for p in "${all_paths[@]}"; do
-    [[ "${p##*/}" == *"-${target}" ]] && candidates+=("$p")
-  done
-
-  # ③ Substring fallback: basename contains "<target>" anywhere
-  if [[ ${#candidates[@]} -eq 0 ]]; then
-    for p in "${all_paths[@]}"; do
-      [[ "${p##*/}" == *"${target}"* ]] && candidates+=("$p")
-    done
-  fi
-
-  case ${#candidates[@]} in
-    0)
-      echo "❌ Worktree not found: $target"
-      git worktree list 2>/dev/null | sed 's/^/   /'
-      return 1 ;;
-    1)
-      _wt_enter "${candidates[1]}" ;;
+  local -a matches=(${(f)result})
+  case ${#matches[@]} in
+    0) echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1 ;;
+    1) _wt_enter "${matches[1]}" ;;
     *)
       echo "🔍 Multiple worktrees match '${target}':"
       local i=1
-      for c in "${candidates[@]}"; do
-        echo "  [$i] ${c##*/}   ($c)"
+      for p in "${matches[@]}"; do
+        echo "  [$i] ${p##*/}   ($p)"
         (( i++ ))
       done
-      echo -n "Enter choice [1-${#candidates[@]}]: "
+      echo -n "Enter choice [1-${#matches[@]}]: "
       local choice; read -r choice
-      if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
-        _wt_enter "${candidates[$choice]}"
+      if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
+        _wt_enter "${matches[$choice]}"
       else
         echo "❌ Invalid choice"; return 1
       fi ;;
@@ -85,7 +99,7 @@ wtnew() {
   fi
 
   local dir="wt-${agent}-${branch}"
-  local path="${repo_root:h}/$dir"
+  local path="${repo_root}/.worktrees/$dir"
 
   $git_cmd -C "$repo_root" fetch -p >/dev/null 2>&1 || true
   $git_cmd -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch" || \
@@ -110,20 +124,22 @@ wtnew() {
 # @desc Remove a worktree and its associated local branch
 wtrm() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local arg="$1"; [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all>"
+  local awk_cmd; awk_cmd="$(vibe_find_cmd awk)" || { vibe_die "awk not found"; return 1; }
+  local rm_cmd; rm_cmd="$(vibe_find_cmd rm)" || { vibe_die "rm not found"; return 1; }
+  local arg="$1"; [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all|wildcard>"
 
   local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
 
   _wtrm_one() {
     local p="$1" label="${1##*/}"
     [[ "$p" == "$main_dir" ]] && { echo "⚠️  Cannot remove main worktree"; return 1; }
-    
+
     local branch_name=""
     if [[ -d "$p" ]]; then
       branch_name=$($git_cmd -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null)
     fi
     if [[ -z "$branch_name" ]]; then
-      branch_name=$($git_cmd -C "$main_dir" worktree list --porcelain | awk -v path="$p" '
+      branch_name=$($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd -v path="$p" '
         /^worktree / { if ($2 == path) found=1; else found=0 }
         /^branch / && found { sub("refs/heads/", "", $2); print $2; exit }
       ')
@@ -131,11 +147,12 @@ wtrm() {
 
     if $git_cmd -C "$main_dir" worktree remove --force "$p" 2>/dev/null; then
       echo "✅ Removed: $label"
-      
+
       if [[ -n "$branch_name" && "$branch_name" != "main" && "$branch_name" != "master" ]]; then
         if $git_cmd -C "$main_dir" branch -D "$branch_name" >/dev/null 2>&1; then
            echo "🗑️  Deleted local branch: $branch_name"
         fi
+        # Check and prompt for remote branch deletion
         if $git_cmd -C "$main_dir" ls-remote --exit-code --heads origin "$branch_name" >/dev/null 2>&1; then
            echo -n "❓ Delete remote branch origin/$branch_name? [y/N] "
            local response
@@ -150,10 +167,27 @@ wtrm() {
         fi
       fi
     elif [[ -d "$p" ]]; then
-      command rm -rf "$p"; echo "🗑️  Deleted orphan: $label"
+      $rm_cmd -rf "$p"
+      echo "🗑️  Deleted orphan: $label"
     else
       echo "⚠️  Not found: $p"
     fi
+  }
+
+  # Helper: find worktree paths matching a pattern
+  _wtrm_find() {
+    local pattern="$1"
+    local -a matches=()
+    local wp
+    while IFS= read -r wp; do
+      [[ "$wp" == "$main_dir" ]] && continue
+      local name="${wp##*/}"
+      # Support glob patterns like *-test, wt-*, etc.
+      if [[ "$name" == $~pattern ]]; then
+        matches+=("$wp")
+      fi
+    done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print $2}')
+    printf '%s\n' "${matches[@]}"
   }
 
   if [[ "$arg" == "all" ]]; then
@@ -161,15 +195,37 @@ wtrm() {
     while IFS= read -r wp; do
       [[ "$wp" == "$main_dir" ]] && continue
       [[ "${wp##*/}" == wt-* ]] && paths+=("$wp")
-    done < <($git_cmd -C "$main_dir" worktree list --porcelain | awk '/^worktree /{print $2}')
+    done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print $2}')
     [[ ${#paths[@]} -eq 0 ]] && { echo "ℹ️  No wt-* worktrees"; return 0; }
     echo "🗑️  Removing ${#paths[@]} worktree(s)..."
     for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
-    local path
-    [[ "$arg" == /* ]] && path="$arg" || path="${main_dir:h}/$arg"
-    [[ "$path" =~ /wt- ]] || { echo "⚠️  Name must contain 'wt-': $arg"; return 1; }
-    _wtrm_one "$path"
+    # Use _wt_find to locate worktree (supports exact/suffix/substring match)
+    local result=$(_wt_find "$arg")
+    [[ -z "$result" ]] && { echo "❌ Worktree not found: $arg"; git worktree list | sed 's/^/   /'; return 1; }
+
+    local -a found_paths=(${(f)result})
+    case ${#found_paths[@]} in
+      0) echo "❌ Worktree not found: $arg"; return 1 ;;
+      1) _wtrm_one "${found_paths[1]}" ;;
+      *)
+        echo "🔍 Multiple worktrees match '${arg}':"
+        local i=1 p
+        for p in "${found_paths[@]}"; do
+          echo "  [$i] ${p##*/}   ($p)"
+          (( i++ ))
+        done
+        echo -n "Enter choice [1-${#found_paths[@]}] or 'a' for all: "
+        local choice; read -r choice
+        if [[ "$choice" == "a" ]]; then
+          for p in "${found_paths[@]}"; do _wtrm_one "$p"; done
+        elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#found_paths[@]} )); then
+          _wtrm_one "${found_paths[$choice]}"
+        else
+          echo "❌ Invalid choice"
+        fi
+        ;;
+    esac
   fi
   $git_cmd -C "$main_dir" worktree prune >/dev/null 2>&1 || true
 }
@@ -193,34 +249,61 @@ wtrenew() {
 }
 
 # @desc Initialize a modular Tmux workspace for a worktree
+#   vup              → current worktree
+#   vup <name>       → smart match worktree from wtls
 # @featured
 vup() {
   vibe_require tmux git || return 1
   local mode="dash" target="" agent="${VIBE_DEFAULT_TOOL:-claude}"
-  
+
   # Parse modular subcommands
   case "${1:-}" in
     logs|tests|edit|all) mode="$1"; shift ;;
     -a|--all) mode="all"; shift ;;
-    *) mode="dash" ;;
+    *) ;;
   esac
-  
+
   target="${1:-}"
-  # Auto-detect current worktree if target is empty
+
+  # Resolve target to directory path using _wt_find
+  local dir_path
   if [[ -z "$target" ]]; then
-    local gr; gr="$(git rev-parse --show-toplevel 2>/dev/null)"
-    [[ -n "$gr" ]] && { target="${gr##*/}"; [[ "$target" != wt-* ]] && target="main"; } || target="main"
+    # No argument: use current directory
+    dir_path="$(pwd)"
+    target="${dir_path##*/}"
+  else
+    # Use _wt_find to locate worktree (supports exact/suffix/substring match)
+    local result=$(_wt_find "$target")
+    if [[ -n "$result" ]]; then
+      local -a matches=(${(f)result})
+      if [[ ${#matches[@]} -eq 1 ]]; then
+        dir_path="${matches[1]}"
+        target="${dir_path##*/}"
+      else
+        echo "🔍 Multiple worktrees match '${target}':"
+        local i=1 p
+        for p in "${matches[@]}"; do
+          echo "  [$i] ${p##*/}   ($p)"
+          (( i++ ))
+        done
+        echo -n "Enter choice [1-${#matches[@]}]: "
+        local choice; read -r choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
+          dir_path="${matches[$choice]}"
+          target="${dir_path##*/}"
+        else
+          echo "❌ Invalid choice"; return 1
+        fi
+      fi
+    else
+      vibe_die "Worktree not found: $target (checked wtls)"
+    fi
   fi
 
-  local dir_path
-  if [[ "$target" == "main" ]]; then dir_path="$VIBE_MAIN"
-  elif [[ "$target" == /* ]]; then dir_path="$target"; target="${target##*/}"
-  else
-    local rr; rr="$(git rev-parse --show-toplevel 2>/dev/null)"
-    dir_path="${rr:+${rr:h}/$target}"
-    [[ -z "$dir_path" ]] && dir_path="$VIBE_REPO/$target"
-  fi
   [[ -d "$dir_path" ]] || vibe_die "Not found: $dir_path"
+
+  # Session name = worktree name (e.g., main, wt-claude-fix)
+  local session_name="$target"
 
   local agent_cmd
   case "$agent" in
@@ -229,7 +312,15 @@ vup() {
     *)        vibe_require claude;   agent_cmd="claude --dangerously-skip-permissions --continue" ;;
   esac
 
-  vibe_tmux_ensure || return 1
+  # Create session if needed (don't destroy existing)
+  if ! tmux has-session -t "$session_name" 2>/dev/null; then
+    tmux new-session -d -s "$session_name" -c "$dir_path" -n "dash"
+  else
+    # Ensure session has a dash window
+    if ! tmux list-windows -t "$session_name" -F "#{window_name}" 2>/dev/null | grep -qx "dash"; then
+      tmux new-window -t "$session_name" -n "dash" -c "$dir_path"
+    fi
+  fi
 
   case "$mode" in
     dash)
@@ -249,18 +340,19 @@ vup() {
       vibe_tmux_dash "${target}-dash" "$dir_path" "$git_cmd" "$agent_cmd"
       ;;
   esac
-  
+
+  # Switch to the session (but don't change VIBE_SESSION env var permanently)
   if [[ -n "$TMUX" ]]; then
     local cur_s; cur_s=$(tmux display-message -p '#S' 2>/dev/null)
-    if [[ "$cur_s" != "$VIBE_SESSION" ]]; then
-      echo "🚀 Teleporting to session: $VIBE_SESSION"
-      tmux switch-client -t "$VIBE_SESSION"
+    if [[ "$cur_s" != "$session_name" ]]; then
+      echo "🚀 Teleporting to session: $session_name"
+      tmux switch-client -t "$session_name"
     else
       echo "✅ Workspace [$mode] active: ${target}"
     fi
   else
     echo "🛫 Taking off to cockpit..."
-    vibe_tmux_attach
+    tmux attach -t "$session_name"
   fi
 }
 
