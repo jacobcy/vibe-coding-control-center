@@ -3,7 +3,11 @@
 
 _vibe_skills_registry_file() { echo "$VIBE_ROOT/skills/vibe-skills/registry.json"; }
 _vibe_skills_count_entries() { [[ -d "$1" ]] && find "$1" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ' || echo 0; }
-_vibe_skills_project_count() { find "$VIBE_ROOT/skills" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l | tr -d ' '; }
+_vibe_skills_project_count() {
+    local c1=$(find "$VIBE_ROOT/skills" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)
+    local c2=$(find "$VIBE_ROOT/supervisor" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)
+    echo $(( ${c1:-0} + ${c2:-0} )) | tr -d ' '
+}
 _vibe_skills_global_agents() { jq -r '.global._agents[]' "$(_vibe_skills_registry_file)"; }
 _vibe_skills_project_agents() { jq -r '.project._agents[]' "$(_vibe_skills_registry_file)"; }
 _vibe_skills_superpowers() { jq -r '.global.packages[] | select(.source == "obra/superpowers") | .skills[].name' "$(_vibe_skills_registry_file)"; }
@@ -64,7 +68,7 @@ _vibe_skills_sync_global_superpowers() {
     (( ${#skills[@]} )) || { vibe_die "No superpowers skills found in registry"; return 1; }
     log_step "同步全局 Superpowers skills (${(j: :)agents})"
     cmd=(npx skills add obra/superpowers -g --agent)
-    for agent in "${agents[@]}"; do [[ "$agent" == "codex" ]] || cmd+=("$agent"); done
+    for agent in "${agents[@]}"; do [[ "$agent" == "codex" || "$agent" == "kiro" ]] || cmd+=("$agent"); done
     for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
     cmd+=(-y)
     output="$("${cmd[@]}" 2>&1)" || {
@@ -84,7 +88,7 @@ _vibe_skills_sync_local_skills() {
     targets=(${(f)"$(_vibe_skills_project_targets "${agents[@]}")"})
     log_step "同步本地 vibe-* skills"
     for target in "${targets[@]}"; do mkdir -p "$target"; done
-    for skill_dir in "$VIBE_ROOT"/skills/vibe-*(/N); do
+    for skill_dir in "$VIBE_ROOT"/skills/vibe-*(/N) "$VIBE_ROOT"/supervisor/vibe-*(/N); do
         name="${skill_dir:t}"
         for target in "${targets[@]}"; do ln -sfn "$skill_dir" "$target/$name"; done
         count=$((count + 1))

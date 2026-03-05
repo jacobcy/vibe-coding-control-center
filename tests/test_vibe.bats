@@ -44,6 +44,14 @@ setup() {
   [[ "$output" =~ "list, add, update, remove" ]]
 }
 
+@test "4.5 vibe alias load points to the new runtime loader" {
+  run vibe alias --load
+  [ "$status" -eq 0 ]
+  [[ -f "$output" ]]
+  [[ "$output" =~ "alias/loader.sh" ]]
+  [[ ! "$output" =~ "config/aliases.sh" ]]
+}
+
 @test "4.3 vibe help does not advertise unsupported skills audit subcommand" {
   run vibe help
   [ "$status" -eq 0 ]

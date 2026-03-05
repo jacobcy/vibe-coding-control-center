@@ -13,7 +13,7 @@ _vibe_alias_list() {
         shift
     done
 
-    local src_dir="${VIBE_LIB}/../config/aliases"
+    local src_dir="${VIBE_ROOT}/alias"
     echo "${BOLD}Vibe Alias Gallery${NC}"
     if [[ $show_all -eq 0 && -z "$filter_target" ]]; then
         echo "💡 Showing ${CYAN}featured${NC} aliases. Use ${YELLOW}vibe alias -a${NC} for all."
@@ -84,7 +84,7 @@ _vibe_alias_list() {
 vibe_alias() {
     case "${1:-}" in
         --load)
-            echo "${VIBE_LIB}/../config/aliases.sh"
+            echo "${VIBE_ROOT}/alias/loader.sh"
             ;;
         -h|--help)
             echo "${BOLD}Vibe Alias Manager${NC}"

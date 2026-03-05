@@ -36,20 +36,18 @@ input_examples:
 > - **严禁修改任何 `docs/` 下的文件**（如 Task README）。Task 状态、Gate 信息等已全部移至 `.git/vibe/registry.json`，作为唯一真源。
 
 1. **调用 `vibe task update <task_id> --status completed --unassign`**：将该 `task_id` 的 `status` 更新为用户选择的新状态（`completed` / `archived` / `skipped`），并解除 worktree 绑定。
-2. **(新) 归档合规检查**: 确认版本升级和 `CHANGELOG.md` 已在 `vibe flow pr` 阶段通过 `--bump` 完成。如果并未进行版本升级，且这是个功能交付，应提醒用户补做（即先运行 `/vibe-commit` 生成 commit，然后运行 `vibe flow pr` 提交 PR）。
-3. **元数据清算**: 确保已将本次变更的关键决策同步至 `.agent/context/memory/` 或相关 Topic 文档。
+### Step 2: 归档合规与防丢代码检查
 
-### Step 3: 更新全局 Worktrees Map
-修改 `$(git rev-parse --git-common-dir)/vibe/worktrees.json`:
-- 查找当前所在的 `worktree_name`（或被传入 `current_task` 匹配的节点）。
-- 如果当前已经在 CLI 层执行了 `done`，该 worktree 可能已经准备删掉，这儿你需要：
-   - 将这棵树的状态标记为 `idle` 甚至直接从 `worktrees` 数组中移除该条目，防止未来显示为幽灵僵尸。
+**强制审查点：** 
+1. 你的职责是在发起清除前，使用 Git 状态和 PR 状态判断是否有未提交 (uncommitted) 或未合并 (unmerged) 到 `origin/main` 的代码。
+2. 确认版本升级和 `CHANGELOG.md` 已在 `vibe flow pr` 阶段通过 `--bump` 完成。如果并未进行版本升级，且这是个功能交付，应提醒用户补做（即先运行 `/vibe-commit` 生成 commit，然后运行 `vibe flow pr` 提交 PR）。
+3. 如果检查到有遗留代码或任务没有走到终点，**严重警告用户潜在的数据丢失风险**，并拒绝往下执行。
 
-### Step 4: 工作区本地清理（Optional）
-询问用户是否要自动一并运行 `vibe flow done` 控制台命令为您把此工作树文件直接抹除回主树：
-- 这只在你发现当前 CLI 端还没有物理清理工作树时提供。
+### Step 3: 工作区本地清理（Optional）
+如果用户当前处于安全通过检查的状态，询问用户是否要自动一并运行 `vibe flow done` 控制台命令为您把此工作树文件直接抹除回主树：
+- 该命令 (`vibe flow done`) 本身已经内涵了安全检测逻辑。当你调用它时，如果发现未 Clean 或未 Merge，它也会执行二次阻断。
 
-### Step 5: 输出封板报告
+### Step 3: 输出封板报告
 在聊天界面打印封板小结：
 ```markdown
 🎉 **任务结算完毕！**

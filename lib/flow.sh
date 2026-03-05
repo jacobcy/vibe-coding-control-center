@@ -14,7 +14,7 @@ _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git sho
 _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 
-_flow_start_worktree() {
+_flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id
   vibe_require git jq || return 1
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
@@ -30,7 +30,7 @@ _flow_start_worktree() {
   log_success "Feature ready: $feature  (task: $task_id)"; echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
 }
 
-_flow_start_task() {
+_flow_new_task() {
   local task_id="$1" agent="$2" ref="$3" registry_file title branch
   vibe_require git jq || return 1
   registry_file="$(_flow_registry_file)"; title="$(_flow_task_title "$task_id" "$registry_file")"; [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
@@ -39,23 +39,27 @@ _flow_start_task() {
   git checkout -b "$branch" "origin/$ref" || return 1; _flow_set_identity "$agent" || return 1; log_success "Started task: $task_id ($title)"
 }
 
-_flow_start() {
+_flow_new() {
   local feature="" task_id="" agent="" ref="main" arg
-  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_start_usage; return 0; }; done
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do case "$1" in --task) task_id="$2"; shift 2 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feature" ]] && feature="$1"; shift ;; esac; done
   [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"; [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
   if [[ -n "$task_id" && -z "$feature" ]]; then
     if ! _flow_is_main_worktree; then log_step "Binding task $task_id to current worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1; return 0
-    else _flow_start_task "$task_id" "${agent:-claude}" "$ref"; return $?
+    else _flow_new_task "$task_id" "${agent:-claude}" "$ref"; return $?
     fi
   fi
-  [[ -n "$feature" ]] || { _flow_start_usage; return 1; }; _flow_start_worktree "$feature" "${agent:-claude}" "$ref"
+  [[ -n "$feature" ]] || { _flow_new_usage; return 1; }; _flow_new_worktree "$feature" "${agent:-claude}" "$ref"
 }
 
 _flow_done() {
-  local wt_path wt_dir branch main_dir
+  local wt_path wt_dir branch main_dir unmerged
   if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then log_warn "Current repository or branch is protected."; return 1; fi
   wt_path="$PWD"; wt_dir=$(basename "$wt_path"); branch=$(git branch --show-current)
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then log_error "Working directory is not clean. Please commit or stash changes before finishing."; return 1; fi
+  git fetch origin main --quiet 2>/dev/null || true
+  unmerged=$(git rev-list "origin/main..$branch" 2>/dev/null || echo "")
+  if [[ -n "$unmerged" ]]; then log_error "Branch '$branch' has commits not merged into origin/main. Please open a PR and merge first."; return 1; fi
   log_warn "WARNING: This will clear contents of $wt_dir and PERMANENTLY delete local branch ($branch)."; confirm_action "Proceed with cleanup?" || return 0
   main_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); main_dir="${main_dir%/.git}"; cd "$main_dir" || return 1
   [[ $(git ls-remote --exit-code --heads origin "$branch" 2>/dev/null) ]] && { log_step "Deleting remote branch: $branch"; git push origin --delete "$branch" 2>/dev/null || true; }
@@ -126,7 +130,7 @@ _flow_review() {
 
 vibe_flow() {
   case "${1:-help}" in
-    start|new) shift; _flow_start "$@" ;;
+    start|new|create) shift; _flow_new "$@" ;;
     done) shift; _flow_done "$@" ;;
     status) shift; _flow_status "$@" ;;
     list) shift; _flow_list "$@" ;;

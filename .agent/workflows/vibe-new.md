@@ -1,59 +1,43 @@
 ---
-description: 新功能统一入口，调用 Vibe Orchestrator 执行 Vibe Guard 流程。
+description: 新功能统一入口，调用 Vibe Orchestrator 负责意图分析与方案规划 (Discussion Mode)。
 ---
 
-# Vibe New
+# Vibe New (Discussion Mode)
 
 **Input**: 运行 `/vibe-new <feature>` 启动新功能引导流程。
 
+## Workflow 定位
+- `/vibe-new` 属于 **Discussion Mode (讨论与规划阶段)**。
+- 它的核心职责是出具 `plan.md` 图纸。**绝对禁止**在该工作流中直接跳步修改非文档业务代码 (`lib/`, `bin/` 等)。
+
 ## Shared Task Binding Rules
-
-- `/vibe-new` 只负责智能入口编排，不得直接修改共享 registry、worktree 绑定或本地 `.vibe/*` 文件。
-- 新任务讨论完成后，必须通过 shell 命令先写入共享任务真源 `$(git rev-parse --git-common-dir)/vibe/`，再决定绑定到哪个 worktree。
-- 共享真源至少维护：
-  - `registry.json`：task 摘要索引
-  - `worktrees.json`：worktree 与 current task 绑定
-  - `tasks/<task-id>/task.json`：单 task 真源，可包含 optional subtasks
-- 目标 worktree 只保存本地 `.vibe/` 缓存：
-  - `.vibe/current-task.json`：当前 current task 指针
-  - `.vibe/focus.md`：聚焦摘要
-  - `.vibe/session.json`：短期会话缓存
-- `.vibe/` 不是 task 真源，必须加入 gitignore，内容可重建。
+- 新任务讨论完成后，必须通过 shell 命令先写入共享任务真源，再决定绑定到哪个 worktree。
+- 所有 registry / worktree / `.vibe/*` 写入都必须通过 shell 命令完成，不得直接手工编辑 JSON 或 Markdown 状态文件。
 - `/vibe-new` 当前支持两种 shell 路径：
-  - 当前目录开新任务：通过 `vibe task update ... --bind-current` 与 `vibe flow start --task <task-id>` 驱动。
-  - 新目录开新任务：通过 `vibe task` 配置任务，再调用 `vibe flow start <feature>` 创建/切换 worktree。
+  - 当前目录开新任务：通过 `vibe task update ... --bind-current` 驱动。
+  - 新目录开新任务：通过 `vibe task add` / `vibe task update` 准备任务元数据，再调用 `vibe flow create <feature>` 创建/切换 worktree。
 
-**Steps**
+## Steps
 
 1. **Acknowledge the command**
-   立即回复："已进入 Vibe Workflow Engine。我将通过 Vibe Guard 流程（Scope/Plan/Execution/Review 等）引导本次开发。"
+   立即回复："已进入 Vibe Workflow Engine (Discussion Mode)。我将通过相关 Gate 为您分析与编制执行计划。"
 
 2. **Invoke orchestrator**
-   必须调用 `vibe-orchestrator` 技能，并将 `<feature>` 作为目标输入。
+   调用 `supervisor/vibe-orchestrator` 技能，将 `<feature>` 作为目标输入。
 
-3. **Run Gate Flow**
-   严格按 Vibe Guard 以下顺序推进：
-   - Scope Gate（边界检查）
-   - Spec Gate（契约校验）
-   - Plan Gate（计划校验/补齐）
-   - Test Gate（测试覆盖）
-   - Execution Gate（按计划执行并验证）
-   - Audit/Review Gate（合规与结果复核）
+3. **Run Planning Gates**
+   严格按以下顺序推进：
+   - Gate 0: Intent Gate (智能调度与任务初始化)
+   - Gate 1: Scope Gate (边界检查)
+   - Gate 2: Spec Gate (契约校验)
+   - Gate 3: Plan Gate (出具 `plan.md` 执行图纸)
 
-4. **Checkpoint Output**
-   每通过一个 Gate，输出：
-   - 当前 Gate
-   - 判定结果（通过/阻断）
-   - 下一步动作
+4. **Exception Escalation Hook (举报通道)**
+   在任何一个 Gate 中，如果发现严重异常（如系统配置确实、严重越界、或文档严重缺损）：
+   - 立刻终止后续探索，不允许敷衍或胡编乱造。
+   - 抛出红色 🚨 警告，向 Orchestrator 提报错误并等待人类指挥。
 
-5. **Task / Worktree Binding**
-   在进入 Execution 前，必须明确：
-   - 当前 worktree 的 current task
-   - task 是否包含 subtasks
-   - 当前是“当前目录开新任务”还是“新目录开新任务”
-   - 所有 registry / worktree / `.vibe/*` 写入都必须通过 shell 命令完成，不得直接手工编辑 JSON 或 Markdown 状态文件
-   - 当前目录模式：优先调用 `vibe task update <task-id> --bind-current ...`，再调用 `vibe flow start --task <task-id>`
-   - 新目录模式：先用 `vibe task add` / `vibe task update` 准备任务元数据，再调用 `vibe flow start <feature>`
-
-6. **Blocking Policy**
-   任一 Gate 阻断时，停止继续执行后续 Gate，并给出恢复路径。
+5. **Checkpoint Output & HARD STOP**
+   - 每通过一个 Gate，输出判定结果与下一步。
+   - 一旦生成并审查了 `plan.md`，即表示 Gate 3 完成。必须触发 **HARD STOP（硬停止）**。
+   - 回复用户：“✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 或 `vibe flow start` 唤醒 Execution 机器人开始编码。”

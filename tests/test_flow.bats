@@ -36,10 +36,10 @@ JSON
   [[ "$output" =~ "pr" ]]
 }
 
-@test "2. vibe flow start without args returns error" {
-  run vibe flow start
+@test "2. vibe flow new without args returns error" {
+  run vibe flow new
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "Usage: vibe flow start" ]]
+  [[ "$output" =~ "Usage: vibe flow new" ]]
 }
 
 @test "3. vibe flow status in non-worktree returns error" {
@@ -98,7 +98,7 @@ JSON
 
 # --- Multi-task worktree alignment tests ---
 # Tests 7-9: bind-to-current path (inside feature worktree wt-agent-feature)
-# Tests 10-13: _flow_start_task branching path (outside feature worktree)
+# Tests 10-13: _flow_new_task branching path (outside feature worktree)
 
 @test "7. vibe flow start --task binds task to current feature worktree" {
   local fixture
@@ -117,7 +117,7 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 0 ]
@@ -141,7 +141,7 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
     # Verify worktrees.json has the task in tasks array
     jq -e ".worktrees[] | select(.worktree_name == \"wt-claude-refactor\") | .tasks | index(\"2026-03-02-rotate-alignment\")" "'"$fixture"'/vibe/worktrees.json" >/dev/null
   '
@@ -167,7 +167,7 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 1 ]
@@ -195,7 +195,7 @@ JSON
       if [[ "$1" == "config" && "$2" == "user.email" ]]; then return 0; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 0 ]
@@ -225,7 +225,7 @@ JSON
       if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment --agent codex
+    _flow_new --task 2026-03-02-rotate-alignment --agent codex
   '
 
   [ "$status" -eq 0 ]
@@ -253,7 +253,7 @@ JSON
       if [[ "$1" == "checkout" ]]; then echo "unexpected checkout" > "'"$fixture"'/checkout-called"; return 1; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 1 ]
@@ -281,7 +281,7 @@ JSON
       if [[ "$1" == "checkout" ]]; then echo "unexpected checkout" > "'"$fixture"'/checkout-called"; return 1; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_new --task 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 1 ]
