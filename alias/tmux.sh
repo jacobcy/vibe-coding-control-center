@@ -112,7 +112,7 @@ vt() {
 
   local -a matches=(${(f)result})
   case ${#matches[@]} in
-    1) tmux attach -t "${matches[1]}" ;;
+    1) [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[1]}" || tmux attach -t "${matches[1]}" ;;
     *)
       echo "🔍 Multiple sessions match '${target}':"
       local i=1 s
@@ -123,7 +123,7 @@ vt() {
       echo -n "Enter choice [1-${#matches[@]}]: "
       local choice; read -r choice
       if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
-        tmux attach -t "${matches[$choice]}"
+        [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[$choice]}" || tmux attach -t "${matches[$choice]}"
       else
         echo "❌ Invalid choice"
       fi
@@ -159,12 +159,12 @@ vtup() {
   # Check if session exists
   if tmux has-session -t "$session_name" 2>/dev/null; then
     echo "📎 Attaching to: $session_name"
-    tmux attach -t "$session_name"
+    [[ -n "$TMUX" ]] && tmux switch-client -t "$session_name" || tmux attach -t "$session_name"
   else
     # Create new session
     echo "🆕 Creating session: $session_name"
     tmux new-session -d -s "$session_name" -c "$dir_path" -n "main"
-    tmux attach -t "$session_name"
+    [[ -n "$TMUX" ]] && tmux switch-client -t "$session_name" || tmux attach -t "$session_name"
   fi
 }
 
