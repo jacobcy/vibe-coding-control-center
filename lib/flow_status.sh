@@ -49,18 +49,42 @@ _flow_status() {
     return 1
   fi
 
-  local title task_status next_step worktree
+  local title task_status next_step worktree agent subtask_id
   title=$(echo "$task_data" | jq -r '.title // "N/A"')
   task_status=$(echo "$task_data" | jq -r '.status // "unknown"')
   next_step=$(echo "$task_data" | jq -r '.next_step // "N/A"')
   worktree=$(echo "$task_data" | jq -r '.assigned_worktree // "none"')
+  agent=$(echo "$task_data" | jq -r '.agent // "none"')
+  subtask_id=$(echo "$task_data" | jq -r '.current_subtask_id // empty')
 
-  echo "${BOLD}Task:${NC} $feature"
-  echo "${BOLD}Title:${NC} $title"
-  echo "${BOLD}Status:${NC} $task_status"
-  echo "${BOLD}Worktree:${NC} $worktree"
-  echo "${BOLD}Branch:${NC} $(git branch --show-current 2>/dev/null)"
-  echo "${BOLD}Next Step:${NC} $next_step"
+  # Supervisor Lifecycle Detection
+  local phase="${CYAN}Draft${NC}" gate_num="" gate_label=""
+  if [[ "$next_step" =~ "Gate ([0-6])" ]]; then
+      gate_num="${match[1]}"
+      case "$gate_num" in
+          0|1|2|3) phase="${YELLOW}Discuss (Planning)${NC}" ;;
+          4|5)     phase="${GREEN}Execute (Implementation)${NC}" ;;
+          6)       phase="${MAGENTA}Review (Audit)${NC}" ;;
+      esac
+      gate_label="Gate $gate_num"
+  fi
+
+  # Identity Check
+  local current_actor; current_actor=$(git config user.name 2>/dev/null || echo "unknown")
+  local actor_label="${BOLD}${current_actor}${NC}"
+  [[ "$current_actor" != "$agent" && "$agent" != "none" ]] && actor_label="${YELLOW}${current_actor} (${agent} assigned)${NC}"
+
+  echo "──────────────────────────────────────────────────"
+  echo "${BOLD}Task:${NC}    $feature"
+  echo "${BOLD}Title:${NC}   $title"
+  echo "──────────────────────────────────────────────────"
+  echo "${BOLD}Phase:${NC}   $phase ${gate_label:+( $gate_label )}"
+  echo "${BOLD}Actor:${NC}   $actor_label"
+  echo "${BOLD}Worktree:${NC} $worktree [$(git branch --show-current 2>/dev/null)]"
+  echo "${BOLD}Status:${NC}   $task_status${subtask_id:+ ($subtask_id)}"
+  echo "──────────────────────────────────────────────────"
+  echo "${BOLD}Next:${NC}     $next_step"
+  echo "──────────────────────────────────────────────────"
   echo ""
 
   # Physical status
