@@ -5,14 +5,13 @@ source "$VIBE_LIB/flow_status.sh"
 source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
-_flow_task_title() { jq -r --arg task_id "$1" '.tasks[]? | select(.task_id == $task_id) | .title // empty' "$2"; }
-_flow_set_identity() { git config user.name "$1" 2>/dev/null || git config user.name "$1" || return 1; git config user.email "$1@vibe.coding" 2>/dev/null || git config user.email "$1@vibe.coding"; }
+_flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
+_flow_set_identity() { git config user.name "$1" && git config user.email "$1@vibe.coding"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
-_flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
-_flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
-_flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
-_flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
-_flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
+_flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Dirty worktree"; return 1; }; }
+_flow_require_base_ref() { git fetch origin "$1" -q; git show-ref --verify -q "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
+_flow_branch_exists() { git show-ref --verify -q "refs/heads/$1" || git show-ref --verify -q "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
+_flow_is_main_worktree() { [[ "$(basename "$PWD")" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 
 _flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id
@@ -36,52 +35,25 @@ _flow_new_worktree() {
 }
 
 _flow_bind() {
-  local task_id="" agent="" arg registry_file title
-  for arg in "$@"; do
-    case "$arg" in
-      -h|--help) _flow_bind_usage; return 0 ;;
-    esac
-  done
-  task_id="$1"
-  shift $(( $# > 0 ? 1 : 0 ))
-  for arg in "$@"; do
-    case "$arg" in
-      --agent) agent="${1:-}"; shift ;;
-    esac
-  done
-  [[ -z "$task_id" || "$task_id" =~ ^-- ]] && { _flow_bind_usage; return 1; }
-  
-  registry_file="$(_flow_registry_file)"
-  title="$(_flow_task_title "$task_id" "$registry_file")"
-  [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
-  [[ -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
-  
-  log_step "Refreshing physical workspace identity ($agent)"
-  if typeset -f wtinit &>/dev/null; then
-      wtinit "$agent" >/dev/null || true
-  else
-      _flow_set_identity "$agent" || return 1
-  fi
-  
-  log_step "Binding task to current worktree"
-  _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1
-  log_success "Bound task: $task_id ($title)"
+  local tid agent="" arg reg title
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_bind_usage; return 0; }; done
+  tid="$1"; shift $(( $# > 0 ? 1 : 0 ))
+  while [[ $# -gt 0 ]]; do case "$1" in --agent) agent="$2"; shift 2 ;; *) shift ;; esac; done
+  [[ -z "$tid" || "$tid" =~ ^-- ]] && { _flow_bind_usage; return 1; }
+  reg="$(_flow_registry_file)"; title="$(_flow_task_title "$tid" "$reg")"
+  [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
+  agent="${agent:-${VIBE_AGENT:-claude}}"
+  log_step "Identity: $agent"; typeset -f wtinit &>/dev/null && wtinit "$agent" >/dev/null || _flow_set_identity "$agent" || return 1
+  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
+  log_success "Bound: $tid ($title)"
 }
 
 _flow_new() {
-  local feature="" agent="" ref="main" arg
+  local feat="" agent="" ref="main" arg
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
-  while [[ $# -gt 0 ]]; do 
-    case "$1" in 
-      --task) log_error "To bind an existing task, use: vibe flow bind $2"; return 1 ;; 
-      --agent) agent="$2"; shift 2 ;; 
-      --branch|--base) ref="$2"; shift 2 ;; 
-      *) [[ -z "$feature" ]] && feature="$1"; shift ;; 
-    esac
-  done
-  [[ -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
-  [[ -n "$feature" ]] || { _flow_new_usage; return 1; }
-  _flow_new_worktree "$feature" "$agent" "$ref"
+  while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
+  [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
+  _flow_new_worktree "$feat" "${agent:-${VIBE_AGENT:-claude}}" "$ref"
 }
 
 _flow_done() {

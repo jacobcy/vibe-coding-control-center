@@ -120,7 +120,7 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Binding task" ]]
+  [[ "$output" =~ "Binding" ]]
 }
 
 @test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
