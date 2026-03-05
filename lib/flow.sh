@@ -12,6 +12,7 @@ _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]
 _flow_require_base_ref() { git fetch origin "$1" -q; git show-ref --verify -q "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
 _flow_branch_exists() { git show-ref --verify -q "refs/heads/$1" || git show-ref --verify -q "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
 _flow_is_main_worktree() { [[ "$(basename "$PWD")" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
+_flow_shared_dir() { local d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 
 _flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id

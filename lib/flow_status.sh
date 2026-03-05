@@ -124,5 +124,5 @@ _flow_list() {
     echo ""
   done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
 
-  [[ "$shared_count" -gt 0 ]] && echo "${CYAN}Shared Context:${NC} $shared_count files in .git/vibe/shared"
+  [[ "$shared_count" -gt 0 ]] && echo "${CYAN}Shared Context:${NC} $shared_count files in .git/vibe/shared" || true
 }
