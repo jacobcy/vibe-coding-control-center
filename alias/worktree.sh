@@ -11,6 +11,7 @@ alias wtls='git worktree list'
 _wt_find() {
   local target="$1"
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || return 1
+  local awk_cmd; awk_cmd="$(vibe_find_cmd awk)" || return 1
 
   local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)"
   [[ -z "$main_dir" ]] && return 1
@@ -18,7 +19,7 @@ _wt_find() {
   local -a all_paths=()
   while IFS= read -r p; do
     [[ -n "$p" ]] && all_paths+=("$p")
-  done < <($git_cmd -C "$main_dir" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+  done < <($git_cmd -C "$main_dir" worktree list --porcelain 2>/dev/null | $awk_cmd '/^worktree /{print substr($0,10)}')
 
   [[ ${#all_paths[@]} -eq 0 ]] && return 1
 
@@ -140,7 +141,7 @@ wtrm() {
     fi
     if [[ -z "$branch_name" ]]; then
       branch_name=$($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd -v path="$p" '
-        /^worktree / { if ($2 == path) found=1; else found=0 }
+        /^worktree / { if (substr($0,10) == path) found=1; else found=0 }
         /^branch / && found { sub("refs/heads/", "", $2); print $2; exit }
       ')
     fi
@@ -174,40 +175,28 @@ wtrm() {
     fi
   }
 
-  # Helper: find worktree paths matching a pattern
-  _wtrm_find() {
-    local pattern="$1"
-    # Escape brackets so malformed classes don't hard-fail matching.
-    local safe_pattern="$pattern"
-    safe_pattern="${safe_pattern//\[/\\[}"
-    safe_pattern="${safe_pattern//\]/\\]}"
-    local -a matches=()
-    local wp
-    while IFS= read -r wp; do
-      [[ "$wp" == "$main_dir" ]] && continue
-      local name="${wp##*/}"
-      # Support glob patterns like *-test, wt-*, etc.
-      if [[ "$name" == $~safe_pattern ]]; then
-        matches+=("$wp")
-      fi
-    done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print $2}')
-    printf '%s\n' "${matches[@]}"
-  }
 
   if [[ "$arg" == "all" ]]; then
     local -a paths=()
     while IFS= read -r wp; do
       [[ "$wp" == "$main_dir" ]] && continue
       [[ "${wp##*/}" == wt-* ]] && paths+=("$wp")
-    done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print $2}')
+    done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print substr($0,10)}')
     [[ ${#paths[@]} -eq 0 ]] && { echo "ℹ️  No wt-* worktrees"; return 0; }
     echo "🗑️  Removing ${#paths[@]} worktree(s)..."
     for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
     local result=""
-    # Wildcard path match (glob) goes through dedicated matcher.
+    # Wildcard path match (glob) goes through inline matcher.
     if [[ "$arg" == *'*'* || "$arg" == *'?'* ]]; then
-      result=$(_wtrm_find "$arg")
+      local safe_pattern="${arg//\[/\\[}"; safe_pattern="${safe_pattern//\]/\\]}"
+      local wp
+      local -a glob_matches=()
+      while IFS= read -r wp; do
+        [[ "$wp" == "$main_dir" ]] && continue
+        [[ "${wp##*/}" == $~safe_pattern ]] && glob_matches+=("$wp")
+      done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print substr($0,10)}')
+      result="${(pj:\n:)glob_matches}"
     else
       # Default smart finder: exact/suffix/substring.
       result=$(_wt_find "$arg")
