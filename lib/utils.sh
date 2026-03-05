@@ -61,6 +61,31 @@ vibe_find_cmd() {
     return 1
 }
 
+# Delete local branch with safe (-d) or force (-D) mode.
+vibe_delete_local_branch() {
+    local branch="$1" mode="${2:-safe}" flag="-d"
+    [[ -n "$branch" ]] || return 1
+    [[ "$mode" == "force" ]] && flag="-D"
+    if git branch "$flag" "$branch" >/dev/null 2>&1; then
+        log_step "Deleted local branch: $branch"
+        return 0
+    fi
+    log_warn "Failed to delete local branch: $branch"
+    return 1
+}
+
+# Delete remote branch from origin.
+vibe_delete_remote_branch() {
+    local branch="$1"
+    [[ -n "$branch" ]] || return 1
+    if git push origin --delete "$branch" >/dev/null 2>&1; then
+        log_step "Deleted remote branch: $branch"
+        return 0
+    fi
+    log_warn "Failed to delete remote branch: $branch"
+    return 1
+}
+
 # Print error and return failure
 vibe_die() {
     echo "${RED}✗ $*${NC}" >&2

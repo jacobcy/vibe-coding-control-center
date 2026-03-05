@@ -83,14 +83,33 @@ _vibe_task_remove() {
     _vibe_task_require_file "$registry_file" "registry.json" || return 1; _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
     jq -e --arg task_id "$task_id" '.worktrees[]? | select(.current_task == $task_id or (.tasks // [] | index($task_id) != null))' "$worktrees_file" >/dev/null 2>&1 && { vibe_die "Task is still bound to a worktree: $task_id"; return 1; }
-    local indexed_branch; indexed_branch=$(jq -r --arg tid "$task_id" '.worktrees[]? | select(.current_task == $tid or (.tasks // [] | index($tid) != null)) | .branch // empty' "$worktrees_file" | head -1)
-    local local_branches; [[ -n "$indexed_branch" ]] && local_branches=$(git branch --list "$indexed_branch" "*/$task_id" | sort -u | sed 's/^[ *]*//') || local_branches=$(git branch --list "*/$task_id" | sed 's/^[ *]*//')
-    if [[ -n "$local_branches" ]]; then log_error "Safety Block: Local branch(es) found for this task:"; echo "$local_branches" | sed 's/^/  - /'; return 1; fi
-    local remote_branches; [[ -n "$indexed_branch" ]] && remote_branches=$(git branch -r --list "origin/$indexed_branch" "origin/*/$task_id" | sort -u | sed 's/^[ *]*//') || remote_branches=$(git branch -r --list "origin/*/$task_id" | sed 's/^[ *]*//')
-    if [[ -n "$remote_branches" ]]; then
-        log_warn "Remote branch(es) detected for this task:"; echo "$remote_branches" | sed 's/^/  - /'
-        if confirm_action "Delete these remote branches before removing task?"; then
-            while read -r rb; do local rb_name="${rb#origin/}"; log_step "Deleting remote branch: $rb_name"; git push origin --delete "$rb_name" 2>/dev/null || true; done <<< "$remote_branches"
+    local indexed_branch local_branches remote_branches residual_local="" residual_remote=""
+    indexed_branch=$(jq -r --arg tid "$task_id" '.worktrees[]? | select(.current_task == $tid or (.tasks // [] | index($tid) != null)) | .branch // empty' "$worktrees_file" | head -1)
+    [[ -n "$indexed_branch" ]] && local_branches=$(git branch --list "$indexed_branch" "*/$task_id" | sort -u | sed 's/^[ *]*//') || local_branches=$(git branch --list "*/$task_id" | sed 's/^[ *]*//')
+    [[ -n "$indexed_branch" ]] && remote_branches=$(git branch -r --list "origin/$indexed_branch" "origin/*/$task_id" | sort -u | sed 's/^[ *]*//' | sed '/->/d') || remote_branches=$(git branch -r --list "origin/*/$task_id" | sed 's/^[ *]*//' | sed '/->/d')
+    if [[ -n "$local_branches" || -n "$remote_branches" ]]; then
+        log_warn "Branch(es) detected for this task:"
+        [[ -n "$local_branches" ]] && echo "$local_branches" | sed 's/^/  - local: /'
+        [[ -n "$remote_branches" ]] && echo "$remote_branches" | sed 's/^/  - remote: /'
+        if confirm_action "Try deleting these branches before removing task?"; then
+            while read -r lb; do
+                [[ -z "$lb" ]] && continue
+                vibe_delete_local_branch "$lb" || residual_local+="$lb\n"
+            done <<< "$local_branches"
+            while read -r rb; do
+                [[ -z "$rb" ]] && continue
+                local rb_name="${rb#origin/}"
+                vibe_delete_remote_branch "$rb_name" || residual_remote+="$rb_name\n"
+            done <<< "$remote_branches"
+        else
+            log_warn "Skipping branch deletion by user choice."
+            residual_local="$local_branches"
+            residual_remote="$(echo "$remote_branches" | sed 's/^origin\///')"
+        fi
+        if [[ -n "$residual_local" || -n "$residual_remote" ]]; then
+            log_warn "Branch residue detected for task $task_id:"
+            [[ -n "$residual_local" ]] && echo "$residual_local" | sed '/^$/d; s/^/  - local: /'
+            [[ -n "$residual_remote" ]] && echo "$residual_remote" | sed '/^$/d; s/^/  - remote: /'
         fi
     fi
     tmp="$(mktemp)" || return 1

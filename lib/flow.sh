@@ -13,21 +13,39 @@ _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; gi
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
 _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
+_flow_rollback_task() { _vibe_task_remove "$1" >/dev/null 2>&1 || true; }
+_flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }
 
 _flow_start_worktree() {
-  local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id
+  local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id feature_slug branch_name
   vibe_require git jq || return 1
+  feature_slug="$(_vibe_task_slugify "$feature")"
+  branch_name="${agent}/${feature_slug}"
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
-  wt_dir="wt-${agent}-${feature}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
-  registry_file="$(_flow_registry_file)"; task_id="$(_vibe_task_today)-$(_vibe_task_slugify "$feature")"
+  wt_dir="wt-${agent}-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
+  registry_file="$(_flow_registry_file)"; task_id="$(_vibe_task_today)-${feature_slug}"
   [[ -f "$registry_file" ]] && jq -e --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1 && { log_error "Task already registered: $task_id (use 'vibe flow start --task $task_id' to resume)"; return 1; }
-  log_step "Registering task: $feature → $task_id"; _vibe_task_add "$feature" || return 1
+
+  echo ""
+  log_step "Registering task: $feature → $task_id"
+  _vibe_task_add "$feature" --id "$task_id" || return 1
+
+  echo ""
   log_step "Creating worktree: $wt_dir"
-  if typeset -f wtnew &>/dev/null; then wtnew "$feature" "$agent" "$ref" || { log_error "wtnew failed"; return 1; }
-  else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "${agent}/${feature}" "$wt_path" "$ref" || { log_error "git worktree add failed"; return 1; }; cd "$wt_path" || return 1
+  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$agent" "$ref" || { log_error "wtnew failed"; _flow_rollback_task "$task_id"; return 1; }
+  else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; _flow_rollback_task "$task_id"; return 1; }
   fi
-  log_step "Binding task $task_id to worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1
-  log_success "Feature ready: $feature  (task: $task_id)"; echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
+  cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
+
+  echo ""
+  log_step "Binding task $task_id to worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
+
+  echo ""
+  log_success "Feature ready: $feature  (task: $task_id)"
+  echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
+  echo "💬 Next"
+  echo "   1. cd ${CYAN}${wt_path}${NC}"
+  echo "   2. ${CYAN}vup${NC}"
 }
 
 _flow_start_task() {
@@ -58,9 +76,9 @@ _flow_done() {
   wt_path="$PWD"; wt_dir=$(basename "$wt_path"); branch=$(git branch --show-current)
   log_warn "WARNING: This will clear contents of $wt_dir and PERMANENTLY delete local branch ($branch)."; confirm_action "Proceed with cleanup?" || return 0
   main_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); main_dir="${main_dir%/.git}"; cd "$main_dir" || return 1
-  [[ $(git ls-remote --exit-code --heads origin "$branch" 2>/dev/null) ]] && { log_step "Deleting remote branch: $branch"; git push origin --delete "$branch" 2>/dev/null || true; }
+  [[ $(git ls-remote --exit-code --heads origin "$branch" 2>/dev/null) ]] && vibe_delete_remote_branch "$branch" || true
   log_step "Detaching worktree $wt_dir"; git worktree remove "$wt_path" --force 2>/dev/null || true; mkdir -p "$wt_path"
-  log_step "Cleaning up local branch: $branch"; git branch -D "$branch" 2>/dev/null || true
+  log_step "Cleaning up local branch: $branch"; vibe_delete_local_branch "$branch" force || true
   log_success "Cleanup complete."; echo "💡 Next: Run ${CYAN}vibe task list${NC} to check remaining tasks."
 }
 
