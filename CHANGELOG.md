@@ -2,28 +2,26 @@
 
 ## [2.1.4] - 2026-03-05
 
-### ✨ Changed
-- feat: new three layer plan ...
+### ✨ Improvements
+- **Flow Control**: Integrated local AI code review via `codex` into `vibe flow review --local`.
+- **Flow PR**: Added idempotency checks to avoid duplicate version bumps and changelog noise when a Pull Request is already active.
 
 ## [2.1.3] - 2026-03-05
 
-### ✨ Changed
-- feat: new three layer plan ...
+### 🐛 Bug Fixes
+- **Status Audits**: Fixed a behavioral regression in `vibe flow status` where querying a missing task ID incorrectly returned Exit Code 0.
+- **Audit Noise**: Resolved systemic false positive warnings for ghost branches by checking active worktrees and applying slug-based matching. Excluded `docs/prds/` from scattered document audits.
 
 ## [2.1.2] - 2026-03-05
 
-### ✨ Changed
-- feat: new three layer plan ...
+### ✨ New Features
+- **Multi-task Display**: Upgraded `vibe flow status` and `vibe flow list` to properly display up to 6 registered tasks per feature worktree.
+- **Audit Upgrades**: Enhanced `vibe check` to proactively detect scattered task plans and flag unassociated zombie/ghost branches.
 
 ## [2.1.1] - 2026-03-05
 
-### ✨ Changed
-- feat: enforce strict stepper controller and logical bind boundaries (docs & codebase sync)
-
-## [2.1.0-rc1] - 2026-03-04
-
-### ✨ Changed
-- Automated version bump to 2.1.0-rc1
+### ✨ Improvements
+- **Flow Automation**: Enforced strict stepper controller boundaries and logical task binding separation for `vibe start`.
 
 ## [2.0.1] - 2026-02-14
 
