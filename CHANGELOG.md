@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.1] - 2026-03-05
+
+### ✨ Changed
+- feat: enforce strict stepper controller and logical bind boundaries (docs & codebase sync)
+
 ## [2.1.0-rc1] - 2026-03-04
 
 ### ✨ Changed
