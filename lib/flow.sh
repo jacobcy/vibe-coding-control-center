@@ -106,9 +106,31 @@ _flow_pr() {
 }
 
 _flow_review() {
-  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS"
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_review_usage; return 0 ;; *) target="$1"; shift ;; esac; done
+  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS" local_mode=0
+  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_review_usage; return 0 ;; --local) local_mode=1; shift ;; *) target="$1"; shift ;; esac; done
   vibe_require git || return 1; [[ -z "$target" ]] && target=$(git branch --show-current)
+
+  if [[ $local_mode -eq 1 ]]; then
+    if ! vibe_has codex; then
+      log_error "codex CLI not found. Cannot run local review."
+      return 1
+    fi
+    log_step "Running local codebase review via Codex..."
+    mkdir -p .agent
+    # Run interactive, but also tee to a log file for agent reference
+    if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+        log_info "Uncommitted changes detected. Running: codex review --uncommitted"
+        # We don't use tee here because codex review can be highly interactive/colorful,
+        # but we can redirect raw output if needed. For now just let it run.
+        codex review --uncommitted
+    else
+        log_info "Working directory clean. Running against origin/main..."
+        codex review --base main
+    fi
+    log_success "Local review complete."
+    return 0
+  fi
+
   if ! vibe_has gh; then log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."; vibe check; return 0; fi
   log_step "Fetching PR status for '$target'..."; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
   [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
