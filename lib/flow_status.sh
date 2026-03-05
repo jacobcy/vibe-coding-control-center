@@ -3,6 +3,7 @@
 
 _detect_feature() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-[^-]+-(.+)$ ]] && { echo "${match[1]}"; return 0; }; return 1; }
 _detect_agent() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-([^-]+)- ]] && { echo "${match[1]}"; return 0; }; echo "claude"; }
+_normalize_actor_name() { local name="${1:l}"; echo "${name#agent-}"; }
 
 # Show status for current or specified feature
 _flow_status() {
@@ -97,10 +98,12 @@ _flow_status() {
 
     # Identity Check
     local current_actor="$(git config user.name 2>/dev/null || echo "unknown")"
+    local current_actor_norm="$(_normalize_actor_name "$current_actor")"
+    local assigned_actor_norm="$(_normalize_actor_name "$agent")"
     local actor_label="${BOLD}${current_actor}${NC}"
-    [[ "$current_actor" != "$agent" && "$agent" != "none" ]] && actor_label="${YELLOW}${current_actor} (${agent} assigned)${NC}"
+    [[ "$current_actor_norm" != "$assigned_actor_norm" && "$agent" != "none" ]] && actor_label="${YELLOW}${current_actor} (${agent} assigned)${NC}"
 
-    local header_label="${CYAN}${BOLD}任务 $[idx+1]${NC}"
+    local header_label="${CYAN}${BOLD}任务 $((idx + 1))${NC}"
     [[ "$tid" == "$cur_t" ]] && header_label="${GREEN}${BOLD}重点任务 (Main)${NC}"
     
     echo "$header_label ──────────────────────────────────────────"

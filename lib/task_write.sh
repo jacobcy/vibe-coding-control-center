@@ -2,13 +2,15 @@
 # lib/task_write.sh - Task Write/Persistence operations
 
 _vibe_task_write_registry() {
-    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" assigned="$5" agent="$6" now="$7" tmp
+    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" assigned="$5" assigned_mode="$6" agent="$7" now="$8" tmp
     tmp="$(mktemp)" || return 1
-    jq --arg task_id "$task_id" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg agent "$agent" --arg now "$now" '
+    jq --arg task_id "$task_id" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg assigned_mode "$assigned_mode" --arg agent "$agent" --arg now "$now" '
       .tasks |= map(if .task_id == $task_id then
         (if $task_status != "" then .status = $task_status else . end)
         | (if $next_step != "" then .next_step = $next_step else . end)
-        | (if $assigned != "" then .assigned_worktree = $assigned else .assigned_worktree = null end)
+        | (if $assigned_mode == "set" then .assigned_worktree = (if $assigned == "" then null else $assigned end)
+           elif $assigned_mode == "clear" then .assigned_worktree = null
+           else . end)
         | (if $agent != "" then .agent = $agent else . end)
         | .updated_at = $now
       else . end)

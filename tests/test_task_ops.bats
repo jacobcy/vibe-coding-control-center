@@ -38,6 +38,21 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .next_step' "$fixture/vibe/registry.json")" = "New Step" ]
 }
 
+@test "ops: update status preserves existing assigned_worktree when not rebinding" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update old-task --status in_progress
+  '
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .status' "$fixture/vibe/registry.json")" = "in_progress" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .assigned_worktree' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+}
+
 @test "ops: update bind-current syncs worktree binding and cache" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"

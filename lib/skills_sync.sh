@@ -63,11 +63,15 @@ _vibe_skills_sync_agents_symlinks() {
 _vibe_skills_sync_global_superpowers() {
     local -a agents skills cmd
     local agent skill output
+    local skills_cli_version superpowers_ref superpowers_source
     agents=(${(f)"$(_vibe_skills_global_agents)"})
     skills=(${(f)"$(_vibe_skills_superpowers)"})
     (( ${#skills[@]} )) || { vibe_die "No superpowers skills found in registry"; return 1; }
+    skills_cli_version="${VIBE_SKILLS_CLI_VERSION:-1.4.4}"
+    superpowers_ref="${VIBE_SUPERPOWERS_REF:-e4a2375cb705ca5800f0833528ce36a3faf9017a}"
+    superpowers_source="obra/superpowers@${superpowers_ref}"
     log_step "同步全局 Superpowers skills (${(j: :)agents})"
-    cmd=(npx skills add obra/superpowers -g --agent)
+    cmd=(npx --yes --package "skills@${skills_cli_version}" skills add "$superpowers_source" -g --agent)
     for agent in "${agents[@]}"; do [[ "$agent" == "codex" || "$agent" == "kiro" ]] || cmd+=("$agent"); done
     for skill in "${skills[@]}"; do cmd+=(--skill "$skill"); done
     cmd+=(-y)

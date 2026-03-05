@@ -174,5 +174,174 @@ JSON
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Task not found" ]]
 }
+@test "10. _flow_done fails when worktree is dirty" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo "M modified-file"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Working directory is not clean" ]]
+}
 
+@test "11. _flow_done fails when branch has unmerged commits" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "rev-list origin/main..feature-branch") echo "commit-hash"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "has commits not merged into origin/main" ]]
+}
 
+@test "12. _flow_pr skips bump if PR already exists" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; } # Mock all tools as present
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;; # PR exists
+        "pr edit current-branch --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        "config --get user.name") echo "test"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "13. _flow_pr skips bump if changelog message exists" {
+  local fixture; fixture="$(mktemp -d)"; cd "$fixture"
+  echo "## [2.1.0] - 2026-03-05" > CHANGELOG.md
+  echo "- test commit ..." >> CHANGELOG.md
+  
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; } # Mock all tools as present
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;; # PR does not exist
+        "pr create --title test --body test --web") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        "config --get user.name") echo "test"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test" --msg "test commit ..."
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "14. _flow_pr runs bump when no existing PR and changelog has no message" {
+  local fixture; fixture="$(mktemp -d)"; cd "$fixture"
+  mkdir -p scripts
+  cat > scripts/bump.sh <<'EOF'
+#!/usr/bin/env bash
+touch bump_called
+exit 0
+EOF
+  chmod +x scripts/bump.sh
+  echo "2.1.4" > VERSION
+  echo "# Changelog" > CHANGELOG.md
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;;
+        "pr create --title test --body test --web") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add VERSION CHANGELOG.md") return 0 ;;
+        "commit -m chore: bump version to 2.1.4") return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test" --msg "fresh release note"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Bumping version" ]]
+  [ -f "$fixture/bump_called" ]
+}
+
+@test "15. _flow_bind normalizes identity even when wtinit exists" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+  local calls="$fixture/git_config_calls.log"
+  : > "$calls"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    wtinit() { return 0; }
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      if [[ "$1" == "config" ]]; then echo "$*" >> "'"$calls"'"; return 0; fi
+      return 0
+    }
+    _flow_bind 2026-03-02-rotate-alignment --agent claude
+  '
+
+  [ "$status" -eq 0 ]
+  grep -q "config user.name claude" "$calls"
+  grep -q "config user.email claude@vibe.coding" "$calls"
+}

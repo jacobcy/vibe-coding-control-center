@@ -44,7 +44,11 @@ _flow_bind() {
   reg="$(_flow_registry_file)"; title="$(_flow_task_title "$tid" "$reg")"
   [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
   agent="${agent:-${VIBE_AGENT:-claude}}"
-  log_step "Identity: $agent"; typeset -f wtinit &>/dev/null && wtinit "$agent" >/dev/null || _flow_set_identity "$agent" || return 1
+  log_step "Identity: $agent"
+  if typeset -f wtinit &>/dev/null; then
+    wtinit "$agent" >/dev/null || return 1
+  fi
+  _flow_set_identity "$agent" || return 1
   log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
   log_success "Bound: $tid ($title)"
 }
