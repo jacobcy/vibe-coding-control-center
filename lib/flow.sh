@@ -153,10 +153,10 @@ _flow_review() {
   if ! vibe_has gh; then log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."; vibe check; return 0; fi
   log_step "Fetching PR status for '$target'..."; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
   [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
-  number=$(echo "$pr_info" | jq -r '.number'); title=$(echo "$pr_info" | jq -r '.title'); state=$(echo "$pr_info" | jq -r '.state')
-  decision=$(echo "$pr_info" | jq -r '.reviewDecision // "PENDING"'); mergeable=$(echo "$pr_info" | jq -r '.mergeable'); url=$(echo "$pr_info" | jq -r '.url')
+  number=$(printf '%s\n' "$pr_info" | jq -r '.number'); title=$(printf '%s\n' "$pr_info" | jq -r '.title'); state=$(printf '%s\n' "$pr_info" | jq -r '.state')
+  decision=$(printf '%s\n' "$pr_info" | jq -r '.reviewDecision // "PENDING"'); mergeable=$(printf '%s\n' "$pr_info" | jq -r '.mergeable'); url=$(printf '%s\n' "$pr_info" | jq -r '.url')
   echo "${BOLD}PR #$number:${NC} $title"; echo "${CYAN}URL:${NC} $url"; echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
-  log_step "Fetching latest review comments..."; comments=$(echo "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
+  log_step "Fetching latest review comments..."; comments=$(printf '%s\n' "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
   [[ -n "$comments" ]] && echo "$comments" | sed 's/^/  💬 /' || echo "  (No comments found)"
   while [[ $retry -lt 3 ]]; do
     log_step "Checking CI status (Attempt $((retry+1))/3)..."
