@@ -115,6 +115,7 @@ vibe_check() {
     echo "  - Total Tasks: $total"
     echo "  - Active (Todo/In-Progress): $in_progress"
     echo "  - Completed (Pending Archive): $completed"
+    echo "  - Archived Tasks: $archived (Docs in archive/: $archived_folders)"
     echo "  - Ghost Branches: ${#ghost_branches[@]}"
     echo "  - Scattered Docs: ${#scattered[@]}"
     echo ""
