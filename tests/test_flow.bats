@@ -28,9 +28,11 @@ JSON
   # Check for key parts separately (output has ANSI color codes)
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe flow" ]]
-  [[ "$output" =~ "start" ]]
+  [[ "$output" =~ "new" ]]
+  [[ "$output" =~ "bind" ]]
   [[ "$output" =~ "done" ]]
   [[ "$output" =~ "status" ]]
+  [[ "$output" =~ "list" ]]
   [[ "$output" =~ "sync" ]]
   [[ "$output" =~ "review" ]]
   [[ "$output" =~ "pr" ]]
