@@ -91,17 +91,36 @@ _flow_pr() {
   commit_logs=$(git log main..HEAD --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since main. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
   if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
+  
+  local has_pr=0
   if vibe_has gh; then
     log_step "Checking for open PRs to main..."; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
     [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to 'main' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
+    
+    # Check if a PR already exists from this branch
+    gh pr view "$branch" >/dev/null 2>&1 && has_pr=1
   fi
-  log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
-  git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+  
+  local skip_bump=0
+  [[ $has_pr -eq 1 ]] && skip_bump=1
+  [[ -f CHANGELOG.md ]] && grep -qF "$version_msg" CHANGELOG.md 2>/dev/null && skip_bump=1
+  
+  if [[ $skip_bump -eq 0 ]]; then
+    log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
+    git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+  else
+    log_info "Skipping version bump (PR exists or changelog already up-to-date)."
+  fi
+
   log_step "Pushing changes to origin/$branch"; git push origin HEAD || return 1
   if ! vibe_has gh; then log_success "Changes pushed. Please create/view PR manually."; return 0; fi
   log_info "GitHub CLI detected. Managing PR..."
-  if gh pr view "$branch" --json number >/dev/null 2>&1; then log_success "Updating existing PR..."; gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
-  else log_step "Creating new PR: $pr_title"; gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
+  if [[ $has_pr -eq 1 ]]; then
+    log_success "Updating existing PR..."
+    gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
+  else
+    log_step "Creating new PR: $pr_title"
+    gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
   fi
 }
 
