@@ -42,9 +42,9 @@
 为了在执行时做到完美的签名自检，在对应的 Vibe Workflow 中植入**身份审计 (Signature Check)** 与**成果登记**：
 
 1. **`/vibe-start` 和 `/vibe-continue` (Execution 唤醒时)**：
-   - 必须运行环境自检：获取当前 `git config user.name`。
-   - 在后台日志或上下文中备注：`"当前操作者: $Agent"`。
-   - 发现身份不对或找不到身份时，触发拦截并指导运行 `wtinit <agent-name>` 或 `wtrenew`。
+   - 运行环境自检：Agent 必须**先确认自己的真实身份**，然后再与 `git config user.name` 的物理签名比对。
+   - 在后台日志或上下文中备注：`"当前操作者: [自己的真实身份]"`。
+   - 如果发现环境被别人的签名占用（或者还没设置），禁止盲目盗用别人的签名。必须先自我纠偏：调用 `wtinit <真实名字>` 或 `wtrenew` 把签名修正成自己。
 
 2. **`/vibe-save` (阶段性存档时)**：
    - 在追加 Markdown 研发日志时，附加署名（如：*@Agent-Claude: 修复了核心报错Bug*）。
