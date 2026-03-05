@@ -19,7 +19,7 @@ _vibe_task_render() {
             (.tasks // []) as $ids |
             
             # Determine if this is the focused worktree
-            (($wts[] | select(.current_task == $cur or (.tasks // [] | index($cur) != null)) | .worktree_name) == $wn) as $is_cur_wt |
+            ([$wts[] | select(.current_task == $cur or (.tasks // [] | index($cur) != null)) | .worktree_name] | any(. == $wn)) as $is_cur_wt |
 
             # Map to task objects
             ($all_tasks | map(select(.task_id as $tid | $ids | index($tid) != null))) as $wt_tasks |

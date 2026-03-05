@@ -31,31 +31,32 @@ input_examples:
  
  ### Step 1: 标记任务状态进度
 
-> ⚠️ **收口边界原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的元数据清算指令**。
-> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。这些文件在 `.git/` 里，不被 Git 追踪，修改它们不会产生新的 dirty 文件或 commit。
-> - **严禁修改任何 `docs/` 下的文件**（如 Task README）。Task 状态、Gate 信息等已全部移至 `.git/vibe/registry.json`，作为唯一真源。
+> ⚠️ **收口边界绝杀原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的终结级别元数据清算指令**。
+> - **【红线】绝对禁止修改任何业务源代码文件！** 任务此时已实质结束（可能已合并），任何试图在这里再动代码的行为都会导致无限 PR 循环。如果检查时发现代码遗留 Bug，请**直接报错并停止**，让用户新开 Task，绝不允许你擅自进行二次修复代码及提交！
+> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。修改它们不会产生新的 git dirty。
+> - **严禁修改 `docs/` 等项目内文档**。追踪大盘数据应全部收敛在 `.git/vibe/` 内。
 
-1. **调用 `vibe task update <task_id> --status completed --unassign`**：将该 `task_id` 的 `status` 更新为用户选择的新状态（`completed` / `archived` / `skipped`），并解除 worktree 绑定。
-2. **(新) 归档合规检查**: 确认版本升级和 `CHANGELOG.md` 已在 `vibe flow pr` 阶段通过 `--bump` 完成。如果并未进行版本升级，且这是个功能交付，应提醒用户补做（即先运行 `/vibe-commit` 生成 commit，然后运行 `vibe flow pr` 提交 PR）。
-3. **元数据清算**: 确保已将本次变更的关键决策同步至 `.agent/context/memory/` 或相关 Topic 文档。
+1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。然后通过 `git config user.name` 检查当前沙盒中记录的签名身份是否匹配你的真实身份。如果环境显示的是别人的名字（或者未设置），你应先使用 `wtinit <你自己的名字>` 进行修正，然后再以你的真实身份作为**“结项操作者”**进行签字记录。
+2. **调用 `vibe task update <task_id> --status completed --unassign`**：将该任务设为 `completed` / `archived` / `skipped`。
+### Step 2: 归档合规与防丢代码检查
 
-### Step 3: 更新全局 Worktrees Map
-修改 `$(git rev-parse --git-common-dir)/vibe/worktrees.json`:
-- 查找当前所在的 `worktree_name`（或被传入 `current_task` 匹配的节点）。
-- 如果当前已经在 CLI 层执行了 `done`，该 worktree 可能已经准备删掉，这儿你需要：
-   - 将这棵树的状态标记为 `idle` 甚至直接从 `worktrees` 数组中移除该条目，防止未来显示为幽灵僵尸。
+**强制审查点：** 
+1. 你的职责是在发起清除前，使用 Git 状态和 PR 状态判断是否有未提交 (uncommitted) 或未合并 (unmerged) 到 `origin/main` 的代码。
+2. 确认版本升级和 `CHANGELOG.md` 已在 `vibe flow pr` 阶段通过 `--bump` 完成。如果并未进行版本升级，且这是个功能交付，应提醒用户补做（即先运行 `/vibe-commit` 生成 commit，然后运行 `vibe flow pr` 提交 PR）。
+3. 如果检查到有遗留代码或任务没有走到终点，**严重警告用户潜在的数据丢失风险**，并拒绝往下执行。
 
-### Step 4: 工作区本地清理（Optional）
-询问用户是否要自动一并运行 `vibe flow done` 控制台命令为您把此工作树文件直接抹除回主树：
-- 这只在你发现当前 CLI 端还没有物理清理工作树时提供。
+### Step 3: 工作区本地清理（Optional）
+如果用户当前处于安全通过检查的状态，询问用户是否要自动一并运行 `vibe flow done` 控制台命令为您把此工作树文件直接抹除回主树：
+- 该命令 (`vibe flow done`) 本身已经内涵了安全检测逻辑。当你调用它时，如果发现未 Clean 或未 Merge，它也会执行二次阻断。
 
-### Step 5: 输出封板报告
+### Step 3: 输出封板报告
 在聊天界面打印封板小结：
 ```markdown
 🎉 **任务结算完毕！**
 
 • **已锁定任务:** <Task_ID: Title>
 • **更新状态:** 从 `in_progress` -> `completed`
+• **结项操作者:** <Agent_Name>
 • **大盘注册表:** 共享状态库已同步清理。
 
 若还需要开始新探索，请 `vibe-new <feature>`。

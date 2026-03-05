@@ -5,17 +5,17 @@ source "$VIBE_LIB/flow_status.sh"
 source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
-_flow_task_title() { jq -r --arg task_id "$1" '.tasks[]? | select(.task_id == $task_id) | .title // empty' "$2"; }
-_flow_set_identity() { git config user.name "$1" 2>/dev/null || git config user.name "$1" || return 1; git config user.email "$1@vibe.coding" 2>/dev/null || git config user.email "$1@vibe.coding"; }
+_flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
+_flow_set_identity() { git config user.name "$1" && git config user.email "$1@vibe.coding"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
 _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
 _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
-_flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
+_flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_rollback_task() { _vibe_task_remove "$1" >/dev/null 2>&1 || true; }
 _flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }
-_flow_start_worktree() {
+_flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id feature_slug branch_name
   vibe_require git jq || return 1
   feature_slug="$(_vibe_task_slugify "$feature")"
@@ -23,7 +23,7 @@ _flow_start_worktree() {
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
   wt_dir="wt-${agent}-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
   registry_file="$(_flow_registry_file)"; task_id="$(_vibe_task_today)-${feature_slug}"
-  [[ -f "$registry_file" ]] && jq -e --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1 && { log_error "Task already registered: $task_id (use 'vibe flow start --task $task_id' to resume)"; return 1; }
+  [[ -f "$registry_file" ]] && jq -e --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1 && { log_error "Task already registered: $task_id (use 'vibe flow bind $task_id' to resume)"; return 1; }
   log_step "Registering task: $feature → $task_id"
   _vibe_task_add "$feature" --id "$task_id" || return 1
   log_step "Creating worktree: $wt_dir"
@@ -31,6 +31,7 @@ _flow_start_worktree() {
   else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; _flow_rollback_task "$task_id"; return 1; }
   fi
   cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
+  _flow_set_identity "$agent" || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
   log_step "Binding task $task_id to worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
   log_success "Feature ready: $feature  (task: $task_id)"
   echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
@@ -38,30 +39,40 @@ _flow_start_worktree() {
   echo "   1. cd ${CYAN}${wt_path}${NC}"
   echo "   2. ${CYAN}vup${NC}"
 }
-_flow_start_task() {
-  local task_id="$1" agent="$2" ref="$3" registry_file title branch
-  vibe_require git jq || return 1
-  registry_file="$(_flow_registry_file)"; title="$(_flow_task_title "$task_id" "$registry_file")"; [[ -n "$title" ]] || { log_error "Task not found: $task_id"; return 1; }
-  _flow_require_clean_worktree || return 1; _flow_require_base_ref "$ref" || return 1; branch="${agent}/${task_id}"
-  _flow_branch_exists "$branch" && { log_error "Target branch already exists: $branch"; return 1; }
-  git checkout -b "$branch" "origin/$ref" || return 1; _flow_set_identity "$agent" || return 1; log_success "Started task: $task_id ($title)"
+_flow_start_worktree() { _flow_new_worktree "$@"; }
+_flow_bind() {
+  local tid agent="" arg reg title
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_bind_usage; return 0; }; done
+  tid="$1"; shift $(( $# > 0 ? 1 : 0 ))
+  while [[ $# -gt 0 ]]; do case "$1" in --agent) agent="$2"; shift 2 ;; *) shift ;; esac; done
+  [[ -z "$tid" || "$tid" =~ ^-- ]] && { _flow_bind_usage; return 1; }
+  reg="$(_flow_registry_file)"; title="$(_flow_task_title "$tid" "$reg")"
+  [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
+  agent="${agent:-${VIBE_AGENT:-claude}}"
+  log_step "Identity: $agent"
+  if typeset -f wtinit &>/dev/null; then
+    wtinit "$agent" >/dev/null || return 1
+  fi
+  _flow_set_identity "$agent" || return 1
+  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
+  log_success "Bound: $tid ($title)"
 }
 
-_flow_start() {
-  local feature="" task_id="" agent="" ref="main" arg
-  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_start_usage; return 0; }; done
-  while [[ $# -gt 0 ]]; do case "$1" in --task) task_id="$2"; shift 2 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feature" ]] && feature="$1"; shift ;; esac; done
-  [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"; [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
-  if [[ -n "$task_id" && -z "$feature" ]]; then
-    if ! _flow_is_main_worktree; then log_step "Binding task $task_id to current worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1; return 0; fi
-    _flow_start_task "$task_id" "${agent:-claude}" "$ref"; return $?
-  fi
-  [[ -n "$feature" ]] || { _flow_start_usage; return 1; }; _flow_start_worktree "$feature" "${agent:-claude}" "$ref"
+_flow_new() {
+  local feat="" agent="" ref="main" arg
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
+  while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
+  [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
+  _flow_new_worktree "$feat" "${agent:-${VIBE_AGENT:-claude}}" "$ref"
 }
 _flow_done() {
-  local wt_path wt_dir branch main_dir
+  local wt_path wt_dir branch main_dir unmerged
   if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then log_warn "Current repository or branch is protected."; return 1; fi
   wt_path="$PWD"; wt_dir=$(basename "$wt_path"); branch=$(git branch --show-current)
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then log_error "Working directory is not clean. Please commit or stash changes before finishing."; return 1; fi
+  git fetch origin main --quiet 2>/dev/null || true
+  unmerged=$(git rev-list "origin/main..$branch" 2>/dev/null || echo "")
+  if [[ -n "$unmerged" ]]; then log_error "Branch '$branch' has commits not merged into origin/main. Please open a PR and merge first."; return 1; fi
   log_warn "WARNING: This will clear contents of $wt_dir and PERMANENTLY delete local branch ($branch)."; confirm_action "Proceed with cleanup?" || return 0
   main_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); main_dir="${main_dir%/.git}"; cd "$main_dir" || return 1
   [[ $(git ls-remote --exit-code --heads origin "$branch" 2>/dev/null) ]] && vibe_delete_remote_branch "$branch" || true
@@ -88,31 +99,72 @@ _flow_pr() {
   commit_logs=$(git log main..HEAD --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since main. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
   if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
+  
+  local has_pr=0
   if vibe_has gh; then
     log_step "Checking for open PRs to main..."; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
     [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to 'main' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
+    
+    # Check if a PR already exists from this branch
+    gh pr view "$branch" >/dev/null 2>&1 && has_pr=1
   fi
-  log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
-  git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+  
+  local skip_bump=0
+  [[ $has_pr -eq 1 ]] && skip_bump=1
+  [[ -f CHANGELOG.md ]] && grep -qF "$version_msg" CHANGELOG.md 2>/dev/null && skip_bump=1
+  
+  if [[ $skip_bump -eq 0 ]]; then
+    log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
+    git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+  else
+    log_info "Skipping version bump (PR exists or changelog already up-to-date)."
+  fi
+
   log_step "Pushing changes to origin/$branch"; git push origin HEAD || return 1
   if ! vibe_has gh; then log_success "Changes pushed. Please create/view PR manually."; return 0; fi
   log_info "GitHub CLI detected. Managing PR..."
-  if gh pr view "$branch" --json number >/dev/null 2>&1; then log_success "Updating existing PR..."; gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
-  else log_step "Creating new PR: $pr_title"; gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
+  if [[ $has_pr -eq 1 ]]; then
+    log_success "Updating existing PR..."
+    gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
+  else
+    log_step "Creating new PR: $pr_title"
+    gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
   fi
 }
 
 _flow_review() {
-  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS"
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_review_usage; return 0 ;; *) target="$1"; shift ;; esac; done
+  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS" local_mode=0
+  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_review_usage; return 0 ;; --local) local_mode=1; shift ;; *) target="$1"; shift ;; esac; done
   vibe_require git || return 1; [[ -z "$target" ]] && target=$(git branch --show-current)
+
+  if [[ $local_mode -eq 1 ]]; then
+    if ! vibe_has codex; then
+      log_error "codex CLI not found. Cannot run local review."
+      return 1
+    fi
+    log_step "Running local codebase review via Codex..."
+    mkdir -p .agent
+    # Run interactive, but also tee to a log file for agent reference
+    if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+        log_info "Uncommitted changes detected. Running: codex review --uncommitted"
+        # We don't use tee here because codex review can be highly interactive/colorful,
+        # but we can redirect raw output if needed. For now just let it run.
+        codex review --uncommitted
+    else
+        log_info "Working directory clean. Running against origin/main..."
+        codex review --base main
+    fi
+    log_success "Local review complete."
+    return 0
+  fi
+
   if ! vibe_has gh; then log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."; vibe check; return 0; fi
   log_step "Fetching PR status for '$target'..."; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
   [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
-  number=$(echo "$pr_info" | jq -r '.number'); title=$(echo "$pr_info" | jq -r '.title'); state=$(echo "$pr_info" | jq -r '.state')
-  decision=$(echo "$pr_info" | jq -r '.reviewDecision // "PENDING"'); mergeable=$(echo "$pr_info" | jq -r '.mergeable'); url=$(echo "$pr_info" | jq -r '.url')
+  number=$(printf '%s\n' "$pr_info" | jq -r '.number'); title=$(printf '%s\n' "$pr_info" | jq -r '.title'); state=$(printf '%s\n' "$pr_info" | jq -r '.state')
+  decision=$(printf '%s\n' "$pr_info" | jq -r '.reviewDecision // "PENDING"'); mergeable=$(printf '%s\n' "$pr_info" | jq -r '.mergeable'); url=$(printf '%s\n' "$pr_info" | jq -r '.url')
   echo "${BOLD}PR #$number:${NC} $title"; echo "${CYAN}URL:${NC} $url"; echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
-  log_step "Fetching latest review comments..."; comments=$(echo "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
+  log_step "Fetching latest review comments..."; comments=$(printf '%s\n' "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
   [[ -n "$comments" ]] && echo "$comments" | sed 's/^/  💬 /' || echo "  (No comments found)"
   while [[ $retry -lt 3 ]]; do
     log_step "Checking CI status (Attempt $((retry+1))/3)..."
@@ -132,7 +184,8 @@ _flow_review() {
 
 vibe_flow() {
   case "${1:-help}" in
-    start|new) shift; _flow_start "$@" ;;
+    start|new|create) shift; _flow_new "$@" ;;
+    bind) shift; _flow_bind "$@" ;;
     done) shift; _flow_done "$@" ;;
     status) shift; _flow_status "$@" ;;
     list) shift; _flow_list "$@" ;;

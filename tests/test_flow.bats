@@ -28,18 +28,20 @@ JSON
   # Check for key parts separately (output has ANSI color codes)
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe flow" ]]
-  [[ "$output" =~ "start" ]]
+  [[ "$output" =~ "new" ]]
+  [[ "$output" =~ "bind" ]]
   [[ "$output" =~ "done" ]]
   [[ "$output" =~ "status" ]]
+  [[ "$output" =~ "list" ]]
   [[ "$output" =~ "sync" ]]
   [[ "$output" =~ "review" ]]
   [[ "$output" =~ "pr" ]]
 }
 
-@test "2. vibe flow start without args returns error" {
-  run vibe flow start
+@test "2. vibe flow new without args returns error" {
+  run vibe flow new
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "Usage: vibe flow start" ]]
+  [[ "$output" =~ "Usage: vibe flow new" ]]
 }
 
 @test "3. vibe flow status in non-worktree returns error" {
@@ -97,10 +99,9 @@ JSON
 }
 
 # --- Multi-task worktree alignment tests ---
-# Tests 7-9: bind-to-current path (inside feature worktree wt-agent-feature)
-# Tests 10-13: _flow_start_task branching path (outside feature worktree)
+# Tests 7-9: flow bind (inside feature worktree wt-agent-feature)
 
-@test "7. vibe flow start --task binds task to current feature worktree" {
+@test "7. vibe flow bind binds task to current feature worktree" {
   local fixture
   fixture="$(mktemp -d)"
   make_flow_task_fixture "$fixture"
@@ -117,14 +118,14 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_bind 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Binding task" ]]
+  [[ "$output" =~ "Binding" ]]
 }
 
-@test "8. vibe flow start --task in feature worktree updates worktrees.json with tasks array" {
+@test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
   local fixture
   fixture="$(mktemp -d)"
   make_flow_task_fixture "$fixture"
@@ -141,7 +142,7 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_bind 2026-03-02-rotate-alignment
     # Verify worktrees.json has the task in tasks array
     jq -e ".worktrees[] | select(.worktree_name == \"wt-claude-refactor\") | .tasks | index(\"2026-03-02-rotate-alignment\")" "'"$fixture"'/vibe/worktrees.json" >/dev/null
   '
@@ -149,7 +150,7 @@ JSON
   [ "$status" -eq 0 ]
 }
 
-@test "9. vibe flow start --task fails when task missing (feature worktree bind mode)" {
+@test "9. vibe flow bind fails when task missing" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor" "$fixture/wt-claude-refactor/.vibe"
@@ -167,126 +168,182 @@ JSON
       if [[ "$1" == "config" ]]; then return 0; fi
       return 1
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_bind 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Task not found" ]]
 }
-
-@test "10. vibe flow start --task in non-feature dir creates branch with correct naming" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_flow_task_fixture "$fixture" "$fixture/project-root"
-
+@test "10. _flow_done fails when worktree is dirty" {
   run zsh -c '
-    cd "'"$fixture"'/project-root"
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     git() {
-      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "fetch" && "$2" == "origin" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/remotes/origin/main" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" ]]; then return 1; fi
-      if [[ "$1" == "checkout" && "$2" == "-b" ]]; then printf "%s" "$3" > "'"$fixture"'/branch-name"; printf "%s" "$4" > "'"$fixture"'/branch-base"; return 0; fi
-      if [[ "$1" == "config" && "$2" == "user.name" ]]; then return 0; fi
-      if [[ "$1" == "config" && "$2" == "user.email" ]]; then return 0; fi
-      return 1
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo "M modified-file"; return 0 ;;
+        *) return 0 ;;
+      esac
     }
-    _flow_start --task 2026-03-02-rotate-alignment
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Working directory is not clean" ]]
+}
+
+@test "11. _flow_done fails when branch has unmerged commits" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "rev-list origin/main..feature-branch") echo "commit-hash"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "has commits not merged into origin/main" ]]
+}
+
+@test "12. _flow_pr skips bump if PR already exists" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; } # Mock all tools as present
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;; # PR exists
+        "pr edit current-branch --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        "config --get user.name") echo "test"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "13. _flow_pr skips bump if changelog message exists" {
+  local fixture; fixture="$(mktemp -d)"; cd "$fixture"
+  echo "## [2.1.0] - 2026-03-05" > CHANGELOG.md
+  echo "- test commit ..." >> CHANGELOG.md
+  
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; } # Mock all tools as present
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;; # PR does not exist
+        "pr create --title test --body test --web") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        "config --get user.name") echo "test"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test" --msg "test commit ..."
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "14. _flow_pr runs bump when no existing PR and changelog has no message" {
+  local fixture; fixture="$(mktemp -d)"; cd "$fixture"
+  mkdir -p scripts
+  cat > scripts/bump.sh <<'EOF'
+#!/usr/bin/env bash
+touch bump_called
+exit 0
+EOF
+  chmod +x scripts/bump.sh
+  echo "2.1.4" > VERSION
+  echo "# Changelog" > CHANGELOG.md
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;;
+        "pr create --title test --body test --web") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add VERSION CHANGELOG.md") return 0 ;;
+        "commit -m chore: bump version to 2.1.4") return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test" --msg "fresh release note"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Bumping version" ]]
+  [ -f "$fixture/bump_called" ]
+}
+
+@test "15. _flow_bind normalizes identity even when wtinit exists" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+  local calls="$fixture/git_config_calls.log"
+  : > "$calls"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    wtinit() { return 0; }
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      if [[ "$1" == "config" ]]; then echo "$*" >> "'"$calls"'"; return 0; fi
+      return 0
+    }
+    _flow_bind 2026-03-02-rotate-alignment --agent claude
   '
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$fixture/branch-name")" = "claude/2026-03-02-rotate-alignment" ]
-  [ "$(cat "$fixture/branch-base")" = "origin/main" ]
-  [[ "$output" =~ "Rotate Workflow Refinement" ]]
-}
-
-@test "11. vibe flow start --task in non-feature dir accepts explicit agent" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_flow_task_fixture "$fixture" "$fixture/project-root"
-
-  run zsh -c '
-    cd "'"$fixture"'/project-root"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    git() {
-      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "fetch" && "$2" == "origin" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/remotes/origin/main" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" ]]; then return 1; fi
-      if [[ "$1" == "checkout" && "$2" == "-b" ]]; then printf "%s" "$3" > "'"$fixture"'/branch-name"; return 0; fi
-      if [[ "$1" == "config" && "$2" == "user.name" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-name"; return 0; fi
-      if [[ "$1" == "config" && "$2" == "user.email" ]]; then printf "%s" "$3" > "'"$fixture"'/git-user-email"; return 0; fi
-      return 1
-    }
-    _flow_start --task 2026-03-02-rotate-alignment --agent codex
-  '
-
-  [ "$status" -eq 0 ]
-  [ "$(cat "$fixture/branch-name")" = "codex/2026-03-02-rotate-alignment" ]
-  [ "$(cat "$fixture/git-user-name")" = "codex" ]
-  [ "$(cat "$fixture/git-user-email")" = "codex@vibe.coding" ]
-}
-
-@test "12. vibe flow start --task rejects existing target branch instead of resetting it" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_flow_task_fixture "$fixture" "$fixture/project-root"
-
-  run zsh -c '
-    cd "'"$fixture"'/project-root"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    git() {
-      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "fetch" && "$2" == "origin" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/remotes/origin/main" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/heads/claude/2026-03-02-rotate-alignment" ]]; then return 0; fi
-      if [[ "$1" == "checkout" ]]; then echo "unexpected checkout" > "'"$fixture"'/checkout-called"; return 1; fi
-      return 1
-    }
-    _flow_start --task 2026-03-02-rotate-alignment
-  '
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "already exists" ]]
-  [ ! -e "$fixture/checkout-called" ]
-}
-
-@test "13. vibe flow start --task rejects remote target branch even when local refs are stale" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_flow_task_fixture "$fixture" "$fixture/project-root"
-
-  run zsh -c '
-    cd "'"$fixture"'/project-root"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    git() {
-      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "fetch" && "$2" == "origin" && "$3" == "main" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" && "$4" == "refs/remotes/origin/main" ]]; then return 0; fi
-      if [[ "$1" == "show-ref" && "$2" == "--verify" ]]; then return 1; fi
-      if [[ "$1" == "ls-remote" && "$2" == "--exit-code" && "$3" == "--heads" && "$4" == "origin" && "$5" == "claude/2026-03-02-rotate-alignment" ]]; then return 0; fi
-      if [[ "$1" == "checkout" ]]; then echo "unexpected checkout" > "'"$fixture"'/checkout-called"; return 1; fi
-      return 1
-    }
-    _flow_start --task 2026-03-02-rotate-alignment
-  '
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "already exists" ]]
-  [ ! -e "$fixture/checkout-called" ]
+  grep -q "config user.name claude" "$calls"
+  grep -q "config user.email claude@vibe.coding" "$calls"
 }
 
 @test "14. vibe flow start with path feature uses sanitized branch and prints cd next-step" {

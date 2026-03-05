@@ -134,11 +134,11 @@ Last Updated: YYYY-MM-DD
    - **重点记录当期疑难杂症 (Blockers) 和临时方案**，便于下个会话 `/vibe-continue` 加载。
 - 该文件在 `.gitignore` 内，不必让用户为此做出 `git add` 或提交动作。
 
-### Step 6: 回写共享 registry 并刷新本地缓存
+### Step 6: 同步共享 Task 状态
 
-- 将 `next_step`、`status`、`current_subtask_id` 回写到共享 `registry.json` 和 `task.json`
-- 将当前 worktree 的 `dirty/clean`、`last_updated`、`worktree_path`、`current_task` 回写到 `worktrees.json`
-- 刷新 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
+- 使用 CLI 工具命令（如 `vibe task update <task-id> --next-step ...`）将进度更新到共享真源。
+- **严禁** AI 层直接手工编辑底层的 `.git/vibe/registry.json` 或 `worktrees.json`。所有的信息沉积都必须由 Shell API (`vibe task`) 处理。
+- 刷新本地只读缓存：`.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
 - `.vibe/focus.md` 保存当前 worktree 的聚焦摘要（task、subtask、next step）
 - `.vibe/session.json` 保存当前 worktree 的短期会话缓存（`worktree_name`、`current_task`、`current_subtask_id`、时间戳）
 - `.vibe/` 仅作为本地缓存，可重建，不保存共享 memory 真源

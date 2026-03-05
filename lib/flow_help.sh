@@ -7,8 +7,8 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}start${NC} <feature> [--agent <name>] [--branch <ref>]   注册任务 + 创建沙盒 + 绑定"
-  echo "  ${GREEN}start${NC} --task <task-id> [--agent <name>]              在当前 worktree 内领取已注册任务"
+  echo "  ${GREEN}new${NC} <feature> [--agent <name>] [--branch <ref>]     注册任务 + 创建沙盒 + 绑定"
+  echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
   echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
   echo "  ${GREEN}status${NC} [<feature>]                                   查看当前分支状态 (默认: 当前分支)"
   echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
@@ -16,13 +16,17 @@ _flow_usage() {
   echo "  ${GREEN}pr${NC}                                                   提交代码并打开 Pull Request"
   echo "  ${GREEN}review${NC}                                               查看 PR 或进行本地最终检查"
   echo ""
-  echo "Options for 'start <feature>':"
+  echo "Options for 'new <feature>':"
   echo "  --agent <name>     指定 AI 身份 (默认: claude)"
   echo "  --branch <ref>     指定基础分支 (默认: main)"
 }
 
-_flow_start_usage() { 
-    echo "Usage: vibe flow start <feature> | --task <task-id> [--agent=claude] [--branch=main]"
+_flow_new_usage() { 
+    echo "Usage: vibe flow new <feature> [--agent=claude] [--branch=main]"
+}
+
+_flow_bind_usage() { 
+    echo "Usage: vibe flow bind <task-id> [--agent=claude]"
 }
 
 _flow_pr_usage() {
@@ -39,13 +43,14 @@ _flow_pr_usage() {
 }
 
 _flow_review_usage() {
-  echo "Usage: ${CYAN}vibe flow review${NC} [<pr-number>|<branch>]"
+  echo "Usage: ${CYAN}vibe flow review${NC} [--local] [<pr-number>|<branch>]"
   echo ""
-  echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性）。"
+  echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
   echo "核心职责："
   echo "  1. 状态提取：拉取云端 PR 的评审决策 (Review Decision)"
   echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
   echo "  3. 合并判定：自动判断当前真源是否满足 Merge 准入条件"
+  echo "  4. 本地审查：使用 --local 调用 codex review 进行深度静态分析与缺陷检测"
 }
 
 _flow_list_usage() {
