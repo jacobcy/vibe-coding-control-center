@@ -8,7 +8,7 @@ _flow_usage() {
   echo ""
   echo "Subcommands:"
   echo "  ${GREEN}new${NC} <feature> [--agent <name>] [--branch <ref>]     注册任务 + 创建沙盒 + 绑定"
-  echo "  ${GREEN}new${NC} --task <task-id> [--agent <name>]                在当前 worktree 内领取已注册任务"
+  echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
   echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
   echo "  ${GREEN}status${NC} [<feature>]                                   查看当前分支状态 (默认: 当前分支)"
   echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
@@ -22,7 +22,11 @@ _flow_usage() {
 }
 
 _flow_new_usage() { 
-    echo "Usage: vibe flow new <feature> | --task <task-id> [--agent=claude] [--branch=main]"
+    echo "Usage: vibe flow new <feature> [--agent=claude] [--branch=main]"
+}
+
+_flow_bind_usage() { 
+    echo "Usage: vibe flow bind <task-id> [--agent=claude]"
 }
 
 _flow_pr_usage() {

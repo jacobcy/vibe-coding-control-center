@@ -86,8 +86,8 @@ setup() {
   [[ "$output" =~ "remove" ]]
 }
 
-@test "9. vibe flow start help mentions task mode" {
-  run vibe flow start --task --help
+@test "9. vibe flow bind help mentions task id" {
+  run vibe flow bind --help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "--task <task-id>" ]]
+  [[ "$output" =~ "vibe flow bind <task-id>" ]]
 }

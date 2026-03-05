@@ -26,8 +26,6 @@ _vibe_task_update() {
     if [[ -n "$agent" ]]; then
         case "$agent" in codex|antigravity|trae|claude|opencode|kiro) ;; *) [[ "$force" -eq 1 ]] || { vibe_die "Unsupported agent: $agent"; return 1; } ;; esac
         email_slug="$agent"; [[ "$force" -eq 1 ]] && email_slug="$(_vibe_task_slugify "$agent")"
-        git config user.name "$agent" 2>/dev/null || git config user.name "$agent" || return 1
-        git config user.email "${email_slug}@vibe.coding" 2>/dev/null || git config user.email "${email_slug}@vibe.coding" || return 1
     fi
     [[ "$unassign" == "true" ]] && worktree=""
     [[ "$bind_current" == "true" ]] && { target_name="$(basename "$PWD")"; target_path="$PWD"; worktree="$target_name"; }
