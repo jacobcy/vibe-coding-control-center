@@ -24,7 +24,13 @@ _flow_status() {
 
   # If no feature specified, use current worktree's task
   if [[ -z "$feature" ]]; then
-    feature=$(jq -r --arg wt "$current_wt" '.worktrees[]? | select(.worktree_name == $wt) | .current_task // empty' "$worktrees_file" 2>/dev/null)
+    local wt_data; wt_data=$(jq -c --arg wt "$current_wt" '.worktrees[]? | select(.worktree_name == $wt)' "$worktrees_file" 2>/dev/null)
+    feature=$(echo "$wt_data" | jq -r '.current_task // empty')
+    if [[ -z "$feature" ]]; then
+        # Fallback to first available task in this worktree
+        feature=$(echo "$wt_data" | jq -r '.tasks[0] // empty')
+        [[ -n "$feature" ]] && log_step "No primary task; showing status for $feature"
+    fi
     [[ -z "$feature" ]] && { log_error "No task bound to current worktree"; return 1; }
   fi
 
