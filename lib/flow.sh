@@ -15,7 +15,6 @@ _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared";
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 _flow_rollback_task() { _vibe_task_remove "$1" >/dev/null 2>&1 || true; }
 _flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }
-
 _flow_start_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path registry_file task_id feature_slug branch_name
   vibe_require git jq || return 1
@@ -25,29 +24,20 @@ _flow_start_worktree() {
   wt_dir="wt-${agent}-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
   registry_file="$(_flow_registry_file)"; task_id="$(_vibe_task_today)-${feature_slug}"
   [[ -f "$registry_file" ]] && jq -e --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1 && { log_error "Task already registered: $task_id (use 'vibe flow start --task $task_id' to resume)"; return 1; }
-
-  echo ""
   log_step "Registering task: $feature → $task_id"
   _vibe_task_add "$feature" --id "$task_id" || return 1
-
-  echo ""
   log_step "Creating worktree: $wt_dir"
   if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$agent" "$ref" || { log_error "wtnew failed"; _flow_rollback_task "$task_id"; return 1; }
   else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; _flow_rollback_task "$task_id"; return 1; }
   fi
   cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
-
-  echo ""
   log_step "Binding task $task_id to worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
-
-  echo ""
   log_success "Feature ready: $feature  (task: $task_id)"
   echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
   echo "💬 Next"
   echo "   1. cd ${CYAN}${wt_path}${NC}"
   echo "   2. ${CYAN}vup${NC}"
 }
-
 _flow_start_task() {
   local task_id="$1" agent="$2" ref="$3" registry_file title branch
   vibe_require git jq || return 1
@@ -63,13 +53,11 @@ _flow_start() {
   while [[ $# -gt 0 ]]; do case "$1" in --task) task_id="$2"; shift 2 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feature" ]] && feature="$1"; shift ;; esac; done
   [[ -n "$task_id" && -z "$agent" ]] && agent="$(_flow_default_agent)"; [[ -z "$task_id" && -z "$agent" ]] && agent="${VIBE_AGENT:-claude}"
   if [[ -n "$task_id" && -z "$feature" ]]; then
-    if ! _flow_is_main_worktree; then log_step "Binding task $task_id to current worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1; return 0
-    else _flow_start_task "$task_id" "${agent:-claude}" "$ref"; return $?
-    fi
+    if ! _flow_is_main_worktree; then log_step "Binding task $task_id to current worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || return 1; return 0; fi
+    _flow_start_task "$task_id" "${agent:-claude}" "$ref"; return $?
   fi
   [[ -n "$feature" ]] || { _flow_start_usage; return 1; }; _flow_start_worktree "$feature" "${agent:-claude}" "$ref"
 }
-
 _flow_done() {
   local wt_path wt_dir branch main_dir
   if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then log_warn "Current repository or branch is protected."; return 1; fi
