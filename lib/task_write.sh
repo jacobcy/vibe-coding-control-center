@@ -8,7 +8,7 @@ _vibe_task_write_registry() {
       .tasks |= map(if .task_id == $task_id then
         (if $task_status != "" then .status = $task_status else . end)
         | (if $next_step != "" then .next_step = $next_step else . end)
-        | (if $assigned != "" then .assigned_worktree = $assigned else . end)
+        | (if $assigned != "" then .assigned_worktree = $assigned else .assigned_worktree = null end)
         | (if $agent != "" then .agent = $agent else . end)
         | .updated_at = $now
       else . end)
