@@ -57,15 +57,15 @@ setup() {
   [ "$(jq -r '.task_id' "$wt_path/.vibe/current-task.json")" = "2026-03-02-rotate-alignment" ]
 }
 
-@test "ops: update agent manages git identity" {
+@test "ops: update agent updates registry without modifying git identity" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
   local git_name_file="$fixture/git_user_name"
-  local git_email_file="$fixture/git_user_email"
 
   run zsh -c '
     source "'"$HELPER"'"
     setup_task_env
+    mock_git_registry "'"$fixture"'"
     git() {
       if [[ "$1" == "rev-parse" ]]; then
         if [[ "$2" == "--is-inside-work-tree" ]]; then echo true; return 0; fi
@@ -73,16 +73,15 @@ setup() {
         if [[ "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'"; return 0; fi
       fi
       if [[ "$1" == "config" ]]; then
-        if [[ "$2" == "user.name" ]]; then echo "$3" > "'"$git_name_file"'"; return 0; fi
-        if [[ "$2" == "user.email" ]]; then echo "$3" > "'"$git_email_file"'"; return 0; fi
+        echo "FAIL: vibe_task should not call git config" > "'"$git_name_file"'"; return 1
       fi
       return 0
     }
     vibe_task update 2026-03-02-rotate-alignment --agent "claude"
   '
   [ "$status" -eq 0 ]
-  [ "$(cat "$git_name_file")" = "claude" ]
-  [ "$(cat "$git_email_file")" = "claude@vibe.coding" ]
+  [ ! -f "$git_name_file" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .agent' "$fixture/vibe/registry.json")" = "claude" ]
 }
 
 @test "ops: remove deletes metadata if unbound" {
