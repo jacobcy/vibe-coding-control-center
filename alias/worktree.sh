@@ -177,13 +177,17 @@ wtrm() {
   # Helper: find worktree paths matching a pattern
   _wtrm_find() {
     local pattern="$1"
+    # Escape brackets so malformed classes don't hard-fail matching.
+    local safe_pattern="$pattern"
+    safe_pattern="${safe_pattern//\[/\\[}"
+    safe_pattern="${safe_pattern//\]/\\]}"
     local -a matches=()
     local wp
     while IFS= read -r wp; do
       [[ "$wp" == "$main_dir" ]] && continue
       local name="${wp##*/}"
       # Support glob patterns like *-test, wt-*, etc.
-      if [[ "$name" == $~pattern ]]; then
+      if [[ "$name" == $~safe_pattern ]]; then
         matches+=("$wp")
       fi
     done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print $2}')
@@ -200,8 +204,14 @@ wtrm() {
     echo "🗑️  Removing ${#paths[@]} worktree(s)..."
     for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
-    # Use _wt_find to locate worktree (supports exact/suffix/substring match)
-    local result=$(_wt_find "$arg")
+    local result=""
+    # Wildcard path match (glob) goes through dedicated matcher.
+    if [[ "$arg" == *'*'* || "$arg" == *'?'* ]]; then
+      result=$(_wtrm_find "$arg")
+    else
+      # Default smart finder: exact/suffix/substring.
+      result=$(_wt_find "$arg")
+    fi
     [[ -z "$result" ]] && { echo "❌ Worktree not found: $arg"; git worktree list | sed 's/^/   /'; return 1; }
 
     local -a found_paths=(${(f)result})
@@ -304,6 +314,9 @@ vup() {
 
   # Session name = worktree name (e.g., main, wt-claude-fix)
   local session_name="$target"
+  local had_session=${+VIBE_SESSION}
+  local old_session="$VIBE_SESSION"
+  VIBE_SESSION="$session_name"
 
   local agent_cmd
   case "$agent" in
@@ -353,6 +366,12 @@ vup() {
   else
     echo "🛫 Taking off to cockpit..."
     tmux attach -t "$session_name"
+  fi
+
+  if (( had_session )); then
+    VIBE_SESSION="$old_session"
+  else
+    unset VIBE_SESSION
   fi
 }
 
