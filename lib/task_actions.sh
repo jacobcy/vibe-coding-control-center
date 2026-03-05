@@ -2,7 +2,7 @@
 # lib/task_actions.sh - Task core actions (add, update, remove, sync)
 
 _vibe_task_update() {
-    local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false"
+    local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve"
     shift $(( $# > 0 ? 1 : 0 ))
     [[ "$task_id" == "-h" || "$task_id" == "--help" ]] && { _vibe_task_usage; return 0; }
     [[ -n "$task_id" ]] || { vibe_die "Missing task id for update"; return 1; }
@@ -26,13 +26,20 @@ _vibe_task_update() {
     if [[ -n "$agent" ]]; then
         case "$agent" in codex|antigravity|trae|claude|opencode|kiro) ;; *) [[ "$force" -eq 1 ]] || { vibe_die "Unsupported agent: $agent"; return 1; } ;; esac
         email_slug="$agent"; [[ "$force" -eq 1 ]] && email_slug="$(_vibe_task_slugify "$agent")"
-        git config user.name "$agent" 2>/dev/null || git config user.name "$agent" || return 1
-        git config user.email "${email_slug}@vibe.coding" 2>/dev/null || git config user.email "${email_slug}@vibe.coding" || return 1
     fi
-    [[ "$unassign" == "true" ]] && worktree=""
-    [[ "$bind_current" == "true" ]] && { target_name="$(basename "$PWD")"; target_path="$PWD"; worktree="$target_name"; }
+    if [[ "$unassign" == "true" ]]; then
+        assigned_mode="clear"
+        worktree=""
+    elif [[ "$bind_current" == "true" ]]; then
+        assigned_mode="set"
+        target_name="$(basename "$PWD")"
+        target_path="$PWD"
+        worktree="$target_name"
+    elif [[ -n "$worktree" ]]; then
+        assigned_mode="set"
+    fi
     [[ -z "$target_name" ]] && target_name="$worktree"
-    _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$agent" "$now" || return 1
+    _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$assigned_mode" "$agent" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
     [[ "$bind_current" == "true" ]] && _vibe_task_refresh_cache "$common_dir" "$registry_file" "$task_id" "$target_name" "$now"

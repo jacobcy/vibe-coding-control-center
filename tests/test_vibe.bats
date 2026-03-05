@@ -44,6 +44,14 @@ setup() {
   [[ "$output" =~ "list, add, update, remove" ]]
 }
 
+@test "4.5 vibe alias load points to the new runtime loader" {
+  run vibe alias --load
+  [ "$status" -eq 0 ]
+  [[ -f "$output" ]]
+  [[ "$output" =~ "alias/loader.sh" ]]
+  [[ ! "$output" =~ "config/aliases.sh" ]]
+}
+
 @test "4.3 vibe help does not advertise unsupported skills audit subcommand" {
   run vibe help
   [ "$status" -eq 0 ]
@@ -78,8 +86,8 @@ setup() {
   [[ "$output" =~ "remove" ]]
 }
 
-@test "9. vibe flow start help mentions task mode" {
-  run vibe flow start --task --help
+@test "9. vibe flow bind help mentions task id" {
+  run vibe flow bind --help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "--task <task-id>" ]]
+  [[ "$output" =~ "vibe flow bind <task-id>" ]]
 }

@@ -3,13 +3,13 @@ name: Test Aliases
 on:
   push:
     paths:
-      - 'config/aliases.sh'
-      - 'config/aliases/**/*.sh'
+      - 'config/*.sh'
+      - 'alias/*.sh'
       - 'tests/test-aliases.sh'
   pull_request:
     paths:
-      - 'config/aliases.sh'
-      - 'config/aliases/**/*.sh'
+      - 'config/*.sh'
+      - 'alias/*.sh'
       - 'tests/test-aliases.sh'
 
 jobs:
@@ -37,9 +37,9 @@ jobs:
       shell: zsh {0}
       run: |
         cd $GITHUB_WORKSPACE
-        echo "Checking syntax of all alias files..."
-        zsh -n config/aliases.sh
-        for file in config/aliases/*.sh; do
+        echo "Checking syntax of all alias and config files..."
+        for file in config/*.sh alias/*.sh; do
+          [[ -e "$file" ]] || continue
           echo "Checking: $file"
           zsh -n "$file"
         done
