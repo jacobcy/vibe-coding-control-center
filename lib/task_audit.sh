@@ -227,7 +227,7 @@ vibe_task_audit() {
     # Phase 1: Data Quality Check (null branches)
     if [[ "$fix_branches" == "true" ]] || [[ "$all_checks" == "true" ]]; then
         log_step "Phase 1: Data Quality Check (Branch Fields)"
-        _task_fix_branches "$worktrees_file" "$dry_run"
+        _task_fix_branches "$worktrees_file" "$dry_run" || true
         echo ""
     fi
 
@@ -279,6 +279,12 @@ vibe_task_audit() {
         log_step "Phase 3: PR Association Check"
         log_info "Not yet implemented"
         echo ""
+    fi
+
+
+    # Generate summary report if running comprehensive audit
+    if [[ "$all_checks" == "true" ]]; then
+        _task_generate_audit_summary "$common_dir"
     fi
 
     # If no specific check was requested, show status
@@ -415,4 +421,91 @@ _task_check_openspec_sync() {
     done
     
     return ${#unsynced_changes[@]}
+}
+
+# Helper: Generate audit summary report
+_task_generate_audit_summary() {
+    local common_dir="$1"
+    local worktrees_file="$common_dir/vibe/worktrees.json"
+    local registry_file="$common_dir/vibe/registry.json"
+    
+    local -a data_quality_issues
+    local -a registration_issues
+    local -a sync_issues
+    
+    echo ""
+    log_step "Audit Summary Report"
+    echo ""
+    
+    # Data Quality Issues
+    log_info "=== Data Quality Issues ==="
+    local null_count
+    null_count=$(_task_audit_branches "$worktrees_file" | wc -l | xargs)
+    if [[ "$null_count" -eq 0 ]]; then
+        log_success "✓ All worktrees have valid branch fields"
+    else
+        log_warn "✗ $null_count worktrees with null branch field"
+        log_info "  Repair: vibe task audit --fix-branches"
+        data_quality_issues+=("null_branch_fields")
+    fi
+    echo ""
+    
+    # Registration Issues
+    log_info "=== Task Registration Issues ==="
+    local -a unregistered_branches
+    while IFS= read -r line; do
+        unregistered_branches+=("$line")
+    done < <(_task_check_branch_registration "$common_dir")
+    
+    if [[ ${#unregistered_branches[@]} -eq 0 ]]; then
+        log_success "✓ All branch tasks are registered"
+    else
+        log_warn "✗ ${#unregistered_branches[@]} unregistered branch tasks found"
+        for entry in "${unregistered_branches[@]}"; do
+            local wt_name branch pattern
+            wt_name=$(echo "$entry" | cut -d'|' -f1)
+            branch=$(echo "$entry" | cut -d'|' -f2)
+            pattern=$(echo "$entry" | cut -d'|' -f3)
+            echo "    - $wt_name (branch: $branch)"
+        done
+        log_info "  Action: Review and register tasks as needed"
+        registration_issues+=("unregistered_branches")
+    fi
+    echo ""
+    
+    # Sync Issues
+    log_info "=== OpenSpec Sync Issues ==="
+    local -a unsynced_changes
+    while IFS= read -r line; do
+        unsynced_changes+=("$line")
+    done < <(_task_check_openspec_sync "$common_dir")
+    
+    if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
+        log_success "✓ All OpenSpec changes are synced"
+    else
+        log_warn "✗ ${#unsynced_changes[@]} unsynced OpenSpec changes found"
+        for change in "${unsynced_changes[@]}"; do
+            echo "    - $change"
+        done
+        log_info "  Repair: vibe task sync"
+        sync_issues+=("unsynced_changes")
+    fi
+    echo ""
+    
+    # Overall Health
+    log_step "Overall Health Status"
+    local total_issues=$((${#data_quality_issues[@]} + ${#registration_issues[@]} + ${#sync_issues[@]}))
+    
+    if [[ $total_issues -eq 0 ]]; then
+        log_success "✓✓✓ All checks passed! Task registry is healthy."
+        return 0
+    else
+        log_warn "✗✗✗ Found $total_issues category(s) with issues"
+        echo ""
+        log_info "Next Steps:"
+        [[ ${#data_quality_issues[@]} -gt 0 ]] && echo "  1. Fix data quality: vibe task audit --fix-branches"
+        [[ ${#registration_issues[@]} -gt 0 ]] && echo "  2. Review unregistered tasks and register as needed"
+        [[ ${#sync_issues[@]} -gt 0 ]] && echo "  3. Sync OpenSpec changes: vibe task sync"
+        return 1
+    fi
 }
