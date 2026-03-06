@@ -261,10 +261,10 @@ vibe_task_audit() {
         local -a all_changes_data
         
         # Read all changes data
+        local in_registry line
         while IFS= read -r line; do
             all_changes_data+=("$line")
             # Parse line: name|has_tasks|total|done|in_registry
-            local in_registry
             in_registry=$(echo "$line" | cut -d'|' -f5)
             if [[ "$in_registry" == "false" ]]; then
                 unsynced_changes+=("$line")
@@ -275,8 +275,8 @@ vibe_task_audit() {
             log_success "All OpenSpec changes are synced"
         else
             log_warn "Found ${#unsynced_changes[@]} unsynced OpenSpec changes:"
+            local name has_tasks total done entry
             for entry in "${unsynced_changes[@]}"; do
-                local name has_tasks total done
                 name=$(echo "$entry" | cut -d'|' -f1)
                 has_tasks=$(echo "$entry" | cut -d'|' -f2)
                 total=$(echo "$entry" | cut -d'|' -f3)
@@ -298,6 +298,7 @@ vibe_task_audit() {
     if [[ "$check_plans" == "true" ]] || [[ "$all_checks" == "true" ]]; then
         log_step "Phase 2: Plans & PRDs Check"
         local -a untracked_files
+        local line
         while IFS= read -r line; do
             untracked_files+=("$line")
         done < <(_task_check_plans_prds "$common_dir")
@@ -306,8 +307,8 @@ vibe_task_audit() {
             log_success "All plans and PRDs are tracked"
         else
             log_warn "Found ${#untracked_files[@]} untracked files:"
+            local type file entry
             for entry in "${untracked_files[@]}"; do
-                local type file
                 type=$(echo "$entry" | cut -d'|' -f1)
                 file=$(echo "$entry" | cut -d'|' -f2)
                 echo "  - [$type] $file"
@@ -507,8 +508,8 @@ _task_generate_audit_summary() {
         log_success "✓ All branch tasks are registered"
     else
         log_warn "✗ ${#unregistered_branches[@]} unregistered branch tasks found"
+        local wt_name branch pattern entry
         for entry in "${unregistered_branches[@]}"; do
-            local wt_name branch pattern
             wt_name=$(echo "$entry" | cut -d'|' -f1)
             branch=$(echo "$entry" | cut -d'|' -f2)
             pattern=$(echo "$entry" | cut -d'|' -f3)
@@ -523,9 +524,9 @@ _task_generate_audit_summary() {
     log_info "=== OpenSpec Sync Issues ==="
     local -a unsynced_changes
     local -a all_changes_data
+    local in_registry line
     while IFS= read -r line; do
         all_changes_data+=("$line")
-        local in_registry
         in_registry=$(echo "$line" | cut -d'|' -f5)
         if [[ "$in_registry" == "false" ]]; then
             unsynced_changes+=("$line")
@@ -536,8 +537,8 @@ _task_generate_audit_summary() {
         log_success "✓ All OpenSpec changes are synced"
     else
         log_warn "✗ ${#unsynced_changes[@]} unsynced OpenSpec changes found"
+        local name has_tasks total done entry
         for entry in "${unsynced_changes[@]}"; do
-            local name has_tasks total done
             name=$(echo "$entry" | cut -d'|' -f1)
             has_tasks=$(echo "$entry" | cut -d'|' -f2)
             total=$(echo "$entry" | cut -d'|' -f3)
@@ -577,11 +578,11 @@ _task_check_plans_prds() {
     local common_dir="$1"
     local registry_file="$common_dir/vibe/registry.json"
     local -a untracked_files
+    local file_name file
     
     # Check docs/plans
     if [[ -d "docs/plans" ]]; then
         while IFS= read -r file; do
-            local file_name
             file_name=$(basename "$file" .md)
             
             # Check if file is already in registry (by task_id, slug, or source_path)
@@ -596,7 +597,6 @@ _task_check_plans_prds() {
     # Check docs/prds
     if [[ -d "docs/prds" ]]; then
         while IFS= read -r file; do
-            local file_name
             file_name=$(basename "$file" .md)
             
             # Check if file is already in registry
