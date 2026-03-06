@@ -1,5 +1,8 @@
-## MODIFIED Requirements
+# vibe-check Specification
 
+## Purpose
+TBD - created by archiving change vibe-check-smart-sync. Update Purpose after archive.
+## Requirements
 ### Requirement: vibe-check-four-phase-workflow
 The `vibe check` command SHALL execute a four-phase checking workflow.
 
@@ -76,3 +79,4 @@ The `vibe check` command SHALL allow user to choose handling method for medium-c
 - **THEN** system SHALL:
   - Not include these tasks in final suggestions
   - Continue to Phase 4
+

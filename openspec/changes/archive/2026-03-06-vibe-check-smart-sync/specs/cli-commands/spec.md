@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: vibe-flow-list-with-pr-filter
 The `vibe flow list` command SHALL support filtering branches by PR status.
