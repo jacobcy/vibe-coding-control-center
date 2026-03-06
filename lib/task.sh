@@ -35,6 +35,7 @@ source "$VIBE_LIB/task_write.sh"
 source "$VIBE_LIB/task_help.sh"
 source "$VIBE_LIB/task_query.sh"
 source "$VIBE_LIB/task_actions.sh"
+source "$VIBE_LIB/task_audit.sh"
 
 vibe_task() {
     local subcommand="${1:-list}"
@@ -44,6 +45,7 @@ vibe_task() {
         update) [[ $# -gt 0 ]] && shift; _vibe_task_update "$@" ;;
         remove) [[ $# -gt 0 ]] && shift; _vibe_task_remove "$@" ;;
         sync) [[ $# -gt 0 ]] && shift; _vibe_task_sync "$@" ;;
+        audit) [[ $# -gt 0 ]] && shift; vibe_task_audit "$@" ;;
         -h|--help|help) _vibe_task_usage ;;
         -*) _vibe_task_list "$@" ;;
         "") _vibe_task_list ;;
