@@ -1,5 +1,23 @@
 # 更新日志
 
+## [2.1.5] - 2026-03-07
+
+### ✨ New Features
+- **Smart Task Sync**: Upgraded `vibe check` to intelligently sync task status based on PR merged events.
+  - **Phase 2**: Detect merged PRs and analyze task completion using AI (Subagent)
+  - **Phase 3**: Confidence-based processing (high/medium/low) with user confirmation
+  - **Phase 4**: Deep code analysis option for uncertain tasks
+  - **Graceful Degradation**: Continue static checks when `gh` CLI is unavailable
+- **Flow Commands**: Enhanced `vibe flow` command family
+  - `vibe flow list --pr`: Query last 10 branches with PRs
+  - `vibe flow list --keywords <text>`: Filter branches by keyword
+  - `vibe flow review <branch> --json`: Return structured PR data for programmatic use
+
+### 🔧 Technical Details
+- **Architecture**: Three-tier implementation (Shell → Skill → Subagent)
+- **Data Strategy**: Real-time query via `gh`, no local PR caching
+- **User Control**: AI suggests, human confirms - preserves decision authority
+
 ## [2.1.4] - 2026-03-05
 
 ### ✨ Improvements

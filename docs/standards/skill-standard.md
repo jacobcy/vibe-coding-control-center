@@ -1,94 +1,80 @@
-# Vibe Skills 规范标准 (SKILL_STANDARD.md)
+# Vibe Skills 与 Slash 命令标准
 
-所有技能必须遵循统一的 Vibe Skills 治理体系标准。
+本文档用于解决以下常见混淆：
+- `skills/`、`.agent/skills/`、`npx skills`、`vibe skills` 的关系
+- OpenSpec 的 `opsx-*` 流程和 Vibe Skills 的边界
+- 跨 Agent 工作流注册（`.agent/workflows/`）与 Claude 专用命令注册（`.claude/commands/`）的选择
 
-## 1. 文件结构
-```
+## 1. 概念分层与唯一职责
+
+| 概念 | 作用 | 规范位置 | 管理方式 | 备注 |
+|---|---|---|---|---|
+| 本项目 Skills 源码 | 团队自有技能定义（权威源） | `skills/<name>/SKILL.md` | Git 维护 | 只改这里，不改运行时镜像 |
+| Skills 运行时链接 | 供 Agent 实际加载的 symlink 层 | `.agent/skills/` | `scripts/init.sh` / `vibe skills sync` | 运行时产物，非权威源 |
+| 第三方 Markdown Skills 依赖 | 安装/移除外部 skills | 项目级或全局环境 | `npx skills add/remove/ls` | 外部生态依赖管理器 |
+| Vibe Skills Shell 工具 | 统一管理 skills 的 Shell 入口 | `bin/vibe skills` -> `lib/skills.sh` | `vibe skills <subcommand>` | 编排器，不是 skill 内容本身 |
+| Vibe Skills 技能 | 对话式审计/推荐流程 | `skills/vibe-skills/SKILL.md` | 由 slash/workflow 触发 | 负责推荐，不直接替代底层 CLI |
+| OpenSpec OPSX 流程 | OpenSpec 实验流程命令（`/opsx:*`） | `.agent/workflows/opsx-*.md` | `openspec` 工具链 | 独立体系，不归 `npx skills` 管 |
+| Claude 插件 | Claude Code 官方插件生态 | `~/.claude/plugins/...` | `claude plugin add ...` | 与 Markdown skills 分离 |
+| Slash 命令注册 | 用户输入 `/xxx` 的入口定义 | `.agent/workflows/*.md`（跨 Agent） | 工作流文件维护 | 可加 Claude 适配层 |
+
+## 2. 明确边界（必须遵守）
+
+1. `skills/` 是技能定义的唯一真源（source of truth）。
+2. `.agent/skills/` 只做运行时链接，不直接手改业务逻辑。
+3. 第三方公共 skills 的安装/卸载使用 `npx skills`。
+4. `vibe skills` 是 Shell 管理命令；`/vibe-skills` 是 AI workflow 入口，两者不是同一个层级。
+5. `opsx-*` 属于 OpenSpec 工作流，生命周期由 `openspec` 管，不并入 `vibe skills` 的安装语义。
+6. Claude 第三方能力优先走 plugin 机制（例如 `everything-claude-code`、`superpowers`），不要用 `npx skills` 去模拟插件。
+
+## 3. 关于 `.agent/workflows` vs `.claude/commands`
+
+结论：两者都可以用，但职责应分离，避免双真源。
+
+推荐策略：
+1. 继续把 `.agent/workflows/` 作为跨 Agent 的权威命令语义层。
+2. 在 Claude Code 中可以增加 `.claude/commands/` 作为 Claude 专用注册层（适配层）。
+3. `.claude/commands/*` 只做薄封装，内容应委托到 `.agent/workflows/*` 或 `skills/*`，不要复制完整逻辑。
+4. 若两处内容冲突，以 `.agent/workflows/` 为准并及时同步。
+
+一句话：
+`.agent/workflows/` 管"语义与流程"，`.claude/commands/` 管"Claude 入口适配"。
+
+## 4. SKILL.md 最小规范
+
+每个自有 skill 至少包含：
+- Frontmatter：`name`, `description`, `user-invokable`（按需）
+- `Overview`
+- `When to Use`
+- `Execution Flow` 或等价步骤说明
+- `Guardrails` / `Common Mistakes`（边界）
+
+建议目录结构：
+
+```text
 skills/<name>/
-  SKILL.md          # 技能定义（必须）
-  README.md         # 使用说明（可选）
-  examples/         # 示例（可选）
+  SKILL.md          # 必须
+  README.md         # 可选
+  examples/         # 可选
 ```
 
-## 2. SKILL.md Frontmatter 必须包含
+## 5. 操作映射（避免概念串线）
 
-在文件顶部的 YAML frontmatter 区域，必须提供以下元数据：
+| 目标 | 正确入口 | 不该使用 |
+|---|---|---|
+| 安装 Claude 插件（如 superpowers） | `claude plugin add <plugin>` | `npx skills add` |
+| 管理第三方 Markdown skills | `npx skills add/remove/ls` | 手工改 `.agent/skills/` |
+| 同步本项目本地 skills 到运行时 | `vibe skills sync` / `scripts/init.sh` | 手工批量建 symlink |
+| 触发 Vibe skills 推荐流程 | `/vibe-skills` -> `skills/vibe-skills/SKILL.md` | 直接把 workflow 写成脚本拼接 |
+| 触发 OpenSpec opsx 流程 | `/opsx:*` + `openspec ...` | 通过 `vibe skills` 安装/卸载 |
 
-```yaml
----
-name: <skill-name>
-description: <one-line description>
-category: process | guardian | audit
-trigger: manual | auto | mixed
-enforcement: hard | tiered | advisory
-phase: exploration | convergence | both
----
-```
+## 6. 变更检查清单
 
-## 3. 必须包含的章节
+修改本标准或相关实现时，逐项确认：
 
-每个 `SKILL.md` 必须包含以下 Markdown 标题和内容：
-
-- **System Role**: 技能人格和需要绝对遵守的硬规则
-- **Overview**: 用一段话清晰描述该技能的核心目的
-- **When to Use**: 触发条件列表（何时该用此技能）
-- **Execution Steps**: 具体的执行步骤指南
-- **Output Format**: 输出的格式模板（如合规报告模板）
-- **What This Skill Does NOT Do**: 边界声明（明确不做的事情，防止范围蔓延）
-
-## 4. Skills 清单与职责边界
-
-### 4.1 核心 Skills
-
-| Skill | 职责 | 使用命令 | 检查范围 |
-|-------|------|---------|---------|
-| **vibe-check** | 验证 memory 一致性 | `vibe check` | `.agent/` + `.git/` |
-| **vibe-commit** | 生成 git commit | `git commit` | 本地代码 |
-| **vibe-review-code** | 代码质量审查 | `vibe flow review` | PR 代码 |
-| **vibe-review-docs** | 文档概念审查 | `vibe flow review` | 入口文件 + docs/ |
-| **vibe-done** | 任务收口 | `vibe flow done` | Worktree 清理 |
-| **vibe-save** | 保存会话上下文 | `vibe task update` | `.agent/context/` |
-| **vibe-continue** | 恢复会话上下文 | Read tools | `.agent/context/` |
-| **vibe-task** | 任务概览 | `vibe task list` | Registry |
-
-### 4.2 流程 Skills
-
-| Skill | 职责 | 触发时机 |
-|-------|------|---------|
-| **vibe-orchestrator** | Vibe Guard 总编排 | 开发任务入口 |
-| **vibe-scope-gate** | 范围检查 | Gate 1 |
-| **vibe-boundary-check** | 边界指标检查 | Gate 6 |
-| **vibe-rules-enforcer** | 合规检查 | Gate 6 |
-| **vibe-test-runner** | 自动测试 | Gate 4 |
-
-### 4.3 Shell/Skill 职责划分原则
-
-**Tier 1 (物理层 - Shell 命令)**:
-- ✅ 执行具体操作（git, gh, jq, 读写文件）
-- ✅ 修改数据结构（`.git/vibe/*.json`）
-- ✅ 提供稳定的 API 接口
-
-**Tier 2 (认知层 - Skills)**:
-- ✅ 智能判断和交互编排
-- ✅ 调用 Shell API 执行操作
-- ✅ 提供流程控制和用户体验
-
-**禁止越界**:
-- ❌ Skills 不得直接修改 `.git/vibe/*.json`
-- ❌ Skills 不得实现复杂的数据处理逻辑
-- ❌ Skills 不得绕过 Shell API 直接操作数据
-
-## 5. 标准 Shell 命令映射
-
-Skills 必须使用以下标准命令，不得自行实现等价功能：
-
-| 场景 | 命令 | 说明 |
-|------|------|------|
-| 检查 memory 一致性 | `vibe check` | 物理层审计 |
-| 检查 PR 状态 | `vibe flow review` | PR 审计 |
-| 查看当前分支 | `vibe flow status` | 当前任务状态 |
-| 查看所有分支 | `vibe flow list` | 所有 worktree 状态 |
-| 提交 PR | `vibe flow pr` | PR 提交 |
-| 清理 worktree | `vibe flow done` | Worktree 清理 |
-| 更新任务状态 | `vibe task update` | Registry 更新 |
+1. 是否把 `skills/` 与 `.agent/skills/` 区分为"源码"与"运行时"？
+2. 是否明确区分了 `vibe skills`（Shell）与 `/vibe-skills`（Skill workflow）？
+3. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
+4. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
+5. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
 

@@ -133,8 +133,27 @@ _flow_pr() {
 }
 
 _flow_review() {
-  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS" local_mode=0
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_review_usage; return 0 ;; --local) local_mode=1; shift ;; *) target="$1"; shift ;; esac; done
+  local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS" local_mode=0 json_output=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        _flow_review_usage
+        return 0
+        ;;
+      --local)
+        local_mode=1
+        shift
+        ;;
+      --json)
+        json_output=1
+        shift
+        ;;
+      *)
+        target="$1"
+        shift
+        ;;
+    esac
+  done
   vibe_require git || return 1; [[ -z "$target" ]] && target=$(git branch --show-current)
 
   if [[ $local_mode -eq 1 ]]; then
@@ -158,8 +177,28 @@ _flow_review() {
     return 0
   fi
 
-  if ! vibe_has gh; then log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."; vibe check; return 0; fi
-  log_step "Fetching PR status for '$target'..."; pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
+  if ! vibe_has gh; then
+    [[ $json_output -eq 1 ]] && echo '{"error": "gh (GitHub CLI) not found"}' && return 1
+    log_warn "gh (GitHub CLI) not found. Falling back to local vibe check."
+    vibe check
+    return 0
+  fi
+
+  log_step "Fetching PR status for '$target'..."
+
+  # For JSON output, fetch comprehensive PR data
+  if [[ $json_output -eq 1 ]]; then
+    pr_info=$(gh pr view "$target" --json number,title,body,comments,reviews,commits,state,mergedAt,headRefName,baseRefName 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+      echo "{\"error\": \"No PR found for '$target'\"}"
+      return 1
+    fi
+    echo "$pr_info"
+    return 0
+  fi
+
+  # Human-readable output (original behavior)
+  pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
   [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
   number=$(printf '%s\n' "$pr_info" | jq -r '.number'); title=$(printf '%s\n' "$pr_info" | jq -r '.title'); state=$(printf '%s\n' "$pr_info" | jq -r '.state')
   decision=$(printf '%s\n' "$pr_info" | jq -r '.reviewDecision // "PENDING"'); mergeable=$(printf '%s\n' "$pr_info" | jq -r '.mergeable'); url=$(printf '%s\n' "$pr_info" | jq -r '.url')

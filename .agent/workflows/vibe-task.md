@@ -1,5 +1,8 @@
 ---
-description: 查看跨工作树任务总览，建议下一步进入哪个工作树。
+name: "Vibe: Task"
+description: View cross-worktree task overview and get recommendations for next steps
+category: Workflow
+tags: [workflow, vibe, tasks, overview]
 ---
 
 # Vibe Task Overview

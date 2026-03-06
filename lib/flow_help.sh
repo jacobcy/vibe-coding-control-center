@@ -43,7 +43,7 @@ _flow_pr_usage() {
 }
 
 _flow_review_usage() {
-  echo "Usage: ${CYAN}vibe flow review${NC} [--local] [<pr-number>|<branch>]"
+  echo "Usage: ${CYAN}vibe flow review${NC} [--local] [--json] [<pr-number>|<branch>]"
   echo ""
   echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
   echo "核心职责："
@@ -51,14 +51,23 @@ _flow_review_usage() {
   echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
   echo "  3. 合并判定：自动判断当前真源是否满足 Merge 准入条件"
   echo "  4. 本地审查：使用 --local 调用 codex review 进行深度静态分析与缺陷检测"
+  echo ""
+  echo "选项："
+  echo "  --local     执行本地代码审查（使用 codex）"
+  echo "  --json      输出 PR 详细数据的 JSON 格式（用于程序化调用）"
 }
 
 _flow_list_usage() {
-  echo "Usage: ${CYAN}vibe flow list${NC}"
+  echo "Usage: ${CYAN}vibe flow list${NC} [--pr] [--keywords <text>]"
   echo ""
   echo "查看全部分支状态（所有 worktree 的任务进度和物理变动）。"
-  echo "输出包括："
+  echo ""
+  echo "默认输出包括："
   echo "  - 每个 worktree 的 task 绑定"
   echo "  - 每个 worktree 的 dirty 状态"
   echo "  - 共享上下文文件数量"
+  echo ""
+  echo "选项："
+  echo "  --pr                 查询最近 10 个有 PR 的分支"
+  echo "  --keywords <text>    按关键字查找分支（匹配分支名、任务标题）"
 }

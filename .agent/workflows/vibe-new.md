@@ -1,5 +1,8 @@
 ---
-description: 新功能统一入口，调用 Vibe Orchestrator 负责意图分析与方案规划 (Discussion Mode)。
+name: "Vibe: New"
+description: Entry point for new features with orchestrator-driven planning (Discussion Mode)
+category: Workflow
+tags: [workflow, vibe, planning, orchestrator]
 ---
 
 # Vibe New (Discussion Mode)

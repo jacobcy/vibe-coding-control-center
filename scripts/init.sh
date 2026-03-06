@@ -84,6 +84,17 @@ for skill in .github/skills/openspec-*/; do
   ln -sfn "../../$skill" ".claude/skills/$name"
 done
 
+# ── 3.5. Symlink workflows to Claude commands ──────────────────────────────
+echo "🔗 Creating symlinks for workflows..."
+mkdir -p .claude/commands
+
+# Link .agent/workflows/vibe-* (but NOT opsx-* which is managed by OpenSpec)
+for workflow in .agent/workflows/vibe-*.md; do
+  [ -f "$workflow" ] || continue
+  name=$(basename "$workflow")
+  ln -sfn "../../$workflow" ".claude/commands/$name"
+done
+
 echo "✅ Environment setup complete!"
 
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────

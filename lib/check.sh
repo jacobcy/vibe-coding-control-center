@@ -2,6 +2,81 @@
 # v2/lib/check.sh - Minimalist Validation for Vibe 2.0
 # Target: ~30 lines | Simplified API
 
+# Helper function: Check if gh CLI is available
+_check_gh_available() {
+    if ! vibe_has gh; then
+        return 1
+    fi
+
+    # Check if gh is authenticated
+    if ! gh auth status >/dev/null 2>&1; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Helper function: Get merged PRs
+_get_merged_prs() {
+    local limit="${1:-10}"
+    gh pr list --state merged --limit "$limit" --json number,headRefName,title,mergedAt 2>/dev/null
+}
+
+# Helper function: Get in-progress tasks
+_get_in_progress_tasks() {
+    local registry_file="$1"
+    jq -r '.tasks[] | select(.status == "in_progress") | @json' "$registry_file" 2>/dev/null
+}
+
+# Helper function: Check PR merged status for tasks
+_check_pr_merged_status() {
+    local registry_file="$1"
+    local worktrees_file="$2"
+    local -a merged_pr_branches
+    local -a uncertain_tasks
+
+    # Get all merged PR branches
+    local merged_prs
+    merged_prs=$(_get_merged_prs 50)
+
+    if [[ -z "$merged_prs" ]] || [[ "$merged_prs" == "[]" ]]; then
+        return 0
+    fi
+
+    # Extract branch names from merged PRs
+    while IFS= read -r branch; do
+        merged_pr_branches+=("$branch")
+    done < <(echo "$merged_prs" | jq -r '.[].headRefName')
+
+    # Get all in-progress tasks
+    while IFS= read -r task_json; do
+        local task_id assigned_worktree branch
+        task_id=$(echo "$task_json" | jq -r '.task_id')
+        assigned_worktree=$(echo "$task_json" | jq -r '.assigned_worktree // empty')
+
+        [[ -z "$assigned_worktree" ]] && continue
+
+        # Get branch from worktree (match by worktree_name)
+        branch=$(jq -r --arg wt "$assigned_worktree" '.worktrees[]? | select(.worktree_name == $wt) | .branch // empty' "$worktrees_file" 2>/dev/null)
+
+        [[ -z "$branch" ]] && continue
+
+        # Check if branch has merged PR
+        for merged_branch in "${merged_pr_branches[@]}"; do
+            if [[ "$branch" == "$merged_branch" ]]; then
+                # Found a match - this task should be analyzed
+                uncertain_tasks+=("$task_id|$branch")
+                break
+            fi
+        done
+    done < <(_get_in_progress_tasks "$registry_file")
+
+    # Output uncertain tasks (those with merged PRs)
+    for task_info in "${uncertain_tasks[@]}"; do
+        echo "$task_info"
+    done
+}
+
 vibe_check() {
     local file="${1:-}"
     
@@ -104,7 +179,30 @@ vibe_check() {
         for gb in "${ghost_branches[@]}"; do echo "     - $gb"; done
     fi
 
-    # 6. Health Check Summary
+    # Phase 2: Git Status Check (PR merged detection)
+    log_info "6. Checking PR merged status..."
+    if ! _check_gh_available; then
+        log_warn "   gh CLI not available or not authenticated. Skipping PR status check."
+    else
+        local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
+        local -a uncertain_tasks
+        while IFS='|' read -r task_id branch; do
+            [[ -n "$task_id" && -n "$branch" ]] && uncertain_tasks+=("$task_id|$branch")
+        done < <(_check_pr_merged_status "$reg" "$worktrees_file")
+
+        if [[ ${#uncertain_tasks[@]} -gt 0 ]]; then
+            log_info "   Found ${#uncertain_tasks[@]} task(s) with merged PRs:"
+            for task_info in "${uncertain_tasks[@]}"; do
+                local tid br
+                IFS='|' read -r tid br <<< "$task_info"
+                echo "     - $tid (branch: $br)"
+            done
+            echo ""
+            log_info "   Run ${CYAN}/vibe-check${NC} for AI-assisted task completion analysis."
+        fi
+    fi
+
+    # 7. Health Check Summary
     local total; total=$(jq '.tasks | length' "$reg")
     local in_progress; in_progress=$(jq '[.tasks[] | select(.status == "in_progress" or .status == "todo")] | length' "$reg")
     local archived; archived=$(jq '[.tasks[] | select(.status == "archived")] | length' "$reg")

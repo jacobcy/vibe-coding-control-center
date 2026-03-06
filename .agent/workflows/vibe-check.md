@@ -1,12 +1,8 @@
 ---
-document_type: workflow
+name: "Vibe: Check"
 description: Verify the consistency of project memory and documents
-author: Claude Sonnet 4.5
-created: 2025-01-24
-related_docs:
-  - .agent/context/memory.md
-  - .agent/context/task.md
-  - SOUL.md
+category: Workflow
+tags: [workflow, vibe, memory, verification]
 ---
 
 # Verify Memory Consistency

@@ -1,5 +1,8 @@
 ---
-description: 启动执行引擎（Execution Mode），按图索骥静默完成 `plan.md` 中的开发任务。
+name: "Vibe: Start"
+description: Start execution engine (Execution Mode) to complete plan.md tasks step-by-step
+category: Workflow
+tags: [workflow, vibe, execution, automation]
 ---
 
 # Vibe Start Stepper (Execution Mode)
