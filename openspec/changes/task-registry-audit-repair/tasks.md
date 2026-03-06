@@ -21,6 +21,15 @@
 - [x] 2.7 实现 `vibe task audit --dry-run` 参数处理（预览模式）
 - [x] 2.8 更新 `lib/task_help.sh` 添加 audit 相关帮助文档
 
+<!-- Architecture Refactoring: Removed vibe task sync -->
+<!-- - vibe task sync deleted - Shell layer should not make smart decisions -->
+<!-- - Enhanced --check-openspec to provide context data -->
+<!-- - Added --check-plans to check docs/plans and docs/prds -->
+
+- [x] 2.9 删除 vibe task sync 命令 - Shell 层不应做智能判断
+- [x] 2.10 增强 --check-openspec 提供更多上下文数据（tasks.md 完成度）
+- [x] 2.11 新增 --check-plans 参数 - 检查 docs/plans 和 docs/prds
+
 ## 3. Skill 层编排流程
 
 - [ ] 3.1 更新 `skills/vibe-task/SKILL.md` 添加 audit 模式说明
