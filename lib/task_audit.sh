@@ -60,6 +60,7 @@ _task_fix_branches() {
     local worktrees_file="$1"
     local dry_run="${2:-false}"
     local backup_file="${worktrees_file}.backup"
+    local rollback_needed=false
     local common_dir
     common_dir=$(dirname "$worktrees_file")
     common_dir=$(dirname "$common_dir")
@@ -136,9 +137,19 @@ _task_fix_branches() {
             else
                 log_error "Failed to update $wt_name"
                 failed_worktrees+=("$wt_name (update failed)")
+                rollback_needed=true
             fi
         fi
     done
+
+
+    # Rollback if critical failure occurred
+    if [[ "$rollback_needed" == "true" && -f "$backup_file" ]]; then
+        log_warn "Critical failure detected, rolling back from backup..."
+        cp "$backup_file" "$worktrees_file"
+        log_info "Restored from backup: $backup_file"
+        return 1
+    fi
 
     # Summary
     echo ""
@@ -220,17 +231,46 @@ vibe_task_audit() {
         echo ""
     fi
 
-    # Phase 2: Branch Registration Check (future implementation)
-    if [[ "$check_branches" == "true" ]]; then
+    # Phase 2: Branch Registration Check
+    if [[ "$check_branches" == "true" ]] || [[ "$all_checks" == "true" ]]; then
         log_step "Phase 2: Branch Registration Check"
-        log_info "Not yet implemented"
+        local -a unregistered_branches
+        while IFS= read -r line; do
+            unregistered_branches+=("$line")
+        done < <(_task_check_branch_registration "$common_dir")
+        
+        if [[ ${#unregistered_branches[@]} -eq 0 ]]; then
+            log_success "All branch tasks are registered"
+        else
+            log_warn "Found ${#unregistered_branches[@]} unregistered branch tasks:"
+            for entry in "${unregistered_branches[@]}"; do
+                local wt_name branch pattern
+                wt_name=$(echo "$entry" | cut -d'|' -f1)
+                branch=$(echo "$entry" | cut -d'|' -f2)
+                pattern=$(echo "$entry" | cut -d'|' -f3)
+                echo "  - $wt_name (branch: $branch, pattern: $pattern)"
+            done
+        fi
         echo ""
     fi
 
-    # Phase 2: OpenSpec Sync Check (future implementation)
-    if [[ "$check_openspec" == "true" ]]; then
+    # Phase 2: OpenSpec Sync Check
+    if [[ "$check_openspec" == "true" ]] || [[ "$all_checks" == "true" ]]; then
         log_step "Phase 2: OpenSpec Sync Check"
-        log_info "Not yet implemented"
+        local -a unsynced_changes
+        while IFS= read -r line; do
+            unsynced_changes+=("$line")
+        done < <(_task_check_openspec_sync "$common_dir")
+        
+        if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
+            log_success "All OpenSpec changes are synced"
+        else
+            log_warn "Found ${#unsynced_changes[@]} unsynced OpenSpec changes:"
+            for change in "${unsynced_changes[@]}"; do
+                echo "  - $change"
+            done
+            log_info "Run 'vibe task sync' to sync OpenSpec changes to registry"
+        fi
         echo ""
     fi
 
@@ -259,4 +299,120 @@ vibe_task_audit() {
     fi
 
     return 0
+}
+# Helper: Extract task pattern from branch name
+_task_extract_branch_pattern() {
+    local branch_name="$1"
+    local pattern=""
+    
+    # Match YYYY-MM-DD-slug pattern
+    if [[ "$branch_name" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+        pattern="${match[1]}"
+    # Match codex/YYYY-MM-DD-slug pattern
+    elif [[ "$branch_name" =~ codex/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+        pattern="${match[1]}"
+    # Match feature/YYYY-MM-DD-slug pattern
+    elif [[ "$branch_name" =~ feature/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+        pattern="${match[1]}"
+    fi
+    
+    if [[ -n "$pattern" ]]; then
+        echo "$pattern"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Helper: Check if branch task is registered
+_task_is_branch_registered() {
+    local branch_pattern="$1"
+    local registry_file="$2"
+    
+    # Check if task exists with matching ID or slug
+    if jq -e --arg pattern "$branch_pattern" \
+        '.tasks[]? | select(.task_id == $pattern or .slug == $pattern)' \
+        "$registry_file" >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Helper: Check branch registration status
+_task_check_branch_registration() {
+    local common_dir="$1"
+    local worktrees_file="$common_dir/vibe/worktrees.json"
+    local registry_file="$common_dir/vibe/registry.json"
+    local -a unregistered_branches
+    
+    # Get all worktrees with valid branches
+    while IFS= read -r line; do
+        local wt_name branch pattern
+        wt_name=$(echo "$line" | cut -d'|' -f1)
+        branch=$(echo "$line" | cut -d'|' -f2)
+        
+        # Extract task pattern from branch name
+        pattern=$(_task_extract_branch_pattern "$branch")
+        
+        if [[ -n "$pattern" ]]; then
+            # Check if registered
+            if ! _task_is_branch_registered "$pattern" "$registry_file"; then
+                unregistered_branches+=("$wt_name|$branch|$pattern")
+            fi
+        fi
+    done < <(jq -r '.worktrees[]? | select(.branch != null and .branch != "") | "\(.worktree_name)|\(.branch)"' "$worktrees_file" 2>/dev/null)
+    
+    # Output results
+    if [[ ${#unregistered_branches[@]} -eq 0 ]]; then
+        return 0
+    fi
+    
+    for entry in "${unregistered_branches[@]}"; do
+        echo "$entry"
+    done
+    
+    return ${#unregistered_branches[@]}
+}
+
+# Helper: Check OpenSpec sync status
+_task_check_openspec_sync() {
+    local common_dir="$1"
+    local registry_file="$common_dir/vibe/registry.json"
+    local openspec_changes_dir="openspec/changes"
+    local -a unsynced_changes
+    
+    # Check if OpenSpec directory exists
+    if [[ ! -d "$openspec_changes_dir" ]]; then
+        return 0
+    fi
+    
+    # Scan all changes directories (excluding archive)
+    while IFS= read -r change_dir; do
+        local change_name
+        change_name=$(basename "$change_dir")
+        
+        # Skip archive directory
+        if [[ "$change_name" == "archive" ]]; then
+            continue
+        fi
+        
+        # Check if change is registered
+        if ! jq -e --arg change "$change_name" \
+            '.tasks[]? | select(.task_id == $change or .slug == $change or (.openspec_change == $change))' \
+            "$registry_file" >/dev/null 2>&1; then
+            unsynced_changes+=("$change_name")
+        fi
+    done < <(find "$openspec_changes_dir" -maxdepth 1 -type d ! -path "$openspec_changes_dir")
+    
+    # Output results
+    if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
+        return 0
+    fi
+    
+    for change in "${unsynced_changes[@]}"; do
+        echo "$change"
+    done
+    
+    return ${#unsynced_changes[@]}
 }

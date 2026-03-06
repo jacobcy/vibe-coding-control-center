@@ -4,20 +4,20 @@
 
 - [x] 1.1 在 `lib/task.sh` 中新增 `_task_audit_branches()` 函数 - 核对 worktrees.json 的 null branch 字段
 - [x] 1.2 在 `lib/task.sh` 中新增 `_task_fix_branches()` 函数 - 自动修复 null branch 字段
-- [ ] 1.3 在 `lib/task.sh` 中新增 `_task_check_branch_registration()` 函数 - 检查分支任务注册
-- [ ] 1.4 在 `lib/task.sh` 中新增 `_task_check_openspec_sync()` 函数 - 检查 OpenSpec 同步状态
+- [x] 1.3 在 `lib/task.sh` 中新增 `_task_check_branch_registration()` 函数 - 检查分支任务注册
+- [x] 1.4 在 `lib/task.sh` 中新增 `_task_check_openspec_sync()` 函数 - 检查 OpenSpec 同步状态
 - [ ] 1.5 在 `lib/task.sh` 中新增 `_task_check_pr_associations()` 函数 - 检查 PR 任务关联
 - [ ] 1.6 在 `lib/task.sh` 中新增 `_task_register_batch()` 函数 - 批量注册任务
-- [ ] 1.7 在 `lib/task.sh` 中集成 `vibe_task_audit()` 主函数，编排三阶段核对
+- [x] 1.7 在 `lib/task.sh` 中集成 `vibe_task_audit()` 主函数，编排三阶段核对
 
 ## 2. Shell 层命令接口
 
 - [x] 2.1 扩展 `bin/vibe` 支持 `vibe task audit` 子命令
 - [x] 2.2 实现 `vibe task audit --fix-branches` 参数处理
-- [ ] 2.3 实现 `vibe task audit --check-branches` 参数处理
-- [ ] 2.4 实现 `vibe task audit --check-openspec` 参数处理
+- [x] 2.3 实现 `vibe task audit --check-branches` 参数处理
+- [x] 2.4 实现 `vibe task audit --check-openspec` 参数处理
 - [ ] 2.5 实现 `vibe task audit --check-prs` 参数处理
-- [ ] 2.6 实现 `vibe task audit --all` 参数处理（运行所有检查）
+- [x] 2.6 实现 `vibe task audit --all` 参数处理（运行所有检查）
 - [x] 2.7 实现 `vibe task audit --dry-run` 参数处理（预览模式）
 - [x] 2.8 更新 `lib/task_help.sh` 添加 audit 相关帮助文档
 
@@ -36,15 +36,15 @@
 - [x] 4.2 实现备份机制 - 修复前创建 worktrees.json.backup
 - [x] 4.3 实现修复逻辑 - 更新 null branch 字段
 - [x] 4.4 实现修复验证 - 确认字段已正确更新
-- [ ] 4.5 实现回滚机制 - 验证失败时从备份恢复
+- [x] 4.5 实现回滚机制 - 验证失败时从备份恢复
 - [x] 4.6 测试数据质量修复 - 创建 null branch worktree，运行修复，验证结果
 
 ## 5. 确定性核对 (Phase 2)
 
-- [ ] 5.1 实现分支名匹配逻辑 - 提取 YYYY-MM-DD-slug 模式
-- [ ] 5.2 实现 registry 查询 - 检查分支名对应的 task 是否已注册
-- [ ] 5.3 实现 OpenSpec changes 扫描 - 列出所有 changes 目录
-- [ ] 5.4 实现 OpenSpec → registry 对比 - 检查未同步的 changes
+- [x] 5.1 实现分支名匹配逻辑 - 提取 YYYY-MM-DD-slug 模式
+- [x] 5.2 实现 registry 查询 - 检查分支名对应的 task 是否已注册
+- [x] 5.3 实现 OpenSpec changes 扫描 - 列出所有 changes 目录
+- [x] 5.4 实现 OpenSpec → registry 对比 - 检查未同步的 changes
 - [ ] 5.5 实现结果分类输出 - 按问题类型分组显示
 - [ ] 5.6 测试分支核对 - 创建未注册分支，运行核对，验证检测
 - [ ] 5.7 测试 OpenSpec 核对 - 创建新 change，运行核对，验证检测
