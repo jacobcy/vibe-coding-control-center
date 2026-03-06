@@ -1,6 +1,6 @@
 {
     "_comment": "Vibe Center Skills Registry - 推荐技能注册表",
-    "_updated": "2026-03-02",
+    "_updated": "2026-03-06",
     "_philosophy": "Superpowers 全局安装（所有项目共享），本地 vibe-* 项目级（通过 symlink）",
 
     "global": {
@@ -188,6 +188,11 @@
                 "name": "vibe-skills",
                 "category": "meta",
                 "description": "Skills 生命周期管理"
+            },
+            {
+                "name": "vibe-roadmap",
+                "category": "workflow",
+                "description": "智能调度器，维护版本目标和 Issue 分类"
             },
             {
                 "name": "vibe-task",
