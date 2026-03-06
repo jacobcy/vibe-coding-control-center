@@ -43,6 +43,10 @@ case "$command" in
         source "$VIBE_LIB/task.sh"
         vibe_task "$@"
         ;;
+    roadmap)
+        source "$VIBE_LIB/roadmap.sh"
+        vibe_roadmap "$@"
+        ;;
     clean)
         source "$VIBE_LIB/clean.sh"
         vibe_clean "$@"
