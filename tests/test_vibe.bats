@@ -84,10 +84,19 @@ setup() {
   [[ "$output" =~ "add" ]]
   [[ "$output" =~ "update" ]]
   [[ "$output" =~ "remove" ]]
+  [[ "$output" =~ "audit" ]]
+  [[ ! "$output" =~ "sync" ]]
 }
 
 @test "9. vibe flow bind help mentions task id" {
   run vibe flow bind --help
   [ "$status" -eq 0 ]
   [[ "$output" =~ "vibe flow bind <task-id>" ]]
+}
+
+@test "10. vibe roadmap help is available" {
+  run vibe roadmap help
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Roadmap" ]]
+  [[ "$output" =~ "classify" ]]
 }

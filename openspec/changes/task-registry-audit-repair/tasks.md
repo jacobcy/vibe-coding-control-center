@@ -32,12 +32,12 @@
 
 ## 3. Skill 层编排流程
 
-- [ ] 3.1 更新 `skills/vibe-task/SKILL.md` 添加 audit 模式说明
-- [ ] 3.2 在 SKILL.md 中实现 Step 0: 运行 `vibe task audit` 获取核对结果
-- [ ] 3.3 在 SKILL.md 中实现结果解析和健康度评估
-- [ ] 3.4 在 SKILL.md 中实现修复建议生成逻辑
-- [ ] 3.5 在 SKILL.md 中实现用户交互流程（批量 vs 逐个确认）
-- [ ] 3.6 在 SKILL.md 中实现修复执行和验证逻辑
+- [x] 3.1 更新 `skills/vibe-task/SKILL.md` 添加 audit 模式说明
+- [x] 3.2 在 SKILL.md 中实现 Step 0: 运行 `vibe task audit` 获取核对结果
+- [x] 3.3 在 SKILL.md 中实现结果解析和健康度评估
+- [x] 3.4 在 SKILL.md 中实现修复建议生成逻辑
+- [x] 3.5 在 SKILL.md 中实现用户交互流程（批量 vs 逐个确认）
+- [x] 3.6 在 SKILL.md 中实现修复执行和验证逻辑
 
 ## 4. 数据质量修复 (Phase 1 MVP)
 

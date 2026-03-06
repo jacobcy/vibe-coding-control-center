@@ -108,9 +108,9 @@ vibe_check() {
     local reg; reg="$(git rev-parse --git-common-dir)/vibe/registry.json"
     [[ -f "$reg" ]] || { log_error "Missing registry.json"; return 1; }
 
-    # 1. Registry vs OpenSpec
-    log_info "1. Syncing Registry with OpenSpec..."
-    vibe_task sync 2>/dev/null || true
+    # 1. OpenSpec registration audit
+    log_info "1. Auditing OpenSpec registration..."
+    vibe_task audit --check-openspec >/dev/null 2>&1 || true
 
     # 2. Archive completed tasks
     log_info "2. Archiving completed tasks..."

@@ -447,3 +447,48 @@ EOF
   [[ "$output" =~ "Failed to enter worktree" ]]
   [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
 }
+
+
+@test "17. vibe flow list --keywords filters by task title" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"t-1","title":"Roadmap Alpha","status":"todo","next_step":""},
+  {"task_id":"t-2","title":"Unrelated Task","status":"todo","next_step":""}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-a","tasks":["t-1"],"current_task":"t-1"},
+  {"worktree_name":"wt-b","tasks":["t-2"],"current_task":"t-2"}
+]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "worktree list --porcelain")
+          echo "worktree /tmp/wt-a"
+          echo "worktree /tmp/wt-b"
+          return 0
+          ;;
+        "-C /tmp/wt-a status --porcelain"|"-C /tmp/wt-b status --porcelain") echo ""; return 0 ;;
+        "-C /tmp/wt-a branch --show-current") echo "feature/a"; return 0 ;;
+        "-C /tmp/wt-b branch --show-current") echo "feature/b"; return 0 ;;
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_list --keywords Roadmap
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "wt-a" ]]
+  [[ ! "$output" =~ "wt-b" ]]
+}

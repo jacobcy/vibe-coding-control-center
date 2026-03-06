@@ -31,7 +31,6 @@ _vibe_task_usage() {
     echo "  --check-branches   检查分支任务注册状态（Phase 2）"
     echo "  --check-openspec   检查 OpenSpec 同步状态（Phase 2）"
     echo "  --check-plans      检查 docs/plans 和 docs/prds 未跟踪文件（Phase 2）"
-    echo "  --check-plans      检查 docs/plans 和 docs/prds 未跟踪文件（Phase 2）"
     echo "  --all              运行所有检查"
 }
 
@@ -46,8 +45,7 @@ _task_audit_usage() {
     echo "  1. 数据质量修复 - 检测并修复 worktrees.json 中的 null branch 字段"
     echo "  2. 任务注册核对 - 检查分支、OpenSpec changes 的任务注册状态"
     echo "  3. Plans & PRDs 检查 - 发现 docs/plans、docs/prds 中的散落任务"
-    echo "  3. Plans & PRDs 检查 - 发现 docs/plans、docs/prds 中的散落任务"
-    echo "  3. Skill 层智能审计 - 语义分析和决策"
+    echo "  4. 汇总报告 - 全量输出健康状态与建议动作"
     echo ""
     echo "选项:"
     echo "  --fix-branches     修复 null branch 字段（Phase 1 MVP）"

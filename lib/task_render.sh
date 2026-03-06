@@ -2,14 +2,14 @@
 # lib/task_render.sh - Task rendering logic
 
 _vibe_task_render() {
-    local worktrees_file="$1" registry_file="$2" show_all="$3" current_task_id="$4"
+    local worktrees_file="$1" registry_file="$2" openspec_tasks_file="$3" show_all="$4" current_task_id="$5"
     echo "${BOLD}==== Vibe Task Registry Overview ====${NC}"
     echo ""
-    jq -r --slurpfile registry "$registry_file" \
+    jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" \
       --arg cur "$current_task_id" --arg show_all "$show_all" \
       --arg BOLD "$BOLD" --arg GREEN "$GREEN" --arg CYAN "$CYAN" --arg NC "$NC" \
       '
-      (($registry[0].tasks // []) as $all_tasks 
+      ((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all_tasks 
       | .worktrees as $wts
       | (
           # 1. Render Worktree Groups
