@@ -429,8 +429,8 @@ _task_check_openspec_sync() {
     fi
     
     # Scan all changes directories (excluding archive)
+    local change_name has_tasks_file total_tasks done_tasks in_registry tasks_file
     while IFS= read -r change_dir; do
-        local change_name has_tasks_file total_tasks done_tasks in_registry
         change_name=$(basename "$change_dir")
         
         # Skip archive directory
@@ -447,7 +447,7 @@ _task_check_openspec_sync() {
         fi
         
         # Get tasks.md data
-        local tasks_file="$change_dir/tasks.md"
+        tasks_file="$change_dir/tasks.md"
         has_tasks_file="false"
         total_tasks=0
         done_tasks=0
