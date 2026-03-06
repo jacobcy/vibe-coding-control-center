@@ -174,7 +174,6 @@ vibe_task_audit() {
     local dry_run=false
     local check_branches=false
     local check_openspec=false
-    local check_prs=false
     local all_checks=false
 
     # Parse arguments
@@ -194,10 +193,6 @@ vibe_task_audit() {
                 ;;
             --check-openspec)
                 check_openspec=true
-                shift
-                ;;
-            --check-prs)
-                check_prs=true
                 shift
                 ;;
             --all)
@@ -274,13 +269,6 @@ vibe_task_audit() {
         echo ""
     fi
 
-    # Phase 3: PR Association Check (future implementation)
-    if [[ "$check_prs" == "true" ]]; then
-        log_step "Phase 3: PR Association Check"
-        log_info "Not yet implemented"
-        echo ""
-    fi
-
 
     # Generate summary report if running comprehensive audit
     if [[ "$all_checks" == "true" ]]; then
@@ -289,7 +277,7 @@ vibe_task_audit() {
 
     # If no specific check was requested, show status
     if [[ "$fix_branches" == "false" && "$check_branches" == "false" && \
-          "$check_openspec" == "false" && "$check_prs" == "false" && \
+          "$check_openspec" == "false" && \
           "$all_checks" == "false" ]]; then
         log_step "Task Registry Audit Status"
         echo ""

@@ -31,7 +31,6 @@ _vibe_task_usage() {
     echo "  --dry-run          预览修复内容而不执行"
     echo "  --check-branches   检查分支任务注册状态（Phase 2）"
     echo "  --check-openspec   检查 OpenSpec 同步状态（Phase 2）"
-    echo "  --check-prs        检查 PR 任务关联（Phase 3）"
     echo "  --all              运行所有检查"
 }
 
@@ -45,14 +44,13 @@ _task_audit_usage() {
     echo "核心功能:"
     echo "  1. 数据质量修复 - 检测并修复 worktrees.json 中的 null branch 字段"
     echo "  2. 任务注册核对 - 检查分支、OpenSpec changes 的任务注册状态"
-    echo "  3. PR 任务检测 - 从已合并 PR 识别未注册的任务"
+    echo "  3. Skill 层智能审计 - 语义分析和决策"
     echo ""
     echo "选项:"
     echo "  --fix-branches     修复 null branch 字段（Phase 1 MVP）"
     echo "  --dry-run          预览修复内容而不实际修改文件"
     echo "  --check-branches   检查分支对应的任务是否已注册"
     echo "  --check-openspec   检查 OpenSpec changes 是否已同步到 registry"
-    echo "  --check-prs        分析已合并 PR 识别完成的任务"
     echo "  --all              运行所有检查阶段"
     echo "  -h, --help         显示此帮助信息"
     echo ""

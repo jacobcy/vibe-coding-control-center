@@ -6,8 +6,8 @@
 - [x] 1.2 在 `lib/task.sh` 中新增 `_task_fix_branches()` 函数 - 自动修复 null branch 字段
 - [x] 1.3 在 `lib/task.sh` 中新增 `_task_check_branch_registration()` 函数 - 检查分支任务注册
 - [x] 1.4 在 `lib/task.sh` 中新增 `_task_check_openspec_sync()` 函数 - 检查 OpenSpec 同步状态
-- [ ] 1.5 在 `lib/task.sh` 中新增 `_task_check_pr_associations()` 函数 - 检查 PR 任务关联
-- [ ] 1.6 在 `lib/task.sh` 中新增 `_task_register_batch()` 函数 - 批量注册任务
+<!-- DELETED: Violates architecture - Shell layer should not do PR analysis -->
+<!-- DELETED: Moved to Skill layer -->
 - [x] 1.7 在 `lib/task.sh` 中集成 `vibe_task_audit()` 主函数，编排三阶段核对
 
 ## 2. Shell 层命令接口
@@ -16,7 +16,7 @@
 - [x] 2.2 实现 `vibe task audit --fix-branches` 参数处理
 - [x] 2.3 实现 `vibe task audit --check-branches` 参数处理
 - [x] 2.4 实现 `vibe task audit --check-openspec` 参数处理
-- [ ] 2.5 实现 `vibe task audit --check-prs` 参数处理
+<!-- DELETED: Violates architecture - Shell layer should not do PR analysis -->
 - [x] 2.6 实现 `vibe task audit --all` 参数处理（运行所有检查）
 - [x] 2.7 实现 `vibe task audit --dry-run` 参数处理（预览模式）
 - [x] 2.8 更新 `lib/task_help.sh` 添加 audit 相关帮助文档
@@ -49,16 +49,16 @@
 - [ ] 5.6 测试分支核对 - 创建未注册分支，运行核对，验证检测
 - [ ] 5.7 测试 OpenSpec 核对 - 创建新 change，运行核对，验证检测
 
-## 6. PR 任务检测 (Phase 3 可选)
+## 6. Skill 层智能审计 (Phase 3)
 
-- [ ] 6.1 实现 PR 查询 - 获取最近 N 个 merged PRs
-- [ ] 6.2 实现分支名提取 - 从 PR 的 headRefName 提取
-- [ ] 6.3 实现 commit message 解析 - 提取任务引用
-- [ ] 6.4 实现 PR description 解析 - 提取任务引用
-- [ ] 6.5 实现置信度评分算法 - 根据匹配质量打分
-- [ ] 6.6 实现多任务 PR 检测 - 一个 PR 识别多个任务
-- [ ] 6.7 实现结果过滤 - 排除低置信度 (< 0.5) 结果
-- [ ] 6.8 测试 PR 检测 - 使用已合并 PR，验证任务识别准确性
+- [ ] 6.1 在 SKILL.md 中实现 Audit 模式入口
+- [ ] 6.2 在 SKILL.md 中调用 Shell 获取 PR 数据 (vibe flow review --json)
+- [ ] 6.3 在 SKILL.md 中分析 PR 语义（调用 Subagent 分析描述、评论、commits）
+- [ ] 6.4 在 SKILL.md 中检查 docs/plans、docs/prds 散落任务
+- [ ] 6.5 在 SKILL.md 中生成智能任务创建/更新建议
+- [ ] 6.6 在 SKILL.md 中实现用户交互（逐个确认 vs 批量确认）
+- [ ] 6.7 在 SKILL.md 中调用 Shell 执行操作 (vibe task add/update)
+- [ ] 6.8 测试 Skill 层审计流程 - 验证完整语义分析和用户交互
 
 ## 7. 批量修复功能
 
