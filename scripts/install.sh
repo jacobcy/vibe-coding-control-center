@@ -91,7 +91,56 @@ fi
 
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center"
 
-# 6. Finalize
+# 6. Direnv Setup (auto-configure if direnv is installed)
+_setup_direnv() {
+    log_step "Setting up direnv..."
+
+    # Check if direnv is installed
+    if ! command -v direnv &> /dev/null; then
+        log_info "direnv not installed, skipping auto-venv setup"
+        return 0
+    fi
+
+    # Add direnv hook to RC file
+    local direnv_hook='eval "$(direnv hook zsh)"'
+    if ! grep -qF 'direnv hook zsh' "$RC_FILE" 2>/dev/null; then
+        _append_to_rc "$RC_FILE" "$direnv_hook" "direnv"
+        log_info "Added direnv hook to $RC_FILE"
+    else
+        log_info "direnv hook already present in $RC_FILE"
+    fi
+
+    # Create global venv if not exists
+    local venv_path="$HOME/.venvs/vibe-center"
+    if [[ ! -d "$venv_path" ]]; then
+        log_info "Creating global venv at $venv_path..."
+        mkdir -p "$HOME/.venvs"
+        uv venv "$venv_path"
+    else
+        log_info "Global venv already exists at $venv_path"
+    fi
+
+    # Create .envrc in source root if not exists
+    local envrc_path="$SOURCE_ROOT/.envrc"
+    if [[ ! -f "$envrc_path" ]]; then
+        log_info "Creating $envrc_path..."
+        echo "source $venv_path/bin/activate" > "$envrc_path"
+    else
+        log_info ".envrc already exists at $envrc_path"
+    fi
+
+    # Allow direnv (in source root)
+    log_info "Running direnv allow..."
+    cd "$SOURCE_ROOT"
+    direnv allow 2>/dev/null || log_warn "direnv allow failed (may need manual approval)"
+
+    log_success "direnv setup complete!"
+}
+
+# Auto-run direnv setup if direnv is installed
+_setup_direnv
+
+# 7. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
 log_success "Installation complete!"
 
