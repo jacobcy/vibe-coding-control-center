@@ -11,7 +11,6 @@ _vibe_task_usage() {
     echo "  ${GREEN}add${NC} <title> [--id <id>]      注册新任务记录"
     echo "  ${GREEN}update${NC} <task-id> [options]  更新任务状态、详情或绑定"
     echo "  ${GREEN}remove${NC} <task-id>          从注册表中安全移除任务"
-    echo "  ${GREEN}sync${NC}                       同步 OpenSpec 任务至 Registry"
     echo "  ${GREEN}audit${NC} [options]            核对任务注册完整性和数据质量"
     echo ""
     echo "Options for 'list':"
@@ -31,6 +30,8 @@ _vibe_task_usage() {
     echo "  --dry-run          预览修复内容而不执行"
     echo "  --check-branches   检查分支任务注册状态（Phase 2）"
     echo "  --check-openspec   检查 OpenSpec 同步状态（Phase 2）"
+    echo "  --check-plans      检查 docs/plans 和 docs/prds 未跟踪文件（Phase 2）"
+    echo "  --check-plans      检查 docs/plans 和 docs/prds 未跟踪文件（Phase 2）"
     echo "  --all              运行所有检查"
 }
 
@@ -44,6 +45,8 @@ _task_audit_usage() {
     echo "核心功能:"
     echo "  1. 数据质量修复 - 检测并修复 worktrees.json 中的 null branch 字段"
     echo "  2. 任务注册核对 - 检查分支、OpenSpec changes 的任务注册状态"
+    echo "  3. Plans & PRDs 检查 - 发现 docs/plans、docs/prds 中的散落任务"
+    echo "  3. Plans & PRDs 检查 - 发现 docs/plans、docs/prds 中的散落任务"
     echo "  3. Skill 层智能审计 - 语义分析和决策"
     echo ""
     echo "选项:"

@@ -174,6 +174,7 @@ vibe_task_audit() {
     local dry_run=false
     local check_branches=false
     local check_openspec=false
+    local check_plans=false
     local all_checks=false
 
     # Parse arguments
@@ -193,6 +194,10 @@ vibe_task_audit() {
                 ;;
             --check-openspec)
                 check_openspec=true
+                shift
+                ;;
+            --check-plans)
+                check_plans=true
                 shift
                 ;;
             --all)
@@ -253,22 +258,64 @@ vibe_task_audit() {
     if [[ "$check_openspec" == "true" ]] || [[ "$all_checks" == "true" ]]; then
         log_step "Phase 2: OpenSpec Sync Check"
         local -a unsynced_changes
+        local -a all_changes_data
+        
+        # Read all changes data
         while IFS= read -r line; do
-            unsynced_changes+=("$line")
+            all_changes_data+=("$line")
+            # Parse line: name|has_tasks|total|done|in_registry
+            local in_registry
+            in_registry=$(echo "$line" | cut -d'|' -f5)
+            if [[ "$in_registry" == "false" ]]; then
+                unsynced_changes+=("$line")
+            fi
         done < <(_task_check_openspec_sync "$common_dir")
         
         if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
             log_success "All OpenSpec changes are synced"
         else
             log_warn "Found ${#unsynced_changes[@]} unsynced OpenSpec changes:"
-            for change in "${unsynced_changes[@]}"; do
-                echo "  - $change"
+            for entry in "${unsynced_changes[@]}"; do
+                local name has_tasks total done
+                name=$(echo "$entry" | cut -d'|' -f1)
+                has_tasks=$(echo "$entry" | cut -d'|' -f2)
+                total=$(echo "$entry" | cut -d'|' -f3)
+                done=$(echo "$entry" | cut -d'|' -f4)
+                
+                if [[ "$has_tasks" == "true" && "$total" -gt 0 ]]; then
+                    echo "  - $name (tasks: $done/$total completed)"
+                else
+                    echo "  - $name (no tasks.md)"
+                fi
             done
-            log_info "Run 'vibe task sync' to sync OpenSpec changes to registry"
+            log_info "Consider registering these OpenSpec changes as tasks"
         fi
         echo ""
     fi
 
+
+    # Phase 2: Plans & PRDs Check
+    if [[ "$check_plans" == "true" ]] || [[ "$all_checks" == "true" ]]; then
+        log_step "Phase 2: Plans & PRDs Check"
+        local -a untracked_files
+        while IFS= read -r line; do
+            untracked_files+=("$line")
+        done < <(_task_check_plans_prds "$common_dir")
+        
+        if [[ ${#untracked_files[@]} -eq 0 ]]; then
+            log_success "All plans and PRDs are tracked"
+        else
+            log_warn "Found ${#untracked_files[@]} untracked files:"
+            for entry in "${untracked_files[@]}"; do
+                local type file
+                type=$(echo "$entry" | cut -d'|' -f1)
+                file=$(echo "$entry" | cut -d'|' -f2)
+                echo "  - [$type] $file"
+            done
+            log_info "Consider converting these files to standard task format"
+        fi
+        echo ""
+    fi
 
     # Generate summary report if running comprehensive audit
     if [[ "$all_checks" == "true" ]]; then
@@ -277,7 +324,7 @@ vibe_task_audit() {
 
     # If no specific check was requested, show status
     if [[ "$fix_branches" == "false" && "$check_branches" == "false" && \
-          "$check_openspec" == "false" && \
+          "$check_openspec" == "false" && "$check_plans" == "false" && \
           "$all_checks" == "false" ]]; then
         log_step "Task Registry Audit Status"
         echo ""
@@ -383,7 +430,7 @@ _task_check_openspec_sync() {
     
     # Scan all changes directories (excluding archive)
     while IFS= read -r change_dir; do
-        local change_name
+        local change_name has_tasks_file total_tasks done_tasks in_registry
         change_name=$(basename "$change_dir")
         
         # Skip archive directory
@@ -392,21 +439,32 @@ _task_check_openspec_sync() {
         fi
         
         # Check if change is registered
-        if ! jq -e --arg change "$change_name" \
+        in_registry="false"
+        if jq -e --arg change "$change_name" \
             '.tasks[]? | select(.task_id == $change or .slug == $change or (.openspec_change == $change))' \
             "$registry_file" >/dev/null 2>&1; then
+            in_registry="true"
+        fi
+        
+        # Get tasks.md data
+        local tasks_file="$change_dir/tasks.md"
+        has_tasks_file="false"
+        total_tasks=0
+        done_tasks=0
+        
+        if [[ -f "$tasks_file" ]]; then
+            has_tasks_file="true"
+            total_tasks=$(grep -E '^- \[( |x|X)\]' "$tasks_file" 2>/dev/null | wc -l | tr -d ' ')
+            done_tasks=$(grep -E '^- \[[xX]\]' "$tasks_file" 2>/dev/null | wc -l | tr -d ' ')
+        fi
+        
+        # Output: name|has_tasks|total|done|in_registry
+        echo "$change_name|$has_tasks_file|$total_tasks|$done_tasks|$in_registry"
+        
+        if [[ "$in_registry" == "false" ]]; then
             unsynced_changes+=("$change_name")
         fi
     done < <(find "$openspec_changes_dir" -maxdepth 1 -type d ! -path "$openspec_changes_dir")
-    
-    # Output results
-    if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
-        return 0
-    fi
-    
-    for change in "${unsynced_changes[@]}"; do
-        echo "$change"
-    done
     
     return ${#unsynced_changes[@]}
 }
@@ -464,18 +522,34 @@ _task_generate_audit_summary() {
     # Sync Issues
     log_info "=== OpenSpec Sync Issues ==="
     local -a unsynced_changes
+    local -a all_changes_data
     while IFS= read -r line; do
-        unsynced_changes+=("$line")
+        all_changes_data+=("$line")
+        local in_registry
+        in_registry=$(echo "$line" | cut -d'|' -f5)
+        if [[ "$in_registry" == "false" ]]; then
+            unsynced_changes+=("$line")
+        fi
     done < <(_task_check_openspec_sync "$common_dir")
     
     if [[ ${#unsynced_changes[@]} -eq 0 ]]; then
         log_success "✓ All OpenSpec changes are synced"
     else
         log_warn "✗ ${#unsynced_changes[@]} unsynced OpenSpec changes found"
-        for change in "${unsynced_changes[@]}"; do
-            echo "    - $change"
+        for entry in "${unsynced_changes[@]}"; do
+            local name has_tasks total done
+            name=$(echo "$entry" | cut -d'|' -f1)
+            has_tasks=$(echo "$entry" | cut -d'|' -f2)
+            total=$(echo "$entry" | cut -d'|' -f3)
+            done=$(echo "$entry" | cut -d'|' -f4)
+            
+            if [[ "$has_tasks" == "true" && "$total" -gt 0 ]]; then
+                echo "    - $name (tasks: $done/$total completed)"
+            else
+                echo "    - $name"
+            fi
         done
-        log_info "  Repair: vibe task sync"
+        log_info "  Action: Register these OpenSpec changes as tasks"
         sync_issues+=("unsynced_changes")
     fi
     echo ""
@@ -493,7 +567,55 @@ _task_generate_audit_summary() {
         log_info "Next Steps:"
         [[ ${#data_quality_issues[@]} -gt 0 ]] && echo "  1. Fix data quality: vibe task audit --fix-branches"
         [[ ${#registration_issues[@]} -gt 0 ]] && echo "  2. Review unregistered tasks and register as needed"
-        [[ ${#sync_issues[@]} -gt 0 ]] && echo "  3. Sync OpenSpec changes: vibe task sync"
+        [[ ${#sync_issues[@]} -gt 0 ]] && echo "  3. Register OpenSpec changes as tasks"
         return 1
     fi
+}
+
+# Helper: Check plans and PRDs for untracked files
+_task_check_plans_prds() {
+    local common_dir="$1"
+    local registry_file="$common_dir/vibe/registry.json"
+    local -a untracked_files
+    
+    # Check docs/plans
+    if [[ -d "docs/plans" ]]; then
+        while IFS= read -r file; do
+            local file_name
+            file_name=$(basename "$file" .md)
+            
+            # Check if file is already in registry (by task_id, slug, or source_path)
+            if ! jq -e --arg name "$file_name" \
+                '.tasks[]? | select(.task_id == $name or .slug == $name or (.source_path | test($name)))' \
+                "$registry_file" >/dev/null 2>&1; then
+                untracked_files+=("plans|$file")
+            fi
+        done < <(find docs/plans -name "*.md" -type f 2>/dev/null)
+    fi
+    
+    # Check docs/prds
+    if [[ -d "docs/prds" ]]; then
+        while IFS= read -r file; do
+            local file_name
+            file_name=$(basename "$file" .md)
+            
+            # Check if file is already in registry
+            if ! jq -e --arg name "$file_name" \
+                '.tasks[]? | select(.task_id == $name or .slug == $name or (.source_path | test($name)))' \
+                "$registry_file" >/dev/null 2>&1; then
+                untracked_files+=("prds|$file")
+            fi
+        done < <(find docs/prds -name "*.md" -type f 2>/dev/null)
+    fi
+    
+    # Output results
+    if [[ ${#untracked_files[@]} -eq 0 ]]; then
+        return 0
+    fi
+    
+    for entry in "${untracked_files[@]}"; do
+        echo "$entry"
+    done
+    
+    return ${#untracked_files[@]}
 }

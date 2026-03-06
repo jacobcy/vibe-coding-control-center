@@ -121,31 +121,3 @@ _vibe_task_remove() {
     jq --arg task_id "$task_id" '.tasks |= map(select(.task_id != $task_id))' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file" || return 1
     rm -f "$task_file"; rmdir "$(dirname "$task_file")" 2>/dev/null || true; log_success "Task $task_id removed from registry."
 }
-_vibe_task_sync() {
-    local common_dir registry_file repo_root openspec_tasks_file task_json
-    vibe_require git jq || return 1
-    common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"
-    _vibe_task_require_file "$registry_file" "registry.json" || return 1; repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-    openspec_tasks_file="$(mktemp)" || return 1; _vibe_task_collect_openspec_tasks "$repo_root" > "$openspec_tasks_file"
-    local tasks_list; tasks_list=$(jq -c '.tasks[]?' "$openspec_tasks_file" 2>/dev/null)
-    if [[ -n "$tasks_list" ]]; then
-        while read -r task_json; do
-            [[ -n "$task_json" ]] || continue; local tid; tid=$(echo "$task_json" | jq -r '.task_id // empty'); [[ -n "$tid" ]] || continue
-            local title; title=$(echo "$task_json" | jq -r '.title // "OpenSpec Task"')
-            local t_status; t_status=$(echo "$task_json" | jq -r '.status // "todo"')
-            local next; next=$(echo "$task_json" | jq -r '.next_step // ""')
-            if ! jq -e --arg tid "$tid" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1; then
-                local tmp_add; tmp_add="$(mktemp)"
-                jq --arg tid "$tid" --arg title "$title" --arg status "$t_status" --arg next "$next" --arg now "$now" \
-                   '.tasks += [{task_id:$tid, title:$title, status:$status, next_step:$next, updated_at:$now}]' \
-                   "$registry_file" > "$tmp_add" && mv "$tmp_add" "$registry_file"
-            fi
-            log_step "Syncing OpenSpec task: $tid"; _vibe_task_update "$tid" --status "$t_status" --next-step "$next" >/dev/null
-            local tmp; tmp="$(mktemp)"
-            jq --arg tid "$tid" --arg title "$title" --arg src "openspec/changes/$tid" \
-               '.tasks |= map(if .task_id == $tid then .title = $title | .framework = "openspec" | .source_path = $src else . end)' \
-               "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
-        done <<< "$tasks_list"
-    fi
-    rm -f "$openspec_tasks_file"; log_success "OpenSpec tasks synced to registry."
-}
