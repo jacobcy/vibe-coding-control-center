@@ -143,6 +143,8 @@ Recommendation
 
 根据用户需求选择核对范围：
 
+### 1.1 数据质量和注册核对
+
 ```bash
 # 完整核对（所有维度）
 bin/vibe task audit --all
@@ -161,6 +163,32 @@ bin/vibe task audit --check-plans
 ```
 
 **目标:** 获取各维度的核对结果（纯数据，不含判断）
+
+### 1.2 获取 PR 数据（用于语义分析）
+
+如果有 PR 相关的分支或工作流，获取 PR 上下文：
+
+```bash
+# 获取当前分支的 PR 信息
+bin/vibe flow review --json
+
+# 获取指定 PR 的信息
+bin/vibe flow review --json <pr-number>
+
+# 获取指定分支的 PR 信息
+bin/vibe flow review --json <branch-name>
+```
+
+**返回的 PR 数据包括:**
+- PR 编号、标题、描述
+- 评论和审查意见
+- Commits 列表
+- 状态信息（open/merged）
+- 分支信息
+
+**处理失败情况:**
+- 如果没有 PR，记录"无 PR 数据"，跳过 PR 语义分析
+- 如果 `gh` 不可用，记录"GitHub CLI 不可用"，跳过 PR 分析
 
 ## Step 2: 解析核对结果
 
@@ -220,9 +248,136 @@ bin/vibe task audit --check-plans
 - `clean`: 所有文档都已关联任务
 - `warning`: 存在散落的计划/PRD 文档
 
+## Step 2.5: PR 语义分析（AI 智能审计）
+
+**这是 Skill 层的核心价值** - 利用 AI 能力理解 PR 内容，识别已完成的任务。
+
+### 2.5.1 分析 PR 描述
+
+从 PR 的 `body` 字段中提取：
+
+**任务引用模式识别:**
+- "完成 #task-id" 或 "完成了 #task-id"
+- "实现 #task-id" 或 "实现 feature-name"
+- "修复 #task-id" 或 "修复 bug-name"
+- "Closes #task-id" / "Fixes #task-id" / "Resolves #task-id"
+
+**自然语言任务描述:**
+- "This PR implements user authentication" → 可能是一个新任务
+- "添加了支付功能" → 可能是一个新任务
+- "重构了数据库层" → 可能是一个新任务或子任务
+
+**多任务识别:**
+- 一个 PR 可能提到多个完成的任务
+- 列表项（"- 完成登录功能\n- 完成注册功能"）
+- 章节标题（"## Features\n- Feature A\n- Feature B"）
+
+### 2.5.2 分析 PR Comments 和 Reviews
+
+**从评论中提取:**
+- 审查者提到的任务："This completes the auth feature"
+- 用户确认："Yes, this implements #task-123"
+- 讨论中的任务引用
+
+**置信度判断:**
+- 明确引用 task-id → 高置信度
+- 自然语言描述 → 中置信度（需要用户确认）
+- 模糊提及 → 低置信度（仅作为提示）
+
+### 2.5.3 分析 PR Commits
+
+**从 commit messages 中提取:**
+- "feat: implement user login (#123)" → 任务 #123
+- "fix(auth): resolve token expiry issue" → 可能是修复任务
+- "refactor(db): optimize queries" → 可能是重构任务
+
+**统计信息:**
+- Commits 数量
+- 修改的文件数
+- 代码变更量（additions/deletions）
+
+### 2.5.4 生成任务候选列表
+
+基于 PR 分析，生成：
+
+```json
+{
+  "pr_number": 123,
+  "pr_title": "Implement user authentication",
+  "identified_tasks": [
+    {
+      "type": "referenced",
+      "task_id": "2026-03-01-user-auth",
+      "confidence": "high",
+      "source": "pr_description",
+      "evidence": "PR description says 'Completes #2026-03-01-user-auth'"
+    },
+    {
+      "type": "inferred",
+      "title": "Add password reset functionality",
+      "confidence": "medium",
+      "source": "commit_message",
+      "evidence": "Commit: 'feat: add password reset'",
+      "suggested_action": "create_new_task"
+    }
+  ]
+}
+```
+
+**置信度分级:**
+- **High**: 明确引用 task-id，可直接关联
+- **Medium**: 自然语言描述，需要用户确认
+- **Low**: 模糊提及，仅供参考
+
+## Step 3: 扫描文档中的散落任务（增强版）
+
+除了 Shell 层的 `--check-plans`，Skill 层做深度语义扫描：
+
+### 3.1 扫描 docs/plans/*.md
+
+**识别任务模式:**
+- 标题中的任务描述："# User Authentication System"
+- TODO 列表："- [ ] Implement login"
+- 日期模式："2026-03-01: Start auth implementation"
+- 状态标记："[WIP]", "[DONE]", "[BLOCKED]"
+
+### 3.2 扫描 docs/prds/*.md
+
+**识别 PRD 中的任务:**
+- 功能需求章节
+- 里程碑定义
+- 验收标准
+
+### 3.3 扫描 docs/archives/*.md
+
+**识别已归档但可能未注册的任务:**
+- 旧的计划文档
+- 历史功能说明
+
+### 3.4 生成任务候选列表
+
+```json
+{
+  "scanned_files": [
+    {
+      "path": "docs/plans/api-redesign.md",
+      "identified_tasks": [
+        {
+          "title": "API Redesign",
+          "type": "plan",
+          "confidence": "medium",
+          "evidence": "Document title and TODO list found",
+          "suggested_task_id": "2026-03-07-api-redesign"
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## Step 3: 生成修复建议
 
-基于核对结果，生成智能修复建议。
+基于核对结果（Shell 层数据 + AI 语义分析），生成智能修复建议。
 
 ### 3.1 数据质量问题
 
@@ -250,7 +405,30 @@ Worktree: .agent/worktrees/wt-codex-roadmap-skill
 您的选择?
 ```
 
-### 3.3 未同步 OpenSpec Changes
+### 3.3 PR 识别的任务（AI 智能分析）
+
+对于 PR 语义分析识别出的任务：
+
+```
+🎯 PR #123 识别出的任务
+
+PR 标题: Implement user authentication
+置信度: 高
+
+识别依据:
+- PR 描述明确提到 "完成 #2026-03-01-user-auth"
+- Commit message: "feat(auth): implement login flow"
+- 审查者确认: "LGTM for auth feature"
+
+建议操作:
+  1. 关联到现有任务 #2026-03-01-user-auth
+  2. 创建新任务: vibe task add "User Authentication" --from-pr 123
+  3. 忽略（任务已存在或不需要跟踪）
+
+您的选择?
+```
+
+### 3.4 未同步 OpenSpec Changes
 
 对于每个未同步的 change，生成建议：
 
@@ -269,12 +447,35 @@ Tasks.md: ✅ 存在 (12/28 任务已完成)
 您的选择?
 ```
 
-### 3.4 散落的 Plans/PRDs
+### 3.5 文档中识别的任务（AI 扫描）
+
+对于从 docs/ 扫描出的任务：
+
+```
+📄 文档中识别的任务
+
+来源: docs/plans/api-redesign.md
+置信度: 中
+
+识别依据:
+- 文档标题: "API Redesign Plan"
+- 包含 TODO 列表: 5 项待办事项
+- 创建时间: 2026-03-05
+
+建议操作:
+  1. 创建新任务: vibe task add "API Redesign" --source-path docs/plans/api-redesign.md
+  2. 忽略（这是参考文档，不需要任务跟踪）
+  3. 移动到其他目录
+
+您的选择?
+```
+
+### 3.6 散落的 Plans/PRDs
 
 ```
 📄 散落的计划文档
 
-docs/plans/api-redesign.md - 未关联任何任务
+docs/plans/2026-03-02-vibe-new-task-flow-convergence.md - 未关联任何任务
 docs/prds/performance-optimization.md - 未关联任何任务
 
 建议操作:
@@ -287,42 +488,141 @@ docs/prds/performance-optimization.md - 未关联任何任务
 
 ## Step 4: 用户交互流程
 
-提供两种修复模式：
+提供三种修复模式，根据问题数量和用户偏好选择。
 
 ### 模式选择
 
 ```
 检测到以下问题:
-- N 个未注册分支
-- M 个未同步 OpenSpec changes
-- K 个散落文档
+- N 个数据质量问题（已自动修复）
+- M 个未注册分支
+- P 个 PR 识别的任务
+- O 个未同步 OpenSpec changes
+- D 个散落文档
 
 请选择修复模式:
-1. 批量修复（自动处理所有问题）
+1. 批量修复（自动处理所有高置信度问题）
 2. 逐个确认（每个问题单独询问）
 3. 仅查看（不执行修复）
 ```
 
 ### 批量修复模式
 
-1. 显示所有将要执行的操作
-2. 请求一次性确认
-3. 按顺序执行所有操作
+**适用场景:** 问题数量多，大部分是高置信度的
+
+**流程:**
+1. 显示所有将要执行的操作（按置信度排序）
+2. 请求一次性确认："将执行 X 个操作，是否继续？"
+3. 按优先级顺序执行：
+   - 数据质量修复（自动）
+   - 高置信度任务注册（PR 明确引用、分支名匹配）
+   - 中置信度任务注册（PR 模糊匹配、文档扫描）
+   - 低置信度任务注册（仅供参考）
 4. 输出执行结果摘要
+
+**示例:**
+```
+即将执行以下操作:
+✅ 高置信度 (12 项):
+  - 关联 PR #123 到任务 #2026-03-01-user-auth
+  - 注册分支 2026-03-05-doc-update 为新任务
+  ...
+
+⚠️  中置信度 (3 项):
+  - 从 docs/plans/api-redesign.md 创建新任务
+  - 从 PR #124 描述推断任务
+  ...
+
+❓ 低置信度 (1 项):
+  - docs/prds/performance.md 可能包含任务（需人工确认）
+
+是否继续？[Y/n]
+```
 
 ### 逐个确认模式
 
+**适用场景:** 问题数量少，或需要精细控制
+
+**流程:**
 1. 对每个问题单独询问用户
-2. 提供多个选项（创建新任务/关联现有任务/忽略）
-3. 如果选择关联现有任务，提供任务列表供选择
+2. 提供多个选项：
+   - **创建新任务**: 自动生成任务 ID 和标题
+   - **关联现有任务**: 从任务列表中选择
+   - **忽略**: 跳过此项，不记录
+   - **稍后处理**: 保存到待处理列表
+3. 如果选择关联现有任务，调用 `vibe task list` 显示任务列表供选择
 4. 立即执行用户选择的操作
 5. 继续下一个问题
 
+**示例交互:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+问题 1/15: PR #123 识别的任务
+
+PR 标题: Implement user authentication
+置信度: 高
+
+识别依据:
+- PR 描述: "完成 #2026-03-01-user-auth"
+- Commit: "feat(auth): implement login"
+
+建议:
+  1. 关联到任务 #2026-03-01-user-auth [推荐]
+  2. 创建新任务
+  3. 忽略
+  4. 稍后处理
+
+您的选择 [1-4]: 1
+
+✅ 已关联 PR #123 到任务 #2026-03-01-user-auth
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
 ### 仅查看模式
 
-1. 显示所有问题和建议
-2. 不执行任何操作
-3. 提示用户可以手动执行修复命令
+**适用场景:** 先了解问题全貌，不立即修复
+
+**流程:**
+1. 显示所有问题和建议（按类型分组）
+2. 显示置信度分布
+3. 显示潜在的操作命令
+4. 不执行任何操作
+5. 提示用户可以手动执行命令
+
+**示例输出:**
+```
+🔍 任务注册核对报告
+
+━━━━━━ 数据质量 ━━━━━━
+✅ 3 个 null branch 字段可修复
+   修复命令: vibe task audit --fix-branches
+
+━━━━━━ 未注册分支 ━━━━━━
+⚠️  2 个未注册分支:
+   - 2026-03-07-audit-feature
+     注册命令: vibe task add "Audit Feature" --branch 2026-03-07-audit-feature
+   - temp-experiment
+     建议: 忽略（非任务分支）
+
+━━━━━━ PR 识别任务 ━━━━━━
+🎯 3 个 PR 可能完成任务:
+   - PR #123 (高置信度): 完成 #2026-03-01-user-auth
+     关联命令: vibe task update 2026-03-01-user-auth --pr 123
+   - PR #124 (中置信度): 实现了登录功能
+     建议创建: vibe task add "Login Feature" --from-pr 124
+
+━━━━━━ 置信度分布 ━━━━━━
+✅ 高置信度: 8 项（建议自动处理）
+⚠️  中置信度: 4 项（建议人工确认）
+❓ 低置信度: 2 项（仅供参考）
+
+━━━━━━ 建议操作 ━━━━━━
+1. 先修复数据质量: vibe task audit --fix-branches
+2. 批量注册高置信度任务（手动执行上述命令）
+3. 逐个确认中置信度任务
+
+总耗时估计: 5-10 分钟
+```
 
 ## Step 5: 执行修复操作
 
@@ -358,29 +658,119 @@ bin/vibe task audit --all
 
 ## Step 6: 输出修复报告
 
-生成修复结果摘要：
+生成详细的修复结果摘要，包括数据来源统计。
+
+### 修复报告模板
 
 ```
 🎯 任务注册核对完成
 
-数据质量:
-- ✅ 修复了 3 个 null branch 字段
+━━━━━━ 执行摘要 ━━━━━━
+处理时间: 2026-03-07 14:32:15
+总问题数: 15
+已修复: 12
+需人工确认: 2
+已忽略: 1
 
-分支核对:
-- ✅ 注册了 2 个新任务
-  - 2026-03-07-task-registry-audit
-  - 2026-03-05-doc-update
+━━━━━━ 数据质量 ━━━━━━
+✅ 修复了 3 个 null branch 字段
+   - wt-feature-a: null → feature/2026-03-01-auth
+   - wt-bugfix-b: null → codex/2026-03-05-fix-token
+   - wt-docs-c: null → 2026-03-06-docs
+   备份: worktrees.json.backup
 
-OpenSpec 核对:
-- ✅ 同步了 1 个 change
-  - task-registry-audit-repair (12/28 完成)
+━━━━━━ 分支核对 ━━━━━━
+✅ 注册了 2 个新任务
+   - 2026-03-07-audit-feature (来自分支名)
+   - 2026-03-05-performance (来自分支名)
 
-Plans/PRDs 核对:
-- ⚠️ 2 个文档未处理（用户选择忽略）
+━━━━━━ PR 智能识别 ━━━━━━
+✅ 关联了 3 个 PR 到任务
+   - PR #123 → #2026-03-01-user-auth (置信度: 高)
+   - PR #124 → #2026-03-02-login-ui (置信度: 高)
+   - PR #125 → #2026-03-03-api (置信度: 中)
 
-总体健康度: 良好（8/10）
-建议: 定期运行 vibe task audit 保持数据质量
+🎯 新发现 1 个任务（来自 PR #126）
+   - 2026-03-07-bugfix-token (置信度: 中)
+   来源: PR 描述 "修复 token 过期问题"
+
+━━━━━━ OpenSpec 核对 ━━━━━━
+✅ 同步了 1 个 change
+   - task-registry-audit-repair (12/28 完成)
+
+⚠️  1 个 change 待处理
+   - api-redesign (0/5 完成)
+   建议: 等待 OpenSpec 任务完成后再注册
+
+━━━━━━ 文档扫描 ━━━━━━
+✅ 从文档创建了 1 个任务
+   - docs/plans/performance-optimization.md → #2026-03-07-perf
+
+⚠️  2 个文档未处理（用户选择忽略）
+   - docs/prds/api-v2.md (参考文档)
+   - docs/plans/archived/old-feature.md (已归档)
+
+━━━━━━ 置信度分布 ━━━━━━
+✅ 高置信度: 9 项 (100% 准确)
+   - PR 明确引用: 3
+   - 分支名匹配: 2
+   - 数据质量: 3
+   - OpenSpec 同步: 1
+
+⚠️  中置信度: 4 项 (需验证)
+   - PR 模糊匹配: 2
+   - 文档扫描: 2
+
+❓ 低置信度: 2 项 (仅供参考)
+   - 文档推测: 2
+
+━━━━━━ 任务来源统计 ━━━━━━
+Shell 层确定性核对: 5 个任务
+AI 层 PR 语义分析: 4 个任务
+AI 层文档扫描: 1 个任务
+用户手动创建: 2 个任务
+
+━━━━━━ 总体健康度 ━━━━━━
+健康度评分: 8.5/10
+评级: 良好 ✨
+
+✅ 优点:
+   - 所有活跃分支已注册
+   - PR 关联度高 (92%)
+   - 数据质量良好
+
+⚠️  改进建议:
+   - 2 个中置信度任务需人工验证
+   - docs/prds/ 目录建议整理
+   - 定期运行 vibe task audit 保持数据质量
+
+━━━━━━ 下次建议 ━━━━━━
+建议每周运行一次: vibe task audit --all
+或集成到 CI/CD: vibe task audit --check-branches --check-openspec
 ```
+
+### 报告字段说明
+
+**健康度评分计算:**
+- 基础分: 10.0
+- 数据质量问题: -1.0/个
+- 未注册分支: -0.5/个
+- 未同步 change: -0.3/个
+- 低置信度任务: -0.1/个
+
+**评级标准:**
+- 9.0-10.0: 优秀 ✨
+- 7.0-8.9: 良好 ✅
+- 5.0-6.9: 一般 ⚠️
+- < 5.0: 需改进 ❌
+
+**任务来源追踪:**
+每个任务记录其来源:
+- `shell_deterministic`: Shell 层确定性核对
+- `ai_pr_analysis`: AI 分析 PR 语义
+- `ai_doc_scan`: AI 扫描文档
+- `manual`: 用户手动创建
+- `openspec_sync`: OpenSpec 同步
 
 ## Failure Handling
 
