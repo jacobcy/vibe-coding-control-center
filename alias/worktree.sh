@@ -267,8 +267,11 @@ vup() {
   # Resolve target to directory path using _wt_find
   local dir_path
   if [[ -z "$target" ]]; then
-    # No argument: use current directory
-    dir_path="$(pwd)"
+    # No argument: use current git worktree root
+    dir_path="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+      vibe_die "Not in a git worktree"
+      return 1
+    }
     target="${dir_path##*/}"
   else
     # Use _wt_find to locate worktree (supports exact/suffix/substring match)
@@ -296,10 +299,14 @@ vup() {
       fi
     else
       vibe_die "Worktree not found: $target (checked wtls)"
+      return 1
     fi
   fi
 
-  [[ -d "$dir_path" ]] || vibe_die "Not found: $dir_path"
+  [[ -d "$dir_path" ]] || {
+    vibe_die "Not found: $dir_path"
+    return 1
+  }
 
   # Session name = worktree name (e.g., main, wt-claude-fix)
   local session_name="$target"

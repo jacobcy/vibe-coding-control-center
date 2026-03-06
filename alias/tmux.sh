@@ -126,6 +126,7 @@ vt() {
         [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[$choice]}" || tmux attach -t "${matches[$choice]}"
       else
         echo "❌ Invalid choice"
+        return 1
       fi
       ;;
   esac
