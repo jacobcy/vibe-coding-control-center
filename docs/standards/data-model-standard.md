@@ -17,20 +17,25 @@ related_docs:
   - STRUCTURE.md
   - docs/README.md
   - docs/standards/command-standard.md
+  - docs/standards/registry-json-standard.md
+  - docs/standards/roadmap-json-standard.md
 ---
 
 # 共享数据模型标准
 
-本文档是 Vibe 共享状态数据模型的唯一规范真源，定义 `roadmap.json`、`tasks.json`、`worktrees.json` 的职责边界、命名规则、关系约束和生命周期规则。
+本文档是 Vibe 共享状态数据模型的高层规范真源，定义 `roadmap.json`、`registry.json`、`worktrees.json` 的职责边界、命名规则、关系约束和生命周期规则。
 
-本文档只定义最终标准，不记录讨论过程、迁移步骤或实现现状。
+本文档只定义最终标准，不记录讨论过程、迁移步骤或实现现状。文件级精确 schema 见：
+
+- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
 ## 1. Scope
 
 本文档只覆盖三类共享状态文件：
 
 - `roadmap.json`
-- `tasks.json`
+- `registry.json`
 - `worktrees.json`
 
 命令语义由 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 定义；本文只负责数据模型本身。
@@ -55,9 +60,9 @@ related_docs:
 - PR 历史
 - 本地 `epic` / `milestone` 派生模型
 
-### 2.2 `tasks.json`
+### 2.2 `registry.json`
 
-`tasks.json` 是执行态真源，只负责：
+`registry.json` 是执行态真源，只负责：
 
 - task 生命周期
 - task 与 roadmap item / issue / PR 的关联
@@ -65,7 +70,7 @@ related_docs:
 - task 当前 runtime 绑定事实
 - task 最终归档事实
 
-`tasks.json` 不负责：
+`registry.json` 不负责：
 
 - 规划优先级
 - 现场创建与销毁
@@ -94,7 +99,7 @@ related_docs:
 三层共享状态固定映射如下：
 
 - `roadmap.json` = 规划态
-- `tasks.json` = 执行态
+- `registry.json` = 执行态
 - `worktrees.json` = 现场态
 
 补充约束：
@@ -188,7 +193,7 @@ related_docs:
 ### 7.1 Runtime Binding
 
 - 当前执行中的现场绑定以 `worktrees.json` 为准
-- `tasks.json` 可以保存当前 runtime 绑定事实
+- `registry.json` 可以保存当前 runtime 绑定事实
 - task 完成后必须清空 runtime `branch` / `worktree` / `agent` 绑定
 - task 归档后必须清空 runtime `branch` / `worktree` / `agent` 绑定
 - worktree 删除后必须从 `worktrees.json` 移除
@@ -196,8 +201,8 @@ related_docs:
 ### 7.2 Historical Facts
 
 - 未来规划态以 `roadmap.json` 为准
-- 当前执行态以 `tasks.json` 与 `worktrees.json` 联合表达
-- 历史完成态以 `tasks.json` 的完成与归档事实为准
+- 当前执行态以 `registry.json` 与 `worktrees.json` 联合表达
+- 历史完成态以 `registry.json` 的完成与归档事实为准
 
 ### 7.3 Computed Fields
 
@@ -220,10 +225,9 @@ related_docs:
 禁止：
 
 - 用 `roadmap.json` 记录现场信息
-- 用 `tasks.json` 记录规划优先级
+- 用 `registry.json` 记录规划优先级
 - 用 `worktrees.json` 承担历史归档
 - 将 `openspec` 写成 roadmap provider
 - 将 `feature` 写成共享模型字段
 - 将 `dirty` 写成持久化真源字段
 - 将 branch 或 worktree 当作历史唯一索引
-
