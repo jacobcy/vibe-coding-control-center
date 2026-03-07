@@ -3,13 +3,12 @@
 
 _task_extract_branch_pattern() {
   local branch_name="$1"
+  local normalized_branch="${branch_name#refs/heads/}"
   local pattern=""
 
-  if [[ "$branch_name" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+  if [[ "$normalized_branch" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
     pattern="${match[1]}"
-  elif [[ "$branch_name" =~ codex/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
-    pattern="${match[1]}"
-  elif [[ "$branch_name" =~ feature/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
+  elif [[ "$normalized_branch" =~ ^[^/]+/([0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+)$ ]]; then
     pattern="${match[1]}"
   fi
 

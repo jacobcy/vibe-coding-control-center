@@ -42,6 +42,15 @@ phase: convergence
 4. 修改完成后，再次调用 find_referencing_symbols 确认引用完整
 ```
 
+执行闭环命令（必须落盘证据）：
+
+```bash
+bash scripts/serena_gate.sh --base main...HEAD
+```
+
+产物文件：
+- `.agent/reports/serena-impact.json`
+
 **硬性要求**：不满足此步骤，禁止进行 Layer 2。
 
 ### Serena 启动说明（执行前置）
@@ -61,6 +70,7 @@ uvx --from git+https://github.com/oraios/serena serena start-mcp-server
 - 记录阻塞原因（工具缺失/网络失败/配置缺失）
 - 继续执行 Layer 2 + Layer 3
 - 在最终报告标记为 `Major`
+- 在最终报告注明：缺失 `.agent/reports/serena-impact.json`
 
 ## Layer 2: 语法 + Lint 检查（修改后）
 

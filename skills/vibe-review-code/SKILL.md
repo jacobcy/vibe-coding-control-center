@@ -23,31 +23,48 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
 - **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
 
-## 2. Review Standards (MSC Paradigm Gate)
+## 2. Serena Mandatory Gate (Before Conclusions)
+Before deciding severity on function-level changes, you MUST run Serena impact analysis.
+
+Startup:
+- Prefer on-demand startup: `uvx --from git+https://github.com/oraios/serena serena start-mcp-server`
+- Preconditions: `uv/uvx` available and project has `.serena/project.yml`
+- Evidence command: `bash scripts/serena_gate.sh --base main...HEAD`
+- Required artifact: `.agent/reports/serena-impact.json`
+
+Required checks:
+1. For each changed function, run `find_referencing_symbols("<function_name>")`.
+2. For each removed function, verify caller count is `0`; otherwise mark as `Blocking`.
+3. For each signature change, verify all callers are updated; otherwise mark as `Major`.
+
+If Serena is unavailable:
+- Record blocking reason (tool/network/config).
+- Continue review with `git diff` + targeted grep as fallback.
+- Add one `Major` finding: "AST impact analysis not completed".
+
+## 3. Review Standards (MSC Paradigm Gate)
 You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
-1. **LOC Hard Limits**: Are new functions blowing up the line count? (Threshold: bin/ + lib/ <= 1200 LOC, max 200 lines per file).
+1. **LOC Hard Limits**: Are new functions blowing up the line count? (Threshold: bin/ + lib/ <= 4800 LOC, max 200 lines per file).
 2. **Zero Dead Code**: Does every added shell function have a clear caller? If not, FLAG IT as a blocking issue.
 3. **Safety & Robustness**: Are Zsh/Bash parameters properly quoted? Are error cases handled gracefully?
 4. **Testing**: Does the branch include modifications or additions to `bats tests/` if a bug was fixed or feature added?
 5. **Linting Check**: Has the user passed `bash scripts/lint.sh`? Run it if unsure.
 
-## 3. Review Process
+## 4. Review Process
 1. **Understand Intent**: Compare implementation against the `docs/prds/` or plan file.
 2. **Line-by-Line Analysis**: Point out exact files and lines where issues exist.
 3. **Actionability**: Never just say "it's bad", always provide the code snippet to fix it.
 
-## 4. Output: The Code Review Report
-Construct a structured report using Markdown:
+## 5. Output: The Code Review Report
+Construct a structured report using Markdown with strict severity buckets:
 
-### 📋 Code Review Summary
-**Score (0-10):** [Score]
-**Conclusion:** [Approved / Needs Changes / Rejected]
+- `Blocking`
+- `Major`
+- `Minor`
+- `Nit`
 
-### 🔴 Critical Issues (Blockers)
-- **[File:Line]** Description + why it violates standards (e.g. Dead Code, shell syntax vulnerability).
-
-### 🟡 Suggestions (Non-blocking)
-- **[File:Line]** Refactoring suggestions or minor optimizations.
-
-### 🟢 Highlights
-- Code that is particularly elegant or well-contained.
+Each finding MUST include:
+- `file/function`
+- `issue`
+- `failure mode`
+- `minimal fix`
