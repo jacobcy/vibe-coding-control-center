@@ -64,7 +64,7 @@ bash scripts/serena_gate.sh --base main...HEAD
 Serena 不要求全局安装 `serena` 可执行文件；可直接用 `uvx` 按需拉起 MCP 服务：
 
 ```bash
-uvx --from git+https://github.com/oraios/serena serena start-mcp-server
+uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ```
 
 前置条件：

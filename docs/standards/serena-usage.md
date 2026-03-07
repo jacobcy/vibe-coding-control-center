@@ -25,7 +25,7 @@ Serena 在本项目中是 **MCP AST 能力**，不是 `skills/` 目录里的 Ski
 优先使用按需启动（无需全局安装 `serena` 命令）：
 
 ```bash
-uvx --from git+https://github.com/oraios/serena serena start-mcp-server
+uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server
 ```
 
 前置条件：

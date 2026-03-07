@@ -11,7 +11,8 @@ fi
 REPORT_DIR="$ROOT/.agent/reports"
 REPORT_FILE="$REPORT_DIR/serena-impact.json"
 PROJECT_FILE="$ROOT/.serena/project.yml"
-SERENA_CMD=(uvx --from git+https://github.com/oraios/serena serena)
+SERENA_SOURCE="git+https://github.com/oraios/serena@v0.1.4"
+SERENA_CMD=(uvx --from "$SERENA_SOURCE" serena)
 BASE_REF="${SERENA_BASE_REF:-main...HEAD}"
 PORT="${SERENA_PROJECT_SERVER_PORT:-18231}"
 

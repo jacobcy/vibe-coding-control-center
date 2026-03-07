@@ -11,7 +11,7 @@ setup() {
 }
 
 @test "review-code includes Serena startup and reference checks" {
-  run grep -F "uvx --from git+https://github.com/oraios/serena serena start-mcp-server" \
+  run grep -F "uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server" \
     "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
   [ "$status" -eq 0 ]
 

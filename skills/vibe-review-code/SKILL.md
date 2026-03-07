@@ -68,7 +68,7 @@ vibe flow review --local
 Before deciding severity on function-level changes, run Serena impact analysis first.
 
 Startup:
-- Prefer on-demand startup: `uvx --from git+https://github.com/oraios/serena serena start-mcp-server`
+- Prefer on-demand startup: `uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server`
 - Preconditions: `uv/uvx` available and project has `.serena/project.yml`
 - Evidence command: `bash scripts/serena_gate.sh --base main...HEAD`
 - Required artifact: `.agent/reports/serena-impact.json`
