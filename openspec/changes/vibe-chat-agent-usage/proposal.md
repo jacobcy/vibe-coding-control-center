@@ -42,8 +42,8 @@ vibe chat [--agent=<name>]
 ```yaml
 agents:
   codex:
-    name: Anthropic Codex
-    install: npm install -g @anthropic/codex
+    name: OpenAI Codex
+    install: npm install -g @openai/codex
     description: Professional code review and analysis
     commands:
       review: codex review --uncommitted

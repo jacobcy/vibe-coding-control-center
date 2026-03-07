@@ -111,7 +111,7 @@ _flow_review_local() {
   case "$agent" in
     codex)
       if ! vibe_has codex; then
-        log_error "codex CLI not found. Install: npm install -g @anthropic/codex"
+        log_error "codex CLI not found. Install: npm install -g @openai/codex"
         return 1
       fi
       log_step "Running local review via Codex..."
@@ -151,7 +151,7 @@ _flow_review_local() {
       else
         log_error "Neither codex nor copilot found."
         log_info "Install one of:"
-        log_info "  - codex: npm install -g @anthropic/codex"
+        log_info "  - codex: npm install -g @openai/codex"
         log_info "  - copilot: Install GitHub Copilot CLI extension"
         return 1
       fi
@@ -183,8 +183,8 @@ _flow_review_usage() {
   echo "  --json           输出 PR 详细数据的 JSON 格式（用于程序化调用）"
   echo ""
   echo "本地 LLM 工具："
-  echo "  ${GREEN}codex${NC}    - Anthropic Codex CLI (推荐，专业审查能力)"
-  echo "             安装: npm install -g @anthropic/codex"
+  echo "  ${GREEN}codex${NC}    - OpenAI Codex CLI (推荐，专业审查能力)"
+  echo "             安装: npm install -g @openai/codex"
   echo "  ${GREEN}copilot${NC}  - GitHub Copilot CLI (通用助手)"
   echo "             安装: 安装 GitHub Copilot CLI 扩展"
   echo ""

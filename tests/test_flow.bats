@@ -38,6 +38,14 @@ JSON
   [[ "$output" =~ "pr" ]]
 }
 
+@test "1.1 vibe flow review help points to the supported Codex package" {
+  run vibe flow review --help
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "@openai/codex" ]]
+  [[ ! "$output" =~ "@anthropic/codex" ]]
+}
+
 @test "2. vibe flow new without args returns error" {
   run vibe flow new
   [ "$status" -eq 1 ]
