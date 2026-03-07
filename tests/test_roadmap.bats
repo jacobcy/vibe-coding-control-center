@@ -97,3 +97,51 @@ JSON
   [[ "$output" =~ "Issue rm-new classified as: next" ]]
   [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-new") | .status' "$fixture/vibe/roadmap.json")" = "next" ]
 }
+
+@test "roadmap version set-goal writes version_goal to roadmap.json" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    _vibe_roadmap_version set-goal "Ship roadmap split"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Version goal set to: Ship roadmap split" ]]
+  [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "Ship roadmap split" ]
+}
+
+@test "roadmap version clear-goal clears version_goal in roadmap.json" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    _vibe_roadmap_version clear-goal
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Version goal cleared." ]]
+  [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "null" ]
+}
