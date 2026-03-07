@@ -15,21 +15,24 @@ _vibe_roadmap_common_dir() {
     git rev-parse --git-common-dir
 }
 
-_vibe_roadmap_status() {
-    local common_dir registry_file
-    common_dir="$(_vibe_roadmap_common_dir)" || return 1
-    registry_file="$common_dir/vibe/registry.json"
-    _vibe_roadmap_require_file "$registry_file" "registry.json" || return 1
+_vibe_roadmap_file() {
+    local common_dir="$1"
+    echo "$common_dir/vibe/roadmap.json"
+}
 
-    local version_goal current_version
-    version_goal="$(jq -r '.roadmap.version_goal // "none"' "$registry_file")"
-    current_version="$(jq -r '.roadmap.current_version // "none"' "$registry_file")"
+_vibe_roadmap_status() {
+    local common_dir roadmap_file
+    common_dir="$(_vibe_roadmap_common_dir)" || return 1
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+
+    local version_goal
+    version_goal="$(jq -r '.version_goal // "none"' "$roadmap_file")"
 
     echo "========================================"
     echo "         Roadmap Status"
     echo "========================================"
     echo ""
-    echo "Current Version: $current_version"
     echo "Version Goal: $version_goal"
     echo ""
 
@@ -37,18 +40,18 @@ _vibe_roadmap_status() {
     # Single jq call to get all counts, parse with read
     local counts
     local p0_count current_count next_count deferred_count rejected_count
-    counts="$(jq -r '[.roadmap.issues[]? | .status] |
+    counts="$(jq -r '[.items[]? | .status] |
         {p0: (map(select(. == "p0")) | length),
          current: (map(select(. == "current")) | length),
          next: (map(select(. == "next")) | length),
          deferred: (map(select(. == "deferred")) | length),
          rejected: (map(select(. == "rejected")) | length)} |
-        "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$registry_file")"
+        "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$roadmap_file")"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
     echo "  P0 (urgent):      $p0_count"
-    echo "  Current Version:  $current_count"
-    echo "  Next Version:     $next_count"
+    echo "  Current:          $current_count"
+    echo "  Next:             $next_count"
     echo "  Deferred:         $deferred_count"
     echo "  Rejected:        $rejected_count"
     echo ""
@@ -59,8 +62,9 @@ _vibe_roadmap_status() {
 }
 
 _vibe_roadmap_get_version_goal() {
-    local common_dir="$1" registry_file="$common_dir/vibe/registry.json"
-    jq -r '.roadmap.version_goal // empty' "$registry_file"
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    jq -r '.version_goal // empty' "$roadmap_file"
 }
 
 _vibe_roadmap_has_version_goal() {
@@ -70,6 +74,7 @@ _vibe_roadmap_has_version_goal() {
 }
 
 _vibe_roadmap_get_current_issues() {
-    local common_dir="$1" registry_file="$common_dir/vibe/registry.json"
-    jq -c '[.roadmap.issues[]? | select(.status == "current" or .status == "p0")] | sort_by(.priority // 0) | reverse' "$registry_file"
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    jq -c '[.items[]? | select(.status == "current" or .status == "p0")]' "$roadmap_file"
 }

@@ -13,21 +13,25 @@ _vibe_roadmap_check_state() {
 }
 
 _vibe_roadmap_init() {
-    local common_dir="$1" registry_file="$common_dir/vibe/registry.json"
-    if ! jq -e '.roadmap' "$registry_file" >/dev/null 2>&1; then
-        jq '. + {roadmap: {version_goal: null, current_version: "v0.0", issues: []}}' "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    if [[ ! -f "$roadmap_file" ]]; then
+        mkdir -p "$(dirname "$roadmap_file")" || return 1
+        jq -n '{schema_version: "v2", version_goal: null, items: []}' > "$roadmap_file" || return 1
     fi
 }
 
 _vibe_roadmap_set_version_goal() {
-    local common_dir="$1" version_goal="$2" registry_file="$common_dir/vibe/registry.json"
+    local common_dir="$1" version_goal="$2" roadmap_file
     _vibe_roadmap_init "$common_dir"
-    jq --arg goal "$version_goal" '.roadmap.version_goal = $goal' "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    jq --arg goal "$version_goal" '.version_goal = $goal' "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
     echo "Version goal set to: $version_goal"
 }
 
 _vibe_roadmap_classify() {
-    local common_dir="$1" issue_id="$2" issue_state="$3" registry_file="$common_dir/vibe/registry.json"
+    local common_dir="$1" issue_id="$2" issue_state="$3" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
 
     if ! _vibe_roadmap_check_state "$issue_state"; then
         echo "Error: Invalid state '$issue_state'. Valid states: $(_vibe_roadmap_valid_states)"
@@ -36,23 +40,25 @@ _vibe_roadmap_classify() {
     _vibe_roadmap_init "$common_dir"
 
     local exists
-    exists="$(jq --arg id "$issue_id" '[.roadmap.issues[]? | select(.id == $id)] | length' "$registry_file")"
+    exists="$(jq --arg id "$issue_id" '[.items[]? | select(.roadmap_item_id == $id)] | length' "$roadmap_file")"
 
     if [[ "$exists" == "0" ]]; then
         echo "Issue $issue_id not found in roadmap. Adding it..."
         jq --arg id "$issue_id" --arg s "$issue_state" \
-            '.roadmap.issues += [{id: $id, status: $s, added_at: (now | strftime("%Y-%m-%d"))}]' \
-            "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
+            '.items += [{roadmap_item_id: $id, title: $id, description: null, status: $s, source_type: "local", source_refs: [], issue_refs: [], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]' \
+            "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
     else
         jq --arg id "$issue_id" --arg s "$issue_state" \
-            '(.roadmap.issues[]? | select(.id == $id) | .status) = $s' \
-            "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
+            '(.items[]? | select(.roadmap_item_id == $id) | .status) = $s
+             | (.items[]? | select(.roadmap_item_id == $id) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
+            "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
     fi
     echo "Issue $issue_id classified as: $issue_state"
 }
 
 _vibe_roadmap_sync_github() {
-    local common_dir="$1" repo="$2" label="${3:-vibe-task}" registry_file="$common_dir/vibe/registry.json"
+    local common_dir="$1" repo="$2" label="${3:-vibe-task}" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_init "$common_dir"
 
     echo "Syncing GitHub issues from $repo with label '$label'..."
@@ -71,21 +77,13 @@ _vibe_roadmap_sync_github() {
     fi
 
     local new_issues_json
-    new_issues_json="$(echo "${issues_json}" | jq --arg repo "$repo" --arg state "deferred" '[.[] | {id: ("gh-" + (.number | tostring)), repo: $repo, issue_number: .number, title: .title, status: $state, added_at: (now | strftime("%Y-%m-%d"))}]')"
+    new_issues_json="$(echo "${issues_json}" | jq --arg repo "$repo" --arg state "deferred" '[.[] | {roadmap_item_id: ("gh-" + (.number | tostring)), title: .title, description: null, status: $state, source_type: "github", source_refs: [("gh:" + $repo + "#" + (.number | tostring))], issue_refs: [("gh:" + $repo + "#" + (.number | tostring))], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]')"
 
-    # Merge with existing issues (P1 fix: remove extra array wrapper)
     local merged_issues
-    merged_issues="$(jq --argjson new "$new_issues_json" '(.roadmap.issues // []) + $new | unique_by(.id) | .[:100]' "$registry_file")"
+    merged_issues="$(jq --argjson new "$new_issues_json" '(.items // []) + $new | unique_by(.roadmap_item_id) | .[:100]' "$roadmap_file")"
 
-    # Get current roadmap fields (P2 fix: preserve null for version_goal)
-    local version_goal_json current_version
-    version_goal_json="$(jq -c '.roadmap.version_goal // null' "$registry_file")"
-    current_version="$(jq -r '.roadmap.current_version // "v0.0"' "$registry_file")"
-
-    # Use --argjson to preserve null, otherwise null becomes string "null"
-    jq --argjson vg "$version_goal_json" --arg cv "$current_version" --argjson issues "$merged_issues" \
-        '.roadmap = {version_goal: $vg, current_version: $cv, issues: $issues}' \
-        "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
+    jq --argjson issues "$merged_issues" '.items = $issues' \
+        "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Sync complete. Added $issue_count issues (state: deferred - use 'vibe roadmap classify' to categorize)."
 }
