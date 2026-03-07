@@ -1,6 +1,6 @@
 ---
 name: vibe-skills
-description: Use when skills are messy across IDEs, unsure which are installed globally vs project-level, need to audit/clean/recommend skills, or setting up a new worktree
+description: Use when skills are messy across IDEs, unsure which are installed globally vs project-level, need to audit/clean/recommend skills, or setting up a new worktree. **RECOMMENDED: Run as subagent to save tokens.**
 user-invokable: true
 ---
 

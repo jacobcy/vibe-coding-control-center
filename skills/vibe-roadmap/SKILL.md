@@ -1,6 +1,6 @@
 ---
 name: vibe-roadmap
-description: Use when user wants to manage roadmap, version goals, issue classification, or says "vibe roadmap", "/roadmap", "版本规划", "下一个版本做什么".
+description: Use when user wants to manage roadmap, version goals, issue classification, or says "vibe roadmap", "/roadmap", "版本规划", "下一个版本做什么". **RECOMMENDED: Run as subagent to save tokens.**
 ---
 
 # /vibe-roadmap - 智能调度器
