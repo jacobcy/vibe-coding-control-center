@@ -16,8 +16,16 @@ log_success() { echo "${GREEN}★ $1${NC}"; }
 
 confirm_action() {
     local prompt="${1:-Are you sure?}" response
-    echo -n "${YELLOW}? $prompt [y/N]: ${NC}"
-    read -r response; [[ "$response" =~ ^[yY](es)?$ ]]
+    if [[ "${VIBE_ASSUME_YES:-}" == "1" ]]; then
+        return 0
+    fi
+    if [[ -n "${VIBE_ALLOW_INTERACTIVE:-}" && -t 0 ]]; then
+        echo -n "${YELLOW}? $prompt [y/N]: ${NC}"
+        read -r response
+        [[ "$response" =~ ^[yY](es)?$ ]]
+    else
+        vibe_die "Interactive confirmation blocked: $prompt (set VIBE_ASSUME_YES=1 or pass --yes)."
+    fi
 }
 
 get_vibe_version() { local vfile="${VIBE_ROOT:-$(cd "$(dirname "${(%):-%x}")/.." && pwd)}/VERSION"; [[ -f "$vfile" ]] && cat "$vfile" || echo "2.0.0-dev"; }

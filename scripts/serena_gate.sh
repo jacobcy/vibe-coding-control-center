@@ -107,7 +107,14 @@ analyze_file() {
 
   functions_tmp="$(mktemp)"
   symbols_tmp="$(mktemp)"
-  echo "$overview" | jq -r '[.. | objects | select(.kind? == "Function") | .name] | unique[]?' >"$functions_tmp"
+  echo "$overview" | jq -r '
+    (
+      if type == "object" and (.Function? | type == "array") then .Function else [] end
+    ) + (
+      [.. | objects | select(.kind? == "Function" and (.name? | type == "string")) | .name]
+    )
+    | unique[]?
+  ' >"$functions_tmp"
   echo '[]' >"$symbols_tmp"
 
   while IFS= read -r fn; do

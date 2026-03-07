@@ -4,7 +4,15 @@
 
 set -e
 
-VIBE_ROOT="${VIBE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Prefer the current git repository root to avoid stale global VIBE_ROOT pollution.
+if GIT_ROOT="$(git -C "$SCRIPT_ROOT" rev-parse --show-toplevel 2>/dev/null)"; then
+  VIBE_ROOT="$GIT_ROOT"
+else
+  VIBE_ROOT="${VIBE_ROOT:-$SCRIPT_ROOT}"
+fi
 
 echo "## 📊 MSC 健康度仪表盘"
 echo ""

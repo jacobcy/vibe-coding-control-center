@@ -63,25 +63,19 @@ wt() {
   [[ -z "$result" ]] && { echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1; }
 
   local -a matches=(${(f)result})
-  case ${#matches[@]} in
-    0) echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1 ;;
-    1) _wt_enter "${matches[1]}" ;;
-    *)
-      echo "🔍 Multiple worktrees match '${target}':"
-      local i=1
-      for p in "${matches[@]}"; do
-        echo "  [$i] ${p##*/}   ($p)"
-        (( i++ ))
-      done
-      echo -n "Enter choice [1-${#matches[@]}]: "
-      local choice; read -r choice
-      if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
-        _wt_enter "${matches[$choice]}"
-      else
-        echo "❌ Invalid choice"; return 1
-      fi ;;
-  esac
-}
+    case ${#matches[@]} in
+      0) echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1 ;;
+      1) _wt_enter "${matches[1]}" ;;
+      *)
+        echo "🔍 Multiple worktrees match '${target}':"
+        for p in "${matches[@]}"; do
+          echo "  • ${p##*/}   ($p)"
+        done
+        echo "📌 Rerun wt with the exact worktree name (or full path)."
+        return 1
+        ;;
+    esac
+  }
 
 # @desc Create a new feature worktree with agent identity
 # @featured
@@ -123,11 +117,35 @@ wtnew() {
 }
 
 # @desc Remove a worktree and its associated local branch
+# @desc Remove a worktree and its associated local branch
 wtrm() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
   local awk_cmd; awk_cmd="$(vibe_find_cmd awk)" || { vibe_die "awk not found"; return 1; }
   local rm_cmd; rm_cmd="$(vibe_find_cmd rm)" || { vibe_die "rm not found"; return 1; }
-  local arg="$1"; [[ -z "$arg" ]] && vibe_die "usage: wtrm <wt-dir|path|all|wildcard>"
+  local assume_yes=false delete_remote=false target=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes)
+        assume_yes=true
+        shift
+        ;;
+      -r|--delete-remote)
+        delete_remote=true
+        shift
+        ;;
+      -h|--help)
+        vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"
+        ;;
+      *)
+        if [[ -n "$target" ]]; then
+          vibe_die "Unexpected argument: $1"
+        fi
+        target="$1"
+        shift
+        ;;
+    esac
+  done
+  [[ -n "$target" ]] || vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"
 
   local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
 
@@ -151,20 +169,18 @@ wtrm() {
 
       if [[ -n "$branch_name" && "$branch_name" != "main" && "$branch_name" != "master" ]]; then
         if $git_cmd -C "$main_dir" branch -D "$branch_name" >/dev/null 2>&1; then
-           echo "🗑️  Deleted local branch: $branch_name"
+          echo "🗑️  Deleted local branch: $branch_name"
         fi
-        # Check and prompt for remote branch deletion
         if $git_cmd -C "$main_dir" ls-remote --exit-code --heads origin "$branch_name" >/dev/null 2>&1; then
-           echo -n "❓ Delete remote branch origin/$branch_name? [y/N] "
-           local response
-           read -r response
-           if [[ "$response" =~ ^[yY]$ ]]; then
-              if $git_cmd -C "$main_dir" push origin --delete "$branch_name"; then
-                 echo "🗑️  Deleted remote branch: origin/$branch_name"
-              fi
-           else
-              echo "ℹ️  Kept remote branch"
-           fi
+          if [[ "$delete_remote" == true ]]; then
+            if $git_cmd -C "$main_dir" push origin --delete "$branch_name" >/dev/null 2>&1; then
+              echo "🗑️  Deleted remote branch: origin/$branch_name"
+            else
+              log_warn "Failed to delete remote branch: origin/$branch_name"
+            fi
+          else
+            echo "ℹ️  Remote branch origin/$branch_name still exists; rerun with --delete-remote to remove it."
+          fi
         fi
       fi
     elif [[ -d "$p" ]]; then
@@ -176,20 +192,21 @@ wtrm() {
   }
 
 
-  if [[ "$arg" == "all" ]]; then
+  if [[ "$target" == "all" ]]; then
     local -a paths=()
     while IFS= read -r wp; do
       [[ "$wp" == "$main_dir" ]] && continue
       [[ "${wp##*/}" == wt-* ]] && paths+=("$wp")
     done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print substr($0,10)}')
     [[ ${#paths[@]} -eq 0 ]] && { echo "ℹ️  No wt-* worktrees"; return 0; }
+    [[ "$assume_yes" == true ]] || { echo "⚠️  wtrm --yes all will remove ${#paths[@]} worktrees. Rerun with --yes to confirm."; return 1; }
     echo "🗑️  Removing ${#paths[@]} worktree(s)..."
     for wp in "${paths[@]}"; do _wtrm_one "$wp"; done
   else
     local result=""
     # Wildcard path match (glob) goes through inline matcher.
-    if [[ "$arg" == *'*'* || "$arg" == *'?'* ]]; then
-      local safe_pattern="${arg//\[/\\[}"; safe_pattern="${safe_pattern//\]/\\]}"
+    if [[ "$target" == *'*'* || "$target" == *'?'* ]]; then
+      local safe_pattern="${target//\[/\\[}"; safe_pattern="${safe_pattern//\]/\\]}"
       local wp
       local -a glob_matches=()
       while IFS= read -r wp; do
@@ -199,30 +216,24 @@ wtrm() {
       result="${(pj:\n:)glob_matches}"
     else
       # Default smart finder: exact/suffix/substring.
-      result=$(_wt_find "$arg")
+      result=$(_wt_find "$target")
     fi
-    [[ -z "$result" ]] && { echo "❌ Worktree not found: $arg"; git worktree list | sed 's/^/   /'; return 1; }
+    [[ -z "$result" ]] && { echo "❌ Worktree not found: $target"; git worktree list | sed 's/^/   /'; return 1; }
 
     local -a found_paths=(${(f)result})
     case ${#found_paths[@]} in
-      0) echo "❌ Worktree not found: $arg"; return 1 ;;
-      1) _wtrm_one "${found_paths[1]}" ;;
+      0) echo "❌ Worktree not found: $target"; return 1 ;;
+      1)
+        [[ "$assume_yes" == true ]] || { echo "⚠️  wtrm requires --yes to remove worktree '${found_paths[1]}'. Rerun with --yes."; return 1; }
+        _wtrm_one "${found_paths[1]}"
+        ;;
       *)
-        echo "🔍 Multiple worktrees match '${arg}':"
-        local i=1 p
+        echo "🔍 Multiple worktrees match '${target}':"
         for p in "${found_paths[@]}"; do
-          echo "  [$i] ${p##*/}   ($p)"
-          (( i++ ))
+          echo "  • ${p##*/}   ($p)"
         done
-        echo -n "Enter choice [1-${#found_paths[@]}] or 'a' for all: "
-        local choice; read -r choice
-        if [[ "$choice" == "a" ]]; then
-          for p in "${found_paths[@]}"; do _wtrm_one "$p"; done
-        elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#found_paths[@]} )); then
-          _wtrm_one "${found_paths[$choice]}"
-        else
-          echo "❌ Invalid choice"
-        fi
+        echo "📌 Rerun wtrm with a more specific name or path."
+        return 1
         ;;
     esac
   fi
@@ -280,19 +291,11 @@ vup() {
         target="${dir_path##*/}"
       else
         echo "🔍 Multiple worktrees match '${target}':"
-        local i=1 p
         for p in "${matches[@]}"; do
-          echo "  [$i] ${p##*/}   ($p)"
-          (( i++ ))
+          echo "  • ${p##*/}   ($p)"
         done
-        echo -n "Enter choice [1-${#matches[@]}]: "
-        local choice; read -r choice
-        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
-          dir_path="${matches[$choice]}"
-          target="${dir_path##*/}"
-        else
-          echo "❌ Invalid choice"; return 1
-        fi
+        echo "📌 Rerun vup with the full worktree name to pick the right target."
+        return 1
       fi
     else
       vibe_die "Worktree not found: $target (checked wtls)"
