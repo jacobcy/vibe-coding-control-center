@@ -52,6 +52,27 @@ _get_shell_rc() {
     esac
 }
 
+_setup_gh_noninteractive() {
+    log_step "Setting up GitHub CLI defaults..."
+
+    if ! command -v gh &> /dev/null; then
+        log_info "gh not installed, skipping non-interactive setup"
+        return 0
+    fi
+
+    gh config set prompt disabled >/dev/null 2>&1 || log_warn "Failed to set gh prompt=disabled"
+    gh config set pager cat >/dev/null 2>&1 || log_warn "Failed to set gh pager=cat"
+    log_success "Configured gh for non-interactive mode"
+}
+
+_require_uv_cli() {
+    if command -v uv >/dev/null 2>&1; then
+        return 0
+    fi
+    log_error "uv CLI is required for direnv auto-venv setup. Install from https://github.com/oraios/uv and rerun this installer."
+    return 1
+}
+
 # --- Main Flow ---
 log_step "Installing Vibe Center (Global)"
 
@@ -91,9 +112,14 @@ fi
 
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center"
 
-# 6. Direnv Setup (auto-configure if direnv is installed)
+# 6. GitHub CLI defaults (non-interactive)
+_setup_gh_noninteractive
+
+# 7. Direnv Setup (auto-configure if direnv is installed)
 _setup_direnv() {
     log_step "Setting up direnv..."
+
+    _require_uv_cli || vibe_die "uv CLI dependency missing"
 
     # Check if direnv is installed
     if ! command -v direnv &> /dev/null; then
@@ -140,7 +166,7 @@ _setup_direnv() {
 # Auto-run direnv setup if direnv is installed
 _setup_direnv
 
-# 7. Finalize
+# 8. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
 log_success "Installation complete!"
 
