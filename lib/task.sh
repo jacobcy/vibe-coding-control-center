@@ -45,6 +45,7 @@ vibe_task() {
         update) [[ $# -gt 0 ]] && shift; _vibe_task_update "$@" ;;
         remove) [[ $# -gt 0 ]] && shift; _vibe_task_remove "$@" ;;
         audit) [[ $# -gt 0 ]] && shift; vibe_task_audit "$@" ;;
+        count-by-branch) [[ $# -gt 0 ]] && shift; _vibe_task_count_by_branch "$@" ;;
         -h|--help|help) _vibe_task_usage ;;
         -*) _vibe_task_list "$@" ;;
         "") _vibe_task_list ;;

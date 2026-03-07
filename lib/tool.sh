@@ -20,13 +20,37 @@ _tool_update_via_brew() {
     vibe_has brew && brew upgrade "$pkg" 2>/dev/null
 }
 
+_tool_require_confirmation() {
+    local prompt="$1" assume_yes="${2:-false}"
+    local allow_interactive="${VIBE_ALLOW_INTERACTIVE:-}"
+    if [[ "$assume_yes" != true && -z "$allow_interactive" ]]; then
+        vibe_die "Interactive confirmation disabled for '$prompt'. Rerun with 'vibe tool --yes' or set VIBE_ALLOW_INTERACTIVE=1."
+    fi
+    local prev_assume="${VIBE_ASSUME_YES:-}" prev_defined=0
+    [[ -n "${VIBE_ASSUME_YES+x}" ]] && prev_defined=1
+    if [[ "$assume_yes" == true ]]; then
+        VIBE_ASSUME_YES=1
+    fi
+    confirm_action "$prompt"
+    local ok=$?
+    if [[ "$assume_yes" == true ]]; then
+        if [[ "$prev_defined" -eq 1 ]]; then
+            VIBE_ASSUME_YES="$prev_assume"
+        else
+            unset VIBE_ASSUME_YES
+        fi
+    fi
+    return $ok
+}
+
 # ── Install Claude ──────────────────────────────────────
 _tool_claude() {
+    local assume_yes="${1:-false}"
     log_step "Claude Code"
     if vibe_has claude; then
         local ver="$(claude --version 2>&1 | head -1)"
         log_info "Installed: $ver"
-        confirm_action "Update Claude?" || return 0
+        _tool_require_confirmation "Update Claude?" "$assume_yes" || return 0
         if [[ "$OSTYPE" == darwin* ]] && vibe_has brew; then
             _tool_update_via_brew "claude-code"
         elif vibe_has npm; then
@@ -45,11 +69,12 @@ _tool_claude() {
 
 # ── Install OpenCode ────────────────────────────────────
 _tool_opencode() {
+    local assume_yes="${1:-false}"
     log_step "OpenCode"
     if vibe_has opencode; then
         local ver="$(opencode --version 2>&1 | head -1)"
         log_info "Installed: $ver"
-        confirm_action "Update OpenCode?" || return 0
+        _tool_require_confirmation "Update OpenCode?" "$assume_yes" || return 0
         if [[ "$OSTYPE" == darwin* ]] && vibe_has brew; then
             _tool_update_via_brew "opencode"
         else
@@ -69,11 +94,12 @@ _tool_opencode() {
 
 # ── Install Codex ───────────────────────────────────────
 _tool_codex() {
+    local assume_yes="${1:-false}"
     log_step "Codex"
     if vibe_has codex; then
         local ver="$(codex --version 2>&1 | head -1)"
         log_info "Installed: $ver"
-        confirm_action "Update Codex?" || return 0
+        _tool_require_confirmation "Update Codex?" "$assume_yes" || return 0
         _tool_install_via_npm "@openai/codex"
     else
         log_warn "Not installed. Installing..."
@@ -102,6 +128,7 @@ _tool_status() {
 
 # ── Install Core Dependencies ───────────────────────────
 _tool_deps() {
+    local assume_yes="${1:-false}"
     log_step "Core Dependencies"
     local tools=("git" "jq" "tmux" "lazygit" "curl")
     local missing=()
@@ -116,26 +143,48 @@ _tool_deps() {
 
     log_warn "Missing: ${missing[*]}"
     if [[ "$OSTYPE" == darwin* ]] && vibe_has brew; then
-        confirm_action "Install missing tools via Homebrew?" && brew install "${missing[@]}"
+        if [[ "$assume_yes" != true && -z "${VIBE_ALLOW_INTERACTIVE:-}" ]]; then
+            log_info "Pass --yes to install missing tools automatically: ${missing[*]}"
+            return 1
+        fi
+        _tool_require_confirmation "Install missing tools via Homebrew?" "$assume_yes" || return 1
+        brew install "${missing[@]}"
     else
         log_info "Please install missing tools manually: ${missing[*]}"
+        return 1
     fi
 }
 
 # ── Dispatcher ──────────────────────────────────────────
 vibe_tool() {
+    local assume_yes=false
+    [[ "${VIBE_ASSUME_YES:-}" == "1" ]] && assume_yes=true
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes)
+                assume_yes=true
+                shift
+                ;;
+            *)
+                args+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${args[@]}"
     local target="${1:-}"
 
     case "$target" in
-        claude)   _tool_claude ;;
-        opencode) _tool_opencode ;;
-        codex)    _tool_codex ;;
-        deps)     _tool_deps ;;
+        claude)   _tool_claude "$assume_yes" ;;
+        opencode) _tool_opencode "$assume_yes" ;;
+        codex)    _tool_codex "$assume_yes" ;;
+        deps)     _tool_deps "$assume_yes" ;;
         all)
-            _tool_deps
-            _tool_claude
-            _tool_opencode
-            _tool_codex
+            _tool_deps "$assume_yes"
+            _tool_claude "$assume_yes"
+            _tool_opencode "$assume_yes"
+            _tool_codex "$assume_yes"
             ;;
         ""|status)
             _tool_status
@@ -150,6 +199,9 @@ vibe_tool() {
             echo "  ${GREEN}opencode${NC}  Install/Update OpenCode"
             echo "  ${GREEN}codex${NC}     Install/Update Codex"
             echo "  ${GREEN}all${NC}       Install/Update all tools and dependencies"
+            echo ""
+            echo "Options:"
+            echo "  -y, --yes      Skip confirmation prompts for installs/updates"
             ;;
         *)
             log_error "Unknown tool: $target"

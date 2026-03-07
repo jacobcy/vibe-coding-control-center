@@ -64,6 +64,23 @@ _vibe_task_collect_openspec_tasks() {
     rm -f "$aggregate_file"
 }
 
+_vibe_task_count_by_branch() {
+    local branch="$1" common_dir worktrees_file registry_file count
+    common_dir="$(_vibe_task_common_dir)" || { echo "0"; return 0; }
+    worktrees_file="$common_dir/vibe/worktrees.json"
+    registry_file="$common_dir/vibe/registry.json"
+
+    [[ -f "$worktrees_file" ]] || { echo "0"; return 0; }
+    [[ -f "$registry_file" ]] || { echo "0"; return 0; }
+
+    # Count tasks assigned to worktrees on this branch
+    count=$(jq -r --arg branch "$branch" '
+      [.worktrees[]? | select(.branch == $branch) | .tasks // []] | add | length // 0
+    ' "$worktrees_file" 2>/dev/null || echo "0")
+
+    echo "$count"
+}
+
 _vibe_task_list() {
     local common_dir worktrees_file registry_file show_all="0" json_out="0" missing repo_root openspec_tasks_file
     for arg in "$@"; do
