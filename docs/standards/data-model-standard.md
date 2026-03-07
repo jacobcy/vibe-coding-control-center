@@ -25,7 +25,7 @@ related_docs:
 
 本文档是 Vibe 共享状态数据模型的高层规范真源，定义 `roadmap.json`、`registry.json`、`worktrees.json` 的职责边界、命名规则、关系约束和生命周期规则。
 
-本文档只定义最终标准，不记录讨论过程、迁移步骤或实现现状。文件级精确 schema 见：
+本文档只定义高层数据模型边界，不重复定义文件级 schema，不记录讨论过程、迁移步骤或实现现状。文件级精确 schema 见：
 
 - [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
@@ -42,57 +42,17 @@ related_docs:
 
 ## 2. Canonical Files
 
-### 2.1 `roadmap.json`
+高层模型只定义文件分层，不重复描述文件内部字段。文件级 schema 以各自标准为准：
 
-`roadmap.json` 是规划态真源，只负责：
-
-- roadmap item
-- 规划状态
-- `version_goal`
-- roadmap item 与 issue / task 的映射
-
-`roadmap.json` 不负责：
-
-- branch
-- worktree
-- dirty
-- task runtime
-- PR 历史
-- 本地 `epic` / `milestone` 派生模型
-
-### 2.2 `registry.json`
-
-`registry.json` 是执行态真源，只负责：
-
-- task 生命周期
-- task 与 roadmap item / issue / PR 的关联
-- subtasks
-- task 当前 runtime 绑定事实
-- task 最终归档事实
-
-`registry.json` 不负责：
-
-- 规划优先级
-- 现场创建与销毁
-- 长期 worktree 历史
-- 多个 PR 历史数组
-- 把 branch / worktree 当作历史索引
-
-### 2.3 `worktrees.json`
-
-`worktrees.json` 是现场态真源，只负责：
-
-- 当前存在的 worktree
-- 当前 worktree 的 path、branch、agent、绑定 task
-- 当前现场状态
-
-`worktrees.json` 不负责：
-
-- 历史查询
-- 已删除 worktree 的长期记录
-- task 归档事实
-- roadmap 规划状态
-- 持久化 `dirty`
+- `roadmap.json`
+  - 规划态真源
+  - schema 见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- `registry.json`
+  - 执行态真源
+  - schema 见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+- `worktrees.json`
+  - 现场态真源
+  - 本文当前只定义其高层职责边界，尚无单独文件级 schema 标准
 
 ## 3. Layer Ownership
 

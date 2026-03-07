@@ -15,6 +15,9 @@ related_docs:
   - CLAUDE.md
   - STRUCTURE.md
   - docs/README.md
+  - docs/standards/data-model-standard.md
+  - docs/standards/registry-json-standard.md
+  - docs/standards/roadmap-json-standard.md
 ---
 
 # 共享状态命令标准
@@ -22,6 +25,12 @@ related_docs:
 本文档是 Vibe 共享状态命令的唯一规范真源，定义 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的最终命令模型。
 
 本文档只定义最终标准，不记录历史演进、迁移步骤、现状偏差或实现映射。
+
+命令的数据模型基础见：
+
+- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
 ## 1. Scope
 
@@ -33,6 +42,17 @@ related_docs:
 - `vibe check`
 
 其他顶层命令不在本文档范围内。
+
+## 1.1 Data Model Dependency
+
+四个命令域必须建立在共享状态文件标准之上：
+
+- `vibe roadmap` 以 `roadmap.json` 为规划态真源
+- `vibe task` 以 `registry.json` 为执行态真源
+- `vibe flow` 以 `worktrees.json` 为现场态真源
+- `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
+
+命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。
 
 ## 2. Global Rules
 
@@ -453,4 +473,3 @@ provider 只允许：
 - 在 `check` 中默认执行 fix
 - 在 `check` 中处理业务逻辑
 - 将 `check` 扩展成第二套 workflow 系统
-
