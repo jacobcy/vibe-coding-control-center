@@ -195,7 +195,33 @@ setup() {
   [[ "$output" =~ "still bound to a worktree" ]]
 }
 
-@test "ops: remove prompts branch cleanup and deletes local+remote when confirmed" {
+@test "ops: remove refuses branch cleanup without --yes" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/heads") echo "claude/rotate-alignment"; return 0 ;;
+        "for-each-ref --format=%(refname:short) refs/remotes/origin") echo "origin/claude/rotate-alignment"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    vibe_task remove 2026-03-02-rotate-alignment
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "rerun with --yes" ]]
+  [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "1" ]
+}
+
+@test "ops: remove deletes local+remote branches when --yes is provided" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
   local local_deleted="$fixture/local_deleted"
@@ -205,7 +231,6 @@ setup() {
     source "'"$HELPER"'"
     setup_task_env
     mock_git_registry "'"$fixture"'"
-    confirm_action() { return 0; }
     git() {
       case "$*" in
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
@@ -218,7 +243,7 @@ setup() {
         *) return 0 ;;
       esac
     }
-    vibe_task remove 2026-03-02-rotate-alignment
+    vibe_task remove --yes 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 0 ]
@@ -227,7 +252,7 @@ setup() {
   [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
 }
 
-@test "ops: remove fails and preserves task when branch deletion fails" {
+@test "ops: remove fails when --yes branch cleanup still hits residue" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
 
@@ -235,7 +260,6 @@ setup() {
     source "'"$HELPER"'"
     setup_task_env
     mock_git_registry "'"$fixture"'"
-    confirm_action() { return 0; }
     git() {
       case "$*" in
         "rev-parse --is-inside-work-tree") echo true; return 0 ;;
@@ -247,7 +271,7 @@ setup() {
         *) return 0 ;;
       esac
     }
-    vibe_task remove 2026-03-02-rotate-alignment
+    vibe_task remove --yes 2026-03-02-rotate-alignment
   '
 
   [ "$status" -eq 1 ]

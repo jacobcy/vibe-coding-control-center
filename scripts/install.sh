@@ -69,7 +69,7 @@ _require_uv_cli() {
     if command -v uv >/dev/null 2>&1; then
         return 0
     fi
-    log_error "uv CLI is required for direnv auto-venv setup. Install from https://github.com/oraios/uv and rerun this installer."
+    log_warn "uv CLI not found. Direnv auto-venv setup will be skipped."
     return 1
 }
 
@@ -119,13 +119,16 @@ _setup_gh_noninteractive
 _setup_direnv() {
     log_step "Setting up direnv..."
 
-    _require_uv_cli || vibe_die "uv CLI dependency missing"
-
     # Check if direnv is installed
     if ! command -v direnv &> /dev/null; then
         log_info "direnv not installed, skipping auto-venv setup"
         return 0
     fi
+
+    _require_uv_cli || {
+        log_info "Direnv hook configured, but auto-venv setup skipped (uv missing)."
+        return 0
+    }
 
     # Add direnv hook to RC file
     local direnv_hook='eval "$(direnv hook zsh)"'

@@ -78,7 +78,7 @@ JSON
 
   run zsh -c 'source "'"$HELPER"'"; setup_task_env; vibe_task remove --help'
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Usage: vibe task remove <task-id>" ]]
+  [[ "$output" == *"Usage: vibe task remove [--yes] <task-id>"* ]]
 }
 
 @test "core: unknown subcommand fails" {
