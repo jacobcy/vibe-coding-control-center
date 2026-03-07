@@ -80,11 +80,11 @@
 
 ## 8. 与 vibe check 集成
 
-- [ ] 8.1 在 `lib/check.sh` 中添加 `--audit-tasks` 参数支持
-- [ ] 8.2 在 `vibe_check()` 中集成任务核对作为可选步骤
-- [ ] 8.3 实现条件触发 - 只在用户指定时运行任务核对
-- [ ] 8.4 更新 `vibe check` 帮助文档说明新参数
-- [ ] 8.5 测试集成 - 运行 `vibe check --audit-tasks` 验证完整流程
+- [x] 8.1 在 `lib/check.sh` 中添加 `--audit-tasks` 参数支持
+- [x] 8.2 在 `vibe_check()` 中集成任务核对作为可选步骤
+- [x] 8.3 实现条件触发 - 只在用户指定时运行任务核对
+- [x] 8.4 更新 `vibe check` 帮助文档说明新参数
+- [x] 8.5 测试集成 - 运行 `vibe check --audit-tasks` 验证完整流程
 
 ## 9. 增强任务概览
 
