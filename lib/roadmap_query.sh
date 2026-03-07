@@ -1,10 +1,17 @@
 #!/usr/bin/env zsh
 # lib/roadmap_query.sh - Read/Query operations for Roadmap module
 
-_vibe_roadmap_require_file() { [[ -f "$1" ]] || { vibe_die "Missing $2: $1" }; }
+_vibe_roadmap_require_file() {
+    if [[ -f "$1" ]]; then
+        return 0
+    fi
+    vibe_die "Missing $2: $1"
+}
 
 _vibe_roadmap_common_dir() {
-    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { vibe_die "Not in a git repository" }
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        vibe_die "Not in a git repository"
+    fi
     git rev-parse --git-common-dir
 }
 
@@ -28,16 +35,16 @@ _vibe_roadmap_status() {
 
     echo "Issue Summary:"
     # Single jq call to get all counts, parse with read
+    local counts
     local p0_count current_count next_count deferred_count rejected_count
-    IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<EOF
-$(jq -r '[.roadmap.issues[]? | .status] |
-    {p0: (map(select(. == "p0")) | length),
-     current: (map(select(. == "current")) | length),
-     next: (map(select(. == "next")) | length),
-     deferred: (map(select(. == "deferred")) | length),
-     rejected: (map(select(. == "rejected")) | length)} |
-    "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$registry_file")
-EOF
+    counts="$(jq -r '[.roadmap.issues[]? | .status] |
+        {p0: (map(select(. == "p0")) | length),
+         current: (map(select(. == "current")) | length),
+         next: (map(select(. == "next")) | length),
+         deferred: (map(select(. == "deferred")) | length),
+         rejected: (map(select(. == "rejected")) | length)} |
+        "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$registry_file")"
+    IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
     echo "  P0 (urgent):      $p0_count"
     echo "  Current Version:  $current_count"
