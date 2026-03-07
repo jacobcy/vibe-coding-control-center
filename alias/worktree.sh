@@ -134,18 +134,20 @@ wtrm() {
         shift
         ;;
       -h|--help)
-        vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"
+        echo "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"
+        return 0
         ;;
       *)
         if [[ -n "$target" ]]; then
           vibe_die "Unexpected argument: $1"
+          return 1
         fi
         target="$1"
         shift
         ;;
     esac
   done
-  [[ -n "$target" ]] || vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"
+  [[ -n "$target" ]] || { vibe_die "usage: wtrm [--yes] [--delete-remote] <wt-dir|path|all|wildcard>"; return 1; }
 
   local main_dir; main_dir="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || { vibe_die "Not in git repo"; return 1; }
 
