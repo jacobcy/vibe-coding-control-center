@@ -16,14 +16,19 @@
   - **次选**: 使用 subagent + AI 审查
   - **Fallback**: copilot 本地审查（如果 codex 不可用）
 
+**2. vibe-review-docs**
+- **Token 成本**: 高（读取大量文档文件）
+- **执行时间**: 中
+- **优化策略**: 使用 subagent 隔离文档审查
+
 ### ⭐⭐ 推荐
 
-**2. vibe-roadmap**
+**3. vibe-roadmap**
 - **Token 成本**: 高（扫描项目文件）
 - **执行时间**: 中长
 - **优化策略**: 使用 subagent 扫描项目结构
 
-**3. vibe-skills**
+**4. vibe-skills**
 - **Token 成本**: 中（扫描 skills 目录）
 - **执行时间**: 中
 - **优化策略**: 使用 subagent 独立分析
@@ -38,6 +43,16 @@
 - **vibe-done**: 需要用户确认
 - **vibe-check**: 快速读取，立即反馈
 - **vibe-task**: 需要交互选择
+
+## Token 节省效果
+
+| Skill | 原始成本 | 优化后成本 | 节省 |
+|-------|---------|-----------|------|
+| vibe-review-code | ~10K tokens | ~500 tokens (codex) | **95%** |
+| vibe-review-code | ~10K tokens | ~2K tokens (subagent) | **80%** |
+| vibe-review-docs | ~5K tokens | ~1K tokens (subagent) | **80%** |
+| vibe-roadmap | ~5K tokens | ~1K tokens (subagent) | **80%** |
+| vibe-skills | ~3K tokens | ~800 tokens (subagent) | **73%** |
 
 ## 如何使用
 
@@ -59,4 +74,6 @@ AI 会根据 skill description 中的 `**RECOMMENDED: Run as subagent to save to
 
 ## 更新日志
 
-- 2026-03-07: 初始版本，标记 vibe-review-code, vibe-roadmap, vibe-skills
+- 2026-03-07: 初始版本，标记 vibe-review-code, vibe-review-docs, vibe-roadmap, vibe-skills
+- 2026-03-07: 增强 `vibe flow review --local` 支持 codex/copilot fallback
+

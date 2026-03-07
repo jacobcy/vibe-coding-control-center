@@ -27,21 +27,43 @@ _flow_review() {
   [[ -z "$target" ]] && target=$(git branch --show-current)
 
   if [[ $local_mode -eq 1 ]]; then
-    if ! vibe_has codex; then
-      log_error "codex CLI not found. Cannot run local review."
-      return 1
+    # Try codex first
+    if vibe_has codex; then
+      log_step "Running local codebase review via Codex..."
+      mkdir -p .agent
+      if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+        log_info "Uncommitted changes detected. Running: codex review --uncommitted"
+        codex review --uncommitted
+      else
+        log_info "Working directory clean. Running against origin/main..."
+        codex review --base main
+      fi
+      log_success "Local review complete."
+      return 0
     fi
-    log_step "Running local codebase review via Codex..."
-    mkdir -p .agent
-    if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-      log_info "Uncommitted changes detected. Running: codex review --uncommitted"
-      codex review --uncommitted
-    else
-      log_info "Working directory clean. Running against origin/main..."
-      codex review --base main
+
+    # Fallback to copilot
+    if vibe_has copilot; then
+      log_step "Codex not found. Falling back to GitHub Copilot..."
+      log_info "Note: Copilot review is less comprehensive than Codex."
+      mkdir -p .agent
+      if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+        log_info "Uncommitted changes detected. Running: copilot review --uncommitted"
+        copilot review --uncommitted 2>/dev/null || copilot review
+      else
+        log_info "Working directory clean. Running against origin/main..."
+        copilot review --base main 2>/dev/null || copilot review
+      fi
+      log_success "Local review complete (via Copilot fallback)."
+      return 0
     fi
-    log_success "Local review complete."
-    return 0
+
+    # No local LLM available
+    log_error "Neither codex nor copilot CLI found. Cannot run local review."
+    log_info "Install one of the following:"
+    log_info "  - codex: npm install -g @anthropic/codex"
+    log_info "  - copilot: Install GitHub Copilot CLI extension"
+    return 1
   fi
 
   if ! vibe_has gh; then
