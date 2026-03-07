@@ -15,6 +15,16 @@ trigger: manual
 
 When invoked as a code reviewer, you are a Senior Staff Engineer tasked with guarding the project against entropy, dead code, and standard violations.
 
+## 0. 与 `vibe-test-runner` 的关系（互补）
+- `vibe-test-runner`：偏执行验证（Serena + Lint + Tests + Review Gate），通常在代码改完后自动跑。
+- `vibe-review-code`：偏人工审查结论，适合 PR 前人工把关、PR 后针对 review comment 复核。
+- 推荐顺序：先让 `vibe-test-runner` 跑出基础质量结果，再用本 skill 输出最终审查意见。
+
+## 触发时机（手动）
+- 你准备发起 PR，需要先做一轮严格审查时
+- 你收到 review comment，需要确认修复是否引入回归时
+- 你需要一份结构化审查结论（Blocking/Major/Minor/Nit）时
+
 ## 1. Context Gathering (Align Truth)
 - **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of the PR and project health.
 - **Fetch Diff**: 
@@ -23,8 +33,8 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
 - **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
 
-## 2. Serena Mandatory Gate (Before Conclusions)
-Before deciding severity on function-level changes, you MUST run Serena impact analysis.
+## 2. Serena 使用步骤（审查前）
+Before deciding severity on function-level changes, run Serena impact analysis first.
 
 Startup:
 - Prefer on-demand startup: `uvx --from git+https://github.com/oraios/serena serena start-mcp-server`

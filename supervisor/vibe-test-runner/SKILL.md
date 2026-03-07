@@ -15,11 +15,17 @@ phase: convergence
 
 此 Skill 将四个环节（Serena AST、zsh lint + shellcheck、bats、Review Gate）串联成一个自动修复闭环，确保每次代码修改都满足 MSC 规范的 Context 层要求。
 
+## 与 `vibe-review-code` 的关系（互补）
+- `vibe-test-runner`：负责“跑起来”的验证闭环，产出可执行证据（Lint/Test/Serena 报告）。
+- `vibe-review-code`：负责“怎么看”的审查结论，给出 Blocking/Major/Minor/Nit。
+- 配合方式：先跑本 skill 保证基础质量，再用 `vibe-review-code` 做人工审查结论。
+
 # When to Use
 
 - 修改任何 `lib/*.sh` 或 `bin/vibe` 文件后
 - PR Review 前的自动验证
 - 被 `vibe-orchestrator` 或其 Execution Gate 调用时
+- 当你需要生成 Serena 实际执行产物（`.agent/reports/serena-impact.json`）时
 
 # Invocation Boundary
 
