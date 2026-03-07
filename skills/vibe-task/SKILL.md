@@ -838,3 +838,32 @@ AI 层文档扫描: 1 个任务
 1. Shell 层提供数据和原子操作
 2. Skill 层负责语义分析和决策
 3. 用户负责最终确认
+
+## Integration with vibe check
+
+任务审计功能已集成到 `vibe check` 命令中，形成完整的闭环工作流。
+
+### 使用方式
+
+```bash
+# 在运行主审计前先修复任务
+bin/vibe check --audit-tasks
+
+# 或单独运行任务审计
+bin/vibe task audit
+```
+
+### 闭环工作流
+
+```
+vibe check --audit-tasks
+    ↓
+Phase 0: Task Audit (修复任务注册问题)
+    ↓
+Phase 1-6: 主审计流程
+    ↓
+完整的项目健康检查
+```
+
+**价值:** 确保在进行项目审计时，任务注册数据是完整和准确的，从而提供更可靠的审计结果。
+
