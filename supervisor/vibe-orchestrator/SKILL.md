@@ -91,6 +91,24 @@ input_examples:
 - 决策：低置信度 → **主动询问** "这是一个复杂系统设计，建议用 OpenSpec 做完整规划，或者用 Superpower 快速验证想法，你想用哪个？"
 
 **记忆更新：**
+- **任务负载检查（Task Load Validation）：**
+  - 在创建新任务前，先检查当前分支的任务数量
+  - 运行 `vibe task count-by-branch $(git branch --show-current)` 获取当前分支任务数
+  - 如果任务数 > 3，**立即阻断**并提示用户：
+    ```
+    🚨 **任务负载过重警告**
+
+    当前分支已有 **{count}** 个任务，超过建议上限（3个）。
+
+    **建议操作：**
+    1. 先完成现有任务：`vibe task list` 查看任务列表
+    2. 或切换到新分支：`git checkout -b <new-branch>`
+    3. 或使用 worktree 隔离：`vibe flow create <feature>`
+
+    为避免上下文混乱和任务冲突，请先处理现有任务。
+    ```
+  - 如果任务数 <= 3，继续执行后续步骤
+
 - 确定框架后，调用 `vibe task add "<title>"` 初始化任务记录：
   - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
   - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`

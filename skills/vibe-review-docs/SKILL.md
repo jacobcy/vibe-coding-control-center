@@ -1,6 +1,6 @@
 ---
 name: vibe-review-docs
-description: Agentic Documentation and Changelog Review. Use when auditing entry files (CLAUDE.md, SOUL.md), docs/ directory, or checking for incorrect concepts. Use `vibe flow review` to check PR status.
+description: Agentic Documentation and Changelog Review. Use when auditing entry files (CLAUDE.md, SOUL.md), docs/ directory, or checking for incorrect concepts. Use `vibe flow review` to check PR status. **RECOMMENDED: Run as subagent to save tokens.**
 category: process
 trigger: manual
 ---

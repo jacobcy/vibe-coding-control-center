@@ -1,5 +1,8 @@
 ---
-description: Interactive Smart Commit Workflow based on diff analysis to draft Conventional Commits.
+name: "Vibe: Commit"
+description: Interactive Smart Commit Workflow based on diff analysis to draft Conventional Commits
+category: Workflow
+tags: [workflow, vibe, git, commit]
 ---
 
 # Vibe Commit

@@ -52,18 +52,41 @@ _get_shell_rc() {
     esac
 }
 
+_setup_gh_noninteractive() {
+    log_step "Setting up GitHub CLI defaults..."
+
+    if ! command -v gh &> /dev/null; then
+        log_info "gh not installed, skipping non-interactive setup"
+        return 0
+    fi
+
+    gh config set prompt disabled >/dev/null 2>&1 || log_warn "Failed to set gh prompt=disabled"
+    gh config set pager cat >/dev/null 2>&1 || log_warn "Failed to set gh pager=cat"
+    log_success "Configured gh for non-interactive mode"
+}
+
+_require_uv_cli() {
+    if command -v uv >/dev/null 2>&1; then
+        return 0
+    fi
+    log_warn "uv CLI not found. Direnv auto-venv setup will be skipped."
+    return 1
+}
+
 # --- Main Flow ---
 log_step "Installing Vibe Center (Global)"
 
 # 1. Create directory structure
 log_info "Setting up $INSTALL_DIR..."
-mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config"
+mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_DIR/scripts"
 
 # 2. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
 for dir in bin lib config scripts; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
-    cp -r "$SOURCE_ROOT/$dir/" "$INSTALL_DIR/$dir/"
+    mkdir -p "$INSTALL_DIR/$dir"
+    # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
+    cp -R "$SOURCE_ROOT/$dir/." "$INSTALL_DIR/$dir/"
 done
 
 # 3. Handle Key Template
@@ -91,7 +114,64 @@ fi
 
 _append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center"
 
-# 6. Finalize
+# 6. GitHub CLI defaults (non-interactive)
+_setup_gh_noninteractive
+
+# 7. Direnv Setup (auto-configure if direnv is installed)
+_setup_direnv() {
+    log_step "Setting up direnv..."
+
+    # Check if direnv is installed
+    if ! command -v direnv &> /dev/null; then
+        log_info "direnv not installed, skipping auto-venv setup"
+        return 0
+    fi
+
+    _require_uv_cli || {
+        log_info "Direnv hook configured, but auto-venv setup skipped (uv missing)."
+        return 0
+    }
+
+    # Add direnv hook to RC file
+    local direnv_hook='eval "$(direnv hook zsh)"'
+    if ! grep -qF 'direnv hook zsh' "$RC_FILE" 2>/dev/null; then
+        _append_to_rc "$RC_FILE" "$direnv_hook" "direnv"
+        log_info "Added direnv hook to $RC_FILE"
+    else
+        log_info "direnv hook already present in $RC_FILE"
+    fi
+
+    # Create global venv if not exists
+    local venv_path="$HOME/.venvs/vibe-center"
+    if [[ ! -d "$venv_path" ]]; then
+        log_info "Creating global venv at $venv_path..."
+        mkdir -p "$HOME/.venvs"
+        uv venv "$venv_path"
+    else
+        log_info "Global venv already exists at $venv_path"
+    fi
+
+    # Create .envrc in source root if not exists
+    local envrc_path="$SOURCE_ROOT/.envrc"
+    if [[ ! -f "$envrc_path" ]]; then
+        log_info "Creating $envrc_path..."
+        echo "source $venv_path/bin/activate" > "$envrc_path"
+    else
+        log_info ".envrc already exists at $envrc_path"
+    fi
+
+    # Allow direnv (in source root)
+    log_info "Running direnv allow..."
+    cd "$SOURCE_ROOT"
+    direnv allow 2>/dev/null || log_warn "direnv allow failed (may need manual approval)"
+
+    log_success "direnv setup complete!"
+}
+
+# Auto-run direnv setup if direnv is installed
+_setup_direnv
+
+# 8. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
 log_success "Installation complete!"
 

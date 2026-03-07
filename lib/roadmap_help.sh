@@ -1,0 +1,31 @@
+#!/usr/bin/env zsh
+# lib/roadmap_help.sh - Help text for Roadmap module
+
+_vibe_roadmap_usage() {
+    echo "${BOLD}Vibe Roadmap - 智能调度器${NC}"
+    echo ""
+    echo "Usage: ${CYAN}vibe roadmap <subcommand>${NC} [args]"
+    echo ""
+    echo "Subcommands:"
+    echo "  ${GREEN}status${NC}        Show roadmap status and issue summary"
+    echo "  ${GREEN}sync${NC}          Sync issues from GitHub (--provider github --repo owner/repo)"
+    echo "  ${GREEN}assign${NC}        Assign version goal"
+    echo "  ${GREEN}classify${NC}      Classify an issue (p0/current/next/deferred/rejected)"
+    echo "  ${GREEN}version${NC}       Version cycle management (bump/next/complete)"
+    echo ""
+    echo "Issue Status:"
+    echo "  p0        - 紧急阻断性问题，立即处理"
+    echo "  current   - 当前版本要完成"
+    echo "  next      - 下一个版本要做"
+    echo "  deferred  - 延期，待讨论"
+    echo "  rejected  - 拒绝，不做"
+    echo ""
+    echo "Examples:"
+    echo "  vibe roadmap status"
+    echo "  vibe roadmap sync --provider github --repo jacobcy/vibe-coding-control-center"
+    echo "  vibe roadmap assign 'Complete GitHub integration'"
+    echo "  vibe roadmap classify gh-36 --status p0"
+    echo "  vibe roadmap version bump minor"
+    echo "  vibe roadmap version next"
+    echo "  vibe roadmap version complete"
+}

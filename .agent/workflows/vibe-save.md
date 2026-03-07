@@ -1,5 +1,8 @@
 ---
-description: Save session context, tasks, and decisions to project memory.
+name: "Vibe: Save"
+description: Save session context, tasks, and decisions to project memory
+category: Workflow
+tags: [workflow, vibe, memory, persistence]
 ---
 
 # Save Session Context

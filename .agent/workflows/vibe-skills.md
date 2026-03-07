@@ -1,5 +1,8 @@
 ---
-description: 交互式管理、检查、同步和清理 AI Skills。
+name: "Vibe: Skills"
+description: Interactively manage, audit, sync, and clean AI skills
+category: Workflow
+tags: [workflow, vibe, skills, management]
 ---
 
 # Vibe Skills

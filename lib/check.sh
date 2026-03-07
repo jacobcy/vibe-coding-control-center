@@ -2,21 +2,40 @@
 # v2/lib/check.sh - Minimalist Validation for Vibe 2.0
 # Target: ~30 lines | Simplified API
 
+[[ -f "$VIBE_LIB/check_pr_status.sh" ]] && source "$VIBE_LIB/check_pr_status.sh"
+
 vibe_check() {
     local file="${1:-}"
-    
-    if [[ "$file" == "-h" || "$file" == "--help" ]]; then
-        echo "${BOLD}Vibe Health Checker${NC}"
-        echo ""
-        echo "Usage: ${CYAN}vibe check${NC} [file]"
-        echo ""
-        echo "Modes:"
-        echo "  ${GREEN}[file]${NC}        验证文件格式（目前支持 JSON 及其 Vibe Schema）"
-        echo "  ${GREEN}(无参数)${NC}      执行项目全要素审计（Registry、OpenSpec、归档、僵尸分支）"
-        return 0
-    fi
+    local audit_tasks=false
 
-    if [[ -n "$file" ]]; then
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --audit-tasks)
+                audit_tasks=true
+                shift
+                ;;
+            -h|--help)
+                echo "${BOLD}Vibe Health Checker${NC}"
+                echo ""
+                echo "Usage: ${CYAN}vibe check${NC} [options] [file]"
+                echo ""
+                echo "Modes:"
+                echo "  ${GREEN}[file]${NC}        验证文件格式（目前支持 JSON 及其 Vibe Schema）"
+                echo "  ${GREEN}(无参数)${NC}      执行项目全要素审计（Registry、OpenSpec、归档、僵尸分支）"
+                echo ""
+                echo "Options:"
+                echo "  ${GREEN}--audit-tasks${NC}  运行任务注册审计与修复（在主检查前执行）"
+                return 0
+                ;;
+            *)
+                file="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -n "$file" && "$file" != "--audit-tasks" ]]; then
         [[ -f "$file" ]] || { log_error "File not found: $file"; return 1; }
         if [[ "$file" == *.json ]]; then
             jq empty "$file" >/dev/null 2>&1 || { log_error "Invalid JSON: $file"; return 1; }
@@ -28,14 +47,30 @@ vibe_check() {
         return 0
     fi
 
+    # --- Task Audit Mode (--audit-tasks) ---
+    if [[ "$audit_tasks" == true ]]; then
+        log_step "Running Task Registration Audit..."
+        log_info "Phase 0: Task registry audit and repair"
+        echo ""
+
+        # Run vibe task audit (which triggers repair workflow)
+        if vibe task audit; then
+            log_success "Task audit complete. Proceeding to project audit..."
+            echo ""
+        else
+            log_warn "Task audit encountered issues. Review the output above."
+            echo ""
+        fi
+    fi
+
     # --- Audit Mode (No arguments) ---
     log_step "Starting Comprehensive Vibe Audit..."
     local reg; reg="$(git rev-parse --git-common-dir)/vibe/registry.json"
     [[ -f "$reg" ]] || { log_error "Missing registry.json"; return 1; }
 
-    # 1. Registry vs OpenSpec
-    log_info "1. Syncing Registry with OpenSpec..."
-    vibe_task sync 2>/dev/null || true
+    # 1. OpenSpec registration audit
+    log_info "1. Auditing OpenSpec registration..."
+    vibe task audit --check-openspec >/dev/null 2>&1 || true
 
     # 2. Archive completed tasks
     log_info "2. Archiving completed tasks..."
@@ -104,7 +139,30 @@ vibe_check() {
         for gb in "${ghost_branches[@]}"; do echo "     - $gb"; done
     fi
 
-    # 6. Health Check Summary
+    # Phase 2: Git Status Check (PR merged detection)
+    log_info "6. Checking PR merged status..."
+    if ! _check_gh_available; then
+        log_warn "   gh CLI not available or not authenticated. Skipping PR status check."
+    else
+        local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
+        local -a uncertain_tasks
+        while IFS='|' read -r task_id branch; do
+            [[ -n "$task_id" && -n "$branch" ]] && uncertain_tasks+=("$task_id|$branch")
+        done < <(_check_pr_merged_status "$reg" "$worktrees_file")
+
+        if [[ ${#uncertain_tasks[@]} -gt 0 ]]; then
+            log_info "   Found ${#uncertain_tasks[@]} task(s) with merged PRs:"
+            for task_info in "${uncertain_tasks[@]}"; do
+                local tid br
+                IFS='|' read -r tid br <<< "$task_info"
+                echo "     - $tid (branch: $br)"
+            done
+            echo ""
+            log_info "   Run ${CYAN}/vibe-check${NC} for AI-assisted task completion analysis."
+        fi
+    fi
+
+    # 7. Health Check Summary
     local total; total=$(jq '.tasks | length' "$reg")
     local in_progress; in_progress=$(jq '[.tasks[] | select(.status == "in_progress" or .status == "todo")] | length' "$reg")
     local archived; archived=$(jq '[.tasks[] | select(.status == "archived")] | length' "$reg")

@@ -1,5 +1,8 @@
 ---
-description: Resume previous work or start a new session by loading saved task context.
+name: "Vibe: Continue"
+description: Resume previous work or start a new session by loading saved task context
+category: Workflow
+tags: [workflow, vibe, context, resume]
 ---
 
 # Resume Saved Tasks

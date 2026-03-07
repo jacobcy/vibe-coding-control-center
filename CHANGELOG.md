@@ -1,5 +1,55 @@
 # 更新日志
 
+## [Unreleased]
+
+### ✨ New Features
+- **Task Registry Audit & Repair**: Comprehensive task registration audit and automatic repair system.
+  - **Three-Phase Audit**: Data quality → Deterministic checks → Semantic analysis
+  - **Data Quality Repair**: Auto-fix null branch fields in worktrees.json
+  - **Branch Registration Check**: Detect unregistered task branches
+  - **OpenSpec Sync Check**: Identify unsynced OpenSpec changes
+  - **PR Semantic Analysis**: AI-powered task detection from merged PRs
+  - **Document Scanning**: Detect tasks in docs/plans and docs/prds
+- **vibe check Integration**: Task audit now integrates with `vibe check --audit-tasks`
+  - **Closed-Loop Workflow**: Repair tasks before project audit
+  - **Phase 0 Addition**: Task audit runs as Phase 0 in vibe check
+- **Interactive Repair**: Three user interaction modes
+  - **Batch Mode**: Auto-repair high-confidence issues
+  - **Individual Mode**: Confirm each repair step-by-step
+  - **View-Only Mode**: Preview issues without making changes
+
+### 🔧 Technical Details
+- **Architecture**: Strict three-layer separation (Shell → Skill → User)
+- **Shell Layer**: Deterministic data operations, no AI decisions
+- **Skill Layer**: Semantic analysis, intelligent suggestions, user interaction
+- **User Layer**: Final confirmation and decision authority
+- **Backup Strategy**: Automatic backup before repairs (worktrees.json.backup)
+- **Validation**: Post-repair verification with rollback on failure
+
+### 📊 Completion Metrics
+- **Section 1-8**: Core functionality complete (48/79 tasks, 61%)
+- **Shell Layer**: 100% complete (all audit commands functional)
+- **Skill Layer**: 100% complete (full audit workflow with AI analysis)
+- **Integration**: 100% complete (vibe check --audit-tasks working)
+
+## [2.1.5] - 2026-03-07
+
+### ✨ New Features
+- **Smart Task Sync**: Upgraded `vibe check` to intelligently sync task status based on PR merged events.
+  - **Phase 2**: Detect merged PRs and analyze task completion using AI (Subagent)
+  - **Phase 3**: Confidence-based processing (high/medium/low) with user confirmation
+  - **Phase 4**: Deep code analysis option for uncertain tasks
+  - **Graceful Degradation**: Continue static checks when `gh` CLI is unavailable
+- **Flow Commands**: Enhanced `vibe flow` command family
+  - `vibe flow list --pr`: Query last 10 branches with PRs
+  - `vibe flow list --keywords <text>`: Filter branches by keyword
+  - `vibe flow review <branch> --json`: Return structured PR data for programmatic use
+
+### 🔧 Technical Details
+- **Architecture**: Three-tier implementation (Shell → Skill → Subagent)
+- **Data Strategy**: Real-time query via `gh`, no local PR caching
+- **User Control**: AI suggests, human confirms - preserves decision authority
+
 ## [2.1.4] - 2026-03-05
 
 ### ✨ Improvements

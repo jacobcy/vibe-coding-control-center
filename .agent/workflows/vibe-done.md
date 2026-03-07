@@ -1,5 +1,8 @@
 ---
-description: 提交 PR 或结束本地工作树后用于收尾工作，一键流转到 Completed/Archived 状态。
+name: "Vibe: Done"
+description: Finalize work after PR submission or worktree completion
+category: Workflow
+tags: [workflow, vibe, completion, archive]
 ---
 
 # Vibe Done

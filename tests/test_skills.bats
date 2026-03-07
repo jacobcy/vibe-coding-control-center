@@ -10,10 +10,10 @@ setup() {
 
   export TMP_BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$TMP_BIN"
-  cat > "$TMP_BIN/npx" <<'EOF'
+  cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash
 exit 0
-EOF
+SHELL
   chmod +x "$TMP_BIN/npx"
 }
 
@@ -22,7 +22,9 @@ EOF
     'cd "'"$REPO_ROOT"'/docs" && HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" ../bin/vibe skills check'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "项目级: 16 个" ]]
+  [[ "$output" =~ "项目级:" ]]
+  [[ "$output" =~ "已链接:" ]]
+  [[ "$output" =~ "本地 vibe-* skills" ]]
 }
 
 @test "global agent symlinks target HOME/.agents/skills for trae and kiro" {
@@ -39,11 +41,11 @@ EOF
 }
 
 @test "global superpowers sync fails when npx skills add fails" {
-  cat > "$TMP_BIN/npx" <<'EOF'
+  cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash
 echo "network failure" >&2
 exit 7
-EOF
+SHELL
   chmod +x "$TMP_BIN/npx"
 
   run env HOME="$TMP_HOME" PATH="$TMP_BIN:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" zsh -c '

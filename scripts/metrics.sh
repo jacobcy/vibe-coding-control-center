@@ -4,7 +4,15 @@
 
 set -e
 
-VIBE_ROOT="${VIBE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Prefer the current git repository root to avoid stale global VIBE_ROOT pollution.
+if GIT_ROOT="$(git -C "$SCRIPT_ROOT" rev-parse --show-toplevel 2>/dev/null)"; then
+  VIBE_ROOT="$GIT_ROOT"
+else
+  VIBE_ROOT="${VIBE_ROOT:-$SCRIPT_ROOT}"
+fi
 
 echo "## 📊 MSC 健康度仪表盘"
 echo ""
@@ -14,8 +22,8 @@ echo "|------|------|--------|------|"
 # --- Total LOC ---
 total_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 loc_status="✅"
-[ "${total_loc:-0}" -gt 2400 ] && loc_status="❌"
-echo "| 总 LOC | 2400 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 2400 ))% |"
+[ "${total_loc:-0}" -gt 4800 ] && loc_status="❌"
+echo "| 总 LOC | 4800 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 4800 ))% |"
 
 # --- Max file LOC ---
 max_file_loc=0

@@ -1,5 +1,8 @@
 ---
-description: 新功能统一入口，调用 Vibe Orchestrator 负责意图分析与方案规划 (Discussion Mode)。
+name: "Vibe: New"
+description: Entry point for new features with orchestrator-driven planning (Discussion Mode)
+category: Workflow
+tags: [workflow, vibe, planning, orchestrator]
 ---
 
 # Vibe New (Discussion Mode)
@@ -22,22 +25,30 @@ description: 新功能统一入口，调用 Vibe Orchestrator 负责意图分析
 1. **Acknowledge the command**
    立即回复："已进入 Vibe Workflow Engine (Discussion Mode)。我将通过相关 Gate 为您分析与编制执行计划。"
 
-2. **Invoke orchestrator**
+2. **Invoke Scheduler (调度器检查)**
+   在调用 orchestrator 之前，先通过调度器检查版本目标状态：
+   - 运行 `vibe roadmap status` 获取当前版本目标
+   - 如果没有设置版本目标（version_goal = none），则提示用户：
+     "当前没有设置版本目标。请先使用 `vibe roadmap assign <目标>` 确定本版本要完成的目标，然后再来领任务。"
+   - 如果有版本目标，检查当前版本是否有 P0 或 current 状态的任务
+   - 如果没有可执行的任务，提示用户使用 `vibe roadmap classify <issue-id> --status current` 将 Issue 纳入当前版本
+
+3. **Invoke orchestrator**
    调用 `supervisor/vibe-orchestrator` 技能，将 `<feature>` 作为目标输入。
 
-3. **Run Planning Gates**
+4. **Run Planning Gates**
    严格按以下顺序推进：
    - Gate 0: Intent Gate (智能调度与任务初始化)
    - Gate 1: Scope Gate (边界检查)
    - Gate 2: Spec Gate (契约校验)
    - Gate 3: Plan Gate (出具 `plan.md` 执行图纸)
 
-4. **Exception Escalation Hook (举报通道)**
-   在任何一个 Gate 中，如果发现严重异常（如系统配置确实、严重越界、或文档严重缺损）：
+5. **Exception Escalation Hook (举报通道)**
+   在任何一个 Gate 中，如果发现严重异常（如系统配置确实、严重越界，或文档严重缺损）：
    - 立刻终止后续探索，不允许敷衍或胡编乱造。
    - 抛出红色 🚨 警告，向 Orchestrator 提报错误并等待人类指挥。
 
-5. **Checkpoint Output & HARD STOP**
+6. **Checkpoint Output & HARD STOP**
    - 每通过一个 Gate，输出判定结果与下一步。
    - 一旦生成并审查了 `plan.md`，即表示 Gate 3 完成。必须触发 **HARD STOP（硬停止）**。
-   - 回复用户：“✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new` 或 `vibe flow bind`。”
+   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new` 或 `vibe flow bind`。"

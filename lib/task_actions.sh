@@ -72,8 +72,27 @@ _vibe_task_add() {
 }
 _vibe_task_branch_matches_any() { local branch="$1" candidate; shift; for candidate in "$@"; do [[ -n "$candidate" && ( "$branch" == "$candidate" || "$branch" == */"$candidate" ) ]] && return 0; done; return 1; }
 _vibe_task_remove() {
-    local task_id="${1:-}" common_dir registry_file worktrees_file task_file tmp
-    [[ "$task_id" == "-h" || "$task_id" == "--help" ]] && { echo "Usage: vibe task remove <task-id>"; return 0; }
+    local assume_yes=false task_id="" common_dir registry_file worktrees_file task_file tmp
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                echo "Usage: vibe task remove [--yes] <task-id>"
+                return 0
+                ;;
+            -y|--yes)
+                assume_yes=true
+                shift
+                ;;
+            *)
+                if [[ -n "$task_id" ]]; then
+                    vibe_die "Unexpected argument: $1"
+                    return 1
+                fi
+                task_id="$1"
+                shift
+                ;;
+        esac
+    done
     [[ -n "$task_id" ]] || { vibe_die "Missing task id for remove"; return 1; }
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; worktrees_file="$common_dir/vibe/worktrees.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
@@ -98,17 +117,16 @@ _vibe_task_remove() {
         log_warn "Branch(es) detected for this task:"
         [[ -n "$local_branches" ]] && echo "$local_branches" | sed 's/^/  - local: /'
         [[ -n "$remote_branches" ]] && echo "$remote_branches" | sed 's/^/  - remote: /'
-        if confirm_action "Delete these branches before removing task?"; then
-            while read -r lb; do [[ -n "$lb" ]] && vibe_delete_local_branch "$lb" || residual_local+="$lb\n"; done <<< "$local_branches"
-            while read -r rb; do
-                [[ -z "$rb" ]] && continue
-                local rb_name="${rb#origin/}"
-                vibe_delete_remote_branch "$rb_name" || residual_remote+="$rb_name\n"
-            done <<< "$remote_branches"
-        else
-            vibe_die "Task removal cancelled: branch cleanup is required."
+        if [[ "$assume_yes" != true ]]; then
+            vibe_die "Branch cleanup required before removing task $task_id; rerun with --yes."
             return 1
         fi
+        while read -r lb; do [[ -n "$lb" ]] && vibe_delete_local_branch "$lb" || residual_local+="$lb\n"; done <<< "$local_branches"
+        while read -r rb; do
+            [[ -z "$rb" ]] && continue
+            local rb_name="${rb#origin/}"
+            vibe_delete_remote_branch "$rb_name" || residual_remote+="$rb_name\n"
+        done <<< "$remote_branches"
         if [[ -n "$residual_local" || -n "$residual_remote" ]]; then
             log_warn "Branch residue detected for task $task_id:"
             [[ -n "$residual_local" ]] && echo "$residual_local" | sed '/^$/d; s/^/  - local: /'
@@ -120,32 +138,4 @@ _vibe_task_remove() {
     tmp="$(mktemp)" || return 1
     jq --arg task_id "$task_id" '.tasks |= map(select(.task_id != $task_id))' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file" || return 1
     rm -f "$task_file"; rmdir "$(dirname "$task_file")" 2>/dev/null || true; log_success "Task $task_id removed from registry."
-}
-_vibe_task_sync() {
-    local common_dir registry_file repo_root openspec_tasks_file task_json
-    vibe_require git jq || return 1
-    common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"
-    _vibe_task_require_file "$registry_file" "registry.json" || return 1; repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-    openspec_tasks_file="$(mktemp)" || return 1; _vibe_task_collect_openspec_tasks "$repo_root" > "$openspec_tasks_file"
-    local tasks_list; tasks_list=$(jq -c '.tasks[]?' "$openspec_tasks_file" 2>/dev/null)
-    if [[ -n "$tasks_list" ]]; then
-        while read -r task_json; do
-            [[ -n "$task_json" ]] || continue; local tid; tid=$(echo "$task_json" | jq -r '.task_id // empty'); [[ -n "$tid" ]] || continue
-            local title; title=$(echo "$task_json" | jq -r '.title // "OpenSpec Task"')
-            local t_status; t_status=$(echo "$task_json" | jq -r '.status // "todo"')
-            local next; next=$(echo "$task_json" | jq -r '.next_step // ""')
-            if ! jq -e --arg tid "$tid" '.tasks[]? | select(.task_id == $tid)' "$registry_file" >/dev/null 2>&1; then
-                local tmp_add; tmp_add="$(mktemp)"
-                jq --arg tid "$tid" --arg title "$title" --arg status "$t_status" --arg next "$next" --arg now "$now" \
-                   '.tasks += [{task_id:$tid, title:$title, status:$status, next_step:$next, updated_at:$now}]' \
-                   "$registry_file" > "$tmp_add" && mv "$tmp_add" "$registry_file"
-            fi
-            log_step "Syncing OpenSpec task: $tid"; _vibe_task_update "$tid" --status "$t_status" --next-step "$next" >/dev/null
-            local tmp; tmp="$(mktemp)"
-            jq --arg tid "$tid" --arg title "$title" --arg src "openspec/changes/$tid" \
-               '.tasks |= map(if .task_id == $tid then .title = $title | .framework = "openspec" | .source_path = $src else . end)' \
-               "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
-        done <<< "$tasks_list"
-    fi
-    rm -f "$openspec_tasks_file"; log_success "OpenSpec tasks synced to registry."
 }

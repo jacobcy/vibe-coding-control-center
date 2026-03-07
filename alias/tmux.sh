@@ -115,19 +115,12 @@ vt() {
     1) [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[1]}" || tmux attach -t "${matches[1]}" ;;
     *)
       echo "🔍 Multiple sessions match '${target}':"
-      local i=1 s
+      local s
       for s in "${matches[@]}"; do
-        echo "  [$i] $s"
-        (( i++ ))
+        echo "  • $s"
       done
-      echo -n "Enter choice [1-${#matches[@]}]: "
-      local choice; read -r choice
-      if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#matches[@]} )); then
-        [[ -n "$TMUX" ]] && tmux switch-client -t "${matches[$choice]}" || tmux attach -t "${matches[$choice]}"
-      else
-        echo "❌ Invalid choice"
-        return 1
-      fi
+      echo "📌 Rerun with the exact session name to attach."
+      return 1
       ;;
   esac
 }
@@ -182,25 +175,35 @@ vtdown() {
 # @featured
 vdown() {
   [[ -z "$TMUX" ]] && { echo "❌ Must be run inside tmux"; return 1; }
-  local target="${1:-current}"
+  local assume_yes=false parsed_target=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes) assume_yes=true; shift ;;
+      *)
+        parsed_target="$1"
+        shift
+        ;;
+    esac
+  done
+  local target="${parsed_target:-current}"
   local s; s="$(tmux display-message -p '#S')"
-  
+
   if [[ "$target" == "all" ]]; then
     local -a windows
     windows=("${(@f)$(tmux list-windows -t "$s" -F "#{window_name}" | grep "^wt-")}")
     [[ ${#windows[@]} -eq 0 ]] && { echo "ℹ️ No wt-* windows found"; return 0; }
-    confirm_action "Kill all ${#windows[@]} worktree windows?" || return 0
+    [[ "$assume_yes" == true ]] || { echo "⚠️  vdown --yes all would kill ${#windows[@]} windows. Rerun with --yes to confirm."; return 1; }
     for w in "${windows[@]}"; do tmux kill-window -t "$s:$w"; done
     echo "✅ Cleaned up all wt-* windows."
   elif [[ "$target" == "current" ]]; then
     local w; w="$(tmux display-message -p '#W')"
-    confirm_action "Kill current window '$w'?" || return 0
+    [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vdown to close the current window '$w'."; return 1; }
     tmux kill-window -t "$s:$w"
   else
-    # Target specific prefix
     local -a windows
     windows=("${(@f)$(tmux list-windows -t "$s" -F "#{window_name}" | grep "^${target}")}")
     [[ ${#windows[@]} -eq 0 ]] && { echo "❌ No windows found matching '$target'"; return 1; }
+    [[ "$assume_yes" == true ]] || { echo "⚠️  vdown --yes $target will kill ${#windows[@]} windows. Rerun with --yes to confirm."; return 1; }
     for w in "${windows[@]}"; do tmux kill-window -t "$s:$w"; done
     echo "✅ Cleaned up windows for: $target"
   fi
@@ -229,16 +232,26 @@ vtls() {
 
 # @desc Kill a specific Tmux session
 vtkill() {
-  local s="$1"
-  if [[ -z "$s" ]]; then
+  local assume_yes=false session="$1"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -y|--yes) assume_yes=true; shift ;;
+      *)
+        session="$1"
+        shift
+        ;;
+    esac
+  done
+  if [[ -z "$session" ]]; then
     if [[ -n "$TMUX" ]]; then
-      s="$(tmux display-message -p '#S')"
-      confirm_action "Kill current session '$s'?" || return 0
+      session="$(tmux display-message -p '#S')"
+      [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate the current session '$session'."; return 1; }
     else
-      s="$VIBE_SESSION"
+      session="$VIBE_SESSION"
     fi
   fi
-  tmux has-session -t "$s" 2>/dev/null || { echo "❌ No session: $s"; return 1; }
-  tmux kill-session -t "$s"
-  echo "✅ Killed: $s"
+  tmux has-session -t "$session" 2>/dev/null || { echo "❌ No session: $session"; return 1; }
+  [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate session '$session'."; return 1; }
+  tmux kill-session -t "$session"
+  echo "✅ Killed: $session"
 }

@@ -10,6 +10,30 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "review-code includes Serena startup and reference checks" {
+  run grep -F "uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server" \
+    "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "find_referencing_symbols(\"<function_name>\")" \
+    "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F "bash scripts/serena_gate.sh --base main...HEAD" \
+    "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
+  [ "$status" -eq 0 ]
+
+  run grep -F ".agent/reports/serena-impact.json" \
+    "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "review-code uses current LOC threshold" {
+  run grep -F "bin/ + lib/ <= 4800 LOC" \
+    "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "review-docs local guidance includes unstaged and staged markdown discovery" {
   run grep -F "For local docs review, combine \`git diff --name-only\` and \`git diff --cached --name-only\`, then filter for \`\.md$\`." \
     "$REPO_ROOT/skills/vibe-review-docs/SKILL.md"
