@@ -276,6 +276,61 @@ related_docs:
 
 当作同一个概念。
 
+## 6.1 Documentation Role Terms
+
+### `入口文件`
+
+- 正式术语：`入口文件`
+- 别称：无
+- 定义：人类或执行代理进入项目时首先阅读的导航型文档。
+- 边界：
+  - `入口文件` 不是标准真源
+  - `入口文件` 不应承载复杂规范全文
+- 落点：
+  - 根目录入口文件，如 [AGENTS.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/AGENTS.md)、[CLAUDE.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/CLAUDE.md)、[README.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/README.md)、[STRUCTURE.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/STRUCTURE.md)
+- 使用规则：
+  - 入口文件应提供导航、最小必要约束和引用链
+  - 不在入口文件中堆叠复杂规范
+
+### `标准文件`
+
+- 正式术语：`标准文件`
+- 别称：无
+- 定义：位于 `docs/standards/` 的项目内部稳定规范真源。
+- 边界：
+  - `标准文件` 不等于入口文件
+  - `标准文件` 不记录临时讨论和执行噪音
+- 落点：
+  - [docs/standards/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards)
+- 使用规则：
+  - 讨论项目一致规范、稳定定义和边界时使用 `标准文件`
+
+### `参考文件`
+
+- 正式术语：`参考文件`
+- 别称：无
+- 定义：位于 `docs/references/` 的外部知识、外部库和外部资料引用文档。
+- 边界：
+  - `参考文件` 不是项目内部规范真源
+  - `参考文件` 不应反向定义项目标准
+- 落点：
+  - [docs/references/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/references)
+- 使用规则：
+  - 引用外部库、外部知识、外部资料时使用 `参考文件`
+
+### `规则文件`
+
+- 正式术语：`规则文件`
+- 别称：无
+- 定义：位于 `.agent/rules/` 的 agent 执行规则、实现细则和模式约束文件。
+- 边界：
+  - `规则文件` 不是项目宪法
+  - `规则文件` 不应重写标准文件或入口文件的概念真源
+- 落点：
+  - [.agent/rules/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/rules)
+- 使用规则：
+  - 执行代理需要具体执行细则、实现边界和模式时使用 `规则文件`
+
 ## 7. Common Confusions
 
 以下混用是高风险错误：
