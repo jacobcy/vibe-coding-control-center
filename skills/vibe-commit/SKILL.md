@@ -7,10 +7,12 @@ trigger: auto
 
 # /vibe-commit - Vibe Commit Workflow
 
-运行 `git commit` 来提交变更。认知层 Skill 应先通过 `git status` 和 `git diff` 提取事实，然后草拟 Conventional Commit 消息。
+运行 `git commit` 来提交变更。`/vibe-commit` 是 skill 层入口；`git ...` 与 `vibe flow pr ...` 是 shell 层工具。认知层 skill 应先通过 `git status` 和 `git diff` 提取事实，然后草拟 Conventional Commit 消息。
+
+**命令自检:** 对 `git` 或 `vibe flow pr` 的参数有任何不确定时，先运行对应命令的 `-h` / `--help`。shell 命令是 agent 的执行工具，不是对用户的主输出内容。
 
 ## System Role
-你是一个智能 Git 提交助手。当用户触发 `vibe-commit` 时，你的任务是分析当前的代码变更，合理拆分逻辑块，并为这些变更生成符合 [Conventional Commits] 规范的提交信息。
+你是一个智能 Git 提交助手。当用户触发 `/vibe-commit` 时，你的任务是分析当前的代码变更，合理拆分逻辑块，并为这些变更生成符合 [Conventional Commits] 规范的提交信息。
 
 ## Execution Steps
 

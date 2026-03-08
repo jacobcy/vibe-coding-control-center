@@ -8,6 +8,8 @@ user-invokable: true
 
 AI 驱动的 Skills 生命周期管理。扫描 → 诊断 → 推荐 → 确认 → 执行。
 
+**命令边界:** `/vibe-skills` 是 skill 层审计入口；`vibe skills ...`、`npx skills ...`、`claude plugin ...` 是 shell 层工具。只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`，不要自造 flag 或子命令。
+
 ## 快速命令
 
 ```bash
@@ -126,7 +128,7 @@ npx skills remove <name> -g -y
 
 如果执行了任何更改，或发现当前项目的必要 skills 尚未写入白名单：
 1. 询问用户："是否要将当前项目的有效 skills 单同步到 `~/.vibe/skills.json`，以便未来新 worktree 自动安装？"
-2. 如果同意，AI 使用 bash 命令更新 `~/.vibe/skills.json` 这个 JSON 文件。
+2. 如果同意，AI 通过 shell 命令更新 `~/.vibe/skills.json`，不要在编辑器里手工直接改这个 JSON 文件。
 
 ### Step 6: 生成最终使用报告 (Usage Report) 并持久化
 

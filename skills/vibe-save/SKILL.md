@@ -1,9 +1,9 @@
 ---
 name: vibe-save
-description: Use when the user wants to save session context, says "/save", or when ending a session and you want to preserve work state. Saves tasks, decisions, and solutions to project memory.
+description: Use when the user wants to save session context, says "/vibe-save", or when ending a session and you want to preserve work state. Saves tasks, decisions, and solutions to project memory.
 ---
 
-# /save - Session Context Save
+# /vibe-save - Session Context Save
 
 会话上下文保存命令。在会话结束前自动提取和保存有价值的信息到项目记忆系统。
 
@@ -11,7 +11,9 @@ description: Use when the user wants to save session context, says "/save", or w
 **审阅优先原则:** 在任何写入操作之前，必须优先审阅目标文件的已有内容。若发现已有内容存在陈旧、错误或冲突（如状态不一致、陈旧的 next_step 等），必须先进行修正对齐，然后再追加或更新本次会话的新内容。不允许无视已有错误直接堆砌新内容。
 
 
-**Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
+**Announce at start:** "我正在使用 /vibe-save 技能来保存本次会话的上下文。"
+
+**命令边界:** `/vibe-save` 是 skill 层入口；`vibe flow status`、`vibe task update` 是 shell 层工具。对 shell 参数、子命令或 flag 有任何不确定时，先运行对应命令的 `-h` / `--help`。shell 命令只服务 agent 执行，不是面向用户的命令教学清单。
 
 ## Shared Task Source
  
@@ -23,11 +25,11 @@ description: Use when the user wants to save session context, says "/save", or w
  
 **指令**: 物理层状态已通过 `vibe flow status` 自动对齐。认知层保存需调用 `vibe task update --next-step ...` 沉积当前进度。
 
-`/save` 只处理当前 worktree 绑定的 current task。
+`/vibe-save` 只处理当前 worktree 绑定的 current task。
 
 ## Schema 契约
 
-`/save` 只使用以下真实字段名，不使用旧示例字段：
+`/vibe-save` 只使用以下真实字段名，不使用旧示例字段：
 
 - `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
 - `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
@@ -137,7 +139,7 @@ Last Updated: YYYY-MM-DD
 ### Step 6: 同步共享 Task 状态
 
 - 使用 CLI 工具命令（如 `vibe task update <task-id> --next-step ...`）将进度更新到共享真源。
-- **严禁** AI 层直接手工编辑底层的 `.git/vibe/registry.json` 或 `worktrees.json`。所有的信息沉积都必须由 Shell API (`vibe task`) 处理。
+- **严禁** AI 层直接手工编辑底层的 `.git/vibe/registry.json` 或 `worktrees.json`。这些路径只用于读取、定位和解释；所有共享状态写入都必须通过 shell API（如 `vibe task update`）完成。
 - 刷新本地只读缓存：`.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
 - `.vibe/focus.md` 保存当前 worktree 的聚焦摘要（task、subtask、next step）
 - `.vibe/session.json` 保存当前 worktree 的短期会话缓存（`worktree_name`、`current_task`、`current_subtask_id`、时间戳）
@@ -227,17 +229,17 @@ Last Updated: YYYY-MM-DD
 
 ## 与 /learn 的关系
 
-| 方面 | `/save` | `/learn` |
+| 方面 | `/vibe-save` | `/learn` |
 | ---- | ------- | -------- |
 | **目的** | 保存项目上下文 | 提取可复用模式 |
 | **存储位置** | 项目级 `.agent/context/` | 全局 `~/.claude/skills/learned/` |
-| **触发方式** | 手动 `/save` + Hook 提醒 | Stop Hook (自动, 需配置) |
+| **触发方式** | 手动 `/vibe-save` + Hook 提醒 | Stop Hook (自动, 需配置) |
 | **内容** | 认知、任务、决策 | 模式、技巧、最佳实践 |
 
 ## 设计决策
 
-1. **共享真源优先** - `/save` 先读 `.vibe/current-task.json`，再回写共享 registry 与 task memory
+1. **共享真源优先** - `/vibe-save` 先读 `.vibe/current-task.json`，再回写共享 registry 与 task memory
 2. **认知与任务分离** - memory 记录共识，task 记录状态与 next step
 3. **compat 层保留** - `.agent/context/*` 暂不废弃，作为迁移过渡入口
 4. **本地缓存可重建** - `.vibe/` 只保留 focus/session 缓存，不保存共享真源
-5. **与 /learn 独立** - `/save` 保存项目上下文，`/learn` 提取全局模式
+5. **与 /learn 独立** - `/vibe-save` 保存项目上下文，`/learn` 提取全局模式

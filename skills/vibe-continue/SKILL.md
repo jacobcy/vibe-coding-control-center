@@ -1,19 +1,21 @@
 ---
 name: vibe-continue
-description: Use when the user wants to resume previous work, says "/continue", or starts a new session and wants to load saved context. Reads task.md and memory/ to restore state.
+description: Use when the user wants to resume previous work, says "/vibe-continue", or starts a new session and wants to load saved context. Reads task.md and memory/ to restore state.
 ---
 
-# /continue - Resume Saved Tasks
+# /vibe-continue - Resume Saved Tasks
 
 继续上次保存的任务。自动读取 task.md 和 memory/ 中的状态，识别未完成的任务。
 
 **核心原则:** 无缝衔接，延续进度。
 
-**Announce at start:** "我正在使用 continue 技能来恢复上次保存的任务。"
+**Announce at start:** "我正在使用 /vibe-continue 技能来恢复上次保存的任务。"
+
+**命令边界:** `/vibe-continue` 是 skill 层恢复流程，不存在同名 shell 子命令。需要 shell 读取当前现场时，使用 `vibe flow status` 等现有 `vibe <command>`；只要参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`。
 
 ## Current Worktree Model
 
-`/continue` 只继续当前 worktree 绑定的 current task，不提供跨 worktree 选择。
+`/vibe-continue` 只继续当前 worktree 绑定的 current task，不提供跨 worktree 选择。
 
 优先读取：
 
@@ -31,7 +33,7 @@ description: Use when the user wants to resume previous work, says "/continue", 
 
 ## Schema 契约
 
-`/continue` 只使用以下真实字段名：
+`/vibe-continue` 只使用以下真实字段名：
 
 - `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
 - `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
@@ -42,15 +44,16 @@ description: Use when the user wants to resume previous work, says "/continue", 
 
 ## 工作流程
 
-### Step 0: Shell-Level Resume
+### Step 0: Shell-Level Context Check
+
+```bash
+vibe flow status
+git config user.name
+```
+
+先用 `vibe flow status` 校验当前 worktree 现场，再检查 `git config user.name` 是否与当前执行代理一致。若签名缺失或不匹配，先执行 `wtinit <agent>` 再继续；不要发明不存在的 shell 命令。
  
- ```bash
- vibe flow continue
- ```
- 
- 运行 `vibe flow continue` 来从共享存储中恢复任务状态与上下文。
- 
- ### Step 1: 恢复方案（根据记忆内容）读取当前 task 指针与共享状态
+### Step 1: 恢复方案（根据记忆内容）读取当前 task 指针与共享状态
 
 ```bash
 # 读取当前 worktree 指针和共享 task registry
@@ -105,6 +108,7 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
   • state: dirty|clean
 
 📌 Current Task
+  • current actor: <agent>
   • [ ] <task-id>: <title> (in progress)
   • current subtask: <subtask-id>
   • next step: <next-step>
@@ -164,14 +168,14 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 - `current_task`
 - `current_subtask_id`
 
-## 与 /save 的关系
+## 与 /vibe-save 的关系
 
 ```
 会话 A                        会话 B
    │                            │
-   ├─ 执行任务                  ├─ /continue
+   ├─ 执行任务                  ├─ /vibe-continue
    ├─ 遇到中断点                │  ↓
-   ├─ /save                     │  读取 task.md
+   ├─ /vibe-save                │  读取 task.md
    │  ↓                         │  读取 memory/<topic>.md
    │  保存状态                  │  恢复上下文
    │                            │  ↓
@@ -215,7 +219,7 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 
 ## 设计决策
 
-1. **当前 worktree 优先** - `/continue` 只继续当前指针绑定的 task
+1. **当前 worktree 优先** - `/vibe-continue` 只继续当前指针绑定的 task
 2. **共享真源优先** - task/subtask/next step 以共享 registry 和 task.json 为准
 3. **compat 层保留** - `.agent/context/*` 作为入口索引，逐步迁移
-4. **与 /save 互补** - `/save` 回写共享状态，`/continue` 读取共享状态
+4. **与 /vibe-save 互补** - `/vibe-save` 回写共享状态，`/vibe-continue` 读取共享状态

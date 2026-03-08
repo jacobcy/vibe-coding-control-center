@@ -1,9 +1,9 @@
 ---
 name: vibe-check
-description: Use when the user wants to verify project memory consistency, says "/check", "verify memory", or "check context". Validates that memory.md, task.md, and memory/ topics match actual project state. Now with intelligent task status sync based on PR merged events.
+description: Use when the user wants to verify project memory consistency, says "/vibe-check", "verify memory", or "check context". Validates that memory.md, task.md, and memory/ topics match actual project state. Now with intelligent task status sync based on PR merged events.
 ---
 
-# /check - Intelligent Status Sync & Memory Consistency
+# /vibe-check - Intelligent Status Sync & Memory Consistency
 
 智能任务状态同步 + 项目记忆一致性验证。检测外部事件（PR merged）并自动建议状态更新，同时验证文档腐烂（documentation rot）。
 
@@ -13,7 +13,9 @@ description: Use when the user wants to verify project memory consistency, says 
 
 **核心原则:** 渐进式智能，保留人工决策权，只留最新，确保可信。
 
-**Announce at start:** "我正在使用 vibe-check 技能来执行智能状态同步和内存一致性验证。"
+**Announce at start:** "我正在使用 /vibe-check 技能来执行智能状态同步和内存一致性验证。"
+
+**命令边界:** `/vibe-check` 是 skill 层入口；`vibe check`、`vibe flow review` 是 shell 层工具。只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`。这些 shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
 
 ## 工作流程
 
@@ -198,7 +200,7 @@ task_file=".agent/context/task.md"
 💡 推荐操作：
   1. 清理僵尸分支
   2. 修复内存不一致
-  3. 运行 /save 清理
+  3. 运行 /vibe-save 清理
 ```
 
 ## 检查项目清单
@@ -236,22 +238,22 @@ task_file=".agent/context/task.md"
 ## 与其他命令的关系
 
 ```
-/save ──────→ 保存上下文（写入）
+/vibe-save ─→ 保存上下文（写入）
                  │
                  ↓
-/check ──────→ 智能状态同步 + 验证一致性（审计）
+/vibe-check ─→ 智能状态同步 + 验证一致性（审计）
                  │
                  ↓
 /review ─────→ 物理与逻辑深度审计（Codex）
                  │
                  ↓
-/continue ───→ 恢复上下文（读取）
+/vibe-continue → 恢复上下文（读取）
 ```
 
 **工作流**:
-1. `/save` - 会话结束时保存
-2. `/check` - 定期智能同步 + 验证一致性
-3. `/continue` - 新会话开始时恢复
+1. `/vibe-save` - 会话结束时保存
+2. `/vibe-check` - 定期智能同步 + 验证一致性
+3. `/vibe-continue` - 新会话开始时恢复
 
 ## 设计决策
 
@@ -265,8 +267,8 @@ task_file=".agent/context/task.md"
 ## 示例用法
 
 ```
-用户: /check
-Claude: 我正在使用 vibe-check 技能来执行智能状态同步和内存一致性验证。
+用户: /vibe-check
+Claude: 我正在使用 /vibe-check 技能来执行智能状态同步和内存一致性验证。
 
         ## Phase 1: 静态检查
         ✅ Registry 与 OpenSpec 已同步
