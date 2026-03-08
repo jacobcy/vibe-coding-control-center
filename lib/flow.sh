@@ -7,8 +7,7 @@ source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
-_flow_set_identity() { git config user.name "$1" && git config user.email "$1@vibe.coding"; }
-_flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
+_flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_DEFAULT_TOOL:-claude}"; }
 _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
 _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
@@ -19,16 +18,15 @@ _flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path feature_slug branch_name suggested_task_id
   vibe_require git jq || return 1
   feature_slug="$(_vibe_task_slugify "$feature")"
-  branch_name="${agent}/${feature_slug}"
+  branch_name="task/${feature_slug}"
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
-  wt_dir="wt-${agent}-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
+  wt_dir="wt-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
   suggested_task_id="$(_vibe_task_today)-${feature_slug}"
   log_step "Creating worktree: $wt_dir"
-  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$agent" "$ref" || { log_error "wtnew failed"; return 1; }
+  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$ref" || { log_error "wtnew failed"; return 1; }
   else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; return 1; }
   fi
   cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_worktree "$wt_path"; return 1; }
-  _flow_set_identity "$agent" || { _flow_rollback_worktree "$wt_path"; return 1; }
   log_success "Flow runtime ready: $feature  (branch: $branch_name)"
   echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
   echo "💬 Next"
@@ -46,13 +44,9 @@ _flow_bind() {
   [[ -z "$tid" || "$tid" =~ ^-- ]] && { _flow_bind_usage; return 1; }
   reg="$(_flow_registry_file)"; title="$(_flow_task_title "$tid" "$reg")"
   [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
-  agent="${agent:-${VIBE_AGENT:-claude}}"
+  agent="${agent:-$(_flow_default_agent)}"
   log_step "Identity: $agent"
-  if typeset -f wtinit &>/dev/null; then
-    wtinit "$agent" >/dev/null || return 1
-  fi
-  _flow_set_identity "$agent" || return 1
-  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
+  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current --agent "$agent" || return 1
   log_success "Bound: $tid ($title)"
 }
 
@@ -61,7 +55,7 @@ _flow_new() {
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
-  _flow_new_worktree "$feat" "${agent:-${VIBE_AGENT:-claude}}" "$ref"
+  _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
 _flow_done() {
   local branch unmerged

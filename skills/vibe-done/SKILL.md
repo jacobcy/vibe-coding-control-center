@@ -36,8 +36,8 @@ input_examples:
 > - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。修改它们不会产生新的 git dirty。
 > - **严禁修改 `docs/` 等项目内文档**。追踪大盘数据应全部收敛在 `.git/vibe/` 内。
 
-1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。然后通过 `git config user.name` 检查当前沙盒中记录的签名身份是否匹配你的真实身份。如果环境显示的是别人的名字（或者未设置），你应先使用 `wtinit <你自己的名字>` 进行修正，然后再以你的真实身份作为**“结项操作者”**进行签字记录。
-2. **调用 `vibe task update <task_id> --status completed --unassign`**：将该任务设为 `completed` / `archived` / `skipped`。
+1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。你需要主动声明，确保你在更新任务状态时，能够正确使用 `--agent <你的真实身份>` 以确保写入系统的 `agent_log` 打卡记录是准确的主动署名。
+2. **调用 `vibe task update <task_id> --status completed --unassign --agent <你的名字>`**：将该任务设为 `completed` / `archived` / `skipped`，并在同时触发最终的身份追加。
 ### Step 2: 归档合规与防丢代码检查
 
 **强制审查点：** 

@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.6] - 2026-03-08
+
+### ✨ Changed
+- refactor: decouple physical git signature from logical authorship log ...
+
 ## [Unreleased]
 
 ### ✨ New Features

@@ -26,7 +26,11 @@ _vibe_task_write_registry() {
            else . end)
         | (if $runtime_mode != "set" and $runtime_branch != "" then .runtime_branch = $runtime_branch else . end)
         | (if $runtime_mode != "set" and $runtime_agent != "" then .runtime_agent = $runtime_agent else . end)
-        | (if $runtime_agent != "" then .agent = $runtime_agent else . end)
+        | (if $runtime_agent != "" then 
+             .agent = $runtime_agent 
+             | (.agent_log // {planned_by: $runtime_agent, executed_by: [], committed_by: null, latest_actor: null}) as $log
+             | .agent_log = ($log | .latest_actor = $runtime_agent | .executed_by = ((.executed_by + [$runtime_agent]) | unique))
+           else . end)
         | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
         | (if $issue_mode == "append" then .issue_refs = (((.issue_refs // []) + $issue_refs) | unique) else . end)
         | (if $roadmap_mode == "append" then .roadmap_item_ids = (((.roadmap_item_ids // []) + $roadmap_item_ids) | unique) else . end)
