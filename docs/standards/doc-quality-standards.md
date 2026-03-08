@@ -116,6 +116,7 @@ related_docs:
 |--------|------|------|------|---------|
 | `document_type` | string | 是 | 文档类型标识 | `core-entry`, `skill`, `template` 等 |
 | `author` | string | 是 | 文档创建者 | AI: `"Claude Sonnet 4.5"` / Human: 真实姓名 |
+| `co_writers` | array[string] | 否 | 协作署名列表 | `["GPT-5 Codex", "Chen Yi"]` |
 | `created` | string | 是 | 创建时间 | `2025-01-24` (ISO 8601) |
 | `last_updated` | string | 否 | 最后更新时间 | `2025-01-24` (ISO 8601) |
 | `related_docs` | array[string] | 否 | 相关文档路径（上下文圈定） | `["SOUL.md", "docs/README.md"]` |
@@ -132,7 +133,14 @@ related_docs:
   - ✅ 正确：`"Claude Sonnet 4.5"`
   - ❌ 错误：`"Vibe Center Team"`、`"AI Assistant"`
 - **人类创建的文档**：使用真实姓名或用户名
+- 表示首位创建者或当前文档主责作者
 - 这是真实性原则的体现，避免虚假身份
+
+**`co_writers`**
+- 可选字段，用于记录参与实质撰写且需要保留署名的协作者
+- 可包含 AI Agent 身份或人类身份
+- 新增协作者且主责作者未变化时，应优先追加 `co_writers`，而不是改写 `author`
+- 不得把 `co_writers` 当作 `author` 的替代字段
 
 **`created`**
 - 文档首次创建的日期
@@ -175,6 +183,8 @@ authority:
 audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-24
 last_updated: 2025-01-24
 related_docs:
@@ -389,6 +399,8 @@ title: Implement Document Quality Standards
 current_layer: code
 status: in-progress
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-15
 last_updated: 2025-01-24
 related_docs:
@@ -430,6 +442,8 @@ task_id: 2024-01-15-doc-quality
 document_type: task-prd
 title: Document Quality Standards - PRD
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-15
 last_updated: 2025-01-15
 related_docs:
