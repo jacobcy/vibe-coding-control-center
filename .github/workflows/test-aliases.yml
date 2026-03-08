@@ -2,11 +2,13 @@ name: Test Aliases
 
 on:
   push:
+    branches: [main]
     paths:
       - 'config/*.sh'
       - 'alias/*.sh'
       - 'tests/test-aliases.sh'
   pull_request:
+    branches: [main]
     paths:
       - 'config/*.sh'
       - 'alias/*.sh'
