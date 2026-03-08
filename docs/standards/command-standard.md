@@ -16,8 +16,10 @@ related_docs:
   - STRUCTURE.md
   - docs/README.md
   - docs/standards/data-model-standard.md
+  - docs/standards/skill-standard.md
   - docs/standards/registry-json-standard.md
   - docs/standards/roadmap-json-standard.md
+  - docs/standards/shell-capability-design.md
 ---
 
 # 共享状态命令标准
@@ -25,6 +27,73 @@ related_docs:
 本文档是 Vibe 共享状态命令的唯一规范真源，定义 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的最终命令模型。
 
 本文档只定义最终标准，不记录历史演进、迁移步骤、现状偏差或实现映射。
+
+## 0. Shell Role
+
+`vibe` Shell 的顶层定位不是 workflow engine，而是 capability layer。
+
+它的唯一目标是：
+
+- 隔离 skill 与共享状态数据源
+- 暴露原子、可组合、可验证的方法
+- 为 skill 提供稳定工具，而不是替 skill 完成业务流程
+
+### 0.1 Responsibility Boundary
+
+`skill` / agent 负责：
+
+- 业务逻辑
+- 工作流编排
+- 任务拆分
+- 优先级决策
+- 是否新建 flow
+- 一个 flow 绑定一个还是多个 task
+
+`vibe` Shell 负责：
+
+- 读取共享状态
+- 写入共享状态
+- 创建现场
+- 绑定现场
+- 执行单一原子动作
+
+### 0.2 Source Isolation Principle
+
+skill 不得直接读写共享状态真源：
+
+- `roadmap.json`
+- `registry.json`
+- `worktrees.json`
+
+skill 必须通过 Shell API 操作共享状态。
+
+Shell 的存在目的就是隔离：
+
+- 上层智能编排
+- 下层共享状态真源
+
+### 0.3 No Hidden Workflow Rule
+
+Shell 命令禁止：
+
+- 偷偷创建额外实体
+- 隐式推进多步业务流程
+- 在单个命令内完成本应由 skill 决定的编排动作
+- 代替 skill 做任务拆分、优先级判断或任务选择
+
+判断标准：
+
+- 如果一个命令同时完成两个以上跨层动作，它大概率越权
+- 如果删掉 skill 后命令仍在替用户做业务决策，它大概率越权
+
+### 0.4 Shell Design Review Questions
+
+评审任何 Shell 命令设计时，必须先回答：
+
+1. 是否提供了足够的原子方法让 skill 完成工作？
+2. 是否越过职责边界，执行了应由 skill 负责的业务逻辑？
+3. 是否把数据层写入暴露给了 skill 以外的路径？
+4. 是否存在“顺手多做一步”的隐藏副作用？
 
 命令的数据模型基础见：
 
@@ -62,12 +131,14 @@ related_docs:
 - 子命令使用短单词
 - 长参数统一使用 `--kebab-case`
 - 查询命令优先使用 `status / list / show`
+- 命令应尽量对应单一原子动作
 
 ### 2.2 Action Naming
 
 - 向共享模型新增实体使用 `add`
 - 创建运行时现场使用 `new`
 - `add` 与 `new` 不能混用
+- 命令名必须表达能力，不表达完整业务流程
 
 结论：
 
@@ -87,6 +158,7 @@ related_docs:
 - 任何创建、删除、覆盖或状态修改动作必须显式传 `-y` 或 `--yes`
 - 若上下文不足以安全执行，命令必须直接失败，不进入确认流程
 - help 文案必须明确标出哪些子命令要求 `-y`
+- 命令失败时必须暴露阻塞事实，不能擅自 fallback 到直接改数据源
 
 ### 2.5 Runtime vs Persistent State
 
@@ -114,6 +186,7 @@ related_docs:
 - 用 `task` 承担规划层职责
 - 用 `flow` 承担 task 生命周期或规划职责
 - 用 `check` 承担业务写入职责
+- 用 Shell 替 skill 承担工作流编排职责
 
 ## 4. `vibe roadmap` Standard
 
