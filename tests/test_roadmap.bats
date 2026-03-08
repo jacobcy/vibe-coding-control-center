@@ -296,7 +296,31 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [ "$output" = "[p0] gh-36" ]
+  [ "$output" = $'P0 (1)\n  gh-36' ]
+  [[ ! "$output" =~ $'\033' ]]
+}
+
+@test "roadmap list text output groups items by status" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = $'P0 (1)\n  rm-2  Beta\n\nCurrent (1)\n  rm-1  Alpha\n\nDeferred (1)\n  rm-3  Gamma' ]
   [[ ! "$output" =~ $'\033' ]]
 }
 

@@ -45,6 +45,18 @@ _vibe_roadmap_color_status() {
     esac
 }
 
+_vibe_roadmap_status_label() {
+    local item_status="$1"
+    case "$item_status" in
+        p0) printf 'P0' ;;
+        current) printf 'Current' ;;
+        next) printf 'Next' ;;
+        deferred) printf 'Deferred' ;;
+        rejected) printf 'Rejected' ;;
+        *) printf '%s' "$item_status" ;;
+    esac
+}
+
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -187,18 +199,31 @@ _vibe_roadmap_list() {
         return 0
     fi
 
-    local row item_status rid title colored_status
-    echo "$items_json" | jq -c '.[]' | while read -r row; do
-        item_status=$(echo "$row" | jq -r '.status')
-        rid=$(echo "$row" | jq -r '.roadmap_item_id')
-        title=$(echo "$row" | jq -r '.title')
-        colored_status=$(_vibe_roadmap_color_status "$item_status")
-        
-        if [[ "$title" == "$rid" || -z "$title" ]]; then
-            printf "[%b] %s\n" "$colored_status" "$rid"
+    local first_group="true" group_status group_items group_count row rid title
+    local -a ordered_statuses=(p0 current next deferred rejected)
+
+    for group_status in "${ordered_statuses[@]}"; do
+        group_items="$(echo "$items_json" | jq -c --arg status "$group_status" '[.[] | select(.status == $status)]')"
+        group_count="$(echo "$group_items" | jq 'length')"
+        [[ "$group_count" == "0" ]] && continue
+
+        if [[ "$first_group" == "true" ]]; then
+            first_group="false"
         else
-            printf "[%b] %-12s  %s\n" "$colored_status" "$rid" "$title"
+            printf '\n'
         fi
+
+        printf '%s (%s)\n' "$(_vibe_roadmap_status_label "$group_status")" "$group_count"
+        echo "$group_items" | jq -c '.[]' | while read -r row; do
+            rid=$(echo "$row" | jq -r '.roadmap_item_id')
+            title=$(echo "$row" | jq -r '.title')
+
+            if [[ "$title" == "$rid" || -z "$title" ]]; then
+                printf '  %s\n' "$rid"
+            else
+                printf '  %s  %s\n' "$rid" "$title"
+            fi
+        done
     done
 }
 
