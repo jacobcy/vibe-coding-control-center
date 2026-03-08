@@ -3,6 +3,8 @@ document_type: template
 template_for: prd
 description: Template for Product Requirements Documents (PRD) following Vibe Workflow Paradigm
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-24
 last_updated: 2025-01-24
 related_docs:

@@ -11,8 +11,10 @@ input_examples:
 
 # Vibe Done Skill
 
-作为整个开发闭环的最后一扣，本指令只做一件事：**任务结算与大盘清理**。
-在执行 `vibe flow done` (CLI 移除工作树) 前后，用户通常需要呼叫本指令通知 AI 结算任务。
+作为整个开发闭环的最后一扣，`/vibe-done` 只做一件事：**任务结算与大盘清理**。
+`/vibe-done` 是 skill 层入口；`vibe flow done`、`vibe task update` 是 shell 层工具。在执行 `vibe flow done` 前后，用户通常需要呼叫本指令通知 AI 结算任务。
+
+**命令自检:** 对 `vibe flow`、`vibe task` 或 `git` 的参数有任何不确定时，先运行对应命令的 `-h` / `--help`。shell 命令是 agent 的执行工具，不是给用户背诵的命令列表。
 
 ## Workflow Steps
 
@@ -33,11 +35,11 @@ input_examples:
 
 > ⚠️ **收口边界绝杀原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的终结级别元数据清算指令**。
 > - **【红线】绝对禁止修改任何业务源代码文件！** 任务此时已实质结束（可能已合并），任何试图在这里再动代码的行为都会导致无限 PR 循环。如果检查时发现代码遗留 Bug，请**直接报错并停止**，让用户新开 Task，绝不允许你擅自进行二次修复代码及提交！
-> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。修改它们不会产生新的 git dirty。
+> - **共享状态写入只能通过 shell API 完成**，例如 `vibe task update ...`、`vibe flow done`。skill 可以读取 `.git/vibe/*` 状态并解释，但不得手工直接编辑真源 JSON。
 > - **严禁修改 `docs/` 等项目内文档**。追踪大盘数据应全部收敛在 `.git/vibe/` 内。
 
-1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。你需要主动声明，确保你在更新任务状态时，能够正确使用 `--agent <你的真实身份>` 以确保写入系统的 `agent_log` 打卡记录是准确的主动署名。
-2. **调用 `vibe task update <task_id> --status completed --unassign --agent <你的名字>`**：将该任务设为 `completed` / `archived` / `skipped`，并在同时触发最终的身份追加。
+1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。然后通过 `git config user.name` 检查当前沙盒中记录的签名身份是否匹配你的真实身份。如果环境显示的是别人的名字（或者未设置），你应先使用 `wtinit <你自己的名字>` 进行修正，然后再以你的真实身份作为**“结项操作者”**进行记录。
+2. **调用 `vibe task update <task_id> --status completed --unassign`**：通过 shell API 将该任务设为 `completed` 并解除现场绑定；若要归档，再显式调用支持的 shell 命令，不要口头发明状态值。
 ### Step 2: 归档合规与防丢代码检查
 
 **强制审查点：** 

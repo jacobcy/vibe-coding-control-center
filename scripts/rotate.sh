@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # scripts/rotate.sh - 从当前 worktree 旋转到新的可发布 workflow
-# 用法: ./scripts/rotate.sh <new-branch-name>
+# 用法: ./scripts/rotate.sh <new-branch-name> [--save-unstash]
 
 set -euo pipefail
 
@@ -52,11 +52,44 @@ update_worktree_dashboard() {
     ' "$worktrees_file" > "$tmp" && mv "$tmp" "$worktrees_file"
 }
 
-new_task="${1:-}"
+new_task=""
+save_unstash=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --save-unstash|--carry-wip)
+            save_unstash=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 <new-branch-name> [--save-unstash]"
+            echo "  从当前 worktree 旋转到新的可发布 workflow"
+            echo "  默认不会把未提交改动带到新分支（仅保存到 stash）"
+            echo "  传 --save-unstash 时会在新分支自动恢复 stash"
+            exit 0
+            ;;
+        -*)
+            log_error "Unknown option: $1"
+            echo "Usage: $0 <new-branch-name> [--save-unstash]"
+            exit 1
+            ;;
+        *)
+            if [[ -z "$new_task" ]]; then
+                new_task="$1"
+                shift
+            else
+                log_error "Unexpected argument: $1"
+                echo "Usage: $0 <new-branch-name> [--save-unstash]"
+                exit 1
+            fi
+            ;;
+    esac
+done
+
 if [[ -z "$new_task" ]]; then
-    echo "Usage: $0 <new-branch-name>"
+    echo "Usage: $0 <new-branch-name> [--save-unstash]"
     echo "  从当前 worktree 旋转到新的可发布 workflow"
-    echo "  当前 HEAD 上的已提交内容会保留，未提交改动会通过 stash 带过去"
+    echo "  默认不会把未提交改动带到新分支（仅保存到 stash）"
+    echo "  传 --save-unstash 时会在新分支自动恢复 stash"
     exit 1
 fi
 
@@ -137,11 +170,17 @@ else
 fi
 
 if $stashed; then
-    log_step "Applying saved changes"
-    if git stash pop; then
-        log_success "Applied changes to $new_task"
+    if $save_unstash; then
+        log_step "Applying saved changes (--save-unstash)"
+        if git stash pop; then
+            log_success "Applied changes to $new_task"
+        else
+            log_warn "Stash pop failed (conflicts?). Run 'git stash pop' manually."
+        fi
     else
-        log_warn "Stash pop failed (conflicts?). Run 'git stash pop' manually."
+        log_info "Saved WIP kept in stash (default behavior)"
+        log_info "Use '--save-unstash' to auto-apply WIP on the new branch."
+        log_info "Top stash: $(git stash list | head -n 1)"
     fi
 fi
 

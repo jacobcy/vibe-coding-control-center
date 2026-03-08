@@ -7,9 +7,11 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 维护全景路线图，管理版本目标，对 roadmap item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** CLI 负责读写数据，skill 负责调度决策。
+**核心原则:** `/vibe-roadmap` 负责调度决策，`vibe roadmap` 负责 shell 层读写数据。
 
-**Announce at start:** "我正在使用 vibe-roadmap 技能来管理版本路线图。"
+**Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
+
+**命令自检:** 对 `vibe roadmap` 的参数、子命令或 flag 有任何不确定时，先运行 `vibe roadmap -h`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
 
 ## Trigger Examples
 
@@ -23,7 +25,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 ## Hard Boundary
 
-- 必须先运行 `bin/vibe roadmap` 相关命令
+- 必须先运行 `vibe roadmap` 相关 shell 命令
 - 不得直接修改 `registry.json` 底层数据
 - 必须通过 Shell API 写入数据
 - 调度器无法判断优先级时，必须要求人类讨论
@@ -32,7 +34,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 ### Step 1: 检查版本目标
 
-运行 `bin/vibe roadmap status` 获取当前版本目标状态：
+运行 `vibe roadmap status` 获取当前版本目标状态：
 
 - 当前版本目标是什么
 - 有哪些 Issue 等待分类
@@ -97,7 +99,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 ## Failure Handling
 
-如果 `bin/vibe roadmap` 失败：
+如果 `vibe roadmap` 失败：
 
 - 直接展示 CLI 返回的阻塞原因
 - 明确告诉用户当前无法进行路线图管理
