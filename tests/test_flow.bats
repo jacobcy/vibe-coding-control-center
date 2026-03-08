@@ -354,7 +354,7 @@ EOF
   grep -q "config user.email claude@vibe.coding" "$calls"
 }
 
-@test "14. vibe flow start with path feature uses sanitized branch and prints cd next-step" {
+@test "14. vibe flow start with path feature does not auto-create or bind task" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -367,9 +367,8 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
-    _vibe_task_add() { echo "$*" > "'"$fixture"'/task_add_args"; return 0; }
-    _vibe_task_update() { return 0; }
+    _vibe_task_add() { echo "CALLED" > "'"$fixture"'/task_add_called"; return 0; }
+    _vibe_task_update() { echo "CALLED" > "'"$fixture"'/task_update_called"; return 0; }
     wtnew() {
       echo "$1" > "'"$fixture"'/wtnew_branch"
       mkdir -p "'"$fixture"'/wt-claude-$1"
@@ -386,13 +385,15 @@ EOF
   '
 
   [ "$status" -eq 0 ]
-  [[ "$(cat "$fixture/task_add_args")" =~ "--id 2026-03-05-2026-03-02-vibe-new-task-flow-convergence" ]]
+  [ ! -f "$fixture/task_add_called" ]
+  [ ! -f "$fixture/task_update_called" ]
   [ "$(cat "$fixture/wtnew_branch")" = "2026-03-02-vibe-new-task-flow-convergence" ]
   [[ "$output" =~ "cd " ]]
-  [[ "$output" =~ "vup" ]]
+  [[ "$output" =~ "vibe task add" ]]
+  [[ "$output" =~ "vibe flow bind" ]]
 }
 
-@test "15. vibe flow start rolls back task when worktree creation fails" {
+@test "15. vibe flow start fails cleanly when worktree creation fails" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -405,7 +406,6 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
     wtnew() { return 1; }
 
     git() {
@@ -423,7 +423,7 @@ EOF
   [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
 }
 
-@test "16. vibe flow start rolls back task when entering worktree fails" {
+@test "16. vibe flow start rolls back worktree when entering worktree fails" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -436,7 +436,6 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
     wtnew() { return 0; }
 
     git() {
@@ -457,46 +456,14 @@ EOF
 }
 
 
-@test "17. vibe flow list --keywords filters by task title" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/vibe"
-  cat > "$fixture/vibe/registry.json" <<'JSON'
-{"schema_version":"v1","tasks":[
-  {"task_id":"t-1","title":"Roadmap Alpha","status":"todo","next_step":""},
-  {"task_id":"t-2","title":"Unrelated Task","status":"todo","next_step":""}
-]}
-JSON
-  cat > "$fixture/vibe/worktrees.json" <<'JSON'
-{"schema_version":"v1","worktrees":[
-  {"worktree_name":"wt-a","tasks":["t-1"],"current_task":"t-1"},
-  {"worktree_name":"wt-b","tasks":["t-2"],"current_task":"t-2"}
-]}
-JSON
-
+@test "17. vibe flow list rejects unsupported --keywords option" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
-    git() {
-      case "$*" in
-        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
-        "worktree list --porcelain")
-          echo "worktree /tmp/wt-a"
-          echo "worktree /tmp/wt-b"
-          return 0
-          ;;
-        "-C /tmp/wt-a status --porcelain"|"-C /tmp/wt-b status --porcelain") echo ""; return 0 ;;
-        "-C /tmp/wt-a branch --show-current") echo "feature/a"; return 0 ;;
-        "-C /tmp/wt-b branch --show-current") echo "feature/b"; return 0 ;;
-        "rev-parse --is-inside-work-tree") return 0 ;;
-        *) return 0 ;;
-      esac
-    }
     _flow_list --keywords Roadmap
   '
 
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "wt-a" ]]
-  [[ ! "$output" =~ "wt-b" ]]
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Unknown option for flow list" ]]
 }

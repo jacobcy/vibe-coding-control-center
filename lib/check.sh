@@ -1,181 +1,158 @@
 #!/usr/bin/env zsh
-# v2/lib/check.sh - Minimalist Validation for Vibe 2.0
-# Target: ~30 lines | Simplified API
+# lib/check.sh - Shared-state audits and schema checks
 
 [[ -f "$VIBE_LIB/check_pr_status.sh" ]] && source "$VIBE_LIB/check_pr_status.sh"
+[[ -f "$VIBE_LIB/check_groups.sh" ]] && source "$VIBE_LIB/check_groups.sh"
+
+_vibe_check_help() {
+  echo "${BOLD}Vibe Check${NC}"
+  echo ""
+  echo "Usage: ${CYAN}vibe check${NC} [check] [target] [options]"
+  echo ""
+  echo "Targets:"
+  echo "  ${GREEN}(none)${NC}            运行全量审计（roadmap/task/flow/link/docs）"
+  echo "  ${GREEN}check${NC}             同上（兼容 command-standard）"
+  echo "  ${GREEN}roadmap${NC}           只检查 roadmap 域"
+  echo "  ${GREEN}task${NC}              只检查 task 域"
+  echo "  ${GREEN}flow${NC}              只检查 flow 域"
+  echo "  ${GREEN}link${NC}              只检查跨层链接一致性"
+  echo "  ${GREEN}json <file>${NC}       JSON + schema 检查"
+  echo "  ${GREEN}docs${NC}              文档 frontmatter 审计"
+  echo ""
+  echo "Options:"
+  echo "  ${GREEN}--json${NC}            输出机器可读结果"
+  echo ""
+  echo "Examples:"
+  echo "  vibe check"
+  echo "  vibe check check --json"
+  echo "  vibe check roadmap"
+  echo "  vibe check json .git/vibe/registry.json"
+}
+
+_vibe_check_render_text() {
+  local payload="$1" group group_json display_status summary
+  local -a groups
+  groups=("$(echo "$payload" | jq -r 'keys[]')")
+
+  echo "${BOLD}Vibe Check Report${NC}"
+  echo ""
+
+  while IFS= read -r group; do
+    [[ -z "$group" ]] && continue
+    group_json="$(echo "$payload" | jq -c --arg g "$group" '.[$g]')"
+    display_status="$(echo "$group_json" | jq -r '.status')"
+    summary="$(echo "$group_json" | jq -r '.summary')"
+
+    if [[ "$display_status" == "pass" ]]; then
+      echo "${GREEN}[$group] PASS${NC} - $summary"
+    else
+      echo "${RED}[$group] FAIL${NC} - $summary"
+    fi
+
+    echo "$group_json" | jq -r '.errors[]?' | sed 's/^/  error: /'
+    echo "$group_json" | jq -r '.warnings[]?' | sed 's/^/  warn:  /'
+    echo ""
+  done < <(echo "$payload" | jq -r 'keys[]')
+}
+
+_vibe_check_has_failures() {
+  local payload="$1"
+  echo "$payload" | jq -e 'to_entries | any(.value.status == "fail")' >/dev/null 2>&1
+}
 
 vibe_check() {
-    local file="${1:-}"
-    local audit_tasks=false
+  local mode="all" json_out=0 file_arg=""
+  local extra_args=()
 
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --audit-tasks)
-                audit_tasks=true
-                shift
-                ;;
-            -h|--help)
-                echo "${BOLD}Vibe Health Checker${NC}"
-                echo ""
-                echo "Usage: ${CYAN}vibe check${NC} [options] [file]"
-                echo ""
-                echo "Modes:"
-                echo "  ${GREEN}[file]${NC}        验证文件格式（目前支持 JSON 及其 Vibe Schema）"
-                echo "  ${GREEN}(无参数)${NC}      执行项目全要素审计（Registry、OpenSpec、归档、僵尸分支）"
-                echo ""
-                echo "Options:"
-                echo "  ${GREEN}--audit-tasks${NC}  运行任务注册审计与修复（在主检查前执行）"
-                return 0
-                ;;
-            *)
-                file="$1"
-                shift
-                ;;
-        esac
-    done
-
-    if [[ -n "$file" && "$file" != "--audit-tasks" ]]; then
-        [[ -f "$file" ]] || { log_error "File not found: $file"; return 1; }
-        if [[ "$file" == *.json ]]; then
-            jq empty "$file" >/dev/null 2>&1 || { log_error "Invalid JSON: $file"; return 1; }
-            jq -e 'has("tasks") or has("worktrees")' "$file" >/dev/null 2>&1 && log_success "Valid Vibe Data: $file" || log_success "Valid JSON: $file"
-        else
-            log_warn "Unsupported file type for check: $file"
-            return 1
-        fi
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        _vibe_check_help
         return 0
-    fi
+        ;;
+      check)
+        shift
+        ;;
+      --json)
+        json_out=1
+        shift
+        ;;
+      roadmap|task|flow|link|docs)
+        [[ "$mode" == "all" ]] || { log_error "Only one check target can be specified"; return 1; }
+        mode="$1"
+        shift
+        ;;
+      json)
+        mode="json"
+        shift
+        [[ $# -gt 0 ]] || { log_error "Usage: vibe check json <file>"; return 1; }
+        file_arg="$1"
+        shift
+        ;;
+      *)
+        extra_args+=("$1")
+        shift
+        ;;
+    esac
+  done
 
-    # --- Task Audit Mode (--audit-tasks) ---
-    if [[ "$audit_tasks" == true ]]; then
-        log_step "Running Task Registration Audit..."
-        log_info "Phase 0: Task registry audit and repair"
-        echo ""
-
-        # Run vibe task audit (which triggers repair workflow)
-        if vibe task audit; then
-            log_success "Task audit complete. Proceeding to project audit..."
-            echo ""
-        else
-            log_warn "Task audit encountered issues. Review the output above."
-            echo ""
-        fi
-    fi
-
-    # --- Audit Mode (No arguments) ---
-    log_step "Starting Comprehensive Vibe Audit..."
-    local reg; reg="$(git rev-parse --git-common-dir)/vibe/registry.json"
-    [[ -f "$reg" ]] || { log_error "Missing registry.json"; return 1; }
-
-    # 1. OpenSpec registration audit
-    log_info "1. Auditing OpenSpec registration..."
-    vibe task audit --check-openspec >/dev/null 2>&1 || true
-
-    # 2. Archive completed tasks
-    log_info "2. Archiving completed tasks..."
-    local archive_dir="docs/tasks/archive"
-    mkdir -p "$archive_dir"
-    jq -r '.tasks[] | select(.status == "completed") | .task_id' "$reg" | while read -r tid; do
-        if [[ -d "docs/tasks/$tid" ]]; then
-            log_info "   Archiving $tid..."
-            mv "docs/tasks/$tid" "$archive_dir/" 2>/dev/null
-            vibe task update "$tid" --status archived >/dev/null 2>&1
-        elif [[ -d "$archive_dir/$tid" ]]; then
-            # Folder already in archive, but status still "completed" - sync it
-            vibe task update "$tid" --status archived >/dev/null 2>&1
-        fi
-    done
-
-    # 3. Detect stale remote branches
-    log_info "3. Scanning stale remote branches..."
-    git fetch origin --prune --quiet 2>/dev/null || true
-    # Local cleanup of merged branches
-    git branch --merged main | grep -v '^*\|main' | xargs git branch -d 2>/dev/null || true
-    
-    # 4. Detect scattered documents (plans only, prds are canonical)
-    log_info "4. Searching for scattered task documents (docs/plans)..."
-    local scattered=()
-    if [[ -d "docs/plans" ]]; then
-        while read -r f; do
-            scattered+=("$f")
-        done < <(find "docs/plans" -maxdepth 1 -name "*.md" ! -name "README.md" 2>/dev/null)
-    fi
-    if [[ ${#scattered[@]} -gt 0 ]]; then
-        log_warn "   Found ${#scattered[@]} scattered documents in docs/plans:"
-        for f in "${scattered[@]}"; do echo "     - $f"; done
-    fi
-
-    # 5. Branch Consistency Check
-    log_info "5. Verifying branch-to-task consistency..."
-    local active_tasks; active_tasks=$(jq -r '.tasks[] | select(.status == "in_progress" or .status == "todo") | .task_id' "$reg")
-    local branches_in_use; branches_in_use=($(git worktree list --porcelain | awk '$1=="branch" {print $2}'))
-    local ghost_branches=()
-    while read -r branch; do
-        branch="${branch#* }" # Remove star if current
-        # 1. Exempt branches currently checked out in any worktree
-        local in_use=0
-        for b in "${branches_in_use[@]}"; do
-            [[ "refs/heads/$branch" == "$b" ]] && { in_use=1; break; }
-        done
-        [[ $in_use -eq 1 ]] && continue
-
-        # 2. Check if branch name matches any active task ID or slug
-        local match_found=0
-        for tid in ${(f)active_tasks}; do
-            # Full match or slug match (e.g. branch "claude/feat" matches task "YYYY-MM-DD-feat")
-            [[ "$branch" == *"$tid"* ]] && { match_found=1; break; }
-            local slug="${tid#????-??-??-}" # Extract slug from YYYY-MM-DD-slug
-            [[ -n "$slug" && "$branch" == *"$slug"* ]] && { match_found=1; break; }
-        done
-        # Ignore main and v* branches
-        [[ "$branch" == "main" || "$branch" == v* ]] && match_found=1
-        
-        [[ $match_found -eq 0 ]] && ghost_branches+=("$branch")
-    done < <(git branch --list --no-column | sed 's/^[ *]*//')
-    
-    if [[ ${#ghost_branches[@]} -gt 0 ]]; then
-        log_warn "   Found ${#ghost_branches[@]} ghost branches (no active task matching):"
-        for gb in "${ghost_branches[@]}"; do echo "     - $gb"; done
-    fi
-
-    # Phase 2: Git Status Check (PR merged detection)
-    log_info "6. Checking PR merged status..."
-    if ! _check_gh_available; then
-        log_warn "   gh CLI not available or not authenticated. Skipping PR status check."
+  if [[ ${#extra_args[@]} -gt 0 ]]; then
+    if [[ "$mode" == "all" && ${#extra_args[@]} -eq 1 ]]; then
+      mode="json"
+      file_arg="${extra_args[1]}"
     else
-        local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
-        local -a uncertain_tasks
-        while IFS='|' read -r task_id branch; do
-            [[ -n "$task_id" && -n "$branch" ]] && uncertain_tasks+=("$task_id|$branch")
-        done < <(_check_pr_merged_status "$reg" "$worktrees_file")
-
-        if [[ ${#uncertain_tasks[@]} -gt 0 ]]; then
-            log_info "   Found ${#uncertain_tasks[@]} task(s) with merged PRs:"
-            for task_info in "${uncertain_tasks[@]}"; do
-                local tid br
-                IFS='|' read -r tid br <<< "$task_info"
-                echo "     - $tid (branch: $br)"
-            done
-            echo ""
-            log_info "   Run ${CYAN}/vibe-check${NC} for AI-assisted task completion analysis."
-        fi
+      log_error "Unknown check target: ${extra_args[1]}"
+      return 1
     fi
+  fi
 
-    # 7. Health Check Summary
-    local total; total=$(jq '.tasks | length' "$reg")
-    local in_progress; in_progress=$(jq '[.tasks[] | select(.status == "in_progress" or .status == "todo")] | length' "$reg")
-    local archived; archived=$(jq '[.tasks[] | select(.status == "archived")] | length' "$reg")
-    local completed; completed=$(jq '[.tasks[] | select(.status == "completed")] | length' "$reg")
-    local archived_folders; archived_folders=$(ls -1 "$archive_dir" 2>/dev/null | wc -l | xargs)
+  local payload
+  case "$mode" in
+    all)
+      local g_roadmap g_task g_flow g_link g_docs
+      g_roadmap="$(_vibe_check_group_roadmap)"
+      g_task="$(_vibe_check_group_task)"
+      g_flow="$(_vibe_check_group_flow)"
+      g_link="$(_vibe_check_group_link)"
+      g_docs="$(_vibe_check_group_docs)"
+      payload="$(jq -nc \
+        --argjson roadmap "$g_roadmap" \
+        --argjson task "$g_task" \
+        --argjson flow "$g_flow" \
+        --argjson link "$g_link" \
+        --argjson docs "$g_docs" \
+        '{roadmap:$roadmap, task:$task, flow:$flow, link:$link, docs:$docs}')"
+      ;;
+    roadmap)
+      payload="$(jq -nc --argjson roadmap "$(_vibe_check_group_roadmap)" '{roadmap:$roadmap}')"
+      ;;
+    task)
+      payload="$(jq -nc --argjson task "$(_vibe_check_group_task)" '{task:$task}')"
+      ;;
+    flow)
+      payload="$(jq -nc --argjson flow "$(_vibe_check_group_flow)" '{flow:$flow}')"
+      ;;
+    link)
+      payload="$(jq -nc --argjson link "$(_vibe_check_group_link)" '{link:$link}')"
+      ;;
+    docs)
+      payload="$(jq -nc --argjson docs "$(_vibe_check_group_docs)" '{docs:$docs}')"
+      ;;
+    json)
+      [[ -n "$file_arg" ]] || { log_error "Usage: vibe check json <file>"; return 1; }
+      payload="$(jq -nc --argjson json "$(_vibe_check_group_json_file "$file_arg")" '{json:$json}')"
+      ;;
+    *)
+      log_error "Unknown check mode: $mode"
+      return 1
+      ;;
+  esac
 
-    log_success "Audit complete."
-    echo "  - Total Tasks: $total"
-    echo "  - Active (Todo/In-Progress): $in_progress"
-    echo "  - Completed (Pending Archive): $completed"
-    echo "  - Archived Tasks: $archived (Docs in archive/: $archived_folders)"
-    echo "  - Ghost Branches: ${#ghost_branches[@]}"
-    echo "  - Scattered Docs: ${#scattered[@]}"
-    echo ""
-    log_info "Tip: Use ${CYAN}/vibe-check (slash)${NC} for AI-assisted remediation."
+  if [[ "$json_out" -eq 1 ]]; then
+    echo "$payload"
+  else
+    _vibe_check_render_text "$payload"
+  fi
+
+  _vibe_check_has_failures "$payload" && return 1 || return 0
 }
