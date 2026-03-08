@@ -1,9 +1,12 @@
 ---
-document_type: prd
+task_id: 2026-03-08-roadmap-style-polish
+document_type: task-prd
+title: CLI Roadmap Style Polish - PRD
 author: Antigravity
 created: 2026-03-08
 status: draft
 related_docs:
+  - docs/tasks/2026-03-08-roadmap-style-polish/plan-v1.md
   - SOUL.md
   - CLAUDE.md
 ---

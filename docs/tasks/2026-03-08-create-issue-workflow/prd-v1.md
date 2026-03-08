@@ -1,12 +1,14 @@
 ---
-document_type: prd
+task_id: 2026-03-08-create-issue-workflow
+document_type: task-prd
+title: Vibe Issue Workflow Skill - PRD
 author: Antigravity
 created: 2026-03-08
 status: draft
 related_docs:
+  - docs/tasks/2026-03-08-create-issue-workflow/plan-v1.md
   - SOUL.md
   - CLAUDE.md
-  - docs/standards/vibe-workflow-paradigm.md
 ---
 
 # PRD: Vibe Issue Workflow Skill

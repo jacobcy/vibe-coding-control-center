@@ -1,5 +1,7 @@
 ---
-document_type: plan
+task_id: 2026-03-08-roadmap-style-polish
+document_type: task-plan
+title: CLI Roadmap Style Polish - Plan
 author: Antigravity
 created: 2026-03-08
 status: draft

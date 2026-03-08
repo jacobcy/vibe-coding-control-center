@@ -1,5 +1,7 @@
 ---
-document_type: plan
+task_id: 2026-03-08-create-issue-workflow
+document_type: task-plan
+title: Vibe Issue Workflow - Plan
 author: Antigravity
 created: 2026-03-08
 status: draft
@@ -36,5 +38,5 @@ related_docs:
 - [ ] 最终成功产出一个关联了 Roadmap Item ID 的真实 GitHub Issue（或模拟输出 `gh` 命令内容）。
 
 ## 4. 非目标
-- ❌ 不修改 `lib/*.sh` 增加新逻辑。
+- ❌ 不为 issue workflow 新增专用 `lib/*.sh` 能力或新子命令。
 - ❌ 不在 `bin/vibe` 增加新子命令（除了 help 修复）。
