@@ -20,6 +20,8 @@ setup() {
   '
   [ "$status" -eq 0 ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .title' "$fixture/vibe/registry.json")" = "New Task Title" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .source_type' "$fixture/vibe/registry.json")" = "local" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "null" ]
   [ -f "$fixture/vibe/tasks/2026-03-04-new-task/task.json" ]
 }
 
@@ -109,7 +111,7 @@ setup() {
   '
   [ "$status" -eq 0 ]
   [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .status' "$fixture/vibe/registry.json")" = "in_progress" ]
-  [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .assigned_worktree' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 
 @test "ops: update bind-current syncs worktree binding and cache" {
@@ -129,6 +131,41 @@ setup() {
   [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
   [ -f "$wt_path/.vibe/current-task.json" ]
   [ "$(jq -r '.task_id' "$wt_path/.vibe/current-task.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+}
+
+@test "ops: update accepts --issue/--roadmap-item/--pr and deduplicates refs" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment \
+      --issue gh:owner/repo#68 --issue gh:owner/repo#68 \
+      --roadmap-item rm-1 --roadmap-item rm-1 \
+      --pr 64
+  '
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .issue_refs | length' "$fixture/vibe/registry.json")" = "1" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "1" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .pr_ref' "$fixture/vibe/registry.json")" = "64" ]
+}
+
+@test "ops: update maps legacy status names to standard status" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --status merged
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .status' "$fixture/vibe/registry.json")" = "completed" ]
 }
 
 @test "ops: update agent updates registry without modifying git identity" {

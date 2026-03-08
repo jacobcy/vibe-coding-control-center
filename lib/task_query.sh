@@ -27,6 +27,7 @@ _vibe_task_collect_openspec_tasks() {
                     source_path: (.source_path // ("openspec/changes/" + $cid)),
                     status: (.status // "todo"),
                     current_subtask_id: null,
+                    runtime_worktree_name: null,
                     assigned_worktree: null,
                     next_step: (.next_step // ("Continue OpenSpec change: openspec/changes/" + $cid + "/tasks.md"))
                 }')"
@@ -54,7 +55,7 @@ _vibe_task_collect_openspec_tasks() {
             task_json="$(jq -nc --arg task_id "$change_name" --arg title "$change_name" \
                 --arg framework "openspec" --arg source_path "openspec/changes/$change_name" \
                 --arg status "$change_status" --arg next_step "$next_step" \
-                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,current_subtask_id:null,assigned_worktree:null,next_step:$next_step}')"
+                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
         fi
 
         jq --argjson t "$task_json" '. += [$t]' "$aggregate_file" > "$aggregate_file.tmp" && mv "$aggregate_file.tmp" "$aggregate_file"
@@ -109,7 +110,16 @@ _vibe_task_list() {
 
     if [[ "$json_out" == "1" ]]; then
         jq -n --slurpfile reg "$registry_file" --slurpfile wt "$worktrees_file" --slurpfile os "$openspec_tasks_file" \
-          '{tasks: (($reg[0].tasks // []) + ($os[0].tasks // []) | unique_by(.task_id)), worktrees: ($wt[0].worktrees // [])}'
+          'def norm_status:
+             if . == "review" then "in_progress"
+             elif . == "done" or . == "merged" then "completed"
+             elif . == "skipped" then "archived"
+             else . end;
+           {tasks: ((($reg[0].tasks // []) + ($os[0].tasks // [])
+              | unique_by(.task_id)
+              | map(.status = ((.status // "todo") | norm_status))
+              | map(.runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null))
+            )), worktrees: ($wt[0].worktrees // [])}'
         rm -f "$openspec_tasks_file"
         return 0
     fi
@@ -176,11 +186,17 @@ _vibe_task_show() {
     merged_json="$(jq -n \
         --argjson reg "$registry_json" \
         --argjson detail "$detail_json" \
-        '($detail + $reg)
+        'def norm_status:
+           if . == "review" then "in_progress"
+           elif . == "done" or . == "merged" then "completed"
+           elif . == "skipped" then "archived"
+           else . end;
+         ($detail + $reg)
          | .task_id = ($reg.task_id // .task_id)
          | .title = ($reg.title // .title)
-         | .status = ($reg.status // .status // "todo")
+         | .status = (($reg.status // .status // "todo") | norm_status)
          | .subtasks = (.subtasks // [])
+         | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
          | .next_step = (.next_step // null)' )"
 
     if [[ "$json_out" == "1" ]]; then
@@ -192,7 +208,7 @@ _vibe_task_show() {
         "Task: \(.task_id)\n" +
         "Title: \(.title)\n" +
         "Status: \(.status)\n" +
-        "Assigned Worktree: \((.assigned_worktree // "null"))\n" +
+        "Runtime Worktree: \((.runtime_worktree_name // "null"))\n" +
         "Next Step: \((.next_step // "null"))\n" +
         "Subtasks: \(.subtasks | length)"'
 }
