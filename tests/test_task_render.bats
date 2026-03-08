@@ -105,3 +105,34 @@ MD
   [ "$status" -eq 0 ]
   [[ "$output" =~ "active-change" ]]
 }
+
+@test "render: vibe_task show returns merged task details as json" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"
+  make_task_fixture "$fixture"
+  cat > "$fixture/vibe/tasks/old-task/task.json" <<'JSON'
+{
+  "task_id": "old-task",
+  "title": "Old Task",
+  "description": "Detailed task file",
+  "status": "done",
+  "subtasks": [
+    {"subtask_id":"s1","title":"First","status":"done"}
+  ],
+  "assigned_worktree": "wt-test-task",
+  "next_step": "Done."
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task show old-task --json
+  '
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.task_id')" = "old-task" ]
+  [ "$(echo "$output" | jq -r '.assigned_worktree')" = "wt-test-task" ]
+  [ "$(echo "$output" | jq -r '.subtasks | length')" = "1" ]
+  [ "$(echo "$output" | jq -r '.description')" = "Detailed task file" ]
+}

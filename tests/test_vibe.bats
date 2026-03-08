@@ -82,6 +82,7 @@ setup() {
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe task" ]]
   [[ "$output" =~ "add" ]]
+  [[ "$output" =~ "show" ]]
   [[ "$output" =~ "update" ]]
   [[ "$output" =~ "remove" ]]
   [[ "$output" =~ "audit" ]]
