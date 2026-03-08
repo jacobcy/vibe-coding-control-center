@@ -107,11 +107,6 @@ wtnew() {
     echo "✅ Created worktree: $dir -> $branch (base: $base)"
   fi
 
-  # Set agent identity
-  local aname="Agent-${(C)agent}" aemail="agent-${agent}@vibecoding.ai"
-  $git_cmd -C "$path" config user.name "$aname"
-  $git_cmd -C "$path" config user.email "$aemail"
-  echo "👤 Identity: $aname <$aemail>"
   cd "$path" || return
   echo "💡 Next: Run ${CYAN}vup${NC} to initialize your cockpit."
 }
@@ -242,23 +237,6 @@ wtrm() {
   $git_cmd -C "$main_dir" worktree prune >/dev/null 2>&1 || true
 }
 
-# @desc Initialize git identity in current worktree
-wtinit() {
-  local agent="${1:-claude}"
-  [[ -d ".git" || -f ".git" ]] || vibe_die "Not in a git repo/worktree"
-  local aname="Agent-${(C)agent}" aemail="agent-${agent}@vibecoding.ai"
-  git config user.name "$aname"; git config user.email "$aemail"
-  echo "✅ Identity: $aname <$aemail>"
-}
-
-# @desc Refresh current worktree identity and state
-wtrenew() {
-  local wt="${PWD##*/}"; echo "🔄 Refreshing: $wt"
-  local name; name="$(git config user.name 2>/dev/null)"
-  [[ -z "$name" ]] && { wtinit claude; return; }
-  echo "✅ Identity OK: $name <$(git config user.email 2>/dev/null)>"
-  echo "💡 Tips: Sync state with ${CYAN}vibe task sync${NC}"
-}
 
 # @desc Initialize a modular Tmux workspace for a worktree
 #   vup              → current worktree
