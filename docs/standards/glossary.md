@@ -331,7 +331,38 @@ related_docs:
 - 使用规则：
   - 执行代理需要具体执行细则、实现边界和模式时使用 `规则文件`
 
-## 7. Common Confusions
+## 7. Identity Tracking Terms
+
+### 7.1 `署名`
+
+- 正式术语：`署名`
+- 别称：`Authorship`, `打卡`, `追加署名`
+- 定义：在认知记录和大盘数据中声明参与贡献的身份记录。例如写入 `task.json` 的 `agent_log` 字段，或在 `vibe-save` 记录中主动附带的宣告（如 `@Agent-Claude: xxxx`），以及在 Commit Message 中追加的 `Co-authored-by`。
+- 边界：
+  - `署名` 是逻辑层（Tier 2/3）的概念。
+  - `署名` 不是数字签名（Digital Signature）。
+  - `署名` 不是物理的 Git Author。
+- 落点：
+  - `task.json` 中的 `agent_log` 字段。
+  - Git Commit Message 中的 `Co-authored-by` 行。
+- 使用规则：
+  - 讨论 Agent 如何宣告自己的参与贡献时，统一使用**“署名”**。
+  - “如果误用签名，指的也是署名，不是数字签名。”项目语境下默认口语中的签名等同于署名。
+
+### 7.2 `物理签名`
+
+- 正式术语：`物理签名`
+- 别称：`Git Author`, `Alias`, `工作区身份`
+- 定义：仅指 Git 仓库物理底层的作者信息（即通过 `git config user.name` 和 `user.email` 写入的数据）。这是强制的、排他的单一所有者标记。
+- 边界：
+  - `物理签名` 只能在 `vibe flow new` 与用户手动调用 `wtinit` 时设定。
+  - `物理签名` 不能代表所有参与接力的协作者。
+- 落点：
+  - Worktree 隔离的 `.git/config`。
+- 使用规则：
+  - 讨论底层谁在提交代码或初始化 Worktree 所记录的身份时，使用**“物理签名”**。
+
+## 8. Common Confusions
 
 以下混用是高风险错误：
 

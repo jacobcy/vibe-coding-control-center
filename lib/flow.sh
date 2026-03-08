@@ -7,7 +7,6 @@ source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
-_flow_set_identity() { git config user.name "$1" && git config user.email "$1@vibe.coding"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
 _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
 _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
@@ -32,7 +31,6 @@ _flow_new_worktree() {
   else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; _flow_rollback_task "$task_id"; return 1; }
   fi
   cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
-  _flow_set_identity "$agent" || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
   log_step "Binding task $task_id to worktree"; _vibe_task_update "$task_id" --status "in_progress" --bind-current || { _flow_rollback_task "$task_id"; _flow_rollback_worktree "$wt_path"; return 1; }
   log_success "Feature ready: $feature  (task: $task_id)"
   echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
@@ -54,7 +52,6 @@ _flow_bind() {
   if typeset -f wtinit &>/dev/null; then
     wtinit "$agent" >/dev/null || return 1
   fi
-  _flow_set_identity "$agent" || return 1
   log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
   log_success "Bound: $tid ($title)"
 }

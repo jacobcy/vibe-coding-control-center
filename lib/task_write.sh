@@ -11,7 +11,11 @@ _vibe_task_write_registry() {
         | (if $assigned_mode == "set" then .assigned_worktree = (if $assigned == "" then null else $assigned end)
            elif $assigned_mode == "clear" then .assigned_worktree = null
            else . end)
-        | (if $agent != "" then .agent = $agent else . end)
+        | (if $agent != "" then 
+             .agent = $agent 
+             | (.agent_log // {planned_by: $agent, executed_by: [], committed_by: null, latest_actor: null}) as $log
+             | .agent_log = ($log | .latest_actor = $agent | .executed_by = ((.executed_by + [$agent]) | unique))
+           else . end)
         | .updated_at = $now
       else . end)
     ' "$registry_file" >"$tmp" && mv "$tmp" "$registry_file"
