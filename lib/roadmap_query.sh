@@ -154,7 +154,12 @@ _vibe_roadmap_list() {
         return 0
     fi
 
-    echo "$items_json" | jq -r '.[] | "\(.roadmap_item_id)\t[\(.status)]\t\(.title)"'
+    echo "$items_json" | jq -r '.[] |
+        if (.title == .roadmap_item_id or (.title // "") == "") then
+            "[\(.status)] \(.roadmap_item_id)"
+        else
+            "[\(.status)] \(.roadmap_item_id)  \(.title)"
+        end'
 }
 
 _vibe_roadmap_show() {
@@ -227,7 +232,6 @@ _vibe_roadmap_audit() {
     done
 
     if [[ "$check_links" == "false" && "$check_status" == "false" && "$check_version_goal" == "false" ]]; then
-        check_links="true"
         check_status="true"
         check_version_goal="true"
     fi

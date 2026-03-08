@@ -248,6 +248,32 @@ JSON
   [ "$(echo "$output" | jq -r '.title')" = "Beta" ]
 }
 
+@test "roadmap list text output avoids repeating id when title matches id" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+  jq '.items = [{"roadmap_item_id":"gh-36","title":"gh-36","description":null,"status":"p0","source_type":"github","source_refs":[],"issue_refs":["gh-36"],"linked_task_ids":[],"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"}]' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "[p0] gh-36" ]
+}
+
 @test "roadmap audit returns json summary when checks pass" {
   local fixture
   fixture="$(mktemp -d)"
@@ -273,6 +299,30 @@ JSON
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq -r '.ok')" = "true" ]
   [ "$(echo "$output" | jq -r '.checks.version_goal.present')" = "true" ]
+}
+
+@test "roadmap audit defaults do not fail on unlinked items" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap audit --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.ok')" = "true" ]
+  [ "$(echo "$output" | jq -r '.checks.links.enabled')" = "false" ]
 }
 
 @test "roadmap audit fails when status is invalid" {
