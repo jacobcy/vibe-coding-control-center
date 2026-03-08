@@ -343,7 +343,7 @@ provider 只允许：
 - 管 worktree 现场
 - 管当前 branch 现场动作
 - 管当前 task 的绑定与解绑
-- 管当前现场的发布、检查、清理
+- 管当前现场的发布、检查、收尾
 
 ### 6.2 Boundaries
 
@@ -352,6 +352,7 @@ provider 只允许：
 - roadmap 查询
 - task 历史归档
 - 全局 task 生命周期管理
+- 跨 worktree 的分支同步编排
 - 将命名输入当作共享模型字段
 
 ### 6.3 Standard Subcommands
@@ -360,7 +361,6 @@ provider 只允许：
 - `list`
 - `new <name>`
 - `bind <task-id>`
-- `sync`
 - `pr`
 - `review`
 - `done`
@@ -383,13 +383,13 @@ provider 只允许：
 
 ### 6.5 Write Rules
 
-以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
+以下高风险写操作必须要求 `-y` 或 `--yes`：
 
 - `new`
 - `bind`
-- `sync`
 - `pr`
-- `done`
+
+`done` 是现场收尾动作，不应触发环境销毁，因此不要求 `-y`。
 
 ### 6.6 Naming Rules
 
@@ -435,6 +435,7 @@ provider 只允许：
 - 将 `feature` 写成共享模型字段
 - 持久化 `dirty`
 - 让 `review` 默认产生发布副作用
+- 通过 `flow sync` 将当前分支批量 merge 到所有 worktree 分支
 
 ## 7. `vibe check` Standard
 
