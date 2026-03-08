@@ -35,6 +35,19 @@ case "${MOCK_MODE:-}" in
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
       "checkout -b feature-safe") exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  stash_with_restore)
+    case "$*" in
+      "rev-parse --is-inside-work-tree") exit 0 ;;
+      "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
+      "branch --show-current") printf 'feature-old\n'; exit 0 ;;
+      "check-ref-format --branch feature-safe") exit 0 ;;
+      "checkout -b feature-safe") exit 0 ;;
+      "stash list") printf 'stash@{0}: On feature-old: Rotate to feature-safe: saved WIP\n'; exit 0 ;;
       "stash pop") exit 0 ;;
       *) exit 1 ;;
     esac
@@ -99,7 +112,7 @@ case "${MOCK_MODE:-}" in
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
       "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
       "checkout -b feature-safe") exit 0 ;;
-      "stash pop") exit 0 ;;
+      "stash list") printf 'stash@{0}: On claude/refactor: Rotate to feature-safe: saved WIP\n'; exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -112,16 +125,26 @@ EOF
   chmod +x "$TEST_DIR/bin/git"
 }
 
-@test "rotate stashes untracked files with -u" {
+@test "rotate stashes untracked files with -u and keeps stash by default" {
   write_mock_git
   run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_requires_u "$TEST_DIR/rotate.sh" feature-safe
 
   [ "$status" -eq 0 ]
   grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
   grep -q "checkout -b feature-safe" "$LOG_FILE"
+  ! grep -q "stash pop" "$LOG_FILE"
   ! grep -q "branch -D feature-old" "$LOG_FILE"
   ! grep -q "push origin --delete feature-old" "$LOG_FILE"
   ! grep -q "fetch origin main --quiet" "$LOG_FILE"
+}
+
+@test "rotate restores stash on new branch when --save-unstash is set" {
+  write_mock_git
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_with_restore "$TEST_DIR/rotate.sh" feature-safe --save-unstash
+
+  [ "$status" -eq 0 ]
+  grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+  grep -q "stash pop" "$LOG_FILE"
 }
 
 @test "rotate rejects invalid branch names before deleting current branch" {
