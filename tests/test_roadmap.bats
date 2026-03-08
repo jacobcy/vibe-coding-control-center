@@ -48,6 +48,7 @@ JSON
   [[ "$output" =~ "P0 (urgent):      1" ]]
   [[ "$output" =~ "Current:          1" ]]
   [[ ! "$output" =~ "Current Version:" ]]
+  [[ ! "$output" =~ $'\033' ]]
 }
 
 @test "roadmap status supports json output" {
@@ -296,6 +297,32 @@ JSON
 
   [ "$status" -eq 0 ]
   [ "$output" = "[p0] gh-36" ]
+  [[ ! "$output" =~ $'\033' ]]
+}
+
+@test "roadmap show text output omits ansi escapes when stdout is not a tty" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap show rm-2
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Roadmap Item: rm-2" ]]
+  [[ "$output" =~ "Status:      p0" ]]
+  [[ ! "$output" =~ $'\033' ]]
 }
 
 @test "roadmap audit returns json summary when checks pass" {

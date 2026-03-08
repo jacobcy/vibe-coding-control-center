@@ -82,6 +82,7 @@ case "$command" in
         echo "Primary Commands:"
         echo "  ${GREEN}flow${NC}     开发环境编排（new, done, status, sync）"
         echo "  ${GREEN}task${NC}     任务生命周期管理（list, add, update, remove, sync）"
+        echo "  ${GREEN}roadmap${NC}  路线图与版本目标管理 (status, list, show, classify, sync)"
         echo "  ${GREEN}check${NC}    项目全要素审计与格式校验"
         echo ""
         echo "System Commands:"
