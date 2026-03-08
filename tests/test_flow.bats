@@ -52,6 +52,21 @@ JSON
   [[ "$output" =~ "Usage: vibe flow new" ]]
 }
 
+@test "2.1 _flow_new rejects legacy --base alias to keep branch semantics explicit" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_new_worktree() { echo "UNEXPECTED_WORKTREE_CALL"; return 0; }
+    _flow_new demo --base develop
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Unknown option: --base" ]]
+  [[ "$output" =~ "--branch" ]]
+  [[ ! "$output" =~ "UNEXPECTED_WORKTREE_CALL" ]]
+}
+
 @test "3. vibe flow status in non-worktree returns error" {
   # Run in a directory that is definitely not a worktree
   cd /tmp
@@ -284,12 +299,13 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; } # Mock all tools as present
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 0 ;; # PR exists
-        "pr edit current-branch --title test --body test") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -316,12 +332,13 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; } # Mock all tools as present
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;; # PR does not exist
-        "pr create --title test --body test --web") return 0 ;;
+        "pr create --title test --body test --base main --web") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -354,12 +371,13 @@ EOF
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; }
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;;
-        "pr create --title test --body test --web") return 0 ;;
+        "pr create --title test --body test --base main --web") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -378,6 +396,65 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Bumping version" ]]
   [ -f "$fixture/bump_called" ]
+}
+
+@test "14.1 _flow_pr allows inferred main as default base" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "14.2 _flow_pr refuses non-main inferred base without explicit override" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_pick_pr_base() { echo "claude/refactor"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base claude/refactor --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "log claude/refactor..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "claude/refactor" ]]
+  [[ "$output" =~ "--base" ]]
 }
 
 

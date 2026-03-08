@@ -24,14 +24,17 @@ trigger: auto
    - **必做项**：在提交信息的末尾（在正文后空一行），必须强制拼接该组所有联合贡献者的 `Co-authored-by:` 后缀。例如：`Co-authored-by: Agent-Claude <claude@vibe.coding>`
 5. **Interactive Confirmation**: 将分类结果及带有 `Co-authored-by` 的完整草稿提交列出来，**明确提请用户检查并确认**。
 6. **Execution Recommendations**: 用户确认后，提取并正式执行 `git add ...` 及 `git commit -m "..."`。
-7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您发起 Pull Request 发布流程？"
+7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你可以主动询问用户："所有变更已提交。是否需要帮您发起 Pull Request 发布流程？" 但只能把它表述为“提议发 PR”，不能在未校验 base 前暗示“已经准备好合并到主干”。
    - **数据准备 (Agent 认知层)**：
+     - **Base Rule First**: 在生成任何 PR 草案前，必须先读取 `vibe flow pr --help`（或等价 shell 帮助输出），确认 `vibe flow pr (shell)` 当前支持的 base 规则。
+     - **Base Validation**: 先判断当前分支相对哪个 base 才是最小差异；若不是 `main`，不得默认建议发往 `main`，而应明确提示需要 `--base <ref>`。
      - **Bump Type**: 询问并确认本次升级级别（`patch` / `minor` / `major`）。
      - **PR Description**: 根据所有未提交的 Commit 记录，总结一份高质量的 PR Body（支持多行）。
      - **Version Note**: 提炼一份要写入 `CHANGELOG.md` 的版本变更说明。
    - **操作执行 (Physical Tier 1)**：
+     - `/vibe-commit` 负责认知层编排与草案生成；真正的 base 判定与发布入口以 `vibe flow pr (shell)` 为准；`gh pr create` 只是底层外部工具，不应由 skill 直接替代 shell 规则。
      - 向用户展示上述三部分内容，确认后调用指令（必须正确转义换行符）：
-       `vibe flow pr --bump <type> --title "<title>" --body "<body>" --msg "<version_msg>"`
+       `vibe flow pr --base <ref> --bump <type> --title "<title>" --body "<body>" --msg "<version_msg>"`
    - 创建成功后，立刻提示用户"不要忘记在 AI 助手中收口该任务！（执行 `/vibe-done`）"。
 
 ## Expected Output Format
@@ -61,8 +64,8 @@ trigger: auto
 ```markdown
 ✅ **所有变更已成功 commit！** 
 
-当前的特性代码目前都在本地，准备好合并到主干了吗？
-我可以为您读取最近这几次提交的内容，**一键生成并提交 Pull Request (PR)** 到仓库，免去您手动跑 `vibe flow pr` 的麻烦。
+当前的特性代码目前都在本地。我可以先帮您校验本分支应该相对哪个 base 发 PR，再生成发布草案。
+我会先读取 `vibe flow pr (shell)` 的 base 规则；如果当前分支不是直接从 `main` 近切，就不会默认建议发往 `main`。
 
 需要我帮您直接跑 PR 发版流程吗？
 ```

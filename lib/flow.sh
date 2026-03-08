@@ -13,6 +13,27 @@ _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; gi
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
+_flow_branch_ref() { git show-ref --verify --quiet "refs/heads/$1" && { echo "$1"; return 0; }; git show-ref --verify --quiet "refs/remotes/origin/$1" && { echo "origin/$1"; return 0; }; return 1; }
+_flow_pr_candidate_bases() { local branch="$1"; git for-each-ref --format='%(refname:short)' refs/heads refs/remotes/origin 2>/dev/null | sed 's#^origin/##' | awk -v b="$branch" 'NF && $0 != "HEAD" && $0 != b { seen[$0]=1 } END { for (name in seen) print name }'; }
+_flow_pick_pr_base() {
+  local branch="$1" candidate ref best="" best_count=""
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue; ref="$(_flow_branch_ref "$candidate")" || continue
+    git merge-base --is-ancestor "$ref" HEAD >/dev/null 2>&1 || continue
+    local ahead_count; ahead_count=$(git rev-list --count "$ref..HEAD" 2>/dev/null) || continue
+    [[ -z "$best" || "$ahead_count" -lt "$best_count" ]] && { best="$candidate"; best_count="$ahead_count"; }
+  done < <(_flow_pr_candidate_bases "$branch")
+  [[ -n "$best" ]] && echo "$best"
+}
+_flow_resolve_pr_base() {
+  local requested="$1" branch="$2" inferred=""
+  if [[ -n "$requested" ]]; then _flow_branch_exists "$requested" || { log_error "PR base not found: $requested"; return 1; }; echo "$requested"; return 0; fi
+  inferred="$(_flow_pick_pr_base "$branch")"
+  [[ -n "$inferred" ]] || { log_error "Unable to infer PR base. Re-run with --base <ref>."; return 1; }
+  [[ "$inferred" == "main" ]] && { echo "$inferred"; return 0; }
+  log_error "Refusing to default PR base to main. Current branch appears to be based on '$inferred'. Re-run with --base $inferred."
+  return 1
+}
 _flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }
 _flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path feature_slug branch_name suggested_task_id
@@ -53,7 +74,16 @@ _flow_bind() {
 _flow_new() {
   local feat="" agent="" ref="main" arg
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
-  while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --task) log_error "Use: vibe flow bind $2"; return 1 ;;
+      --agent) agent="$2"; shift 2 ;;
+      --branch) ref="$2"; shift 2 ;;
+      --base) log_error "Unknown option: --base. Use --branch <ref> for the source branch when creating a flow."; return 1 ;;
+      -*) log_error "Unknown option for flow new: $1"; _flow_new_usage; return 1 ;;
+      *) [[ -z "$feat" ]] && feat="$1"; shift ;;
+    esac
+  done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
   _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
@@ -85,17 +115,19 @@ _flow_sync() {
 }
 
 _flow_pr() {
-  local bump_type="" pr_title="" pr_body="" version_msg="" branch commit_logs first_msg open_prs
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; *) shift ;; esac; done
+  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_ref="" commit_logs first_msg open_prs
+  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_ref="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; *) shift ;; esac; done
   vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
-  commit_logs=$(git log main..HEAD --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since main. Nothing to PR."; return 1; }
+  base_ref="$(_flow_resolve_pr_base "$base_ref" "$branch")" || return 1
+  log_info "Using PR base: $base_ref"
+  commit_logs=$(git log "$base_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_ref. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
   if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
   
   local has_pr=0
   if vibe_has gh; then
-    log_step "Checking for open PRs to main..."; open_prs=$(gh pr list --state open --base main --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
-    [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to 'main' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
+    log_step "Checking for open PRs to $base_ref..."; open_prs=$(gh pr list --state open --base "$base_ref" --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
+    [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to '$base_ref' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
     
     # Check if a PR already exists from this branch
     gh pr view "$branch" >/dev/null 2>&1 && has_pr=1
@@ -117,10 +149,10 @@ _flow_pr() {
   log_info "GitHub CLI detected. Managing PR..."
   if [[ $has_pr -eq 1 ]]; then
     log_success "Updating existing PR..."
-    gh pr edit "$branch" --title "$pr_title" --body "$pr_body" || true
+    gh pr edit "$branch" --base "$base_ref" --title "$pr_title" --body "$pr_body" || true
   else
     log_step "Creating new PR: $pr_title"
-    gh pr create --title "$pr_title" --body "$pr_body" --web || log_warn "Failed to create PR with gh, please check manually."
+    gh pr create --title "$pr_title" --body "$pr_body" --base "$base_ref" --web || log_warn "Failed to create PR with gh, please check manually."
   fi
 }
 
