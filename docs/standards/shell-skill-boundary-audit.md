@@ -71,7 +71,53 @@ related_docs:
 - `task add --issue-ref ... --roadmap-item ...`
 - `task update --issue-ref ... --roadmap-item ...`
 
-### 2.3 High: `registry.json` 标准与当前 task 写入字段不一致
+### 2.3 Blocking: `roadmap current` 不能被解释为分支当前态
+
+当前讨论已确认：
+
+- `roadmap.current` 只表示全局规划窗口纳入的项
+- 它不表示某个 branch / worktree 当前在做什么
+- 多分支并行开发时，分支当前焦点必须由 `flow` 与 task runtime 绑定表达
+
+如果 shell 或 skill 将 `roadmap.current` 误解释为分支当前态，就会导致：
+
+- 多分支开发冲突
+- 共享规划状态与运行时现场混淆
+- 错误地让 `roadmap` 承担 `flow` 语义
+
+判定：
+
+- `Semantic Boundary`
+
+期望：
+
+- 将 `roadmap.current` 固定为规划窗口状态
+- 将分支当前工作固定为 `flow` / task runtime 语义
+
+### 2.4 Blocking: `issue`、`task`、`flow` 的业务概念必须明确区分
+
+当前讨论已确认：
+
+- `issue` 是愿望、问题、需求来源
+- `task` 是明确、可执行的工作单元
+- `flow` 是 task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
+
+关系必须固定为：
+
+- `issue <-> task` 多对多
+- `roadmap item <-> task` 多对多
+- `flow -> task` 一对多
+
+如果 shell 或 skill 混用这些概念，就会产生两类问题：
+
+- Shell 越权替 skill 做任务拆分决策
+- skill 误以为调用单个 shell 命令就能完成业务逻辑
+
+判定：
+
+- `Concept Boundary`
+
+### 2.5 High: `registry.json` 标准与当前 task 写入字段不一致
 
 标准要求 task 应包含：
 
@@ -89,7 +135,26 @@ related_docs:
 
 - `Capability Gap`
 
-### 2.4 Medium: `vibe-new` workflow 文案基本正确，但依赖的 Shell 合同尚未落地
+### 2.6 High: `roadmap classify` 越权执行“分类 + 新增实体”
+
+当前 [roadmap_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/roadmap_write.sh#L73) 到 [roadmap_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/roadmap_write.sh#L97) 中，`vibe roadmap classify` 在找不到 roadmap item 时会自动新增 item。
+
+这使得 `classify` 同时承担：
+
+- 查找
+- 实体创建
+- 状态分类
+
+判定：
+
+- `Shell Overreach`
+
+期望：
+
+- `classify` 只负责已有 item 的状态变更
+- 新增 item 必须显式通过 `roadmap add` 或 `roadmap sync`
+
+### 2.7 Medium: `vibe-new` workflow 文案基本正确，但依赖的 Shell 合同尚未落地
 
 [vibe-new.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/workflows/vibe-new.md#L15) 到 [vibe-new.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/workflows/vibe-new.md#L22) 明确写了：
 
@@ -105,7 +170,7 @@ related_docs:
 - `Contract Accurate`
 - `Blocked By Shell Gap`
 
-### 2.5 Medium: `vibe-roadmap` skill 文案与目标原则一致
+### 2.8 Medium: `vibe-roadmap` skill 文案方向正确，但有一处能力描述超前
 
 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L8) 到 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L28) 已明确：
 
@@ -113,11 +178,19 @@ related_docs:
 - skill 负责调度决策
 - 不得直接改底层数据
 
+但 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L79) 到 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L86) 仍写有“从当前版本 backlog 中分配最高优先级任务”。
+
+这句话的问题是：
+
+- 它容易让 agent 误以为 `roadmap.current` 等于 branch 当前任务池
+- 它也容易让 agent 误以为现有 shell 已能直接完成 roadmap -> task 分配
+
 判定：
 
-- `Contract Accurate`
+- `Contract Mostly Accurate`
+- `Needs Clarification`
 
-### 2.6 Medium: `vibe-task` 与 `vibe-save` skill 文案整体正确
+### 2.9 Medium: `vibe-task` 与 `vibe-save` skill 文案整体正确
 
 [vibe-task/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-task/SKILL.md#L825) 到 [vibe-task/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-task/SKILL.md#L839) 已明确：
 
@@ -135,8 +208,11 @@ related_docs:
 当前边界状态可以概括为：
 
 - 标准原则以前写得不够显式，现在已补强
+- `roadmap.current` 与 branch current 的语义边界现已明确
+- `issue`、`task`、`flow` 的关系边界现已明确
 - 大部分 skill 文案已经接受“shell 是工具，不是业务执行者”这一原则
 - 当前主要问题不在 skill，而在 Shell 缺少足够的原子能力，同时某些命令越权编排
+- `roadmap` 相关实现已经暴露出“共享规划状态”和“分支运行时状态”混用风险
 
 ## 4. Required Follow-Up
 
@@ -144,9 +220,11 @@ related_docs:
 
 1. 将 `flow new` 收紧为纯现场创建
 2. 为 `task add` / `task update` 增加 issue / roadmap 关联原子能力
-3. 让 skill 能通过公开命令完成 task 拆分与绑定，而无需触碰数据源
+3. 修正 `roadmap classify`，禁止隐式新增 roadmap item
+4. 收紧 `vibe-roadmap` skill 对 `roadmap.current` 与 backlog 分配的描述
+5. 让 skill 能通过公开命令完成 task 拆分与绑定，而无需触碰数据源
 
-在以上三项完成前，系统只能部分支持：
+在以上五项完成前，系统只能部分支持：
 
 - `roadmap -> 拆多个 task -> flow 绑定多个 task`
 

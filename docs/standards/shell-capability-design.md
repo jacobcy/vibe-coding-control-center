@@ -78,6 +78,42 @@ Skill Layer 负责：
 - Shell 提供工具
 - Skill 使用工具完成业务逻辑
 
+### 2.4 Planning vs Runtime Semantics
+
+共享规划状态与分支现场状态必须严格分离。
+
+- `roadmap.current` 表示当前规划窗口纳入的 roadmap item
+- `roadmap.current` 不表示某个 branch / worktree 当前正在做什么
+- branch / worktree 当前焦点只能由 `flow` 与 task runtime 绑定表达
+
+原因：
+
+- roadmap 是全局共享状态
+- flow 是分支绑定的运行时容器
+- 多分支并行开发时，不能把全局规划状态误用为分支现场状态
+
+### 2.5 Core Entity Semantics
+
+后续 Shell 设计必须坚持以下概念边界：
+
+- `issue` = 外部愿望、问题、需求来源
+- `roadmap item` = 规划层选中的工作单元
+- `task` = 可执行、可落地、能进入执行循环的工作单元
+- `flow` = task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
+
+关系约束：
+
+- `issue` 与 `task` 是多对多
+- `roadmap item` 与 `task` 是多对多
+- `flow` 与 `task` 是一对多
+- 一个 `flow` 可以承载多个相关 task，但应保留单一当前焦点
+
+因此：
+
+- Shell 不应把 `issue` 当成 `task`
+- Shell 不应把 `roadmap current` 当成 flow current
+- Shell 不应根据 roadmap 状态自动替 skill 选择 branch 当前任务
+
 ## 3. Atomic Method Rule
 
 每个 Shell 命令应尽量只表达一个能力。
