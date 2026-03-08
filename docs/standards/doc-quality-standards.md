@@ -14,10 +14,13 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/README.md
+  - docs/standards/glossary.md
   - docs/standards/doc-organization.md
 ---
 
 # Document Quality Standards
+
+本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 概述
 

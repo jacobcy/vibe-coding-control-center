@@ -12,6 +12,7 @@ last_updated: 2026-03-08
 related_docs:
   - SOUL.md
   - CLAUDE.md
+  - docs/standards/glossary.md
   - docs/standards/data-model-standard.md
   - docs/standards/command-standard.md
 ---
@@ -19,6 +20,8 @@ related_docs:
 # `roadmap.json` 标准
 
 本文档定义 `roadmap.json` 的最终文件结构。它是规划态共享真源，只表达规划项和版本目标，不表达执行层或现场层事实。
+
+本文档涉及的 `roadmap item`、`task`、`issue`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. File Responsibility
 
