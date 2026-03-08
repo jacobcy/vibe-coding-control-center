@@ -7,7 +7,7 @@ source "$VIBE_LIB/task.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
-_flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_AGENT:-claude}"; }
+_flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_DEFAULT_TOOL:-claude}"; }
 _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
 _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
@@ -44,7 +44,7 @@ _flow_bind() {
   [[ -z "$tid" || "$tid" =~ ^-- ]] && { _flow_bind_usage; return 1; }
   reg="$(_flow_registry_file)"; title="$(_flow_task_title "$tid" "$reg")"
   [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
-  agent="${agent:-${VIBE_AGENT:-claude}}"
+  agent="${agent:-$(_flow_default_agent)}"
   log_step "Identity: $agent"
   log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current --agent "$agent" || return 1
   log_success "Bound: $tid ($title)"
@@ -55,7 +55,7 @@ _flow_new() {
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
-  _flow_new_worktree "$feat" "${agent:-${VIBE_AGENT:-claude}}" "$ref"
+  _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
 _flow_done() {
   local wt_path wt_dir branch main_dir unmerged
