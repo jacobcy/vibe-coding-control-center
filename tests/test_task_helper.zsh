@@ -84,8 +84,7 @@ mock_git_registry() {
                 fi
                 return 0 
                 ;;
-            "config user.name"*) return 0 ;;
-            "config user.email"*) return 0 ;;
+
             "branch"*) return 1 ;;
             *) command git "$@" ;;
         esac

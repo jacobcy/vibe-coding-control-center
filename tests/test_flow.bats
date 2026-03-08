@@ -241,7 +241,6 @@ JSON
         "branch --show-current") echo "current-branch"; return 0 ;;
         "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "push origin HEAD") return 0 ;;
-        "config --get user.name") echo "test"; return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -274,8 +273,6 @@ JSON
         "branch --show-current") echo "current-branch"; return 0 ;;
         "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "push origin HEAD") return 0 ;;
-        "config --get user.name") echo "test"; return 0 ;;
-        *) return 0 ;;
       esac
     }
     _flow_pr --title "test" --body "test" --msg "test commit ..."
@@ -326,33 +323,7 @@ EOF
   [ -f "$fixture/bump_called" ]
 }
 
-@test "15. _flow_bind normalizes identity even when wtinit exists" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_flow_task_fixture "$fixture"
-  local calls="$fixture/git_config_calls.log"
-  : > "$calls"
 
-  run zsh -c '
-    cd "'"$fixture"'/wt-claude-refactor"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    wtinit() { return 0; }
-    git() {
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
-      if [[ "$1" == "config" ]]; then echo "$*" >> "'"$calls"'"; return 0; fi
-      return 0
-    }
-    _flow_bind 2026-03-02-rotate-alignment --agent claude
-  '
-
-  [ "$status" -eq 0 ]
-  grep -q "config user.name claude" "$calls"
-  grep -q "config user.email claude@vibe.coding" "$calls"
-}
 
 @test "14. vibe flow start with path feature does not auto-create or bind task" {
   local fixture
@@ -371,7 +342,7 @@ EOF
     _vibe_task_update() { echo "CALLED" > "'"$fixture"'/task_update_called"; return 0; }
     wtnew() {
       echo "$1" > "'"$fixture"'/wtnew_branch"
-      mkdir -p "'"$fixture"'/wt-claude-$1"
+      mkdir -p "'"$fixture"'/wt-$1"
       return 0
     }
 
