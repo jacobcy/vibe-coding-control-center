@@ -169,3 +169,55 @@ JSON
   [[ "$output" =~ "Roadmap item added:" ]]
   [ "$(jq -r '.items[] | select(.title=="Local roadmap item") | .source_type' "$fixture/vibe/roadmap.json")" = "local" ]
 }
+
+@test "roadmap list filters items and supports json output" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+  jq '.items[0].linked_task_ids = ["2026-03-08-command-standard-rewrite"]' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list --status current --linked --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq 'length')" -eq 1 ]
+  [ "$(echo "$output" | jq -r '.[0].roadmap_item_id')" = "rm-1" ]
+}
+
+@test "roadmap show returns a single roadmap item as json" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap show rm-2 --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.roadmap_item_id')" = "rm-2" ]
+  [ "$(echo "$output" | jq -r '.status')" = "p0" ]
+  [ "$(echo "$output" | jq -r '.title')" = "Beta" ]
+}

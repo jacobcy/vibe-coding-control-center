@@ -61,6 +61,121 @@ _vibe_roadmap_status() {
     fi
 }
 
+_vibe_roadmap_list() {
+    local common_dir="$1" output_json="false" status_filter="" source_filter="" keywords="" linked="false" unlinked="false" roadmap_file
+    shift
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            --status)
+                status_filter="$2"
+                shift 2
+                ;;
+            --source)
+                source_filter="$2"
+                shift 2
+                ;;
+            --keywords)
+                keywords="$2"
+                shift 2
+                ;;
+            --linked)
+                linked="true"
+                shift
+                ;;
+            --unlinked)
+                unlinked="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    [[ "$linked" == "true" && "$unlinked" == "true" ]] && {
+        echo "Error: --linked and --unlinked cannot be used together"
+        return 1
+    }
+
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+
+    local items_json
+    items_json="$(jq -c \
+        --arg status "$status_filter" \
+        --arg source "$source_filter" \
+        --arg keywords "${keywords:l}" \
+        --argjson linked "$linked" \
+        --argjson unlinked "$unlinked" \
+        '[.items[]?
+          | select(
+              ($status == "" or .status == $status)
+              and ($source == "" or .source_type == $source)
+              and ($keywords == "" or ((.roadmap_item_id + " " + .title + " " + (.description // "")) | ascii_downcase | contains($keywords)))
+              and (($linked | not) or ((.linked_task_ids | length) > 0))
+              and (($unlinked | not) or ((.linked_task_ids | length) == 0))
+            )]' \
+        "$roadmap_file")"
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$items_json"
+        return 0
+    fi
+
+    if [[ "$(echo "$items_json" | jq 'length')" == "0" ]]; then
+        echo "No roadmap items found."
+        return 0
+    fi
+
+    echo "$items_json" | jq -r '.[] | "\(.roadmap_item_id)\t[\(.status)]\t\(.title)"'
+}
+
+_vibe_roadmap_show() {
+    local common_dir="$1" item_id="$2" output_json="false" roadmap_file item_json
+    shift 2
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    [[ -n "$item_id" ]] || { echo "Usage: vibe roadmap show <roadmap-item-id> [--json]"; return 1; }
+
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+    item_json="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
+    [[ -n "$item_json" ]] || { echo "Error: roadmap item not found: $item_id"; return 1; }
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$item_json"
+        return 0
+    fi
+
+    echo "$item_json" | jq -r '
+        "Roadmap Item: \(.roadmap_item_id)\n" +
+        "Title: \(.title)\n" +
+        "Status: \(.status)\n" +
+        "Source: \(.source_type)\n" +
+        "Description: \(.description // "null")\n" +
+        "Linked Tasks: \((.linked_task_ids | join(", ")))\n" +
+        "Issue Refs: \((.issue_refs | join(", ")))\n" +
+        "Updated At: \(.updated_at)"'
+}
+
 _vibe_roadmap_get_version_goal() {
     local common_dir="$1" roadmap_file
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
