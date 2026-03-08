@@ -84,16 +84,15 @@ _vibe_roadmap_classify() {
     exists="$(jq --arg id "$issue_id" '[.items[]? | select(.roadmap_item_id == $id)] | length' "$roadmap_file")"
 
     if [[ "$exists" == "0" ]]; then
-        echo "Issue $issue_id not found in roadmap. Adding it..."
-        jq --arg id "$issue_id" --arg s "$issue_state" \
-            '.items += [{roadmap_item_id: $id, title: $id, description: null, status: $s, source_type: "local", source_refs: [], issue_refs: [], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]' \
-            "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
-    else
-        jq --arg id "$issue_id" --arg s "$issue_state" \
-            '(.items[]? | select(.roadmap_item_id == $id) | .status) = $s
-             | (.items[]? | select(.roadmap_item_id == $id) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
-            "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
+        echo "Error: Roadmap item '$issue_id' not found. Add or sync it before classifying."
+        return 1
     fi
+
+    jq --arg id "$issue_id" --arg s "$issue_state" \
+        '(.items[]? | select(.roadmap_item_id == $id) | .status) = $s
+         | (.items[]? | select(.roadmap_item_id == $id) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
+        "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
+
     echo "Issue $issue_id classified as: $issue_state"
 }
 

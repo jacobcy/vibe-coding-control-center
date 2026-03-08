@@ -13,7 +13,7 @@ _vibe_roadmap_usage() {
     echo "  ${GREEN}add${NC}           Add a local roadmap item"
     echo "  ${GREEN}sync${NC}          Sync issues from GitHub (--provider github --repo owner/repo)"
     echo "  ${GREEN}assign${NC}        Assign version goal"
-    echo "  ${GREEN}classify${NC}      Classify an issue (p0/current/next/deferred/rejected)"
+    echo "  ${GREEN}classify${NC}      Classify an existing roadmap item (p0/current/next/deferred/rejected)"
     echo "  ${GREEN}audit${NC}         Audit roadmap data without fixing it"
     echo "  ${GREEN}version${NC}       Version goal management (set-goal/clear-goal)"
     echo ""
@@ -33,6 +33,7 @@ _vibe_roadmap_usage() {
     echo "  vibe roadmap sync --provider github --repo jacobcy/vibe-coding-control-center"
     echo "  vibe roadmap assign 'Complete GitHub integration'"
     echo "  vibe roadmap classify gh-36 --status p0"
+    echo "  # classify only updates existing items; use add or sync first"
     echo "  vibe roadmap version set-goal 'Ship shared-state cleanup'"
     echo "  vibe roadmap version clear-goal"
 }

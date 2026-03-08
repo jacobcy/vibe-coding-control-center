@@ -5,7 +5,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 # /vibe-roadmap - 智能调度器
 
-维护全景路线图，管理版本目标，对 Issue 进行分类，决定下一个版本做什么。
+维护全景路线图，管理版本目标，对 roadmap item 进行分类，决定规划窗口纳入什么。
 
 **核心原则:** CLI 负责读写数据，skill 负责调度决策。
 
@@ -82,14 +82,15 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 - 检查是否有版本目标
 - 无目标 → 要求人类讨论确定
-- 有目标 → 从当前版本 backlog 中分配最高优先级任务
+- 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 task
+- 是否拆 task、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
 
 ## Issue 分类状态
 
 | 状态 | 含义 | 行为 |
 |------|------|------|
-| P0 | 阻断性问题，需要立即处理 | 不受版本约束，调度器立即分配 |
-| 当前版本 | 明确纳入本版本 | 按优先级分配给 vibe-new |
+| P0 | 阻断性问题，需要立即处理 | 优先进入规划讨论，不直接等于 branch 当前任务 |
+| 当前版本 | 明确纳入当前规划窗口 | 可被后续 skill 拆成 task，但不等于 branch 当前任务 |
 | 下一个版本 | 有更优先的事项，但要做 | 本版本结束后自动成为下版本目标 |
 | 延期 | 待决定，暂时不做 | 等下次讨论 |
 | 拒绝 | 不做 | 关闭 |
@@ -107,4 +108,6 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 - `版本目标`: 当前版本要完成的目标
 - `许愿池`: GitHub Issues (需求池)
 - `Issue`: 心愿，不是具体任务
+- `Roadmap Item`: 规划层工作单元，不等于 task
 - `Task`: 具体的执行单元，最小单位
+- `Flow`: task 的运行时容器，通常绑定一个 worktree / branch

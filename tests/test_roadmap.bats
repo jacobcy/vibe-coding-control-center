@@ -100,7 +100,31 @@ JSON
   [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "Ship roadmap split" ]
 }
 
-@test "roadmap classify writes roadmap items into roadmap.json items" {
+@test "roadmap classify updates an existing roadmap item in roadmap.json" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    _vibe_roadmap_classify "'"$fixture"'" "rm-1" "next"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Issue rm-1 classified as: next" ]]
+  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .status' "$fixture/vibe/roadmap.json")" = "next" ]
+}
+
+@test "roadmap classify fails when roadmap item does not already exist" {
   local fixture
   fixture="$(mktemp -d)"
   make_roadmap_fixture "$fixture"
@@ -119,9 +143,9 @@ JSON
     _vibe_roadmap_classify "'"$fixture"'" "rm-new" "next"
   '
 
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "Issue rm-new classified as: next" ]]
-  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-new") | .status' "$fixture/vibe/roadmap.json")" = "next" ]
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Error: Roadmap item 'rm-new' not found" ]]
+  [ "$(jq '[.items[] | select(.roadmap_item_id=="rm-new")] | length' "$fixture/vibe/roadmap.json")" = "0" ]
 }
 
 @test "roadmap version set-goal writes version_goal to roadmap.json" {
