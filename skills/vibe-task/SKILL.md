@@ -3,13 +3,16 @@ name: vibe-task
 description: Use when the user wants a cross-worktree task overview, says "vibe task" or "/vibe-task", asks which worktree to enter next, wants to review current task status across worktrees, or wants to audit/repair task registry issues.
 ---
 
-# /vibe-task - Cross-Worktree Task Overview & Audit
+# /vibe-task - Cross-Worktree Task Overview & Roadmap-Task Audit
 
-查看当前仓库下各个 worktree 绑定的任务总览，并给出下一步优先进入哪个 worktree 的建议。同时也支持核对任务注册完整性和修复数据质量问题。
+查看当前仓库下各个 worktree 绑定的任务总览，并给出下一步优先进入哪个 worktree 的建议。同时也支持核对 task 注册完整性，以及修复 `roadmap <-> task` 对应关系和相关数据质量问题。
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
-**命令边界:** `/vibe-task` 是 skill 层入口；`vibe task ...` 与 `vibe flow review ...` 是 shell 层工具。对 shell 参数、子命令或 flag 有任何不确定时，先运行 `vibe task -h` 或 `vibe flow -h`，不要自造不存在的 flag。
+**职责拆分:**
+- `vibe-task`：负责 `roadmap <-> task` 对应关系、task registry 完整性、task 相关数据质量
+- `vibe-check`：负责 `task <-> flow` / runtime 绑定修复
+- `vibe-roadmap`：负责规划、分类、版本目标，不负责执行层修复
 
 **Announce at start:**
 - Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的任务总览。"
@@ -29,6 +32,8 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 - `vibe task audit`
 - `/vibe-task audit`
 - `核对任务注册`
+- `修复 roadmap 和 task 对应关系`
+- `检查 roadmap task 映射`
 - `检查任务完整性`
 - `修复任务数据`
 - `任务健康检查`
@@ -45,8 +50,9 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 - 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
-- 必须通过 `vibe task audit` 获取核对结果
-- 必须通过 `vibe task add/update/remove` 执行修复操作
+- 必须通过 `bin/vibe task audit` 获取核对结果
+- 允许补充使用 `bin/vibe roadmap audit --check-links --json` 获取 roadmap 侧证据
+- 必须通过 `bin/vibe task add/update/remove` 执行修复操作
 - 不得直接修改 JSON 文件
 - 所有修复操作必须经过用户确认
 
@@ -134,7 +140,20 @@ Recommendation
 
 # Audit Workflow
 
-核对任务注册完整性，发现并修复数据质量问题。
+核对任务注册完整性，发现并修复 `roadmap <-> task` 对应关系及 task 数据质量问题。
+
+**本技能负责的修复类型:**
+- task 未关联 roadmap item，但已有确定性映射证据
+- roadmap item 缺少 task 反向链接
+- task 缺少 roadmap item 反向链接
+- task registry 数据质量问题
+
+**本技能不负责:**
+- task runtime / worktree 绑定修复
+- flow 现场状态修复
+- worktree 缺失后的 runtime 决策
+
+这些属于 `vibe-check` 范围。
 
 **三阶段核对流程:**
 1. **Phase 1: 数据质量修复** - 修复 worktrees.json 的 null branch 字段

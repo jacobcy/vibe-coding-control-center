@@ -1,15 +1,16 @@
 ---
 name: vibe-check
-description: Use when the user wants to verify project shared-state consistency and, when safe, repair deterministic gaps through Shell APIs. This skill consumes audit output; it does not edit shared JSON directly.
+description: Use when the user wants to verify task-flow/runtime consistency and, when safe, repair deterministic task-worktree binding gaps through Shell APIs. This skill consumes audit output; it does not edit shared JSON directly.
 ---
 
-# /check - 审计驱动修复
+# /check - task-flow 审计驱动修复
 
 `vibe check(shell)` 只负责审计。`vibe-check` skill 负责：
 
 1. 读取审计输出
 2. 做业务判断
-3. 只通过 Shell API 执行安全修复
+3. 只修复 `task <-> flow` / runtime 绑定问题
+4. 只通过 Shell API 执行安全修复
 
 **Announce at start:** "我正在使用 vibe-check 技能读取 shell 审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
 
@@ -44,6 +45,22 @@ vibe check link --json
 vibe roadmap audit --check-links --json
 ```
 
+## 职责边界
+
+`vibe-check` 只处理：
+
+- task runtime 指向不存在的 worktree
+- 已完成 / 已归档 task 仍残留 runtime 绑定
+- 当前现场绑定与 task runtime 的确定性修复
+
+`vibe-check` 不处理：
+
+- `roadmap item <-> task` 对应关系修复
+- roadmap item 未链接 task 的规划问题
+- task 应该归属于哪个 roadmap item 的语义判断
+
+这些属于 `vibe-task` 的审计/修复范围。
+
 ## Step 2: 分类问题
 
 把问题分成三类：
@@ -58,21 +75,19 @@ vibe roadmap audit --check-links --json
 
 当前允许的确定性修复：
 
-- `roadmap item missing task back-link: <roadmap-item-id>:<task-id>`
-  - 修复命令：`vibe task update <task-id> --roadmap-item <roadmap-item-id>`
-- `task missing roadmap back-link: <task-id>:<roadmap-item-id>`
-  - 修复命令：`vibe task update <task-id> --roadmap-item <roadmap-item-id>`
 - `completed/archived task still has runtime binding: <task-id>`
   - 修复命令：`vibe task update <task-id> --unassign`
+- 当前 worktree 就是目标 task 的确定性现场
+  - 修复命令：`vibe task update <task-id> --bind-current`
 
 ### B. 需要用户确认
 
 以下情况不允许直接修：
 
-- `unlinked roadmap item: <roadmap-item-id>`
-  - shell 只能确认“未链接”，不能判断“应该链接到哪个 task”
+- `runtime points to missing worktree: <task-id>:<worktree-name>`
+  - shell 能发现缺口，但无法仅凭审计结果判断应解绑还是重绑
 - 需要从 PR / 评论 / 文档语义推断 task 完成度
-- 需要在多个 task / roadmap item 之间做语义匹配
+- 需要在多个 worktree / task 之间做语义匹配
 
 此时必须向用户展示：
 
@@ -84,8 +99,8 @@ vibe roadmap audit --check-links --json
 
 如果发现问题但缺少原子能力，例如：
 
-- dangling ref 需要移除，而 shell 没有 remove/unlink API
-- 需要跨多个文件做事务修复但只有单侧写接口
+- 现场记录需要删除或改成 `missing/stale`，但 shell 没有单独的 flow 修复 API
+- 需要跨多个 worktree 做事务修复，但 shell 只有单 task 写入口
 
 则必须停止并明确报告 shell 能力缺口。
 
@@ -94,8 +109,8 @@ vibe roadmap audit --check-links --json
 对 A 类问题，逐条调用 shell 命令，不做 JSON 直写：
 
 ```bash
-vibe task update "$task_id" --roadmap-item "$roadmap_item_id"
 vibe task update "$task_id" --unassign
+vibe task update "$task_id" --bind-current
 ```
 
 如果命令失败：
@@ -134,12 +149,12 @@ vibe check link --json
 📋 Vibe Check Report
 
 已自动修复：
-- task missing roadmap back-link: 2026-03-08-foo:rm-1
-  command: vibe task update 2026-03-08-foo --roadmap-item rm-1
+- completed/archived task still has runtime binding: 2026-03-08-foo
+  command: vibe task update 2026-03-08-foo --unassign
 
 需要确认：
-- unlinked roadmap item: gh-52
-  reason: shell 无法判断应链接到哪个 task
+- runtime points to missing worktree: 2026-03-08-bar:wt-old
+  reason: shell 无法仅凭审计结果判断应解绑还是重绑
 
 验证结果：
 - vibe check link --json -> clean
@@ -149,5 +164,5 @@ vibe check link --json
 
 - `vibe check`：审计
 - `vibe task update`：原子写入
-- `vibe roadmap audit`：补充规划层检查
-- `/vibe-check`：解释审计并编排修复
+- `/vibe-check`：解释 task-flow 审计并编排修复
+- `/vibe-task`：处理 roadmap-task 与 registry 审计修复

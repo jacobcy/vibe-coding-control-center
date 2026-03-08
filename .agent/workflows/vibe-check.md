@@ -1,13 +1,13 @@
 ---
 name: "Vibe: Check"
-description: Read shell audit output, explain discrepancies, and invoke the vibe-check skill for safe shell-driven repairs.
+description: Read shell audit output, explain task-flow/runtime discrepancies, and invoke the vibe-check skill for safe shell-driven repairs.
 category: Workflow
 tags: [workflow, vibe, verification, shared-state]
 ---
 
-# Verify Shared-State Consistency
+# Verify Task-Flow Consistency
 
-**Input**: Run `/vibe-check` to inspect `roadmap.json`, `registry.json`, and `worktrees.json`, then repair deterministic gaps through Shell APIs when safe.
+**Input**: Run `/vibe-check` to inspect task-flow/runtime consistency and repair deterministic task-worktree binding gaps through Shell APIs when safe.
 
 **Steps**
 
@@ -19,8 +19,9 @@ tags: [workflow, vibe, verification, shared-state]
 
 3. **Respect shell / skill boundary**
    - `vibe check(shell)` only audits.
-   - `vibe-check` skill interprets results and decides whether a fix is safe.
+   - `vibe-check` skill only handles `task <-> flow` / runtime repair.
    - Shared-state writes must go through Shell APIs such as `vibe task update`.
+   - `roadmap <-> task` repair belongs to `vibe-task`, not `vibe-check`.
 
 4. **Report status**
    Show:
