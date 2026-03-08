@@ -82,6 +82,7 @@ setup() {
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe task" ]]
   [[ "$output" =~ "add" ]]
+  [[ "$output" =~ "show" ]]
   [[ "$output" =~ "update" ]]
   [[ "$output" =~ "remove" ]]
   [[ "$output" =~ "audit" ]]
@@ -99,4 +100,24 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Vibe Roadmap" ]]
   [[ "$output" =~ "classify" ]]
+}
+
+@test "11. global vibe delegates to repo bin/vibe inside a git repo" {
+  local fixture home_dir global_root
+  fixture="$(mktemp -d)"
+  home_dir="$(mktemp -d)"
+  global_root="$home_dir/.vibe"
+  git -C "$fixture" init >/dev/null 2>&1
+  mkdir -p "$fixture/bin" "$global_root/bin"
+  cp "$BATS_TEST_DIRNAME/../bin/vibe" "$global_root/bin/vibe"
+  chmod +x "$global_root/bin/vibe"
+  cat > "$fixture/bin/vibe" <<'SH'
+#!/usr/bin/env zsh
+echo "LOCAL-REPO-VIBE"
+SH
+  chmod +x "$fixture/bin/vibe"
+
+  run env HOME="$home_dir" zsh -c 'cd "'"$fixture"'" && "'"$global_root"'/bin/vibe" version'
+  [ "$status" -eq 0 ]
+  [ "$output" = "LOCAL-REPO-VIBE" ]
 }

@@ -15,40 +15,64 @@ _vibe_roadmap_common_dir() {
     git rev-parse --git-common-dir
 }
 
-_vibe_roadmap_status() {
-    local common_dir registry_file
-    common_dir="$(_vibe_roadmap_common_dir)" || return 1
-    registry_file="$common_dir/vibe/registry.json"
-    _vibe_roadmap_require_file "$registry_file" "registry.json" || return 1
+_vibe_roadmap_file() {
+    local common_dir="$1"
+    echo "$common_dir/vibe/roadmap.json"
+}
 
-    local version_goal current_version
-    version_goal="$(jq -r '.roadmap.version_goal // "none"' "$registry_file")"
-    current_version="$(jq -r '.roadmap.current_version // "none"' "$registry_file")"
+_vibe_roadmap_status() {
+    local common_dir roadmap_file output_json="false"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    common_dir="$(_vibe_roadmap_common_dir)" || return 1
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+
+    local status_json
+    status_json="$(jq -c '{
+        version_goal: .version_goal,
+        counts: {
+            p0: ([.items[]? | select(.status == "p0")] | length),
+            current: ([.items[]? | select(.status == "current")] | length),
+            next: ([.items[]? | select(.status == "next")] | length),
+            deferred: ([.items[]? | select(.status == "deferred")] | length),
+            rejected: ([.items[]? | select(.status == "rejected")] | length)
+        }
+    }' "$roadmap_file")"
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$status_json"
+        return 0
+    fi
+
+    local version_goal counts p0_count current_count next_count deferred_count rejected_count
+    version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
     echo "========================================"
     echo "         Roadmap Status"
     echo "========================================"
     echo ""
-    echo "Current Version: $current_version"
     echo "Version Goal: $version_goal"
     echo ""
 
     echo "Issue Summary:"
-    # Single jq call to get all counts, parse with read
-    local counts
-    local p0_count current_count next_count deferred_count rejected_count
-    counts="$(jq -r '[.roadmap.issues[]? | .status] |
-        {p0: (map(select(. == "p0")) | length),
-         current: (map(select(. == "current")) | length),
-         next: (map(select(. == "next")) | length),
-         deferred: (map(select(. == "deferred")) | length),
-         rejected: (map(select(. == "rejected")) | length)} |
-        "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$registry_file")"
+    counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
     echo "  P0 (urgent):      $p0_count"
-    echo "  Current Version:  $current_count"
-    echo "  Next Version:     $next_count"
+    echo "  Current:          $current_count"
+    echo "  Next:             $next_count"
     echo "  Deferred:         $deferred_count"
     echo "  Rejected:        $rejected_count"
     echo ""
@@ -58,9 +82,130 @@ _vibe_roadmap_status() {
     fi
 }
 
+_vibe_roadmap_list() {
+    local common_dir="$1" output_json="false" status_filter="" source_filter="" keywords="" linked="false" unlinked="false" roadmap_file
+    shift
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            --status)
+                status_filter="$2"
+                shift 2
+                ;;
+            --source)
+                source_filter="$2"
+                shift 2
+                ;;
+            --keywords)
+                keywords="$2"
+                shift 2
+                ;;
+            --linked)
+                linked="true"
+                shift
+                ;;
+            --unlinked)
+                unlinked="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    [[ "$linked" == "true" && "$unlinked" == "true" ]] && {
+        echo "Error: --linked and --unlinked cannot be used together"
+        return 1
+    }
+
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+
+    local items_json
+    items_json="$(jq -c \
+        --arg status "$status_filter" \
+        --arg source "$source_filter" \
+        --arg keywords "${keywords:l}" \
+        --argjson linked "$linked" \
+        --argjson unlinked "$unlinked" \
+        '[.items[]?
+          | select(
+              ($status == "" or .status == $status)
+              and ($source == "" or .source_type == $source)
+              and ($keywords == "" or ((.roadmap_item_id + " " + .title + " " + (.description // "")) | ascii_downcase | contains($keywords)))
+              and (($linked | not) or ((.linked_task_ids | length) > 0))
+              and (($unlinked | not) or ((.linked_task_ids | length) == 0))
+            )]' \
+        "$roadmap_file")"
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$items_json"
+        return 0
+    fi
+
+    if [[ "$(echo "$items_json" | jq 'length')" == "0" ]]; then
+        echo "No roadmap items found."
+        return 0
+    fi
+
+    echo "$items_json" | jq -r '.[] |
+        if (.title == .roadmap_item_id or (.title // "") == "") then
+            "[\(.status)] \(.roadmap_item_id)"
+        else
+            "[\(.status)] \(.roadmap_item_id)  \(.title)"
+        end'
+}
+
+_vibe_roadmap_show() {
+    local common_dir="$1" item_id="$2" output_json="false" roadmap_file item_json
+    shift 2
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
+    [[ -n "$item_id" ]] || { echo "Usage: vibe roadmap show <roadmap-item-id> [--json]"; return 1; }
+
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+    item_json="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
+    [[ -n "$item_json" ]] || { echo "Error: roadmap item not found: $item_id"; return 1; }
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$item_json"
+        return 0
+    fi
+
+    echo "$item_json" | jq -r '
+        "Roadmap Item: \(.roadmap_item_id)\n" +
+        "Title: \(.title)\n" +
+        "Status: \(.status)\n" +
+        "Source: \(.source_type)\n" +
+        "Description: \(.description // "null")\n" +
+        "Linked Tasks: \((.linked_task_ids | join(", ")))\n" +
+        "Issue Refs: \((.issue_refs | join(", ")))\n" +
+        "Updated At: \(.updated_at)"'
+}
+
 _vibe_roadmap_get_version_goal() {
-    local common_dir="$1" registry_file="$common_dir/vibe/registry.json"
-    jq -r '.roadmap.version_goal // empty' "$registry_file"
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    jq -r '.version_goal // empty' "$roadmap_file"
 }
 
 _vibe_roadmap_has_version_goal() {
@@ -70,6 +215,7 @@ _vibe_roadmap_has_version_goal() {
 }
 
 _vibe_roadmap_get_current_issues() {
-    local common_dir="$1" registry_file="$common_dir/vibe/registry.json"
-    jq -c '[.roadmap.issues[]? | select(.status == "current" or .status == "p0")] | sort_by(.priority // 0) | reverse' "$registry_file"
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    jq -c '[.items[]? | select(.status == "current" or .status == "p0")]' "$roadmap_file"
 }

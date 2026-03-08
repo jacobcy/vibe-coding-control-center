@@ -41,6 +41,7 @@ vibe_task() {
     local subcommand="${1:-list}"
     case "$subcommand" in
         list) [[ $# -gt 0 ]] && shift; _vibe_task_list "$@" ;;
+        show) [[ $# -gt 0 ]] && shift; _vibe_task_show "$@" ;;
         add) [[ $# -gt 0 ]] && shift; _vibe_task_add "$@" ;;
         update) [[ $# -gt 0 ]] && shift; _vibe_task_update "$@" ;;
         remove) [[ $# -gt 0 ]] && shift; _vibe_task_remove "$@" ;;

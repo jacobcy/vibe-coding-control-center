@@ -1,118 +1,512 @@
-# Vibe CLI 命令规范 (Command Standard)
+---
+document_type: standard
+title: Shared-State Command Standard
+status: approved
+scope: shared-state
+authority:
+  - command-semantics
+  - command-boundaries
+  - command-naming
+author: Codex GPT-5
+created: 2026-03-08
+last_updated: 2026-03-08
+related_docs:
+  - SOUL.md
+  - CLAUDE.md
+  - STRUCTURE.md
+  - docs/README.md
+  - docs/standards/data-model-standard.md
+  - docs/standards/skill-standard.md
+  - docs/standards/registry-json-standard.md
+  - docs/standards/roadmap-json-standard.md
+  - docs/standards/shell-capability-design.md
+---
 
-本文档作为 Vibe Coding Control Center 命令行工具的工程化规范标准。所有新增命令及重构工作必须严格遵循本规范。
+# 共享状态命令标准
 
-## 1. 设计原则 (Design Principles)
+本文档是 Vibe 共享状态命令的唯一规范真源，定义 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的最终命令模型。
 
-*   **Git 风格子命令**: 采用 `vibe <subcommand> [action]` 的结构。
-*   **单一职责**: 子命令专注于单一领域。
-*   **层级清晰**: 区分 配置(Config)、环境(Env)、检测(Check)、业务(Flow/Chat)。
-*   **本地优先**: 默认优先使用项目级配置，支持全局回退。
+本文档只定义最终标准，不记录历史演进、迁移步骤、现状偏差或实现映射。
 
-## 1.1. 统一交互规范 (Interaction Standards)
+## 0. Shell Role
 
-**帮助规范**:
-*   所有子命令必须支持 `help` / `-h` / `--help` 三种帮助入口。
-*   帮助输出结构必须包含：命令简述 → 子命令/动作列表 → 示例。
+`vibe` Shell 的顶层定位是 capability layer，不是 workflow engine。
 
-**参数风格**:
-*   子命令与 action 使用小写短单词（如 `vibe flow start`）。
-*   长参数使用 `--kebab-case`（如 `--base=main`），短参数使用单字母（如 `-g`）。
-*   参数顺序：`vibe <subcommand> <action> [options] [args]`。
+在共享状态命令域中，Shell 只负责暴露原子、可组合、可验证的方法，并隔离 skill 与共享状态真源。
 
-**退出码与错误分级**:
-*   `0`: 成功执行。
-*   `1`: 通用错误（未知子命令、执行失败）。
-*   `2`: 用户输入错误（参数缺失、非法值）。
-*   `3`: 环境/依赖错误（缺少依赖、配置缺失）。
+完整的 Shell 设计原则、职责边界与审查清单，见：
 
-**输出格式**:
-*   默认输出面向人类阅读。
-*   若支持机器可读输出，统一使用 `--json` 标志并输出稳定字段结构。
+- [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
 
-## 2. 核心命令体系 (Core Command Hierarchy)
+命令的数据模型基础见：
 
-### 2.1. 诊断与检测: `vibe check`
-*统一的系统状态验证入口*
+- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
-*   `vibe check` (或 `all`): 执行所有核心检查。
-*   `vibe check system`: 检查系统依赖、环境路径、工具版本（原 `doctor status`）。
-*   `vibe check api`: 检查 API 连接性及 Key 有效性。
-*   `vibe check mcp`: 检查 MCP 服务器配置及状态。
+## 1. Scope
 
-### 2.2. 配置管理: `vibe config`
-*管理持久化配置文件 (Static Configuration)*
+本文档只覆盖四个共享状态命令域：
 
-*   `vibe config`: 列出所有配置文件的路径及存在状态。
-*   `vibe config list`: 列出所有读取到的配置值（脱敏）。
-*   `vibe config <target>`: 显示指定目标的配置详情。
-*   `vibe config edit <target>`: 调用编辑器修改指定配置。
-    *   `keys`: 修改当前项目的 `keys.env`。
-    *   `claude`: 修改 `~/.claude.json`。
-    *   `opencode`: 修改 `opencode.json`。
-    *   `alias`: 修改 `aliases.sh` (或通过 `vibe alias` 管理)。
+- `vibe roadmap`
+- `vibe task`
+- `vibe flow`
+- `vibe check`
 
-### 2.3. 运行时环境: `vibe env`
-*管理当前 Shell 会话及环境变量 (Runtime Environment)*
+其他顶层命令不在本文档范围内。
 
-**关于 keys.env 与 ~/.zshrc 的区别**:
-*   `keys.env`: **项目级/本地环境**。只在该项目目录下生效，不会污染全局环境，适合存放项目专用的 API Key 或 Toggle。
-*   `~/.zshrc`: **用户级/全局环境**。所有终端生效。
+## 1.1 Data Model Dependency
 
-命令行为：
-*   `vibe env`: 列出当前**生效中**的环境变量 (Resolved Variables)。包含来源标注 (`[Local]` / `[Global]`)。
-*   `vibe env edit`: **快捷指令**，等同于 `vibe config edit keys`。
-*   `vibe env inject`: 将当前项目的 `keys.env` 注入到当前 Shell Session (export)。
-*   ~~`vibe env switch`~~: (已移除，避免过度设计，请直接编辑 keys.env)。
+四个命令域必须建立在共享状态文件标准之上：
 
-### 2.4. 快捷指令: `vibe alias`
-*管理用户定义的快捷命令*
+- `vibe roadmap` 以 `roadmap.json` 为规划态真源
+- `vibe task` 以 `registry.json` 为执行态真源
+- `vibe flow` 以 `worktrees.json` 为现场态真源
+- `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
 
-*   `vibe alias` (或 `list`): 列出所有可用别名及其对应命令。
-*   `vibe alias edit`: 调用编辑器打开 `~/.vibe/custom_aliases.sh` (或其他别名文件) 进行手动编辑。
-*   `vibe alias inject`: 将别名配置注入当前 Shell Session (source)。
+命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。
 
-### 2.5. 全局操作
+## 2. Global Rules
 
-*   **全局标志 `-g` / `--global`**:
-    *   `vibe -g <command>`: 强制使用全局安装的 Vibe (`~/.vibe/bin/vibe`) 执行命令。
+### 2.1 Command Shape
 
-## 3. 业务功能命令说明 (Business Logic)
+- 命令格式统一为 `vibe <domain> <subcommand> [options] [args]`
+- 子命令使用短单词
+- 长参数统一使用 `--kebab-case`
+- 查询命令优先使用 `status / list / show`
+- 命令应尽量对应单一原子动作
 
-### 3.1 `vibe flow` (工作流)
-*   核心功能：规范化 Git 操作与研发流程。
-*   **Action**:
-    *   `start <feature>`: 创建分支，创建 worktree，初始化 PRD 模板。
-    *   `status [<feature>]`: 查看当前分支的任务状态和文件指标（默认：当前分支）。
-    *   `list`: 查看所有 worktree 的状态和任务绑定。
-    *   `review [<pr>|<branch>]`: 检查 PR 状态、CI 结果、评审意见（实时真源审计）。
-    *   `spec`: 打开/创建技术规格文档。
-    *   `test`: 初始化或运行测试 (TDD)。
-    *   `pr`: 提交 PR（自动处理版本升级和 CHANGELOG）。
-    *   `done`: 清理工作区，归档分支。
+### 2.2 Action Naming
 
-### 3.2 `vibe chat` (AI 对话)
-*   核心功能：快速启动 AI 交互工具。
-*   **Action**:
-    *   `vibe chat`: 启动配置的默认 AI 工具 (Claude/OpenCode)。
-    *   `vibe chat "message"`: 单次提问模式。
+- 向共享模型新增实体使用 `add`
+- 创建运行时现场使用 `new`
+- `add` 与 `new` 不能混用
+- 命令名必须表达能力，不表达完整业务流程
 
-### 3.3 `vibe tool` (工具链)
-*   核心功能：安装与升级依赖工具。
-*   **Action**:
-    *   `vibe tool`: 显示交互式菜单，选择安装 Claude, OpenCode, Gum 等工具。
-    *   `vibe tool install <tool>`: 直接安装指定工具。
-    *   `vibe tool update`: 更新所有已安装工具。
+结论：
 
-### 3.4 `vibe init` (初始化)
-*   核心功能：项目脚手架与环境初始化。
-*   **行为**:
-    *   在当前目录生成标准目录结构 (.vibe, docs, scripts 等)。
-    *   创建 `vibe.toml` 或 `keys.env` 模板。
-    *   检查并提示安装 git hooks。
+- `roadmap add` = 新增规划项
+- `task add` = 新增执行任务
+- `flow new` = 创建现场
 
-## 4. 废弃与兼容 (Deprecation)
+### 2.3 Output Rules
 
-*   `vibe doctor` -> `vibe check`
-*   `vibe keys` -> `vibe config` / `vibe env`
-*   `vibe env verify` -> `vibe check api`
+- 默认输出面向人类阅读
+- 机器可读输出统一使用 `--json`
+- `--json` 输出必须保持字段稳定
+
+### 2.4 Non-Interactive Rules
+
+- 所有命令默认非交互
+- 任何创建、删除、覆盖或状态修改动作必须显式传 `-y` 或 `--yes`
+- 若上下文不足以安全执行，命令必须直接失败，不进入确认流程
+- help 文案必须明确标出哪些子命令要求 `-y`
+- 命令失败时必须暴露阻塞事实，不能擅自 fallback 到直接改数据源
+
+### 2.5 Runtime vs Persistent State
+
+- 运行时计算字段不得伪装成持久化真源
+- 持久化数据只保存稳定共享事实
+- 临时现场状态只能在查询时计算
+
+示例：
+
+- `dirty` 可以显示，但不能作为共享真源字段持久化
+- `branch` 与 `worktree` 可以作为当前绑定事实存在，但不能作为长期历史索引
+
+## 3. Layer Mapping
+
+四个命令域的职责固定如下：
+
+- `vibe roadmap` = 规划层
+- `vibe task` = 执行层
+- `vibe flow` = 现场层
+- `vibe check` = 审计胶水层
+
+禁止：
+
+- 用 `roadmap` 承担执行层职责
+- 用 `task` 承担规划层职责
+- 用 `flow` 承担 task 生命周期或规划职责
+- 用 `check` 承担业务写入职责
+- 用 Shell 替 skill 承担工作流编排职责
+
+## 3.1 Core Semantics
+
+以下业务语义由本文件定义，其他标准文件引用但不得重写：
+
+- `issue` = 外部愿望、问题、需求来源
+- `roadmap item` = 规划层工作单元
+- `task` = 可执行、可落地的执行单元
+- `flow` = task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
+
+语义关系：
+
+- `issue <-> task` 多对多
+- `roadmap item <-> task` 多对多
+- `flow -> task` 一对多
+
+## 4. `vibe roadmap` Standard
+
+### 4.1 Responsibility
+
+`vibe roadmap` 只负责：
+
+- 管 roadmap item
+- 管规划优先级
+- 管 `version_goal`
+- 管 roadmap item 与 issue / task 的映射
+
+### 4.2 Boundaries
+
+`vibe roadmap` 不负责：
+
+- task 生命周期
+- worktree 与 branch 现场
+- PR 发布与归档
+- 当前版本号真源
+
+### 4.3 Standard Subcommands
+
+- `status`
+- `list`
+- `show <roadmap-item-id>`
+- `add <title>`
+- `sync`
+- `assign <text>`
+- `classify <roadmap-item-id> --status <status>`
+- `audit`
+- `version <set-goal|clear-goal>`
+
+### 4.4 Query Rules
+
+- `status` 用于规划层概览
+- `list` 用于列出规划项
+- `show` 用于查看单个规划项详情
+- 查询类子命令支持 `--json`
+
+`list` 支持：
+
+- `--status <p0|current|next|deferred|rejected>`
+- `--source <github|local>`
+- `--keywords <text>`
+- `--linked`
+- `--unlinked`
+
+### 4.5 Write Rules
+
+以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
+
+- `add`
+- `sync`
+- `assign`
+- `classify`
+- `version set-goal`
+- `version clear-goal`
+
+### 4.6 Status and Provider Rules
+
+规划层状态只允许：
+
+- `p0`
+- `current`
+- `next`
+- `deferred`
+- `rejected`
+
+其中：
+
+- `current` 表示当前规划窗口纳入的项
+- `current` 不表示某个 branch / worktree 当前正在做什么
+- 分支当前焦点只能由 `flow` 与 task runtime 绑定表达
+
+provider 只允许：
+
+- `github`
+- `local`
+
+### 4.7 Prohibited Semantics
+
+禁止：
+
+- 将 `openspec` 作为 roadmap provider
+- 将 roadmap item 直接当作 task 使用
+- 持久化 `current_version`
+- 持久化 `branch`
+- 持久化 `worktree`
+- 持久化 `dirty`
+- 将 `version bump`
+- 将 `version next`
+- 将 `version complete`
+  当作版本真源管理动作
+
+## 5. `vibe task` Standard
+
+### 5.1 Responsibility
+
+`vibe task` 只负责：
+
+- 管 task 生命周期
+- 管 task 与 roadmap / issue / PR 的关联
+- 管 subtasks
+- 管 task 归档事实
+- 管 task 当前 runtime 绑定事实
+
+### 5.2 Boundaries
+
+`vibe task` 不负责：
+
+- roadmap 排布
+- 规划优先级
+- 现场创建与清理
+- 将 `branch` / `worktree` 当作长期历史索引
+
+### 5.3 Standard Subcommands
+
+- `list`
+- `show <task-id>`
+- `add <title>`
+- `update <task-id>`
+- `remove <task-id>`
+- `audit`
+
+### 5.4 Query Rules
+
+- `list` 用于任务总览
+- `show` 用于查看单个 task 详情
+- 查询类子命令支持 `--json`
+
+`list` 支持：
+
+- `--status <todo|in_progress|blocked|completed|archived>`
+- `--source <issue|local|openspec>`
+- `--keywords <text>`
+
+### 5.5 Write Rules
+
+以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
+
+- `add`
+- `update`
+- `remove`
+
+`update` 只允许修改执行层事实，例如：
+
+- `--status`
+- `--next-step`
+- `--roadmap-item`
+- `--issue`
+- `--pr`
+- `--bind-current`
+- `--unbind`
+
+### 5.6 Status and Source Rules
+
+执行层状态只允许：
+
+- `todo`
+- `in_progress`
+- `blocked`
+- `completed`
+- `archived`
+
+来源只允许：
+
+- `issue`
+- `local`
+- `openspec`
+
+### 5.7 Runtime Binding Rules
+
+- task 可以记录当前绑定的 `branch`、`worktree`、`agent`
+- 这些字段只表示当前 runtime 绑定
+- task 完成后必须清空 runtime 绑定
+- task 归档后必须清空 runtime 绑定
+
+### 5.8 Prohibited Semantics
+
+禁止：
+
+- 使用 `in-progress`
+- 使用 `done`
+- 使用 `merged`
+- 使用 `skipped`
+- 用 `task` 承担 roadmap 规划职责
+- 用 `branch` 或 `worktree` 作为 task 历史索引
+
+## 6. `vibe flow` Standard
+
+### 6.1 Responsibility
+
+`vibe flow` 只负责：
+
+- 管 worktree 现场
+- 管当前 branch 现场动作
+- 管当前 task 的绑定与解绑
+- 管当前现场的发布、检查、清理
+
+### 6.2 Boundaries
+
+`vibe flow` 不负责：
+
+- roadmap 查询
+- task 历史归档
+- 全局 task 生命周期管理
+- 将命名输入当作共享模型字段
+
+### 6.3 Standard Subcommands
+
+- `status`
+- `list`
+- `new <name>`
+- `bind <task-id>`
+- `sync`
+- `pr`
+- `review`
+- `done`
+
+### 6.4 Query Rules
+
+- `status` 用于查看当前现场状态
+- `list` 用于查看全部现场状态
+- `review` 用于检查当前 PR 或执行本地最终审查
+- 查询类子命令支持 `--json`
+
+`review` 支持：
+
+- `--local`
+- `--json`
+
+`flow` 不支持：
+
+- `--keywords`
+
+### 6.5 Write Rules
+
+以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
+
+- `new`
+- `bind`
+- `sync`
+- `pr`
+- `done`
+
+### 6.6 Naming Rules
+
+- `new <name>` 中的 `name` 只是命名输入
+- `name` 不是共享模型字段
+- 标准文案中不得把 `name` 写成 `feature` 这一类长期模型概念
+
+### 6.7 Semantic Separation
+
+- `pr` = publish
+- `review` = inspect
+
+`pr` 可以有副作用，例如：
+
+- push
+- 创建或更新 PR
+- CHANGELOG 相关动作
+- 版本发布相关动作
+
+`review` 默认不产生发布副作用。
+
+### 6.8 Runtime State Rules
+
+现场状态只允许：
+
+- `active`
+- `idle`
+- `missing`
+- `stale`
+
+`dirty`：
+
+- 可以在 `status` 或 `list` 中输出
+- 只能运行时计算
+- 不能作为持久化真源字段
+
+### 6.9 Prohibited Semantics
+
+禁止：
+
+- 用 `flow` 描述 task 生命周期管理
+- 用 `flow` 描述 roadmap 规划入口
+- 将 `feature` 写成共享模型字段
+- 持久化 `dirty`
+- 让 `review` 默认产生发布副作用
+
+## 7. `vibe check` Standard
+
+### 7.1 Responsibility
+
+`vibe check` 只负责：
+
+- 聚合各层 audit
+- 做跨层一致性检查
+- 做通用 schema 校验
+- 做文档元数据校验
+
+### 7.2 Boundaries
+
+`vibe check` 不负责：
+
+- 直接实现各层完整业务逻辑
+- 默认执行 fix
+- 处理业务状态修改
+- 替代各层自己的 audit
+
+### 7.3 Standard Subcommands
+
+- `check`
+- `check roadmap`
+- `check task`
+- `check flow`
+- `check link`
+- `check json <file>`
+- `check docs`
+
+### 7.4 Execution Rules
+
+- `check` 作为总入口，执行全量审计汇总
+- `check roadmap` 只汇总 `roadmap audit`
+- `check task` 只汇总 `task audit`
+- `check flow` 只汇总 `flow audit`
+- `check link` 只检查跨层链接一致性
+- `check json <file>` 只做 JSON / schema 校验
+- `check docs` 只做 frontmatter / 元数据审计
+
+### 7.5 Cross-Layer Link Rules
+
+`check link` 至少覆盖：
+
+- roadmap item 关联不存在的 task
+- task 关联不存在的 roadmap item
+- task runtime 指向不存在的 worktree
+- 已完成 task 仍残留 runtime 绑定
+
+### 7.6 Output Rules
+
+- `check` 相关子命令支持 `--json`
+- 输出按域分组：
+  - `roadmap`
+  - `task`
+  - `flow`
+  - `link`
+  - `docs`
+
+每组至少包含：
+
+- `status`
+- `errors`
+- `warnings`
+- `summary`
+
+### 7.7 Prohibited Semantics
+
+禁止：
+
+- 在 `check` 中重复实现各层完整审计逻辑
+- 在 `check` 中默认执行 fix
+- 在 `check` 中处理业务逻辑
+- 将 `check` 扩展成第二套 workflow 系统

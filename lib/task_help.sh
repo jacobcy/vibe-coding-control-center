@@ -8,6 +8,7 @@ _vibe_task_usage() {
     echo ""
     echo "Subcommands:"
     echo "  ${GREEN}list${NC} [-a|--all] [--json]     列出任务与绑定关系"
+    echo "  ${GREEN}show${NC} <task-id> [--json]      查看单个任务详情"
     echo "  ${GREEN}add${NC} <title> [--id <id>]      注册新任务记录"
     echo "  ${GREEN}update${NC} <task-id> [options]  更新任务状态、详情或绑定"
     echo "  ${GREEN}remove${NC} <task-id> [--yes]   从注册表中安全移除任务（需要 --yes 来清理分支）"

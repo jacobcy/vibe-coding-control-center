@@ -3,6 +3,7 @@
 
 # Load dependencies
 source "$VIBE_LIB/roadmap_query.sh"
+source "$VIBE_LIB/roadmap_audit.sh"
 source "$VIBE_LIB/roadmap_write.sh"
 source "$VIBE_LIB/roadmap_help.sh"
 
@@ -21,6 +22,26 @@ vibe_roadmap() {
         status)
             shift
             _vibe_roadmap_status "$@"
+            ;;
+        list)
+            shift
+            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
+            _vibe_roadmap_list "$common_dir" "$@"
+            ;;
+        show)
+            shift
+            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
+            _vibe_roadmap_show "$common_dir" "$@"
+            ;;
+        audit)
+            shift
+            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
+            _vibe_roadmap_audit "$common_dir" "$@"
+            ;;
+        add)
+            shift
+            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
+            _vibe_roadmap_add "$common_dir" "$*"
             ;;
         sync)
             shift
@@ -124,58 +145,21 @@ _vibe_roadmap_version() {
     local common_dir
 
     common_dir="$(_vibe_roadmap_common_dir)" || return 1
-    local registry_file="$common_dir/vibe/registry.json"
+    local roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_init "$common_dir"
 
     case "$action" in
-        bump)
-            local bump_type="${2:-minor}"
-            local current_version
-            current_version="$(jq -r '.roadmap.current_version // "v0.0"' "$registry_file")"
-
-            # Parse version number
-            local major minor
-            major="$(echo "$current_version" | sed 's/v\([0-9]*\).*/\1/')"
-            minor="$(echo "$current_version" | sed 's/v[0-9]*\.\([0-9]*\)/\1/')"
-
-            if [[ "$bump_type" == "major" ]]; then
-                major=$((major + 1))
-                minor=0
-            else
-                minor=$((minor + 1))
-            fi
-
-            local new_version="v${major}.${minor}"
-            jq --arg v "$new_version" '.roadmap.current_version = $v' "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
-
-            echo "Version bumped to: $new_version"
+        set-goal)
+            shift
+            _vibe_roadmap_assign "$common_dir" "$*"
             ;;
-        next)
-            # Move "next" issues to "current" - batch update in single write
-            local next_count
-            next_count="$(jq '[.roadmap.issues[]? | select(.status == "next")] | length' "$registry_file")"
-
-            if [[ "$next_count" == "0" || "$next_count" == "null" ]]; then
-                echo "No issues in 'next' status to promote."
-                return 0
-            fi
-
-            # Single jq to update all "next" to "current"
-            jq '(.roadmap.issues[]? | select(.status == "next") | .status) = "current"' \
-                "$registry_file" > "${registry_file}.tmp" && mv "${registry_file}.tmp" "$registry_file"
-
-            echo "Promoted $next_count 'next' issues to 'current'."
-            ;;
-        complete)
-            # Mark current version as complete and prepare for next
-            local current_version
-            current_version="$(jq -r '.roadmap.current_version // "v0.0"' "$registry_file")"
-
-            echo "Version $current_version marked as complete!"
-            echo "Run 'vibe roadmap version bump' to increment version"
-            echo "Run 'vibe roadmap version next' to promote next issues"
+        clear-goal)
+            jq '.version_goal = null' "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
+            echo "Version goal cleared."
             ;;
         *)
-            echo "Usage: vibe roadmap version <bump|next|complete> [major|minor]"
+            echo "Usage: vibe roadmap version <set-goal|clear-goal> [text]"
             ;;
     esac
 }
