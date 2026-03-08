@@ -174,7 +174,9 @@ EOF
   write_mock_git
   make_worktree_dashboard
 
+  pushd "$TEST_DIR/wt-claude-refactor" >/dev/null
   run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" TEST_DIR="$TEST_DIR" MOCK_MODE=update_dashboard "$TEST_DIR/rotate.sh" feature-safe
+  popd >/dev/null
 
   [ "$status" -eq 0 ]
   [ "$(jq -r '.worktrees[0].branch' "$TEST_DIR/repo/.git/vibe/worktrees.json")" = "feature-safe" ]
