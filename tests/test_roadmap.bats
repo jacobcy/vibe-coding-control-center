@@ -221,3 +221,57 @@ JSON
   [ "$(echo "$output" | jq -r '.status')" = "p0" ]
   [ "$(echo "$output" | jq -r '.title')" = "Beta" ]
 }
+
+@test "roadmap audit returns json summary when checks pass" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+  jq '.items |= map(.linked_task_ids = ["2026-03-08-command-standard-rewrite"])' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap audit --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.ok')" = "true" ]
+  [ "$(echo "$output" | jq -r '.checks.version_goal.present')" = "true" ]
+}
+
+@test "roadmap audit fails when status is invalid" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+  jq '.items[1].status = "broken"' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap audit --check-status --json
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(echo "$output" | jq -r '.ok')" = "false" ]
+  [ "$(echo "$output" | jq -r '.checks.status.invalid_item_ids[0]')" = "rm-2" ]
+}
