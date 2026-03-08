@@ -1,4 +1,6 @@
-# Vibe Coding 团队工程范式 
+# Vibe Coding 团队工程范式
+
+> 术语说明：本文定义的是文档流程层级，不是共享状态或运行时系统术语。`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 `Plan` → `Spec` → `Execution Plan` → `Test` → `Code` → `AI Audit Review`
 

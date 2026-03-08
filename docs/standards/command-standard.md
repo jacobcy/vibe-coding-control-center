@@ -15,6 +15,7 @@ related_docs:
   - CLAUDE.md
   - STRUCTURE.md
   - docs/README.md
+  - docs/standards/glossary.md
   - docs/standards/data-model-standard.md
   - docs/standards/skill-standard.md
   - docs/standards/registry-json-standard.md
@@ -37,6 +38,10 @@ related_docs:
 完整的 Shell 设计原则、职责边界与审查清单，见：
 
 - [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+
+本文档使用的核心术语定义见：
+
+- [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)
 
 命令的数据模型基础见：
 
@@ -133,12 +138,7 @@ related_docs:
 
 ## 3.1 Core Semantics
 
-以下业务语义由本文件定义，其他标准文件引用但不得重写：
-
-- `issue` = 外部愿望、问题、需求来源
-- `roadmap item` = 规划层工作单元
-- `task` = 可执行、可落地的执行单元
-- `flow` = task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
+以下关系建立在 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 的术语定义之上。
 
 语义关系：
 

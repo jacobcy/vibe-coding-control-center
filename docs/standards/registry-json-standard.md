@@ -12,6 +12,7 @@ last_updated: 2026-03-08
 related_docs:
   - SOUL.md
   - CLAUDE.md
+  - docs/standards/glossary.md
   - docs/standards/data-model-standard.md
   - docs/standards/command-standard.md
 ---
@@ -19,6 +20,8 @@ related_docs:
 # `registry.json` 标准
 
 本文档定义 `registry.json` 的最终文件结构。它是执行态共享真源，只表达 task 注册信息，不表达规划层或现场层以外的内容。
+
+本文档涉及的 `task`、`issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. File Responsibility
 

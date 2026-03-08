@@ -10,12 +10,14 @@ docs/
 ├── standards/                       # 标准和规范文档
 │   ├── DOC_ORGANIZATION.md         # 文档组织标准（必读）
 │   ├── cognition-spec-dominion.md  # 宪法大纲：Vibe Guard 流程定义
-│   └── vibe-engine-design.md       # Vibe 工作流引擎设计
+│   └── ...                         # 其他现行标准
 ├── prds/                           # 产品需求文档（全局 PRD）
 │   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
 ├── references/                     # 外部参考资料
 │   └── ...                         # 收集的外部文档、论文、资料等
+├── archive/                        # 历史文档归档
+│   └── ...                         # 已完成任务或已退役设计，保留备查
 └── tasks/                          # 任务文档（按任务组织）
     └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
         ├── README.md               # 任务概述、状态和导航
@@ -33,10 +35,10 @@ docs/
 存放项目的标准、规范、架构设计等元文档。这些文档定义了"如何做事"。
 
 **必读文档**：
+- **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
+- **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准，定义命名规范和使用指南
 - **[cognition-spec-dominion.md](standards/cognition-spec-dominion.md)** - 宪法大纲，定义 Vibe Guard 流程
-- **[vibe-engine-design.md](standards/vibe-engine-design.md)** - 工作流引擎设计
-
 ### 全局 PRD (`prds/`)
 存放不针对特定任务的全局性产品需求文档。
 
@@ -51,6 +53,11 @@ docs/
 - 第三方工具和框架文档
 
 **用途**：为项目决策和实现提供外部知识支持，不属于项目自身文档。
+
+### 历史归档 (`archive/`)
+存放已完成任务、历史设计稿、退役方案等非现行真源文档。
+
+**用途**：保留备查，不作为当前标准或当前实现的规范真源。
 
 ### 任务文档 (`tasks/`)
 每个任务一个子目录，包含该任务的完整 Vibe Guard 文档。

@@ -16,6 +16,7 @@ related_docs:
   - CLAUDE.md
   - STRUCTURE.md
   - docs/README.md
+  - docs/standards/glossary.md
   - docs/standards/command-standard.md
   - docs/standards/registry-json-standard.md
   - docs/standards/roadmap-json-standard.md
@@ -29,6 +30,8 @@ related_docs:
 
 - [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+
+本文档涉及的 `issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. Scope
 

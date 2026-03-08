@@ -13,12 +13,15 @@ created: 2025-01-20
 last_updated: 2025-01-24
 related_docs:
   - docs/README.md
+  - docs/standards/glossary.md
   - docs/standards/doc-quality-standards.md
   - docs/prds/vibe-workflow-paradigm.md
   - STRUCTURE.md
 ---
 
 # 文档组织标准
+
+本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式完全对齐。
 
@@ -36,10 +39,12 @@ docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
 │   ├── DOC_ORGANIZATION.md         # 本文档组织标准
-│   └── vibe-engine-design.md       # Vibe 工作流引擎设计
+│   └── ...                         # 其他现行标准
 ├── prds/                           # 产品需求文档（全局 PRD）
 │   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
+├── archive/                        # 历史文档归档
+│   └── ...                         # 已退役设计与历史任务文档
 └── tasks/                          # 任务文档（按任务组织）
     └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
         ├── README.md               # 任务概述、状态和导航
@@ -180,4 +185,4 @@ gates:
 
 - [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - Vibe Guard 范式总 PRD
 - [Cognition Spec Dominion](cognition-spec-dominion.md) - 宪法大纲
-- [Vibe Engine Design](vibe-engine-design.md) - 工作流引擎设计
+- [docs/archive/](../archive/) - 历史文档归档区

@@ -1,4 +1,21 @@
+---
+document_type: standard
+title: Vibe Workflow Engine 架构设计
+status: historical
+scope: architecture-history
+author: GPT-5 Codex
+created: 2026-03-08
+last_updated: 2026-03-08
+related_docs:
+  - SOUL.md
+  - docs/README.md
+  - docs/standards/glossary.md
+  - docs/standards/doc-quality-standards.md
+---
+
 # Vibe Workflow Engine 架构设计
+
+> 历史状态：本文档为历史设计稿，保留备查，不作为当前标准真源。
 
 > 术语说明：本文保留其架构设计语境，但 `flow`、`workflow`、`Skill 层`、`Shell 能力层`、`执行代理`、`共享状态真源` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 

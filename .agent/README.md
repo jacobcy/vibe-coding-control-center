@@ -8,6 +8,8 @@
 - **[AGENTS.md](../AGENTS.md)**: Agent 全局入口
 - **[CLAUDE.md](../CLAUDE.md)**: 技术栈与上下文
 - **[SOUL.md](../SOUL.md)**: 核心原则与价值观 (Constitution & Principles)
+- **[docs/standards/glossary.md](../docs/standards/glossary.md)**: 项目术语真源
+- **[docs/standards/action-verbs.md](../docs/standards/action-verbs.md)**: 高频动作词真源
 
 ## 📂 目录结构 (Directory Structure)
 
@@ -16,6 +18,8 @@
   - `task.md`: 当前活动任务列表。
 - **`workflows/`**: **用户接口 (User Interface)**。定义了 Agent 可执行的标准任务流程。
 - **`rules/`**: 具体的编码标准和项目规则。
+  - `coding-standards.md`: 实现、边界、工具与交付细则
+  - `patterns.md`: 执行模式、报告模式与渐进披露模式
 - **`templates/`**: Commit, PR 等模板。
 
 ## 🤖 AI 互操作协议 (AI Interoperability Protocol)
@@ -25,6 +29,7 @@
 2.  **遵循工作流**: 如果用户请求匹配下方的工作流，请**严格按步骤执行**。
 3.  **遵循约束**: 优先使用现有的能力（如 Skills），不要重新发明轮子。
 4.  **更新上下文**: 任务完成后，更新 `context/task.md` 和 `context/memory.md`。
+5.  **遇到歧义先查真源**: 名词看 `glossary.md`，动词看 `action-verbs.md`，执行细则看 `rules/`。
 
 ---
 

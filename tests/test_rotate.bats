@@ -10,6 +10,14 @@ setup() {
   : > "$LOG_FILE"
 }
 
+make_worktree_dashboard() {
+  local current_dir="${1:-$TEST_DIR/wt-claude-refactor}"
+  mkdir -p "$TEST_DIR/repo/.git/vibe" "$current_dir"
+  cat > "$TEST_DIR/repo/.git/vibe/worktrees.json" <<EOF
+{"schema_version":"v1","worktrees":[{"worktree_name":"$(basename "$current_dir")","worktree_path":"$current_dir","branch":"claude/refactor","current_task":"task-1","tasks":["task-1"],"status":"active","dirty":false,"last_updated":"2026-03-08T10:00:00+08:00"}]}
+EOF
+}
+
 write_mock_git() {
   cat > "$TEST_DIR/bin/git" <<'EOF'
 #!/usr/bin/env bash
@@ -21,17 +29,12 @@ case "${MOCK_MODE:-}" in
   stash_requires_u)
     case "$*" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
+      "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
       "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
-      "fetch origin main --quiet") exit 0 ;;
-      "show-ref --verify --quiet refs/remotes/origin/main") exit 0 ;;
-      "checkout -b feature-safe origin/main") exit 0 ;;
-      "branch -D feature-old") exit 0 ;;
-      "rev-parse --verify origin/feature-old") exit 0 ;;
-      "push origin --delete feature-old") exit 0 ;;
-      "branch --set-upstream-to=origin/main feature-safe") exit 0 ;;
+      "checkout -b feature-safe") exit 0 ;;
       "stash pop") exit 0 ;;
       *) exit 1 ;;
     esac
@@ -42,24 +45,18 @@ case "${MOCK_MODE:-}" in
       "status --porcelain") exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch bad branch") exit 1 ;;
-      "fetch origin main --quiet") exit 0 ;;
-      "show-ref --verify --quiet refs/remotes/origin/main") exit 0 ;;
       "checkout --detach HEAD --quiet") exit 0 ;;
-      "branch -D feature-old") exit 0 ;;
-      "checkout -b bad branch origin/main") exit 1 ;;
+      "checkout -b bad branch") exit 1 ;;
       *) exit 0 ;;
     esac
     ;;
-  missing_origin_main)
+  generic_target)
     case "$*" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
-      "status --porcelain") exit 0 ;;
-      "branch --show-current") printf 'feature-old\n'; exit 0 ;;
-      "check-ref-format --branch feature-safe") exit 0 ;;
-      "fetch origin main --quiet") exit 0 ;;
-      "show-ref --verify --quiet refs/remotes/origin/main") exit 1 ;;
-      "checkout --detach HEAD --quiet") exit 0 ;;
-      "branch -D feature-old") exit 0 ;;
+      "check-ref-format --branch refactor") exit 0 ;;
+      "branch --show-current") printf 'bug-fix\n'; exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to refactor: saved WIP") exit 0 ;;
       *) exit 0 ;;
     esac
     ;;
@@ -93,6 +90,19 @@ case "${MOCK_MODE:-}" in
       *) exit 1 ;;
     esac
     ;;
+  update_dashboard)
+    case "$*" in
+      "rev-parse --is-inside-work-tree") exit 0 ;;
+      "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
+      "check-ref-format --branch feature-safe") exit 0 ;;
+      "branch --show-current") printf 'claude/refactor\n'; exit 0 ;;
+      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
+      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
+      "checkout -b feature-safe") exit 0 ;;
+      "stash pop") exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
   *)
     exit 1
     ;;
@@ -108,8 +118,10 @@ EOF
 
   [ "$status" -eq 0 ]
   grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
-  grep -q "push origin --delete feature-old" "$LOG_FILE"
-  grep -q "branch --set-upstream-to=origin/main feature-safe" "$LOG_FILE"
+  grep -q "checkout -b feature-safe" "$LOG_FILE"
+  ! grep -q "branch -D feature-old" "$LOG_FILE"
+  ! grep -q "push origin --delete feature-old" "$LOG_FILE"
+  ! grep -q "fetch origin main --quiet" "$LOG_FILE"
 }
 
 @test "rotate rejects invalid branch names before deleting current branch" {
@@ -122,14 +134,13 @@ EOF
   ! grep -q "branch -D feature-old" "$LOG_FILE"
 }
 
-@test "rotate verifies origin/main exists before deleting current branch" {
+@test "rotate rejects generic target workflow names before stashing" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=missing_origin_main "$TEST_DIR/rotate.sh" feature-safe
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=generic_target "$TEST_DIR/rotate.sh" refactor
 
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "origin/main" ]]
-  ! grep -q "checkout --detach HEAD --quiet" "$LOG_FILE"
-  ! grep -q "branch -D feature-old" "$LOG_FILE"
+  [[ "$output" =~ "generic workflow name" ]]
+  ! grep -q "stash push -u -m Rotate to refactor: saved WIP" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting detached HEAD" {
@@ -157,4 +168,16 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
   ! grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+}
+
+@test "rotate updates worktrees dashboard branch for current worktree" {
+  write_mock_git
+  make_worktree_dashboard
+
+  pushd "$TEST_DIR/wt-claude-refactor" >/dev/null
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" TEST_DIR="$TEST_DIR" MOCK_MODE=update_dashboard "$TEST_DIR/rotate.sh" feature-safe
+  popd >/dev/null
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.worktrees[0].branch' "$TEST_DIR/repo/.git/vibe/worktrees.json")" = "feature-safe" ]
 }
