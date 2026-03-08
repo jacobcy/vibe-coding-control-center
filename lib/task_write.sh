@@ -2,20 +2,42 @@
 # lib/task_write.sh - Task Write/Persistence operations
 
 _vibe_task_write_registry() {
-    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" assigned="$5" assigned_mode="$6" agent="$7" now="$8" tmp
+    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" runtime_name="$5" runtime_path="$6" runtime_branch="$7" runtime_mode="$8" runtime_agent="$9" now="${10}" issue_refs_json="${11}" issue_mode="${12}" roadmap_item_ids_json="${13}" roadmap_mode="${14}" pr_ref="${15}" pr_mode="${16}" tmp
     tmp="$(mktemp)" || return 1
-    jq --arg task_id "$task_id" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg assigned_mode "$assigned_mode" --arg agent "$agent" --arg now "$now" '
+    jq --arg task_id "$task_id" --arg task_status "$task_status" --arg next_step "$next_step" \
+       --arg runtime_name "$runtime_name" --arg runtime_path "$runtime_path" --arg runtime_branch "$runtime_branch" --arg runtime_mode "$runtime_mode" --arg runtime_agent "$runtime_agent" \
+       --arg now "$now" --argjson issue_refs "$issue_refs_json" --arg issue_mode "$issue_mode" \
+       --argjson roadmap_item_ids "$roadmap_item_ids_json" --arg roadmap_mode "$roadmap_mode" --arg pr_ref "$pr_ref" --arg pr_mode "$pr_mode" '
       .tasks |= map(if .task_id == $task_id then
         (if $task_status != "" then .status = $task_status else . end)
         | (if $next_step != "" then .next_step = $next_step else . end)
-        | (if $assigned_mode == "set" then .assigned_worktree = (if $assigned == "" then null else $assigned end)
-           elif $assigned_mode == "clear" then .assigned_worktree = null
+        | (if $runtime_mode == "set" then
+             .runtime_worktree_name = (if $runtime_name == "" then null else $runtime_name end)
+             | .runtime_worktree_path = (if $runtime_path == "" then .runtime_worktree_path // null else $runtime_path end)
+             | .runtime_branch = (if $runtime_branch == "" then .runtime_branch // null else $runtime_branch end)
+             | .runtime_agent = (if $runtime_agent == "" then .runtime_agent // null else $runtime_agent end)
+             | .assigned_worktree = (if $runtime_name == "" then null else $runtime_name end)
+           elif $runtime_mode == "clear" then
+             .runtime_worktree_name = null
+             | .runtime_worktree_path = null
+             | .runtime_branch = null
+             | .runtime_agent = null
+             | .assigned_worktree = null
            else . end)
-        | (if $agent != "" then 
-             .agent = $agent 
-             | (.agent_log // {planned_by: $agent, executed_by: [], committed_by: null, latest_actor: null}) as $log
-             | .agent_log = ($log | .latest_actor = $agent | .executed_by = ((.executed_by + [$agent]) | unique))
+        | (if $runtime_mode != "set" and $runtime_branch != "" then .runtime_branch = $runtime_branch else . end)
+        | (if $runtime_mode != "set" and $runtime_agent != "" then .runtime_agent = $runtime_agent else . end)
+        | (if $runtime_agent != "" then 
+             .agent = $runtime_agent 
+             | (.agent_log // {planned_by: $runtime_agent, executed_by: [], committed_by: null, latest_actor: null}) as $log
+             | .agent_log = ($log | .latest_actor = $runtime_agent | .executed_by = ((.executed_by + [$runtime_agent]) | unique))
            else . end)
+        | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
+        | (if $issue_mode == "append" then .issue_refs = (((.issue_refs // []) + $issue_refs) | unique) else . end)
+        | (if $roadmap_mode == "append" then .roadmap_item_ids = (((.roadmap_item_ids // []) + $roadmap_item_ids) | unique) else . end)
+        | (if $pr_mode == "set" then .pr_ref = (if $pr_ref == "" then null else $pr_ref end) else . end)
+        | (if $task_status == "completed" then .completed_at = (.completed_at // $now) else . end)
+        | (if $task_status == "archived" then .archived_at = (.archived_at // $now) else . end)
+        | (if $task_status != "" and ($task_status != "completed" and $task_status != "archived") then .completed_at = null | .archived_at = null else . end)
         | .updated_at = $now
       else . end)
     ' "$registry_file" >"$tmp" && mv "$tmp" "$registry_file"
@@ -67,20 +89,25 @@ _vibe_task_write_worktrees() {
 }
 
 _vibe_task_write_task_file() {
-    local common_dir="$1" registry_file="$2" task_id="$3" now="$4" task_file tmp task_title task_status next_step assigned
+    local common_dir="$1" registry_file="$2" task_id="$3" now="$4" task_file tmp registry_task_json
     task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
-    task_title="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .title // ""' "$registry_file")"
-    task_status="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .status // "todo"' "$registry_file")"
-    next_step="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .next_step // ""' "$registry_file")"
-    assigned="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .assigned_worktree // ""' "$registry_file")"
+    registry_task_json="$(jq -c --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id)' "$registry_file" | head -n 1)"
+    [[ -n "$registry_task_json" ]] || return 1
     mkdir -p "$(dirname "$task_file")"; tmp="$(mktemp)" || return 1
     if [[ -f "$task_file" ]]; then
-        jq --arg task_id "$task_id" --arg task_title "$task_title" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg now "$now" '
-          .task_id = $task_id | .title = (if (.title // "") == "" then $task_title else .title end) | .subtasks = (.subtasks // []) | .status = $task_status | .assigned_worktree = (if $assigned == "" then null else $assigned end) | .next_step = $next_step | .updated_at = $now
+        jq --argjson reg "$registry_task_json" --arg now "$now" '
+          (. + $reg)
+          | .subtasks = (.subtasks // [])
+          | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
+          | .assigned_worktree = (.runtime_worktree_name // .assigned_worktree // null)
+          | .updated_at = $now
         ' "$task_file" >"$tmp" && mv "$tmp" "$task_file"
     else
-        jq -n --arg task_id "$task_id" --arg task_title "$task_title" --arg task_status "$task_status" --arg next_step "$next_step" --arg assigned "$assigned" --arg now "$now" '
-          {task_id: $task_id, title: $task_title, status: $task_status, subtasks: [], assigned_worktree: (if $assigned == "" then null else $assigned end), next_step: $next_step, updated_at: $now}
+        jq -n --argjson reg "$registry_task_json" --arg now "$now" '
+          ($reg + {subtasks: ($reg.subtasks // [])})
+          | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
+          | .assigned_worktree = (.runtime_worktree_name // .assigned_worktree // null)
+          | .updated_at = $now
         ' >"$tmp" && mv "$tmp" "$task_file"
     fi
 }

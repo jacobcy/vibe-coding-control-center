@@ -29,6 +29,27 @@ _vibe_task_slugify() {
 }
 _vibe_task_require_file() { [[ -f "$1" ]] || { vibe_die "Missing $2: $1"; return 1; }; }
 _vibe_task_task_file() { echo "$1/vibe/tasks/$2/task.json"; }
+_vibe_task_normalize_status() {
+    local raw="$1"
+    case "$raw" in
+        review) echo "in_progress" ;;
+        done|merged) echo "completed" ;;
+        skipped) echo "archived" ;;
+        *) echo "$raw" ;;
+    esac
+}
+_vibe_task_is_valid_status() {
+    case "$1" in
+        todo|in_progress|blocked|completed|archived) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+_vibe_task_normalize_and_validate_status() {
+    local normalized
+    normalized="$(_vibe_task_normalize_status "$1")"
+    _vibe_task_is_valid_status "$normalized" || return 1
+    echo "$normalized"
+}
 
 source "$VIBE_LIB/task_render.sh"
 source "$VIBE_LIB/task_write.sh"

@@ -9,11 +9,20 @@ _vibe_task_render() {
       --arg cur "$current_task_id" --arg show_all "$show_all" \
       --arg BOLD "$BOLD" --arg GREEN "$GREEN" --arg CYAN "$CYAN" --arg NC "$NC" \
       '
-      ((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all_tasks 
+      def norm_status:
+        if . == "review" then "in_progress"
+        elif . == "done" or . == "merged" then "completed"
+        elif . == "skipped" then "archived"
+        else . end;
+      ((($registry[0].tasks // []) + ($openspec[0].tasks // [])
+          | unique_by(.task_id)
+          | map(.status = ((.status // "todo") | norm_status))
+          | map(.runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null))
+       ) as $all_tasks
       | .worktrees as $wts
       | (
           # 1. Render Worktree Groups
-          ($wts[] | 
+          ($wts[] |
             (.worktree_name) as $wn |
             (.current_task) as $ct |
             (.tasks // []) as $ids |
@@ -26,8 +35,8 @@ _vibe_task_render() {
 
             if ($wt_tasks | length) > 0 then
               (if $is_cur_wt then "\($GREEN)\($BOLD)● WORKTREE: \($wn)\($NC)" else "\($CYAN)\($BOLD)○ WORKTREE: \($wn)\($NC)" end),
-              ($wt_tasks[] | 
-                (if .task_id == $ct then "  [Main] " else "  [Sub ] " end) + 
+              ($wt_tasks[] |
+                (if .task_id == $ct then "  [Main] " else "  [Sub ] " end) +
                 "\(.task_id) \(.title) [\(.status)]" +
                 (if .task_id == $cur then " \($GREEN)(focused)\($NC)" else "" end)
               ),
@@ -36,8 +45,8 @@ _vibe_task_render() {
           ),
 
           # 2. Render Unassigned Tasks
-          (($all_tasks | map(select(.assigned_worktree == null and (.task_id as $tid | ($wts | map(.tasks // []) | flatten | index($tid)) == null))) |
-            map(select($show_all == "1" or (.status != "completed" and .status != "archived" and .status != "done" and .status != "skipped")))) as $u_tasks |
+          (($all_tasks | map(select(.runtime_worktree_name == null and (.task_id as $tid | ($wts | map(.tasks // []) | flatten | index($tid)) == null))) |
+            map(select($show_all == "1" or (.status != "completed" and .status != "archived")))) as $u_tasks |
             if ($u_tasks | length) > 0 then
               "\($NC)\($BOLD)Unassigned Tasks\($NC)",
               ($u_tasks[] |
