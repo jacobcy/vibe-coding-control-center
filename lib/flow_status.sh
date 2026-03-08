@@ -125,12 +125,10 @@ _flow_status() {
       gate_label="Gate $gate_num"
     fi
 
-    local current_actor current_actor_norm assigned_actor_norm actor_label header_label
-    current_actor="$(git config user.name 2>/dev/null || echo "unknown")"
-    current_actor_norm="$(_normalize_actor_name "$current_actor")"
-    assigned_actor_norm="$(_normalize_actor_name "$agent")"
+    local current_actor agent_assigned actor_label header_label
+    current_actor="$(echo "$task_data" | jq -r '.agent_log.latest_actor // .runtime_agent // .agent // "unknown"')"
+    agent_assigned="$(echo "$task_data" | jq -r '.assigned_worktree // "none"')"
     actor_label="${BOLD}${current_actor}${NC}"
-    [[ "$current_actor_norm" != "$assigned_actor_norm" && "$agent" != "none" ]] && actor_label="${YELLOW}${current_actor} (${agent} assigned)${NC}"
 
     header_label="${CYAN}${BOLD}任务 $((idx + 1))${NC}"
     [[ "$tid" == "$cur_t" ]] && header_label="${GREEN}${BOLD}重点任务 (Main)${NC}"
