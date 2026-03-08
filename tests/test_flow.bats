@@ -380,6 +380,66 @@ EOF
   [ -f "$fixture/bump_called" ]
 }
 
+@test "14.1 _flow_pr allows inferred main as default base" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Skipping version bump" ]]
+}
+
+@test "14.2 _flow_pr refuses non-main inferred base without explicit override" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "claude/refactor"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base claude/refactor --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;;
+        "pr create --title test --body test --base claude/refactor --web") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "log claude/refactor..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "claude/refactor" ]]
+  [[ "$output" =~ "--base" ]]
+}
+
 
 
 @test "14. vibe flow start with path feature does not auto-create or bind task" {
