@@ -41,12 +41,13 @@ related_docs:
 
 ## 2. Term Axes
 
-本项目术语按四个维度组织：
+本项目术语按五个维度组织：
 
 - 共享状态术语
 - Git 与现场术语
 - 系统职责术语
 - 文档流程术语
+- 调用面术语
 
 禁止把不同维度的术语当作同一层概念使用。
 
@@ -255,8 +256,37 @@ related_docs:
 - 落点：
   - 边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
 - 使用规则：
-  - 讨论共享状态文件本身时使用 `共享状态真源`
-  - 不要再用“物理真源”同时指 shell 和 JSON 文件
+- 讨论共享状态文件本身时使用 `共享状态真源`
+- 不要再用“物理真源”同时指 shell 和 JSON 文件
+
+### 5.7 `shell 命令`
+
+- 正式术语：`shell 命令`
+- 别称：`vibe shell`
+- 定义：通过 CLI 直接执行的 `vibe <domain> <subcommand>` 命令能力，例如 `vibe flow`、`vibe task`、`vibe roadmap`。
+- 边界：
+  - `shell 命令` 不是 skill
+  - `shell 命令` 不是 workflow 文案本身
+- 使用规则：
+  - 文档和沟通中首次提及时，建议显式写成 `vibe flow (shell)` 这类格式
+
+### 5.8 `skill 命令`
+
+- 正式术语：`skill 命令`
+- 别称：`vibe skill`
+- 定义：通过 Slash/workflow 触发的 skill 能力入口，例如 `/vibe-save`、`/vibe-new`。
+- 边界：
+  - `skill 命令` 不是 `bin/vibe` 的子命令
+  - `skill 命令` 不应冒充 shell 命令语义
+- 使用规则：
+  - 文档和沟通中首次提及时，建议显式写成 `/vibe-save (skill)` 这类格式
+
+### 5.9 `调用面标注规则`
+
+- 当同一段内容同时出现 shell 与 skill 能力时，首次提及必须显式标注调用面：
+  - `vibe flow (shell)`
+  - `/vibe-save (skill)`
+- 后续同段复用同一对象时可省略后缀，但跨段再次出现建议重标一次，避免歧义。
 
 ## 6. Document Process Terms
 
