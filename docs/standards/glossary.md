@@ -14,6 +14,7 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/README.md
+  - docs/standards/action-verbs.md
   - docs/standards/command-standard.md
   - docs/standards/data-model-standard.md
   - docs/standards/shell-capability-design.md
@@ -25,6 +26,8 @@ related_docs:
 本文档是 Vibe Center 项目术语的唯一真源。
 
 本文档只定义本项目内的特指语义，不展开通用百科解释。其他标准、入口文档、skills、workflows 若使用本文档已定义术语，只能引用，不得重新定义。
+
+高频动作词见 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md)。
 
 ## 1. Governance
 
