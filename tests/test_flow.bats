@@ -284,12 +284,13 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; } # Mock all tools as present
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 0 ;; # PR exists
-        "pr edit current-branch --title test --body test") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -316,12 +317,13 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; } # Mock all tools as present
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;; # PR does not exist
-        "pr create --title test --body test --web") return 0 ;;
+        "pr create --title test --body test --base main --web") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -354,12 +356,13 @@ EOF
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
     vibe_has() { return 0; }
     gh() {
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;;
-        "pr create --title test --body test --web") return 0 ;;
+        "pr create --title test --body test --base main --web") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -391,7 +394,7 @@ EOF
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 0 ;;
-        "pr edit current-branch --title test --body test") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -414,13 +417,12 @@ EOF
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
-    _flow_resolve_pr_base() { echo "claude/refactor"; return 0; }
+    _flow_pick_pr_base() { echo "claude/refactor"; return 0; }
     vibe_has() { return 0; }
     gh() {
       case "$*" in
         "pr list --state open --base claude/refactor --json number,headRefName,title") echo "[]"; return 0 ;;
-        "pr view current-branch") return 1 ;;
-        "pr create --title test --body test --base claude/refactor --web") return 0 ;;
+        "pr view current-branch") return 0 ;;
         *) return 0 ;;
       esac
     }

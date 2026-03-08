@@ -33,13 +33,19 @@ _flow_pr_usage() {
   echo "Usage: ${CYAN}vibe flow pr${NC} [options]"
   echo ""
   echo "提交当前工作区的修改并创建/更新 Pull Request。"
-  echo "核心职责：执行串行检查 -> 自动处理版本与 CHANGELOG -> 物理 Push -> 云端 PR 关联"
+  echo "核心职责：判定/校验 PR base -> 执行串行检查 -> 自动处理版本与 CHANGELOG -> 物理 Push -> 云端 PR 关联"
   echo ""
   echo "选项："
+  echo "  --base <ref>     显式指定 PR 基线分支；从非 main 近切分支发 PR 时必须传入"
   echo "  --bump <type>    自动版本升级 (patch|minor|major, 默认: patch)"
   echo "  --title <text>   PR 的标题 (默认: 首条 commit 标题)"
   echo "  --body <text>    PR 的正文描述 (默认: 所有 commit 列表)"
   echo "  --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)"
+  echo ""
+  echo "默认行为："
+  echo "  - 仅当当前分支可判定为直接从 main 近切时，才会默认使用 main"
+  echo "  - 如果检测到当前分支更接近其他祖先分支，命令会拒绝继续并要求显式 --base"
+  echo "  - 这样可以避免把从中间分支派生的变更误向 main 发 PR"
 }
 
 _flow_review_usage() {
