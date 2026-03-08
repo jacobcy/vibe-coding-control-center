@@ -20,15 +20,28 @@ _vibe_roadmap_file() {
     echo "$common_dir/vibe/roadmap.json"
 }
 
+_vibe_roadmap_supports_color() {
+    [[ -t 1 ]]
+}
+
+_vibe_roadmap_format() {
+    local prefix="$1" text="$2"
+    if _vibe_roadmap_supports_color; then
+        printf '%s%s%s' "$prefix" "$text" "$NC"
+    else
+        printf '%s' "$text"
+    fi
+}
+
 _vibe_roadmap_color_status() {
     local s="$1"
     case "$s" in
-        p0) echo "${RED}${BOLD}${s}${NC}" ;;
-        current) echo "${GREEN}${s}${NC}" ;;
-        next) echo "${BLUE}${s}${NC}" ;;
-        deferred) echo "${YELLOW}${s}${NC}" ;;
-        rejected) echo -e "\033[0;90m${s}${NC}" ;; # Grey
-        *) echo "$s" ;;
+        p0) _vibe_roadmap_format "${RED}${BOLD}" "$s" ;;
+        current) _vibe_roadmap_format "$GREEN" "$s" ;;
+        next) _vibe_roadmap_format "$BLUE" "$s" ;;
+        deferred) _vibe_roadmap_format "$YELLOW" "$s" ;;
+        rejected) _vibe_roadmap_format "$(printf '\033[0;90m')" "$s" ;;
+        *) printf '%s' "$s" ;;
     esac
 }
 
@@ -72,25 +85,33 @@ _vibe_roadmap_status() {
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
     echo "========================================"
-    echo "         ${BOLD}Roadmap Status${NC}"
+    echo "         $(_vibe_roadmap_format "$BOLD" "Roadmap Status")"
     echo "========================================"
     echo ""
-    echo "Version Goal: ${CYAN}${version_goal}${NC}"
+    echo "Version Goal: $(_vibe_roadmap_format "$CYAN" "$version_goal")"
     echo ""
 
     echo "Issue Summary:"
     counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
-    printf "  %-16s  %b\n" "P0 (urgent):" "$(_vibe_roadmap_color_status "p0") ($p0_count)"
-    printf "  %-16s  %b\n" "Current:" "$(_vibe_roadmap_color_status "current") ($current_count)"
-    printf "  %-16s  %b\n" "Next:" "$(_vibe_roadmap_color_status "next") ($next_count)"
-    printf "  %-16s  %b\n" "Deferred:" "$(_vibe_roadmap_color_status "deferred") ($deferred_count)"
-    printf "  %-16s  %b\n" "Rejected:" "$(_vibe_roadmap_color_status "rejected") ($rejected_count)"
+    if _vibe_roadmap_supports_color; then
+        printf "  %-16s  %b\n" "P0 (urgent):" "$(_vibe_roadmap_color_status "p0") ($p0_count)"
+        printf "  %-16s  %b\n" "Current:" "$(_vibe_roadmap_color_status "current") ($current_count)"
+        printf "  %-16s  %b\n" "Next:" "$(_vibe_roadmap_color_status "next") ($next_count)"
+        printf "  %-16s  %b\n" "Deferred:" "$(_vibe_roadmap_color_status "deferred") ($deferred_count)"
+        printf "  %-16s  %b\n" "Rejected:" "$(_vibe_roadmap_color_status "rejected") ($rejected_count)"
+    else
+        echo "  P0 (urgent):      $p0_count"
+        echo "  Current:          $current_count"
+        echo "  Next:             $next_count"
+        echo "  Deferred:         $deferred_count"
+        echo "  Rejected:         $rejected_count"
+    fi
     echo ""
 
     if [[ "$version_goal" == "none" ]]; then
-        echo "${YELLOW}No version goal set. Run 'vibe roadmap assign' to set one.${NC}"
+        echo "$(_vibe_roadmap_format "$YELLOW" "No version goal set. Run 'vibe roadmap assign' to set one.")"
     fi
 }
 
@@ -224,9 +245,9 @@ _vibe_roadmap_show() {
     local colored_status
     colored_status=$(_vibe_roadmap_color_status "$item_status")
 
-    echo "Roadmap Item: ${CYAN}${BOLD}${id}${NC}"
+    echo "Roadmap Item: $(_vibe_roadmap_format "${CYAN}${BOLD}" "$id")"
     echo "----------------------------------------"
-    echo "Title:       ${BOLD}${title}${NC}"
+    echo "Title:       $(_vibe_roadmap_format "$BOLD" "$title")"
     echo "Status:      ${colored_status}"
     echo "Source:      ${source}"
     echo "Updated:     ${updated}"

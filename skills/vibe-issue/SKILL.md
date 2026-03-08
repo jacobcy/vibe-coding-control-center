@@ -18,7 +18,7 @@ phase: both
 ## 使用逻辑
 
 ### Step 1: 确定意图与模板
-- 用户通过 `/vibe-issue create "<标题>"` 触发。
+- 用户可直接运行 `/vibe-issue` 进入引导；若已确定标题，可运行 `/vibe-issue create "<标题>"` 跳过首轮澄清。
 - Skill 扫描 `.github/ISSUE_TEMPLATE/*.md`。
 - 如果没有指定模板，主动询问用户是 Bug 还是 Feature。
 - 获取对应模板的 fields。
@@ -35,11 +35,12 @@ phase: both
 
 ### Step 4: 填充与润饰
 - 引导用户补充模板中缺失的关键信息。
-- 基于 AI 建议合适的 Labels (例如 `bug`, `enhancement`, `vibe-task`)。
+- 基于 AI 建议合适的 Labels。
+- 为保证 `vibe roadmap sync` 可发现该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
 
 ### Step 5: 提交与收口
 - 执行 `gh issue create --title "<标题>" --body "<润色后的内容>" --label "<labels>"`。
-- 创建成功后，如果它不在 Roadmap 中，询问用户或自动执行 `vibe roadmap sync`。
+- 创建成功后，如果它不在 Roadmap 中，询问用户或自动执行 `vibe roadmap sync`；默认同步路径依赖前一步已附加 `vibe-task`。
 - 输出成功提示及 Issue 链接。
 
 ## Failure Handling
