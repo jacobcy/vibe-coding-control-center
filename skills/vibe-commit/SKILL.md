@@ -108,8 +108,11 @@ git log --oneline <base>..HEAD
 如果不满足，或者明显需要多个 PR：
 
 - 不要继续沿用当前分支直接发 PR
-- 若仍在当前目录串行推进，使用 `vibe flow switch <name> --branch <ref> [--save-stash]` 进入新的逻辑 flow
-- 若需要并行隔离，再使用 `vibe flow new <name> --branch <ref>` 或等价 worktree 命令创建新的物理现场
+<<<<<<< HEAD
+- 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
+=======
+- 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
+>>>>>>> ee66d77 (docs(commit): add dirty-worktree and PR-slicing flow)
 - 在新的 flow 中迁移当前要发布的那一组改动或 commit
 - 再由新分支继续提交与发布
 
