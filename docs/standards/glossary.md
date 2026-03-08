@@ -355,7 +355,7 @@ related_docs:
 - 别称：`Git Author`, `Alias`, `工作区身份`
 - 定义：仅指 Git 仓库物理底层的作者信息（即通过 `git config user.name` 和 `user.email` 写入的数据）。这是强制的、排他的单一所有者标记。
 - 边界：
-  - `物理签名` 只能在 `vibe flow new` 与用户手动调用 `wtinit` 时设定。
+  - `物理签名` 只能由用户在具体 worktree 中显式设定（例如 `git config user.name/user.email`）。
   - `物理签名` 不能代表所有参与接力的协作者。
 - 落点：
   - Worktree 隔离的 `.git/config`。

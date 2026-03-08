@@ -49,7 +49,7 @@ _flow_bind() {
   if typeset -f wtinit &>/dev/null; then
     wtinit "$agent" >/dev/null || return 1
   fi
-  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current || return 1
+  log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current --agent "$agent" || return 1
   log_success "Bound: $tid ($title)"
 }
 

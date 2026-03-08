@@ -77,7 +77,7 @@ wt() {
     esac
   }
 
-# @desc Create a new feature worktree with agent identity
+# @desc Create a new feature worktree
 # @featured
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
@@ -357,8 +357,8 @@ vup() {
 # @desc One-shot command to create worktree and setup workspace
 # @featured
 vnew() {
-  local branch="$1" agent="${2:-claude}" base="${3:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent] [base]"
+  local branch="$1" base="${2:-main}"
+  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [base]"
   wtnew "$branch" "$base" || return 1
   vup "$branch" || return 1
   

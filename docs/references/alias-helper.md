@@ -93,22 +93,19 @@ repo/
 |------|------|------|
 | `wtls` | 列出所有 worktree | `wtls` |
 | `wt <wt-dir>` | 跳转到某个 worktree（tmux 内自动重命名窗口） | `wt wt-login-fix` |
-| `wtnew <branch> [agent] [base]` | 创建新 worktree + 设置 agent identity | `wtnew login-fix claude` |
+| `wtnew <branch> [base]` | 创建新 worktree | `wtnew login-fix` |
 | `wtrm <wt-dir\|all>` | 删除 worktree 并清理 git 引用 | `wtrm wt-login-fix` |
-| `wtinit [agent]` | 重新设置当前 worktree 的 git identity | `wtinit opencode` |
-| `wtrenew` | 刷新当前 worktree identity 和状态 | `wtrenew` |
 
 ### `wtnew` 详解
 
 ```bash
-wtnew login-fix claude        # 从 main 创建
-wtnew feature-branch opencode develop  # 从 develop 创建
+wtnew login-fix               # 从 main 创建
+wtnew feature-branch develop  # 从 develop 创建
 ```
 
 结果：
-- 创建 `wt-claude-login-fix/` 目录
+- 创建 `wt-login-fix/` 目录
 - 分支名：`login-fix`（从 main 分支）
-- Git identity：`Agent-Claude <agent-claude@vibecoding.ai>`
 
 ### `wtrm` 详解
 
@@ -196,23 +193,23 @@ vup wt-login-fix claude
 
 ## 八、一键从零开始（最推荐）
 
-### `vnew <branch> [agent] [base]`
+### `vnew <branch> [base]`
 
 这是你最常用的命令。
 
 它会一次性完成：
 1. 创建新分支
-2. 创建 worktree（`wt-<agent>-<branch>`）
+2. 创建 worktree（`wt-<branch>`）
 3. 启动 tmux 全套窗口
-4. 启动 agent（--yes）
-5. 打开 lazygit
+4. 打开 lazygit
 
 ```bash
-vnew login-fix claude
+vnew login-fix
+vnew login-fix develop
 ```
 
 你接下来只需要：
-- 去 `wt-claude-login-fix-git` 窗口
+- 去 `wt-login-fix-git` 窗口
 - Review → Commit
 
 ---

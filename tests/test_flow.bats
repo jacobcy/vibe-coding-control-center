@@ -158,6 +158,30 @@ JSON
   [ "$status" -eq 0 ]
 }
 
+@test "8.1 vibe flow bind forwards --agent to task update" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _vibe_task_update() { echo "TASK_UPDATE:$*"; return 0; }
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      return 0
+    }
+    _flow_bind 2026-03-02-rotate-alignment --agent codex
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "TASK_UPDATE:2026-03-02-rotate-alignment --status in_progress --bind-current --agent codex" ]]
+}
+
 @test "9. vibe flow bind fails when task missing" {
   local fixture
   fixture="$(mktemp -d)"
@@ -437,4 +461,22 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Unknown option for flow list" ]]
+}
+
+@test "18. vnew forwards base arg and opens branch workspace" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/alias/worktree.sh"
+    vibe_die() { echo "ERR:$*"; return 1; }
+    wtnew() { echo "WTNEW:$*"; return 0; }
+    vup() { echo "VUP:$*"; return 0; }
+    CYAN=""
+    NC=""
+    vnew feat-x develop
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "WTNEW:feat-x develop" ]]
+  [[ "$output" =~ "VUP:feat-x" ]]
 }
