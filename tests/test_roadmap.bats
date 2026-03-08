@@ -324,6 +324,32 @@ JSON
   [[ ! "$output" =~ $'\033' ]]
 }
 
+@test "roadmap list color output highlights grouped status headings" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    _vibe_roadmap_supports_color() { return 0; }
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ $'\033' ]]
+  [[ "$output" =~ "P0 (1)" ]]
+  [[ "$output" =~ "Current (1)" ]]
+}
+
 @test "roadmap show text output omits ansi escapes when stdout is not a tty" {
   local fixture
   fixture="$(mktemp -d)"

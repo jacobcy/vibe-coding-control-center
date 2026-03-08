@@ -45,6 +45,18 @@ _vibe_roadmap_color_status() {
     esac
 }
 
+_vibe_roadmap_status_color_prefix() {
+    local item_status="$1"
+    case "$item_status" in
+        p0) printf '%s' "${RED}${BOLD}" ;;
+        current) printf '%s' "${GREEN}${BOLD}" ;;
+        next) printf '%s' "${BLUE}${BOLD}" ;;
+        deferred) printf '%s' "${YELLOW}${BOLD}" ;;
+        rejected) printf '%s' "$(printf '\033[1;90m')" ;;
+        *) printf '%s' "$NC" ;;
+    esac
+}
+
 _vibe_roadmap_status_label() {
     local item_status="$1"
     case "$item_status" in
@@ -55,6 +67,12 @@ _vibe_roadmap_status_label() {
         rejected) printf 'Rejected' ;;
         *) printf '%s' "$item_status" ;;
     esac
+}
+
+_vibe_roadmap_group_heading() {
+    local item_status="$1" count="$2" label
+    label="$(_vibe_roadmap_status_label "$item_status")"
+    _vibe_roadmap_format "$(_vibe_roadmap_status_color_prefix "$item_status")" "${label} (${count})"
 }
 
 _vibe_roadmap_status() {
@@ -213,7 +231,7 @@ _vibe_roadmap_list() {
             printf '\n'
         fi
 
-        printf '%s (%s)\n' "$(_vibe_roadmap_status_label "$group_status")" "$group_count"
+        printf '%s\n' "$(_vibe_roadmap_group_heading "$group_status" "$group_count")"
         echo "$group_items" | jq -c '.[]' | while read -r row; do
             rid=$(echo "$row" | jq -r '.roadmap_item_id')
             title=$(echo "$row" | jq -r '.title')
