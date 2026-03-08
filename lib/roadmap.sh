@@ -22,6 +22,11 @@ vibe_roadmap() {
             shift
             _vibe_roadmap_status "$@"
             ;;
+        add)
+            shift
+            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
+            _vibe_roadmap_add "$common_dir" "$*"
+            ;;
         sync)
             shift
             _vibe_roadmap_sync "$@"

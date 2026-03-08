@@ -21,6 +21,47 @@ _vibe_roadmap_init() {
     fi
 }
 
+_vibe_roadmap_slugify() {
+    local raw="$1" slug
+    slug="$(print -r -- "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+    [[ -n "$slug" ]] || slug="roadmap-item"
+    print -r -- "$slug"
+}
+
+_vibe_roadmap_next_item_id() {
+    local common_dir="$1" title="$2" roadmap_file date_part slug base candidate suffix exists
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    date_part="$(date +%F)"
+    slug="$(_vibe_roadmap_slugify "$title")"
+    base="rm-${date_part}-${slug}"
+    candidate="$base"
+    suffix=2
+
+    while true; do
+        exists="$(jq --arg id "$candidate" '[.items[]? | select(.roadmap_item_id == $id)] | length' "$roadmap_file")"
+        [[ "$exists" == "0" ]] && break
+        candidate="${base}-${suffix}"
+        suffix=$((suffix + 1))
+    done
+
+    print -r -- "$candidate"
+}
+
+_vibe_roadmap_add() {
+    local common_dir="$1" title="$2" roadmap_file item_id
+    [[ -n "$title" ]] || { echo "Error: title required"; return 1; }
+
+    _vibe_roadmap_init "$common_dir"
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    item_id="$(_vibe_roadmap_next_item_id "$common_dir" "$title")" || return 1
+
+    jq --arg id "$item_id" --arg title "$title" \
+        '.items += [{roadmap_item_id: $id, title: $title, description: null, status: "deferred", source_type: "local", source_refs: [], issue_refs: [], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]' \
+        "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
+
+    echo "Roadmap item added: $item_id"
+}
+
 _vibe_roadmap_set_version_goal() {
     local common_dir="$1" version_goal="$2" roadmap_file
     _vibe_roadmap_init "$common_dir"

@@ -145,3 +145,27 @@ JSON
   [[ "$output" =~ "Version goal cleared." ]]
   [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "null" ]
 }
+
+@test "roadmap add creates a local roadmap item in roadmap.json" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap add "Local roadmap item"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Roadmap item added:" ]]
+  [ "$(jq -r '.items[] | select(.title=="Local roadmap item") | .source_type' "$fixture/vibe/roadmap.json")" = "local" ]
+}
