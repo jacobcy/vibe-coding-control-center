@@ -12,6 +12,18 @@ setup() {
   run vibe check --help
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Usage:" ]]
+  [[ "$output" =~ "roadmap" ]]
+  [[ "$output" =~ "task" ]]
+  [[ "$output" =~ "flow" ]]
+  [[ "$output" =~ "link" ]]
+  [[ "$output" =~ "json <file>" ]]
+  [[ "$output" =~ "docs" ]]
+}
+
+@test "2.1 vibe check check --json returns grouped result" {
+  run vibe check check --json
+  [[ "$status" -eq 0 || "$status" -eq 1 ]]
+  echo "$output" | jq -e '.roadmap and .task and .flow and .link and .docs' >/dev/null
 }
 
 @test "3. vibe help outputs Usage" {

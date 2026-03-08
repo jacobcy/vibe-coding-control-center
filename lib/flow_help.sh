@@ -7,23 +7,23 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <feature> [--agent <name>] [--branch <ref>]     创建/切换现场（worktree + branch）"
+  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建/切换现场（worktree + branch）"
   echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
   echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
-  echo "  ${GREEN}status${NC} [<feature>]                                   查看当前分支状态 (默认: 当前分支)"
+  echo "  ${GREEN}status${NC} [<name>]                                      查看当前分支状态 (默认: 当前分支)"
   echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
   echo "  ${GREEN}sync${NC}                                                 同步当前变更至所有 worktree"
   echo "  ${GREEN}pr${NC}                                                   提交代码并打开 Pull Request"
   echo "  ${GREEN}review${NC}                                               查看 PR 或进行本地最终检查"
   echo ""
-  echo "Options for 'new <feature>':"
+  echo "Options for 'new <name>':"
   echo "  --agent <name>     指定 AI 身份 (默认: claude)"
   echo "  --branch <ref>     指定基础分支 (默认: main)"
   echo "  # 标准路径：先 vibe task add/update，再 vibe flow new，再 vibe flow bind"
 }
 
 _flow_new_usage() { 
-    echo "Usage: vibe flow new <feature> [--agent=claude] [--branch=main]"
+    echo "Usage: vibe flow new <name> [--agent=claude] [--branch=main]"
 }
 
 _flow_bind_usage() { 
@@ -59,7 +59,7 @@ _flow_review_usage() {
 }
 
 _flow_list_usage() {
-  echo "Usage: ${CYAN}vibe flow list${NC} [--pr] [--keywords <text>]"
+  echo "Usage: ${CYAN}vibe flow list${NC} [--pr]"
   echo ""
   echo "查看全部分支状态（所有 worktree 的任务进度和物理变动）。"
   echo ""
@@ -69,6 +69,5 @@ _flow_list_usage() {
   echo "  - 共享上下文文件数量"
   echo ""
   echo "选项："
-  echo "  --pr                 查询最近 10 个有 PR 的分支"
-  echo "  --keywords <text>    按关键字查找分支（匹配分支名、任务标题）"
+  echo "  --pr    查询最近 10 个有 PR 的分支"
 }

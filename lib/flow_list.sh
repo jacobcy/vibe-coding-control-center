@@ -5,13 +5,12 @@ _flow_list() {
   setopt localoptions typeset_silent 2>/dev/null || true
 
   local filter_pr=0
-  local filter_keywords=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --pr) filter_pr=1; shift ;;
-      --keywords) filter_keywords="$2"; shift 2 ;;
-      *) shift ;;
+      -h|--help) _flow_list_usage; return 0 ;;
+      *) log_error "Unknown option for flow list: $1"; _flow_list_usage; return 1 ;;
     esac
   done
 
@@ -64,19 +63,6 @@ _flow_list() {
     wt_tasks_raw=$(jq -r --arg n "$wt_name" '.worktrees[]? | select(.worktree_name == $n) | .tasks[]?' "$worktrees_file" 2>/dev/null)
     local -a wt_tasks sorted_tasks
     wt_tasks=(${(f)wt_tasks_raw})
-
-    if [[ -n "$filter_keywords" ]]; then
-      local match=0
-      [[ "$wt_branch" == *"$filter_keywords"* ]] && match=1
-      if [[ $match -eq 0 ]]; then
-        local tid t_title
-        for tid in "${wt_tasks[@]}"; do
-          t_title=$(jq -r --arg tid "$tid" '.tasks[]? | select(.task_id == $tid) | .title // ""' "$registry_file" 2>/dev/null)
-          [[ "$t_title" == *"$filter_keywords"* ]] && { match=1; break; }
-        done
-      fi
-      [[ $match -eq 0 ]] && continue
-    fi
 
     [[ -n "$cur_t" ]] && sorted_tasks+=("$cur_t")
     local t

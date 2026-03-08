@@ -54,6 +54,55 @@ JSON
   ! echo "$output" | grep -F "task-completed"
 }
 
+@test "render: vibe_task list supports --status/--source/--keywords filters" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "tasks": [
+    {"task_id":"t-issue","title":"Fix issue sync","status":"in_progress","source_type":"issue","source_refs":[],"roadmap_item_ids":[],"issue_refs":[],"related_task_ids":[],"subtasks":[],"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
+    {"task_id":"t-local","title":"Write docs","status":"todo","source_type":"local","source_refs":[],"roadmap_item_ids":[],"issue_refs":[],"related_task_ids":[],"subtasks":[],"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
+    {"task_id":"t-blocked","title":"Blocked by API","status":"blocked","source_type":"local","source_refs":[],"roadmap_item_ids":[],"issue_refs":[],"related_task_ids":[],"subtasks":[],"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"}
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task list --status blocked
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "t-blocked" ]]
+  [[ ! "$output" =~ "t-local" ]]
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task list --source issue
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "t-issue" ]]
+  [[ ! "$output" =~ "t-local" ]]
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task list --keywords blocked
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "t-blocked" ]]
+  [[ ! "$output" =~ "t-issue" ]]
+}
+
 @test "render: displays framework and source path when present" {
   local fixture; fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"

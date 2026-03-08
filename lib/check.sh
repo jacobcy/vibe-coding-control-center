@@ -1,181 +1,402 @@
 #!/usr/bin/env zsh
-# v2/lib/check.sh - Minimalist Validation for Vibe 2.0
-# Target: ~30 lines | Simplified API
+# lib/check.sh - Shared-state audits and schema checks
 
 [[ -f "$VIBE_LIB/check_pr_status.sh" ]] && source "$VIBE_LIB/check_pr_status.sh"
 
-vibe_check() {
-    local file="${1:-}"
-    local audit_tasks=false
+_vibe_check_help() {
+  echo "${BOLD}Vibe Check${NC}"
+  echo ""
+  echo "Usage: ${CYAN}vibe check${NC} [check] [target] [options]"
+  echo ""
+  echo "Targets:"
+  echo "  ${GREEN}(none)${NC}            运行全量审计（roadmap/task/flow/link/docs）"
+  echo "  ${GREEN}check${NC}             同上（兼容 command-standard）"
+  echo "  ${GREEN}roadmap${NC}           只检查 roadmap 域"
+  echo "  ${GREEN}task${NC}              只检查 task 域"
+  echo "  ${GREEN}flow${NC}              只检查 flow 域"
+  echo "  ${GREEN}link${NC}              只检查跨层链接一致性"
+  echo "  ${GREEN}json <file>${NC}       JSON + schema 检查"
+  echo "  ${GREEN}docs${NC}              文档 frontmatter 审计"
+  echo ""
+  echo "Options:"
+  echo "  ${GREEN}--json${NC}            输出机器可读结果"
+  echo ""
+  echo "Examples:"
+  echo "  vibe check"
+  echo "  vibe check check --json"
+  echo "  vibe check roadmap"
+  echo "  vibe check json .git/vibe/registry.json"
+}
 
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --audit-tasks)
-                audit_tasks=true
-                shift
-                ;;
-            -h|--help)
-                echo "${BOLD}Vibe Health Checker${NC}"
-                echo ""
-                echo "Usage: ${CYAN}vibe check${NC} [options] [file]"
-                echo ""
-                echo "Modes:"
-                echo "  ${GREEN}[file]${NC}        验证文件格式（目前支持 JSON 及其 Vibe Schema）"
-                echo "  ${GREEN}(无参数)${NC}      执行项目全要素审计（Registry、OpenSpec、归档、僵尸分支）"
-                echo ""
-                echo "Options:"
-                echo "  ${GREEN}--audit-tasks${NC}  运行任务注册审计与修复（在主检查前执行）"
-                return 0
-                ;;
-            *)
-                file="$1"
-                shift
-                ;;
-        esac
-    done
+_vibe_check_lines_to_json_array() {
+  jq -Rsc 'split("\n") | map(select(length > 0))'
+}
 
-    if [[ -n "$file" && "$file" != "--audit-tasks" ]]; then
-        [[ -f "$file" ]] || { log_error "File not found: $file"; return 1; }
-        if [[ "$file" == *.json ]]; then
-            jq empty "$file" >/dev/null 2>&1 || { log_error "Invalid JSON: $file"; return 1; }
-            jq -e 'has("tasks") or has("worktrees")' "$file" >/dev/null 2>&1 && log_success "Valid Vibe Data: $file" || log_success "Valid JSON: $file"
-        else
-            log_warn "Unsupported file type for check: $file"
-            return 1
-        fi
-        return 0
+_vibe_check_group_json() {
+  local group_status="$1" summary="$2" errors_json="$3" warnings_json="$4"
+  jq -nc \
+    --arg status "$group_status" \
+    --arg summary "$summary" \
+    --argjson errors "${errors_json:-[]}" \
+    --argjson warnings "${warnings_json:-[]}" \
+    '{status:$status, errors:$errors, warnings:$warnings, summary:$summary}'
+}
+
+_vibe_check_common_dir() {
+  git rev-parse --git-common-dir 2>/dev/null
+}
+
+_vibe_check_group_roadmap() {
+  local audit_json invalid_ids unlinked_ids errors_json warnings_json warnings group_status summary
+
+  if ! audit_json="$(vibe roadmap audit --json 2>/dev/null)"; then
+    _vibe_check_group_json "fail" "roadmap audit failed" '["vibe roadmap audit failed"]' '[]'
+    return
+  fi
+
+  invalid_ids="$(echo "$audit_json" | jq -r '.checks.status.invalid_item_ids[]?')"
+  unlinked_ids="$(echo "$audit_json" | jq -r '.checks.links.unlinked_item_ids[]?')"
+
+  errors_json="$(printf '%s\n' "$invalid_ids" | sed '/^$/d' | _vibe_check_lines_to_json_array | jq 'map("invalid roadmap item status: " + .)')"
+
+  warnings=""
+  if [[ "$(echo "$audit_json" | jq -r '.checks.version_goal.present')" != "true" ]]; then
+    warnings+="version_goal is empty\n"
+  fi
+  if [[ -n "$unlinked_ids" ]]; then
+    while IFS= read -r item; do
+      [[ -n "$item" ]] && warnings+="unlinked roadmap item: $item\n"
+    done <<< "$unlinked_ids"
+  fi
+  warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+
+  if [[ "$(echo "$errors_json" | jq 'length')" -gt 0 ]]; then
+    group_status="fail"
+    summary="roadmap audit found invalid status entries"
+  else
+    group_status="pass"
+    summary="roadmap audit passed"
+  fi
+
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" "$warnings_json"
+}
+
+_vibe_check_group_task() {
+  local output group_status summary errors_json
+  if output="$(vibe task audit --all 2>&1)"; then
+    group_status="pass"
+    summary="task audit passed"
+    errors_json='[]'
+  else
+    group_status="fail"
+    summary="task audit failed"
+    errors_json='["vibe task audit --all failed"]'
+  fi
+
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" '[]'
+}
+
+_vibe_check_group_flow() {
+  local common_dir worktrees_file invalid_status missing_paths errors warnings
+  local errors_json warnings_json group_status summary
+
+  common_dir="$(_vibe_check_common_dir)"
+  [[ -n "$common_dir" ]] || { _vibe_check_group_json "fail" "not in git repo" '["Not in a git repository"]' '[]'; return; }
+  worktrees_file="$common_dir/vibe/worktrees.json"
+  [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
+
+  invalid_status="$(jq -r '.worktrees[]? | select((.status // "active" | IN("active","idle","missing","stale")) | not) | "\(.worktree_name):\(.status // "null")"' "$worktrees_file")"
+  while IFS='|' read -r wt_name wt_path; do
+    [[ -z "$wt_name" || -z "$wt_path" ]] && continue
+    [[ -d "$wt_path" ]] || warnings+="worktree path missing: ${wt_name} -> ${wt_path}\n"
+  done < <(jq -r '.worktrees[]? | select((.worktree_path // "") != "" and (.status // "active") != "missing") | "\(.worktree_name)|\(.worktree_path)"' "$worktrees_file")
+
+  errors=""
+  if [[ -n "$invalid_status" ]]; then
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && errors+="invalid flow status: $line\n"
+    done <<< "$invalid_status"
+  fi
+
+  errors_json="$(printf '%b' "$errors" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+  warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+
+  if [[ "$(echo "$errors_json" | jq 'length')" -gt 0 ]]; then
+    group_status="fail"
+    summary="flow audit found invalid persisted status"
+  else
+    group_status="pass"
+    summary="flow audit passed"
+  fi
+
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" "$warnings_json"
+}
+
+_vibe_check_group_link() {
+  local common_dir reg_file roadmap_file worktrees_file
+  local task_ids_json item_ids_json wt_names_json
+  local errors errors_json group_status summary
+
+  common_dir="$(_vibe_check_common_dir)"
+  [[ -n "$common_dir" ]] || { _vibe_check_group_json "fail" "not in git repo" '["Not in a git repository"]' '[]'; return; }
+
+  reg_file="$common_dir/vibe/registry.json"
+  roadmap_file="$common_dir/vibe/roadmap.json"
+  worktrees_file="$common_dir/vibe/worktrees.json"
+
+  [[ -f "$reg_file" ]] || { _vibe_check_group_json "fail" "missing registry.json" '["Missing registry.json"]' '[]'; return; }
+  [[ -f "$roadmap_file" ]] || { _vibe_check_group_json "fail" "missing roadmap.json" '["Missing roadmap.json"]' '[]'; return; }
+  [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
+
+  task_ids_json="$(jq -c '[.tasks[]?.task_id]' "$reg_file")"
+  item_ids_json="$(jq -c '[.items[]?.roadmap_item_id]' "$roadmap_file")"
+  wt_names_json="$(jq -c '[.worktrees[]?.worktree_name]' "$worktrees_file")"
+
+  errors=""
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="roadmap links missing task: $line\n"
+  done < <(jq -r --argjson task_ids "$task_ids_json" '.items[]? | .roadmap_item_id as $rid | (.linked_task_ids // [])[]? | select($task_ids | index(.) | not) | "\($rid):\(.)"' "$roadmap_file" 2>/dev/null)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="task links missing roadmap item: $line\n"
+  done < <(jq -r --argjson item_ids "$item_ids_json" '.tasks[]? | .task_id as $tid | (.roadmap_item_ids // [])[]? | select($item_ids | index(.) | not) | "\($tid):\(.)"' "$reg_file" 2>/dev/null)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="runtime points to missing worktree: $line\n"
+  done < <(jq -r --argjson wt_names "$wt_names_json" '.tasks[]? | (.runtime_worktree_name // "") as $wt | select($wt != "") | select($wt_names | index($wt) | not) | "\(.task_id):\($wt)"' "$reg_file" 2>/dev/null)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="completed/archived task still has runtime binding: $line\n"
+  done < <(jq -r '.tasks[]? | select((.status == "completed" or .status == "archived") and ((.runtime_worktree_name != null) or (.runtime_worktree_path != null) or (.runtime_branch != null) or (.runtime_agent != null))) | .task_id' "$reg_file" 2>/dev/null)
+
+  errors_json="$(printf '%b' "$errors" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+
+  if [[ "$(echo "$errors_json" | jq 'length')" -gt 0 ]]; then
+    group_status="fail"
+    summary="link check failed"
+  else
+    group_status="pass"
+    summary="link check passed"
+  fi
+
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" '[]'
+}
+
+_vibe_check_group_json_file() {
+  local file="$1" base errors warnings group_status summary
+  local errors_json warnings_json
+
+  [[ -f "$file" ]] || { _vibe_check_group_json "fail" "file missing" "[\"File not found: $file\"]" '[]'; return; }
+  jq empty "$file" >/dev/null 2>&1 || { _vibe_check_group_json "fail" "invalid json" "[\"Invalid JSON: $file\"]" '[]'; return; }
+
+  base="$(basename "$file")"
+  errors=""
+
+  case "$base" in
+    registry.json)
+      jq -e 'type == "object" and has("schema_version") and has("tasks") and (.tasks | type == "array")' "$file" >/dev/null 2>&1 || errors+="registry root shape invalid\n"
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="registry required fields missing: $line\n"
+      done < <(jq -r 'def req:["task_id","title","status","source_type","source_refs","roadmap_item_ids","issue_refs","related_task_ids","subtasks","created_at","updated_at"]; .tasks[]? | .task_id as $id | (req - (keys)) as $m | select($m|length>0) | "\($id):\($m|join(","))"' "$file")
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="registry invalid status: $line\n"
+      done < <(jq -r '.tasks[]? | select((.status | IN("todo","in_progress","blocked","completed","archived")) | not) | "\(.task_id):\(.status)"' "$file")
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="registry invalid source_type: $line\n"
+      done < <(jq -r '.tasks[]? | select((.source_type | IN("issue","local","openspec")) | not) | "\(.task_id):\(.source_type // "null")"' "$file")
+      ;;
+    roadmap.json)
+      jq -e 'type == "object" and has("schema_version") and has("version_goal") and has("items") and (.items | type == "array")' "$file" >/dev/null 2>&1 || errors+="roadmap root shape invalid\n"
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="roadmap required fields missing: $line\n"
+      done < <(jq -r 'def req:["roadmap_item_id","title","status","source_type","source_refs","issue_refs","linked_task_ids","created_at","updated_at"]; .items[]? | .roadmap_item_id as $id | (req - (keys)) as $m | select($m|length>0) | "\($id):\($m|join(","))"' "$file")
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="roadmap invalid status: $line\n"
+      done < <(jq -r '.items[]? | select((.status | IN("p0","current","next","deferred","rejected")) | not) | "\(.roadmap_item_id):\(.status)"' "$file")
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="roadmap invalid source_type: $line\n"
+      done < <(jq -r '.items[]? | select((.source_type | IN("github","local")) | not) | "\(.roadmap_item_id):\(.source_type // "null")"' "$file")
+      ;;
+    worktrees.json)
+      jq -e 'type == "object" and has("schema_version") and has("worktrees") and (.worktrees | type == "array")' "$file" >/dev/null 2>&1 || errors+="worktrees root shape invalid\n"
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && errors+="worktrees invalid status: $line\n"
+      done < <(jq -r '.worktrees[]? | select((.status // "active" | IN("active","idle","missing","stale")) | not) | "\(.worktree_name):\(.status // "null")"' "$file")
+      ;;
+    *)
+      warnings+="no strict schema for file: $base\n"
+      ;;
+  esac
+
+  errors_json="$(printf '%b' "$errors" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+  warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+
+  if [[ "$(echo "$errors_json" | jq 'length')" -gt 0 ]]; then
+    group_status="fail"
+    summary="json/schema check failed"
+  else
+    group_status="pass"
+    summary="json/schema check passed"
+  fi
+
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" "$warnings_json"
+}
+
+_vibe_check_group_docs() {
+  local -a missing_frontmatter
+  local file first_line total checked
+  local warnings_json summary
+
+  if [[ ! -d docs ]]; then
+    _vibe_check_group_json "pass" "docs directory not found" '[]' '[]'
+    return
+  fi
+
+  while IFS= read -r file; do
+    checked=$((checked + 1))
+    first_line="$(sed -n '1p' "$file" 2>/dev/null)"
+    if [[ "$first_line" != "---" ]]; then
+      missing_frontmatter+=("$file")
     fi
+  done < <(find docs -type f -name '*.md' 2>/dev/null)
 
-    # --- Task Audit Mode (--audit-tasks) ---
-    if [[ "$audit_tasks" == true ]]; then
-        log_step "Running Task Registration Audit..."
-        log_info "Phase 0: Task registry audit and repair"
-        echo ""
+  total=${#missing_frontmatter[@]}
+  if [[ "$total" -gt 0 ]]; then
+    warnings_json="$(printf '%s\n' "${missing_frontmatter[@]:0:20}" | _vibe_check_lines_to_json_array | jq 'map("missing frontmatter: " + .)')"
+    summary="docs check warnings: ${total} files missing frontmatter (showing first 20)"
+  else
+    warnings_json='[]'
+    summary="docs check passed (${checked:-0} files scanned)"
+  fi
 
-        # Run vibe task audit (which triggers repair workflow)
-        if vibe task audit; then
-            log_success "Task audit complete. Proceeding to project audit..."
-            echo ""
-        else
-            log_warn "Task audit encountered issues. Review the output above."
-            echo ""
-        fi
-    fi
+  _vibe_check_group_json "pass" "$summary" '[]' "$warnings_json"
+}
 
-    # --- Audit Mode (No arguments) ---
-    log_step "Starting Comprehensive Vibe Audit..."
-    local reg; reg="$(git rev-parse --git-common-dir)/vibe/registry.json"
-    [[ -f "$reg" ]] || { log_error "Missing registry.json"; return 1; }
+_vibe_check_render_text() {
+  local payload="$1" group group_json display_status summary
+  local -a groups
+  groups=("$(echo "$payload" | jq -r 'keys[]')")
 
-    # 1. OpenSpec registration audit
-    log_info "1. Auditing OpenSpec registration..."
-    vibe task audit --check-openspec >/dev/null 2>&1 || true
+  echo "${BOLD}Vibe Check Report${NC}"
+  echo ""
 
-    # 2. Archive completed tasks
-    log_info "2. Archiving completed tasks..."
-    local archive_dir="docs/tasks/archive"
-    mkdir -p "$archive_dir"
-    jq -r '.tasks[] | select(.status == "completed") | .task_id' "$reg" | while read -r tid; do
-        if [[ -d "docs/tasks/$tid" ]]; then
-            log_info "   Archiving $tid..."
-            mv "docs/tasks/$tid" "$archive_dir/" 2>/dev/null
-            vibe task update "$tid" --status archived >/dev/null 2>&1
-        elif [[ -d "$archive_dir/$tid" ]]; then
-            # Folder already in archive, but status still "completed" - sync it
-            vibe task update "$tid" --status archived >/dev/null 2>&1
-        fi
-    done
+  while IFS= read -r group; do
+    [[ -z "$group" ]] && continue
+    group_json="$(echo "$payload" | jq -c --arg g "$group" '.[$g]')"
+    display_status="$(echo "$group_json" | jq -r '.status')"
+    summary="$(echo "$group_json" | jq -r '.summary')"
 
-    # 3. Detect stale remote branches
-    log_info "3. Scanning stale remote branches..."
-    git fetch origin --prune --quiet 2>/dev/null || true
-    # Local cleanup of merged branches
-    git branch --merged main | grep -v '^*\|main' | xargs git branch -d 2>/dev/null || true
-    
-    # 4. Detect scattered documents (plans only, prds are canonical)
-    log_info "4. Searching for scattered task documents (docs/plans)..."
-    local scattered=()
-    if [[ -d "docs/plans" ]]; then
-        while read -r f; do
-            scattered+=("$f")
-        done < <(find "docs/plans" -maxdepth 1 -name "*.md" ! -name "README.md" 2>/dev/null)
-    fi
-    if [[ ${#scattered[@]} -gt 0 ]]; then
-        log_warn "   Found ${#scattered[@]} scattered documents in docs/plans:"
-        for f in "${scattered[@]}"; do echo "     - $f"; done
-    fi
-
-    # 5. Branch Consistency Check
-    log_info "5. Verifying branch-to-task consistency..."
-    local active_tasks; active_tasks=$(jq -r '.tasks[] | select(.status == "in_progress" or .status == "todo") | .task_id' "$reg")
-    local branches_in_use; branches_in_use=($(git worktree list --porcelain | awk '$1=="branch" {print $2}'))
-    local ghost_branches=()
-    while read -r branch; do
-        branch="${branch#* }" # Remove star if current
-        # 1. Exempt branches currently checked out in any worktree
-        local in_use=0
-        for b in "${branches_in_use[@]}"; do
-            [[ "refs/heads/$branch" == "$b" ]] && { in_use=1; break; }
-        done
-        [[ $in_use -eq 1 ]] && continue
-
-        # 2. Check if branch name matches any active task ID or slug
-        local match_found=0
-        for tid in ${(f)active_tasks}; do
-            # Full match or slug match (e.g. branch "claude/feat" matches task "YYYY-MM-DD-feat")
-            [[ "$branch" == *"$tid"* ]] && { match_found=1; break; }
-            local slug="${tid#????-??-??-}" # Extract slug from YYYY-MM-DD-slug
-            [[ -n "$slug" && "$branch" == *"$slug"* ]] && { match_found=1; break; }
-        done
-        # Ignore main and v* branches
-        [[ "$branch" == "main" || "$branch" == v* ]] && match_found=1
-        
-        [[ $match_found -eq 0 ]] && ghost_branches+=("$branch")
-    done < <(git branch --list --no-column | sed 's/^[ *]*//')
-    
-    if [[ ${#ghost_branches[@]} -gt 0 ]]; then
-        log_warn "   Found ${#ghost_branches[@]} ghost branches (no active task matching):"
-        for gb in "${ghost_branches[@]}"; do echo "     - $gb"; done
-    fi
-
-    # Phase 2: Git Status Check (PR merged detection)
-    log_info "6. Checking PR merged status..."
-    if ! _check_gh_available; then
-        log_warn "   gh CLI not available or not authenticated. Skipping PR status check."
+    if [[ "$display_status" == "pass" ]]; then
+      echo "${GREEN}[$group] PASS${NC} - $summary"
     else
-        local worktrees_file; worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
-        local -a uncertain_tasks
-        while IFS='|' read -r task_id branch; do
-            [[ -n "$task_id" && -n "$branch" ]] && uncertain_tasks+=("$task_id|$branch")
-        done < <(_check_pr_merged_status "$reg" "$worktrees_file")
-
-        if [[ ${#uncertain_tasks[@]} -gt 0 ]]; then
-            log_info "   Found ${#uncertain_tasks[@]} task(s) with merged PRs:"
-            for task_info in "${uncertain_tasks[@]}"; do
-                local tid br
-                IFS='|' read -r tid br <<< "$task_info"
-                echo "     - $tid (branch: $br)"
-            done
-            echo ""
-            log_info "   Run ${CYAN}/vibe-check${NC} for AI-assisted task completion analysis."
-        fi
+      echo "${RED}[$group] FAIL${NC} - $summary"
     fi
 
-    # 7. Health Check Summary
-    local total; total=$(jq '.tasks | length' "$reg")
-    local in_progress; in_progress=$(jq '[.tasks[] | select(.status == "in_progress" or .status == "todo")] | length' "$reg")
-    local archived; archived=$(jq '[.tasks[] | select(.status == "archived")] | length' "$reg")
-    local completed; completed=$(jq '[.tasks[] | select(.status == "completed")] | length' "$reg")
-    local archived_folders; archived_folders=$(ls -1 "$archive_dir" 2>/dev/null | wc -l | xargs)
-
-    log_success "Audit complete."
-    echo "  - Total Tasks: $total"
-    echo "  - Active (Todo/In-Progress): $in_progress"
-    echo "  - Completed (Pending Archive): $completed"
-    echo "  - Archived Tasks: $archived (Docs in archive/: $archived_folders)"
-    echo "  - Ghost Branches: ${#ghost_branches[@]}"
-    echo "  - Scattered Docs: ${#scattered[@]}"
+    echo "$group_json" | jq -r '.errors[]?' | sed 's/^/  error: /'
+    echo "$group_json" | jq -r '.warnings[]?' | sed 's/^/  warn:  /'
     echo ""
-    log_info "Tip: Use ${CYAN}/vibe-check (slash)${NC} for AI-assisted remediation."
+  done < <(echo "$payload" | jq -r 'keys[]')
+}
+
+_vibe_check_has_failures() {
+  local payload="$1"
+  echo "$payload" | jq -e 'to_entries | any(.value.status == "fail")' >/dev/null 2>&1
+}
+
+vibe_check() {
+  local mode="all" json_out=0 file_arg=""
+  local extra_args=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        _vibe_check_help
+        return 0
+        ;;
+      check)
+        shift
+        ;;
+      --json)
+        json_out=1
+        shift
+        ;;
+      roadmap|task|flow|link|docs)
+        [[ "$mode" == "all" ]] || { log_error "Only one check target can be specified"; return 1; }
+        mode="$1"
+        shift
+        ;;
+      json)
+        mode="json"
+        shift
+        [[ $# -gt 0 ]] || { log_error "Usage: vibe check json <file>"; return 1; }
+        file_arg="$1"
+        shift
+        ;;
+      *)
+        extra_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if [[ ${#extra_args[@]} -gt 0 ]]; then
+    if [[ "$mode" == "all" && ${#extra_args[@]} -eq 1 ]]; then
+      mode="json"
+      file_arg="${extra_args[1]}"
+    else
+      log_error "Unknown check target: ${extra_args[1]}"
+      return 1
+    fi
+  fi
+
+  local payload
+  case "$mode" in
+    all)
+      local g_roadmap g_task g_flow g_link g_docs
+      g_roadmap="$(_vibe_check_group_roadmap)"
+      g_task="$(_vibe_check_group_task)"
+      g_flow="$(_vibe_check_group_flow)"
+      g_link="$(_vibe_check_group_link)"
+      g_docs="$(_vibe_check_group_docs)"
+      payload="$(jq -nc \
+        --argjson roadmap "$g_roadmap" \
+        --argjson task "$g_task" \
+        --argjson flow "$g_flow" \
+        --argjson link "$g_link" \
+        --argjson docs "$g_docs" \
+        '{roadmap:$roadmap, task:$task, flow:$flow, link:$link, docs:$docs}')"
+      ;;
+    roadmap)
+      payload="$(jq -nc --argjson roadmap "$(_vibe_check_group_roadmap)" '{roadmap:$roadmap}')"
+      ;;
+    task)
+      payload="$(jq -nc --argjson task "$(_vibe_check_group_task)" '{task:$task}')"
+      ;;
+    flow)
+      payload="$(jq -nc --argjson flow "$(_vibe_check_group_flow)" '{flow:$flow}')"
+      ;;
+    link)
+      payload="$(jq -nc --argjson link "$(_vibe_check_group_link)" '{link:$link}')"
+      ;;
+    docs)
+      payload="$(jq -nc --argjson docs "$(_vibe_check_group_docs)" '{docs:$docs}')"
+      ;;
+    json)
+      [[ -n "$file_arg" ]] || { log_error "Usage: vibe check json <file>"; return 1; }
+      payload="$(jq -nc --argjson json "$(_vibe_check_group_json_file "$file_arg")" '{json:$json}')"
+      ;;
+    *)
+      log_error "Unknown check mode: $mode"
+      return 1
+      ;;
+  esac
+
+  if [[ "$json_out" -eq 1 ]]; then
+    echo "$payload"
+  else
+    _vibe_check_render_text "$payload"
+  fi
+
+  _vibe_check_has_failures "$payload" && return 1 || return 0
 }
