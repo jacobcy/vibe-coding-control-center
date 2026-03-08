@@ -26,4 +26,14 @@ tags: [workflow, vibe, git, commit]
    Output grouped commit drafts and **ask for the user's explicit confirmation** before any commit execution.
 
 5. **Post-Commit PR Proposal**
-   Once the user's working tree is completely clean and all changes are committed, automatically ask if they would like to create a Pull Request directly. If yes, generate the PR Title and Body, ask for confirmation again, and then execute `gh pr create` with the generated contents.
+   Once the user's working tree is completely clean and all changes are committed, you may propose creating a Pull Request. Keep the wording precise: this is only a proposal to start PR publication, not a claim that the branch is ready to merge into `main`.
+
+6. **Base Validation Before PR Draft**
+   Before drafting any PR command, read `vibe flow pr --help` and treat `vibe flow pr (shell)` as the source of truth for base selection.
+   If the current branch is not closest to `main`, do not imply the PR should target `main`; surface the inferred base or require an explicit `--base <ref>`.
+
+7. **Boundary Alignment**
+   Keep responsibilities explicit:
+   - `/vibe-commit`: skill-layer orchestration and commit/PR draft preparation
+   - `vibe flow pr`: shell-layer publication entry and PR base validation
+   - `gh pr create`: underlying external tool invoked by shell, not the workflow's direct source of truth
