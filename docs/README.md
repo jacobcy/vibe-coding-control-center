@@ -33,6 +33,7 @@ docs/
 存放项目的标准、规范、架构设计等元文档。这些文档定义了"如何做事"。
 
 **必读文档**：
+- **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准，定义命名规范和使用指南
 - **[cognition-spec-dominion.md](standards/cognition-spec-dominion.md)** - 宪法大纲，定义 Vibe Guard 流程
 - **[vibe-engine-design.md](standards/vibe-engine-design.md)** - 工作流引擎设计
