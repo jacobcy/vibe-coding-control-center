@@ -33,7 +33,7 @@ JSON
   [[ "$output" =~ "done" ]]
   [[ "$output" =~ "status" ]]
   [[ "$output" =~ "list" ]]
-  [[ "$output" =~ "sync" ]]
+  [[ ! "$output" =~ "sync" ]]
   [[ "$output" =~ "review" ]]
   [[ "$output" =~ "pr" ]]
 }
@@ -80,30 +80,15 @@ JSON
   rm -rf /tmp/wt-opencode-myfeature
 }
 
-@test "6. _flow_sync returns non-zero when any merge fails" {
+@test "6. _flow_sync returns non-zero with deprecation guidance" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
-    git() {
-      case "$*" in
-        "branch --show-current") echo "source-branch"; return 0 ;;
-        "worktree list --porcelain")
-          echo "worktree /tmp/wt-source"
-          echo "worktree /tmp/wt-fail"
-          return 0
-          ;;
-        "-C /tmp/wt-source branch --show-current") echo "source-branch"; return 0 ;;
-        "-C /tmp/wt-fail branch --show-current") echo "target-branch"; return 0 ;;
-        "rev-list --count target-branch..source-branch") echo "1"; return 0 ;;
-        "-C /tmp/wt-fail merge source-branch --no-edit") return 1 ;;
-        *) return 0 ;;
-      esac
-    }
     _flow_sync
   '
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "Merge failed for target-branch" ]]
+  [[ "$output" =~ "no longer supports cross-worktree branch merges" ]]
 }
 
 # --- Multi-task worktree alignment tests ---
@@ -270,6 +255,28 @@ JSON
   '
   [ "$status" -eq 1 ]
   [[ "$output" =~ "has commits not merged into origin/main" ]]
+}
+
+@test "11.1 _flow_done completes wrap-up without deleting environment" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..feature-branch") echo ""; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Flow wrap-up complete for branch" ]]
+  [[ "$output" =~ "Environment preserved" ]]
 }
 
 @test "12. _flow_pr skips bump if PR already exists" {

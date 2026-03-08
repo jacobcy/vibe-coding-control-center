@@ -58,30 +58,30 @@ _flow_new() {
   _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
 _flow_done() {
-  local wt_path wt_dir branch main_dir unmerged
-  if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then log_warn "Current repository or branch is protected."; return 1; fi
-  wt_path="$PWD"; wt_dir=$(basename "$wt_path"); branch=$(git branch --show-current)
-  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then log_error "Working directory is not clean. Please commit or stash changes before finishing."; return 1; fi
+  local branch unmerged
+  if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then
+    log_warn "Current repository or branch is protected."
+    return 1
+  fi
+  branch=$(git branch --show-current)
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    log_error "Working directory is not clean. Please commit or stash changes before finishing."
+    return 1
+  fi
   git fetch origin main --quiet 2>/dev/null || true
   unmerged=$(git rev-list "origin/main..$branch" 2>/dev/null || echo "")
-  if [[ -n "$unmerged" ]]; then log_error "Branch '$branch' has commits not merged into origin/main. Please open a PR and merge first."; return 1; fi
-  log_warn "WARNING: This will clear contents of $wt_dir and PERMANENTLY delete local branch ($branch)."; confirm_action "Proceed with cleanup?" || return 0
-  main_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); main_dir="${main_dir%/.git}"; cd "$main_dir" || return 1
-  [[ $(git ls-remote --exit-code --heads origin "$branch" 2>/dev/null) ]] && vibe_delete_remote_branch "$branch" || true
-  log_step "Detaching worktree $wt_dir"; git worktree remove "$wt_path" --force 2>/dev/null || true; mkdir -p "$wt_path"
-  log_step "Cleaning up local branch: $branch"; vibe_delete_local_branch "$branch" force || true
-  log_success "Cleanup complete."; echo "💡 Next: Run ${CYAN}vibe task list${NC} to check remaining tasks."
+  if [[ -n "$unmerged" ]]; then
+    log_error "Branch '$branch' has commits not merged into origin/main. Please open a PR and merge first."
+    return 1
+  fi
+  log_success "Flow wrap-up complete for branch '$branch'. Environment preserved (no worktree/branch cleanup)."
+  echo "💡 Next: Run ${CYAN}vibe flow review${NC} or ${CYAN}vibe task list${NC}."
 }
 
 _flow_sync() {
-  local current_branch has_fail=0 wt_branch behind
-  current_branch=$(git branch --show-current 2>/dev/null); [[ -z "$current_branch" ]] && { log_error "Not in a git repository"; return 1; }
-  while read -r wt_path; do
-    wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null); [[ "$wt_branch" == "$current_branch" ]] && continue
-    behind=$(git rev-list --count "$wt_branch".."$current_branch" 2>/dev/null || echo "0")
-    [[ "$behind" -gt 0 ]] && git -C "$wt_path" merge "$current_branch" --no-edit >/dev/null 2>&1 || [[ "$behind" -gt 0 ]] && { log_error "Merge failed for $wt_branch"; has_fail=1; }
-  done < <(git worktree list --porcelain | awk '/^worktree / {print $2}')
-  [[ "$has_fail" -eq 1 ]] && return 1; log_success "Branches synced."
+  log_error "vibe flow sync no longer supports cross-worktree branch merges."
+  echo "Use explicit git merge/rebase in the target branch when needed."
+  return 1
 }
 
 _flow_pr() {
