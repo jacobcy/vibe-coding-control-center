@@ -1,79 +1,206 @@
 ---
 document_type: standard
-title: Git Workflow & Worktree Lifecycle Standard
-status: approved
-author: Claude Sonnet 4.5
-created: 2026-02-28
+title: Git Workflow Standard
+status: active
+scope: git-delivery
+authority:
+  - flow-pr-process
+  - delivery-splitting
+  - recovery-rules
+author: Codex GPT-5
+created: 2026-03-08
+last_updated: 2026-03-08
 related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/standards/glossary.md
+  - docs/standards/action-verbs.md
+  - docs/standards/command-standard.md
+  - docs/standards/worktree-lifecycle-standard.md
 ---
 
-# Git Workflow & Worktree Lifecycle Standard
+# Git Workflow Standard
 
-> 本文档规范了 Vibe Coding 模式下 Agent 和人类协作时的 Git 与 Worktree 生命周期。秉承 **“本地试错 0 成本，远端污染 0 容忍”** 的核心原则约束所有版本控制行为。
->
-> `flow`、`workflow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准；本文只定义 Git 与 worktree 生命周期规则。
+本文档定义本项目的 Git 交付流程标准，重点回答：
 
-## 1. 核心架构：双域隔离
+- `roadmap -> task -> flow -> PR` 应如何推进
+- `flow`、`branch`、`worktree` 在交付中的职责如何分离
+- 何时继续当前 flow
+- 何时必须新开 branch / 新开 flow
+- 现场偏离标准后，如何回归标准 flow
 
-工作模式被物理切分为两个完全隔离的域：
-- **行政区（本地 Worktree）**：极度宽松的环境。Agent 可以高频 Commit，允许过程性错误，方便随时试错和回滚。
-- **决议区（远端仓库 & PR）**：极度严格的环境。必须经过 **Audit Gate** 全要素通过后，由人类触发代码和分支流向远端。
+术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。高频动作词以 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)。
 
-## 2. 行为准则与四模块协议
+## 1. Scope
 
-### 核心命令映射
+本文档只定义：
 
-| 命令 | 功能 | 使用场景 |
-|------|------|---------|
-| `vibe flow status` | 查看当前分支状态 | 检查任务进度和文件指标 |
-| `vibe flow list` | 查看所有 worktree | 全局状态概览 |
-| `vibe flow review` | 检查 PR 状态 | CI/评审审计 |
-| `vibe flow pr` | 提交 PR | 发布流程 |
-| `vibe flow done` | 清理 worktree | 任务收口 |
+- 交付流程语义
+- `flow` 与 `PR` 的默认对应关系
+- `branch` 在交付切片中的使用规则
+- 偏离标准场景下的恢复动作
 
-### 模块一：本地高频游击战 (Commit 规范)
-Agent 在实现业务逻辑时，禁止“憋大招”。
-- **时机**：在 `Test Gate` 与 `Code Gate` 的循环中，只要完成了一个逻辑单元且测试变绿（Green），**必须在当前开发分支上主动发起本地 Commit**（或请求人类运行 `/vibe-commit`）。
-- **质量要求**：Commit Info 须严格遵守 Conventional Commits 标准。
-- **作用**：记录极其细粒度的上下文历史节点。当触发 “3 次重试失败熔断” 等情况，可以方便地退回上一个绿灯安全点。
+本文档不重写：
 
-### 模块二：网络通信铁律禁令 (Push / PR 禁令)
-对于处于 `Code` 层的 Agent 设定绝对红线：
-- **动作约束**：未最终通过 Audit Gate 前，Agent **严格禁止**执行任何网络相关的 Git 操作（包括 `git push`、发起 Pull Request 的指令或企图）。
-- **认知治理**：“我是否要 push ？”属于 Agent 违法越位。一切进度全凭本地 Commit 固化。绝对物理隔离开发分支与远端主库。
+- 共享状态命令语义
+- `worktree` 的物理创建、复用与清理细节
+- shell 自动化设计
 
-### 模块三：决议与交付 (Audit Gate)
-- **拦截与回退（Audit 失败）**：如果 Audit 并未通过（架构严重跑偏、幻觉泛滥），不要试图修修补补——**立刻废弃当前 Worktree 及其开发分支**（人类可直接使用 `vibe flow done` 将沙盒连根拔起）。重回 PRD 或 Spec 层启动新沙盒（`vibe flow start`）。
-- **正式交付（Audit 通过）**：当且仅当人类检查了全绿的 AI 审计报告（也可借由 `vibe flow review` 提供的 Checklist 检查）并签署 Approve 后，才正式触发交付流程。此时人类在控制台执行 **`vibe flow pr`** 进入交互式发版流程，由底层辅助负责 Push 以及产生 PR 表单。
+## 2. Core Model
 
-### 模块四：物理沙盒清理协议 (Post-PR 回收)
-完成 PR 的合并或废弃后，必须彻底清理本地痕迹以确保系统零残留：
-- **关联命令**：通过执行控制台命令 **`vibe flow done`** 安全地剥离并拔除当前工作树；并在对话窗口向 AI 呼叫 **`/vibe-done`** 来将挂在 Vibe 大盘（Task Registry）中该任务的状态结算关闭。
-- **目标一**：彻底移除此开发任务对应的独立 Worktree 沙盒目录。
-- **目标二**：清理本地对应的开发临时缓存信息与无用分支。
-- **目的**：杜绝幽灵分支和僵尸树堆积，将环境重置为极简无状态的安全工作模式。
+默认交付模型如下：
 
-## 3. 分支保护规则 (Branch Protection Rules)
+- `roadmap` 负责规划窗口与优先级
+- `task` 负责可执行单元
+- `flow` 负责当前交付切片
+- `pr` 负责当前交付产物
+- `branch` 负责承载当前交付切片的 Git 提交线
+- `worktree` 只是物理容器，不是 flow 本体
 
-正如 [Vibe Coding 核心信念 (SOUL.md)](../../SOUL.md) 所定义，`main` 分支是项目唯一真源，必须施加严格保护伞。
+默认关系：
 
-### 保护目标：`main` 分支
+- 一个 `flow` 对应一个当前交付目标
+- 一个当前交付目标默认对应一个当前 `pr`
+- 一个 `flow` 默认绑定一个当前 `branch`
+- 一个 `worktree` 可以承载当前 `flow`，但 `flow` 不等于目录
 
-在远端 (GitHub Repository Settings) 强制执行以下规则集 (Rulesets)：
+因此：
 
-#### 1. 强制 Pull Request 准入
-- **合并前需提交 PR** (Require a pull request before merging): 开启。
-- **必须获得 Review 批准** (Require approvals): 至少 1 票同意。
-- **有新 Commit 需重新 Review** (Dismiss stale PR approvals): 开启。
-- **必须解决所有评论/讨论** (Resolve conversations): 开启。
+- 开下一个 `flow` 的关键是切换到新的交付目标与新的 `branch`
+- 不要求必须新建 `worktree`
+- 但不得让同一个 `flow` 同时承载多个当前 `pr` 目标
 
-#### 2. 严厉的行为限制
-- **禁止强推** (Block force pushes): 开启 (绝不允许篡改 `main` 历史记录)。
-- **禁止删除主干** (Block deletions): 开启。
+## 3. Happy Path
 
-### 实现与变更约束
-上述所有保护规则均通过 GitHub Rulesets 在代码托管平台引擎层面落地。
-任何试图变更这些规则的行为都需要持有 Admin 系统权限，且所有变动都必须同步更新于本文档中进行审计记录。
+标准路径如下：
+
+1. 从 `roadmap` 选择当前要推进的 `roadmap item`
+2. 将目标拆成一个或多个 `task`
+3. 为当前这轮交付创建或进入一个 `flow`
+4. 让该 `flow` 绑定本轮要交付的 `task`
+5. 在该 `flow` 对应的 `branch` 上提交本地 commit
+6. 执行 `review`
+7. 提交 `pr`
+8. 合并后收尾并结束当前 `flow`
+
+执行要求：
+
+- 同一 `flow` 内的 commit 应服务同一个当前交付目标
+- 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
+- `done` 只应发生在当前交付目标已经完成或明确废弃之后
+
+## 4. Flow Decision Rules
+
+### 4.1 Continue Current Flow
+
+继续当前 `flow` 的条件：
+
+- 仍然服务同一个当前交付目标
+- 仍然准备进入同一个当前 `pr`
+- 当前 `branch` 语义仍与该交付目标一致
+- 新改动只是 review follow-up、补测试、补文档或同一目标下的必要修正
+
+### 4.2 Open a New Flow
+
+以下情况必须新开下一个 `flow`：
+
+- 新改动应进入另一个 `pr`
+- 当前交付目标被另一个独立交付目标阻塞
+- 当前 `flow` 中已经混入多个 feature，决定拆成多个 `pr`
+- 当前 `pr` 已经提交，而剩余改动属于下一个目标而非当前 review follow-up
+
+默认恢复动作：
+
+- 保留上层 `roadmap item` / `issue`
+- 将新的交付切片切到新的 `branch`
+- 让新的 `flow` 对应新的当前 `pr` 目标
+
+## 5. Exception Paths
+
+### 5.1 `A flow` 被 `B task` 阻塞
+
+场景：
+
+- 原本计划推进 `A`
+- 发现 `A` 必须依赖 `B`
+- `B` 需要单独合并，不能继续混在 `A` 的 `pr`
+
+标准动作：
+
+1. 将 `A` 标记为 `blocked`
+2. 冻结当前 `A flow`，不再继续在其语义下提交 `B`
+3. 为 `B` 新开一个 `flow` 与 `branch`
+4. 在 `B flow` 中完成、review、提 `pr`
+5. `B` 合并后，再重新开启或恢复 `A`
+
+禁止：
+
+- 在名义上属于 `A` 的 `flow` / `branch` 中直接提交 `B` 的独立 `pr`
+- 用同一个当前 `flow` 同时承载 `A` 与 `B` 两个当前交付目标
+
+### 5.2 `pr` 已提交，但现场仍有未提交改动
+
+分两种情况：
+
+- 若这些改动仍属于当前 `pr` 的 review follow-up：继续当前 `flow`
+- 若这些改动已经属于下一个交付目标：必须新开下一个 `flow`
+
+判断标准：
+
+- 同一个 `pr` 的修订，继续当前 `flow`
+- 不应进入当前 `pr` 的新 feature、新切片、新目标，不得继续留在当前 `flow`
+
+默认恢复动作：
+
+1. 识别未提交改动是否仍属于当前 `pr`
+2. 若属于当前 `pr`，继续当前 `branch`
+3. 若不属于当前 `pr`，切换到新的 `flow` / `branch`
+4. 让剩余改动在新的交付语义下继续推进
+
+### 5.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
+
+场景：
+
+- 当前 `flow` 已经混入多个 feature
+- 一个 `pr` 不利于 review 或 merge
+
+标准动作：
+
+1. 先按交付目标重新分组 task
+2. 当前 `flow` 只保留其中一个当前 `pr` 目标
+3. 其他 feature 必须切到新的 `flow` 与新的 `branch`
+4. 每个新的交付切片各自 review、提 `pr`
+
+禁止：
+
+- 继续把“多个 feature、多个 `pr` 目标”写在同一个当前 `flow` 中
+- 用一个当前 `flow` 依次冒充多个当前 `pr` 目标而不重建语义
+
+## 6. Recovery Rules
+
+当现场偏离标准时，按下列优先级恢复：
+
+1. 先判断当前改动真正服务哪个 `pr` 目标
+2. 让当前 `flow` 只保留一个当前交付目标
+3. 若当前语义与真实目标不符，立即切到新的 `flow` / `branch`
+4. 旧 `flow` 要么进入 `blocked`，要么在其目标完成后 `done`
+
+恢复原则：
+
+- 谁要发当前 `pr`，当前 `flow` 就应该代表谁
+- `flow` 名、`branch` 语义、`pr` 目标应尽量一致
+- 目录是否变化不是首要判断条件
+- 若复用同一 `worktree`，也必须显式切换到新的 `branch` 与新的 `flow` 语义
+
+## 7. Branch Protection
+
+`main` 是项目唯一主干，远端必须至少启用以下约束：
+
+- 合并前必须经过 `pr`
+- 合并前至少获得 1 个 review 批准
+- 有新 commit 时需重新 review
+- 必须解决 review discussion
+- 禁止 force push
+- 禁止删除主干
+
+本文只定义这些保护规则的最低要求，不扩展平台实现细节。
