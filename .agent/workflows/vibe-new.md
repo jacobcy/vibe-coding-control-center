@@ -18,7 +18,9 @@ tags: [workflow, vibe, planning, orchestrator]
 - 所有 registry / worktree / `.vibe/*` 写入都必须通过 shell 命令完成，不得直接手工编辑 JSON 或 Markdown 状态文件。
 - `/vibe-new` 当前支持两种 shell 路径：
   - 当前目录开新任务：通过 `vibe task update ... --bind-current` 驱动。
-  - 新目录开新任务：通过 `vibe task add` / `vibe task update` 准备任务元数据，再调用 `vibe flow create <feature>` 创建/切换 worktree。
+  - 新目录开新任务：通过 `vibe task add` / `vibe task update` 准备任务元数据，再调用 `vibe flow new <feature> --agent <agent>` 创建/切换 worktree。
+  - 如需在已有 worktree 绑定任务，使用 `vibe flow bind <task-id> --agent <agent>`。
+  - 若不确定 shell 参数，先运行 `vibe flow -h` 或 `vibe task -h`，不要自造命令形式。
 
 ## Dirty Worktree Rotation Rule
 - 当用户在当前 worktree 存在未提交改动（尤其是 unstaged/untracked）且需要开新分支时，按参数显式控制：
@@ -26,7 +28,7 @@ tags: [workflow, vibe, planning, orchestrator]
     - 行为：先 `stash -u` 保存当前改动，但不自动回放到新分支（新分支保持干净）
   - 传 `--save-unstash`：`zsh scripts/rotate.sh <new-branch-name> --save-unstash`
     - 行为：先 `stash -u` 保存，再在新分支自动 `stash pop` 回放改动
-- 仅当没有未提交改动，或用户明确不走 rotate 流程时，才可以直接走 `vibe flow new` / `vibe flow bind`。
+- 仅当没有未提交改动，或用户明确不走 rotate 流程时，才可以直接走 `vibe flow new <feature> --agent <agent>` / `vibe flow bind <task-id> --agent <agent>`。
 
 ## Steps
 
@@ -59,4 +61,4 @@ tags: [workflow, vibe, planning, orchestrator]
 6. **Checkpoint Output & HARD STOP**
    - 每通过一个 Gate，输出判定结果与下一步。
    - 一旦生成并审查了 `plan.md`，即表示 Gate 3 完成。必须触发 **HARD STOP（硬停止）**。
-   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new` 或 `vibe flow bind`。若当前有未提交改动且要开新分支，默认执行 `zsh scripts/rotate.sh <new-branch-name>`（不带改动）；若需带入改动，请执行 `zsh scripts/rotate.sh <new-branch-name> --save-unstash`。"
+   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new <feature> --agent <agent>` 或 `vibe flow bind <task-id> --agent <agent>`。若当前有未提交改动且要开新分支，默认执行 `zsh scripts/rotate.sh <new-branch-name>`（不带改动）；若需带入改动，请执行 `zsh scripts/rotate.sh <new-branch-name> --save-unstash`。"

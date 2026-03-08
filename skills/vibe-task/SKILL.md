@@ -9,6 +9,8 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
+**命令边界:** `/vibe-task` 是 skill 层入口；`vibe task ...` 与 `vibe flow review ...` 是 shell 层工具。对 shell 参数、子命令或 flag 有任何不确定时，先运行 `vibe task -h` 或 `vibe flow -h`，不要自造不存在的 flag。
+
 **Announce at start:**
 - Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的任务总览。"
 - Audit mode: "我正在使用 vibe-task 技能来核对任务注册完整性和数据质量。"
@@ -34,17 +36,17 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 ## Hard Boundary
 
 **通用原则:**
-- 必须通过 `bin/vibe task` 命令获取数据和执行操作
+- 必须通过 `vibe task` 命令获取数据和执行操作
 - 不得直接读取或修改 `registry.json`、`worktrees.json`
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
 **Task Overview 模式:**
-- 必须先运行 `bin/vibe task list --json`
+- 必须先运行 `vibe task list --json`
 - 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
-- 必须通过 `bin/vibe task audit` 获取核对结果
-- 必须通过 `bin/vibe task add/update/remove` 执行修复操作
+- 必须通过 `vibe task audit` 获取核对结果
+- 必须通过 `vibe task add/update/remove` 执行修复操作
 - 不得直接修改 JSON 文件
 - 所有修复操作必须经过用户确认
 
@@ -66,7 +68,7 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 ### Step 1: 运行 CLI
 
 ```bash
-bin/vibe task list --json
+vibe task list --json
 ```
 
 目标：
@@ -147,19 +149,19 @@ Recommendation
 
 ```bash
 # 完整核对（所有维度）
-bin/vibe task audit --all
+vibe task audit --all
 
 # 仅数据质量修复
-bin/vibe task audit --fix-branches
+vibe task audit --fix-branches
 
 # 仅分支核对
-bin/vibe task audit --check-branches
+vibe task audit --check-branches
 
 # 仅 OpenSpec 核对
-bin/vibe task audit --check-openspec
+vibe task audit --check-openspec
 
 # 仅 Plans/PRDs 核对
-bin/vibe task audit --check-plans
+vibe task audit --check-plans
 ```
 
 **目标:** 获取各维度的核对结果（纯数据，不含判断）
@@ -170,13 +172,13 @@ bin/vibe task audit --check-plans
 
 ```bash
 # 获取当前分支的 PR 信息
-bin/vibe flow review --json
+vibe flow review --json
 
 # 获取指定 PR 的信息
-bin/vibe flow review --json <pr-number>
+vibe flow review --json <pr-number>
 
 # 获取指定分支的 PR 信息
-bin/vibe flow review --json <branch-name>
+vibe flow review --json <branch-name>
 ```
 
 **返回的 PR 数据包括:**
@@ -398,7 +400,9 @@ bin/vibe flow review --json <branch-name>
 分支: 2026-03-07-task-registry-audit
 Worktree: .agent/worktrees/wt-codex-roadmap-skill
 建议操作:
-  1. 创建新任务: vibe task add "Task Registry Audit" --branch 2026-03-07-task-registry-audit
+  1. 创建新任务后再绑定分支:
+     - vibe task add "Task Registry Audit"
+     - vibe task update <task-id> --branch 2026-03-07-task-registry-audit
   2. 关联现有任务: vibe task update <task-id> --branch 2026-03-07-task-registry-audit
   3. 忽略（这不是一个任务分支）
 
@@ -422,7 +426,8 @@ PR 标题: Implement user authentication
 
 建议操作:
   1. 关联到现有任务 #2026-03-01-user-auth
-  2. 创建新任务: vibe task add "User Authentication" --from-pr 123
+  2. 创建新任务并显式记录 PR:
+     - vibe task add "User Authentication" --pr 123
   3. 忽略（任务已存在或不需要跟踪）
 
 您的选择?
@@ -440,8 +445,8 @@ Tasks.md: ✅ 存在 (12/28 任务已完成)
 状态: 未在 registry 中注册
 
 建议操作:
-  1. 注册为新任务: vibe task add "Task Registry Audit & Repair" --openspec-change task-registry-audit-repair
-  2. 关联现有任务: vibe task update <task-id> --openspec-change task-registry-audit-repair
+  1. 当前 shell 没有 `--openspec-change` 原子能力；仅报告该 change，等待人类决定是否创建普通 task
+  2. 若要先落普通 task，可执行: vibe task add "Task Registry Audit & Repair"
   3. 稍后处理（保留在 OpenSpec 中）
 
 您的选择?
@@ -463,7 +468,7 @@ Tasks.md: ✅ 存在 (12/28 任务已完成)
 - 创建时间: 2026-03-05
 
 建议操作:
-  1. 创建新任务: vibe task add "API Redesign" --source-path docs/plans/api-redesign.md
+  1. 当前 shell 没有 `--source-path` 原子能力；若要先落普通 task，可执行: vibe task add "API Redesign"
   2. 忽略（这是参考文档，不需要任务跟踪）
   3. 移动到其他目录
 
@@ -600,7 +605,9 @@ PR 标题: Implement user authentication
 ━━━━━━ 未注册分支 ━━━━━━
 ⚠️  2 个未注册分支:
    - 2026-03-07-audit-feature
-     注册命令: vibe task add "Audit Feature" --branch 2026-03-07-audit-feature
+     注册命令:
+       1. vibe task add "Audit Feature"
+       2. vibe task update <task-id> --branch 2026-03-07-audit-feature
    - temp-experiment
      建议: 忽略（非任务分支）
 
@@ -609,7 +616,7 @@ PR 标题: Implement user authentication
    - PR #123 (高置信度): 完成 #2026-03-01-user-auth
      关联命令: vibe task update 2026-03-01-user-auth --pr 123
    - PR #124 (中置信度): 实现了登录功能
-     建议创建: vibe task add "Login Feature" --from-pr 124
+     建议创建: vibe task add "Login Feature" --pr 124
 
 ━━━━━━ 置信度分布 ━━━━━━
 ✅ 高置信度: 8 项（建议自动处理）
@@ -631,29 +638,27 @@ PR 标题: Implement user authentication
 ### 5.1 创建新任务
 
 ```bash
-bin/vibe task add "<task-title>" \
-  --branch "<branch-name>" \
-  --openspec-change "<change-name>" \
-  --source-path "<doc-path>"
+vibe task add "<task-title>"
+vibe task update "<task-id>" --branch "<branch-name>"
 ```
+
+OpenSpec change 或文档路径目前没有对应 shell 原子 flag。若需要这类关联，应明确标记为 capability gap，不要自造 `--openspec-change` 或 `--source-path`。
 
 ### 5.2 关联现有任务
 
 ```bash
 # 显示任务列表供用户选择
-bin/vibe task list --json
+vibe task list --json
 
 # 更新任务关联
-bin/vibe task update "<task-id>" \
-  --branch "<branch-name>" \
-  --openspec-change "<change-name>"
+vibe task update "<task-id>" --branch "<branch-name>"
 ```
 
 ### 5.3 验证修复结果
 
 ```bash
 # 再次运行核对，确认问题已解决
-bin/vibe task audit --all
+vibe task audit --all
 ```
 
 ## Step 6: 输出修复报告
@@ -776,7 +781,7 @@ AI 层文档扫描: 1 个任务
 
 ### Task Overview 模式
 
-如果 `bin/vibe task list` 失败：
+如果 `vibe task list` 失败：
 
 - 直接展示 CLI 返回的阻塞原因
 - 明确告诉用户当前无法生成可靠总览
@@ -784,7 +789,7 @@ AI 层文档扫描: 1 个任务
 
 ### Audit 模式
 
-如果 `bin/vibe task audit` 失败：
+如果 `vibe task audit` 失败：
 
 - 直接展示 CLI 返回的错误信息
 - 明确告诉用户当前无法完成核对
@@ -846,17 +851,17 @@ AI 层文档扫描: 1 个任务
 ### 使用方式
 
 ```bash
-# 在运行主审计前先修复任务
-bin/vibe check --audit-tasks
+# 运行 task 域审计
+vibe check task
 
 # 或单独运行任务审计
-bin/vibe task audit
+vibe task audit
 ```
 
 ### 闭环工作流
 
 ```
-vibe check --audit-tasks
+vibe check task
     ↓
 Phase 0: Task Audit (修复任务注册问题)
     ↓
@@ -866,4 +871,3 @@ Phase 1-6: 主审计流程
 ```
 
 **价值:** 确保在进行项目审计时，任务注册数据是完整和准确的，从而提供更可靠的审计结果。
-
