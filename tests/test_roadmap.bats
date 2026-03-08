@@ -350,6 +350,25 @@ JSON
   [[ "$output" =~ "Current (1)" ]]
 }
 
+@test "roadmap color support allows interactive stdin when stdout is not a tty" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    _vibe_roadmap_fd_is_tty() {
+      [[ "$1" == "0" ]]
+    }
+    if _vibe_roadmap_supports_color; then
+      echo yes
+    else
+      echo no
+    fi
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "yes" ]
+}
+
 @test "roadmap show text output omits ansi escapes when stdout is not a tty" {
   local fixture
   fixture="$(mktemp -d)"

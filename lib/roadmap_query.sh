@@ -20,8 +20,12 @@ _vibe_roadmap_file() {
     echo "$common_dir/vibe/roadmap.json"
 }
 
+_vibe_roadmap_fd_is_tty() {
+    [[ -t "$1" ]]
+}
+
 _vibe_roadmap_supports_color() {
-    [[ -t 1 ]]
+    _vibe_roadmap_fd_is_tty 1 || _vibe_roadmap_fd_is_tty 0
 }
 
 _vibe_roadmap_format() {
