@@ -20,6 +20,12 @@ tags: [workflow, vibe, planning, orchestrator]
   - 当前目录开新任务：通过 `vibe task update ... --bind-current` 驱动。
   - 新目录开新任务：通过 `vibe task add` / `vibe task update` 准备任务元数据，再调用 `vibe flow create <feature>` 创建/切换 worktree。
 
+## Dirty Worktree Rotation Rule
+- 当用户在当前 worktree 存在未提交改动（尤其是 unstaged/untracked）时，要求“开新分支继续下一个交付目标”，必须优先执行：
+  - `zsh scripts/rotate.sh <new-branch-name>`
+- `rotate.sh` 负责先 `stash -u` 保存现场，再创建新分支并回放改动，避免手工切分支导致未提交内容丢失。
+- 仅当没有未提交改动，或用户明确不需要保留当前现场时，才可以直接走 `vibe flow new` / `vibe flow bind`。
+
 ## Steps
 
 1. **Acknowledge the command**
@@ -51,4 +57,4 @@ tags: [workflow, vibe, planning, orchestrator]
 6. **Checkpoint Output & HARD STOP**
    - 每通过一个 Gate，输出判定结果与下一步。
    - 一旦生成并审查了 `plan.md`，即表示 Gate 3 完成。必须触发 **HARD STOP（硬停止）**。
-   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new` 或 `vibe flow bind`。"
+  - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，若无异议，请回复 `/vibe-start` 唤醒 Execution 机器人开始编码；如需在 shell 中创建或绑定 worktree，请使用 `vibe flow new` 或 `vibe flow bind`。若当前有未提交改动且要开新分支，请先执行 `zsh scripts/rotate.sh <new-branch-name>`。"
