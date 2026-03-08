@@ -21,6 +21,8 @@ related_docs:
 
 ## 1. Audit Questions
 
+本审计使用 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md) 中的审查原则，并将 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 作为命令语义真源。
+
 审计时统一使用以下问题：
 
 1. Shell 是否提供了足够的原子能力让 skill 完成工作？
@@ -73,11 +75,7 @@ related_docs:
 
 ### 2.3 Blocking: `roadmap current` 不能被解释为分支当前态
 
-当前讨论已确认：
-
-- `roadmap.current` 只表示全局规划窗口纳入的项
-- 它不表示某个 branch / worktree 当前在做什么
-- 多分支并行开发时，分支当前焦点必须由 `flow` 与 task runtime 绑定表达
+依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`roadmap.current` 属于规划窗口状态，而分支当前焦点属于 `flow` / task runtime。
 
 如果 shell 或 skill 将 `roadmap.current` 误解释为分支当前态，就会导致：
 
@@ -91,22 +89,11 @@ related_docs:
 
 期望：
 
-- 将 `roadmap.current` 固定为规划窗口状态
-- 将分支当前工作固定为 `flow` / task runtime 语义
+- 按 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 执行，不在 shell 或 skill 中重写这套语义
 
 ### 2.4 Blocking: `issue`、`task`、`flow` 的业务概念必须明确区分
 
-当前讨论已确认：
-
-- `issue` 是愿望、问题、需求来源
-- `task` 是明确、可执行的工作单元
-- `flow` 是 task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
-
-关系必须固定为：
-
-- `issue <-> task` 多对多
-- `roadmap item <-> task` 多对多
-- `flow -> task` 一对多
+依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
 
 如果 shell 或 skill 混用这些概念，就会产生两类问题：
 
@@ -116,6 +103,11 @@ related_docs:
 判定：
 
 - `Concept Boundary`
+
+期望：
+
+- 业务概念统一引用 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
+- 文件字段与关系统一引用数据模型标准
 
 ### 2.5 High: `registry.json` 标准与当前 task 写入字段不一致
 

@@ -30,70 +30,13 @@ related_docs:
 
 ## 0. Shell Role
 
-`vibe` Shell 的顶层定位不是 workflow engine，而是 capability layer。
+`vibe` Shell 的顶层定位是 capability layer，不是 workflow engine。
 
-它的唯一目标是：
+在共享状态命令域中，Shell 只负责暴露原子、可组合、可验证的方法，并隔离 skill 与共享状态真源。
 
-- 隔离 skill 与共享状态数据源
-- 暴露原子、可组合、可验证的方法
-- 为 skill 提供稳定工具，而不是替 skill 完成业务流程
+完整的 Shell 设计原则、职责边界与审查清单，见：
 
-### 0.1 Responsibility Boundary
-
-`skill` / agent 负责：
-
-- 业务逻辑
-- 工作流编排
-- 任务拆分
-- 优先级决策
-- 是否新建 flow
-- 一个 flow 绑定一个还是多个 task
-
-`vibe` Shell 负责：
-
-- 读取共享状态
-- 写入共享状态
-- 创建现场
-- 绑定现场
-- 执行单一原子动作
-
-### 0.2 Source Isolation Principle
-
-skill 不得直接读写共享状态真源：
-
-- `roadmap.json`
-- `registry.json`
-- `worktrees.json`
-
-skill 必须通过 Shell API 操作共享状态。
-
-Shell 的存在目的就是隔离：
-
-- 上层智能编排
-- 下层共享状态真源
-
-### 0.3 No Hidden Workflow Rule
-
-Shell 命令禁止：
-
-- 偷偷创建额外实体
-- 隐式推进多步业务流程
-- 在单个命令内完成本应由 skill 决定的编排动作
-- 代替 skill 做任务拆分、优先级判断或任务选择
-
-判断标准：
-
-- 如果一个命令同时完成两个以上跨层动作，它大概率越权
-- 如果删掉 skill 后命令仍在替用户做业务决策，它大概率越权
-
-### 0.4 Shell Design Review Questions
-
-评审任何 Shell 命令设计时，必须先回答：
-
-1. 是否提供了足够的原子方法让 skill 完成工作？
-2. 是否越过职责边界，执行了应由 skill 负责的业务逻辑？
-3. 是否把数据层写入暴露给了 skill 以外的路径？
-4. 是否存在“顺手多做一步”的隐藏副作用？
+- [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
 
 命令的数据模型基础见：
 
@@ -188,6 +131,21 @@ Shell 命令禁止：
 - 用 `check` 承担业务写入职责
 - 用 Shell 替 skill 承担工作流编排职责
 
+## 3.1 Core Semantics
+
+以下业务语义由本文件定义，其他标准文件引用但不得重写：
+
+- `issue` = 外部愿望、问题、需求来源
+- `roadmap item` = 规划层工作单元
+- `task` = 可执行、可落地的执行单元
+- `flow` = task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
+
+语义关系：
+
+- `issue <-> task` 多对多
+- `roadmap item <-> task` 多对多
+- `flow -> task` 一对多
+
 ## 4. `vibe roadmap` Standard
 
 ### 4.1 Responsibility
@@ -255,6 +213,12 @@ Shell 命令禁止：
 - `next`
 - `deferred`
 - `rejected`
+
+其中：
+
+- `current` 表示当前规划窗口纳入的项
+- `current` 不表示某个 branch / worktree 当前正在做什么
+- 分支当前焦点只能由 `flow` 与 task runtime 绑定表达
 
 provider 只允许：
 

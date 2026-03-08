@@ -78,41 +78,20 @@ Skill Layer 负责：
 - Shell 提供工具
 - Skill 使用工具完成业务逻辑
 
-### 2.4 Planning vs Runtime Semantics
+### 2.4 Semantic Dependency
 
-共享规划状态与分支现场状态必须严格分离。
+当 Shell 设计涉及 `roadmap`、`task`、`flow` 的业务语义时，必须引用以下真源，而不是在设计文档中重复定义：
 
-- `roadmap.current` 表示当前规划窗口纳入的 roadmap item
-- `roadmap.current` 不表示某个 branch / worktree 当前正在做什么
-- branch / worktree 当前焦点只能由 `flow` 与 task runtime 绑定表达
+- [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
+- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
-原因：
+设计层只回答：
 
-- roadmap 是全局共享状态
-- flow 是分支绑定的运行时容器
-- 多分支并行开发时，不能把全局规划状态误用为分支现场状态
-
-### 2.5 Core Entity Semantics
-
-后续 Shell 设计必须坚持以下概念边界：
-
-- `issue` = 外部愿望、问题、需求来源
-- `roadmap item` = 规划层选中的工作单元
-- `task` = 可执行、可落地、能进入执行循环的工作单元
-- `flow` = task 的运行时容器，通常绑定一个 worktree / branch，通常对应一个 PR
-
-关系约束：
-
-- `issue` 与 `task` 是多对多
-- `roadmap item` 与 `task` 是多对多
-- `flow` 与 `task` 是一对多
-- 一个 `flow` 可以承载多个相关 task，但应保留单一当前焦点
-
-因此：
-
-- Shell 不应把 `issue` 当成 `task`
-- Shell 不应把 `roadmap current` 当成 flow current
-- Shell 不应根据 roadmap 状态自动替 skill 选择 branch 当前任务
+- Shell 是否误解了这些语义
+- Shell 是否跨层混用了这些语义
+- Shell 是否提供了足够原子能力让 skill 正确使用这些语义
 
 ## 3. Atomic Method Rule
 
@@ -130,7 +109,7 @@ Skill Layer 负责：
 
 - `flow new` 自动创建 task、绑定 task、推断优先级
 - `task add` 自动决定 roadmap 归属
-- `roadmap classify` 顺带物化 task
+- `roadmap classify` 顺带新增 roadmap item
 
 ## 4. Hidden Workflow Ban
 
