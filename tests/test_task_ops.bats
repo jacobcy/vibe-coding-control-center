@@ -137,11 +137,31 @@ setup() {
 @test "ops: update accepts --issue/--roadmap-item/--pr and deduplicates refs" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Test roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
 
-  run zsh -c '
-    source "'"$HELPER"'"
+  run env TEST_FIXTURE="$fixture" TEST_HELPER="$HELPER" zsh -c '
+    source "$TEST_HELPER"
     setup_task_env
-    mock_git_registry "'"$fixture"'"
+    mock_git_registry "$TEST_FIXTURE"
     vibe_task update 2026-03-02-rotate-alignment \
       --issue gh:owner/repo#68 --issue gh:owner/repo#68 \
       --roadmap-item rm-1 --roadmap-item rm-1 \
@@ -151,6 +171,44 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .issue_refs | length' "$fixture/vibe/registry.json")" = "1" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "1" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .pr_ref' "$fixture/vibe/registry.json")" = "64" ]
+  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .linked_task_ids[0]' "$fixture/vibe/roadmap.json")" = "2026-03-02-rotate-alignment" ]
+}
+
+@test "ops: update rejects unknown roadmap item without partial write" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Test roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --roadmap-item rm-missing
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Roadmap item not found" ]]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "0" ]
+  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .linked_task_ids | length' "$fixture/vibe/roadmap.json")" = "0" ]
 }
 
 @test "ops: update maps legacy status names to standard status" {

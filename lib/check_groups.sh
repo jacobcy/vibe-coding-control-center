@@ -22,7 +22,8 @@ _vibe_check_common_dir() {
 _vibe_check_group_roadmap() {
   local audit_json invalid_ids unlinked_ids errors_json warnings_json warnings group_status summary
 
-  if ! audit_json="$(vibe roadmap audit --json 2>/dev/null)"; then
+  audit_json="$(vibe roadmap audit --check-status --check-version-goal --check-links --json 2>/dev/null)" || true
+  if [[ -z "$audit_json" ]] || ! echo "$audit_json" | jq empty >/dev/null 2>&1; then
     _vibe_check_group_json "fail" "roadmap audit failed" '["vibe roadmap audit failed"]' '[]'
     return
   fi
@@ -132,8 +133,32 @@ _vibe_check_group_link() {
   done < <(jq -r --argjson task_ids "$task_ids_json" '.items[]? | .roadmap_item_id as $rid | (.linked_task_ids // [])[]? | select($task_ids | index(.) | not) | "\($rid):\(.)"' "$roadmap_file" 2>/dev/null)
 
   while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="roadmap item missing task back-link: $line\n"
+  done < <(jq -r '
+    $tasks[0] as $tasks
+    | $roadmap[0] as $roadmap
+    | $tasks.tasks[]? as $task
+    | ($task.roadmap_item_ids // [])[]? as $rid
+    | select(($roadmap.items | map(.roadmap_item_id) | index($rid)) != null)
+    | select(([$roadmap.items[]? | select(.roadmap_item_id == $rid) | (.linked_task_ids // [])[]?] | index($task.task_id)) == null)
+    | "\($rid):\($task.task_id)"
+  ' --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n 2>/dev/null)
+
+  while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="task links missing roadmap item: $line\n"
   done < <(jq -r --argjson item_ids "$item_ids_json" '.tasks[]? | .task_id as $tid | (.roadmap_item_ids // [])[]? | select($item_ids | index(.) | not) | "\($tid):\(.)"' "$reg_file" 2>/dev/null)
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && errors+="task missing roadmap back-link: $line\n"
+  done < <(jq -r '
+    $tasks[0] as $tasks
+    | $roadmap[0] as $roadmap
+    | $roadmap.items[]? as $item
+    | ($item.linked_task_ids // [])[]? as $tid
+    | select(($tasks.tasks | map(.task_id) | index($tid)) != null)
+    | select(([$tasks.tasks[]? | select(.task_id == $tid) | (.roadmap_item_ids // [])[]?] | index($item.roadmap_item_id)) == null)
+    | "\($tid):\($item.roadmap_item_id)"
+  ' --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n 2>/dev/null)
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="runtime points to missing worktree: $line\n"

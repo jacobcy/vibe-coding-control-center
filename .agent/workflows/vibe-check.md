@@ -1,21 +1,30 @@
 ---
 name: "Vibe: Check"
-description: Verify the consistency of project memory and documents
+description: Read shell audit output, explain discrepancies, and invoke the vibe-check skill for safe shell-driven repairs.
 category: Workflow
-tags: [workflow, vibe, memory, verification]
+tags: [workflow, vibe, verification, shared-state]
 ---
 
-# Verify Memory Consistency
+# Verify Shared-State Consistency
 
-**Input**: Run `/vibe-check` to validate that project state, tasks, and governance configs align with memory records.
+**Input**: Run `/vibe-check` to inspect `roadmap.json`, `registry.json`, and `worktrees.json`, then repair deterministic gaps through Shell APIs when safe.
 
 **Steps**
 
 1. **Acknowledge the command**
-   Immediately say: "Invoking the vibe-check skill to verify project memory and governance consistency."
+   Immediately say: "Invoking the vibe-check skill to read shell audit output and repair deterministic shared-state gaps through Shell APIs."
 
 2. **Call the underlying skill**
-   You MUST invoke the `vibe-check` skill. The skill will cross-reference files in `.agent/context/` and validate the `governance.yaml`.
-   
-3. **Report Status**
-   Show the discrepancies and pass on the recommended actions from the skill to the user.
+   You MUST invoke the `vibe-check` skill.
+
+3. **Respect shell / skill boundary**
+   - `vibe check(shell)` only audits.
+   - `vibe-check` skill interprets results and decides whether a fix is safe.
+   - Shared-state writes must go through Shell APIs such as `vibe task update`.
+
+4. **Report status**
+   Show:
+   - shell audit findings
+   - fixes executed through shell commands
+   - items requiring user confirmation
+   - any missing shell capability that blocks safe repair
