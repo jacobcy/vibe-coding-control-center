@@ -50,6 +50,32 @@ JSON
   [[ ! "$output" =~ "Current Version:" ]]
 }
 
+@test "roadmap status supports json output" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap status --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.version_goal')" = "Complete shared-state standardization" ]
+  [ "$(echo "$output" | jq -r '.counts.p0')" = "1" ]
+  [ "$(echo "$output" | jq -r '.counts.current')" = "1" ]
+  [ "$(echo "$output" | jq -r '.counts.deferred')" = "1" ]
+}
+
 @test "roadmap assign writes version_goal to roadmap.json root" {
   local fixture
   fixture="$(mktemp -d)"

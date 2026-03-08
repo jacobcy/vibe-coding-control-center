@@ -21,13 +21,43 @@ _vibe_roadmap_file() {
 }
 
 _vibe_roadmap_status() {
-    local common_dir roadmap_file
+    local common_dir roadmap_file output_json="false"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                output_json="true"
+                shift
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+
     common_dir="$(_vibe_roadmap_common_dir)" || return 1
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
 
-    local version_goal
-    version_goal="$(jq -r '.version_goal // "none"' "$roadmap_file")"
+    local status_json
+    status_json="$(jq -c '{
+        version_goal: .version_goal,
+        counts: {
+            p0: ([.items[]? | select(.status == "p0")] | length),
+            current: ([.items[]? | select(.status == "current")] | length),
+            next: ([.items[]? | select(.status == "next")] | length),
+            deferred: ([.items[]? | select(.status == "deferred")] | length),
+            rejected: ([.items[]? | select(.status == "rejected")] | length)
+        }
+    }' "$roadmap_file")"
+
+    if [[ "$output_json" == "true" ]]; then
+        echo "$status_json"
+        return 0
+    fi
+
+    local version_goal counts p0_count current_count next_count deferred_count rejected_count
+    version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
     echo "========================================"
     echo "         Roadmap Status"
@@ -37,16 +67,7 @@ _vibe_roadmap_status() {
     echo ""
 
     echo "Issue Summary:"
-    # Single jq call to get all counts, parse with read
-    local counts
-    local p0_count current_count next_count deferred_count rejected_count
-    counts="$(jq -r '[.items[]? | .status] |
-        {p0: (map(select(. == "p0")) | length),
-         current: (map(select(. == "current")) | length),
-         next: (map(select(. == "next")) | length),
-         deferred: (map(select(. == "deferred")) | length),
-         rejected: (map(select(. == "rejected")) | length)} |
-        "\(.p0) \(.current) \(.next) \(.deferred) \(.rejected)"' "$roadmap_file")"
+    counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
     echo "  P0 (urgent):      $p0_count"
