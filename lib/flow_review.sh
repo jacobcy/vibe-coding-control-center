@@ -22,6 +22,10 @@ _flow_review() {
         json_output=1
         shift
         ;;
+      --branch)
+        target="$2"
+        shift 2
+        ;;
       *)
         target="$1"
         shift
@@ -166,7 +170,7 @@ _flow_review_local() {
 _flow_review_usage() {
   echo "${BOLD}Vibe Flow Review${NC}"
   echo ""
-  echo "Usage: ${CYAN}vibe flow review${NC} [options] [<pr-number>|<branch>]"
+  echo "Usage: ${CYAN}vibe flow review${NC} [options] [--branch <ref>]"
   echo ""
   echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
   echo ""
@@ -181,6 +185,7 @@ _flow_review_usage() {
   echo "  --local=codex    强制使用 Codex 本地审查"
   echo "  --local=copilot  强制使用 GitHub Copilot 审查"
   echo "  --json           输出 PR 详细数据的 JSON 格式（用于程序化调用）"
+  echo "  --branch <ref>   指定要查看的分支或 PR 号 (默认: 当前分支)"
   echo ""
   echo "本地 LLM 工具："
   echo "  ${GREEN}codex${NC}    - OpenAI Codex CLI (推荐，专业审查能力)"

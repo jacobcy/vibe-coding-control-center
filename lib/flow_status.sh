@@ -48,10 +48,28 @@ _flow_print_metrics() {
 _flow_status() {
   setopt localoptions typeset_silent 2>/dev/null || true
 
-  local json_out=0
-  [[ "${1:-}" == "--json" ]] && { json_out=1; shift; }
+  local json_out=0 feature="" arg
+  
+  # 处理帮助参数
+  for arg in "$@"; do 
+    [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_status_usage; return 0; }
+  done
+  
+  # 解析参数
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_out=1; shift ;;
+      --branch) feature="$2"; shift 2 ;;
+      *)
+        # 保持向后兼容：如果没有 --branch，第一个位置参数作为 feature
+        if [[ -z "$feature" && ! "$1" =~ ^-- ]]; then
+          feature="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
-  local feature="${1:-}"
   local current_wt git_common_dir worktrees_file registry_file
   current_wt=$(basename "$PWD")
 
