@@ -1,10 +1,17 @@
 ---
 task_id: "{{TASK_ID}}"
+document_type: task-readme
 title: "{{TASK_TITLE}}"
-created: "{{DATE}}T00:00:00Z"
-updated: "{{DATE}}T00:00:00Z"
+author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
+created: "{{DATE}}"
+last_updated: "{{DATE}}"
 current_layer: "prd"
 status: "draft"
+related_docs:
+  - docs/standards/doc-quality-standards.md
+  - docs/README.md
 
 gates:
   scope:
