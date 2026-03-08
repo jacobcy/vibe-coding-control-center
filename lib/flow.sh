@@ -46,9 +46,6 @@ _flow_bind() {
   [[ -n "$title" ]] || { log_error "Task not found: $tid"; return 1; }
   agent="${agent:-${VIBE_AGENT:-claude}}"
   log_step "Identity: $agent"
-  if typeset -f wtinit &>/dev/null; then
-    wtinit "$agent" >/dev/null || return 1
-  fi
   log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current --agent "$agent" || return 1
   log_success "Bound: $tid ($title)"
 }

@@ -182,6 +182,32 @@ JSON
   [[ "$output" =~ "TASK_UPDATE:2026-03-02-rotate-alignment --status in_progress --bind-current --agent codex" ]]
 }
 
+@test "8.2 vibe flow bind does not invoke legacy wtinit hook" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_flow_task_fixture "$fixture"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    wtinit() { echo "WTINIT_CALLED"; return 1; }
+    _vibe_task_update() { echo "TASK_UPDATE:$*"; return 0; }
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      return 0
+    }
+    _flow_bind 2026-03-02-rotate-alignment --agent codex
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "TASK_UPDATE:2026-03-02-rotate-alignment --status in_progress --bind-current --agent codex" ]]
+  [[ ! "$output" =~ "WTINIT_CALLED" ]]
+}
+
 @test "9. vibe flow bind fails when task missing" {
   local fixture
   fixture="$(mktemp -d)"
