@@ -23,9 +23,10 @@ This project has **two dimensions** (see CLAUDE.md for details):
 1. **[SOUL.md](SOUL.md)** — Core constitution and principles (authority on values and boundaries)
 2. **[STRUCTURE.md](STRUCTURE.md)** — Project structure definition (authority on file organization)
 3. **[docs/standards/glossary.md](docs/standards/glossary.md)** — Project terminology source of truth (authority on term meanings)
-4. **[CLAUDE.md](CLAUDE.md)** — Project context, tech stack, and **HARD RULES** (authority on technical rules)
-5. **[docs/README.md](docs/README.md)** — Documentation structure and standards (authority on documentation)
-6. **[.agent/README.md](.agent/README.md)** — Workflows, skills, and rules (authority on AI workflows)
+4. **[docs/standards/action-verbs.md](docs/standards/action-verbs.md)** — High-frequency action verbs source of truth (authority on default action meanings)
+5. **[CLAUDE.md](CLAUDE.md)** — Project context, tech stack, and minimal hard rules
+6. **[docs/README.md](docs/README.md)** — Documentation structure and standards (authority on documentation)
+7. **[.agent/README.md](.agent/README.md)** — Workflows, skills, and rules (authority on AI workflows)
 
 ## 🤖 Protocol
 Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
@@ -35,10 +36,11 @@ Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
 4. **Respect** rules in `.agent/rules/` and CLAUDE.md §HARD RULES
 5. **Respond** in Chinese (中文回复)
 6. **Use** `docs/standards/glossary.md` when a project term appears ambiguous or conflicts with older wording
+7. **Use** `docs/standards/action-verbs.md` when a high-frequency action verb is ambiguous
 
 ## 🚀 Quick Start
 1. Read `CLAUDE.md` to understand the project
-2. Read `.agent/rules/coding-standards.md` for code standards
+2. Read `.agent/rules/coding-standards.md` and `.agent/rules/patterns.md` for execution details
 3. Check `.agent/context/task.md` for current work
 4. Run `bin/vibe check` to verify environment
 
