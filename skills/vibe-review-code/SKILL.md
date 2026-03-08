@@ -91,6 +91,22 @@ You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
 4. **Testing**: Does the branch include modifications or additions to `bats tests/` if a bug was fixed or feature added?
 5. **Linting Check**: Has the user passed `bash scripts/lint.sh`? Run it if unsure.
 
+## 3.1 Document Governance Check
+When the change touches documentation, you MUST also review it against:
+- `SOUL.md`
+- `docs/standards/glossary.md`
+- `docs/standards/action-verbs.md`
+- `docs/standards/doc-quality-standards.md`
+
+Check these questions:
+1. Is the document acting within its role (`入口文件` / `标准文件` / `参考文件` / `规则文件`)?
+2. Does it redefine a concept that should only live in `glossary.md`?
+3. Does it use a high-frequency action verb in a way that conflicts with `action-verbs.md`?
+4. Is an entry document carrying too much detail that should move to `docs/standards/` or `.agent/rules/`?
+5. If the file is historical or superseded, is that status made explicit?
+
+If any answer fails, report it as a documentation governance finding even if the prose itself is clear.
+
 ## 4. Review Process
 1. **Understand Intent**: Compare implementation against the `docs/prds/` or plan file.
 2. **Line-by-Line Analysis**: Point out exact files and lines where issues exist.

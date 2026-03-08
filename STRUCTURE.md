@@ -69,12 +69,14 @@ vibe-center/
 │   ├── standards/               # 标准和规范
 │   │   ├── DOC_ORGANIZATION.md  # 文档组织标准
 │   │   ├── cognition-spec-dominion.md  # 宪法大纲
-│   │   └── vibe-engine-design.md       # 工作流引擎设计
+│   │   └── ...                         # 其他现行标准
 │   ├── prds/                    # 全局 PRD
 │   │   ├── vibe-workflow-paradigm.md   # 总 PRD
 │   │   └── ...
 │   ├── references/              # 外部参考资料
 │   │   └── ...                  # 收集的外部文档、论文、资料等
+│   ├── archive/                 # 历史文档归档
+│   │   └── ...                  # 已退役设计与历史任务文档
 │   └── tasks/                   # 任务文档
 │       └── {Task_ID}/           # 各任务目录
 │
@@ -131,7 +133,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **规则**：
 - 单文件 ≤ 200 行
-- 总行数 ≤ 1200 行
+- 总行数 ≤ 4800 行
 - 零死代码：所有函数必须有调用方
 - 模块化：每个 `.sh` 文件负责一个功能域
 
@@ -202,6 +204,41 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **职责**：技能的运行时环境（symlinks 到 `skills/`）
 
+### `.git/vibe/` 和 `<worktree>/.vibe/` - 数据存储
+
+**职责**：Vibe 系统的数据存储位置
+
+#### 数据存储位置规则
+
+| 路径 | 职责 | 共享范围 | 示例内容 |
+|------|------|---------|---------|
+| **`.git/vibe/`** | **跨项目共享数据**（主仓库） | 所有 worktrees 共享 | `registry.json`, `worktrees.json`, `tasks/*/` |
+| **`<worktree>/.vibe/`** | **本分支独立数据**（worktree 本地） | 仅当前 worktree | 本地临时数据、缓存 |
+
+#### 重要文件
+
+**`.git/vibe/registry.json`** - 任务注册表（跨项目共享）
+- 记录所有任务的状态、worktree 绑定关系
+- 所有 worktree 都访问同一个 registry
+- 通过 `git rev-parse --git-common-dir` 定位
+
+**`.git/vibe/worktrees.json`** - Worktree 映射表（跨项目共享）
+- 记录 worktree 路径与任务的绑定关系
+- 所有 worktree 都访问同一个映射表
+
+**`.git/vibe/tasks/{task-id}/`** - 任务详细数据（跨项目共享）
+- 每个任务的 `task.json` 详细配置
+- 所有 worktree 共享访问
+
+**访问方式**：
+```bash
+# Shell 中获取 registry 路径
+git rev-parse --git-common-dir)/vibe/registry.json
+
+# 查看当前 worktree 的本地数据（如果存在）
+ls <worktree-path>/.vibe/
+```
+
 ### `docs/` - 人类文档区
 
 **职责**：所有给人类阅读的文档
@@ -216,7 +253,10 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 |------|------|
 | `DOC_ORGANIZATION.md` | 文档组织标准 |
 | `cognition-spec-dominion.md` | 宪法大纲：Vibe Guard 流程定义 |
-| `vibe-engine-design.md` | 工作流引擎设计 |
+
+#### `docs/archive/` - 历史文档归档
+
+**职责**：保留已完成任务、退役设计稿和历史方案，供后续备查，不作为当前真源
 
 #### `docs/prds/` - 全局 PRD
 

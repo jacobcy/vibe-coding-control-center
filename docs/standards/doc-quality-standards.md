@@ -1,7 +1,7 @@
 ---
 document_type: standard
 title: Document Quality Standards
-status: approved
+status: active
 scope: project-wide
 authority:
   - document-metadata
@@ -63,6 +63,33 @@ related_docs:
 | PRD 文档 | `prd` | `docs/prds/*.md` | 产品需求文档 | Human + AI |
 | 任务文档 | `task-*` | `docs/tasks/{Task_ID}/*.md` | 任务文档 | Human + AI |
 | 标准文档 | `standard` | `docs/standards/*.md` | 标准和规范 | Human + AI |
+
+## 状态字段设计
+
+`status` 不是全局统一枚举，而是按文档类型分别定义。
+
+规则：
+- 不同类型文档应使用各自语义稳定的 `status`
+- 不允许把某一类文档的状态枚举机械套用到所有文档
+- 标准文件不应继续使用 `approved` 作为长期状态
+
+推荐状态设计：
+
+| 文档类型 | 推荐 `status` |
+|---------|---------------|
+| `core-entry` | `active` / `historical` / `superseded` |
+| `prd` | `draft` / `review` / `accepted` / `retired` |
+| `task-readme` | `draft` / `in-progress` / `completed` / `archived` |
+| `standard` | `draft` / `active` / `historical` / `superseded` |
+| `task-audit` | `draft` / `final` |
+
+说明：
+- `active`：当前有效，应遵循
+- `historical`：保留备查，不作为当前真源
+- `superseded`：已被其他文档取代
+- `accepted`：PRD 已确认，可作为后续设计输入
+- `retired`：PRD 已废弃，不再继续推进
+- `final`：审计结论已定稿
 
 ## Frontmatter Schema 定义
 
@@ -292,7 +319,7 @@ PRD 文档定义产品需求，位于 `docs/prds/*.md`。
 |--------|------|------|------|--------|
 | `document_type` | string | 是 | 固定值 | `prd` |
 | `title` | string | 是 | PRD 标题 | `Vibe Workflow Paradigm` |
-| `status` | string | 是 | 文档状态 | `draft` / `review` / `approved` / `deprecated` |
+| `status` | string | 是 | 文档状态 | `draft` / `review` / `accepted` / `retired` |
 
 #### 完整示例
 
@@ -300,7 +327,7 @@ PRD 文档定义产品需求，位于 `docs/prds/*.md`。
 ---
 document_type: prd
 title: Vibe Workflow Paradigm
-status: approved
+status: accepted
 author: Claude Sonnet 4.5
 created: 2025-01-15
 last_updated: 2025-01-24
@@ -320,8 +347,8 @@ related_docs:
 **`status`**
 - `draft`：草稿状态，正在编写
 - `review`：审查中，等待反馈
-- `approved`：已批准，可以实施
-- `deprecated`：已废弃，不再使用
+- `accepted`：需求已确认，可进入后续设计/执行
+- `retired`：已废弃，不再使用
 
 ### 任务文档 (Task Document)
 
@@ -440,7 +467,7 @@ related_docs:
 |--------|------|------|------|--------|
 | `document_type` | string | 是 | 固定值 | `standard` |
 | `title` | string | 是 | 标准标题 | `Document Organization Standard` |
-| `status` | string | 是 | 文档状态 | `draft` / `review` / `approved` / `deprecated` |
+| `status` | string | 是 | 文档状态 | `draft` / `active` / `historical` / `superseded` |
 | `scope` | string | 是 | 适用范围 | `project-wide` / `specific-module` |
 | `authority` | array[string] | 否 | 该标准是哪些概念的权威来源 | `["document-naming", "file-organization"]` |
 
@@ -450,7 +477,7 @@ related_docs:
 ---
 document_type: standard
 title: Document Organization Standard
-status: approved
+status: active
 scope: project-wide
 authority:
   - document-naming
@@ -474,9 +501,9 @@ related_docs:
 
 **`status`**
 - `draft`：草稿状态，正在编写
-- `review`：审查中，等待反馈
-- `approved`：已批准，应遵循
-- `deprecated`：已废弃，不再使用
+- `active`：当前有效，应遵循
+- `historical`：保留备查，不作为当前真源
+- `superseded`：已被其他标准替代
 
 **`scope`**
 - `project-wide`：适用于整个项目

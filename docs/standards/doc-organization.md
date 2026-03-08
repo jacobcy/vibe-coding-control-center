@@ -39,10 +39,12 @@ docs/
 ├── README.md                        # 项目文档总览和索引
 ├── standards/                       # 标准和规范文档
 │   ├── DOC_ORGANIZATION.md         # 本文档组织标准
-│   └── vibe-engine-design.md       # Vibe 工作流引擎设计
+│   └── ...                         # 其他现行标准
 ├── prds/                           # 产品需求文档（全局 PRD）
 │   ├── vibe-workflow-paradigm.md   # 总 PRD：Vibe Guard 范式
 │   └── ...                         # 其他全局 PRD
+├── archive/                        # 历史文档归档
+│   └── ...                         # 已退役设计与历史任务文档
 └── tasks/                          # 任务文档（按任务组织）
     └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
         ├── README.md               # 任务概述、状态和导航
@@ -183,4 +185,4 @@ gates:
 
 - [Vibe Workflow Paradigm](../prds/vibe-workflow-paradigm.md) - Vibe Guard 范式总 PRD
 - [Cognition Spec Dominion](cognition-spec-dominion.md) - 宪法大纲
-- [Vibe Engine Design](vibe-engine-design.md) - 工作流引擎设计
+- [docs/archive/](../archive/) - 历史文档归档区
