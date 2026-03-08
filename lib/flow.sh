@@ -74,7 +74,16 @@ _flow_bind() {
 _flow_new() {
   local feat="" agent="" ref="main" arg
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
-  while [[ $# -gt 0 ]]; do case "$1" in --task) log_error "Use: vibe flow bind $2"; return 1 ;; --agent) agent="$2"; shift 2 ;; --branch|--base) ref="$2"; shift 2 ;; *) [[ -z "$feat" ]] && feat="$1"; shift ;; esac; done
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --task) log_error "Use: vibe flow bind $2"; return 1 ;;
+      --agent) agent="$2"; shift 2 ;;
+      --branch) ref="$2"; shift 2 ;;
+      --base) log_error "Unknown option: --base. Use --branch <ref> for the source branch when creating a flow."; return 1 ;;
+      -*) log_error "Unknown option for flow new: $1"; _flow_new_usage; return 1 ;;
+      *) [[ -z "$feat" ]] && feat="$1"; shift ;;
+    esac
+  done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
   _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }

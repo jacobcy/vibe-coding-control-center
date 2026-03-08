@@ -52,6 +52,21 @@ JSON
   [[ "$output" =~ "Usage: vibe flow new" ]]
 }
 
+@test "2.1 _flow_new rejects legacy --base alias to keep branch semantics explicit" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_new_worktree() { echo "UNEXPECTED_WORKTREE_CALL"; return 0; }
+    _flow_new demo --base develop
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Unknown option: --base" ]]
+  [[ "$output" =~ "--branch" ]]
+  [[ ! "$output" =~ "UNEXPECTED_WORKTREE_CALL" ]]
+}
+
 @test "3. vibe flow status in non-worktree returns error" {
   # Run in a directory that is definitely not a worktree
   cd /tmp
