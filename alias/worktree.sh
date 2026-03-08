@@ -81,8 +81,8 @@ wt() {
 # @featured
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local branch="$1" agent="${2:-claude}" base="${3:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [agent=claude|opencode|codex] [base=main]"
+  local branch="$1" base="${2:-main}"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=main]"
 
   local repo_root
   repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
@@ -93,7 +93,7 @@ wtnew() {
     echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
   fi
 
-  local dir="wt-${agent}-${branch}"
+  local dir="wt-${branch//\//-}"
   local path="${repo_root}/.worktrees/$dir"
 
   $git_cmd -C "$repo_root" fetch -p >/dev/null 2>&1 || true
@@ -359,8 +359,8 @@ vup() {
 vnew() {
   local branch="$1" agent="${2:-claude}" base="${3:-main}"
   [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [agent] [base]"
-  wtnew "$branch" "$agent" "$base" || return 1
-  vup "$agent" "$branch" || return 1
+  wtnew "$branch" "$base" || return 1
+  vup "$branch" || return 1
   
   if [[ -n "$TMUX" ]]; then
     echo "✅ Ready. Your dash window is active."

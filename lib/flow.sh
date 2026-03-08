@@ -18,12 +18,12 @@ _flow_new_worktree() {
   local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path feature_slug branch_name suggested_task_id
   vibe_require git jq || return 1
   feature_slug="$(_vibe_task_slugify "$feature")"
-  branch_name="${agent}/${feature_slug}"
+  branch_name="task/${feature_slug}"
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
-  wt_dir="wt-${agent}-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
+  wt_dir="wt-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
   suggested_task_id="$(_vibe_task_today)-${feature_slug}"
   log_step "Creating worktree: $wt_dir"
-  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$agent" "$ref" || { log_error "wtnew failed"; return 1; }
+  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$ref" || { log_error "wtnew failed"; return 1; }
   else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; return 1; }
   fi
   cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_worktree "$wt_path"; return 1; }
