@@ -20,6 +20,18 @@ _vibe_roadmap_file() {
     echo "$common_dir/vibe/roadmap.json"
 }
 
+_vibe_roadmap_color_status() {
+    local s="$1"
+    case "$s" in
+        p0) echo "${RED}${BOLD}${s}${NC}" ;;
+        current) echo "${GREEN}${s}${NC}" ;;
+        next) echo "${BLUE}${s}${NC}" ;;
+        deferred) echo "${YELLOW}${s}${NC}" ;;
+        rejected) echo -e "\033[0;90m${s}${NC}" ;; # Grey
+        *) echo "$s" ;;
+    esac
+}
+
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -60,21 +72,21 @@ _vibe_roadmap_status() {
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
     echo "========================================"
-    echo "         Roadmap Status"
+    echo "         ${BOLD}Roadmap Status${NC}"
     echo "========================================"
     echo ""
-    echo "Version Goal: $version_goal"
+    echo "Version Goal: ${CYAN}${version_goal}${NC}"
     echo ""
 
     echo "Issue Summary:"
     counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
-    echo "  P0 (urgent):      $p0_count"
-    echo "  Current:          $current_count"
-    echo "  Next:             $next_count"
-    echo "  Deferred:         $deferred_count"
-    echo "  Rejected:        $rejected_count"
+    printf "  %-16s  %b\n" "P0 (urgent):" "$(_vibe_roadmap_color_status "p0") ($p0_count)"
+    printf "  %-16s  %b\n" "Current:" "$(_vibe_roadmap_color_status "current") ($current_count)"
+    printf "  %-16s  %b\n" "Next:" "$(_vibe_roadmap_color_status "next") ($next_count)"
+    printf "  %-16s  %b\n" "Deferred:" "$(_vibe_roadmap_color_status "deferred") ($deferred_count)"
+    printf "  %-16s  %b\n" "Rejected:" "$(_vibe_roadmap_color_status "rejected") ($rejected_count)"
     echo ""
 
     if [[ "$version_goal" == "none" ]]; then
@@ -154,12 +166,19 @@ _vibe_roadmap_list() {
         return 0
     fi
 
-    echo "$items_json" | jq -r '.[] |
-        if (.title == .roadmap_item_id or (.title // "") == "") then
-            "[\(.status)] \(.roadmap_item_id)"
+    local row item_status rid title colored_status
+    echo "$items_json" | jq -c '.[]' | while read -r row; do
+        item_status=$(echo "$row" | jq -r '.status')
+        rid=$(echo "$row" | jq -r '.roadmap_item_id')
+        title=$(echo "$row" | jq -r '.title')
+        colored_status=$(_vibe_roadmap_color_status "$item_status")
+        
+        if [[ "$title" == "$rid" || -z "$title" ]]; then
+            printf "[%b] %s\n" "$colored_status" "$rid"
         else
-            "[\(.status)] \(.roadmap_item_id)  \(.title)"
-        end'
+            printf "[%b] %-12s  %s\n" "$colored_status" "$rid" "$title"
+        fi
+    done
 }
 
 _vibe_roadmap_show() {
@@ -191,15 +210,40 @@ _vibe_roadmap_show() {
         return 0
     fi
 
-    echo "$item_json" | jq -r '
-        "Roadmap Item: \(.roadmap_item_id)\n" +
-        "Title: \(.title)\n" +
-        "Status: \(.status)\n" +
-        "Source: \(.source_type)\n" +
-        "Description: \(.description // "null")\n" +
-        "Linked Tasks: \((.linked_task_ids | join(", ")))\n" +
-        "Issue Refs: \((.issue_refs | join(", ")))\n" +
-        "Updated At: \(.updated_at)"'
+    # Read fields
+    local id title item_status source description tasks issues updated
+    id=$(echo "$item_json" | jq -r '.roadmap_item_id')
+    title=$(echo "$item_json" | jq -r '.title')
+    item_status=$(echo "$item_json" | jq -r '.status')
+    source=$(echo "$item_json" | jq -r '.source_type')
+    description=$(echo "$item_json" | jq -r '.description // ""')
+    tasks=$(echo "$item_json" | jq -r '.linked_task_ids | join(", ")')
+    issues=$(echo "$item_json" | jq -r '.issue_refs | join(", ")')
+    updated=$(echo "$item_json" | jq -r '.updated_at')
+
+    local colored_status
+    colored_status=$(_vibe_roadmap_color_status "$item_status")
+
+    echo "Roadmap Item: ${CYAN}${BOLD}${id}${NC}"
+    echo "----------------------------------------"
+    echo "Title:       ${BOLD}${title}${NC}"
+    echo "Status:      ${colored_status}"
+    echo "Source:      ${source}"
+    echo "Updated:     ${updated}"
+    echo ""
+    if [[ -n "$description" ]]; then
+        echo "Description:"
+        echo "  ${description}"
+        echo ""
+    fi
+    if [[ -n "$tasks" ]]; then
+        echo "Linked Tasks:"
+        echo "  ${tasks}"
+    fi
+    if [[ -n "$issues" ]]; then
+        echo "Issue Refs:"
+        echo "  ${issues}"
+    fi
 }
 
 _vibe_roadmap_get_version_goal() {
