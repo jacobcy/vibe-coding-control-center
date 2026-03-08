@@ -1,5 +1,7 @@
 # Vibe Workflow Engine 架构设计
 
+> 术语说明：本文保留其架构设计语境，但 `flow`、`workflow`、`Skill 层`、`Shell 能力层`、`执行代理`、`共享状态真源` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+
 ## 1. 设计初衷与痛点
 
 在 Vibe Center 2.0 中，我们确立了**Model-Spec-Context (MSC) 范式**，旨在用强约束和边界控制收敛 AI 生成的代码质量，防止"凭感觉写出垃圾代码"。然而，我们发现当前系统的**执行入口存在断层**：
@@ -43,7 +45,7 @@ graph TD
     classDef engine fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
     classDef tool fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff;
 
-    subgraph "Tier 2: Vibe Skills Layer (胶水层 - 智能包装)"
+    subgraph "Tier 2: Vibe Skills Layer (Skill 层 - 智能包装)"
         A1[bin/vibe flow]:::ui
         A2[/vibe-task / /vibe-flow / /vibe-save]:::ui
         A3[自然语言需求对话]:::ui
@@ -56,7 +58,7 @@ graph TD
         B4{Stage 4: Review Gate<br/>(规则审计 & Metrics)}:::engine
     end
 
-    subgraph "Tier 1: Shell Layer (物理真源层 - 无感知运行)"
+    subgraph "Tier 1: Shell Layer (Shell 能力层 - 无感知运行)"
         C1[vibe 命令及 alias]:::tool
         C2[bats-core]:::tool
         C3[codex & Shellcheck]:::tool
@@ -132,5 +134,5 @@ graph TD
 1. **架构师 (Gemini)**：擅长无限上下文。负责通读整个代码库与高阶业务需求，在 `docs/plans/` 中输出精确到步骤的系统设计与抽象逻辑 (`plan.md`)。
 2. **执行者 (Claude)**：擅长零样本编码。作为无头(Headless)引擎被唤醒（`claude -c -p <plan> --dangerously-skip-permissions`），在隔离的 Worktree 中老老实实地落实每一行代码，不去擅自重构项目。
 3. **审计员 (Codex)**：擅长挑刺和严谨的静态分析。作为守门员拦截在提交前（`vibe flow review --local`），专门负责代码 review、找 bug 和死代码。如果退回，再发给 Claude 重新修。
-4. **总指挥 (OpenClaw / Vibe Flow Auto)**：维持整个工作区流转的 Shell 主导循环，负责调用上述 Agent，挂载和清理 Worktree 环境。
+4. **总指挥 (OpenClaw / Vibe Flow Auto)**：维持整个工作区流转的编排循环，负责调用上述执行代理，挂载和清理 Worktree 环境。
 5. **人类 (Human Approver)**：从打字员解放为终审法官，只需在 Slack/Channel 中查看汇总的 PR 与 Review 报告，点一下 "LGTM" 闭环合码。

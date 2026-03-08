@@ -4,11 +4,17 @@ title: Git Workflow & Worktree Lifecycle Standard
 status: approved
 author: Claude Sonnet 4.5
 created: 2026-02-28
+related_docs:
+  - SOUL.md
+  - CLAUDE.md
+  - docs/standards/glossary.md
 ---
 
 # Git Workflow & Worktree Lifecycle Standard
 
 > 本文档规范了 Vibe Coding 模式下 Agent 和人类协作时的 Git 与 Worktree 生命周期。秉承 **“本地试错 0 成本，远端污染 0 容忍”** 的核心原则约束所有版本控制行为。
+>
+> `flow`、`workflow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准；本文只定义 Git 与 worktree 生命周期规则。
 
 ## 1. 核心架构：双域隔离
 

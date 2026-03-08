@@ -1,5 +1,9 @@
 # Vibe Skills 与 Slash 命令标准
 
+本文档只定义 skills、workflows、运行时链接与 shell 管理入口的边界。
+
+`Skill 层`、`Shell 能力层`、`workflow` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准；本文不重新定义这些术语。
+
 本文档用于解决以下常见混淆：
 - `skills/`、`.agent/skills/`、`npx skills`、`vibe skills` 的关系
 - OpenSpec 的 `opsx-*` 流程和 Vibe Skills 的边界
@@ -12,8 +16,8 @@
 | 本项目 Skills 源码 | 团队自有技能定义（权威源） | `skills/<name>/SKILL.md` | Git 维护 | 只改这里，不改运行时镜像 |
 | Skills 运行时链接 | 供 Agent 实际加载的 symlink 层 | `.agent/skills/` | `scripts/init.sh` / `vibe skills sync` | 运行时产物，非权威源 |
 | 第三方 Markdown Skills 依赖 | 安装/移除外部 skills | 项目级或全局环境 | `npx skills add/remove/ls` | 外部生态依赖管理器 |
-| Vibe Skills Shell 工具 | 统一管理 skills 的 Shell 入口 | `bin/vibe skills` -> `lib/skills.sh` | `vibe skills <subcommand>` | 编排器，不是 skill 内容本身 |
-| Vibe Skills 技能 | 对话式审计/推荐流程 | `skills/vibe-skills/SKILL.md` | 由 slash/workflow 触发 | 负责推荐，不直接替代底层 CLI |
+| Vibe Skills Shell 工具 | 统一管理 skills 的 Shell 入口 | `bin/vibe skills` -> `lib/skills.sh` | `vibe skills <subcommand>` | Shell 管理入口，不是 skill 内容本身 |
+| Vibe Skills 技能 | 对话式审计/推荐流程 | `skills/vibe-skills/SKILL.md` | 由 slash/workflow 触发 | 属于 Skill 层，负责推荐，不直接替代底层 CLI |
 | OpenSpec OPSX 流程 | OpenSpec 实验流程命令（`/opsx:*`） | `.agent/workflows/opsx-*.md` | `openspec` 工具链 | 独立体系，不归 `npx skills` 管 |
 | Claude 插件 | Claude Code 官方插件生态 | `~/.claude/plugins/...` | `claude plugin add ...` | 与 Markdown skills 分离 |
 | Slash 命令注册 | 用户输入 `/xxx` 的入口定义 | `.agent/workflows/*.md`（跨 Agent） | 工作流文件维护 | 可加 Claude 适配层 |
@@ -23,7 +27,7 @@
 1. `skills/` 是技能定义的唯一真源（source of truth）。
 2. `.agent/skills/` 只做运行时链接，不直接手改业务逻辑。
 3. 第三方公共 skills 的安装/卸载使用 `npx skills`。
-4. `vibe skills` 是 Shell 管理命令；`/vibe-skills` 是 AI workflow 入口，两者不是同一个层级。
+4. `vibe skills` 是 Shell 能力层中的管理命令；`/vibe-skills` 是 Skill 层中的 workflow 入口，两者不是同一个层级。
 5. `opsx-*` 属于 OpenSpec 工作流，生命周期由 `openspec` 管，不并入 `vibe skills` 的安装语义。
 6. Claude 第三方能力优先走 plugin 机制（例如 `everything-claude-code`、`superpowers`），不要用 `npx skills` 去模拟插件。
 
@@ -77,4 +81,3 @@ skills/<name>/
 3. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
 4. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
 5. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
-
