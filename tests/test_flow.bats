@@ -354,7 +354,7 @@ EOF
   grep -q "config user.email claude@vibe.coding" "$calls"
 }
 
-@test "14. vibe flow start with path feature uses sanitized branch and prints cd next-step" {
+@test "14. vibe flow start with path feature does not auto-create or bind task" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -367,9 +367,8 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
-    _vibe_task_add() { echo "$*" > "'"$fixture"'/task_add_args"; return 0; }
-    _vibe_task_update() { return 0; }
+    _vibe_task_add() { echo "CALLED" > "'"$fixture"'/task_add_called"; return 0; }
+    _vibe_task_update() { echo "CALLED" > "'"$fixture"'/task_update_called"; return 0; }
     wtnew() {
       echo "$1" > "'"$fixture"'/wtnew_branch"
       mkdir -p "'"$fixture"'/wt-claude-$1"
@@ -386,13 +385,15 @@ EOF
   '
 
   [ "$status" -eq 0 ]
-  [[ "$(cat "$fixture/task_add_args")" =~ "--id 2026-03-05-2026-03-02-vibe-new-task-flow-convergence" ]]
+  [ ! -f "$fixture/task_add_called" ]
+  [ ! -f "$fixture/task_update_called" ]
   [ "$(cat "$fixture/wtnew_branch")" = "2026-03-02-vibe-new-task-flow-convergence" ]
   [[ "$output" =~ "cd " ]]
-  [[ "$output" =~ "vup" ]]
+  [[ "$output" =~ "vibe task add" ]]
+  [[ "$output" =~ "vibe flow bind" ]]
 }
 
-@test "15. vibe flow start rolls back task when worktree creation fails" {
+@test "15. vibe flow start fails cleanly when worktree creation fails" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -405,7 +406,6 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
     wtnew() { return 1; }
 
     git() {
@@ -423,7 +423,7 @@ EOF
   [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
 }
 
-@test "16. vibe flow start rolls back task when entering worktree fails" {
+@test "16. vibe flow start rolls back worktree when entering worktree fails" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/repo"
@@ -436,7 +436,6 @@ EOF
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_today() { echo "2026-03-05"; }
     wtnew() { return 0; }
 
     git() {

@@ -7,7 +7,7 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <feature> [--agent <name>] [--branch <ref>]     注册任务 + 创建沙盒 + 绑定"
+  echo "  ${GREEN}new${NC} <feature> [--agent <name>] [--branch <ref>]     创建/切换现场（worktree + branch）"
   echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
   echo "  ${GREEN}done${NC}                                                 结项并彻底清理当前环境"
   echo "  ${GREEN}status${NC} [<feature>]                                   查看当前分支状态 (默认: 当前分支)"
@@ -19,6 +19,7 @@ _flow_usage() {
   echo "Options for 'new <feature>':"
   echo "  --agent <name>     指定 AI 身份 (默认: claude)"
   echo "  --branch <ref>     指定基础分支 (默认: main)"
+  echo "  # 标准路径：先 vibe task add/update，再 vibe flow new，再 vibe flow bind"
 }
 
 _flow_new_usage() { 
