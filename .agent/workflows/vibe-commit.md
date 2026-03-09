@@ -48,13 +48,8 @@ tags: [workflow, vibe, git, commit, pr]
    If the current branch name/history still matches a single delivery target, continue with one PR.
    If branch semantics are no longer suitable, or multiple PRs are needed:
    - do not publish from the current branch
-<<<<<<< HEAD
    - create a new flow with `vibe flow new <name> --branch <ref>`
    - move the relevant change slice to the new branch first
-=======
-   - create a new flow with `vibe flow new <name> --branch <ref>`
-   - move the relevant change slice to the new branch first
->>>>>>> ee66d77 (docs(commit): add dirty-worktree and PR-slicing flow)
 
    For serial multi-PR delivery, follow this exact playbook:
    - enumerate commit groups first

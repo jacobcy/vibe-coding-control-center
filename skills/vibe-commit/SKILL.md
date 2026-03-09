@@ -108,11 +108,7 @@ git log --oneline <base>..HEAD
 如果不满足，或者明显需要多个 PR：
 
 - 不要继续沿用当前分支直接发 PR
-<<<<<<< HEAD
 - 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
-=======
-- 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
->>>>>>> ee66d77 (docs(commit): add dirty-worktree and PR-slicing flow)
 - 在新的 flow 中迁移当前要发布的那一组改动或 commit
 - 再由新分支继续提交与发布
 
