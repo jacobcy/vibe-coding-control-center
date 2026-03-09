@@ -340,8 +340,8 @@ provider 只允许：
 
 `vibe flow` 只负责：
 
-- 管 worktree 现场
-- 管当前 branch 现场动作
+- 管逻辑 `flow` 现场
+- 管当前 `branch` 的 flow 级现场动作
 - 管当前 task 的绑定与解绑
 - 管当前现场的发布、检查、收尾
 
@@ -354,12 +354,14 @@ provider 只允许：
 - 全局 task 生命周期管理
 - 跨 worktree 的分支同步编排
 - 将命名输入当作共享模型字段
+- 并行 worktree 的物理创建与目录进入编排
 
 ### 6.3 Standard Subcommands
 
 - `status`
 - `list`
 - `new <name>`
+- `switch <name>`
 - `bind <task-id>`
 - `pr`
 - `review`
