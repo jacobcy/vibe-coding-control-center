@@ -20,31 +20,6 @@ _vibe_roadmap_file() {
     echo "$common_dir/vibe/roadmap.json"
 }
 
-_vibe_roadmap_supports_color() {
-    [[ -t 1 ]]
-}
-
-_vibe_roadmap_format() {
-    local prefix="$1" text="$2"
-    if _vibe_roadmap_supports_color; then
-        printf '%s%s%s' "$prefix" "$text" "$NC"
-    else
-        printf '%s' "$text"
-    fi
-}
-
-_vibe_roadmap_color_status() {
-    local s="$1"
-    case "$s" in
-        p0) _vibe_roadmap_format "${RED}${BOLD}" "$s" ;;
-        current) _vibe_roadmap_format "$GREEN" "$s" ;;
-        next) _vibe_roadmap_format "$BLUE" "$s" ;;
-        deferred) _vibe_roadmap_format "$YELLOW" "$s" ;;
-        rejected) _vibe_roadmap_format "$(printf '\033[0;90m')" "$s" ;;
-        *) printf '%s' "$s" ;;
-    esac
-}
-
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -187,18 +162,31 @@ _vibe_roadmap_list() {
         return 0
     fi
 
-    local row item_status rid title colored_status
-    echo "$items_json" | jq -c '.[]' | while read -r row; do
-        item_status=$(echo "$row" | jq -r '.status')
-        rid=$(echo "$row" | jq -r '.roadmap_item_id')
-        title=$(echo "$row" | jq -r '.title')
-        colored_status=$(_vibe_roadmap_color_status "$item_status")
-        
-        if [[ "$title" == "$rid" || -z "$title" ]]; then
-            printf "[%b] %s\n" "$colored_status" "$rid"
+    local first_group="true" group_status group_items group_count row rid title
+    local -a ordered_statuses=(p0 current next deferred rejected)
+
+    for group_status in "${ordered_statuses[@]}"; do
+        group_items="$(echo "$items_json" | jq -c --arg status "$group_status" '[.[] | select(.status == $status)]')"
+        group_count="$(echo "$group_items" | jq 'length')"
+        [[ "$group_count" == "0" ]] && continue
+
+        if [[ "$first_group" == "true" ]]; then
+            first_group="false"
         else
-            printf "[%b] %-12s  %s\n" "$colored_status" "$rid" "$title"
+            printf '\n'
         fi
+
+        printf '%s\n' "$(_vibe_roadmap_group_heading "$group_status" "$group_count")"
+        echo "$group_items" | jq -c '.[]' | while read -r row; do
+            rid=$(echo "$row" | jq -r '.roadmap_item_id')
+            title=$(echo "$row" | jq -r '.title')
+
+            if [[ "$title" == "$rid" || -z "$title" ]]; then
+                printf '  %s\n' "$rid"
+            else
+                printf '  %s  %s\n' "$rid" "$title"
+            fi
+        done
     done
 }
 

@@ -296,8 +296,77 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [ "$output" = "[p0] gh-36" ]
+  [ "$output" = $'P0 (1)\n  gh-36' ]
   [[ ! "$output" =~ $'\033' ]]
+}
+
+@test "roadmap list text output groups items by status" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = $'P0 (1)\n  rm-2  Beta\n\nCurrent (1)\n  rm-1  Alpha\n\nDeferred (1)\n  rm-3  Gamma' ]
+  [[ ! "$output" =~ $'\033' ]]
+}
+
+@test "roadmap list color output highlights grouped status headings" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    _vibe_roadmap_supports_color() { return 0; }
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_roadmap list
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ $'\033' ]]
+  [[ "$output" =~ "P0 (1)" ]]
+  [[ "$output" =~ "Current (1)" ]]
+}
+
+@test "roadmap color support allows interactive stdin when stdout is not a tty" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    _vibe_roadmap_fd_is_tty() {
+      [[ "$1" == "0" ]]
+    }
+    if _vibe_roadmap_supports_color; then
+      echo yes
+    else
+      echo no
+    fi
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "yes" ]
 }
 
 @test "roadmap show text output omits ansi escapes when stdout is not a tty" {
