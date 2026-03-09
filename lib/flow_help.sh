@@ -7,12 +7,13 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建新的物理现场（当前为 worktree + branch 过渡语义）"
-  echo "  ${GREEN}switch${NC} <name> [--branch <ref>] [--save-stash]       在当前目录进入/切换逻辑 flow"
+  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建新的 flow 现场；已存在则拒绝"
+  echo "  ${GREEN}switch${NC} <name> [--branch <ref>] [--save-stash]       进入未关闭且未发过 PR 的现有 flow"
   echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
-  echo "  ${GREEN}done${NC} [--branch <ref>]                               当前/指定现场收尾（保留 worktree/branch）"
-  echo "  ${GREEN}status${NC} [--branch <ref>]                             查看当前/指定分支状态"
-  echo "  ${GREEN}list${NC}                                                   查看当前未关闭 flow 列表"
+  echo "  ${GREEN}show${NC} [<feature>|<branch>] [--json]                   查看单个 flow 的详情（默认当前 flow）"
+  echo "  ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支"
+  echo "  ${GREEN}status${NC} [--json]                                     查看未关闭 flow 大盘"
+  echo "  ${GREEN}list${NC} [--pr]                                          查看所有 flow（含历史）"
   echo "  ${GREEN}pr${NC} [--base <ref>]                                    提交代码并打开 Pull Request（目标基线分支）"
   echo "  ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或进行本地最终检查"
   echo ""
@@ -23,7 +24,7 @@ _flow_usage() {
   echo "  --branch <ref>     指定新逻辑 flow 的起点分支 (默认: main)"
   echo "  --save-stash       将当前未提交改动 stash 后带入新 flow"
   echo "  # 标准路径：当前目录串行切 flow 用 vibe flow switch；并行新物理现场用 vibe flow new / wtnew"
-  echo "  # 概念边界：flow new/new worktree 与 flow switch/reuse current worktree 不是一回事"
+  echo "  # flow new 拒绝“已存在”或“存在过”的 feature；已存在但未发 PR 的 flow 用 switch"
   echo "  # 参数边界：flow new/switch 用 --branch；flow pr 用 --base；两者不是同义参数"
 }
 
@@ -36,6 +37,7 @@ _flow_switch_usage() {
     echo "Usage: vibe flow switch <name> [--branch <ref>] [--save-stash]"
     echo "  --branch <ref>     在当前目录进入新的逻辑 flow 时使用的起点分支"
     echo "  --save-stash       将未提交改动 stash 后带入新 flow"
+    echo "  仅允许进入未关闭且未发过 PR 的 flow"
 }
 
 _flow_bind_usage() { 
@@ -62,32 +64,33 @@ _flow_pr_usage() {
   echo "  - 概念边界：这里的 --base 是 PR 要合入的目标分支，不是创建 flow 时的起点分支"
 }
 
-_flow_status_usage() {
-  echo "Usage: ${CYAN}vibe flow status${NC} [--branch <ref>] [--json]"
+_flow_show_usage() {
+  echo "Usage: ${CYAN}vibe flow show${NC} [<feature>|<branch>] [--json]"
   echo ""
-  echo "查看当前或指定分支的任务状态、进度和工作区信息。"
+  echo "查看单个 flow 的详情，默认当前 flow。"
+  echo "显示内容：feature、branch、task、issue refs、pr ref、state、closed_at。"
+}
+
+_flow_status_usage() {
+  echo "Usage: ${CYAN}vibe flow status${NC} [--json]"
+  echo ""
+  echo "查看未关闭 flow 大盘。"
   echo ""
   echo "显示内容："
-  echo "  - 绑定到分支的任务 ID、标题、状态"
-  echo "  - 任务当前阶段（Draft/Planning/Implementation/Review）"
-  echo "  - 下一步操作建议"
-  echo "  - 工作区物理状态（未提交文件数量）"
-  echo "  - 代码库度量信息"
+  echo "  - open flow 的 feature / branch / task / PR / next_step"
   echo ""
   echo "选项："
-  echo "  --branch <ref>  指定要查看的分支 (默认: 当前分支)"
   echo "  --json          以 JSON 格式输出任务数据"
 }
 
 _flow_list_usage() {
   echo "Usage: ${CYAN}vibe flow list${NC} [--pr]"
   echo ""
-  echo "查看未关闭 flow 列表（逻辑层：registry 中 status 属于 todo/in_progress/blocked）。"
+  echo "查看所有 flow，包括已关闭历史。"
   echo ""
   echo "默认输出包括："
-  echo "  - flow task id / title / status"
-  echo "  - flow next_step（若存在）"
-  echo "  - 不展示 worktree 物理层状态"
+  echo "  - open flow"
+  echo "  - closed flow history"
   echo ""
   echo "选项："
   echo "  --pr    切换到 PR 分支视图（最近 10 条）"
@@ -96,16 +99,17 @@ _flow_list_usage() {
 _flow_done_usage() {
   echo "Usage: ${CYAN}vibe flow done${NC} [--branch <ref>]"
   echo ""
-  echo "完成当前或指定的 flow 现场，检查分支是否已合并到 origin/main。"
-  echo "核心职责：验证工作已完成并合并，保留 worktree/branch 供后续清理。"
+  echo "关闭当前或指定的 flow，并删除本地/远端分支。"
+  echo "核心职责：验证该 flow 对应 PR 已完成，写入 flow 历史，再关闭 branch。"
   echo ""
   echo "选项："
   echo "  --branch <ref>    指定要完成的分支 (默认: 当前分支)"
   echo ""
   echo "检查项："
-  echo "  1. 分支不能是 main 或主 worktree"
-  echo "  2. 工作目录必须干净（无未提交修改）"
-  echo "  3. 分支的所有提交必须已合并到 origin/main"
+  echo "  1. 分支不能是 main 或已关闭 flow"
+  echo "  2. 工作目录必须干净（若关闭当前分支）"
+  echo "  3. 分支必须已有 PR 事实"
+  echo "  4. 分支对应的 PR 必须已完成；若无法确认，再回退检查 origin/main 是否已吸收变更"
   echo ""
   echo "示例："
   echo "  ${CYAN}vibe flow done${NC}                    # 完成当前分支"

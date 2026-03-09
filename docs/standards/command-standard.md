@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -66,7 +66,7 @@ related_docs:
 
 - `vibe roadmap` 以 `roadmap.json` 为规划态真源
 - `vibe task` 以 `registry.json` 为执行态真源
-- `vibe flow` 以 `worktrees.json` 为现场态真源
+- `vibe flow` 以 `worktrees.json` 表达开放现场，并以 `flow-history.json` 表达已关闭 flow 历史
 - `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
 
 命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。
@@ -103,8 +103,8 @@ related_docs:
 ### 2.4 Non-Interactive Rules
 
 - 所有命令默认非交互
-- 任何创建、删除、覆盖或状态修改动作必须显式传 `-y` 或 `--yes`
-- 若上下文不足以安全执行，命令必须直接失败，不进入确认流程
+- 批量、覆盖式或上下文不唯一的高风险写操作，必须显式传 `-y` 或 `--yes`
+- 若命令只作用于当前现场或明确单目标，可以直接执行，但上下文不足时必须直接失败
 - help 文案必须明确标出哪些子命令要求 `-y`
 - 命令失败时必须暴露阻塞事实，不能擅自 fallback 到直接改数据源
 
@@ -342,8 +342,10 @@ provider 只允许：
 
 - 管逻辑 `flow` 现场
 - 管当前 `branch` 的 flow 级现场动作
+- 管单个 flow 的查询与开放现场大盘
+- 管 flow 历史留存与 branch 关闭
 - 管当前 task 的绑定与解绑
-- 管当前现场的发布、检查、收尾
+- 管当前现场的发布与检查入口
 
 ### 6.2 Boundaries
 
@@ -352,12 +354,16 @@ provider 只允许：
 - roadmap 查询
 - task 历史归档
 - 全局 task 生命周期管理
+- 关闭 issue
+- 合并 PR
+- review / CI 失败后的自动修复
 - 跨 worktree 的分支同步编排
 - 将命名输入当作共享模型字段
 - 并行 worktree 的物理创建与目录进入编排
 
 ### 6.3 Standard Subcommands
 
+- `show [<feature>|<branch>]`
 - `status`
 - `list`
 - `new <name>`
@@ -369,10 +375,15 @@ provider 只允许：
 
 ### 6.4 Query Rules
 
-- `status` 用于查看当前现场状态
-- `list` 用于查看全部现场状态
+- `show` 用于查看单个 flow 详情，默认当前 flow
+- `status` 用于查看未关闭 flow 大盘
+- `list` 用于查看全部 flow，包括历史
 - `review` 用于检查当前 PR 或执行本地最终审查
 - 查询类子命令支持 `--json`
+
+`show` 支持：
+
+- `--json`
 
 `review` 支持：
 
@@ -385,24 +396,28 @@ provider 只允许：
 
 ### 6.5 Write Rules
 
-以下高风险写操作必须要求 `-y` 或 `--yes`：
+`vibe flow` 写操作均为当前 repo 或显式单目标动作，应保持非交互、失败即停止，不要求额外确认：
 
 - `new`
+- `switch`
 - `bind`
 - `pr`
-
-`done` 是现场收尾动作，不应触发环境销毁，因此不要求 `-y`。
+- `done`
 
 ### 6.6 Naming Rules
 
-- `new <name>` 中的 `name` 只是命名输入
-- `name` 不是共享模型字段
-- 标准文案中不得把 `name` 写成 `feature` 这一类长期模型概念
+- `new <name>`、`switch <name>` 中的 `name` 是命名输入
+- `show [<feature>|<branch>]` 可以接受 feature slug 或 branch ref
+- `feature` 只允许作为 flow 的展示语义或命名输入，不是共享模型字段
 
 ### 6.7 Semantic Separation
 
 - `pr` = publish
 - `review` = inspect
+- `show` = 单 flow 查询
+- `status` = open flow dashboard
+- `list` = 全量 flow 枚举
+- `done` = close flow and branch, not task / issue completion
 
 `pr` 可以有副作用，例如：
 
@@ -438,6 +453,9 @@ provider 只允许：
 - 持久化 `dirty`
 - 让 `review` 默认产生发布副作用
 - 通过 `flow sync` 将当前分支批量 merge 到所有 worktree 分支
+- 让 `done` 自动关闭 task 或 issue
+- 让 `switch` 进入已经有 PR 事实的 flow
+- 让 `new` 重新创建已关闭历史中的同名 flow
 
 ## 7. `vibe check` Standard
 

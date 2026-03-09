@@ -24,18 +24,37 @@ _flow_update_current_worktree_branch() {
   tmp="$(mktemp)" || return 1
 
   jq --arg wt "$current_dir" --arg path "$current_path" --arg branch "$branch" --arg now "$now" '
-    .worktrees = ((.worktrees // []) | map(
-      if .worktree_name == $wt or .worktree_path == $path then
-        .branch = $branch
-        | .status = "active"
-        | .last_updated = $now
-      else . end
-    ))
+    .worktrees = (
+      (.worktrees // []) as $items
+      | if any($items[]?; .worktree_name == $wt or .worktree_path == $path) then
+          $items | map(
+            if .worktree_name == $wt or .worktree_path == $path then
+              .branch = $branch
+              | .worktree_name = $wt
+              | .worktree_path = $path
+              | .status = "active"
+              | .last_updated = $now
+            else . end
+          )
+        else
+          $items + [{
+            worktree_name: $wt,
+            worktree_path: $path,
+            branch: $branch,
+            current_task: null,
+            tasks: [],
+            status: "active",
+            dirty: false,
+            agent: null,
+            last_updated: $now
+          }]
+        end
+    )
   ' "$worktrees_file" > "$tmp" && mv "$tmp" "$worktrees_file"
 }
 
 _flow_switch() {
-  local target="" base_ref="main" save_stash=0 arg current_branch branch_name dirty="" stashed=0
+  local target="" base_ref="main" save_stash=0 arg current_branch branch_name dirty="" stashed=0 existing_ref=""
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_switch_usage; return 0; }; done
 
   while [[ $# -gt 0 ]]; do
@@ -58,6 +77,7 @@ _flow_switch() {
   esac
 
   branch_name="$(_flow_switch_target_branch "$target")"
+  _flow_history_has_closed_feature "$target" && { log_error "Flow already existed and was closed: $(_flow_feature_slug "$target")"; return 1; }
   git check-ref-format --branch "$branch_name" >/dev/null 2>&1 || { log_error "Invalid branch name: $branch_name"; return 1; }
   [[ "$branch_name" != "$current_branch" ]] || { log_error "Target branch matches current branch: $current_branch"; return 1; }
 
@@ -73,13 +93,29 @@ _flow_switch() {
     stashed=1
   fi
 
-  if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-    log_step "Switching to existing flow branch: $branch_name"
-    git checkout "$branch_name" || {
+  if existing_ref="$(_flow_branch_ref "$branch_name" 2>/dev/null)"; then
+    if _flow_branch_has_pr "$branch_name"; then
       [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
-      log_error "Failed to checkout branch: $branch_name"
+      log_error "Flow '$branch_name' already has PR history and cannot be resumed via switch."
       return 1
-    }
+    fi
+  fi
+
+  if [[ -n "$existing_ref" ]]; then
+    log_step "Switching to existing flow branch: $branch_name"
+    if [[ "$existing_ref" == "$branch_name" ]]; then
+      git checkout "$branch_name" || {
+        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+        log_error "Failed to checkout branch: $branch_name"
+        return 1
+      }
+    else
+      git checkout -b "$branch_name" "$existing_ref" || {
+        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+        log_error "Failed to materialize branch from: $existing_ref"
+        return 1
+      }
+    fi
   else
     log_step "Creating flow branch: $branch_name from $base_ref"
     git checkout -b "$branch_name" "$base_ref" || {

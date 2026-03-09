@@ -10,7 +10,7 @@ authority:
   - state-lifecycle
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -24,7 +24,7 @@ related_docs:
 
 # 共享数据模型标准
 
-本文档是 Vibe 共享状态数据模型的高层规范真源，定义 `roadmap.json`、`registry.json`、`worktrees.json` 的职责边界、命名规则、关系约束和生命周期规则。
+本文档是 Vibe 共享状态数据模型的高层规范真源，定义 `roadmap.json`、`registry.json`、`worktrees.json`、`flow-history.json` 的职责边界、命名规则、关系约束和生命周期规则。
 
 本文档只定义高层数据模型边界，不重复定义文件级 schema，不记录讨论过程、迁移步骤或实现现状。文件级精确 schema 见：
 
@@ -35,11 +35,12 @@ related_docs:
 
 ## 1. Scope
 
-本文档只覆盖三类共享状态文件：
+本文档只覆盖四类共享状态文件：
 
 - `roadmap.json`
 - `registry.json`
 - `worktrees.json`
+- `flow-history.json`
 
 命令语义由 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 定义；本文只负责数据模型本身。
 
@@ -56,14 +57,18 @@ related_docs:
 - `worktrees.json`
   - 现场态真源
   - 本文当前只定义其高层职责边界，尚无单独文件级 schema 标准
+- `flow-history.json`
+  - flow 历史真源
+  - 记录已关闭 flow 的墓碑事实，不承担当前运行态
 
 ## 3. Layer Ownership
 
-三层共享状态固定映射如下：
+共享状态固定映射如下：
 
 - `roadmap.json` = 规划态
 - `registry.json` = 执行态
 - `worktrees.json` = 现场态
+- `flow-history.json` = 已关闭 flow 的历史态
 
 补充约束：
 
@@ -165,7 +170,9 @@ related_docs:
 
 - 未来规划态以 `roadmap.json` 为准
 - 当前执行态以 `registry.json` 与 `worktrees.json` 联合表达
-- 历史完成态以 `registry.json` 的完成与归档事实为准
+- task 的完成与归档事实以 `registry.json` 为准
+- 已关闭 flow 的历史事实以 `flow-history.json` 为准
+- `worktrees.json` 只表达当前开放现场，不承担 flow 历史归档
 
 ### 7.3 Computed Fields
 
@@ -190,6 +197,7 @@ related_docs:
 - 用 `roadmap.json` 记录现场信息
 - 用 `registry.json` 记录规划优先级
 - 用 `worktrees.json` 承担历史归档
+- 用 `registry.json` 或 `worktrees.json` 冒充 flow 关闭历史
 - 将 `openspec` 写成 roadmap provider
 - 将 `feature` 写成共享模型字段
 - 将 `dirty` 写成持久化真源字段

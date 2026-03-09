@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 [[ -z "${VIBE_ROOT:-}" ]] && { echo "error: VIBE_ROOT not set"; return 1; }
 source "$VIBE_LIB/flow_help.sh"
+source "$VIBE_LIB/flow_history.sh"
+source "$VIBE_LIB/flow_show.sh"
 source "$VIBE_LIB/flow_status.sh"
 source "$VIBE_LIB/flow_review.sh"
 source "$VIBE_LIB/task.sh"
@@ -88,7 +90,7 @@ _flow_bind() {
 }
 
 _flow_new() {
-  local feat="" agent="" ref="main" arg
+  local feat="" agent="" ref="main" arg branch_name feature_slug
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -101,10 +103,21 @@ _flow_new() {
     esac
   done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
+  feature_slug="$(_vibe_task_slugify "$feat")"
+  branch_name="task/$feature_slug"
+  _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already existed and was closed: $feature_slug"; return 1; }
+  if _flow_branch_exists "$branch_name"; then
+    if _flow_branch_has_pr "$branch_name"; then
+      log_error "Flow '$feature_slug' already has PR history and must be closed through skill handoff."
+    else
+      log_error "Flow '$feature_slug' already exists. Use: vibe flow switch $feature_slug"
+    fi
+    return 1
+  fi
   _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
 _flow_done() {
-  local target_branch="" arg unmerged current_branch
+  local target_branch="" arg unmerged current_branch branch_ref="" branch_name feature_slug flow_record="" tasks_json='[]' current_task="" worktree_name="" worktree_path="" pr_ref="" now pr_merged=1 delete_mode="safe"
   
   # 处理帮助参数
   for arg in "$@"; do 
@@ -139,11 +152,14 @@ _flow_done() {
     return 1
   fi
   
-  local branch_ref=""
   branch_ref="$(_flow_branch_ref "$target_branch")" || {
     log_error "Branch not found: $target_branch"
     return 1
   }
+  branch_name="${branch_ref#origin/}"
+  feature_slug="$(_flow_feature_slug "$branch_name")"
+  _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already closed: $feature_slug"; return 1; }
+  _flow_branch_has_pr "$branch_name" || { log_error "Branch '$target_branch' has no PR history. Use skill handoff instead of force-closing."; return 1; }
 
   # 如果检查的是当前分支，额外检查工作目录
   if [[ "$branch_ref" == "$current_branch" ]]; then
@@ -154,16 +170,44 @@ _flow_done() {
   fi
   # 获取远程 main 分支最新状态
   git fetch origin main --quiet 2>/dev/null || true
-  
-  # 检查是否有未合并的提交
+
+  if _flow_branch_pr_merged "$branch_name"; then
+    pr_merged=0
+    delete_mode="force"
+  fi
+
+  # 无法确认 PR merged 时，回退到 Git 提交检查
   unmerged=$(git rev-list "origin/main..$branch_ref" 2>/dev/null || echo "")
-  if [[ -n "$unmerged" ]]; then
+  if [[ $pr_merged -ne 0 && -n "$unmerged" ]]; then
     log_error "Branch '$target_branch' has commits not merged into origin/main. Please open a PR and merge first."
     return 1
   fi
-  
-  log_success "Flow wrap-up complete for branch '$target_branch'. Environment preserved (no worktree/branch cleanup)."
-  echo "💡 Next: Run ${CYAN}vibe flow review${NC} or ${CYAN}vibe task list${NC}."
+
+  flow_record="$(_flow_branch_dashboard_entry "$branch_name" 2>/dev/null || true)"
+  if [[ -n "$flow_record" ]]; then
+    tasks_json="$(echo "$flow_record" | jq -c '.tasks // []')"
+    current_task="$(echo "$flow_record" | jq -r '.current_task // empty')"
+    worktree_name="$(echo "$flow_record" | jq -r '.worktree_name // empty')"
+    worktree_path="$(echo "$flow_record" | jq -r '.worktree_path // empty')"
+    pr_ref="$(echo "$flow_record" | jq -r '.pr_ref // empty')"
+  fi
+  now="$(_flow_now_iso)"
+  _flow_history_close "$feature_slug" "$branch_name" "$worktree_name" "$worktree_path" "$current_task" "$tasks_json" "$pr_ref" "$now" || return 1
+  _flow_close_branch_runtime "$branch_name" || return 1
+
+  if [[ "$branch_name" == "$current_branch" ]]; then
+    _flow_checkout_detached_main || { log_error "Failed to move current worktree off branch: $branch_name"; return 1; }
+  fi
+
+  if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+    vibe_delete_local_branch "$branch_name" "$delete_mode" || return 1
+  fi
+  if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+    vibe_delete_remote_branch "$branch_name" || return 1
+  fi
+
+  log_success "Flow closed for branch '$branch_name'. History preserved."
+  echo "💡 Next: Run ${CYAN}vibe flow show $feature_slug${NC} or your closing skill to finish task/issue handoff."
 }
 
 _flow_sync() {
@@ -224,6 +268,7 @@ vibe_flow() {
     switch) shift; _flow_switch "$@" ;;
     bind) shift; _flow_bind "$@" ;;
     done) shift; _flow_done "$@" ;;
+    show) shift; _flow_show "$@" ;;
     status) shift; _flow_status "$@" ;;
     list) shift; _flow_list "$@" ;;
     sync) _flow_sync ;;

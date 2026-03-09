@@ -114,6 +114,8 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 1; }
 
     git() {
       case "$*" in
@@ -122,6 +124,7 @@ JSON
         "check-ref-format --branch task/next-flow") return 0 ;;
         "stash push -u -m Flow switch to task/next-flow: saved WIP") echo "STASHED"; return 0 ;;
         "show-ref --verify --quiet refs/heads/task/next-flow") return 1 ;;
+        "show-ref --verify --quiet refs/remotes/origin/task/next-flow") return 1 ;;
         "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
         "stash pop") echo "UNSTASHED"; return 0 ;;
         *) return 0 ;;
@@ -135,6 +138,31 @@ JSON
   [[ "$output" =~ "STASHED" ]]
   [[ "$output" =~ "CHECKOUT_NEW" ]]
   [[ "$output" =~ "UNSTASHED" ]]
+}
+
+@test "2.6 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-upsert"
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-codex-runtime-upsert"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    _flow_update_current_worktree_branch "task/runtime-upsert"
+    jq -r ".worktrees[0].worktree_name + \"|\" + .worktrees[0].worktree_path + \"|\" + .worktrees[0].branch + \"|\" + .worktrees[0].status" "'"$fixture"'/vibe/worktrees.json"
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "wt-codex-runtime-upsert|$fixture/wt-codex-runtime-upsert|task/runtime-upsert|active" ]
 }
 
 @test "2.1 _flow_new rejects legacy --base alias to keep branch semantics explicit" {
@@ -160,21 +188,22 @@ JSON
   [[ "$output" =~ "Not in a worktree" ]]
 }
 
-@test "3.1 _flow_status --branch resolves tasks from matching worktree branch" {
+@test "3.1 _flow_show resolves current flow details from runtime state" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
   cat > "$fixture/vibe/registry.json" <<'JSON'
 {"schema_version":"v1","tasks":[
-  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude"},
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"]},
   {"task_id":"task-side","title":"Side Task","status":"todo","next_step":"Gate 2","assigned_worktree":"wt-claude-refactor","agent":"claude"}
 ]}
 JSON
   cat > "$fixture/vibe/worktrees.json" <<'JSON'
 {"schema_version":"v1","worktrees":[
-  {"worktree_name":"wt-claude-refactor","branch":"feature/refactor","current_task":"task-main","tasks":["task-main","task-side"]}
+  {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/refactor","current_task":"task-main","tasks":["task-main","task-side"]}
 ]}
 JSON
+  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
 
   run zsh -c '
     cd "'"$fixture"'/wt-claude-refactor"
@@ -185,28 +214,37 @@ JSON
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     git() {
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/refactor"; return 0; fi
       if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
       return 0
     }
-    _flow_status --branch feature/refactor --json
+    _flow_show --json
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ '"task_id": "task-main"' ]]
-  [[ "$output" =~ '"task_id": "task-side"' ]]
+  [[ "$output" =~ '"feature": "refactor"' ]]
+  [[ "$output" =~ '"current_task": "task-main"' ]]
+  [[ "$output" =~ '"task_status": "in_progress"' ]]
+  [[ "$output" =~ '"pr_ref": "#42"' ]]
+  [[ "$output" =~ '"#7"' ]]
 }
 
-@test "3.2 _flow_status keeps positional task id fallback" {
+@test "3.2 _flow_status shows only open flow dashboard entries" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
   cat > "$fixture/vibe/registry.json" <<'JSON'
 {"schema_version":"v1","tasks":[
-  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude"}
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42"},
+  {"task_id":"task-main-2","title":"Main Task 2","status":"todo","next_step":"Gate 2","assigned_worktree":"wt-main","agent":"claude"}
 ]}
 JSON
   cat > "$fixture/vibe/worktrees.json" <<'JSON'
-{"schema_version":"v1","worktrees":[]}
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","branch":"task/refactor","current_task":"task-main","tasks":["task-main"],"status":"active"},
+  {"worktree_name":"wt-main","branch":"main","current_task":"task-main-2","tasks":["task-main-2"],"status":"active"},
+  {"worktree_name":"wt-missing","branch":"task/ghost","current_task":"task-main-2","tasks":["task-main-2"],"status":"missing"}
+]}
 JSON
 
   run zsh -c '
@@ -218,14 +256,16 @@ JSON
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     git() {
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
       return 0
     }
-    _flow_status task-main --json
+    _flow_status --json
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ '"task_id": "task-main"' ]]
+  [[ "$output" =~ '"feature": "refactor"' ]]
+  [[ "$output" =~ '"current_task": "task-main"' ]]
+  [[ ! "$output" =~ '"branch": "main"' ]]
+  [[ ! "$output" =~ '"feature": "ghost"' ]]
 }
 
 @test "4. _detect_feature extracts feature from dir name" {
@@ -390,6 +430,9 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
     git() {
       case "$*" in
         "branch --show-current") echo "feature-branch"; return 0 ;;
@@ -409,6 +452,10 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 1; }
     git() {
       case "$*" in
         "branch --show-current") echo "feature-branch"; return 0 ;;
@@ -425,26 +472,85 @@ JSON
   [[ "$output" =~ "has commits not merged into origin/main" ]]
 }
 
-@test "11.1 _flow_done completes wrap-up without deleting environment" {
+@test "11.0 _flow_done accepts squash-merged PR state even when branch ancestry diverges" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 0; }
+    _flow_history_close() { echo "HISTORY_CLOSED"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
+    vibe_delete_local_branch() { echo "DELETE_LOCAL:$1:$2"; return 0; }
     git() {
       case "$*" in
-        "branch --show-current") echo "feature-branch"; return 0 ;;
-        "status --porcelain") echo ""; return 0 ;;
+        "branch --show-current") echo "other-branch"; return 0 ;;
+        "show-ref --verify --quiet refs/heads/feature-branch") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/feature-branch") return 1 ;;
         "fetch origin main --quiet") return 0 ;;
-        "rev-list origin/main..feature-branch") echo ""; return 0 ;;
+        "rev-list origin/main..feature-branch") echo "commit-hash"; return 0 ;;
         *) return 0 ;;
       esac
     }
     _flow_is_main_worktree() { return 1; }
+    _flow_done --branch feature-branch
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "HISTORY_CLOSED" ]]
+  [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
+}
+
+@test "11.1 _flow_done closes flow history and deletes local and remote branches" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"]}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/feature-branch","current_task":"task-main","tasks":["task-main"],"status":"active"}
+]}
+JSON
+  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_is_main_worktree() { return 1; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_checkout_detached_main() { echo "DETACHED_MAIN"; return 0; }
+    vibe_delete_local_branch() { echo "DELETE_LOCAL:$1"; return 0; }
+    vibe_delete_remote_branch() { echo "DELETE_REMOTE:$1"; return 0; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "task/feature-branch"; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "show-ref --verify --quiet refs/heads/task/feature-branch") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/task/feature-branch") return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..task/feature-branch") echo ""; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
     _flow_done
   '
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Flow wrap-up complete for branch" ]]
-  [[ "$output" =~ "Environment preserved" ]]
+  [[ "$output" =~ "DETACHED_MAIN" ]]
+  [[ "$output" =~ "DELETE_LOCAL:task/feature-branch" ]]
+  [[ "$output" =~ "DELETE_REMOTE:task/feature-branch" ]]
+  [[ "$output" =~ "History preserved" ]]
+  [ "$(jq -r '.flows[0].state' "$fixture/vibe/flow-history.json")" = "closed" ]
+  [ "$(jq -r '.flows[0].feature' "$fixture/vibe/flow-history.json")" = "feature-branch" ]
+  [ "$(jq -r '.worktrees[0].branch // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
 }
 
 @test "11.2 _flow_done rejects unknown options" {
@@ -482,6 +588,12 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_history_close() { echo "HISTORY:$1:$2"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED:$1"; return 0; }
+    vibe_delete_local_branch() { echo "DELETE_LOCAL:$1"; return 0; }
+    vibe_delete_remote_branch() { echo "DELETE_REMOTE:$1"; return 0; }
     git() {
       case "$*" in
         "branch --show-current") echo "other-branch"; return 0 ;;
@@ -497,7 +609,9 @@ JSON
     _flow_done --branch origin/feature-branch
   '
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "origin/feature-branch" ]]
+  [[ "$output" =~ "HISTORY:feature-branch:feature-branch" ]]
+  [[ "$output" =~ "DELETE_REMOTE:feature-branch" ]]
+  [[ ! "$output" =~ "DELETE_LOCAL:feature-branch" ]]
 }
 
 @test "12. _flow_pr skips bump if PR already exists" {
