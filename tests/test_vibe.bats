@@ -2,6 +2,8 @@
 
 setup() {
   export PATH="$BATS_TEST_DIRNAME/../bin:$PATH"
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export VIBE_LIB="$VIBE_ROOT/lib"
 }
 
 @test "1. bin/vibe is executable" {
@@ -24,6 +26,137 @@ setup() {
   run vibe check check --json
   [[ "$status" -eq 0 || "$status" -eq 1 ]]
   echo "$output" | jq -e '.roadmap and .task and .flow and .link and .docs' >/dev/null
+}
+
+@test "2.2 vibe check roadmap --json warns on unlinked roadmap items" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Ship roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/roadmap.sh"
+    source "'"$VIBE_ROOT"'/lib/check.sh"
+    vibe() {
+      local cmd="$1"
+      shift
+      case "$cmd" in
+        roadmap) vibe_roadmap "$@" ;;
+        check) vibe_check "$@" ;;
+        *) return 1 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_check roadmap --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.roadmap.status')" = "pass" ]
+  [ "$(echo "$output" | jq -r '.roadmap.warnings[0]')" = "unlinked roadmap item: rm-1" ]
+}
+
+@test "2.3 vibe check link --json fails on missing roadmap back-link" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "tasks": [
+    {
+      "task_id": "task-1",
+      "title": "Task One",
+      "description": null,
+      "status": "todo",
+      "source_type": "local",
+      "source_refs": [],
+      "roadmap_item_ids": ["rm-1"],
+      "issue_refs": [],
+      "pr_ref": null,
+      "related_task_ids": [],
+      "current_subtask_id": null,
+      "subtasks": [],
+      "runtime_worktree_name": null,
+      "runtime_worktree_path": null,
+      "runtime_branch": null,
+      "runtime_agent": null,
+      "next_step": null,
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00",
+      "completed_at": null,
+      "archived_at": null
+    }
+  ]
+}
+JSON
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Ship roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/check.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_check link --json
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(echo "$output" | jq -r '.link.status')" = "fail" ]
+  [ "$(echo "$output" | jq -r '.link.errors[0]')" = "roadmap item missing task back-link: rm-1:task-1" ]
 }
 
 @test "3. vibe help outputs Usage" {
@@ -77,9 +210,11 @@ setup() {
 }
 
 @test "6. VIBE_ROOT is set correctly in script" {
-  run zsh -c "source $BATS_TEST_DIRNAME/../bin/vibe && echo \$VIBE_ROOT"
+  local expected_root
+  expected_root="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  run zsh -c "unset VIBE_ROOT VIBE_LIB; source $BATS_TEST_DIRNAME/../bin/vibe >/dev/null && echo \$VIBE_ROOT"
   [ "$status" -eq 0 ]
-  [ -n "$output" ]
+  [ "$output" = "$expected_root" ]
 }
 
 @test "7. vibe version outputs version info" {
