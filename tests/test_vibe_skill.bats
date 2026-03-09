@@ -11,7 +11,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Missing Reference" ]]
   [[ "$output" =~ "docs/standards/glossary.md" ]]
-  [[ "$output" =~ "docs/standards/command-standard.md" ]]
+  [[ "$output" =~ "docs/standards/action-verbs.md" ]]
 }
 
 @test "vibe-skill audit flags nonexistent vibe command usage" {

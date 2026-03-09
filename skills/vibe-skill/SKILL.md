@@ -15,7 +15,7 @@ Read [review-checklist.md](./references/review-checklist.md) before substantial 
 
 - Treat `skills/` as the only canonical source for Vibe-owned skill definitions.
 - Do not treat `.agent/skills/` as editable source; it is runtime linkage only. See `docs/standards/skill-standard.md`.
-- Do not edit `.git/vibe/*.json` directly from a skill workflow. Shared-state writes must go through real `bin/vibe ...` commands. See `docs/standards/command-standard.md` and `docs/standards/shell-capability-design.md`.
+- Do not edit `.git/vibe/*.json` directly from a skill workflow. Shared-state writes must go through real `bin/vibe` subcommands. See `docs/standards/command-standard.md` and `docs/standards/shell-capability-design.md`.
 - Do not restate term definitions that already belong in `docs/standards/glossary.md` or action semantics that belong in `docs/standards/action-verbs.md`.
 - If a required Shell capability is missing, report `Capability Gap` instead of inventing a direct-file workaround.
 
