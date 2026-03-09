@@ -12,12 +12,6 @@ _flow_history_ensure_file() {
 
 _flow_feature_slug() { local raw="${1#origin/}"; raw="${raw#refs/heads/}"; raw="${raw#task/}"; echo "$(_vibe_task_slugify "$raw")"; }
 
-_flow_history_has_feature() {
-  local feature="$(_flow_feature_slug "$1")" history_file
-  history_file="$(_flow_history_ensure_file)" || return 1
-  jq -e --arg feature "$feature" '.flows[]? | select(.feature == $feature)' "$history_file" >/dev/null 2>&1
-}
-
 _flow_history_has_closed_feature() {
   local feature="$(_flow_feature_slug "$1")" history_file
   history_file="$(_flow_history_ensure_file)" || return 1

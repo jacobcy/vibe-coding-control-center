@@ -5,7 +5,6 @@
 
 _detect_feature() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-[^-]+-(.+)$ ]] && { echo "${match[1]}"; return 0; }; return 1; }
 _detect_agent() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-([^-]+)- ]] && { echo "${match[1]}"; return 0; }; echo "claude"; }
-_normalize_actor_name() { local name="${1:l}"; echo "${name#agent-}"; }
 
 _flow_open_dashboard_json() {
   local git_common_dir worktrees_file branch lines=""
