@@ -150,6 +150,11 @@ related_docs:
 - 让新的 `flow` 对应新的当前 `pr` 目标
 - 若复用当前目录，使用 `vibe flow switch` 一类显式 flow 切换能力进入新 `flow`
 
+补充语义：
+
+- `vibe flow switch (shell)` 默认应安全携带当前目录的未提交改动进入目标 flow；这属于该命令的基础语义，而不是额外开关
+- `vibe flow new (shell)` 仍可保持更保守的默认值，由显式参数决定是否带入未提交改动
+
 `flow new` / `flow switch` 的准入规则：
 
 - 若同名 flow 当前存在，`new` 必须拒绝，并提示 `switch`

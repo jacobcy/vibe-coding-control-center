@@ -5,6 +5,7 @@ source "$VIBE_LIB/flow_history.sh"
 source "$VIBE_LIB/flow_show.sh"
 source "$VIBE_LIB/flow_status.sh"
 source "$VIBE_LIB/flow_review.sh"
+source "$VIBE_LIB/flow_pr.sh"
 source "$VIBE_LIB/task.sh"
 source "$VIBE_LIB/flow_runtime.sh"
 
@@ -24,11 +25,11 @@ _flow_branch_ref() {
 }
 _flow_pr_candidate_bases() { local branch="$1"; git for-each-ref --format='%(refname:short)' refs/heads refs/remotes/origin 2>/dev/null | sed 's#^origin/##' | awk -v b="$branch" 'NF && $0 != "HEAD" && $0 != b { seen[$0]=1 } END { for (name in seen) print name }'; }
 _flow_pick_pr_base() {
-  local branch="$1" candidate ref best="" best_count=""
+  local branch="$1" candidate ref best="" best_count="" ahead_count=""
   while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue; ref="$(_flow_branch_ref "$candidate")" || continue
     git merge-base --is-ancestor "$ref" HEAD >/dev/null 2>&1 || continue
-    local ahead_count; ahead_count=$(git rev-list --count "$ref..HEAD" 2>/dev/null) || continue
+    ahead_count=$(git rev-list --count "$ref..HEAD" 2>/dev/null) || continue
     [[ -z "$best" || "$ahead_count" -lt "$best_count" ]] && { best="$candidate"; best_count="$ahead_count"; }
   done < <(_flow_pr_candidate_bases "$branch")
   [[ -n "$best" ]] && echo "$best"
@@ -90,22 +91,34 @@ _flow_bind() {
 }
 
 _flow_new() {
-  local feat="" agent="" ref="main" arg branch_name feature_slug
+  local feat="" agent="" ref="main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stash_ref="" branch_created=0
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --task) log_error "Use: vibe flow bind $2"; return 1 ;;
       --agent) agent="$2"; shift 2 ;;
       --branch) ref="$2"; shift 2 ;;
+      --save-unstash) save_unstash=1; shift ;;
       --base) log_error "Unknown option: --base. Use --branch <ref> for the source branch when creating a flow."; return 1 ;;
       -*) log_error "Unknown option for flow new: $1"; _flow_new_usage; return 1 ;;
       *) [[ -z "$feat" ]] && feat="$1"; shift ;;
     esac
   done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
-  feature_slug="$(_vibe_task_slugify "$feat")"
-  branch_name="task/$feature_slug"
+  current_branch="$(git branch --show-current 2>/dev/null)"
+  [[ -n "$current_branch" ]] || { log_error "Not on a branch."; return 1; }
+  case "$current_branch" in
+    main|master)
+      log_error "Refusing to rotate protected branch: $current_branch"
+      return 1
+      ;;
+  esac
+
+  branch_name="$(_flow_switch_target_branch "$feat")"
+  feature_slug="$(_flow_feature_slug "$branch_name")"
   _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already existed and was closed: $feature_slug"; return 1; }
+  git check-ref-format --branch "$branch_name" >/dev/null 2>&1 || { log_error "Invalid branch name: $branch_name"; return 1; }
+  [[ "$branch_name" != "$current_branch" ]] || { log_error "Target branch matches current branch: $current_branch"; return 1; }
   if _flow_branch_exists "$branch_name"; then
     if _flow_branch_has_pr "$branch_name"; then
       log_error "Flow '$feature_slug' already has PR history and must be closed through skill handoff."
@@ -114,7 +127,44 @@ _flow_new() {
     fi
     return 1
   fi
-  _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
+
+  dirty="$(git status --porcelain 2>/dev/null || true)"
+  if [[ -n "$dirty" && $save_unstash -ne 1 ]]; then
+    log_error "Working directory is not clean. Re-run with --save-unstash to carry changes into the next flow."
+    return 1
+  fi
+
+  if [[ -n "$dirty" ]]; then
+    log_step "Saving uncommitted changes for flow new"
+    stash_ref="$(_flow_capture_dirty_state new "$branch_name")" || return 1
+  fi
+
+  log_step "Creating flow branch: $branch_name from $ref"
+  git checkout -b "$branch_name" "$ref" || {
+    _flow_restore_source_state "" "$stash_ref" "flow new to $branch_name"
+    log_error "Failed to create branch: $branch_name"
+    return 1
+  }
+  branch_created=1
+
+  _flow_update_current_worktree_branch "$branch_name" || {
+    _flow_restore_source_state "$current_branch" "$stash_ref" "flow new to $branch_name"
+    if [[ $branch_created -eq 1 ]]; then
+      git branch -D "$branch_name" >/dev/null 2>&1 || log_warn "Failed to clean up incomplete branch: $branch_name"
+    fi
+    log_error "Failed to update worktree runtime state"
+    return 1
+  }
+
+  if [[ -n "$stash_ref" ]]; then
+    log_step "Restoring saved changes into $branch_name"
+    _flow_restore_captured_state "$stash_ref" "flow new to $branch_name" || return 1
+  fi
+
+  log_success "Flow runtime ready: $feat (branch: $branch_name)"
+  if [[ -n "$agent" ]]; then
+    echo "💡 Agent hint: $agent"
+  fi
 }
 _flow_done() {
   local target_branch="" arg unmerged current_branch branch_ref="" branch_name feature_slug flow_record="" tasks_json='[]' current_task="" worktree_name="" worktree_path="" pr_ref="" now pr_merged=1 delete_mode="safe"
@@ -214,52 +264,6 @@ _flow_sync() {
   log_error "vibe flow sync no longer supports cross-worktree branch merges."
   echo "Use explicit git merge/rebase in the target branch when needed."
   return 1
-}
-
-_flow_pr() {
-  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs first_msg open_prs
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_name="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; *) shift ;; esac; done
-  vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
-  base_name="$(_flow_resolve_pr_base "$base_name" "$branch")" || return 1
-  base_git_ref="$(_flow_pr_base_git_ref "$base_name")" || return 1
-  if vibe_has gh; then
-    _flow_require_base_ref "$base_name" || return 1
-  fi
-  log_info "Using PR base: $base_name"
-  commit_logs=$(git log "$base_git_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_name. Nothing to PR."; return 1; }
-  [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
-  if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
-  
-  local has_pr=0
-  if vibe_has gh; then
-    log_step "Checking for open PRs to $base_name..."; open_prs=$(gh pr list --state open --base "$base_name" --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
-    [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to '$base_name' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
-    
-    # Check if a PR already exists from this branch
-    gh pr view "$branch" >/dev/null 2>&1 && has_pr=1
-  fi
-  
-  local skip_bump=0
-  [[ $has_pr -eq 1 ]] && skip_bump=1
-  [[ -f CHANGELOG.md ]] && grep -qF "$version_msg" CHANGELOG.md 2>/dev/null && skip_bump=1
-  
-  if [[ $skip_bump -eq 0 ]]; then
-    log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
-    git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
-  else
-    log_info "Skipping version bump (PR exists or changelog already up-to-date)."
-  fi
-
-  log_step "Pushing changes to origin/$branch"; git push origin HEAD || return 1
-  if ! vibe_has gh; then log_success "Changes pushed. Please create/view PR manually."; return 0; fi
-  log_info "GitHub CLI detected. Managing PR..."
-  if [[ $has_pr -eq 1 ]]; then
-    log_success "Updating existing PR..."
-    gh pr edit "$branch" --base "$base_name" --title "$pr_title" --body "$pr_body" || true
-  else
-    log_step "Creating new PR: $pr_title"
-    gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" --web || log_warn "Failed to create PR with gh, please check manually."
-  fi
 }
 
 vibe_flow() {
