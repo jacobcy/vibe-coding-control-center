@@ -80,7 +80,7 @@ JSON
   [[ "$output" =~ "save-unstash" ]]
 }
 
-@test "2.3 _flow_new refuses protected main branch rotation" {
+@test "2.3 _flow_new allows starting a new flow from main" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -93,6 +93,7 @@ JSON
         "branch --show-current") echo "main"; return 0 ;;
         "status --porcelain") echo ""; return 0 ;;
         "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -100,8 +101,8 @@ JSON
     _flow_new next-flow
   '
 
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "protected" || "$output" =~ "main" ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "CHECKOUT_NEW" ]]
 }
 
 @test "2.4 _flow_new stashes changes and creates a new branch when requested" {
@@ -157,7 +158,35 @@ JSON
   [[ "$output" =~ "Target branch matches current branch" ]]
 }
 
-@test "2.6 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
+@test "2.6 _flow_switch re-enters an existing open flow without PR history" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 0; }
+    _flow_branch_has_pr() { return 1; }
+    _flow_branch_ref() { echo "origin/task/next-flow"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED"; return 0; }
+
+    git() {
+      case "$*" in
+        "branch --show-current") echo "task/existing-flow"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "checkout -b task/next-flow origin/task/next-flow") echo "CHECKOUT_EXISTING"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_switch next-flow
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "CHECKOUT_EXISTING" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED" ]]
+}
+
+@test "2.7 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-upsert"
@@ -197,7 +226,7 @@ JSON
   [[ ! "$output" =~ "UNEXPECTED_WORKTREE_CALL" ]]
 }
 
-@test "2.7 vibe flow new help no longer describes worktree creation" {
+@test "2.8 vibe flow new help no longer describes worktree creation" {
   run vibe flow new --help
 
   [ "$status" -eq 0 ]

@@ -77,6 +77,8 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") printf 'main\n'; exit 0 ;;
+      "status --porcelain") exit 0 ;;
+      "checkout -b feature-safe main") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -151,12 +153,12 @@ EOF
   ! grep -q "stash push -u -m Flow new to feature-old: saved WIP" "$LOG_FILE"
 }
 
-@test "rotate rejects protected branches before stashing" {
+@test "rotate can start a new flow from main without stashing" {
   write_mock_git
   run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=protected_branch VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
+  [ "$status" -eq 0 ]
+  grep -q "checkout -b feature-safe main" "$LOG_FILE"
   ! grep -q "stash push -u -m Flow new to feature-safe: saved WIP" "$LOG_FILE"
 }
 
