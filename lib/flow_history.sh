@@ -1,8 +1,6 @@
 #!/usr/bin/env zsh
 
-_flow_history_file() {
-  echo "$(git rev-parse --git-common-dir)/vibe/flow-history.json"
-}
+_flow_history_file() { echo "$(git rev-parse --git-common-dir)/vibe/flow-history.json"; }
 
 _flow_history_ensure_file() {
   local history_file
@@ -12,12 +10,7 @@ _flow_history_ensure_file() {
   echo "$history_file"
 }
 
-_flow_feature_slug() {
-  local raw="${1#origin/}"
-  raw="${raw#refs/heads/}"
-  raw="${raw#task/}"
-  echo "$(_vibe_task_slugify "$raw")"
-}
+_flow_feature_slug() { local raw="${1#origin/}"; raw="${raw#refs/heads/}"; raw="${raw#task/}"; echo "$(_vibe_task_slugify "$raw")"; }
 
 _flow_history_has_feature() {
   local feature="$(_flow_feature_slug "$1")" history_file
@@ -85,14 +78,7 @@ _flow_branch_has_pr() {
   [[ -n "$current_task" ]]
 }
 
-_flow_branch_pr_merged() {
-  local branch_name="${1#origin/}" pr_state=""
-  if vibe_has gh; then
-    pr_state="$(gh pr view "$branch_name" --json state --jq '.state' 2>/dev/null || true)"
-    [[ "$pr_state" == "MERGED" ]] && return 0
-  fi
-  return 1
-}
+_flow_branch_pr_merged() { local branch_name="${1#origin/}" pr_state=""; vibe_has gh || return 1; pr_state="$(gh pr view "$branch_name" --json state --jq '.state' 2>/dev/null || true)"; [[ "$pr_state" == "MERGED" ]]; }
 
 _flow_close_branch_runtime() {
   local branch_name="${1#origin/}" git_common_dir worktrees_file tmp now
@@ -128,9 +114,7 @@ _flow_branch_dashboard_entry() {
   [[ -n "$wt_data" ]] || return 1
   current_task="$(echo "$wt_data" | jq -r '.current_task // empty')"
   tasks_json="$(echo "$wt_data" | jq -c '.tasks // []')"
-  title=""
-  pr_ref=""
-  issue_refs_json='[]'
+  title=""; pr_ref=""; issue_refs_json='[]'
   if [[ -n "$current_task" ]]; then
     title="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" 2>/dev/null | head -n 1)"
     task_status="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .status // empty' "$registry_file" 2>/dev/null | head -n 1)"

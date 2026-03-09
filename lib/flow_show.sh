@@ -2,10 +2,7 @@
 
 _flow_show_resolve_target() {
   local target="${1:-}" current_branch
-  if [[ -n "$target" ]]; then
-    echo "$target"
-    return 0
-  fi
+  [[ -n "$target" ]] && { echo "$target"; return 0; }
   current_branch="$(git branch --show-current 2>/dev/null)"
   [[ -n "$current_branch" ]] && { echo "$current_branch"; return 0; }
   _detect_feature 2>/dev/null && return 0
@@ -35,12 +32,8 @@ _flow_show_open_record() {
 
 _flow_show() {
   setopt localoptions typeset_silent 2>/dev/null || true
-
   local json_out=0 target="" arg record current_task=""
-  for arg in "$@"; do
-    [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_show_usage; return 0; }
-  done
-
+  for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_show_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --json) json_out=1; shift ;;
@@ -48,12 +41,10 @@ _flow_show() {
       *) [[ -z "$target" ]] && target="$1"; shift ;;
     esac
   done
-
   target="$(_flow_show_resolve_target "$target")" || { log_error "Unable to resolve current flow."; return 1; }
   record="$(_flow_show_open_record "$target")"
   [[ -z "$record" ]] && record="$(_flow_history_show "$target")"
   [[ -n "$record" ]] || { log_error "Flow not found: $target"; return 1; }
-
   current_task="$(echo "$record" | jq -r '.current_task // empty')"
   if [[ -n "$current_task" ]]; then
     local registry_file task_json issue_refs_json
@@ -70,12 +61,7 @@ _flow_show() {
       ')"
     fi
   fi
-
-  if (( json_out )); then
-    echo "$record"
-    return 0
-  fi
-
+  (( json_out )) && { echo "$record"; return 0; }
   echo "${BOLD}Flow:${NC} $(echo "$record" | jq -r '.feature')"
   echo "${BOLD}State:${NC} $(echo "$record" | jq -r '.state')"
   echo "${BOLD}Branch:${NC} $(echo "$record" | jq -r '.branch')"

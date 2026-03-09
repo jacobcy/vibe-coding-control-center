@@ -12,7 +12,6 @@ _flow_open_dashboard_json() {
   git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
   worktrees_file="$git_common_dir/vibe/worktrees.json"
   [[ -f "$worktrees_file" ]] || return 1
-
   while IFS= read -r branch; do
     [[ -n "$branch" ]] || continue
     [[ "$branch" == "main" || "$branch" == "master" ]] && continue
@@ -20,18 +19,12 @@ _flow_open_dashboard_json() {
     record="$(_flow_branch_dashboard_entry "$branch" 2>/dev/null || true)"
     [[ -n "$record" ]] && lines+="$record"$'\n'
   done < <(jq -r '.worktrees[]? | select((.branch // "") != "" and (.status // "active") != "missing") | .branch' "$worktrees_file" 2>/dev/null | awk '!seen[$0]++')
-
-  if [[ -z "$lines" ]]; then
-    printf '%s\n' '{"flows":[]}'
-    return 0
-  fi
-
+  [[ -z "$lines" ]] && { printf '%s\n' '{"flows":[]}'; return 0; }
   printf '%s' "$lines" | jq -s '{flows: .}'
 }
 
 _flow_status() {
   setopt localoptions typeset_silent 2>/dev/null || true
-
   local json_out=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -40,24 +33,13 @@ _flow_status() {
       *) log_error "Unknown option for flow status: $1"; _flow_status_usage; return 1 ;;
     esac
   done
-
   local dashboard_json
   dashboard_json="$(_flow_open_dashboard_json)" || { log_error "Not in a worktree"; return 1; }
-
-  if (( json_out )); then
-    echo "$dashboard_json"
-    return 0
-  fi
-
+  (( json_out )) && { echo "$dashboard_json"; return 0; }
   local count
   count="$(echo "$dashboard_json" | jq -r '.flows | length')"
   echo "${BOLD}${CYAN}Open Flow Dashboard:${NC}"
-  echo ""
-  if [[ "$count" == "0" ]]; then
-    echo "No open flows."
-    return 0
-  fi
-
+  [[ "$count" == "0" ]] && { echo "No open flows."; return 0; }
   echo "$dashboard_json" | jq -c '.flows[]' | while IFS= read -r flow; do
     echo "${BOLD}$(echo "$flow" | jq -r '.feature')${NC}"
     echo "  Branch: $(echo "$flow" | jq -r '.branch')"
@@ -65,6 +47,5 @@ _flow_status() {
     echo "  Status: $(echo "$flow" | jq -r '.task_status // "unknown"')"
     echo "  PR:     $(echo "$flow" | jq -r '.pr_ref // "none"')"
     echo "  Next:   $(echo "$flow" | jq -r '.next_step // "N/A"')"
-    echo ""
   done
 }
