@@ -19,6 +19,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 - 允许：检查 CI、检查 review threads、判断堆叠顺序、修复小型 follow-up、推动 merge
 - 不允许：直接关闭 task、直接关闭 issue、手工修改共享真源 JSON
 - 若 flow 还没有 PR 事实，这不是 `/vibe-integrate` 的阶段，应回到 `/vibe-commit`
+- `/vibe-integrate` 只处理 `open + had_pr`，不负责开启下一个 flow
 
 ## Workflow
 
@@ -99,6 +100,7 @@ gh api graphql ...
 - pr: <merged-or-pending-pr-ref>
 - issues: <issue-refs-or-none>
 - completed: <本轮已合并或已解除阻塞的 PR>
+- capability_gap: <none|gap>
 - next: <交给 vibe-done 的收口动作，或剩余待整合 PR>
 ```
 
