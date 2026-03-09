@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.7] - 2026-03-10
+
+### ✨ Changed
+- refactor(flow): split tests and make switch carry dirty state safely ...
+
 ## [2.1.6] - 2026-03-08
 
 ### ✨ Changed
