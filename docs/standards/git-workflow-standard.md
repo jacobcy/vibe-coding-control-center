@@ -9,7 +9,7 @@ authority:
   - recovery-rules
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -27,6 +27,7 @@ related_docs:
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
+- 何时必须进入整合或收口，而不是继续开发
 - 现场偏离标准后，如何回归标准 flow
 
 术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。高频动作词以 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)。
@@ -71,7 +72,32 @@ related_docs:
 - 但不得让同一个 `flow` 同时承载多个当前 `pr` 目标
 - 复用当前目录串行进入下一个 `flow` 时，应显式执行 flow 切换，而不是把旧 `flow` 继续伪装成新目标
 
-## 3. Happy Path
+## 3. Flow Lifecycle States
+
+标准 flow 生命周期只分三类：
+
+- `open + no_pr`
+  - flow 已打开
+  - 当前 branch 尚未形成 PR 事实
+  - 允许继续开发
+  - 允许通过 `vibe flow switch` 重新进入
+- `open + had_pr`
+  - flow 尚未关闭
+  - 当前 branch 已经形成 PR 事实
+  - 不再允许当作普通开发 flow 重新进入
+  - 应交由 `vibe-integrate` 或同类 skill 处理 review、CI、merge 与收口 handoff
+- `closed`
+  - flow 已完成并进入历史
+  - 不允许再次 `new` 同名 flow
+  - 不允许复用同名 branch 语义重新发 PR
+
+命令语义对应：
+
+- `show`：查看单个 flow 的当前或历史详情
+- `status`：只看未关闭 flow 大盘
+- `list`：看所有 flow，包括已关闭历史
+
+## 4. Happy Path
 
 标准路径如下：
 
@@ -82,7 +108,8 @@ related_docs:
 5. 在该 `flow` 对应的 `branch` 上提交本地 commit
 6. 执行 `review`
 7. 提交 `pr`
-8. 合并后收尾并结束当前 `flow`
+8. 进入整合阶段，直到该 `pr` 可合并
+9. 合并后收尾并结束当前 `flow`
 
 执行要求：
 
@@ -90,9 +117,9 @@ related_docs:
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后
 
-## 4. Flow Decision Rules
+## 5. Flow Decision Rules
 
-### 4.1 Continue Current Flow
+### 5.1 Continue Current Flow
 
 继续当前 `flow` 的条件：
 
@@ -101,7 +128,13 @@ related_docs:
 - 当前 `branch` 语义仍与该交付目标一致
 - 新改动只是 review follow-up、补测试、补文档或同一目标下的必要修正
 
-### 4.2 Open a New Flow
+补充约束：
+
+- 若当前 flow 仍处于 `open + no_pr`，可以继续正常开发
+- 若当前 flow 已进入 `open + had_pr`，只能继续处理该 PR 的 follow-up 或整合阻塞
+- 不得把 `open + had_pr` 的 flow 当作“下一个新目标”的开发现场继续复用
+
+### 5.2 Open a New Flow
 
 以下情况必须新开下一个 `flow`：
 
@@ -117,9 +150,16 @@ related_docs:
 - 让新的 `flow` 对应新的当前 `pr` 目标
 - 若复用当前目录，使用 `vibe flow switch` 一类显式 flow 切换能力进入新 `flow`
 
-## 5. Exception Paths
+`flow new` / `flow switch` 的准入规则：
 
-### 5.1 `A flow` 被 `B task` 阻塞
+- 若同名 flow 当前存在，`new` 必须拒绝，并提示 `switch`
+- 若同名 flow 历史存在过且已关闭，`new` 必须直接报错
+- `switch` 只允许进入 `open + no_pr`
+- 已经 `had_pr` 但未关闭的 flow，不允许通过 `switch` 继续，应交给 skill 处理
+
+## 6. Exception Paths
+
+### 6.1 `A flow` 被 `B task` 阻塞
 
 场景：
 
@@ -140,7 +180,7 @@ related_docs:
 - 在名义上属于 `A` 的 `flow` / `branch` 中直接提交 `B` 的独立 `pr`
 - 用同一个当前 `flow` 同时承载 `A` 与 `B` 两个当前交付目标
 
-### 5.2 `pr` 已提交，但现场仍有未提交改动
+### 6.2 `pr` 已提交，但现场仍有未提交改动
 
 分两种情况：
 
@@ -159,7 +199,13 @@ related_docs:
 3. 若不属于当前 `pr`，切换到新的 `flow` / `branch`
 4. 让剩余改动在新的交付语义下继续推进
 
-### 5.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
+补充规则：
+
+- `pr` 已提交但 flow 未关闭时，该 flow 属于 `open + had_pr`
+- 此时若需要检查 CI、处理 review、等待合并或补 follow-up，应进入整合阶段，而不是新开同名 flow
+- 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe-done` 或等价收口流程
+
+### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 
 场景：
 
@@ -178,7 +224,7 @@ related_docs:
 - 继续把“多个 feature、多个 `pr` 目标”写在同一个当前 `flow` 中
 - 用一个当前 `flow` 依次冒充多个当前 `pr` 目标而不重建语义
 
-## 6. Recovery Rules
+## 7. Recovery Rules
 
 当现场偏离标准时，按下列优先级恢复：
 
@@ -195,7 +241,24 @@ related_docs:
 - 若复用同一 `worktree`，也必须显式切换到新的 `branch` 与新的 `flow` 语义
 - 并行推进多个交付目标时，优先新建物理 `worktree`；串行推进下一个交付目标时，优先复用当前目录并显式切换 `flow`
 
-## 7. Branch Protection
+## 8. Serial Handoff
+
+针对“提交 -> 整合 -> 收口”的串行链路，职责固定如下：
+
+- `vibe-commit`
+  - 负责脏工作区分类、commit 分组、串行 PR 切片与 PR 草案
+  - 不负责 merge、issue close、flow close
+- `vibe-integrate`
+  - 负责检查 CI、review、堆叠顺序、merge eligibility
+  - 负责处理 `open + had_pr` 的 flow
+  - 不直接承担 task / issue 真源写入
+- `vibe-done`
+  - 负责合并后的收口编排
+  - 通过 `vibe task update`、`gh issue close`、`vibe flow done` 完成 task / issue / flow handoff
+
+`.agent/context/task.md` 只作为 skill 之间的短期 handoff 记录，不是共享真源。
+
+## 9. Branch Protection
 
 `main` 是项目唯一主干，远端必须至少启用以下约束：
 

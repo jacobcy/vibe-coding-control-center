@@ -1,160 +1,145 @@
 ---
 name: vibe-commit
-description: Review-gated commit and PR-slicing workflow for Vibe projects. Use when the user wants to inspect a dirty worktree, decide what should be committed vs stashed vs discarded, group valid changes into conventional commits, judge whether the branch should produce one PR or multiple PRs, and if necessary create a new flow/branch before proposing PR publication.
-category: process
-trigger: auto
+description: Use when the user wants to classify dirty changes, create serial commits, split work into one PR or multiple PRs, and prepare publication from the correct flow without handling merge or post-merge closure.
 ---
 
-# /vibe-commit - Vibe Commit Workflow
+# /vibe-commit - 串行提交与 PR 切片
 
-`/vibe-commit` 负责认知层编排，不直接替代 shell 的发布规则。涉及术语、动作词、flow 生命周期、提交署名时，以以下真源为准：
+`/vibe-commit` 只负责编排提交与发 PR 之前的判断，不负责 merge、关 issue、关 task、关 flow。
 
-- `docs/standards/glossary.md`
-- `docs/standards/action-verbs.md`
-- `docs/standards/authorship-standard.md`
-- `docs/standards/command-standard.md`
+先读这些真源：
+
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/command-standard.md`
+- `.agent/context/task.md`
 
-## Core Role
+只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
 
-你是一个提交与 PR 切片助手。你的职责不是“尽快把当前分支发出去”，而是先确认：
+## 核心边界
 
-1. 当前工作区是否干净
-2. 脏改动里哪些应该提交、哪些应该暂存、哪些应该丢弃
-3. 已提交历史适合提一个 PR 还是多个 PR
-4. 当前分支语义是否仍然匹配这次要发布的交付目标
-
-只有这些问题都过关后，才进入 PR 草案阶段。
+- 允许：分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `vibe flow pr`
+- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接调用 `vibe flow done` 做收口
+- 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
 
 ## Workflow
 
-### Step 1: Check Worktree Cleanliness First
+### Step 1: 读取当前 flow 与上下文
+
+优先读取：
+
+```bash
+vibe flow show --json
+```
+
+如果当前 flow 不可解析，再退回：
+
+```bash
+vibe flow status --json
+vibe flow list
+```
+
+检查点：
+
+- 当前 `flow` / `branch` / `task` / `issue` / `pr`
+- 当前 flow 是否已经进入 `open + had_pr`
+- `.agent/context/task.md` 里上一环节留下了什么 handoff
+
+### Step 2: 审计工作区
 
 先运行：
 
 ```bash
 git status --short
-```
-
-如果工作区不干净，继续收集：
-
-```bash
 git diff --stat
 git diff --cached --stat
-git diff --cached
-git diff
 ```
 
-读取 diff 时保持节制，不要把全量 diff 直接喷到终端。
+必要时再读精确 diff。把未提交内容明确分成三类：
 
-### Step 2: Classify Dirty Changes
+- `commit now`
+- `stash`
+- `discard`
 
-把未提交内容分成三类：
+执行前必须向用户说明：
 
-- `commit now`: 属于当前交付目标，应该进入这次发布
-- `stash`: 本身有效，但不适合进入当前 commit / 当前 PR
-- `discard`: 明显实验残留、误改或与当前目标无关
-
-要求：
-
-- `discard` 必须明确向用户说明原因，再执行删除
-- `stash` 只用于“暂不进入当前交付切片”的有效工作，不要把不确定内容直接混入 commit
-- 若 dirty changes 横跨多个独立交付目标，先判定“需要多个 PR”，不要急于提交
-
-### Step 3: Group Commits
-
-对 `commit now` 的内容做逻辑分组。每组必须只对应一个独立变更目标。
-
-草拟 Conventional Commit 信息时，按 `docs/standards/authorship-standard.md` 追加 `Co-authored-by`。不要依赖过时的固定路径假设；若需要贡献者名册，应从当前项目可用的任务/上下文记录中读取，读取失败时明确说明证据不足。
-
-在任何 `git commit` 执行前，必须先向用户展示：
-
-- 每个分组包含哪些文件
+- 哪些文件进入当前 commit
 - 哪些内容会被 stash
 - 哪些内容会被 discard
+
+### Step 3: 组织 commit
+
+每个 commit 只对应一个独立交付目标。生成 commit 草案前，先说明：
+
+- 每组变更包含哪些文件
 - 每条 commit 草案
+- 这些 commit 将进入哪个 flow / 哪个 PR
 
-### Step 4: Inspect Commit History Before PR Draft
+若当前分支历史已经混入多个交付目标，不得继续硬挤进一个 PR。
 
-只有工作区清理并提交完成后，才检查历史切片是否适合发 PR。
+### Step 4: 处理串行多 PR
 
-先读取 shell 真源：
+对“当前已有一串待发布 commit，需要串行拆成多个 PR”的场景，固定按以下步骤执行：
 
-```bash
-vibe flow pr --help
-```
-
-再读取当前分支相对基线的提交历史，例如：
-
-```bash
-git log --oneline <base>..HEAD
-```
-
-判断：
-
-- 当前提交历史是否只服务一个交付目标
-- 当前分支名是否仍然表达这个交付目标
-- 是否已经混入多个应拆开的 PR 切片
-
-### Step 5: Decide One PR Or Multiple PRs
-
-如果满足以下条件，可以继续按单 PR 处理：
-
-- 提交历史只服务一个交付目标
-- 当前分支语义与这个目标一致
-- `git-workflow-standard.md` 下的 flow/PR 关系没有被破坏
-
-如果不满足，或者明显需要多个 PR：
-
-- 不要继续沿用当前分支直接发 PR
-- 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
-- 在新的 flow 中迁移当前要发布的那一组改动或 commit
-- 再由新分支继续提交与发布
-
-对“当前已有一串待发布 commit，需要串行拆成多个 PR”的场景，必须按下面固定步骤执行，不要自由发挥：
-
-1. 先列出待发布分组，明确每组包含哪些 commit、目标 base 是什么。
-2. 明确本轮采用串行模式，而不是并行 worktree 模式。
+1. 列出待发布分组，明确每组包含哪些 commit、目标 base 是什么。
+2. 明确当前采用串行模式，而不是并行 worktree 模式。
 3. 对每一组依次执行：
    - 确认当前工作区干净；若不干净，先分类为 `commit now` / `stash` / `discard`
    - 从正确基线进入新的逻辑 flow，默认优先使用最新主干，例如 `vibe flow switch <flow-name> --branch origin/main`
    - 若需要带入未提交改动，才显式追加 `--save-stash`
-   - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`，不要临时改用别的 Git 手术
+   - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`
    - 运行该组应有的验证命令
    - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
-   - 当前这一组 PR 完成前，不要提前切到下一组
-4. 当前组 PR 创建完成后，再进入下一组 flow，重复同样步骤。
+   - 当前这一组 PR 创建完成前，不要提前切到下一组
 
-硬约束：
+### Step 5: 发 PR 前复核
 
-- 串行拆 PR 时，默认基线应来自最新 `origin/main` 或明确指定的正确 `--base`
-- 默认迁移手段是 `git cherry-pick`
-- 不得在 skill 层临时发明 `rebase --onto`、手工改历史、批量 reset 等替代流程，除非用户明确要求
-- 若发现某组 commit 不是最小可发布切片，先停下来重新分组，不要强行发 PR
+先读取：
 
-### Step 6: Propose PR Publication
+```bash
+vibe flow pr --help
+git log --oneline <base>..HEAD
+```
 
-只有在以下条件同时满足时，才能提议发 PR：
+只有同时满足以下条件，才能继续发 PR：
 
 - 工作区已干净
-- 该发的 commit 都已经完成
-- 单 PR / 多 PR 判断已完成
-- 若单 PR，当前分支语义适合直接发布
+- 当前 commit 只服务一个交付目标
+- 当前分支语义仍匹配这个目标
+- 当前 flow 没有被错误复用
 
-此时才向用户展示 PR 草案，并明确责任边界：
+发布入口只用：
 
-- `/vibe-commit`：认知层分组、判断、草案生成
-- `vibe flow pr`：shell 层发布入口与 base 校验真源
-- `gh pr create`：底层外部工具，不应越过 shell 规则单独充当真源
+```bash
+vibe flow pr --base <ref>
+```
 
-如果当前分支不是直接面向 `main` 的最小差异分支，不得默认建议“发往 `main`”；要么给出推断的 `--base <ref>`，要么要求显式指定。
+不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
+
+### Step 6: 写入 handoff
+
+完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+
+```markdown
+## Skill Handoff
+- skill: vibe-commit
+- updated_at: <ISO-8601>
+- flow: <feature-or-none>
+- branch: <branch-or-none>
+- task: <task-id-or-none>
+- pr: <pr-ref-or-none>
+- issues: <issue-refs-or-none>
+- completed: <本轮已完成的提交/PR 草案>
+- next: <交给 vibe-integrate 或继续 commit 的动作>
+```
+
+`.agent/context/task.md` 只是下一个 skill 的短期入口，不是共享真源。
 
 ## Restrictions
 
-- 必须遵循 Conventional Commits
 - 不得在用户确认前静默执行 `git commit`
 - 不得把“是否拆多个 PR”的判断偷换成“先发一个再说”
-- 不得把 `stash` 当作垃圾桶，也不得把 `discard` 当作默认处理方式
-- 遇到多 PR 串行发布时，必须优先遵守上面的固定步骤，不得临场改剧本
-- 对外始终使用中文
+- 不得把 `stash` 当垃圾桶
+- 不得把 `discard` 当默认处理方式
+- 不得在 skill 层发明 `rebase --onto`、`reset --hard` 等替代串行拆 PR 的主流程
+- 若发现当前 flow 已有 PR 事实且用户要开始新目标，应停止并切换 flow，而不是继续堆在原 flow
