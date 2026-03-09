@@ -108,10 +108,30 @@ git log --oneline <base>..HEAD
 如果不满足，或者明显需要多个 PR：
 
 - 不要继续沿用当前分支直接发 PR
-- 若仍在当前目录串行推进，使用 `vibe flow switch <name> --branch <ref> [--save-stash]` 进入新的逻辑 flow
-- 若需要并行隔离，再使用 `vibe flow new <name> --branch <ref>` 或等价 worktree 命令创建新的物理现场
+- 使用 `vibe flow new <name> --branch <ref>` 创建新的 flow/branch
 - 在新的 flow 中迁移当前要发布的那一组改动或 commit
 - 再由新分支继续提交与发布
+
+对“当前已有一串待发布 commit，需要串行拆成多个 PR”的场景，必须按下面固定步骤执行，不要自由发挥：
+
+1. 先列出待发布分组，明确每组包含哪些 commit、目标 base 是什么。
+2. 明确本轮采用串行模式，而不是并行 worktree 模式。
+3. 对每一组依次执行：
+   - 确认当前工作区干净；若不干净，先分类为 `commit now` / `stash` / `discard`
+   - 从正确基线进入新的逻辑 flow，默认优先使用最新主干，例如 `vibe flow switch <flow-name> --branch origin/main`
+   - 若需要带入未提交改动，才显式追加 `--save-stash`
+   - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`，不要临时改用别的 Git 手术
+   - 运行该组应有的验证命令
+   - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
+   - 当前这一组 PR 完成前，不要提前切到下一组
+4. 当前组 PR 创建完成后，再进入下一组 flow，重复同样步骤。
+
+硬约束：
+
+- 串行拆 PR 时，默认基线应来自最新 `origin/main` 或明确指定的正确 `--base`
+- 默认迁移手段是 `git cherry-pick`
+- 不得在 skill 层临时发明 `rebase --onto`、手工改历史、批量 reset 等替代流程，除非用户明确要求
+- 若发现某组 commit 不是最小可发布切片，先停下来重新分组，不要强行发 PR
 
 ### Step 6: Propose PR Publication
 
@@ -136,4 +156,5 @@ git log --oneline <base>..HEAD
 - 不得在用户确认前静默执行 `git commit`
 - 不得把“是否拆多个 PR”的判断偷换成“先发一个再说”
 - 不得把 `stash` 当作垃圾桶，也不得把 `discard` 当作默认处理方式
+- 遇到多 PR 串行发布时，必须优先遵守上面的固定步骤，不得临场改剧本
 - 对外始终使用中文

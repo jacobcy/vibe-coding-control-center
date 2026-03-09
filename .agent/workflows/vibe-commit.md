@@ -48,9 +48,18 @@ tags: [workflow, vibe, git, commit, pr]
    If the current branch name/history still matches a single delivery target, continue with one PR.
    If branch semantics are no longer suitable, or multiple PRs are needed:
    - do not publish from the current branch
-   - if staying in the current directory, switch to a new logical flow with `vibe flow switch <name> --branch <ref> [--save-stash]`
-   - if physical isolation is needed, create a new worktree-backed flow with `vibe flow new <name> --branch <ref>`
-   - move the relevant change slice to the new flow first
+   - create a new flow with `vibe flow new <name> --branch <ref>`
+   - move the relevant change slice to the new branch first
+
+   For serial multi-PR delivery, follow this exact playbook:
+   - enumerate commit groups first
+   - for each group, switch into a fresh flow from the correct base, usually `origin/main`
+   - move only that group's commits with `git cherry-pick <commit...>`
+   - verify that slice
+   - publish it with `vibe flow pr --base <ref>`
+   - only then continue to the next group
+
+   Do not improvise alternate history surgery unless the user explicitly asks for it.
 
 8. **Post-Commit PR Proposal**
    Once the correct branch is clean and semantically valid, you may propose PR publication.
