@@ -342,4 +342,11 @@ git diff --stat
 
 ## Capability Gap Placeholder
 
-- 若执行中发现新的 shell 缺口，追加到此节，不在本轮讨论阶段直接设计替代实现。
+- 当前结论：`none`
+- 已确认无需新增 shell 原子能力即可完成本轮 skill/workflow 契约收敛。
+- 本轮显式引用并已对齐的标准：
+  - `docs/standards/glossary.md`
+  - `docs/standards/action-verbs.md`
+  - `docs/standards/command-standard.md`
+  - `docs/standards/git-workflow-standard.md`
+  - `docs/standards/worktree-lifecycle-standard.md`
