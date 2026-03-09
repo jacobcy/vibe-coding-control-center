@@ -90,22 +90,34 @@ _flow_bind() {
 }
 
 _flow_new() {
-  local feat="" agent="" ref="main" arg branch_name feature_slug
+  local feat="" agent="" ref="main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stashed=0
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --task) log_error "Use: vibe flow bind $2"; return 1 ;;
       --agent) agent="$2"; shift 2 ;;
       --branch) ref="$2"; shift 2 ;;
+      --save-unstash) save_unstash=1; shift ;;
       --base) log_error "Unknown option: --base. Use --branch <ref> for the source branch when creating a flow."; return 1 ;;
       -*) log_error "Unknown option for flow new: $1"; _flow_new_usage; return 1 ;;
       *) [[ -z "$feat" ]] && feat="$1"; shift ;;
     esac
   done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
-  feature_slug="$(_vibe_task_slugify "$feat")"
-  branch_name="task/$feature_slug"
+  current_branch="$(git branch --show-current 2>/dev/null)"
+  [[ -n "$current_branch" ]] || { log_error "Not on a branch."; return 1; }
+  case "$current_branch" in
+    main|master)
+      log_error "Refusing to rotate protected branch: $current_branch"
+      return 1
+      ;;
+  esac
+
+  branch_name="$(_flow_switch_target_branch "$feat")"
+  feature_slug="$(_flow_feature_slug "$branch_name")"
   _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already existed and was closed: $feature_slug"; return 1; }
+  git check-ref-format --branch "$branch_name" >/dev/null 2>&1 || { log_error "Invalid branch name: $branch_name"; return 1; }
+  [[ "$branch_name" != "$current_branch" ]] || { log_error "Target branch matches current branch: $current_branch"; return 1; }
   if _flow_branch_exists "$branch_name"; then
     if _flow_branch_has_pr "$branch_name"; then
       log_error "Flow '$feature_slug' already has PR history and must be closed through skill handoff."
@@ -114,7 +126,41 @@ _flow_new() {
     fi
     return 1
   fi
-  _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
+
+  dirty="$(git status --porcelain 2>/dev/null || true)"
+  if [[ -n "$dirty" && $save_unstash -ne 1 ]]; then
+    log_error "Working directory is not clean. Re-run with --save-unstash to carry changes into the next flow."
+    return 1
+  fi
+
+  if [[ -n "$dirty" ]]; then
+    log_step "Saving uncommitted changes for flow new"
+    git stash push -u -m "Flow new to $branch_name: saved WIP" || { log_error "Failed to stash changes"; return 1; }
+    stashed=1
+  fi
+
+  log_step "Creating flow branch: $branch_name from $ref"
+  git checkout -b "$branch_name" "$ref" || {
+    [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+    log_error "Failed to create branch: $branch_name"
+    return 1
+  }
+
+  _flow_update_current_worktree_branch "$branch_name" || {
+    [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+    log_error "Failed to update worktree runtime state"
+    return 1
+  }
+
+  if [[ $stashed -eq 1 ]]; then
+    log_step "Restoring saved changes into $branch_name"
+    git stash pop || { log_error "Stash pop failed (conflicts?). Resolve manually."; return 1; }
+  fi
+
+  log_success "Flow runtime ready: $feat (branch: $branch_name)"
+  if [[ -n "$agent" ]]; then
+    echo "💡 Agent hint: $agent"
+  fi
 }
 _flow_done() {
   local target_branch="" arg unmerged current_branch branch_ref="" branch_name feature_slug flow_record="" tasks_json='[]' current_task="" worktree_name="" worktree_path="" pr_ref="" now pr_merged=1 delete_mode="safe"
@@ -264,7 +310,8 @@ _flow_pr() {
 
 vibe_flow() {
   case "${1:-help}" in
-    start|new|create) shift; _flow_new "$@" ;;
+    new) shift; _flow_new "$@" ;;
+    start|create) shift; _flow_start_worktree "$@" ;;
     switch) shift; _flow_switch "$@" ;;
     bind) shift; _flow_bind "$@" ;;
     done) shift; _flow_done "$@" ;;

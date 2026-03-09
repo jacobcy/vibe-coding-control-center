@@ -80,6 +80,10 @@ _flow_switch() {
   _flow_history_has_closed_feature "$target" && { log_error "Flow already existed and was closed: $(_flow_feature_slug "$target")"; return 1; }
   git check-ref-format --branch "$branch_name" >/dev/null 2>&1 || { log_error "Invalid branch name: $branch_name"; return 1; }
   [[ "$branch_name" != "$current_branch" ]] || { log_error "Target branch matches current branch: $current_branch"; return 1; }
+  if ! _flow_branch_exists "$branch_name"; then
+    log_error "Flow does not exist: $branch_name. Use: vibe flow new $target"
+    return 1
+  fi
 
   dirty="$(git status --porcelain 2>/dev/null || true)"
   if [[ -n "$dirty" && $save_stash -ne 1 ]]; then
@@ -93,34 +97,29 @@ _flow_switch() {
     stashed=1
   fi
 
-  if existing_ref="$(_flow_branch_ref "$branch_name" 2>/dev/null)"; then
-    if _flow_branch_has_pr "$branch_name"; then
-      [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
-      log_error "Flow '$branch_name' already has PR history and cannot be resumed via switch."
-      return 1
-    fi
+  if _flow_branch_has_pr "$branch_name"; then
+    [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+    log_error "Flow '$branch_name' already has PR history and cannot be resumed via switch."
+    return 1
   fi
 
-  if [[ -n "$existing_ref" ]]; then
-    log_step "Switching to existing flow branch: $branch_name"
-    if [[ "$existing_ref" == "$branch_name" ]]; then
-      git checkout "$branch_name" || {
-        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
-        log_error "Failed to checkout branch: $branch_name"
-        return 1
-      }
-    else
-      git checkout -b "$branch_name" "$existing_ref" || {
-        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
-        log_error "Failed to materialize branch from: $existing_ref"
-        return 1
-      }
-    fi
-  else
-    log_step "Creating flow branch: $branch_name from $base_ref"
-    git checkout -b "$branch_name" "$base_ref" || {
+  existing_ref="$(_flow_branch_ref "$branch_name" 2>/dev/null)" || {
+    [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+    log_error "Flow branch not found: $branch_name"
+    return 1
+  }
+
+  log_step "Switching to existing flow branch: $branch_name"
+  if [[ "$existing_ref" == "$branch_name" ]]; then
+    git checkout "$branch_name" || {
       [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
-      log_error "Failed to create branch: $branch_name"
+      log_error "Failed to checkout branch: $branch_name"
+      return 1
+    }
+  else
+    git checkout -b "$branch_name" "$existing_ref" || {
+      [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+      log_error "Failed to materialize branch from: $existing_ref"
       return 1
     }
   fi

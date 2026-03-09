@@ -48,12 +48,13 @@ tags: [workflow, vibe, git, commit, pr]
    If the current branch name/history still matches a single delivery target, continue with one PR.
    If branch semantics are no longer suitable, or multiple PRs are needed:
    - do not publish from the current branch
-   - create a new flow with `vibe flow new <name> --branch <ref>`
+   - create a new logical flow in the current directory with `vibe flow new <name> [--branch <ref>]`
+   - if uncommitted changes must travel with that slice, append `--save-unstash`
    - move the relevant change slice to the new branch first
 
    For serial multi-PR delivery, follow this exact playbook:
    - enumerate commit groups first
-   - for each group, switch into a fresh flow from the correct base, usually `origin/main`
+   - for each group, enter a fresh flow from the correct base, usually `origin/main`
    - move only that group's commits with `git cherry-pick <commit...>`
    - verify that slice
    - publish it with `vibe flow pr --base <ref>`
@@ -70,6 +71,7 @@ tags: [workflow, vibe, git, commit, pr]
 
 9. **Boundary Alignment**
    Keep responsibilities explicit:
-   - `/vibe-commit`: skill-layer orchestration and slicing
+   - `/vibe-commit`: skill-layer orchestration for `open + no_pr`
    - `vibe flow pr`: shell-layer publication entry and base validation
+   - `wtnew` / `vnew`: parallel physical worktree entry, not serial PR slicing entry
    - `gh pr create`: underlying external tool, not the workflow's source of truth

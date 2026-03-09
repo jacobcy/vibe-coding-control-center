@@ -20,7 +20,7 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 - 允许：分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `vibe flow pr`
 - 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接调用 `vibe flow done` 做收口
-- 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
+- 若当前 flow 已有 `pr_ref`，说明它已进入 `open + had_pr`；只能处理该 PR 的 follow-up，若用户要开始下一个 PR，必须切到新 flow
 
 ## Workflow
 
@@ -85,12 +85,17 @@ git diff --cached --stat
 2. 明确当前采用串行模式，而不是并行 worktree 模式。
 3. 对每一组依次执行：
    - 确认当前工作区干净；若不干净，先分类为 `commit now` / `stash` / `discard`
-   - 从正确基线进入新的逻辑 flow，默认优先使用最新主干，例如 `vibe flow switch <flow-name> --branch origin/main`
-   - 若需要带入未提交改动，才显式追加 `--save-stash`
+   - 从正确基线进入新的逻辑 flow，默认优先使用最新主干，例如 `vibe flow new <flow-name> --branch origin/main`
+   - 若需要带入未提交改动，才显式追加 `--save-unstash`
    - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`
    - 运行该组应有的验证命令
    - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
    - 当前这一组 PR 创建完成前，不要提前切到下一组
+
+并行隔离目录不是这里的默认路径：
+
+- 若用户明确要并行物理隔离，才使用 `wtnew` / `vnew`
+- 普通串行多 PR 拆分优先复用当前目录的 `vibe flow new`
 
 ### Step 5: 发 PR 前复核
 
@@ -143,3 +148,4 @@ vibe flow pr --base <ref>
 - 不得把 `discard` 当默认处理方式
 - 不得在 skill 层发明 `rebase --onto`、`reset --hard` 等替代串行拆 PR 的主流程
 - 若发现当前 flow 已有 PR 事实且用户要开始新目标，应停止并切换 flow，而不是继续堆在原 flow
+- 不得继续把 `vibe flow switch` / `--save-stash` 写成主推荐路径；它们最多只作为兼容入口存在

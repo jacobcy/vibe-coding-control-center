@@ -36,6 +36,8 @@ JSON
   [[ ! "$output" =~ "sync" ]]
   [[ "$output" =~ "review" ]]
   [[ "$output" =~ "pr" ]]
+  [[ "$output" =~ "switch" ]]
+  [[ "$output" =~ "save-unstash" ]]
 }
 
 @test "1.1 vibe flow review help points to the supported Codex package" {
@@ -65,11 +67,13 @@ JSON
   [[ "$output" =~ "Usage: vibe flow switch" ]]
 }
 
-@test "2.3 _flow_switch refuses dirty worktree without --save-stash" {
+@test "2.3 _flow_new refuses dirty worktree without --save-unstash" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 1; }
 
     git() {
       case "$*" in
@@ -80,18 +84,21 @@ JSON
       esac
     }
 
-    _flow_switch next-flow
+    _flow_new next-flow
   '
 
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "Working directory is not clean" || "$output" =~ "stash" ]]
+  [[ "$output" =~ "Working directory is not clean" ]]
+  [[ "$output" =~ "save-unstash" ]]
 }
 
-@test "2.4 _flow_switch refuses protected main branch rotation" {
+@test "2.4 _flow_new refuses protected main branch rotation" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 1; }
 
     git() {
       case "$*" in
@@ -102,36 +109,34 @@ JSON
       esac
     }
 
-    _flow_switch next-flow
+    _flow_new next-flow
   '
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "protected" || "$output" =~ "main" ]]
 }
 
-@test "2.5 _flow_switch stashes changes and creates a new branch when requested" {
+@test "2.5 _flow_new stashes changes and creates a new branch when requested" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     _flow_history_has_closed_feature() { return 1; }
-    _flow_branch_has_pr() { return 1; }
+    _flow_branch_exists() { return 1; }
 
     git() {
       case "$*" in
         "branch --show-current") echo "task/existing-flow"; return 0 ;;
         "status --porcelain") echo "M dirty-file"; return 0 ;;
         "check-ref-format --branch task/next-flow") return 0 ;;
-        "stash push -u -m Flow switch to task/next-flow: saved WIP") echo "STASHED"; return 0 ;;
-        "show-ref --verify --quiet refs/heads/task/next-flow") return 1 ;;
-        "show-ref --verify --quiet refs/remotes/origin/task/next-flow") return 1 ;;
+        "stash push -u -m Flow new to task/next-flow: saved WIP") echo "STASHED"; return 0 ;;
         "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
         "stash pop") echo "UNSTASHED"; return 0 ;;
         *) return 0 ;;
       esac
     }
 
-    _flow_switch next-flow --branch main --save-stash
+    _flow_new next-flow --branch main --save-unstash
   '
 
   [ "$status" -eq 0 ]
@@ -140,7 +145,36 @@ JSON
   [[ "$output" =~ "UNSTASHED" ]]
 }
 
-@test "2.6 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
+@test "2.6 _flow_switch re-enters an existing open flow without PR history" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 0; }
+    _flow_branch_has_pr() { return 1; }
+    _flow_branch_ref() { echo "origin/task/next-flow"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED"; return 0; }
+
+    git() {
+      case "$*" in
+        "branch --show-current") echo "task/existing-flow"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow origin/task/next-flow") echo "CHECKOUT_EXISTING"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_switch next-flow
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "CHECKOUT_EXISTING" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED" ]]
+}
+
+@test "2.7 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-upsert"
@@ -178,6 +212,14 @@ JSON
   [[ "$output" =~ "Unknown option: --base" ]]
   [[ "$output" =~ "--branch" ]]
   [[ ! "$output" =~ "UNEXPECTED_WORKTREE_CALL" ]]
+}
+
+@test "2.8 vibe flow new help no longer describes worktree creation" {
+  run vibe flow new --help
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "save-unstash" ]]
+  [[ ! "$output" =~ "worktree" ]]
 }
 
 @test "3. vibe flow status in non-worktree returns error" {
@@ -901,11 +943,12 @@ EOF
   [[ "$output" =~ "vibe flow bind" ]]
 }
 
-@test "14.3 vibe flow help lists switch as runtime flow command" {
+@test "14.3 vibe flow help keeps switch as runtime flow command" {
   run vibe flow help
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "switch" ]]
+  [[ "$output" =~ "save-unstash" ]]
 }
 
 @test "15. vibe flow start fails cleanly when worktree creation fails" {

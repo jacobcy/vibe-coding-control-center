@@ -22,25 +22,27 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 - `.vibe/current-task.json`：当前 current task 指针
 - `.vibe/focus.md`：当前 worktree 的聚焦摘要缓存
 - `.vibe/session.json`：当前 worktree 的短期会话缓存
-- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 `schema_version`、task 摘要、`next_step`、`current_subtask_id`
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含 `schema_version`、`worktree_name`、`worktree_path`、`current_task`、branch、`dirty/clean`
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`：包含 task 摘要、`next_step`、`current_subtask_id`、runtime 绑定事实
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`：包含开放 flow / worktree 现场与 branch 绑定事实
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`：task/subtask 详情，subtask 以 `subtask_id` 标识
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md`：共享记忆真源
 
 **本地工作区缓存重构**：
-- `.agent/context/memory.md` (Tracked)：作为人类与AI共享的高阶认知索引池，存放在版本控制中。
-- `.agent/context/task.md` (Untracked)：被放入 `.gitignore`。完全作为当前物理 worktree 短期进度的草稿本。如果冷启动时文件缺失，`/vibe-continue` 需要自动通过读取大盘 `registry.json` 和 `focus.md` 重新组装并拉取一份到本地。
+- `.agent/context/memory.md`：作为人类与 AI 共享的高阶认知索引池。
+- `.agent/context/task.md`：作为当前目录短期 handoff 草稿本。如果冷启动时文件缺失，`/vibe-continue` 需要通过读取共享真源和本地缓存重新组装。
 
 ## Schema 契约
 
-`/vibe-continue` 只使用以下真实字段名：
+`/vibe-continue` 必须区分三类数据：
 
-- `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
-- `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
-- `task.json`：`task_id`、`status`、`subtasks[].subtask_id`、`assigned_worktree`、`next_step`、`plan_path`
-- `.vibe/session.json`：`worktree_name`、`current_task`、`current_subtask_id`、`saved_at`
+- **共享真源字段**
+  - `registry.json`：`task_id`、`title`、`status`、`current_subtask_id`、`runtime_worktree_name`、`runtime_worktree_path`、`runtime_branch`、`runtime_agent`、`next_step`
+- **查询展示字段**
+  - `dirty` / `clean` 只允许来自 `vibe flow status` 等查询结果，不得写成共享真源字段
+- **本地缓存字段**
+  - `.vibe/session.json`：`worktree_name`、`current_task`、`current_subtask_id`、`saved_at`
 
-不得使用旧字段名 `version`、`name`、`path`、`current_task_id`、`id`。
+不得使用旧字段名或旧模型表述，例如 `assigned_worktree`、`worktree_name`、`current_task`、`current_task_id`、`version`、`name`、`path`。
 
 ## 工作流程
 
@@ -71,8 +73,9 @@ governance_file=".agent/governance.yaml"
 - **Next Step**: 共享 registry 中记录的下一步动作
 - **Focus Summary**: `.vibe/focus.md` 中的聚焦摘要
 - **Session Cache**: `.vibe/session.json` 中最近一次保存的短期会话状态
-- **Dirty State**: 当前 worktree 是否 dirty
-- **Governance Phase**: 当前处于探索期 (`exploration`) 还是收敛期 (`convergence`)。
+- **Dirty State**: 当前 worktree 是否 dirty（仅来自 shell 查询）
+- **Governance Phase**: 当前处于探索期 (`exploration`) 还是收敛期 (`convergence`)
+- **Capability Gap**: 上次 handoff 是否留下未解决的能力缺口
 
 ### Step 2: 识别当前 task 与共享 memory
 
@@ -90,12 +93,13 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 2. **Key Decisions** - 共享 memory 中的相关决策
 3. **Subtasks Summary** - subtask 状态概览（按 `subtask_id`）
 4. **Next Step** - 当前下一步动作
-5. **Worktree View** - `worktree_path`、branch、dirty/clean
+5. **Worktree View** - `runtime_worktree_path`、`runtime_branch`、dirty/clean
 6. **Local Cache View** - `focus.md` / `session.json` 的摘要
+7. **Handoff View** - `.agent/context/task.md` 中的当前操作者、blockers、capability gap
 
 *如果 `.agent/context/task.md` 不存在或为空 (比如因为它是 git-ignored 被新切出来的 worktree 跳过的)*：
   - 自动创建 `.agent/context/task.md`。
-  - 将上一步加载的 Summary / Next Step / Dirty 等从 `registry.json` 当中取得的最新状态渲染进它。
+  - 将上一步加载的 Summary / Next Step / Dirty / Capability Gap 等状态渲染进它。
 
 ### Step 4: 输出继续报告
 
@@ -112,6 +116,7 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
   • [ ] <task-id>: <title> (in progress)
   • current subtask: <subtask-id>
   • next step: <next-step>
+  • capability gap: <none|gap>
 
 📂 Context Loaded:
   • .vibe/current-task.json
@@ -156,16 +161,14 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 
 - `status`
 - `subtasks`
-- `assigned_worktree`
 - `next_step`
 - `plan_path`
 
 ### worktrees.json / registry.json 关键字段
 
-- `schema_version`
-- `worktree_name`
-- `worktree_path`
-- `current_task`
+- `runtime_worktree_name`
+- `runtime_worktree_path`
+- `runtime_branch`
 - `current_subtask_id`
 
 ## 与 /vibe-save 的关系
@@ -186,7 +189,7 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 
 1. **P0**: 读取 `.vibe/current-task.json` 并识别当前 worktree 绑定任务
 2. **P0**: 加载共享 `task.json` 与共享 `memory.md`
-3. **P1**: 输出 current task / current subtask / next step / dirty 状态
+3. **P1**: 输出 current task / current subtask / next step / dirty 查询状态
 4. **P2**: 自动建议 executing-plans，如果 `plan_path` 存在
 
 ## 示例输出
@@ -200,9 +203,11 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
   • state: dirty
 
 📌 Current Task
+  • current actor: <agent>
   • [ ] 2026-03-02-cross-worktree-task-registry: Cross-Worktree Task Registry
   • current subtask: task-4-monitoring-and-save-view
   • next step: Update vibe-save and vibe-continue to read current-task pointer and shared registry fields.
+  • capability gap: none
 
 📂 Context Loaded:
   • .vibe/current-task.json
@@ -220,6 +225,6 @@ $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
 ## 设计决策
 
 1. **当前 worktree 优先** - `/vibe-continue` 只继续当前指针绑定的 task
-2. **共享真源优先** - task/subtask/next step 以共享 registry 和 task.json 为准
-3. **compat 层保留** - `.agent/context/*` 作为入口索引，逐步迁移
+2. **共享真源优先** - task/subtask/next step 以共享 registry 和 task.json 为准，dirty 只来自查询结果
+3. **compat 层保留** - `.agent/context/*` 作为入口索引，`.agent/context/task.md` 只作为本地 handoff
 4. **与 /vibe-save 互补** - `/vibe-save` 回写共享状态，`/vibe-continue` 读取共享状态

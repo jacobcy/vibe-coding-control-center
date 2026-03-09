@@ -29,10 +29,9 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Flow switch to feature-safe: saved WIP") exit 0 ;;
+      "stash push -u -m Flow new to feature-safe: saved WIP") exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
-      "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
       "checkout -b feature-safe feature-old") exit 0 ;;
       "stash pop") exit 0 ;;
       *) exit 1 ;;
@@ -88,8 +87,7 @@ case "${MOCK_MODE:-}" in
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") printf 'claude/refactor\n'; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Flow switch to feature-safe: saved WIP") exit 0 ;;
-      "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
+      "stash push -u -m Flow new to feature-safe: saved WIP") exit 0 ;;
       "checkout -b feature-safe claude/refactor") exit 0 ;;
       "stash pop") exit 0 ;;
       *) exit 1 ;;
@@ -109,7 +107,7 @@ EOF
   run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_requires_u VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
   [ "$status" -eq 0 ]
-  grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  grep -q "stash push -u -m Flow new to feature-safe: saved WIP" "$LOG_FILE"
   grep -q "checkout -b feature-safe feature-old" "$LOG_FILE"
   ! grep -q "branch -D feature-old" "$LOG_FILE"
   ! grep -q "push origin --delete feature-old" "$LOG_FILE"
@@ -132,7 +130,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "generic workflow name" ]]
-  ! grep -q "stash push -u -m Flow switch to refactor: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m Flow new to refactor: saved WIP" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting detached HEAD" {
@@ -141,7 +139,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Not on a branch" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m Flow new to feature-safe: saved WIP" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting same branch name" {
@@ -150,7 +148,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Target branch matches current branch" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-old: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m Flow new to feature-old: saved WIP" "$LOG_FILE"
 }
 
 @test "rotate rejects protected branches before stashing" {
@@ -159,7 +157,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m Flow new to feature-safe: saved WIP" "$LOG_FILE"
 }
 
 @test "rotate updates worktrees dashboard branch for current worktree" {
@@ -172,4 +170,12 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$(jq -r '.worktrees[0].branch' "$TEST_DIR/repo/.git/vibe/worktrees.json")" = "feature-safe" ]
+}
+
+@test "rotate help points to vibe flow new --save-unstash compatibility path" {
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "vibe flow new" ]]
+  [[ "$output" =~ "save-unstash" ]]
 }
