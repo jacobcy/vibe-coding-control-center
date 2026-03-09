@@ -69,6 +69,10 @@ input_examples:
   - 相同模块 + 相似范围 → 中置信度
   - 无相似记录 → 低置信度
 
+说明：
+- `.agent/context/task.md` 只作为当前目录的短期 handoff 与历史线索，不是共享任务真源。
+- task / flow / worktree 的共享事实必须以 shell 与共享状态文件为准。
+
 **框架决策逻辑：**
 
 | 置信度 | 场景 | 决策 |
@@ -113,7 +117,7 @@ input_examples:
   - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
   - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`
 - 记录完成后，通过 `vibe task update <task_id> --next-step "Entry: Gate 1 Scope Gate"` 标记进度。
-- 框架选择记录在 `.agent/context/task.md` 中，格式：`- <feature> (framework: <superpower|openspec>)`。
+- 框架选择可记录在 `.agent/context/task.md` 中，作为本地 handoff 备注，格式：`- <feature> (framework: <superpower|openspec>)`。
 - 同时记录需求特征，用于 future pattern 匹配。
 **选择提示模板（仅在需要询问时使用）：**
 ```
@@ -154,8 +158,8 @@ input_examples:
   - 当前目录模式：
     1. 调用 `vibe task add <title>` (若尚未立项)
     2. 调用 `vibe task update <task-id> --bind-current` 建立绑定关系
-  - 当前目录切换到新的交付 flow：调用 `vibe flow new <feature> --branch <ref>`；若需保留未提交改动，显式追加 `--save-unstash`
-  - 若确实需要新的物理 worktree，使用 `wtnew` / `vnew`
+  - 当前目录切换到新的交付 flow：调用 `vibe flow new <feature> [--branch <ref>]`；若需保留未提交改动，显式追加 `--save-unstash`
+  - 若确实需要新的物理 worktree，使用 `wtnew` / `vnew`，不要把 `flow new` 写成创建目录的能力
 - 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
 - 严禁 Vibe Skills 直接操作 `.vibe/` 缓存文件夹，必须通过 CLI 读取。
 - 在进入执行前，先读取并遵循：`docs/standards/serena-usage.md`、`.github/workflows/ci.yml`
