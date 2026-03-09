@@ -2,6 +2,7 @@
 # lib/roadmap.sh - Roadmap module for intelligent scheduling
 
 # Load dependencies
+source "$VIBE_LIB/roadmap_render.sh"
 source "$VIBE_LIB/roadmap_query.sh"
 source "$VIBE_LIB/roadmap_audit.sh"
 source "$VIBE_LIB/roadmap_write.sh"

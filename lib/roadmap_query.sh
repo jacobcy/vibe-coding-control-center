@@ -20,65 +20,6 @@ _vibe_roadmap_file() {
     echo "$common_dir/vibe/roadmap.json"
 }
 
-_vibe_roadmap_fd_is_tty() {
-    [[ -t "$1" ]]
-}
-
-_vibe_roadmap_supports_color() {
-    _vibe_roadmap_fd_is_tty 1 || _vibe_roadmap_fd_is_tty 0
-}
-
-_vibe_roadmap_format() {
-    local prefix="$1" text="$2"
-    if _vibe_roadmap_supports_color; then
-        printf '%s%s%s' "$prefix" "$text" "$NC"
-    else
-        printf '%s' "$text"
-    fi
-}
-
-_vibe_roadmap_color_status() {
-    local s="$1"
-    case "$s" in
-        p0) _vibe_roadmap_format "${RED}${BOLD}" "$s" ;;
-        current) _vibe_roadmap_format "$GREEN" "$s" ;;
-        next) _vibe_roadmap_format "$BLUE" "$s" ;;
-        deferred) _vibe_roadmap_format "$YELLOW" "$s" ;;
-        rejected) _vibe_roadmap_format "$(printf '\033[0;90m')" "$s" ;;
-        *) printf '%s' "$s" ;;
-    esac
-}
-
-_vibe_roadmap_status_color_prefix() {
-    local item_status="$1"
-    case "$item_status" in
-        p0) printf '%s' "${RED}${BOLD}" ;;
-        current) printf '%s' "${GREEN}${BOLD}" ;;
-        next) printf '%s' "${BLUE}${BOLD}" ;;
-        deferred) printf '%s' "${YELLOW}${BOLD}" ;;
-        rejected) printf '%s' "$(printf '\033[1;90m')" ;;
-        *) printf '%s' "$NC" ;;
-    esac
-}
-
-_vibe_roadmap_status_label() {
-    local item_status="$1"
-    case "$item_status" in
-        p0) printf 'P0' ;;
-        current) printf 'Current' ;;
-        next) printf 'Next' ;;
-        deferred) printf 'Deferred' ;;
-        rejected) printf 'Rejected' ;;
-        *) printf '%s' "$item_status" ;;
-    esac
-}
-
-_vibe_roadmap_group_heading() {
-    local item_status="$1" count="$2" label
-    label="$(_vibe_roadmap_status_label "$item_status")"
-    _vibe_roadmap_format "$(_vibe_roadmap_status_color_prefix "$item_status")" "${label} (${count})"
-}
-
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
