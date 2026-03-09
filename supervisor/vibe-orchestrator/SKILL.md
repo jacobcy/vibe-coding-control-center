@@ -103,7 +103,7 @@ input_examples:
     **建议操作：**
     1. 先完成现有任务：`vibe task list` 查看任务列表
     2. 或切换到新分支：`git checkout -b <new-branch>`
-    3. 或使用 worktree 隔离：`wtnew` / `vnew`
+    3. 或使用 worktree 隔离：`vibe flow create <feature>`
 
     为避免上下文混乱和任务冲突，请先处理现有任务。
     ```
@@ -154,8 +154,7 @@ input_examples:
   - 当前目录模式：
     1. 调用 `vibe task add <title>` (若尚未立项)
     2. 调用 `vibe task update <task-id> --bind-current` 建立绑定关系
-  - 当前目录切换到新的交付 flow：调用 `vibe flow new <feature> --branch <ref>`；若需保留未提交改动，显式追加 `--save-unstash`
-  - 若确实需要新的物理 worktree，使用 `wtnew` / `vnew`
+  - 完整流程模式：调用 `vibe flow new <feature>` 创建/切换 worktree 并初始化 context。
 - 任务数据映射在 `$(_git_common_dir)/vibe/` 下统一管理。
 - 严禁 Vibe Skills 直接操作 `.vibe/` 缓存文件夹，必须通过 CLI 读取。
 - 在进入执行前，先读取并遵循：`docs/standards/serena-usage.md`、`.github/workflows/ci.yml`

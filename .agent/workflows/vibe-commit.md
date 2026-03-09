@@ -49,12 +49,11 @@ tags: [workflow, vibe, git, commit, pr]
    If branch semantics are no longer suitable, or multiple PRs are needed:
    - do not publish from the current branch
    - create a new flow with `vibe flow new <name> --branch <ref>`
-   - if uncommitted changes must travel with that slice, append `--save-unstash`
    - move the relevant change slice to the new branch first
 
    For serial multi-PR delivery, follow this exact playbook:
    - enumerate commit groups first
-   - for each group, enter a fresh flow from the correct base, usually `origin/main`
+   - for each group, switch into a fresh flow from the correct base, usually `origin/main`
    - move only that group's commits with `git cherry-pick <commit...>`
    - verify that slice
    - publish it with `vibe flow pr --base <ref>`

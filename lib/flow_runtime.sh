@@ -54,23 +54,87 @@ _flow_update_current_worktree_branch() {
 }
 
 _flow_switch() {
-  local forwarded=() target_seen=0
+  local target="" base_ref="main" save_stash=0 arg current_branch branch_name dirty="" stashed=0 existing_ref=""
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_switch_usage; return 0; }; done
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --branch) forwarded+=("$1" "$2"); shift 2 ;;
-      --save-stash) forwarded+=("--save-unstash"); shift ;;
+      --branch) base_ref="$2"; shift 2 ;;
+      --save-stash) save_stash=1; shift ;;
       -*) log_error "Unknown option for flow switch: $1"; _flow_switch_usage; return 1 ;;
-      *)
-        if [[ $target_seen -eq 0 ]]; then
-          forwarded+=("$1")
-          target_seen=1
-        fi
-        shift
-        ;;
+      *) [[ -z "$target" ]] && target="$1"; shift ;;
     esac
   done
 
-  _flow_new "${forwarded[@]}"
+  [[ -n "$target" ]] || { _flow_switch_usage; return 1; }
+  current_branch="$(git branch --show-current 2>/dev/null)"
+  [[ -n "$current_branch" ]] || { log_error "Not on a branch."; return 1; }
+  case "$current_branch" in
+    main|master)
+      log_error "Refusing to rotate protected branch: $current_branch"
+      return 1
+      ;;
+  esac
+
+  branch_name="$(_flow_switch_target_branch "$target")"
+  _flow_history_has_closed_feature "$target" && { log_error "Flow already existed and was closed: $(_flow_feature_slug "$target")"; return 1; }
+  git check-ref-format --branch "$branch_name" >/dev/null 2>&1 || { log_error "Invalid branch name: $branch_name"; return 1; }
+  [[ "$branch_name" != "$current_branch" ]] || { log_error "Target branch matches current branch: $current_branch"; return 1; }
+
+  dirty="$(git status --porcelain 2>/dev/null || true)"
+  if [[ -n "$dirty" && $save_stash -ne 1 ]]; then
+    log_error "Working directory is not clean. Re-run with --save-stash to carry changes into the next flow."
+    return 1
+  fi
+
+  if [[ -n "$dirty" ]]; then
+    log_step "Saving uncommitted changes for flow switch"
+    git stash push -u -m "Flow switch to $branch_name: saved WIP" || { log_error "Failed to stash changes"; return 1; }
+    stashed=1
+  fi
+
+  if existing_ref="$(_flow_branch_ref "$branch_name" 2>/dev/null)"; then
+    if _flow_branch_has_pr "$branch_name"; then
+      [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+      log_error "Flow '$branch_name' already has PR history and cannot be resumed via switch."
+      return 1
+    fi
+  fi
+
+  if [[ -n "$existing_ref" ]]; then
+    log_step "Switching to existing flow branch: $branch_name"
+    if [[ "$existing_ref" == "$branch_name" ]]; then
+      git checkout "$branch_name" || {
+        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+        log_error "Failed to checkout branch: $branch_name"
+        return 1
+      }
+    else
+      git checkout -b "$branch_name" "$existing_ref" || {
+        [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+        log_error "Failed to materialize branch from: $existing_ref"
+        return 1
+      }
+    fi
+  else
+    log_step "Creating flow branch: $branch_name from $base_ref"
+    git checkout -b "$branch_name" "$base_ref" || {
+      [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+      log_error "Failed to create branch: $branch_name"
+      return 1
+    }
+  fi
+
+  _flow_update_current_worktree_branch "$branch_name" || {
+    [[ $stashed -eq 1 ]] && git stash pop >/dev/null 2>&1 || true
+    log_error "Failed to update worktree runtime state"
+    return 1
+  }
+
+  if [[ $stashed -eq 1 ]]; then
+    log_step "Restoring saved changes into $branch_name"
+    git stash pop || { log_error "Stash pop failed (conflicts?). Resolve manually."; return 1; }
+  fi
+
+  log_success "Flow runtime ready: $target (branch: $branch_name)"
 }
