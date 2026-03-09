@@ -134,7 +134,7 @@ _vibe_check_group_link() {
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="roadmap item missing task back-link: $line\n"
-  done < <(jq -r '
+  done < <(jq -r --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n '
     $tasks[0] as $tasks
     | $roadmap[0] as $roadmap
     | $tasks.tasks[]? as $task
@@ -142,7 +142,7 @@ _vibe_check_group_link() {
     | select(($roadmap.items | map(.roadmap_item_id) | index($rid)) != null)
     | select(([$roadmap.items[]? | select(.roadmap_item_id == $rid) | (.linked_task_ids // [])[]?] | index($task.task_id)) == null)
     | "\($rid):\($task.task_id)"
-  ' --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n 2>/dev/null)
+  ' 2>/dev/null)
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="task links missing roadmap item: $line\n"
@@ -150,7 +150,7 @@ _vibe_check_group_link() {
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="task missing roadmap back-link: $line\n"
-  done < <(jq -r '
+  done < <(jq -r --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n '
     $tasks[0] as $tasks
     | $roadmap[0] as $roadmap
     | $roadmap.items[]? as $item
@@ -158,7 +158,7 @@ _vibe_check_group_link() {
     | select(($tasks.tasks | map(.task_id) | index($tid)) != null)
     | select(([$tasks.tasks[]? | select(.task_id == $tid) | (.roadmap_item_ids // [])[]?] | index($item.roadmap_item_id)) == null)
     | "\($tid):\($item.roadmap_item_id)"
-  ' --slurpfile tasks "$reg_file" --slurpfile roadmap "$roadmap_file" -n 2>/dev/null)
+  ' 2>/dev/null)
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="runtime points to missing worktree: $line\n"
