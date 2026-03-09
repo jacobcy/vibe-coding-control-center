@@ -21,7 +21,6 @@ description: Use when a PR has already been merged and the user wants to close t
 - 允许：读取 `vibe flow show`、关闭 task、关闭 issue、执行 `vibe flow done`、写入 handoff
 - 不允许：修业务代码、补 review follow-up、merge PR、手工改 `.git/vibe/*.json`
 - `vibe flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
-- `/vibe-done` 只处理 merged 后的收口，不负责 `open + no_pr` 或 `open + had_pr` 阶段的开发与整合
 
 ## Workflow
 
@@ -46,7 +45,7 @@ vibe flow show <feature-or-branch> --json
 - `current_task`
 - `issue_refs`
 - `pr_ref`
-- 当前 flow 是否已经满足 merged 后收口前提
+- 当前 flow 是否已经满足收口前提
 
 若没有 task 或 issue，后续步骤按“可跳过”处理，不要伪造关联。
 
@@ -110,7 +109,6 @@ vibe flow done --branch <ref>
 - pr: <pr-ref-or-none>
 - issues: <closed-issue-refs-or-none>
 - completed: <已关闭的 task / issue / flow>
-- capability_gap: <none|gap>
 - next: <是否已完全收口；若未完成，阻塞点是什么>
 ```
 
@@ -120,5 +118,4 @@ vibe flow done --branch <ref>
 - 不得跳过 `vibe flow show` 直接猜测 task / issue / pr 关联
 - 不得手工编辑 `.git/vibe/*.json`
 - 不得把未 merge 的 branch 强行 `flow done`
-- 不得把 `/vibe-done` 误当成 `/vibe-integrate` 的替代入口
 - 若 `vibe flow done` 阻断，必须如实汇报原因，并停止收口
