@@ -44,11 +44,31 @@ check_reference() {
 file_timestamp() {
   local path="$1"
   local git_ts=""
-  git_ts="$(git -C "$REPO_ROOT" log -1 --format=%ct -- "$path" 2>/dev/null || true)"
+  local git_path="$path"
+
+  if [[ "$git_path" == "$REPO_ROOT/"* ]]; then
+    git_path="${git_path#"$REPO_ROOT"/}"
+  fi
+
+  git_ts="$(git -C "$REPO_ROOT" log -1 --format=%ct -- "$git_path" 2>/dev/null || true)"
   if [[ -n "$git_ts" ]]; then
     printf '%s\n' "$git_ts"
   else
-    stat -f '%m' "$path"
+    local fs_ts=""
+    if fs_ts="$(stat -c '%Y' "$path" 2>/dev/null)"; then
+      printf '%s\n' "$fs_ts"
+    elif fs_ts="$(stat -f '%m' "$path" 2>/dev/null)"; then
+      printf '%s\n' "$fs_ts"
+    elif command -v python3 >/dev/null 2>&1; then
+      python3 - <<'PY' "$path"
+import os
+import sys
+
+print(int(os.path.getmtime(sys.argv[1])))
+PY
+    else
+      return 1
+    fi
   fi
 }
 
