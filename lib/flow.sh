@@ -106,6 +106,12 @@ _flow_new() {
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
   current_branch="$(git branch --show-current 2>/dev/null)"
   [[ -n "$current_branch" ]] || { log_error "Not on a branch."; return 1; }
+  case "$current_branch" in
+    main|master)
+      log_error "Refusing to rotate protected branch: $current_branch"
+      return 1
+      ;;
+  esac
 
   branch_name="$(_flow_switch_target_branch "$feat")"
   feature_slug="$(_flow_feature_slug "$branch_name")"
