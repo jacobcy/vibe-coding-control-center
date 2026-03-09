@@ -13,7 +13,12 @@ _flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; gi
 _flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
-_flow_branch_ref() { git show-ref --verify --quiet "refs/heads/$1" && { echo "$1"; return 0; }; git show-ref --verify --quiet "refs/remotes/origin/$1" && { echo "origin/$1"; return 0; }; return 1; }
+_flow_branch_ref() {
+  local branch_name="${1#origin/}"
+  git show-ref --verify --quiet "refs/heads/$branch_name" && { echo "$branch_name"; return 0; }
+  git show-ref --verify --quiet "refs/remotes/origin/$branch_name" && { echo "origin/$branch_name"; return 0; }
+  return 1
+}
 _flow_pr_candidate_bases() { local branch="$1"; git for-each-ref --format='%(refname:short)' refs/heads refs/remotes/origin 2>/dev/null | sed 's#^origin/##' | awk -v b="$branch" 'NF && $0 != "HEAD" && $0 != b { seen[$0]=1 } END { for (name in seen) print name }'; }
 _flow_pick_pr_base() {
   local branch="$1" candidate ref best="" best_count=""
@@ -98,23 +103,66 @@ _flow_new() {
   _flow_new_worktree "$feat" "${agent:-$(_flow_default_agent)}" "$ref"
 }
 _flow_done() {
-  local branch unmerged
-  if [[ $(git branch --show-current) == "main" ]] || _flow_is_main_worktree; then
+  local target_branch="" arg unmerged current_branch
+  
+  # 处理帮助参数
+  for arg in "$@"; do 
+    [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_done_usage; return 0; }
+  done
+  
+  # 解析参数
+  while [[ $# -gt 0 ]]; do 
+    case "$1" in 
+      --branch) target_branch="$2"; shift 2 ;;
+      -*) log_error "Unknown option: $1"; _flow_done_usage; return 1 ;;
+      *) shift ;;
+    esac
+  done
+  
+  # 获取当前分支
+  current_branch=$(git branch --show-current)
+
+  if _flow_is_main_worktree; then
     log_warn "Current repository or branch is protected."
     return 1
   fi
-  branch=$(git branch --show-current)
-  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-    log_error "Working directory is not clean. Please commit or stash changes before finishing."
+  
+  # 如果没有指定分支，使用当前分支
+  if [[ -z "$target_branch" ]]; then
+    target_branch="$current_branch"
+  fi
+  
+  # 检查是否是 main 分支
+  if [[ "$target_branch" == "main" ]]; then
+    log_error "Cannot close main branch flow."
     return 1
   fi
+  
+  local branch_ref=""
+  branch_ref="$(_flow_branch_ref "$target_branch")" || {
+    log_error "Branch not found: $target_branch"
+    return 1
+  }
+
+  # 如果检查的是当前分支，额外检查工作目录
+  if [[ "$branch_ref" == "$current_branch" ]]; then
+    if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+      log_error "Working directory is not clean. Please commit or stash changes before finishing."
+      return 1
+    fi
+  fi
+  
+  # 获取远程 main 分支最新状态
   git fetch origin main --quiet 2>/dev/null || true
-  unmerged=$(git rev-list "origin/main..$branch" 2>/dev/null || echo "")
+  
+  # 检查是否有未合并的提交
+  unmerged=$(git rev-list "origin/main..$branch_ref" 2>/dev/null || echo "")
   if [[ -n "$unmerged" ]]; then
-    log_error "Branch '$branch' has commits not merged into origin/main. Please open a PR and merge first."
+    log_error "Branch '$target_branch' has commits not merged into origin/main. Please open a PR and merge first."
     return 1
   fi
-  log_success "Flow wrap-up complete for branch '$branch'. Environment preserved (no worktree/branch cleanup)."
+  
+  log_success "Flow wrap-up complete for branch '$target_branch'. Environment preserved (no worktree/branch cleanup)."
   echo "💡 Next: Run ${CYAN}vibe flow review${NC} or ${CYAN}vibe task list${NC}."
 }
 

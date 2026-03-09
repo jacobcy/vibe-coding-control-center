@@ -48,10 +48,28 @@ _flow_print_metrics() {
 _flow_status() {
   setopt localoptions typeset_silent 2>/dev/null || true
 
-  local json_out=0
-  [[ "${1:-}" == "--json" ]] && { json_out=1; shift; }
+  local json_out=0 feature="" branch_ref="" arg
+  
+  # 处理帮助参数
+  for arg in "$@"; do 
+    [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_status_usage; return 0; }
+  done
+  
+  # 解析参数
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_out=1; shift ;;
+      --branch) branch_ref="$2"; shift 2 ;;
+      *)
+        # 保持向后兼容：如果没有 --branch，第一个位置参数作为 feature
+        if [[ -z "$feature" && ! "$1" =~ ^-- ]]; then
+          feature="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
-  local feature="${1:-}"
   local current_wt git_common_dir worktrees_file registry_file
   current_wt=$(basename "$PWD")
 
@@ -64,8 +82,20 @@ _flow_status() {
   registry_file="$git_common_dir/vibe/registry.json"
 
   local -a tasks_to_show
-  local cur_t=""
-  if [[ -z "$feature" ]]; then
+  local cur_t="" wt_data branch_name=""
+  if [[ -n "$branch_ref" ]]; then
+    branch_name="${branch_ref#origin/}"
+    wt_data=$(jq -c --arg branch "$branch_name" '.worktrees[]? | select(.branch == $branch)' "$worktrees_file" 2>/dev/null | head -n 1)
+    [[ -n "$wt_data" ]] || { log_error "Requested branch not found: $branch_ref"; return 1; }
+    cur_t=$(echo "$wt_data" | jq -r '.current_task // empty')
+    [[ -n "$cur_t" ]] && tasks_to_show+=("$cur_t")
+    while IFS= read -r t; do
+      [[ -z "$t" || "$t" == "$cur_t" ]] && continue
+      [[ ${#tasks_to_show[@]} -ge 6 ]] && break
+      tasks_to_show+=("$t")
+    done < <(echo "$wt_data" | jq -r '.tasks[]? // empty' 2>/dev/null)
+    [[ ${#tasks_to_show[@]} -eq 0 ]] && { log_error "No task bound to branch: $branch_ref"; return 1; }
+  elif [[ -z "$feature" ]]; then
     local wt_data t
     wt_data=$(jq -c --arg wt "$current_wt" '.worktrees[]? | select(.worktree_name == $wt)' "$worktrees_file" 2>/dev/null)
     cur_t=$(echo "$wt_data" | jq -r '.current_task // empty')
