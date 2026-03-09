@@ -6,8 +6,9 @@ _flow_usage() {
 ${BOLD}Vibe Flow Manager${NC}
 Usage: ${CYAN}vibe flow <subcommand>${NC} [args]
 Subcommands:
-  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建新的 flow 现场；已存在则拒绝
-  ${GREEN}switch${NC} <name> [--branch <ref>] [--save-stash]       进入未关闭且未发过 PR 的现有 flow
+  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>] [--save-unstash]
+                                                          在当前目录创建新的逻辑 flow / branch
+  ${GREEN}switch${NC} <name>                                       安全进入未关闭且未发过 PR 的现有 flow
   ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务
   ${GREEN}show${NC} [<feature>|<branch>] [--json]                   查看单个 flow 的详情（默认当前 flow）
   ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支
@@ -17,25 +18,27 @@ Subcommands:
   ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或进行本地最终检查
 Options for 'new <name>':
   --agent <name>     指定 AI 身份 (默认: claude)
-  --branch <ref>     指定创建现场时的起点分支 (默认: main)
+  --branch <ref>     指定当前目录创建新 flow 时的起点分支 (默认: main)
+  --save-unstash     将当前未提交改动 stash 后带入新 flow
 Options for 'switch <name>':
-  --branch <ref>     指定新逻辑 flow 的起点分支 (默认: main)
-  --save-stash       将当前未提交改动 stash 后带入新 flow
-  # flow new/switch 用 --branch；flow pr 用 --base
+  dirty worktree     默认自动保存并带入当前未提交改动
+Parallel worktree:
+  使用 ${CYAN}wtnew${NC} / ${CYAN}vnew${NC} 创建新的物理 worktree；它们不属于 vibe flow 主语义
+  # flow 命令用 --branch；flow pr 用 --base
 EOF
 }
 
 _flow_new_usage() { cat <<EOF
-Usage: vibe flow new <name> [--agent <name>] [--branch <ref>]
+Usage: vibe flow new <name> [--agent <name>] [--branch <ref>] [--save-unstash]
   --branch <ref>  创建 flow 时选择起点分支；不接受 --base
+  --save-unstash  将当前未提交改动 stash 后带入新 flow
 EOF
 }
 
 _flow_switch_usage() { cat <<EOF
-Usage: vibe flow switch <name> [--branch <ref>] [--save-stash]
-  --branch <ref>     在当前目录进入新的逻辑 flow 时使用的起点分支
-  --save-stash       将未提交改动 stash 后带入新 flow
-  仅允许进入未关闭且未发过 PR 的 flow
+Usage: vibe flow switch <name>
+  dirty worktree     默认自动保存并带入当前未提交改动
+  仅允许进入未关闭且未发过 PR 的现有 flow
 EOF
 }
 
