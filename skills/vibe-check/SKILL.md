@@ -3,7 +3,7 @@ name: vibe-check
 description: Use when the user wants to verify task-flow/runtime consistency and, when safe, repair deterministic task-worktree binding gaps through Shell APIs. This skill consumes audit output; it does not edit shared JSON directly.
 ---
 
-# /check - task-flow 审计驱动修复
+# /vibe-check (/check) - task-flow 审计驱动修复
 
 `vibe check(shell)` 只负责审计。`vibe-check` skill 负责：
 

@@ -210,9 +210,11 @@ JSON
 }
 
 @test "6. VIBE_ROOT is set correctly in script" {
-  run zsh -c "source $BATS_TEST_DIRNAME/../bin/vibe && echo \$VIBE_ROOT"
+  local expected_root
+  expected_root="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  run zsh -c "unset VIBE_ROOT VIBE_LIB; source $BATS_TEST_DIRNAME/../bin/vibe >/dev/null && echo \$VIBE_ROOT"
   [ "$status" -eq 0 ]
-  [ -n "$output" ]
+  [ "$output" = "$expected_root" ]
 }
 
 @test "7. vibe version outputs version info" {
