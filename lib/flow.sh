@@ -4,6 +4,7 @@ source "$VIBE_LIB/flow_help.sh"
 source "$VIBE_LIB/flow_status.sh"
 source "$VIBE_LIB/flow_review.sh"
 source "$VIBE_LIB/task.sh"
+source "$VIBE_LIB/flow_runtime.sh"
 
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
@@ -151,7 +152,6 @@ _flow_done() {
       return 1
     fi
   fi
-  
   # 获取远程 main 分支最新状态
   git fetch origin main --quiet 2>/dev/null || true
   
@@ -221,6 +221,7 @@ _flow_pr() {
 vibe_flow() {
   case "${1:-help}" in
     start|new|create) shift; _flow_new "$@" ;;
+    switch) shift; _flow_switch "$@" ;;
     bind) shift; _flow_bind "$@" ;;
     done) shift; _flow_done "$@" ;;
     status) shift; _flow_status "$@" ;;
