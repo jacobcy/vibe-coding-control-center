@@ -312,7 +312,9 @@ JSON
     git() {
       case "$*" in
         "branch --show-current") echo "current-branch"; return 0 ;;
-        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "push origin HEAD") return 0 ;;
         *) return 0 ;;
       esac
@@ -345,7 +347,9 @@ JSON
     git() {
       case "$*" in
         "branch --show-current") echo "current-branch"; return 0 ;;
-        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "push origin HEAD") return 0 ;;
       esac
     }
@@ -384,7 +388,9 @@ EOF
     git() {
       case "$*" in
         "branch --show-current") echo "current-branch"; return 0 ;;
-        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "add VERSION CHANGELOG.md") return 0 ;;
         "commit -m chore: bump version to 2.1.4") return 0 ;;
         "push origin HEAD") return 0 ;;
@@ -416,7 +422,9 @@ EOF
     git() {
       case "$*" in
         "branch --show-current") echo "current-branch"; return 0 ;;
-        "log main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "push origin HEAD") return 0 ;;
         *) return 0 ;;
       esac
@@ -455,6 +463,81 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" =~ "claude/refactor" ]]
   [[ "$output" =~ "--base" ]]
+}
+
+@test "14.3 _flow_pr keeps GitHub base name separate from git history ref" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "develop"; return 0; }
+    _flow_pr_base_git_ref() { echo "origin/develop"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base develop --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base develop --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log origin/develop..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base develop --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Using PR base: develop" ]]
+}
+
+@test "14.4 _flow_pr_base_git_ref prefers origin base over stale local branch" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "show-ref --verify --quiet refs/heads/main") return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    _flow_pr_base_git_ref main
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "origin/main" ]
+}
+
+@test "14.5 _flow_pr rejects local-only PR base when gh is used" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "develop"; return 0; }
+    vibe_has() { return 0; }
+    gh() { return 0; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin develop --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/develop") return 1 ;;
+        "show-ref --verify --quiet refs/heads/develop") return 0 ;;
+        "ls-remote --exit-code --heads origin develop") return 1 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base develop --title "test" --body "test"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "origin/develop not found" ]]
 }
 
 
