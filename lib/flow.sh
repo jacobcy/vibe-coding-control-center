@@ -36,9 +36,11 @@ _flow_resolve_pr_base() {
 }
 _flow_pr_base_git_ref() {
   local base_name="$1" base_ref=""
-  base_ref="$(_flow_branch_ref "$base_name")" && { echo "$base_ref"; return 0; }
+  git fetch origin "$base_name" --quiet 2>/dev/null || true
+  git show-ref --verify --quiet "refs/remotes/origin/$base_name" && { echo "origin/$base_name"; return 0; }
+  git show-ref --verify --quiet "refs/heads/$base_name" && { echo "$base_name"; return 0; }
   _flow_require_base_ref "$base_name" || return 1
-  base_ref="$(_flow_branch_ref "$base_name")" && { echo "$base_ref"; return 0; }
+  git show-ref --verify --quiet "refs/remotes/origin/$base_name" && { echo "origin/$base_name"; return 0; }
   log_error "Unable to resolve local git ref for PR base: $base_name"
   return 1
 }
@@ -128,6 +130,9 @@ _flow_pr() {
   vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
   base_name="$(_flow_resolve_pr_base "$base_name" "$branch")" || return 1
   base_git_ref="$(_flow_pr_base_git_ref "$base_name")" || return 1
+  if vibe_has gh; then
+    _flow_require_base_ref "$base_name" || return 1
+  fi
   log_info "Using PR base: $base_name"
   commit_logs=$(git log "$base_git_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_name. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
