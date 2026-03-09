@@ -7,7 +7,8 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建/切换现场（worktree + branch）"
+  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建新的物理现场（当前为 worktree + branch 过渡语义）"
+  echo "  ${GREEN}switch${NC} <name> [--branch <ref>] [--save-stash]       在当前目录进入/切换逻辑 flow"
   echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
   echo "  ${GREEN}done${NC} [--branch <ref>]                               当前/指定现场收尾（保留 worktree/branch）"
   echo "  ${GREEN}status${NC} [--branch <ref>]                             查看当前/指定分支状态"
@@ -18,13 +19,23 @@ _flow_usage() {
   echo "Options for 'new <name>':"
   echo "  --agent <name>     指定 AI 身份 (默认: claude)"
   echo "  --branch <ref>     指定创建现场时的起点分支 (默认: main)"
-  echo "  # 标准路径：先 vibe task add/update，再 vibe flow new，再 vibe flow bind"
-  echo "  # 概念边界：flow new 用 --branch；flow pr 用 --base；两者不是同义参数"
+  echo "Options for 'switch <name>':"
+  echo "  --branch <ref>     指定新逻辑 flow 的起点分支 (默认: main)"
+  echo "  --save-stash       将当前未提交改动 stash 后带入新 flow"
+  echo "  # 标准路径：当前目录串行切 flow 用 vibe flow switch；并行新物理现场用 vibe flow new / wtnew"
+  echo "  # 概念边界：flow new/new worktree 与 flow switch/reuse current worktree 不是一回事"
+  echo "  # 参数边界：flow new/switch 用 --branch；flow pr 用 --base；两者不是同义参数"
 }
 
 _flow_new_usage() { 
     echo "Usage: vibe flow new <name> [--agent=claude] [--branch=main]"
     echo "  --branch <ref>  创建 flow 时选择起点分支；不接受 --base"
+}
+
+_flow_switch_usage() {
+    echo "Usage: vibe flow switch <name> [--branch <ref>] [--save-stash]"
+    echo "  --branch <ref>     在当前目录进入新的逻辑 flow 时使用的起点分支"
+    echo "  --save-stash       将未提交改动 stash 后带入新 flow"
 }
 
 _flow_bind_usage() { 
