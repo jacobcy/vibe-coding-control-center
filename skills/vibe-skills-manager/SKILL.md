@@ -1,5 +1,5 @@
 ---
-name: vibe-skills
+name: vibe-skills-manager
 description: Use when skills are messy across IDEs, unsure which are installed globally vs project-level, need to audit/clean/recommend skills, or setting up a new worktree. **RECOMMENDED: Run as subagent to save tokens.**
 user-invokable: true
 ---
@@ -8,7 +8,7 @@ user-invokable: true
 
 AI 驱动的 Skills 生命周期管理。扫描 → 诊断 → 推荐 → 确认 → 执行。
 
-**命令边界:** `/vibe-skills` 是 skill 层审计入口；`vibe skills ...`、`npx skills ...`、`claude plugin ...` 是 shell 层工具。只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`，不要自造 flag 或子命令。
+**命令边界:** `/vibe-skills-manager` 是 skill 层审计入口；`vibe skills ...`、`npx skills ...`、`claude plugin ...` 是 shell 层工具。只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`，不要自造 flag 或子命令。
 
 ## 快速命令
 
@@ -20,16 +20,16 @@ vibe skills sync
 vibe skills check
 ```
 
-> 💡 完整交互式审计（诊断、推荐、确认）请直接对话使用 `/vibe-skills`
+> 💡 完整交互式审计（诊断、推荐、确认）请直接对话使用 `/vibe-skills-manager`
 
 ## 架构概览
 
-| 组件 | 管理方式 | 目标 Agents |
-|------|---------|-------------|
-| **Superpowers** | 全局 npx skills | Antigravity, Codex, Trae |
-| **Claude Code** | Plugin 机制 | `claude plugin add superpowers` |
-| **本地 vibe-*** | Symlink | .agent/, .trae/, .claude/ |
-| **OpenSpec** | 自己管理 | 不在此 skill 范围 |
+| 组件             | 管理方式        | 目标 Agents                     |
+| ---------------- | --------------- | ------------------------------- |
+| **Superpowers**  | 全局 npx skills | Antigravity, Codex, Trae        |
+| **Claude Code**  | Plugin 机制     | `claude plugin add superpowers` |
+| **本地 vibe-\*** | Symlink         | .agent/, .trae/, .claude/       |
+| **OpenSpec**     | 自己管理        | 不在此 skill 范围               |
 
 ## When to Use
 
@@ -42,18 +42,18 @@ vibe skills check
 
 诊断时以下 skills **不计入总数**，不触发清理建议：
 
-| 类型 | 示例 | 原因 |
-|------|------|------|
-| **流程 skills** | `openspec-*` 系列 | 工作流体系，非通用能力 |
-| **元 skills** | `find-skills`, `skill-creator`, `writing-skills`, `using-superpowers`, `vibe-skills` | 管理 skills 本身的工具 |
-| **Antigravity 独立体系** | `~/.gemini/antigravity/skills/` | 独立管理，勿计入全局 |
+| 类型                     | 示例                                                                                         | 原因                   |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ---------------------- |
+| **流程 skills**          | `openspec-*` 系列                                                                            | 工作流体系，非通用能力 |
+| **元 skills**            | `find-skills`, `skill-creator`, `writing-skills`, `using-superpowers`, `vibe-skills-manager` | 管理 skills 本身的工具 |
+| **Antigravity 独立体系** | `~/.gemini/antigravity/skills/`                                                              | 独立管理，勿计入全局   |
 
 ## 参考上限（建议值，非硬性规定）
 
-| 层级 | 建议上限 | 说明 |
-|------|---------|------|
-| 全局 | ≤ 10 个 | 排除上表各类后，通用 skills 保持精简 |
-| 项目级 | ≤ 20 个 | 排除流程/元 skills 后计算 |
+| 层级   | 建议上限 | 说明                                 |
+| ------ | -------- | ------------------------------------ |
+| 全局   | ≤ 10 个  | 排除上表各类后，通用 skills 保持精简 |
+| 项目级 | ≤ 20 个  | 排除流程/元 skills 后计算            |
 
 > 超出建议值不强制操作，仅提示用户评估是否有冗余。
 
@@ -62,11 +62,13 @@ vibe skills check
 ### Step 1: 扫描现状与上下文收集
 
 1. 取当前环境：
+
 ```bash
 npx skills ls        # 项目级 skills
 npx skills ls -g     # 全局 skills（不含 Antigravity）
 cat ~/.vibe/skills.json # 读取跨工作区白名单（如存在）
 ```
+
 2. **强制确认 IDE 偏好**：即使 AI 从过往记忆或 `~/.vibe/skills.json` 中获取了你的 IDE 偏好（例如 Trae, Antigravity），AI 也**必须向你明示并二次确认**："本次操作是否依然针对这些 IDE 下发生？"，以便后续组合精准的 `--agent` 参数。用户的意图随时会变，绝不能静默代替用户做决定。
 
 ### Step 2: 诊断（AI 分析）
@@ -74,14 +76,16 @@ cat ~/.vibe/skills.json # 读取跨工作区白名单（如存在）
 读取扫描结果，分三组分析：
 
 **A. 冗余项** — 检查：
+
 - 全局中与本项目无关的 skills（文档处理、特定框架等）
 - 项目级中与全局重复安装的通用 skills
 - 旧命名 skills（已被更新版本覆盖）
 - 超出建议上限的部分（排除流程/元 skills 后计算）
 
 **B. 推荐新增** — AI 对比执行：
-这是每次执行 `vibe-skills` 的**必设环节**，除非用户明确跳过：
-1. 读取 `skills/vibe-skills/registry.json` 获取官方推荐列表
+这是每次执行 `vibe-skills-manager` 的**必设环节**，除非用户明确跳过：
+
+1. 读取 `skills/vibe-skills-manager/registry.json` 获取官方推荐列表
 2. 读取 `CLAUDE.md` 识别当前项目技术栈
 3. 对比：找出 `recommended: true` 且当前**未**安装的 skills
 4. 按 `project_types` 匹配当前项目类型进行二次筛选
@@ -108,10 +112,12 @@ C. 是否有冷门 skill 需要清理？[y/n]
 ### Step 4: 执行（用户确认后）
 
 **🚨 关键隔离规则 (Claude Code vs 其他 Agent)**：
+
 - **对于纯 Markdown 依赖（如 Trae, Antigravity, Cline）**：统统使用 `npx skills add` 进行分发和安装。
 - **对于 Claude Code**：它拥有独立的 MCP Plugin 生态（如 `~/.claude/plugins/installed_plugins.json`）。对于第三方公共包（如 `obra/superpowers`），**禁止使用** `npx skills` 为其强行塞入低级 Markdown，必须提示用户手动使用终端原生命令：`claude plugin add superpowers`。只有我们自己写的、没有发布成插件的本地纯 Markdown 文件（如 `vibe-*`, `openspec-*`），才需要被按需链接进项目的 `.claude/skills/` 中。
 
 **执行命令参考**：
+
 ```bash
 # 安装到项目（常规 IDE 适配，排除全局向 Claude 推送）
 npx skills add obra/superpowers --agent antigravity trae --skill <name> -y
@@ -127,6 +133,7 @@ npx skills remove <name> -g -y
 ### Step 5: 同步跨项目偏好 (`~/.vibe/skills.json`)
 
 如果执行了任何更改，或发现当前项目的必要 skills 尚未写入白名单：
+
 1. 询问用户："是否要将当前项目的有效 skills 单同步到 `~/.vibe/skills.json`，以便未来新 worktree 自动安装？"
 2. 如果同意，AI 通过 shell 命令更新 `~/.vibe/skills.json`，不要在编辑器里手工直接改这个 JSON 文件。
 
@@ -134,6 +141,7 @@ npx skills remove <name> -g -y
 
 **这是让 skills 真正发挥价值的关键步骤。**
 在流程最后，AI 必须基于当前的安装状态，结合 `registry.json` 和项目实际情况，生成一份清晰的 Markdown 报告：
+
 - **按类别分组**（如：工作流、开发规范、项目特定）
 - 列出每个 skill 的**一句话使用场景**（When to use & What it does）
 - 标注支持的 IDE 范围
@@ -143,21 +151,22 @@ npx skills remove <name> -g -y
 
 ## IDE × Agent 名称
 
-| IDE | `--agent` 值 | 生态特性 |
-|-----|-------------|----------|
+| IDE         | `--agent` 值             | 生态特性                                            |
+| ----------- | ------------------------ | --------------------------------------------------- |
 | Claude Code | **不适用 (通过 Plugin)** | 第三方使用原生 Plugin，非第三方才接收 Markdown 链接 |
-| Trae | `trae` | 纯 Markdown 驱动 |
-| Antigravity | `antigravity` | 纯 Markdown 驱动 |
-| Codex | `codex` |
-| Kiro | `kiro` |
-| 所有 IDE | `*` |
+| Trae        | `trae`                   | 纯 Markdown 驱动                                    |
+| Antigravity | `antigravity`            | 纯 Markdown 驱动                                    |
+| Codex       | `codex`                  |
+| Kiro        | `kiro`                   |
+| 所有 IDE    | `*`                      |
 
 ## 用户偏好、Registry 关系与共建讨论
 
 - **`~/.vibe/skills.json`**：存放在用户个人家目录，是当前开发者的**个人偏好白名单**。
-- **`registry.json`**：存放在本项目 `skills/vibe-skills/`，是整个 Vibe 团队**推荐的技能标准库**。
+- **`registry.json`**：存放在本项目 `skills/vibe-skills-manager/`，是整个 Vibe 团队**推荐的技能标准库**。
 
 **🚨 关键：Registry 的生成与演进必须是“讨论驱动”的**：
+
 1. **非自编自导**：如果项目首次初始化 `registry.json`，AI 绝不能单方面凭借 `CLAUDE.md` 直接生成。AI 必须先抛出**推荐草稿**，与用户讨论："基于识别到的技术栈，我建议将以下 [N] 个工具划为必装推荐，你觉得增删哪些？" 达成共识后才可生成文件。
 2. **向外扩展 (Add-to-Registry)**：当用户要求安装一个全新的第三方神器技能时，AI 必须主动发问："这个新技能很好用，是否需要纳入我们的 `registry.json` 成为项目级的团队标准？这需要配置 categories 和 level。" 经过一问一答，再提交 PR 固化知识。
 

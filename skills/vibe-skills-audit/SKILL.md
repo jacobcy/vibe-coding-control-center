@@ -1,5 +1,5 @@
 ---
-name: vibe-skill
+name: vibe-skill-audit
 description: Create, update, review, or audit Vibe project skills under `skills/` when the user wants a Vibe-specific skill workflow rather than a generic skill. Use for: creating a new `vibe-*` skill, tightening an existing skill's Shell boundary, checking whether a skill cites the correct `docs/standards/*` truth sources, verifying referenced `bin/vibe` commands are real, or warning when standards have drifted ahead of a skill.
 ---
 
@@ -35,7 +35,7 @@ If the target skill only manages local installation or runtime linking, only cit
 
 ## Mode 1: Create Or Update A Vibe Skill
 
-1. Confirm the skill belongs under `skills/` and is not just an update to `skills/vibe-skills/`.
+1. Confirm the skill belongs under `skills/` and is not just an update to `skills/vibe-skills-manager/`.
 2. If creating from scratch, initialize the folder with the shared initializer:
    ```bash
    python3 /Users/jacobcy/.codex/skills/.system/skill-creator/scripts/init_skill.py <skill-name> --path skills --resources scripts,references --interface display_name="..." --interface short_description="..." --interface default_prompt="Use $<skill-name> ..."
@@ -56,7 +56,7 @@ If the target skill only manages local installation or runtime linking, only cit
 Run the repository-local audit helper first:
 
 ```bash
-bash skills/vibe-skill/scripts/audit-skill-references.sh skills/<target>/SKILL.md
+bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/<target>/SKILL.md
 ```
 
 Then inspect the target skill with this order:

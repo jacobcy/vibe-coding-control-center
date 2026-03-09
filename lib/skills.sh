@@ -15,7 +15,7 @@ _skills_help() {
     echo "  ${GREEN}sync${NC}      一键同步所有 skills（Claude plugin + 全局 + 本地）"
     echo "  ${GREEN}check${NC}     检查各 Agent skills 状态"
     echo ""
-    echo "💡 物理同步后，建议在对话中使用 ${CYAN}/vibe-skills${NC} 进行逻辑确认。"
+    echo "💡 物理同步后，建议在对话中使用 ${CYAN}/vibe-skills-manager${NC} 进行逻辑确认。"
 }
 
 vibe_skills() {

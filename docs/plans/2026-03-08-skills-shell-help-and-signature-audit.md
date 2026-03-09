@@ -49,7 +49,7 @@
 - Modify: `skills/vibe-done/SKILL.md`
 - Modify: `skills/vibe-roadmap/SKILL.md`
 - Modify: `skills/vibe-save/SKILL.md`
-- Modify: `skills/vibe-skills/SKILL.md`
+- Modify: `skills/vibe-skills-manager/SKILL.md`
 - Modify: `skills/vibe-task/SKILL.md`
 
 **Step 1: 写出统一文案块**
@@ -90,7 +90,7 @@ Expected: 无命中。
 
 **Files:**
 - Modify: `skills/vibe-done/SKILL.md`
-- Modify: `skills/vibe-skills/SKILL.md`
+- Modify: `skills/vibe-skills-manager/SKILL.md`
 - Modify: `skills/vibe-continue/SKILL.md`
 - Modify: `skills/vibe-save/SKILL.md`
 
@@ -178,7 +178,7 @@ Expected:
 - `skills/vibe-done/SKILL.md`
 - `skills/vibe-roadmap/SKILL.md`
 - `skills/vibe-save/SKILL.md`
-- `skills/vibe-skills/SKILL.md`
+- `skills/vibe-skills-manager/SKILL.md`
 - `skills/vibe-task/SKILL.md`
 - `.agent/workflows/vibe-new.md`
 - `.agent/workflows/vibe-continue.md`

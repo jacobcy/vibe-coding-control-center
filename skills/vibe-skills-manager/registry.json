@@ -185,7 +185,7 @@
                 "description": "恢复之前的工作"
             },
             {
-                "name": "vibe-skills",
+                "name": "vibe-skills-manager",
                 "category": "meta",
                 "description": "Skills 生命周期管理"
             },

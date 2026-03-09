@@ -3,7 +3,7 @@
 > **日期**: 2026-02-25
 > **状态**: 已批准
 > **前置**: [架构审计报告](../audits/2026-02-25-architecture-audit.md)
-> **取代**: [Rebuild Plan](2026-02-25-vibe-rebuild-v2.md) + [Governance Design](2026-02-25-vibe-skills-governance-design.md)
+> **取代**: [Rebuild Plan](2026-02-25-vibe-rebuild-v2.md) + [Governance Design](2026-02-25-vibe-skills-manager-governance-design.md)
 
 ---
 
@@ -350,7 +350,7 @@ shellcheck v2/lib/*.sh v2/bin/vibe
 
 ## 8. 关于治理设计的处置
 
-[Skills 治理体系设计](2026-02-25-vibe-skills-governance-design.md) 中的认知洞察已被吸收到本计划：
+[Skills 治理体系设计](2026-02-25-vibe-skills-manager-governance-design.md) 中的认知洞察已被吸收到本计划：
 
 | 原计划内容 | 吸收方式 | 位置 |
 |-----------|---------|------|
