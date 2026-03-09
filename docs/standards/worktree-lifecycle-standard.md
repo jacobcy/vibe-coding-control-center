@@ -51,6 +51,7 @@ related_docs:
 - 新 `flow` 不强制要求新 `worktree`
 - 复用同一目录承载新的 `flow` 是允许的
 - 但复用目录时，必须显式切换到新的 `branch`
+- 复用目录进入新的逻辑 `flow` 时，应通过正式 flow 切换能力完成，而不是靠目录名暗示
 
 ## 3. Create and Reuse Rules
 
@@ -75,6 +76,7 @@ related_docs:
 - 当前 `flow` 语义已经结束或冻结
 - 当前目录切到新的 `branch`
 - 新目录语义只服务一个新的当前交付目标
+- 当前目录的 flow runtime 记录已同步到新的 `branch` / `flow` 语义
 
 ## 4. Residual Changes
 
@@ -97,6 +99,7 @@ related_docs:
 - 复用同一个 `worktree`
 - 将当前未提交改动带入新的 `branch`
 - 让该目录开始承载新的 `flow`
+- 标准入口应是显式的 flow 切换命令；游离脚本只能作为兼容包装存在
 
 该模式不是：
 

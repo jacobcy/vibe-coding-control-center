@@ -69,6 +69,7 @@ related_docs:
 - 开下一个 `flow` 的关键是切换到新的交付目标与新的 `branch`
 - 不要求必须新建 `worktree`
 - 但不得让同一个 `flow` 同时承载多个当前 `pr` 目标
+- 复用当前目录串行进入下一个 `flow` 时，应显式执行 flow 切换，而不是把旧 `flow` 继续伪装成新目标
 
 ## 3. Happy Path
 
@@ -114,6 +115,7 @@ related_docs:
 - 保留上层 `roadmap item` / `issue`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
+- 若复用当前目录，使用 `vibe flow switch` 一类显式 flow 切换能力进入新 `flow`
 
 ## 5. Exception Paths
 
@@ -191,6 +193,7 @@ related_docs:
 - `flow` 名、`branch` 语义、`pr` 目标应尽量一致
 - 目录是否变化不是首要判断条件
 - 若复用同一 `worktree`，也必须显式切换到新的 `branch` 与新的 `flow` 语义
+- 并行推进多个交付目标时，优先新建物理 `worktree`；串行推进下一个交付目标时，优先复用当前目录并显式切换 `flow`
 
 ## 7. Branch Protection
 
