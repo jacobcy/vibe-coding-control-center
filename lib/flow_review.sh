@@ -170,7 +170,7 @@ _flow_review_local() {
 _flow_review_usage() {
   echo "${BOLD}Vibe Flow Review${NC}"
   echo ""
-  echo "Usage: ${CYAN}vibe flow review${NC} [options] [--branch <ref>]"
+  echo "Usage: ${CYAN}vibe flow review${NC} [options] [<pr-or-branch>|--branch <ref>]"
   echo ""
   echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
   echo ""
