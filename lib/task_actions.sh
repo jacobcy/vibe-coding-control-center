@@ -10,13 +10,14 @@ _vibe_task_validate_roadmap_items() {
 
     roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
     [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
+    jq empty "$roadmap_file" >/dev/null 2>&1 || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
 
     missing_ids="$(jq -nr --argjson roadmap_item_ids "$roadmap_item_ids_json" --slurpfile roadmap "$roadmap_file" '
       ($roadmap[0].items // [] | map(.roadmap_item_id)) as $existing
       | $roadmap_item_ids[]
       | . as $target
       | select($existing | index($target) | not)
-    ' 2>/dev/null)"
+    ')" || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
 
     if [[ -n "$missing_ids" ]]; then
         first_missing="$(printf '%s\n' "$missing_ids" | sed -n '1p')"

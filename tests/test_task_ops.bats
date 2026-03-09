@@ -211,6 +211,24 @@ JSON
   [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .linked_task_ids | length' "$fixture/vibe/roadmap.json")" = "0" ]
 }
 
+@test "ops: update fails fast on invalid roadmap json without partial write" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{"schema_version":"v2","items":[
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --roadmap-item rm-1
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "0" ]
+}
+
 @test "ops: update maps legacy status names to standard status" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
