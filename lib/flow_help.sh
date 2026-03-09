@@ -23,12 +23,12 @@ _flow_usage() {
 }
 
 _flow_new_usage() { 
-    echo "Usage: vibe flow new <name> [--agent=claude] [--branch=main]"
+    echo "Usage: vibe flow new <name> [--agent <name>] [--branch <ref>]"
     echo "  --branch <ref>  创建 flow 时选择起点分支；不接受 --base"
 }
 
 _flow_bind_usage() { 
-    echo "Usage: vibe flow bind <task-id> [--agent=claude]"
+    echo "Usage: vibe flow bind <task-id> [--agent <name>]"
 }
 
 _flow_pr_usage() {
