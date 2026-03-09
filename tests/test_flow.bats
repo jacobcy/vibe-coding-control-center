@@ -44,6 +44,7 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ "@openai/codex" ]]
   [[ ! "$output" =~ "@anthropic/codex" ]]
+  [[ "$output" =~ "[<pr-or-branch>|--branch <ref>]" ]]
 }
 
 @test "2. vibe flow new without args returns error" {
@@ -73,6 +74,74 @@ JSON
   run vibe flow status
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Not in a worktree" ]]
+}
+
+@test "3.1 _flow_status --branch resolves tasks from matching worktree branch" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude"},
+  {"task_id":"task-side","title":"Side Task","status":"todo","next_step":"Gate 2","assigned_worktree":"wt-claude-refactor","agent":"claude"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","branch":"feature/refactor","current_task":"task-main","tasks":["task-main","task-side"]}
+]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
+      return 0
+    }
+    _flow_status --branch feature/refactor --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"task_id": "task-main"' ]]
+  [[ "$output" =~ '"task_id": "task-side"' ]]
+}
+
+@test "3.2 _flow_status keeps positional task id fallback" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
+      return 0
+    }
+    _flow_status task-main --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"task_id": "task-main"' ]]
 }
 
 @test "4. _detect_feature extracts feature from dir name" {
@@ -292,6 +361,59 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Flow wrap-up complete for branch" ]]
   [[ "$output" =~ "Environment preserved" ]]
+}
+
+@test "11.2 _flow_done rejects unknown options" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_done --branhc feature-branch
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Unknown option" ]]
+  [[ "$output" =~ "Usage:" ]]
+}
+
+@test "11.3 _flow_done blocks main worktree even for explicit target branch" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "main"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 0; }
+    _flow_done --branch feature-branch
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "protected" ]]
+}
+
+@test "11.4 _flow_done accepts remote branch refs" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "branch --show-current") echo "other-branch"; return 0 ;;
+        "show-ref --verify --quiet refs/heads/origin/feature-branch") return 1 ;;
+        "show-ref --verify --quiet refs/heads/feature-branch") return 1 ;;
+        "show-ref --verify --quiet refs/remotes/origin/feature-branch") return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..origin/feature-branch") echo ""; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done --branch origin/feature-branch
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "origin/feature-branch" ]]
 }
 
 @test "12. _flow_pr skips bump if PR already exists" {
