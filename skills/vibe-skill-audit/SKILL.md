@@ -9,15 +9,16 @@ description: Create, update, review, or audit Vibe project skills under `skills/
 
 Use this skill to govern Vibe-native skills. It wraps generic skill creation with Vibe's stricter rules around Shell boundaries, standards citations, and flow lifecycle semantics.
 
+本 skill 只负责校验和收敛 skill 文案，不负责在这里重新定义 `flow`、`workflow`、`worktree`、`branch`、shared-state 或 Shell 边界语义。相关语义一律引用标准文件。
+
 Read [review-checklist.md](./references/review-checklist.md) before substantial work. Use the checklist both when creating a new skill and when auditing an existing one.
 
 ## Hard Boundary
 
-- Treat `skills/` as the only canonical source for Vibe-owned skill definitions.
-- Do not treat `.agent/skills/` as editable source; it is runtime linkage only. See `docs/standards/skill-standard.md`.
-- Do not edit `.git/vibe/*.json` directly from a skill workflow. Shared-state writes must go through real `bin/vibe` subcommands. See `docs/standards/command-standard.md` and `docs/standards/shell-capability-design.md`.
-- Do not restate term definitions that already belong in `docs/standards/glossary.md` or action semantics that belong in `docs/standards/action-verbs.md`.
-- If a required Shell capability is missing, report `Capability Gap` instead of inventing a direct-file workaround.
+- `skills/` 是 Vibe 自有 skill 定义的唯一源码；`.agent/skills/` 只是运行时链接层。见 `docs/standards/skill-standard.md`。
+- 共享状态相关写入只能通过真实 `bin/vibe` 命令完成；不要在 skill 中直接改 `.git/vibe/*.json`。见 `docs/standards/command-standard.md` 和 `docs/standards/shell-capability-design.md`。
+- 术语定义与边界语义只引用真源，不在本 skill 中复述。术语见 `docs/standards/glossary.md`，动作词默认语义见 `docs/standards/action-verbs.md`。
+- 如果需要的 Shell 能力不存在，结论应为 `Capability Gap`，而不是在 skill 文案中发明 workaround。
 
 ## Truth Sources
 
@@ -33,6 +34,12 @@ When the skill touches the corresponding semantic area, cite these files directl
 
 If the target skill only manages local installation or runtime linking, only cite the subset that actually governs that behavior.
 
+引用原则：
+
+- 只引用与当前语义范围直接相关的标准文件。
+- 引用标准时优先说“以某标准为准”，不要在 skill 里再展开第二套解释。
+- 如果为了说明边界必须举例，例子也只能用于帮助理解，不能取代标准定义。
+
 ## Mode 1: Create Or Update A Vibe Skill
 
 1. Confirm the skill belongs under `skills/` and is not just an update to `skills/vibe-skills-manager/`.
@@ -44,6 +51,7 @@ If the target skill only manages local installation or runtime linking, only cit
    - keep the trigger description precise
    - state Shell boundary explicitly
    - cite the governing standards instead of redefining them
+   - when semantics are already defined in standards, replace prose duplication with direct references
 4. Add only the minimum supporting resources actually needed. Prefer one checklist/reference file over many thin docs.
 5. Validate structure:
    ```bash
@@ -64,7 +72,7 @@ Then inspect the target skill with this order:
 1. Check whether the skill cites the right standards for its semantic scope.
 2. Check whether it asks the agent to use real `bin/vibe` commands that exist today.
 3. Check whether it turns Shell audit commands into hidden repair commands.
-4. Check whether it confuses `roadmap`, `task`, `flow`, `workflow`, `branch`, or `worktree`.
+4. Check whether it paraphrases standards so loosely that `roadmap`, `task`, `flow`, `workflow`, `branch`, or `worktree` become ambiguous.
 5. Check whether a newer standards file likely invalidates part of the skill text.
 
 ## Output Contract
