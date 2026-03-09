@@ -29,12 +29,17 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Flow switch to feature-safe: saved WIP") exit 0 ;;
+      "stash push -u -m vibe-flow:new:feature-safe:"*) exit 0 ;;
+      "rev-parse -q --verify refs/stash") printf 'deadbeef1234567890\n'; exit 0 ;;
+      "stash list --format=%H %gd") printf 'deadbeef1234567890 stash@{0}\n'; exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
       "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
       "checkout -b feature-safe feature-old") exit 0 ;;
-      "stash pop") exit 0 ;;
+      "show-ref --verify --quiet refs/remotes/origin/feature-safe") exit 1 ;;
+      "ls-remote --exit-code --heads origin feature-safe") exit 2 ;;
+      "stash apply stash@{0}") exit 0 ;;
+      "stash drop stash@{0}") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -88,10 +93,15 @@ case "${MOCK_MODE:-}" in
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") printf 'claude/refactor\n'; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Flow switch to feature-safe: saved WIP") exit 0 ;;
+      "stash push -u -m vibe-flow:new:feature-safe:"*) exit 0 ;;
+      "rev-parse -q --verify refs/stash") printf 'deadbeef1234567890\n'; exit 0 ;;
+      "stash list --format=%H %gd") printf 'deadbeef1234567890 stash@{0}\n'; exit 0 ;;
       "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
       "checkout -b feature-safe claude/refactor") exit 0 ;;
-      "stash pop") exit 0 ;;
+      "show-ref --verify --quiet refs/remotes/origin/feature-safe") exit 1 ;;
+      "ls-remote --exit-code --heads origin feature-safe") exit 2 ;;
+      "stash apply stash@{0}") exit 0 ;;
+      "stash drop stash@{0}") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -109,8 +119,10 @@ EOF
   run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_requires_u VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
   [ "$status" -eq 0 ]
-  grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  grep -Eq "stash push -u -m vibe-flow:new:feature-safe:" "$LOG_FILE"
   grep -q "checkout -b feature-safe feature-old" "$LOG_FILE"
+  grep -q "stash apply stash@{0}" "$LOG_FILE"
+  grep -q "stash drop stash@{0}" "$LOG_FILE"
   ! grep -q "branch -D feature-old" "$LOG_FILE"
   ! grep -q "push origin --delete feature-old" "$LOG_FILE"
   ! grep -q "fetch origin main --quiet" "$LOG_FILE"
@@ -132,7 +144,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "generic workflow name" ]]
-  ! grep -q "stash push -u -m Flow switch to refactor: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting detached HEAD" {
@@ -141,7 +153,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Not on a branch" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting same branch name" {
@@ -150,7 +162,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Target branch matches current branch" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-old: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate rejects protected branches before stashing" {
@@ -159,7 +171,7 @@ EOF
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
-  ! grep -q "stash push -u -m Flow switch to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate updates worktrees dashboard branch for current worktree" {

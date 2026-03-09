@@ -27,7 +27,7 @@ is_generic_workflow_name() {
 new_task="${1:-}"
 if [[ -z "$new_task" ]]; then
     echo "Usage: $0 <new-branch-name>"
-    echo "  兼容入口：委托给 vibe flow switch --save-stash"
+    echo "  兼容入口：委托给内部 flow new 逻辑，并保留原始 branch 名称"
     exit 1
 fi
 
@@ -53,4 +53,4 @@ if [[ -z "$old_branch" ]]; then
     exit 1
 fi
 _flow_switch_target_branch() { echo "$1"; }
-_flow_switch "$new_task" --branch "$old_branch" --save-stash
+_flow_new "$new_task" --branch "$old_branch" --save-unstash
