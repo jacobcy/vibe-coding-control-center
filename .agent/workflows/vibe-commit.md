@@ -56,6 +56,16 @@ tags: [workflow, vibe, git, commit, pr]
    - move the relevant change slice to the new branch first
 >>>>>>> ee66d77 (docs(commit): add dirty-worktree and PR-slicing flow)
 
+   For serial multi-PR delivery, follow this exact playbook:
+   - enumerate commit groups first
+   - for each group, switch into a fresh flow from the correct base, usually `origin/main`
+   - move only that group's commits with `git cherry-pick <commit...>`
+   - verify that slice
+   - publish it with `vibe flow pr --base <ref>`
+   - only then continue to the next group
+
+   Do not improvise alternate history surgery unless the user explicitly asks for it.
+
 8. **Post-Commit PR Proposal**
    Once the correct branch is clean and semantically valid, you may propose PR publication.
    Before drafting any PR command:
