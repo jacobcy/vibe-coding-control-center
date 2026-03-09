@@ -26,7 +26,7 @@ commands:
             required: false
             default: "main"
         returns: "0 on success"
-        example: "vibe flow start my-feature --branch develop --agent=claude"
+        example: "vibe flow start my-feature --branch develop --agent claude"
       - name: review
         description: "Pre-PR 检查清单 + lazygit"
         parameters:
@@ -42,6 +42,15 @@ commands:
             type: string
             required: false
           - name: "--bump"
+            type: string
+            required: false
+          - name: "--title"
+            type: string
+            required: false
+          - name: "--body"
+            type: string
+            required: false
+          - name: "--msg"
             type: string
             required: false
         returns: "0 on success"

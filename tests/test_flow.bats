@@ -457,6 +457,36 @@ EOF
   [[ "$output" =~ "--base" ]]
 }
 
+@test "14.3 _flow_pr keeps GitHub base name separate from git history ref" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "develop"; return 0; }
+    _flow_pr_base_git_ref() { echo "origin/develop"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base develop --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base develop --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "log origin/develop..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base develop --title "test" --body "test"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Using PR base: develop" ]]
+}
+
 
 
 @test "14. vibe flow start with path feature does not auto-create or bind task" {
