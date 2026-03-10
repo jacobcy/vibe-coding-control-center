@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.8] - 2026-03-10
+
+### ✨ Changed
+- Align task/flow worktree root semantics and skill routing.
+
 ## [2.1.7] - 2026-03-10
 
 ### ✨ Changed
