@@ -10,6 +10,8 @@ description: Use when the user wants to save session context, says "/save", or w
 **核心原则:** 保存现在，延续未来。
 **审阅优先原则:** 在任何写入操作之前，必须优先审阅目标文件的已有内容。若发现已有内容存在陈旧、错误或冲突（如状态不一致、陈旧的 next_step 等），必须先进行修正对齐，然后再追加或更新本次会话的新内容。不允许无视已有错误直接堆砌新内容。
 
+**语义边界:** `/save` 只沉积认知与 execution record 进度，不决定 `repo issue`、`GitHub Project item` / `roadmap item` 或 milestone 的规划语义。
+
 
 **Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
 

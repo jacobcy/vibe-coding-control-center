@@ -5,7 +5,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 # /vibe-roadmap - 智能调度器
 
-维护全景路线图，管理版本目标，对 roadmap item 进行分类，决定规划窗口纳入什么。
+维护 mirrored GitHub Project items，管理 milestone / 兼容性的版本目标，对 roadmap item 的 `type` 和规划窗口进行调度。
 
 **核心原则:** CLI 负责读写数据，skill 负责调度决策。
 
@@ -34,9 +34,9 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 运行 `bin/vibe roadmap status` 获取当前版本目标状态：
 
-- 当前版本目标是什么
-- 有哪些 Issue 等待分类
-- 各个分类下有多少 Issue
+- 当前 milestone / 规划窗口是什么
+- 有哪些 repo issue 等待进入 GitHub Project / roadmap
+- 各个 roadmap item `type` 和状态下有多少项
 
 ### Step 2: 调度决策
 
@@ -48,7 +48,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 - 要求人类讨论确定目标
 
 **场景 B: 有版本目标但有新 Issue**
-- 对新 Issue 进行分类：P0/当前版本/下一个版本/延期/拒绝
+- 对新 repo issue 对应的 roadmap item 进行分类：P0/当前版本/下一个版本/延期/拒绝
 - 按优先级排序
 
 **场景 C: 版本结束**
@@ -83,6 +83,7 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 - 检查是否有版本目标
 - 无目标 → 要求人类讨论确定
 - 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 task
+- 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 execution records
 - 是否拆 task、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
 
 ## Issue 分类状态
@@ -105,9 +106,9 @@ description: Use when user wants to manage roadmap, version goals, issue classif
 
 ## Terminology Contract
 
-- `版本目标`: 当前版本要完成的目标
-- `许愿池`: GitHub Issues (需求池)
-- `Issue`: 心愿，不是具体任务
-- `Roadmap Item`: 规划层工作单元，不等于 task
-- `Task`: 具体的执行单元，最小单位
+- `版本目标`: 对 milestone 的兼容性文本表达
+- `repo issue`: 需求来源层对象
+- `Roadmap Item`: mirrored GitHub Project item
+- `feature` / `task` / `bug`: roadmap item 的 `type`
+- `Task`: execution record，不是另一套产品规划对象
 - `Flow`: task 的运行时容器，通常绑定一个 worktree / branch

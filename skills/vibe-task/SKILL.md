@@ -5,9 +5,14 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 
 # /vibe-task - Cross-Worktree Task Overview & Audit
 
-查看当前仓库下各个 worktree 绑定的任务总览，并给出下一步优先进入哪个 worktree 的建议。同时也支持核对任务注册完整性和修复数据质量问题。
+查看当前仓库下各个 worktree 绑定的 execution record 总览，并给出下一步优先进入哪个 worktree 的建议。同时也支持核对任务注册完整性和修复数据质量问题。
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
+
+**语义边界补充:**
+- 本地 `task` 是 execution record / runtime record
+- `roadmap item` 是 mirrored GitHub Project item
+- roadmap item 的 `type=task` 不等于本地 task record；前者是规划类型，后者是执行记录
 
 **Announce at start:**
 - Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的任务总览。"
@@ -808,6 +813,7 @@ AI 层文档扫描: 1 个任务
 - `next step`
 - `dirty`
 - `clean`
+- `execution record`
 
 **Audit:**
 - `数据质量` (data quality)
@@ -817,6 +823,8 @@ AI 层文档扫描: 1 个任务
 - `健康度` (health)
 - `修复` (repair/fix)
 - `核对` (audit/check)
+- `repo issue`
+- `type=task`
 
 不要改写成其他近义词。
 
@@ -866,4 +874,3 @@ Phase 1-6: 主审计流程
 ```
 
 **价值:** 确保在进行项目审计时，任务注册数据是完整和准确的，从而提供更可靠的审计结果。
-
