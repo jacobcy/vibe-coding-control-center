@@ -26,6 +26,8 @@ _vibe_task_collect_openspec_tasks() {
                     framework: (.framework // "openspec"),
                     source_path: (.source_path // ("openspec/changes/" + $cid)),
                     status: (.status // "todo"),
+                    spec_standard: "openspec",
+                    spec_ref: (.source_path // ("openspec/changes/" + $cid)),
                     current_subtask_id: null,
                     runtime_worktree_name: null,
                     assigned_worktree: null,
@@ -55,7 +57,7 @@ _vibe_task_collect_openspec_tasks() {
             task_json="$(jq -nc --arg task_id "$change_name" --arg title "$change_name" \
                 --arg framework "openspec" --arg source_path "openspec/changes/$change_name" \
                 --arg status "$change_status" --arg next_step "$next_step" \
-                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
+                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,spec_standard:"openspec",spec_ref:$source_path,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
         fi
 
         jq --argjson t "$task_json" '. += [$t]' "$aggregate_file" > "$aggregate_file.tmp" && mv "$aggregate_file.tmp" "$aggregate_file"
@@ -160,7 +162,10 @@ _vibe_task_list() {
               | unique_by(.task_id)
               | map(.status = ((.status // "todo") | norm_status))
               | map(.source_type = norm_source)
+              | map(.spec_standard = (.spec_standard // (if .source_type == "openspec" then "openspec" else "none" end)))
+              | map(.spec_ref = (.spec_ref // null))
               | map(.runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null))
+              | map(del(.github_project_item_id, .content_type))
               | map(select(
                   ($status == "" or .status == $status)
                   and ($source == "" or .source_type == $source)
@@ -203,6 +208,9 @@ _vibe_task_list() {
             | unique_by(.task_id)
             | map(.status = ((.status // "todo") | norm_status))
             | map(.source_type = norm_source)
+            | map(.spec_standard = (.spec_standard // (if .source_type == "openspec" then "openspec" else "none" end)))
+            | map(.spec_ref = (.spec_ref // null))
+            | map(del(.github_project_item_id, .content_type))
             | map(select(
                 ($status == "" or .status == $status)
                 and ($source == "" or .source_type == $source)
@@ -280,8 +288,11 @@ _vibe_task_show() {
          | .title = ($reg.title // .title)
          | .status = (($reg.status // .status // "todo") | norm_status)
          | .subtasks = (.subtasks // [])
+         | .spec_standard = ($reg.spec_standard // .spec_standard // "none")
+         | .spec_ref = ($reg.spec_ref // .spec_ref // null)
          | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
-         | .next_step = (.next_step // null)' )"
+         | .next_step = (.next_step // null)
+         | del(.github_project_item_id, .content_type)' )"
 
     if [[ "$json_out" == "1" ]]; then
         echo "$merged_json"

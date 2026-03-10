@@ -46,14 +46,14 @@ _vibe_task_sync_roadmap_links() {
 }
 
 _vibe_task_update() {
-    local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve"
+    local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve" spec_standard="" spec_ref="" spec_mode="preserve"
     local -a issue_refs roadmap_item_ids
     shift $(( $# > 0 ? 1 : 0 ))
     [[ "$task_id" == "-h" || "$task_id" == "--help" ]] && { _vibe_task_usage; return 0; }
     [[ -n "$task_id" ]] || { vibe_die "Missing task id for update"; return 1; }
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --status|--agent|--worktree|--branch|--next-step|--pr)
+            --status|--agent|--worktree|--branch|--next-step|--pr|--spec-standard|--spec-ref)
                 [[ $# -ge 2 ]] || { vibe_die "Missing value for $1"; return 1; }
                 case "$1" in
                     --status) task_status="$2" ;;
@@ -62,8 +62,14 @@ _vibe_task_update() {
                     --branch) branch="$2" ;;
                     --next-step) next_step="$2" ;;
                     --pr) pr_ref="$2"; pr_mode="set" ;;
+                    --spec-standard) spec_standard="$2"; spec_mode="set" ;;
+                    --spec-ref) spec_ref="$2"; spec_mode="set" ;;
                 esac
                 shift 2
+                ;;
+            --github-project-item-id|--content-type)
+                vibe_die "GitHub Project item identity must not be written via vibe task"
+                return 1
                 ;;
             --issue)
                 [[ $# -ge 2 ]] || { vibe_die "Missing value for --issue"; return 1; }
@@ -84,13 +90,16 @@ _vibe_task_update() {
             *) vibe_die "Unknown update option: $1"; return 1 ;;
         esac
     done
-    [[ -n "$task_status$agent$worktree$branch$next_step$pr_ref" || "$bind_current" == "true" || "$unassign" == "true" || "$issue_mode" == "append" || "$roadmap_mode" == "append" ]] || { vibe_die "No update fields provided"; return 1; }
+    [[ -n "$task_status$agent$worktree$branch$next_step$pr_ref$spec_standard$spec_ref" || "$bind_current" == "true" || "$unassign" == "true" || "$issue_mode" == "append" || "$roadmap_mode" == "append" ]] || { vibe_die "No update fields provided"; return 1; }
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; worktrees_file="$common_dir/vibe/worktrees.json"; now="$(_vibe_task_now)"
     _vibe_task_require_file "$registry_file" "registry.json" || return 1; _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
     if [[ -n "$task_status" ]]; then
         task_status="$(_vibe_task_normalize_and_validate_status "$task_status")" || { vibe_die "Invalid task status: $task_status"; return 1; }
+    fi
+    if [[ "$spec_mode" == "set" ]]; then
+        spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "${spec_standard:-none}")" || { vibe_die "Invalid spec standard: ${spec_standard:-}"; return 1; }
     fi
     if [[ -n "$agent" ]]; then
         case "$agent" in codex|antigravity|trae|claude|opencode|kiro) ;; *) [[ "$force" -eq 1 ]] || { vibe_die "Unsupported agent: $agent"; return 1; } ;; esac
@@ -116,7 +125,7 @@ _vibe_task_update() {
     fi
     _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     [[ -z "$target_name" ]] && target_name="$worktree"
-    _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$target_path" "$branch" "$assigned_mode" "$agent" "$now" "$issue_refs_json" "$issue_mode" "$roadmap_item_ids_json" "$roadmap_mode" "$pr_ref" "$pr_mode" || return 1
+    _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$target_path" "$branch" "$assigned_mode" "$agent" "$now" "$issue_refs_json" "$issue_mode" "$roadmap_item_ids_json" "$roadmap_mode" "$pr_ref" "$pr_mode" "$spec_standard" "$spec_ref" "$spec_mode" || return 1
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
@@ -128,10 +137,10 @@ _vibe_task_update() {
     return 0
 }
 _vibe_task_add() {
-    local task_id="" title="" common_dir registry_file task_file now tmp pr_ref=""
+    local task_id="" title="" common_dir registry_file task_file now tmp pr_ref="" spec_standard="none" spec_ref=""
     local -a issue_refs roadmap_item_ids
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        echo "Usage: vibe task add <title> [--id <task-id>] [--issue <ref>]... [--roadmap-item <id>]... [--pr <ref>]"
+        echo "Usage: vibe task add <title> [--id <task-id>] [--issue <ref>]... [--roadmap-item <id>]... [--pr <ref>] [--spec-standard <standard>] [--spec-ref <ref>]"
         return 0
     fi
     if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then title="$1"; shift; fi
@@ -142,10 +151,17 @@ _vibe_task_add() {
             --issue) issue_refs+=("$2"); shift 2 ;;
             --roadmap-item) roadmap_item_ids+=("$2"); shift 2 ;;
             --pr) pr_ref="$2"; shift 2 ;;
+            --spec-standard) spec_standard="$2"; shift 2 ;;
+            --spec-ref) spec_ref="$2"; shift 2 ;;
+            --github-project-item-id|--content-type)
+                vibe_die "GitHub Project item identity must not be written via vibe task"
+                return 1
+                ;;
             *) vibe_die "Unknown add option: $1"; return 1 ;;
         esac
     done
     [[ -n "$title" ]] || { vibe_die "Missing title for task add"; return 1; }
+    spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "$spec_standard")" || { vibe_die "Invalid spec standard: $spec_standard"; return 1; }
     if [[ -z "$task_id" ]]; then local slug; slug="$(_vibe_task_slugify "$title")"; task_id="$(_vibe_task_today)-$slug"; fi
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"; now="$(_vibe_task_now)"
@@ -160,7 +176,7 @@ _vibe_task_add() {
     fi
     _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     mkdir -p "$(dirname "$task_file")"; tmp="$(mktemp)" || return 1
-    jq --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \
+    jq --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --arg spec_standard "$spec_standard" --arg spec_ref "$spec_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \
       '.tasks += [{
         task_id:$task_id,
         title:$title,
@@ -179,13 +195,15 @@ _vibe_task_add() {
         runtime_branch:null,
         runtime_agent:null,
         assigned_worktree:null,
+        spec_standard:$spec_standard,
+        spec_ref:(if $spec_ref == "" then null else $spec_ref end),
         next_step:null,
         created_at:$now,
         updated_at:$now,
         completed_at:null,
         archived_at:null
       }]' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file" || return 1
-    jq -n --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \
+    jq -n --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --arg spec_standard "$spec_standard" --arg spec_ref "$spec_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \
       '{
         task_id:$task_id,
         title:$title,
@@ -204,6 +222,8 @@ _vibe_task_add() {
         runtime_branch:null,
         runtime_agent:null,
         assigned_worktree:null,
+        spec_standard:$spec_standard,
+        spec_ref:(if $spec_ref == "" then null else $spec_ref end),
         next_step:null,
         created_at:$now,
         updated_at:$now,

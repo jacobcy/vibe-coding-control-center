@@ -44,6 +44,23 @@ _vibe_task_is_valid_status() {
         *) return 1 ;;
     esac
 }
+_vibe_task_is_valid_spec_standard() {
+    case "$1" in
+        openspec|kiro|superpowers|supervisor|none) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+_vibe_task_normalize_spec_standard() {
+    local raw="${1:-none}"
+    [[ -n "$raw" ]] || raw="none"
+    echo "${raw:l}"
+}
+_vibe_task_normalize_and_validate_spec_standard() {
+    local normalized
+    normalized="$(_vibe_task_normalize_spec_standard "$1")"
+    _vibe_task_is_valid_spec_standard "$normalized" || return 1
+    echo "$normalized"
+}
 _vibe_task_normalize_and_validate_status() {
     local normalized
     normalized="$(_vibe_task_normalize_status "$1")"
