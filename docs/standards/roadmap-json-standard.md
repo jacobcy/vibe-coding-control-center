@@ -8,7 +8,7 @@ authority:
   - roadmap-item-fields
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -19,18 +19,18 @@ related_docs:
 
 # `roadmap.json` 标准
 
-本文档定义 `roadmap.json` 的最终文件结构。它是规划态共享真源，只表达规划项和版本目标，不表达执行层或现场层事实。
+本文档定义 `roadmap.json` 的最终文件结构。它是规划态共享真源，只表达 mirrored `GitHub Project item`、规划窗口和兼容性的版本目标，不表达执行层或现场层事实。
 
-本文档涉及的 `roadmap item`、`task`、`issue`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `roadmap item`、`task`、`repo issue`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. File Responsibility
 
 `roadmap.json` 只负责：
 
-- roadmap item
+- roadmap item（mirrored GitHub Project item）
 - roadmap item 状态
-- `version_goal`
-- roadmap item 与 task / issue 的映射
+- milestone / 兼容性的 `version_goal`
+- roadmap item 与 task / repo issue 的映射
 
 `roadmap.json` 不负责：
 
@@ -48,6 +48,7 @@ related_docs:
 ```json
 {
   "schema_version": "v2",
+  "milestone": null,
   "version_goal": null,
   "items": []
 }
@@ -56,6 +57,7 @@ related_docs:
 根对象只允许：
 
 - `schema_version`
+- `milestone`
 - `version_goal`
 - `items`
 
@@ -68,6 +70,7 @@ related_docs:
   "roadmap_item_id": "roadmap-command-standard",
   "title": "Standardize shared-state command model",
   "description": "Define final command semantics for roadmap, task, flow, and check.",
+  "type": "feature",
   "status": "current",
   "source_type": "local",
   "source_refs": [],
@@ -88,6 +91,7 @@ related_docs:
 
 - `roadmap_item_id`
 - `title`
+- `type`
 - `status`
 - `source_type`
 - `source_refs`
@@ -102,6 +106,7 @@ related_docs:
 
 - `version_goal`
 - `description`
+- `milestone`
 
 ### 4.3 Status Enum
 
@@ -120,22 +125,32 @@ related_docs:
 - `github`
 - `local`
 
+### 4.5 Type Enum
+
+`type` 只允许：
+
+- `feature`
+- `task`
+- `bug`
+
 ## 5. Relationship Rules
 
 - `linked_task_ids` 用于关联执行层 task
-- `issue_refs` 用于关联 issue
+- `issue_refs` 用于关联 repo issue
 - `source_refs` 用于记录导入来源
 
 补充约束：
 
 - 一个 roadmap item 可以关联多个 task
-- 一个 roadmap item 可以关联多个 issue
+- 一个 roadmap item 可以关联多个 repo issue
+- 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
 - roadmap item 不直接持有 PR 字段
 
 ## 6. Version Goal Rules
 
+- `milestone` 是根对象字段，表示当前版本或阶段窗口
 - `version_goal` 是根对象字段
-- `version_goal` 表示当前规划窗口目标
+- `version_goal` 表示当前规划窗口目标的兼容性文本锚点
 - `version_goal` 不是当前版本号
 
 禁止：
@@ -155,7 +170,6 @@ related_docs:
 - `pr_history`
 - `feature`
 - `epic`
-- `milestone`
 - `current_version`
 
 ## 8. Minimal Example
@@ -163,12 +177,14 @@ related_docs:
 ```json
 {
   "schema_version": "v2",
+  "milestone": "v2.1",
   "version_goal": "Complete shared-state standardization",
   "items": [
     {
       "roadmap_item_id": "roadmap-command-standard",
       "title": "Standardize shared-state command model",
       "description": null,
+      "type": "feature",
       "status": "current",
       "source_type": "local",
       "source_refs": [],

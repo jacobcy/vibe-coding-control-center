@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -142,7 +142,8 @@ related_docs:
 
 语义关系：
 
-- `issue <-> task` 多对多
+- `repo issue <-> roadmap item` 多对多
+- `repo issue <-> task` 多对多
 - `roadmap item <-> task` 多对多
 - `flow -> task` 一对多
 
@@ -152,10 +153,10 @@ related_docs:
 
 `vibe roadmap` 只负责：
 
-- 管 roadmap item
+- 管 roadmap item（mirrored GitHub Project item）
 - 管规划优先级
-- 管 `version_goal`
-- 管 roadmap item 与 issue / task 的映射
+- 管 milestone / 兼容性的 `version_goal`
+- 管 roadmap item 与 repo issue / task 的映射
 
 ### 4.2 Boundaries
 
@@ -225,6 +226,12 @@ provider 只允许：
 - `github`
 - `local`
 
+补充约束：
+
+- `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
+- `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
+- 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
+
 ### 4.7 Prohibited Semantics
 
 禁止：
@@ -246,8 +253,8 @@ provider 只允许：
 
 `vibe task` 只负责：
 
-- 管 task 生命周期
-- 管 task 与 roadmap / issue / PR 的关联
+- 管 execution record 生命周期
+- 管 task 与 roadmap / repo issue / PR 的关联
 - 管 subtasks
 - 管 task 归档事实
 - 管 task 当前 runtime 绑定事实
@@ -259,6 +266,7 @@ provider 只允许：
 - roadmap 排布
 - 规划优先级
 - 现场创建与清理
+- 决定 roadmap item 的 `type`
 - 将 `branch` / `worktree` 当作长期历史索引
 
 ### 5.3 Standard Subcommands
@@ -318,7 +326,7 @@ provider 只允许：
 
 ### 5.7 Runtime Binding Rules
 
-- task 可以记录当前绑定的 `branch`、`worktree`、`agent`
+- task 作为 execution record，可以记录当前绑定的 `branch`、`worktree`、`agent`
 - 这些字段只表示当前 runtime 绑定
 - task 完成后必须清空 runtime 绑定
 - task 归档后必须清空 runtime 绑定
@@ -344,6 +352,12 @@ provider 只允许：
 - 管当前 branch 现场动作
 - 管当前 task 的绑定与解绑
 - 管当前现场的发布、检查、收尾
+
+补充约束：
+
+- `flow new` 只创建现场，不定义 feature
+- `flow bind <task-id>` 绑定的是 execution record
+- flow 只能消费已存在的 task，不替代 repo issue / roadmap item 的规划入口
 
 ### 6.2 Boundaries
 
@@ -396,6 +410,7 @@ provider 只允许：
 - `new <name>` 中的 `name` 只是命名输入
 - `name` 不是共享模型字段
 - 标准文案中不得把 `name` 写成 `feature` 这一类长期模型概念
+- 标准文案应优先写 `bind <task-id>`
 
 ### 6.7 Semantic Separation
 

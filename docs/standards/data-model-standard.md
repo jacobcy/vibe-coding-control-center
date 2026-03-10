@@ -10,7 +10,7 @@ authority:
   - state-lifecycle
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -31,7 +31,7 @@ related_docs:
 - [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
-本文档涉及的 `issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. Scope
 
@@ -68,7 +68,10 @@ related_docs:
 补充约束：
 
 - `openspec` 属于执行层输入，不属于规划层来源
-- `feature` 不是共享模型字段，只是 `flow new <name>` 的命名输入
+- `roadmap item` 是 mirrored `GitHub Project item`
+- `feature` / `task` / `bug` 是 roadmap item 的 `type`
+- `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
+- `milestone` 是版本/阶段窗口锚点；历史上的 `version_goal` 只保留兼容语义
 
 ## 4. Naming Rules
 
@@ -138,8 +141,8 @@ related_docs:
 
 允许的实体关系如下：
 
-- issue 与 roadmap item：多对多
-- issue 与 task：多对多
+- repo issue 与 roadmap item：多对多
+- repo issue 与 task：多对多
 - roadmap item 与 task：多对多
 - PR 与 task：一对一
 - task 与相关 task：通过 `related_task_ids` 建立关联
@@ -148,8 +151,9 @@ related_docs:
 
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
-- roadmap item 可以关联多个 task
+- 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
 - task 可以关联多个 issue ref
+- `flow` 只属于执行层，不承担规划层关系建模
 
 ## 7. Lifecycle Rules
 

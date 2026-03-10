@@ -8,7 +8,7 @@ authority:
   - task-registry-fields
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -19,17 +19,17 @@ related_docs:
 
 # `registry.json` 标准
 
-本文档定义 `registry.json` 的最终文件结构。它是执行态共享真源，只表达 task 注册信息，不表达规划层或现场层以外的内容。
+本文档定义 `registry.json` 的最终文件结构。它是执行态共享真源，只表达 task execution record 注册信息，不表达规划层或现场层以外的内容。
 
-本文档涉及的 `task`、`issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `task`、`repo issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. File Responsibility
 
 `registry.json` 只负责：
 
-- task 主记录
+- task 主记录（execution record）
 - task 生命周期状态
-- task 与 roadmap / issue / PR 的关联
+- task 与 roadmap / repo issue / PR 的关联
 - task subtasks
 - task 当前 runtime 绑定事实
 - task 完成与归档事实
@@ -182,7 +182,7 @@ related_docs:
 ## 7. Relationship Rules
 
 - `roadmap_item_ids` 用于关联 roadmap item
-- `issue_refs` 用于关联 issue
+- `issue_refs` 用于关联 repo issue
 - `pr_ref` 只允许单值
 - `related_task_ids` 用于 task 之间的松耦合关联
 
@@ -190,6 +190,7 @@ related_docs:
 
 - 一个 task 只允许一个主 PR
 - 一个 task 不允许多个 PR 历史数组
+- task 作为 execution record，不承担 roadmap item `type` 的定义职责
 
 ## 8. Prohibited Fields
 
