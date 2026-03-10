@@ -7,9 +7,9 @@ ${BOLD}Vibe Flow Manager${NC}
 Usage: ${CYAN}vibe flow <subcommand>${NC} [args]
 Subcommands:
   ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>] [--save-unstash]
-                                                          在当前目录创建新的逻辑 flow / branch
+                                                          在当前目录创建新的 runtime flow / branch；不创建 planning object
   ${GREEN}switch${NC} <name>                                       安全进入未关闭且未发过 PR 的现有 flow
-  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务
+  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内绑定 existing execution record
   ${GREEN}show${NC} [<flow-name>|<branch>] [--json]                 查看单个 flow 的详情（默认当前 flow）
   ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支
   ${GREEN}status${NC} [--json]                                     查看未关闭 flow 大盘
@@ -25,11 +25,13 @@ Options for 'switch <name>':
 Parallel worktree:
   使用 ${CYAN}wtnew${NC} / ${CYAN}vnew${NC} 创建新的物理 worktree；它们不属于 vibe flow 主语义
   # flow 命令用 --branch；flow pr 用 --base
+  # flow consumes existing execution records and does not create planning objects
 EOF
 }
 
 _flow_new_usage() { cat <<EOF
 Usage: vibe flow new <name> [--agent <name>] [--branch <ref>] [--save-unstash]
+  creates a runtime container only; create task separately
   --branch <ref>  创建 flow 时选择起点分支（默认: origin/main）；不接受 --base
   --save-unstash  将当前未提交改动 stash 后带入新 flow
 EOF
@@ -42,7 +44,10 @@ Usage: vibe flow switch <name>
 EOF
 }
 
-_flow_bind_usage() { echo "Usage: vibe flow bind <task-id> [--agent <name>]"; }
+_flow_bind_usage() {
+  echo "Usage: vibe flow bind <task-id> [--agent <name>]"
+  echo "  requires an existing task execution record"
+}
 
 _flow_pr_usage() {
   cat <<EOF
