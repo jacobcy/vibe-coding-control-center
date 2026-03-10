@@ -32,7 +32,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 ## Hard Boundary
 
-- 只负责 roadmap 层规划，不负责 Issue 创建、task registry 修复或 runtime 修复
+- 只负责 roadmap 层规划，不负责 `repo issue` 创建、task registry 修复或 runtime 修复
 - 必须先运行 `vibe roadmap` 相关 shell 命令
 - 不得直接修改 `registry.json` 底层数据
 - 必须通过 Shell API 写入数据
@@ -40,7 +40,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 边界对照：
 
-- Issue intake、模板补全、查重：交给 `vibe-issue`
+- `repo issue` intake、模板补全、查重：交给 `vibe-issue`
 - `roadmap <-> task` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
 
@@ -51,8 +51,8 @@ description: Use when the user wants project-level roadmap planning, version goa
 运行 `vibe roadmap status` 获取当前版本目标状态：
 
 - 当前版本目标是什么
-- 有哪些 Issue 等待分类
-- 各个分类下有多少 Issue
+- 有哪些 `repo issue` / roadmap item 等待分类
+- 各个分类下有多少 roadmap item
 
 ### Step 2: 调度决策
 
@@ -61,12 +61,12 @@ description: Use when the user wants project-level roadmap planning, version goa
 **场景 A: 没有版本目标**
 
 - 提示用户定义版本目标
-- 展示许愿池中的 Issue 供选择
+- 展示许愿池中的 `repo issue` 供选择
 - 要求人类讨论确定目标
 
-**场景 B: 有版本目标但有新 Issue**
+**场景 B: 有版本目标但有新 `repo issue`**
 
-- 对新 Issue 进行分类：P0/当前版本/下一个版本/延期/拒绝
+- 对新的 `repo issue` / roadmap item 进行分类：P0/当前版本/下一个版本/延期/拒绝
 - 按优先级排序
 
 **场景 C: 版本结束**
@@ -101,10 +101,10 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 - 检查是否有版本目标
 - 无目标 → 要求人类讨论确定
-- 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 task
-- 是否拆 task、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
+- 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 task execution record
+- 是否拆 task execution record、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
 
-## Issue 分类状态
+## Roadmap 分类状态
 
 | 状态       | 含义                     | 行为                                               |
 | ---------- | ------------------------ | -------------------------------------------------- |
@@ -125,8 +125,8 @@ description: Use when the user wants project-level roadmap planning, version goa
 ## Terminology Contract
 
 - `版本目标`: 当前版本要完成的目标
-- `许愿池`: GitHub Issues (需求池)
-- `Issue`: 心愿，不是具体任务
-- `Roadmap Item`: 规划层工作单元，不等于 task
-- `Task`: 具体的执行单元，最小单位
-- `Flow`: task 的运行时容器，通常由一个 worktree / branch 承载
+- `许愿池`: GitHub `repo issues`（需求池）
+- `repo issue`: 需求来源与讨论入口，不是 execution record
+- `Roadmap Item`: mirrored GitHub Project item，规划层工作单元
+- `Task`: execution record，执行层最小单元，不等于 roadmap item `type=task`
+- `Flow`: task execution record 的运行时容器，通常由一个 worktree / branch 承载

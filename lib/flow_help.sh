@@ -10,7 +10,7 @@ Subcommands:
                                                           在当前目录创建新的逻辑 flow / branch
   ${GREEN}switch${NC} <name>                                       安全进入未关闭且未发过 PR 的现有 flow
   ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务
-  ${GREEN}show${NC} [<feature>|<branch>] [--json]                   查看单个 flow 的详情（默认当前 flow）
+  ${GREEN}show${NC} [<flow-name>|<branch>] [--json]                 查看单个 flow 的详情（默认当前 flow）
   ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支
   ${GREEN}status${NC} [--json]                                     查看未关闭 flow 大盘
   ${GREEN}list${NC} [--pr]                                          查看所有 flow（含历史）
@@ -63,9 +63,9 @@ EOF
 }
 
 _flow_show_usage() { cat <<EOF
-Usage: ${CYAN}vibe flow show${NC} [<feature>|<branch>] [--json]
+Usage: ${CYAN}vibe flow show${NC} [<flow-name>|<branch>] [--json]
 查看单个 flow 的详情，默认当前 flow。
-显示内容：feature、branch、task、issue refs、pr ref、state、closed_at。
+显示内容：flow name、branch、task、issue refs、pr ref、state、closed_at。
 EOF
 }
 
@@ -73,7 +73,7 @@ _flow_status_usage() { cat <<EOF
 Usage: ${CYAN}vibe flow status${NC} [--json]
 查看未关闭 flow 大盘。
 显示内容：
-  - open flow 的 feature / branch / task / PR / next_step
+  - open flow 的 flow name / branch / task / PR / next_step
 选项：
   --json          以 JSON 格式输出任务数据
 EOF
