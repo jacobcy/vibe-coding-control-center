@@ -4,7 +4,7 @@ document_type: task-readme
 title: "Cross-Worktree Task Registry"
 author: "Codex GPT-5"
 created: "2026-03-02"
-last_updated: "2026-03-02"
+last_updated: "2026-03-10"
 related_docs:
   - docs/standards/git-workflow-standard.md
   - docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md
@@ -14,9 +14,11 @@ related_docs:
 
 # Task: Cross-Worktree Task Registry
 
+> 历史语义说明（2026-03-10）：本归档文档已按现行标准做语义归一化。若文中提到 worktree，应理解为承载 flow 的物理目录，而不是任务运行时主体。现行真源以 `docs/standards/glossary.md` 和 `docs/standards/git-workflow-standard.md` 为准。
+
 ## 概述
 
-当前系统能在单个 worktree 内恢复最近一次 session，但缺少跨 worktree 的统一任务视图，导致多任务并行时无法快速判断应进入哪个 worktree，也无法监控多个 worktree 上的 task 执行状态。
+当前系统能在单个 worktree 内恢复最近一次 session，但缺少跨 worktree 的统一 flow/task 视图，导致多任务并行时无法快速判断应回到哪个现场，也无法监控多个 worktree 上的 task 执行状态。
 
 本任务将先设计一个跨 worktree 的共享任务注册表，定义任务、子任务与 worktree 的绑定关系，再决定如何让现有 session checkpoint 方案接入该真源。
 
@@ -50,7 +52,7 @@ related_docs:
 
 - 任务模型统一为 `task + optional subtasks`，不再区分 `major/minor`。
 - 每个 worktree 在任一时刻只绑定一个当前 task。
-- `vibe-continue` 只负责继续当前 worktree 绑定的 task，不负责跨 worktree 路由。
+- `vibe-continue` 只负责继续当前目录承载的 flow 所对应 task，不负责跨 worktree 路由。
 - 任务与 memory 的真源需要迁移到共享位置，不能继续依赖每个 worktree 的独立副本。
 - worktree 本地聚焦内容放在 `.vibe/`，并加入 `.gitignore`，避免合并负担。
 - session checkpoint 后续必须依附共享任务真源，而不是继续扩展成独立状态系统。

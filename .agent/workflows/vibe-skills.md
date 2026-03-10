@@ -1,6 +1,6 @@
 ---
 name: "Vibe: Skills"
-description: Interactively manage, audit, sync, and clean AI skills
+description: Interactively manage, audit, sync, recommend, and clean installed AI skills across IDEs; not for authoring or reviewing repo-local `skills/vibe-*`.
 category: Workflow
 tags: [workflow, vibe, skills, management]
 ---

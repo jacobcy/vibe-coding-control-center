@@ -1,34 +1,46 @@
 ---
 name: vibe-task
-description: Use when the user wants a cross-worktree task overview, says "vibe task" or "/vibe-task", asks which worktree to enter next, wants to review current task status across worktrees, or wants to audit/repair task registry issues.
+description: Use when the user wants a cross-worktree flow/task overview, asks which existing flow or task context to resume next in the current repo, wants to inspect task registry health, needs audit and repair of roadmap-task mappings, or mentions "/vibe-task" or "vibe task audit". Do not use for project-level roadmap prioritization or task-flow runtime repair.
 ---
 
 # /vibe-task - Cross-Worktree Task Overview & Roadmap-Task Audit
 
-查看当前仓库下各个 worktree 绑定的任务总览，并给出下一步优先进入哪个 worktree 的建议。同时也支持核对 task 注册完整性，以及修复 `roadmap <-> task` 对应关系和相关数据质量问题。
+查看当前仓库下各个 worktree 当前承载的 `flow / task` 现场总览，并给出下一步优先回到哪个 flow / task 现场的建议。同时也支持核对 task 注册完整性，以及修复 `roadmap <-> task` 对应关系和相关数据质量问题。
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
+标准真源：
+
+- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/skill-standard.md`、`docs/standards/command-standard.md`、`docs/standards/shell-capability-design.md` 为准。
+- 触发时机与相邻 skill 分流以 `docs/standards/skill-trigger-standard.md` 为准。
+- task / flow / worktree 生命周期语义以 `docs/standards/git-workflow-standard.md`、`docs/standards/worktree-lifecycle-standard.md` 为准。
+
 **职责拆分:**
+
 - `vibe-task`：负责 `roadmap <-> task` 对应关系、task registry 完整性、task 相关数据质量
 - `vibe-check`：负责 `task <-> flow` / runtime 绑定修复
 - `vibe-roadmap`：负责规划、分类、版本目标，不负责执行层修复
+- `vibe-issue`：负责 GitHub Issue intake、模板补全、查重与创建
 
 **Announce at start:**
-- Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的任务总览。"
+
+- Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的 flow/task 总览。"
 - Audit mode: "我正在使用 vibe-task 技能来核对任务注册完整性和数据质量。"
 
 ## Trigger Examples
 
 ### Task Overview
+
 - `vibe task`
 - `/vibe-task`
-- `查看 worktree 任务`
+- `查看 flow 任务`
 - `任务总览`
-- `现在该进哪个 worktree`
-- `哪个 worktree 该优先处理`
+- `现在该回哪个 flow`
+- `当前该回哪个现场`
 
 ### Audit Mode
+
 - `vibe task audit`
 - `/vibe-task audit`
 - `核对任务注册`
@@ -41,18 +53,21 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 ## Hard Boundary
 
 **通用原则:**
+
 - 必须通过 `vibe task` 命令获取数据和执行操作
 - 不得直接读取或修改 `registry.json`、`worktrees.json`
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
 **Task Overview 模式:**
+
 - 必须先运行 `vibe task list --json`
 - 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
+
 - 必须通过 `bin/vibe task audit` 获取核对结果
 - 允许补充使用 `bin/vibe roadmap audit --check-links --json` 获取 roadmap 侧证据
-- 必须通过 `bin/vibe task add/update/remove` 执行修复操作
+- 必须通过真实存在的 `bin/vibe task add`、`bin/vibe task update`、`bin/vibe task remove` 执行修复操作
 - 不得直接修改 JSON 文件
 - 所有修复操作必须经过用户确认
 
@@ -62,14 +77,14 @@ description: Use when the user wants a cross-worktree task overview, says "vibe 
 
 根据用户输入选择工作流：
 
-1. **Task Overview 模式**: 用户询问任务总览、worktree 优先级等
+1. **Task Overview 模式**: 用户询问任务总览、flow 优先级或现场去向等
 2. **Audit 模式**: 用户请求核对任务注册、修复数据问题等
 
 ---
 
 # Task Overview Workflow
 
-查看跨 worktree 的任务总览和优先级建议。
+查看跨 worktree 的 flow/task 总览和优先级建议。
 
 ### Step 1: 运行 CLI
 
@@ -103,15 +118,15 @@ vibe task list --json
 用简洁报告向用户说明：
 
 1. 当前有哪些 worktree
-2. 每个 worktree 正在处理什么 current task
+2. 每个 worktree 当前承载的 flow 对应什么 current task
 3. 哪些 worktree 是 dirty，哪些是 clean
-4. 哪个 worktree 最值得优先进入
+4. 哪个 flow / 现场最值得优先回到，以及它当前由哪个 worktree 承载
 5. 为什么推荐它
 
 优先级建议规则：
 
-- 若某个 worktree 的 task `status` 为 `blocked`，优先提示阻塞
-- 若存在 `in_progress` 且 `dirty` 的 worktree，优先建议回到该 worktree 收口
+- 若某个 worktree 承载的 task `status` 为 `blocked`，优先提示阻塞
+- 若存在 `in_progress` 且 `dirty` 的 worktree，优先建议回到该目录当前承载的 flow 收口
 - 若多个 worktree 都是 `done` 或 `idle`，明确说明暂无明显优先级差异
 
 ### Step 4: 输出格式
@@ -132,8 +147,8 @@ Worktrees
 - wt-claude-refactor: current task = 2026-03-02-cross-worktree-task-registry, state = active dirty
 
 Recommendation
-- 优先进入 wt-claude-refactor
-- 原因：它仍处于 dirty 状态，且 next step 已明确
+- 优先回到由 wt-claude-refactor 承载的当前 flow
+- 原因：该现场仍处于 dirty 状态，且 next step 已明确
 ```
 
 ---
@@ -143,19 +158,22 @@ Recommendation
 核对任务注册完整性，发现并修复 `roadmap <-> task` 对应关系及 task 数据质量问题。
 
 **本技能负责的修复类型:**
+
 - task 未关联 roadmap item，但已有确定性映射证据
 - roadmap item 缺少 task 反向链接
 - task 缺少 roadmap item 反向链接
 - task registry 数据质量问题
 
 **本技能不负责:**
-- task runtime / worktree 绑定修复
+
+- task runtime / flow 现场修复
 - flow 现场状态修复
 - worktree 缺失后的 runtime 决策
 
 这些属于 `vibe-check` 范围。
 
 **三阶段核对流程:**
+
 1. **Phase 1: 数据质量修复** - 修复 worktrees.json 的 null branch 字段
 2. **Phase 2: 确定性核对** - 分支核对 + OpenSpec 核对 + Plans/PRDs 核对
 3. **Phase 3: 语义分析** - PR 语义分析（后续实现）
@@ -201,6 +219,7 @@ vibe flow review --json <branch-name>
 ```
 
 **返回的 PR 数据包括:**
+
 - PR 编号、标题、描述
 - 评论和审查意见
 - Commits 列表
@@ -208,6 +227,7 @@ vibe flow review --json <branch-name>
 - 分支信息
 
 **处理失败情况:**
+
 - 如果没有 PR，记录"无 PR 数据"，跳过 PR 语义分析
 - 如果 `gh` 不可用，记录"GitHub CLI 不可用"，跳过 PR 分析
 
@@ -222,6 +242,7 @@ vibe flow review --json <branch-name>
 - 是否有备份文件创建
 
 **判断逻辑:**
+
 - 如果修复数量 > 0，提示用户数据质量问题已修复
 - 如果修复失败，停止流程并报告错误
 
@@ -234,6 +255,7 @@ vibe flow review --json <branch-name>
 - 分支名模式（YYYY-MM-DD-slug）
 
 **健康度评估:**
+
 - `healthy`: 所有分支都已注册
 - `warning`: 存在未注册分支（可能是遗漏注册）
 - `error`: 分支名模式不符合规范
@@ -243,6 +265,7 @@ vibe flow review --json <branch-name>
 从 `--check-openspec` 输出中提取：
 
 每个 OpenSpec change 的状态：
+
 - change 名称
 - 是否有 tasks.md 文件
 - tasks.md 中的总任务数
@@ -250,11 +273,13 @@ vibe flow review --json <branch-name>
 - 是否已在 registry 中注册
 
 **健康度评估:**
+
 - `synced`: change 已在 registry 中
 - `unsynced`: change 未在 registry 中（需要决定是否注册）
 - `orphaned`: change 在 registry 中但目录不存在（不应发生）
 
 **优先级判断:**
+
 - 如果 change 有 tasks.md 且已完成任务数 > 0，优先建议注册
 - 如果 change 没有 tasks.md，可能是新创建的，询问用户是否需要注册
 
@@ -266,6 +291,7 @@ vibe flow review --json <branch-name>
 - docs/prds 中未注册的文件
 
 **健康度评估:**
+
 - `clean`: 所有文档都已关联任务
 - `warning`: 存在散落的计划/PRD 文档
 
@@ -278,17 +304,20 @@ vibe flow review --json <branch-name>
 从 PR 的 `body` 字段中提取：
 
 **任务引用模式识别:**
+
 - "完成 #task-id" 或 "完成了 #task-id"
 - "实现 #task-id" 或 "实现 feature-name"
 - "修复 #task-id" 或 "修复 bug-name"
 - "Closes #task-id" / "Fixes #task-id" / "Resolves #task-id"
 
 **自然语言任务描述:**
+
 - "This PR implements user authentication" → 可能是一个新任务
 - "添加了支付功能" → 可能是一个新任务
 - "重构了数据库层" → 可能是一个新任务或子任务
 
 **多任务识别:**
+
 - 一个 PR 可能提到多个完成的任务
 - 列表项（"- 完成登录功能\n- 完成注册功能"）
 - 章节标题（"## Features\n- Feature A\n- Feature B"）
@@ -296,11 +325,13 @@ vibe flow review --json <branch-name>
 ### 2.5.2 分析 PR Comments 和 Reviews
 
 **从评论中提取:**
+
 - 审查者提到的任务："This completes the auth feature"
 - 用户确认："Yes, this implements #task-123"
 - 讨论中的任务引用
 
 **置信度判断:**
+
 - 明确引用 task-id → 高置信度
 - 自然语言描述 → 中置信度（需要用户确认）
 - 模糊提及 → 低置信度（仅作为提示）
@@ -308,11 +339,13 @@ vibe flow review --json <branch-name>
 ### 2.5.3 分析 PR Commits
 
 **从 commit messages 中提取:**
+
 - "feat: implement user login (#123)" → 任务 #123
 - "fix(auth): resolve token expiry issue" → 可能是修复任务
 - "refactor(db): optimize queries" → 可能是重构任务
 
 **统计信息:**
+
 - Commits 数量
 - 修改的文件数
 - 代码变更量（additions/deletions）
@@ -346,6 +379,7 @@ vibe flow review --json <branch-name>
 ```
 
 **置信度分级:**
+
 - **High**: 明确引用 task-id，可直接关联
 - **Medium**: 自然语言描述，需要用户确认
 - **Low**: 模糊提及，仅供参考
@@ -354,24 +388,27 @@ vibe flow review --json <branch-name>
 
 除了 Shell 层的 `--check-plans`，Skill 层做深度语义扫描：
 
-### 3.1 扫描 docs/plans/*.md
+### 3.1 扫描 docs/plans/\*.md
 
 **识别任务模式:**
+
 - 标题中的任务描述："# User Authentication System"
 - TODO 列表："- [ ] Implement login"
 - 日期模式："2026-03-01: Start auth implementation"
 - 状态标记："[WIP]", "[DONE]", "[BLOCKED]"
 
-### 3.2 扫描 docs/prds/*.md
+### 3.2 扫描 docs/prds/\*.md
 
 **识别 PRD 中的任务:**
+
 - 功能需求章节
 - 里程碑定义
 - 验收标准
 
-### 3.3 扫描 docs/archives/*.md
+### 3.3 扫描 docs/archives/\*.md
 
 **识别已归档但可能未注册的任务:**
+
 - 旧的计划文档
 - 历史功能说明
 
@@ -535,6 +572,7 @@ docs/prds/performance-optimization.md - 未关联任何任务
 **适用场景:** 问题数量多，大部分是高置信度的
 
 **流程:**
+
 1. 显示所有将要执行的操作（按置信度排序）
 2. 请求一次性确认："将执行 X 个操作，是否继续？"
 3. 按优先级顺序执行：
@@ -545,6 +583,7 @@ docs/prds/performance-optimization.md - 未关联任何任务
 4. 输出执行结果摘要
 
 **示例:**
+
 ```
 即将执行以下操作:
 ✅ 高置信度 (12 项):
@@ -568,6 +607,7 @@ docs/prds/performance-optimization.md - 未关联任何任务
 **适用场景:** 问题数量少，或需要精细控制
 
 **流程:**
+
 1. 对每个问题单独询问用户
 2. 提供多个选项：
    - **创建新任务**: 自动生成任务 ID 和标题
@@ -579,6 +619,7 @@ docs/prds/performance-optimization.md - 未关联任何任务
 5. 继续下一个问题
 
 **示例交互:**
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 问题 1/15: PR #123 识别的任务
@@ -607,6 +648,7 @@ PR 标题: Implement user authentication
 **适用场景:** 先了解问题全貌，不立即修复
 
 **流程:**
+
 1. 显示所有问题和建议（按类型分组）
 2. 显示置信度分布
 3. 显示潜在的操作命令
@@ -614,6 +656,7 @@ PR 标题: Implement user authentication
 5. 提示用户可以手动执行命令
 
 **示例输出:**
+
 ```
 🔍 任务注册核对报告
 
@@ -776,6 +819,7 @@ AI 层文档扫描: 1 个任务
 ### 报告字段说明
 
 **健康度评分计算:**
+
 - 基础分: 10.0
 - 数据质量问题: -1.0/个
 - 未注册分支: -0.5/个
@@ -783,6 +827,7 @@ AI 层文档扫描: 1 个任务
 - 低置信度任务: -0.1/个
 
 **评级标准:**
+
 - 9.0-10.0: 优秀 ✨
 - 7.0-8.9: 良好 ✅
 - 5.0-6.9: 一般 ⚠️
@@ -790,6 +835,7 @@ AI 层文档扫描: 1 个任务
 
 **任务来源追踪:**
 每个任务记录其来源:
+
 - `shell_deterministic`: Shell 层确定性核对
 - `ai_pr_analysis`: AI 分析 PR 语义
 - `ai_doc_scan`: AI 扫描文档
@@ -826,6 +872,7 @@ AI 层文档扫描: 1 个任务
 本 skill 统一使用以下术语：
 
 **Task Overview:**
+
 - `worktree`
 - `current task`
 - `current subtask`
@@ -834,6 +881,7 @@ AI 层文档扫描: 1 个任务
 - `clean`
 
 **Audit:**
+
 - `数据质量` (data quality)
 - `未注册分支` (unregistered branch)
 - `未同步 change` (unsynced change)
@@ -847,11 +895,13 @@ AI 层文档扫描: 1 个任务
 ## Architecture Notes
 
 **Shell 层职责** (物理真源):
+
 - 执行具体操作、数据读写
 - 提供确定性核对结果（纯数据）
 - 不做智能判断或语义分析
 
 **Skill 层职责** (智能编排):
+
 - 调用 Shell 获取数据和执行操作
 - 分析数据、评估健康度
 - 生成智能建议
@@ -859,6 +909,7 @@ AI 层文档扫描: 1 个任务
 - 不直接修改底层数据文件
 
 **严格遵循三层架构:**
+
 1. Shell 层提供数据和原子操作
 2. Skill 层负责语义分析和决策
 3. 用户负责最终确认

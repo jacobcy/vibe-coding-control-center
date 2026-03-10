@@ -92,6 +92,10 @@ subcommand_exists() {
 check_reference "docs/standards/glossary.md"
 check_reference "docs/standards/action-verbs.md"
 
+if [[ "$skill_text" =~ 进入哪个[[:space:]]*worktree|现在该进哪个[[:space:]]*worktree|优先进入[[:space:]]*worktree|哪个[[:space:]]*worktree[[:space:]]*该优先处理|worktree优先级|继续当前[[:space:]]*worktree绑定的task|当前[[:space:]]*worktree绑定的task|which[[:space:]]+existing[[:space:]]+worktree[[:space:]]+to[[:space:]]+enter[[:space:]]+next|which[[:space:]]+worktree[[:space:]]+to[[:space:]]+enter[[:space:]]+next|preferred[[:space:]]+worktree|current[[:space:]]+worktree[[:space:]]+bound[[:space:]]+task ]]; then
+  record "Drift Warning" "routing language turns worktree into the runtime subject; describe flow/task context first and use worktree only as the physical carrier"
+fi
+
 if needs_reference 'bin/vibe[[:space:]]+'; then
   check_reference "docs/standards/command-standard.md"
   check_reference "docs/standards/shell-capability-design.md"

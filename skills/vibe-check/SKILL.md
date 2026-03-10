@@ -1,6 +1,6 @@
 ---
 name: vibe-check
-description: Use when the user wants to verify task-flow/runtime consistency and, when safe, repair deterministic task-worktree binding gaps through Shell APIs. This skill consumes audit output; it does not edit shared JSON directly.
+description: Use when the user wants to inspect or repair task-flow/worktree runtime consistency after shell audit, asks whether a task binding or current worktree state is stale, or mentions "/vibe-check" or "check runtime". Do not use for roadmap prioritization or roadmap-task mapping.
 ---
 
 # /vibe-check (/check) - task-flow 审计驱动修复
@@ -13,6 +13,13 @@ description: Use when the user wants to verify task-flow/runtime consistency and
 4. 只通过 Shell API 执行安全修复
 
 **Announce at start:** "我正在使用 vibe-check 技能读取 shell 审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
+
+标准真源：
+
+- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/skill-standard.md`、`docs/standards/command-standard.md`、`docs/standards/shell-capability-design.md` 为准。
+- 触发时机与相邻 skill 分流以 `docs/standards/skill-trigger-standard.md` 为准。
+- task / flow / worktree 生命周期语义以 `docs/standards/git-workflow-standard.md`、`docs/standards/worktree-lifecycle-standard.md` 为准。
 
 ## 真源边界
 
@@ -58,8 +65,14 @@ vibe roadmap audit --check-links --json
 - `roadmap item <-> task` 对应关系修复
 - roadmap item 未链接 task 的规划问题
 - task 应该归属于哪个 roadmap item 的语义判断
+- GitHub Issue intake、模板补全、查重与创建
 
-这些属于 `vibe-task` 的审计/修复范围。
+前三项属于 `vibe-task` 的审计/修复范围。
+
+其中：
+
+- roadmap 规划与版本归类属于 `vibe-roadmap`
+- Issue intake 与 GitHub 创建属于 `vibe-issue`
 
 ## Step 2: 分类问题
 
@@ -77,7 +90,7 @@ vibe roadmap audit --check-links --json
 
 - `completed/archived task still has runtime binding: <task-id>`
   - 修复命令：`vibe task update <task-id> --unassign`
-- 当前 worktree 就是目标 task 的确定性现场
+- 当前目录承载的 flow 就是目标 task 的确定性现场
   - 修复命令：`vibe task update <task-id> --bind-current`
 
 ### B. 需要用户确认

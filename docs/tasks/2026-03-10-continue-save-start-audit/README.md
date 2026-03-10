@@ -61,9 +61,17 @@ gates:
 
 ## 文档导航
 
+### Design / Plan
+- [docs/plans/2026-03-10-remove-local-vibe-cache-design.md](../../plans/2026-03-10-remove-local-vibe-cache-design.md)
+- [docs/plans/2026-03-10-remove-local-vibe-cache-plan.md](../../plans/2026-03-10-remove-local-vibe-cache-plan.md)
+
 ### Review（AI 审计层）
 - [audit-2026-03-10.md](audit-2026-03-10.md)
 - [findings-2026-03-10.md](findings-2026-03-10.md)
+
+说明：
+- `audit-2026-03-10.md` 保留修复前的审计清单与证据口径，属于历史审计语境。
+- `findings-2026-03-10.md` 记录当前收敛后的正式结论，应优先作为现行状态参考。
 
 ## 关键约束
 

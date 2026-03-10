@@ -18,8 +18,8 @@ _flow_update_current_worktree_branch() {
   worktrees_file="$git_common_dir/vibe/worktrees.json"
   [[ -f "$worktrees_file" ]] || return 0
 
-  current_dir="$(basename "$PWD")"
-  current_path="$PWD"
+  current_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+  current_dir="$(basename "$current_path")"
   now="$(_flow_now_iso)"
   tmp="$(mktemp)" || return 1
 

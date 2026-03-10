@@ -1,13 +1,19 @@
 ---
 name: vibe-skill-audit
-description: Create, update, review, or audit Vibe project skills under `skills/` when the user wants a Vibe-specific skill workflow rather than a generic skill. Use for: creating a new `vibe-*` skill, tightening an existing skill's Shell boundary, checking whether a skill cites the correct `docs/standards/*` truth sources, verifying referenced `bin/vibe` commands are real, or warning when standards have drifted ahead of a skill.
+description: Use when the user wants to create, update, review, or audit a repo-local Vibe skill under `skills/`, mentions "/vibe-skill-audit", "vibe-skill", "vibe skill", "创建 skill", "审查 skill", "skill 文案", or "自动匹配语义", or needs a Vibe-specific wrapper around `skill-creator` rather than a generic cross-project skill workflow.
 ---
 
-# Vibe Skill
+# /vibe-skill-audit - Vibe Skill Governance
 
 ## Overview
 
 Use this skill to govern Vibe-native skills. It wraps generic skill creation with Vibe's stricter rules around Shell boundaries, standards citations, and flow lifecycle semantics.
+
+语义边界：
+
+- 通用、跨项目的 skill 创建方法，以 `skill-creator` 为基线。
+- 目标是当前仓库里的 `skills/vibe-*` 时，优先用 `vibe-skill-audit` 做创建、更新、审查和漂移治理；`vibe-skill` 可作为对话层短称。
+- `vibe-skills-manager` 只处理 skill 安装、同步、清理与推荐，不负责设计或审查 `skills/vibe-*` 文案。
 
 本 skill 只负责校验和收敛 skill 文案，不负责在这里重新定义 `flow`、`workflow`、`worktree`、`branch`、shared-state 或 Shell 边界语义。相关语义一律引用标准文件。
 
@@ -18,6 +24,7 @@ Read [review-checklist.md](./references/review-checklist.md) before substantial 
 - `skills/` 是 Vibe 自有 skill 定义的唯一源码；`.agent/skills/` 只是运行时链接层。见 `docs/standards/skill-standard.md`。
 - 共享状态相关写入只能通过真实 `bin/vibe` 命令完成；不要在 skill 中直接改 `.git/vibe/*.json`。见 `docs/standards/command-standard.md` 和 `docs/standards/shell-capability-design.md`。
 - 术语定义与边界语义只引用真源，不在本 skill 中复述。术语见 `docs/standards/glossary.md`，动作词默认语义见 `docs/standards/action-verbs.md`。
+- 触发时机、合理介入范围与相邻 skill 冲突裁决以 `docs/standards/skill-trigger-standard.md` 为准。
 - 如果需要的 Shell 能力不存在，结论应为 `Capability Gap`，而不是在 skill 文案中发明 workaround。
 
 ## Truth Sources

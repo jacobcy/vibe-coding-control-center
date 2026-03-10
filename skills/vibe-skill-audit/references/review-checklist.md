@@ -41,5 +41,6 @@ If not, report `Capability Gap` instead of improvising.
 - Is the governing standards file newer than the target skill?
 - Is the skill still using older wording such as redefining `flow`, `task`, or `roadmap current`?
 - Does the skill cite standards only superficially while still keeping a parallel definition?
+- Does the skill use routing phrases that turn `worktree` into the runtime subject, such as “which worktree to enter next”, “进入哪个 worktree”, or “继续当前 worktree 绑定的 task”, instead of describing `flow` as the runtime container and `worktree` only as the physical carrier?
 
 If review is needed but not conclusively broken, report `Drift Warning`.

@@ -147,7 +147,7 @@
             {
                 "name": "vibe-check",
                 "category": "verification",
-                "description": "验证项目记忆一致性"
+                "description": "审计并修复 task-flow 与 worktree runtime 的确定性绑定问题"
             },
             {
                 "name": "vibe-boundary-check",
@@ -187,17 +187,22 @@
             {
                 "name": "vibe-skills-manager",
                 "category": "meta",
-                "description": "Skills 生命周期管理"
+                "description": "已安装 skills 的同步、清理、推荐与跨 IDE 管理"
+            },
+            {
+                "name": "vibe-skill-audit",
+                "category": "meta",
+                "description": "创建、审查与治理仓库内的 skills/vibe-* 技能"
             },
             {
                 "name": "vibe-roadmap",
                 "category": "workflow",
-                "description": "智能调度器，维护版本目标和 Issue 分类"
+                "description": "roadmap 规划、版本目标管理与 Issue 规划归类"
             },
             {
                 "name": "vibe-task",
                 "category": "workflow",
-                "description": "任务管理和追踪"
+                "description": "跨 worktree 的 flow/task 总览，以及 roadmap-task 映射核对与修复"
             },
             {
                 "name": "web-design-guidelines",

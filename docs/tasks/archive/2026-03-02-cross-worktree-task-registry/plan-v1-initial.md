@@ -4,7 +4,7 @@ document_type: task-plan
 title: "Cross-Worktree Task Registry - Plan V1"
 author: "Codex GPT-5"
 created: "2026-03-02"
-last_updated: "2026-03-02"
+last_updated: "2026-03-10"
 related_docs:
   - docs/tasks/2026-03-02-cross-worktree-task-registry/README.md
   - docs/standards/git-workflow-standard.md
@@ -13,11 +13,13 @@ related_docs:
 
 # Cross-Worktree Task Registry Implementation Plan
 
+> 历史语义说明（2026-03-10）：本计划保留 2026-03-02 的设计上下文，但正文已按现行标准做语义归一化。若文中提到 worktree，应理解为承载 flow 的物理目录；任务运行时主体始终是 flow/scene，而不是 worktree。
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 设计并实现一个跨 worktree 的共享任务注册表，让用户可以看到每个 worktree 当前绑定的 task、subtask 状态和下一步动作，并据此决定进入哪个 worktree 工作。
+**Goal:** 设计并实现一个跨 worktree 的共享任务注册表，让用户可以看到每个 worktree 当前承载的 flow 所对应 task、subtask 状态和下一步动作，并据此决定回到哪个现场继续工作。
 
-**Architecture:** 引入跨 worktree 的共享状态目录，集中保存 task registry、subtask 进度、worktree 绑定关系和共享 memory；各 worktree 通过本地 `.vibe/` 持有当前任务指针与聚焦缓存，该目录加入 `.gitignore`，不作为真源。现有 session checkpoint 后续改为读取共享 registry 中与当前 worktree 绑定的 task。
+**Architecture:** 引入跨 worktree 的共享状态目录，集中保存 task registry、subtask 进度、worktree 绑定关系和共享 memory；各 worktree 通过本地 `.vibe/` 持有当前任务指针与聚焦缓存，该目录加入 `.gitignore`，不作为真源。现有 session checkpoint 后续改为读取共享 registry 中当前目录承载 flow 所对应的 task。
 
 **Tech Stack:** Markdown task docs, JSON/YAML shared state design, git worktree metadata, existing `.agent` workflows
 
@@ -62,7 +64,7 @@ related_docs:
 - 每个 task 可以没有 subtasks，也可以包含多个 subtasks
 - task 的完成由 subtasks 完成情况或整体状态驱动
 - `worktree.current_task` 同时只能有一个
-- `vibe-continue` 仅继续当前 worktree 的 `current_task`
+- `vibe-continue` 仅继续当前目录承载 flow 所对应的 `current_task`
 - 跨 worktree 总览交由未来的 `vibe-task` 负责
 
 ### Status Enum V1
@@ -227,7 +229,7 @@ Expected:
 
 - `vibe-save` 从当前 worktree 的 `.vibe/current-task.json` 读取任务指针
 - `vibe-save` 将状态回写共享真源，并可刷新本地 `.vibe/`
-- `vibe-continue` 只继续当前 worktree 绑定的 task，不提供跨 worktree 选择
+- `vibe-continue` 只继续当前目录承载 flow 所对应的 task，不提供跨 worktree 选择
 
 **Step 3: 验证输出字段**
 

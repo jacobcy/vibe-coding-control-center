@@ -104,7 +104,7 @@ related_docs:
 
 - 正式术语：`flow`
 - 别称：无
-- 定义：task 的运行时容器，表示当前 worktree/branch 承载的现场语义。
+- 定义：task 的运行时容器，表示通常由当前 worktree/branch 承载的现场语义。
 - 边界：
   - `flow` 不等于 worktree
   - `flow` 不等于 branch
@@ -113,7 +113,7 @@ related_docs:
   - 命令边界见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
   - 现场态边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
 - 使用规则：
-  - 讨论当前交付切片、当前 worktree 承载的任务现场时使用 `flow`
+  - 讨论当前交付切片、由当前 worktree 承载的任务现场时使用 `flow`
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
 ### 3.5 `pr`

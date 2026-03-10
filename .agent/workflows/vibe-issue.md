@@ -1,6 +1,6 @@
 ---
 name: "Vibe: Issue"
-description: 启动 Issue 创建与预旋工作流
+description: Handle issue intake for this repo: create, deduplicate, template-check, and label a GitHub issue before roadmap planning.
 ---
 
 # Vibe Issue Workflow

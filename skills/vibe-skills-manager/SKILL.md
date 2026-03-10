@@ -1,7 +1,7 @@
 ---
 name: vibe-skills-manager
-description: Use when skills are messy across IDEs, unsure which are installed globally vs project-level, need to audit/clean/recommend skills, or setting up a new worktree. **RECOMMENDED: Run as subagent to save tokens.**
-user-invokable: true
+description: Use when installed skills are messy across IDEs, the user is unsure which skills exist globally vs project-level, needs to sync, clean, or recommend installed skills, is setting up a new worktree, or mentions "/vibe-skills-manager". Do not use for authoring or reviewing `skills/vibe-*` content.
+user-invocable: true
 ---
 
 # Vibe Skills Manager
@@ -9,6 +9,13 @@ user-invokable: true
 AI 驱动的 Skills 生命周期管理。扫描 → 诊断 → 推荐 → 确认 → 执行。
 
 **命令边界:** `/vibe-skills-manager` 是 skill 层审计入口；`vibe skills ...`、`npx skills ...`、`claude plugin ...` 是 shell 层工具。只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `-h` / `--help`，不要自造 flag 或子命令。
+
+标准真源：
+
+- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/skill-standard.md`、`docs/standards/command-standard.md`、`docs/standards/shell-capability-design.md` 为准。
+- 触发时机与相邻 skill 分流以 `docs/standards/skill-trigger-standard.md` 为准。
+- worktree 上下文与交付语义若被提及，以 `docs/standards/git-workflow-standard.md`、`docs/standards/worktree-lifecycle-standard.md` 为准。
 
 ## 快速命令
 
@@ -37,6 +44,14 @@ vibe skills check
 - 全局或项目级 skills 数量过多，想清理冗余
 - 新 worktree 建好后，想确认 skills 是否完整
 - 想要发现新武器时：不知道当前项目适合安装哪些新 skills
+
+不用于：
+
+- 创建新的 `skills/vibe-*`
+- 审查或收紧现有 `skills/vibe-*` 的语义边界
+- 处理 skill 自动匹配文案漂移
+
+这些场景交给 `vibe-skill-audit`。
 
 ## 计数排除规则
 

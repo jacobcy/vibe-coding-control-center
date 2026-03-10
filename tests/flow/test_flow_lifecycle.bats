@@ -313,6 +313,7 @@ JSON
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     git() {
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-codex-runtime-upsert"; return 0; fi
       return 0
     }
     _flow_update_current_worktree_branch "task/runtime-upsert"
@@ -321,6 +322,32 @@ JSON
 
   [ "$status" -eq 0 ]
   [ "$output" = "wt-codex-runtime-upsert|$fixture/wt-codex-runtime-upsert|task/runtime-upsert|active" ]
+}
+
+@test "2.7.1 _flow_update_current_worktree_branch resolves nested directories to the worktree root" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-root/subdir"
+  cat > "$fixture/vibe/worktrees.json" <<JSON
+{"schema_version":"v1","worktrees":[{"worktree_name":"wt-codex-runtime-root","worktree_path":"$fixture/wt-codex-runtime-root","branch":"task/existing","current_task":"task-main","tasks":["task-main"],"status":"active"}]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-codex-runtime-root/subdir"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-codex-runtime-root"; return 0; fi
+      return 0
+    }
+    _flow_update_current_worktree_branch "task/runtime-root"
+    jq -r ".worktrees[0].worktree_name + \"|\" + .worktrees[0].worktree_path + \"|\" + .worktrees[0].branch + \"|\" + (.worktrees | length | tostring)" "'"$fixture"'/vibe/worktrees.json"
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "wt-codex-runtime-root|$fixture/wt-codex-runtime-root|task/runtime-root|1" ]
 }
 
 @test "2.1 _flow_new rejects legacy --base alias to keep branch semantics explicit" {

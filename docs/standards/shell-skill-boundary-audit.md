@@ -40,7 +40,7 @@ related_docs:
 - 生成 task id
 - 注册 task
 - 创建 worktree
-- 绑定 task
+- 让 flow 对应 task
 
 仅仅因为一个命令同时触碰 task / flow / worktree，并不能自动判定为越权。
 

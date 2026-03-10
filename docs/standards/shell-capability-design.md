@@ -137,7 +137,7 @@ Skill Layer 负责：
 
 坏例子：
 
-- `flow new` 自动创建 task、绑定 task、推断优先级
+- `flow new` 自动创建 task、决定 flow 对应 task、推断优先级
 - `task add` 自动决定 roadmap 归属
 - `roadmap classify` 顺带新增 roadmap item
 
