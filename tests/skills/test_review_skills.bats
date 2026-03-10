@@ -39,3 +39,15 @@ setup() {
     "$REPO_ROOT/skills/vibe-review-docs/SKILL.md"
   [ "$status" -eq 0 ]
 }
+
+@test "github project orchestration docs do not describe extension sources as official github types" {
+  run rg -n \
+    "GitHub 官方来源类型.*(openspec|kiro|superpowers|supervisor)|(openspec|kiro|superpowers|supervisor).*(GitHub 官方来源类型|official github type)" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-save/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md"
+
+  [ "$status" -ne 0 ]
+}

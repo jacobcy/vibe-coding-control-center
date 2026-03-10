@@ -59,3 +59,45 @@ SHELL
 
   [ "$status" -eq 1 ]
 }
+
+@test "workflow and skill docs preserve github project orchestration terminology" {
+  run rg -n \
+    "roadmap item.*GitHub Project item mirror|Roadmap Item: mirrored GitHub Project item|task.*execution record|Task: execution record" \
+    "$REPO_ROOT/.agent/workflows" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-new-feature.md" ]]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "vibe-task/SKILL.md" ]]
+}
+
+@test "task save and check docs treat spec_standard and spec_ref as extension fields" {
+  run rg -n \
+    "spec_standard|spec_ref|扩展桥接字段|extension field|execution spec" \
+    "$REPO_ROOT/.agent/workflows/vibe-save.md" \
+    "$REPO_ROOT/.agent/workflows/vibe-check.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-save/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "spec_standard" ]]
+  [[ "$output" =~ "spec_ref" ]]
+}
+
+@test "orchestration docs require reading shell output before semantic decisions" {
+  run rg -n \
+    "先读 shell 输出|先运行 `vibe|必须先运行 `vibe|read shell output" \
+    "$REPO_ROOT/.agent/workflows/vibe-task.md" \
+    "$REPO_ROOT/.agent/workflows/vibe-save.md" \
+    "$REPO_ROOT/.agent/workflows/vibe-check.md" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-save/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md"
+
+  [ "$status" -eq 0 ]
+}

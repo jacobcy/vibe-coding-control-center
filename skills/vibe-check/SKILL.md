@@ -12,6 +12,13 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 3. 只修复 `task <-> flow` / runtime 绑定问题
 4. 只通过 Shell API 执行安全修复
 
+对象约束：
+
+- `roadmap item = GitHub Project item mirror`
+- `task = execution record`
+- `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
+- 任何修复都必须先读 shell 审计输出，再决定动作
+
 **Announce at start:** "我正在使用 vibe-check 技能读取 shell 审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
 
 标准真源：
@@ -52,6 +59,8 @@ vibe check link --json
 vibe roadmap audit --check-links --json
 ```
 
+若要核对 execution spec 证据，可额外读取 `vibe task list --json` 或 `vibe task show <task-id> --json` 的 `spec_standard/spec_ref` 字段。
+
 ## 职责边界
 
 `vibe-check` 只处理：
@@ -59,6 +68,7 @@ vibe roadmap audit --check-links --json
 - task runtime 指向不存在的 worktree
 - 已完成 / 已归档 task 仍残留 runtime 绑定
 - 当前现场绑定与 task runtime 的确定性修复
+- 基于 shell 输出可直接确认的 execution spec 缺失提示
 
 `vibe-check` 不处理：
 
@@ -66,6 +76,8 @@ vibe roadmap audit --check-links --json
 - roadmap item 未链接 task 的规划问题
 - task 应该归属于哪个 roadmap item 的语义判断
 - GitHub Issue intake、模板补全、查重与创建
+
+`execution_record_id` 与 `spec_standard/spec_ref` 只能作为审计证据或转交依据，不得在 skill 内重写成 GitHub 官方身份。
 
 前三项属于 `vibe-task` 的审计/修复范围。
 

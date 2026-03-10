@@ -25,5 +25,6 @@ vibe flow bind <task-id>
 
 - `flow new <slug>` 只创建现场，不创建 feature
 - `task-id` 指向 execution record
+- 在选择 `task-id` 之前，必须先读取 shell 输出中的 task / roadmap 事实
 - 若该 task 对应 `type=feature` 的 roadmap item，应保持 `1 feature = 1 branch = 1 PR`
 - 若该 task 对应 `type=task` 的 roadmap item，则它属于更细的执行切片

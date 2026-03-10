@@ -12,6 +12,8 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - 以 `.agent/context/task.md` 为默认保存载体。
 - 共享真源只同步最小必要事实，不在 skill 中堆叠额外业务推断。
 - 只有当本次会话形成了稳定、可复用的项目共识时，才更新 `.agent/context/memory.md`。
+- 任何共享状态判断都必须先读 shell 输出，再决定是否写回。
+- `spec_standard/spec_ref` 是 execution spec 扩展字段，只能通过 Shell API 同步。
 
 **Announce at start:** "我正在使用 /vibe-save 技能来保存当前会话的 handoff。"
 
@@ -37,6 +39,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - `git` / `gh` 可以用于读取当前 branch、dirty、PR 等现场事实。
 - 不得直接编辑 `.git/vibe/*.json`。
 - 不得假设 `.agent/governance.yaml` 中的 hook 已经自动执行。
+- 不得把 execution spec 扩展字段改写成 GitHub 官方层身份。
 
 ## Default Save Policy
 
@@ -62,6 +65,11 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - `$(git rev-parse --git-common-dir)/vibe/registry.json`
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`（如果当前目录承载的 `flow` 已能从共享真源识别 `task`）
 - `.agent/context/task.md`
+
+如果 task 已存在，还应先读 shell 输出或 task 真源中的：
+
+- `spec_standard`
+- `spec_ref`
 
 必要时补充读取：
 
@@ -91,6 +99,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 - 使用现有 Shell API 同步最小必要事实。
 - 优先同步 `next_step`，必要时同步 `status` 或 `pr_ref`。
+- 若 execution spec 在本会话已明确，使用 `vibe task update` 同步 `spec_standard/spec_ref`。
 - 不在 save 阶段替上层流程做新的任务拆分、归属判断或优先级判断。
 
 如果当前目录尚未识别出当前 `flow` 对应的 `task`：

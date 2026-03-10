@@ -9,6 +9,14 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 **核心原则:** `/vibe-roadmap` 负责调度决策，`vibe roadmap` 负责 shell 层读写数据。
 
+对象约束：
+
+- `repo issue`: 需求来源
+- `roadmap item = GitHub Project item mirror`
+- `task = execution record`
+- `spec_standard/spec_ref` 是 task 侧扩展桥接字段，不是 roadmap item 官方来源类型
+- 任何规划判断都必须先读 shell 输出，再做编排
+
 标准真源：
 
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
@@ -48,7 +56,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 ### Step 1: 检查版本目标
 
-运行 `vibe roadmap status` 获取当前版本目标状态：
+先运行 `vibe roadmap status --json` 获取当前版本目标状态；必要时再补充文本输出：
 
 - 当前版本目标是什么
 - 有哪些 `repo issue` / roadmap item 等待分类
@@ -103,6 +111,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - 无目标 → 要求人类讨论确定
 - 有目标 → 提示当前规划窗口有哪些 roadmap item 可供继续拆成 task execution record
 - 是否拆 task execution record、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
+- 不得把扩展层的 `spec_standard/spec_ref` 描述成 GitHub Project 官方来源类型
 
 ## Roadmap 分类状态
 

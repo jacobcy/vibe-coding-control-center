@@ -23,6 +23,14 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 - `vibe-roadmap`：负责规划、分类、版本目标，不负责执行层修复
 - `vibe-issue`：负责 GitHub Issue intake、模板补全、查重与创建
 
+对象约束：
+
+- `repo issue -> roadmap item -> task -> flow -> PR`
+- `roadmap item = GitHub Project item mirror`
+- `task = execution record`
+- `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
+- 任何判断都必须先读 shell 输出，再做语义分析
+
 **Announce at start:**
 
 - Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的 flow/task 总览。"
@@ -62,6 +70,7 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 - 必须先运行 `vibe task list --json`
 - 不得补充 CLI 未提供的字段
+- 若 CLI 已返回 `spec_standard/spec_ref`，必须把它们当作 execution spec 展示或解释
 
 **Audit 模式:**
 
@@ -110,6 +119,7 @@ vibe task list --json
 - status
 - current subtask
 - next step
+- spec standard / spec ref（如果 CLI 提供）
 
 不得补充 CLI 未提供的字段。
 
@@ -139,6 +149,7 @@ vibe task list --json
 - `Next step`
 - `State`
 - `Recommendation`
+- `Execution spec`
 
 示例结构：
 
@@ -163,6 +174,7 @@ Recommendation
 - roadmap item 缺少 task 反向链接
 - task 缺少 roadmap item 反向链接
 - task registry 数据质量问题
+- task 缺少 `spec_standard/spec_ref` 或 execution spec 与当前资料不一致
 
 **本技能不负责:**
 
@@ -258,6 +270,16 @@ vibe flow review --json <branch-name>
 
 - `healthy`: 所有分支都已注册
 - `warning`: 存在未注册分支（可能是遗漏注册）
+
+### 2.3 Execution spec 核对
+
+对 task 相关输出额外检查：
+
+- `spec_standard` 是否存在
+- `spec_ref` 是否存在
+- 若 roadmap item 已记录 `execution_record_id`，task 是否与该 execution record 对齐
+
+这些字段只作为扩展层桥接信息，不得解释为 GitHub 官方 item 身份。
 - `error`: 分支名模式不符合规范
 
 ### 2.3 OpenSpec 核对结果
