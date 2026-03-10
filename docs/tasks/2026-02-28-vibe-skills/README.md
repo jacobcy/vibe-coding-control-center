@@ -1,5 +1,5 @@
 ---
-task_id: 2026-02-28-vibe-skills-manager
+task_id: 2026-02-28-vibe-skills
 document_type: task-readme
 title: vibe-skills-manager — Skills 生命周期管理 Skill
 ---

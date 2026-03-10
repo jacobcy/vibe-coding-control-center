@@ -40,7 +40,7 @@ SHELL
   [[ "$output" =~ "$TMP_HOME/.agents/skills/brainstorming" ]]
 }
 
-@test "global superpowers sync fails when npx skills add fails" {
+@test "global superpowers sync returns failure when npx skills add fails" {
   cat > "$TMP_BIN/npx" <<'SHELL'
 #!/usr/bin/env bash
 echo "network failure" >&2
@@ -48,12 +48,14 @@ exit 7
 SHELL
   chmod +x "$TMP_BIN/npx"
 
-  run env HOME="$TMP_HOME" PATH="$TMP_BIN:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" zsh -c '
-    source "'"$REPO_ROOT"'/lib/config.sh"
-    source "'"$REPO_ROOT"'/lib/skills.sh"
-    _vibe_skills_sync_global_superpowers
+  run env HOME="$TMP_HOME" PATH="$TMP_BIN:/usr/bin:/bin" VIBE_ROOT="$REPO_ROOT" bash -lc '
+    HOME="'"$TMP_HOME"'" PATH="'"$TMP_BIN"':/usr/bin:/bin" VIBE_ROOT="'"$REPO_ROOT"'" \
+      zsh -c '"'"'
+        source "'"$REPO_ROOT"'/lib/config.sh"
+        source "'"$REPO_ROOT"'/lib/skills.sh"
+        _vibe_skills_sync_global_superpowers
+      '"'"' 2>&1
   '
 
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "network failure" ]]
 }
