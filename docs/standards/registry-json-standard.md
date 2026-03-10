@@ -36,6 +36,8 @@ related_docs:
 
 `registry.json` 不负责：
 
+- GitHub Project item 本体
+- roadmap item `type` 定义
 - roadmap 规划优先级
 - version goal
 - worktree 历史
@@ -147,6 +149,12 @@ related_docs:
 - `local`
 - `openspec`
 
+`source_type` 表示 execution record 的创建来源，不表示 GitHub Project item 类型：
+
+- `issue` = 由 `repo issue` 驱动创建
+- `local` = 由本地执行决策创建
+- `openspec` = 由 OpenSpec 执行输入创建
+
 ## 5. Subtask Shape
 
 `subtasks` 为对象数组，每个元素固定包含：
@@ -188,6 +196,11 @@ related_docs:
 
 补充约束：
 
+- `task` 是 execution record，不是 GitHub `type=task` item 的本地副本
+- 若 roadmap item 的 `type=task` 需要执行，可以关联一个或多个本地 `task`
+- `roadmap_item_ids` 只表达“此 execution record 服务哪些 roadmap items”，不改变 roadmap item 类型
+- `issue_refs` 只桥接需求来源，不把 `repo issue` 变成 execution record 身份
+- `pr_ref` 只桥接当前主交付单元，不记录 PR 历史列表
 - 一个 task 只允许一个主 PR
 - 一个 task 不允许多个 PR 历史数组
 - task 作为 execution record，不承担 roadmap item `type` 的定义职责
@@ -203,6 +216,8 @@ related_docs:
 - `pr_history`
 - `feature`
 - `repo`
+- `milestone`
+- `roadmap_type`
 
 ## 9. Minimal Example
 

@@ -146,6 +146,14 @@ related_docs:
 - `repo issue <-> task` 多对多
 - `roadmap item <-> task` 多对多
 - `flow -> task` 一对多
+- 默认 happy path = `repo issue -> roadmap item -> task -> flow -> PR`
+
+补充约束：
+
+- `roadmap` 负责 GitHub Project 规划对象
+- `task` 只负责 execution record
+- `flow` 只负责执行现场
+- slash / workflow 只能调度这些对象，不得重新发明对象层级
 
 ## 4. `vibe roadmap` Standard
 
@@ -205,6 +213,12 @@ related_docs:
 - `version set-goal`
 - `version clear-goal`
 
+写入边界：
+
+- `add` 新增的是 roadmap item，而不是 task / flow
+- `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
+- `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
+
 ### 4.6 Status and Provider Rules
 
 规划层状态只允许：
@@ -231,6 +245,7 @@ provider 只允许：
 - `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
+- `milestone` 是规划窗口锚点，不是 flow 切换开关
 
 ### 4.7 Prohibited Semantics
 
@@ -238,6 +253,8 @@ provider 只允许：
 
 - 将 `openspec` 作为 roadmap provider
 - 将 roadmap item 直接当作 task 使用
+- 通过 `roadmap` 命令隐式创建 flow
+- 通过 `roadmap sync` 自动决定 task 拆分
 - 持久化 `current_version`
 - 持久化 `branch`
 - 持久化 `worktree`
@@ -263,6 +280,7 @@ provider 只允许：
 
 `vibe task` 不负责：
 
+- GitHub Project 规划对象定义
 - roadmap 排布
 - 规划优先级
 - 现场创建与清理
@@ -308,6 +326,19 @@ provider 只允许：
 - `--bind-current`
 - `--unbind`
 
+`task add/update` 可以写入的桥接关系仅限：
+
+- `roadmap_item_ids`
+- `issue_refs`
+- `pr_ref`
+- runtime 绑定事实
+
+`task add/update` 不得承担：
+
+- 创建 GitHub Project item
+- 决定 roadmap item `type`
+- 变更 milestone 或规划窗口
+
 ### 5.6 Status and Source Rules
 
 执行层状态只允许：
@@ -340,6 +371,7 @@ provider 只允许：
 - 使用 `merged`
 - 使用 `skipped`
 - 用 `task` 承担 roadmap 规划职责
+- 将 roadmap item `type=task` 直接等同于本地 `task`
 - 用 `branch` 或 `worktree` 作为 task 历史索引
 
 ## 6. `vibe flow` Standard
@@ -358,6 +390,7 @@ provider 只允许：
 - `flow new` 只创建现场，不定义 feature
 - `flow bind <task-id>` 绑定的是 execution record
 - flow 只能消费已存在的 task，不替代 repo issue / roadmap item 的规划入口
+- `flow` 永远不回退为规划入口
 
 ### 6.2 Boundaries
 
@@ -447,6 +480,7 @@ provider 只允许：
 
 - 用 `flow` 描述 task 生命周期管理
 - 用 `flow` 描述 roadmap 规划入口
+- 用 `flow new` 代替 roadmap item / task 创建
 - 将 `feature` 写成共享模型字段
 - 持久化 `dirty`
 - 让 `review` 默认产生发布副作用

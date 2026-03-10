@@ -23,7 +23,7 @@ related_docs:
 
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
-- `roadmap -> task -> flow -> PR` 应如何推进
+- `repo issue -> roadmap item -> task -> flow -> PR` 应如何推进
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
@@ -50,15 +50,19 @@ related_docs:
 
 默认交付模型如下：
 
-- `roadmap` 负责规划窗口与优先级
-- `task` 负责可执行单元
+- `repo issue` 负责需求来源与讨论入口
+- `roadmap item` 负责 GitHub Project 规划对象
+- `task` 负责 execution record
 - `flow` 负责当前交付切片
 - `pr` 负责当前交付产物
 - `branch` 负责承载当前交付切片的 Git 提交线
 - `worktree` 只是物理容器，不是 flow 本体
+- `milestone` 负责规划窗口锚点，不负责 runtime 切换
 
 默认关系：
 
+- 一个 `repo issue` 可以映射到一个或多个 roadmap item
+- 一个 roadmap item 可以映射到一个或多个 task
 - 一个 `flow` 对应一个当前交付目标
 - 一个当前交付目标默认对应一个当前 `pr`
 - 一个 `flow` 默认绑定一个当前 `branch`
@@ -66,6 +70,7 @@ related_docs:
 
 因此：
 
+- 默认 happy path 是 `repo issue -> roadmap item -> task -> flow -> PR`
 - 开下一个 `flow` 的关键是切换到新的交付目标与新的 `branch`
 - 不要求必须新建 `worktree`
 - 但不得让同一个 `flow` 同时承载多个当前 `pr` 目标
@@ -74,20 +79,22 @@ related_docs:
 
 标准路径如下：
 
-1. 从 `roadmap` 选择当前要推进的 `roadmap item`
-2. 将目标拆成一个或多个 `task`
-3. 为当前这轮交付创建或进入一个 `flow`
-4. 让该 `flow` 绑定本轮要交付的 `task`
-5. 在该 `flow` 对应的 `branch` 上提交本地 commit
-6. 执行 `review`
-7. 提交 `pr`
-8. 合并后收尾并结束当前 `flow`
+1. 从 `repo issue` 或既有 backlog 中确认需求来源
+2. 将需求纳入一个 `roadmap item`
+3. 必要时把 roadmap item 拆成一个或多个 `task` execution record
+4. 为当前这轮交付创建或进入一个 `flow`
+5. 让该 `flow` 绑定本轮要交付的 `task`
+6. 在该 `flow` 对应的 `branch` 上提交本地 commit
+7. 执行 `review`
+8. 提交 `pr`
+9. 合并后收尾并结束当前 `flow`
 
 执行要求：
 
 - 同一 `flow` 内的 commit 应服务同一个当前交付目标
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后
+- `task` 是 execution layer，不替代规划对象；不要跳过 roadmap item 直接让 flow 承担规划入口
 
 ## 4. Flow Decision Rules
 
@@ -111,7 +118,7 @@ related_docs:
 
 默认恢复动作：
 
-- 保留上层 `roadmap item` / `issue`
+- 保留上层 `repo issue` / `roadmap item`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
 
@@ -144,6 +151,12 @@ related_docs:
 
 - 若这些改动仍属于当前 `pr` 的 review follow-up：继续当前 `flow`
 - 若这些改动已经属于下一个交付目标：必须新开下一个 `flow`
+
+切换边界：
+
+- open PR follow-up 仍属于当前 execution slice
+- 下一个 roadmap item 或下一个 task slice 必须进入新的 flow
+- `flow` 不得因为“顺手继续做一点下一个目标”而回退成规划入口
 
 判断标准：
 
@@ -191,6 +204,7 @@ related_docs:
 - `flow` 名、`branch` 语义、`pr` 目标应尽量一致
 - 目录是否变化不是首要判断条件
 - 若复用同一 `worktree`，也必须显式切换到新的 `branch` 与新的 `flow` 语义
+- `milestone` 只影响规划窗口，不直接决定是否切 flow
 
 ## 7. Branch Protection
 

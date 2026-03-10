@@ -30,6 +30,7 @@
 4. `vibe skills` 是 Shell 能力层中的管理命令；`/vibe-skills` 是 Skill 层中的 workflow 入口，两者不是同一个层级。
 5. `opsx-*` 属于 OpenSpec 工作流，生命周期由 `openspec` 管，不并入 `vibe skills` 的安装语义。
 6. Claude 第三方能力优先走 plugin 机制（例如 `everything-claude-code`、`superpowers`），不要用 `npx skills` 去模拟插件。
+7. slash / workflow 只能调度既有 GitHub 对象与本地 execution record，不得在入口文案中重新定义 `repo issue`、`roadmap item`、`task`、`flow`。
 
 ## 3. 关于 `.agent/workflows` vs `.claude/commands`
 
@@ -72,7 +73,25 @@ skills/<name>/
 | 触发 Vibe skills 推荐流程 | `/vibe-skills` -> `skills/vibe-skills/SKILL.md` | 直接把 workflow 写成脚本拼接 |
 | 触发 OpenSpec opsx 流程 | `/opsx:*` + `openspec ...` | 通过 `vibe skills` 安装/卸载 |
 
-## 6. 变更检查清单
+## 6. Slash / Workflow 边界
+
+slash 与 workflow 入口只负责调度、编排与提示，不定义共享状态对象模型。
+
+统一约束：
+
+- `/vibe-new-feature` 面向“选择或创建规划目标”的入口文案，但底层对象仍应落到 `repo issue` / `roadmap item`
+- `/vibe-new-flow` 只创建执行现场，不得把 `flow` 说成 feature 本体
+- `/vibe-issue` 只处理 `repo issue` 生命周期与关联建议，不创建 execution record 语义
+- `/vibe-task` 只围绕本地 execution record 调度，不承担 GitHub Project 规划职责
+- `/vibe-save` 只保存上下文与执行事实，不得回写新的规划对象定义
+
+禁止：
+
+- 在 slash 文案里把 `task` 与 roadmap item `type=task` 混用
+- 在 workflow 入口里把 `flow` 说成规划入口
+- 绕过 Shell 能力层直接重定义 GitHub Project 对象链路
+
+## 7. 变更检查清单
 
 修改本标准或相关实现时，逐项确认：
 
@@ -81,3 +100,4 @@ skills/<name>/
 3. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
 4. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
 5. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
+6. 是否避免在 slash / workflow 文案中重新发明 `repo issue -> roadmap item -> task -> flow -> PR` 这条对象链？

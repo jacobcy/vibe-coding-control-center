@@ -67,11 +67,14 @@ related_docs:
 
 补充约束：
 
+- `repo issue` 是外部来源对象，不是本地执行对象
 - `openspec` 属于执行层输入，不属于规划层来源
 - `roadmap item` 是 mirrored `GitHub Project item`
 - `feature` / `task` / `bug` 是 roadmap item 的 `type`
+- `task` 是 execution record，不等于 roadmap item 的 `type=task`
 - `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
 - `milestone` 是版本/阶段窗口锚点；历史上的 `version_goal` 只保留兼容语义
+- `flow` 只属于执行层，是 task 的运行时容器，不承担规划入口语义
 
 ## 4. Naming Rules
 
@@ -144,11 +147,18 @@ related_docs:
 - repo issue 与 roadmap item：多对多
 - repo issue 与 task：多对多
 - roadmap item 与 task：多对多
+- milestone 与 roadmap item：一对多
+- task 与 flow：一对多（历史上可经过多个 flow，当前时刻只绑定一个活动 flow）
 - PR 与 task：一对一
 - task 与相关 task：通过 `related_task_ids` 建立关联
 
 补充约束：
 
+- `repo issue -> roadmap item -> task -> flow -> PR` 是默认 happy path 链路
+- `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
+- roadmap item 与 task 只建立关联关系，不共享身份
+- `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
+- milestone 只锚定规划窗口，不直接驱动 runtime 切换
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
 - 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
@@ -195,6 +205,8 @@ related_docs:
 - 用 `registry.json` 记录规划优先级
 - 用 `worktrees.json` 承担历史归档
 - 将 `openspec` 写成 roadmap provider
+- 将 `task` 与 roadmap item `type=task` 视为同一对象
+- 将 `flow` 回退成规划入口
 - 将 `feature` 写成共享模型字段
 - 将 `dirty` 写成持久化真源字段
 - 将 branch 或 worktree 当作历史唯一索引

@@ -34,6 +34,7 @@ related_docs:
 
 `roadmap.json` 不负责：
 
+- task execution record 本体
 - branch
 - worktree
 - `dirty`
@@ -108,6 +109,12 @@ related_docs:
 - `description`
 - `milestone`
 
+说明：
+
+- 根字段 `milestone` 保留，作为当前规划窗口的标准锚点
+- 根字段 `version_goal` 保留，但只作为兼容性文本锚点，不替代 milestone
+- item 级 `source_refs` 用于记录 GitHub Project item / issue 等来源引用
+
 ### 4.3 Status Enum
 
 `status` 只允许：
@@ -141,9 +148,14 @@ related_docs:
 
 补充约束：
 
+- `roadmap item` 是 mirrored `GitHub Project item`，不是任意本地 feature 草稿
+- `type=feature|task|bug` 只表达规划分类，足以覆盖当前标准层需求
+- 若未来需要更高层规划对象，应新增独立标准，而不是让 roadmap item 混装 `epic`
+- `source_refs` 应优先记录 GitHub Project item / repo issue 来源，而不是本地运行时来源
 - 一个 roadmap item 可以关联多个 task
 - 一个 roadmap item 可以关联多个 repo issue
 - 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
+- 一个 `type=task` 的 roadmap item 也可以继续拆成多个 execution record
 - roadmap item 不直接持有 PR 字段
 
 ## 6. Version Goal Rules
@@ -171,6 +183,8 @@ related_docs:
 - `feature`
 - `epic`
 - `current_version`
+- `runtime_worktree_name`
+- `runtime_branch`
 
 ## 8. Minimal Example
 
