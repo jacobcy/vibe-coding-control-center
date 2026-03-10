@@ -54,6 +54,26 @@ skills / workflows 可以调度对象，但不得重新定义对象模型。
 - skill / workflow 不得把 roadmap item `type=task` 与本地 task execution record 混成同一实体
 - skill / workflow 不得把 `pr`、`flow` 或 `task` 改写成规划层对象
 
+## 0.1 Slash / Workflow Boundary
+
+slash 与 workflow 入口只负责调度、编排与提示，不定义共享状态对象模型。
+
+统一约束：
+
+- `/vibe-new-feature` 面向“选择或创建规划目标”的入口文案，但底层对象仍应落到 `repo issue` / roadmap item
+- `/vibe-new-flow` 只创建执行现场，不得把 `flow` 说成 feature 本体
+- `/vibe-issue` 只处理 `repo issue` 生命周期与关联建议，不创建 execution record 语义
+- `/vibe-task` 只围绕本地 execution record 调度，不承担 GitHub Project 规划职责
+- `/vibe-save` 只保存上下文与执行事实，不得回写新的规划对象定义
+- workflow 可以建议或填写 `spec_standard` / `spec_ref`，但不得重写 GitHub item 的官方字段
+
+禁止：
+
+- 在 slash 文案里把 `task` 与 roadmap item `type=task` 混用
+- 在 workflow 入口里把 `flow` 说成规划入口
+- 绕过 Shell 能力层直接重定义 GitHub Project 对象链路
+- 把 `openspec` / `kiro` / `superpowers` / `supervisor` 写成 GitHub 官方 item 来源类型
+
 ## 1. 概念分层与唯一职责
 
 | 概念 | 作用 | 规范位置 | 管理方式 | 备注 |

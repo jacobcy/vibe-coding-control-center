@@ -143,10 +143,20 @@ related_docs:
 语义关系：
 
 - `repo issue <-> roadmap item` 多对多
+- `repo issue <-> task` 多对多
 - `roadmap item <-> task` 多对多
 - `task <-> flow` 多对一（单个 task 在任一时刻只应绑定一个当前 flow）
 - `task <-> pr` 一对一
 - `milestone -> roadmap window` 一对多
+
+补充约束：
+
+- 默认 happy path = `repo issue -> roadmap item -> task -> flow -> PR`
+- `roadmap` 负责 GitHub Project 规划对象
+- `task` 只负责 execution record
+- `flow` 只负责执行现场
+- slash / workflow 只能调度这些对象，不得重新发明对象层级
+- GitHub 官方字段与 Vibe 扩展字段可以同时同步，但语义层级必须分离
 
 ## 4. `vibe roadmap` Standard
 
@@ -206,6 +216,13 @@ related_docs:
 - `version set-goal`
 - `version clear-goal`
 
+写入边界：
+
+- `add` 新增的是 roadmap item，而不是 task / flow
+- `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
+- `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
+- `sync` 可以同步 Vibe 扩展字段，但不能改写 `content_type` 这类 GitHub 官方身份语义
+
 ### 4.6 Status and Provider Rules
 
 规划层状态只允许：
@@ -228,12 +245,22 @@ provider 只允许：
 - `github`
 - `local`
 
+补充约束：
+
+- `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
+- `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
+- 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
+- `milestone` 是规划窗口锚点，不是 flow 切换开关
+- roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` 属于允许双向同步的扩展字段
+
 ### 4.7 Prohibited Semantics
 
 禁止：
 
 - 将 `openspec` 作为 roadmap provider
 - 将 roadmap item 直接当作 task 使用
+- 通过 `roadmap` 命令隐式创建 flow
+- 通过 `roadmap sync` 自动决定 task 拆分
 - 持久化 `current_version`
 - 持久化 `branch`
 - 持久化 `worktree`
@@ -303,6 +330,22 @@ provider 只允许：
 - `--bind-current`
 - `--unbind`
 
+`task add/update` 可以写入的桥接关系仅限：
+
+- `roadmap_item_ids`
+- `issue_refs`
+- `pr_ref`
+- `spec_standard`
+- `spec_ref`
+- runtime 绑定事实
+
+`task add/update` 不得承担：
+
+- 创建 GitHub Project item
+- 决定 roadmap item `type`
+- 变更 milestone 或规划窗口
+- 改写 GitHub Project item 的官方来源类型
+
 ### 5.6 Status and Source Rules
 
 执行层状态只允许：
@@ -325,6 +368,14 @@ provider 只允许：
 - `local` 不得被解释为 roadmap item 的替代物
 - `openspec` 表示执行输入来源，不表示规划层 provider
 
+`spec_standard` 只允许：
+
+- `openspec`
+- `kiro`
+- `superpowers`
+- `supervisor`
+- `none`
+
 ### 5.7 Runtime Binding Rules
 
 - task 可以记录当前绑定的 `branch`、`worktree`、`agent`
@@ -341,6 +392,7 @@ provider 只允许：
 - 使用 `merged`
 - 使用 `skipped`
 - 用 `task` 承担 roadmap 规划职责
+- 将 roadmap item `type=task` 直接等同于本地 `task`
 - 用 `branch` 或 `worktree` 作为 task 历史索引
 
 ## 6. `vibe flow` Standard
