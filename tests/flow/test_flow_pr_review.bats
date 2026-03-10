@@ -59,7 +59,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;;
-        "pr create --title test --body test --base main --web") return 0 ;;
+        "pr create --title test --body test --base main") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -102,7 +102,7 @@ EOF
       case "$*" in
         "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
         "pr view current-branch") return 1 ;;
-        "pr create --title test --body test --base main --web") return 0 ;;
+        "pr create --title test --body test --base main") return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -280,6 +280,37 @@ EOF
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Using PR base: main" ]]
+}
+
+@test "14.3.2 _flow_pr only uses web creation when explicitly requested" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;;
+        "pr create --title test --body test --base main --web") echo "WEB_CREATE"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base main --title "test" --body "test" --web
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "WEB_CREATE" ]]
 }
 
 @test "14.4 _flow_pr_base_git_ref prefers origin base over stale local branch" {

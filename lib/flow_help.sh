@@ -60,10 +60,12 @@ Usage: ${CYAN}vibe flow pr${NC} [options]
   --title <text>   PR 的标题 (默认: 首条 commit 标题)
   --body <text>    PR 的正文描述 (默认: 所有 commit 列表)
   --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)
+  --web            显式使用 GitHub Web 页面创建 PR；默认直接用 gh CLI 创建
 默认行为：
   - 仅当当前分支可判定为直接从 main 近切时，才会默认使用 main
   - 如果检测到当前分支更接近其他祖先分支，命令会拒绝继续并要求显式 --base
   - 这里的 --base 是 PR 目标分支，不是创建 flow 时的起点分支
+  - 默认不打开 Web；只有显式传 `--web` 时才走浏览器创建流程
 EOF
 }
 
