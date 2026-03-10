@@ -7,40 +7,45 @@ author: Codex GPT-5
 created: 2026-03-10
 last_updated: 2026-03-10
 related_docs:
+  - docs/references/github_project.md
   - docs/standards/skill-standard.md
   - docs/standards/command-standard.md
-  - docs/standards/registry-json-standard.md
-  - docs/references/github_project.md
+  - docs/standards/data-model-standard.md
 ---
 
 # Skill GitHub Project Orchestration Plan
 
-**Goal:** 让现有 workflow 和 skills 严格建立在新的 Shell/API 与共享真源之上，正确编排 GitHub 官方层对象和 Vibe 扩展字段，不再在入口文案里重新发明对象语义。
+**Goal:** 重写 workflow 和 skills 的实施方案，使其严格依赖当前 shell/API 与共享真源，不再用项目内部旧术语覆盖 GitHub Project 官方语义。
 
 **Non-Goals:**
-- 本计划不改共享真源 schema。
+- 本计划不修改 shared-state schema。
 - 本计划不实现 GitHub API。
-- 本计划不处理一次性数据回填。
+- 本计划不替代 shell contract 改造。
 
-**Tech Stack:** Markdown workflow files, `skills/*/SKILL.md`, `bin/vibe`, existing CLI JSON output
+**Tech Stack:** Markdown workflow files, `skills/*/SKILL.md`, `bin/vibe`, JSON output contracts, Bats smoke tests
 
 ---
 
 ## Current Assessment
 
-当前 workflow / skill 主要问题不在“完全错误”，而在“还不够结构化”：
+最近的语义纠偏已经修正了标准层和部分文案，所以这里的重点不再是“全面纠错”，而是把编排层剩余缺口收口。旧方案过时的地方主要在于它仍假设 workflow/skill 需要自己定义对象模型，而当前标准已经明确：
 
-1. `/vibe-new-feature`、`/vibe-new-flow` 已经部分纠偏，但还没把 `spec_standard` / `spec_ref` 纳入编排入口。
-2. `/vibe-issue`、`vibe-roadmap` 仍偏重 issue/roadmap 关系，对 Project item 官方字段和扩展字段同步未形成固定问法。
-3. `/vibe-task`、`/vibe-save`、`/vibe-check` 还没有把 execution spec 作为一等对象处理。
-4. 现有 skill 说明没有统一规定何时读写 `spec_standard`、`execution_record_id`、`spec_ref`。
+1. workflow 和 skill 只能编排，不得重定义对象层级。
+2. `roadmap item` 是 GitHub Project item mirror。
+3. `task` 是 execution record。
+4. `spec_standard/spec_ref` 是扩展桥接字段，不是 GitHub 官方身份。
+5. skill 必须优先读取 shell 输出，而不是从文案推导隐含字段。
 
 ## Target Decision
 
-1. workflow 只负责编排，不定义新对象。
-2. skill 必须优先读取 Shell 输出，不自行脑补字段。
-3. 所有与 task 创建/更新相关的 skill 都必须显式处理 `spec_standard` / `spec_ref`。
-4. roadmap/issue 类 skill 必须把 GitHub 官方字段与 Vibe 扩展字段分开叙述。
+1. workflow 层只表达顺序与前置条件，不发明新对象。
+2. skill 层只消费 shell 输出中的官方字段与扩展字段，不自行拼接身份。
+3. 所有与 task 相关的编排都显式处理 `spec_standard/spec_ref`。
+4. 所有与 roadmap/issue 相关的编排都显式区分：
+   - repo issue
+   - roadmap item
+   - task
+   - flow
 
 ## Files To Modify
 
@@ -55,28 +60,29 @@ related_docs:
 - Modify: `skills/vibe-task/SKILL.md`
 - Modify: `skills/vibe-save/SKILL.md`
 - Modify: `skills/vibe-check/SKILL.md`
-- Test: `tests/test_skills.bats`
-- Test: `tests/test_review_skills.bats`
+- Modify: `tests/test_skills.bats`
+- Modify: `tests/test_review_skills.bats`
 
-## Task 1: 收紧 workflow 入口语义
+## Task 1: 收紧 workflow 的对象边界
 
 **Files:**
 - Modify: `.agent/workflows/vibe-new-feature.md`
 - Modify: `.agent/workflows/vibe-new-flow.md`
 - Modify: `.agent/workflows/vibe-issue.md`
+- Modify: `.agent/workflows/vibe-task.md`
 
 **Step tasks:**
 
-1. 给 `/vibe-new-feature` 增加一条固定编排要求：
-   - 讨论阶段确认 roadmap item
-   - 执行前确认 `spec_standard`
-2. 给 `/vibe-new-flow` 增加“绑定前必须已有 task record”的硬约束，并明确 `spec_standard` 由 task 持有。
-3. 给 `/vibe-issue` 增加 Project-first 同步说明，不把 issue 本身当 execution record。
+1. 在 workflow 中固定对象链：
+   - repo issue -> roadmap item -> task -> flow -> PR
+2. 明确 `vibe-new-flow` 只接受已有 task，不生成规划对象。
+3. 明确 `vibe-issue` 只处理 issue/roadmap 关系，不把 issue 说成 execution record。
+4. 明确 `vibe-task` 负责 execution record，而不是 roadmap type。
 
 **Expected Result:**
-- workflow 入口在对象层级上不再模糊。
+- workflow 不再把 GitHub Project 规划语义和本地执行语义混用。
 
-## Task 2: 让 `vibe-roadmap` / `vibe-issue` 技能读取新字段
+## Task 2: 让 roadmap/issue skill 明确使用官方层与扩展层
 
 **Files:**
 - Modify: `skills/vibe-roadmap/SKILL.md`
@@ -84,44 +90,36 @@ related_docs:
 
 **Step tasks:**
 
-1. 在 `vibe-roadmap` 中新增“读取 GitHub 官方字段 + Vibe 扩展字段”的说明。
-2. 明确 roadmap 调度时只决定：
-   - roadmap item 规划状态
-   - milestone
-   - type
-3. 明确 `spec_standard` 只是扩展字段，不参与规划类型定义。
-4. 在 `vibe-issue` 中区分：
-   - repo issue 创建
-   - roadmap sync
-   - execution record 创建
+1. 明确 roadmap 读取的是 GitHub Project item mirror。
+2. 明确 skill 只把 `spec_standard/spec_ref` 当扩展桥接字段描述。
+3. 明确 roadmap/issue skill 不得决定 execution record 身份。
+4. 明确 GitHub 官方来源类型不得被 `openspec/kiro/superpowers/supervisor` 覆盖。
 
 **Expected Result:**
-- roadmap/issue skill 不再把执行规范和规划对象混在一起。
+- roadmap/issue skill 对 GitHub 官方语义的叙述与标准一致。
 
-## Task 3: 让 `vibe-task` / `vibe-save` / `vibe-check` 使用 execution spec
+## Task 3: 让 task/save/check skill 以 execution spec 为一等输入
 
 **Files:**
 - Modify: `skills/vibe-task/SKILL.md`
 - Modify: `skills/vibe-save/SKILL.md`
 - Modify: `skills/vibe-check/SKILL.md`
-- Modify: `.agent/workflows/vibe-task.md`
 - Modify: `.agent/workflows/vibe-save.md`
 - Modify: `.agent/workflows/vibe-check.md`
 
 **Step tasks:**
 
-1. 在 `vibe-task` 中加入：
-   - task overview 时展示 `spec_standard`
-   - audit 时检查 `spec_standard/spec_ref` 缺失或非法值
-2. 在 `vibe-save` 中明确：
-   - 只能通过 `vibe task update --spec-standard/--spec-ref/--next-step` 持久化执行规范信息
-3. 在 `vibe-check` 中新增一个检查维度：
-   - roadmap 扩展字段与 task 扩展字段桥接是否一致
+1. `vibe-task` 明确展示和审计 `spec_standard/spec_ref`。
+2. `vibe-save` 明确持久化执行规范信息必须经过 `vibe task update`。
+3. `vibe-check` 增加桥接一致性检查：
+   - roadmap item 的 `execution_record_id`
+   - task 的 `spec_standard/spec_ref`
+4. 所有 skill 说明都强调“先读 shell 输出，再做编排”。
 
 **Expected Result:**
-- execution spec 成为 skill 层的一等信息，而非临时备注。
+- execution spec 成为编排层的稳定输入，而不是散落在自由文案中的约定。
 
-## Task 4: 为 skill 文案和最小 smoke tests 补回归
+## Task 4: 为 skill/workflow 增加语义 smoke tests
 
 **Files:**
 - Modify: `tests/test_skills.bats`
@@ -129,21 +127,24 @@ related_docs:
 
 **Step tasks:**
 
-1. 给关键 workflow/skill 文案增加 grep 级测试，锁定：
-   - `task` = execution record
-   - `spec_standard` 是扩展字段
-   - 不能重写 GitHub 官方来源类型
-2. 跑现有 skill smoke tests，确认文档更新不破坏基本命令。
+1. 对关键 workflow/skill 文案做 grep 级断言，锁定：
+   - `task = execution record`
+   - `roadmap item = GitHub Project item mirror`
+   - `spec_standard/spec_ref` 是扩展字段
+2. 锁定禁用表述：
+   - 把 `type=task` 写成本地 task
+   - 把 `openspec/kiro/superpowers/supervisor` 写成 GitHub 官方来源类型
+3. 保持测试轻量，只验证编排语义不回退。
 
 **Expected Result:**
-- skill/workflow 的语义边界被轻量回归测试锁住。
+- skill/workflow 语义边界可以通过轻量测试持续检查。
 
 ## Test Command
 
 ```bash
 bats tests/test_skills.bats
 bats tests/test_review_skills.bats
-rg -n "spec_standard|execution_record_id|GitHub 官方字段|execution record" \
+rg -n "execution record|GitHub Project item mirror|spec_standard|spec_ref|type=task" \
   .agent/workflows/vibe-new-feature.md \
   .agent/workflows/vibe-new-flow.md \
   .agent/workflows/vibe-issue.md \
@@ -159,16 +160,14 @@ rg -n "spec_standard|execution_record_id|GitHub 官方字段|execution record" \
 
 ## Expected Result
 
-- workflow/skill 对 GitHub 官方层和 Vibe 扩展层的口径一致。
-- 入口编排会显式处理 `spec_standard` / `spec_ref`。
-- skill 不再自行重定义对象模型。
+- skill/workflow 只做编排，不再生造 GitHub Project 之外的对象身份。
+- shell、shared-state、skill 三层可以围绕同一对象模型协作。
 
 ## Estimated Change Summary
 
 - Modified: 13 files
-- Added: ~140-240 lines
-- Removed: ~20-60 lines
+- Added/Changed Lines: ~150-260 lines
 - Risk: 中等
 - Main risk:
-  - 仅改文案不改 CLI 输出时，容易再次出现“skill 说得对，命令做不到”
-  - smoke test 目前偏轻，可能无法覆盖所有 workflow 语义回退
+  - 若 shell 输出仍未补齐，skill 文案会出现“语义正确但命令做不到”的断层
+  - smoke test 过轻时，可能遗漏局部 workflow 的旧术语回流

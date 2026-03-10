@@ -7,59 +7,63 @@ author: Codex GPT-5
 created: 2026-03-10
 last_updated: 2026-03-10
 related_docs:
+  - docs/references/github_project.md
+  - docs/standards/command-standard.md
   - docs/standards/data-model-standard.md
   - docs/standards/roadmap-json-standard.md
   - docs/standards/registry-json-standard.md
-  - docs/standards/command-standard.md
-  - docs/references/github_project.md
 ---
 
 # GitHub Project Bootstrap Sync Cutover Plan
 
-**Goal:** 设计一次性把现有共享真源与 GitHub Project 对接成功的执行方案，完成 schema 补齐、字段映射、预检查、回填、校验和回滚预案。
+**Goal:** 设计一套可执行的 GitHub Project 启动同步与切换方案，让本地共享真源在不改写 GitHub 官方对象语义的前提下，逐步接入 GitHub Project 作为规划层真源。
 
 **Non-Goals:**
-- 本计划不定义长期产品规划流程。
-- 本计划不重构全部历史 worktree 记录。
-- 本计划不处理多仓库场景。
+- 本计划不实现长期双向实时同步。
+- 本计划不清洗全部历史数据。
+- 本计划不改 skill 文案或 workflow 编排。
 
-**Tech Stack:** Zsh, jq, gh CLI, GitHub GraphQL/REST, `.git/vibe/*.json`, one-off migration scripts, Bats smoke checks
+**Tech Stack:** Zsh, jq, gh CLI, GitHub GraphQL, `.git/vibe/*.json`, Bats, audit artifacts
 
 ---
 
 ## Current Assessment
 
-当前项目要“一次性对接成功”，真正风险不在新字段本身，而在历史数据和 GitHub 真实项目状态之间的偏差：
+主线标准已经完成语义纠偏，但“如何真正切到 GitHub Project”仍缺一个可落地 cutover 方案。旧方案的问题是把 cutover 假定成一次性双向同步，而当前标准要求更严格：
 
-1. 现有 `roadmap.json` 里很多 item 仍是 repo issue mirror，而不是 Project item mirror。
-2. 现有 `registry.json` 里 task 还没有统一的 `spec_standard/spec_ref`。
-3. 现有 GitHub Project 上未必已经存在所需 custom fields。
-4. 若直接同步，容易出现：
-   - 本地覆盖 GitHub
-   - GitHub 覆盖本地
-   - task 与 roadmap bridge 丢失
+1. `roadmap item` 是 mirrored GitHub Project item，不是 repo issue mirror。
+2. `task` 是 execution record，只能承载 `spec_standard/spec_ref` 等 Vibe 扩展字段。
+3. GitHub 官方字段与 Vibe 扩展字段必须分层同步，不能互相改写身份。
+4. 当前仓库还没有 bootstrap 脚本、字段探测脚本和对应的最小回归测试。
+
+因此当前需要的不是“直接上线同步”，而是一个分阶段、可 dry-run、可回滚的 cutover 实施方案。
 
 ## Target Decision
 
-1. 先做只读审计，再做字段建模，再做一次性回填，最后切换到双向同步。
-2. `github_project_item_id + content_type` 是 GitHub 官方锚点。
-3. `execution_record_id + spec_standard + spec_ref` 是 Vibe 扩展锚点。
-4. migration 必须具备 dry-run、snapshot、rollback 三件套。
+1. cutover 分成 `read-only audit -> field readiness -> dry-run reconcile -> apply -> verify` 五段。
+2. GitHub Project 官方身份字段以 GitHub 返回值为准：
+   - `github_project_item_id`
+   - `content_type`
+   - GitHub 原生状态/字段映射
+3. Vibe 仅追加扩展桥接字段，不改写 GitHub 官方类型：
+   - `execution_record_id`
+   - `spec_standard`
+   - `spec_ref`
+4. 首次 cutover 只支持 Project-first，同步 repo issue 仅作为来源补充，不作为主身份来源。
 
 ## Files To Modify
 
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Create: `scripts/github_project_field_map.sh`
+- Create: `tests/test_github_project_bootstrap.bats`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
 - Modify: `lib/check.sh`
 - Modify: `lib/check_groups.sh`
-- Modify: `tests/test_roadmap.bats`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/check_help.sh`
+- Modify: `tests/test_task_sync.bats`
 - Create: `artifacts/github-project-bootstrap/README.md`
 
-## Task 1: 设计一次性同步前置审计
+## Task 1: 建立只读 readiness audit
 
 **Files:**
 - Create: `scripts/github_project_bootstrap_sync.sh`
@@ -68,21 +72,22 @@ related_docs:
 
 **Step tasks:**
 
-1. 增加 dry-run 模式，只读取：
+1. 为 bootstrap 脚本实现只读模式，读取：
    - GitHub Project items
-   - custom fields
-   - 本地 roadmap/task 数据
-2. 输出审计报告：
-   - 缺少 `github_project_item_id` 的 roadmap item
-   - 无 `execution_record_id` 的 roadmap item
-   - task 缺失 `spec_standard/spec_ref`
-   - GitHub Project 缺失 custom fields
-3. 审计报告写入 `artifacts/github-project-bootstrap/`。
+   - GitHub Project custom fields
+   - 本地 `roadmap.json`
+   - 本地 `registry.json`
+2. 输出 readiness 报告，至少识别：
+   - 缺失 `github_project_item_id` 的 roadmap item
+   - 缺失 `content_type` 的 roadmap item
+   - 缺失 `execution_record_id` 的 roadmap item
+   - 缺失 `spec_standard/spec_ref` 的 task
+3. 将审计结果写入 `artifacts/github-project-bootstrap/`，供 apply 前人工复核。
 
 **Expected Result:**
-- 能在真正回填前知道差距和阻塞项。
+- 在任何写操作之前，先看见当前主线数据与 GitHub Project 真实状态的差距。
 
-## Task 2: 设计 GitHub Project 字段映射与建场步骤
+## Task 2: 固化 GitHub Project 字段就绪检查
 
 **Files:**
 - Create: `scripts/github_project_field_map.sh`
@@ -90,108 +95,102 @@ related_docs:
 
 **Step tasks:**
 
-1. 明确必需 custom fields：
-   - `spec_standard`
-   - `execution_record_id`
-   - `spec_ref`
-2. 为每个字段定义：
-   - GitHub 类型
-   - 合法值
-   - 本地字段来源
-3. 输出建场步骤：
-   - 如何检测字段是否已存在
-   - 如何创建缺失字段
-   - 如何记录 field id 供后续同步使用
+1. 固化当前 cutover 所需的 GitHub Project 字段清单。
+2. 区分：
+   - GitHub 官方字段
+   - Vibe 扩展字段承载方式
+3. 为扩展字段定义：
+   - GitHub Project custom field 类型
+   - 合法值范围
+   - 与本地字段的映射关系
+4. 输出缺失字段的创建步骤和后续脚本需要使用的 field id 记录格式。
 
 **Expected Result:**
-- 一次性对接前，GitHub Project 端具备接收 Vibe 扩展字段的结构。
+- cutover 前能够确认 GitHub Project 端结构已经准备完毕。
 
-## Task 3: 回填 roadmap 与 task 桥接字段
+## Task 3: 实现 dry-run reconcile
 
 **Files:**
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
+- Modify: `tests/test_github_project_bootstrap.bats`
 
 **Step tasks:**
 
-1. 先为本地 roadmap item 回填：
-   - `github_project_item_id`
-   - `content_type`
-   - `execution_record_id`
-2. 再为本地 task 回填：
-   - `spec_standard`
-   - `spec_ref`
-3. 生成 before/after snapshot，保存在 artifact 目录。
-4. 每一步都支持 `--dry-run` 和 `--apply`。
+1. 让 bootstrap 脚本在 dry-run 下生成：
+   - GitHub -> local 官方字段更新提案
+   - local -> GitHub 扩展字段写回提案
+2. 明确冲突规则：
+   - 官方身份字段以 GitHub 为准
+   - Vibe 扩展字段以本地为准，但必须记录冲突
+3. 输出 before/after preview，不直接修改任何本地 JSON 或 GitHub Project 数据。
+4. 为 dry-run 输出添加最小测试，锁定报告格式与退出码。
 
 **Expected Result:**
-- 本地共享真源具备完整双向同步锚点。
+- 在真正 apply 之前，能够预览 reconciliation 结果和冲突点。
 
-## Task 4: 执行一次性 push/pull 对齐
+## Task 4: 实现受控 apply 与 snapshot
 
 **Files:**
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
+- Modify: `tests/test_task_sync.bats`
 
 **Step tasks:**
 
-1. 先 pull GitHub Project 官方字段到本地。
-2. 再 push 本地扩展字段到 GitHub Project custom fields。
-3. 冲突时按以下优先级：
-   - 官方身份字段以 GitHub 为准
-   - execution spec 扩展字段以本地为准，但记录冲突
-4. 输出最终 reconciliation 报告。
+1. apply 前生成本地 snapshot。
+2. 先落 GitHub 官方字段到本地 roadmap item。
+3. 再把 Vibe 扩展字段写回 GitHub Project custom fields。
+4. apply 完成后生成 reconciliation report，记录：
+   - 成功更新数
+   - 冲突数
+   - 跳过数
+   - 失败原因
 
 **Expected Result:**
-- 本地与 GitHub Project 完成首次一致化。
+- 首次切换具备顺序化 apply、snapshot 和冲突报告。
 
-## Task 5: 收尾验证与回滚预案
+## Task 5: 增加 cutover 后核验与回滚入口
 
 **Files:**
 - Modify: `lib/check.sh`
-- Modify: `tests/test_roadmap.bats`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/check_help.sh`
+- Modify: `lib/check_groups.sh`
+- Create: `tests/test_github_project_bootstrap.bats`
 
 **Step tasks:**
 
-1. 增加一个 bootstrap 后校验入口，检查：
-   - roadmap item 的 GitHub 锚点完整
+1. 为 `vibe check` 增加 GitHub Project cutover 校验组。
+2. 校验项至少包含：
+   - roadmap item 官方锚点完整
    - task execution spec 完整
-   - custom fields 与本地值一致
-2. 提供回滚步骤：
-   - 恢复本地 snapshot
-   - 停止同步脚本
-   - 重新执行 dry-run
-3. 为脚本参数和帮助文案补最小 smoke test。
+   - task 不持有 GitHub item 身份字段
+3. 在 artifact README 中记录本地 snapshot 恢复步骤与 rerun 顺序。
 
 **Expected Result:**
-- 一次性对接有明确的成功标准和失败回退路径。
+- cutover 完成后有明确成功标准，失败时有明确恢复路径。
 
 ## Test Command
 
 ```bash
-zsh scripts/github_project_bootstrap_sync.sh --dry-run
 zsh scripts/github_project_field_map.sh --check
-bats tests/test_roadmap.bats
-bats tests/test_task_ops.bats
-bash tests/check_help.sh
+zsh scripts/github_project_bootstrap_sync.sh --dry-run
+bats tests/test_github_project_bootstrap.bats
+bats tests/test_task_sync.bats
 ```
 
 ## Expected Result
 
-- 对接前能识别缺口。
-- GitHub Project 端 custom fields 结构完备。
-- 本地共享真源与 GitHub Project 完成首次一致化后，可进入常态双向同步。
-- 失败时可用 snapshot 回滚。
+- cutover 以 GitHub Project 官方语义为基础，而不是本地自造对象语义。
+- 首次同步具备 field readiness、dry-run、apply、snapshot、rollback 全链路。
+- `roadmap item` 与 `task` 的边界在同步实现中继续保持清晰。
 
 ## Estimated Change Summary
 
-- Modified: 7 files
-- Added: 3 files
-- Added/Changed Lines: ~220-420 lines
+- Modified: 4 files
+- Added: 5 files
+- Added/Changed Lines: ~260-420 lines
 - Risk: 高
 - Main risk:
-  - 真实 GitHub Project 数据可能比标准假设更脏
-  - 一次性对接脚本若没有 dry-run/snapshot，容易造成双边数据污染
+  - GitHub Project 实际字段形态可能与文档假设不完全一致
+  - 首次 apply 若缺少 dry-run 报告，容易污染 GitHub 官方字段与本地桥接字段

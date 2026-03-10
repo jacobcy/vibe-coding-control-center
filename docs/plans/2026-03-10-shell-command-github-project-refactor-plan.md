@@ -7,40 +7,42 @@ author: Codex GPT-5
 created: 2026-03-10
 last_updated: 2026-03-10
 related_docs:
-  - docs/standards/command-standard.md
-  - docs/standards/roadmap-json-standard.md
-  - docs/standards/registry-json-standard.md
   - docs/references/github_project.md
+  - docs/standards/command-standard.md
+  - docs/standards/data-model-standard.md
+  - docs/standards/skill-standard.md
 ---
 
 # Shell Command GitHub Project Refactor Plan
 
-**Goal:** 把 `vibe roadmap` / `vibe task` / `vibe flow` 的实现改造成符合新标准层语义的原子命令接口，为后续 skill 与双向同步提供稳定 Shell API。
+**Goal:** 把 `vibe roadmap`、`vibe task`、`vibe flow` 的命令契约收敛到当前 GitHub Project 兼容语义，使 shell API 能稳定表达规划层、执行层和 runtime 层边界。
 
 **Non-Goals:**
-- 本计划不直接改 skill 文案。
-- 本计划不完成一次性历史数据迁移。
-- 本计划不实现完整 GitHub Project 同步脚本，只补命令契约与最小执行路径。
+- 本计划不改技能文案。
+- 本计划不实现完整 GitHub Project bootstrap。
+- 本计划不做历史数据迁移。
 
-**Tech Stack:** Zsh, jq, gh CLI, Bats, `bin/vibe`, `lib/roadmap*.sh`, `lib/task*.sh`, `lib/flow*.sh`
+**Tech Stack:** Zsh, jq, gh CLI, `bin/vibe`, `lib/roadmap*.sh`, `lib/task*.sh`, `lib/flow*.sh`, Bats
 
 ---
 
 ## Current Assessment
 
-当前命令实现与标准层仍有四个缺口：
+标准层已经定义了对象边界，但 shell 命令实现还需要进一步落地。旧方案的主要过时点有两个：一是默认假设存在 `tests/test_flow.bats` 等测试文件，二是对 `roadmap sync` 的描述还不够严格。当前需要补的是命令契约，而不是再次造术语。
 
-1. `vibe roadmap sync` 仍是“按 label 拉 repo issue”语义，还不是 GitHub Project item 同步。
-2. `vibe task add/update` 还不能显式管理 `spec_standard` / `spec_ref`。
-3. `vibe flow new/bind` 文案已经纠偏，但底层没有强制校验 execution record 与 roadmap item 的桥接状态。
-4. help/usage 文案和 JSON 输出尚未体现“官方字段 vs 扩展字段”的层级。
+当前壳层应满足以下事实：
+
+1. `vibe roadmap` 管理 mirrored GitHub Project item。
+2. `vibe task` 是 execution record 的唯一写入口。
+3. `vibe flow` 只消费 task，不创建规划对象。
+4. help、JSON 输出和退出码都需要体现这些边界。
 
 ## Target Decision
 
-1. `vibe roadmap sync` 先收敛为 GitHub Project item 镜像同步入口，保留 repo issue 兼容路径但明确降级。
-2. `vibe task` 成为管理 execution record 扩展字段的唯一合法入口。
-3. `vibe flow` 只消费已有 task record，不替代规划或同步动作。
-4. 所有命令帮助文案都要反映新的对象分层。
+1. `roadmap sync` 收敛为 Project-first，同步 repo issue 仅作为兼容导入或来源补充。
+2. `task add/update` 显式支持 `spec_standard/spec_ref`，并拒绝 GitHub item 身份字段。
+3. `flow` 绑定前校验 task 语义，不再暗示 feature/roadmap type 身份。
+4. CLI 帮助文案必须与当前标准完全一致。
 
 ## Files To Modify
 
@@ -53,139 +55,133 @@ related_docs:
 - Modify: `lib/task_help.sh`
 - Modify: `lib/task_actions.sh`
 - Modify: `lib/task_write.sh`
+- Modify: `lib/task_query.sh`
 - Modify: `lib/flow.sh`
 - Modify: `lib/flow_help.sh`
-- Modify: `tests/test_roadmap.bats`
 - Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_flow.bats`
+- Modify: `tests/test_task_sync.bats`
+- Modify: `tests/check_help.sh`
+- Create: `tests/test_roadmap_contract.bats`
+- Create: `tests/test_flow_contract.bats`
 
-## Task 1: 重写 `vibe roadmap sync` 命令边界
+## Task 1: 收紧 `vibe roadmap sync` 入口
 
 **Files:**
 - Modify: `lib/roadmap.sh`
 - Modify: `lib/roadmap_help.sh`
 - Modify: `lib/roadmap_write.sh`
-- Test: `tests/test_roadmap.bats`
+- Modify: `lib/roadmap_query.sh`
+- Create: `tests/test_roadmap_contract.bats`
 
 **Step tasks:**
 
-1. 调整 `sync` 参数设计，显式区分：
-   - GitHub Project item 同步路径
-   - repo issue label 兼容导入路径
-2. 将默认说明改为“Project-first”，把现有 repo issue 镜像路径标记为兼容模式。
-3. 为 sync 返回结果增加：
-   - 新增/更新 item 数
-   - 官方字段同步结果
-   - 扩展字段同步结果
-4. 新增 help 和测试，锁定 `--provider github --repo ...` 的语义提示。
+1. 明确 `sync` 的默认语义是 GitHub Project item mirror。
+2. 将 repo issue 导入路径标记为兼容模式，而不是主语义。
+3. 让 `sync --json` 输出区分：
+   - GitHub 官方字段同步结果
+   - Vibe 扩展字段同步结果
+4. 为 help 与 JSON 输出补回归测试。
 
 **Expected Result:**
-- `vibe roadmap sync` 不再被误解为 issue-first 导入器。
+- `roadmap sync` 不再被视为 issue-first 导入器。
 
-## Task 2: 扩展 `vibe task add/update` 为规范字段入口
+## Task 2: 让 `vibe task` 成为 execution spec 唯一入口
 
 **Files:**
 - Modify: `lib/task.sh`
 - Modify: `lib/task_help.sh`
 - Modify: `lib/task_actions.sh`
 - Modify: `lib/task_write.sh`
-- Test: `tests/test_task_ops.bats`
+- Modify: `lib/task_query.sh`
+- Modify: `tests/test_task_ops.bats`
 
 **Step tasks:**
 
-1. 在 `task add` 支持 `--spec-standard`、`--spec-ref`。
-2. 在 `task update` 支持更新 `spec_standard`、`spec_ref`。
-3. 明确枚举校验：
-   - `openspec`
-   - `kiro`
-   - `superpowers`
-   - `supervisor`
-   - `none`
-4. 明确拒绝写入 GitHub item 官方字段。
-5. 更新 help 文案与 JSON 输出测试。
+1. 在 `task add/update` 中支持 `--spec-standard`、`--spec-ref`。
+2. 校验允许值与 null 行为。
+3. 显式拒绝通过 `task` 写入 `github_project_item_id/content_type`。
+4. 在 `show/list --json` 中保留 execution spec 字段，供上层消费。
 
 **Expected Result:**
-- `vibe task` 成为 execution record 扩展字段的标准入口。
+- 所有 execution spec 更新都必须经过 `vibe task`。
 
-## Task 3: 收紧 `vibe flow` 的消费边界
+## Task 3: 收紧 `vibe flow` 只消费 execution record
 
 **Files:**
 - Modify: `lib/flow.sh`
 - Modify: `lib/flow_help.sh`
-- Test: `tests/test_flow.bats`
+- Create: `tests/test_flow_contract.bats`
 
 **Step tasks:**
 
-1. 保留 `flow new` 只创建现场的行为，并把帮助文案进一步收紧到“必须先有 task record”。
-2. 在 `flow bind` 前增加最小校验：
-   - task 存在
-   - task 状态允许绑定
-   - task 若已有 `spec_standard`，绑定日志中展示出来
-3. 在 `flow status --json` 中透出 task 的 `spec_standard` / `spec_ref` 摘要，便于 skill 消费。
-4. 补测试锁定：
-   - bind 时不创建 task
-   - bind 时保留 execution record 语义
+1. 强化 `flow new`、`flow bind` 的帮助文案，明确前置条件是已有 task。
+2. 在 bind/new 的关键路径增加 task 状态与存在性校验。
+3. 让 `flow status --json` 暴露 task 摘要字段，但不复制 roadmap identity。
+4. 为 flow contract 增加最小测试。
 
 **Expected Result:**
-- flow 命令继续只做 runtime orchestration，不偷渡规划逻辑。
+- flow 是 runtime 容器，不再混入 roadmap item 或 feature type 语义。
 
-## Task 4: 更新 CLI 顶层帮助与命令叙述
+## Task 4: 更新顶层帮助和退出码契约
 
 **Files:**
 - Modify: `bin/vibe`
 - Modify: `lib/roadmap_help.sh`
 - Modify: `lib/task_help.sh`
 - Modify: `lib/flow_help.sh`
+- Modify: `tests/check_help.sh`
 
 **Step tasks:**
 
-1. 更新顶层 `vibe help`，反映：
-   - roadmap = GitHub Project 镜像与规划层
+1. 顶层 help 明确三层对象：
+   - roadmap item = planning mirror
    - task = execution record
-   - flow = 现场编排
-2. 在各子命令 help 中补充“官方字段 vs 扩展字段”的说明。
-3. 避免任何帮助文案再把 `task` 和 `type=task` 混用。
+   - flow = runtime container
+2. 避免任何帮助文案继续把 `type=task` 说成本地 task。
+3. 锁定帮助文案中的关键术语与错误退出码。
 
 **Expected Result:**
-- Shell 层对外口径与标准文件一致。
+- 用户从 help 即可看见当前对象模型，而不是旧项目语义。
 
-## Task 5: Shell 回归测试
+## Task 5: 建立 shell contract 回归
 
 **Files:**
-- Modify: `tests/test_roadmap.bats`
+- Create: `tests/test_roadmap_contract.bats`
+- Create: `tests/test_flow_contract.bats`
 - Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_flow.bats`
+- Modify: `tests/test_task_sync.bats`
+- Modify: `tests/check_help.sh`
 
 **Step tasks:**
 
-1. 为 roadmap/task/flow 新参数和帮助文案补测试。
-2. 跑 targeted bats，确保新参数没有破坏现有基本路径。
-3. 对 JSON 输出做最小 snapshot 断言。
+1. 对 roadmap/task/flow 的关键 JSON 输出做字段存在性断言。
+2. 对帮助文案做 grep 级断言。
+3. 对拒绝非法字段写入的错误路径补测试。
 
 **Expected Result:**
-- 命令层变更具备最小回归保护。
+- shell 语义与标准文件保持同步，并在回归测试中可见。
 
 ## Test Command
 
 ```bash
-bats tests/test_roadmap.bats
 bats tests/test_task_ops.bats
-bats tests/test_flow.bats
+bats tests/test_task_sync.bats
+bats tests/test_roadmap_contract.bats
+bats tests/test_flow_contract.bats
+bash tests/check_help.sh
 ```
 
 ## Expected Result
 
-- Shell 命令边界与标准层一致。
-- `vibe roadmap sync` 被收敛为 GitHub Project-first 入口。
-- `vibe task` 成为扩展字段写入入口。
-- `vibe flow` 只消费 execution record，不重新发明对象层级。
+- `vibe roadmap`、`vibe task`、`vibe flow` 的边界与 GitHub Project 兼容标准一致。
+- CLI 输出不再鼓励用户使用项目自造语义解释 GitHub 官方对象。
 
 ## Estimated Change Summary
 
-- Modified: 14 files
-- Added: ~180-320 lines
-- Removed: ~40-110 lines
+- Modified: 15 files
+- Added: 2 files
+- Added/Changed Lines: ~220-360 lines
 - Risk: 中高
 - Main risk:
-  - help/JSON 输出改动可能影响 skill 消费端
-  - sync 子命令从 issue-first 向 project-first 收敛时，兼容路径容易被误删
+  - 帮助文案与 JSON 输出一旦变化，现有 skill 消费端可能暴露隐含依赖
+  - 若 `roadmap sync` 兼容路径处理不严，容易再次回退到 issue-first 语义
