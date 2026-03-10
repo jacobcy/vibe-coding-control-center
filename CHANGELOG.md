@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.9] - 2026-03-10
+
+### ✨ Changed
+- - renname vibe-skill -> vibe-skill-audit - rename vibe-skills -> vibe-skills-manager ...
+
 ## [2.1.8] - 2026-03-10
 
 ### ✨ Changed
