@@ -10,7 +10,7 @@
 
 1. **新增智能调度器 (vibe-roadmap)**
    - 创建 `skills/vibe-roadmap/SKILL.md`
-   - 注册到 `skills/vibe-skills/registry.json`
+   - 注册到 `skills/vibe-skills-manager/registry.json`
    - 维护版本目标和 Issue 分类状态机
 
 2. **重新定义 Issue 分类**
@@ -48,6 +48,6 @@
 ## Impact
 
 - **新增文件**: `skills/vibe-roadmap/SKILL.md`
-- **修改文件**: `skills/vibe-skills/registry.json`, `lib/task_actions.sh`, `lib/task_help.sh`, `.agent/skills/vibe-new/SKILL.md`
+- **修改文件**: `skills/vibe-skills-manager/registry.json`, `lib/task_actions.sh`, `lib/task_help.sh`, `.agent/skills/vibe-new/SKILL.md`
 - **测试文件**: `tests/test_task_sync_github.bats`, `tests/test_roadmap_scheduler.bats`
 - **数据**: `registry.json` 扩展 Issue 分类字段

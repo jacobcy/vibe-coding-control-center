@@ -9,7 +9,7 @@ authority:
   - recovery-rules
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -23,10 +23,11 @@ related_docs:
 
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
-- `repo issue -> roadmap item -> task -> flow -> PR` 应如何推进
+- `roadmap -> task -> flow -> PR` 应如何推进
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
+- 何时必须进入整合或收口，而不是继续开发
 - 现场偏离标准后，如何回归标准 flow
 
 术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。高频动作词以 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)。
@@ -50,19 +51,15 @@ related_docs:
 
 默认交付模型如下：
 
-- `repo issue` 负责需求来源与讨论入口
-- `roadmap item` 负责 GitHub Project 规划对象
-- `task` 负责 execution record
+- `roadmap` 负责规划窗口与优先级
+- `task` 负责可执行单元
 - `flow` 负责当前交付切片
 - `pr` 负责当前交付产物
 - `branch` 负责承载当前交付切片的 Git 提交线
 - `worktree` 只是物理容器，不是 flow 本体
-- `milestone` 负责规划窗口锚点，不负责 runtime 切换
 
 默认关系：
 
-- 一个 `repo issue` 可以映射到一个或多个 roadmap item
-- 一个 roadmap item 可以映射到一个或多个 task
 - 一个 `flow` 对应一个当前交付目标
 - 一个当前交付目标默认对应一个当前 `pr`
 - 一个 `flow` 默认绑定一个当前 `branch`
@@ -70,23 +67,48 @@ related_docs:
 
 因此：
 
-- 默认 happy path 是 `repo issue -> roadmap item -> task -> flow -> PR`
 - 开下一个 `flow` 的关键是切换到新的交付目标与新的 `branch`
 - 不要求必须新建 `worktree`
 - 但不得让同一个 `flow` 同时承载多个当前 `pr` 目标
+- 复用当前目录串行进入下一个 `flow` 时，应显式执行 flow 切换，而不是把旧 `flow` 继续伪装成新目标
 
-## 3. Happy Path
+## 3. Flow Lifecycle States
+
+标准 flow 生命周期只分三类：
+
+- `open + no_pr`
+  - flow 已打开
+  - 当前 branch 尚未形成 PR 事实
+  - 允许继续开发
+  - 允许通过 `vibe flow switch` 重新进入
+- `open + had_pr`
+  - flow 尚未关闭
+  - 当前 branch 已经形成 PR 事实
+  - 不再允许当作普通开发 flow 重新进入
+  - 应交由 `vibe-integrate` 或同类 skill 处理 review、CI、merge 与收口 handoff
+- `closed`
+  - flow 已完成并进入历史
+  - 不允许再次 `new` 同名 flow
+  - 不允许复用同名 branch 语义重新发 PR
+
+命令语义对应：
+
+- `show`：查看单个 flow 的当前或历史详情
+- `status`：只看未关闭 flow 大盘
+- `list`：看所有 flow，包括已关闭历史
+
+## 4. Happy Path
 
 标准路径如下：
 
-1. 从 `repo issue` 或既有 backlog 中确认需求来源
-2. 将需求纳入一个 `roadmap item`
-3. 必要时把 roadmap item 拆成一个或多个 `task` execution record
-4. 为当前这轮交付创建或进入一个 `flow`
-5. 让该 `flow` 绑定本轮要交付的 `task`
-6. 在该 `flow` 对应的 `branch` 上提交本地 commit
-7. 执行 `review`
-8. 提交 `pr`
+1. 从 `roadmap` 选择当前要推进的 `roadmap item`
+2. 将目标拆成一个或多个 `task`
+3. 为当前这轮交付创建或进入一个 `flow`
+4. 让该 `flow` 绑定本轮要交付的 `task`
+5. 在该 `flow` 对应的 `branch` 上提交本地 commit
+6. 执行 `review`
+7. 提交 `pr`
+8. 进入整合阶段，直到该 `pr` 可合并
 9. 合并后收尾并结束当前 `flow`
 
 执行要求：
@@ -94,11 +116,10 @@ related_docs:
 - 同一 `flow` 内的 commit 应服务同一个当前交付目标
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后
-- `task` 是 execution layer，不替代规划对象；不要跳过 roadmap item 直接让 flow 承担规划入口
 
-## 4. Flow Decision Rules
+## 5. Flow Decision Rules
 
-### 4.1 Continue Current Flow
+### 5.1 Continue Current Flow
 
 继续当前 `flow` 的条件：
 
@@ -107,7 +128,13 @@ related_docs:
 - 当前 `branch` 语义仍与该交付目标一致
 - 新改动只是 review follow-up、补测试、补文档或同一目标下的必要修正
 
-### 4.2 Open a New Flow
+补充约束：
+
+- 若当前 flow 仍处于 `open + no_pr`，可以继续正常开发
+- 若当前 flow 已进入 `open + had_pr`，只能继续处理该 PR 的 follow-up 或整合阻塞
+- 不得把 `open + had_pr` 的 flow 当作“下一个新目标”的开发现场继续复用
+
+### 5.2 Open a New Flow
 
 以下情况必须新开下一个 `flow`：
 
@@ -118,13 +145,26 @@ related_docs:
 
 默认恢复动作：
 
-- 保留上层 `repo issue` / `roadmap item`
+- 保留上层 `roadmap item` / `issue`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
+- 若复用当前目录，使用 `vibe flow switch` 一类显式 flow 切换能力进入新 `flow`
 
-## 5. Exception Paths
+补充语义：
 
-### 5.1 `A flow` 被 `B task` 阻塞
+- `vibe flow switch (shell)` 默认应安全携带当前目录的未提交改动进入目标 flow；这属于该命令的基础语义，而不是额外开关
+- `vibe flow new (shell)` 仍可保持更保守的默认值，由显式参数决定是否带入未提交改动
+
+`flow new` / `flow switch` 的准入规则：
+
+- 若同名 flow 当前存在，`new` 必须拒绝，并提示 `switch`
+- 若同名 flow 历史存在过且已关闭，`new` 必须直接报错
+- `switch` 只允许进入 `open + no_pr`
+- 已经 `had_pr` 但未关闭的 flow，不允许通过 `switch` 继续，应交给 skill 处理
+
+## 6. Exception Paths
+
+### 6.1 `A flow` 被 `B task` 阻塞
 
 场景：
 
@@ -145,18 +185,12 @@ related_docs:
 - 在名义上属于 `A` 的 `flow` / `branch` 中直接提交 `B` 的独立 `pr`
 - 用同一个当前 `flow` 同时承载 `A` 与 `B` 两个当前交付目标
 
-### 5.2 `pr` 已提交，但现场仍有未提交改动
+### 6.2 `pr` 已提交，但现场仍有未提交改动
 
 分两种情况：
 
 - 若这些改动仍属于当前 `pr` 的 review follow-up：继续当前 `flow`
 - 若这些改动已经属于下一个交付目标：必须新开下一个 `flow`
-
-切换边界：
-
-- open PR follow-up 仍属于当前 execution slice
-- 下一个 roadmap item 或下一个 task slice 必须进入新的 flow
-- `flow` 不得因为“顺手继续做一点下一个目标”而回退成规划入口
 
 判断标准：
 
@@ -170,7 +204,13 @@ related_docs:
 3. 若不属于当前 `pr`，切换到新的 `flow` / `branch`
 4. 让剩余改动在新的交付语义下继续推进
 
-### 5.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
+补充规则：
+
+- `pr` 已提交但 flow 未关闭时，该 flow 属于 `open + had_pr`
+- 此时若需要检查 CI、处理 review、等待合并或补 follow-up，应进入整合阶段，而不是新开同名 flow
+- 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe-done` 或等价收口流程
+
+### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 
 场景：
 
@@ -189,7 +229,7 @@ related_docs:
 - 继续把“多个 feature、多个 `pr` 目标”写在同一个当前 `flow` 中
 - 用一个当前 `flow` 依次冒充多个当前 `pr` 目标而不重建语义
 
-## 6. Recovery Rules
+## 7. Recovery Rules
 
 当现场偏离标准时，按下列优先级恢复：
 
@@ -204,9 +244,26 @@ related_docs:
 - `flow` 名、`branch` 语义、`pr` 目标应尽量一致
 - 目录是否变化不是首要判断条件
 - 若复用同一 `worktree`，也必须显式切换到新的 `branch` 与新的 `flow` 语义
-- `milestone` 只影响规划窗口，不直接决定是否切 flow
+- 并行推进多个交付目标时，优先新建物理 `worktree`；串行推进下一个交付目标时，优先复用当前目录并显式切换 `flow`
 
-## 7. Branch Protection
+## 8. Serial Handoff
+
+针对“提交 -> 整合 -> 收口”的串行链路，职责固定如下：
+
+- `vibe-commit`
+  - 负责脏工作区分类、commit 分组、串行 PR 切片与 PR 草案
+  - 不负责 merge、issue close、flow close
+- `vibe-integrate`
+  - 负责检查 CI、review、堆叠顺序、merge eligibility
+  - 负责处理 `open + had_pr` 的 flow
+  - 不直接承担 task / issue 真源写入
+- `vibe-done`
+  - 负责合并后的收口编排
+  - 通过 `vibe task update`、`gh issue close`、`vibe flow done` 完成 task / issue / flow handoff
+
+`.agent/context/task.md` 只作为 skill 之间的短期 handoff 记录，不是共享真源。
+
+## 9. Branch Protection
 
 `main` 是项目唯一主干，远端必须至少启用以下约束：
 

@@ -9,7 +9,7 @@ authority:
   - worktree-cleanup
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -21,7 +21,7 @@ related_docs:
 
 # Worktree Lifecycle Standard
 
-本文档定义 `worktree` 的物理生命周期规则，只回答目录现场如何创建、复用、清理与回收。
+本文档定义 `worktree` 的物理生命周期规则，只回答目录现场如何创建、复用、清理与回收，以及 flow 关闭后目录与历史如何分离。
 
 `flow`、`workflow`、`worktree`、`branch` 的正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。交付流程语义见 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)。
 
@@ -33,6 +33,7 @@ related_docs:
 - 何时新建目录，何时复用目录
 - 何时清理目录
 - 现场残留与幽灵目录的治理规则
+- flow 关闭后目录、branch 与历史留存的关系
 
 本文档不定义：
 
@@ -51,6 +52,8 @@ related_docs:
 - 新 `flow` 不强制要求新 `worktree`
 - 复用同一目录承载新的 `flow` 是允许的
 - 但复用目录时，必须显式切换到新的 `branch`
+- 复用目录进入新的逻辑 `flow` 时，应通过正式 flow 切换能力完成，而不是靠目录名暗示
+- 已关闭 flow 的历史不保存在 `worktree` 目录内，而应保存在共享历史真源中
 
 ## 3. Create and Reuse Rules
 
@@ -69,19 +72,22 @@ related_docs:
 - 当前目录只需要承载下一个 `flow`
 - 旧 `flow` 已停止继续扩展
 - 当前目录中的未提交改动需要被带入新的 `branch`
+- 目标 flow 仍处于 `open + no_pr`
 
 复用目录时的最低要求：
 
 - 当前 `flow` 语义已经结束或冻结
 - 当前目录切到新的 `branch`
 - 新目录语义只服务一个新的当前交付目标
+- 当前目录的 flow runtime 记录已同步到新的 `branch` / `flow` 语义
+- 若目标 flow 已有 PR 事实，不得通过目录复用继续 `switch`
 
 ## 4. Residual Changes
 
 当目录中仍有未提交改动时：
 
 - 若这些改动属于当前 `pr` 的 follow-up，可以保留在当前目录继续处理
-- 若这些改动属于新的交付目标，应在切换 `branch` 后继续处理
+- 若这些改动属于新的交付目标，应在切换 `branch` 后继续处理；通过 `vibe flow switch (shell)` 复用当前目录时，默认应安全带入这批未提交改动
 
 禁止：
 
@@ -97,6 +103,8 @@ related_docs:
 - 复用同一个 `worktree`
 - 将当前未提交改动带入新的 `branch`
 - 让该目录开始承载新的 `flow`
+- 标准入口应是显式的 flow 切换命令；其中 `vibe flow switch (shell)` 默认承担安全保存与恢复当前未提交改动的职责，游离脚本只能作为兼容包装存在
+- 只允许进入尚未关闭、且尚未发过 PR 的 flow
 
 该模式不是：
 
@@ -117,6 +125,13 @@ related_docs:
 - 不再残留错误的当前 `branch` 语义
 - 不再形成幽灵目录、幽灵分支、僵尸现场
 
+补充规则：
+
+- `vibe flow done` 负责关闭 flow 并删除本地/远端 branch
+- `vibe flow done` 不负责关闭 task / issue
+- flow 关闭后，目录可以被保留或复用，但不能继续代表旧 flow
+- 即使 branch 被删除，已关闭 flow 的历史也必须保留
+
 ## 7. Ghost Worktree and Ghost Branch
 
 出现下列情况应视为异常：
@@ -131,6 +146,11 @@ related_docs:
 - 若仍有用途，则切到新的 `branch` 与新的 `flow` 语义
 - 若无用途，则清理目录
 
+若 branch 已经产生过 PR 事实但 flow 尚未关闭：
+
+- 该目录不应再作为普通开发 worktree 继续 `switch`
+- 应转交 skill 做整合或收口，而不是让 shell 自动修复
+
 ## 8. Relationship With Delivery Workflow
 
 `worktree` 生命周期必须服从交付流程，而不能反过来主导交付语义。
@@ -140,3 +160,4 @@ related_docs:
 - 不应因为目录没变，就假设当前 `flow` 没变
 - 不应因为目录还在，就继续沿用旧 `pr` 目标
 - `flow` 的变化应先由交付目标决定，再决定是否复用目录
+- `worktree` 被清理或 branch 被删除，不等于 flow 历史可以丢失

@@ -114,7 +114,7 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 
-@test "ops: update bind-current syncs worktree binding and cache" {
+@test "ops: update bind-current syncs worktree binding without local cache" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
   local wt_path="$fixture/wt-test-task"
@@ -129,19 +129,110 @@ setup() {
   '
   [ "$status" -eq 0 ]
   [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
-  [ -f "$wt_path/.vibe/current-task.json" ]
-  [ "$(jq -r '.task_id' "$wt_path/.vibe/current-task.json")" = "2026-03-02-rotate-alignment" ]
+  [ ! -e "$wt_path/.vibe/current-task.json" ]
+  [ ! -e "$wt_path/.vibe/focus.md" ]
+  [ ! -e "$wt_path/.vibe/session.json" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+}
+
+@test "ops: task query prefers shared worktree binding over local stale cache" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+  mkdir -p "$wt_path/.vibe"
+  cat > "$wt_path/.vibe/current-task.json" <<'JSON'
+{"task_id":"2026-03-02-rotate-alignment"}
+JSON
+
+  run zsh -c '
+    cd "'"$wt_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -F "old-task Old Task [completed]"
+  [[ "$output" == *"old-task Old Task [completed]"* ]]
+  [[ "$output" == *"(focused)"* ]]
+  [[ ! "$output" =~ "2026-03-02-rotate-alignment Rotate Workflow Refinement \[todo\].*focused" ]]
+}
+
+@test "ops: task query handles unbound worktree without local cache" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+
+  jq '
+    .worktrees = [
+      .worktrees[]
+      | select(.worktree_name == "wt-test-task")
+      | .current_task = null
+      | .tasks = []
+    ]
+  ' "$fixture/vibe/worktrees.json" > "$fixture/vibe/worktrees.json.tmp"
+  mv "$fixture/vibe/worktrees.json.tmp" "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$wt_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
+  [[ ! "$output" =~ "focused" ]]
+}
+
+@test "ops: update bind-current from subdirectory binds the worktree root" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+  local nested_path="$wt_path/subdir"
+  mkdir -p "$nested_path"
+
+  run zsh -c '
+    cd "'"$nested_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --bind-current
+  '
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '[.worktrees[] | select(.worktree_name=="subdir")] | length' "$fixture/vibe/worktrees.json")" = "0" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 
 @test "ops: update accepts --issue/--roadmap-item/--pr and deduplicates refs" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Test roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
 
-  run zsh -c '
-    source "'"$HELPER"'"
+  run env TEST_FIXTURE="$fixture" TEST_HELPER="$HELPER" zsh -c '
+    source "$TEST_HELPER"
     setup_task_env
-    mock_git_registry "'"$fixture"'"
+    mock_git_registry "$TEST_FIXTURE"
     vibe_task update 2026-03-02-rotate-alignment \
       --issue gh:owner/repo#68 --issue gh:owner/repo#68 \
       --roadmap-item rm-1 --roadmap-item rm-1 \
@@ -151,6 +242,62 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .issue_refs | length' "$fixture/vibe/registry.json")" = "1" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "1" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .pr_ref' "$fixture/vibe/registry.json")" = "64" ]
+  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .linked_task_ids[0]' "$fixture/vibe/roadmap.json")" = "2026-03-02-rotate-alignment" ]
+}
+
+@test "ops: update rejects unknown roadmap item without partial write" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "version_goal": "Test roadmap links",
+  "items": [
+    {
+      "roadmap_item_id": "rm-1",
+      "title": "Alpha",
+      "description": null,
+      "status": "current",
+      "source_type": "local",
+      "source_refs": [],
+      "issue_refs": [],
+      "linked_task_ids": [],
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --roadmap-item rm-missing
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Roadmap item not found" ]]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "0" ]
+  [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .linked_task_ids | length' "$fixture/vibe/roadmap.json")" = "0" ]
+}
+
+@test "ops: update fails fast on invalid roadmap json without partial write" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{"schema_version":"v2","items":[
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --roadmap-item rm-1
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .roadmap_item_ids | length' "$fixture/vibe/registry.json")" = "0" ]
 }
 
 @test "ops: update maps legacy status names to standard status" {

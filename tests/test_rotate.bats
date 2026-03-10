@@ -4,8 +4,6 @@ setup() {
   export REPO_ROOT="$BATS_TEST_DIRNAME/.."
   export TEST_DIR="$BATS_TEST_TMPDIR/rotate"
   mkdir -p "$TEST_DIR/bin"
-  cp "$REPO_ROOT/scripts/rotate.sh" "$TEST_DIR/rotate.sh"
-  chmod +x "$TEST_DIR/rotate.sh"
   export LOG_FILE="$TEST_DIR/git.log"
   : > "$LOG_FILE"
 }
@@ -31,11 +29,17 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "rev-parse --git-common-dir") printf '%s\n' "$TEST_DIR/repo/.git"; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
+      "stash push -u -m vibe-flow:new:feature-safe:"*) exit 0 ;;
+      "rev-parse -q --verify refs/stash") printf 'deadbeef1234567890\n'; exit 0 ;;
+      "stash list --format=%H %gd") printf 'deadbeef1234567890 stash@{0}\n'; exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
-      "checkout -b feature-safe") exit 0 ;;
-      "stash pop") exit 0 ;;
+      "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
+      "checkout -b feature-safe feature-old") exit 0 ;;
+      "show-ref --verify --quiet refs/remotes/origin/feature-safe") exit 1 ;;
+      "ls-remote --exit-code --heads origin feature-safe") exit 2 ;;
+      "stash apply stash@{0}") exit 0 ;;
+      "stash drop stash@{0}") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -55,8 +59,6 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "check-ref-format --branch refactor") exit 0 ;;
       "branch --show-current") printf 'bug-fix\n'; exit 0 ;;
-      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to refactor: saved WIP") exit 0 ;;
       *) exit 0 ;;
     esac
     ;;
@@ -65,8 +67,6 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") exit 0 ;;
-      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -75,8 +75,6 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "check-ref-format --branch feature-old") exit 0 ;;
       "branch --show-current") printf 'feature-old\n'; exit 0 ;;
-      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to feature-old: saved WIP") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -85,8 +83,6 @@ case "${MOCK_MODE:-}" in
       "rev-parse --is-inside-work-tree") exit 0 ;;
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") printf 'main\n'; exit 0 ;;
-      "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -97,9 +93,15 @@ case "${MOCK_MODE:-}" in
       "check-ref-format --branch feature-safe") exit 0 ;;
       "branch --show-current") printf 'claude/refactor\n'; exit 0 ;;
       "status --porcelain") printf '?? draft.txt\n'; exit 0 ;;
-      "stash push -u -m Rotate to feature-safe: saved WIP") exit 0 ;;
-      "checkout -b feature-safe") exit 0 ;;
-      "stash pop") exit 0 ;;
+      "stash push -u -m vibe-flow:new:feature-safe:"*) exit 0 ;;
+      "rev-parse -q --verify refs/stash") printf 'deadbeef1234567890\n'; exit 0 ;;
+      "stash list --format=%H %gd") printf 'deadbeef1234567890 stash@{0}\n'; exit 0 ;;
+      "show-ref --verify --quiet refs/heads/feature-safe") exit 1 ;;
+      "checkout -b feature-safe claude/refactor") exit 0 ;;
+      "show-ref --verify --quiet refs/remotes/origin/feature-safe") exit 1 ;;
+      "ls-remote --exit-code --heads origin feature-safe") exit 2 ;;
+      "stash apply stash@{0}") exit 0 ;;
+      "stash drop stash@{0}") exit 0 ;;
       *) exit 1 ;;
     esac
     ;;
@@ -114,11 +116,13 @@ EOF
 
 @test "rotate stashes untracked files with -u" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_requires_u "$TEST_DIR/rotate.sh" feature-safe
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=stash_requires_u VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
   [ "$status" -eq 0 ]
-  grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
-  grep -q "checkout -b feature-safe" "$LOG_FILE"
+  grep -Eq "stash push -u -m vibe-flow:new:feature-safe:" "$LOG_FILE"
+  grep -q "checkout -b feature-safe feature-old" "$LOG_FILE"
+  grep -q "stash apply stash@{0}" "$LOG_FILE"
+  grep -q "stash drop stash@{0}" "$LOG_FILE"
   ! grep -q "branch -D feature-old" "$LOG_FILE"
   ! grep -q "push origin --delete feature-old" "$LOG_FILE"
   ! grep -q "fetch origin main --quiet" "$LOG_FILE"
@@ -126,7 +130,7 @@ EOF
 
 @test "rotate rejects invalid branch names before deleting current branch" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=invalid_branch "$TEST_DIR/rotate.sh" "bad branch"
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=invalid_branch VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" "bad branch"
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Invalid branch name" ]]
@@ -136,38 +140,38 @@ EOF
 
 @test "rotate rejects generic target workflow names before stashing" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=generic_target "$TEST_DIR/rotate.sh" refactor
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=generic_target VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" refactor
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "generic workflow name" ]]
-  ! grep -q "stash push -u -m Rotate to refactor: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting detached HEAD" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=detached_head "$TEST_DIR/rotate.sh" feature-safe
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=detached_head VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Not on a branch" ]]
-  ! grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate does not stash before rejecting same branch name" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=same_branch_name "$TEST_DIR/rotate.sh" feature-old
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=same_branch_name VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-old
 
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "New branch name matches current branch" ]]
-  ! grep -q "stash push -u -m Rotate to feature-old: saved WIP" "$LOG_FILE"
+  [[ "$output" =~ "Target branch matches current branch" ]]
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate rejects protected branches before stashing" {
   write_mock_git
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=protected_branch "$TEST_DIR/rotate.sh" feature-safe
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" MOCK_MODE=protected_branch VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Refusing to rotate protected branch: main" ]]
-  ! grep -q "stash push -u -m Rotate to feature-safe: saved WIP" "$LOG_FILE"
+  ! grep -q "stash push -u -m" "$LOG_FILE"
 }
 
 @test "rotate updates worktrees dashboard branch for current worktree" {
@@ -175,7 +179,7 @@ EOF
   make_worktree_dashboard
 
   pushd "$TEST_DIR/wt-claude-refactor" >/dev/null
-  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" TEST_DIR="$TEST_DIR" MOCK_MODE=update_dashboard "$TEST_DIR/rotate.sh" feature-safe
+  run env PATH="$TEST_DIR/bin:/usr/bin:/bin" LOG_FILE="$LOG_FILE" TEST_DIR="$TEST_DIR" MOCK_MODE=update_dashboard VIBE_ROOT="$REPO_ROOT" VIBE_LIB="$REPO_ROOT/lib" zsh "$REPO_ROOT/scripts/rotate.sh" feature-safe
   popd >/dev/null
 
   [ "$status" -eq 0 ]

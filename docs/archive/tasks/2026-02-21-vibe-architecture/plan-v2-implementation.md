@@ -459,7 +459,7 @@ git commit -m "feat: implement vibe tool command"
 
 **Files:**
 - Create: `bin/vibe-mcp`
-- Create: `bin/vibe-skill`
+- Create: `bin/vibe-skill-audit`
 - Create: `lib/mcp_manager.sh`
 - Create: `lib/skill_manager.sh`
 

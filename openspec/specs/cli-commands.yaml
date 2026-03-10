@@ -12,7 +12,7 @@ commands:
     description: "开发工作流"
     subcommands:
       - name: start
-        description: "创建 worktree"
+        description: "从指定起点分支创建 worktree"
         parameters:
           - name: feature
             type: string
@@ -21,12 +21,12 @@ commands:
             type: string
             required: false
             default: "claude"
-          - name: "--base"
+          - name: "--branch"
             type: string
             required: false
             default: "main"
         returns: "0 on success"
-        example: "vibe flow start my-feature --agent=claude"
+        example: "vibe flow start my-feature --branch develop --agent claude"
       - name: review
         description: "Pre-PR 检查清单 + lazygit"
         parameters:
@@ -36,13 +36,25 @@ commands:
         returns: "0 on success"
         example: "vibe flow review my-feature"
       - name: pr
-        description: "生成 PR 并通过 gh 创建"
+        description: "基于当前分支创建/更新 PR，并指定目标基线分支"
         parameters:
-          - name: feature
+          - name: "--base"
+            type: string
+            required: false
+          - name: "--bump"
+            type: string
+            required: false
+          - name: "--title"
+            type: string
+            required: false
+          - name: "--body"
+            type: string
+            required: false
+          - name: "--msg"
             type: string
             required: false
         returns: "0 on success"
-        example: "vibe flow pr my-feature"
+        example: "vibe flow pr --base main"
       - name: done
         description: "清理 worktree"
         parameters:

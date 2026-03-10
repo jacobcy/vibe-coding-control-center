@@ -2,7 +2,7 @@
 document_type: task-plan
 title: vibe-task unified entry implementation plan
 date: 2026-03-02
-last_updated: 2026-03-02
+last_updated: 2026-03-10
 status: planning
 author: Codex GPT-5
 related_docs:
@@ -19,11 +19,13 @@ related_docs:
 
 # Vibe Task Unified Entry Implementation Plan
 
+> 历史语义说明（2026-03-10）：本文保留实现 당시的原始设计上下文，但正文已按现行标准做语义归一化。下文若提到 worktree，均表示当前承载 flow 的物理目录，而不是用户真正要进入的运行时对象。
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 补齐 `vibe task` 和 `vibe-task` 的统一入口方案，但以当前仓库已有 WIP 为起点继续推进，而不是从零重做。
 
-**Architecture:** 保持 `bin/vibe task` 为唯一底层事实读取入口，负责读取 `$(git rev-parse --git-common-dir)/vibe/registry.json` 与 `worktrees.json` 并输出稳定总览；`skills/vibe-task/SKILL.md` 仅包装 CLI，解释输出并给出“下一步进入哪个 worktree”的建议，不重复解析 shared registry。
+**Architecture:** 保持 `bin/vibe task` 为唯一底层事实读取入口，负责读取 `$(git rev-parse --git-common-dir)/vibe/registry.json` 与 `worktrees.json` 并输出稳定总览；`skills/vibe-task/SKILL.md` 仅包装 CLI，解释输出并给出“下一步该回哪个 flow/现场”的建议，不重复解析 shared registry。
 
 **Tech Stack:** Zsh CLI, existing `bin/vibe` dispatcher, `jq`, shared registry JSON under `git-common-dir`, Markdown skill, Bats tests
 
@@ -31,7 +33,7 @@ related_docs:
 
 ## Goal
 
-- 保持 `vibe task` 为跨 worktree 任务总览的唯一读取入口。
+- 保持 `vibe task` 为跨 worktree 的 flow/task 总览唯一读取入口。
 - 新增 `skills/vibe-task/SKILL.md`，让对话层走 CLI 而不是自己读 registry。
 - 在当前已有 WIP 基础上补齐缺失测试、错误分支和人工验证步骤。
 - 给执行阶段一个可直接照做的、最小范围的任务拆分。
@@ -119,15 +121,15 @@ Vibe Task Overview
 - 明确触发词：
   - `vibe task`
   - `/vibe-task`
-  - `哪个 worktree`
+  - `哪个 flow`
   - `任务总览`
-  - `现在该进哪个 worktree`
+  - `现在该回哪个 flow`
 - 工作流第一步必须运行 `bin/vibe task`
 - 若 CLI 失败，skill 直接报告阻塞原因，不自行读取 registry
 - 输出总结必须包含：
   - 当前 worktree 列表
-  - 每个 worktree 的 task / status / next step / dirty
-  - 推荐优先进入的 worktree
+  - 每个 worktree 当前承载的 flow 对应 task / status / next step / dirty
+  - 推荐优先回到的 flow/现场及其当前承载目录
 
 ## Change Budget
 
@@ -162,7 +164,7 @@ Vibe Task Overview
 Run:
 
 ```bash
-rg -n "task\\)|查看跨 worktree 的任务总览" bin/vibe
+rg -n "task\\)|flow/task 总览|Vibe Task Overview" bin/vibe
 rg -n "vibe_task|Vibe Task Overview|Task not found in registry" lib/task.sh
 rg -n "task command|vibe_task" tests/test_vibe.bats tests/test_task.bats
 ```
@@ -207,7 +209,7 @@ Expected:
 如当前 help 断言只检查包含 `task` 单词，可把 `tests/test_vibe.bats` 收紧到更具体文案，例如：
 
 ```bash
-[[ "$output" =~ "查看跨 worktree 的任务总览" ]]
+[[ "$output" =~ "flow/task 总览|Vibe Task Overview" ]]
 ```
 
 **Step 2: 先运行测试确认当前实现缺口**

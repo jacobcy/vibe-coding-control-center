@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-09
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -66,7 +66,7 @@ related_docs:
 
 - `vibe roadmap` 以 `roadmap.json` 为规划态真源
 - `vibe task` 以 `registry.json` 为执行态真源
-- `vibe flow` 以 `worktrees.json` 为现场态真源
+- `vibe flow` 以 `worktrees.json` 表达开放现场，并以 `flow-history.json` 表达已关闭 flow 历史
 - `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
 
 命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。
@@ -103,8 +103,8 @@ related_docs:
 ### 2.4 Non-Interactive Rules
 
 - 所有命令默认非交互
-- 任何创建、删除、覆盖或状态修改动作必须显式传 `-y` 或 `--yes`
-- 若上下文不足以安全执行，命令必须直接失败，不进入确认流程
+- 批量、覆盖式或上下文不唯一的高风险写操作，必须显式传 `-y` 或 `--yes`
+- 若命令只作用于当前现场或明确单目标，可以直接执行，但上下文不足时必须直接失败
 - help 文案必须明确标出哪些子命令要求 `-y`
 - 命令失败时必须暴露阻塞事实，不能擅自 fallback 到直接改数据源
 
@@ -142,19 +142,9 @@ related_docs:
 
 语义关系：
 
-- `repo issue <-> roadmap item` 多对多
-- `repo issue <-> task` 多对多
+- `issue <-> task` 多对多
 - `roadmap item <-> task` 多对多
 - `flow -> task` 一对多
-- 默认 happy path = `repo issue -> roadmap item -> task -> flow -> PR`
-
-补充约束：
-
-- `roadmap` 负责 GitHub Project 规划对象
-- `task` 只负责 execution record
-- `flow` 只负责执行现场
-- slash / workflow 只能调度这些对象，不得重新发明对象层级
-- GitHub 官方字段与 Vibe 扩展字段应同时可同步，但语义层级必须分离
 
 ## 4. `vibe roadmap` Standard
 
@@ -162,10 +152,10 @@ related_docs:
 
 `vibe roadmap` 只负责：
 
-- 管 roadmap item（mirrored GitHub Project item）
+- 管 roadmap item
 - 管规划优先级
-- 管 milestone / 兼容性的 `version_goal`
-- 管 roadmap item 与 repo issue / task 的映射
+- 管 `version_goal`
+- 管 roadmap item 与 issue / task 的映射
 
 ### 4.2 Boundaries
 
@@ -214,13 +204,6 @@ related_docs:
 - `version set-goal`
 - `version clear-goal`
 
-写入边界：
-
-- `add` 新增的是 roadmap item，而不是 task / flow
-- `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
-- `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
-- `sync` 可以同步 Vibe 扩展字段，但不能改写 `content_type` 这类 GitHub 官方身份语义
-
 ### 4.6 Status and Provider Rules
 
 规划层状态只允许：
@@ -242,22 +225,12 @@ provider 只允许：
 - `github`
 - `local`
 
-补充约束：
-
-- `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
-- `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
-- 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
-- `milestone` 是规划窗口锚点，不是 flow 切换开关
-- roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` 属于允许双向同步的扩展字段
-
 ### 4.7 Prohibited Semantics
 
 禁止：
 
 - 将 `openspec` 作为 roadmap provider
 - 将 roadmap item 直接当作 task 使用
-- 通过 `roadmap` 命令隐式创建 flow
-- 通过 `roadmap sync` 自动决定 task 拆分
 - 持久化 `current_version`
 - 持久化 `branch`
 - 持久化 `worktree`
@@ -273,8 +246,8 @@ provider 只允许：
 
 `vibe task` 只负责：
 
-- 管 execution record 生命周期
-- 管 task 与 roadmap / repo issue / PR 的关联
+- 管 task 生命周期
+- 管 task 与 roadmap / issue / PR 的关联
 - 管 subtasks
 - 管 task 归档事实
 - 管 task 当前 runtime 绑定事实
@@ -283,11 +256,9 @@ provider 只允许：
 
 `vibe task` 不负责：
 
-- GitHub Project 规划对象定义
 - roadmap 排布
 - 规划优先级
 - 现场创建与清理
-- 决定 roadmap item 的 `type`
 - 将 `branch` / `worktree` 当作长期历史索引
 
 ### 5.3 Standard Subcommands
@@ -329,22 +300,6 @@ provider 只允许：
 - `--bind-current`
 - `--unbind`
 
-`task add/update` 可以写入的桥接关系仅限：
-
-- `roadmap_item_ids`
-- `issue_refs`
-- `pr_ref`
-- `spec_standard`
-- `spec_ref`
-- runtime 绑定事实
-
-`task add/update` 不得承担：
-
-- 创建 GitHub Project item
-- 决定 roadmap item `type`
-- 变更 milestone 或规划窗口
-- 改写 GitHub Project item 的官方来源类型
-
 ### 5.6 Status and Source Rules
 
 执行层状态只允许：
@@ -361,17 +316,9 @@ provider 只允许：
 - `local`
 - `openspec`
 
-`spec_standard` 只允许：
-
-- `openspec`
-- `kiro`
-- `superpowers`
-- `supervisor`
-- `none`
-
 ### 5.7 Runtime Binding Rules
 
-- task 作为 execution record，可以记录当前绑定的 `branch`、`worktree`、`agent`
+- task 可以记录当前绑定的 `branch`、`worktree`、`agent`
 - 这些字段只表示当前 runtime 绑定
 - task 完成后必须清空 runtime 绑定
 - task 归档后必须清空 runtime 绑定
@@ -385,7 +332,6 @@ provider 只允许：
 - 使用 `merged`
 - 使用 `skipped`
 - 用 `task` 承担 roadmap 规划职责
-- 将 roadmap item `type=task` 直接等同于本地 `task`
 - 用 `branch` 或 `worktree` 作为 task 历史索引
 
 ## 6. `vibe flow` Standard
@@ -394,17 +340,12 @@ provider 只允许：
 
 `vibe flow` 只负责：
 
-- 管 worktree 现场
-- 管当前 branch 现场动作
+- 管逻辑 `flow` 现场
+- 管当前 `branch` 的 flow 级现场动作
+- 管单个 flow 的查询与开放现场大盘
+- 管 flow 历史留存与 branch 关闭
 - 管当前 task 的绑定与解绑
-- 管当前现场的发布、检查、收尾
-
-补充约束：
-
-- `flow new` 只创建现场，不定义 feature
-- `flow bind <task-id>` 绑定的是 execution record
-- flow 只能消费已存在的 task，不替代 repo issue / roadmap item 的规划入口
-- `flow` 永远不回退为规划入口
+- 管当前现场的发布与检查入口
 
 ### 6.2 Boundaries
 
@@ -413,14 +354,20 @@ provider 只允许：
 - roadmap 查询
 - task 历史归档
 - 全局 task 生命周期管理
+- 关闭 issue
+- 合并 PR
+- review / CI 失败后的自动修复
 - 跨 worktree 的分支同步编排
 - 将命名输入当作共享模型字段
+- 并行 worktree 的物理创建与目录进入编排
 
 ### 6.3 Standard Subcommands
 
+- `show [<feature>|<branch>]`
 - `status`
 - `list`
 - `new <name>`
+- `switch <name>`
 - `bind <task-id>`
 - `pr`
 - `review`
@@ -428,10 +375,15 @@ provider 只允许：
 
 ### 6.4 Query Rules
 
-- `status` 用于查看当前现场状态
-- `list` 用于查看全部现场状态
+- `show` 用于查看单个 flow 详情，默认当前 flow
+- `status` 用于查看未关闭 flow 大盘
+- `list` 用于查看全部 flow，包括历史
 - `review` 用于检查当前 PR 或执行本地最终审查
 - 查询类子命令支持 `--json`
+
+`show` 支持：
+
+- `--json`
 
 `review` 支持：
 
@@ -444,25 +396,28 @@ provider 只允许：
 
 ### 6.5 Write Rules
 
-以下高风险写操作必须要求 `-y` 或 `--yes`：
+`vibe flow` 写操作均为当前 repo 或显式单目标动作，应保持非交互、失败即停止，不要求额外确认：
 
 - `new`
+- `switch`
 - `bind`
 - `pr`
-
-`done` 是现场收尾动作，不应触发环境销毁，因此不要求 `-y`。
+- `done`
 
 ### 6.6 Naming Rules
 
-- `new <name>` 中的 `name` 只是命名输入
-- `name` 不是共享模型字段
-- 标准文案中不得把 `name` 写成 `feature` 这一类长期模型概念
-- 标准文案应优先写 `bind <task-id>`
+- `new <name>`、`switch <name>` 中的 `name` 是命名输入
+- `show [<feature>|<branch>]` 可以接受 feature slug 或 branch ref
+- `feature` 只允许作为 flow 的展示语义或命名输入，不是共享模型字段
 
 ### 6.7 Semantic Separation
 
 - `pr` = publish
 - `review` = inspect
+- `show` = 单 flow 查询
+- `status` = open flow dashboard
+- `list` = 全量 flow 枚举
+- `done` = close flow and branch, not task / issue completion
 
 `pr` 可以有副作用，例如：
 
@@ -494,11 +449,13 @@ provider 只允许：
 
 - 用 `flow` 描述 task 生命周期管理
 - 用 `flow` 描述 roadmap 规划入口
-- 用 `flow new` 代替 roadmap item / task 创建
 - 将 `feature` 写成共享模型字段
 - 持久化 `dirty`
 - 让 `review` 默认产生发布副作用
 - 通过 `flow sync` 将当前分支批量 merge 到所有 worktree 分支
+- 让 `done` 自动关闭 task 或 issue
+- 让 `switch` 进入已经有 PR 事实的 flow
+- 让 `new` 重新创建已关闭历史中的同名 flow
 
 ## 7. `vibe check` Standard
 

@@ -2,72 +2,105 @@
 # lib/flow_help.sh - Help information for Flow module
 
 _flow_usage() {
-  echo "${BOLD}Vibe Flow Manager${NC}"
-  echo ""
-  echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
-  echo ""
-  echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建/切换执行现场（worktree + branch）"
-  echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内绑定已注册的 execution record"
-  echo "  ${GREEN}done${NC}                                                 当前现场收尾（保留 worktree/branch）"
-  echo "  ${GREEN}status${NC} [<name>]                                      查看当前分支状态 (默认: 当前分支)"
-  echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
-  echo "  ${GREEN}pr${NC}                                                   提交代码并打开 Pull Request"
-  echo "  ${GREEN}review${NC}                                               查看 PR 或进行本地最终检查"
-  echo ""
-  echo "Options for 'new <name>':"
-  echo "  --agent <name>     指定 AI 身份 (默认: claude)"
-  echo "  --branch <ref>     指定基础分支 (默认: main)"
-  echo "  # 标准路径：先明确 repo issue / roadmap item，再 vibe task add/update，再 vibe flow new，再 vibe flow bind"
+  cat <<EOF
+${BOLD}Vibe Flow Manager${NC}
+Usage: ${CYAN}vibe flow <subcommand>${NC} [args]
+Subcommands:
+  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>] [--save-unstash]
+                                                          在当前目录创建新的逻辑 flow / branch
+  ${GREEN}switch${NC} <name>                                       安全进入未关闭且未发过 PR 的现有 flow
+  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务
+  ${GREEN}show${NC} [<feature>|<branch>] [--json]                   查看单个 flow 的详情（默认当前 flow）
+  ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支
+  ${GREEN}status${NC} [--json]                                     查看未关闭 flow 大盘
+  ${GREEN}list${NC} [--pr]                                          查看所有 flow（含历史）
+  ${GREEN}pr${NC} [--base <ref>]                                    提交代码并打开 Pull Request（目标基线分支）
+  ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或进行本地最终检查
+Options for 'new <name>':
+  --agent <name>     指定 AI 身份 (默认: claude)
+  --branch <ref>     指定当前目录创建新 flow 时的起点分支 (默认: main)
+  --save-unstash     将当前未提交改动 stash 后带入新 flow
+Options for 'switch <name>':
+  dirty worktree     默认自动保存并带入当前未提交改动
+Parallel worktree:
+  使用 ${CYAN}wtnew${NC} / ${CYAN}vnew${NC} 创建新的物理 worktree；它们不属于 vibe flow 主语义
+  # flow 命令用 --branch；flow pr 用 --base
+EOF
 }
 
-_flow_new_usage() { 
-    echo "Usage: vibe flow new <name> [--agent=claude] [--branch=main]"
-    echo "Creates an execution scene only; it does not define a feature or roadmap item."
+_flow_new_usage() { cat <<EOF
+Usage: vibe flow new <name> [--agent <name>] [--branch <ref>] [--save-unstash]
+  --branch <ref>  创建 flow 时选择起点分支；不接受 --base
+  --save-unstash  将当前未提交改动 stash 后带入新 flow
+EOF
 }
 
-_flow_bind_usage() { 
-    echo "Usage: vibe flow bind <task-id> [--agent=claude]"
+_flow_switch_usage() { cat <<EOF
+Usage: vibe flow switch <name>
+  dirty worktree     默认自动保存并带入当前未提交改动
+  仅允许进入未关闭且未发过 PR 的现有 flow
+EOF
 }
+
+_flow_bind_usage() { echo "Usage: vibe flow bind <task-id> [--agent <name>]"; }
 
 _flow_pr_usage() {
-  echo "Usage: ${CYAN}vibe flow pr${NC} [options]"
-  echo ""
-  echo "提交当前工作区的修改并创建/更新 Pull Request。"
-  echo "核心职责：执行串行检查 -> 自动处理版本与 CHANGELOG -> 物理 Push -> 云端 PR 关联"
-  echo ""
-  echo "选项："
-  echo "  --bump <type>    自动版本升级 (patch|minor|major, 默认: patch)"
-  echo "  --title <text>   PR 的标题 (默认: 首条 commit 标题)"
-  echo "  --body <text>    PR 的正文描述 (默认: 所有 commit 列表)"
-  echo "  --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)"
+  cat <<EOF
+Usage: ${CYAN}vibe flow pr${NC} [options]
+提交当前工作区的修改并创建/更新 Pull Request。
+核心职责：判定/校验 PR base -> 执行串行检查 -> 自动处理版本与 CHANGELOG -> 物理 Push -> 云端 PR 关联
+选项：
+  --base <ref>     显式指定 PR 目标基线分支；从非 main 近切分支发 PR 时必须传入
+  --bump <type>    自动版本升级 (patch|minor|major, 默认: patch)
+  --title <text>   PR 的标题 (默认: 首条 commit 标题)
+  --body <text>    PR 的正文描述 (默认: 所有 commit 列表)
+  --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)
+默认行为：
+  - 仅当当前分支可判定为直接从 main 近切时，才会默认使用 main
+  - 如果检测到当前分支更接近其他祖先分支，命令会拒绝继续并要求显式 --base
+  - 这里的 --base 是 PR 目标分支，不是创建 flow 时的起点分支
+EOF
 }
 
-_flow_review_usage() {
-  echo "Usage: ${CYAN}vibe flow review${NC} [--local] [--json] [<pr-number>|<branch>]"
-  echo ""
-  echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
-  echo "核心职责："
-  echo "  1. 状态提取：拉取云端 PR 的评审决策 (Review Decision)"
-  echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
-  echo "  3. 合并判定：自动判断当前真源是否满足 Merge 准入条件"
-  echo "  4. 本地审查：使用 --local 调用 codex review 进行深度静态分析与缺陷检测"
-  echo ""
-  echo "选项："
-  echo "  --local     执行本地代码审查（使用 codex）"
-  echo "  --json      输出 PR 详细数据的 JSON 格式（用于程序化调用）"
+_flow_show_usage() { cat <<EOF
+Usage: ${CYAN}vibe flow show${NC} [<feature>|<branch>] [--json]
+查看单个 flow 的详情，默认当前 flow。
+显示内容：feature、branch、task、issue refs、pr ref、state、closed_at。
+EOF
 }
 
-_flow_list_usage() {
-  echo "Usage: ${CYAN}vibe flow list${NC} [--pr]"
-  echo ""
-  echo "查看全部分支状态（所有 worktree 的任务进度和物理变动）。"
-  echo ""
-  echo "默认输出包括："
-  echo "  - 每个 worktree 的 task 绑定"
-  echo "  - 每个 worktree 的 dirty 状态"
-  echo "  - 共享上下文文件数量"
-  echo ""
-  echo "选项："
-  echo "  --pr    查询最近 10 个有 PR 的分支"
+_flow_status_usage() { cat <<EOF
+Usage: ${CYAN}vibe flow status${NC} [--json]
+查看未关闭 flow 大盘。
+显示内容：
+  - open flow 的 feature / branch / task / PR / next_step
+选项：
+  --json          以 JSON 格式输出任务数据
+EOF
+}
+
+_flow_list_usage() { cat <<EOF
+Usage: ${CYAN}vibe flow list${NC} [--pr]
+查看所有 flow，包括已关闭历史。
+默认输出包括：
+  - open flow
+  - closed flow history
+选项：
+  --pr    切换到 PR 分支视图（最近 10 条）
+EOF
+}
+
+_flow_done_usage() {
+  cat <<EOF
+Usage: ${CYAN}vibe flow done${NC} [--branch <ref>]
+关闭当前或指定的 flow，并删除本地/远端分支。
+核心职责：验证该 flow 对应 PR 已完成，写入 flow 历史，再关闭 branch。
+选项：
+  --branch <ref>    指定要完成的分支 (默认: 当前分支)
+检查项：
+  1. 分支不能是 main 或已关闭 flow
+  2. 工作目录必须干净（若关闭当前分支）
+  3. 分支必须已有 PR 事实
+  4. 分支对应的 PR 必须已完成；若无法确认，再回退检查 origin/main 是否已吸收变更
+EOF
 }

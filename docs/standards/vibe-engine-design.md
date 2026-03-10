@@ -1,12 +1,14 @@
 # Vibe Workflow Engine 架构设计
 
+> 边界补充（2026-03-10）：当本文提到 `vibe flow` 触发 worktree 创建、切换或清理时，只是在描述 Shell 物理层动作。现行标准下 `flow` 仍是 task 的运行时容器，`worktree` 只是承载该 flow 的物理目录，不能反向把 worktree 当成 flow 本体。
+
 > 术语说明：本文保留其架构设计语境，但 `flow`、`workflow`、`Skill 层`、`Shell 能力层`、`执行代理`、`共享状态真源` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. 设计初衷与痛点
 
 在 Vibe Center 2.0 中，我们确立了**Model-Spec-Context (MSC) 范式**，旨在用强约束和边界控制收敛 AI 生成的代码质量，防止"凭感觉写出垃圾代码"。然而，我们发现当前系统的**执行入口存在断层**：
 
-- **痛点一：Shell 工具只是空壳**。`bin/vibe flow start` 仅仅完成了物理环境的隔离（创建 git worktree、复制文件），它并没有真正拉起 AI Agent 进入规范中的验证阶段。`governance.yaml` 中配置的 `flow_hooks` 被记录了，但无人执行。
+- **痛点一：Shell 工具只是空壳**。`bin/vibe flow start` 仅仅完成了物理环境的隔离（创建 git worktree 作为 flow 的承载目录、复制文件），它并没有真正拉起 AI Agent 进入规范中的验证阶段。`governance.yaml` 中配置的 `flow_hooks` 被记录了，但无人执行。
 - **痛点二：Slash 命令缺乏强制约束**。用户可以直接使用 `/vibe-commit` 或直接在对话中提出改代码要求，Agent 会欣然接受，这就绕过了所有的需求验证 (PRD)、代码质量检查 (lint/test) 等 MSC 规范机制。
 - **痛点三：工具的认知负面影响**。无论是 openSpec 还是 Serena，这些本该作为隐形护栏的基础工具，反而成了需要用户主动理解并运行的负担。
 

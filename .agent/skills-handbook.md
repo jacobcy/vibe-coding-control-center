@@ -1,6 +1,6 @@
 # Skills Handbook
 
-> 自动生成于 2026-03-02 by vibe-skills
+> 自动生成于 2026-03-02 by vibe-skills-manager
 
 ## 当前安装概览
 
@@ -45,7 +45,7 @@
 | vibe-audit | 项目审计 | 评估项目是否该继续 |
 | vibe-save | 保存会话 | 结束会话时保存上下文 |
 | vibe-continue | 继续会话 | 恢复之前的工作 |
-| vibe-skills | Skills 管理 | 管理 skills 生命周期 |
+| vibe-skills-manager | Skills 管理 | 管理 skills 生命周期 |
 
 ---
 

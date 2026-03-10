@@ -1,8 +1,8 @@
-# vibe-skills Implementation Plan
+# vibe-skills-manager Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 创建 `skills/vibe-skills/` skill，让 AI 通过对话驱动 Skills 生命周期管理——扫描、诊断、推荐、确认、执行，底层操作全部委托给 `npx skills`。
+**Goal:** 创建 `skills/vibe-skills-manager/` skill，让 AI 通过对话驱动 Skills 生命周期管理——扫描、诊断、推荐、确认、执行，底层操作全部委托给 `npx skills`。
 
 **Architecture:** SKILL.md 定义 AI 对话流程（触发 → 扫描 → 诊断 → 推荐 → 确认 → 执行）；`registry.json` 存储 skills 推荐数据库；`npx skills ls/add/remove` 承担所有实际操作，AI 不写自定义脚本。
 
@@ -13,13 +13,13 @@
 ### Task 1: 创建 registry.json
 
 **Files:**
-- Create: `skills/vibe-skills/registry.json`
+- Create: `skills/vibe-skills-manager/registry.json`
 
 **Step 1: 创建文件**
 
 ```json
 {
-  "_comment": "vibe-skills 推荐注册表。AI 读取此文件推荐适合当前项目的 skills。",
+  "_comment": "vibe-skills-manager 推荐注册表。AI 读取此文件推荐适合当前项目的 skills。",
   "_schema": "name=skill唯一名, source=npx安装包, level=global|project|either, ides=适用IDE列表, category=分类, project_types=适用项目类型, recommended=是否默认推荐",
   "skills": [
     {
@@ -169,7 +169,7 @@
 **Step 2: 验证 JSON 格式**
 
 ```bash
-jq . skills/vibe-skills/registry.json
+jq . skills/vibe-skills-manager/registry.json
 ```
 
 预期输出：格式化后的 JSON，无报错。
@@ -177,8 +177,8 @@ jq . skills/vibe-skills/registry.json
 **Step 3: Commit**
 
 ```bash
-git add skills/vibe-skills/registry.json
-git commit -m "feat(vibe-skills): add skills registry.json with 14 recommended skills"
+git add skills/vibe-skills-manager/registry.json
+git commit -m "feat(vibe-skills-manager): add skills registry.json with 14 recommended skills"
 ```
 
 ---
@@ -186,7 +186,7 @@ git commit -m "feat(vibe-skills): add skills registry.json with 14 recommended s
 ### Task 2: 创建 SKILL.md
 
 **Files:**
-- Create: `skills/vibe-skills/SKILL.md`
+- Create: `skills/vibe-skills-manager/SKILL.md`
 
 **Step 1: 创建文件**
 
@@ -194,7 +194,7 @@ git commit -m "feat(vibe-skills): add skills registry.json with 14 recommended s
 
 ```markdown
 ---
-name: vibe-skills
+name: vibe-skills-manager
 description: Use when skills are messy, unknown which are installed globally vs project-level, need to audit/clean/install skills across IDEs, or want recommendations for current project
 category: orchestration
 trigger: manual
@@ -232,7 +232,7 @@ npx skills ls -g       # 全局 skills
 - 明显应该项目级却在全局的 skills（如业务特定 skills）
 
 **B. 推荐新增** — AI 执行：
-1. 读取 `skills/vibe-skills/registry.json`
+1. 读取 `skills/vibe-skills-manager/registry.json`
 2. 读取 `CLAUDE.md` 识别项目技术栈
 3. 过滤出 `recommended: true` 且未安装的 skills
 4. 按 `project_types` 匹配当前项目类型
@@ -307,7 +307,7 @@ npx skills remove <name> -g
 **Step 2: 验证字数**
 
 ```bash
-wc -w skills/vibe-skills/SKILL.md
+wc -w skills/vibe-skills-manager/SKILL.md
 ```
 
 预期：< 500 words（skill 质量要求）
@@ -315,8 +315,8 @@ wc -w skills/vibe-skills/SKILL.md
 **Step 3: Commit**
 
 ```bash
-git add skills/vibe-skills/SKILL.md
-git commit -m "feat(vibe-skills): add SKILL.md with full conversation flow"
+git add skills/vibe-skills-manager/SKILL.md
+git commit -m "feat(vibe-skills-manager): add SKILL.md with full conversation flow"
 ```
 
 ---
@@ -326,29 +326,29 @@ git commit -m "feat(vibe-skills): add SKILL.md with full conversation flow"
 **Files:**
 - Modify: `install.sh:23-30`（现有 vibe-* symlink 循环段）
 
-**Step 1: 确认当前 symlink 逻辑已覆盖 vibe-skills**
+**Step 1: 确认当前 symlink 逻辑已覆盖 vibe-skills-manager**
 
 ```bash
 grep -n "vibe-\*" install.sh
 ```
 
-预期输出：`for skill in skills/vibe-*/;` — `vibe-skills` 会被这个 glob 自动包含，**无需修改**。
+预期输出：`for skill in skills/vibe-*/;` — `vibe-skills-manager` 会被这个 glob 自动包含，**无需修改**。
 
 **Step 2: 验证 symlink 创建正确**
 
 ```bash
 bash install.sh 2>&1 | head -20
-ls -la .agent/skills/vibe-skills
-ls -la .trae/skills/vibe-skills
+ls -la .agent/skills/vibe-skills-manager
+ls -la .trae/skills/vibe-skills-manager
 ```
 
-预期：显示 symlink 指向 `../../skills/vibe-skills`
+预期：显示 symlink 指向 `../../skills/vibe-skills-manager`
 
 **Step 3: Commit（仅当 install.sh 有变动时）**
 
 ```bash
 git add install.sh
-git commit -m "feat(install): include vibe-skills in symlink distribution"
+git commit -m "feat(install): include vibe-skills-manager in symlink distribution"
 ```
 
 ---
@@ -356,7 +356,7 @@ git commit -m "feat(install): include vibe-skills in symlink distribution"
 ### Task 4: 更新 task README（推进 gate 状态）
 
 **Files:**
-- Modify: `docs/tasks/2026-02-28-vibe-skills/README.md`
+- Modify: `docs/tasks/2026-02-28-vibe-skills-manager/README.md`
 
 **Step 1: 更新 gates 状态**
 
@@ -365,8 +365,8 @@ git commit -m "feat(install): include vibe-skills in symlink distribution"
 **Step 2: Commit**
 
 ```bash
-git add docs/tasks/2026-02-28-vibe-skills/README.md
-git commit -m "docs(tasks): update vibe-skills gates — spec/plan/code passed"
+git add docs/tasks/2026-02-28-vibe-skills-manager/README.md
+git commit -m "docs(tasks): update vibe-skills-manager gates — spec/plan/code passed"
 ```
 
 ---
@@ -376,37 +376,37 @@ git commit -m "docs(tasks): update vibe-skills gates — spec/plan/code passed"
 **Step 1: 验证文件存在**
 
 ```bash
-ls skills/vibe-skills/
+ls skills/vibe-skills-manager/
 # 预期：SKILL.md  registry.json
 ```
 
 **Step 2: 验证 registry.json 可用**
 
 ```bash
-jq '.skills | length' skills/vibe-skills/registry.json
+jq '.skills | length' skills/vibe-skills-manager/registry.json
 # 预期：14
 
-jq '.skills[] | select(.recommended == true) | .name' skills/vibe-skills/registry.json
+jq '.skills[] | select(.recommended == true) | .name' skills/vibe-skills-manager/registry.json
 # 预期：列出 13 个 recommended skills
 ```
 
 **Step 3: 验证 symlink**
 
 ```bash
-ls -la .agent/skills/vibe-skills
-# 预期：lrwxr-xr-x -> ../../skills/vibe-skills
+ls -la .agent/skills/vibe-skills-manager
+# 预期：lrwxr-xr-x -> ../../skills/vibe-skills-manager
 
-ls -la .trae/skills/vibe-skills
-# 预期：lrwxr-xr-x -> ../../skills/vibe-skills
+ls -la .trae/skills/vibe-skills-manager
+# 预期：lrwxr-xr-x -> ../../skills/vibe-skills-manager
 ```
 
 **Step 4: 验证 SKILL.md 格式**
 
 ```bash
-head -6 skills/vibe-skills/SKILL.md
+head -6 skills/vibe-skills-manager/SKILL.md
 # 预期：frontmatter 含 name, description, category, trigger
 
-wc -w skills/vibe-skills/SKILL.md
+wc -w skills/vibe-skills-manager/SKILL.md
 # 预期：< 600 words
 ```
 
@@ -414,5 +414,5 @@ wc -w skills/vibe-skills/SKILL.md
 
 ```bash
 git add .
-git commit -m "test(vibe-skills): verify all artifacts correct"
+git commit -m "test(vibe-skills-manager): verify all artifacts correct"
 ```

@@ -1,9 +1,22 @@
 # 更新日志
 
+## [2.1.9] - 2026-03-10
+
+### ✨ Changed
+- Rename `vibe-skill` to `vibe-skill-audit`.
+- Rename `vibe-skills` to `vibe-skills-manager`.
+- Align task/flow runtime to resolve worktree roots via `git rev-parse --show-toplevel`.
+- Remove worktree-local `.vibe/*` cache usage in favor of shared-state-first task resolution.
+
+## [2.1.8] - 2026-03-10
+
+### ✨ Changed
+- Align task/flow worktree root semantics and skill routing.
+
 ## [2.1.7] - 2026-03-10
 
 ### ✨ Changed
-- archive legacy planning docs and add GitHub Project migration preparation plans
+- refactor(flow): split tests and make switch carry dirty state safely ...
 
 ## [2.1.6] - 2026-03-08
 
@@ -227,4 +240,3 @@
 - [ ] 添加版本回退功能
 - [ ] 支持更多包管理器
 - [ ] 添加更新日志显示
-

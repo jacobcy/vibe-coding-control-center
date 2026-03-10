@@ -1,5 +1,50 @@
 #!/usr/bin/env zsh
 
+_vibe_task_roadmap_file() {
+    echo "$1/vibe/roadmap.json"
+}
+
+_vibe_task_validate_roadmap_items() {
+    local common_dir="$1" roadmap_item_ids_json="$2" roadmap_file missing_ids first_missing
+    [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
+
+    roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
+    [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
+    jq empty "$roadmap_file" >/dev/null 2>&1 || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
+
+    missing_ids="$(jq -nr --argjson roadmap_item_ids "$roadmap_item_ids_json" --slurpfile roadmap "$roadmap_file" '
+      ($roadmap[0].items // [] | map(.roadmap_item_id)) as $existing
+      | $roadmap_item_ids[]
+      | . as $target
+      | select($existing | index($target) | not)
+    ')" || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
+
+    if [[ -n "$missing_ids" ]]; then
+        first_missing="$(printf '%s\n' "$missing_ids" | sed -n '1p')"
+        vibe_die "Roadmap item not found: $first_missing"
+        return 1
+    fi
+}
+
+_vibe_task_sync_roadmap_links() {
+    local common_dir="$1" task_id="$2" roadmap_item_ids_json="$3" now="$4" roadmap_file tmp
+    [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
+
+    roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
+    [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
+
+    tmp="$(mktemp)" || return 1
+    jq --arg task_id "$task_id" --arg now "$now" --argjson roadmap_item_ids "$roadmap_item_ids_json" '
+      .items |= map(
+        . as $item
+        | if ($roadmap_item_ids | index($item.roadmap_item_id)) != null then
+          .linked_task_ids = (((.linked_task_ids // []) + [$task_id]) | unique)
+          | .updated_at = $now
+        else . end
+      )
+    ' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file"
+}
+
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve"
     local -a issue_refs roadmap_item_ids
@@ -56,8 +101,8 @@ _vibe_task_update() {
         worktree=""
     elif [[ "$bind_current" == "true" ]]; then
         assigned_mode="set"
-        target_name="$(basename "$PWD")"
-        target_path="$PWD"
+        target_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+        target_name="$(basename "$target_path")"
         worktree="$target_name"
     elif [[ -n "$worktree" ]]; then
         assigned_mode="set"
@@ -69,11 +114,12 @@ _vibe_task_update() {
     if (( ${#roadmap_item_ids[@]} > 0 )); then
         roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
     fi
+    _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     [[ -z "$target_name" ]] && target_name="$worktree"
     _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$target_path" "$branch" "$assigned_mode" "$agent" "$now" "$issue_refs_json" "$issue_mode" "$roadmap_item_ids_json" "$roadmap_mode" "$pr_ref" "$pr_mode" || return 1
+    _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
-    [[ "$bind_current" == "true" ]] && _vibe_task_refresh_cache "$common_dir" "$registry_file" "$task_id" "$target_name" "$now"
     case "$task_status" in
         todo) echo "💡 Next: Create an execution scene using ${CYAN}wtnew <branch>${NC} or start with ${CYAN}vnew <branch>${NC}" ;;
         in_progress) echo "💡 Next: Ensure your cockpit is ready with ${CYAN}vup${NC}; this task record is an execution record, not a roadmap item." ;;
@@ -112,6 +158,7 @@ _vibe_task_add() {
     if (( ${#roadmap_item_ids[@]} > 0 )); then
         roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
     fi
+    _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     mkdir -p "$(dirname "$task_file")"; tmp="$(mktemp)" || return 1
     jq --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \
       '.tasks += [{
@@ -163,6 +210,7 @@ _vibe_task_add() {
         completed_at:null,
         archived_at:null
       }' > "$task_file"
+    _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     log_success "Task added: $task_id"
     echo "💡 Next: Run ${CYAN}wtnew <branch>${NC} or ${CYAN}vnew <branch>${NC} to start an execution scene, then bind this execution record."
 }

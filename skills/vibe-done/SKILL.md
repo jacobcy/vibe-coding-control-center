@@ -1,63 +1,121 @@
 ---
 name: vibe-done
-description: 提交 PR 或结束本地工作树后用于收尾工作，一键流转到 Completed/Archived 状态，并强制将状态刷入全局 Registry 和工作树列表缓存。
-trigger: manual
-enforcement: hard
-phase: ending
-input_examples:
-  - prompt: "我要收口并完成当前任务"
-    call: "vibe-done"
+description: Use when a PR has already been merged and the user wants to close the related task, close linked issues, run flow closure, and archive the final handoff without changing source code.
 ---
 
-# Vibe Done Skill
+# /vibe-done - 合并后收口
 
-作为整个开发闭环的最后一扣，本指令只做一件事：**任务结算与大盘清理**。
-在执行 `vibe flow done` (CLI 移除工作树) 前后，用户通常需要呼叫本指令通知 AI 结算任务。
+`/vibe-done` 只做合并后的收口编排，不做业务代码修复，不替代 PR 整合。
 
-## Workflow Steps
+先读这些真源：
 
-### Step 1: 读取环境与上下文
-1. 首先识别当前目录是否有 `.vibe/current-task.json`，若有，从中提取 `task_id`。
-   - 如果不存在该文件，则询问用户需要结算的任务编号。
-2. 根据目标 `task_id` 加载 `docs/tasks/<task_id>/README.md` 与 `$(git rev-parse --git-common-dir)/vibe/registry.json`，确保数据存在。
+- `docs/standards/git-workflow-standard.md`
+- `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/command-standard.md`
+- `.agent/context/task.md`
 
-### Step 0: Shell-Level Cleanup
- 
- ```bash
- vibe flow done
- ```
- 
- 运行 `vibe flow done` 来标记任务结束、冻结代码、并自动清理本地与远程分支及 Worktree。
- 
- ### Step 1: 标记任务状态进度
+对 `vibe flow`、`vibe task` 或 `gh` 参数有任何不确定时，先运行 `--help`。
 
-> ⚠️ **收口边界绝杀原则（必须严格遵守）**：`/vibe-done` 是一个 **Post-PR 的终结级别元数据清算指令**。
-> - **【红线】绝对禁止修改任何业务源代码文件！** 任务此时已实质结束（可能已合并），任何试图在这里再动代码的行为都会导致无限 PR 循环。如果检查时发现代码遗留 Bug，请**直接报错并停止**，让用户新开 Task，绝不允许你擅自进行二次修复代码及提交！
-> - **只写 `.git/vibe/` 目录下的 JSON 文件**（registry.json、worktrees.json）。修改它们不会产生新的 git dirty。
-> - **严禁修改 `docs/` 等项目内文档**。追踪大盘数据应全部收敛在 `.git/vibe/` 内。
+## 核心边界
 
-1. **审计追责 (Accountability)**：你必须首先清楚自己作为当前正在运行的 AI 的真实身份。你需要主动声明，确保你在更新任务状态时，能够正确使用 `--agent <你的真实身份>` 以确保写入系统的 `agent_log` 打卡记录是准确的主动署名。
-2. **调用 `vibe task update <task_id> --status completed --unassign --agent <你的名字>`**：将该任务设为 `completed` / `archived` / `skipped`，并在同时触发最终的身份追加。
-### Step 2: 归档合规与防丢代码检查
+- 允许：读取 `vibe flow show`、关闭 task、关闭 issue、执行 `vibe flow done`、写入 handoff
+- 不允许：修业务代码、补 review follow-up、merge PR、手工改 `.git/vibe/*.json`
+- `vibe flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
 
-**强制审查点：** 
-1. 你的职责是在发起清除前，使用 Git 状态和 PR 状态判断是否有未提交 (uncommitted) 或未合并 (unmerged) 到 `origin/main` 的代码。
-2. 确认版本升级和 `CHANGELOG.md` 已在 `vibe flow pr` 阶段通过 `--bump` 完成。如果并未进行版本升级，且这是个功能交付，应提醒用户补做（即先运行 `/vibe-commit` 生成 commit，然后运行 `vibe flow pr` 提交 PR）。
-3. 如果检查到有遗留代码或任务没有走到终点，**严重警告用户潜在的数据丢失风险**，并拒绝往下执行。
+## Workflow
 
-### Step 3: 工作区本地清理（Optional）
-如果用户当前处于安全通过检查的状态，询问用户是否要自动一并运行 `vibe flow done` 控制台命令为您把此工作树文件直接抹除回主树：
-- 该命令 (`vibe flow done`) 本身已经内涵了安全检测逻辑。当你调用它时，如果发现未 Clean 或未 Merge，它也会执行二次阻断。
+### Step 1: 读取当前 flow 事实
 
-### Step 3: 输出封板报告
-在聊天界面打印封板小结：
-```markdown
-🎉 **任务结算完毕！**
+先运行：
 
-• **已锁定任务:** <Task_ID: Title>
-• **更新状态:** 从 `in_progress` -> `completed`
-• **结项操作者:** <Agent_Name>
-• **大盘注册表:** 共享状态库已同步清理。
-
-若还需要开始新探索，请 `vibe-new <feature>`。
+```bash
+vibe flow show --json
 ```
+
+必要时对指定目标运行：
+
+```bash
+vibe flow show <feature-or-branch> --json
+```
+
+确认：
+
+- `flow`
+- `branch`
+- `current_task`
+- `issue_refs`
+- `pr_ref`
+- 当前 flow 是否已经满足收口前提
+
+若没有 task 或 issue，后续步骤按“可跳过”处理，不要伪造关联。
+
+### Step 2: 关闭 task
+
+若 `flow show` 返回 `current_task`，执行：
+
+```bash
+vibe task update <task-id> --status completed --unassign
+```
+
+禁止直接编辑 `registry.json`。
+
+### Step 3: 关闭 issue
+
+若 task 绑定了 `issue_refs`，逐个执行：
+
+```bash
+gh issue close <issue-number-or-ref>
+```
+
+如果 issue 无法关闭，明确报出阻塞事实，不要假装 flow 已完全收口。
+
+### Step 4: 关闭 flow
+
+执行：
+
+```bash
+vibe flow done
+```
+
+或在处理非当前分支时执行：
+
+```bash
+vibe flow done --branch <ref>
+```
+
+该命令会负责：
+
+- 校验该 flow 对应 PR 已完成
+- 写入 flow 历史
+- 删除本地与远端 branch
+
+该命令不会负责：
+
+- 关闭 task
+- 关闭 issue
+- 自动修复异常中间态
+
+### Step 5: 写入 handoff
+
+完成后必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+
+```markdown
+## Skill Handoff
+- skill: vibe-done
+- updated_at: <ISO-8601>
+- flow: <feature-or-none>
+- branch: <closed-branch-or-none>
+- task: <task-id-or-none>
+- pr: <pr-ref-or-none>
+- issues: <closed-issue-refs-or-none>
+- completed: <已关闭的 task / issue / flow>
+- next: <是否已完全收口；若未完成，阻塞点是什么>
+```
+
+## Restrictions
+
+- 不得修改业务源代码文件
+- 不得跳过 `vibe flow show` 直接猜测 task / issue / pr 关联
+- 不得手工编辑 `.git/vibe/*.json`
+- 不得把未 merge 的 branch 强行 `flow done`
+- 若 `vibe flow done` 阻断，必须如实汇报原因，并停止收口

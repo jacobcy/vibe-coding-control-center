@@ -1,3 +1,17 @@
+---
+document_type: template
+template_for: plan
+description: Template for execution plan documents
+author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
+created: 2025-01-24
+last_updated: 2026-03-08
+related_docs:
+  - docs/plans/2026-03-08-co-writers-frontmatter-plan.md
+  - docs/standards/doc-quality-standards.md
+---
+
 # Execution Plan: {{TASK_TITLE}}
 
 > 本文档定义 {{TASK_TITLE}} 的执行计划。

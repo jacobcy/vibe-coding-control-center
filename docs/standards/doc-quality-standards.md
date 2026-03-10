@@ -9,7 +9,7 @@ authority:
   - document-quality
 author: Claude Sonnet 4.5
 created: 2025-01-24
-last_updated: 2025-01-24
+last_updated: 2026-03-08
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -49,6 +49,21 @@ related_docs:
 - **`skills/` 目录**：项目自己的 skills 有特殊格式要求
 - **`.agent/skills/` 目录**：外部 skills 的 symlinks，不应修改
 - **`lib/`、`bin/` 目录**：Shell 脚本，不需要 frontmatter
+
+## 调用面标注规范
+
+为避免 `vibe` 相关能力在文档中出现语义混淆，文档写作必须显式区分调用面：
+
+- `shell 命令`：`vibe <domain> <subcommand>`，例如 `vibe flow (shell)`
+- `skill 命令`：`/<skill-name>`，例如 `/vibe-save (skill)`
+
+写作规则：
+
+- 同一段首次提及时，必须带调用面后缀（`(shell)` 或 `(skill)`）
+- 同段后续复用可省略后缀
+- 跨段再次出现同名或近似名称时，建议重新标注
+
+术语定义与边界以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 文档类型分类
 
@@ -101,6 +116,7 @@ related_docs:
 |--------|------|------|------|---------|
 | `document_type` | string | 是 | 文档类型标识 | `core-entry`, `skill`, `template` 等 |
 | `author` | string | 是 | 文档创建者 | AI: `"Claude Sonnet 4.5"` / Human: 真实姓名 |
+| `co_writers` | array[string] | 否 | 协作署名列表 | `["GPT-5 Codex", "Chen Yi"]` |
 | `created` | string | 是 | 创建时间 | `2025-01-24` (ISO 8601) |
 | `last_updated` | string | 否 | 最后更新时间 | `2025-01-24` (ISO 8601) |
 | `related_docs` | array[string] | 否 | 相关文档路径（上下文圈定） | `["SOUL.md", "docs/README.md"]` |
@@ -117,7 +133,14 @@ related_docs:
   - ✅ 正确：`"Claude Sonnet 4.5"`
   - ❌ 错误：`"Vibe Center Team"`、`"AI Assistant"`
 - **人类创建的文档**：使用真实姓名或用户名
+- 表示首位创建者或当前文档主责作者
 - 这是真实性原则的体现，避免虚假身份
+
+**`co_writers`**
+- 可选字段，用于记录参与实质撰写且需要保留署名的协作者
+- 可包含 AI Agent 身份或人类身份
+- 新增协作者且主责作者未变化时，应优先追加 `co_writers`，而不是改写 `author`
+- 不得把 `co_writers` 当作 `author` 的替代字段
 
 **`created`**
 - 文档首次创建的日期
@@ -160,6 +183,8 @@ authority:
 audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-24
 last_updated: 2025-01-24
 related_docs:
@@ -374,6 +399,8 @@ title: Implement Document Quality Standards
 current_layer: code
 status: in-progress
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-15
 last_updated: 2025-01-24
 related_docs:
@@ -415,6 +442,8 @@ task_id: 2024-01-15-doc-quality
 document_type: task-prd
 title: Document Quality Standards - PRD
 author: Claude Sonnet 4.5
+co_writers:
+  - GPT-5 Codex
 created: 2025-01-15
 last_updated: 2025-01-15
 related_docs:

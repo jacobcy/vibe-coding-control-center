@@ -1,365 +1,181 @@
 ---
 name: vibe-check
-description: Use when the user wants to verify project memory consistency, says "/check", "verify memory", or "check context". Validates that memory.md, task.md, and memory/ topics match actual project state. Now with intelligent task status sync based on PR merged events.
+description: Use when the user wants to inspect or repair task-flow/worktree runtime consistency after shell audit, asks whether a task binding or current worktree state is stale, or mentions "/vibe-check" or "check runtime". Do not use for roadmap prioritization or roadmap-task mapping.
 ---
 
-# /check - Intelligent Status Sync & Memory Consistency
+# /vibe-check (/check) - task-flow 审计驱动修复
 
-智能任务状态同步 + 项目记忆一致性验证。检测外部事件（PR merged）并自动建议状态更新，同时验证文档腐烂（documentation rot）。
+`vibe check(shell)` 只负责审计。`vibe-check` skill 负责：
 
-**核心职责**:
+1. 读取审计输出
+2. 做业务判断
+3. 只修复 `task <-> flow` / runtime 绑定问题
+4. 只通过 Shell API 执行安全修复
 
-1. **智能状态同步**: 检测 PR merged 事件，分析任务完成度，提示用户确认后修正状态
-2. **内存一致性检查**: 确保 `.agent/` 和 `.git/` 目录的一致性，task 记录和 memory 文件与实际代码状态对齐
+**Announce at start:** "我正在使用 vibe-check 技能读取 shell 审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
 
-**核心原则:** 渐进式智能，保留人工决策权，只留最新，确保可信。
+标准真源：
 
-**Announce at start:** "我正在使用 vibe-check 技能来执行智能状态同步和内存一致性验证。"
+- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/skill-standard.md`、`docs/standards/command-standard.md`、`docs/standards/shell-capability-design.md` 为准。
+- 触发时机与相邻 skill 分流以 `docs/standards/skill-trigger-standard.md` 为准。
+- task / flow / worktree 生命周期语义以 `docs/standards/git-workflow-standard.md`、`docs/standards/worktree-lifecycle-standard.md` 为准。
 
-## 工作流程
+## 真源边界
 
-### Step 0: Shell-Level Audit (Phase 1 - 静态检查)
+共享真源固定为：
 
-```bash
-vibe check
-```
+- `$(git rev-parse --git-common-dir)/vibe/roadmap.json`
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
 
-运行 `vibe check` 进行全面的 Registry、任务归档以及物理真源审计。解释其审计结果。
+禁止：
 
-**Phase 1 包括**:
+- skill 直接编辑 `.git/vibe/*.json`
+- 把 `.agent/context/task.md` 当作共享真源
+- 把 `vibe check(shell)` 扩展成默认自动修复器
 
-- Registry 与 OpenSpec 同步
-- completed → archived 自动流转
-- 僵尸分支检测
-- 散落文档检测
-- 分支-任务一致性检查
+## 执行流程
 
-### Step 1: PR Merged Detection (Phase 2 - Git 状态检查)
+### Step 1: 运行 shell 审计
 
-如果 Shell 层检测到有任务的 PR 已合并，继续智能分析流程。
-
-**获取 PR 数据**:
-
-```bash
-# 获取任务关联的 PR 详细信息
-vibe flow review <branch> --json
-```
-
-返回数据包括：
-
-- PR number, title, body
-- Comments and reviews
-- Commits
-- State and mergedAt
-
-### Step 2: Subagent Analysis (Phase 3 - 智能分析)
-
-**使用 Agent tool，启动 subagent_type="Explore"**
-
-**任务**: 分析 PR 是否完成了所有绑定的 tasks
-
-**输入数据**:
-
-- PR 数据（number, title, body, comments, reviews, commits）
-- Branch 绑定的 task 列表（每个 task 的 title/description）
-
-**分析方法**:
-
-1. 仔细阅读 PR 描述，理解 PR 实际完成了什么
-2. 阅读评论和 review，获取更多上下文
-3. 对比每个 task 的目标
-4. 给出判断
-
-**输出格式（JSON）**:
-
-```json
-{
-  "results": [
-    {
-      "task_id": "xxx",
-      "completed": true/false,
-      "confidence": 0.0-1.0,
-      "reason": "基于 ... 判断"
-    }
-  ]
-}
-```
-
-**置信度分级**:
-
-- confidence > 0.8: 高置信度，AI 可直接决定
-- 0.5 <= confidence <= 0.8: 中置信度，需要用户确认
-- confidence < 0.5: 低置信度，跳过
-
-### Step 3: Confidence-Based Processing (置信度分级处理)
-
-根据 Subagent 返回的置信度进行分级处理：
-
-**高置信度 (> 0.8)**:
-
-```
-✅ 确定完成的任务：
-  • 2026-03-05-add-login (置信度: 0.92)
-    原因：PR 描述明确提到完成了 feature-a
-```
-
-→ 自动记录建议，等待用户最终确认
-
-**中置信度 (0.5-0.8)**:
-
-```
-⚠️ 需要确认的任务：
-  • 2026-03-04-feature-b (置信度: 0.65)
-    原因：评论中有讨论，但未明确完成
-```
-
-→ 询问用户选择处理方式
-
-**低置信度 (< 0.5)**:
-
-```
-⏭️ 跳过的任务：
-  • 2026-03-04-feature-c (置信度: 0.32)
-    原因：PR 内容未提及
-```
-
-→ 不做建议，跳过
-
-### Step 4: User Interaction (用户交互流程)
-
-**显示建议列表**:
-
-```
-💡 建议操作：
-✅ 标记以下任务为已完成：
-  1. 2026-03-04-feature-a
-  2. 2026-03-04-feature-b
-
-是否执行？[Y/n]
-```
-
-**中置信度任务的处理选项**:
-
-```
-⚠️ 无法确定以下任务是否完成：
-  1. 2026-03-04-feature-b (中置信度)
-
-请选择处理方式：
-1. 深度分析代码变更
-2. 手动选择是否完成
-3. 跳过这些任务
-
-选择 [1-3]:
-```
-
-**选项 1: 深度代码分析（可选）**:
-
-- 调用 subagent_type="Explore"
-- 输入：task 的功能需求 + PR 的代码变更
-- 分析：代码是否实现了 task 的功能需求
-- 输出：完成度评估
-
-**选项 2: 手动选择**:
-
-- 显示任务列表
-- 让用户手动勾选完成的任务
-
-**选项 3: 跳过**:
-
-- 不处理这些任务
-- 继续到最终确认
-
-### Step 5: Execute Status Updates (执行状态更新)
-
-用户确认后，调用 Shell API 更新状态：
+先运行：
 
 ```bash
-for task_id in tasks_to_update; do
-  vibe task update "$task_id" --status completed
-done
+vibe check --json
 ```
 
-### Step 6: Memory Consistency Check (内存一致性检查)
-
-完成智能状态同步后，继续执行原有的内存一致性检查：
+必要时补充定向检查：
 
 ```bash
-memory_index=".agent/context/memory.md"
-memory_dir=".agent/context/memory/"
-task_file=".agent/context/task.md"
+vibe check link --json
+vibe roadmap audit --check-links --json
 ```
 
-**验证内容**:
+## 职责边界
 
-- 文件存在性检查
-- 任务状态一致性
-- 代码引用有效性
-- 项目治理状态
+`vibe-check` 只处理：
 
-### Step 7: Final Report (最终报告)
+- task runtime 指向不存在的 worktree
+- 已完成 / 已归档 task 仍残留 runtime 绑定
+- 当前现场绑定与 task runtime 的确定性修复
 
+`vibe-check` 不处理：
+
+- `roadmap item <-> task` 对应关系修复
+- roadmap item 未链接 task 的规划问题
+- task 应该归属于哪个 roadmap item 的语义判断
+- GitHub Issue intake、模板补全、查重与创建
+
+前三项属于 `vibe-task` 的审计/修复范围。
+
+其中：
+
+- roadmap 规划与版本归类属于 `vibe-roadmap`
+- Issue intake 与 GitHub 创建属于 `vibe-issue`
+
+## Step 2: 分类问题
+
+把问题分成三类：
+
+### A. 可确定自动修复
+
+满足以下条件才可自动修复：
+
+- shell 已提供原子命令
+- 修复目标唯一
+- 不需要语义猜测
+
+当前允许的确定性修复：
+
+- `completed/archived task still has runtime binding: <task-id>`
+  - 修复命令：`vibe task update <task-id> --unassign`
+- 当前目录承载的 flow 就是目标 task 的确定性现场
+  - 修复命令：`vibe task update <task-id> --bind-current`
+
+### B. 需要用户确认
+
+以下情况不允许直接修：
+
+- `runtime points to missing worktree: <task-id>:<worktree-name>`
+  - shell 能发现缺口，但无法仅凭审计结果判断应解绑还是重绑
+- 需要从 PR / 评论 / 文档语义推断 task 完成度
+- 需要在多个 worktree / task 之间做语义匹配
+
+此时必须向用户展示：
+
+- 审计证据
+- 可选修复命令
+- 不确定点
+
+### C. shell 能发现但不能修
+
+如果发现问题但缺少原子能力，例如：
+
+- 现场记录需要删除或改成 `missing/stale`，但 shell 没有单独的 flow 修复 API
+- 需要跨多个 worktree 做事务修复，但 shell 只有单 task 写入口
+
+则必须停止并明确报告 shell 能力缺口。
+
+## Step 3: 执行修复
+
+对 A 类问题，逐条调用 shell 命令，不做 JSON 直写：
+
+```bash
+vibe task update "$task_id" --unassign
+vibe task update "$task_id" --bind-current
 ```
-📋 Vibe Check 完整报告
 
-## 智能状态同步
-✅ 已更新：2 个任务
-  • 2026-03-04-feature-a
-  • 2026-03-04-feature-b
+如果命令失败：
 
-## 静态检查
-✅ Registry 与 OpenSpec 已同步
-✅ 3 个任务已归档
-⚠️  发现 2 个僵尸分支
+- 立即停止该条修复
+- 记录失败命令和错误
+- 不继续假设状态已同步
 
-## 内存一致性
-✅ 所有引用有效
-⚠️  2 个不一致性
+## Step 4: 重新验证
 
-💡 推荐操作：
-  1. 清理僵尸分支
-  2. 修复内存不一致
-  3. 运行 /save 清理
+修复后必须重新运行：
+
+```bash
+vibe check --json
 ```
 
-## 检查项目清单
+若修的是链接问题，额外运行：
 
-| 检查项         | 说明                          | 严重程度 | 阶段    |
-| -------------- | ----------------------------- | -------- | ------- |
-| PR merged 检测 | 检测已合并 PR 关联的任务      | 高       | Phase 2 |
-| 智能完成度分析 | AI 分析任务是否完成           | 高       | Phase 3 |
-| 幽灵分支       | 无关联任务的长期存活分支      | 高       | Phase 1 |
-| 文档散落       | 任务文档遗留在 docs/plans     | 高       | Phase 1 |
-| 文件存在       | 引用的文件是否存在            | 高       | Phase 1 |
-| 状态同步       | task.md 和 topic 文件状态一致 | 中       | Phase 1 |
-| 引用有效       | References 中的链接有效       | 中       | Phase 1 |
-
-## 优雅降级
-
-**gh CLI 不可用时**:
-
-```
-⚠️  gh CLI not found or not authenticated
-跳过 PR 状态检查，继续静态检查...
+```bash
+vibe check link --json
 ```
 
-- 自动跳过 Phase 2 和 Phase 3
-- 继续执行 Phase 1 的静态检查
-- 不影响其他功能
+## Step 5: 报告
 
-**网络错误时**:
+最终报告固定包含：
 
+- 审计结论
+- 已执行的 shell 命令
+- 修复成功项
+- 需用户确认项
+- shell 能力缺口
+
+输出示例：
+
+```text
+📋 Vibe Check Report
+
+已自动修复：
+- completed/archived task still has runtime binding: 2026-03-08-foo
+  command: vibe task update 2026-03-08-foo --unassign
+
+需要确认：
+- runtime points to missing worktree: 2026-03-08-bar:wt-old
+  reason: shell 无法仅凭审计结果判断应解绑还是重绑
+
+验证结果：
+- vibe check link --json -> clean
 ```
-⚠️  Network error during PR query
-继续其他检查...
-```
-
-- 捕获错误，优雅降级
-- 继续执行其他检查
-- 显示友好的错误提示
 
 ## 与其他命令的关系
 
-```
-/save ──────→ 保存上下文（写入）
-                 │
-                 ↓
-/check ──────→ 智能状态同步 + 验证一致性（审计）
-                 │
-                 ↓
-/review ─────→ 物理与逻辑深度审计（Codex）
-                 │
-                 ↓
-/continue ───→ 恢复上下文（读取）
-```
-
-**工作流**:
-
-1. `/save` - 会话结束时保存
-2. `/check` - 定期智能同步 + 验证一致性
-3. `/continue` - 新会话开始时恢复
-
-## 设计决策
-
-1. **渐进式智能** - 从确定性到启发式，逐层递进
-2. **保留人工决策权** - AI 辅助，但最终决策在人
-3. **优雅降级** - gh 不可用时仍能做静态检查
-4. **实时查询 gh** - 不同步本地 PR 记录，符合单一真源原则
-5. **置信度分级** - 高/中/低置信度差异化处理
-6. **用户确认** - 状态更新前必须用户确认
-
-## 示例用法
-
-```
-用户: /check
-Claude: 我正在使用 vibe-check 技能来执行智能状态同步和内存一致性验证。
-
-        ## Phase 1: 静态检查
-        ✅ Registry 与 OpenSpec 已同步
-        ✅ 3 个任务已归档
-        ⚠️  发现 2 个僵尸分支
-
-        ## Phase 2: Git 状态检查
-        🔍 发现 1 个已合并的 PR：
-          • PR #42: "feat: implement multi-feature"
-            Branch: claude/multi-feature
-            Merged: 2026-03-05
-
-        ## Phase 3: 智能分析
-        🤖 调用 AI 分析 PR 内容...
-
-        分析结果：
-        ✅ 高置信度（AI 决定）：
-          • 2026-03-04-feature-a (置信度: 0.92)
-            原因：PR 描述明确提到完成了 feature-a
-
-        ⚠️  中置信度（需要确认）：
-          • 2026-03-04-feature-b (置信度: 0.65)
-            原因：评论中有讨论，但未明确完成
-
-        💡 建议操作：
-        ✅ 标记 "2026-03-04-feature-a" 为已完成
-
-        ⚠️  无法确定 "2026-03-04-feature-b" 是否完成
-        请选择处理方式：
-        1. 深度分析代码变更
-        2. 手动选择是否完成
-        3. 跳过此任务
-
-        选择 [1-3]: 1
-
-        🤖 深度分析代码变更...
-
-        深度分析结果：
-        Task: 2026-03-04-feature-b
-        需求: 添加用户认证功能
-
-        代码变更分析：
-        • 新增文件: auth/login.py (✅ 实现)
-        • 新增文件: tests/test_auth.py (✅ 测试)
-        • 修改文件: config.py (✅ 配置)
-
-        结论：已完成 (置信度: 0.88)
-
-        💡 最终建议：
-        ✅ 标记以下任务为已完成：
-          1. 2026-03-04-feature-a
-          2. 2026-03-04-feature-b
-
-        是否执行？[Y/n] y
-
-        ✅ 已更新 2 个任务状态
-
-        ## Phase 4: 内存一致性检查
-        ✅ 所有引用有效
-        ⚠️  2 个不一致性
-        ...
-```
-
-## 实现优先级
-
-1. **P0**: PR merged 检测
-2. **P0**: Subagent 智能分析
-3. **P0**: 用户确认流程
-4. **P1**: 深度代码分析（可选）
-5. **P1**: 优雅降级处理
-6. **P2**: 内存一致性检查增强
+- `vibe check`：审计
+- `vibe task update`：原子写入
+- `/vibe-check`：解释 task-flow 审计并编排修复
+- `/vibe-task`：处理 roadmap-task 与 registry 审计修复

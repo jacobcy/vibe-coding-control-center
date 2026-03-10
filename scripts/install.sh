@@ -78,11 +78,11 @@ log_step "Installing Vibe Center (Global)"
 
 # 1. Create directory structure
 log_info "Setting up $INSTALL_DIR..."
-mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_DIR/scripts"
+mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_DIR/scripts" "$INSTALL_DIR/alias"
 
 # 2. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib config scripts; do
+for dir in bin lib config scripts alias; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
@@ -155,7 +155,7 @@ _setup_direnv() {
     local envrc_path="$SOURCE_ROOT/.envrc"
     if [[ ! -f "$envrc_path" ]]; then
         log_info "Creating $envrc_path..."
-        echo "source $venv_path/bin/activate" > "$envrc_path"
+        echo 'source "$HOME/.venvs/vibe-center/bin/activate"' > "$envrc_path"
     else
         log_info ".envrc already exists at $envrc_path"
     fi

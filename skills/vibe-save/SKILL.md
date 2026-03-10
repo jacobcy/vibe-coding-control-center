@@ -1,245 +1,158 @@
 ---
 name: vibe-save
-description: Use when the user wants to save session context, says "/save", or when ending a session and you want to preserve work state. Saves tasks, decisions, and solutions to project memory.
+description: Use when the user wants to save session context, says "/vibe-save", or when ending a session and you want to preserve work state. Save a clear local handoff in task.md and sync only minimal shared task facts.
 ---
 
-# /save - Session Context Save
+# /vibe-save - Session Handoff Save
 
-会话上下文保存命令。在会话结束前自动提取和保存有价值的信息到项目记忆系统。
+`/vibe-save` 的首要目标不是散落保存大量文件，而是把当前会话整理成一份清晰、可继续的本地 handoff。
 
-**核心原则:** 保存现在，延续未来。
-**审阅优先原则:** 在任何写入操作之前，必须优先审阅目标文件的已有内容。若发现已有内容存在陈旧、错误或冲突（如状态不一致、陈旧的 next_step 等），必须先进行修正对齐，然后再追加或更新本次会话的新内容。不允许无视已有错误直接堆砌新内容。
+**核心原则：**
 
-**语义边界:** `/save` 只沉积认知与 execution record 进度，不决定 `repo issue`、`GitHub Project item` / `roadmap item` 或 milestone 的规划语义。
+- 以 `.agent/context/task.md` 为默认保存载体。
+- 共享真源只同步最小必要事实，不在 skill 中堆叠额外业务推断。
+- 只有当本次会话形成了稳定、可复用的项目共识时，才更新 `.agent/context/memory.md`。
 
+**Announce at start:** "我正在使用 /vibe-save 技能来保存当前会话的 handoff。"
 
-**Announce at start:** "我正在使用 save 技能来保存本次会话的上下文。"
+## Truth Sources
 
-## Shared Task Source
- 
-1. **定位**: 根据当前目录路径 `$(pwd)` 在 `$(git rev-parse --git-common-dir)/vibe/worktrees.json` 中定位当前 `task_id`。
-2. **真源**:
-   - `registry.json`：包含 task 摘要与全局索引。
-   - `worktrees.json`：worktree 状态与 task 绑定。
-   - `shared/`：存放跨 worktree 的流程状态文件。
- 
-**指令**: 物理层状态已通过 `vibe flow status` 自动对齐。认知层保存需调用 `vibe task update --next-step ...` 沉积当前进度。
+以下语义以标准为准，不在本 skill 中重写：
 
-`/save` 只处理当前 worktree 绑定的 current task。
+- `docs/standards/skill-standard.md`
+- `docs/standards/command-standard.md`
+- `docs/standards/shell-capability-design.md`
+- `docs/standards/git-workflow-standard.md`
+- `docs/standards/glossary.md`
 
-## Schema 契约
+特别约束：
 
-`/save` 只使用以下真实字段名，不使用旧示例字段：
+- `.agent/context/task.md` 只作为本地 handoff，不是共享真源。见 `docs/standards/git-workflow-standard.md`。
+- Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成“自动判断”或“自动修复”。见 `docs/standards/shell-capability-design.md`。
 
-- `registry.json`：`schema_version`、`task_id`、`current_subtask_id`、`assigned_worktree`、`next_step`
-- `worktrees.json`：`schema_version`、`worktree_name`、`worktree_path`、`current_task`、`dirty`、`last_updated`
-- `task.json`：`task_id`、`status`、`subtasks[].subtask_id`、`assigned_worktree`、`next_step`、`plan_path`
+## Command Boundary
 
-不得回退到旧字段名 `version`、`name`、`path`、`current_task_id`、`id`。
+- `/vibe-save` 负责判断这次会话哪些内容值得保留。
+- `vibe task update` 之类的 Shell 命令只用于同步共享真源中的最小必要事实。
+- `git` / `gh` 可以用于读取当前 branch、dirty、PR 等现场事实。
+- 不得直接编辑 `.git/vibe/*.json`。
+- 不得假设 `.agent/governance.yaml` 中的 hook 已经自动执行。
 
-## 文件职责分离
+## Default Save Policy
 
-| 文件 | 职责 | 内容 |
-| ---- | ---- | ---- |
-| `memory.md` | 认知对齐目录 | 达成的概念共识、关键定义、文件目录索引 |
-| `memory/<topic>.md` | 复杂概念展开 | 深入的概念定义、设计决策（可选，按需创建） |
-| `task.md` | 任务状态 | 已完成的工作 + 待办事项 |
+`/vibe-save` 默认只做三件事：
 
-**核心区分：**
-- `.agent/context/memory.md` = **[Tracked]** 跨项目、跨任务的人类/AI公共知识池与共识（我们达成了什么架构规约）。
-- `.agent/context/task.md` = **[Untracked]** 仅仅是当前物理环境（Worktree）中的临时草稿本和 AI 上下文切片区（我们在这个分支里做了什么、Blockers 是什么）。不被 Git 追踪。
+1. 更新 `.agent/context/task.md`，作为下个会话继续工作的主 handoff。
+2. 如果当前目录承载的 `flow` 已能从共享真源识别当前 `task`，则通过 Shell 命令同步最小共享事实，例如 `status`、`next_step`、必要时的 `pr_ref`。
+3. 仅当本次会话形成稳定项目共识时，才更新 `.agent/context/memory.md`。
 
-## 工作流程
+默认不做：
 
-### Step 1: 分析对话内容
+- 不默认创建 `memory/<topic>.md`。
+- 不把 `vibe flow status` 之类查询命令描述成“自动对齐”。
+- 不把 save 描述成由 governance hook 自动编排完成。
 
-回顾本次会话，识别：
+## Workflow
 
-1. **认知对齐** - 达成了哪些概念共识？（写入 memory.md）
-2. **复杂概念** - 是否有需要深入展开的概念？（按需写入 memory/<topic>.md）
-3. **任务状态** - 完成了什么？待办是什么？（写入 task.md）
+### Step 1: 读取当前现场事实
 
-### Step 2: 读取当前 task 指针与共享状态
+优先读取：
 
-先读取 `.vibe/current-task.json`，确认：
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
+- `$(git rev-parse --git-common-dir)/vibe/registry.json`
+- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`（如果当前目录承载的 `flow` 已能从共享真源识别 `task`）
+- `.agent/context/task.md`
 
-- `task_id`
-- `task_path`
-- `registry_path`
-- `worktree_name`
+必要时补充读取：
 
-再从共享真源读取：
+- 当前 `git status --short`
+- 当前 branch
+- 当前 PR / review 事实（如会话内容涉及）
 
-- `schema_version`
-- `current_task` / `current_subtask_id`
-- `worktree_path`
-- next step
-- subtasks summary（`subtasks[].subtask_id`）
-- shared memory 路径
-- 当前 worktree 的 `dirty/clean` 状态
+### Step 2: 审阅并更新 `.agent/context/task.md`
 
-### Step 3: 更新认知对齐目录
+在写入前必须先完整审阅已有内容，修正陈旧或冲突信息。
 
-更新 `.agent/context/memory.md`：
+推荐将 `task.md` 保持为单文件 handoff，至少覆盖：
 
-1. **审查**: 完整阅读 `memory.md`，检查现有的概念共识、定义和索引。
-2. **修正**: 若当前会话的结论推翻了旧共识，或发现旧记录有误，必须先修正旧内容。
-3. **更新**:
-   - 在 **认知对齐目录** 中添加/更新达成的概念共识
-   - 记录关键定义和术语
-   - 更新文件目录索引（如有新文件类型）
+1. 当前任务
+2. 当前现场
+3. 本轮已完成
+4. 当前判断
+5. 阻塞点
+6. 下一步
+7. 关键文件
 
-**判断是否写入 memory.md：**
-- 是否达成了新的概念共识？→ 写入
-- 是否定义了新的术语或流程？→ 写入
-- 是否只是完成任务？→ 不写入，只更新 task.md
+`task.md` 应优先回答“下个会话接手时需要知道什么”，而不是扩展成认知档案库。
 
-同时回写共享 memory 真源 `tasks/<task-id>/memory.md`，`.agent/context/memory.md` 仅作为入口索引和兼容层。
+### Step 3: 仅在必要时同步共享真源
 
-### Step 4: 更新复杂概念（可选）
+如果当前目录承载的 `flow` 已能识别当前 `task`：
 
-对于需要深入展开的复杂概念，创建 `memory/<topic>.md`：
+- 使用现有 Shell API 同步最小必要事实。
+- 优先同步 `next_step`，必要时同步 `status` 或 `pr_ref`。
+- 不在 save 阶段替上层流程做新的任务拆分、归属判断或优先级判断。
 
-```markdown
-# <Topic Name>
+如果当前目录尚未识别出当前 `flow` 对应的 `task`：
 
-## 概述
-<!-- 1-2 句概念定义 -->
+- 只更新本地 `task.md` handoff。
+- 明确向用户说明本次未回写共享 task 状态。
 
-## 核心概念
-<!-- 概念的详细展开 -->
+### Step 4: 仅在形成稳定共识时更新 `memory.md`
 
-## 设计决策
-<!-- 为什么这样设计 -->
+只有在本次会话产出了稳定的项目约束、长期适用的定义或反复复用的规则时，才更新 `.agent/context/memory.md`。
 
-## 参考
-- 相关文件、链接等
+如果只是完成当前任务、记录 blockers 或保存下一步，不写 `memory.md`，更不默认创建新的 topic 文件。
 
----
-Created: YYYY-MM-DD
-Last Updated: YYYY-MM-DD
-```
+### Step 5: 输出保存摘要
 
-**判断是否需要创建 topic 文件：**
-- 概念是否复杂到需要独立文档？→ 创建
-- 是否会多次引用？→ 创建
-- 是否只是简单共识？→ 不创建，保留在 memory.md 即可
+摘要应说明：
 
-### Step 5: 更新任务状态（Un-tracked）
+- `task.md` 是否已更新
+- 是否同步了共享 task 状态
+- 是否更新了 `memory.md`
+- 当前最关键的下一步是什么
 
-更新当前工作树的缓存 `.agent/context/task.md`：
-1. **审查**: 审阅已有的 `Task Info`、`Gate Progress` 和 `Completed/Pending Tasks`。
-2. **修正**: 确保 `Status`、`Worktree` 等基础信息与真实物理状态一致。若已有记录中的 blockers 已解决，应予以更新或移除。
-3. **更新**: 
-   - 刷新 current task 摘要
-   - 记录当前 worktree、next step、subtasks summary
-   - **重点记录当期疑难杂症 (Blockers) 和临时方案**，便于下个会话 `/vibe-continue` 加载。
-- 该文件在 `.gitignore` 内，不必让用户为此做出 `git add` 或提交动作。
-
-### Step 6: 同步共享 Task 状态
-
-- 使用 CLI 工具命令（如 `vibe task update <task-id> --next-step ...`）将进度更新到共享真源。
-- **严禁** AI 层直接手工编辑底层的 `.git/vibe/registry.json` 或 `worktrees.json`。所有的信息沉积都必须由 Shell API (`vibe task`) 处理。
-- 刷新本地只读缓存：`.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
-- `.vibe/focus.md` 保存当前 worktree 的聚焦摘要（task、subtask、next step）
-- `.vibe/session.json` 保存当前 worktree 的短期会话缓存（`worktree_name`、`current_task`、`current_subtask_id`、时间戳）
-- `.vibe/` 仅作为本地缓存，可重建，不保存共享 memory 真源
-
-### Step 7: 输出摘要报告
-
-向用户展示保存结果：
-
-```
-📋 Session Summary
-
-🧠 认知对齐:
-  • <概念1> - 简要描述
-  • <概念2> - 简要描述
-
-📁 Topic 文件:
-  • memory/<topic>.md (created/updated/skipped)
-
-✅ 任务状态:
-  • 完成: <task-1>, <task-2>
-  • 待办: <task-3>, <task-4>
-
-📂 文件更新:
-  • $(git rev-parse --git-common-dir)/vibe/registry.json
-  • $(git rev-parse --git-common-dir)/vibe/worktrees.json
-  • $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json
-  • $(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/memory.md
-  • .agent/context/memory.md
-  • .agent/context/task.md
-  • .vibe/current-task.json / .vibe/focus.md / .vibe/session.json
-```
-
-### Step 8: 分析可学习模式
-
-分析保存的内容是否包含可复用模式：
-
-- **error_resolution**: 错误解决方案
-- **debugging_techniques**: 调试技巧
-- **workarounds**: 临时解决方案
-- **project_specific**: 项目特定约定
-
-如果发现可复用模式，建议运行 `/learn` 提取为全局 skill。
-
-### Step 9: 触发 Governance Hook
-
-- 保存行为受 `.agent/governance.yaml` 的 `flow_hooks.done` 配置编排。
-- 在最后归档前，必须确保上下文沉积工作已完成。
-
-## 示例：本次会话的保存
-
-### memory.md 更新
+## Recommended `task.md` Shape
 
 ```markdown
-## 2026-02-27: Vibe Workflow Paradigm（开发范式）
+# Current Task
 
-### 核心共识
+- task_id:
+- title:
+- status:
 
-**Vibe Guard 流程**：`PRD → Spec → Execution Plan → Test → Code → AI Audit`
+# Current Scene
 
-### 关键概念
+- branch:
+- flow:
+- worktree:
+- pr:
+- dirty:
 
-| 概念 | 定义 |
-| ---- | ---- |
-| PRD（认知层） | 定目标，人类主导 |
-| Spec（规范层） | 定法律，AI 刺客找茬后锁定 |
-| ... | ... |
+# Completed This Session
+
+- ...
+
+# Current Judgment
+
+- ...
+
+# Blockers
+
+- ...
+
+# Next Step
+
+- ...
+
+# Key Files
+
+- ...
 ```
 
-### task.md 更新
+## Design Decisions
 
-```markdown
-## Current
-（无当前任务）
-
-## Recent
-- vibe-workflow-paradigm PRD 编写
-  - status: completed
-  - 产出：5 个 PRD 文件
-
-## Backlog
-| 优先级 | PRD | 说明 |
-| ------ | --- | ---- |
-| P1 | test-layer | TDD 顺序、3 次熔断 |
-| ... | ... | ... |
-```
-
-## 与 /learn 的关系
-
-| 方面 | `/save` | `/learn` |
-| ---- | ------- | -------- |
-| **目的** | 保存项目上下文 | 提取可复用模式 |
-| **存储位置** | 项目级 `.agent/context/` | 全局 `~/.claude/skills/learned/` |
-| **触发方式** | 手动 `/save` + Hook 提醒 | Stop Hook (自动, 需配置) |
-| **内容** | 认知、任务、决策 | 模式、技巧、最佳实践 |
-
-## 设计决策
-
-1. **共享真源优先** - `/save` 先读 `.vibe/current-task.json`，再回写共享 registry 与 task memory
-2. **认知与任务分离** - memory 记录共识，task 记录状态与 next step
-3. **compat 层保留** - `.agent/context/*` 暂不废弃，作为迁移过渡入口
-4. **本地缓存可重建** - `.vibe/` 只保留 focus/session 缓存，不保存共享真源
-5. **与 /learn 独立** - `/save` 保存项目上下文，`/learn` 提取全局模式
+1. `task.md` 是默认 handoff 载体，避免 save 默认散落出过多文件。
+2. 共享真源只同步最小必要事实，不把 save 扩展成 workflow 编排器。
+3. `memory.md` 只记录稳定共识，不承担每次会话的临时状态保存。

@@ -1,73 +1,145 @@
 ---
 name: vibe-commit
-description: Interactive Smart Commit Workflow based on git status and diff. Group changes logically and draft Conventional Commits.
-category: process
-trigger: auto
+description: Use when the user wants to classify dirty changes, create serial commits, split work into one PR or multiple PRs, and prepare publication from the correct flow without handling merge or post-merge closure.
 ---
 
-# /vibe-commit - Vibe Commit Workflow
+# /vibe-commit - 串行提交与 PR 切片
 
-运行 `git commit` 来提交变更。认知层 Skill 应先通过 `git status` 和 `git diff` 提取事实，然后草拟 Conventional Commit 消息。
+`/vibe-commit` 只负责编排提交与发 PR 之前的判断，不负责 merge、关 issue、关 task、关 flow。
 
-## System Role
-你是一个智能 Git 提交助手。当用户触发 `vibe-commit` 时，你的任务是分析当前的代码变更，合理拆分逻辑块，并为这些变更生成符合 [Conventional Commits] 规范的提交信息。
+先读这些真源：
 
-## Execution Steps
+- `docs/standards/git-workflow-standard.md`
+- `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/command-standard.md`
+- `.agent/context/task.md`
 
-1. **Status Analysis**: 首先执行 `git status` 确定工作区当前修改了哪些文件。
-2. **Diff Extraction (防污染限制)**: **严禁直接向终端打印全量的 `git diff`**。如果变更过多，必须结合 `git diff --stat`，或使用 `git diff | head -n 300` 提取上下文，或要求子系统提供“修改摘要”。确保你的阅读不会发生严重的 Context 溢出与日志漫灌。
-3. **Logical Grouping**: 根据代码具体变动的领域和上下文，将文件自然分类聚类（例如：同时涉及功能A的新增归为一组、修复B的归为另一组）。
-4. **Draft Commits & Authorship (署名追加)**: 根据《Vibe Coding 署名规范》（Authorship Standard），你需要读取大盘记录（如 `.vibe/current-task.json` 或物理沙盒任务的 `agent_log.executed_by` 字段），查出参与过本次任务的所有贡献者 Agent 署名。
-   - 针对每一个变更分组，草拟一个纯粹的高质量提交信息（如：`feat: add auth logical module`）。
-   - **必做项**：在提交信息的末尾（在正文后空一行），必须强制拼接该组所有联合贡献者的 `Co-authored-by:` 后缀。例如：`Co-authored-by: Agent-Claude <claude@vibe.coding>`
-5. **Interactive Confirmation**: 将分类结果及带有 `Co-authored-by` 的完整草稿提交列出来，**明确提请用户检查并确认**。
-6. **Execution Recommendations**: 用户确认后，提取并正式执行 `git add ...` 及 `git commit -m "..."`。
-7. **自动化 PR 流 (Post-Commit PR Proposal)**: 当工作区的所有变更都已被成功提交（即 `git status` 干净后），你必须主动询问用户："所有变更已提交。是否需要帮您发起 Pull Request 发布流程？"
-   - **数据准备 (Agent 认知层)**：
-     - **Bump Type**: 询问并确认本次升级级别（`patch` / `minor` / `major`）。
-     - **PR Description**: 根据所有未提交的 Commit 记录，总结一份高质量的 PR Body（支持多行）。
-     - **Version Note**: 提炼一份要写入 `CHANGELOG.md` 的版本变更说明。
-   - **操作执行 (Physical Tier 1)**：
-     - 向用户展示上述三部分内容，确认后调用指令（必须正确转义换行符）：
-       `vibe flow pr --bump <type> --title "<title>" --body "<body>" --msg "<version_msg>"`
-   - 创建成功后，立刻提示用户"不要忘记在 AI 助手中收口该任务！（执行 `/vibe-done`）"。
+只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
 
-## Expected Output Format
-```markdown
-## 分析出的变更分组
+## 核心边界
 
-### 1. [分组一：如：UI微调与组件重构]
-涉及文件：
-- 文件1
-- 文件2
+- 允许：分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `vibe flow pr`
+- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接调用 `vibe flow done` 做收口
+- 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
 
-### 2. [分组二：如：修复登录逻辑失效]
-涉及文件： ...
+## Workflow
 
-## 草拟的提交列表
-1. `[type]: [description]` 
+### Step 1: 读取当前 flow 与上下文
 
-   (如有正文则放入这里)
+优先读取：
 
-   Co-authored-by: Agent-Gemini <gemini@vibe.coding>
-   Co-authored-by: Agent-Claude <claude@vibe.coding>
-2. `...`
-
-👉 各位，是否同意这些分类和提交信息？如果有需要调整的，请直接告诉我。确认后我可以生成执行命令为您提交。
-
-*(当 Commit 执行完毕后，预期输出：)*
-```markdown
-✅ **所有变更已成功 commit！** 
-
-当前的特性代码目前都在本地，准备好合并到主干了吗？
-我可以为您读取最近这几次提交的内容，**一键生成并提交 Pull Request (PR)** 到仓库，免去您手动跑 `vibe flow pr` 的麻烦。
-
-需要我帮您直接跑 PR 发版流程吗？
+```bash
+vibe flow show --json
 ```
 
+如果当前 flow 不可解析，再退回：
+
+```bash
+vibe flow status --json
+vibe flow list
+```
+
+检查点：
+
+- 当前 `flow` / `branch` / `task` / `issue` / `pr`
+- 当前 flow 是否已经进入 `open + had_pr`
+- `.agent/context/task.md` 里上一环节留下了什么 handoff
+
+### Step 2: 审计工作区
+
+先运行：
+
+```bash
+git status --short
+git diff --stat
+git diff --cached --stat
+```
+
+必要时再读精确 diff。把未提交内容明确分成三类：
+
+- `commit now`
+- `stash`
+- `discard`
+
+执行前必须向用户说明：
+
+- 哪些文件进入当前 commit
+- 哪些内容会被 stash
+- 哪些内容会被 discard
+
+### Step 3: 组织 commit
+
+每个 commit 只对应一个独立交付目标。生成 commit 草案前，先说明：
+
+- 每组变更包含哪些文件
+- 每条 commit 草案
+- 这些 commit 将进入哪个 flow / 哪个 PR
+
+若当前分支历史已经混入多个交付目标，不得继续硬挤进一个 PR。
+
+### Step 4: 处理串行多 PR
+
+对“当前已有一串待发布 commit，需要串行拆成多个 PR”的场景，固定按以下步骤执行：
+
+1. 列出待发布分组，明确每组包含哪些 commit、目标 base 是什么。
+2. 明确当前采用串行模式，而不是并行 worktree 模式。
+3. 对每一组依次执行：
+   - 确认当前工作区干净；若不干净，先分类为 `commit now` / `stash` / `discard`
+   - 从正确基线进入新的逻辑 flow，默认优先使用最新主干，例如 `vibe flow switch <flow-name> --branch origin/main`
+   - 若需要带入未提交改动，才显式追加 `--save-stash`
+   - 只把当前这一组 commit 迁移到新 flow；默认使用 `git cherry-pick <commit...>`
+   - 运行该组应有的验证命令
+   - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
+   - 当前这一组 PR 创建完成前，不要提前切到下一组
+
+### Step 5: 发 PR 前复核
+
+先读取：
+
+```bash
+vibe flow pr --help
+git log --oneline <base>..HEAD
+```
+
+只有同时满足以下条件，才能继续发 PR：
+
+- 工作区已干净
+- 当前 commit 只服务一个交付目标
+- 当前分支语义仍匹配这个目标
+- 当前 flow 没有被错误复用
+
+发布入口只用：
+
+```bash
+vibe flow pr --base <ref>
+```
+
+不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
+
+### Step 6: 写入 handoff
+
+完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+
+```markdown
+## Skill Handoff
+- skill: vibe-commit
+- updated_at: <ISO-8601>
+- flow: <feature-or-none>
+- branch: <branch-or-none>
+- task: <task-id-or-none>
+- pr: <pr-ref-or-none>
+- issues: <issue-refs-or-none>
+- completed: <本轮已完成的提交/PR 草案>
+- next: <交给 vibe-integrate 或继续 commit 的动作>
+```
+
+`.agent/context/task.md` 只是下一个 skill 的短期入口，不是共享真源。
+
 ## Restrictions
-- 必须遵循 Conventional Commits（`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, etc.）
-- 一个提交只能涉及一件独立的逻辑变动。不要把完全不相干的修改强行揉合在一起。
-- **强制约束**：每一个系统化自动构建的 Commit 必须包含从当前 Task 记录提取的 `Co-authored-by` 以遵从 Multi-Agent 责任追溯规范。
-- 绝不要在用户明确同意前静默执行 `git commit`。
-- 与用户的交互语言始终应使用**中文**。
+
+- 不得在用户确认前静默执行 `git commit`
+- 不得把“是否拆多个 PR”的判断偷换成“先发一个再说”
+- 不得把 `stash` 当垃圾桶
+- 不得把 `discard` 当默认处理方式
+- 不得在 skill 层发明 `rebase --onto`、`reset --hard` 等替代串行拆 PR 的主流程
+- 若发现当前 flow 已有 PR 事实且用户要开始新目标，应停止并切换 flow，而不是继续堆在原 flow
