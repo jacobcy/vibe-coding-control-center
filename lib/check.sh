@@ -10,11 +10,12 @@ _vibe_check_help() {
   echo "Usage: ${CYAN}vibe check${NC} [check] [target] [options]"
   echo ""
   echo "Targets:"
-  echo "  ${GREEN}(none)${NC}            运行全量审计（roadmap/task/flow/link/docs）"
+  echo "  ${GREEN}(none)${NC}            运行全量审计（roadmap/task/flow/bootstrap/link/docs）"
   echo "  ${GREEN}check${NC}             同上（兼容 command-standard）"
   echo "  ${GREEN}roadmap${NC}           只检查 roadmap 域"
   echo "  ${GREEN}task${NC}              只检查 task 域"
   echo "  ${GREEN}flow${NC}              只检查 flow 域"
+  echo "  ${GREEN}bootstrap${NC}         只检查 GitHub Project cutover 域"
   echo "  ${GREEN}link${NC}              只检查跨层链接一致性"
   echo "  ${GREEN}json <file>${NC}       JSON + schema 检查"
   echo "  ${GREEN}docs${NC}              文档 frontmatter 审计"
@@ -77,7 +78,7 @@ vibe_check() {
         json_out=1
         shift
         ;;
-      roadmap|task|flow|link|docs)
+      roadmap|task|flow|bootstrap|link|docs)
         [[ "$mode" == "all" ]] || { log_error "Only one check target can be specified"; return 1; }
         mode="$1"
         shift
@@ -109,19 +110,21 @@ vibe_check() {
   local payload
   case "$mode" in
     all)
-      local g_roadmap g_task g_flow g_link g_docs
+      local g_roadmap g_task g_flow g_bootstrap g_link g_docs
       g_roadmap="$(_vibe_check_group_roadmap)"
       g_task="$(_vibe_check_group_task)"
       g_flow="$(_vibe_check_group_flow)"
+      g_bootstrap="$(_vibe_check_group_bootstrap)"
       g_link="$(_vibe_check_group_link)"
       g_docs="$(_vibe_check_group_docs)"
       payload="$(jq -nc \
         --argjson roadmap "$g_roadmap" \
         --argjson task "$g_task" \
         --argjson flow "$g_flow" \
+        --argjson bootstrap "$g_bootstrap" \
         --argjson link "$g_link" \
         --argjson docs "$g_docs" \
-        '{roadmap:$roadmap, task:$task, flow:$flow, link:$link, docs:$docs}')"
+        '{roadmap:$roadmap, task:$task, flow:$flow, bootstrap:$bootstrap, link:$link, docs:$docs}')"
       ;;
     roadmap)
       payload="$(jq -nc --argjson roadmap "$(_vibe_check_group_roadmap)" '{roadmap:$roadmap}')"
@@ -131,6 +134,9 @@ vibe_check() {
       ;;
     flow)
       payload="$(jq -nc --argjson flow "$(_vibe_check_group_flow)" '{flow:$flow}')"
+      ;;
+    bootstrap)
+      payload="$(jq -nc --argjson bootstrap "$(_vibe_check_group_bootstrap)" '{bootstrap:$bootstrap}')"
       ;;
     link)
       payload="$(jq -nc --argjson link "$(_vibe_check_group_link)" '{link:$link}')"
