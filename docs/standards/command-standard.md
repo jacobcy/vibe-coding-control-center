@@ -154,6 +154,7 @@ related_docs:
 - `task` 只负责 execution record
 - `flow` 只负责执行现场
 - slash / workflow 只能调度这些对象，不得重新发明对象层级
+- GitHub 官方字段与 Vibe 扩展字段应同时可同步，但语义层级必须分离
 
 ## 4. `vibe roadmap` Standard
 
@@ -218,6 +219,7 @@ related_docs:
 - `add` 新增的是 roadmap item，而不是 task / flow
 - `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
 - `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
+- `sync` 可以同步 Vibe 扩展字段，但不能改写 `content_type` 这类 GitHub 官方身份语义
 
 ### 4.6 Status and Provider Rules
 
@@ -246,6 +248,7 @@ provider 只允许：
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
 - `milestone` 是规划窗口锚点，不是 flow 切换开关
+- roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` 属于允许双向同步的扩展字段
 
 ### 4.7 Prohibited Semantics
 
@@ -331,6 +334,8 @@ provider 只允许：
 - `roadmap_item_ids`
 - `issue_refs`
 - `pr_ref`
+- `spec_standard`
+- `spec_ref`
 - runtime 绑定事实
 
 `task add/update` 不得承担：
@@ -338,6 +343,7 @@ provider 只允许：
 - 创建 GitHub Project item
 - 决定 roadmap item `type`
 - 变更 milestone 或规划窗口
+- 改写 GitHub Project item 的官方来源类型
 
 ### 5.6 Status and Source Rules
 
@@ -354,6 +360,14 @@ provider 只允许：
 - `issue`
 - `local`
 - `openspec`
+
+`spec_standard` 只允许：
+
+- `openspec`
+- `kiro`
+- `superpowers`
+- `supervisor`
+- `none`
 
 ### 5.7 Runtime Binding Rules
 

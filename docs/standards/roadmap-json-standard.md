@@ -31,6 +31,8 @@ related_docs:
 - roadmap item 状态
 - milestone / 兼容性的 `version_goal`
 - roadmap item 与 task / repo issue 的映射
+- GitHub Project item 的稳定桥接字段
+- 允许双向同步的 Vibe 扩展字段
 
 `roadmap.json` 不负责：
 
@@ -75,6 +77,11 @@ related_docs:
   "status": "current",
   "source_type": "local",
   "source_refs": [],
+  "github_project_item_id": null,
+  "content_type": "draft_issue",
+  "spec_standard": null,
+  "execution_record_id": null,
+  "spec_ref": null,
   "issue_refs": [],
   "linked_task_ids": [
     "2026-03-08-command-standard-rewrite"
@@ -96,6 +103,11 @@ related_docs:
 - `status`
 - `source_type`
 - `source_refs`
+- `github_project_item_id`
+- `content_type`
+- `spec_standard`
+- `execution_record_id`
+- `spec_ref`
 - `issue_refs`
 - `linked_task_ids`
 - `created_at`
@@ -108,6 +120,10 @@ related_docs:
 - `version_goal`
 - `description`
 - `milestone`
+- `github_project_item_id`
+- `spec_standard`
+- `execution_record_id`
+- `spec_ref`
 
 说明：
 
@@ -140,6 +156,37 @@ related_docs:
 - `task`
 - `bug`
 
+### 4.6 GitHub Alignment Fields
+
+`content_type` 只允许：
+
+- `issue`
+- `pull_request`
+- `draft_issue`
+
+约束：
+
+- `content_type` 表达 GitHub Project item 的官方来源类型
+- `github_project_item_id` 用于稳定对齐 GitHub Project item 身份
+- 这两个字段属于 GitHub 官方层，不得被本地 workflow 语义覆盖
+
+### 4.7 Vibe Extension Fields
+
+`spec_standard` 只允许：
+
+- `openspec`
+- `kiro`
+- `superpowers`
+- `supervisor`
+- `none`
+
+约束：
+
+- `spec_standard` 是 Vibe 扩展字段，不是 GitHub 官方字段
+- `execution_record_id` 用于桥接本地 `registry.json.task_id`
+- `spec_ref` 用于指向规范文档或执行规范入口
+- 扩展字段必须可双向同步，但不得改变 GitHub item 的官方身份字段
+
 ## 5. Relationship Rules
 
 - `linked_task_ids` 用于关联执行层 task
@@ -152,6 +199,8 @@ related_docs:
 - `type=feature|task|bug` 只表达规划分类，足以覆盖当前标准层需求
 - 若未来需要更高层规划对象，应新增独立标准，而不是让 roadmap item 混装 `epic`
 - `source_refs` 应优先记录 GitHub Project item / repo issue 来源，而不是本地运行时来源
+- `github_project_item_id` + `content_type` 是 GitHub Project 对齐主桥
+- `spec_standard` / `execution_record_id` / `spec_ref` 是 Vibe 扩展桥
 - 一个 roadmap item 可以关联多个 task
 - 一个 roadmap item 可以关联多个 repo issue
 - 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
@@ -185,6 +234,7 @@ related_docs:
 - `current_version`
 - `runtime_worktree_name`
 - `runtime_branch`
+- `runtime_agent`
 
 ## 8. Minimal Example
 
@@ -202,6 +252,11 @@ related_docs:
       "status": "current",
       "source_type": "local",
       "source_refs": [],
+      "github_project_item_id": null,
+      "content_type": "draft_issue",
+      "spec_standard": "none",
+      "execution_record_id": null,
+      "spec_ref": null,
       "issue_refs": [],
       "linked_task_ids": [],
       "created_at": "2026-03-08T09:00:00+08:00",

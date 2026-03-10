@@ -70,11 +70,14 @@ related_docs:
 - `repo issue` 是外部来源对象，不是本地执行对象
 - `openspec` 属于执行层输入，不属于规划层来源
 - `roadmap item` 是 mirrored `GitHub Project item`
+- GitHub 官方对象语义必须原样保留；项目自定义语义只能作为扩展字段叠加
 - `feature` / `task` / `bug` 是 roadmap item 的 `type`
 - `task` 是 execution record，不等于 roadmap item 的 `type=task`
 - `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
 - `milestone` 是版本/阶段窗口锚点；历史上的 `version_goal` 只保留兼容语义
 - `flow` 只属于执行层，是 task 的运行时容器，不承担规划入口语义
+- `spec_standard` 是 Vibe 扩展字段，用于标记 execution record 采用的规范体系
+- `execution_record_id` 是 Vibe 扩展桥接字段，用于稳定对齐 GitHub Project item 与本地 task
 
 ## 4. Naming Rules
 
@@ -159,6 +162,7 @@ related_docs:
 - roadmap item 与 task 只建立关联关系，不共享身份
 - `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
 - milestone 只锚定规划窗口，不直接驱动 runtime 切换
+- GitHub 官方字段与 Vibe 扩展字段必须可双向同步，且扩展字段不得改写官方对象身份
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
 - 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
@@ -205,6 +209,7 @@ related_docs:
 - 用 `registry.json` 记录规划优先级
 - 用 `worktrees.json` 承担历史归档
 - 将 `openspec` 写成 roadmap provider
+- 用 Vibe 扩展字段重定义 GitHub 官方对象类型
 - 将 `task` 与 roadmap item `type=task` 视为同一对象
 - 将 `flow` 回退成规划入口
 - 将 `feature` 写成共享模型字段

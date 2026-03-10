@@ -30,6 +30,7 @@ related_docs:
 - task 主记录（execution record）
 - task 生命周期状态
 - task 与 roadmap / repo issue / PR 的关联
+- task 采用的 spec 标准与规范引用
 - task subtasks
 - task 当前 runtime 绑定事实
 - task 完成与归档事实
@@ -78,6 +79,8 @@ related_docs:
   "status": "in_progress",
   "source_type": "local",
   "source_refs": [],
+  "spec_standard": "openspec",
+  "spec_ref": "openspec/changes/command-standard",
   "roadmap_item_ids": [
     "roadmap-command-standard"
   ],
@@ -109,6 +112,8 @@ related_docs:
 - `status`
 - `source_type`
 - `source_refs`
+- `spec_standard`
+- `spec_ref`
 - `roadmap_item_ids`
 - `issue_refs`
 - `related_task_ids`
@@ -121,6 +126,7 @@ related_docs:
 以下字段允许为 `null`：
 
 - `description`
+- `spec_ref`
 - `pr_ref`
 - `current_subtask_id`
 - `runtime_worktree_name`
@@ -154,6 +160,22 @@ related_docs:
 - `issue` = 由 `repo issue` 驱动创建
 - `local` = 由本地执行决策创建
 - `openspec` = 由 OpenSpec 执行输入创建
+
+### 4.5 Spec Standard Enum
+
+`spec_standard` 只允许：
+
+- `openspec`
+- `kiro`
+- `superpowers`
+- `supervisor`
+- `none`
+
+约束：
+
+- `spec_standard` 表示当前 execution record 采用的规范体系
+- `spec_ref` 用于指向规范文档、spec 目录或 workflow 入口
+- 这两个字段属于 Vibe 扩展层，不改变 GitHub 官方对象身份
 
 ## 5. Subtask Shape
 
@@ -201,6 +223,7 @@ related_docs:
 - `roadmap_item_ids` 只表达“此 execution record 服务哪些 roadmap items”，不改变 roadmap item 类型
 - `issue_refs` 只桥接需求来源，不把 `repo issue` 变成 execution record 身份
 - `pr_ref` 只桥接当前主交付单元，不记录 PR 历史列表
+- `spec_standard` / `spec_ref` 只表达执行规范选择，不承担 roadmap 规划分类
 - 一个 task 只允许一个主 PR
 - 一个 task 不允许多个 PR 历史数组
 - task 作为 execution record，不承担 roadmap item `type` 的定义职责
@@ -218,6 +241,8 @@ related_docs:
 - `repo`
 - `milestone`
 - `roadmap_type`
+- `content_type`
+- `github_project_item_id`
 
 ## 9. Minimal Example
 
