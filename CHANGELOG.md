@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.7] - 2026-03-10
+
+### ✨ Changed
+- archive legacy planning docs and add GitHub Project migration preparation plans
+
 ## [2.1.6] - 2026-03-08
 
 ### ✨ Changed
