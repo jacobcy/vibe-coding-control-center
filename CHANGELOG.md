@@ -1,5 +1,15 @@
 # 更新日志
 
+## [2.1.12] - 2026-03-11
+
+### ✨ Changed
+- fix: remove flow-new worktree semantics ...
+
+## [2.1.11] - 2026-03-11
+
+### ✨ Changed
+- test commit ...
+
 ## [2.1.10] - 2026-03-11
 
 ### ✨ Changed

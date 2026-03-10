@@ -17,13 +17,14 @@ tags: [workflow, vibe, planning, orchestrator]
 执行命令：
 
 ```bash
-vibe flow new <slug> --branch main --save-unstash
+vibe flow new <slug> --branch origin/main --save-unstash
 vibe flow bind <task-id>
 ```
 
 语义约束：
 
 - `flow new <slug>` 只创建现场，不创建 feature
+- `flow new <slug>` 默认在当前 worktree 内创建/切换 branch，不新建物理 worktree
 - `task-id` 指向 execution record
 - 在选择 `task-id` 之前，必须先读取 shell 输出中的 task / roadmap 事实
 - 若该 task 对应 `type=feature` 的 roadmap item，应保持 `1 feature = 1 branch = 1 PR`

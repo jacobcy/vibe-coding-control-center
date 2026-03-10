@@ -381,14 +381,12 @@ JSON
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
-    _flow_new_worktree() { echo "UNEXPECTED_WORKTREE_CALL"; return 0; }
     _flow_new demo --base develop
   '
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Unknown option: --base" ]]
   [[ "$output" =~ "--branch" ]]
-  [[ ! "$output" =~ "UNEXPECTED_WORKTREE_CALL" ]]
 }
 
 @test "2.8 vibe flow new help no longer describes worktree creation" {
@@ -409,105 +407,21 @@ JSON
   [[ ! "$output" =~ "save-stash" ]]
 }
 
-@test "14. vibe flow start with path feature does not auto-create or bind task" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/vibe" "$fixture/repo"
-  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
-  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
-
+@test "14. flow module no longer exposes legacy worktree-start helpers" {
   run zsh -c '
-    cd "'"$fixture"'/repo"
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
 
-    _vibe_task_add() { echo "CALLED" > "'"$fixture"'/task_add_called"; return 0; }
-    _vibe_task_update() { echo "CALLED" > "'"$fixture"'/task_update_called"; return 0; }
-    wtnew() {
-      echo "$1" > "'"$fixture"'/wtnew_branch"
-      mkdir -p "'"$fixture"'/wt-$1"
-      return 0
-    }
-
-    git() {
-      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      return 0
-    }
-
-    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
+    typeset -f _flow_new_worktree >/dev/null 2>&1
+    status_new=$?
+    typeset -f _flow_start_worktree >/dev/null 2>&1
+    status_start=$?
+    echo "${status_new}|${status_start}"
   '
 
   [ "$status" -eq 0 ]
-  [ ! -f "$fixture/task_add_called" ]
-  [ ! -f "$fixture/task_update_called" ]
-  [ "$(cat "$fixture/wtnew_branch")" = "2026-03-02-vibe-new-task-flow-convergence" ]
-  [[ "$output" =~ "cd " ]]
-  [[ "$output" =~ "vibe task add" ]]
-  [[ "$output" =~ "vibe flow bind" ]]
-}
-
-@test "15. vibe flow start fails cleanly when worktree creation fails" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/vibe" "$fixture/repo"
-  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
-  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
-
-  run zsh -c '
-    cd "'"$fixture"'/repo"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-
-    wtnew() { return 1; }
-
-    git() {
-      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
-      if [[ "$1" == "branch" ]]; then return 1; fi
-      return 0
-    }
-
-    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
-  '
-
-  [ "$status" -eq 1 ]
-  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
-}
-
-@test "16. vibe flow start rolls back worktree when entering worktree fails" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/vibe" "$fixture/repo"
-  printf '%s\n' '{"schema_version":"v1","tasks":[]}' > "$fixture/vibe/registry.json"
-  printf '%s\n' '{"schema_version":"v1","worktrees":[]}' > "$fixture/vibe/worktrees.json"
-
-  run zsh -c '
-    cd "'"$fixture"'/repo"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-
-    wtnew() { return 0; }
-
-    git() {
-      if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/repo"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
-      if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
-      if [[ "$1" == "branch" ]]; then return 1; fi
-      if [[ "$1" == "worktree" && "$2" == "remove" ]]; then return 0; fi
-      return 0
-    }
-
-    _flow_start_worktree "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" "claude" "main"
-  '
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "Failed to enter worktree" ]]
-  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" -eq 0 ]
+  [ "$output" = "1|1" ]
 }
 
 @test "18. vnew forwards base arg and opens branch workspace" {

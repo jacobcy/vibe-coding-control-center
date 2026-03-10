@@ -23,7 +23,7 @@ tags: [workflow, vibe, planning, orchestrator]
 - 所有 registry / worktree / `.vibe/*` 写入都必须通过 shell 命令完成，不得直接手工编辑 JSON 或 Markdown 状态文件。
 - `/vibe-new-feature` 当前支持两种 shell 路径：
   - 当前目录开新任务：通过 `vibe task update ... --bind-current` 驱动。
-  - 新工作树开新任务：通过 `vibe task add` / `vibe task update` 准备任务元数据；**物理 worktree 的创建/切换由用户在 Shell 中执行** `vibe flow new <slug>` 或 `wt <worktree-name>`，本 workflow 仅负责逻辑分区的绑定。
+  - 当前目录切入新 flow：通过 `vibe task add` / `vibe task update` 准备任务元数据；随后在当前 worktree 执行 `vibe flow new <slug>`，再用 `vibe flow bind <task-id>` 完成绑定。若确实需要额外物理目录，再使用 `wtnew` / `vnew`。
 
 ## Steps
 
@@ -57,4 +57,4 @@ tags: [workflow, vibe, planning, orchestrator]
 6. **Checkpoint Output & HARD STOP**
    - 每通过一个 Gate，输出判定结果与下一步。
    - 一旦生成并审查了 `plan.md`，即表示 Gate 3 完成。必须触发 **HARD STOP（硬停止）**。
-   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，确认 `repo issue`、`GitHub Project item` / `roadmap item` 与本地 `task` 的关系无误后，再进入执行；**如需创建或切换到新的工作树，请在 Shell 中执行** `vibe flow new` 或 `wt <worktree-name>`，**然后使用** `vibe flow bind <task-id>` **绑定 execution record**。"
+   - 回复用户："✍️ 规划文件 `plan.md` 已就绪。执行引擎已被挂起。请您审查图纸，确认 `repo issue`、`GitHub Project item` / `roadmap item` 与本地 `task` 的关系无误后，再进入执行；默认请在当前目录执行 `vibe flow new <slug>`，再使用 `vibe flow bind <task-id>` 绑定 execution record。只有在需要并行隔离现场时，才额外使用 `wtnew` / `vnew` 新建物理 worktree。"

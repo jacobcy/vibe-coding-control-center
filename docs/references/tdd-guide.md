@@ -23,37 +23,33 @@ Following the PRD requirements, all development should follow a standardized Tes
 
 ## Using `vibe flow`
 
-To start a new feature with TDD workflow:
+To enter a new implementation flow with TDD:
 
 ```bash
-# 1. Start feature workflow (creates worktree, PRD, etc.)
-vibe flow start <feature-name> --agent=claude
+# 1. Create/switch to a new flow in the current worktree
+vibe flow new <feature-name> --agent claude
 
-# 2. Navigate to the worktree
-cd ../wt-claude-<feature-name>
+# 2. Bind the current execution record when needed
+vibe flow bind <task-id>
 
-# 3. Write specification
-vibe flow spec
+# 3. Define tests first (TDD Red Phase)
+# run the relevant bats/unit test and confirm it fails
 
-# 4. Initialize tests (TDD Red Phase)
-vibe flow test
+# 4. Implement the minimum change (TDD Green Phase)
+# run the same test and confirm it passes
 
-# 5. Implement feature (TDD Green Phase)
-vibe flow dev
-
-# 6. Review code
+# 5. Review code
 vibe flow review
 
-# 7. Create Pull Request
+# 6. Create Pull Request
 vibe flow pr
 
-# 8. Complete feature (after merge)
+# 7. Complete feature (after merge)
 vibe flow done
 ```
 
 This workflow:
-- Creates a dedicated worktree and branch
-- Generates PRD and spec documents
-- Creates test template in `tests/test_<feature-name>.sh`
+- Creates or switches to a dedicated flow / branch in the current worktree
+- Keeps task binding explicit through `vibe flow bind`
 - Guides you through the TDD cycle
-- Tracks progress with workflow state
+- Uses `wtnew` / `vnew` only when you truly need a separate physical worktree
