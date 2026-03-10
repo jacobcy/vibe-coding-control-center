@@ -1,13 +1,10 @@
 #!/usr/bin/env zsh
-
 _vibe_task_roadmap_file() {
     echo "$1/vibe/roadmap.json"
 }
-
 _vibe_task_validate_roadmap_items() {
     local common_dir="$1" roadmap_item_ids_json="$2" roadmap_file missing_ids first_missing
     [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
-
     roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
     [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
     jq empty "$roadmap_file" >/dev/null 2>&1 || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
@@ -25,7 +22,6 @@ _vibe_task_validate_roadmap_items() {
         return 1
     fi
 }
-
 _vibe_task_sync_roadmap_links() {
     local common_dir="$1" task_id="$2" roadmap_item_ids_json="$3" now="$4" roadmap_file tmp
     [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
@@ -44,7 +40,6 @@ _vibe_task_sync_roadmap_links() {
       )
     ' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file"
 }
-
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve" spec_standard="" spec_ref="" spec_mode="preserve"
     local -a issue_refs roadmap_item_ids

@@ -19,7 +19,6 @@ _vibe_roadmap_file() {
     local common_dir="$1"
     echo "$common_dir/vibe/roadmap.json"
 }
-
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -121,7 +120,6 @@ _vibe_roadmap_status() {
 _vibe_roadmap_list() {
     local common_dir="$1" output_json="false" status_filter="" source_filter="" keywords="" linked="false" unlinked="false" roadmap_file
     shift
-
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --json)

@@ -8,7 +8,6 @@ source "$VIBE_LIB/flow_review.sh"
 source "$VIBE_LIB/flow_pr.sh"
 source "$VIBE_LIB/task.sh"
 source "$VIBE_LIB/flow_runtime.sh"
-
 _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_DEFAULT_TOOL:-claude}"; }
@@ -113,7 +112,6 @@ _flow_bind() {
   log_step "Binding $tid"; _vibe_task_update "$tid" --status "in_progress" --bind-current --agent "$agent" || return 1
   log_success "Bound: $tid ($title)"
 }
-
 _flow_new() {
   local feat="" agent="" ref="origin/main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stash_ref="" branch_created=0
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
@@ -137,7 +135,6 @@ _flow_new() {
       return 1
       ;;
   esac
-
   branch_name="$(_flow_switch_target_branch "$feat")"
   feature_slug="$(_flow_feature_slug "$branch_name")"
   _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already existed and was closed: $feature_slug"; return 1; }
@@ -157,7 +154,6 @@ _flow_new() {
     log_error "Working directory is not clean. Re-run with --save-unstash to carry changes into the next flow."
     return 1
   fi
-
   if [[ -n "$dirty" ]]; then
     log_step "Saving uncommitted changes for flow new"
     stash_ref="$(_flow_capture_dirty_state new "$branch_name")" || return 1
@@ -184,7 +180,6 @@ _flow_new() {
     log_step "Restoring saved changes into $branch_name"
     _flow_restore_captured_state "$stash_ref" "flow new to $branch_name" || return 1
   fi
-
   log_success "Flow runtime ready: $feat (branch: $branch_name)"
   if [[ -n "$agent" ]]; then
     echo "💡 Agent hint: $agent"
@@ -192,13 +187,9 @@ _flow_new() {
 }
 _flow_done() {
   local target_branch="" arg unmerged current_branch branch_ref="" branch_name feature_slug flow_record="" tasks_json='[]' current_task="" worktree_name="" worktree_path="" pr_ref="" now pr_merged=1 delete_mode="safe"
-  
-  # 处理帮助参数
   for arg in "$@"; do 
     [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_done_usage; return 0; }
   done
-  
-  # 解析参数
   while [[ $# -gt 0 ]]; do 
     case "$1" in 
       --branch) target_branch="$2"; shift 2 ;;
@@ -206,21 +197,14 @@ _flow_done() {
       *) shift ;;
     esac
   done
-  
-  # 获取当前分支
   current_branch=$(git branch --show-current)
-
   if _flow_is_main_worktree; then
     log_warn "Current repository or branch is protected."
     return 1
   fi
-  
-  # 如果没有指定分支，使用当前分支
   if [[ -z "$target_branch" ]]; then
     target_branch="$current_branch"
   fi
-  
-  # 检查是否是 main 分支
   if [[ "$target_branch" == "main" ]]; then
     log_error "Cannot close main branch flow."
     return 1
