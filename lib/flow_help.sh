@@ -7,8 +7,8 @@ _flow_usage() {
   echo "Usage: ${CYAN}vibe flow <subcommand>${NC} [args]"
   echo ""
   echo "Subcommands:"
-  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建/切换现场（worktree + branch）"
-  echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内复用环境领取已注册任务"
+  echo "  ${GREEN}new${NC} <name> [--agent <name>] [--branch <ref>]        创建/切换执行现场（worktree + branch）"
+  echo "  ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内绑定已注册的 execution record"
   echo "  ${GREEN}done${NC}                                                 当前现场收尾（保留 worktree/branch）"
   echo "  ${GREEN}status${NC} [<name>]                                      查看当前分支状态 (默认: 当前分支)"
   echo "  ${GREEN}list${NC}                                                   查看全部分支状态"
@@ -18,11 +18,12 @@ _flow_usage() {
   echo "Options for 'new <name>':"
   echo "  --agent <name>     指定 AI 身份 (默认: claude)"
   echo "  --branch <ref>     指定基础分支 (默认: main)"
-  echo "  # 标准路径：先 vibe task add/update，再 vibe flow new，再 vibe flow bind"
+  echo "  # 标准路径：先明确 repo issue / roadmap item，再 vibe task add/update，再 vibe flow new，再 vibe flow bind"
 }
 
 _flow_new_usage() { 
     echo "Usage: vibe flow new <name> [--agent=claude] [--branch=main]"
+    echo "Creates an execution scene only; it does not define a feature or roadmap item."
 }
 
 _flow_bind_usage() { 

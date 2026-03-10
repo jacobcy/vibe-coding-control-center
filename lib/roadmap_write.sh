@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # lib/roadmap_write.sh - Write operations for Roadmap module
 
-# Valid roadmap issue statuses
+# Valid roadmap item statuses
 _vibe_roadmap_valid_states() { echo "p0 current next deferred rejected"; }
 
 _vibe_roadmap_check_state() {
@@ -60,6 +60,7 @@ _vibe_roadmap_add() {
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Roadmap item added: $item_id"
+    echo "This local roadmap item is the mirror record for a GitHub Project item."
 }
 
 _vibe_roadmap_set_version_goal() {
@@ -68,6 +69,7 @@ _vibe_roadmap_set_version_goal() {
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     jq --arg goal "$version_goal" '.version_goal = $goal' "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
     echo "Version goal set to: $version_goal"
+    echo "Note: version goal is currently a compatibility text anchor for the planning window."
 }
 
 _vibe_roadmap_classify() {
@@ -93,7 +95,7 @@ _vibe_roadmap_classify() {
          | (.items[]? | select(.roadmap_item_id == $id) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
-    echo "Issue $issue_id classified as: $issue_state"
+    echo "Roadmap item $issue_id classified as: $issue_state"
 }
 
 _vibe_roadmap_sync_github() {
@@ -101,18 +103,18 @@ _vibe_roadmap_sync_github() {
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_init "$common_dir"
 
-    echo "Syncing GitHub issues from $repo with label '$label'..."
+    echo "Syncing repo issues from $repo with label '$label' into local roadmap items..."
 
     local issues_json
     issues_json="$(gh issue list --repo "$repo" --label "$label" --state open --json number,title 2>/dev/null)" || {
-        echo "Failed to fetch issues from GitHub. Make sure gh is authenticated."
+        echo "Failed to fetch repo issues from GitHub. Make sure gh is authenticated."
         return 1
     }
 
     local issue_count
     issue_count="$(echo "${issues_json}" | jq 'length')"
     if [[ "$issue_count" == "0" ]]; then
-        echo "No issues found with label '$label' in $repo"
+        echo "No repo issues found with label '$label' in $repo"
         return 0
     fi
 
@@ -125,7 +127,8 @@ _vibe_roadmap_sync_github() {
     jq --argjson issues "$merged_issues" '.items = $issues' \
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
-    echo "Sync complete. Added $issue_count issues (state: deferred - use 'vibe roadmap classify' to categorize)."
+    echo "Sync complete. Added $issue_count roadmap item mirrors from repo issues."
+    echo "Current limitation: this sync path still mirrors repo issues directly; full GitHub Project item sync remains a follow-up gap."
 }
 
 _vibe_roadmap_assign() {
