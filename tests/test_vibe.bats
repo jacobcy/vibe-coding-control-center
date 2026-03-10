@@ -171,16 +171,16 @@ JSON
   [[ "$output" =~ "Usage:" ]]
 }
 
-@test "4.1 vibe help mentions /vibe-new onboarding" {
+@test "4.1 vibe help mentions issue to task to flow onboarding" {
   run vibe help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "/vibe-new" ]]
+  [[ "$output" =~ "repo issue / roadmap item" ]]
 }
 
 @test "4.2 vibe help mentions task command" {
   run vibe help
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "任务生命周期管理" ]]
+  [[ "$output" =~ "execution record 生命周期管理" ]]
 }
 
 @test "4.4 vibe help mentions task add update remove" {
