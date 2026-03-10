@@ -172,11 +172,9 @@ _vibe_task_list() {
         return 0
     fi
 
-    local cur_tid; cur_tid="$(jq -r '.task_id // empty' .vibe/current-task.json 2>/dev/null || true)"
-    if [[ -z "$cur_tid" ]]; then
-        local current_wt_path; current_wt_path=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
+        local cur_tid="" current_wt_path=""
+        current_wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
         cur_tid="$(jq -r --arg p "$current_wt_path" '.worktrees[]? | select(.worktree_path == $p) | .current_task // empty' "$worktrees_file" | head -1)"
-    fi
 
     missing="$(jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" --arg cur "$cur_tid" \
       '((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all |

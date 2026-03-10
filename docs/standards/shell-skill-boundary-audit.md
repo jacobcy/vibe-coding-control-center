@@ -5,7 +5,7 @@ status: approved
 scope: shell-skill-boundary
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - docs/standards/command-standard.md
   - docs/standards/shell-capability-design.md
@@ -16,8 +16,8 @@ related_docs:
 
 本文档记录当前 Shell 与 Skill 边界的审计基线，用于检查两类问题：
 
-- Shell 是否越权执行了应由 skill 负责的业务逻辑
-- Skills / workflows 是否准确描述了 Shell 只是工具，而不是业务执行者
+- Shell 是否越权执行了应由 skill 负责的业务判断
+- Skills / workflows 是否准确描述了 Shell 是围绕共享真源的能力层，而不是业务判断者
 
 ## 1. Audit Questions
 
@@ -25,33 +25,38 @@ related_docs:
 
 审计时统一使用以下问题：
 
-1. Shell 是否提供了足够的原子能力让 skill 完成工作？
-2. Shell 是否跨越职责边界，执行了 workflow logic？
-3. Skill 是否暗示“调用 shell 命令即可完成业务逻辑”？
-4. Skill 是否被诱导绕过 Shell 直接触碰共享状态？
+1. Shell 是否提供了足够的共享真源相关能力让 skill 完成工作，而不必自己拼接高成本机械步骤？
+2. Shell 是否替 skill 做了归属、拆分、优先级、下一步等业务判断？
+3. Shell 的 `git` / `gh` / worktree 副作用是否都服务于共享真源同步或单一现场落地？
+4. Skill 是否暗示“调用 shell 命令即可自动完成业务判断”？
+5. Skill 是否被诱导绕过 Shell 直接触碰共享状态？
 
 ## 2. Findings
 
-### 2.1 Blocking: `flow new` 越权创建 task
+### 2.1 Medium: `flow new` 的边界不应按“是否同时碰多个对象”来判断
 
 当前 [flow.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/flow.sh#L19) 到 [flow.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/flow.sh#L37) 中，`vibe flow new` 会：
 
 - 生成 task id
 - 注册 task
 - 创建 worktree
-- 绑定 task
+- 让 flow 对应 task
 
-这已经不是“创建现场”，而是在执行完整 workflow 片段。
+仅仅因为一个命令同时触碰 task / flow / worktree，并不能自动判定为越权。
+
+如果这些动作都服务于同一个共享真源同步目标，且不替 skill 决定任务拆分、issue/roadmap 归属、优先级和 next step，那么它仍可能是可接受的中等粒度 Shell 能力。
+
+真正需要审计的是：`flow new` 是否在没有显式上层判断的情况下，替 skill 做了业务归属决定。
 
 判定：
 
-- `Shell Overreach`
+- `Needs Clarification`
 
 期望：
 
-- `flow new` 只创建现场
-- 任务创建与关联由 `task` 命令提供原子能力
-- skill 负责决定先建 task 还是先开 flow
+- 不再使用“只要同时创建 task 和现场就一定越界”这一过度绝对化判据
+- 审查重点改为：它是否替 skill 决定了本轮交付的业务语义
+- 若只是围绕当前单一 flow 建立共享事实与现场落地，则可以保留为 Shell 能力
 
 ### 2.2 Blocking: `task` 缺少 issue / roadmap 关联原子能力
 
@@ -200,17 +205,18 @@ related_docs:
 当前边界状态可以概括为：
 
 - 标准原则以前写得不够显式，现在已补强
+- Shell 可以调用 `git` / `gh` / worktree，但这些副作用必须服务于共享真源与单一现场同步
 - `roadmap.current` 与 branch current 的语义边界现已明确
 - `issue`、`task`、`flow` 的关系边界现已明确
-- 大部分 skill 文案已经接受“shell 是工具，不是业务执行者”这一原则
-- 当前主要问题不在 skill，而在 Shell 缺少足够的原子能力，同时某些命令越权编排
+- 大部分 skill 文案已经接受“shell 是能力层，不是业务判断者”这一原则
+- 当前主要问题不在 shell 会不会调用 `git` / `gh`，而在它是否替 skill 做了语义判断，以及当前原子能力是否足够
 - `roadmap` 相关实现已经暴露出“共享规划状态”和“分支运行时状态”混用风险
 
 ## 4. Required Follow-Up
 
 后续 Shell 收敛必须优先完成：
 
-1. 将 `flow new` 收紧为纯现场创建
+1. 明确 `flow new` 的合法边界是“围绕当前单一 flow 的共享真源与现场同步”，而不是简单要求它退化为纯现场创建
 2. 为 `task add` / `task update` 增加 issue / roadmap 关联原子能力
 3. 修正 `roadmap classify`，禁止隐式新增 roadmap item
 4. 收紧 `vibe-roadmap` skill 对 `roadmap.current` 与 backlog 分配的描述

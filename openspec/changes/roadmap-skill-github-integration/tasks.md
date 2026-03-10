@@ -1,7 +1,7 @@
 ## 1. Roadmap Skill Setup
 
 - [x] 1.1 Create skills/vibe-roadmap/SKILL.md
-- [x] 1.2 Register skill in skills/vibe-skills/registry.json
+- [x] 1.2 Register skill in skills/vibe-skills-manager/registry.json
 - [x] 1.3 Verify skill loads: `bin/vibe check`
 
 ## 2. Scheduler Core Logic

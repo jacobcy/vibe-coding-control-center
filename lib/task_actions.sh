@@ -101,8 +101,8 @@ _vibe_task_update() {
         worktree=""
     elif [[ "$bind_current" == "true" ]]; then
         assigned_mode="set"
-        target_name="$(basename "$PWD")"
-        target_path="$PWD"
+        target_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+        target_name="$(basename "$target_path")"
         worktree="$target_name"
     elif [[ -n "$worktree" ]]; then
         assigned_mode="set"
@@ -120,7 +120,6 @@ _vibe_task_update() {
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
-    [[ "$bind_current" == "true" ]] && _vibe_task_refresh_cache "$common_dir" "$registry_file" "$task_id" "$target_name" "$now"
     case "$task_status" in
         todo) echo "💡 Next: Create a worktree using ${CYAN}wtnew <branch>${NC} or start with ${CYAN}vnew <branch>${NC}" ;;
         in_progress) echo "💡 Next: Ensure your cockpit is ready with ${CYAN}vup${NC}" ;;

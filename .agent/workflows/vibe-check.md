@@ -1,6 +1,6 @@
 ---
 name: "Vibe: Check"
-description: Read shell audit output, explain task-flow/runtime discrepancies, and invoke the vibe-check skill for safe shell-driven repairs.
+description: Read shell audit output, explain task-flow or runtime discrepancies, and invoke the vibe-check skill for safe Shell-API repair of deterministic task-worktree binding gaps.
 category: Workflow
 tags: [workflow, vibe, verification, shared-state]
 ---

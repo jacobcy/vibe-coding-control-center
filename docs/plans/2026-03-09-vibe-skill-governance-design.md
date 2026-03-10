@@ -20,7 +20,7 @@ related_docs:
 
 ## Goal
 
-创建一个专属的 `vibe-skill`，用于服务本项目自有 Vibe Skills 的创建、更新、审查与漂移提醒。
+创建一个专属的 `vibe-skill-audit`，用于服务本项目自有 Vibe Skills 的创建、更新、审查与漂移提醒。
 
 它必须满足三条硬约束：
 
@@ -31,8 +31,8 @@ related_docs:
 ## Non-Goals
 
 - 不在本轮设计里直接改现有 `skills/vibe-*`。
-- 不把 `vibe-skill` 做成新的 shell 命令域。
-- 不让 `vibe-skill` 代替 `skill-creator` 的通用能力；它应是 Vibe 项目内的受限包装层。
+- 不把 `vibe-skill-audit` 做成新的 shell 命令域。
+- 不让 `vibe-skill-audit` 代替 `skill-creator` 的通用能力；它应是 Vibe 项目内的受限包装层。
 - 不在 skill 层做自动修复共享真源的“暗箱事务”。
 
 ## Current Findings
@@ -46,23 +46,23 @@ related_docs:
 ### 当前 skill 体系的明显问题
 
 1. 多数现有 `vibe-*` skill 没有系统引用 `docs/standards/*`，漂移风险高。
-2. 现有 `skills/vibe-skills/SKILL.md` 的职责是“skills 生命周期管理”，不是“Vibe skill 设计审查器”，不宜继续叠加职责。
+2. 现有 `skills/vibe-skills-manager/SKILL.md` 的职责是“skills 生命周期管理”，不是“Vibe skill 设计审查器”，不宜继续叠加职责。
 3. `skills/vibe-task/SKILL.md`、`skills/vibe-check/SKILL.md`、`skills/vibe-roadmap/SKILL.md` 都写了自己的边界说明，但多数没有把标准文件当显式引用真源。
 4. 当前仓库中存在历史上关于 `vibe skill` / `vibe skills` 的旧表述，后续新 skill 需要主动避免再次混淆 shell 命令、skill、本地源码、运行时链接四个层次。
 
 ## Recommendation
 
-推荐创建一个新的独立 skill：`skills/vibe-skill/`。
+推荐创建一个新的独立 skill：`skills/vibe-skill-audit/`。
 
 理由：
 
-- 它和现有 `vibe-skills` 不是同一职责。前者是“Vibe 自有 skill 的创建与治理”，后者是“已安装 skills 的生命周期管理”。
+- 它和现有 `vibe-skills-manager` 不是同一职责。前者是“Vibe 自有 skill 的创建与治理”，后者是“已安装 skills 的生命周期管理”。
 - 它天然需要双模式：`create/update` 与 `review/audit`。这适合放进一个受限治理 skill，而不是散落到多个文档约定里。
 - 它应该显式复用 `skill-creator` 的方法，但收紧为 Vibe 项目专用规则：真源边界、标准引用、命令真实性、flow 生命周期对齐。
 
 ## Alternative Approaches
 
-### 方案 A：扩展现有 `vibe-skills`
+### 方案 A：扩展现有 `vibe-skills-manager`
 
 优点：
 
@@ -71,11 +71,11 @@ related_docs:
 缺点：
 
 - 会把“安装/同步/推荐第三方 skills”和“审查 Vibe 自有 skill”混成一层。
-- 继续放大会让 `vibe-skills` 变成超大入口，不符合渐进披露。
+- 继续放大会让 `vibe-skills-manager` 变成超大入口，不符合渐进披露。
 
 结论：不推荐。
 
-### 方案 B：创建独立 `vibe-skill`
+### 方案 B：创建独立 `vibe-skill-audit`
 
 优点：
 
@@ -88,7 +88,7 @@ related_docs:
 
 结论：推荐。
 
-### 方案 C：拆成 `vibe-skill-create` + `vibe-skill-review`
+### 方案 C：拆成 `vibe-skill-audit-create` + `vibe-skill-audit-review`
 
 优点：
 
@@ -103,7 +103,7 @@ related_docs:
 
 ## Proposed Responsibility
 
-`vibe-skill` 应只做四类事：
+`vibe-skill-audit` 应只做四类事：
 
 1. 为新 Vibe skill 生成受限设计框架。
 2. 审查现有 Vibe skill 是否越权、是否引用真源、是否误述命令或生命周期。
@@ -163,7 +163,7 @@ related_docs:
 ## Suggested Skill Structure
 
 ```text
-skills/vibe-skill/
+skills/vibe-skill-audit/
   SKILL.md
   references/
     review-checklist.md
@@ -226,11 +226,11 @@ skills/vibe-skill/
 
 ## Files To Modify In Execution Phase
 
-- Create: `skills/vibe-skill/SKILL.md`
-- Create: `skills/vibe-skill/references/review-checklist.md`
-- Create: `skills/vibe-skill/references/standards-mapping.md`
-- Create: `skills/vibe-skill/scripts/audit-skill-references.sh`
-- Create: `skills/vibe-skill/agents/openai.yaml`
+- Create: `skills/vibe-skill-audit/SKILL.md`
+- Create: `skills/vibe-skill-audit/references/review-checklist.md`
+- Create: `skills/vibe-skill-audit/references/standards-mapping.md`
+- Create: `skills/vibe-skill-audit/scripts/audit-skill-references.sh`
+- Create: `skills/vibe-skill-audit/agents/openai.yaml`
 
 预计 5 个文件，属于一个逻辑变更。
 
@@ -240,14 +240,14 @@ skills/vibe-skill/
 
 ```bash
 scripts/quick_validate.py skills/vibe-skill
-bash skills/vibe-skill/scripts/audit-skill-references.sh skills/vibe-task/SKILL.md
-bash skills/vibe-skill/scripts/audit-skill-references.sh skills/vibe-check/SKILL.md
-bash skills/vibe-skill/scripts/audit-skill-references.sh skills/vibe-roadmap/SKILL.md
+bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/vibe-task/SKILL.md
+bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/vibe-check/SKILL.md
+bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/vibe-roadmap/SKILL.md
 ```
 
 ## Expected Result
 
-- 新 `vibe-skill` 能服务“创建 + 审查 + 漂移提醒”三个目标。
+- 新 `vibe-skill-audit` 能服务“创建 + 审查 + 漂移提醒”三个目标。
 - 它不会直接操作共享真源，只会要求通过 shell 能力层完成动作。
 - 它能对现有 skill 给出标准引用缺失、命令失真、生命周期误述、能力缺口等结论。
 - 后续 standards 更新后，skill 至少会收到提醒，而不是静默漂移。

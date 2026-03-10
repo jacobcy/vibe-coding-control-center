@@ -111,22 +111,3 @@ _vibe_task_write_task_file() {
         ' >"$tmp" && mv "$tmp" "$task_file"
     fi
 }
-
-_vibe_task_refresh_cache() {
-    local common_dir="$1" registry_file="$2" task_id="$3" worktree_name="$4" now="$5" task_path title next_step subtask_json worktrees_file tasks_json
-    local vibe_dir=".vibe"; mkdir -p "$vibe_dir"; task_path="$common_dir/vibe/tasks/$task_id/task.json"
-    worktrees_file="$common_dir/vibe/worktrees.json"
-    title="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .title // ""' "$registry_file")"; next_step="$(jq -r --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | .next_step // ""' "$registry_file")"
-    subtask_json="$(jq -c --arg task_id "$task_id" '.tasks[] | select(.task_id == $task_id) | (.current_subtask_id // null)' "$registry_file")"
-    tasks_json="$(jq -c --arg wt "$worktree_name" '.worktrees[]? | select(.worktree_name == $wt) | .tasks // []' "$worktrees_file" 2>/dev/null || echo "[]")"
-    jq -n --arg task_id "$task_id" --arg task_path "$task_path" --arg registry_path "$registry_file" --arg worktree_name "$worktree_name" --argjson tasks "${tasks_json:-[]}" --arg updated_at "$now" \
-       '{task_id:$task_id, tasks:$tasks, task_path:$task_path, registry_path:$registry_path, worktree_name:$worktree_name, updated_at:$updated_at}' > "$vibe_dir/current-task.json"
-    cat > "$vibe_dir/focus.md" <<EOF
-# Focus
-- task: $task_id
-- title: $title
-- next_step: $next_step
-EOF
-    jq -n --arg worktree_name "$worktree_name" --arg current_task "$task_id" --argjson tasks "${tasks_json:-[]}" --arg saved_at "$now" --argjson current_subtask_id "${subtask_json:-null}" \
-       '{worktree_name:$worktree_name, current_task:$current_task, tasks:$tasks, current_subtask_id:$current_subtask_id, saved_at:$saved_at}' > "$vibe_dir/session.json"
-}

@@ -1,13 +1,13 @@
 ---
-name: "Vibe: Skills"
+name: "Vibe: Skills Manager"
 description: Interactively manage, audit, sync, recommend, and clean installed AI skills across IDEs; not for authoring or reviewing repo-local `skills/vibe-*`.
 category: Workflow
 tags: [workflow, vibe, skills, management]
 ---
 
-# Vibe Skills
+# Vibe Skills Manager
 
-**Input**: 运行 `/vibe-skills-manager` 触发，启动 Skills 交互式审计流程（扫描 → 诊断 → 推荐 → 确认 → 执行）。
+**Input**: 运行 `/vibe-skills-manager` 触发，启动 Skills 交互式审计流程（扫描 -> 诊断 -> 推荐 -> 确认 -> 执行）。
 
 ## 执行要求
 

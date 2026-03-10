@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # lib/skills_sync.sh - Skills sync internals
 
-_vibe_skills_registry_file() { echo "$VIBE_ROOT/skills/vibe-skills/registry.json"; }
+_vibe_skills_registry_file() { echo "$VIBE_ROOT/skills/vibe-skills-manager/registry.json"; }
 _vibe_skills_count_entries() { [[ -d "$1" ]] && find "$1" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ' || echo 0; }
 _vibe_skills_project_count() {
     local c1=$(find "$VIBE_ROOT/skills" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)

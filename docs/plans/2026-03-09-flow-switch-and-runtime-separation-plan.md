@@ -158,7 +158,7 @@ git commit -m "refactor(flow): route rotate through flow switch"
 
 **Step 3: 运行引用审计**
 
-Run: `bash skills/vibe-skill/scripts/audit-skill-references.sh skills/vibe-commit/SKILL.md`
+Run: `bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/vibe-commit/SKILL.md`
 
 Expected:
 - 无缺失引用
@@ -243,7 +243,7 @@ bats tests/test_rotate.bats
 bin/vibe flow help
 bin/vibe flow new --help
 bin/vibe flow switch --help
-bash skills/vibe-skill/scripts/audit-skill-references.sh skills/vibe-commit/SKILL.md
+bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/vibe-commit/SKILL.md
 ```
 
 ## Expected Result

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Skill"
+  short_description: "Create and audit Vibe-native skills"
+  default_prompt: "Use $vibe-skill-audit to create or audit a Vibe project skill against current standards."

@@ -77,13 +77,13 @@ related_docs:
 
 ## 需要修改的文件（实施阶段）
 - Create: `skills/vibe-roadmap/SKILL.md`
-- Modify: `skills/vibe-skills/registry.json`（注册新技能）
+- Modify: `skills/vibe-skills-manager/registry.json`（注册新技能）
 - Optional Modify: `AGENTS.md`（若需加入 quick start）
 - Optional Modify: `docs/standards/command-standard.md`（若新增 `vibe roadmap` CLI）
 
 ## Test Command（实施后）
 - `bin/vibe check`
-- `jq . skills/vibe-skills/registry.json`
+- `jq . skills/vibe-skills-manager/registry.json`
 - 手工验证：
   - 输入 GitHub/Linear/本地 JSON 三路需求 → 期望输出统一 roadmap 视图
   - 给出容量约束后重新计算 → 期望 roadmap 排布稳定更新

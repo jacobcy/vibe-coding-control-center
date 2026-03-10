@@ -4,17 +4,16 @@ setup() {
   export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 }
 
-@test "vibe-skill audit flags missing standards references on existing vibe-task skill" {
-  run bash "$REPO_ROOT/skills/vibe-skill/scripts/audit-skill-references.sh" \
+@test "vibe-skill-audit audit passes on existing vibe-task skill" {
+  run bash "$REPO_ROOT/skills/vibe-skill-audit/scripts/audit-skill-references.sh" \
     "$REPO_ROOT/skills/vibe-task/SKILL.md"
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Missing Reference" ]]
-  [[ "$output" =~ "docs/standards/glossary.md" ]]
-  [[ "$output" =~ "docs/standards/action-verbs.md" ]]
+  [[ "$output" =~ "No findings" ]]
+  [[ "$output" =~ "skills/vibe-task/SKILL.md" ]]
 }
 
-@test "vibe-skill audit flags nonexistent vibe command usage" {
+@test "vibe-skill-audit audit flags nonexistent vibe command usage" {
   local fixture
   fixture="$(mktemp -d)"
 
@@ -29,7 +28,7 @@ description: Fake skill for testing
 Run `bin/vibe nonsense launch`.
 EOF
 
-  run bash "$REPO_ROOT/skills/vibe-skill/scripts/audit-skill-references.sh" \
+  run bash "$REPO_ROOT/skills/vibe-skill-audit/scripts/audit-skill-references.sh" \
     "$fixture/fake-skill.md"
 
   [ "$status" -eq 0 ]

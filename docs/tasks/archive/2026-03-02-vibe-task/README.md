@@ -4,7 +4,7 @@ document_type: task-readme
 title: "Vibe Task Unified Entry"
 author: "Codex GPT-5"
 created: "2026-03-02"
-last_updated: "2026-03-02"
+last_updated: "2026-03-10"
 related_docs:
   - docs/tasks/2026-03-02-cross-worktree-task-registry/plan-v1-initial.md
   - docs/tasks/2026-03-01-session-lifecycle/plan-v2-phase-2.md
@@ -14,9 +14,11 @@ related_docs:
 
 # Task: Vibe Task Unified Entry
 
+> 历史语义说明（2026-03-10）：本归档任务产生于 `vibe-task` 入口语义仍在收敛的阶段。现行语义已经统一为“跨 worktree 的 flow/task 总览”；如果下文提到 worktree，总是指物理承载目录，而不是用户真正要进入的运行时对象。
+
 ## 概述
 
-该任务负责把跨 worktree 的任务总览能力整理成统一入口：
+该任务负责把跨 worktree 的 flow/task 总览能力整理成统一入口：
 
 - `vibe task`：CLI 只读事实入口
 - `vibe-task`：skill 解释层

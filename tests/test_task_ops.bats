@@ -114,7 +114,7 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 
-@test "ops: update bind-current syncs worktree binding and cache" {
+@test "ops: update bind-current syncs worktree binding without local cache" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
   local wt_path="$fixture/wt-test-task"
@@ -129,8 +129,79 @@ setup() {
   '
   [ "$status" -eq 0 ]
   [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
-  [ -f "$wt_path/.vibe/current-task.json" ]
-  [ "$(jq -r '.task_id' "$wt_path/.vibe/current-task.json")" = "2026-03-02-rotate-alignment" ]
+  [ ! -e "$wt_path/.vibe/current-task.json" ]
+  [ ! -e "$wt_path/.vibe/focus.md" ]
+  [ ! -e "$wt_path/.vibe/session.json" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+}
+
+@test "ops: task query prefers shared worktree binding over local stale cache" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+  mkdir -p "$wt_path/.vibe"
+  cat > "$wt_path/.vibe/current-task.json" <<'JSON'
+{"task_id":"2026-03-02-rotate-alignment"}
+JSON
+
+  run zsh -c '
+    cd "'"$wt_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -F "old-task Old Task [completed]"
+  [[ "$output" == *"old-task Old Task [completed]"* ]]
+  [[ "$output" == *"(focused)"* ]]
+  [[ ! "$output" =~ "2026-03-02-rotate-alignment Rotate Workflow Refinement \[todo\].*focused" ]]
+}
+
+@test "ops: task query handles unbound worktree without local cache" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+
+  jq '
+    .worktrees = [
+      .worktrees[]
+      | select(.worktree_name == "wt-test-task")
+      | .current_task = null
+      | .tasks = []
+    ]
+  ' "$fixture/vibe/worktrees.json" > "$fixture/vibe/worktrees.json.tmp"
+  mv "$fixture/vibe/worktrees.json.tmp" "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$wt_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Task Registry Overview" ]]
+  [[ ! "$output" =~ "focused" ]]
+}
+
+@test "ops: update bind-current from subdirectory binds the worktree root" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+  local nested_path="$wt_path/subdir"
+  mkdir -p "$nested_path"
+
+  run zsh -c '
+    cd "'"$nested_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --bind-current
+  '
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '[.worktrees[] | select(.worktree_name=="subdir")] | length' "$fixture/vibe/worktrees.json")" = "0" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 

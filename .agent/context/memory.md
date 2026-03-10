@@ -59,7 +59,7 @@ vibe task update <task-id> --next-step <step>
 | `/vibe-continue` | ✅ 合规 | 只读操作 |
 | `/vibe-commit` | ✅ 合规 | 使用 git 命令 |
 | `/vibe-check` | ✅ 合规 | 只读检查 |
-| `/vibe-skills` | ✅ 合规 | 读取 registry，生成报告 |
+| `/vibe-skills-manager` | ✅ 合规 | 读取 registry，生成报告 |
 
 ### Hook 配置优化
 

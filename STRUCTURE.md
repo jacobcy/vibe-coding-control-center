@@ -48,7 +48,7 @@ vibe-center/
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
-│   │   ├── task.md              # [UNTRACKED] 当前 Worktree 状态草稿（.gitignore）
+│   │   ├── task.md              # [UNTRACKED] 当前 flow handoff 草稿（.gitignore）
 │   │   └── memory.md            # [TRACKED] 跨项目长期记忆与架构共识
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
@@ -138,7 +138,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - 模块化：每个 `.sh` 文件负责一个功能域
 
 **主要模块**：
-- `flow.sh` - Git worktree 工作流
+- `flow.sh` - flow 运行时与 worktree 编排
 - `tool.sh` - 工具链管理
 - `keys.sh` - API 密钥管理
 - `utils.sh` - 通用工具函数
@@ -170,7 +170,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | **[UNTRACKED]** 当前工作树任务草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离） | 每个动作后 |
+| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离） | 每个动作后 |
 | `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
 
 #### `.agent/rules/` - 编码规则
@@ -204,7 +204,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **职责**：技能的运行时环境（symlinks 到 `skills/`）
 
-### `.git/vibe/` 和 `<worktree>/.vibe/` - 数据存储
+### `.git/vibe/`、`~/.vibe/` 与历史 `<worktree>/.vibe/` - 数据存储
 
 **职责**：Vibe 系统的数据存储位置
 
@@ -212,13 +212,14 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 | 路径 | 职责 | 共享范围 | 示例内容 |
 |------|------|---------|---------|
-| **`.git/vibe/`** | **跨项目共享数据**（主仓库） | 所有 worktrees 共享 | `registry.json`, `worktrees.json`, `tasks/*/` |
-| **`<worktree>/.vibe/`** | **本分支独立数据**（worktree 本地） | 仅当前 worktree | 本地临时数据、缓存 |
+| **`.git/vibe/`** | **当前运行时共享真源**（主仓库） | 所有 worktrees 共享 | `registry.json`, `worktrees.json`, `tasks/*/` |
+| **`~/.vibe/`** | **用户级全局配置** | 当前用户跨仓库共享 | loader、keys、skills 偏好 |
+| **`<worktree>/.vibe/`** | **历史本地缓存方案（已淘汰）** | 仅历史文档背景 | 不再作为当前运行时真源 |
 
 #### 重要文件
 
 **`.git/vibe/registry.json`** - 任务注册表（跨项目共享）
-- 记录所有任务的状态、worktree 绑定关系
+- 记录所有任务的状态与当前 runtime 映射关系
 - 所有 worktree 都访问同一个 registry
 - 通过 `git rev-parse --git-common-dir` 定位
 
@@ -230,13 +231,21 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - 每个任务的 `task.json` 详细配置
 - 所有 worktree 共享访问
 
+**`~/.vibe/`** - 全局用户配置
+- 保存跨仓库生效的 loader、keys 与偏好设置
+- 不承载当前仓库的 task/worktree 运行时绑定
+
+**`<worktree>/.vibe/`** - 已淘汰的本地缓存层
+- 当前 shell/runtime 不再读写 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
+- 如在历史文档中出现，仅表示旧设计，不代表现行真源
+
 **访问方式**：
 ```bash
 # Shell 中获取 registry 路径
-git rev-parse --git-common-dir)/vibe/registry.json
+$(git rev-parse --git-common-dir)/vibe/registry.json
 
-# 查看当前 worktree 的本地数据（如果存在）
-ls <worktree-path>/.vibe/
+# 查看用户级全局配置目录
+ls ~/.vibe/
 ```
 
 ### `docs/` - 人类文档区
