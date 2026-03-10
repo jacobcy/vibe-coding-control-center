@@ -43,11 +43,11 @@ related_docs:
 
 结论：标准层不是主因，主因在“引用这些标准的下游文本和残留实现心智”。
 
-## 2. 直接诱发错觉的第一责任层：workflow 文案仍在混用
+## 2. 直接诱发错觉的第一责任层：workflow 文案曾经混用
 
-- `.agent/workflows/vibe-new.md` 第 22 行仍写着：
-  - “再调用 `vibe flow new <slug> --agent <agent>` 创建/切换 worktree”
-- 同文件第 65 行虽然补充“`vibe flow new` 只创建执行现场”，但紧接着又把它与“shell 中新建 worktree”并列描述。
+- 在较早版本中，`.agent/workflows/vibe-new.md` 曾把 `vibe flow new <slug> --agent <agent>` 表述为“创建/切换 worktree”。
+- 同一时期的文案虽然也补充过“`vibe flow new` 只创建执行现场”，但仍把它与“shell 中新建 worktree”并列描述。
+- 本 PR 已将该 workflow 文案更新为：`vibe flow new` 在当前 worktree 内创建/切换 branch 对应的 flow 现场，不再宣称自动创建/切换 worktree。
 
 这会让 agent 形成冲突心智：
 
@@ -55,17 +55,17 @@ related_docs:
 2. 下半段又说它只是现场创建
 3. agent 在不确定时会退回更具体、更可执行的旧表述，也就是“开 worktree”
 
-## 3. 第二责任层：实现文件仍保留旧入口残影
+## 3. 第二责任层：实现文件曾经保留旧入口残影
 
-- `lib/flow.sh:80-101` 仍存在 `_flow_new_worktree()` / `_flow_start_worktree()`，而且内部真实执行 `wtnew` 或 `git worktree add -b ...`
-- 即使当前 `vibe flow new` 实际入口走的是 `_flow_new()`（`lib/flow.sh:115-187`），代码库里仍保留“flow=start_worktree”的历史实现痕迹
-- `lib/flow.sh:162` 也仍输出 `Creating flow branch: ...`，说明现在真实语义已转向“当前目录开 branch”，但旧 worktree helper 没有被彻底退场
+- 旧版 `lib/flow.sh` 曾包含 `_flow_new_worktree()` / `_flow_start_worktree()` 这类 helper，并在内部执行 `wtnew` 或 `git worktree add -b ...`。
+- 本 PR 已删除这些 helper；当前 `vibe flow new` 的入口统一走 `_flow_new()`，实现只在当前目录上创建/切换 branch。
+- `lib/flow.sh` 中仍有 `Creating flow branch: ...` 这样的日志文案，说明真实语义已经收敛为“当前目录开 branch”，不再隐式新建 worktree。
 
 结论：这会诱导任何读实现或做模式归纳的 agent 认为：
 
-- `flow` 子系统天然负责 worktree 编排
-- `flow new` 与 “new worktree” 至少存在近义关系
-- 只是当前某条路径临时换成了 checkout 分支
+- `flow` 子系统天然负责或至少曾经负责过 worktree 编排
+- `flow new` 与 “new worktree” 至少存在过近义关系
+- 当前语义收敛后，历史实现心智仍可能滞留在 workflow / 设计文档中
 
 ## 4. 第三责任层：架构文档保留了高强度历史语义
 
@@ -90,18 +90,17 @@ related_docs:
 
 根因不是单一 bug，而是三层叠加：
 
-1. **workflow 直述错误**：把 `vibe flow new` 明写成“创建/切换 worktree”
-2. **实现残影未清**：`_flow_new_worktree()` / `_flow_start_worktree()` 仍留在 `lib/flow.sh`
+1. **workflow 历史直述错误**：曾把 `vibe flow new` 明写成“创建/切换 worktree”
+2. **实现历史残影强化误解**：旧版 `lib/flow.sh` 曾保留 worktree helper，放大了这种联想
 3. **架构叙事惯性**：旧设计文档长期把 flow 生命周期和 worktree 生命周期捆绑叙述
 
 因此 agent 并不是“没听懂”，而是在做代码库内一致性归纳时，读到了相互冲突的信息，并偏向了更老、更具体、出现次数更多的那一组。
 
 # Suggested Tasks
 
-1. 修正 `.agent/workflows/vibe-new.md` 中所有把 `flow new` 说成“创建/切换 worktree”的表述。
-2. 审计 `.agent/workflows/`、`skills/`、`docs/standards/` 中所有 `flow new -> worktree` 的残留文案。
-3. 为 `action-verbs.md` 或 `command-standard.md` 增加一句反歧义说明：`flow new` 默认不是“新建物理 worktree”。
-4. 评估 `lib/flow.sh` 中 `_flow_new_worktree()` / `_flow_start_worktree()` 是否应迁移到纯 worktree/alias 语义层，避免实现层继续污染认知。
+1. 审计 `.agent/workflows/`、`skills/`、`docs/standards/` 中所有 `flow new -> worktree` 的残留文案。
+2. 为 `action-verbs.md` 或 `command-standard.md` 增加一句反歧义说明：`flow new` 默认不是“新建物理 worktree”。
+3. 审阅 `docs/standards/vibe-engine-design.md` 这类叙事性文档，继续降低旧故事线对 agent 的误导。
 
 # Files To Modify
 
@@ -109,7 +108,6 @@ related_docs:
 - `.agent/workflows/vibe-new-flow.md`
 - `docs/standards/action-verbs.md` 或 `docs/standards/command-standard.md`
 - `docs/standards/vibe-engine-design.md`
-- `lib/flow.sh`（仅在确认要清理历史 helper 时）
 
 # Test Command
 
