@@ -248,6 +248,7 @@ provider 只允许：
 补充约束：
 
 - `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
+- `roadmap sync` 只负责规划层 mirror 同步，不负责 execution record 注册或 task 拆分
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
 - `milestone` 是规划窗口锚点，不是 flow 切换开关
@@ -290,6 +291,12 @@ provider 只允许：
 - 规划优先级
 - 现场创建与清理
 - 将 `branch` / `worktree` 当作长期历史索引
+
+补充约束：
+
+- `task audit` 的目标语义是 execution record 审计 / 修复
+- `task audit` 可以核对 OpenSpec / plans / 分支证据，但不替 `roadmap sync` 承担规划层镜像同步
+- OpenSpec change / plan 文档只作为 execution spec 来源桥接，不自动变成 roadmap item
 
 ### 5.3 Standard Subcommands
 

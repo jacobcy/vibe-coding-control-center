@@ -15,6 +15,9 @@ description: Use when the user wants project-level roadmap planning, version goa
 - `roadmap item = GitHub Project item mirror`
 - `task = execution record`
 - `spec_standard/spec_ref` 是 task 侧扩展桥接字段，不是 roadmap item 官方来源类型
+- `roadmap sync` = 规划层 mirror 同步
+- `task audit` = execution record 审计 / 修复
+- OpenSpec 注册 = execution spec 来源桥接
 - 任何规划判断都必须先读 shell 输出，再做编排
 
 标准真源：
@@ -51,6 +54,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - `repo issue` intake、模板补全、查重：交给 `vibe-issue`
 - `roadmap <-> task` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
+- OpenSpec / plan 到 `spec_standard/spec_ref` 的 execution spec 写回：交给 `vibe-task` 或 task 写入路径
 
 ## Workflow
 

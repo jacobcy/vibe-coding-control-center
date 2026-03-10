@@ -29,6 +29,8 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 - `roadmap item = GitHub Project item mirror`
 - `task = execution record`
 - `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
+- `task audit` = execution record 审计 / 修复，不是规划层 mirror 同步
+- OpenSpec / plans 注册 = execution spec 来源桥接，不是 roadmap item 创建
 - 任何判断都必须先读 shell 输出，再做语义分析
 
 **Announce at start:**
@@ -181,8 +183,9 @@ Recommendation
 - task runtime / flow 现场修复
 - flow 现场状态修复
 - worktree 缺失后的 runtime 决策
+- `roadmap sync` 语义解释或 GitHub Project mirror 同步
 
-这些属于 `vibe-check` 范围。
+其中前 3 项属于 `vibe-check` 范围；`roadmap sync` 规划层语义属于 `vibe-roadmap`。
 
 **三阶段核对流程:**
 
