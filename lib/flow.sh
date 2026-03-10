@@ -13,8 +13,26 @@ _flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.js
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_DEFAULT_TOOL:-claude}"; }
 _flow_require_clean_worktree() { [[ -z "$(git status --porcelain 2>/dev/null)" ]] || { log_error "Refusing to start task from dirty worktree"; return 1; }; }
-_flow_require_base_ref() { git fetch origin "$1" --quiet 2>/dev/null || true; git show-ref --verify --quiet "refs/remotes/origin/$1" || { log_error "origin/$1 not found"; return 1; }; }
-_flow_branch_exists() { git show-ref --verify --quiet "refs/heads/$1" || git show-ref --verify --quiet "refs/remotes/origin/$1" || git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
+_flow_normalize_branch_name() {
+  local ref="$1"
+  case "$ref" in
+    refs/remotes/origin/*) echo "${ref#refs/remotes/origin/}" ;;
+    refs/heads/*) echo "${ref#refs/heads/}" ;;
+    origin/*) echo "${ref#origin/}" ;;
+    *) echo "$ref" ;;
+  esac
+}
+_flow_require_base_ref() {
+  local branch_name
+  branch_name="$(_flow_normalize_branch_name "$1")"
+  git fetch origin "$branch_name" --quiet 2>/dev/null || true
+  git show-ref --verify --quiet "refs/remotes/origin/$branch_name" || { log_error "origin/$branch_name not found"; return 1; }
+}
+_flow_branch_exists() {
+  local branch_name
+  branch_name="$(_flow_normalize_branch_name "$1")"
+  git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name" || git ls-remote --exit-code --heads origin "$branch_name" >/dev/null 2>&1
+}
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
 _flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_branch_ref() {
@@ -35,8 +53,13 @@ _flow_pick_pr_base() {
   [[ -n "$best" ]] && echo "$best"
 }
 _flow_resolve_pr_base() {
-  local requested="$1" branch="$2" inferred=""
-  if [[ -n "$requested" ]]; then _flow_branch_exists "$requested" || { log_error "PR base not found: $requested"; return 1; }; echo "$requested"; return 0; fi
+  local requested="$1" branch="$2" inferred="" normalized=""
+  if [[ -n "$requested" ]]; then
+    normalized="$(_flow_normalize_branch_name "$requested")"
+    _flow_branch_exists "$normalized" || { log_error "PR base not found: $requested"; return 1; }
+    echo "$normalized"
+    return 0
+  fi
   inferred="$(_flow_pick_pr_base "$branch")"
   [[ -n "$inferred" ]] || { log_error "Unable to infer PR base. Re-run with --base <ref>."; return 1; }
   [[ "$inferred" == "main" ]] && { echo "$inferred"; return 0; }
@@ -44,13 +67,14 @@ _flow_resolve_pr_base() {
   return 1
 }
 _flow_pr_base_git_ref() {
-  local base_name="$1" base_ref=""
-  git fetch origin "$base_name" --quiet 2>/dev/null || true
-  git show-ref --verify --quiet "refs/remotes/origin/$base_name" && { echo "origin/$base_name"; return 0; }
-  git show-ref --verify --quiet "refs/heads/$base_name" && { echo "$base_name"; return 0; }
-  _flow_require_base_ref "$base_name" || return 1
-  git show-ref --verify --quiet "refs/remotes/origin/$base_name" && { echo "origin/$base_name"; return 0; }
-  log_error "Unable to resolve local git ref for PR base: $base_name"
+  local base_name branch_name base_ref=""
+  branch_name="$(_flow_normalize_branch_name "$1")"
+  git fetch origin "$branch_name" --quiet 2>/dev/null || true
+  git show-ref --verify --quiet "refs/remotes/origin/$branch_name" && { echo "origin/$branch_name"; return 0; }
+  git show-ref --verify --quiet "refs/heads/$branch_name" && { echo "$branch_name"; return 0; }
+  _flow_require_base_ref "$branch_name" || return 1
+  git show-ref --verify --quiet "refs/remotes/origin/$branch_name" && { echo "origin/$branch_name"; return 0; }
+  log_error "Unable to resolve local git ref for PR base: $branch_name"
   return 1
 }
 _flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }

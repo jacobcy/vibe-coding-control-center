@@ -251,6 +251,37 @@ EOF
   [[ "$output" =~ "Using PR base: develop" ]]
 }
 
+@test "14.3.1 _flow_pr normalizes origin/main input to PR base name and remote git ref" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base origin/main --title "test" --body "test"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Using PR base: main" ]]
+}
+
 @test "14.4 _flow_pr_base_git_ref prefers origin base over stale local branch" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
@@ -269,6 +300,24 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$output" = "origin/main" ]
+}
+
+@test "14.4.1 _flow_resolve_pr_base normalizes origin-prefixed input" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      case "$*" in
+        "show-ref --verify --quiet refs/heads/main") return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    _flow_resolve_pr_base origin/main current-branch
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "main" ]
 }
 
 @test "14.5 _flow_pr rejects local-only PR base when gh is used" {
