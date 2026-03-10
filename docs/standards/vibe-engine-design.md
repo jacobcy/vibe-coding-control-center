@@ -1,6 +1,6 @@
 # Vibe Workflow Engine 架构设计
 
-> 边界补充（2026-03-10）：当本文提到 `vibe flow` 触发 worktree 创建、切换或清理时，只是在描述 Shell 物理层动作。现行标准下 `flow` 仍是 task 的运行时容器，`worktree` 只是承载该 flow 的物理目录，不能反向把 worktree 当成 flow 本体。
+> 边界补充（2026-03-11）：本文已按现行标准收敛语义。`flow` 是 task 的运行时容器；`vibe flow new/start/create` 默认是在当前 worktree 中切入新的 branch / flow 现场，不默认新建物理 worktree。并行物理目录由 `wtnew` / `vnew` 承担。
 
 > 术语说明：本文保留其架构设计语境，但 `flow`、`workflow`、`Skill 层`、`Shell 能力层`、`执行代理`、`共享状态真源` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
@@ -8,7 +8,7 @@
 
 在 Vibe Center 2.0 中，我们确立了**Model-Spec-Context (MSC) 范式**，旨在用强约束和边界控制收敛 AI 生成的代码质量，防止"凭感觉写出垃圾代码"。然而，我们发现当前系统的**执行入口存在断层**：
 
-- **痛点一：Shell 工具只是空壳**。`bin/vibe flow start` 仅仅完成了物理环境的隔离（创建 git worktree 作为 flow 的承载目录、复制文件），它并没有真正拉起 AI Agent 进入规范中的验证阶段。`governance.yaml` 中配置的 `flow_hooks` 被记录了，但无人执行。
+- **痛点一：Shell 工具只是空壳**。早期 `bin/vibe flow start` 偏向“切执行现场”而缺少真正的规范驱动，它没有真正拉起 AI Agent 进入验证阶段。`governance.yaml` 中配置的 `flow_hooks` 被记录了，但无人执行。
 - **痛点二：Slash 命令缺乏强制约束**。用户可以直接使用 `/vibe-commit` 或直接在对话中提出改代码要求，Agent 会欣然接受，这就绕过了所有的需求验证 (PRD)、代码质量检查 (lint/test) 等 MSC 规范机制。
 - **痛点三：工具的认知负面影响**。无论是 openSpec 还是 Serena，这些本该作为隐形护栏的基础工具，反而成了需要用户主动理解并运行的负担。
 
@@ -18,26 +18,26 @@
 
 ### 2.1 任务生命周期与系统闭环 (Task Lifecycle Loop)
 
-在 Vibe Engine 中，一项开发任务的生命周期与底层的 Git Worktree 操作和 CLI 命令是严格绑定的：
+在 Vibe Engine 中，一项开发任务的生命周期与底层的 Git branch / flow runtime 和 CLI 命令是严格绑定的：
 
 1. **创建 (Todo)**
    - **触发**: `vibe task add <title>` 或 Agent 识别出新意图。
    - **状态**: 任务已登记在 `registry.json` 中，但尚未创建代码分支，也未指派 AI 角色。
 2. **执行 (In Progress)**
-   - **触发**: `vibe flow new <slug>`（全新切出）或 `vibe flow bind <task-id>`（绑定现有工作区）。
-   - **状态**: 代码分支和 Worktree 被建立，Agent 身份确认，一切就绪。
+   - **触发**: `vibe flow new <slug>`（在当前目录切到新 flow / branch）或 `vibe flow bind <task-id>`（绑定现有工作区）。
+   - **状态**: 当前 branch 与 flow runtime 就绪，Agent 身份确认，一切就绪。
    - **循环**: Agent 开始写代码了，这是纯粹的 Execution 阶段，不受干扰。
 3. **审计 (In Review / Code Review)**
    - **触发**: `vibe flow review --local` （调用底层大模型进行自动化逻辑与依赖检查）或者 `vibe flow pr` (推送至云端供人类复核)。
    - **状态**: 任务处于冻结待决状态，根据 Codex/Human 的反馈决定退回 *执行* 还是前进到 *完成*。
 4. **收尾 (Completed / Closed)**
    - **触发**: `vibe flow done` (人类敲击或 AI 代办)。
-   - **状态**: 物理清理。当前特征分支被从环境中彻底抹除和清理。
+   - **状态**: 交付收口。当前特征分支被删除，flow 历史被保留；物理目录是否清理取决于 worktree 生命周期，而不是 flow 本体。
 5. **归档 (Archived)**
    - **触发**: `vibe check`。
    - **状态**: `registry.json` 中属于已完结状态的任务，连带的 Markdown 等元信息被永久搬运入 `archive/`。
 
-这个流转关系使得工具不再是散落的拼图，而是：**新建任务 -> 切出环境 -> 编写代码 -> Codex Review -> 提交 PR -> 物理销毁 -> 归档记录** 的完美闭环。
+这个流转关系使得工具不再是散落的拼图，而是：**新建任务 -> 切入 flow/branch 现场 -> 编写代码 -> Codex Review -> 提交 PR -> 结束当前 flow -> 归档记录** 的完美闭环。
 
 ### 2.2 三层分离的架构模型
 
@@ -134,7 +134,7 @@ graph TD
 通过在底座中封装这些不可变的生命周期（如 `vibe flow review`），Vibe Center 最终将演化为能够托管异构 AI 智能体的超管基础设施（Super-Orchestrator），例如借助 `OpenClaw` 或类似底座实现完全自治的开发管线：
 
 1. **架构师 (Gemini)**：擅长无限上下文。负责通读整个代码库与高阶业务需求，在 `docs/plans/` 中输出精确到步骤的系统设计与抽象逻辑 (`plan.md`)。
-2. **执行者 (Claude)**：擅长零样本编码。作为无头(Headless)引擎被唤醒（`claude -c -p <plan> --dangerously-skip-permissions`），在隔离的 Worktree 中老老实实地落实每一行代码，不去擅自重构项目。
+2. **执行者 (Claude)**：擅长零样本编码。作为无头(Headless)引擎被唤醒（`claude -c -p <plan> --dangerously-skip-permissions`），在当前被分配的 flow / branch 现场中老老实实地落实每一行代码，不去擅自重构项目。
 3. **审计员 (Codex)**：擅长挑刺和严谨的静态分析。作为守门员拦截在提交前（`vibe flow review --local`），专门负责代码 review、找 bug 和死代码。如果退回，再发给 Claude 重新修。
-4. **总指挥 (OpenClaw / Vibe Flow Auto)**：维持整个工作区流转的编排循环，负责调用上述执行代理，挂载和清理 Worktree 环境。
+4. **总指挥 (OpenClaw / Vibe Flow Auto)**：维持整个 flow 现场流转的编排循环，负责调用上述执行代理，并在需要并行隔离时额外调度 worktree 基础设施。
 5. **人类 (Human Approver)**：从打字员解放为终审法官，只需在 Slack/Channel 中查看汇总的 PR 与 Review 报告，点一下 "LGTM" 闭环合码。

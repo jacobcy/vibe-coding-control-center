@@ -73,6 +73,7 @@ related_docs:
 
 - 默认含义：创建一个新的运行时现场
 - 前置提醒：确认这是新现场，而不是向共享模型新增实体
+- 反歧义提醒：对 `vibe flow new` 而言，默认是在当前 worktree 中切入新的 flow / branch 现场，不等于新建物理 worktree
 - 不要隐含什么：不要自动建 task，不要自动决定 roadmap 归属，不要自动提 PR
 
 ### 2.8 `bind`
