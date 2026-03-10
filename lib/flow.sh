@@ -91,7 +91,7 @@ _flow_bind() {
 }
 
 _flow_new() {
-  local feat="" agent="" ref="main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stash_ref="" branch_created=0
+  local feat="" agent="" ref="origin/main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stash_ref="" branch_created=0
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in

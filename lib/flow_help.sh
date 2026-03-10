@@ -18,7 +18,7 @@ Subcommands:
   ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或进行本地最终检查
 Options for 'new <name>':
   --agent <name>     指定 AI 身份 (默认: claude)
-  --branch <ref>     指定当前目录创建新 flow 时的起点分支 (默认: main)
+  --branch <ref>     指定当前目录创建新 flow 时的起点分支 (默认: origin/main)
   --save-unstash     将当前未提交改动 stash 后带入新 flow
 Options for 'switch <name>':
   dirty worktree     默认自动保存并带入当前未提交改动
@@ -30,7 +30,7 @@ EOF
 
 _flow_new_usage() { cat <<EOF
 Usage: vibe flow new <name> [--agent <name>] [--branch <ref>] [--save-unstash]
-  --branch <ref>  创建 flow 时选择起点分支；不接受 --base
+  --branch <ref>  创建 flow 时选择起点分支（默认: origin/main）；不接受 --base
   --save-unstash  将当前未提交改动 stash 后带入新 flow
 EOF
 }
