@@ -34,6 +34,46 @@ related_docs:
 - OpenSpec 的 `opsx-*` 流程和 Vibe Skills 的边界
 - 跨 Agent 工作流注册（`.agent/workflows/`）与 Claude 专用命令注册（`.claude/commands/`）的选择
 
+## 0. 对象模型边界
+
+skills / workflows 可以调度对象，但不得重新定义对象模型。
+
+固定边界如下：
+
+- `repo issue` 是来源层对象
+- `roadmap item` 是 mirrored GitHub Project item
+- `task` 是 execution record
+- `flow` 是运行时现场
+- `pr` 是交付与审查单元
+
+因此：
+
+- skill 可以决定先看哪个 `repo issue`、哪个 roadmap item 进入当前讨论
+- workflow 可以编排 `roadmap item -> task -> flow -> pr` 的推进顺序
+- skill / workflow 不得把 `flow new` 写成“创建 feature”
+- skill / workflow 不得把 roadmap item `type=task` 与本地 task execution record 混成同一实体
+- skill / workflow 不得把 `pr`、`flow` 或 `task` 改写成规划层对象
+
+## 0.1 Slash / Workflow Boundary
+
+slash 与 workflow 入口只负责调度、编排与提示，不定义共享状态对象模型。
+
+统一约束：
+
+- `/vibe-new-feature` 面向“选择或创建规划目标”的入口文案，但底层对象仍应落到 `repo issue` / roadmap item
+- `/vibe-new-flow` 只创建执行现场，不得把 `flow` 说成 feature 本体
+- `/vibe-issue` 只处理 `repo issue` 生命周期与关联建议，不创建 execution record 语义
+- `/vibe-task` 只围绕本地 execution record 调度，不承担 GitHub Project 规划职责
+- `/vibe-save` 只保存上下文与执行事实，不得回写新的规划对象定义
+- workflow 可以建议或填写 `spec_standard` / `spec_ref`，但不得重写 GitHub item 的官方字段
+
+禁止：
+
+- 在 slash 文案里把 `task` 与 roadmap item `type=task` 混用
+- 在 workflow 入口里把 `flow` 说成规划入口
+- 绕过 Shell 能力层直接重定义 GitHub Project 对象链路
+- 把 `openspec` / `kiro` / `superpowers` / `supervisor` 写成 GitHub 官方 item 来源类型
+
 ## 1. 概念分层与唯一职责
 
 | 概念 | 作用 | 规范位置 | 管理方式 | 备注 |
@@ -118,3 +158,4 @@ skills/<name>/
 4. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
 5. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
 6. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
+7. 是否避免在 skill / workflow 文案中重新定义 `repo issue`、`roadmap item`、`task`、`flow`、`pr` 的对象边界？

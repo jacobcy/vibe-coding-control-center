@@ -10,7 +10,7 @@ authority:
   - state-lifecycle
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-09
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -31,7 +31,7 @@ related_docs:
 - [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 
-本文档涉及的 `issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
 
 ## 1. Scope
 
@@ -65,15 +65,25 @@ related_docs:
 
 共享状态固定映射如下：
 
-- `roadmap.json` = 规划态
-- `registry.json` = 执行态
-- `worktrees.json` = 现场态
+- `roadmap.json` = 规划态（mirrored GitHub Project item 的本地真源）
+- `registry.json` = 执行态（task execution record 真源）
+- `worktrees.json` = 现场态（flow runtime 真源）
 - `flow-history.json` = 已关闭 flow 的历史态
 
 补充约束：
 
+- `repo issue` 是外部来源对象，不是本地执行对象
 - `openspec` 属于执行层输入，不属于规划层来源
-- `feature` 不是共享模型字段，只是 `flow new <name>` 的命名输入
+- `roadmap item` 是 mirrored `GitHub Project item`
+- GitHub 官方对象语义必须原样保留；项目自定义语义只能作为扩展字段叠加
+- `feature` / `task` / `bug` 在规划层默认解释为 roadmap item `type`
+- `task` 是 execution record，不等于 roadmap item 的 `type=task`
+- `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
+- `milestone` 属于 roadmap 规划窗口锚点，不属于 registry 或 worktree runtime 字段
+- `flow` 只属于执行层，是 task 的运行时容器，不承担规划入口语义
+- `spec_standard` 是 Vibe 扩展字段，用于标记 execution record 采用的规范体系
+- `execution_record_id` 是 Vibe 扩展桥接字段，用于稳定对齐 GitHub Project item 与本地 task
+- `flow new <name>` 中的 `name` 只是现场命名输入，不定义 feature 实体
 
 ## 4. Naming Rules
 
@@ -143,18 +153,30 @@ related_docs:
 
 允许的实体关系如下：
 
-- issue 与 roadmap item：多对多
-- issue 与 task：多对多
+- repo issue 与 roadmap item：多对多
+- repo issue 与 task：多对多
 - roadmap item 与 task：多对多
+- milestone 与 roadmap item：一对多
+- flow 与 task：一对多
 - PR 与 task：一对一
 - task 与相关 task：通过 `related_task_ids` 建立关联
 
 补充约束：
 
+- `repo issue -> roadmap item -> task -> flow -> PR` 是默认 happy path 链路
+- `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
+- roadmap item 与 task 只建立关联关系，不共享身份
+- roadmap item 是 mirrored GitHub Project item，不是 execution record
+- `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
+- task 是 execution record，不等于 GitHub Project `type=task` item 本体
+- milestone 只锚定规划窗口，不直接驱动 runtime 切换
+- GitHub 官方字段与 Vibe 扩展字段必须可双向同步，且扩展字段不得改写官方对象身份
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
 - roadmap item 可以关联多个 task
+- 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
 - task 可以关联多个 issue ref
+- `flow` 只属于执行层，不承担规划层关系建模
 
 ## 7. Lifecycle Rules
 
@@ -199,6 +221,9 @@ related_docs:
 - 用 `worktrees.json` 承担历史归档
 - 用 `registry.json` 或 `worktrees.json` 冒充 flow 关闭历史
 - 将 `openspec` 写成 roadmap provider
+- 用 Vibe 扩展字段重定义 GitHub 官方对象类型
+- 将 `task` 与 roadmap item `type=task` 视为同一对象
+- 将 `flow` 回退成规划入口
 - 将 `feature` 写成共享模型字段
 - 将 `dirty` 写成持久化真源字段
 - 将 branch 或 worktree 当作历史唯一索引

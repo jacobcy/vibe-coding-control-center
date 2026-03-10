@@ -9,7 +9,7 @@ authority:
   - recovery-rules
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-09
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -23,7 +23,7 @@ related_docs:
 
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
-- `roadmap -> task -> flow -> PR` 应如何推进
+- `repo issue -> roadmap item -> task -> flow -> PR` 应如何推进
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
@@ -51,9 +51,10 @@ related_docs:
 
 默认交付模型如下：
 
-- `roadmap` 负责规划窗口与优先级
-- `task` 负责可执行单元
-- `flow` 负责当前交付切片
+- `repo issue` 负责来源层需求与讨论事实
+- `roadmap item` 负责规划窗口与 GitHub Project item 镜像
+- `task` 负责 execution record
+- `flow` 负责当前交付切片与 runtime 现场
 - `pr` 负责当前交付产物
 - `branch` 负责承载当前交付切片的 Git 提交线
 - `worktree` 只是物理容器，不是 flow 本体
@@ -101,18 +102,21 @@ related_docs:
 
 标准路径如下：
 
-1. 从 `roadmap` 选择当前要推进的 `roadmap item`
-2. 将目标拆成一个或多个 `task`
-3. 为当前这轮交付创建或进入一个 `flow`
-4. 让该 `flow` 绑定本轮要交付的 `task`
-5. 在该 `flow` 对应的 `branch` 上提交本地 commit
-6. 执行 `review`
-7. 提交 `pr`
-8. 进入整合阶段，直到该 `pr` 可合并
-9. 合并后收尾并结束当前 `flow`
+1. 从 `repo issue` 确认来源层目标
+2. 创建、选择或同步对应的 `roadmap item`
+3. 将该 roadmap item 拆成一个或多个 `task` execution record
+4. 为当前这轮交付创建或进入一个 `flow`
+5. 让该 `flow` 绑定本轮要交付的 `task`
+6. 在该 `flow` 对应的 `branch` 上提交本地 commit
+7. 执行 `review`
+8. 提交 `pr`
+9. 进入整合阶段，直到该 `pr` 可合并
+10. 合并后收尾并结束当前 `flow`
 
 执行要求：
 
+- 一个 `type=feature` 的 roadmap item 默认对应一个主 `branch` 和一个主 `pr`
+- `task` 作为 execution record 服务于 roadmap item，不替代规划对象本身
 - 同一 `flow` 内的 commit 应服务同一个当前交付目标
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后
@@ -145,7 +149,7 @@ related_docs:
 
 默认恢复动作：
 
-- 保留上层 `roadmap item` / `issue`
+- 保留上层 `roadmap item` / `repo issue`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
 - 若复用当前目录，使用 `vibe flow switch` 一类显式 flow 切换能力进入新 `flow`

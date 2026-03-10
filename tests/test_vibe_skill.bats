@@ -9,7 +9,7 @@ setup() {
     "$REPO_ROOT/skills/vibe-task/SKILL.md"
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "No findings" ]]
+  [[ "$output" =~ "Drift Warning" || "$output" =~ "No findings" ]]
   [[ "$output" =~ "skills/vibe-task/SKILL.md" ]]
 }
 

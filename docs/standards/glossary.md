@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-08
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -53,34 +53,36 @@ related_docs:
 
 ## 3. Shared-State Terms
 
-### 3.1 `issue`
+### 3.1 `repo issue`
 
-- 正式术语：`issue`
-- 别称：无
-- 定义：本项目中 `issue` 默认特指 `GitHub Issue`，表示外部问题、愿望、需求入口或讨论入口。
+- 正式术语：`repo issue`
+- 别称：`issue`
+- 定义：本项目中 `repo issue` 特指 `GitHub repository issue`，表示外部问题、愿望、需求入口或讨论入口。
 - 边界：
-  - `issue` 不是执行单元
-  - `issue` 不是 roadmap item
-  - `issue` 不是 flow
+  - `repo issue` 不是 execution record
+  - `repo issue` 不是 roadmap item
+  - `repo issue` 不是 flow
 - 落点：
   - 命令语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
   - task 关联字段见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - 使用规则：
-  - 讨论需求来源、外部问题、GitHub 追踪项时使用 `issue`
-  - 不要把 `issue` 直接写成“正在执行的工作”
+  - 讨论需求来源、外部问题、GitHub 追踪项时使用 `repo issue`
+  - 若只写 `issue`，默认按 `repo issue` 解释
+  - 不要把 `repo issue` 直接写成“正在执行的工作”
 
 ### 3.2 `roadmap item`
 
 - 正式术语：`roadmap item`
 - 别称：`规划项`
-- 定义：写入 `roadmap.json` 的规划层工作单元，表示某项愿望是否进入当前规划窗口。
+- 定义：写入 `roadmap.json` 的规划层工作单元，是 mirrored `GitHub Project item` 的本地表达。
 - 边界：
-  - `roadmap item` 不是 task
+  - `roadmap item` 不是 execution record
   - `roadmap item` 不表达 branch/worktree 当前态
 - 落点：
   - 规划语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
   - 文件边界见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
 - 使用规则：
+  - `feature` / `task` / `bug` 是 roadmap item 的 `type`
   - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
   - 不要把 roadmap 状态当成分支当前执行状态
 
@@ -88,7 +90,7 @@ related_docs:
 
 - 正式术语：`task`
 - 别称：`执行任务`
-- 定义：写入 `registry.json` 的内部执行单元，必须可执行、可跟踪、可绑定现场。
+- 定义：写入 `registry.json` 的 execution record / runtime record，必须可执行、可跟踪、可绑定现场。
 - 边界：
   - `task` 不是外部需求入口
   - `task` 不等于 PR
@@ -98,7 +100,23 @@ related_docs:
   - 文件字段见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
 - 使用规则：
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
-  - `issue` 可以拆成多个 `task`
+  - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
+  - `repo issue` 可以映射到一个或多个 `task`
+
+### 3.3.1 `milestone`
+
+- 正式术语：`milestone`
+- 别称：无
+- 定义：GitHub 标准中的版本或阶段窗口对象，也是本项目表达版本/阶段窗口的优先语义锚点。
+- 边界：
+  - `milestone` 不是 roadmap item type
+  - `milestone` 不是 flow
+- 落点：
+  - 规划语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
+  - 文件边界见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- 使用规则：
+  - 讨论版本、阶段、交付窗口时优先使用 `milestone`
+  - 历史上的 `version_goal` 应视为兼容字段，而不是长期上位概念
 
 ### 3.4 `flow`
 
@@ -109,6 +127,7 @@ related_docs:
   - `flow` 不等于 worktree
   - `flow` 不等于 branch
   - `flow` 不是业务愿望本身
+  - `flow` 不承担规划语义
 - 落点：
   - 命令边界见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
   - 现场态边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
@@ -396,7 +415,7 @@ related_docs:
 
 以下混用是高风险错误：
 
-- `issue` != `task`
+  - `repo issue` != `task`
 - `roadmap item` != `task`
 - `flow` != `workflow`
 - `flow` != `worktree`

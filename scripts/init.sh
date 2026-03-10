@@ -30,6 +30,32 @@ done
 
 VIBE_SKILLS_CONFIG="${HOME}/.vibe/skills.json"
 
+# --- Helper Functions ---
+_symlink_files() {
+  local source_pattern="$1"
+  local target_dir="$2"
+  local name_transform="${3:-identity}"  # Optional: function to transform filename
+  local file_type="${4:-file}"            # Optional: 'file' or 'dir'
+
+  mkdir -p "$target_dir"
+
+  for item in $source_pattern; do
+    if [ "$file_type" = "dir" ]; then
+      [ -d "$item" ] || continue
+      item="${item%/}"
+    else
+      [ -f "$item" ] || continue
+    fi
+
+    local name=$(basename "$item")
+    if [ "$name_transform" = "add_prompt_suffix" ]; then
+      name="${name%.md}.prompt.md"
+    fi
+
+    ln -sfn "../../$item" "$target_dir/$name"
+  done
+}
+
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 
 # ── 1. Install approved skills from ~/.vibe/skills.json ──────────────────────
@@ -54,7 +80,7 @@ fi
 # ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
 echo "📦 Initializing OpenSpec..."
 if command -v openspec &> /dev/null; then
-  openspec init --tools antigravity,claude,trae
+  openspec init --tools antigravity,claude,codex,trae
 else
   echo -e "\033[1;33m⚠️  Warning: 'openspec' not found. Skipping.\033[0m"
   echo "   Install via: pnpm add -g @openspec/tools"
@@ -62,38 +88,16 @@ fi
 
 # ── 3. Symlink local project skills to agent directories ─────────────────────
 echo "🔗 Creating symlinks for local skills..."
-mkdir -p .agent/skills .trae/skills .claude/skills
 
 # Link skills/vibe-* (project-owned skills)
-for skill in skills/vibe-*/; do
-  [ -d "$skill" ] || continue
-  skill="${skill%/}"
-  name=$(basename "$skill")
-  ln -sfn "../../$skill" ".agent/skills/$name"
-  ln -sfn "../../$skill" ".trae/skills/$name"
-  ln -sfn "../../$skill" ".claude/skills/$name"
-done
+_symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".trae/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
+_symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
 
-# Link .github/skills/openspec-* (OpenSpec skills)
-for skill in .github/skills/openspec-*/; do
-  [ -d "$skill" ] || continue
-  skill="${skill%/}"
-  name=$(basename "$skill")
-  ln -sfn "../../$skill" ".agent/skills/$name"
-  ln -sfn "../../$skill" ".trae/skills/$name"
-  ln -sfn "../../$skill" ".claude/skills/$name"
-done
-
-# ── 3.5. Symlink workflows to Claude commands ──────────────────────────────
+#  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."
-mkdir -p .claude/commands
-
-# Link .agent/workflows/vibe-* (but NOT opsx-* which is managed by OpenSpec)
-for workflow in .agent/workflows/vibe-*.md; do
-  [ -f "$workflow" ] || continue
-  name=$(basename "$workflow")
-  ln -sfn "../../$workflow" ".claude/commands/$name"
-done
+_symlink_files ".agent/workflows/vibe-*.md" ".claude/commands" "identity" "file"
 
 echo "✅ Environment setup complete!"
 

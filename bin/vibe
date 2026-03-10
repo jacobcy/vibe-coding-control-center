@@ -80,9 +80,9 @@ case "$command" in
         echo "Usage: ${CYAN}vibe <command>${NC} [args]"
         echo ""
         echo "Primary Commands:"
-        echo "  ${GREEN}flow${NC}     开发环境编排（new, done, status, sync）"
-        echo "  ${GREEN}task${NC}     任务生命周期管理（list, add, update, remove, sync）"
-        echo "  ${GREEN}roadmap${NC}  路线图与版本目标管理 (status, list, show, classify, sync)"
+        echo "  ${GREEN}flow${NC}     执行现场编排（new, bind, done, status, review, pr）"
+        echo "  ${GREEN}task${NC}     execution record 生命周期管理（list, add, update, remove, audit）"
+        echo "  ${GREEN}roadmap${NC}  roadmap item 与规划窗口管理 (status, list, show, classify, sync)"
         echo "  ${GREEN}check${NC}    项目全要素审计与格式校验"
         echo ""
         echo "System Commands:"
@@ -96,7 +96,7 @@ case "$command" in
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
         echo "  ${GREEN}version${NC}  显示当前版本号"
         echo ""
-        echo "💡 提示：在 AI 助手环境，优先使用 /vibe-new 开启新功能开发。"
+        echo "💡 提示：先明确 repo issue / roadmap item，再进入 task + flow 执行路径。"
         ;;
     *)
         echo "${BOLD}Vibe Coding Control Center${NC} v${VIBE_VERSION}"
