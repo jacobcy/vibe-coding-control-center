@@ -25,11 +25,12 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - `docs/standards/command-standard.md`
 - `docs/standards/shell-capability-design.md`
 - `docs/standards/git-workflow-standard.md`
+- `docs/standards/handoff-governance-standard.md`
 - `docs/standards/glossary.md`
 
 特别约束：
 
-- `.agent/context/task.md` 只作为本地 handoff，不是共享真源。见 `docs/standards/git-workflow-standard.md`。
+- `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/handoff-governance-standard.md` 为准。
 - Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成“自动判断”或“自动修复”。见 `docs/standards/shell-capability-design.md`。
 
 ## Command Boundary
@@ -79,7 +80,9 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 ### Step 2: 审阅并更新 `.agent/context/task.md`
 
-在写入前必须先完整审阅已有内容，修正陈旧或冲突信息。
+在写入前必须先完整审阅已有内容，并先核查共享真源与现场事实。
+
+若发现现有 handoff 与当前事实不一致，必须先修正，再退出当前 skill。
 
 推荐将 `task.md` 保持为单文件 handoff，至少覆盖：
 

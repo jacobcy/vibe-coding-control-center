@@ -101,3 +101,29 @@ SHELL
 
   [ "$status" -eq 0 ]
 }
+
+@test "handoff governance is defined in a standard and referenced by CLAUDE and skills" {
+  run rg -n \
+    "handoff-governance-standard|task\\.md.*不是.*真源|发现.*不一致.*必须修正" \
+    "$REPO_ROOT/docs/standards/handoff-governance-standard.md" \
+    "$REPO_ROOT/CLAUDE.md" \
+    "$REPO_ROOT/skills/vibe-save/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-continue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-commit/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-done/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "handoff-governance-standard.md" ]]
+  [[ "$output" =~ "CLAUDE.md" ]]
+}
+
+@test "patterns define agent auto confirmation without bypassing validation" {
+  run rg -n \
+    "Auto Confirmation Convention|auto|--yes|过程确认|不得跳过验证|fail-fast|高风险决策" \
+    "$REPO_ROOT/.agent/rules/patterns.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Auto Confirmation Convention" ]]
+  [[ "$output" =~ "不得跳过验证" ]]
+}

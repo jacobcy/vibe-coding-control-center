@@ -12,6 +12,7 @@ description: Use when a PR has already been merged and the user wants to close t
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
 - `docs/standards/command-standard.md`
+- `docs/standards/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 对 `vibe flow`、`vibe task` 或 `gh` 参数有任何不确定时，先运行 `--help`。
@@ -46,6 +47,8 @@ vibe flow show <feature-or-branch> --json
 - `issue_refs`
 - `pr_ref`
 - 当前 flow 是否已经满足收口前提
+
+若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把过时 handoff 留给下一个环节。
 
 若没有 task 或 issue，后续步骤按“可跳过”处理，不要伪造关联。
 
