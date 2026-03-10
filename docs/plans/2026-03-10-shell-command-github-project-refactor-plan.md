@@ -58,11 +58,11 @@ related_docs:
 - Modify: `lib/task_query.sh`
 - Modify: `lib/flow.sh`
 - Modify: `lib/flow_help.sh`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_task_sync.bats`
-- Modify: `tests/check_help.sh`
-- Create: `tests/test_roadmap_contract.bats`
-- Create: `tests/test_flow_contract.bats`
+- Modify: `tests/task/test_task_ops.bats`
+- Modify: `tests/task/test_task_sync.bats`
+- Modify: `tests/contracts/check_help.sh`
+- Create: `tests/contracts/test_roadmap_contract.bats`
+- Create: `tests/contracts/test_flow_contract.bats`
 
 ## Task 1: 收紧 `vibe roadmap sync` 入口
 
@@ -71,7 +71,7 @@ related_docs:
 - Modify: `lib/roadmap_help.sh`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
-- Create: `tests/test_roadmap_contract.bats`
+- Create: `tests/contracts/test_roadmap_contract.bats`
 
 **Step tasks:**
 
@@ -93,7 +93,7 @@ related_docs:
 - Modify: `lib/task_actions.sh`
 - Modify: `lib/task_write.sh`
 - Modify: `lib/task_query.sh`
-- Modify: `tests/test_task_ops.bats`
+- Modify: `tests/task/test_task_ops.bats`
 
 **Step tasks:**
 
@@ -110,7 +110,7 @@ related_docs:
 **Files:**
 - Modify: `lib/flow.sh`
 - Modify: `lib/flow_help.sh`
-- Create: `tests/test_flow_contract.bats`
+- Create: `tests/contracts/test_flow_contract.bats`
 
 **Step tasks:**
 
@@ -129,7 +129,7 @@ related_docs:
 - Modify: `lib/roadmap_help.sh`
 - Modify: `lib/task_help.sh`
 - Modify: `lib/flow_help.sh`
-- Modify: `tests/check_help.sh`
+- Modify: `tests/contracts/check_help.sh`
 
 **Step tasks:**
 
@@ -146,11 +146,11 @@ related_docs:
 ## Task 5: 建立 shell contract 回归
 
 **Files:**
-- Create: `tests/test_roadmap_contract.bats`
-- Create: `tests/test_flow_contract.bats`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_task_sync.bats`
-- Modify: `tests/check_help.sh`
+- Create: `tests/contracts/test_roadmap_contract.bats`
+- Create: `tests/contracts/test_flow_contract.bats`
+- Modify: `tests/task/test_task_ops.bats`
+- Modify: `tests/task/test_task_sync.bats`
+- Modify: `tests/contracts/check_help.sh`
 
 **Step tasks:**
 
@@ -164,11 +164,11 @@ related_docs:
 ## Test Command
 
 ```bash
-bats tests/test_task_ops.bats
-bats tests/test_task_sync.bats
-bats tests/test_roadmap_contract.bats
-bats tests/test_flow_contract.bats
-bash tests/check_help.sh
+bats tests/task/test_task_ops.bats
+bats tests/task/test_task_sync.bats
+bats tests/contracts/test_roadmap_contract.bats
+bats tests/contracts/test_flow_contract.bats
+bash tests/contracts/check_help.sh
 ```
 
 ## Expected Result

@@ -60,8 +60,8 @@ related_docs:
 - Modify: `skills/vibe-task/SKILL.md`
 - Modify: `skills/vibe-save/SKILL.md`
 - Modify: `skills/vibe-check/SKILL.md`
-- Modify: `tests/test_skills.bats`
-- Modify: `tests/test_review_skills.bats`
+- Modify: `tests/skills/test_skills.bats`
+- Modify: `tests/skills/test_review_skills.bats`
 
 ## Task 1: 收紧 workflow 的对象边界
 
@@ -122,8 +122,8 @@ related_docs:
 ## Task 4: 为 skill/workflow 增加语义 smoke tests
 
 **Files:**
-- Modify: `tests/test_skills.bats`
-- Modify: `tests/test_review_skills.bats`
+- Modify: `tests/skills/test_skills.bats`
+- Modify: `tests/skills/test_review_skills.bats`
 
 **Step tasks:**
 
@@ -142,8 +142,8 @@ related_docs:
 ## Test Command
 
 ```bash
-bats tests/test_skills.bats
-bats tests/test_review_skills.bats
+bats tests/skills/test_skills.bats
+bats tests/skills/test_review_skills.bats
 rg -n "execution record|GitHub Project item mirror|spec_standard|spec_ref|type=task" \
   .agent/workflows/vibe-new-feature.md \
   .agent/workflows/vibe-new-flow.md \
