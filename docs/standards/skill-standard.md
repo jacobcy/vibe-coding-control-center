@@ -34,6 +34,26 @@ related_docs:
 - OpenSpec 的 `opsx-*` 流程和 Vibe Skills 的边界
 - 跨 Agent 工作流注册（`.agent/workflows/`）与 Claude 专用命令注册（`.claude/commands/`）的选择
 
+## 0. 对象模型边界
+
+skills / workflows 可以调度对象，但不得重新定义对象模型。
+
+固定边界如下：
+
+- `repo issue` 是来源层对象
+- `roadmap item` 是 mirrored GitHub Project item
+- `task` 是 execution record
+- `flow` 是运行时现场
+- `pr` 是交付与审查单元
+
+因此：
+
+- skill 可以决定先看哪个 `repo issue`、哪个 roadmap item 进入当前讨论
+- workflow 可以编排 `roadmap item -> task -> flow -> pr` 的推进顺序
+- skill / workflow 不得把 `flow new` 写成“创建 feature”
+- skill / workflow 不得把 roadmap item `type=task` 与本地 task execution record 混成同一实体
+- skill / workflow 不得把 `pr`、`flow` 或 `task` 改写成规划层对象
+
 ## 1. 概念分层与唯一职责
 
 | 概念 | 作用 | 规范位置 | 管理方式 | 备注 |
@@ -118,3 +138,4 @@ skills/<name>/
 4. 是否把 OpenSpec `opsx-*` 归类到 OpenSpec 工具链而非 skills 依赖管理？
 5. 是否对 Claude 采用插件优先策略，并避免用 `npx skills` 代替插件生态？
 6. 若引入 `.claude/commands/`，是否保持其为适配层而非第二套业务逻辑？
+7. 是否避免在 skill / workflow 文案中重新定义 `repo issue`、`roadmap item`、`task`、`flow`、`pr` 的对象边界？

@@ -58,7 +58,7 @@ related_docs:
 - 审查重点改为：它是否替 skill 决定了本轮交付的业务语义
 - 若只是围绕当前单一 flow 建立共享事实与现场落地，则可以保留为 Shell 能力
 
-### 2.2 Blocking: `task` 缺少 issue / roadmap 关联原子能力
+### 2.2 Blocking: `task` 缺少 `repo issue` / roadmap item 关联原子能力
 
 当前 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L50) 到 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L71) 中，`vibe task add` 只能创建最小 task 记录。
 
@@ -67,7 +67,7 @@ related_docs:
 - `--issue-ref`
 - `--roadmap-item`
 
-这意味着 skill 若想把 `#59` 拆成多个本地 task 并建立统一关联，Shell 目前没有足够能力。
+这意味着 skill 若想把某个 `repo issue` 拆成多个 task execution record 并建立统一关联，Shell 目前没有足够能力。
 
 判定：
 
@@ -96,9 +96,9 @@ related_docs:
 
 - 按 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 执行，不在 shell 或 skill 中重写这套语义
 
-### 2.4 Blocking: `issue`、`task`、`flow` 的业务概念必须明确区分
+### 2.4 Blocking: `repo issue`、`roadmap item`、`task`、`flow` 的业务概念必须明确区分
 
-依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
+依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`repo issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
 
 如果 shell 或 skill 混用这些概念，就会产生两类问题：
 
@@ -207,7 +207,7 @@ related_docs:
 - 标准原则以前写得不够显式，现在已补强
 - Shell 可以调用 `git` / `gh` / worktree，但这些副作用必须服务于共享真源与单一现场同步
 - `roadmap.current` 与 branch current 的语义边界现已明确
-- `issue`、`task`、`flow` 的关系边界现已明确
+- `repo issue`、`roadmap item`、`task`、`flow` 的关系边界现已明确
 - 大部分 skill 文案已经接受“shell 是能力层，不是业务判断者”这一原则
 - 当前主要问题不在 shell 会不会调用 `git` / `gh`，而在它是否替 skill 做了语义判断，以及当前原子能力是否足够
 - `roadmap` 相关实现已经暴露出“共享规划状态”和“分支运行时状态”混用风险
@@ -217,13 +217,13 @@ related_docs:
 后续 Shell 收敛必须优先完成：
 
 1. 明确 `flow new` 的合法边界是“围绕当前单一 flow 的共享真源与现场同步”，而不是简单要求它退化为纯现场创建
-2. 为 `task add` / `task update` 增加 issue / roadmap 关联原子能力
+2. 为 `task add` / `task update` 增加 `repo issue` / roadmap item 关联原子能力
 3. 修正 `roadmap classify`，禁止隐式新增 roadmap item
 4. 收紧 `vibe-roadmap` skill 对 `roadmap.current` 与 backlog 分配的描述
 5. 让 skill 能通过公开命令完成 task 拆分与绑定，而无需触碰数据源
 
 在以上五项完成前，系统只能部分支持：
 
-- `roadmap -> 拆多个 task -> flow 绑定多个 task`
+- `repo issue -> roadmap item -> 拆多个 task execution record -> flow 绑定多个 task`
 
 但还不能说完全符合标准工作流。

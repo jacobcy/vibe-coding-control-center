@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-09
+last_updated: 2026-03-10
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -142,9 +142,11 @@ related_docs:
 
 语义关系：
 
-- `issue <-> task` 多对多
+- `repo issue <-> roadmap item` 多对多
 - `roadmap item <-> task` 多对多
-- `flow -> task` 一对多
+- `task <-> flow` 多对一（单个 task 在任一时刻只应绑定一个当前 flow）
+- `task <-> pr` 一对一
+- `milestone -> roadmap window` 一对多
 
 ## 4. `vibe roadmap` Standard
 
@@ -154,8 +156,8 @@ related_docs:
 
 - 管 roadmap item
 - 管规划优先级
-- 管 `version_goal`
-- 管 roadmap item 与 issue / task 的映射
+- 管规划窗口锚点（含 `milestone` / `version_goal` 兼容语义）
+- 管 roadmap item 与 `repo issue` / task 的映射
 
 ### 4.2 Boundaries
 
@@ -181,7 +183,7 @@ related_docs:
 ### 4.4 Query Rules
 
 - `status` 用于规划层概览
-- `list` 用于列出规划项
+- `list` 用于列出 roadmap item / mirrored GitHub Project item
 - `show` 用于查看单个规划项详情
 - 查询类子命令支持 `--json`
 
@@ -219,6 +221,7 @@ related_docs:
 - `current` 表示当前规划窗口纳入的项
 - `current` 不表示某个 branch / worktree 当前正在做什么
 - 分支当前焦点只能由 `flow` 与 task runtime 绑定表达
+- `current` 表达的是 roadmap item 所在规划窗口，不是 execution record 当前态
 
 provider 只允许：
 
@@ -246,8 +249,8 @@ provider 只允许：
 
 `vibe task` 只负责：
 
-- 管 task 生命周期
-- 管 task 与 roadmap / issue / PR 的关联
+- 管 execution record 生命周期
+- 管 task 与 roadmap item / `repo issue` / pr 的关联
 - 管 subtasks
 - 管 task 归档事实
 - 管 task 当前 runtime 绑定事实
@@ -273,7 +276,7 @@ provider 只允许：
 ### 5.4 Query Rules
 
 - `list` 用于任务总览
-- `show` 用于查看单个 task 详情
+- `show` 用于查看单个 execution record 详情
 - 查询类子命令支持 `--json`
 
 `list` 支持：
@@ -295,7 +298,7 @@ provider 只允许：
 - `--status`
 - `--next-step`
 - `--roadmap-item`
-- `--issue`
+- `--issue-ref`
 - `--pr`
 - `--bind-current`
 - `--unbind`
@@ -315,6 +318,12 @@ provider 只允许：
 - `issue`
 - `local`
 - `openspec`
+
+其中：
+
+- `issue` source 表示该 execution record 来源于 `repo issue`
+- `local` 不得被解释为 roadmap item 的替代物
+- `openspec` 表示执行输入来源，不表示规划层 provider
 
 ### 5.7 Runtime Binding Rules
 
@@ -363,7 +372,7 @@ provider 只允许：
 
 ### 6.3 Standard Subcommands
 
-- `show [<feature>|<branch>]`
+- `show [<flow-name>|<branch>]`
 - `status`
 - `list`
 - `new <name>`
@@ -406,9 +415,9 @@ provider 只允许：
 
 ### 6.6 Naming Rules
 
-- `new <name>`、`switch <name>` 中的 `name` 是命名输入
-- `show [<feature>|<branch>]` 可以接受 feature slug 或 branch ref
-- `feature` 只允许作为 flow 的展示语义或命名输入，不是共享模型字段
+- `new <name>`、`switch <name>` 中的 `name` 是 flow 命名输入，不定义 roadmap item、feature 或 task
+- `show [<flow-name>|<branch>]` 可以接受 flow slug 或 branch ref
+- `feature` 若出现，只能是 roadmap item `type=feature`，不是 flow 共享模型字段
 
 ### 6.7 Semantic Separation
 
