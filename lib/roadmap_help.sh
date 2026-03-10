@@ -7,7 +7,7 @@ _vibe_roadmap_usage() {
     echo "Usage: ${CYAN}vibe roadmap <subcommand>${NC} [args]"
     echo ""
     echo "Subcommands:"
-    echo "  ${GREEN}status${NC}        Show roadmap status and repo issue summary"
+    echo "  ${GREEN}status${NC}        Show roadmap status, repo issue summary, and sync guidance"
     echo "  ${GREEN}list${NC}          List roadmap items"
     echo "  ${GREEN}show${NC}          Show a roadmap item by id"
     echo "  ${GREEN}add${NC}           Add a local GitHub Project item mirror"

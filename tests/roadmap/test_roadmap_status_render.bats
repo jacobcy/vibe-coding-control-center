@@ -29,6 +29,21 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [ "$(echo "$output" | jq -r '.counts.p0')" = "1" ]
   [ "$(echo "$output" | jq -r '.counts.current')" = "1" ]
   [ "$(echo "$output" | jq -r '.counts.deferred')" = "1" ]
+  [ "$(echo "$output" | jq -r '.sync_check.recommended')" = "true" ]
+  [ "$(echo "$output" | jq -r '.sync_check.missing_github_project_item_id')" = "3" ]
+  [ "$(echo "$output" | jq -r '.sync_check.recommended_command')" = "vibe roadmap sync --provider github --repo <owner/repo> --json" ]
+}
+
+@test "roadmap status text output recommends sync when official layer is incomplete" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run_roadmap_fixture_cmd_no_tty "$fixture" '_vibe_roadmap_status'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Roadmap sync recommended" ]]
+  [[ "$output" =~ "vibe roadmap sync --provider github --repo <owner/repo> --json" ]]
 }
 
 @test "roadmap list text output avoids repeating id when title matches id" {

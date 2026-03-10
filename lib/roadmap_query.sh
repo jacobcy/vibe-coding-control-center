@@ -53,11 +53,18 @@ _vibe_roadmap_status() {
             with_github_project_item_id: ([.items[]? | select(.github_project_item_id != null)] | length),
             with_content_type: ([.items[]? | select(.content_type != null)] | length)
         },
+        sync_check: {
+            missing_github_project_item_id: ([.items[]? | select(.github_project_item_id == null)] | length),
+            missing_content_type: ([.items[]? | select(.content_type == null)] | length)
+        },
         extension_layer: {
             with_execution_record_id: ([.items[]? | select(.execution_record_id != null)] | length),
             with_spec_standard: ([.items[]? | select((.spec_standard // "none") != "none")] | length),
             with_spec_ref: ([.items[]? | select(.spec_ref != null)] | length)
         }
+    } | .sync_check += {
+        recommended: ((.sync_check.missing_github_project_item_id > 0) or (.sync_check.missing_content_type > 0)),
+        recommended_command: "vibe roadmap sync --provider github --repo <owner/repo> --json"
     }' "$roadmap_file")"
 
     if [[ "$output_json" == "true" ]]; then
@@ -67,6 +74,7 @@ _vibe_roadmap_status() {
 
     local version_goal counts p0_count current_count next_count deferred_count rejected_count
     local official_counts official_total official_item_id official_content_type
+    local sync_counts sync_missing_item_id sync_missing_content_type sync_recommended sync_command
     local extension_counts extension_execution extension_spec_standard extension_spec_ref
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
@@ -103,6 +111,17 @@ _vibe_roadmap_status() {
     echo "  Project Item IDs:  $official_item_id"
     echo "  Content Types:     $official_content_type"
     echo ""
+
+    sync_counts="$(echo "$status_json" | jq -r '"\(.sync_check.missing_github_project_item_id) \(.sync_check.missing_content_type) \(.sync_check.recommended)"')"
+    IFS=' ' read -r sync_missing_item_id sync_missing_content_type sync_recommended sync_command <<< "$sync_counts"
+    sync_command="$(echo "$status_json" | jq -r '.sync_check.recommended_command')"
+    if [[ "$sync_recommended" == "true" ]]; then
+        echo "$(_vibe_roadmap_format "$YELLOW" "Roadmap sync recommended before relying on GitHub Projects coverage.")"
+        echo "  Missing Project Item IDs: $sync_missing_item_id"
+        echo "  Missing Content Types:    $sync_missing_content_type"
+        echo "  Next: $sync_command"
+        echo ""
+    fi
 
     extension_counts="$(echo "$status_json" | jq -r '"\(.extension_layer.with_execution_record_id) \(.extension_layer.with_spec_standard) \(.extension_layer.with_spec_ref)"')"
     IFS=' ' read -r extension_execution extension_spec_standard extension_spec_ref <<< "$extension_counts"
