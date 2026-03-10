@@ -28,7 +28,14 @@ _flow_pr() {
 
   if [[ $skip_bump -eq 0 ]]; then
     log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
-    git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+    git add VERSION CHANGELOG.md 2>/dev/null || {
+      log_error "Failed to stage VERSION/CHANGELOG after bump."
+      return 1
+    }
+    git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || {
+      log_error "Failed to create bump commit."
+      return 1
+    }
   else
     log_info "Skipping version bump (PR exists or changelog already up-to-date)."
   fi

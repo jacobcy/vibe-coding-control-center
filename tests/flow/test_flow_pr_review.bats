@@ -125,6 +125,55 @@ EOF
   [ -f "$fixture/bump_called" ]
 }
 
+@test "14.0 _flow_pr fails when bump commit cannot be created" {
+  local fixture
+  fixture="$(mktemp -d)"
+  cd "$fixture"
+  mkdir -p scripts
+  cat > scripts/bump.sh <<'EOF'
+#!/usr/bin/env bash
+echo "2.1.4" > VERSION
+echo "# Changelog" > CHANGELOG.md
+echo "- fresh release note" >> CHANGELOG.md
+exit 0
+EOF
+  chmod +x scripts/bump.sh
+  echo "2.1.3" > VERSION
+  echo "# Changelog" > CHANGELOG.md
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 1 ;;
+        "pr create --title test --body test --base main") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add VERSION CHANGELOG.md") return 0 ;;
+        "commit -m chore: bump version to 2.1.4") return 1 ;;
+        "push origin HEAD") echo "PUSH_SHOULD_NOT_RUN"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test" --msg "fresh release note"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ ! "$output" =~ "PUSH_SHOULD_NOT_RUN" ]]
+}
+
 @test "14.1 _flow_pr allows inferred main as default base" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
