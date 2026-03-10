@@ -55,18 +55,19 @@ related_docs:
 
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
+- Modify: `lib/task_actions.sh`
 - Modify: `lib/task_write.sh`
 - Modify: `lib/task_query.sh`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_task_sync.bats`
-- Modify: `tests/test_task_helper.zsh`
-- Create: `tests/test_shared_state_contracts.bats`
+- Modify: `tests/task/test_task_ops.bats`
+- Modify: `tests/task/test_task_sync.bats`
+- Modify: `tests/task/test_task_helper.zsh`
+- Create: `tests/contracts/test_shared_state_contracts.bats`
 
 ## Task 1: 补齐 roadmap item 写入契约
 
 **Files:**
 - Modify: `lib/roadmap_write.sh`
-- Create: `tests/test_shared_state_contracts.bats`
+- Create: `tests/contracts/test_shared_state_contracts.bats`
 
 **Step tasks:**
 
@@ -87,7 +88,7 @@ related_docs:
 
 **Files:**
 - Modify: `lib/roadmap_query.sh`
-- Create: `tests/test_shared_state_contracts.bats`
+- Create: `tests/contracts/test_shared_state_contracts.bats`
 
 **Step tasks:**
 
@@ -104,9 +105,10 @@ related_docs:
 ## Task 3: 补齐 execution record 扩展字段写入
 
 **Files:**
+- Modify: `lib/task_actions.sh`
 - Modify: `lib/task_write.sh`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_task_helper.zsh`
+- Modify: `tests/task/test_task_ops.bats`
+- Modify: `tests/task/test_task_helper.zsh`
 
 **Step tasks:**
 
@@ -122,8 +124,8 @@ related_docs:
 
 **Files:**
 - Modify: `lib/task_query.sh`
-- Modify: `tests/test_task_sync.bats`
-- Create: `tests/test_shared_state_contracts.bats`
+- Modify: `tests/task/test_task_sync.bats`
+- Create: `tests/contracts/test_shared_state_contracts.bats`
 
 **Step tasks:**
 
@@ -138,9 +140,9 @@ related_docs:
 ## Task 5: 建立共享真源交叉断言
 
 **Files:**
-- Create: `tests/test_shared_state_contracts.bats`
-- Modify: `tests/test_task_ops.bats`
-- Modify: `tests/test_task_sync.bats`
+- Create: `tests/contracts/test_shared_state_contracts.bats`
+- Modify: `tests/task/test_task_ops.bats`
+- Modify: `tests/task/test_task_sync.bats`
 
 **Step tasks:**
 
@@ -154,9 +156,9 @@ related_docs:
 ## Test Command
 
 ```bash
-bats tests/test_task_ops.bats
-bats tests/test_task_sync.bats
-bats tests/test_shared_state_contracts.bats
+bats tests/task/test_task_ops.bats
+bats tests/task/test_task_sync.bats
+bats tests/contracts/test_shared_state_contracts.bats
 ```
 
 ## Expected Result

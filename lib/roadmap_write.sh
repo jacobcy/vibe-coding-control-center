@@ -28,6 +28,33 @@ _vibe_roadmap_slugify() {
     print -r -- "$slug"
 }
 
+_vibe_roadmap_new_item() {
+    local item_id="$1" title="$2" source_type="$3" source_refs_json="$4" issue_refs_json="$5"
+    jq -nc \
+        --arg id "$item_id" \
+        --arg title "$title" \
+        --arg source_type "$source_type" \
+        --argjson source_refs "$source_refs_json" \
+        --argjson issue_refs "$issue_refs_json" \
+        '{
+            roadmap_item_id: $id,
+            title: $title,
+            description: null,
+            status: "deferred",
+            source_type: $source_type,
+            source_refs: $source_refs,
+            issue_refs: $issue_refs,
+            linked_task_ids: [],
+            github_project_item_id: null,
+            content_type: "draft_issue",
+            execution_record_id: null,
+            spec_standard: "none",
+            spec_ref: null,
+            created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")),
+            updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))
+        }'
+}
+
 _vibe_roadmap_next_item_id() {
     local common_dir="$1" title="$2" roadmap_file date_part slug base candidate suffix exists
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
@@ -48,15 +75,16 @@ _vibe_roadmap_next_item_id() {
 }
 
 _vibe_roadmap_add() {
-    local common_dir="$1" title="$2" roadmap_file item_id
+    local common_dir="$1" title="$2" roadmap_file item_id item_json
     [[ -n "$title" ]] || { echo "Error: title required"; return 1; }
 
     _vibe_roadmap_init "$common_dir"
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     item_id="$(_vibe_roadmap_next_item_id "$common_dir" "$title")" || return 1
+    item_json="$(_vibe_roadmap_new_item "$item_id" "$title" "local" '[]' '[]')" || return 1
 
-    jq --arg id "$item_id" --arg title "$title" \
-        '.items += [{roadmap_item_id: $id, title: $title, description: null, status: "deferred", source_type: "local", source_refs: [], issue_refs: [], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]' \
+    jq --argjson item "$item_json" \
+        '.items += [$item]' \
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Roadmap item added: $item_id"
@@ -119,7 +147,31 @@ _vibe_roadmap_sync_github() {
     fi
 
     local new_issues_json
-    new_issues_json="$(echo "${issues_json}" | jq --arg repo "$repo" --arg state "deferred" '[.[] | {roadmap_item_id: ("gh-" + (.number | tostring)), title: .title, description: null, status: $state, source_type: "github", source_refs: [("gh:" + $repo + "#" + (.number | tostring))], issue_refs: [("gh:" + $repo + "#" + (.number | tostring))], linked_task_ids: [], created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")), updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))}]')"
+    new_issues_json="$(echo "${issues_json}" | jq -c --arg repo "$repo" '[.[] | {
+        roadmap_item_id: ("gh-" + (.number | tostring)),
+        title: .title,
+        source_ref: ("gh:" + $repo + "#" + (.number | tostring))
+    }]')"
+
+    new_issues_json="$(
+        echo "${new_issues_json}" | jq -c '[.[] | {
+            roadmap_item_id: .roadmap_item_id,
+            title: .title,
+            description: null,
+            status: "deferred",
+            source_type: "github",
+            source_refs: [.source_ref],
+            issue_refs: [.source_ref],
+            linked_task_ids: [],
+            github_project_item_id: null,
+            content_type: "draft_issue",
+            execution_record_id: null,
+            spec_standard: "none",
+            spec_ref: null,
+            created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")),
+            updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))
+        }]'
+    )"
 
     local merged_issues
     merged_issues="$(jq --argjson new "$new_issues_json" '(.items // []) + $new | unique_by(.roadmap_item_id) | .[:100]' "$roadmap_file")"

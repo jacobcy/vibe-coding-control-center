@@ -71,6 +71,7 @@ _vibe_roadmap_sync() {
     local provider="github"
     local repo=""
     local label="vibe-task"
+    local output_json="false"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -86,6 +87,10 @@ _vibe_roadmap_sync() {
                 label="$2"
                 shift 2
                 ;;
+            --json)
+                output_json="true"
+                shift
+                ;;
             *)
                 shift
                 ;;
@@ -100,6 +105,29 @@ _vibe_roadmap_sync() {
             if [[ -z "$repo" ]]; then
                 echo "Error: --repo required for GitHub sync"
                 return 1
+            fi
+            if [[ "$output_json" == "true" ]]; then
+                jq -n \
+                  --arg provider "$provider" \
+                  --arg repo "$repo" \
+                  --arg label "$label" \
+                  '{
+                    mode: "project_first",
+                    official_layer: {
+                      provider: $provider,
+                      repo: $repo,
+                      primary_object: "github_project_item_mirror",
+                      compatibility_import: "repo_issue"
+                    },
+                    extension_layer: {
+                      writeback: "roadmap_bridge_only",
+                      fields: ["execution_record_id", "spec_standard", "spec_ref"]
+                    },
+                    compatibility: {
+                      issue_label: $label
+                    }
+                  }'
+                return 0
             fi
             _vibe_roadmap_sync_github "$common_dir" "$repo" "$label"
             ;;

@@ -2,12 +2,13 @@
 # lib/task_write.sh - Task Write/Persistence operations
 
 _vibe_task_write_registry() {
-    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" runtime_name="$5" runtime_path="$6" runtime_branch="$7" runtime_mode="$8" runtime_agent="$9" now="${10}" issue_refs_json="${11}" issue_mode="${12}" roadmap_item_ids_json="${13}" roadmap_mode="${14}" pr_ref="${15}" pr_mode="${16}" tmp
+    local registry_file="$1" task_id="$2" task_status="$3" next_step="$4" runtime_name="$5" runtime_path="$6" runtime_branch="$7" runtime_mode="$8" runtime_agent="$9" now="${10}" issue_refs_json="${11}" issue_mode="${12}" roadmap_item_ids_json="${13}" roadmap_mode="${14}" pr_ref="${15}" pr_mode="${16}" spec_standard="${17}" spec_ref="${18}" spec_mode="${19}" tmp
     tmp="$(mktemp)" || return 1
     jq --arg task_id "$task_id" --arg task_status "$task_status" --arg next_step "$next_step" \
        --arg runtime_name "$runtime_name" --arg runtime_path "$runtime_path" --arg runtime_branch "$runtime_branch" --arg runtime_mode "$runtime_mode" --arg runtime_agent "$runtime_agent" \
        --arg now "$now" --argjson issue_refs "$issue_refs_json" --arg issue_mode "$issue_mode" \
-       --argjson roadmap_item_ids "$roadmap_item_ids_json" --arg roadmap_mode "$roadmap_mode" --arg pr_ref "$pr_ref" --arg pr_mode "$pr_mode" '
+       --argjson roadmap_item_ids "$roadmap_item_ids_json" --arg roadmap_mode "$roadmap_mode" --arg pr_ref "$pr_ref" --arg pr_mode "$pr_mode" \
+       --arg spec_standard "$spec_standard" --arg spec_ref "$spec_ref" --arg spec_mode "$spec_mode" '
       .tasks |= map(if .task_id == $task_id then
         (if $task_status != "" then .status = $task_status else . end)
         | (if $next_step != "" then .next_step = $next_step else . end)
@@ -35,6 +36,7 @@ _vibe_task_write_registry() {
         | (if $issue_mode == "append" then .issue_refs = (((.issue_refs // []) + $issue_refs) | unique) else . end)
         | (if $roadmap_mode == "append" then .roadmap_item_ids = (((.roadmap_item_ids // []) + $roadmap_item_ids) | unique) else . end)
         | (if $pr_mode == "set" then .pr_ref = (if $pr_ref == "" then null else $pr_ref end) else . end)
+        | (if $spec_mode == "set" then .spec_standard = $spec_standard | .spec_ref = (if $spec_ref == "" then null else $spec_ref end) else . end)
         | (if $task_status == "completed" then .completed_at = (.completed_at // $now) else . end)
         | (if $task_status == "archived" then .archived_at = (.archived_at // $now) else . end)
         | (if $task_status != "" and ($task_status != "completed" and $task_status != "archived") then .completed_at = null | .archived_at = null else . end)

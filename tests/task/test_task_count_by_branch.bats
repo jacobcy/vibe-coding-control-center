@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/test_task_count_by_branch.bats - Test count-by-branch functionality
+# tests/task/test_task_count_by_branch.bats - Test count-by-branch functionality
 
 setup() {
-  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   export HELPER="$BATS_TEST_DIRNAME/test_task_helper.zsh"
 }
 

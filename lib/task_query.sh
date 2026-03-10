@@ -5,11 +5,9 @@ _vibe_task_collect_openspec_tasks() {
     local repo_root="$1" changes_dir="$repo_root/openspec/changes" aggregate_file change_dir change_name
     local bridge_script="$VIBE_ROOT/scripts/openspec_bridge.sh"
     local task_json tasks_file total_tasks done_tasks change_status next_step
-
     [[ -d "$changes_dir" ]] || { echo '{"tasks":[]}'; return 0; }
     aggregate_file="$(mktemp)" || return 1
     echo '[]' > "$aggregate_file"
-
     { setopt nullglob 2>/dev/null || shopt -s nullglob 2>/dev/null; } || true
     for change_dir in "$changes_dir"/*; do
         [[ -d "$change_dir" ]] || continue
@@ -26,6 +24,8 @@ _vibe_task_collect_openspec_tasks() {
                     framework: (.framework // "openspec"),
                     source_path: (.source_path // ("openspec/changes/" + $cid)),
                     status: (.status // "todo"),
+                    spec_standard: "openspec",
+                    spec_ref: (.source_path // ("openspec/changes/" + $cid)),
                     current_subtask_id: null,
                     runtime_worktree_name: null,
                     assigned_worktree: null,
@@ -35,7 +35,6 @@ _vibe_task_collect_openspec_tasks() {
                 task_json=""
             fi
         fi
-
         if [[ -z "$task_json" ]]; then
             tasks_file="$change_dir/tasks.md"
             total_tasks=0
@@ -55,12 +54,11 @@ _vibe_task_collect_openspec_tasks() {
             task_json="$(jq -nc --arg task_id "$change_name" --arg title "$change_name" \
                 --arg framework "openspec" --arg source_path "openspec/changes/$change_name" \
                 --arg status "$change_status" --arg next_step "$next_step" \
-                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
+                '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,spec_standard:"openspec",spec_ref:$source_path,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
         fi
 
         jq --argjson t "$task_json" '. += [$t]' "$aggregate_file" > "$aggregate_file.tmp" && mv "$aggregate_file.tmp" "$aggregate_file"
     done
-
     jq -n --slurpfile tasks "$aggregate_file" '{"tasks":($tasks[0] // [])}'
     rm -f "$aggregate_file"
 }
@@ -70,15 +68,12 @@ _vibe_task_count_by_branch() {
     common_dir="$(_vibe_task_common_dir)" || { echo "0"; return 0; }
     worktrees_file="$common_dir/vibe/worktrees.json"
     registry_file="$common_dir/vibe/registry.json"
-
     [[ -f "$worktrees_file" ]] || { echo "0"; return 0; }
     [[ -f "$registry_file" ]] || { echo "0"; return 0; }
-
     # Count tasks assigned to worktrees on this branch
     count=$(jq -r --arg branch "$branch" '
       [.worktrees[]? | select(.branch == $branch) | .tasks // []] | add | length // 0
     ' "$worktrees_file" 2>/dev/null || echo "0")
-
     echo "$count"
 }
 
@@ -140,7 +135,6 @@ _vibe_task_list() {
     repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
     openspec_tasks_file="$(mktemp)" || return 1
     _vibe_task_collect_openspec_tasks "$repo_root" > "$openspec_tasks_file"
-
     if [[ "$json_out" == "1" ]]; then
         jq -n --slurpfile reg "$registry_file" --slurpfile wt "$worktrees_file" --slurpfile os "$openspec_tasks_file" \
           --arg status "$status_filter" \
@@ -160,7 +154,10 @@ _vibe_task_list() {
               | unique_by(.task_id)
               | map(.status = ((.status // "todo") | norm_status))
               | map(.source_type = norm_source)
+              | map(.spec_standard = (.spec_standard // (if .source_type == "openspec" then "openspec" else "none" end)))
+              | map(.spec_ref = (.spec_ref // null))
               | map(.runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null))
+              | map(del(.github_project_item_id, .content_type))
               | map(select(
                   ($status == "" or .status == $status)
                   and ($source == "" or .source_type == $source)
@@ -172,16 +169,14 @@ _vibe_task_list() {
         return 0
     fi
 
-        local cur_tid="" current_wt_path=""
-        current_wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-        cur_tid="$(jq -r --arg p "$current_wt_path" '.worktrees[]? | select(.worktree_path == $p) | .current_task // empty' "$worktrees_file" | head -1)"
-
+    local cur_tid="" current_wt_path=""
+    current_wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+    cur_tid="$(jq -r --arg p "$current_wt_path" '.worktrees[]? | select(.worktree_path == $p) | .current_task // empty' "$worktrees_file" | head -1)"
     missing="$(jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" --arg cur "$cur_tid" \
       '((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all |
         [.worktrees[]? as $w | select($w.current_task != null) |
          select(($all | map(.task_id) | index($w.current_task)) == null) | $w.current_task] | unique[])' "$worktrees_file")" || { rm -f "$openspec_tasks_file"; return 1; }
     [[ -z "$missing" ]] || { rm -f "$openspec_tasks_file"; vibe_die "Task not found in registry: ${missing%%$'\n'*}"; return 1; }
-
     if [[ "$list_has_filters" == "1" ]]; then
         local filtered_output
         filtered_output="$(jq -rn --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" \
@@ -203,6 +198,9 @@ _vibe_task_list() {
             | unique_by(.task_id)
             | map(.status = ((.status // "todo") | norm_status))
             | map(.source_type = norm_source)
+            | map(.spec_standard = (.spec_standard // (if .source_type == "openspec" then "openspec" else "none" end)))
+            | map(.spec_ref = (.spec_ref // null))
+            | map(del(.github_project_item_id, .content_type))
             | map(select(
                 ($status == "" or .status == $status)
                 and ($source == "" or .source_type == $source)
@@ -219,7 +217,6 @@ _vibe_task_list() {
         rm -f "$openspec_tasks_file"
         return 0
     fi
-
     _vibe_task_render "$worktrees_file" "$registry_file" "$openspec_tasks_file" "$show_all" "$cur_tid"
     rm -f "$openspec_tasks_file"
 }
@@ -280,8 +277,11 @@ _vibe_task_show() {
          | .title = ($reg.title // .title)
          | .status = (($reg.status // .status // "todo") | norm_status)
          | .subtasks = (.subtasks // [])
+         | .spec_standard = ($reg.spec_standard // .spec_standard // "none")
+         | .spec_ref = ($reg.spec_ref // .spec_ref // null)
          | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
-         | .next_step = (.next_step // null)' )"
+         | .next_step = (.next_step // null)
+         | del(.github_project_item_id, .content_type)' )"
 
     if [[ "$json_out" == "1" ]]; then
         echo "$merged_json"

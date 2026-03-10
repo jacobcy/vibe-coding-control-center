@@ -17,6 +17,7 @@ setup() {
   [[ "$output" =~ "roadmap" ]]
   [[ "$output" =~ "task" ]]
   [[ "$output" =~ "flow" ]]
+  [[ "$output" =~ "bootstrap" ]]
   [[ "$output" =~ "link" ]]
   [[ "$output" =~ "json <file>" ]]
   [[ "$output" =~ "docs" ]]
@@ -25,7 +26,7 @@ setup() {
 @test "2.1 vibe check check --json returns grouped result" {
   run vibe check check --json
   [[ "$status" -eq 0 || "$status" -eq 1 ]]
-  echo "$output" | jq -e '.roadmap and .task and .flow and .link and .docs' >/dev/null
+  echo "$output" | jq -e '.roadmap and .task and .flow and .bootstrap and .link and .docs' >/dev/null
 }
 
 @test "2.2 vibe check roadmap --json warns on unlinked roadmap items" {

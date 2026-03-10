@@ -24,7 +24,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - **不重造轮子**：直接调用 `gh` CLI 和 `vibe roadmap` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
-- **自动对齐**：自动将 Issue 映射为 Roadmap Item。
+- **先读 shell 输出**：先读取 `gh` / `vibe roadmap` 输出，再做编排判断。
+- **自动对齐**：自动将 Issue 对齐到 `roadmap item = GitHub Project item mirror`，不生成 execution record 身份。
 
 ## 使用逻辑
 
@@ -44,8 +45,9 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ### Step 3: Roadmap 检查
 
-- 运行 `vibe roadmap list` 检查是否有类似的心愿。
+- 必须先运行 `vibe roadmap list --json` 检查是否已有对应 `roadmap item`。
 - 如果 Issue 标题与某个 Roadmap Item 匹配，自动记录其 ID。
+- `roadmap item` 只解释为 GitHub Project item mirror，不把 issue 直接当作本地 task。
 
 ### Step 4: 填充与润饰
 
@@ -58,6 +60,13 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - 执行 `gh issue create --title "<标题>" --body "<润色后的内容>" --label "<labels>"`。
 - 创建成功后，如果它不在 Roadmap 中，询问用户或自动执行 `vibe roadmap sync`；默认同步路径依赖前一步已附加 `vibe-task`。
 - 输出成功提示及 Issue 链接。
+
+## 对象边界
+
+- `repo issue`: 需求来源与讨论入口
+- `roadmap item`: GitHub Project item mirror
+- `task`: execution record，由 `vibe-task` / shell 流程负责
+- `flow`: execution record 的运行时现场
 
 ## Failure Handling
 

@@ -11,6 +11,7 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 - 先读共享真源，再读 `.agent/context/task.md`。
 - `.agent/context/task.md` 是 handoff，不是共享真源。
+- handoff 的维护义务以 `docs/standards/handoff-governance-standard.md` 为准；发现与现场不一致时必须修正。
 - 不在 continue 阶段发明不存在的 Shell 修复动作。
 
 **Announce at start:** "我正在使用 /vibe-continue 技能来恢复当前 flow 的任务上下文。"
@@ -23,12 +24,13 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 - `docs/standards/command-standard.md`
 - `docs/standards/shell-capability-design.md`
 - `docs/standards/git-workflow-standard.md`
+- `docs/standards/handoff-governance-standard.md`
 - `docs/standards/glossary.md`
 
 特别约束：
 
 - `flow` 不等于 `worktree`、`branch` 或 `workflow`。见 `docs/standards/glossary.md`。
-- `.agent/context/task.md` 只作为短期 handoff，不是共享真源。见 `docs/standards/git-workflow-standard.md`。
+- `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/handoff-governance-standard.md` 为准。
 
 ## Command Boundary
 
@@ -73,6 +75,8 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 - 当前判断
 - blockers
 - 关键文件
+
+若其内容与当前真源或现场不一致，必须在退出前修正 handoff，不能直接沿用旧判断。
 
 如果它缺失，不阻断 continue；只说明当前缺少本地 handoff。
 

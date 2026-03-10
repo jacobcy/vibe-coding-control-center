@@ -12,6 +12,7 @@ description: Use when the user wants to classify dirty changes, create serial co
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
 - `docs/standards/command-standard.md`
+- `docs/standards/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
@@ -44,6 +45,8 @@ vibe flow list
 - 当前 `flow` / `branch` / `task` / `issue` / `pr`
 - 当前 flow 是否已经进入 `open + had_pr`
 - `.agent/context/task.md` 里上一环节留下了什么 handoff
+
+若 handoff 与当前真源或现场不一致，必须在退出前修正，不能继续沿用旧判断。
 
 ### Step 2: 审计工作区
 
@@ -133,7 +136,7 @@ vibe flow pr --base <ref>
 - next: <交给 vibe-integrate 或继续 commit 的动作>
 ```
 
-`.agent/context/task.md` 只是下一个 skill 的短期入口，不是共享真源。
+`.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/handoff-governance-standard.md` 为准。
 
 ## Restrictions
 

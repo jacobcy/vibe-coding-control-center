@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
 
 _flow_pr() {
-  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs first_msg open_prs
-  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_name="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; *) shift ;; esac; done
+  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs first_msg open_prs use_web=0
+  while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_name="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; --web) use_web=1; shift ;; *) shift ;; esac; done
   vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
   base_name="$(_flow_resolve_pr_base "$base_name" "$branch")" || return 1
   base_git_ref="$(_flow_pr_base_git_ref "$base_name")" || return 1
@@ -41,6 +41,10 @@ _flow_pr() {
     gh pr edit "$branch" --base "$base_name" --title "$pr_title" --body "$pr_body" || true
   else
     log_step "Creating new PR: $pr_title"
-    gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" --web || log_warn "Failed to create PR with gh, please check manually."
+    if [[ $use_web -eq 1 ]]; then
+      gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" --web || log_warn "Failed to create PR with gh, please check manually."
+    else
+      gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" || log_warn "Failed to create PR with gh, please check manually."
+    fi
   fi
 }

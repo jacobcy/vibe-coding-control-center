@@ -55,12 +55,12 @@ related_docs:
 
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Create: `scripts/github_project_field_map.sh`
-- Create: `tests/test_github_project_bootstrap.bats`
+- Create: `tests/contracts/test_github_project_bootstrap.bats`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
 - Modify: `lib/check.sh`
 - Modify: `lib/check_groups.sh`
-- Modify: `tests/test_task_sync.bats`
+- Modify: `tests/task/test_task_sync.bats`
 - Create: `artifacts/github-project-bootstrap/README.md`
 
 ## Task 1: 建立只读 readiness audit
@@ -114,7 +114,7 @@ related_docs:
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
-- Modify: `tests/test_github_project_bootstrap.bats`
+- Modify: `tests/contracts/test_github_project_bootstrap.bats`
 
 **Step tasks:**
 
@@ -135,7 +135,7 @@ related_docs:
 **Files:**
 - Create: `scripts/github_project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
-- Modify: `tests/test_task_sync.bats`
+- Modify: `tests/task/test_task_sync.bats`
 
 **Step tasks:**
 
@@ -156,7 +156,7 @@ related_docs:
 **Files:**
 - Modify: `lib/check.sh`
 - Modify: `lib/check_groups.sh`
-- Create: `tests/test_github_project_bootstrap.bats`
+- Create: `tests/contracts/test_github_project_bootstrap.bats`
 
 **Step tasks:**
 
@@ -175,8 +175,8 @@ related_docs:
 ```bash
 zsh scripts/github_project_field_map.sh --check
 zsh scripts/github_project_bootstrap_sync.sh --dry-run
-bats tests/test_github_project_bootstrap.bats
-bats tests/test_task_sync.bats
+bats tests/contracts/test_github_project_bootstrap.bats
+bats tests/task/test_task_sync.bats
 ```
 
 ## Expected Result

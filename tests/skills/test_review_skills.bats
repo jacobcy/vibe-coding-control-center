@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export REPO_ROOT="$BATS_TEST_DIRNAME/.."
+  export REPO_ROOT="$BATS_TEST_DIRNAME/../.."
 }
 
 @test "review-code local guidance covers working tree and staged diffs" {
@@ -38,4 +38,16 @@ setup() {
   run grep -F "For local docs review, combine \`git diff --name-only\` and \`git diff --cached --name-only\`, then filter for \`\.md$\`." \
     "$REPO_ROOT/skills/vibe-review-docs/SKILL.md"
   [ "$status" -eq 0 ]
+}
+
+@test "github project orchestration docs do not describe extension sources as official github types" {
+  run rg -n \
+    "GitHub 官方来源类型.*(openspec|kiro|superpowers|supervisor)|(openspec|kiro|superpowers|supervisor).*(GitHub 官方来源类型|official github type)" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-save/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md"
+
+  [ "$status" -ne 0 ]
 }

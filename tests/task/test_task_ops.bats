@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/test_task_ops.bats - Task Mutation Operations (Add, Update, Remove)
+# tests/task/test_task_ops.bats - Task Mutation Operations (Add, Update, Remove)
 
 setup() {
-  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   export HELPER="$BATS_TEST_DIRNAME/test_task_helper.zsh"
 }
 
@@ -22,6 +22,8 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .title' "$fixture/vibe/registry.json")" = "New Task Title" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .source_type' "$fixture/vibe/registry.json")" = "local" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "null" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_standard' "$fixture/vibe/registry.json")" = "none" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_ref' "$fixture/vibe/registry.json")" = "null" ]
   [ -f "$fixture/vibe/tasks/2026-03-04-new-task/task.json" ]
 }
 
@@ -97,6 +99,55 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .status' "$fixture/vibe/registry.json")" = "in_progress" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .next_step' "$fixture/vibe/registry.json")" = "New Step" ]
+}
+
+@test "ops: update writes spec_standard and spec_ref to registry and task file" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment \
+      --spec-standard openspec \
+      --spec-ref openspec/changes/rotate-alignment
+  '
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .spec_standard' "$fixture/vibe/registry.json")" = "openspec" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .spec_ref' "$fixture/vibe/registry.json")" = "openspec/changes/rotate-alignment" ]
+  [ "$(jq -r '.spec_standard' "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json")" = "openspec" ]
+  [ "$(jq -r '.spec_ref' "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json")" = "openspec/changes/rotate-alignment" ]
+}
+
+@test "ops: task add rejects github item identity flags" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task add "Invalid Task" --github-project-item-id PVTI_123
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "GitHub Project item identity must not be written via vibe task" ]]
+}
+
+@test "ops: task update rejects github item identity flags" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --content-type issue
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "GitHub Project item identity must not be written via vibe task" ]]
 }
 
 @test "ops: update status preserves existing assigned_worktree when not rebinding" {

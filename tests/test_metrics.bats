@@ -38,3 +38,20 @@ setup() {
   reported_max=$(echo "$output" | sed -n 's/.*| 最大文件行数 | 200 | *\([0-9][0-9]*\).*/\1/p' | head -1)
   [ "$reported_max" -eq "$expected_max" ]
 }
+
+@test "shell files stay within the 300-line CI ceiling" {
+  run bash -lc '
+    cd "'"$REPO_ROOT"'"
+    failed=0
+    for f in lib/*.sh bin/vibe; do
+      lines=$(wc -l < "$f")
+      if [ "$lines" -gt 300 ]; then
+        echo "$f:$lines"
+        failed=1
+      fi
+    done
+    exit "$failed"
+  '
+
+  [ "$status" -eq 0 ]
+}

@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.10] - 2026-03-11
+
+### ✨ Changed
+- Align GitHub Project orchestration semantics and handoff governance rules
+
 ## [2.1.9] - 2026-03-10
 
 ### ✨ Changed

@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# tests/test_task_sync.bats - Task audit synchronization tests
+# tests/task/test_task_sync.bats - Task audit synchronization tests
 
 setup() {
-  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export VIBE_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   export HELPER="$BATS_TEST_DIRNAME/test_task_helper.zsh"
 }
 

@@ -12,6 +12,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
 - `docs/standards/command-standard.md`
+- `docs/standards/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 ## 核心边界
@@ -42,6 +43,8 @@ vibe flow list
 - 当前要处理哪些 PR
 - 哪些 PR 是独立的，哪些是 stacked
 - 哪些 flow 已经进入 `open + had_pr`
+
+若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把旧 handoff 继续传给下一个环节。
 
 ### Step 2: 审核合并条件
 

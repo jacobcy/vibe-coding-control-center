@@ -100,7 +100,7 @@ _flow_checkout_detached_main() {
 }
 
 _flow_branch_dashboard_entry() {
-  local branch="$1" worktrees_file registry_file branch_name wt_data current_task tasks_json pr_ref issue_refs_json title task_status next_step
+  local branch="$1" worktrees_file registry_file branch_name wt_data current_task tasks_json pr_ref issue_refs_json title task_status next_step spec_standard spec_ref
   worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
   registry_file="$(_flow_registry_file)"
   branch_name="${branch#origin/}"
@@ -108,12 +108,14 @@ _flow_branch_dashboard_entry() {
   [[ -n "$wt_data" ]] || return 1
   current_task="$(echo "$wt_data" | jq -r '.current_task // empty')"
   tasks_json="$(echo "$wt_data" | jq -c '.tasks // []')"
-  title=""; pr_ref=""; issue_refs_json='[]'
+  title=""; pr_ref=""; issue_refs_json='[]'; spec_standard=""; spec_ref=""
   if [[ -n "$current_task" ]]; then
     title="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" 2>/dev/null | head -n 1)"
     task_status="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .status // empty' "$registry_file" 2>/dev/null | head -n 1)"
     next_step="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .next_step // empty' "$registry_file" 2>/dev/null | head -n 1)"
     pr_ref="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .pr_ref // empty' "$registry_file" 2>/dev/null | head -n 1)"
+    spec_standard="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .spec_standard // empty' "$registry_file" 2>/dev/null | head -n 1)"
+    spec_ref="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .spec_ref // empty' "$registry_file" 2>/dev/null | head -n 1)"
     issue_refs_json="$(jq -c --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | (.issue_refs // [])' "$registry_file" 2>/dev/null | head -n 1)"
     [[ -z "$issue_refs_json" ]] && issue_refs_json='[]'
   fi
@@ -128,6 +130,8 @@ _flow_branch_dashboard_entry() {
     --arg task_status "$task_status" \
     --arg next_step "$next_step" \
     --arg pr_ref "$pr_ref" \
+    --arg spec_standard "$spec_standard" \
+    --arg spec_ref "$spec_ref" \
     --argjson tasks "$tasks_json" \
     --argjson issue_refs "$issue_refs_json" '
       {
@@ -140,6 +144,8 @@ _flow_branch_dashboard_entry() {
         title: (if $title == "" then null else $title end),
         task_status: (if $task_status == "" then null else $task_status end),
         next_step: (if $next_step == "" then null else $next_step end),
+        spec_standard: (if $spec_standard == "" then null else $spec_standard end),
+        spec_ref: (if $spec_ref == "" then null else $spec_ref end),
         tasks: $tasks,
         pr_ref: (if $pr_ref == "" then null else $pr_ref end),
         issue_refs: $issue_refs
