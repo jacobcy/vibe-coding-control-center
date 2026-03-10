@@ -8,6 +8,7 @@ description: Use when the user wants to verify project memory consistency, says 
 智能任务状态同步 + 项目记忆一致性验证。检测外部事件（PR merged）并自动建议状态更新，同时验证文档腐烂（documentation rot）。
 
 **核心职责**:
+
 1. **智能状态同步**: 检测 PR merged 事件，分析任务完成度，提示用户确认后修正状态
 2. **内存一致性检查**: 确保 `.agent/` 和 `.git/` 目录的一致性，task 记录和 memory 文件与实际代码状态对齐
 
@@ -19,13 +20,14 @@ description: Use when the user wants to verify project memory consistency, says 
 
 ### Step 0: Shell-Level Audit (Phase 1 - 静态检查)
 
- ```bash
- vibe check
- ```
+```bash
+vibe check
+```
 
 运行 `vibe check` 进行全面的 Registry、任务归档以及物理真源审计。解释其审计结果。
 
 **Phase 1 包括**:
+
 - Registry 与 OpenSpec 同步
 - completed → archived 自动流转
 - 僵尸分支检测
@@ -37,12 +39,14 @@ description: Use when the user wants to verify project memory consistency, says 
 如果 Shell 层检测到有任务的 PR 已合并，继续智能分析流程。
 
 **获取 PR 数据**:
+
 ```bash
 # 获取任务关联的 PR 详细信息
 vibe flow review <branch> --json
 ```
 
 返回数据包括：
+
 - PR number, title, body
 - Comments and reviews
 - Commits
@@ -55,16 +59,19 @@ vibe flow review <branch> --json
 **任务**: 分析 PR 是否完成了所有绑定的 tasks
 
 **输入数据**:
+
 - PR 数据（number, title, body, comments, reviews, commits）
 - Branch 绑定的 task 列表（每个 task 的 title/description）
 
 **分析方法**:
+
 1. 仔细阅读 PR 描述，理解 PR 实际完成了什么
 2. 阅读评论和 review，获取更多上下文
 3. 对比每个 task 的目标
 4. 给出判断
 
 **输出格式（JSON）**:
+
 ```json
 {
   "results": [
@@ -79,6 +86,7 @@ vibe flow review <branch> --json
 ```
 
 **置信度分级**:
+
 - confidence > 0.8: 高置信度，AI 可直接决定
 - 0.5 <= confidence <= 0.8: 中置信度，需要用户确认
 - confidence < 0.5: 低置信度，跳过
@@ -88,32 +96,39 @@ vibe flow review <branch> --json
 根据 Subagent 返回的置信度进行分级处理：
 
 **高置信度 (> 0.8)**:
+
 ```
 ✅ 确定完成的任务：
   • 2026-03-05-add-login (置信度: 0.92)
     原因：PR 描述明确提到完成了 feature-a
 ```
+
 → 自动记录建议，等待用户最终确认
 
 **中置信度 (0.5-0.8)**:
+
 ```
 ⚠️ 需要确认的任务：
   • 2026-03-04-feature-b (置信度: 0.65)
     原因：评论中有讨论，但未明确完成
 ```
+
 → 询问用户选择处理方式
 
 **低置信度 (< 0.5)**:
+
 ```
 ⏭️ 跳过的任务：
   • 2026-03-04-feature-c (置信度: 0.32)
     原因：PR 内容未提及
 ```
+
 → 不做建议，跳过
 
 ### Step 4: User Interaction (用户交互流程)
 
 **显示建议列表**:
+
 ```
 💡 建议操作：
 ✅ 标记以下任务为已完成：
@@ -124,6 +139,7 @@ vibe flow review <branch> --json
 ```
 
 **中置信度任务的处理选项**:
+
 ```
 ⚠️ 无法确定以下任务是否完成：
   1. 2026-03-04-feature-b (中置信度)
@@ -137,16 +153,19 @@ vibe flow review <branch> --json
 ```
 
 **选项 1: 深度代码分析（可选）**:
+
 - 调用 subagent_type="Explore"
 - 输入：task 的功能需求 + PR 的代码变更
 - 分析：代码是否实现了 task 的功能需求
 - 输出：完成度评估
 
 **选项 2: 手动选择**:
+
 - 显示任务列表
 - 让用户手动勾选完成的任务
 
 **选项 3: 跳过**:
+
 - 不处理这些任务
 - 继续到最终确认
 
@@ -171,6 +190,7 @@ task_file=".agent/context/task.md"
 ```
 
 **验证内容**:
+
 - 文件存在性检查
 - 任务状态一致性
 - 代码引用有效性
@@ -203,32 +223,36 @@ task_file=".agent/context/task.md"
 
 ## 检查项目清单
 
-| 检查项 | 说明 | 严重程度 | 阶段 |
-|--------|------|----------|------|
-| PR merged 检测 | 检测已合并 PR 关联的任务 | 高 | Phase 2 |
-| 智能完成度分析 | AI 分析任务是否完成 | 高 | Phase 3 |
-| 幽灵分支 | 无关联任务的长期存活分支 | 高 | Phase 1 |
-| 文档散落 | 任务文档遗留在 docs/plans | 高 | Phase 1 |
-| 文件存在 | 引用的文件是否存在 | 高 | Phase 1 |
-| 状态同步 | task.md 和 topic 文件状态一致 | 中 | Phase 1 |
-| 引用有效 | References 中的链接有效 | 中 | Phase 1 |
+| 检查项         | 说明                          | 严重程度 | 阶段    |
+| -------------- | ----------------------------- | -------- | ------- |
+| PR merged 检测 | 检测已合并 PR 关联的任务      | 高       | Phase 2 |
+| 智能完成度分析 | AI 分析任务是否完成           | 高       | Phase 3 |
+| 幽灵分支       | 无关联任务的长期存活分支      | 高       | Phase 1 |
+| 文档散落       | 任务文档遗留在 docs/plans     | 高       | Phase 1 |
+| 文件存在       | 引用的文件是否存在            | 高       | Phase 1 |
+| 状态同步       | task.md 和 topic 文件状态一致 | 中       | Phase 1 |
+| 引用有效       | References 中的链接有效       | 中       | Phase 1 |
 
 ## 优雅降级
 
 **gh CLI 不可用时**:
+
 ```
 ⚠️  gh CLI not found or not authenticated
 跳过 PR 状态检查，继续静态检查...
 ```
+
 - 自动跳过 Phase 2 和 Phase 3
 - 继续执行 Phase 1 的静态检查
 - 不影响其他功能
 
 **网络错误时**:
+
 ```
 ⚠️  Network error during PR query
 继续其他检查...
 ```
+
 - 捕获错误，优雅降级
 - 继续执行其他检查
 - 显示友好的错误提示
@@ -249,6 +273,7 @@ task_file=".agent/context/task.md"
 ```
 
 **工作流**:
+
 1. `/save` - 会话结束时保存
 2. `/check` - 定期智能同步 + 验证一致性
 3. `/continue` - 新会话开始时恢复
