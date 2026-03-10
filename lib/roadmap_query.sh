@@ -48,6 +48,16 @@ _vibe_roadmap_status() {
             next: ([.items[]? | select(.status == "next")] | length),
             deferred: ([.items[]? | select(.status == "deferred")] | length),
             rejected: ([.items[]? | select(.status == "rejected")] | length)
+        },
+        official_layer: {
+            total_items: ([.items[]?] | length),
+            with_github_project_item_id: ([.items[]? | select(.github_project_item_id != null)] | length),
+            with_content_type: ([.items[]? | select(.content_type != null)] | length)
+        },
+        extension_layer: {
+            with_execution_record_id: ([.items[]? | select(.execution_record_id != null)] | length),
+            with_spec_standard: ([.items[]? | select((.spec_standard // "none") != "none")] | length),
+            with_spec_ref: ([.items[]? | select(.spec_ref != null)] | length)
         }
     }' "$roadmap_file")"
 
@@ -57,6 +67,8 @@ _vibe_roadmap_status() {
     fi
 
     local version_goal counts p0_count current_count next_count deferred_count rejected_count
+    local official_counts official_total official_item_id official_content_type
+    local extension_counts extension_execution extension_spec_standard extension_spec_ref
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
 
     echo "========================================"
@@ -83,6 +95,22 @@ _vibe_roadmap_status() {
         echo "  Deferred:         $deferred_count"
         echo "  Rejected:         $rejected_count"
     fi
+    echo ""
+
+    official_counts="$(echo "$status_json" | jq -r '"\(.official_layer.total_items) \(.official_layer.with_github_project_item_id) \(.official_layer.with_content_type)"')"
+    IFS=' ' read -r official_total official_item_id official_content_type <<< "$official_counts"
+    echo "GitHub Official Layer:"
+    echo "  Total Items:       $official_total"
+    echo "  Project Item IDs:  $official_item_id"
+    echo "  Content Types:     $official_content_type"
+    echo ""
+
+    extension_counts="$(echo "$status_json" | jq -r '"\(.extension_layer.with_execution_record_id) \(.extension_layer.with_spec_standard) \(.extension_layer.with_spec_ref)"')"
+    IFS=' ' read -r extension_execution extension_spec_standard extension_spec_ref <<< "$extension_counts"
+    echo "Vibe Extension Layer:"
+    echo "  Execution Records: $extension_execution"
+    echo "  Spec Standards:    $extension_spec_standard"
+    echo "  Spec Refs:         $extension_spec_ref"
     echo ""
 
     if [[ "$version_goal" == "none" ]]; then
