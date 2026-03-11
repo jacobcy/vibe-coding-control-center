@@ -66,7 +66,7 @@ related_docs:
 
 - `vibe roadmap` 以 `roadmap.json` 为规划态真源
 - `vibe task` 以 `registry.json` 为执行态真源
-- `vibe flow` 以 `worktrees.json` 表达开放现场，并以 `flow-history.json` 表达已关闭 flow 历史
+- `vibe flow` 以 branch 作为开放现场锚点（解耦 `worktrees.json`），并以 `flow-history.json` 表达已关闭 flow 历史
 - `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
 
 命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。

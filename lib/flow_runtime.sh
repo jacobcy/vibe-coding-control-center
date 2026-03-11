@@ -12,46 +12,7 @@ _flow_switch_target_branch() {
   echo "task/$slug"
 }
 
-_flow_update_current_worktree_branch() {
-  local branch="$1" git_common_dir worktrees_file current_dir current_path now tmp
-  git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
-  worktrees_file="$git_common_dir/vibe/worktrees.json"
-  [[ -f "$worktrees_file" ]] || return 0
 
-  current_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-  current_dir="$(basename "$current_path")"
-  now="$(_flow_now_iso)"
-  tmp="$(mktemp)" || return 1
-
-  jq --arg wt "$current_dir" --arg path "$current_path" --arg branch "$branch" --arg now "$now" '
-    .worktrees = (
-      (.worktrees // []) as $items
-      | if any($items[]?; .worktree_name == $wt or .worktree_path == $path) then
-          $items | map(
-            if .worktree_name == $wt or .worktree_path == $path then
-              .branch = $branch
-              | .worktree_name = $wt
-              | .worktree_path = $path
-              | .status = "active"
-              | .last_updated = $now
-            else . end
-          )
-        else
-          $items + [{
-            worktree_name: $wt,
-            worktree_path: $path,
-            branch: $branch,
-            current_task: null,
-            tasks: [],
-            status: "active",
-            dirty: false,
-            agent: null,
-            last_updated: $now
-          }]
-        end
-    )
-  ' "$worktrees_file" > "$tmp" && mv "$tmp" "$worktrees_file"
-}
 
 _flow_capture_dirty_state() {
   local operation="$1" target_branch="$2" dirty="" nonce="" stash_message="" stash_ref="" stash_oid=""
@@ -169,12 +130,6 @@ _flow_switch() {
       return 1
     }
   fi
-
-  _flow_update_current_worktree_branch "$branch_name" || {
-    _flow_restore_source_state "$current_branch" "$stash_ref" "flow switch to $branch_name"
-    log_error "Failed to update worktree runtime state"
-    return 1
-  }
 
   if [[ -n "$stash_ref" ]]; then
     log_step "Restoring saved changes into $branch_name"

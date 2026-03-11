@@ -64,16 +64,13 @@ _vibe_task_collect_openspec_tasks() {
 }
 
 _vibe_task_count_by_branch() {
-    local branch="$1" common_dir worktrees_file registry_file count
+    local branch="$1" common_dir registry_file count
     common_dir="$(_vibe_task_common_dir)" || { echo "0"; return 0; }
-    worktrees_file="$common_dir/vibe/worktrees.json"
     registry_file="$common_dir/vibe/registry.json"
-    [[ -f "$worktrees_file" ]] || { echo "0"; return 0; }
     [[ -f "$registry_file" ]] || { echo "0"; return 0; }
-    # Count tasks assigned to worktrees on this branch
     count=$(jq -r --arg branch "$branch" '
-      [.worktrees[]? | select(.branch == $branch) | .tasks // []] | add | length // 0
-    ' "$worktrees_file" 2>/dev/null || echo "0")
+      [.tasks[]? | select(.runtime_branch == $branch and .status != "completed" and .status != "archived")] | length // 0
+    ' "$registry_file" 2>/dev/null || echo "0")
     echo "$count"
 }
 
@@ -169,14 +166,9 @@ _vibe_task_list() {
         return 0
     fi
 
-    local cur_tid="" current_wt_path=""
-    current_wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-    cur_tid="$(jq -r --arg p "$current_wt_path" '.worktrees[]? | select(.worktree_path == $p) | .current_task // empty' "$worktrees_file" | head -1)"
-    missing="$(jq -r --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" --arg cur "$cur_tid" \
-      '((($registry[0].tasks // []) + ($openspec[0].tasks // []) | unique_by(.task_id)) as $all |
-        [.worktrees[]? as $w | select($w.current_task != null) |
-         select(($all | map(.task_id) | index($w.current_task)) == null) | $w.current_task] | unique[])' "$worktrees_file")" || { rm -f "$openspec_tasks_file"; return 1; }
-    [[ -z "$missing" ]] || { rm -f "$openspec_tasks_file"; vibe_die "Task not found in registry: ${missing%%$'\n'*}"; return 1; }
+    local cur_tid="" current_branch=""
+    current_branch="$(git branch --show-current 2>/dev/null || echo "")"
+    cur_tid="$(jq -r --arg b "$current_branch" '.tasks[]? | select(.runtime_branch == $b and .status != "completed" and .status != "archived") | .task_id // empty' "$registry_file" | head -1)"
     if [[ "$list_has_filters" == "1" ]]; then
         local filtered_output
         filtered_output="$(jq -rn --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" \

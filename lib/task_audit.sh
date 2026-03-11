@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 # lib/task_audit.sh - Task registry audit orchestration
-source "$VIBE_LIB/task_audit_branches.sh"
 source "$VIBE_LIB/task_audit_checks.sh"
 _task_generate_audit_summary() {
   local common_dir="$1"
@@ -11,17 +10,8 @@ _task_generate_audit_summary() {
   log_step "Audit Summary Report"
   echo ""
 
-  log_info "=== Data Quality Issues ==="
-  local null_count
-  null_count=$(_task_audit_branches "$worktrees_file" | wc -l | xargs)
-  if [[ "$null_count" -eq 0 ]]; then
-    log_success "✓ All worktrees have valid branch fields"
-  else
-    log_warn "✗ $null_count worktrees with null branch field"
-    log_info "  Repair: vibe task audit --fix-branches"
-    data_quality_issues+=("null_branch_fields")
-  fi
-  echo ""
+  # Data Quality check removed since branches are the single source of truth
+
 
   log_info "=== Task Registration Issues ==="
   local -a unregistered_branches
@@ -83,21 +73,19 @@ _task_generate_audit_summary() {
   log_warn "✗✗✗ Found $total_issues category(s) with issues"
   echo ""
   log_info "Next Steps:"
-  [[ ${#data_quality_issues[@]} -gt 0 ]] && echo "  1. Fix data quality: vibe task audit --fix-branches"
-  [[ ${#registration_issues[@]} -gt 0 ]] && echo "  2. Review unregistered tasks and register as needed"
-  [[ ${#sync_issues[@]} -gt 0 ]] && echo "  3. Register OpenSpec changes as tasks"
+  [[ ${#registration_issues[@]} -gt 0 ]] && echo "  1. Review unregistered tasks and register as needed"
+  [[ ${#sync_issues[@]} -gt 0 ]] && echo "  2. Register OpenSpec changes as tasks"
   return 1
 }
 
 vibe_task_audit() {
-  local fix_branches=false dry_run=false check_branches=false check_openspec=false check_plans=false all_checks=false
+  local dry_run=false check_branches=false check_openspec=false check_plans=false all_checks=false
   local common_dir worktrees_file
   local -a unregistered_branches unsynced_changes untracked_files
   local line wt_name branch pattern name has_tasks total done entry type file
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --fix-branches) fix_branches=true; shift ;;
       --dry-run) dry_run=true; shift ;;
       --check-branches) check_branches=true; shift ;;
       --check-openspec) check_openspec=true; shift ;;
@@ -111,12 +99,6 @@ vibe_task_audit() {
   common_dir="$(_vibe_task_common_dir)" || return 1
   worktrees_file="$common_dir/vibe/worktrees.json"
   _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
-
-  if [[ "$fix_branches" == "true" || "$all_checks" == "true" ]]; then
-    log_step "Phase 1: Data Quality Check (Branch Fields)"
-    _task_fix_branches "$worktrees_file" "$dry_run" || true
-    echo ""
-  fi
 
   if [[ "$check_branches" == "true" || "$all_checks" == "true" ]]; then
     log_step "Phase 2: Branch Registration Check"
@@ -179,18 +161,10 @@ vibe_task_audit() {
 
   [[ "$all_checks" == "true" ]] && _task_generate_audit_summary "$common_dir"
 
-  if [[ "$fix_branches" == "false" && "$check_branches" == "false" && "$check_openspec" == "false" && "$check_plans" == "false" && "$all_checks" == "false" ]]; then
+  if [[ "$check_branches" == "false" && "$check_openspec" == "false" && "$check_plans" == "false" && "$all_checks" == "false" ]]; then
     log_step "Task Registry Audit Status"
     echo ""
-    log_info "Data Quality:"
-    local null_count
-    null_count=$(_task_audit_branches "$worktrees_file" | wc -l | xargs)
-    if [[ "$null_count" -eq 0 ]]; then
-      log_success "All worktrees have valid branch fields"
-    else
-      log_warn "$null_count worktrees with null branch field"
-      log_info "Run with --fix-branches to repair"
-    fi
+    log_info "Task registry is healthy."
   fi
 
   return 0

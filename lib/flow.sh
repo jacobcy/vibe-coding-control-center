@@ -151,15 +151,6 @@ _flow_new() {
   }
   branch_created=1
 
-  _flow_update_current_worktree_branch "$branch_name" || {
-    _flow_restore_source_state "$current_branch" "$stash_ref" "flow new to $branch_name" "$current_head"
-    if [[ $branch_created -eq 1 ]]; then
-      git branch -D "$branch_name" >/dev/null 2>&1 || log_warn "Failed to clean up incomplete branch: $branch_name"
-    fi
-    log_error "Failed to update worktree runtime state"
-    return 1
-  }
-
   if [[ -n "$stash_ref" ]]; then
     log_step "Restoring saved changes into $branch_name"
     _flow_restore_captured_state "$stash_ref" "flow new to $branch_name" || return 1

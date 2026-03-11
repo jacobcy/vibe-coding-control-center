@@ -251,13 +251,12 @@ _vibe_task_remove() {
     done
     [[ -n "$task_id" ]] || { vibe_die "Missing task id for remove"; return 1; }
     vibe_require git jq || return 1
-    common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; worktrees_file="$common_dir/vibe/worktrees.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
-    _vibe_task_require_file "$registry_file" "registry.json" || return 1; _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
+    common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
+    _vibe_task_require_file "$registry_file" "registry.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
-    jq -e --arg task_id "$task_id" '.worktrees[]? | select(.current_task == $task_id or (.tasks // [] | index($task_id) != null))' "$worktrees_file" >/dev/null 2>&1 && { vibe_die "Task is still bound to a worktree: $task_id"; return 1; }
     local indexed_branch task_title="" task_suffix="" task_slug="" local_branches="" remote_branches="" residual_local="" residual_remote=""
     local -a branch_candidates local_matches remote_matches
-    indexed_branch=$(jq -r --arg tid "$task_id" '.worktrees[]? | select(.current_task == $tid or (.tasks // [] | index($tid) != null)) | .branch // empty' "$worktrees_file" | head -1)
+    indexed_branch=$(jq -r --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid) | .runtime_branch // empty' "$registry_file" | head -1)
     task_title=$(jq -r --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" | head -1)
     [[ -n "$task_title" ]] && task_slug="$(_vibe_task_slugify "$task_title")"
     [[ "$task_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+)$ ]] && task_suffix="${match[1]}"
