@@ -26,7 +26,7 @@ related_docs:
 
 ## Approach
 1. **固定真源**：只查看 `alias/`, `bin/`, `lib/`, `scripts/`, `skills/`, `tests/` 等代码目录的 diff，确认 shell 依旧是执行真源、逻辑未跨层转移。
-2. **技术审查**：通过 `vibe-review-code` skill（结合 Serena）审查差异，对照硬限制：LOC（`bin/ + lib/ <= 4800`）、每个函数必须有调用方、无死代码/占位符、测试覆盖、工程化程度。
+2. **技术审查**：通过 `vibe-review-code` skill（结合 Serena）审查差异，对照硬限制：LOC（`bin/ + lib/ <= 6000`）、每个函数必须有调用方、无死代码/占位符、测试覆盖、工程化程度。
 3. **测试与容量**：跑 `bats tests/test_review_skills.bats`、`tests/test_flow.bats` 等，计算 `bin/`+`lib/` 的行数，判断是否需提升容量预算或压缩代码。
 4. **输出 issue**：把 review 检查点、当前状态、未解问题写入新 GitHub issue（标题如“Review: roadmap-skill code compliance”），把我们的 review progress 作为 task list，便于下一任务跟进。
 5. **技能评估**：确认 `skills/vibe-review-code/SKILL.md` 的说明不矛盾、推荐子 agent 的提示是否仍然可行，必要时在 issue 中加入“更新 review skill”任务，并在 review summary 里突出需调整的规则。
