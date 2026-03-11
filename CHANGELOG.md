@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.13] - 2026-03-11
+
+### ✨ Changed
+- fix: make flow pr bump commit atomic ...
+
 ## [2.1.12] - 2026-03-11
 
 ### ✨ Changed

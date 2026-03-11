@@ -9,6 +9,7 @@ _flow_pr() {
   if vibe_has gh; then
     _flow_require_base_ref "$base_name" || return 1
   fi
+  _flow_require_latest_pr_base "$base_name" "$base_git_ref" || return 1
   log_info "Using PR base: $base_name"
   commit_logs=$(git log "$base_git_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_name. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
@@ -28,7 +29,14 @@ _flow_pr() {
 
   if [[ $skip_bump -eq 0 ]]; then
     log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
-    git add VERSION CHANGELOG.md 2>/dev/null || true; git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || true
+    git add VERSION CHANGELOG.md 2>/dev/null || {
+      log_error "Failed to stage VERSION/CHANGELOG after bump."
+      return 1
+    }
+    git commit -m "chore: bump version to $(cat VERSION)" 2>/dev/null || {
+      log_error "Failed to create bump commit."
+      return 1
+    }
   else
     log_info "Skipping version bump (PR exists or changelog already up-to-date)."
   fi

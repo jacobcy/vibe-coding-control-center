@@ -103,7 +103,43 @@ related_docs:
   - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
   - `repo issue` 可以映射到一个或多个 `task`
 
-### 3.3.1 `milestone`
+### 3.3.1 `roadmap sync`
+
+- 正式术语：`roadmap sync`
+- 别称：无
+- 定义：`vibe roadmap sync` 对 local roadmap items 与 GitHub Project items 做规划层 mirror 同步的动作。
+- 边界：
+  - `roadmap sync` 不是 execution record 注册
+  - `roadmap sync` 不决定 task 拆分
+- 使用规则：
+  - 讨论 GitHub Project item mirror 对齐时使用 `roadmap sync`
+  - 不要把 `roadmap sync` 当作 task intake 或 flow 编排入口
+
+### 3.3.2 `task audit`
+
+- 正式术语：`task audit`
+- 别称：无
+- 定义：`vibe task audit` 对 execution record、runtime 绑定证据和关联完整性进行审计/修复的动作。
+- 边界：
+  - `task audit` 不是 roadmap mirror 同步
+  - `task audit` 不替 OpenSpec 或 plan 文档定义规划优先级
+- 使用规则：
+  - 讨论 task registry、分支、OpenSpec、plans 的执行层核对时使用 `task audit`
+  - 不要把 `task audit` 表述成 GitHub Project 同步
+
+### 3.3.3 `OpenSpec 注册`
+
+- 正式术语：`OpenSpec 注册`
+- 别称：`OpenSpec execution spec 来源桥接`
+- 定义：把 OpenSpec change 或 plan 文档作为 task 的 execution spec 来源写入 `spec_standard/spec_ref` 的动作。
+- 边界：
+  - `OpenSpec 注册` 不是 roadmap item 创建
+  - `OpenSpec 注册` 不是 `roadmap sync`
+- 使用规则：
+  - 讨论 `spec_standard/spec_ref` 来源时使用 `OpenSpec 注册`
+  - 不要把 OpenSpec change 直接说成 roadmap item 或 task 本体
+
+### 3.3.4 `milestone`
 
 - 正式术语：`milestone`
 - 别称：无
