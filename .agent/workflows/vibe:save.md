@@ -1,3 +1,4 @@
+---
 name: "vibe:save"
 description: Skill-backed workflow that routes session handoff and memory persistence to the vibe-save skill.
 category: Workflow

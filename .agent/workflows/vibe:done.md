@@ -1,3 +1,4 @@
+---
 name: "vibe:done"
 description: Skill-backed workflow that routes post-merge or post-PR closure work to the vibe-done skill.
 category: Workflow

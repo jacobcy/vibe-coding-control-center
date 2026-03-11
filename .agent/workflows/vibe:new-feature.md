@@ -1,3 +1,4 @@
+---
 name: "vibe:new-feature"
 description: Feature-oriented planning alias workflow that routes issue/roadmap-feature intake to vibe:new.
 category: Workflow
@@ -21,7 +22,7 @@ tags: [workflow, vibe, planning, orchestration]
    - `repo issue` intake
    - `roadmap item(type=feature)` 规划
    - feature 下的 task 拆分与 plan 绑定
-3. 然后统一委托 [`vibe:new`](/Users/jacobcy/src/vibe-center/wt-fix-pr-base-selection/.agent/workflows/vibe:new.md)：
+3. 然后统一委托 [`vibe:new`](./vibe:new.md)：
    - 由 `vibe:new` 负责后续的 roadmap / plan / task / flow 编排
    - `vibe:new-feature` 自身不再重复这些规则
 4. 当 `vibe:new` 的 `plan + task binding` 完成后，本入口也随之结束。

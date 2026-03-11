@@ -1,3 +1,4 @@
+---
 name: "vibe:continue"
 description: Skill-backed workflow that routes session resume and backlog loading to the vibe-continue skill.
 category: Workflow

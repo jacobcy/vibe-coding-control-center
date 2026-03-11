@@ -1,3 +1,4 @@
+---
 name: "vibe:issue"
 description: Skill-backed workflow that routes repo issue intake to the vibe-issue skill before roadmap planning.
 ---

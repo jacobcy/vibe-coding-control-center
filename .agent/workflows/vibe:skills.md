@@ -1,3 +1,4 @@
+---
 name: "vibe:skills"
 description: Alias workflow that routes installed-skill management requests to the vibe-skills-manager skill.
 category: Workflow

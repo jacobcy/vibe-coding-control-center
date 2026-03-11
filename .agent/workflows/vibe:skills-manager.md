@@ -1,3 +1,4 @@
+---
 name: "vibe:skills-manager"
 description: Skill-backed workflow that routes installed-skill management to the vibe-skills-manager skill.
 category: Workflow

@@ -1,3 +1,4 @@
+---
 name: "vibe:new-flow"
 description: Standalone orchestration workflow for creating a new logical execution flow from the current worktree.
 category: Workflow

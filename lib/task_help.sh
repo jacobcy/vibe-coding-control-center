@@ -20,7 +20,7 @@ _vibe_task_usage() {
     echo "  --issue <ref>       初始关联 repo issue（可重复传入）"
     echo "  --roadmap-item <id> 初始关联 roadmap item（可重复传入）"
     echo "  --pr <ref>          初始主 PR 关联（pr_ref）"
-    echo "  --spec-standard <standard> execution spec 规范体系 (openspec|kiro|superpowers|supervisor)"
+    echo "  --spec-standard <standard> execution spec 规范体系（必填；openspec|kiro|superpowers|supervisor）"
     echo "  --spec-ref <ref>    execution spec 入口或文档引用（必填；不得创建无 plan task）"
     echo ""
     echo "Options for 'list':"
