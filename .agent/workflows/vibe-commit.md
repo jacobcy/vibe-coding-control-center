@@ -66,6 +66,7 @@ tags: [workflow, vibe, git, commit, pr]
    Before drafting any PR command:
    - read `vibe flow pr --help`
    - validate the correct base branch
+   - confirm the branch already contains the latest `origin/<base>`; if not, pull/rebase, resolve conflicts, re-verify, then PR
    - avoid implying the PR should target `main` unless the shell rules support that inference
 
 9. **Boundary Alignment**

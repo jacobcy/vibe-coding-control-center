@@ -424,3 +424,35 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" =~ "origin/develop not found" ]]
 }
+
+@test "14.6 _flow_pr refuses to publish when branch is behind remote base tip" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "merge-base --is-ancestor origin/main HEAD") return 1 ;;
+        "push origin HEAD") echo "PUSH_SHOULD_NOT_RUN"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --base main --title "test" --body "test"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ ! "$output" =~ "PUSH_SHOULD_NOT_RUN" ]]
+  [[ "$output" =~ "latest main" ]]
+}

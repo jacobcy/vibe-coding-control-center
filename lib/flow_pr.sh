@@ -9,6 +9,7 @@ _flow_pr() {
   if vibe_has gh; then
     _flow_require_base_ref "$base_name" || return 1
   fi
+  _flow_require_latest_pr_base "$base_name" "$base_git_ref" || return 1
   log_info "Using PR base: $base_name"
   commit_logs=$(git log "$base_git_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_name. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
