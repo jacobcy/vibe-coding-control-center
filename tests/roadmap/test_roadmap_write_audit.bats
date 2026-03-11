@@ -22,7 +22,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap classify rm-1 --status next'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Issue rm-1 classified as: next" ]]
+  [[ "$output" =~ "Roadmap item rm-1 classified as: next" ]]
   [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .status' "$fixture/vibe/roadmap.json")" = "next" ]
 }
 
@@ -67,11 +67,23 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   fixture="$(mktemp -d)"
   make_roadmap_fixture "$fixture"
 
-  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap add "Local roadmap item"'
+  run_roadmap_fixture_cmd "$fixture" '_vibe_roadmap_create_github_draft_issue() { echo "PVTI_created"; return 0; }; vibe_roadmap add "Local roadmap item"'
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Roadmap item added:" ]]
   [ "$(jq -r '.items[] | select(.title=="Local roadmap item") | .source_type' "$fixture/vibe/roadmap.json")" = "local" ]
+}
+
+@test "roadmap add --help shows usage without creating a roadmap item" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap add --help'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Vibe Roadmap - 智能调度器" ]]
+  [ "$(jq '.items | length' "$fixture/vibe/roadmap.json")" = "3" ]
 }
 
 @test "roadmap audit returns json summary when checks pass" {
