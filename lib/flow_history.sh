@@ -94,6 +94,26 @@ _flow_close_branch_runtime() {
   ' "$worktrees_file" > "$tmp" && mv "$tmp" "$worktrees_file"
 }
 
+_flow_close_branch_tasks() {
+  local branch_name="${1#origin/}" registry_file tmp now
+  registry_file="$(_flow_registry_file 2>/dev/null)" || return 0
+  [[ -f "$registry_file" ]] || return 0
+  now="$(_flow_now_iso)"
+  tmp="$(mktemp)" || return 1
+  jq --arg branch "$branch_name" --arg now "$now" '
+    .tasks = ((.tasks // []) | map(
+      if (.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch) then
+        .runtime_worktree_name = null
+        | .runtime_worktree_path = null
+        | .runtime_branch = null
+        | .runtime_agent = null
+        | .assigned_worktree = null
+        | .updated_at = $now
+      else . end
+    ))
+  ' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
+}
+
 _flow_checkout_detached_main() {
   git fetch origin main --quiet 2>/dev/null || true
   git checkout --detach origin/main >/dev/null 2>&1 || git checkout --detach main >/dev/null 2>&1
