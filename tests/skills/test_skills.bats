@@ -179,3 +179,14 @@ SHELL
   [[ "$output" =~ "vibe-issue/SKILL.md" ]]
   [[ "$output" =~ "command-standard.md" ]]
 }
+
+@test "roadmap intake view docs reject local long-term issue cache" {
+  run rg -n \
+    "repo issue intake 视图|运行时查询.*roadmap mirror|不维护本地长期.*issue.*cache|不维护本地长期.*issue.*registry|triage 决策快照|issue 整池真源" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "command-standard.md" ]]
+}

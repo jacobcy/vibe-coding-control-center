@@ -14,6 +14,9 @@ intake gate 约束：
 - 不是所有 `repo issue` 都自动进入 GitHub Project。
 - 只有经过 `vibe-roadmap` triage 的候选 `repo issue`，才应纳入 roadmap item / GitHub Project。
 - shell 层不负责智能 intake gate；是否纳入 Project 属于 skill / workflow 的规划判断。
+- `vibe-roadmap` 消费的是 `repo issue intake 视图`，而不是本地长期 issue cache / registry。
+- intake 视图应来自运行时查询与 roadmap mirror 对比。
+- 若未来需要留痕，优先保存 triage 决策快照，而不是复制 issue 整池真源。
 
 对象约束：
 

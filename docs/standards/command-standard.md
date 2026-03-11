@@ -226,6 +226,8 @@ related_docs:
 - `sync` 不同步 `task` / `flow` / execution bridge 等本地执行字段
 - `sync` 不能改写 `content_type` 这类 GitHub 官方身份语义
 - shell 不负责智能 intake gate；`repo issue` 是否纳入 roadmap item，属于上层 skill / workflow 的 triage 判断
+- `repo issue` 真源仍在 GitHub；规划层只消费 `repo issue intake 视图`，不维护本地长期 issue registry / cache
+- intake 视图应优先基于运行时查询与 roadmap mirror 对比；如需留痕，应保存 triage 决策快照而不是 issue 整池真源
 
 ### 4.6 Status and Provider Rules
 
