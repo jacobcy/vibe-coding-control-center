@@ -18,13 +18,13 @@ tags: [workflow, vibe, git, commit, orchestration]
    - 若存在 `current_task`，继续读取 `vibe task show <task-id> --json`
    - 若 `current_task` 缺失、无法解析，或 `runtime_branch` 与当前 flow branch 不一致，则 hard block
    - 若缺少 `issue_refs`、`roadmap_item_ids`、`spec_standard/spec_ref`，则至少报告 warning
-3. 由 `vibe-commit` skill 负责：
+4. 由 `vibe-commit` skill 负责：
    - 改动分类
    - commit 分组
    - 串行多 PR 判断
    - 何时使用 `vibe flow new <name> --branch <ref>`
    - 何时调用 `vibe flow pr --base <ref>`
-4. 当前 workflow 只负责把结果交回用户，或在 skill 完成后提示下一步去 `/vibe-integrate` / `/vibe-done`。
+5. 当前 workflow 只负责把结果交回用户，或在 skill 完成后提示下一步去 `/vibe-integrate` / `/vibe-done`。
 
 ## Boundary
 

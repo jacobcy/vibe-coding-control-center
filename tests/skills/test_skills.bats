@@ -61,7 +61,7 @@ SHELL
 }
 
 @test "workflow and skill docs preserve github project orchestration terminology" {
-  run rg -n \
+  run rg -nH \
     "roadmap item.*GitHub Project item mirror|Roadmap Item: mirrored GitHub Project item|task.*execution record|Task: execution record" \
     "$REPO_ROOT/.agent/workflows" \
     "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
@@ -74,7 +74,7 @@ SHELL
 }
 
 @test "task save and check docs treat spec_standard and spec_ref as extension fields" {
-  run rg -n \
+  run rg -nH \
     "spec_standard|spec_ref|扩展桥接字段|extension field|execution spec" \
     "$REPO_ROOT/.agent/workflows/vibe:save.md" \
     "$REPO_ROOT/.agent/workflows/vibe:check.md" \
@@ -88,7 +88,7 @@ SHELL
 }
 
 @test "orchestration docs require reading shell output before semantic decisions" {
-  run rg -n \
+  run rg -nH \
     "先读 shell 输出|先运行 `vibe|必须先运行 `vibe|read shell output" \
     "$REPO_ROOT/.agent/workflows/vibe:task.md" \
     "$REPO_ROOT/.agent/workflows/vibe:save.md" \
@@ -103,7 +103,7 @@ SHELL
 }
 
 @test "handoff governance is defined in a standard and referenced by CLAUDE and skills" {
-  run rg -n \
+  run rg -nH \
     "handoff-governance-standard|task\\.md.*不是.*真源|发现.*不一致.*必须修正" \
     "$REPO_ROOT/docs/standards/handoff-governance-standard.md" \
     "$REPO_ROOT/CLAUDE.md" \
@@ -129,12 +129,23 @@ SHELL
 }
 
 @test "vibe-commit docs require task metadata preflight before commit grouping" {
-  run rg -n \
+  run rg -nH \
     "metadata preflight|current_task|runtime_branch|issue_refs|roadmap_item_ids|spec_standard|spec_ref|hard block|warning" \
-    "$REPO_ROOT/.agent/workflows/vibe:commit.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:commit.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe:commit.md" ]]
+  [[ "$output" =~ "current_task" ]]
+  [[ "$output" =~ "runtime_branch" ]]
+  [[ "$output" =~ "issue_refs" ]]
+  [[ "$output" =~ "roadmap_item_ids" ]]
+
+  run rg -nH \
+    "metadata preflight|current_task|runtime_branch|issue_refs|roadmap_item_ids|spec_standard|spec_ref|hard block|warning" \
     "$REPO_ROOT/skills/vibe-commit/SKILL.md"
 
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-commit/SKILL.md" ]]
   [[ "$output" =~ "current_task" ]]
   [[ "$output" =~ "runtime_branch" ]]
   [[ "$output" =~ "issue_refs" ]]
