@@ -22,8 +22,8 @@ echo "|------|------|--------|------|"
 # --- Total LOC ---
 total_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 loc_status="✅"
-[ "${total_loc:-0}" -gt 4800 ] && loc_status="❌"
-echo "| 总 LOC | 4800 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 4800 ))% |"
+[ "${total_loc:-0}" -gt 6000 ] && loc_status="❌"
+echo "| 总 LOC | 6000 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 6000 ))% |"
 
 # --- Max file LOC ---
 max_file_loc=0

@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 # lib/roadmap_project_sync.sh - GitHub Project sync helpers for Roadmap module
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_store.sh" ]] && source "$VIBE_LIB/roadmap_store.sh"
+[[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_issue_intake.sh" ]] && source "$VIBE_LIB/roadmap_issue_intake.sh"
 _vibe_roadmap_create_github_draft_issue() {
     local project_id="$1" title="$2" body="${3:-}" response item_id
     response="$(gh api graphql -f query='
@@ -21,7 +22,6 @@ _vibe_roadmap_create_github_draft_issue() {
     }
     print -r -- "$item_id"
 }
-
 _vibe_roadmap_parse_source_ref() {
     local ref="$1" repo="" number="" content_type=""
     case "$ref" in
@@ -48,7 +48,6 @@ _vibe_roadmap_parse_source_ref() {
     [[ -n "$repo" && -n "$number" && -n "$content_type" ]] || return 1
     print -r -- "$repo|$number|$content_type"
 }
-
 _vibe_roadmap_resolve_content_node_id() {
     local repo="$1" number="$2" content_type="$3"
     case "$content_type" in
@@ -63,7 +62,6 @@ _vibe_roadmap_resolve_content_node_id() {
             ;;
     esac
 }
-
 _vibe_roadmap_add_project_item_from_content() {
     local project_id="$1" content_id="$2" response item_id
     response="$(gh api graphql -f query='
@@ -296,5 +294,7 @@ _vibe_roadmap_sync_github() {
 
     echo "GitHub Project bootstrap sync complete for $repo (project_id: $project_id)."
     echo "Bootstrapped $pushed_count roadmap item mirrors into GitHub Project."
+    _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
+    _vibe_roadmap_sync_issue_intake_candidates "$common_dir" "$repo" "$project_id" || return 1
     _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
 }

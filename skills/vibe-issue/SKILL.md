@@ -26,7 +26,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe roadmap` 输出，再做编排判断。
 - **自动对齐**：自动将 Issue 对齐到 `roadmap item = GitHub Project item mirror`，不生成 execution record 身份。
-- **候选资格不等于纳入**：`vibe-task` 只表示该 issue 具备后续 roadmap triage 的候选资格，不自动进入 GitHub Project。
+- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入 roadmap mirror 的候选资格；创建后通过 `vibe roadmap sync` 入 GitHub Project，而不是直接变成 execution record。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
 ## 使用逻辑
@@ -56,7 +56,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - 引导用户补充模板中缺失的关键信息。
 - 基于 AI 建议合适的 Labels。
 - 为保证 `vibe roadmap sync` 可发现该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
-- 附加 `vibe-task` 只表示候选资格；是否进入 GitHub Project，必须交由后续 `vibe-roadmap` triage 决定。
+- 附加 `vibe-task` 后，`vibe roadmap sync` 会把尚未 mirrored 的 open issue 推入 GitHub Project；后续优先级归类仍由 `vibe-roadmap` 决定。
 
 ### Step 4.5: 判断是否继续挂在现有主 issue 下
 
@@ -71,7 +71,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ### Step 5: 提交与收口
 
 - 执行 `gh issue create --title "<标题>" --body "<润色后的内容>" --label "<labels>"`。
-- 创建成功后，如果它不在 Roadmap 中，询问用户或自动执行 `vibe roadmap sync`；默认同步路径依赖前一步已附加 `vibe-task`。
+- 创建成功后，如果它还不在 Roadmap 中，默认执行 `vibe roadmap sync`；该同步会把带 `vibe-task` 的 open issue 推入 GitHub Project mirror。
 - 输出成功提示及 Issue 链接。
 
 ## 对象边界

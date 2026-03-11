@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.18] - 2026-03-11
+
+### ✨ Changed
+- feat: intake vibe-task issues into roadmap sync ...
+
 ## [2.1.17] - 2026-03-11
 
 ### ✨ Changed
