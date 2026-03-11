@@ -66,7 +66,7 @@ _vibe_check_group_task() {
   _vibe_check_group_json "$group_status" "$summary" "$errors_json" '[]'
 }
 _vibe_check_group_flow() {
-  local common_dir worktrees_file invalid_status missing_paths errors warnings
+  local common_dir worktrees_file invalid_status errors warnings
   local errors_json warnings_json group_status summary
 
   common_dir="$(_vibe_check_common_dir)"
@@ -75,11 +75,6 @@ _vibe_check_group_flow() {
   [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
 
   invalid_status="$(jq -r '.worktrees[]? | select((.status // "active" | IN("active","idle","missing","stale")) | not) | "\(.worktree_name):\(.status // "null")"' "$worktrees_file")"
-  while IFS='|' read -r wt_name wt_path; do
-    [[ -z "$wt_name" || -z "$wt_path" ]] && continue
-    [[ -d "$wt_path" ]] || warnings+="worktree path missing: ${wt_name} -> ${wt_path}\n"
-  done < <(jq -r '.worktrees[]? | select((.worktree_path // "") != "" and (.status // "active") != "missing") | "\(.worktree_name)|\(.worktree_path)"' "$worktrees_file")
-
   errors=""
   if [[ -n "$invalid_status" ]]; then
     while IFS= read -r line; do

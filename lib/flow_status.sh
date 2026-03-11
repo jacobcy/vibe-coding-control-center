@@ -7,9 +7,10 @@ _detect_feature() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-[^-]+-(.
 _detect_agent() { local dir; dir=$(basename "$PWD"); [[ "$dir" =~ ^wt-([^-]+)- ]] && { echo "${match[1]}"; return 0; }; echo "claude"; }
 
 _flow_open_dashboard_json() {
-  local git_common_dir worktrees_file branch lines=""
+  local git_common_dir worktrees_file registry_file branch lines=""
   git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
   worktrees_file="$git_common_dir/vibe/worktrees.json"
+  registry_file="$git_common_dir/vibe/registry.json"
   [[ -f "$worktrees_file" ]] || return 1
   while IFS= read -r branch; do
     [[ -n "$branch" ]] || continue
@@ -17,7 +18,16 @@ _flow_open_dashboard_json() {
     local record
     record="$(_flow_branch_dashboard_entry "$branch" 2>/dev/null || true)"
     [[ -n "$record" ]] && lines+="$record"$'\n'
-  done < <(jq -r '.worktrees[]? | select((.branch // "") != "" and (.status // "active") != "missing") | .branch' "$worktrees_file" 2>/dev/null | awk '!seen[$0]++')
+  done < <(
+    {
+      jq -r '.worktrees[]? | select((.branch // "") != "" and (.status // "active") != "missing") | .branch' "$worktrees_file" 2>/dev/null
+      [[ -f "$registry_file" ]] && jq -r '
+        .tasks[]?
+        | select((.status // "") != "completed" and (.status // "") != "archived")
+        | .runtime_branch // empty
+      ' "$registry_file" 2>/dev/null
+    } | sed 's#^origin/##' | awk 'NF && !seen[$0]++'
+  )
   [[ -z "$lines" ]] && { printf '%s\n' '{"flows":[]}'; return 0; }
   printf '%s' "$lines" | jq -s '{flows: .}'
 }

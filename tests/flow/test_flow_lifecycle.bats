@@ -457,7 +457,8 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ "save-unstash" ]]
   [[ "$output" =~ "origin/main" ]]
-  [[ ! "$output" =~ "worktree" ]]
+  [[ "$output" =~ "does not create a physical worktree" ]]
+  [[ ! "$output" =~ "create a new worktree" ]]
 }
 
 @test "2.8.1 vibe flow switch help describes default safe carry semantics" {

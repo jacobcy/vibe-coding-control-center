@@ -43,6 +43,12 @@ vibe_roadmap() {
             ;;
         add)
             shift
+            case "${1:-}" in
+                -h|--help|help)
+                    _vibe_roadmap_usage
+                    return 0
+                    ;;
+            esac
             local common_dir="$(_vibe_roadmap_common_dir)" || return 1
             _vibe_roadmap_add "$common_dir" "$*"
             ;;
