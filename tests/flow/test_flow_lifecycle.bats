@@ -199,6 +199,42 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "Failed to update worktree runtime state" ]]
 }
 
+@test "2.5.1a _flow_new restores detached HEAD before deleting the failed branch" {
+  local branch_cleanup_marker
+  branch_cleanup_marker="$(mktemp)"
+  rm -f "$branch_cleanup_marker"
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { return 1; }
+
+    git() {
+      case "$*" in
+        "branch --show-current") echo ""; return 0 ;;
+        "rev-parse --verify HEAD") echo "abc1234"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
+        "checkout --detach abc1234") echo "RESTORE_DETACHED"; return 0 ;;
+        "branch -D task/next-flow") : > "'"$branch_cleanup_marker"'"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_new next-flow --branch main
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "CHECKOUT_NEW" ]]
+  [[ "$output" =~ "RESTORE_DETACHED" ]]
+  [ -f "$branch_cleanup_marker" ]
+  [[ "$output" =~ "Failed to update worktree runtime state" ]]
+}
+
 @test "2.6 _flow_switch re-enters an existing open flow without PR history" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"

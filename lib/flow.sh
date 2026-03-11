@@ -118,7 +118,7 @@ _flow_bind() {
   log_success "Bound: $tid ($title)"
 }
 _flow_new() {
-  local feat="" agent="" ref="origin/main" save_unstash=0 arg branch_name feature_slug current_branch dirty="" stash_ref="" branch_created=0
+  local feat="" agent="" ref="origin/main" save_unstash=0 arg branch_name feature_slug current_branch current_head="" dirty="" stash_ref="" branch_created=0
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_new_usage; return 0; }; done
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -133,6 +133,7 @@ _flow_new() {
   done
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
   current_branch="$(git branch --show-current 2>/dev/null)"
+  current_head="$(git rev-parse --verify HEAD 2>/dev/null || true)"
   if [[ -n "$current_branch" ]]; then
     case "$current_branch" in
       main|master)
@@ -174,7 +175,7 @@ _flow_new() {
   branch_created=1
 
   _flow_update_current_worktree_branch "$branch_name" || {
-    _flow_restore_source_state "$current_branch" "$stash_ref" "flow new to $branch_name"
+    _flow_restore_source_state "$current_branch" "$stash_ref" "flow new to $branch_name" "$current_head"
     if [[ $branch_created -eq 1 ]]; then
       git branch -D "$branch_name" >/dev/null 2>&1 || log_warn "Failed to clean up incomplete branch: $branch_name"
     fi
