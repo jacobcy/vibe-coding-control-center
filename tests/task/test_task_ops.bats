@@ -6,7 +6,7 @@ setup() {
   export HELPER="$BATS_TEST_DIRNAME/test_task_helper.zsh"
 }
 
-@test "ops: vibe_task add creates registry entry and source file" {
+@test "ops: vibe_task add rejects missing plan binding" {
   local fixture; fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"
   printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
@@ -18,12 +18,33 @@ setup() {
     mock_git_registry "'"$fixture"'"
     vibe_task add "New Task Title" --id 2026-03-04-new-task
   '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "Task creation requires a plan binding" ]]
+  [[ "$output" =~ "vibe roadmap add" ]]
+  [[ "$output" =~ "writing-plans" ]]
+}
+
+@test "ops: vibe_task add creates registry entry and source file when plan binding is provided" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task add "New Task Title" \
+      --id 2026-03-04-new-task \
+      --spec-standard superpowers \
+      --spec-ref docs/plans/2026-03-04-new-task.md
+  '
   [ "$status" -eq 0 ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .title' "$fixture/vibe/registry.json")" = "New Task Title" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .source_type' "$fixture/vibe/registry.json")" = "local" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "null" ]
-  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_standard' "$fixture/vibe/registry.json")" = "none" ]
-  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_ref' "$fixture/vibe/registry.json")" = "null" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_standard' "$fixture/vibe/registry.json")" = "superpowers" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_ref' "$fixture/vibe/registry.json")" = "docs/plans/2026-03-04-new-task.md" ]
   [ -f "$fixture/vibe/tasks/2026-03-04-new-task/task.json" ]
 }
 
@@ -37,7 +58,9 @@ setup() {
     source "'"$HELPER"'"
     setup_task_env
     mock_git_registry "'"$fixture"'"
-    vibe_task add "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md"
+    vibe_task add "docs/plans/2026-03-02-vibe-new-task-flow-convergence.md" \
+      --spec-standard superpowers \
+      --spec-ref docs/plans/2026-03-02-vibe-new-task-flow-convergence.md
   '
   [ "$status" -eq 0 ]
 
@@ -57,7 +80,9 @@ setup() {
     source "'"$HELPER"'"
     setup_task_env
     mock_git_registry "'"$fixture"'"
-    vibe_task add "docs/plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md"
+    vibe_task add "docs/plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md" \
+      --spec-standard superpowers \
+      --spec-ref docs/plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md
   '
   [ "$status" -eq 0 ]
 
@@ -77,7 +102,9 @@ setup() {
     source "'"$HELPER"'"
     setup_task_env
     mock_git_registry "'"$fixture"'"
-    vibe_task add "API/Auth token refresh"
+    vibe_task add "API/Auth token refresh" \
+      --spec-standard superpowers \
+      --spec-ref docs/plans/api-auth-token-refresh.md
   '
   [ "$status" -eq 0 ]
 

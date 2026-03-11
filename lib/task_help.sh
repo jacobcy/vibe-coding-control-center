@@ -20,8 +20,8 @@ _vibe_task_usage() {
     echo "  --issue <ref>       初始关联 repo issue（可重复传入）"
     echo "  --roadmap-item <id> 初始关联 roadmap item（可重复传入）"
     echo "  --pr <ref>          初始主 PR 关联（pr_ref）"
-    echo "  --spec-standard <standard> execution spec 规范体系 (openspec|kiro|superpowers|supervisor|none)"
-    echo "  --spec-ref <ref>    execution spec 入口或文档引用"
+    echo "  --spec-standard <standard> execution spec 规范体系（必填；openspec|kiro|superpowers|supervisor）"
+    echo "  --spec-ref <ref>    execution spec 入口或文档引用（必填；不得创建无 plan task）"
     echo ""
     echo "Options for 'list':"
     echo "  -a, --all            显示包括已完成/已归档在内的所有任务"
@@ -55,6 +55,7 @@ _vibe_task_usage() {
     echo "  - local task records are execution records, not roadmap item types"
     echo "  - a roadmap item with type=task is still a planning-layer object"
     echo "  - GitHub Project item identity must not be written via vibe task"
+    echo "  - create a roadmap item first via 'vibe roadmap add', then generate a plan via writing-plans, then create the task with --spec-standard/--spec-ref"
 }
 
 _task_audit_usage() {

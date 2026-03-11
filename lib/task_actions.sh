@@ -8,7 +8,6 @@ _vibe_task_validate_roadmap_items() {
     roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
     [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
     jq empty "$roadmap_file" >/dev/null 2>&1 || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
-
     missing_ids="$(jq -nr --argjson roadmap_item_ids "$roadmap_item_ids_json" --slurpfile roadmap "$roadmap_file" '
       ($roadmap[0].items // [] | map(.roadmap_item_id)) as $existing
       | $roadmap_item_ids[]
@@ -25,10 +24,8 @@ _vibe_task_validate_roadmap_items() {
 _vibe_task_sync_roadmap_links() {
     local common_dir="$1" task_id="$2" roadmap_item_ids_json="$3" now="$4" roadmap_file tmp
     [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
-
     roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
     [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
-
     tmp="$(mktemp)" || return 1
     jq --arg task_id "$task_id" --arg now "$now" --argjson roadmap_item_ids "$roadmap_item_ids_json" '
       .items |= map(
@@ -39,6 +36,13 @@ _vibe_task_sync_roadmap_links() {
         else . end
       )
     ' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file"
+}
+_vibe_task_require_plan_binding_for_add() {
+    local spec_standard="$1" spec_ref="$2"
+    if [[ "$spec_standard" == "none" || -z "$spec_ref" ]]; then
+        vibe_die "Task creation requires a plan binding. Create or select a roadmap item via 'vibe roadmap add (shell)', then use the writing-plans skill to produce a plan, and re-run vibe task add with --spec-standard/--spec-ref."
+        return 1
+    fi
 }
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve" spec_standard="" spec_ref="" spec_mode="preserve"
@@ -112,12 +116,8 @@ _vibe_task_update() {
         assigned_mode="set"
     fi
     local issue_refs_json='[]' roadmap_item_ids_json='[]'
-    if (( ${#issue_refs[@]} > 0 )); then
-        issue_refs_json="$(printf '%s\n' "${issue_refs[@]}" | jq -R . | jq -s .)"
-    fi
-    if (( ${#roadmap_item_ids[@]} > 0 )); then
-        roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
-    fi
+    (( ${#issue_refs[@]} > 0 )) && issue_refs_json="$(printf '%s\n' "${issue_refs[@]}" | jq -R . | jq -s .)"
+    (( ${#roadmap_item_ids[@]} > 0 )) && roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
     _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     [[ -z "$target_name" ]] && target_name="$worktree"
     _vibe_task_write_registry "$registry_file" "$task_id" "$task_status" "$next_step" "$worktree" "$target_path" "$branch" "$assigned_mode" "$agent" "$now" "$issue_refs_json" "$issue_mode" "$roadmap_item_ids_json" "$roadmap_mode" "$pr_ref" "$pr_mode" "$spec_standard" "$spec_ref" "$spec_mode" || return 1
@@ -157,18 +157,15 @@ _vibe_task_add() {
     done
     [[ -n "$title" ]] || { vibe_die "Missing title for task add"; return 1; }
     spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "$spec_standard")" || { vibe_die "Invalid spec standard: $spec_standard"; return 1; }
+    _vibe_task_require_plan_binding_for_add "$spec_standard" "$spec_ref" || return 1
     if [[ -z "$task_id" ]]; then local slug; slug="$(_vibe_task_slugify "$title")"; task_id="$(_vibe_task_today)-$slug"; fi
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"; now="$(_vibe_task_now)"
     _vibe_task_require_file "$registry_file" "registry.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 && { vibe_die "Task already exists: $task_id"; return 1; }
     local issue_refs_json='[]' roadmap_item_ids_json='[]'
-    if (( ${#issue_refs[@]} > 0 )); then
-        issue_refs_json="$(printf '%s\n' "${issue_refs[@]}" | jq -R . | jq -s .)"
-    fi
-    if (( ${#roadmap_item_ids[@]} > 0 )); then
-        roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
-    fi
+    (( ${#issue_refs[@]} > 0 )) && issue_refs_json="$(printf '%s\n' "${issue_refs[@]}" | jq -R . | jq -s .)"
+    (( ${#roadmap_item_ids[@]} > 0 )) && roadmap_item_ids_json="$(printf '%s\n' "${roadmap_item_ids[@]}" | jq -R . | jq -s .)"
     _vibe_task_validate_roadmap_items "$common_dir" "$roadmap_item_ids_json" || return 1
     mkdir -p "$(dirname "$task_file")"; tmp="$(mktemp)" || return 1
     jq --arg task_id "$task_id" --arg title "$title" --arg now "$now" --arg pr_ref "$pr_ref" --arg spec_standard "$spec_standard" --arg spec_ref "$spec_ref" --argjson issue_refs "$issue_refs_json" --argjson roadmap_item_ids "$roadmap_item_ids_json" \

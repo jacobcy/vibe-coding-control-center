@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.14] - 2026-03-11
+
+### ✨ Changed
+- Require explicit plan binding when creating tasks, and standardize agent workflow naming and workflow/skill boundaries.
+
 ## [2.1.13] - 2026-03-11
 
 ### ✨ Changed
