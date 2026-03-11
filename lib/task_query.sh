@@ -64,14 +64,18 @@ _vibe_task_collect_openspec_tasks() {
 }
 
 _vibe_task_count_by_branch() {
-    local branch="$1" common_dir registry_file count
+    local branch="$1" common_dir worktrees_file registry_file count
     common_dir="$(_vibe_task_common_dir)" || { echo "0"; return 0; }
+    worktrees_file="$common_dir/vibe/worktrees.json"
     registry_file="$common_dir/vibe/registry.json"
-    [[ -f "$registry_file" ]] || { echo "0"; return 0; }
-    count=$(jq -r --arg branch "$branch" '
-      [.tasks[]? | select(.runtime_branch == $branch and .status != "completed" and .status != "archived")] | length // 0
-    ' "$registry_file" 2>/dev/null || echo "0")
-    echo "$count"
+    count=$(jq -rn --arg branch "$branch" \
+      --slurpfile wt "${worktrees_file}" \
+      --slurpfile reg "${registry_file}" '
+      ( [($wt[0].worktrees // [])[] | select(.branch == $branch) | (.tasks // [])[]]
+      + [($reg[0].tasks   // [])[] | select(.runtime_branch == $branch and .status != "completed" and .status != "archived") | .task_id]
+      ) | unique | length
+    ' 2>/dev/null || echo "0")
+    echo "${count:-0}"
 }
 
 _vibe_task_list() {
