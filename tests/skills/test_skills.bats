@@ -177,3 +177,27 @@ SHELL
   [[ "$output" =~ "vibe-issue/SKILL.md" ]]
   [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
 }
+
+@test "roadmap intake gate docs define triage ownership without shell auto intake" {
+  run rg -n \
+    "不是所有.*repo issue.*自动进入.*Project|候选资格|vibe-roadmap.*intake gate|vibe-roadmap.*triage|shell.*不负责.*智能.*gate|不自动进入.*GitHub Project" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "vibe-issue/SKILL.md" ]]
+  [[ "$output" =~ "command-standard.md" ]]
+}
+
+@test "roadmap intake view docs reject local long-term issue cache" {
+  run rg -n \
+    "repo issue intake 视图|运行时查询.*roadmap mirror|不维护本地长期.*issue.*cache|不维护本地长期.*issue.*registry|triage 决策快照|issue 整池真源" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "command-standard.md" ]]
+}

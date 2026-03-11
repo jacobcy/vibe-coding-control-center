@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.17] - 2026-03-11
+
+### ✨ Changed
+- Define roadmap intake gate and intake view boundaries
+
 ## [2.1.16] - 2026-03-11
 
 ### ✨ Changed
