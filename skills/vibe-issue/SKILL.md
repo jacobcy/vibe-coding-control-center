@@ -26,6 +26,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe roadmap` 输出，再做编排判断。
 - **自动对齐**：自动将 Issue 对齐到 `roadmap item = GitHub Project item mirror`，不生成 execution record 身份。
+- **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
 ## 使用逻辑
 
@@ -54,6 +55,16 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - 引导用户补充模板中缺失的关键信息。
 - 基于 AI 建议合适的 Labels。
 - 为保证 `vibe roadmap sync` 可发现该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
+
+### Step 4.5: 判断是否继续挂在现有主 issue 下
+
+- 若当前仓库已存在主 issue / sub-issue 结构，先确认主 issue 是否已经表达：
+  - 治理母题
+  - 范围边界
+  - 哪类问题允许继续追加
+- 若新问题仍属于该治理母题，且没有超出原范围，可继续作为 sub-issue 追加。
+- 若新问题已经超出原范围，必须新建独立 issue，不得无限挂靠在旧主 issue 下。
+- 这一步属于 skill/workflow 判断，不属于 shell runtime、`vibe flow bind` 或 execution record 逻辑。
 
 ### Step 5: 提交与收口
 

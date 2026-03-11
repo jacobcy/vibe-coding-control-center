@@ -115,6 +115,8 @@ vibe flow done --branch <ref>
 - next: <是否已完全收口；若未完成，阻塞点是什么>
 ```
 
+若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `repo issue`，不得继续塞回旧 plan。
+
 ## Restrictions
 
 - 不得修改业务源代码文件
@@ -122,3 +124,4 @@ vibe flow done --branch <ref>
 - 不得手工编辑 `.git/vibe/*.json`
 - 不得把未 merge 的 branch 强行 `flow done`
 - 若 `vibe flow done` 阻断，必须如实汇报原因，并停止收口
+- 不得把 merge 后的新需求伪装成“补充说明”继续留在旧 plan

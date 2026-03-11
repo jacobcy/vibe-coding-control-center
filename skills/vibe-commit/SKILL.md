@@ -48,7 +48,40 @@ vibe flow list
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能继续沿用旧判断。
 
-### Step 2: 审计工作区
+### Step 2: 运行提交前 metadata preflight
+
+在做任何 commit 分类前，必须先检查当前 execution record 的最小完整性。
+
+若 `vibe flow show --json` 返回了 `current_task`，继续读取：
+
+```bash
+vibe task show <task-id> --json
+```
+
+第一版规则：
+
+- `hard block`
+  - 当前 flow 没有 `current_task`
+  - `current_task` 无法从 shell 真源解析
+  - 当前 task 的 `runtime_branch` 为空，或与当前 flow branch 不一致
+
+- `warning`
+  - 当前 task 缺 `issue_refs`
+  - 当前 task 缺 `roadmap_item_ids`
+  - 当前 task 缺 `spec_standard` 或 `spec_ref`
+
+动作边界：
+
+- `hard block`：停止提交，先补最小登记
+- `warning`：允许继续，但必须把缺失元数据当作显式风险报告给用户
+
+说明：
+
+- `task` 是 execution record
+- `issue_refs` / `roadmap_item_ids` / `spec_*` 是提交归类与后续补链的关键元数据
+- 第一版不把缺 `spec_ref` 直接提升为硬阻断，避免历史遗留任务一次性全部卡死
+
+### Step 3: 审计工作区
 
 先运行：
 
@@ -70,7 +103,7 @@ git diff --cached --stat
 - 哪些内容会被 stash
 - 哪些内容会被 discard
 
-### Step 3: 组织 commit
+### Step 4: 组织 commit
 
 每个 commit 只对应一个独立交付目标。生成 commit 草案前，先说明：
 
@@ -80,7 +113,7 @@ git diff --cached --stat
 
 若当前分支历史已经混入多个交付目标，不得继续硬挤进一个 PR。
 
-### Step 4: 处理串行多 PR
+### Step 5: 处理串行多 PR
 
 对“当前已有一串待发布 commit，需要串行拆成多个 PR”的场景，固定按以下步骤执行：
 
@@ -95,7 +128,7 @@ git diff --cached --stat
    - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
    - 当前这一组 PR 创建完成前，不要提前切到下一组
 
-### Step 5: 发 PR 前复核
+### Step 6: 发 PR 前复核
 
 先读取：
 
@@ -119,7 +152,7 @@ vibe flow pr --base <ref>
 
 不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
 
-### Step 6: 写入 handoff
+### Step 7: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
 

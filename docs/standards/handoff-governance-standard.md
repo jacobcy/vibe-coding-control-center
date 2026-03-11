@@ -120,6 +120,15 @@ related_docs:
 - 下一步
 - 关键文件
 
+若当前 flow 对应 PR 已 merged，则 handoff 只允许补记：
+
+- 交付证据
+- 审计说明
+- handoff 更正
+- follow-up 链接
+
+禁止把 merge 后出现的新需求、新目标或新开发范围继续写回旧 plan；这些内容必须进入新的 `repo issue`，并按需要重新进入 `roadmap item` 与后续 execution record。
+
 ## 7. Root-Doc Requirement
 
 `CLAUDE.md` 必须把 handoff 边界作为入口级规则明确告知所有 agent。

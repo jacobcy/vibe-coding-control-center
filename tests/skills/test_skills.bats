@@ -127,3 +127,42 @@ SHELL
   [[ "$output" =~ "Auto Confirmation Convention" ]]
   [[ "$output" =~ "不得跳过验证" ]]
 }
+
+@test "vibe-commit docs require task metadata preflight before commit grouping" {
+  run rg -n \
+    "metadata preflight|current_task|runtime_branch|issue_refs|roadmap_item_ids|spec_standard|spec_ref|hard block|warning" \
+    "$REPO_ROOT/.agent/workflows/vibe:commit.md" \
+    "$REPO_ROOT/skills/vibe-commit/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "current_task" ]]
+  [[ "$output" =~ "runtime_branch" ]]
+  [[ "$output" =~ "issue_refs" ]]
+  [[ "$output" =~ "roadmap_item_ids" ]]
+}
+
+@test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
+  run rg -n \
+    "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \
+    "$REPO_ROOT/docs/standards/git-workflow-standard.md" \
+    "$REPO_ROOT/docs/standards/handoff-governance-standard.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-done/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "git-workflow-standard.md" ]]
+  [[ "$output" =~ "handoff-governance-standard.md" ]]
+  [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
+  [[ "$output" =~ "vibe-done/SKILL.md" ]]
+}
+
+@test "issue orchestration defines parent issue scope and out-of-scope split rules" {
+  run rg -n \
+    "主 issue|sub-issue|超出原范围|新建独立.*issue|治理母题|skill/workflow" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-issue/SKILL.md" ]]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+}

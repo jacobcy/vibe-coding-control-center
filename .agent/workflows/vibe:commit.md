@@ -13,6 +13,11 @@ tags: [workflow, vibe, git, commit, orchestration]
 
 1. 回复用户：`我会先检查工作区与当前 flow，再委托 vibe-commit skill 处理提交分组和 PR 切片。`
 2. 读取当前工作区和 flow 基本事实；若工作区脏或分支语义复杂，继续委托 `skills/vibe-commit/SKILL.md`。
+3. 在任何 commit 分组前，先做最小 metadata preflight：
+   - 读取 `vibe flow show --json`
+   - 若存在 `current_task`，继续读取 `vibe task show <task-id> --json`
+   - 若 `current_task` 缺失、无法解析，或 `runtime_branch` 与当前 flow branch 不一致，则 hard block
+   - 若缺少 `issue_refs`、`roadmap_item_ids`、`spec_standard/spec_ref`，则至少报告 warning
 3. 由 `vibe-commit` skill 负责：
    - 改动分类
    - commit 分组

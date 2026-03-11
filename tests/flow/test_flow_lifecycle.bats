@@ -129,6 +129,32 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "CHECKOUT_DEFAULT" ]]
 }
 
+@test "2.5.0a _flow_new allows detached HEAD and creates a new branch from origin/main" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { return 0; }
+
+    git() {
+      case "$*" in
+        "branch --show-current") echo ""; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow origin/main") echo "CHECKOUT_FROM_DETACHED"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_new next-flow
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "CHECKOUT_FROM_DETACHED" ]]
+}
+
 @test "2.5.1 _flow_new restores the original branch when runtime update fails" {
   local branch_cleanup_marker
   branch_cleanup_marker="$(mktemp)"

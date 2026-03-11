@@ -213,6 +213,9 @@ related_docs:
 - `pr` 已提交但 flow 未关闭时，该 flow 属于 `open + had_pr`
 - 此时若需要检查 CI、处理 review、等待合并或补 follow-up，应进入整合阶段，而不是新开同名 flow
 - 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe-done` 或等价收口流程
+- 若当前 PR 已 merged，则该 PR 对应的 plan 进入 terminal state
+- merged 后只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接，不允许把新需求继续写回旧 plan
+- merged 后若出现新的 feature、补丁或治理项，必须重新进入 `repo issue -> roadmap item -> task -> flow -> PR`
 
 ### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 

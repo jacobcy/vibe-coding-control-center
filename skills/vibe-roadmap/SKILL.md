@@ -48,6 +48,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - 不得直接修改 `registry.json` 底层数据
 - 必须通过 Shell API 写入数据
 - 调度器无法判断优先级时，必须要求人类讨论
+- 若涉及主 issue / sub-issue，只承接 skill/workflow 已做出的范围判断，不在 shell 层发明 parent/sub-issue 运行时逻辑
 
 边界对照：
 
@@ -55,6 +56,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 - `roadmap <-> task` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
 - OpenSpec / plan 到 `spec_standard/spec_ref` 的 execution spec 写回：交给 `vibe-task` 或 task 写入路径
+- parent issue / sub-issue 的范围判断：交给 `vibe-issue` 等 skill/workflow；`vibe-roadmap` 只消费判断结果
 
 ## Workflow
 
@@ -80,6 +82,9 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 - 对新的 `repo issue` / roadmap item 进行分类：P0/当前版本/下一个版本/延期/拒绝
 - 按优先级排序
+- 若该 issue 来自已有治理母题，先读取上游 skill/workflow 的范围判断：
+  - 仍在原主 issue 范围内，可继续按 sub-issue 进入规划
+  - 已超出原范围，要求拆成新的独立 issue，再决定 roadmap 归类
 
 **场景 C: 版本结束**
 
