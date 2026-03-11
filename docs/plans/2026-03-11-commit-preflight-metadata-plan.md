@@ -8,7 +8,7 @@ created: 2026-03-11
 last_updated: 2026-03-11
 related_docs:
   - skills/vibe-commit/SKILL.md
-  - .agent/workflows/vibe-commit.md
+  - .agent/workflows/vibe:commit.md
   - docs/standards/command-standard.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/handoff-governance-standard.md
@@ -52,14 +52,14 @@ related_docs:
 
 ## Files To Modify
 
-- Modify: `.agent/workflows/vibe-commit.md`
+- Modify: `.agent/workflows/vibe:commit.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Modify: `tests/skills/test_skills.bats`
 
 ## Task 1: 收敛 preflight 规则到 workflow
 
 **Files:**
-- Modify: `.agent/workflows/vibe-commit.md`
+- Modify: `.agent/workflows/vibe:commit.md`
 
 **Step tasks:**
 
@@ -118,7 +118,7 @@ related_docs:
 
 ```bash
 rg -n "preflight|current_task|runtime branch|issue_refs|roadmap_item_ids|spec_standard|spec_ref|hard block|warning" \
-  .agent/workflows/vibe-commit.md \
+  .agent/workflows/vibe:commit.md \
   skills/vibe-commit/SKILL.md
 
 bats tests/skills/test_skills.bats
