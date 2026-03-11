@@ -9,8 +9,12 @@ VIBE_SCRIPT_PATH="${(%):-%x:A}"
 VIBE_SCRIPT_DIR="$(cd "$(dirname "$VIBE_SCRIPT_PATH")" && pwd)"
 VIBE_INSTALL_ROOT="$(cd "$VIBE_SCRIPT_DIR/.." && pwd)"
 
-# If invoked through the global install, prefer the current repo's bin/vibe.
-if [[ "$VIBE_INSTALL_ROOT" == "$HOME/.vibe" ]] && command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+# If invoked through the global install (~/.vibe/bin/vibe), prefer the current repo's bin/vibe.
+# We normalize both paths to handle potential symlinks or trailing slashes.
+VIBE_REAL_INSTALL_ROOT="$(cd "$VIBE_INSTALL_ROOT" && pwd -P 2>/dev/null || echo "$VIBE_INSTALL_ROOT")"
+VIBE_REAL_HOME_VIBE="$(cd "$HOME/.vibe" 2>/dev/null && pwd -P || echo "$HOME/.vibe")"
+
+if [[ "$VIBE_REAL_INSTALL_ROOT" == "$VIBE_REAL_HOME_VIBE" ]] && command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     REPO_VIBE="${REPO_ROOT}/bin/vibe"
     if [[ -n "$REPO_ROOT" && -x "$REPO_VIBE" ]]; then

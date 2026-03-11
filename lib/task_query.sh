@@ -129,6 +129,16 @@ _vibe_task_list() {
     registry_file="$common_dir/vibe/registry.json"
     _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     _vibe_task_require_file "$registry_file" "registry.json" || return 1
+
+    # Validate worktree current tasks exist in registry
+    missing="$(jq -r --slurpfile reg "$registry_file" '
+      .worktrees[] | .current_task | select(. != null) as $ct
+      | select([$reg[0].tasks[] | select(.task_id == $ct)] | length == 0)
+    ' "$worktrees_file" | head -n 1)"
+    if [[ -n "$missing" ]]; then
+        vibe_die "Task not found in registry: $missing"
+        return 1
+    fi
     repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
     openspec_tasks_file="$(mktemp)" || return 1
     _vibe_task_collect_openspec_tasks "$repo_root" > "$openspec_tasks_file"
@@ -166,9 +176,14 @@ _vibe_task_list() {
         return 0
     fi
 
-    local cur_tid="" current_branch=""
+    local cur_tid="" current_branch="" repo_root wt_name
     current_branch="$(git branch --show-current 2>/dev/null || echo "")"
-    cur_tid="$(jq -r --arg b "$current_branch" '.tasks[]? | select(.runtime_branch == $b and .status != "completed" and .status != "archived") | .task_id // empty' "$registry_file" | head -1)"
+    repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+    wt_name="$(basename "$repo_root")"
+    cur_tid="$(jq -r --arg wn "$wt_name" '.worktrees[]? | select(.worktree_name == $wn) | .current_task // empty' "$worktrees_file" | head -1)"
+    if [[ -z "$cur_tid" ]]; then
+        cur_tid="$(jq -r --arg b "$current_branch" '.tasks[]? | select(.runtime_branch == $b and .status != "completed" and .status != "archived") | .task_id // empty' "$registry_file" | head -1)"
+    fi
     if [[ "$list_has_filters" == "1" ]]; then
         local filtered_output
         filtered_output="$(jq -rn --slurpfile registry "$registry_file" --slurpfile openspec "$openspec_tasks_file" \
