@@ -161,6 +161,7 @@ JSON
     _vibe_roadmap_resolve_content_node_id() { echo "CONTENT_90"; return 0; }
     _vibe_roadmap_add_project_item_from_content() { echo "PVTI_issue"; return 0; }
     _vibe_roadmap_create_github_draft_issue() { echo "PVTI_draft"; return 0; }
+    _vibe_roadmap_fetch_github_project_items() { cat "'"$fixture"'/vibe/roadmap.json" | jq -c "[.items[] | {github_project_item_id, title, description, content_type, source_type, source_refs, issue_refs, remote_number: null}]"; }
     _vibe_roadmap_sync_github "'"$fixture"'" "owner/repo" "PVT_project"
   '
 
@@ -169,6 +170,79 @@ JSON
   [ "$(jq -r '.items[0].content_type' "$fixture/vibe/roadmap.json")" = "issue" ]
   [ "$(jq -r '.items[1].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_draft" ]
   [ "$(jq -r '.items[1].content_type' "$fixture/vibe/roadmap.json")" = "draft_issue" ]
+}
+
+@test "shared-state: roadmap refresh updates existing mirrors and imports remote-only items" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "project_id": "PVT_project",
+  "version_goal": null,
+  "items": [
+    {
+      "roadmap_item_id": "gh-90",
+      "title": "stale title",
+      "description": null,
+      "status": "current",
+      "source_type": "github",
+      "source_refs": ["gh:owner/repo#90"],
+      "issue_refs": ["gh-90"],
+      "linked_task_ids": [],
+      "github_project_item_id": "PVTI_issue",
+      "content_type": "draft_issue",
+      "execution_record_id": null,
+      "spec_standard": "none",
+      "spec_ref": null,
+      "created_at": "2026-03-10T12:00:00+0800",
+      "updated_at": "2026-03-10T12:30:00+0800"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="$VIBE_ROOT/lib"
+    source "$VIBE_LIB/config.sh" 2>/dev/null || true
+    source "$VIBE_LIB/utils.sh" 2>/dev/null || true
+    source "$VIBE_LIB/roadmap_query.sh"
+    source "$VIBE_LIB/roadmap_write.sh"
+    _vibe_roadmap_fetch_github_project_items() {
+      cat <<'"'"'JSON'"'"'
+[
+  {
+    "github_project_item_id": "PVTI_issue",
+    "title": "fresh issue title",
+    "description": "fresh body",
+    "content_type": "issue",
+    "source_type": "github",
+    "source_refs": ["gh:owner/repo#90", "https://github.com/owner/repo/issues/90"],
+    "issue_refs": ["gh-90"],
+    "remote_number": 90
+  },
+  {
+    "github_project_item_id": "PVTI_draft",
+    "title": "remote draft",
+    "description": "draft body",
+    "content_type": "draft_issue",
+    "source_type": "local",
+    "source_refs": [],
+    "issue_refs": [],
+    "remote_number": null
+  }
+]
+JSON
+    }
+    _vibe_roadmap_refresh_local_mirror "'"$fixture"'" "PVT_project"
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.items[0].title' "$fixture/vibe/roadmap.json")" = "fresh issue title" ]
+  [ "$(jq -r '.items[0].content_type' "$fixture/vibe/roadmap.json")" = "issue" ]
+  [ "$(jq -r '.items[1].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_draft" ]
+  [ "$(jq -r '.items[1].title' "$fixture/vibe/roadmap.json")" = "remote draft" ]
 }
 
 @test "shared-state: roadmap add creates remote project item before writing local mirror" {
