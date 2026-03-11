@@ -3,19 +3,26 @@
 
 _vibe_roadmap_fetch_candidate_repo_issues() {
     local repo="$1"
-    gh issue list --repo "$repo" --state open --label vibe-task --json id,number,title,body,url 2>/dev/null
+    local candidate_list_json=""
+    candidate_list_json="$(
+        gh issue list --repo "$repo" --state open --label vibe-task --limit 1000 --json id,number,title,body,url
+    )" || {
+        vibe_die "Failed to list vibe-task issues for repo '$repo'"
+        return 1
+    }
+    printf '%s\n' "$candidate_list_json"
 }
 
 _vibe_roadmap_sync_issue_intake_candidates() {
-    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_json issue_id issue_number issue_ref issue_url
+    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_list_json candidate_issue_json issue_id issue_number issue_ref issue_url
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    candidate_json="$(_vibe_roadmap_fetch_candidate_repo_issues "$repo")" || return 1
+    candidate_list_json="$(_vibe_roadmap_fetch_candidate_repo_issues "$repo")" || return 1
 
-    while IFS= read -r candidate_json; do
-        [[ -n "$candidate_json" ]] || continue
-        issue_id="$(printf '%s' "$candidate_json" | jq -r '.id // empty')"
-        issue_number="$(printf '%s' "$candidate_json" | jq -r '.number // empty')"
-        issue_url="$(printf '%s' "$candidate_json" | jq -r '.url // empty')"
+    while IFS= read -r candidate_issue_json; do
+        [[ -n "$candidate_issue_json" ]] || continue
+        issue_id="$(printf '%s' "$candidate_issue_json" | jq -r '.id // empty')"
+        issue_number="$(printf '%s' "$candidate_issue_json" | jq -r '.number // empty')"
+        issue_url="$(printf '%s' "$candidate_issue_json" | jq -r '.url // empty')"
         [[ -n "$issue_id" && -n "$issue_number" ]] || continue
         issue_ref="gh-${issue_number}"
 
@@ -28,5 +35,5 @@ _vibe_roadmap_sync_issue_intake_candidates() {
         fi
 
         _vibe_roadmap_add_project_item_from_content "$project_id" "$issue_id" >/dev/null || return 1
-    done < <(printf '%s' "$candidate_json" | jq -c '.[]?')
+    done < <(printf '%s' "$candidate_list_json" | jq -c '.[]?')
 }
