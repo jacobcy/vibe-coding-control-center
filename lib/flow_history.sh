@@ -104,10 +104,39 @@ _flow_branch_dashboard_entry() {
   worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
   registry_file="$(_flow_registry_file)"
   branch_name="${branch#origin/}"
-  wt_data="$(jq -c --arg branch "$branch_name" '.worktrees[]? | select(.branch == $branch)' "$worktrees_file" 2>/dev/null | head -n 1)"
-  [[ -n "$wt_data" ]] || return 1
-  current_task="$(echo "$wt_data" | jq -r '.current_task // empty')"
-  tasks_json="$(echo "$wt_data" | jq -c '.tasks // []')"
+  wt_data="$(jq -c --arg branch "$branch_name" '
+    .worktrees[]?
+    | select((.branch // "") == $branch or (.branch // "") == ("origin/" + $branch))
+  ' "$worktrees_file" 2>/dev/null | head -n 1)"
+  current_task="$(printf '%s' "$wt_data" | jq -r '.current_task // empty' 2>/dev/null)"
+  tasks_json="$(printf '%s' "$wt_data" | jq -c '.tasks // []' 2>/dev/null)"
+  [[ -z "$tasks_json" ]] && tasks_json='[]'
+
+  if [[ -z "$current_task" ]]; then
+    current_task="$(jq -r --arg branch "$branch_name" '
+      .tasks[]?
+      | select((.status // "") != "completed" and (.status // "") != "archived")
+      | select((.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch))
+      | .task_id
+    ' "$registry_file" 2>/dev/null | head -n 1)"
+  fi
+
+  if [[ "$tasks_json" == "[]" ]]; then
+    tasks_json="$(jq -c --arg branch "$branch_name" '
+      [.tasks[]?
+        | select((.status // "") != "completed" and (.status // "") != "archived")
+        | select((.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch))
+        | .task_id]
+    ' "$registry_file" 2>/dev/null)"
+    [[ -z "$tasks_json" ]] && tasks_json='[]'
+  fi
+
+  [[ -n "$wt_data" || -n "$current_task" || "$tasks_json" != "[]" ]] || return 1
+
+  if [[ -z "$current_task" && "$tasks_json" != "[]" ]]; then
+    current_task="$(printf '%s' "$tasks_json" | jq -r '.[0] // empty' 2>/dev/null)"
+  fi
+
   title=""; pr_ref=""; issue_refs_json='[]'; spec_standard=""; spec_ref=""
   if [[ -n "$current_task" ]]; then
     title="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" 2>/dev/null | head -n 1)"
@@ -123,8 +152,8 @@ _flow_branch_dashboard_entry() {
     --arg feature "$(_flow_feature_slug "$branch_name")" \
     --arg branch "$branch_name" \
     --arg state "open" \
-    --arg worktree_name "$(echo "$wt_data" | jq -r '.worktree_name // empty')" \
-    --arg worktree_path "$(echo "$wt_data" | jq -r '.worktree_path // empty')" \
+    --arg worktree_name "$(printf '%s' "$wt_data" | jq -r '.worktree_name // empty' 2>/dev/null)" \
+    --arg worktree_path "$(printf '%s' "$wt_data" | jq -r '.worktree_path // empty' 2>/dev/null)" \
     --arg current_task "$current_task" \
     --arg title "$title" \
     --arg task_status "$task_status" \

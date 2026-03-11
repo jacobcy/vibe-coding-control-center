@@ -67,6 +67,44 @@ JSON
   [[ "$output" =~ '"#7"' ]]
 }
 
+@test "3.1.1 _flow_show falls back to registry runtime_branch when worktree runtime entry is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","runtime_branch":"task/refactor","pr_ref":"#42","issue_refs":["#7"]}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/refactor"; return 0; fi
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
+      return 0
+    }
+    _flow_show --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"feature": "refactor"' ]]
+  [[ "$output" =~ '"branch": "task/refactor"' ]]
+  [[ "$output" =~ '"current_task": "task-main"' ]]
+  [[ "$output" =~ '"task_status": "in_progress"' ]]
+  [[ "$output" =~ '"#42"' ]]
+  [[ "$output" =~ '"#7"' ]]
+}
+
 @test "3.2 _flow_status shows only open flow dashboard entries" {
   local fixture
   fixture="$(mktemp -d)"
@@ -104,6 +142,106 @@ JSON
   [[ "$output" =~ '"current_task": "task-main"' ]]
   [[ ! "$output" =~ '"branch": "main"' ]]
   [[ ! "$output" =~ '"feature": "ghost"' ]]
+}
+
+@test "3.2.1 _flow_status includes runtime branches from registry when worktree runtime entry is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","runtime_branch":"task/refactor","pr_ref":"#42"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    _flow_status --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"feature": "refactor"' ]]
+  [[ "$output" =~ '"branch": "task/refactor"' ]]
+  [[ "$output" =~ '"current_task": "task-main"' ]]
+}
+
+@test "3.2.2 _flow_status ignores completed registry runtime branches without active worktree" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"completed","next_step":"Done","runtime_branch":"task/refactor","pr_ref":"#42"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    _flow_status --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ '"feature": "refactor"' ]]
+}
+
+@test "3.2.3 _flow_list includes runtime branches from registry when worktree runtime entry is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","runtime_branch":"task/refactor","pr_ref":"#42"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[]}
+JSON
+  cat > "$fixture/vibe/flow-history.json" <<'JSON'
+{"schema_version":"v1","flows":[]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    _flow_list
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "refactor" ]]
+  [[ "$output" =~ "Branch: task/refactor" ]]
+  [[ "$output" =~ "Task:   task-main" ]]
 }
 
 @test "4. _detect_feature extracts feature from dir name" {

@@ -184,8 +184,9 @@ related_docs:
 
 ### 7.1 Runtime Binding
 
-- 当前执行中的现场绑定以 `worktrees.json` 为准
-- `registry.json` 可以保存当前 runtime 绑定事实
+- 当前执行中的开放现场应以 `branch` 作为主锚点
+- `worktrees.json` 保存当前开放现场的目录容器与 branch 绑定提示
+- `registry.json` 可以保存当前 runtime 绑定事实，尤其是 `runtime_branch`
 - task 完成后必须清空 runtime `branch` / `worktree` / `agent` 绑定
 - task 归档后必须清空 runtime `branch` / `worktree` / `agent` 绑定
 - worktree 删除后必须从 `worktrees.json` 移除
@@ -193,7 +194,7 @@ related_docs:
 ### 7.2 Historical Facts
 
 - 未来规划态以 `roadmap.json` 为准
-- 当前执行态以 `registry.json` 与 `worktrees.json` 联合表达
+- 当前执行态以 `registry.json` 与 `worktrees.json` 联合表达，但 branch 是优先执行锚点
 - task 的完成与归档事实以 `registry.json` 为准
 - 已关闭 flow 的历史事实以 `flow-history.json` 为准
 - `worktrees.json` 只表达当前开放现场，不承担 flow 历史归档
@@ -228,4 +229,5 @@ related_docs:
 - 将 `flow` 回退成规划入口
 - 将 `feature` 写成共享模型字段
 - 将 `dirty` 写成持久化真源字段
+- 将 `worktree_name` / `worktree_path` 当作开放 flow 的主索引
 - 将 branch 或 worktree 当作历史唯一索引
