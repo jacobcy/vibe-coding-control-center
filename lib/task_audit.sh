@@ -162,9 +162,9 @@ vibe_task_audit() {
   [[ "$all_checks" == "true" ]] && _task_generate_audit_summary "$common_dir"
 
   if [[ "$check_branches" == "false" && "$check_openspec" == "false" && "$check_plans" == "false" && "$all_checks" == "false" ]]; then
-    log_step "Task Registry Audit Status"
-    echo ""
-    log_info "Task registry is healthy."
+    log_warn "No audit checks were selected."
+    log_info "Use --all or specific check flags (e.g., --check-branches) to run the audit."
+    return 1
   fi
 
   return 0
