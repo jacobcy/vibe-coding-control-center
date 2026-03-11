@@ -7,6 +7,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Bidirectional GitHub Project mirror sync" ]]
+  [[ "$output" =~ "vibe-task-labeled open issues" ]]
   [[ "$output" =~ "task / flow / spec bridge fields stay local" ]]
 }
 

@@ -79,6 +79,36 @@ _vibe_roadmap_add_project_item_from_content() {
     print -r -- "$item_id"
 }
 
+_vibe_roadmap_fetch_candidate_repo_issues() {
+    local repo="$1"
+    gh issue list --repo "$repo" --state open --label vibe-task --json id,number,title,body,url 2>/dev/null
+}
+
+_vibe_roadmap_sync_issue_intake_candidates() {
+    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_json issue_id issue_number issue_ref issue_url
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    candidate_json="$(_vibe_roadmap_fetch_candidate_repo_issues "$repo")" || return 1
+
+    while IFS= read -r candidate_json; do
+        [[ -n "$candidate_json" ]] || continue
+        issue_id="$(printf '%s' "$candidate_json" | jq -r '.id // empty')"
+        issue_number="$(printf '%s' "$candidate_json" | jq -r '.number // empty')"
+        issue_url="$(printf '%s' "$candidate_json" | jq -r '.url // empty')"
+        [[ -n "$issue_id" && -n "$issue_number" ]] || continue
+        issue_ref="gh-${issue_number}"
+
+        if jq -e \
+          --arg issue_ref "$issue_ref" \
+          --arg issue_url "$issue_url" \
+          '.items[]? | select(((.issue_refs // []) | index($issue_ref)) != null or ((.source_refs // []) | index($issue_url)) != null)' \
+          "$roadmap_file" >/dev/null; then
+            continue
+        fi
+
+        _vibe_roadmap_add_project_item_from_content "$project_id" "$issue_id" >/dev/null || return 1
+    done < <(printf '%s' "$candidate_json" | jq -c '.[]?')
+}
+
 _vibe_roadmap_bootstrap_remote_item() {
     local project_id="$1" item_json="$2" source_ref parsed repo number content_type content_id remote_item_id title description
     while IFS= read -r source_ref; do
@@ -296,5 +326,7 @@ _vibe_roadmap_sync_github() {
 
     echo "GitHub Project bootstrap sync complete for $repo (project_id: $project_id)."
     echo "Bootstrapped $pushed_count roadmap item mirrors into GitHub Project."
+    _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
+    _vibe_roadmap_sync_issue_intake_candidates "$common_dir" "$repo" "$project_id" || return 1
     _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
 }

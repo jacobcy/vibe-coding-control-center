@@ -161,6 +161,7 @@ JSON
     _vibe_roadmap_resolve_content_node_id() { echo "CONTENT_90"; return 0; }
     _vibe_roadmap_add_project_item_from_content() { echo "PVTI_issue"; return 0; }
     _vibe_roadmap_create_github_draft_issue() { echo "PVTI_draft"; return 0; }
+    _vibe_roadmap_fetch_candidate_repo_issues() { echo "[]"; return 0; }
     _vibe_roadmap_fetch_github_project_items() { cat "'"$fixture"'/vibe/roadmap.json" | jq -c "[.items[] | {github_project_item_id, title, description, content_type, source_type, source_refs, issue_refs, remote_number: null}]"; }
     _vibe_roadmap_sync_github "'"$fixture"'" "owner/repo" "PVT_project"
   '
@@ -170,6 +171,66 @@ JSON
   [ "$(jq -r '.items[0].content_type' "$fixture/vibe/roadmap.json")" = "issue" ]
   [ "$(jq -r '.items[1].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_draft" ]
   [ "$(jq -r '.items[1].content_type' "$fixture/vibe/roadmap.json")" = "draft_issue" ]
+}
+
+@test "shared-state: roadmap sync adds vibe-task labeled repo issues that are not yet mirrored" {
+  local fixture; fixture="$(mktemp -d)"
+  local add_log; add_log="$(mktemp)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "project_id": "PVT_project",
+  "version_goal": null,
+  "items": [
+    {
+      "roadmap_item_id": "gh-90",
+      "title": "Existing mirrored issue",
+      "description": null,
+      "status": "current",
+      "source_type": "github",
+      "source_refs": ["gh:owner/repo#90", "https://github.com/owner/repo/issues/90"],
+      "issue_refs": ["gh-90"],
+      "linked_task_ids": [],
+      "github_project_item_id": "PVTI_issue_90",
+      "content_type": "issue",
+      "execution_record_id": null,
+      "spec_standard": "none",
+      "spec_ref": null,
+      "created_at": "2026-03-10T12:00:00+0800",
+      "updated_at": "2026-03-10T12:30:00+0800"
+    }
+  ]
+}
+JSON
+
+  run env FIXTURE="$fixture" zsh -c '
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="$VIBE_ROOT/lib"
+    source "$VIBE_LIB/config.sh" 2>/dev/null || true
+    source "$VIBE_LIB/utils.sh" 2>/dev/null || true
+    source "$VIBE_LIB/roadmap_query.sh"
+    source "$VIBE_LIB/roadmap_write.sh"
+
+    _vibe_roadmap_fetch_candidate_repo_issues() {
+      cat <<'"'"'JSON'"'"'
+[
+  {"id":"ISSUE_90","number":90,"title":"Existing mirrored issue","body":"old body","url":"https://github.com/owner/repo/issues/90"},
+  {"id":"ISSUE_101","number":101,"title":"New candidate issue","body":"candidate body","url":"https://github.com/owner/repo/issues/101"}
+]
+JSON
+    }
+
+    _vibe_roadmap_add_project_item_from_content() {
+      printf "ADD:%s:%s\n" "$1" "$2" >> "'"$add_log"'"
+      return 0
+    }
+
+    _vibe_roadmap_sync_issue_intake_candidates "'"$fixture"'" "owner/repo" "PVT_project"
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$add_log")" = "ADD:PVT_project:ISSUE_101" ]
 }
 
 @test "shared-state: roadmap refresh updates existing mirrors and imports remote-only items" {
