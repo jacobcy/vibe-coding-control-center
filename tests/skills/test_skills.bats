@@ -166,3 +166,16 @@ SHELL
   [[ "$output" =~ "vibe-issue/SKILL.md" ]]
   [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
 }
+
+@test "roadmap intake gate docs define triage ownership without shell auto intake" {
+  run rg -n \
+    "不是所有.*repo issue.*自动进入.*Project|候选资格|vibe-roadmap.*intake gate|vibe-roadmap.*triage|shell.*不负责.*智能.*gate|不自动进入.*GitHub Project" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "vibe-issue/SKILL.md" ]]
+  [[ "$output" =~ "command-standard.md" ]]
+}

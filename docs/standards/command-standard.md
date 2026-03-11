@@ -221,9 +221,11 @@ related_docs:
 - `add` 新增的是 roadmap item，而不是 task / flow
 - `add` 必须先创建远端 GitHub Project item，再回填本地 mirror
 - `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
+- `sync` 不对全部 `repo issue` 做自动 intake；不是所有 `repo issue` 都自动进入 GitHub Project
 - `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
 - `sync` 不同步 `task` / `flow` / execution bridge 等本地执行字段
 - `sync` 不能改写 `content_type` 这类 GitHub 官方身份语义
+- shell 不负责智能 intake gate；`repo issue` 是否纳入 roadmap item，属于上层 skill / workflow 的 triage 判断
 
 ### 4.6 Status and Provider Rules
 

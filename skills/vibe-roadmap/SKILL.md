@@ -9,6 +9,12 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 **核心原则:** `/vibe-roadmap` 负责调度决策，`vibe roadmap` 负责 shell 层读写数据。
 
+intake gate 约束：
+
+- 不是所有 `repo issue` 都自动进入 GitHub Project。
+- 只有经过 `vibe-roadmap` triage 的候选 `repo issue`，才应纳入 roadmap item / GitHub Project。
+- shell 层不负责智能 intake gate；是否纳入 Project 属于 skill / workflow 的规划判断。
+
 对象约束：
 
 - `repo issue`: 需求来源
@@ -81,6 +87,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 **场景 B: 有版本目标但有新 `repo issue`**
 
 - 对新的 `repo issue` / roadmap item 进行分类：P0/当前版本/下一个版本/延期/拒绝
+- 对候选 `repo issue` 做 intake gate 判断：纳入 / 不纳入 / 待讨论
 - 按优先级排序
 - 若该 issue 来自已有治理母题，先读取上游 skill/workflow 的范围判断：
   - 仍在原主 issue 范围内，可继续按 sub-issue 进入规划
