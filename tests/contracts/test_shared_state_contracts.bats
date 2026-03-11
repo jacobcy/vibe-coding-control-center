@@ -316,7 +316,9 @@ JSON
 
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq -r '.official_layer.total_items')" = "1" ]
+  [ "$(echo "$output" | jq -r '.official_layer.mirrored_items')" = "1" ]
   [ "$(echo "$output" | jq -r '.official_layer.with_github_project_item_id')" = "1" ]
+  [ "$(echo "$output" | jq -r '.official_layer.remote_only_imports')" = "0" ]
   [ "$(echo "$output" | jq -r '.sync_check.missing_project_id')" = "0" ]
   [ "$(echo "$output" | jq -r '.extension_layer.with_execution_record_id')" = "1" ]
   [ "$(echo "$output" | jq -r '.extension_layer.with_spec_ref')" = "1" ]

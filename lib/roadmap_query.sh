@@ -88,8 +88,14 @@ _vibe_roadmap_status() {
         },
         official_layer: {
             total_items: ([.items[]?] | length),
+            mirrored_items: ([.items[]? | select(.github_project_item_id != null)] | length),
             with_github_project_item_id: ([.items[]? | select(.github_project_item_id != null)] | length),
-            with_content_type: ([.items[]? | select(.content_type != null)] | length)
+            with_content_type: ([.items[]? | select(.content_type != null)] | length),
+            remote_only_imports: ([.items[]?
+              | select(.source_type == "github")
+              | select(.github_project_item_id != null)
+              | select((.execution_record_id == null) and ((.linked_task_ids // []) | length == 0))
+            ] | length)
         },
         sync_check: {
             missing_project_id: (if (.project_id // null) == null then 1 else 0 end),
@@ -112,7 +118,7 @@ _vibe_roadmap_status() {
     fi
 
     local version_goal project_id counts p0_count current_count next_count deferred_count rejected_count
-    local official_counts official_total official_item_id official_content_type
+    local official_counts official_total official_mirrored official_item_id official_content_type official_remote_only
     local sync_counts sync_missing_item_id sync_missing_content_type sync_recommended sync_command
     local extension_counts extension_execution extension_spec_standard extension_spec_ref
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
@@ -145,12 +151,14 @@ _vibe_roadmap_status() {
     fi
     echo ""
 
-    official_counts="$(echo "$status_json" | jq -r '"\(.official_layer.total_items) \(.official_layer.with_github_project_item_id) \(.official_layer.with_content_type)"')"
-    IFS=' ' read -r official_total official_item_id official_content_type <<< "$official_counts"
+    official_counts="$(echo "$status_json" | jq -r '"\(.official_layer.total_items) \(.official_layer.mirrored_items) \(.official_layer.with_github_project_item_id) \(.official_layer.with_content_type) \(.official_layer.remote_only_imports)"')"
+    IFS=' ' read -r official_total official_mirrored official_item_id official_content_type official_remote_only <<< "$official_counts"
     echo "GitHub Project Mirror:"
     echo "  Total Items:       $official_total"
+    echo "  Mirrored Items:    $official_mirrored"
     echo "  Project Item IDs:  $official_item_id"
     echo "  Content Types:     $official_content_type"
+    echo "  Remote-only Imports: $official_remote_only"
     echo ""
 
     sync_counts="$(echo "$status_json" | jq -r '"\(.sync_check.missing_project_id) \(.sync_check.missing_github_project_item_id) \(.sync_check.missing_content_type) \(.sync_check.recommended)"')"

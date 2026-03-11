@@ -66,6 +66,8 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [[ "$output" =~ "Roadmap Item Summary:" ]]
   [[ "$output" =~ "GitHub Project Mirror:" ]]
   [[ "$output" =~ "Local Execution Bridge:" ]]
+  [[ "$output" =~ "Mirrored Items:" ]]
+  [[ "$output" =~ "Remote-only Imports:" ]]
 }
 
 @test "roadmap list text output avoids repeating id when title matches id" {
