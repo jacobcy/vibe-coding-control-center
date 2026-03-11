@@ -126,7 +126,7 @@ _vibe_roadmap_status() {
     echo "Project ID:   $(_vibe_roadmap_format "$CYAN" "$project_id")"
     echo ""
 
-    echo "Issue Summary:"
+    echo "Roadmap Item Summary:"
     counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
 
@@ -147,7 +147,7 @@ _vibe_roadmap_status() {
 
     official_counts="$(echo "$status_json" | jq -r '"\(.official_layer.total_items) \(.official_layer.with_github_project_item_id) \(.official_layer.with_content_type)"')"
     IFS=' ' read -r official_total official_item_id official_content_type <<< "$official_counts"
-    echo "GitHub Official Layer:"
+    echo "GitHub Project Mirror:"
     echo "  Total Items:       $official_total"
     echo "  Project Item IDs:  $official_item_id"
     echo "  Content Types:     $official_content_type"
@@ -167,7 +167,7 @@ _vibe_roadmap_status() {
 
     extension_counts="$(echo "$status_json" | jq -r '"\(.extension_layer.with_execution_record_id) \(.extension_layer.with_spec_standard) \(.extension_layer.with_spec_ref)"')"
     IFS=' ' read -r extension_execution extension_spec_standard extension_spec_ref <<< "$extension_counts"
-    echo "Vibe Extension Layer:"
+    echo "Local Execution Bridge:"
     echo "  Execution Records: $extension_execution"
     echo "  Spec Standards:    $extension_spec_standard"
     echo "  Spec Refs:         $extension_spec_ref"

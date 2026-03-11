@@ -55,6 +55,19 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [[ "$output" =~ "vibe roadmap sync --provider github --json" ]]
 }
 
+@test "roadmap status text uses clarified layer labels" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run_roadmap_fixture_cmd_no_tty "$fixture" '_vibe_roadmap_status'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Roadmap Item Summary:" ]]
+  [[ "$output" =~ "GitHub Project Mirror:" ]]
+  [[ "$output" =~ "Local Execution Bridge:" ]]
+}
+
 @test "roadmap list text output avoids repeating id when title matches id" {
   local fixture
   fixture="$(mktemp -d)"

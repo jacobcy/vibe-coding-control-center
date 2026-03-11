@@ -21,6 +21,7 @@ _run_roadmap_cmd() {
       case \"\$*\" in
         \"rev-parse --is-inside-work-tree\") return 0 ;;
         \"rev-parse --git-common-dir\") echo \"$fixture\"; return 0 ;;
+        \"remote get-url origin\") echo \"git@github.com:owner/repo.git\"; return 0 ;;
         *) command git \"\$@\" ;;
       esac
     }

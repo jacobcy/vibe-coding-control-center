@@ -116,8 +116,88 @@ _vibe_roadmap_create_github_draft_issue() {
     print -r -- "$item_id"
 }
 
+_vibe_roadmap_parse_source_ref() {
+    local ref="$1" repo="" number="" content_type=""
+
+    case "$ref" in
+        gh:*#*)
+            repo="${ref#gh:}"
+            repo="${repo%%#*}"
+            number="${ref##*#}"
+            content_type="issue"
+            ;;
+        https://github.com/*/issues/*)
+            repo="${ref#https://github.com/}"
+            repo="${repo%%/issues/*}"
+            number="${ref##*/issues/}"
+            content_type="issue"
+            ;;
+        https://github.com/*/pull/*)
+            repo="${ref#https://github.com/}"
+            repo="${repo%%/pull/*}"
+            number="${ref##*/pull/}"
+            content_type="pull_request"
+            ;;
+    esac
+
+    [[ -n "$repo" && -n "$number" && -n "$content_type" ]] || return 1
+    print -r -- "$repo|$number|$content_type"
+}
+
+_vibe_roadmap_resolve_content_node_id() {
+    local repo="$1" number="$2" content_type="$3"
+    case "$content_type" in
+        issue)
+            gh issue view "$number" --repo "$repo" --json id --jq '.id' 2>/dev/null
+            ;;
+        pull_request)
+            gh pr view "$number" --repo "$repo" --json id --jq '.id' 2>/dev/null
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+_vibe_roadmap_add_project_item_from_content() {
+    local project_id="$1" content_id="$2" response item_id
+    response="$(gh api graphql -f query='
+      mutation($project: ID!, $content: ID!) {
+        addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+          item {
+            id
+          }
+        }
+      }' -F project="$project_id" -F content="$content_id" 2>/dev/null)" || return 1
+    item_id="$(echo "$response" | jq -r '.data.addProjectV2ItemById.item.id // empty')"
+    [[ -n "$item_id" ]] || return 1
+    print -r -- "$item_id"
+}
+
+_vibe_roadmap_bootstrap_remote_item() {
+    local project_id="$1" item_json="$2" source_ref parsed repo number content_type content_id remote_item_id title description
+
+    while IFS= read -r source_ref; do
+        parsed="$(_vibe_roadmap_parse_source_ref "$source_ref")" || continue
+        repo="${parsed%%|*}"
+        local rest="${parsed#*|}"
+        number="${rest%%|*}"
+        content_type="${parsed##*|}"
+        content_id="$(_vibe_roadmap_resolve_content_node_id "$repo" "$number" "$content_type")" || continue
+        remote_item_id="$(_vibe_roadmap_add_project_item_from_content "$project_id" "$content_id")" || continue
+        print -r -- "$remote_item_id|$content_type"
+        return 0
+    done < <(echo "$item_json" | jq -r '.source_refs[]?')
+
+    title="$(echo "$item_json" | jq -r '.title')"
+    description="$(echo "$item_json" | jq -r '.description // ""')"
+    remote_item_id="$(_vibe_roadmap_create_github_draft_issue "$project_id" "$title" "$description")" || return 1
+    print -r -- "$remote_item_id|draft_issue"
+}
+
 _vibe_roadmap_sync_github() {
     local common_dir="$1" repo="$2" project_id="$3" roadmap_file
+    local item_json bootstrap_result remote_item_id content_type pushed_count=0
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_init "$common_dir"
 
@@ -126,8 +206,26 @@ _vibe_roadmap_sync_github() {
         return 1
     }
 
-    echo "GitHub Project sync contract validated for $repo (project_id: $project_id)."
-    echo "Project mirror refresh is not implemented yet; current shell contract now targets GitHub Project items instead of repo issue import."
+    while IFS= read -r item_json; do
+        bootstrap_result="$(_vibe_roadmap_bootstrap_remote_item "$project_id" "$item_json")" || {
+            echo "Failed to bootstrap roadmap item: $(echo "$item_json" | jq -r '.roadmap_item_id')"
+            return 1
+        }
+        remote_item_id="${bootstrap_result%%|*}"
+        content_type="${bootstrap_result##*|}"
+
+        jq --arg rid "$(echo "$item_json" | jq -r '.roadmap_item_id')" \
+           --arg remote_item_id "$remote_item_id" \
+           --arg content_type "$content_type" \
+           '(.items[] | select(.roadmap_item_id == $rid) | .github_project_item_id) = $remote_item_id
+            | (.items[] | select(.roadmap_item_id == $rid) | .content_type) = $content_type
+            | (.items[] | select(.roadmap_item_id == $rid) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
+           "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
+        pushed_count=$((pushed_count + 1))
+    done < <(jq -c '.items[]? | select(.github_project_item_id == null)' "$roadmap_file")
+
+    echo "GitHub Project bootstrap sync complete for $repo (project_id: $project_id)."
+    echo "Bootstrapped $pushed_count roadmap item mirrors into GitHub Project."
 }
 
 _vibe_roadmap_set_version_goal() {
