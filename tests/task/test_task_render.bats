@@ -185,3 +185,20 @@ JSON
   [ "$(echo "$output" | jq -r '.subtasks | length')" = "1" ]
   [ "$(echo "$output" | jq -r '.description')" = "Detailed task file" ]
 }
+
+@test "render: vibe_task show human summary includes issue refs and spec ref" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"
+  make_task_fixture "$fixture"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task show 2026-03-02-rotate-alignment
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Task: 2026-03-02-rotate-alignment" ]]
+  [[ "$output" =~ "Issue Refs:" ]]
+  [[ "$output" =~ "Spec Ref:" ]]
+}

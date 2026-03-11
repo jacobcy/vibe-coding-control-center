@@ -67,6 +67,80 @@ JSON
   [[ "$output" =~ '"#7"' ]]
 }
 
+@test "3.1.0 _flow_show json includes spec ref from bound task" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"],"spec_standard":"superpowers","spec_ref":"docs/plans/main-task.md"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/refactor","current_task":"task-main","tasks":["task-main"]}
+]}
+JSON
+  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/refactor"; return 0; fi
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
+      return 0
+    }
+    _flow_show --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"current_task": "task-main"' ]]
+  [[ "$output" =~ '"spec_ref": "docs/plans/main-task.md"' ]]
+}
+
+@test "3.1.0b _flow_show human summary includes spec ref from bound task" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"],"spec_standard":"superpowers","spec_ref":"docs/plans/main-task.md"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/refactor","current_task":"task-main","tasks":["task-main"]}
+]}
+JSON
+  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="$VIBE_ROOT/lib"
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "$VIBE_ROOT/lib/config.sh"
+    source "$VIBE_ROOT/lib/utils.sh"
+    source "$VIBE_ROOT/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/refactor"; return 0; fi
+      if [[ "$1" == "status" && "$2" == "--porcelain" ]]; then echo ""; return 0; fi
+      return 0
+    }
+    _flow_show
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Issues: #7" ]]
+  [[ "$output" =~ "Spec Ref:" ]]
+}
+
 @test "3.1.1 _flow_show falls back to registry runtime_branch when worktree runtime entry is missing" {
   local fixture
   fixture="$(mktemp -d)"
