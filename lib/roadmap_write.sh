@@ -21,6 +21,7 @@ _vibe_roadmap_add() {
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Roadmap item added: $item_id"
+    echo "Title: $title"
     echo "GitHub Project item created: $remote_item_id"
 }
 

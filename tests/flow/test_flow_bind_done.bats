@@ -26,6 +26,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Binding" ]]
+  [[ "$output" =~ "Rotate Workflow Refinement" ]]
 }
 
 @test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
@@ -322,6 +323,7 @@ JSON
   [[ "$output" =~ "DETACHED_MAIN" ]]
   [[ "$output" =~ "DELETE_LOCAL:task/feature-branch" ]]
   [[ "$output" =~ "DELETE_REMOTE:task/feature-branch" ]]
+  [[ "$output" =~ "task/feature-branch" ]]
   [[ "$output" =~ "History preserved" ]]
   [ "$(jq -r '.flows[0].state' "$fixture/vibe/flow-history.json")" = "closed" ]
   [ "$(jq -r '.flows[0].feature' "$fixture/vibe/flow-history.json")" = "feature-branch" ]

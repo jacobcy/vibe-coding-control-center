@@ -11,6 +11,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Version goal set to: Ship roadmap split" ]]
+  [[ "$output" =~ "planning window" ]]
   [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "Ship roadmap split" ]
 }
 
@@ -59,6 +60,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Version goal cleared." ]]
+  [[ "$output" =~ "Next:" ]]
   [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "null" ]
 }
 
@@ -71,6 +73,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Roadmap item added:" ]]
+  [[ "$output" =~ "Local roadmap item" ]]
   [ "$(jq -r '.items[] | select(.title=="Local roadmap item") | .source_type' "$fixture/vibe/roadmap.json")" = "local" ]
 }
 
