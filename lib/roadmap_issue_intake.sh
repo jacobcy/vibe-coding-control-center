@@ -18,7 +18,7 @@ _vibe_roadmap_fetch_candidate_repo_prs() {
 }
 
 _vibe_roadmap_sync_issue_intake_candidates() {
-    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_list_json
+    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_list_json candidate_issue_json issue_id issue_number issue_ref issue_url added_count=0
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
 
     # Intake Issues (always enabled)
@@ -59,9 +59,11 @@ _vibe_roadmap_process_intake_candidates() {
         fi
 
         _vibe_roadmap_add_project_item_from_content "$project_id" "$id" >/dev/null || return 1
-        # Also try to bridge if it's a new PR item being added
+        added_count=$((added_count + 1))
         _vibe_roadmap_bridge_pr_links "$roadmap_file" "$candidate_json" "$repo"
     done < <(printf '%s' "$candidate_list_json" | jq -c '.[]?')
+
+    echo "Added $added_count vibe-task issue candidates into GitHub Project."
 }
 
 _vibe_roadmap_bridge_pr_links() {

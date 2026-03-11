@@ -276,6 +276,8 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "RUNTIME_UPDATED" ]]
   [[ "$output" =~ "APPLIED" ]]
   [[ "$output" =~ "DROPPED" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
+  [[ "$output" =~ "branch: task/next-flow" ]]
 }
 
 @test "2.6.1 _flow_switch skips stash work when the worktree is already clean" {
