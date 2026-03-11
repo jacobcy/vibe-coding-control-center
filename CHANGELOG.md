@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.15] - 2026-03-11
+
+### ✨ Changed
+- Tighten backlog governance and commit preflight
+
 ## [2.1.14] - 2026-03-11
 
 ### ✨ Changed
