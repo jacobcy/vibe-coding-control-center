@@ -40,6 +40,13 @@ _vibe_task_sync_roadmap_links() {
       )
     ' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file"
 }
+_vibe_task_require_plan_binding_for_add() {
+    local spec_standard="$1" spec_ref="$2"
+    if [[ "$spec_standard" == "none" || -z "$spec_ref" ]]; then
+        vibe_die "Task creation requires a plan binding. Create or select a roadmap item via 'vibe roadmap add (shell)', then use the writing-plans skill to produce a plan, and re-run vibe task add with --spec-standard/--spec-ref."
+        return 1
+    fi
+}
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve" spec_standard="" spec_ref="" spec_mode="preserve"
     local -a issue_refs roadmap_item_ids
@@ -157,6 +164,7 @@ _vibe_task_add() {
     done
     [[ -n "$title" ]] || { vibe_die "Missing title for task add"; return 1; }
     spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "$spec_standard")" || { vibe_die "Invalid spec standard: $spec_standard"; return 1; }
+    _vibe_task_require_plan_binding_for_add "$spec_standard" "$spec_ref" || return 1
     if [[ -z "$task_id" ]]; then local slug; slug="$(_vibe_task_slugify "$title")"; task_id="$(_vibe_task_today)-$slug"; fi
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"; now="$(_vibe_task_now)"
