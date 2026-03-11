@@ -127,6 +127,8 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "CHECKOUT_DEFAULT" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
+  [[ "$output" =~ "branch: task/next-flow" ]]
 }
 
 @test "2.5.0a _flow_new allows detached HEAD and creates a new branch from origin/main" {

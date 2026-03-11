@@ -441,6 +441,8 @@ JSON
     vibe_task remove 2026-03-02-rotate-alignment
   '
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "2026-03-02-rotate-alignment" ]]
+  [[ "$output" =~ "removed from registry" ]]
   [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
   [ ! -f "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json" ]
 }
