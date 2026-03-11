@@ -124,6 +124,12 @@ _vibe_task_update() {
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
+    log_success "Task updated: $task_id"
+    [[ -n "$task_status" ]] && echo "Status: $task_status"
+    [[ -n "$next_step" ]] && echo "Next Step: $next_step"
+    [[ "$spec_mode" == "set" ]] && echo "Spec Ref: ${spec_ref:-none}"
+    [[ -n "$branch" ]] && echo "Runtime Branch: $branch"
+    [[ "$bind_current" == "true" ]] && echo "Runtime Worktree: $worktree"
     case "$task_status" in
         todo) echo "💡 Next: Create an execution scene using ${CYAN}wtnew <branch>${NC} or start with ${CYAN}vnew <branch>${NC}" ;;
         in_progress) echo "💡 Next: Ensure your cockpit is ready with ${CYAN}vup${NC}; this task record is an execution record, not a roadmap item." ;;
@@ -225,6 +231,8 @@ _vibe_task_add() {
       }' > "$task_file"
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     log_success "Task added: $task_id"
+    echo "Title: $title"
+    echo "Spec Ref: $spec_ref"
     echo "💡 Next: Run ${CYAN}wtnew <branch>${NC} or ${CYAN}vnew <branch>${NC} to start an execution scene, then bind this execution record."
 }
 _vibe_task_branch_matches_any() { local branch="$1" candidate; shift; for candidate in "$@"; do [[ -n "$candidate" && ( "$branch" == "$candidate" || "$branch" == */"$candidate" ) ]] && return 0; done; return 1; }

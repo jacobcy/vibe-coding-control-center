@@ -295,6 +295,8 @@ _vibe_task_show() {
         "Title: \(.title)\n" +
         "Status: \(.status)\n" +
         "Runtime Worktree: \((.runtime_worktree_name // "null"))\n" +
+        "Issue Refs: \((.issue_refs // []) | if length == 0 then "none" else join(", ") end)\n" +
+        "Spec Ref: \((.spec_ref // "null"))\n" +
         "Next Step: \((.next_step // "null"))\n" +
         "Subtasks: \(.subtasks | length)"'
 }

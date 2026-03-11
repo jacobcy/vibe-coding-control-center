@@ -190,6 +190,19 @@ JSON
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"
   make_task_fixture "$fixture"
+  jq '
+    .tasks |= map(
+      if .task_id == "2026-03-02-rotate-alignment" then
+        .issue_refs = ["gh-112"]
+        | .spec_standard = "superpowers"
+        | .spec_ref = "docs/plans/2026-03-11-gh-112-cli-output-summary-plan.md"
+      else . end
+    )
+  ' "$fixture/vibe/registry.json" > "$fixture/vibe/registry.json.tmp"
+  mv "$fixture/vibe/registry.json.tmp" "$fixture/vibe/registry.json"
+  cat > "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json" <<'JSON'
+{"task_id":"2026-03-02-rotate-alignment","title":"Rotate Workflow Refinement","status":"todo","subtasks":[],"assigned_worktree":null,"next_step":"Start here.","issue_refs":["gh-112"],"spec_standard":"superpowers","spec_ref":"docs/plans/2026-03-11-gh-112-cli-output-summary-plan.md"}
+JSON
 
   run zsh -c '
     source "'"$HELPER"'"

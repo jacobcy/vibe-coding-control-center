@@ -137,8 +137,8 @@ JSON
   '
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Issues: #7" ]]
-  [[ "$output" =~ "Spec Ref:" ]]
+  [[ "$output" =~ "#7" ]]
+  [[ "$output" =~ "docs/plans/main-task.md" ]]
 }
 
 @test "3.1.1 _flow_show falls back to registry runtime_branch when worktree runtime entry is missing" {

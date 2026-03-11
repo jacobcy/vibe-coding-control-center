@@ -22,7 +22,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap classify rm-1 --status next'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Roadmap item rm-1 classified as: next" ]]
+  [[ "$output" =~ "Roadmap item rm-1 (Alpha) classified as: next" ]]
   [ "$(jq -r '.items[] | select(.roadmap_item_id=="rm-1") | .status' "$fixture/vibe/roadmap.json")" = "next" ]
 }
 
