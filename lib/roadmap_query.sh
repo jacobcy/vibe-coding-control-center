@@ -1,60 +1,6 @@
 #!/usr/bin/env zsh
 # lib/roadmap_query.sh - Read/Query operations for Roadmap module
-
-_vibe_roadmap_require_file() {
-    if [[ -f "$1" ]]; then
-        return 0
-    fi
-    vibe_die "Missing $2: $1"
-}
-
-_vibe_roadmap_common_dir() {
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        vibe_die "Not in a git repository"
-    fi
-    git rev-parse --git-common-dir
-}
-
-_vibe_roadmap_file() {
-    local common_dir="$1"
-    echo "$common_dir/vibe/roadmap.json"
-}
-
-_vibe_roadmap_project_id() {
-    local common_dir="$1" roadmap_file
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
-    jq -r '.project_id // empty' "$roadmap_file"
-}
-
-_vibe_roadmap_current_repo() {
-    local remote_url repo_path
-    remote_url="$(git remote get-url origin 2>/dev/null || git config --get remote.origin.url 2>/dev/null || true)"
-    [[ -n "$remote_url" ]] || { vibe_die "Unable to infer current repo from git remote origin"; return 1; }
-
-    case "$remote_url" in
-        git@github.com:*)
-            repo_path="${remote_url#git@github.com:}"
-            ;;
-        ssh://git@github.com/*)
-            repo_path="${remote_url#ssh://git@github.com/}"
-            ;;
-        https://github.com/*)
-            repo_path="${remote_url#https://github.com/}"
-            ;;
-        http://github.com/*)
-            repo_path="${remote_url#http://github.com/}"
-            ;;
-        *)
-            vibe_die "Unsupported GitHub remote URL: $remote_url"
-            return 1
-            ;;
-    esac
-
-    repo_path="${repo_path%.git}"
-    [[ "$repo_path" == */* ]] || { vibe_die "Unable to normalize repo from remote origin: $remote_url"; return 1; }
-    print -r -- "$repo_path"
-}
+[[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_store.sh" ]] && source "$VIBE_LIB/roadmap_store.sh"
 
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
@@ -348,22 +294,4 @@ _vibe_roadmap_show() {
         echo "Issue Refs:"
         echo "  ${issues}"
     fi
-}
-
-_vibe_roadmap_get_version_goal() {
-    local common_dir="$1" roadmap_file
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    jq -r '.version_goal // empty' "$roadmap_file"
-}
-
-_vibe_roadmap_has_version_goal() {
-    local common_dir="$1" version_goal
-    version_goal="$(_vibe_roadmap_get_version_goal "$common_dir")"
-    [[ -n "$version_goal" ]]
-}
-
-_vibe_roadmap_get_current_issues() {
-    local common_dir="$1" roadmap_file
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    jq -c '[.items[]? | select(.status == "current" or .status == "p0")]' "$roadmap_file"
 }
