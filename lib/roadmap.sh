@@ -70,7 +70,7 @@ vibe_roadmap() {
 _vibe_roadmap_sync() {
     local provider="github"
     local repo=""
-    local label="vibe-task"
+    local project_id=""
     local output_json="false"
 
     while [[ $# -gt 0 ]]; do
@@ -83,8 +83,8 @@ _vibe_roadmap_sync() {
                 repo="$2"
                 shift 2
                 ;;
-            --label)
-                label="$2"
+            --project-id)
+                project_id="$2"
                 shift 2
                 ;;
             --json)
@@ -100,36 +100,37 @@ _vibe_roadmap_sync() {
     local common_dir
     common_dir="$(_vibe_roadmap_common_dir)" || return 1
 
+    [[ -n "$repo" ]] || repo="$(_vibe_roadmap_current_repo)" || return 1
+    [[ -n "$project_id" ]] || project_id="$(_vibe_roadmap_project_id "$common_dir")" || return 1
+
     case "$provider" in
         github)
-            if [[ -z "$repo" ]]; then
-                echo "Error: --repo required for GitHub sync"
+            if [[ -z "$project_id" ]]; then
+                echo "Error: roadmap.json project_id required for GitHub Project sync"
                 return 1
             fi
             if [[ "$output_json" == "true" ]]; then
                 jq -n \
                   --arg provider "$provider" \
                   --arg repo "$repo" \
-                  --arg label "$label" \
+                  --arg project_id "$project_id" \
                   '{
                     mode: "project_first",
                     official_layer: {
                       provider: $provider,
                       repo: $repo,
+                      project_id: $project_id,
                       primary_object: "github_project_item_mirror",
-                      compatibility_import: "repo_issue"
+                      sync_direction: "bidirectional"
                     },
-                    extension_layer: {
-                      writeback: "roadmap_bridge_only",
-                      fields: ["execution_record_id", "spec_standard", "spec_ref"]
-                    },
-                    compatibility: {
-                      issue_label: $label
+                    local_execution_layer: {
+                      sync: "local_only",
+                      fields: ["execution_record_id", "spec_standard", "spec_ref", "linked_task_ids"]
                     }
                   }'
                 return 0
             fi
-            _vibe_roadmap_sync_github "$common_dir" "$repo" "$label"
+            _vibe_roadmap_sync_github "$common_dir" "$repo" "$project_id"
             ;;
         *)
             echo "Error: Unknown provider: $provider"

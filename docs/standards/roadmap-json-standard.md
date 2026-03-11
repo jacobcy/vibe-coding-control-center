@@ -28,11 +28,12 @@ related_docs:
 `roadmap.json` 只负责：
 
 - roadmap item（mirrored GitHub Project item）
+- GitHub Project 身份锚点（`project_id`）
 - roadmap item 状态
 - milestone / 兼容性的 `version_goal`
 - roadmap item 与 task / repo issue 的映射
 - GitHub Project item 的稳定桥接字段
-- 允许双向同步的 Vibe 扩展字段
+- 本地执行桥接扩展字段
 
 `roadmap.json` 不负责：
 
@@ -51,6 +52,7 @@ related_docs:
 ```json
 {
   "schema_version": "v2",
+  "project_id": null,
   "milestone": null,
   "version_goal": null,
   "items": []
@@ -60,6 +62,7 @@ related_docs:
 根对象只允许：
 
 - `schema_version`
+- `project_id`
 - `milestone`
 - `version_goal`
 - `items`
@@ -118,6 +121,7 @@ related_docs:
 以下字段允许为 `null`：
 
 - `version_goal`
+- `project_id`
 - `description`
 - `milestone`
 - `github_project_item_id`
@@ -128,6 +132,7 @@ related_docs:
 说明：
 
 - 根字段 `milestone` 保留，作为当前规划窗口的标准锚点
+- 根字段 `project_id` 是 GitHub Project 的稳定身份锚点；缺失时不得执行远端 sync / add
 - 根字段 `version_goal` 保留，但只作为兼容性文本锚点，不替代 milestone
 - item 级 `source_refs` 用于记录 GitHub Project item / issue 等来源引用
 
@@ -185,7 +190,8 @@ related_docs:
 - `spec_standard` 是 Vibe 扩展字段，不是 GitHub 官方字段
 - `execution_record_id` 用于桥接本地 `registry.json.task_id`
 - `spec_ref` 用于指向规范文档或执行规范入口
-- 扩展字段必须可双向同步，但不得改变 GitHub item 的官方身份字段
+- 这些扩展字段只保留在本地共享真源，不回写到 GitHub Project
+- 扩展字段不得改变 GitHub item 的官方身份字段
 
 ## 5. Relationship Rules
 
@@ -196,11 +202,12 @@ related_docs:
 补充约束：
 
 - `roadmap item` 是 mirrored `GitHub Project item`，不是任意本地 feature 草稿
+- `roadmap.json` 顶层 `project_id` 决定当前仓库默认绑定的 GitHub Project
 - `type=feature|task|bug` 只表达规划分类，足以覆盖当前标准层需求
 - 若未来需要更高层规划对象，应新增独立标准，而不是让 roadmap item 混装 `epic`
 - `source_refs` 应优先记录 GitHub Project item / repo issue 来源，而不是本地运行时来源
 - `github_project_item_id` + `content_type` 是 GitHub Project 对齐主桥
-- `spec_standard` / `execution_record_id` / `spec_ref` 是 Vibe 扩展桥
+- `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 是本地执行桥接字段
 - 一个 roadmap item 可以关联多个 task
 - 一个 roadmap item 可以关联多个 repo issue
 - 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
@@ -241,6 +248,7 @@ related_docs:
 ```json
 {
   "schema_version": "v2",
+  "project_id": "PVT_kwDOBHxkss4A1a2B",
   "milestone": "v2.1",
   "version_goal": "Complete shared-state standardization",
   "items": [

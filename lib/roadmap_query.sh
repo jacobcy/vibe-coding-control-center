@@ -19,6 +19,43 @@ _vibe_roadmap_file() {
     local common_dir="$1"
     echo "$common_dir/vibe/roadmap.json"
 }
+
+_vibe_roadmap_project_id() {
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
+    jq -r '.project_id // empty' "$roadmap_file"
+}
+
+_vibe_roadmap_current_repo() {
+    local remote_url repo_path
+    remote_url="$(git remote get-url origin 2>/dev/null || git config --get remote.origin.url 2>/dev/null || true)"
+    [[ -n "$remote_url" ]] || { vibe_die "Unable to infer current repo from git remote origin"; return 1; }
+
+    case "$remote_url" in
+        git@github.com:*)
+            repo_path="${remote_url#git@github.com:}"
+            ;;
+        ssh://git@github.com/*)
+            repo_path="${remote_url#ssh://git@github.com/}"
+            ;;
+        https://github.com/*)
+            repo_path="${remote_url#https://github.com/}"
+            ;;
+        http://github.com/*)
+            repo_path="${remote_url#http://github.com/}"
+            ;;
+        *)
+            vibe_die "Unsupported GitHub remote URL: $remote_url"
+            return 1
+            ;;
+    esac
+
+    repo_path="${repo_path%.git}"
+    [[ "$repo_path" == */* ]] || { vibe_die "Unable to normalize repo from remote origin: $remote_url"; return 1; }
+    print -r -- "$repo_path"
+}
+
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -40,6 +77,7 @@ _vibe_roadmap_status() {
 
     local status_json
     status_json="$(jq -c '{
+        project_id: .project_id,
         version_goal: .version_goal,
         counts: {
             p0: ([.items[]? | select(.status == "p0")] | length),
@@ -54,6 +92,7 @@ _vibe_roadmap_status() {
             with_content_type: ([.items[]? | select(.content_type != null)] | length)
         },
         sync_check: {
+            missing_project_id: (if (.project_id // null) == null then 1 else 0 end),
             missing_github_project_item_id: ([.items[]? | select(.github_project_item_id == null)] | length),
             missing_content_type: ([.items[]? | select(.content_type == null)] | length)
         },
@@ -63,8 +102,8 @@ _vibe_roadmap_status() {
             with_spec_ref: ([.items[]? | select(.spec_ref != null)] | length)
         }
     } | .sync_check += {
-        recommended: ((.sync_check.missing_github_project_item_id > 0) or (.sync_check.missing_content_type > 0)),
-        recommended_command: "vibe roadmap sync --provider github --repo <owner/repo> --json"
+        recommended: ((.sync_check.missing_project_id > 0) or (.sync_check.missing_github_project_item_id > 0) or (.sync_check.missing_content_type > 0)),
+        recommended_command: "vibe roadmap sync --provider github --json"
     }' "$roadmap_file")"
 
     if [[ "$output_json" == "true" ]]; then
@@ -72,17 +111,19 @@ _vibe_roadmap_status() {
         return 0
     fi
 
-    local version_goal counts p0_count current_count next_count deferred_count rejected_count
+    local version_goal project_id counts p0_count current_count next_count deferred_count rejected_count
     local official_counts official_total official_item_id official_content_type
     local sync_counts sync_missing_item_id sync_missing_content_type sync_recommended sync_command
     local extension_counts extension_execution extension_spec_standard extension_spec_ref
     version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
+    project_id="$(echo "$status_json" | jq -r '.project_id // "none"')"
 
     echo "========================================"
     echo "         $(_vibe_roadmap_format "$BOLD" "Roadmap Status")"
     echo "========================================"
     echo ""
     echo "Version Goal: $(_vibe_roadmap_format "$CYAN" "$version_goal")"
+    echo "Project ID:   $(_vibe_roadmap_format "$CYAN" "$project_id")"
     echo ""
 
     echo "Issue Summary:"
@@ -112,11 +153,12 @@ _vibe_roadmap_status() {
     echo "  Content Types:     $official_content_type"
     echo ""
 
-    sync_counts="$(echo "$status_json" | jq -r '"\(.sync_check.missing_github_project_item_id) \(.sync_check.missing_content_type) \(.sync_check.recommended)"')"
-    IFS=' ' read -r sync_missing_item_id sync_missing_content_type sync_recommended sync_command <<< "$sync_counts"
+    sync_counts="$(echo "$status_json" | jq -r '"\(.sync_check.missing_project_id) \(.sync_check.missing_github_project_item_id) \(.sync_check.missing_content_type) \(.sync_check.recommended)"')"
+    IFS=' ' read -r sync_missing_project_id sync_missing_item_id sync_missing_content_type sync_recommended sync_command <<< "$sync_counts"
     sync_command="$(echo "$status_json" | jq -r '.sync_check.recommended_command')"
     if [[ "$sync_recommended" == "true" ]]; then
         echo "$(_vibe_roadmap_format "$YELLOW" "Roadmap sync recommended before relying on GitHub Projects coverage.")"
+        echo "  Missing Project ID:       $sync_missing_project_id"
         echo "  Missing Project Item IDs: $sync_missing_item_id"
         echo "  Missing Content Types:    $sync_missing_content_type"
         echo "  Next: $sync_command"

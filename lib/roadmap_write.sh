@@ -17,7 +17,7 @@ _vibe_roadmap_init() {
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     if [[ ! -f "$roadmap_file" ]]; then
         mkdir -p "$(dirname "$roadmap_file")" || return 1
-        jq -n '{schema_version: "v2", version_goal: null, items: []}' > "$roadmap_file" || return 1
+        jq -n '{schema_version: "v2", project_id: null, milestone: null, version_goal: null, items: []}' > "$roadmap_file" || return 1
     fi
 }
 
@@ -75,20 +75,59 @@ _vibe_roadmap_next_item_id() {
 }
 
 _vibe_roadmap_add() {
-    local common_dir="$1" title="$2" roadmap_file item_id item_json
+    local common_dir="$1" title="$2" roadmap_file item_id item_json project_id remote_item_id
     [[ -n "$title" ]] || { echo "Error: title required"; return 1; }
 
     _vibe_roadmap_init "$common_dir"
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    project_id="$(_vibe_roadmap_project_id "$common_dir")" || return 1
+    [[ -n "$project_id" ]] || { echo "Error: roadmap.json project_id required before roadmap add"; return 1; }
+    remote_item_id="$(_vibe_roadmap_create_github_draft_issue "$project_id" "$title")" || return 1
     item_id="$(_vibe_roadmap_next_item_id "$common_dir" "$title")" || return 1
     item_json="$(_vibe_roadmap_new_item "$item_id" "$title" "local" '[]' '[]')" || return 1
 
-    jq --argjson item "$item_json" \
-        '.items += [$item]' \
+    jq --arg remote_item_id "$remote_item_id" \
+       --argjson item "$item_json" \
+        '.items += [($item | .github_project_item_id = $remote_item_id)]' \
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Roadmap item added: $item_id"
-    echo "This local roadmap item is the mirror record for a GitHub Project item."
+    echo "GitHub Project item created: $remote_item_id"
+}
+
+_vibe_roadmap_create_github_draft_issue() {
+    local project_id="$1" title="$2" response item_id
+    response="$(gh api graphql -f query='
+      mutation($project: ID!, $title: String!, $body: String!) {
+        addProjectV2DraftIssue(input: {projectId: $project, title: $title, body: $body}) {
+          projectItem {
+            id
+          }
+        }
+      }' -F project="$project_id" -f title="$title" -f body="" 2>/dev/null)" || {
+        echo "Failed to create GitHub Project draft item. Make sure gh is authenticated and project_id is valid."
+        return 1
+    }
+    item_id="$(echo "$response" | jq -r '.data.addProjectV2DraftIssue.projectItem.id // empty')"
+    [[ -n "$item_id" ]] || {
+        echo "Failed to parse GitHub Project item id from GraphQL response."
+        return 1
+    }
+    print -r -- "$item_id"
+}
+
+_vibe_roadmap_sync_github() {
+    local common_dir="$1" repo="$2" project_id="$3" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_init "$common_dir"
+
+    [[ -n "$project_id" ]] || {
+        echo "Error: roadmap.json project_id required for GitHub Project sync"
+        return 1
+    }
+
+    echo "GitHub Project sync contract validated for $repo (project_id: $project_id)."
+    echo "Project mirror refresh is not implemented yet; current shell contract now targets GitHub Project items instead of repo issue import."
 }
 
 _vibe_roadmap_set_version_goal() {
@@ -126,62 +165,6 @@ _vibe_roadmap_classify() {
     echo "Roadmap item $issue_id classified as: $issue_state"
 }
 
-_vibe_roadmap_sync_github() {
-    local common_dir="$1" repo="$2" label="${3:-vibe-task}" roadmap_file
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    _vibe_roadmap_init "$common_dir"
-
-    echo "Syncing repo issues from $repo with label '$label' into local roadmap items..."
-
-    local issues_json
-    issues_json="$(gh issue list --repo "$repo" --label "$label" --state open --json number,title 2>/dev/null)" || {
-        echo "Failed to fetch repo issues from GitHub. Make sure gh is authenticated."
-        return 1
-    }
-
-    local issue_count
-    issue_count="$(echo "${issues_json}" | jq 'length')"
-    if [[ "$issue_count" == "0" ]]; then
-        echo "No repo issues found with label '$label' in $repo"
-        return 0
-    fi
-
-    local new_issues_json
-    new_issues_json="$(echo "${issues_json}" | jq -c --arg repo "$repo" '[.[] | {
-        roadmap_item_id: ("gh-" + (.number | tostring)),
-        title: .title,
-        source_ref: ("gh:" + $repo + "#" + (.number | tostring))
-    }]')"
-
-    new_issues_json="$(
-        echo "${new_issues_json}" | jq -c '[.[] | {
-            roadmap_item_id: .roadmap_item_id,
-            title: .title,
-            description: null,
-            status: "deferred",
-            source_type: "github",
-            source_refs: [.source_ref],
-            issue_refs: [.source_ref],
-            linked_task_ids: [],
-            github_project_item_id: null,
-            content_type: "draft_issue",
-            execution_record_id: null,
-            spec_standard: "none",
-            spec_ref: null,
-            created_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z")),
-            updated_at: (now | strftime("%Y-%m-%dT%H:%M:%S%z"))
-        }]'
-    )"
-
-    local merged_issues
-    merged_issues="$(jq --argjson new "$new_issues_json" '(.items // []) + $new | unique_by(.roadmap_item_id) | .[:100]' "$roadmap_file")"
-
-    jq --argjson issues "$merged_issues" '.items = $issues' \
-        "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
-
-    echo "Sync complete. Added $issue_count roadmap item mirrors from repo issues."
-    echo "Current limitation: this sync path still mirrors repo issues directly; full GitHub Project item sync remains a follow-up gap."
-}
 
 _vibe_roadmap_assign() {
     local common_dir="$1" version_goal="$2"

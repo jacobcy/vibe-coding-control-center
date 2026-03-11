@@ -219,9 +219,11 @@ related_docs:
 写入边界：
 
 - `add` 新增的是 roadmap item，而不是 task / flow
+- `add` 必须先创建远端 GitHub Project item，再回填本地 mirror
 - `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
 - `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
-- `sync` 可以同步 Vibe 扩展字段，但不能改写 `content_type` 这类 GitHub 官方身份语义
+- `sync` 不同步 `task` / `flow` / execution bridge 等本地执行字段
+- `sync` 不能改写 `content_type` 这类 GitHub 官方身份语义
 
 ### 4.6 Status and Provider Rules
 
@@ -252,7 +254,8 @@ provider 只允许：
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
 - `milestone` 是规划窗口锚点，不是 flow 切换开关
-- roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` 属于允许双向同步的扩展字段
+- `roadmap sync` 默认从当前 git 环境推导 repo，并从 `roadmap.json.project_id` 确定目标 project
+- roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 属于本地执行桥接字段，不写回 GitHub Project
 
 ### 4.7 Prohibited Semantics
 

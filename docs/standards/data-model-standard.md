@@ -76,6 +76,7 @@ related_docs:
 - `openspec` 属于执行层输入，不属于规划层来源
 - `roadmap item` 是 mirrored `GitHub Project item`
 - GitHub 官方对象语义必须原样保留；项目自定义语义只能作为扩展字段叠加
+- `roadmap.json.project_id` 是当前仓库默认 GitHub Project 身份锚点
 - `feature` / `task` / `bug` 在规划层默认解释为 roadmap item `type`
 - `task` 是 execution record，不等于 roadmap item 的 `type=task`
 - `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
@@ -83,6 +84,7 @@ related_docs:
 - `flow` 只属于执行层，是 task 的运行时容器，不承担规划入口语义
 - `spec_standard` 是 Vibe 扩展字段，用于标记 execution record 采用的规范体系
 - `execution_record_id` 是 Vibe 扩展桥接字段，用于稳定对齐 GitHub Project item 与本地 task
+- `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 只属于本地执行桥接，不参与 GitHub Project 同步
 - `flow new <name>` 中的 `name` 只是现场命名输入，不定义 feature 实体
 
 ## 4. Naming Rules

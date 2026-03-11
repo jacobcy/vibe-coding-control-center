@@ -11,6 +11,7 @@ _write_roadmap_fixture() {
   cat > "$fixture/vibe/roadmap.json" <<'JSON'
 {
   "schema_version": "v2",
+  "project_id": "PVT_kwDOBHxkss4A1a2B",
   "version_goal": "Q2 sync cutover",
   "items": [
     {
@@ -103,10 +104,10 @@ JSON
 MD
 }
 
-@test "shared-state: roadmap add writes github-project anchor fields by default" {
+@test "shared-state: roadmap add creates remote project item before writing local mirror" {
   local fixture; fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"
-  printf '{"schema_version":"v2","version_goal":null,"items":[]}\n' > "$fixture/vibe/roadmap.json"
+  printf '{"schema_version":"v2","project_id":"PVT_kwDOBHxkss4A1a2B","version_goal":null,"items":[]}\n' > "$fixture/vibe/roadmap.json"
 
   run zsh -c '
     export VIBE_ROOT="'"$VIBE_ROOT"'"
@@ -115,11 +116,12 @@ MD
     source "$VIBE_LIB/utils.sh" 2>/dev/null || true
     source "$VIBE_LIB/roadmap_query.sh"
     source "$VIBE_LIB/roadmap_write.sh"
+    _vibe_roadmap_create_github_draft_issue() { echo "PVTI_created"; return 0; }
     _vibe_roadmap_add "'"$fixture"'" "Bootstrap GitHub Project mirror"
   '
 
   [ "$status" -eq 0 ]
-  [ "$(jq -r '.items[0].github_project_item_id' "$fixture/vibe/roadmap.json")" = "null" ]
+  [ "$(jq -r '.items[0].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_created" ]
   [ "$(jq -r '.items[0].content_type' "$fixture/vibe/roadmap.json")" = "draft_issue" ]
   [ "$(jq -r '.items[0].execution_record_id' "$fixture/vibe/roadmap.json")" = "null" ]
   [ "$(jq -r '.items[0].spec_standard' "$fixture/vibe/roadmap.json")" = "none" ]
@@ -174,6 +176,7 @@ MD
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq -r '.official_layer.total_items')" = "1" ]
   [ "$(echo "$output" | jq -r '.official_layer.with_github_project_item_id')" = "1" ]
+  [ "$(echo "$output" | jq -r '.sync_check.missing_project_id')" = "0" ]
   [ "$(echo "$output" | jq -r '.extension_layer.with_execution_record_id')" = "1" ]
   [ "$(echo "$output" | jq -r '.extension_layer.with_spec_ref')" = "1" ]
 
