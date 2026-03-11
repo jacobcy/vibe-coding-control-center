@@ -69,9 +69,55 @@ _flow_review() {
   echo "${BOLD}PR #$number:${NC} $title"
   echo "${CYAN}URL:${NC} $url"
   echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
-  log_step "Fetching latest review comments..."
-  comments=$(printf '%s\n' "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
-  [[ -n "$comments" ]] && echo "$comments" | sed 's/^/  💬 /' || echo "  (No comments found)"
+  log_step "Fetching review threads (inline + general)..."
+  local repo_nwo threads_json
+  repo_nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || true)
+  if [[ -n "$repo_nwo" ]]; then
+    threads_json=$(gh api graphql -f query="
+    {
+      repository(owner:\"${repo_nwo%/*}\", name:\"${repo_nwo#*/}\") {
+        pullRequest(number:${number}) {
+          reviewThreads(first:100) {
+            nodes {
+              isResolved
+              isOutdated
+              path
+              comments(first:100) {
+                nodes {
+                  author { login }
+                  body
+                  createdAt
+                  line
+                  originalLine
+                  url
+                }
+              }
+            }
+          }
+        }
+      }
+    }" 2>/dev/null | jq -r '
+      .data.repository.pullRequest.reviewThreads.nodes[] as $thread
+      | $thread.comments.nodes[]
+      | "────────────────────────────────────────\n"
+        + "File: \($thread.path // "General")\n"
+        + "Line: \(.line // .originalLine // "-")\n"
+        + "Reviewer: \(.author.login)\n"
+        + "Resolved: \($thread.isResolved) | Outdated: \($thread.isOutdated)\n"
+        + "Time: \(.createdAt)\n\n"
+        + .body + "\n\n"
+        + "Link: \(.url)"
+    ' 2>/dev/null || true)
+    if [[ -n "$threads_json" ]]; then
+      echo "$threads_json"
+    else
+      echo "  (No review threads found)"
+    fi
+  else
+    # Fallback: show last 3 PR-level comments
+    comments=$(printf '%s\n' "$pr_info" | jq -r '.comments[-3:] | .[]? | "[\(.author.login)]: \(.body)"')
+    [[ -n "$comments" ]] && echo "$comments" | sed 's/^/  💬 /' || echo "  (No comments found)"
+  fi
   while [[ $retry -lt 3 ]]; do
     log_step "Checking CI status (Attempt $((retry + 1))/3)..."
     ci_status=$(gh pr view "$target" --json statusCheckRollup -q '.statusCheckRollup[0].status // "SUCCESS"' 2>/dev/null || echo "SUCCESS")

@@ -41,12 +41,10 @@ _check_pr_merged_status() {
     done < <(echo "$merged_prs" | jq -r '.[].headRefName')
 
     while IFS= read -r task_json; do
-        local task_id assigned_worktree branch
+        local task_id branch
         task_id=$(echo "$task_json" | jq -r '.task_id')
-        assigned_worktree=$(echo "$task_json" | jq -r '.assigned_worktree // empty')
+        branch=$(echo "$task_json" | jq -r '.runtime_branch // empty')
 
-        [[ -z "$assigned_worktree" ]] && continue
-        branch=$(jq -r --arg wt "$assigned_worktree" '.worktrees[]? | select(.worktree_name == $wt) | .branch // empty' "$worktrees_file" 2>/dev/null)
         [[ -z "$branch" ]] && continue
 
         for merged_branch in "${merged_pr_branches[@]}"; do

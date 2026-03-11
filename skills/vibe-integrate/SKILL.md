@@ -5,7 +5,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 
 # /vibe-integrate - PR 整合编排
 
-`/vibe-integrate` 负责把 PR 从“已发出”推进到“可合并并已合并”。它处理的是 `open + had_pr` 的 flow，而不是新的开发 flow。
+`/vibe-integrate` 负责把 PR 从"已发出"推进到"可合并并已合并"。它处理的是 `open + had_pr` 的 flow，而不是新的开发 flow。
 
 先读这些真源：
 
@@ -46,7 +46,42 @@ vibe flow list
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把旧 handoff 继续传给下一个环节。
 
-### Step 2: 审核合并条件
+### Step 2: PR Review 状态审核
+
+**重要：此步骤的行为取决于当前 flow 是否已经有 PR。**
+
+#### 情况 A：已有 PR（`pr_ref` 非空）
+
+必须执行 PR review 检查，不可跳过：
+
+```bash
+vibe flow review [pr_number]
+```
+
+`vibe flow review` 会通过 GraphQL 拉取所有行级 review thread，包含：
+- 文件路径 + 行号
+- Reviewer 身份
+- 是否已 resolved / outdated
+- 评论内容与链接
+
+**等待在线 Review 完成后再继续：**
+
+- 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
+- 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
+- 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
+
+可使用 `browser_subagent` 直接查看 PR 页面，或触发 agent 通过 review thread 给出回应：
+
+```
+# 调用 subagent 审查 PR review comments 并生成反馈
+browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
+```
+
+#### 情况 B：尚无 PR（`pr_ref` 为空）
+
+**跳过此步骤**。此阶段是 pre-PR 本地审查，不需要等待在线 review。可直接进入 Step 3。
+
+### Step 3: 审核合并条件
 
 对每个候选 PR，至少检查：
 
@@ -60,10 +95,10 @@ vibe flow list
 ```bash
 gh pr view <pr>
 gh pr checks <pr>
-gh api graphql ...
+vibe flow review <pr>
 ```
 
-### Step 3: 处理阻塞项
+### Step 4: 处理阻塞项
 
 若发现 CI 或 review 阻塞：
 
@@ -79,18 +114,18 @@ gh api graphql ...
 - 若当前 PR 已 merged，则旧 plan 视为 terminal state；此阶段只允许补交付证据或 follow-up 链接，不得把新需求写回旧 plan
 - merge 后出现的新目标必须重新进入 `repo issue` intake，而不是继续挂在已完成 plan 下
 
-### Step 4: 按顺序合并
+### Step 5: 按顺序合并
 
 只有同时满足以下条件，才允许 merge：
 
 - CI 通过
-- 阻塞性 review 已处理完成
+- 阻塞性 review 已处理完成（`APPROVED` 或所有 unresolved thread 已 resolve）
 - 堆叠上游已先合并
 - 当前 PR 已达到可合并状态
 
 遇到 stacked PR 时，必须按依赖顺序推进，不得跳序合并。
 
-### Step 5: 写入 handoff
+### Step 6: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
 
@@ -109,8 +144,9 @@ gh api graphql ...
 
 ## Restrictions
 
-- 不得把 Copilot / review 线程一律当噪声忽略
-- 不得在未验证 CI 的情况下声称“可合并”
+- 不得把 Codex / Copilot 的 review 线程一律当噪声忽略
+- 不得在未验证 CI 的情况下声称"可合并"
+- 不得在 review 尚未完成（无 review threads、decision 为 PENDING）的情况下声称"无阻塞"
 - 不得跳过 stack 顺序
 - 不得直接关闭 task 或 issue
 - 若 PR 尚未达到合并条件，必须停在整合阶段并说明阻塞项
