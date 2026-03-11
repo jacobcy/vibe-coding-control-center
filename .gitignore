@@ -11,6 +11,15 @@ docs/audits/
 .DS_Store
 .aider*
 
+# Editor & OS artifacts
+*.swp
+*.swo
+*~
+*.orig
+*.bak
+Thumbs.db
+Desktop.ini
+
 # Temporary Vibe Artifacts
 tmpvibe-*
 vibe-init-test*
