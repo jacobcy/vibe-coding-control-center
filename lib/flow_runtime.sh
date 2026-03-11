@@ -96,11 +96,17 @@ _flow_restore_captured_state() {
 }
 
 _flow_restore_source_state() {
-  local restore_branch="$1" stash_ref="$2" context="$3"
+  local restore_branch="$1" stash_ref="$2" context="$3" restore_ref="${4:-}"
 
   if [[ -n "$restore_branch" ]]; then
     git checkout "$restore_branch" || {
       log_error "Failed to restore original branch: $restore_branch"
+      [[ -n "$stash_ref" ]] && log_error "Saved changes remain in $stash_ref"
+      return 1
+    }
+  elif [[ -n "$restore_ref" ]]; then
+    git checkout --detach "$restore_ref" || {
+      log_error "Failed to restore original detached HEAD: $restore_ref"
       [[ -n "$stash_ref" ]] && log_error "Saved changes remain in $stash_ref"
       return 1
     }
