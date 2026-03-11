@@ -131,10 +131,34 @@ _flow_switch() {
     }
   fi
 
+  _flow_update_current_worktree_branch "$branch_name" || {
+    log_error "Failed to update worktree runtime state"
+    _flow_restore_source_state "$current_branch" "$stash_ref" "flow switch to $branch_name"
+    return 1
+  }
+
   if [[ -n "$stash_ref" ]]; then
     log_step "Restoring saved changes into $branch_name"
     _flow_restore_captured_state "$stash_ref" "flow switch to $branch_name" || return 1
   fi
 
   log_success "Flow runtime ready: $target (branch: $branch_name)"
+}
+
+_flow_update_current_worktree_branch() {
+  local new_branch="$1" wt_path wt_name common_dir worktrees_file tmp now
+  wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+  wt_name="$(basename "$wt_path")"
+  common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
+  worktrees_file="$common_dir/vibe/worktrees.json"
+  [[ -f "$worktrees_file" ]] || return 0
+  now="$(_flow_now_iso)"
+  tmp="$(mktemp)" || return 1
+  jq --arg name "$wt_name" --arg path "$wt_path" --arg branch "$new_branch" --arg now "$now" '
+    if any(.worktrees[]?; .worktree_name == $name) then
+      .worktrees = [.worktrees[] | if .worktree_name == $name then .branch = $branch | .last_updated = $now else . end]
+    else
+      .worktrees += [{"worktree_name":$name,"worktree_path":$path,"branch":$branch,"status":"active","last_updated":$now}]
+    end
+  ' "$worktrees_file" > "$tmp" && mv "$tmp" "$worktrees_file" || { rm -f "$tmp"; return 1; }
 }

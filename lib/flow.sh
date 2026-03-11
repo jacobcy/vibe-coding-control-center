@@ -151,6 +151,13 @@ _flow_new() {
   }
   branch_created=1
 
+  _flow_update_current_worktree_branch "$branch_name" || {
+    log_error "Failed to update worktree runtime state"
+    _flow_restore_source_state "$current_branch" "$stash_ref" "flow new to $branch_name" "$current_head"
+    git branch -D "$branch_name" 2>/dev/null || true
+    return 1
+  }
+
   if [[ -n "$stash_ref" ]]; then
     log_step "Restoring saved changes into $branch_name"
     _flow_restore_captured_state "$stash_ref" "flow new to $branch_name" || return 1
