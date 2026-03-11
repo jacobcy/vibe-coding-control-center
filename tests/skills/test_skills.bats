@@ -127,3 +127,16 @@ SHELL
   [[ "$output" =~ "Auto Confirmation Convention" ]]
   [[ "$output" =~ "不得跳过验证" ]]
 }
+
+@test "vibe-commit docs require task metadata preflight before commit grouping" {
+  run rg -n \
+    "metadata preflight|current_task|runtime_branch|issue_refs|roadmap_item_ids|spec_standard|spec_ref|hard block|warning" \
+    "$REPO_ROOT/.agent/workflows/vibe:commit.md" \
+    "$REPO_ROOT/skills/vibe-commit/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "current_task" ]]
+  [[ "$output" =~ "runtime_branch" ]]
+  [[ "$output" =~ "issue_refs" ]]
+  [[ "$output" =~ "roadmap_item_ids" ]]
+}
