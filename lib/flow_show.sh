@@ -10,24 +10,11 @@ _flow_show_resolve_target() {
 }
 
 _flow_show_open_record() {
-  local target="$1" git_common_dir worktrees_file branch_name
-  git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
-  worktrees_file="$git_common_dir/vibe/worktrees.json"
-  branch_name="${target#origin/}"
-
-  jq -r --arg target "$target" --arg branch "$branch_name" --arg feature "$(_flow_feature_slug "$target")" '
-    .worktrees[]?
-    | select(
-        (.branch // "") == $branch
-        or (.branch // "") == $target
-        or ((.branch // "") | sub("^task/"; "")) == $feature
-    )
-    | .branch // empty
-  ' "$worktrees_file" 2>/dev/null | head -n 1 | while IFS= read -r branch; do
-    [[ -n "$branch" ]] || continue
-    _flow_branch_dashboard_entry "$branch"
-    return 0
-  done
+  local target="$1" candidate_branch
+  candidate_branch="$(_flow_switch_target_branch "$target")"
+  _flow_branch_dashboard_entry "$candidate_branch" 2>/dev/null && return 0
+  [[ "$candidate_branch" != "$target" ]] && _flow_branch_dashboard_entry "$target" 2>/dev/null && return 0
+  return 1
 }
 
 _flow_show() {

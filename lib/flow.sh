@@ -81,29 +81,6 @@ _flow_require_latest_pr_base() {
   log_error "Current branch is not based on the latest $base_name ($base_git_ref). Pull/rebase the latest $base_name, resolve conflicts, then re-run vibe flow pr."
   return 1
 }
-_flow_rollback_worktree() { git worktree remove "$1" --force >/dev/null 2>&1 || true; }
-_flow_new_worktree() {
-  local feature="$1" agent="$2" ref="$3" repo_root wt_dir wt_path feature_slug branch_name suggested_task_id
-  vibe_require git jq || return 1
-  feature_slug="$(_vibe_task_slugify "$feature")"
-  branch_name="task/${feature_slug}"
-  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || { log_error "Not in a git repo"; return 1; }
-  wt_dir="wt-${feature_slug}"; wt_path="${repo_root:h}/$wt_dir"; [[ -e "$wt_path" ]] && { log_error "Worktree already exists: $wt_dir (use 'wt $wt_dir' to enter)"; return 1; }
-  suggested_task_id="$(_vibe_task_today)-${feature_slug}"
-  log_step "Creating worktree: $wt_dir"
-  if typeset -f wtnew &>/dev/null; then wtnew "$feature_slug" "$ref" || { log_error "wtnew failed"; return 1; }
-  else git fetch origin "$ref" --quiet 2>/dev/null || true; git worktree add -b "$branch_name" "$wt_path" "$ref" || { log_error "git worktree add failed"; return 1; }
-  fi
-  cd "$wt_path" || { log_error "Failed to enter worktree: $wt_path"; _flow_rollback_worktree "$wt_path"; return 1; }
-  log_success "Flow runtime ready: $feature  (branch: $branch_name)"
-  echo "💡 Next: Run ${CYAN}vup${NC} to open your cockpit."
-  echo "💬 Next"
-  echo "   1. cd ${CYAN}${wt_path}${NC}"
-  echo "   2. ${CYAN}vibe task add \"$feature\" --id $suggested_task_id${NC}"
-  echo "   3. ${CYAN}vibe flow bind $suggested_task_id${NC}"
-  echo "   4. ${CYAN}vup${NC}"
-}
-_flow_start_worktree() { _flow_new_worktree "$@"; }
 _flow_bind() {
   local tid agent="" arg reg title
   for arg in "$@"; do [[ "$arg" == "-h" || "$arg" == "--help" ]] && { _flow_bind_usage; return 0; }; done

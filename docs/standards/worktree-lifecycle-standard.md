@@ -52,6 +52,7 @@ related_docs:
 - 新 `flow` 不强制要求新 `worktree`
 - 复用同一目录承载新的 `flow` 是允许的
 - 但复用目录时，必须显式切换到新的 `branch`
+- 当前开放 flow 的执行判断应优先围绕 `branch`，`worktree` 只提供目录 hint
 - 复用目录进入新的逻辑 `flow` 时，应通过正式 flow 切换能力完成，而不是靠目录名暗示
 - 已关闭 flow 的历史不保存在 `worktree` 目录内，而应保存在共享历史真源中
 
@@ -79,7 +80,7 @@ related_docs:
 - 当前 `flow` 语义已经结束或冻结
 - 当前目录切到新的 `branch`
 - 新目录语义只服务一个新的当前交付目标
-- 当前目录的 flow runtime 记录已同步到新的 `branch` / `flow` 语义
+- 当前目录的 flow runtime 记录已同步到新的 `branch` / `flow` 语义，且 `branch` 是主锚点
 - 若目标 flow 已有 PR 事实，不得通过目录复用继续 `switch`
 
 ## 4. Residual Changes
