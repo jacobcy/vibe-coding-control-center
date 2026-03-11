@@ -97,7 +97,7 @@ _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
 
 #  Symlink workflows
 echo "🔗 Creating symlinks for workflows..."
-_symlink_files ".agent/workflows/vibe-*.md" ".claude/commands" "identity" "file"
+_symlink_files ".agent/workflows/vibe:*.md" ".claude/commands" "identity" "file"
 
 echo "✅ Environment setup complete!"
 

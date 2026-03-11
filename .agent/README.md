@@ -16,11 +16,21 @@
 - **`context/`**: 记忆与任务管理
   - `memory.md`: 长期记忆，记录关键决策和架构选择。
   - `task.md`: 当前活动任务列表。
-- **`workflows/`**: **用户接口 (User Interface)**。定义了 Agent 可执行的标准任务流程。
+- **`workflows/`**: **workflow 层入口**。只负责编排、委托和停点，不承载复杂业务逻辑。
 - **`rules/`**: 具体的编码标准和项目规则。
   - `coding-standards.md`: 实现、边界、工具与交付细则
   - `patterns.md`: 执行模式、报告模式与渐进披露模式
 - **`templates/`**: Commit, PR 等模板。
+- **`../skills/`**: **skill 层真源**。负责对象判断、shell 调用顺序、blocker / handoff 逻辑。
+
+## 🧭 Namespace 约定
+
+- `workflow` 使用 `vibe:*`
+  - 例：`vibe:new`、`vibe:start`、`vibe:commit`
+- `skill` 使用 `vibe-*`
+  - 例：`vibe-new`、`vibe-start`、`vibe-commit`
+
+兼容期内，用户仍可使用 `/vibe-new`、`/vibe-start` 等 slash 入口；这些入口触发的是 workflow，workflow 再委托同名 skill。
 
 ## 🤖 AI 互操作协议 (AI Interoperability Protocol)
 
@@ -35,34 +45,43 @@
 
 # Agent Workflows (工作流)
 
-此目录包含 AI Agent 可直接调用的标准化任务流程。
+此目录包含 AI Agent 可直接调用的标准化 workflow 入口。workflow 只负责流程，不负责复杂业务判断。
 
 ## 🚀 开发工作流 (Development)
 
 | Workflow | Description | Usage |
 | :--- | :--- | :--- |
-| **[/vibe-commit](workflows/vibe-commit.md)** | 智能提交 (Smart Commit) | 由 AI 分析 `git diff`，按功能分组并交互式生成 Conventional Commits。 |
+| **[/vibe-new](workflows/vibe:new.md)** | 规划入口 | intake 新目标、handoff 或缺 spec 的 task，委托 `vibe-new` skill 产出 plan 和 task 绑定。 |
+| **[/vibe-start](workflows/vibe:start.md)** | 执行入口 | 执行当前 flow 已绑定且带 plan 的 task，委托 `vibe-start` skill 按图纸推进。 |
+| **[/vibe-commit](workflows/vibe:commit.md)** | 提交与发 PR 入口 | 读取工作区和 flow 事实，再委托 `vibe-commit` skill 处理提交分组与 PR 切片。 |
 
-> 💡 `vibe flow sync` — 通过 CLI 将当前分支同步到所有 Worktree 分支。
-> 💡 `vibe clean` — 通过 CLI 一键清理 `temp/` 及临时文件。
-
-## 🔍 代码审查与维护 (Review & Maintenance)
+## 🧩 专项 workflow
 
 | Workflow | Description | Usage |
 | :--- | :--- | :--- |
-| **[/review-code](workflows/review-code.md)** | 代码审计 (Code Audit) | 运行 ShellCheck 和逻辑检查，确保代码质量。 |
-| **[/review-docs](workflows/review-docs.md)** | 文档审查 (Review Docs) | 检查 `docs/` 和 `CHANGELOG.md` 的完整性。 |
+| **[/vibe-task](workflows/vibe:task.md)** | task 总览与 registry 审计 | 委托 `vibe-task` skill 处理跨 worktree 总览与 roadmap-task 修复。 |
+| **[/vibe-check](workflows/vibe:check.md)** | runtime 检查与修复 | 委托 `vibe-check` skill 处理 `task <-> flow` / runtime 问题。 |
+| **[/vibe-issue](workflows/vibe:issue.md)** | issue intake | 委托 `vibe-issue` skill 处理 repo issue 创建、查重与补全。 |
+| **[/vibe-save](workflows/vibe:save.md)** | 会话保存 | 委托 `vibe-save` skill 写回本地 handoff。 |
 
 ---
 
-### 如何创建新工作流
-直接在 `workflows/` 目录下添加 `.md` 文件：
+### 新增入口时的边界
+
+直接在 `workflows/` 目录下添加 `.md` 文件前，先确认：
+
+- 如果文档主要描述入口、阶段顺序、委托关系和停止点，它属于 workflow。
+- 如果文档需要解释对象边界、shell 读取顺序、fallback / blocker / handoff，它应该放进 `skills/<name>/SKILL.md`。
+
+workflow 模板应保持薄：
+
 ```markdown
 ---
-description: [简短描述]
+name: "vibe:<name>"
+description: [只写入口和委托语义]
 ---
 
-1. 第一步
-// turbo
-User command...
+1. 说明入口作用
+2. 委托到对应 skill
+3. 说明停点与下一步
 ```
