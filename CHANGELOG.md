@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.14] - 2026-03-11
+
+### ✨ Changed
+- feat: require plan binding when creating tasks ...
+
 ## [2.1.13] - 2026-03-11
 
 ### ✨ Changed
