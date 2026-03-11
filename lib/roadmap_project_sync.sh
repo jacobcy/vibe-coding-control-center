@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 # lib/roadmap_project_sync.sh - GitHub Project sync helpers for Roadmap module
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_store.sh" ]] && source "$VIBE_LIB/roadmap_store.sh"
+[[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_issue_intake.sh" ]] && source "$VIBE_LIB/roadmap_issue_intake.sh"
 _vibe_roadmap_create_github_draft_issue() {
     local project_id="$1" title="$2" body="${3:-}" response item_id
     response="$(gh api graphql -f query='
@@ -21,7 +22,6 @@ _vibe_roadmap_create_github_draft_issue() {
     }
     print -r -- "$item_id"
 }
-
 _vibe_roadmap_parse_source_ref() {
     local ref="$1" repo="" number="" content_type=""
     case "$ref" in
@@ -48,7 +48,6 @@ _vibe_roadmap_parse_source_ref() {
     [[ -n "$repo" && -n "$number" && -n "$content_type" ]] || return 1
     print -r -- "$repo|$number|$content_type"
 }
-
 _vibe_roadmap_resolve_content_node_id() {
     local repo="$1" number="$2" content_type="$3"
     case "$content_type" in
@@ -63,7 +62,6 @@ _vibe_roadmap_resolve_content_node_id() {
             ;;
     esac
 }
-
 _vibe_roadmap_add_project_item_from_content() {
     local project_id="$1" content_id="$2" response item_id
     response="$(gh api graphql -f query='
@@ -77,36 +75,6 @@ _vibe_roadmap_add_project_item_from_content() {
     item_id="$(printf '%s' "$response" | jq -r '.data.addProjectV2ItemById.item.id // empty')"
     [[ -n "$item_id" ]] || return 1
     print -r -- "$item_id"
-}
-
-_vibe_roadmap_fetch_candidate_repo_issues() {
-    local repo="$1"
-    gh issue list --repo "$repo" --state open --label vibe-task --json id,number,title,body,url 2>/dev/null
-}
-
-_vibe_roadmap_sync_issue_intake_candidates() {
-    local common_dir="$1" repo="$2" project_id="$3" roadmap_file candidate_json issue_id issue_number issue_ref issue_url
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    candidate_json="$(_vibe_roadmap_fetch_candidate_repo_issues "$repo")" || return 1
-
-    while IFS= read -r candidate_json; do
-        [[ -n "$candidate_json" ]] || continue
-        issue_id="$(printf '%s' "$candidate_json" | jq -r '.id // empty')"
-        issue_number="$(printf '%s' "$candidate_json" | jq -r '.number // empty')"
-        issue_url="$(printf '%s' "$candidate_json" | jq -r '.url // empty')"
-        [[ -n "$issue_id" && -n "$issue_number" ]] || continue
-        issue_ref="gh-${issue_number}"
-
-        if jq -e \
-          --arg issue_ref "$issue_ref" \
-          --arg issue_url "$issue_url" \
-          '.items[]? | select(((.issue_refs // []) | index($issue_ref)) != null or ((.source_refs // []) | index($issue_url)) != null)' \
-          "$roadmap_file" >/dev/null; then
-            continue
-        fi
-
-        _vibe_roadmap_add_project_item_from_content "$project_id" "$issue_id" >/dev/null || return 1
-    done < <(printf '%s' "$candidate_json" | jq -c '.[]?')
 }
 
 _vibe_roadmap_bootstrap_remote_item() {
