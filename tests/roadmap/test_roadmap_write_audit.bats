@@ -76,14 +76,16 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
 
 @test "roadmap add --help shows usage without creating a roadmap item" {
   local fixture
+  local initial_count
   fixture="$(mktemp -d)"
   make_roadmap_fixture "$fixture"
+  initial_count="$(jq '.items | length' "$fixture/vibe/roadmap.json")"
 
   run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap add --help'
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Vibe Roadmap - 智能调度器" ]]
-  [ "$(jq '.items | length' "$fixture/vibe/roadmap.json")" = "3" ]
+  [ "$(jq '.items | length' "$fixture/vibe/roadmap.json")" = "$initial_count" ]
 }
 
 @test "roadmap audit returns json summary when checks pass" {

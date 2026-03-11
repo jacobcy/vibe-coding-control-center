@@ -9,7 +9,7 @@ related_docs:
   - docs/standards/data-model-standard.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
-  - /Users/jacobcy/src/vibe-center/wt-fix-pr-base-selection/.agent/context/task.md
+  - .agent/context/task.md
 ---
 
 # Runtime Boundary Cleanup Implementation Plan

@@ -3,7 +3,8 @@
 ## [2.1.16] - 2026-03-11
 
 ### ✨ Changed
-- fix: handle roadmap add help safely ...
+- Make `vibe roadmap add --help` exit safely without creating roadmap items.
+- Shift flow runtime discovery and audit behavior to branch-first semantics, with registry runtime-branch fallback when worktree entries are missing.
 
 ## [2.1.15] - 2026-03-11
 
