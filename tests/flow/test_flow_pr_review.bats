@@ -171,7 +171,7 @@ JSON
   [[ "$output" =~ "not found" || "$output" =~ "Missing" ]]
 }
 
-@test "12.3 _flow_pr auto-stages bound plan file before publish" {
+@test "12.3 _flow_pr auto-commits bound plan file before publish when bump is skipped" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/docs/plans"
@@ -203,8 +203,9 @@ JSON
         "fetch origin main --quiet") return 0 ;;
         "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
         "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
-        "ls-files --error-unmatch docs/plans/current-plan.md") return 1 ;;
         "add -- docs/plans/current-plan.md") echo "STAGED_PLAN"; return 0 ;;
+        "diff --quiet HEAD -- docs/plans/current-plan.md") return 1 ;;
+        "commit --only -m chore: update managed pr artifacts -- docs/plans/current-plan.md") echo "COMMITTED_MANAGED_PLAN"; return 0 ;;
         "push origin HEAD") return 0 ;;
         *) return 0 ;;
       esac
@@ -214,7 +215,103 @@ JSON
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "STAGED_PLAN" ]]
+  [[ "$output" =~ "COMMITTED_MANAGED_PLAN" ]]
   [[ "$output" =~ "current-plan.md" ]]
+}
+
+@test "12.4 _flow_pr skips managed commit when bound plan is already in HEAD" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/docs/plans"
+  printf '%s\n' '# plan' > "$fixture/docs/plans/current-plan.md"
+
+  run zsh -c '
+    cd "'"$fixture"'"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    _flow_show() {
+      cat <<'"'"'JSON'"'"'
+{"branch":"current-branch","current_task":"task-main","spec_ref":"docs/plans/current-plan.md"}
+JSON
+    }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add -- docs/plans/current-plan.md") echo "STAGED_PLAN"; return 0 ;;
+        "diff --quiet HEAD -- docs/plans/current-plan.md") return 0 ;;
+        "commit --only -m chore: update managed pr artifacts -- docs/plans/current-plan.md") echo "UNEXPECTED_MANAGED_COMMIT"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "STAGED_PLAN" ]]
+  [[ ! "$output" =~ "UNEXPECTED_MANAGED_COMMIT" ]]
+}
+
+@test "12.5 _flow_pr managed commit does not swallow unrelated staged files" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/docs/plans"
+  printf '%s\n' '# plan' > "$fixture/docs/plans/current-plan.md"
+
+  run zsh -c '
+    cd "'"$fixture"'"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    _flow_show() {
+      cat <<'"'"'JSON'"'"'
+{"branch":"current-branch","current_task":"task-main","spec_ref":"docs/plans/current-plan.md"}
+JSON
+    }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add -- docs/plans/current-plan.md") echo "STAGED_PLAN"; return 0 ;;
+        "diff --quiet HEAD -- docs/plans/current-plan.md") return 1 ;;
+        "commit --only -m chore: update managed pr artifacts -- docs/plans/current-plan.md") echo "MANAGED_ONLY_COMMIT"; return 0 ;;
+        "commit -m chore: update managed pr artifacts") echo "UNSCOPED_COMMIT"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "MANAGED_ONLY_COMMIT" ]]
+  [[ ! "$output" =~ "UNSCOPED_COMMIT" ]]
 }
 
 @test "13. _flow_pr skips bump if changelog message exists" {
@@ -288,7 +385,8 @@ EOF
         "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
         "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "add VERSION CHANGELOG.md") return 0 ;;
-        "commit -m chore: bump version to 2.1.4") return 0 ;;
+        "diff --quiet HEAD -- VERSION CHANGELOG.md") return 1 ;;
+        "commit --only -m chore: bump version to 2.1.4 -- VERSION CHANGELOG.md") return 0 ;;
         "push origin HEAD") return 0 ;;
         *) return 0 ;;
       esac
@@ -337,7 +435,8 @@ EOF
         "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
         "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "add VERSION CHANGELOG.md") return 0 ;;
-        "commit -m chore: bump version to 2.1.4") return 1 ;;
+        "diff --quiet HEAD -- VERSION CHANGELOG.md") return 1 ;;
+        "commit --only -m chore: bump version to 2.1.4 -- VERSION CHANGELOG.md") return 1 ;;
         "push origin HEAD") echo "PUSH_SHOULD_NOT_RUN"; return 0 ;;
         *) return 0 ;;
       esac
