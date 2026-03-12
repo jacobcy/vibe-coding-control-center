@@ -8,13 +8,14 @@ elif [[ -n "${VIBE_ROOT:-}" ]]; then
 else
   ROOT="$(pwd)"
 fi
+
 REPORT_DIR="$ROOT/.agent/reports"
 REPORT_FILE="$REPORT_DIR/serena-impact.json"
 PROJECT_FILE="$ROOT/.serena/project.yml"
 SERENA_SOURCE="git+https://github.com/oraios/serena@v0.1.4"
-SERENA_CMD=(uvx --from "$SERENA_SOURCE" serena)
-BASE_REF="${SERENA_BASE_REF:-main...HEAD}"
-PORT="${SERENA_PROJECT_SERVER_PORT:-18231}"
+SERENA_GLOBAL_ROOT="$HOME/.serena"
+SERENA_CACHE_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/uv/archive-v0"
+BASE_REF="${SERENA_BASE_REF:-}"
 
 usage() {
   cat <<'EOF'
@@ -24,7 +25,7 @@ Runs Serena AST gate against changed shell files and writes:
   .agent/reports/serena-impact.json
 
 Options:
-  --base <git-range>   Diff range for candidate files (default: main...HEAD)
+  --base <git-range>   Diff range for candidate files (default: origin/main...HEAD, fallback main...HEAD)
   --file <path>        Explicit file(s) to analyze, can pass multiple times
   -h, --help           Show this help
 EOF
@@ -38,11 +39,67 @@ require_cmd() {
   }
 }
 
-cleanup_server() {
-  if [[ -n "${SERVER_PID:-}" ]]; then
-    kill "$SERVER_PID" >/dev/null 2>&1 || true
-    wait "$SERVER_PID" 2>/dev/null || true
+cleanup_runtime() {
+  if [[ -n "${SERENA_RUNTIME_HOME:-}" && -d "${SERENA_RUNTIME_HOME:-}" ]]; then
+    rm -rf "$SERENA_RUNTIME_HOME"
   fi
+}
+
+setup_serena_runtime_home() {
+  SERENA_RUNTIME_HOME="$(mktemp -d)"
+
+  cat >"$SERENA_RUNTIME_HOME/serena_config.yml" <<'EOF'
+language_backend: LSP
+gui_log_window: false
+web_dashboard: false
+web_dashboard_open_on_launch: false
+web_dashboard_listen_address: 127.0.0.1
+jetbrains_plugin_server_address: 127.0.0.1
+log_level: 20
+trace_lsp_communication: false
+ls_specific_settings: {}
+ignored_paths: []
+tool_timeout: 240
+excluded_tools: []
+included_optional_tools: []
+fixed_tools: []
+base_modes:
+default_modes:
+- interactive
+- editing
+default_max_tool_answer_chars: 150000
+token_count_estimator: CHAR_COUNT
+projects: []
+symbol_info_budget: 10.0
+project_serena_folder_location: $projectDir/.serena
+read_only_memory_patterns: []
+EOF
+
+  if [[ -d "$SERENA_GLOBAL_ROOT/language_servers" ]]; then
+    ln -s "$SERENA_GLOBAL_ROOT/language_servers" "$SERENA_RUNTIME_HOME/language_servers"
+  fi
+}
+
+resolve_serena_site_packages() {
+  local serena_bin archive_root config_path
+  for serena_bin in "$SERENA_CACHE_ROOT"/*/bin/serena; do
+    [[ -e "$serena_bin" ]] || continue
+    archive_root="$(dirname "$(dirname "$serena_bin")")"
+    config_path="$(find "$archive_root/lib" -path '*/site-packages/serena/config/serena_config.py' -print -quit 2>/dev/null || true)"
+    if [[ -n "$config_path" ]] && grep -q 'SERENA_HOME' "$config_path"; then
+      SERENA_SITE_PACKAGES="${config_path%/serena/config/serena_config.py}"
+      SERENA_ARCHIVE_ROOT="$archive_root"
+      return 0
+    fi
+  done
+
+  echo "ERROR: failed to locate Serena site-packages with SERENA_HOME support" >&2
+  exit 3
+}
+
+run_serena_python() {
+  SERENA_HOME="$SERENA_RUNTIME_HOME" \
+  "$SERENA_ARCHIVE_ROOT/bin/python3" "$ROOT/scripts/serena_gate.py"
 }
 
 parse_project_name() {
@@ -52,91 +109,55 @@ parse_project_name() {
   printf '%s' "$name"
 }
 
-wait_heartbeat() {
-  local attempts=0
-  local max_attempts=20
-  while (( attempts < max_attempts )); do
-    if curl -sS "http://127.0.0.1:${PORT}/heartbeat" >/dev/null 2>&1; then
-      return 0
-    fi
-    attempts=$((attempts + 1))
-    sleep 0.5
-  done
-  return 1
-}
-
-query_project_tool() {
-  local project_name="$1"
-  local tool_name="$2"
-  local tool_params_json="$3"
-  local payload
-  payload="$(jq -nc \
-    --arg project_name "$project_name" \
-    --arg tool_name "$tool_name" \
-    --arg tool_params_json "$tool_params_json" \
-    '{project_name:$project_name, tool_name:$tool_name, tool_params_json:$tool_params_json}')"
-  curl -sS -X POST "http://127.0.0.1:${PORT}/query_project" \
-    -H "Content-Type: application/json" \
-    -d "$payload"
-}
-
 collect_changed_files() {
   local -a files
+  local line
   if [[ ${#EXPLICIT_FILES[@]} -gt 0 ]]; then
     files=("${EXPLICIT_FILES[@]}")
   else
-    mapfile -t files < <(git -C "$ROOT" diff --name-only "$BASE_REF" -- '*.sh' 'bin/vibe' 2>/dev/null || true)
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && files+=("$line")
+    done < <(git -C "$ROOT" diff --name-only "$BASE_REF" -- '*.sh' 'bin/vibe' 2>/dev/null || true)
   fi
+
   for f in "${files[@]}"; do
     [[ -f "$ROOT/$f" ]] && printf '%s\n' "$f"
   done | awk '!seen[$0]++'
 }
 
-analyze_file() {
-  local project_name="$1"
-  local relative_file="$2"
-  local params overview functions_tmp symbols_tmp fn ref_params refs ref_count status
-
-  params="$(jq -nc --arg rp "$relative_file" '{relative_path:$rp, depth:0}')"
-  overview="$(query_project_tool "$project_name" "get_symbols_overview" "$params" || true)"
-
-  if ! echo "$overview" | jq -e . >/dev/null 2>&1; then
-    jq -nc --arg f "$relative_file" --arg err "get_symbols_overview_failed" \
-      '{file:$f, status:"error", error:$err, symbols:[]}'
+resolve_base_ref() {
+  if [[ -n "$BASE_REF" ]]; then
     return 0
   fi
 
-  functions_tmp="$(mktemp)"
-  symbols_tmp="$(mktemp)"
-  echo "$overview" | jq -r '
-    (
-      if type == "object" and (.Function? | type == "array") then .Function else [] end
-    ) + (
-      [.. | objects | select(.kind? == "Function" and (.name? | type == "string")) | .name]
-    )
-    | unique[]?
-  ' >"$functions_tmp"
-  echo '[]' >"$symbols_tmp"
+  if git -C "$ROOT" rev-parse --verify origin/main >/dev/null 2>&1; then
+    BASE_REF="origin/main...HEAD"
+    return 0
+  fi
 
-  while IFS= read -r fn; do
-    [[ -n "$fn" ]] || continue
-    ref_params="$(jq -nc --arg n "$fn" --arg rp "$relative_file" '{name_path:$n, relative_path:$rp}')"
-    refs="$(query_project_tool "$project_name" "find_referencing_symbols" "$ref_params" || true)"
-    if echo "$refs" | jq -e . >/dev/null 2>&1; then
-      ref_count="$(echo "$refs" | jq 'if type=="array" then length elif type=="object" then ([.. | objects | .name_path? // empty] | map(select(length>0)) | length) else 0 end')"
-      status="ok"
-    else
-      ref_count=0
-      status="error"
-    fi
-    jq --arg name "$fn" --arg status "$status" --argjson count "$ref_count" \
-      '. += [{name:$name, status:$status, references:$count}]' \
-      "$symbols_tmp" >"${symbols_tmp}.tmp" && mv "${symbols_tmp}.tmp" "$symbols_tmp"
-  done <"$functions_tmp"
+  if git -C "$ROOT" rev-parse --verify main >/dev/null 2>&1; then
+    BASE_REF="main...HEAD"
+    return 0
+  fi
 
-  jq -nc --arg f "$relative_file" --slurpfile s "$symbols_tmp" \
-    '{file:$f, status:"ok", symbols:($s[0] // [])}'
-  rm -f "$functions_tmp" "$symbols_tmp"
+  BASE_REF="HEAD"
+}
+
+write_empty_report() {
+  local project_name="$1"
+  jq -nc \
+    --arg generated_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --arg project "$project_name" \
+    --arg base_ref "$BASE_REF" \
+    '{
+      generated_at:$generated_at,
+      project:$project,
+      base_ref:$base_ref,
+      health_check:{status:"ok", log:""},
+      files:[],
+      summary:{files:0, file_errors:0, symbol_errors:0},
+      notes:["No changed shell files detected"]
+    }' >"$REPORT_FILE"
 }
 
 EXPLICIT_FILES=()
@@ -162,104 +183,38 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+require_cmd python3
 require_cmd uvx
 require_cmd jq
-require_cmd curl
 [[ -f "$PROJECT_FILE" ]] || { echo "ERROR: missing .serena/project.yml" >&2; exit 2; }
 
 mkdir -p "$REPORT_DIR"
 PROJECT_NAME="$(parse_project_name)"
+resolve_base_ref
 
-echo "Serena gate: indexing project ..."
-(cd "$ROOT" && "${SERENA_CMD[@]}" project index . >/dev/null)
-
-HEALTH_CHECK_STATUS="ok"
-HEALTH_CHECK_LOG=""
-HEALTH_CHECK_OUTPUT="$(mktemp)"
-echo "Serena gate: running project health-check ..."
-if (cd "$ROOT" && "${SERENA_CMD[@]}" project health-check . >"$HEALTH_CHECK_OUTPUT" 2>&1); then
-  HEALTH_CHECK_LOG="$(awk -F'Log saved to: ' '/Log saved to:/{print $2; exit}' "$HEALTH_CHECK_OUTPUT" | xargs)"
-  rm -f "$HEALTH_CHECK_OUTPUT"
-else
-  HEALTH_CHECK_STATUS="error"
-  HEALTH_CHECK_LOG="$HEALTH_CHECK_OUTPUT"
-fi
-
-echo "Serena gate: starting project server on port ${PORT} ..."
-SERVER_LOG="$(mktemp)"
-(
-  cd "$ROOT"
-  "${SERENA_CMD[@]}" start-project-server --port "$PORT" >"$SERVER_LOG" 2>&1
-) &
-SERVER_PID=$!
-trap cleanup_server EXIT
-
-wait_heartbeat || {
-  echo "ERROR: Serena project server failed to start" >&2
-  exit 3
-}
-
-mapfile -t TARGET_FILES < <(collect_changed_files)
+TARGET_FILES=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && TARGET_FILES+=("$line")
+done < <(collect_changed_files)
 if [[ ${#TARGET_FILES[@]} -eq 0 ]]; then
-  jq -nc \
-    --arg generated_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-    --arg project "$PROJECT_NAME" \
-    --arg base_ref "$BASE_REF" \
-    --arg health_check_status "$HEALTH_CHECK_STATUS" \
-    --arg health_check_log "$HEALTH_CHECK_LOG" \
-    '{
-      generated_at:$generated_at,
-      project:$project,
-      base_ref:$base_ref,
-      health_check:{status:$health_check_status, log:$health_check_log},
-      files:[],
-      notes:["No changed shell files detected"]
-    }' >"$REPORT_FILE"
+  write_empty_report "$PROJECT_NAME"
   echo "Serena gate: no target files, wrote $REPORT_FILE"
-  if [[ "$HEALTH_CHECK_STATUS" != "ok" ]]; then
-    echo "ERROR: Serena health-check failed. See $HEALTH_CHECK_LOG" >&2
-    exit 5
-  fi
+  cat "$REPORT_FILE"
   exit 0
 fi
 
-files_json_tmp="$(mktemp)"
-echo '[]' >"$files_json_tmp"
-for rel in "${TARGET_FILES[@]}"; do
-  file_result="$(analyze_file "$PROJECT_NAME" "$rel")"
-  jq --argjson fr "$file_result" '. += [$fr]' "$files_json_tmp" >"${files_json_tmp}.tmp" && mv "${files_json_tmp}.tmp" "$files_json_tmp"
-done
+setup_serena_runtime_home
+resolve_serena_site_packages
+trap cleanup_runtime EXIT
 
-jq -nc \
-  --arg generated_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-  --arg project "$PROJECT_NAME" \
-  --arg base_ref "$BASE_REF" \
-  --arg health_check_status "$HEALTH_CHECK_STATUS" \
-  --arg health_check_log "$HEALTH_CHECK_LOG" \
-  --slurpfile files "$files_json_tmp" \
-  '{
-    generated_at:$generated_at,
-    project:$project,
-    base_ref:$base_ref,
-    health_check:{status:$health_check_status, log:$health_check_log},
-    files:($files[0] // []),
-    summary:{
-      files: (($files[0] // []) | length),
-      file_errors: (($files[0] // []) | map(select(.status != "ok")) | length),
-      symbol_errors: (($files[0] // []) | map(.symbols // []) | add | map(select(.status != "ok")) | length)
-    }
-  }' >"$REPORT_FILE"
+TARGET_FILES_JSON="$(printf '%s\n' "${TARGET_FILES[@]}" | jq -R . | jq -s .)"
 
-rm -f "$files_json_tmp"
+echo "Serena gate: analyzing ${#TARGET_FILES[@]} file(s) with isolated SERENA_HOME ..."
+SERENA_TARGET_FILES_JSON="$TARGET_FILES_JSON" \
+SERENA_PROJECT_NAME="$PROJECT_NAME" \
+SERENA_BASE_REF="$BASE_REF" \
+SERENA_REPORT_FILE="$REPORT_FILE" \
+run_serena_python
+
 echo "Serena gate: wrote $REPORT_FILE"
 cat "$REPORT_FILE"
-
-if [[ "$HEALTH_CHECK_STATUS" != "ok" ]]; then
-  echo "ERROR: Serena health-check failed. See $HEALTH_CHECK_LOG" >&2
-  exit 5
-fi
-
-if jq -e '.summary.file_errors > 0 or .summary.symbol_errors > 0' "$REPORT_FILE" >/dev/null 2>&1; then
-  echo "ERROR: Serena gate found analysis errors. See $REPORT_FILE and server log: $SERVER_LOG" >&2
-  exit 4
-fi
