@@ -5,7 +5,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 
 # /vibe-integrate - PR 整合编排
 
-`/vibe-integrate` 负责把 PR 从"已发出"推进到"可合并并已合并"。它处理的是 `open + had_pr` 的 flow，而不是新的开发 flow。
+`/vibe-integrate` 负责把 PR 从"已发出"推进到"可合并并已合并"。它延续用户主链里的 `issue -> flow -> PR` 视角，处理的是 `open + had_pr` 的 flow，而不是新的开发 flow。
 
 先读这些真源：
 

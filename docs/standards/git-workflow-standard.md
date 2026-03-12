@@ -9,7 +9,7 @@ authority:
   - recovery-rules
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-12
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -23,14 +23,15 @@ related_docs:
 
 本文档定义本项目的 Git 交付流程标准，重点回答：
 
-- `repo issue -> roadmap item -> task -> flow -> PR` 应如何推进
+- 用户主视角 `repo issue -> flow -> plan/spec -> commit -> PR -> done` 应如何推进
+- 内部桥接链 `repo issue -> roadmap item -> task -> flow` 应如何配合
 - `flow`、`branch`、`worktree` 在交付中的职责如何分离
 - 何时继续当前 flow
 - 何时必须新开 branch / 新开 flow
 - 何时必须进入整合或收口，而不是继续开发
 - 现场偏离标准后，如何回归标准 flow
 
-术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。高频动作词以 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)。
+术语以 [glossary.md](glossary.md) 为准。高频动作词以 [action-verbs.md](action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](worktree-lifecycle-standard.md)。
 
 ## 1. Scope
 
@@ -52,8 +53,8 @@ related_docs:
 默认交付模型如下：
 
 - `repo issue` 负责来源层需求与讨论事实
-- `roadmap item` 负责规划窗口与 GitHub Project item 镜像
-- `task` 负责 execution record
+- `roadmap item` 负责规划窗口与 GitHub Project item 镜像，是 planning 中间层
+- `task` 负责 execution record，是 flow 建立后的 execution bridge
 - `flow` 负责当前交付切片与 runtime 现场
 - `pr` 负责当前交付产物
 - `branch` 负责承载当前交付切片的 Git 提交线
@@ -100,7 +101,19 @@ related_docs:
 
 ## 4. Happy Path
 
-标准路径如下：
+标准路径分两层：
+
+用户主视角：
+
+1. 从 `repo issue` 确认当前要推进的目标
+2. 进入或切换到对应 `flow`
+3. 在该 `flow` 中挂接 plan/spec 作为 execution spec
+4. 在对应 `branch` 上提交本地 commit
+5. 提交 `pr`
+6. 进入整合阶段，直到该 `pr` 可合并
+7. 合并后收尾并结束当前 `flow`
+
+内部桥接链：
 
 1. 从 `repo issue` 确认来源层目标
 2. 创建、选择或同步对应的 `roadmap item`
@@ -116,7 +129,8 @@ related_docs:
 执行要求：
 
 - 一个 `type=feature` 的 roadmap item 默认对应一个主 `branch` 和一个主 `pr`
-- `task` 作为 execution record 服务于 roadmap item，不替代规划对象本身
+- `task` 作为 execution record / execution bridge 服务于 roadmap item，不替代规划对象本身
+- `flow` 是用户主视角的默认执行锚点；roadmap item 与 task 继续保留为内部桥接对象
 - 同一 `flow` 内的 commit 应服务同一个当前交付目标
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
 - `done` 只应发生在当前交付目标已经完成或明确废弃之后
@@ -215,7 +229,7 @@ related_docs:
 - 若该 PR 已完成且相关 follow-up 已收束，应进入 `vibe-done` 或等价收口流程
 - 若当前 PR 已 merged，则该 PR 对应的 plan 进入 terminal state
 - merged 后只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接，不允许把新需求继续写回旧 plan
-- merged 后若出现新的 feature、补丁或治理项，必须重新进入 `repo issue -> roadmap item -> task -> flow -> PR`
+- merged 后若出现新的 feature、补丁或治理项，必须重新进入用户主链 `repo issue -> flow -> plan/spec -> commit -> PR -> done`，并按需重建内部桥接链 `repo issue -> roadmap item -> task -> flow`
 
 ### 6.3 一个 `flow` 中做了不同 feature，想拆成多个 `pr`
 

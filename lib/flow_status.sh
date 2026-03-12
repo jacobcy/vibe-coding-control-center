@@ -52,9 +52,11 @@ _flow_status() {
   echo "$dashboard_json" | jq -c '.flows[]' | while IFS= read -r flow; do
     echo "${BOLD}$(echo "$flow" | jq -r '.feature')${NC}"
     echo "  Branch: $(echo "$flow" | jq -r '.branch')"
+    echo "  Issue:  $(echo "$flow" | jq -r '(.issue_refs // []) | if length == 0 then "none" else join(", ") end')"
+    echo "  Spec:   $(echo "$flow" | jq -r '.spec_ref // "N/A"')"
+    echo "  PR:     $(echo "$flow" | jq -r '.pr_ref // "none"')"
     echo "  Task:   $(echo "$flow" | jq -r '.current_task // "none"')"
     echo "  Status: $(echo "$flow" | jq -r '.task_status // "unknown"')"
-    echo "  PR:     $(echo "$flow" | jq -r '.pr_ref // "none"')"
     echo "  Next:   $(echo "$flow" | jq -r '.next_step // "N/A"')"
   done
 }

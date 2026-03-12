@@ -48,7 +48,7 @@ vibe flow list
 
 检查点：
 
-- 当前 `flow` / `branch` / `task` / `issue` / `pr`
+- 当前 `issue` / `flow` / `branch` / `task` / `pr`
 - 当前 flow 是否已经进入 `open + had_pr`
 - `.agent/context/task.md` 里上一环节留下了什么 handoff
 
@@ -83,7 +83,7 @@ vibe task show <task-id> --json
 
 说明：
 
-- `task` 是 execution record
+- `task` 是 execution record / execution bridge
 - `issue_refs` / `roadmap_item_ids` / `spec_*` 是提交归类与后续补链的关键元数据
 - 第一版不把缺 `spec_ref` 直接提升为硬阻断，避免历史遗留任务一次性全部卡死
 

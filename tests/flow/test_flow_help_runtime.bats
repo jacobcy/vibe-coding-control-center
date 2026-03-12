@@ -17,6 +17,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "pr" ]]
   [[ "$output" =~ "switch" ]]
   [[ "$output" =~ "save-unstash" ]]
+  [[ "$output" =~ "issue -> flow" ]]
 }
 
 @test "3. vibe flow status in non-worktree returns error" {
@@ -139,6 +140,7 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ "#7" ]]
   [[ "$output" =~ "docs/plans/main-task.md" ]]
+  [[ "$output" == *"Issues:"*"Spec Ref:"*"PR:"*"Task:"* ]]
 }
 
 @test "3.1.1 _flow_show falls back to registry runtime_branch when worktree runtime entry is missing" {
@@ -185,7 +187,7 @@ JSON
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
   cat > "$fixture/vibe/registry.json" <<'JSON'
 {"schema_version":"v1","tasks":[
-  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42"},
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"],"spec_ref":"docs/plans/main-task.md"},
   {"task_id":"task-main-2","title":"Main Task 2","status":"todo","next_step":"Gate 2","assigned_worktree":"wt-main","agent":"claude"}
 ]}
 JSON
@@ -214,8 +216,45 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" =~ '"feature": "refactor"' ]]
   [[ "$output" =~ '"current_task": "task-main"' ]]
+  [[ "$output" =~ '"#7"' ]]
+  [[ "$output" =~ '"spec_ref": "docs/plans/main-task.md"' ]]
   [[ ! "$output" =~ '"branch": "main"' ]]
   [[ ! "$output" =~ '"feature": "ghost"' ]]
+}
+
+@test "3.2.0 _flow_status human summary is issue-first" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"],"spec_ref":"docs/plans/main-task.md"}
+]}
+JSON
+  cat > "$fixture/vibe/worktrees.json" <<'JSON'
+{"schema_version":"v1","worktrees":[
+  {"worktree_name":"wt-claude-refactor","branch":"task/refactor","current_task":"task-main","tasks":["task-main"],"status":"active"}
+]}
+JSON
+
+  run zsh -c '
+    cd "'"$fixture"'/wt-claude-refactor"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    _flow_status
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "#7" ]]
+  [[ "$output" =~ "docs/plans/main-task.md" ]]
+  [[ "$output" == *"Issue:"*"Spec:"*"PR:"*"Task:"* ]]
 }
 
 @test "3.2.1 _flow_status includes runtime branches from registry when worktree runtime entry is missing" {

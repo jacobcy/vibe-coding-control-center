@@ -5,7 +5,7 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 # /vibe-done - 合并后收口
 
-`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。
+`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。它在用户主链中承接 `issue -> flow -> PR -> done` 的最后一跳。
 
 先读这些真源：
 

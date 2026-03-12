@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-12
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -27,7 +27,7 @@ related_docs:
 
 本文档只定义本项目内的特指语义，不展开通用百科解释。其他标准、入口文档、skills、workflows 若使用本文档已定义术语，只能引用，不得重新定义。
 
-高频动作词见 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md)。
+高频动作词见 [action-verbs.md](action-verbs.md)。
 
 ## 1. Governance
 
@@ -63,8 +63,8 @@ related_docs:
   - `repo issue` 不是 roadmap item
   - `repo issue` 不是 flow
 - 落点：
-  - 命令语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-  - task 关联字段见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+  - 命令语义见 [command-standard.md](command-standard.md)
+  - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
 - 使用规则：
   - 讨论需求来源、外部问题、GitHub 追踪项时使用 `repo issue`
   - 若只写 `issue`，默认按 `repo issue` 解释
@@ -79,11 +79,12 @@ related_docs:
   - `roadmap item` 不是 execution record
   - `roadmap item` 不表达 branch/worktree 当前态
 - 落点：
-  - 规划语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+  - 规划语义见 [command-standard.md](command-standard.md)
+  - 文件边界见 [roadmap-json-standard.md](roadmap-json-standard.md)
 - 使用规则：
   - `feature` / `task` / `bug` 是 roadmap item 的 `type`
   - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
+  - `roadmap item` 是 planning 中间层，不是用户默认主链锚点
   - 不要把 roadmap 状态当成分支当前执行状态
 
 ### 3.3 `task`
@@ -96,11 +97,12 @@ related_docs:
   - `task` 不等于 PR
   - `task` 不等于 roadmap item
 - 落点：
-  - 命令语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-  - 文件字段见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+  - 命令语义见 [command-standard.md](command-standard.md)
+  - 文件字段见 [registry-json-standard.md](registry-json-standard.md)
 - 使用规则：
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
   - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
+  - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
   - `repo issue` 可以映射到一个或多个 `task`
 
 ### 3.3.1 `roadmap sync`
@@ -148,8 +150,8 @@ related_docs:
   - `milestone` 不是 roadmap item type
   - `milestone` 不是 flow
 - 落点：
-  - 规划语义见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-  - 文件边界见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+  - 规划语义见 [command-standard.md](command-standard.md)
+  - 文件边界见 [roadmap-json-standard.md](roadmap-json-standard.md)
 - 使用规则：
   - 讨论版本、阶段、交付窗口时优先使用 `milestone`
   - 历史上的 `version_goal` 应视为兼容字段，而不是长期上位概念
@@ -165,10 +167,11 @@ related_docs:
   - `flow` 不是业务愿望本身
   - `flow` 不承担规划语义
 - 落点：
-  - 命令边界见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-  - 现场态边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+  - 命令边界见 [command-standard.md](command-standard.md)
+  - 现场态边界见 [data-model-standard.md](data-model-standard.md)
 - 使用规则：
   - 讨论当前交付切片、由当前 worktree 承载的任务现场时使用 `flow`
+  - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
 ### 3.5 `pr`
@@ -180,7 +183,7 @@ related_docs:
   - `pr` 不是 task
   - `pr` 不是 flow
 - 落点：
-  - task 与 PR 的关系见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+  - task 与 PR 的关系见 [registry-json-standard.md](registry-json-standard.md)
 - 使用规则：
   - 讨论代码评审与合并对象时使用 `pr`
   - 不要把 `pr` 当作需求或执行单元
@@ -196,7 +199,7 @@ related_docs:
   - `worktree` 不是 flow
   - `worktree` 不是 branch
 - 落点：
-  - 现场态边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+  - 现场态边界见 [data-model-standard.md](data-model-standard.md)
 - 使用规则：
   - 讨论物理目录、当前文件现场、worktree 清理时使用 `worktree`
 
@@ -209,7 +212,7 @@ related_docs:
   - `branch` 不是 flow
   - `branch` 不是 worktree
 - 落点：
-  - Git 工作流约束见 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)
+  - Git 工作流约束见 [git-workflow-standard.md](git-workflow-standard.md)
 - 使用规则：
   - 讨论提交线、合并线、切分交付线时使用 `branch`
 
@@ -222,7 +225,7 @@ related_docs:
   - `workflow` 不等于 flow
   - `workflow` 不等于单个 branch
 - 落点：
-  - AI workflows 见 [.agent/README.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/README.md)
+  - AI workflows 见 [../../.agent/README.md](../../.agent/README.md)
 - 使用规则：
   - 讨论过程、阶段、交付路径时使用 `workflow`
   - 讨论运行时容器时不要用 `workflow` 代替 `flow`
@@ -238,7 +241,7 @@ related_docs:
   - `调度` 不是代码执行
   - `调度` 不是单个 task 的步骤组织
 - 落点：
-  - 命令边界见 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
+  - 命令边界见 [command-standard.md](command-standard.md)
 - 使用规则：
   - 讨论下一个 feature、task 分组、PR 切片时使用 `调度`
 
@@ -251,7 +254,7 @@ related_docs:
   - `编排` 不是调度
   - `编排` 不直接等于执行
 - 落点：
-  - skill 职责边界见 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+  - skill 职责边界见 [shell-capability-design.md](shell-capability-design.md)
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
@@ -265,8 +268,8 @@ related_docs:
   - `执行代理` 不是共享状态真源
   - `执行代理` 不应绕过 shell 直接写共享状态文件
 - 落点：
-  - AI 入口与规则见 [AGENTS.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/AGENTS.md)
-  - 项目上下文见 [CLAUDE.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/CLAUDE.md)
+  - AI 入口与规则见 [../../AGENTS.md](../../AGENTS.md)
+  - 项目上下文见 [../../CLAUDE.md](../../CLAUDE.md)
 - 使用规则：
   - 文档中优先使用 `执行代理`
   - `执行器` 只用于识别历史语境
@@ -280,8 +283,8 @@ related_docs:
   - `Skill 层` 不是共享状态真源
   - `Skill 层` 不应直接写 JSON 真源
 - 落点：
-  - 规则见 [skill-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/skill-standard.md)
-  - 设计边界见 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+  - 规则见 [skill-standard.md](skill-standard.md)
+  - 设计边界见 [shell-capability-design.md](shell-capability-design.md)
 - 使用规则：
   - 文档中优先使用 `Skill 层`
   - `胶水层` 作为历史叫法保留
@@ -296,7 +299,7 @@ related_docs:
   - `Shell 能力层` 不是调度器
   - `Shell 能力层` 不是编排器
 - 落点：
-  - 定义见 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+  - 定义见 [shell-capability-design.md](shell-capability-design.md)
 - 使用规则：
   - 讨论命令设计、原子能力、shell 边界时使用 `Shell 能力层`
 
@@ -309,7 +312,7 @@ related_docs:
   - `共享状态真源` 不是 shell
   - `共享状态真源` 不是 skill
 - 落点：
-  - 边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
+  - 边界见 [data-model-standard.md](data-model-standard.md)
 - 使用规则：
 - 讨论共享状态文件本身时使用 `共享状态真源`
 - 不要再用“物理真源”同时指 shell 和 JSON 文件
@@ -352,7 +355,7 @@ related_docs:
 - `代码实现层`
 - `AI审计层`
 
-这些术语的流程定义见 [docs/README.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/README.md) 与 [cognition-spec-dominion.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/cognition-spec-dominion.md)。
+这些术语的流程定义见 [../README.md](../README.md) 与 [cognition-spec-dominion.md](cognition-spec-dominion.md)。
 
 禁止把：
 
@@ -372,7 +375,7 @@ related_docs:
   - `入口文件` 不是标准真源
   - `入口文件` 不应承载复杂规范全文
 - 落点：
-  - 根目录入口文件，如 [AGENTS.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/AGENTS.md)、[CLAUDE.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/CLAUDE.md)、[README.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/README.md)、[STRUCTURE.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/STRUCTURE.md)
+  - 根目录入口文件，如 [../../AGENTS.md](../../AGENTS.md)、[../../CLAUDE.md](../../CLAUDE.md)、[../../README.md](../../README.md)、[../../STRUCTURE.md](../../STRUCTURE.md)
 - 使用规则：
   - 入口文件应提供导航、最小必要约束和引用链
   - 不在入口文件中堆叠复杂规范
@@ -386,7 +389,7 @@ related_docs:
   - `标准文件` 不等于入口文件
   - `标准文件` 不记录临时讨论和执行噪音
 - 落点：
-  - [docs/standards/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards)
+  - [docs/standards/](.)
 - 使用规则：
   - 讨论项目一致规范、稳定定义和边界时使用 `标准文件`
 
@@ -399,7 +402,7 @@ related_docs:
   - `参考文件` 不是项目内部规范真源
   - `参考文件` 不应反向定义项目标准
 - 落点：
-  - [docs/references/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/references)
+  - [docs/references/](../references)
 - 使用规则：
   - 引用外部库、外部知识、外部资料时使用 `参考文件`
 
@@ -412,7 +415,7 @@ related_docs:
   - `规则文件` 不是项目宪法
   - `规则文件` 不应重写标准文件或入口文件的概念真源
 - 落点：
-  - [.agent/rules/](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/rules)
+  - [.agent/rules/](../../.agent/rules)
 - 使用规则：
   - 执行代理需要具体执行细则、实现边界和模式时使用 `规则文件`
 

@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-12
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -37,17 +37,17 @@ related_docs:
 
 完整的 Shell 设计原则、职责边界与审查清单，见：
 
-- [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+- [shell-capability-design.md](shell-capability-design.md)
 
 本文档使用的核心术语定义见：
 
-- [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)
+- [glossary.md](glossary.md)
 
 命令的数据模型基础见：
 
-- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
-- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
-- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- [data-model-standard.md](data-model-standard.md)
+- [registry-json-standard.md](registry-json-standard.md)
+- [roadmap-json-standard.md](roadmap-json-standard.md)
 
 ## 1. Scope
 
@@ -138,7 +138,7 @@ related_docs:
 
 ## 3.1 Core Semantics
 
-以下关系建立在 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 的术语定义之上。
+以下关系建立在 [glossary.md](glossary.md) 的术语定义之上。
 
 语义关系：
 
@@ -151,10 +151,12 @@ related_docs:
 
 补充约束：
 
-- 默认 happy path = `repo issue -> roadmap item -> task -> flow -> PR`
+- 用户主视角主链 = `repo issue -> flow -> plan/spec -> commit -> PR -> done`
+- 内部桥接链 = `repo issue -> roadmap item -> task -> flow`
 - `roadmap` 负责 GitHub Project 规划对象
-- `task` 只负责 execution record
+- `task` 只负责 execution record / execution bridge
 - `flow` 只负责执行现场
+- `roadmap item` 是 planning 中间层，不是用户默认第一锚点
 - slash / workflow 只能调度这些对象，不得重新发明对象层级
 - GitHub 官方字段与 Vibe 扩展字段可以同时同步，但语义层级必须分离
 
