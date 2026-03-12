@@ -12,6 +12,7 @@ tags: [workflow, vibe, execution, orchestration]
 ## 定位
 
 - `vibe:start` 是 workflow 层执行入口，只负责判断当前 flow 是否具备可执行 task，并委托 `vibe-start` skill。
+- 它负责从 issue 落 task，再把 execution spec 交给执行体系。
 - 具体 task 选择顺序、`auto` 模式、blocker 分类、handoff 写回，都下沉到 `vibe-start` skill。
 - `.agent/context/task.md` 只是 handoff 补充，不是执行图纸。
 
@@ -23,6 +24,7 @@ tags: [workflow, vibe, execution, orchestration]
    - task 是否具备可解析的 `spec_standard/spec_ref`
    - 是否存在 `auto` 模式下的后续已绑定 task
 3. 委托 `skills/vibe-start/SKILL.md` 处理业务判断：
+   - 从 issue 落 task
    - 选择当前 task 或 `auto` 顺序
    - 校验 execution spec
    - 缺 spec 时回退到 `/vibe-new`

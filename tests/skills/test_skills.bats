@@ -212,6 +212,21 @@ SHELL
   [[ "$output" =~ "git-workflow-standard.md" ]]
 }
 
+@test "workflows keep new-start-task-check responsibilities narrow" {
+  run rg -nH \
+    "旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/.agent/workflows/vibe:new.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:start.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:task.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:check.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe:new.md" ]]
+  [[ "$output" =~ "vibe:start.md" ]]
+  [[ "$output" =~ "vibe:task.md" ]]
+  [[ "$output" =~ "vibe:check.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \
