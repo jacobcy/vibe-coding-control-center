@@ -435,7 +435,8 @@ EOF
         "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
         "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'/.git"; return 0 ;;
-        "add VERSION CHANGELOG.md") return 0 ;;
+        "add -- VERSION") return 0 ;;
+        "add -- CHANGELOG.md") return 0 ;;
         "diff --quiet HEAD -- VERSION CHANGELOG.md") return 1 ;;
         "commit --only -m chore: bump version to 2.1.4 -- VERSION CHANGELOG.md") return 0 ;;
         "push origin HEAD") return 0 ;;
