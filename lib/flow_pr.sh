@@ -9,7 +9,7 @@ _flow_pr_bound_spec_ref() {
   [[ -n "$current_task" ]] || return 0
 
   spec_ref="$(print -r -- "$flow_record" | jq -r '.spec_ref // empty' 2>/dev/null)"
-  if [[ -z "$spec_ref" || "$spec_ref" == "null" ]]; then
+  if [[ -z "$spec_ref" ]]; then
     log_error "Current task '$current_task' is missing spec_ref. Bind a plan before vibe flow pr."
     return 1
   fi

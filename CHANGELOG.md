@@ -3,7 +3,7 @@
 ## [2.1.27] - 2026-03-12
 
 ### ✨ Changed
-- fix(flow): keep closeout on reusable main branch ...
+- fix(flow): keep closeout on a reusable non-detached baseline branch across worktrees
 
 ## [2.1.26] - 2026-03-12
 
