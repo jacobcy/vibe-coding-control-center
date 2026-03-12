@@ -189,6 +189,19 @@ SHELL
   [[ "$output" =~ "docs/standards/skill-standard.md" ]]
 }
 
+@test "standards freeze vibe new-start-task-check boundary semantics" {
+  run rg -nH \
+    "旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/docs/standards/skill-standard.md" \
+    "$REPO_ROOT/docs/standards/skill-trigger-standard.md" \
+    "$REPO_ROOT/docs/standards/git-workflow-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "skill-standard.md" ]]
+  [[ "$output" =~ "skill-trigger-standard.md" ]]
+  [[ "$output" =~ "git-workflow-standard.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \

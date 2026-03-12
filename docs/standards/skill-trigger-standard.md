@@ -56,6 +56,7 @@ related_docs:
 
 - 只要问题本质是 `roadmap <-> task`、task registry、task 数据质量，走 `vibe-task`。
 - 只要问题本质是 `task <-> flow`、worktree runtime、stale binding，走 `vibe-check`。
+- 其中 `vibe-task` 是 task-centered audit，`vibe-check` 是 runtime / recovery audit。
 
 ### 2.4 Skill 治理与 Skills 管理必须分开
 
@@ -68,6 +69,8 @@ related_docs:
 |---|---|---|---|---|
 | `vibe-issue` | Issue intake | 用户要创建、补全、查重、润色、落 GitHub issue | 已经在讨论版本归类、task 映射、runtime 修复 | “创建 issue”, “提 issue”, “查重”, “补 issue 模板” |
 | `vibe-roadmap` | Roadmap planning | 用户要排版本、定目标、做 backlog triage、决定 issue 放哪版 | 只是在看当前 flow 该去哪，或修 runtime/registry | “版本规划”, “下一个版本做什么”, “这个 issue 放哪一版” |
+| `vibe-new` | Flow transition | 用户要在进入新链前决定主 issue、处理旧 flow 到新 flow 的转换，并明确不创建 task | 已经进入执行、要从 issue 落 task、要修 runtime 审计 | “进入新 flow”, “切主 issue”, “带着改动切换”, “清空后再进入” |
+| `vibe-start` | Execution handoff | 用户已经进入新 flow，要从 issue 落 task，并把 execution spec 交给执行体系 | 旧 flow 到新 flow 的转换、issue intake、roadmap triage | “从 issue 开始做”, “开始执行”, “落 task”, “进入 spec 执行” |
 | `vibe-task` | Task registry / roadmap-task mapping | 用户要看跨 worktree 的 flow/task 大盘，或核对 `roadmap <-> task`、task registry | 项目级版本规划、Issue intake、runtime stale repair | “现在该回哪个 flow”, “任务总览”, “修复 roadmap 和 task 对应关系” |
 | `vibe-check` | Runtime / task-flow binding | 用户要解释或修复 `task <-> flow` / worktree runtime 不一致 | roadmap 归类、task registry 审计、Issue 治理 | “binding 不对”, “runtime stale”, “check runtime”, “当前 worktree 状态不对” |
 | `vibe-review-code` | Code review | 用户要对 source changes 做 pre-PR 审查、复核 PR review feedback、检查实现风险与测试覆盖 | docs-only review、standards/changelog 审查 | “review 这段代码”, “代码审查”, “PR 前 review”, “根据 review feedback 修代码” |
