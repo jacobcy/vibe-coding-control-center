@@ -74,9 +74,9 @@ JSON
   "project_id":"PVT_kwDOBHxkss4A1a2B",
   "version_goal":"Complete shared-state standardization",
   "items":[
-    {"roadmap_item_id":"rm-1","title":"Alpha","status":"current","source_type":"local","source_refs":[],"issue_refs":[],"linked_task_ids":[],"github_project_item_id":"PVTI_alpha","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
-    {"roadmap_item_id":"rm-2","title":"Beta","status":"p0","source_type":"local","source_refs":[],"issue_refs":[],"linked_task_ids":[],"github_project_item_id":"PVTI_beta","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
-    {"roadmap_item_id":"rm-3","title":"Gamma","status":"deferred","source_type":"local","source_refs":[],"issue_refs":[],"linked_task_ids":[],"github_project_item_id":"PVTI_gamma","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"}
+    {"roadmap_item_id":"rm-1","title":"Alpha","status":"current","source_type":"local","source_refs":[],"issue_refs":[],"depends_on_item_ids":[],"linked_task_ids":[],"github_project_item_id":"PVTI_alpha","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
+    {"roadmap_item_id":"rm-2","title":"Beta","status":"p0","source_type":"local","source_refs":[],"issue_refs":[],"depends_on_item_ids":[],"linked_task_ids":[],"github_project_item_id":"PVTI_beta","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"},
+    {"roadmap_item_id":"rm-3","title":"Gamma","status":"deferred","source_type":"local","source_refs":[],"issue_refs":[],"depends_on_item_ids":[],"linked_task_ids":[],"github_project_item_id":"PVTI_gamma","content_type":"draft_issue","spec_standard":"none","execution_record_id":null,"spec_ref":null,"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"}
   ]
 }
 JSON

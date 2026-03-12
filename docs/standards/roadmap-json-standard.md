@@ -86,6 +86,7 @@ related_docs:
   "execution_record_id": null,
   "spec_ref": null,
   "issue_refs": [],
+  "depends_on_item_ids": [],
   "linked_task_ids": [
     "2026-03-08-command-standard-rewrite"
   ],
@@ -112,6 +113,7 @@ related_docs:
 - `execution_record_id`
 - `spec_ref`
 - `issue_refs`
+- `depends_on_item_ids`
 - `linked_task_ids`
 - `created_at`
 - `updated_at`
@@ -198,6 +200,7 @@ related_docs:
 - `linked_task_ids` 用于关联执行层 task
 - `issue_refs` 用于关联 repo issue
 - `source_refs` 用于记录导入来源
+- `depends_on_item_ids` 用于声明 roadmap item 之间的依赖关系
 
 补充约束：
 
@@ -208,6 +211,8 @@ related_docs:
 - `source_refs` 应优先记录 GitHub Project item / repo issue 来源，而不是本地运行时来源
 - `github_project_item_id` + `content_type` 是 GitHub Project 对齐主桥
 - `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 是本地执行桥接字段
+- `depends_on_item_ids` 是依赖声明字段，只允许引用其他 `roadmap_item_id`
+- `depends_on_item_ids` 必须遵守 [roadmap-dependency-standard.md](roadmap-dependency-standard.md) 的校验规则
 - 一个 roadmap item 可以关联多个 task
 - 一个 roadmap item 可以关联多个 repo issue
 - 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
@@ -266,6 +271,7 @@ related_docs:
       "execution_record_id": null,
       "spec_ref": null,
       "issue_refs": [],
+      "depends_on_item_ids": [],
       "linked_task_ids": [],
       "created_at": "2026-03-08T09:00:00+08:00",
       "updated_at": "2026-03-08T09:00:00+08:00"

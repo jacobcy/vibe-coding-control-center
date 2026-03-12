@@ -2,6 +2,61 @@
 # lib/roadmap_query.sh - Read/Query operations for Roadmap module
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_store.sh" ]] && source "$VIBE_LIB/roadmap_store.sh"
 
+# Compute dependency status for a roadmap item
+_vibe_roadmap_compute_dependency_status() {
+    local common_dir="$1" item_id="$2"
+    local roadmap_file registry_file
+
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    registry_file="$common_dir/vibe/registry.json"
+
+    # Get depends_on_item_ids for this item
+    local depends_on
+    depends_on="$(jq -r --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id) | .depends_on_item_ids // []' "$roadmap_file")"
+
+    # If no dependencies, item is ready
+    if [[ "$(echo "$depends_on" | jq 'length')" -eq 0 ]]; then
+        jq -n '{ready: true, blocked: false, blockers: []}'
+        return 0
+    fi
+
+    # Check each dependency and collect blockers
+    local blockers_json
+    blockers_json="$(echo "$depends_on" | jq -r '.[]' | while read -r dep_id; do
+        # Check if dependency has a merged PR
+        local dep_task_json dep_pr_status
+
+        # Find task linked to this roadmap item with PR (get full JSON object)
+        dep_task_json="$(jq -c --arg rid "$dep_id" '
+            .tasks[]? | select((.roadmap_item_ids // []) | index($rid)) | select(.pr_ref != null)
+        ' "$registry_file" 2>/dev/null | head -n 1)"
+
+        if [[ -z "$dep_task_json" ]]; then
+            # No task with PR found for this dependency
+            jq -c -n --arg id "$dep_id" '{roadmap_item_id: $id, reason: "missing_pr_ref"}'
+        else
+            # Check PR status
+            dep_pr_status="$(echo "$dep_task_json" | jq -r '.pr_status // "open"')"
+            if [[ "$dep_pr_status" != "merged" ]]; then
+                jq -c -n --arg id "$dep_id" '{roadmap_item_id: $id, reason: "pr_not_merged"}'
+            fi
+        fi
+    done | jq -s '. | map(select(. != null))')"
+
+    # If blockers is empty or null, item is ready
+    if [[ -z "$blockers_json" || "$blockers_json" == "null" ]]; then
+        jq -n '{ready: true, blocked: false, blockers: []}'
+    else
+        local blocker_count
+        blocker_count="$(echo "$blockers_json" | jq 'length')"
+        if [[ "$blocker_count" -eq 0 ]]; then
+            jq -n '{ready: true, blocked: false, blockers: []}'
+        else
+            echo "$blockers_json" | jq -c '{ready: false, blocked: true, blockers: .}'
+        fi
+    fi
+}
+
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
     while [[ $# -gt 0 ]]; do
@@ -255,8 +310,12 @@ _vibe_roadmap_show() {
     item_json="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
     [[ -n "$item_json" ]] || { echo "Error: roadmap item not found: $item_id"; return 1; }
 
+    # Compute dependency status
+    local dependency_status
+    dependency_status="$(_vibe_roadmap_compute_dependency_status "$common_dir" "$item_id")"
+
     if [[ "$output_json" == "true" ]]; then
-        echo "$item_json"
+        echo "$item_json" | jq -c --argjson dep_status "$dependency_status" '. + {dependency_status: $dep_status}'
         return 0
     fi
 
