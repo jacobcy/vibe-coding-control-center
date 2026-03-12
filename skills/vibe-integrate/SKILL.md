@@ -44,7 +44,6 @@ vibe flow list
 - 当前要处理哪些 PR
 - 哪些 PR 是独立的，哪些是 stacked
 - 哪些 flow 已经进入 `open + had_pr`
-- 若 task 有 `primary_issue_ref`，它对应的 `repo issue` 才是当前整合阶段默认优先关注的 `task issue`
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把旧 handoff 继续传给下一个环节。
 
@@ -59,8 +58,6 @@ vibe flow list
 ```bash
 vibe flow review [pr_number]
 ```
-
-这是查看线上 review comments / review threads / review evidence 的标准 shell 入口。默认先用它读取评论与阻塞项，不要绕开它自行拼接 `gh pr view` 输出做主判断。
 
 `vibe flow review` 会通过 GraphQL 拉取所有行级 review thread，包含：
 - 文件路径 + 行号
@@ -82,10 +79,8 @@ vibe flow review [pr_number]
 
 - 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
 - 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
-- 默认按异步场景处理：若用户当前不在线或没有急迫性，可先等待 10 分钟，再重新运行一次 `vibe flow review [pr]` 检查是否已有新的在线 review evidence
-- 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认由 agent 自动在 PR 中补一条 `@codex` comment 触发评论，再继续停留在 `/vibe-integrate`
+- 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认提醒用户可在 PR 中显式 `@codex` 触发评论，再继续停留在 `/vibe-integrate`
 - 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
-- 若再次等待后仍没有任何线上 review，不要把“作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
 
 可使用 `browser_subagent` 直接查看 PR 页面，或触发 agent 通过 review thread 给出回应：
 
@@ -93,15 +88,6 @@ vibe flow review [pr_number]
 # 调用 subagent 审查 PR review comments 并生成反馈
 browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
 ```
-
-推荐 fallback 顺序：
-
-1. `vibe flow review [pr]` 读取线上 comments / threads / evidence
-2. 若用户不在线或当前没有急迫性，等待 10 分钟后再运行一次 `vibe flow review [pr]`
-3. 若仍没有 Codex 在线 review，由 agent 自动在 PR 中补一条 `@codex` comment
-4. 再等待 10 分钟后，重新运行一次 `vibe flow review [pr]`
-5. 若仍无任何线上 review，则运行 `vibe flow review --local` 或使用 browser/subagent 产出外部 review evidence
-6. 将外部 review 结果回贴到 PR comment 后，再继续判断 merge readiness
 
 #### 情况 B：尚无 PR（`pr_ref` 为空）
 
@@ -116,7 +102,6 @@ browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
 - 是否还有阻塞性的 unresolved review threads
 - merge base / stack 顺序是否正确
 - 当前分支是否还需要 review follow-up patch
-- 若需要描述 issue 归属，优先围绕 `primary_issue_ref`，其余 `issue_refs` 只作补充上下文
 
 常用证据入口：
 
