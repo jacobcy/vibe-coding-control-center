@@ -52,9 +52,56 @@ _vibe_roadmap_process_intake_candidates() {
           --arg url "$url" \
           '.items[]? | select(((.issue_refs // []) | index($ref)) != null or ((.issue_refs // []) | index($alt_ref)) != null or ((.source_refs // []) | index($url)) != null)' \
           "$roadmap_file" >/dev/null; then
+            # Even if it exists as its own item, or is being skipped, we check if it links to another issue
+            # to establish the bridge.
+            _vibe_roadmap_bridge_pr_links "$roadmap_file" "$candidate_json" "$repo"
             continue
         fi
 
         _vibe_roadmap_add_project_item_from_content "$project_id" "$id" >/dev/null || return 1
+        # Also try to bridge if it's a new PR item being added
+        _vibe_roadmap_bridge_pr_links "$roadmap_file" "$candidate_json" "$repo"
     done < <(printf '%s' "$candidate_list_json" | jq -c '.[]?')
+}
+
+_vibe_roadmap_bridge_pr_links() {
+    local roadmap_file="$1" candidate_json="$2" repo="$3"
+    local title body url pr_ref pr_alt_ref linked_issues issue_num issue_ref issue_alt_ref
+    
+    url="$(printf '%s' "$candidate_json" | jq -r '.url // empty')"
+    [[ "$url" == *"/pull/"* ]] || return 0
+    
+    title="$(printf '%s' "$candidate_json" | jq -r '.title // empty')"
+    body="$(printf '%s' "$candidate_json" | jq -r '.body // empty')"
+    number="$(printf '%s' "$candidate_json" | jq -r '.number // empty')"
+    pr_ref="gh-${number}"
+    pr_alt_ref="gh:${repo}#${number}"
+
+    # Extract issue numbers from "Fixes #123", "Closes #123", etc.
+    linked_issues=$(printf '%s\n%s' "$title" "$body" | grep -oEi "(fixes|closes|resolves) #[0-9]+" | grep -oEi "#[0-9]+" | tr -d '#' || true)
+    
+    [[ -n "$linked_issues" ]] || return 0
+    
+    local tmp; tmp="$(mktemp)" || return 1
+    cp "$roadmap_file" "$tmp"
+
+    while read -r issue_num; do
+        [[ -n "$issue_num" ]] || continue
+        issue_ref="gh-${issue_num}"
+        issue_alt_ref="gh:${repo}#${issue_num}"
+        
+        # Update the existing issue item to include this PR in its refs
+        jq --arg issue_ref "$issue_ref" \
+           --arg issue_alt_ref "$issue_alt_ref" \
+           --arg pr_url "$url" \
+           --arg pr_ref "$pr_ref" \
+           --arg pr_alt_ref "$pr_alt_ref" \
+           '(.items[] | select(((.issue_refs // []) | index($issue_ref)) != null or ((.issue_refs // []) | index($issue_alt_ref)) != null)) |= (
+              .source_refs = (((.source_refs // []) + [$pr_url]) | unique)
+              | .issue_refs = (((.issue_refs // []) + [$pr_ref, $pr_alt_ref]) | unique)
+              | .updated_at = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))
+           )' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
+    done <<< "$linked_issues"
+    
+    mv "$tmp" "$roadmap_file"
 }
