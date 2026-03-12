@@ -179,13 +179,23 @@ SHELL
 }
 
 @test "skill loop memo and standard keep the main chain and audit sidecars aligned" {
+  run rg -nH "旧 flow.*新 flow.*不创建 task" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "从 issue 落 task" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "task-centered audit" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "runtime / recovery audit" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
   run rg -nH \
-    "vibe-issue|vibe-roadmap|vibe-new|vibe-start|vibe-commit|vibe-integrate|vibe-done|vibe-task|vibe-check|发 issue|排 roadmap|开始做|merge and clear|task 账本|runtime / binding" \
-    "$REPO_ROOT/docs/references/skill-loop-memo.md" \
+    "vibe-issue|vibe-roadmap|vibe-new|vibe-start|vibe-commit|vibe-integrate|vibe-done|vibe-task|vibe-check|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
     "$REPO_ROOT/docs/standards/skill-standard.md"
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "docs/references/skill-loop-memo.md" ]]
   [[ "$output" =~ "docs/standards/skill-standard.md" ]]
 }
 

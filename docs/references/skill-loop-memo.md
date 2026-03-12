@@ -35,7 +35,7 @@ related_docs:
 
 ## 主链路
 
-`repo issue -> roadmap item -> plan + task binding -> execute -> PR -> review/integrate -> done`
+`repo issue -> roadmap item -> vibe-new -> vibe-start -> spec execution -> PR -> review/integrate -> done`
 
 对应常用 skill：
 
@@ -50,14 +50,14 @@ related_docs:
    - 记忆句：它是 roadmap 的大脑。
 
 3. `vibe-new`
-   - 做什么：快捷规划入口；决定当前目标从哪里 intake，补 plan，绑定 task，必要时准备逻辑 flow。
-   - 不做什么：不直接开始编码。
-   - 记忆句：它决定“当前 flow 接下来做什么、按什么 plan 做”，但停在执行前。
+   - 做什么：旧 flow 到新 flow 的转换器；决定主 issue，判断是否带着未提交改动进入新 flow，还是清空现场后再进入。
+   - 不做什么：不创建 task，不直接开始执行。
+   - 记忆句：它处理“怎么进入新链”，不是“进来后怎么落 task”。
 
 4. `vibe-start`
-   - 做什么：快捷执行入口；读取当前 flow 已绑定、已有 `spec_standard/spec_ref` 的 task，然后按 plan 开始做。
-   - 不做什么：不根据 issue 创建 task，不负责生成 plan。
-   - 记忆句：它是“开始做了”，不是“开始想做什么”。
+   - 做什么：进入新 flow 后，从 issue 落 task，再把 `spec_standard/spec_ref` 交给对应执行体系。
+   - 不做什么：不承担旧 flow 到新 flow 的转换，不负责 issue intake。
+   - 记忆句：它是“从 issue 落 task 后开始做”，不是“决定切到哪个主 issue”。
 
 5. `vibe-commit`
    - 做什么：commit 分组、PR 切片、提交并发 PR。
@@ -79,12 +79,12 @@ related_docs:
 这两条不是主交付链，而是审计/修复旁路：
 
 1. `vibe-task`
-   - 做什么：task 视角的审计；看 task registry、`roadmap <-> task` 映射、task 数据质量、跨 worktree task 总览。
+   - 做什么：task-centered audit；看 task registry、`roadmap <-> task` 映射、task 数据质量、跨 worktree task 总览。
    - 重要纠正：它不是纯只读；在审计修复模式下，可以在用户确认后执行 `vibe task add/update/remove`。
    - 不做什么：不负责 runtime `task <-> flow` 修复。
 
 2. `vibe-check`
-   - 做什么：runtime / 完整性中的“现场一致性”部分，具体是 `task <-> flow`、worktree、stale binding 的审计与修复。
+   - 做什么：runtime / recovery audit，负责 `task <-> flow`、worktree、stale binding 的现场一致性审计与修复。
    - 重要纠正：它不是 roadmap / task registry 的历史总审计，也不是“下一个做什么”的大脑。
    - 不做什么：不负责 roadmap 排期，不负责 `roadmap <-> task` 语义修复。
 
@@ -92,10 +92,10 @@ related_docs:
 
 - `vibe-issue`：发 issue
 - `vibe-roadmap`：排 roadmap
-- `vibe-new`：定当前要做什么，并把 plan + task 绑好
-- `vibe-start`：开始做
+- `vibe-new`：旧 flow 到新 flow 的转换，不创建 task
+- `vibe-start`：从 issue 落 task，然后开始做
 - `vibe-commit`：提交 + PR
 - `vibe-integrate`：review / CI / merge readiness
 - `vibe-done`：merge and clear
-- `vibe-task`：task 账本与映射审计
-- `vibe-check`：runtime / binding 审计
+- `vibe-task`：task-centered audit
+- `vibe-check`：runtime / recovery audit
