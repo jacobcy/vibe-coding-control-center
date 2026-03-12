@@ -37,7 +37,6 @@ Regardless of your identity (Claude, OpenCode, Codex, Trae, etc.):
 5. **Respond** in Chinese (中文回复)
 6. **Use** `docs/standards/glossary.md` when a project term appears ambiguous or conflicts with older wording
 7. **Use** `docs/standards/action-verbs.md` when a high-frequency action verb is ambiguous
-8. **Commit** the execution plan file together with the implementation/docs change when that plan is the explicit input for the current execution session
 
 ## 🚀 Quick Start
 1. Read `CLAUDE.md` to understand the project

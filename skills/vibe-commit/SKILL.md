@@ -168,6 +168,7 @@ vibe flow pr --base <ref>
 - 首次发布若当前 branch 还没有已确认的 changelog message cache，agent 必须显式提供 `--msg`
 - `--msg` 不允许使用空字符串、`...` 或默认占位文案糊弄过关
 - 同一 branch 若已经提供过一次有效 `--msg`，后续重复执行 `vibe flow pr` 时默认复用缓存值，不必反复询问
+- 若本轮是按显式输入的 plan 执行改动，发布对应实现/文档改动时必须同时提交该 plan 文件，不得把 plan 留在工作区外游离
 
 ### Step 6.5: PR 发出后的强制停点
 
