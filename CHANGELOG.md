@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.29] - 2026-03-13
+
+### ✨ Changed
+- add remote issue dependency commands
+
 ## [2.1.28] - 2026-03-12
 
 ### ✨ Changed
