@@ -278,7 +278,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
 }
 
-@test "11.3 _flow_done closes flow history and deletes local and remote branches" {
+@test "11.3 _flow_done closes flow history, lands on main branch, and deletes local and remote branches" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
@@ -303,7 +303,7 @@ JSON
     _flow_is_main_worktree() { return 1; }
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_has_pr() { return 0; }
-    _flow_checkout_detached_main() { echo "DETACHED_MAIN"; return 0; }
+    _flow_checkout_safe_main_branch() { echo "SAFE_MAIN_BRANCH"; return 0; }
     vibe_delete_local_branch() { echo "DELETE_LOCAL:$1"; return 0; }
     vibe_delete_remote_branch() { echo "DELETE_REMOTE:$1"; return 0; }
     git() {
@@ -321,7 +321,7 @@ JSON
     _flow_done
   '
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "DETACHED_MAIN" ]]
+  [[ "$output" =~ "SAFE_MAIN_BRANCH" ]]
   [[ "$output" =~ "DELETE_LOCAL:task/feature-branch" ]]
   [[ "$output" =~ "DELETE_REMOTE:task/feature-branch" ]]
   [[ "$output" =~ "task/feature-branch" ]]

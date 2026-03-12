@@ -67,7 +67,6 @@ vibe task show <task-id> --json
 第一版规则：
 
 - `hard block`
-  - 当前 flow 没有 `current_task`
   - `current_task` 无法从 shell 真源解析
   - 当前 task 的 `runtime_branch` 为空，或与当前 flow branch 不一致
 
@@ -78,7 +77,11 @@ vibe task show <task-id> --json
 
 动作边界：
 
-- `hard block`：停止提交，先补最小登记
+- 若当前 flow 没有 `current_task`：
+  - 先检查当前 flow / issue / plan 事实能否**唯一推出**一个 execution spec
+  - 若能唯一推出，则由 skill 直接补 `vibe task add/update ... --spec-standard --spec-ref`，并绑定到当前 flow；这一步默认不再额外征求用户确认
+  - 若无法唯一推出 plan 是哪个，或 issue / plan 归属存在歧义，再 `hard block` 并向用户确认
+- 其余 `hard block`：停止提交，先补最小登记
 - `warning`：允许继续，但必须把缺失元数据当作显式风险报告给用户
 
 说明：
@@ -86,6 +89,7 @@ vibe task show <task-id> --json
 - `task` 是 execution record / execution bridge
 - `issue_refs` / `roadmap_item_ids` / `spec_*` 是提交归类与后续补链的关键元数据
 - 第一版不把缺 `spec_ref` 直接提升为硬阻断，避免历史遗留任务一次性全部卡死
+- 这里的自动补 task 只适用于“plan 唯一明确”的场景；若存在多个候选 plan / spec，不得替用户猜
 
 ### Step 3: 审计工作区
 
@@ -149,6 +153,7 @@ git log --oneline <base>..HEAD
 - 当前 commit 只服务一个交付目标
 - 当前分支语义仍匹配这个目标
 - 当前 flow 没有被错误复用
+- 若这是该 branch 第一次写 CHANGELOG，必须准备好非占位的 `--msg`
 
 发布入口只用：
 
@@ -157,6 +162,13 @@ vibe flow pr --base <ref>
 ```
 
 不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
+
+补充约束：
+
+- 首次发布若当前 branch 还没有已确认的 changelog message cache，agent 必须显式提供 `--msg`
+- `--msg` 不允许使用空字符串、`...` 或默认占位文案糊弄过关
+- 同一 branch 若已经提供过一次有效 `--msg`，后续重复执行 `vibe flow pr` 时默认复用缓存值，不必反复询问
+- 若本轮是按显式输入的 plan 执行改动，发布对应实现/文档改动时必须同时提交该 plan 文件，不得把 plan 留在工作区外游离
 
 ### Step 6.5: PR 发出后的强制停点
 

@@ -113,6 +113,11 @@ related_docs:
 6. 进入整合阶段，直到该 `pr` 可合并
 7. 合并后收尾并结束当前 `flow`
 
+closeout 约束：
+
+- `vibe flow done (shell)` 在关闭当前 branch 时，应把当前目录落到安全的、非 detached 的、指向 `main` 的基线分支上；优先使用本地 `main`，若受 `git worktree` 限制则使用当前 worktree 专用的 safe branch
+- closeout 完成后，同一物理目录可直接进入下一条 `flow`；“继续开发”默认是新的 `branch` / 新的 `flow`，不是继续占用旧 branch
+
 内部桥接链：
 
 1. 从 `repo issue` 确认来源层目标

@@ -1,6 +1,24 @@
 #!/usr/bin/env zsh
 
 _flow_history_file() { echo "$(git rev-parse --git-common-dir)/vibe/flow-history.json"; }
+_flow_ref_slugify() {
+  local raw="${1:-}"
+  raw="${raw:l}"
+  raw="${raw//[^a-z0-9._-]/-}"
+  raw="${raw##[-./]}"
+  raw="${raw%%[-./]}"
+  while [[ "$raw" == *--* ]]; do
+    raw="${raw//--/-}"
+  done
+  echo "${raw:-default}"
+}
+_flow_safe_main_branch_name() {
+  local wt_path wt_name suffix
+  wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+  wt_name="$(basename "$wt_path")"
+  suffix="$(_flow_ref_slugify "$wt_name")"
+  echo "vibe/main-safe/${suffix}"
+}
 
 _flow_history_ensure_file() {
   local history_file
@@ -114,9 +132,24 @@ _flow_close_branch_tasks() {
   ' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
 }
 
-_flow_checkout_detached_main() {
+_flow_checkout_safe_main_branch() {
+  local safe_branch
   git fetch origin main --quiet 2>/dev/null || true
-  git checkout --detach origin/main >/dev/null 2>&1 || git checkout --detach main >/dev/null 2>&1
+  if git show-ref --verify --quiet refs/heads/main; then
+    if git checkout main >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  if git show-ref --verify --quiet refs/remotes/origin/main; then
+    safe_branch="$(_flow_safe_main_branch_name)"
+    if git show-ref --verify --quiet "refs/heads/${safe_branch}"; then
+      git checkout "$safe_branch" >/dev/null 2>&1
+      return $?
+    fi
+    git checkout -B "$safe_branch" origin/main >/dev/null 2>&1
+    return $?
+  fi
+  return 1
 }
 
 _flow_branch_dashboard_entry() {

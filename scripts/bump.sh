@@ -35,7 +35,15 @@ echo "$new_v" > "$vfile"
 # Update CHANGELOG.md if it exists
 if [[ -f "$clfile" ]]; then
     today=$(date +"%Y-%m-%d")
-    desc="${2:-"Automated version bump and updates."}"
+    desc="${2-}"
+    desc="${desc#"${desc%%[![:space:]]*}"}"
+    desc="${desc%"${desc##*[![:space:]]}"}"
+    case "$desc" in
+        ""|"..."|"Automated version bump and updates.")
+            echo "Error: A non-placeholder changelog message is required."
+            exit 1
+            ;;
+    esac
     # Check if this version header already exists
     if grep -q "## \[$new_v\]" "$clfile"; then
         echo "Note: Version $new_v already exists in CHANGELOG.md"
