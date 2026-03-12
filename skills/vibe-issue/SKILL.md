@@ -5,11 +5,12 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 # /vibe-issue - 智能 Issue 助手
 
-该技能负责引导用户创建高质量的 GitHub Issue，并确保其与项目路线图同步。
+该技能负责引导用户创建高质量的 GitHub Issue，并在进入 roadmap 规划前完成 intake 治理。
 
 语义边界：
 
 - `vibe-issue` 负责 Issue intake、模板补全、查重、标签与创建。
+- `vibe-issue` 不决定 roadmap 排期，也不创建 task。
 - `vibe-roadmap` 负责 Issue 已存在之后的版本规划与优先级归类。
 - `vibe-task` 与 `vibe-check` 不负责 Issue 创建治理。
 
@@ -25,7 +26,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - **不重造轮子**：直接调用 `gh` CLI 和 `vibe roadmap` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe roadmap` 输出，再做编排判断。
-- **自动对齐**：自动将 Issue 对齐到 `roadmap item = GitHub Project item mirror`，不生成 execution record 身份。
+- **只做 intake，不做排期**：Issue 创建后是否进入 roadmap mirror、何时进入版本窗口，由 `vibe-roadmap` 决定。
 - **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入 roadmap mirror 的候选资格；创建后通过 `vibe roadmap sync` 入 GitHub Project，而不是直接变成 execution record。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
@@ -45,18 +46,18 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
   - **高相似度**：展示重复 Issue，建议用户在原 Issue 下评论或合并。
   - **低相似度**：继续创建流程。
 
-### Step 3: Roadmap 检查
+### Step 3: Roadmap 上下文检查
 
 - 必须先运行 `vibe roadmap list --json` 检查是否已有对应 `roadmap item`。
-- 如果 Issue 标题与某个 Roadmap Item 匹配，自动记录其 ID。
-- `roadmap item` 只解释为 GitHub Project item mirror，不把 issue 直接当作本地 task。
+- 如果 Issue 标题与某个 Roadmap Item 匹配，只记录上下文供后续 `vibe-roadmap` 参考。
+- `roadmap item` 只解释为 GitHub Project item mirror，不把 issue 直接当作本地 task，也不在这里决定 roadmap 排期。
 
 ### Step 4: 填充与润饰
 
 - 引导用户补充模板中缺失的关键信息。
 - 基于 AI 建议合适的 Labels。
-- 为保证 `vibe roadmap sync` 可发现该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
-- 附加 `vibe-task` 后，`vibe roadmap sync` 会把尚未 mirrored 的 open issue 推入 GitHub Project；后续优先级归类仍由 `vibe-roadmap` 决定。
+- 为保证后续 intake 链路可识别该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
+- 附加 `vibe-task` 不等于已完成 roadmap placement；是否推入 GitHub Project、何时纳入版本窗口，仍由 `vibe-roadmap` 决定。
 
 ### Step 4.5: 判断是否继续挂在现有主 issue 下
 
@@ -71,7 +72,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ### Step 5: 提交与收口
 
 - 执行 `gh issue create --title "<标题>" --body "<润色后的内容>" --label "<labels>"`。
-- 创建成功后，如果它还不在 Roadmap 中，默认执行 `vibe roadmap sync`；该同步会把带 `vibe-task` 的 open issue 推入 GitHub Project mirror。
+- 创建成功后，输出 Issue 链接与建议下一步；若需要进入 roadmap 规划，交给 `vibe-roadmap` 继续处理。
 - 输出成功提示及 Issue 链接。
 
 ## 对象边界

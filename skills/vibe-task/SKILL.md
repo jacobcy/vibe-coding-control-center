@@ -9,6 +9,8 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
+`vibe-task` 是 task-centered audit，不处理 runtime / recovery audit。
+
 标准真源：
 
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。

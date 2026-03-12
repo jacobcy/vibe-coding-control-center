@@ -7,7 +7,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护全景路线图，管理版本目标，对 roadmap item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** `/vibe-roadmap` 负责调度决策，`vibe roadmap` 负责 shell 层读写数据。
+**核心原则:** `/vibe-roadmap` 是 roadmap 的 dispatch brain，负责调度决策；`vibe roadmap` 负责 shell 层读写数据。
 
 intake gate 约束：
 

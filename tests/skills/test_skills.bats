@@ -227,6 +227,25 @@ SHELL
   [[ "$output" =~ "vibe:check.md" ]]
 }
 
+@test "skill docs keep issue-roadmap-new-start-task-check boundaries aligned" {
+  run rg -nH \
+    "不决定 roadmap 排期|dispatch brain|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-new/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-start/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-issue/SKILL.md" ]]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "vibe-new/SKILL.md" ]]
+  [[ "$output" =~ "vibe-start/SKILL.md" ]]
+  [[ "$output" =~ "vibe-task/SKILL.md" ]]
+  [[ "$output" =~ "vibe-check/SKILL.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \

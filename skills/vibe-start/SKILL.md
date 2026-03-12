@@ -5,7 +5,7 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 # /vibe-start - Execute Bound Tasks From Plans
 
-`vibe-start` 只负责执行当前 flow 已经具备 execution spec 的 task。它不创建 roadmap item、plan 或 task；缺少这些对象时应回退到上游入口。
+`vibe-start` 负责进入新 flow 后从 issue 落 task，再执行当前 flow 已具备 execution spec 的 task。它不创建 roadmap item 或 plan；缺少这些对象时应回退到上游入口。
 
 先读这些真源：
 
@@ -21,13 +21,13 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 ## 核心边界
 
-- 允许：读取当前 flow、解析当前 task 的 `spec_standard/spec_ref`、按 plan 执行、运行验证、更新 task 状态、写 handoff
-- 不允许：创建新的 roadmap item、task 或 plan；绕过 plan 自由编码；跨 worktree 调度
+- 允许：读取当前 flow、从 issue 落 task、解析当前 task 的 `spec_standard/spec_ref`、按 plan 执行、运行验证、更新 task 状态、写 handoff
+- 不允许：创建新的 roadmap item 或 plan；绕过 plan 自由编码；跨 worktree 调度
 - 若发现当前 flow 已有 PR，本 skill 只能处理该 flow 合法范围内的 follow-up 或当前已绑定 task，不得把新目标堆进当前 flow
 
 ## Workflow
 
-### Step 1: 读取当前 flow 与 task
+### Step 1: 读取当前 flow、issue 与 task
 
 先运行：
 
@@ -38,17 +38,27 @@ vibe flow show --json
 必要时补充：
 
 ```bash
+vibe issue show <issue-ref>
 vibe task show <task-id> --json
 ```
 
 检查点：
 
+- 当前 `issue_refs`
 - 当前 `current_task`
 - 当前 flow 已绑定的 `tasks[]`
 - 每个 task 的 `status`
 - 每个 task 的 `spec_standard/spec_ref`
 
-### Step 2: 选择执行目标
+### Step 2: 从 issue 落 task 并选择执行目标
+
+若当前 flow 尚未绑定 task，但 issue 与 plan 已明确：
+
+- 先从 issue 落 task
+- 通过 `vibe task add/update ... --spec-standard --spec-ref` 写入 execution spec
+- 再把该 task 绑定到当前 flow
+
+若当前 flow 已绑定 task，则直接进入执行目标选择。
 
 默认顺序：
 
@@ -67,7 +77,7 @@ vibe task show <task-id> --json
 若缺失：
 
 - 不执行当前 task
-- 回退到 `/vibe-new` 补齐 plan 与 task 绑定
+- 回退到 `/vibe-new` 补齐 issue / roadmap / plan 侧准备
 - 若当前 flow 没有任何 task，则回退到 `/vibe-task`
 - 若 `/vibe-task` 也找不到可绑定 task，再回到 `/vibe-roadmap`
 
@@ -106,4 +116,4 @@ handoff 最少记录：
 - 不得把 `.agent/context/task.md` 当正式执行图纸
 - 不得把“跳过”写成“完成”
 - 不得在缺 `spec_ref` 时继续编码
-- 不得直接创建新 task 来绕过 intake
+- 不得绕过 issue 直接凭空创建 task
