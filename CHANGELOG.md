@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.26] - 2026-03-12
+
+### ✨ Changed
+- docs(standards): define flow identity main chain ...
+
 ## [2.1.25] - 2026-03-12
 
 ### ✨ Changed
