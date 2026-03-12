@@ -4,6 +4,16 @@
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_issue_intake.sh" ]] && source "$VIBE_LIB/roadmap_issue_intake.sh"
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_github_api.sh" ]] && source "$VIBE_LIB/roadmap_github_api.sh"
 
+_vibe_roadmap_persist_project_id() {
+    local roadmap_file="$1" project_id="$2" tmp
+    [[ -f "$roadmap_file" ]] || return 1
+    tmp="$(mktemp)" || return 1
+    jq --arg project_id "$project_id" '.project_id = $project_id' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file" || {
+        rm -f "$tmp"
+        return 1
+    }
+}
+
 _vibe_roadmap_import_remote_item() {
     local common_dir="$1" remote_json="$2" roadmap_file roadmap_item_id title source_type source_refs issue_refs
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
@@ -50,6 +60,7 @@ _vibe_roadmap_import_remote_item() {
 _vibe_roadmap_refresh_local_mirror() {
     local common_dir="$1" project_id="$2" roadmap_file remote_items remote_json refreshed_count=0 imported_count=0
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+    _vibe_roadmap_persist_project_id "$roadmap_file" "$project_id" || return 1
     remote_items="$(_vibe_roadmap_fetch_github_project_items "$project_id")" || return 1
     while IFS= read -r remote_json; do
         [[ -n "$remote_json" ]] || continue
@@ -80,6 +91,7 @@ _vibe_roadmap_refresh_local_mirror() {
 
     echo "Refreshed $refreshed_count local roadmap mirrors from GitHub Project."
     echo "Imported $imported_count new roadmap items from GitHub Project."
+    _vibe_roadmap_persist_project_id "$roadmap_file" "$project_id" || return 1
 }
 
 _vibe_roadmap_sync_github() {
@@ -92,6 +104,8 @@ _vibe_roadmap_sync_github() {
         echo "Error: roadmap.json project_id required for GitHub Project sync"
         return 1
     }
+
+    _vibe_roadmap_persist_project_id "$roadmap_file" "$project_id" || return 1
 
     while IFS= read -r item_json; do
         bootstrap_result="$(_vibe_roadmap_bootstrap_remote_item "$project_id" "$item_json")" || {
@@ -116,4 +130,5 @@ _vibe_roadmap_sync_github() {
     _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
     _vibe_roadmap_sync_issue_intake_candidates "$common_dir" "$repo" "$project_id" || return 1
     _vibe_roadmap_refresh_local_mirror "$common_dir" "$project_id" || return 1
+    _vibe_roadmap_persist_project_id "$roadmap_file" "$project_id" || return 1
 }
