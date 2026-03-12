@@ -117,6 +117,106 @@ JSON
   [[ "$output" =~ "Skipping version bump" ]]
 }
 
+@test "12.1 _flow_pr blocks publish when current task is missing spec_ref" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    _flow_show() {
+      cat <<'"'"'JSON'"'"'
+{"branch":"current-branch","current_task":"task-main","spec_ref":null}
+JSON
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "task-main" ]]
+  [[ "$output" =~ "spec_ref" ]]
+}
+
+@test "12.2 _flow_pr blocks publish when bound plan file does not exist" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    _flow_show() {
+      cat <<'"'"'JSON'"'"'
+{"branch":"current-branch","current_task":"task-main","spec_ref":"docs/plans/missing-plan.md"}
+JSON
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "docs/plans/missing-plan.md" ]]
+  [[ "$output" =~ "not found" || "$output" =~ "Missing" ]]
+}
+
+@test "12.3 _flow_pr auto-stages bound plan file before publish" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/docs/plans"
+  printf '%s\n' '# plan' > "$fixture/docs/plans/current-plan.md"
+
+  run zsh -c '
+    cd "'"$fixture"'"
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_resolve_pr_base() { echo "main"; return 0; }
+    _flow_show() {
+      cat <<'"'"'JSON'"'"'
+{"branch":"current-branch","current_task":"task-main","spec_ref":"docs/plans/current-plan.md"}
+JSON
+    }
+    vibe_has() { return 0; }
+    gh() {
+      case "$*" in
+        "pr list --state open --base main --json number,headRefName,title") echo "[]"; return 0 ;;
+        "pr view current-branch") return 0 ;;
+        "pr edit current-branch --base main --title test --body test") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "ls-files --error-unmatch docs/plans/current-plan.md") return 1 ;;
+        "add -- docs/plans/current-plan.md") echo "STAGED_PLAN"; return 0 ;;
+        "push origin HEAD") return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_pr --title "test" --body "test"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "STAGED_PLAN" ]]
+  [[ "$output" =~ "current-plan.md" ]]
+}
+
 @test "13. _flow_pr skips bump if changelog message exists" {
   local fixture
   fixture="$(mktemp -d)"

@@ -1,9 +1,35 @@
 #!/usr/bin/env zsh
 
+_flow_pr_stage_bound_spec_ref() {
+  local flow_record current_task spec_ref
+  flow_record="$(_flow_show --json 2>/dev/null || true)"
+  [[ -n "$flow_record" ]] || return 0
+
+  current_task="$(print -r -- "$flow_record" | jq -r '.current_task // empty' 2>/dev/null)"
+  [[ -n "$current_task" ]] || return 0
+
+  spec_ref="$(print -r -- "$flow_record" | jq -r '.spec_ref // empty' 2>/dev/null)"
+  if [[ -z "$spec_ref" || "$spec_ref" == "null" ]]; then
+    log_error "Current task '$current_task' is missing spec_ref. Bind a plan before vibe flow pr."
+    return 1
+  fi
+  [[ -f "$spec_ref" ]] || {
+    log_error "Bound plan file not found for task '$current_task': $spec_ref"
+    return 1
+  }
+
+  git add -- "$spec_ref" 2>/dev/null || {
+    log_error "Failed to stage bound plan file: $spec_ref"
+    return 1
+  }
+  log_info "Ensured bound plan is staged: $spec_ref"
+}
+
 _flow_pr() {
   local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs first_msg open_prs use_web=0
   while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_name="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; --web) use_web=1; shift ;; *) shift ;; esac; done
   vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
+  _flow_pr_stage_bound_spec_ref || return 1
   base_name="$(_flow_resolve_pr_base "$base_name" "$branch")" || return 1
   base_git_ref="$(_flow_pr_base_git_ref "$base_name")" || return 1
   if vibe_has gh; then
