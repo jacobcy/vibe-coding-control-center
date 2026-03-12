@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.19] - 2026-03-12
+
+### ✨ Changed
+- feat(roadmap): support syncing merged PRs into GitHub Project ...
+
 ## [2.1.18] - 2026-03-11
 
 ### ✨ Changed
