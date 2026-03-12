@@ -27,9 +27,10 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 对象约束：
 
-- `repo issue -> roadmap item -> task -> flow -> PR`
+- 用户主链：`repo issue -> flow -> plan/spec -> commit -> PR -> done`
+- 内部桥接链：`repo issue -> roadmap item -> task -> flow`
 - `roadmap item = GitHub Project item mirror`
-- `task = execution record`
+- `task = execution record / execution bridge`
 - `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
 - `task audit` = execution record 审计 / 修复，不是规划层 mirror 同步
 - OpenSpec / plans 注册 = execution spec 来源桥接，不是 roadmap item 创建

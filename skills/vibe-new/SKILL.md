@@ -5,7 +5,7 @@ description: Use when the user wants to create or intake the next delivery targe
 
 # /vibe-new - Intake, Plan, And Task Binding
 
-`vibe-new` 只处理旧 flow 到新 flow 的转换，不进入执行，也不创建 task。它负责决定主 issue，以及如何进入新的 flow 语义。
+`vibe-new` 只处理旧 flow 到新 flow 的转换，不进入执行，也不创建 task。它负责决定主 issue，并把用户主链推进到对应的 `flow` 语义。
 
 先读这些真源：
 
@@ -68,7 +68,7 @@ vibe task show <task-id> --json
 - 缺少 `repo issue` 或 bug 边界不清时，先委托 `vibe-issue`
 - 缺少 roadmap item 时，先运行 `vibe roadmap add ...`
 - 缺少 plan 时，默认委托 `writing-plans`
-- 只有进入 `/vibe-start` 后，才允许从 issue 落 task 并写入 `spec_standard/spec_ref`
+- 只有进入 `/vibe-start` 后，才允许从 issue 落 task 作为 execution bridge 并写入 `spec_standard/spec_ref`
 
 ### Step 4: 处理 flow 现场
 

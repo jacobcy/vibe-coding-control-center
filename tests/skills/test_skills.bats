@@ -62,10 +62,11 @@ SHELL
 
 @test "workflow and skill docs preserve github project orchestration terminology" {
   run rg -nH \
-    "roadmap item.*GitHub Project item mirror|Roadmap Item: mirrored GitHub Project item|task.*execution record|Task: execution record" \
+    "roadmap item.*GitHub Project item mirror|Roadmap Item: mirrored GitHub Project item|task.*execution record|Task: execution record|execution bridge" \
     "$REPO_ROOT/.agent/workflows" \
     "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
-    "$REPO_ROOT/skills/vibe-task/SKILL.md"
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-start/SKILL.md"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "vibe:new-flow.md" ]]
@@ -191,6 +192,14 @@ SHELL
   run rg -nH "runtime / recovery audit" "$REPO_ROOT/docs/references/skill-loop-memo.md"
   [ "$status" -eq 0 ]
 
+  run rg -nH "repo issue -> flow -> plan/spec -> commit -> PR -> done|execution bridge" \
+    "$REPO_ROOT/docs/standards/skill-standard.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:start.md" \
+    "$REPO_ROOT/skills/vibe-start/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md"
+
+  [ "$status" -eq 0 ]
+
   run rg -nH \
     "vibe-issue|vibe-roadmap|vibe-new|vibe-start|vibe-commit|vibe-integrate|vibe-done|vibe-task|vibe-check|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
     "$REPO_ROOT/docs/standards/skill-standard.md"
@@ -229,7 +238,7 @@ SHELL
 
 @test "skill docs keep issue-roadmap-new-start-task-check boundaries aligned" {
   run rg -nH \
-    "不决定 roadmap 排期|dispatch brain|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "不决定 roadmap 排期|dispatch brain|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit|repo issue -> flow|execution bridge" \
     "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
     "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
     "$REPO_ROOT/skills/vibe-new/SKILL.md" \
@@ -298,7 +307,7 @@ SHELL
 
 @test "command standard freezes roadmap init as skeleton recovery only" {
   run rg -nH \
-    "roadmap init|只创建共享真源骨架|不自动执行 `vibe roadmap sync`|不负责 task 历史恢复" \
+    'roadmap init|只创建共享真源骨架|不自动执行 `vibe roadmap sync`|不负责 task 历史恢复' \
     "$REPO_ROOT/docs/standards/command-standard.md"
 
   [ "$status" -eq 0 ]

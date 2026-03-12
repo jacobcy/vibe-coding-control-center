@@ -5,7 +5,7 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 # /vibe-start - Execute Bound Tasks From Plans
 
-`vibe-start` 负责进入新 flow 后从 issue 落 task，再执行当前 flow 已具备 execution spec 的 task。它不创建 roadmap item 或 plan；缺少这些对象时应回退到上游入口。
+`vibe-start` 负责进入新 flow 后，以 `repo issue -> flow` 作为用户主链视角推进执行。它会从 issue 落 task 作为 execution bridge，再执行当前 flow 已具备 execution spec 的 task。它不创建 roadmap item 或 plan；缺少这些对象时应回退到上游入口。
 
 先读这些真源：
 
@@ -21,7 +21,7 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 ## 核心边界
 
-- 允许：读取当前 flow、从 issue 落 task、解析当前 task 的 `spec_standard/spec_ref`、按 plan 执行、运行验证、更新 task 状态、写 handoff
+- 允许：读取当前 flow、从 issue 落 task 作为 execution bridge、解析当前 task 的 `spec_standard/spec_ref`、按 plan 执行、运行验证、更新 task 状态、写 handoff
 - 不允许：创建新的 roadmap item 或 plan；绕过 plan 自由编码；跨 worktree 调度
 - 若发现当前 flow 已有 PR，本 skill 只能处理该 flow 合法范围内的 follow-up 或当前已绑定 task，不得把新目标堆进当前 flow
 
