@@ -45,6 +45,8 @@ _flow_show() {
         | .next_step = ($task.next_step // null)
         | .pr_ref = (.pr_ref // ($task.pr_ref // null))
         | .issue_refs = (if (.issue_refs // []) | length > 0 then .issue_refs else $issue_refs end)
+        | .spec_standard = (.spec_standard // ($task.spec_standard // null))
+        | .spec_ref = (.spec_ref // ($task.spec_ref // null))
       ')"
     fi
   fi
@@ -58,6 +60,8 @@ _flow_show() {
   echo "${BOLD}Task Status:${NC} $(echo "$record" | jq -r '.task_status // "N/A"')"
   echo "${BOLD}PR:${NC} $(echo "$record" | jq -r '.pr_ref // "none"')"
   echo "${BOLD}Issues:${NC} $(echo "$record" | jq -r '(.issue_refs // []) | if length == 0 then "none" else join(", ") end')"
+  echo "${BOLD}Spec Ref:${NC} $(echo "$record" | jq -r '.spec_ref // "N/A"')"
   echo "${BOLD}Next Step:${NC} $(echo "$record" | jq -r '.next_step // "N/A"')"
   [[ "$(echo "$record" | jq -r '.closed_at // empty')" != "" ]] && echo "${BOLD}Closed At:${NC} $(echo "$record" | jq -r '.closed_at')"
+  return 0
 }

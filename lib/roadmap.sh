@@ -200,6 +200,7 @@ _vibe_roadmap_version() {
         clear-goal)
             jq '.version_goal = null' "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
             echo "Version goal cleared."
+            echo "Next: use vibe roadmap assign <text> to set a new planning window anchor."
             ;;
         *)
             echo "Usage: vibe roadmap version <set-goal|clear-goal> [text]"

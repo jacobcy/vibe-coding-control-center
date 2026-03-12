@@ -168,6 +168,10 @@ JSON
   '
 
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "GitHub Project bootstrap sync complete" ]]
+  [[ "$output" =~ "Bootstrapped 2 roadmap item mirrors into GitHub Project." ]]
+  [[ "$output" =~ "Refreshed 2 local roadmap mirrors from GitHub Project." ]]
+  [[ "$output" =~ "Imported 0 new roadmap items from GitHub Project." ]]
   [ "$(jq -r '.items[0].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_issue" ]
   [ "$(jq -r '.items[0].content_type' "$fixture/vibe/roadmap.json")" = "issue" ]
   [ "$(jq -r '.items[1].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_draft" ]
@@ -233,6 +237,7 @@ JSON
   '
 
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "Added 1 vibe-task issue candidates into GitHub Project." ]]
   [ "$(cat "$add_log")" = "ADD:PVT_project:ISSUE_101" ]
 }
 

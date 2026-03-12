@@ -26,6 +26,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Binding" ]]
+  [[ "$output" =~ "Rotate Workflow Refinement" ]]
 }
 
 @test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
@@ -283,7 +284,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
   cat > "$fixture/vibe/registry.json" <<'JSON'
 {"schema_version":"v1","tasks":[
-  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","agent":"claude","pr_ref":"#42","issue_refs":["#7"]}
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","next_step":"Gate 4","assigned_worktree":"wt-claude-refactor","runtime_worktree_name":"wt-claude-refactor","runtime_worktree_path":"FIXTURE_PATH","runtime_branch":"task/feature-branch","runtime_agent":"claude","agent":"claude","pr_ref":"#42","issue_refs":["#7"]}
 ]}
 JSON
   cat > "$fixture/vibe/worktrees.json" <<'JSON'
@@ -291,6 +292,7 @@ JSON
   {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/feature-branch","current_task":"task-main","tasks":["task-main"],"status":"active"}
 ]}
 JSON
+  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/registry.json"
   perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
 
   run zsh -c '
@@ -322,10 +324,13 @@ JSON
   [[ "$output" =~ "DETACHED_MAIN" ]]
   [[ "$output" =~ "DELETE_LOCAL:task/feature-branch" ]]
   [[ "$output" =~ "DELETE_REMOTE:task/feature-branch" ]]
+  [[ "$output" =~ "task/feature-branch" ]]
   [[ "$output" =~ "History preserved" ]]
   [ "$(jq -r '.flows[0].state' "$fixture/vibe/flow-history.json")" = "closed" ]
   [ "$(jq -r '.flows[0].feature' "$fixture/vibe/flow-history.json")" = "feature-branch" ]
   [ "$(jq -r '.worktrees[0].branch // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
+  [ "$(jq -r '.tasks[0].runtime_branch // "null"' "$fixture/vibe/registry.json")" = "null" ]
+  [ "$(jq -r '.tasks[0].runtime_worktree_name // "null"' "$fixture/vibe/registry.json")" = "null" ]
 }
 
 @test "11.4 _flow_done rejects unknown options" {

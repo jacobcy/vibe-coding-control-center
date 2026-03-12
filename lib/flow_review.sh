@@ -179,12 +179,12 @@ _flow_review() {
     fi
   done
   [[ $retry -eq 3 ]] && log_warn "CI is taking too long. Please check manually using: ${CYAN}gh pr checks --watch${NC}"
-  if [[ "$decision" == "APPROVED" && "$rollup_state" == "SUCCESS" ]]; then
+  if [[ "$state" == "MERGED" ]]; then
+    log_success "PR already merged. Time to run 'vibe flow done'."
+  elif [[ "$decision" == "APPROVED" && "$rollup_state" == "SUCCESS" ]]; then
     log_success "Ready to merge! All criteria met."
   elif [[ "$decision" == "CHANGES_REQUESTED" ]]; then
     log_error "Changes requested. Please address review comments."
-  elif [[ "$state" == "MERGED" ]]; then
-    log_success "PR already merged. Time to run 'vibe flow done'."
   else
     log_info "PR is currently active. Target: Approval + CI Success."
   fi

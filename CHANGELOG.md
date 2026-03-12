@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.24] - 2026-03-12
+
+### ✨ Changed
+- docs(plan): add gh-112 cli output summary plan ...
+
 ## [2.1.23] - 2026-03-12
 
 ### ✨ Changed

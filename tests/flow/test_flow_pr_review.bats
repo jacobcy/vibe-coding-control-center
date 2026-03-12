@@ -11,7 +11,46 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "[<pr-or-branch>|--branch <ref>]" ]]
 }
 
-@test "1.2 _flow_review --json includes structured review evidence summary" {
+@test "1.2 _flow_review reports merged PR summary and next step" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_require() { return 0; }
+    vibe_has() { [[ "$1" == "gh" ]]; }
+    gh() {
+      case "$*" in
+        "pr view current-branch --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments")
+          cat <<'"'"'JSON'"'"'
+{"number":42,"title":"Summary output follow-up","state":"MERGED","reviewDecision":"APPROVED","mergeable":"MERGEABLE","url":"https://example.test/pr/42","statusCheckRollup":[{"status":"COMPLETED","state":"SUCCESS"}],"comments":[]}
+JSON
+          return 0
+          ;;
+        "pr checks current-branch")
+          echo "checks ok"
+          return 0
+          ;;
+        *)
+          return 0
+          ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_review
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "PR #42:" ]]
+  [[ "$output" =~ "MERGED" ]]
+  [[ "$output" =~ "Time to run 'vibe flow done'" ]]
+}
+
+@test "1.2b _flow_review --json includes structured review evidence summary" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"

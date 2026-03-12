@@ -254,6 +254,7 @@ _flow_done() {
   now="$(_flow_now_iso)"
   _flow_history_close "$feature_slug" "$branch_name" "$worktree_name" "$worktree_path" "$current_task" "$tasks_json" "$pr_ref" "$now" || return 1
   _flow_close_branch_runtime "$branch_name" || return 1
+  _flow_close_branch_tasks "$branch_name" || return 1
 
   if [[ "$branch_name" == "$current_branch" ]]; then
     _flow_checkout_detached_main || { log_error "Failed to move current worktree off branch: $branch_name"; return 1; }

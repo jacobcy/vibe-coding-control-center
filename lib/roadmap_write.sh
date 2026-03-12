@@ -21,6 +21,7 @@ _vibe_roadmap_add() {
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
     echo "Roadmap item added: $item_id"
+    echo "Title: $title"
     echo "GitHub Project item created: $remote_item_id"
 }
 
@@ -34,7 +35,7 @@ _vibe_roadmap_set_version_goal() {
 }
 
 _vibe_roadmap_classify() {
-    local common_dir="$1" issue_id="$2" issue_state="$3" roadmap_file
+    local common_dir="$1" issue_id="$2" issue_state="$3" roadmap_file title
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
 
     if ! _vibe_roadmap_check_state "$issue_state"; then
@@ -50,13 +51,14 @@ _vibe_roadmap_classify() {
         echo "Error: Roadmap item '$issue_id' not found. Add or sync it before classifying."
         return 1
     fi
+    title="$(jq -r --arg id "$issue_id" '.items[]? | select(.roadmap_item_id == $id) | .title // empty' "$roadmap_file" | head -n 1)"
 
     jq --arg id "$issue_id" --arg s "$issue_state" \
         '(.items[]? | select(.roadmap_item_id == $id) | .status) = $s
          | (.items[]? | select(.roadmap_item_id == $id) | .updated_at) = (now | strftime("%Y-%m-%dT%H:%M:%S%z"))' \
         "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file"
 
-    echo "Roadmap item $issue_id classified as: $issue_state"
+    echo "Roadmap item $issue_id (${title:-untitled}) classified as: $issue_state"
 }
 
 
