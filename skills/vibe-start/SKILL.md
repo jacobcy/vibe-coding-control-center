@@ -38,7 +38,7 @@ vibe flow show --json
 必要时补充：
 
 ```bash
-vibe issue show <issue-ref>
+gh issue view <issue-ref> --json number,title,body,labels
 vibe task show <task-id> --json
 ```
 
