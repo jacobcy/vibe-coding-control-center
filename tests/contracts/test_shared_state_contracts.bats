@@ -162,6 +162,7 @@ JSON
     _vibe_roadmap_add_project_item_from_content() { echo "PVTI_issue"; return 0; }
     _vibe_roadmap_create_github_draft_issue() { echo "PVTI_draft"; return 0; }
     _vibe_roadmap_fetch_candidate_repo_issues() { echo "[]"; return 0; }
+    _vibe_roadmap_fetch_candidate_repo_prs() { echo "[]"; return 0; }
     _vibe_roadmap_fetch_github_project_items() { cat "'"$fixture"'/vibe/roadmap.json" | jq -c "[.items[] | {github_project_item_id, title, description, content_type, source_type, source_refs, issue_refs, remote_number: null}]"; }
     _vibe_roadmap_sync_github "'"$fixture"'" "owner/repo" "PVT_project"
   '
@@ -220,6 +221,8 @@ JSON
 ]
 JSON
     }
+
+    _vibe_roadmap_fetch_candidate_repo_prs() { echo "[]"; return 0; }
 
     _vibe_roadmap_add_project_item_from_content() {
       printf "ADD:%s:%s\n" "$1" "$2" >> "'"$add_log"'"
