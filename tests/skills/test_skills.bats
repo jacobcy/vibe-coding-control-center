@@ -178,6 +178,17 @@ SHELL
   [[ "$output" =~ "vibe-done/SKILL.md" ]]
 }
 
+@test "skill loop memo and standard keep the main chain and audit sidecars aligned" {
+  run rg -nH \
+    "vibe-issue|vibe-roadmap|vibe-new|vibe-start|vibe-commit|vibe-integrate|vibe-done|vibe-task|vibe-check|发 issue|排 roadmap|开始做|merge and clear|task 账本|runtime / binding" \
+    "$REPO_ROOT/docs/references/skill-loop-memo.md" \
+    "$REPO_ROOT/docs/standards/skill-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "docs/references/skill-loop-memo.md" ]]
+  [[ "$output" =~ "docs/standards/skill-standard.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \
