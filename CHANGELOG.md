@@ -1,5 +1,15 @@
 # 更新日志
 
+## [2.1.21] - 2026-03-12
+
+### ✨ Changed
+- fix(roadmap): replace echo with print -r to prevent JSON mangling in Zsh ...
+
+## [2.1.20] - 2026-03-12
+
+### ✨ Changed
+- feat: commit message ...
+
 ## [2.1.19] - 2026-03-12
 
 ### ✨ Changed
