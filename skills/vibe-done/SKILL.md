@@ -1,11 +1,11 @@
 ---
 name: vibe-done
-description: Use when a PR has already been merged and the user wants to close the related task, close linked issues, run flow closure, and archive the final handoff without changing source code.
+description: Use when a PR is already merged, or is review-ready for vibe flow done to merge, and the user wants to close the related task, close linked issues, run flow closure, and archive the final handoff without changing source code.
 ---
 
 # /vibe-done - 合并后收口
 
-`/vibe-done` 只做合并后的收口编排，不做业务代码修复，不替代 PR 整合。
+`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。
 
 先读这些真源：
 
@@ -20,8 +20,9 @@ description: Use when a PR has already been merged and the user wants to close t
 ## 核心边界
 
 - 允许：读取 `vibe flow show`、关闭 task、关闭 issue、执行 `vibe flow done`、写入 handoff
-- 不允许：修业务代码、补 review follow-up、merge PR、手工改 `.git/vibe/*.json`
+- 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
 - `vibe flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
+- 若 PR 尚未 merged，但已满足 review gate，`vibe flow done` 会先执行 merge，再继续 closeout
 
 ## Workflow
 
@@ -88,7 +89,8 @@ vibe flow done --branch <ref>
 
 该命令会负责：
 
-- 校验该 flow 对应 PR 已完成
+- 若 PR 已 merged，直接兼容收尾
+- 若 PR 未 merged，先检查 review evidence，再尝试 merge
 - 写入 flow 历史
 - 删除本地与远端 branch
 

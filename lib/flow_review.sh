@@ -1,6 +1,46 @@
 #!/usr/bin/env zsh
 # lib/flow_review.sh - PR review command handlers for flow module
 
+_flow_review_attach_evidence() {
+  jq '
+    def review_items:
+      ((.reviews // []) | map({login: (.author.login // ""), body: (.body // "")}))
+      + ((.comments // []) | map({login: (.author.login // ""), body: (.body // "")}));
+    .reviewEvidence = (
+      review_items as $items
+      | {
+          copilot: any($items[]?; ((.login | ascii_downcase) | test("copilot"))),
+          codex: any($items[]?;
+            ((.login | ascii_downcase) | test("(^|[^a-z])codex([^a-z]|$)|openai"))
+            or ((.body | ascii_downcase) | test("@codex|codex review"))
+          ),
+          local_comment: any($items[]?;
+            (.body | ascii_downcase) | test("vibe flow review --local|local review evidence|local review")
+          )
+        }
+      | . + {has_review_evidence: (.copilot or .codex or .local_comment)}
+    )
+  '
+}
+
+_flow_review_fetch_json() {
+  local target="$1" pr_info=""
+  pr_info=$(gh pr view "$target" --json number,title,body,comments,reviews,commits,state,mergedAt,headRefName,baseRefName 2>/dev/null) || return 1
+  printf '%s\n' "$pr_info" | _flow_review_attach_evidence
+}
+
+_flow_review_evidence_json() {
+  local target="$1" pr_info=""
+  pr_info="$(_flow_review_fetch_json "$target")" || return 1
+  printf '%s\n' "$pr_info" | jq '.reviewEvidence'
+}
+
+_flow_review_has_evidence() {
+  local target="$1" evidence_json=""
+  evidence_json="$(_flow_review_evidence_json "$target" 2>/dev/null)" || return 1
+  [[ "$(printf '%s\n' "$evidence_json" | jq -r '.has_review_evidence')" == "true" ]]
+}
+
 _flow_review() {
   local target="" pr_info number title state decision mergeable url comments retry=0 ci_status="PENDING" rollup_state="SUCCESS" local_mode="" json_output=0
   while [[ $# -gt 0 ]]; do
@@ -47,9 +87,8 @@ _flow_review() {
     return 0
   fi
 
-  log_step "Fetching PR status for '$target'..."
   if [[ $json_output -eq 1 ]]; then
-    pr_info=$(gh pr view "$target" --json number,title,body,comments,reviews,commits,state,mergedAt,headRefName,baseRefName 2>/dev/null)
+    pr_info="$(_flow_review_fetch_json "$target")"
     if [[ $? -ne 0 ]]; then
       echo "{\"error\": \"No PR found for '$target'\"}"
       return 1
@@ -57,6 +96,8 @@ _flow_review() {
     echo "$pr_info"
     return 0
   fi
+
+  log_step "Fetching PR status for '$target'..."
 
   pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
   [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
@@ -69,6 +110,11 @@ _flow_review() {
   echo "${BOLD}PR #$number:${NC} $title"
   echo "${CYAN}URL:${NC} $url"
   echo "${CYAN}State:${NC} $state | ${CYAN}Review:${NC} $decision | ${CYAN}Mergeable:${NC} $mergeable"
+  local evidence_json
+  evidence_json="$(_flow_review_evidence_json "$target" 2>/dev/null || true)"
+  if [[ -n "$evidence_json" ]]; then
+    echo "${CYAN}Review Evidence:${NC} $(printf '%s\n' "$evidence_json" | jq -r '"copilot=\(.copilot) codex=\(.codex) local_comment=\(.local_comment) any=\(.has_review_evidence)"')"
+  fi
   log_step "Fetching review threads (inline + general)..."
   local repo_nwo threads_json
   repo_nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || true)
@@ -230,7 +276,7 @@ _flow_review_usage() {
   echo "  --local          自动选择本地 LLM（优先 codex，fallback copilot）"
   echo "  --local=codex    强制使用 Codex 本地审查"
   echo "  --local=copilot  强制使用 GitHub Copilot 审查"
-  echo "  --json           输出 PR 详细数据的 JSON 格式（用于程序化调用）"
+  echo "  --json           输出 PR 详细数据与结构化 review evidence（用于程序化调用）"
   echo "  --branch <ref>   指定要查看的分支或 PR 号 (默认: 当前分支)"
   echo ""
   echo "本地 LLM 工具："
@@ -244,5 +290,5 @@ _flow_review_usage() {
   echo "  ${CYAN}vibe flow review 42${NC}           # 查看 PR #42 的状态"
   echo "  ${CYAN}vibe flow review --local${NC}      # 本地审查（自动选择 LLM）"
   echo "  ${CYAN}vibe flow review --local=codex${NC}    # 强制使用 codex"
-  echo "  ${CYAN}vibe flow review --json${NC}       # JSON 输出（用于脚本）"
+  echo "  ${CYAN}vibe flow review --json${NC}       # JSON 输出，含 reviewEvidence 摘要"
 }

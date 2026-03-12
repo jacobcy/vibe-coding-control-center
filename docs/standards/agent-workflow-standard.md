@@ -105,6 +105,12 @@ related_docs:
 5. 停止点
 6. 下一步入口建议
 
+例如：
+
+- 可以提示“先去收集 review evidence，再进入 `vibe flow done`”
+- 可以说明某个入口是 `skill-backed workflow`
+- 但不能在 workflow 内重写 review evidence 的判定规则
+
 ### 2.2 workflow 不负责什么
 
 `agent workflow` 不应承载：
@@ -115,6 +121,11 @@ related_docs:
 4. 详细 fallback 逻辑
 5. 共享状态写入细节
 6. 对标准文件的第二套重定义
+
+一句话：
+
+- workflow 只负责编排，不承载复杂业务逻辑
+- 例如是否已有 review evidence、何时允许 `vibe flow done`，应由 skill / shell 真源判定
 
 这些内容应分别下沉到：
 

@@ -210,14 +210,34 @@ _flow_done() {
   fi
   # 获取远程 main 分支最新状态
   git fetch origin main --quiet 2>/dev/null || true
+  unmerged=$(git rev-list "origin/main..$branch_ref" 2>/dev/null || echo "")
 
   if _flow_branch_pr_merged "$branch_name"; then
     pr_merged=0
     delete_mode="force"
+  elif [[ -z "$unmerged" ]]; then
+    pr_merged=0
+  else
+    _flow_review_has_evidence "$branch_name" || {
+      log_error "Branch '$target_branch' has no review evidence. Wait for Copilot/Codex review, or post a local review comment from 'vibe flow review --local' before done."
+      return 1
+    }
+    vibe_has gh || {
+      log_error "gh (GitHub CLI) is required to merge reviewed PRs during vibe flow done."
+      return 1
+    }
+    log_step "Review evidence found. Merging PR for branch: $branch_name"
+    gh pr merge "$branch_name" --merge || {
+      log_error "Failed to merge PR for branch '$branch_name'. Resolve merge blockers, then re-run vibe flow done."
+      return 1
+    }
+    if _flow_branch_pr_merged "$branch_name"; then
+      pr_merged=0
+      delete_mode="force"
+    fi
   fi
 
   # 无法确认 PR merged 时，回退到 Git 提交检查
-  unmerged=$(git rev-list "origin/main..$branch_ref" 2>/dev/null || echo "")
   if [[ $pr_merged -ne 0 && -n "$unmerged" ]]; then
     log_error "Branch '$target_branch' has commits not merged into origin/main. Please open a PR and merge first."
     return 1

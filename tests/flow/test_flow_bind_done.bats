@@ -149,7 +149,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "Working directory is not clean" ]]
 }
 
-@test "11. _flow_done fails when branch has unmerged commits" {
+@test "11. _flow_done fails when reviewed branch still has unmerged commits" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -158,6 +158,9 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_has_pr() { return 0; }
     _flow_branch_pr_merged() { return 1; }
+    _flow_review_has_evidence() { return 0; }
+    gh() { return 0; }
+    vibe_has() { [[ "$1" == "gh" ]]; }
     git() {
       case "$*" in
         "branch --show-current") echo "feature-branch"; return 0 ;;
@@ -174,7 +177,77 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "has commits not merged into origin/main" ]]
 }
 
-@test "11.0 _flow_done accepts squash-merged PR state even when branch ancestry diverges" {
+@test "11.0 _flow_done blocks unmerged PRs without review evidence" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 1; }
+    _flow_review_has_evidence() { return 1; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "feature-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..feature-branch") echo "commit-hash"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "review evidence" ]]
+}
+
+@test "11.1 _flow_done merges reviewed PR before closeout" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    local merged=0
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { [[ "$merged" -eq 1 ]]; }
+    _flow_review_has_evidence() { return 0; }
+    _flow_history_close() { echo "HISTORY_CLOSED"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
+    vibe_delete_local_branch() { echo "DELETE_LOCAL:$1:$2"; return 0; }
+    gh() {
+      case "$*" in
+        "pr merge feature-branch --merge")
+          merged=1
+          echo "MERGED_PR"
+          return 0
+          ;;
+        *) return 0 ;;
+      esac
+    }
+    vibe_has() { [[ "$1" == "gh" ]]; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "other-branch"; return 0 ;;
+        "show-ref --verify --quiet refs/heads/feature-branch") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/feature-branch") return 1 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..feature-branch") echo "commit-hash"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done --branch feature-branch
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "MERGED_PR" ]]
+  [[ "$output" =~ "HISTORY_CLOSED" ]]
+  [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
+}
+
+@test "11.2 _flow_done accepts squash-merged PR state even when branch ancestry diverges" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -204,7 +277,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
 }
 
-@test "11.1 _flow_done closes flow history and deletes local and remote branches" {
+@test "11.3 _flow_done closes flow history and deletes local and remote branches" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
@@ -255,7 +328,7 @@ JSON
   [ "$(jq -r '.worktrees[0].branch // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
 }
 
-@test "11.2 _flow_done rejects unknown options" {
+@test "11.4 _flow_done rejects unknown options" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -267,7 +340,7 @@ JSON
   [[ "$output" =~ "Usage:" ]]
 }
 
-@test "11.3 _flow_done blocks main worktree even for explicit target branch" {
+@test "11.5 _flow_done blocks main worktree even for explicit target branch" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -285,7 +358,7 @@ JSON
   [[ "$output" =~ "protected" ]]
 }
 
-@test "11.4 _flow_done accepts remote branch refs" {
+@test "11.6 _flow_done accepts remote branch refs" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"

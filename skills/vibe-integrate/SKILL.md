@@ -64,6 +64,11 @@ vibe flow review [pr_number]
 - 是否已 resolved / outdated
 - 评论内容与链接
 
+同时要确认至少存在一份 `review evidence`，可接受来源为三选一：
+- Copilot 在线 review
+- Codex 在线 review / comment
+- `vibe flow review --local` 结果回贴到 PR comment
+
 **等待在线 Review 完成后再继续：**
 
 - 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
@@ -86,6 +91,7 @@ browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
 对每个候选 PR，至少检查：
 
 - CI 是否通过
+- review evidence 是否存在
 - 是否还有阻塞性的 unresolved review threads
 - merge base / stack 顺序是否正确
 - 当前分支是否还需要 review follow-up patch
@@ -119,6 +125,7 @@ vibe flow review <pr>
 只有同时满足以下条件，才允许 merge：
 
 - CI 通过
+- 已存在 review evidence
 - 阻塞性 review 已处理完成（`APPROVED` 或所有 unresolved thread 已 resolve）
 - 堆叠上游已先合并
 - 当前 PR 已达到可合并状态

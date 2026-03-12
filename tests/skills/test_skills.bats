@@ -152,6 +152,19 @@ SHELL
   [[ "$output" =~ "roadmap_item_ids" ]]
 }
 
+@test "review-gated done docs align workflow and standard semantics" {
+  run rg -nH \
+    "review evidence|vibe flow review --local|skill-backed workflow|只负责编排|不承载复杂业务逻辑|vibe flow done" \
+    "$REPO_ROOT/docs/standards/agent-workflow-standard.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:commit.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent-workflow-standard.md" ]]
+  [[ "$output" =~ "vibe:commit.md" ]]
+  [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \

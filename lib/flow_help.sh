@@ -11,11 +11,11 @@ Subcommands:
   ${GREEN}switch${NC} <name>                                       安全进入未关闭且未发过 PR 的现有 flow
   ${GREEN}bind${NC} <task-id> [--agent <name>]                    在当前 worktree 内绑定 existing execution record
   ${GREEN}show${NC} [<flow-name>|<branch>] [--json]                 查看单个 flow 的详情（默认当前 flow）
-  ${GREEN}done${NC} [--branch <ref>]                               关闭已完成 PR 的 flow，并删除本地/远端分支
+  ${GREEN}done${NC} [--branch <ref>]                               review-gated merge/close：有 review 证据才允许合并并关闭 flow
   ${GREEN}status${NC} [--json]                                     查看未关闭 flow 大盘
   ${GREEN}list${NC} [--pr]                                          查看所有 flow（含历史）
   ${GREEN}pr${NC} [--base <ref>]                                    提交代码并打开 Pull Request（目标基线分支）
-  ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或进行本地最终检查
+  ${GREEN}review${NC} [--branch <ref>] [--local]                   查看 PR 或产出可回贴的 review evidence
 Options for 'new <name>':
   --agent <name>     指定 AI 身份 (默认: claude)
   --branch <ref>     指定当前目录创建新 flow 时的起点分支 (默认: origin/main)
@@ -104,13 +104,15 @@ _flow_done_usage() {
   cat <<EOF
 Usage: ${CYAN}vibe flow done${NC} [--branch <ref>]
 关闭当前或指定的 flow，并删除本地/远端分支。
-核心职责：验证该 flow 对应 PR 已完成，写入 flow 历史，再关闭 branch。
+核心职责：对未 merged PR 执行 review-gated merge gate；有 review evidence 才允许 merge + closeout。
 选项：
   --branch <ref>    指定要完成的分支 (默认: 当前分支)
 检查项：
   1. 分支不能是 main 或已关闭 flow
   2. 工作目录必须干净（若关闭当前分支）
   3. 分支必须已有 PR 事实
-  4. 分支对应的 PR 必须已完成；若无法确认，再回退检查 origin/main 是否已吸收变更
+  4. 若 PR 已 merged，直接走兼容收尾
+  5. 若 PR 未 merged，必须先存在 review evidence（Copilot / Codex / local comment 三选一）
+  6. 若 PR 未 merged 且已有 review evidence，命令会先尝试 merge，再继续 closeout
 EOF
 }
