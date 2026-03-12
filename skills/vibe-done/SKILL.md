@@ -17,12 +17,15 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 对 `vibe flow`、`vibe task` 或 `gh` 参数有任何不确定时，先运行 `--help`。
 
+进入本 skill 前，默认前提是已经经过 `/vibe-integrate`。若没有来自上一环节的 merge / gate 结论，先补读 shell 真源，不得自行脑补“现在应该 done 了”。
+
 ## 核心边界
 
 - 允许：读取 `vibe flow show`、关闭 task、关闭 issue、执行 `vibe flow done`、写入 handoff
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
 - `vibe flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
 - 若 PR 尚未 merged，但已满足 review gate，`vibe flow done` 会先执行 merge，再继续 closeout
+- 若 review evidence 尚不存在，或 PR 还没达到 merge 条件，必须停回 `/vibe-integrate`，不得强行继续
 
 ## Workflow
 
@@ -49,9 +52,22 @@ vibe flow show <feature-or-branch> --json
 - `pr_ref`
 - 当前 flow 是否已经满足收口前提
 
+最低收口前提：
+
+- PR 已 merged
+  或
+- PR 虽未 merged，但 shell 真源已经表明它属于 review-ready，可交给 `vibe flow done` 执行 merge gate
+
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把过时 handoff 留给下一个环节。
 
 若没有 task 或 issue，后续步骤按“可跳过”处理，不要伪造关联。
+
+若当前事实显示：
+
+- 没有 review evidence
+- 或还有 unresolved review / CI 阻塞
+
+则立即停止，返回 `/vibe-integrate`，不要继续 Step 2 以后动作。
 
 ### Step 2: 关闭 task
 
@@ -114,7 +130,7 @@ vibe flow done --branch <ref>
 - pr: <pr-ref-or-none>
 - issues: <closed-issue-refs-or-none>
 - completed: <已关闭的 task / issue / flow>
-- next: <是否已完全收口；若未完成，阻塞点是什么>
+- next: <若已完成则写 none；若未完成则明确写“返回 vibe-integrate 处理 review evidence / CI / unresolved threads 阻塞”>
 ```
 
 若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `repo issue`，不得继续塞回旧 plan。

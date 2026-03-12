@@ -7,6 +7,12 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 `/vibe-commit` 只负责编排提交与发 PR 之前的判断，不负责 merge、关 issue、关 task、关 flow。
 
+一旦 PR 创建成功，本 skill 的默认停点就是：
+
+- 进入 `/vibe-integrate`
+- 等待 review evidence、CI 与 merge readiness
+- 不直接跳到 `/vibe-done`
+
 先读这些真源：
 
 - `docs/standards/git-workflow-standard.md`
@@ -152,6 +158,22 @@ vibe flow pr --base <ref>
 
 不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
 
+### Step 6.5: PR 发出后的强制停点
+
+`vibe flow pr` 成功后，必须立即把当前 flow 视为 `open + had_pr`。
+
+此时：
+
+- 允许：进入 `/vibe-integrate` 检查 review、CI、merge 阻塞
+- 不允许：直接进入 `/vibe-done`
+- 不允许：把当前 flow 当作下一个新目标继续开发现场
+
+若用户问“下一步是什么”，默认回答应是：
+
+- 先去 `/vibe-integrate`
+- 先确认或补齐 review evidence
+- 再决定是否已满足 `vibe flow done` 的收口条件
+
 ### Step 7: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
@@ -166,7 +188,7 @@ vibe flow pr --base <ref>
 - pr: <pr-ref-or-none>
 - issues: <issue-refs-or-none>
 - completed: <本轮已完成的提交/PR 草案>
-- next: <交给 vibe-integrate 或继续 commit 的动作>
+- next: <若 PR 已创建，明确写“进入 vibe-integrate 检查 review evidence / CI / merge readiness”；否则写继续 commit 的动作>
 ```
 
 `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/handoff-governance-standard.md` 为准。

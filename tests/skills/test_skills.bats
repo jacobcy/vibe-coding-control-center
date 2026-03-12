@@ -165,6 +165,19 @@ SHELL
   [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
 }
 
+@test "commit integrate done skills enforce the review-gated handoff chain" {
+  run rg -nH \
+    "进入 `/vibe-integrate`|不直接跳到 `/vibe-done`|blocked on review evidence|返回 `/vibe-integrate`|review-ready|merge gate|next: <若已完成则写 none" \
+    "$REPO_ROOT/skills/vibe-commit/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-done/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-commit/SKILL.md" ]]
+  [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
+  [[ "$output" =~ "vibe-done/SKILL.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \

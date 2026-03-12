@@ -20,6 +20,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 - 允许：检查 CI、检查 review threads、判断堆叠顺序、修复小型 follow-up、推动 merge
 - 不允许：直接关闭 task、直接关闭 issue、手工修改共享真源 JSON
 - 若 flow 还没有 PR 事实，这不是 `/vibe-integrate` 的阶段，应回到 `/vibe-commit`
+- 本 skill 是 `vibe-commit -> vibe-done` 之间的强制中间阶段；只要 PR 已创建，就不能跳过它直接宣告收口
 
 ## Workflow
 
@@ -68,6 +69,11 @@ vibe flow review [pr_number]
 - Copilot 在线 review
 - Codex 在线 review / comment
 - `vibe flow review --local` 结果回贴到 PR comment
+
+若三者都没有，本阶段的默认结论必须是：
+
+- `blocked on review evidence`
+- 不得把“CI 已绿”误报成“可 done”
 
 **等待在线 Review 完成后再继续：**
 
@@ -132,6 +138,19 @@ vibe flow review <pr>
 
 遇到 stacked PR 时，必须按依赖顺序推进，不得跳序合并。
 
+### Step 5.5: 交接到 `/vibe-done`
+
+只有出现以下两类结果之一，才允许把下一步交给 `/vibe-done`：
+
+1. 当前 PR 已经 merged
+2. 当前 PR 尚未 merged，但已经满足：
+   - review evidence 存在
+   - CI 通过
+   - 无阻塞性 review
+   - 当前 PR 已达到可 merge 状态
+
+若还不满足，`next` 必须继续留在 `/vibe-integrate`，并明确写出阻塞项。
+
 ### Step 6: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
@@ -146,7 +165,7 @@ vibe flow review <pr>
 - pr: <merged-or-pending-pr-ref>
 - issues: <issue-refs-or-none>
 - completed: <本轮已合并或已解除阻塞的 PR>
-- next: <交给 vibe-done 的收口动作，或剩余待整合 PR>
+- next: <若已满足条件，交给 vibe-done；否则明确继续 vibe-integrate，并写清 review evidence / CI / unresolved threads 中哪一项仍阻塞>
 ```
 
 ## Restrictions
