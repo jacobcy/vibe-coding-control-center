@@ -13,6 +13,22 @@ _flow_pr() {
   log_info "Using PR base: $base_name"
   commit_logs=$(git log "$base_git_ref..HEAD" --oneline); [[ -z "$commit_logs" ]] && { log_warn "No new commits since $base_name. Nothing to PR."; return 1; }
   [[ -z "$bump_type" ]] && bump_type="patch"; [[ -z "$pr_title" ]] && pr_title=$(echo "$commit_logs" | head -n 1 | sed 's/^[a-f0-9]* //'); [[ -z "$pr_body" ]] && pr_body=$(echo "$commit_logs" | sed 's/^[a-f0-9]* / - /')
+  
+  # Auto-link issues
+  local flow_record issue_refs fixes_block=""
+  flow_record=$(_flow_show --json 2>/dev/null)
+  if [[ -n "$flow_record" ]]; then
+    issue_refs=$(print -r -- "$flow_record" | jq -r '(.issue_refs // []) | .[]' | grep '^gh-' | sed 's/^gh-//' || true)
+    if [[ -n "$issue_refs" ]]; then
+      while read -r issue_num; do
+        [[ -n "$issue_num" ]] && fixes_block+="\nFixes #$issue_num"
+      done <<< "$issue_refs"
+      if [[ -n "$fixes_block" ]]; then
+        pr_body+="\n\n## Linked Issues${fixes_block}"
+      fi
+    fi
+  fi
+
   if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
 
   local has_pr=0

@@ -156,7 +156,10 @@ _flow_update_current_worktree_branch() {
   tmp="$(mktemp)" || return 1
   jq --arg name "$wt_name" --arg path "$wt_path" --arg branch "$new_branch" --arg now "$now" '
     if any(.worktrees[]?; .worktree_name == $name) then
-      .worktrees = [.worktrees[] | if .worktree_name == $name then .branch = $branch | .last_updated = $now else . end]
+      .worktrees = [.worktrees[] | if .worktree_name == $name then 
+        (if .branch != $branch then .current_task = null | .tasks = [] else . end)
+        | .branch = $branch | .last_updated = $now 
+      else . end]
     else
       .worktrees += [{"worktree_name":$name,"worktree_path":$path,"branch":$branch,"status":"active","last_updated":$now}]
     end
