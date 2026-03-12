@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.27] - 2026-03-12
+
+### ✨ Changed
+- fix(flow): keep closeout on reusable main branch ...
+
 ## [2.1.26] - 2026-03-12
 
 ### ✨ Changed
