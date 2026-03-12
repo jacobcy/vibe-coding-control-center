@@ -25,6 +25,7 @@ Options for 'switch <name>':
 Parallel worktree:
   使用 ${CYAN}wtnew${NC} / ${CYAN}vnew${NC} 创建新的物理 worktree；它们不属于 vibe flow 主语义
   物理 worktree 只能由人类明确决定；agent 默认不得自行新建或切换 worktree
+  # 用户主链默认按 "repo issue -> flow -> plan/spec -> PR -> done" 理解 flow 查询输出
   # "vibe flow new/switch" 使用 "--branch" 表示 flow 现场的起点/目标分支；"vibe flow pr" 使用 "--base" 表示 PR 的目标合并分支
   # "vibe flow" 只负责消费已有 task/execution record 并建立运行时现场，不负责创建 roadmap item、repo issue 等规划层对象
 EOF
@@ -75,7 +76,7 @@ EOF
 _flow_show_usage() { cat <<EOF
 Usage: ${CYAN}vibe flow show${NC} [<flow-name>|<branch>] [--json]
 查看单个 flow 的详情，默认当前 flow。
-显示内容：flow name、branch、task、issue refs、pr ref、state、closed_at。
+显示内容：issue refs、spec ref、pr ref、task、branch、state、closed_at。
 EOF
 }
 
@@ -83,7 +84,7 @@ _flow_status_usage() { cat <<EOF
 Usage: ${CYAN}vibe flow status${NC} [--json]
 查看未关闭 flow 大盘。
 显示内容：
-  - open flow 的 flow name / branch / task / PR / next_step
+  - open flow 的 flow name / issue / spec / PR / task / next_step
 选项：
   --json          以 JSON 格式输出任务数据
 EOF
