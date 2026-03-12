@@ -86,7 +86,10 @@ mock_git_registry() {
                 ;;
 
             "branch"*) return 1 ;;
-            *) command git "$@" ;;
+            *)
+                echo "unexpected git call in task fixture: $*" >&2
+                return 97
+                ;;
         esac
     }
 }

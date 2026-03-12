@@ -11,6 +11,42 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "[<pr-or-branch>|--branch <ref>]" ]]
 }
 
+@test "1.2 _flow_review --json includes structured review evidence summary" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    vibe_require() { return 0; }
+    vibe_has() { [[ "$1" == "gh" ]]; }
+    gh() {
+      case "$*" in
+        "pr view current-branch --json number,title,body,comments,reviews,commits,state,mergedAt,headRefName,baseRefName")
+          cat <<'"'"'JSON'"'"'
+{"number":42,"title":"Review gate","body":"body","state":"OPEN","mergedAt":null,"headRefName":"task/review-gated-done","baseRefName":"main","commits":[],"reviews":[{"author":{"login":"github-copilot[bot]"},"body":"Auto review complete"}],"comments":[{"author":{"login":"octocat"},"body":"Local review evidence via vibe flow review --local"},{"author":{"login":"codex"},"body":"@codex approved"}]}
+JSON
+          return 0
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+    }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "current-branch"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_review --json
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$(printf "%s" "$output" | jq -r '.reviewEvidence.has_review_evidence')" == "true" ]]
+  [[ "$(printf "%s" "$output" | jq -r '.reviewEvidence.copilot')" == "true" ]]
+  [[ "$(printf "%s" "$output" | jq -r '.reviewEvidence.codex')" == "true" ]]
+  [[ "$(printf "%s" "$output" | jq -r '.reviewEvidence.local_comment')" == "true" ]]
+}
+
 @test "12. _flow_pr skips bump if PR already exists" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"

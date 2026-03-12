@@ -104,8 +104,8 @@ related_docs:
 
 1. 从 `repo issue` 确认来源层目标
 2. 创建、选择或同步对应的 `roadmap item`
-3. 将该 roadmap item 拆成一个或多个 `task` execution record
-4. 为当前这轮交付创建或进入一个 `flow`
+3. 通过 `vibe-new` 完成旧 flow 到新 flow 的转换，不创建 task
+4. 进入新 flow 后，通过 `vibe-start` 从 issue 落 task，并把 execution spec 交给对应执行体系
 5. 让该 `flow` 绑定本轮要交付的 `task`
 6. 在该 `flow` 对应的 `branch` 上提交本地 commit
 7. 执行 `review`

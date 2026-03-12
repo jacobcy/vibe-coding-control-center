@@ -12,6 +12,7 @@ tags: [workflow, vibe, tasks, orchestration]
 ## 定位
 
 - `vibe:task` 是 task 总览与 registry 审计入口，只负责编排查询、委托 `vibe-task` skill，并返回建议或修复结论。
+- 它是 task-centered audit，不处理 runtime / recovery audit。
 - 具体 task 总览分析、roadmap-task 修复、execution spec 检查、用户确认点，都由 `vibe-task` skill 决定。
 - runtime / `task <-> flow` 绑定修复不在此入口处理，应回到 `/vibe-check`。
 

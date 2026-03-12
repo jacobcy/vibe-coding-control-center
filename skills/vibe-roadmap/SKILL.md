@@ -7,7 +7,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护全景路线图，管理版本目标，对 roadmap item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** `/vibe-roadmap` 负责调度决策，`vibe roadmap` 负责 shell 层读写数据。
+**核心原则:** `/vibe-roadmap` 是 roadmap 的 dispatch brain，负责调度决策；`vibe roadmap` 负责 shell 层读写数据。
 
 intake gate 约束：
 
@@ -25,6 +25,7 @@ intake gate 约束：
 - `task = execution record`
 - `spec_standard/spec_ref` 是 task 侧扩展桥接字段，不是 roadmap item 官方来源类型
 - `roadmap sync` = 规划层 mirror 同步
+- `roadmap init` = shared-state 骨架初始化 / 重建，不等于 sync
 - `task audit` = execution record 审计 / 修复
 - OpenSpec 注册 = execution spec 来源桥接
 - 任何规划判断都必须先读 shell 输出，再做编排
@@ -56,6 +57,8 @@ intake gate 约束：
 - 必须先运行 `vibe roadmap` 相关 shell 命令
 - 不得直接修改 `registry.json` 底层数据
 - 必须通过 Shell API 写入数据
+- 若用户在做 shared-state 恢复，`vibe roadmap init [--force]` 只恢复本地骨架；远端 mirror 恢复仍需单独执行 `vibe roadmap sync`
+- `vibe roadmap init` 不负责 task 历史恢复；task 数据缺失时只能作为后续人工补录 / execution 层修复处理
 - 调度器无法判断优先级时，必须要求人类讨论
 - 若涉及主 issue / sub-issue，只承接 skill/workflow 已做出的范围判断，不在 shell 层发明 parent/sub-issue 运行时逻辑
 
@@ -149,6 +152,12 @@ intake gate 约束：
 - 直接展示 CLI 返回的阻塞原因
 - 明确告诉用户当前无法进行路线图管理
 - 不要自行 fallback 到直接修改 JSON
+
+如果用户目标是恢复 shared state：
+
+- 先运行 `vibe roadmap init --force`
+- 再按需运行 `vibe roadmap sync`
+- 明确说明 task 历史不会被 `roadmap init` 自动恢复
 
 ## Terminology Contract
 

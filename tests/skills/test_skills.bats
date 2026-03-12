@@ -152,6 +152,100 @@ SHELL
   [[ "$output" =~ "roadmap_item_ids" ]]
 }
 
+@test "review-gated done docs align workflow and standard semantics" {
+  run rg -nH \
+    "review evidence|vibe flow review --local|skill-backed workflow|只负责编排|不承载复杂业务逻辑|vibe flow done" \
+    "$REPO_ROOT/docs/standards/agent-workflow-standard.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:commit.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent-workflow-standard.md" ]]
+  [[ "$output" =~ "vibe:commit.md" ]]
+  [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
+}
+
+@test "commit integrate done skills enforce the review-gated handoff chain" {
+  run rg -nH \
+    "进入 `/vibe-integrate`|不直接跳到 `/vibe-done`|blocked on review evidence|返回 `/vibe-integrate`|review-ready|merge gate|next: <若已完成则写 none" \
+    "$REPO_ROOT/skills/vibe-commit/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-integrate/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-done/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-commit/SKILL.md" ]]
+  [[ "$output" =~ "vibe-integrate/SKILL.md" ]]
+  [[ "$output" =~ "vibe-done/SKILL.md" ]]
+}
+
+@test "skill loop memo and standard keep the main chain and audit sidecars aligned" {
+  run rg -nH "旧 flow.*新 flow.*不创建 task" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "从 issue 落 task" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "task-centered audit" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH "runtime / recovery audit" "$REPO_ROOT/docs/references/skill-loop-memo.md"
+  [ "$status" -eq 0 ]
+
+  run rg -nH \
+    "vibe-issue|vibe-roadmap|vibe-new|vibe-start|vibe-commit|vibe-integrate|vibe-done|vibe-task|vibe-check|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/docs/standards/skill-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "docs/standards/skill-standard.md" ]]
+}
+
+@test "standards freeze vibe new-start-task-check boundary semantics" {
+  run rg -nH \
+    "旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/docs/standards/skill-standard.md" \
+    "$REPO_ROOT/docs/standards/skill-trigger-standard.md" \
+    "$REPO_ROOT/docs/standards/git-workflow-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "skill-standard.md" ]]
+  [[ "$output" =~ "skill-trigger-standard.md" ]]
+  [[ "$output" =~ "git-workflow-standard.md" ]]
+}
+
+@test "workflows keep new-start-task-check responsibilities narrow" {
+  run rg -nH \
+    "旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/.agent/workflows/vibe:new.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:start.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:task.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:check.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe:new.md" ]]
+  [[ "$output" =~ "vibe:start.md" ]]
+  [[ "$output" =~ "vibe:task.md" ]]
+  [[ "$output" =~ "vibe:check.md" ]]
+}
+
+@test "skill docs keep issue-roadmap-new-start-task-check boundaries aligned" {
+  run rg -nH \
+    "不决定 roadmap 排期|dispatch brain|旧 flow.*新 flow.*不创建 task|从 issue 落 task|task-centered audit|runtime / recovery audit" \
+    "$REPO_ROOT/skills/vibe-issue/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-roadmap/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-new/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-start/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/skills/vibe-check/SKILL.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-issue/SKILL.md" ]]
+  [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
+  [[ "$output" =~ "vibe-new/SKILL.md" ]]
+  [[ "$output" =~ "vibe-start/SKILL.md" ]]
+  [[ "$output" =~ "vibe-task/SKILL.md" ]]
+  [[ "$output" =~ "vibe-check/SKILL.md" ]]
+}
+
 @test "merged pr governance keeps old plans terminal and pushes new work into fresh intake" {
   run rg -n \
     "merged PR.*terminal|plan.*terminal|新需求.*repo issue|follow-up.*链接|不得.*旧 plan" \
@@ -200,4 +294,14 @@ SHELL
   [ "$status" -eq 0 ]
   [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
   [[ "$output" =~ "command-standard.md" ]]
+}
+
+@test "command standard freezes roadmap init as skeleton recovery only" {
+  run rg -nH \
+    "roadmap init|只创建共享真源骨架|不自动执行 `vibe roadmap sync`|不负责 task 历史恢复" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "command-standard.md" ]]
+  [[ "$output" =~ "roadmap init" ]]
 }

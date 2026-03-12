@@ -12,6 +12,8 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 3. 只修复 `task <-> flow` / runtime 绑定问题
 4. 只通过 Shell API 执行安全修复
 
+`vibe-check` 是 runtime / recovery audit，不承担 task-centered audit。
+
 对象约束：
 
 - `roadmap item = GitHub Project item mirror`

@@ -12,6 +12,7 @@ tags: [workflow, vibe, verification, orchestration]
 ## 定位
 
 - `vibe:check` 是 runtime 审计入口，只负责编排 shell 审计、委托 `vibe-check` skill，并交付结果。
+- 它是 runtime / recovery audit，不承担 task-centered audit。
 - 具体问题分类、可自动修复项、需确认项、shell 能力缺口，都由 `vibe-check` skill 决定。
 - `roadmap <-> task` 对应关系不在此入口处理，应回到 `/vibe-task`。
 

@@ -1,6 +1,6 @@
 ---
 name: "vibe:done"
-description: Skill-backed workflow that routes post-merge or post-PR closure work to the vibe-done skill.
+description: Skill-backed workflow that routes review-ready or post-merge closure work to the vibe-done skill.
 category: Workflow
 tags: [workflow, vibe, completion, archive]
 ---
@@ -12,7 +12,7 @@ tags: [workflow, vibe, completion, archive]
 ## 定位
 
 - `vibe:done` 是一个 `skill-backed workflow`。
-- 它用于在 PR 已完成或工作线需要收口时，把结算逻辑委托给 `vibe-done` skill。
+- 它用于在 PR 已 merged，或已满足 review gate、准备由 `vibe flow done` merge + closeout 时，把结算逻辑委托给 `vibe-done` skill。
 
 ## Steps
 

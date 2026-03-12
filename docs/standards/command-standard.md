@@ -184,6 +184,7 @@ related_docs:
 - `list`
 - `show <roadmap-item-id>`
 - `add <title>`
+- `init [--force]`
 - `sync`
 - `assign <text>`
 - `classify <roadmap-item-id> --status <status>`
@@ -220,11 +221,15 @@ related_docs:
 
 - `add` 新增的是 roadmap item，而不是 task / flow
 - `add` 必须先创建远端 GitHub Project item，再回填本地 mirror
+- `init` 只创建共享真源骨架：`roadmap.json`、`registry.json`、`worktrees.json` 以及必要目录
+- `init --force` 可以强制重建共享真源骨架，但只重建本地 shared state
 - `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
 - `sync` 不对全部 `repo issue` 做自动 intake；不是所有 `repo issue` 都自动进入 GitHub Project
 - `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
 - `sync` 不同步 `task` / `flow` / execution bridge 等本地执行字段
 - `sync` 不能改写 `content_type` 这类 GitHub 官方身份语义
+- `init` 不自动执行 `vibe roadmap sync`
+- `init` 不负责 task 历史恢复；task registry / task data 的人工补录是后续独立动作
 - shell 不负责智能 intake gate；`repo issue` 是否纳入 roadmap item，属于上层 skill / workflow 的 triage 判断
 - `repo issue` 真源仍在 GitHub；规划层只消费 `repo issue intake 视图`，不维护本地长期 issue registry / cache
 - intake 视图应优先基于运行时查询与 roadmap mirror 对比；如需留痕，应保存 triage 决策快照而不是 issue 整池真源
@@ -255,6 +260,7 @@ provider 只允许：
 
 - `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
 - `roadmap sync` 只负责规划层 mirror 同步，不负责 execution record 注册或 task 拆分
+- shared-state 恢复路径固定为：先 `vibe roadmap init --force`，再按需执行 `vibe roadmap sync`
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
 - `milestone` 是规划窗口锚点，不是 flow 切换开关
