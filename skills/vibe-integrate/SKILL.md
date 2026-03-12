@@ -82,9 +82,9 @@ vibe flow review [pr_number]
 - 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
 - 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
 - 默认按异步场景处理：若用户当前不在线或没有急迫性，可先等待 10 分钟，再重新运行一次 `vibe flow review [pr]` 检查是否已有新的在线 review evidence
-- 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认提醒用户可在 PR 中显式 `@codex` 触发评论，再继续停留在 `/vibe-integrate`
+- 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认由 agent 自动在 PR 中补一条 `@codex` comment 触发评论，再继续停留在 `/vibe-integrate`
 - 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
-- 若线上 review 长时间不可用，不要把“作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
+- 若再次等待后仍没有任何线上 review，不要把“作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
 
 可使用 `browser_subagent` 直接查看 PR 页面，或触发 agent 通过 review thread 给出回应：
 
@@ -97,9 +97,10 @@ browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
 
 1. `vibe flow review [pr]` 读取线上 comments / threads / evidence
 2. 若用户不在线或当前没有急迫性，等待 10 分钟后再运行一次 `vibe flow review [pr]`
-3. 若长时间没有 Codex / Copilot 在线 review，提醒用户在 PR 中 `@codex`
-4. 若仍无线上 review，则运行 `vibe flow review --local` 或使用 browser/subagent 产出外部 review evidence
-5. 将外部 review 结果回贴到 PR comment 后，再继续判断 merge readiness
+3. 若仍没有 Codex 在线 review，由 agent 自动在 PR 中补一条 `@codex` comment
+4. 再等待 10 分钟后，重新运行一次 `vibe flow review [pr]`
+5. 若仍无任何线上 review，则运行 `vibe flow review --local` 或使用 browser/subagent 产出外部 review evidence
+6. 将外部 review 结果回贴到 PR comment 后，再继续判断 merge readiness
 
 #### 情况 B：尚无 PR（`pr_ref` 为空）
 
