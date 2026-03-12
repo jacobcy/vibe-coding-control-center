@@ -526,6 +526,34 @@ JSON
   [[ "$output" =~ "Flow runtime ready: next-flow" ]]
 }
 
+@test "2.8.3 _flow_checkout_safe_main_branch falls back to a worktree-safe branch when main is locked elsewhere" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow_history.sh"
+    called_file="$(mktemp)"
+
+    git() {
+      case "$*" in
+        "fetch origin main --quiet") return 0 ;;
+        "show-ref --verify --quiet refs/heads/main") return 0 ;;
+        "checkout main") return 1 ;;
+        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
+        "show-ref --verify --quiet refs/heads/vibe/main-safe/wt-runner") return 1 ;;
+        "checkout -B vibe/main-safe/wt-runner origin/main") print -r -- "SAFE_BRANCH_CREATED" > "$called_file"; return 0 ;;
+        "rev-parse --show-toplevel") echo "/tmp/wt-runner"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_checkout_safe_main_branch
+    cat "$called_file"
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "SAFE_BRANCH_CREATED" ]]
+}
+
 @test "14. flow module no longer exposes legacy worktree-start helpers" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"

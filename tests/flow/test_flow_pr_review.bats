@@ -384,6 +384,8 @@ EOF
         "fetch origin main --quiet") return 0 ;;
         "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
         "log origin/main..HEAD --oneline") echo "abcdef test commit"; return 0 ;;
+        "add -- VERSION") return 0 ;;
+        "add -- CHANGELOG.md") return 0 ;;
         "rev-parse --git-common-dir") echo "'"$fixture"'/.git"; return 0 ;;
         "push origin HEAD") echo "PUSH_SHOULD_NOT_RUN"; return 0 ;;
         *) return 0 ;;
