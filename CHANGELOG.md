@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.22] - 2026-03-12
+
+### ✨ Changed
+- fix: gate vibe flow done on review evidence ...
+
 ## [2.1.21] - 2026-03-12
 
 ### ✨ Changed
