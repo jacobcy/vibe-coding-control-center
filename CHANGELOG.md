@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.23] - 2026-03-12
+
+### ✨ Changed
+- feat(flow): auto-link issues in PR and bridge PRs in roadmap sync.
+
 ## [2.1.22] - 2026-03-12
 
 ### ✨ Changed
@@ -9,11 +14,6 @@
 
 ### ✨ Changed
 - fix(roadmap): replace echo with print -r to prevent JSON mangling in Zsh ...
-
-## [2.1.20] - 2026-03-12
-
-### ✨ Changed
-- feat: commit message ...
 
 ## [2.1.19] - 2026-03-12
 
