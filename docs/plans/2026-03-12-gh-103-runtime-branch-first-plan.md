@@ -49,7 +49,7 @@ related_issues:
 - `branch` / `flow` 才是逻辑执行空间
 - 同一物理目录可顺序承载多条交付线
 
-当时实现里 `vibe flow done` 仍在关闭当前 branch 前调用 `_flow_checkout_detached_main`，导致：
+但实现里 `vibe flow done` 仍在关闭当前 branch 前调用 `_flow_checkout_detached_main`，导致：
 
 - 当前目录被留在 detached HEAD
 - 用户感知上像是必须切别的 worktree 才能继续
@@ -125,7 +125,7 @@ bats tests/flow/test_flow_lifecycle.bats
 - Modify: `lib/flow_history.sh`
 
 **Steps**
-1. 审核 `_flow_checkout_safe_main_branch` 的唯一职责与调用点。
+1. 审核 `_flow_checkout_detached_main` 的唯一职责与调用点。
 2. 把当前 branch closeout 时的落点改为安全 branch checkout，而不是 detached checkout。
 3. 保持 branch 删除、history 关闭、runtime 清理的现有顺序不被破坏。
 4. 处理本地 `main` 缺失场景，避免因为默认 branch 不存在导致 closeout 卡死。
