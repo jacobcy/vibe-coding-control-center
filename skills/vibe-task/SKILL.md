@@ -189,24 +189,28 @@ Recommendation
 
 其中前 3 项属于 `vibe-check` 范围；`roadmap sync` 规划层语义属于 `vibe-roadmap`。
 
-**三阶段核对流程:**
+**分层核对流程:**
 
-1. **Phase 1: 数据质量修复** - 修复 worktrees.json 的 null branch 字段
-2. **Phase 2: 确定性核对** - 分支核对 + OpenSpec 核对 + Plans/PRDs 核对
-3. **Phase 3: 语义分析** - PR 语义分析（后续实现）
+1. **Layer 1: Flow / PR 审计** - 区分哪些 closed flow 只有 `pr_ref`，哪些已经有 task
+2. **Layer 2: Task 审计** - 区分哪些 task 缺 `roadmap_item_ids` 或 execution spec
+3. **Layer 3: Roadmap 审计** - 区分哪些 roadmap item 缺 `execution_record_id`
+4. **Layer 4: 语义分析** - 只在证据足够时做历史补链，不为整齐伪造对象
+
+**修复原则:**
+
+- 能补则补：shell 真源、PR、plan、task README 能唯一推出就补
+- 不能唯一推出就保留缺口，并明确说明不会阻塞当前开发流程
+- 多任务汇总 PR 允许保持 `PR-only` 或 `tasks[]` 为主，不强造单一 `current_task`
 
 ## Step 1: 运行 Shell 层核对
 
 根据用户需求选择核对范围：
 
-### 1.1 数据质量和注册核对
+### 1.1 注册和桥接核对
 
 ```bash
 # 完整核对（所有维度）
 vibe task audit --all
-
-# 仅数据质量修复
-vibe task audit --fix-branches
 
 # 仅分支核对
 vibe task audit --check-branches
@@ -250,20 +254,33 @@ vibe flow review --json <branch-name>
 
 ## Step 2: 解析核对结果
 
-### 2.1 数据质量修复结果
+### 2.1 Flow / PR 分层结果
 
-从 `--fix-branches` 输出中提取：
+从 `flow-history`、`vibe flow review --json`、task/plan 证据中提取：
 
-- 修复的 worktree 数量
-- 修复前后对比（null → 实际分支名）
-- 是否有备份文件创建
+- `PR-linked flows without task`
+- `Fully linked chains`
 
 **判断逻辑:**
 
-- 如果修复数量 > 0，提示用户数据质量问题已修复
-- 如果修复失败，停止流程并报告错误
+- 历史 closed flow 只有 `pr_ref` 但无 task：优先影响审计，不默认阻塞当前开发流程
+- 若能从 PR + plan/task README 唯一推出 execution record，则允许补最小 task
+- 若是多任务汇总 PR，则允许保留 `tasks[]` 或仅保留 `pr_ref`
 
-### 2.2 分支核对结果
+### 2.2 Task 分层结果
+
+从 `vibe task audit`、`vibe task list --json`、`vibe task show --json` 中提取：
+
+- `Tasks without roadmap item`
+- 缺 `spec_standard/spec_ref` 的 task
+- 已有 task 但缺 `pr_ref` / issue bridge 的样本
+
+**判断逻辑:**
+
+- 当前活跃 task 缺执行元数据：优先级高，可能影响流程质量
+- 历史 completed task 缺 roadmap item：主要影响闭环展示，不一定阻塞开发
+
+### 2.3 分支核对结果
 
 从 `--check-branches` 输出中提取：
 
@@ -276,7 +293,7 @@ vibe flow review --json <branch-name>
 - `healthy`: 所有分支都已注册
 - `warning`: 存在未注册分支（可能是遗漏注册）
 
-### 2.3 Execution spec 核对
+### 2.4 Execution spec 核对
 
 对 task 相关输出额外检查：
 
@@ -287,7 +304,7 @@ vibe flow review --json <branch-name>
 这些字段只作为扩展层桥接信息，不得解释为 GitHub 官方 item 身份。
 - `error`: 分支名模式不符合规范
 
-### 2.3 OpenSpec 核对结果
+### 2.5 OpenSpec 核对结果
 
 从 `--check-openspec` 输出中提取：
 
@@ -310,7 +327,22 @@ vibe flow review --json <branch-name>
 - 如果 change 有 tasks.md 且已完成任务数 > 0，优先建议注册
 - 如果 change 没有 tasks.md，可能是新创建的，询问用户是否需要注册
 
-### 2.4 Plans/PRDs 核对结果
+### 2.6 Plans/PRDs 核对结果
+
+## Step 2.7: 审计输出口径
+
+最终审计结论至少分成四组：
+
+- `PR-linked flows without task`
+- `Tasks without roadmap item`
+- `Roadmap items without execution record`
+- `Fully linked chains`
+
+并明确指出：
+
+- 哪些缺口本轮已补
+- 哪些缺口因为证据不足暂时保留
+- 哪些缺口不会阻塞当前开发流程
 
 从 `--check-plans` 输出中提取：
 

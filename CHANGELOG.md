@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.25] - 2026-03-12
+
+### ✨ Changed
+- docs(plan): add history backfill reconciliation plan ...
+
 ## [2.1.24] - 2026-03-12
 
 ### ✨ Changed

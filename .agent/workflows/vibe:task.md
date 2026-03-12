@@ -25,7 +25,7 @@ tags: [workflow, vibe, tasks, orchestration]
 3. 委托 `skills/vibe-task/SKILL.md` 处理业务判断：
    - 读取 `vibe task` / `vibe task audit` 输出
    - 给出当前应优先回到的现场建议
-   - 或输出 roadmap-task 修复建议与需确认项
+   - 或按 `flow / task / roadmap` 分层输出缺口、修复建议与需确认项
 4. 若问题其实属于 runtime / stale binding，停止并提示用户改走 `/vibe-check`。
 
 ## Boundary
@@ -33,3 +33,4 @@ tags: [workflow, vibe, tasks, orchestration]
 - workflow 不承载 task 总览排序规则、registry 修复逻辑或 roadmap-task 映射判断。
 - `vibe:task` 只处理 execution record / registry 语义，不承担 roadmap 版本规划。
 - 所有共享状态修复动作都必须经由已有 shell 命令执行。
+- 历史审计允许存在不影响开发流程的残余缺口；workflow 需要报告这些缺口，但不要求一律补齐。

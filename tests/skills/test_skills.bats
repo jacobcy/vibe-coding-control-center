@@ -305,3 +305,14 @@ SHELL
   [[ "$output" =~ "command-standard.md" ]]
   [[ "$output" =~ "roadmap init" ]]
 }
+
+@test "vibe-task audit docs define layered backfill audit and non-blocking gaps" {
+  run rg -nH \
+    "PR-linked flows without task|Tasks without roadmap item|Roadmap items without execution record|Fully linked chains|不会阻塞当前开发流程|不要求一律补齐" \
+    "$REPO_ROOT/skills/vibe-task/SKILL.md" \
+    "$REPO_ROOT/.agent/workflows/vibe:task.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "vibe-task/SKILL.md" ]]
+  [[ "$output" =~ "vibe:task.md" ]]
+}
