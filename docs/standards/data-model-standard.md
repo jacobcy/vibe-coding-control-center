@@ -30,7 +30,6 @@ related_docs:
 
 - [registry-json-standard.md](registry-json-standard.md)
 - [roadmap-json-standard.md](roadmap-json-standard.md)
-- [roadmap-dependency-standard.md](roadmap-dependency-standard.md)
 
 本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](glossary.md) 为准。
 
@@ -159,7 +158,7 @@ related_docs:
 - repo issue 与 roadmap item：多对多
 - repo issue 与 task：多对多
 - roadmap item 与 task：多对多
-- roadmap item 与 roadmap item：通过 `depends_on_item_ids` 建立依赖关系
+- roadmap item 与 roadmap item：可以存在依赖关系，具体方案仍在参考材料中收敛
 - milestone 与 roadmap item：一对多
 - flow 与 task：一对多
 - PR 与 task：一对一
@@ -172,9 +171,7 @@ related_docs:
 - `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
 - roadmap item 与 task 只建立关联关系，不共享身份
 - roadmap item 是 mirrored GitHub Project item，不是 execution record
-- roadmap item 之间的依赖关系由 [roadmap-dependency-standard.md](roadmap-dependency-standard.md) 定义
-- `ready` / `blocked` / `blockers` 是派生视图，不持久化到共享真源
-- 依赖解除的唯一证据是依赖项对应主 PR 已 `merged`
+- `ready` / `blocked` / `blockers` 若存在，应作为派生视图而非共享真源持久化字段
 - `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
 - task 是 execution record / execution bridge，不等于 GitHub Project `type=task` item 本体
 - milestone 只锚定规划窗口，不直接驱动 runtime 切换
@@ -211,7 +208,7 @@ related_docs:
 以下字段只能运行时计算，不能持久化为共享真源：
 
 - `dirty`
-- `ready` / `blocked` / `blockers`（见 [roadmap-dependency-standard.md](roadmap-dependency-standard.md)）
+- `ready` / `blocked` / `blockers`（若后续启用）
 - 临时统计字段
 - 仅用于显示的聚合摘要
 
@@ -239,6 +236,5 @@ related_docs:
 - 将 `dirty` 写成持久化真源字段
 - 将 `worktree_name` / `worktree_path` 当作开放 flow 的主索引
 - 将 branch 或 worktree 当作历史唯一索引
-- 在各命令或标准中单独发明依赖 gate 语义（必须引用 [roadmap-dependency-standard.md](roadmap-dependency-standard.md)）
+- 在各命令或标准中单独发明依赖 gate 语义
 - 将 `ready` / `blocked` / `blockers` 持久化为真源字段
-- 用 task `completed` 或 roadmap 本地状态替代 merged PR 作为依赖解除证据

@@ -26,7 +26,27 @@ _run_roadmap_cmd() {
           echo \"unexpected git call in roadmap fixture: \$*\" >&2
           return 97
           ;;
+        esac
+    }
+    gh() {
+      case \"\$1 \$2 \$3\" in
+        \"auth status \")
+          [[ -f \"$fixture/gh_auth_ok\" ]] && return 0
+          return 1
+          ;;
       esac
+
+      if [[ \"\$1 \$2 \$3 \$4\" == \"pr list --state merged\" ]]; then
+        if [[ -f \"$fixture/gh_merged_prs.json\" ]]; then
+          cat \"$fixture/gh_merged_prs.json\"
+          return 0
+        fi
+        echo \"[]\"
+        return 0
+      fi
+
+      echo \"unexpected gh call in roadmap fixture: \$*\" >&2
+      return 98
     }
     "
   fi

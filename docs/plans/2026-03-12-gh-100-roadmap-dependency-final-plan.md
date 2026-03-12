@@ -6,7 +6,7 @@ author: Claude Sonnet 4.6
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - docs/standards/roadmap-dependency-standard.md
+  - docs/references/roadmap-dependency.md
   - docs/standards/glossary.md
   - docs/standards/data-model-standard.md
   - docs/standards/roadmap-json-standard.md
@@ -39,7 +39,7 @@ related_docs:
 **Files:**
 - Modify: `docs/standards/roadmap-json-standard.md`
 - Modify: `docs/standards/data-model-standard.md`
-- Reference: `docs/standards/roadmap-dependency-standard.md`
+- Reference: `docs/references/roadmap-dependency.md`
 
 **Step 1: 写文档断言清单**
 
@@ -240,7 +240,7 @@ git commit --allow-empty -m "test: verify roadmap dependency query layer end-to-
 
 ### 保留的认知资产
 
-- **roadmap-dependency-standard.md**: 核心依赖模型、ready/blocked 语义、merged PR 证据规则
+- **roadmap-dependency.md**: 依赖模型草案、ready/blocked 语义候选、merged PR 证据讨论
 - **依赖查询先行**: 先做查询层，后做 gate 的分阶段思路
 
 ### 不再采用的执行路径

@@ -212,7 +212,7 @@ related_docs:
 - `github_project_item_id` + `content_type` 是 GitHub Project 对齐主桥
 - `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 是本地执行桥接字段
 - `depends_on_item_ids` 是依赖声明字段，只允许引用其他 `roadmap_item_id`
-- `depends_on_item_ids` 必须遵守 [roadmap-dependency-standard.md](roadmap-dependency-standard.md) 的校验规则
+- `depends_on_item_ids` 的最终校验规则以后续批准的依赖方案为准；当前只保留字段落点与引用边界
 - 一个 roadmap item 可以关联多个 task
 - 一个 roadmap item 可以关联多个 repo issue
 - 一个 `type=feature` 的 roadmap item 可以拆分出多个 `type=task` item 或多个 execution record
