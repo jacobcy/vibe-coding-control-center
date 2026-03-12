@@ -6,9 +6,11 @@ author: GPT-5 Codex
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - /Users/jacobcy/src/vibe-center/wt-auto-task-runner/docs/plans/2026-03-12-roadmap-triage-and-dependency-design.md
-  - /Users/jacobcy/src/vibe-center/wt-auto-task-runner/docs/plans/2026-03-12-gh-100-roadmap-dependency-view-worthiness.md
-  - /Users/jacobcy/src/vibe-center/wt-auto-task-runner/docs/plans/2026-03-12-roadmap-issue-triage-100-124-and-unlabeled.md
+  - docs/plans/2026-03-12-roadmap-triage-and-dependency-design.md
+  - docs/plans/2026-03-12-gh-100-roadmap-dependency-view-worthiness.md
+  - docs/plans/2026-03-12-roadmap-issue-triage-100-124-and-unlabeled.md
+related_issues:
+  - gh-124
 ---
 
 # GH-124 Flow Identity Audit and Closeout Plan

@@ -10,7 +10,7 @@ authority:
   - state-lifecycle
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-12
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -28,10 +28,10 @@ related_docs:
 
 本文档只定义高层数据模型边界，不重复定义文件级 schema，不记录讨论过程、迁移步骤或实现现状。文件级精确 schema 见：
 
-- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
-- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- [registry-json-standard.md](registry-json-standard.md)
+- [roadmap-json-standard.md](roadmap-json-standard.md)
 
-本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `repo issue`、`roadmap item`、`task`、`flow`、`worktree`、`branch` 等正式术语以 [glossary.md](glossary.md) 为准。
 
 ## 1. Scope
 
@@ -42,7 +42,7 @@ related_docs:
 - `worktrees.json`
 - `flow-history.json`
 
-命令语义由 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 定义；本文只负责数据模型本身。
+命令语义由 [command-standard.md](command-standard.md) 定义；本文只负责数据模型本身。
 
 ## 2. Canonical Files
 
@@ -50,10 +50,10 @@ related_docs:
 
 - `roadmap.json`
   - 规划态真源
-  - schema 见 [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+  - schema 见 [roadmap-json-standard.md](roadmap-json-standard.md)
 - `registry.json`
   - 执行态真源
-  - schema 见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
+  - schema 见 [registry-json-standard.md](registry-json-standard.md)
 - `worktrees.json`
   - 现场态真源
   - 本文当前只定义其高层职责边界，尚无单独文件级 schema 标准

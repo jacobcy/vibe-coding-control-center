@@ -31,7 +31,7 @@ related_docs:
 - 何时必须进入整合或收口，而不是继续开发
 - 现场偏离标准后，如何回归标准 flow
 
-术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。高频动作词以 [action-verbs.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)。
+术语以 [glossary.md](glossary.md) 为准。高频动作词以 [action-verbs.md](action-verbs.md) 为准。物理目录生命周期见 [worktree-lifecycle-standard.md](worktree-lifecycle-standard.md)。
 
 ## 1. Scope
 

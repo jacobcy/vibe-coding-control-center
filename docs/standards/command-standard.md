@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-12
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -37,17 +37,17 @@ related_docs:
 
 完整的 Shell 设计原则、职责边界与审查清单，见：
 
-- [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md)
+- [shell-capability-design.md](shell-capability-design.md)
 
 本文档使用的核心术语定义见：
 
-- [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)
+- [glossary.md](glossary.md)
 
 命令的数据模型基础见：
 
-- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
-- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
-- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- [data-model-standard.md](data-model-standard.md)
+- [registry-json-standard.md](registry-json-standard.md)
+- [roadmap-json-standard.md](roadmap-json-standard.md)
 
 ## 1. Scope
 
@@ -138,7 +138,7 @@ related_docs:
 
 ## 3.1 Core Semantics
 
-以下关系建立在 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 的术语定义之上。
+以下关系建立在 [glossary.md](glossary.md) 的术语定义之上。
 
 语义关系：
 
