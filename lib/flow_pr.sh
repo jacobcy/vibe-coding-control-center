@@ -43,11 +43,64 @@ _flow_pr_commit_managed_files() {
   }
 }
 
+_flow_pr_changelog_cache_dir() {
+  local dir
+  dir="$(git rev-parse --git-common-dir)/vibe/changelog-msg" || return 1
+  mkdir -p "$dir" || return 1
+  print -r -- "$dir"
+}
+
+_flow_pr_changelog_cache_key() {
+  local branch="$1"
+  print -r -- "${branch//[^A-Za-z0-9._-]/_}"
+}
+
+_flow_pr_changelog_cache_file() {
+  local branch="$1" cache_dir cache_key
+  cache_dir="$(_flow_pr_changelog_cache_dir)" || return 1
+  cache_key="$(_flow_pr_changelog_cache_key "$branch")"
+  print -r -- "$cache_dir/$cache_key.txt"
+}
+
+_flow_pr_validate_changelog_message() {
+  local raw_msg="$1" trimmed_msg
+  trimmed_msg="${raw_msg#"${raw_msg%%[![:space:]]*}"}"
+  trimmed_msg="${trimmed_msg%"${trimmed_msg##*[![:space:]]}"}"
+  [[ -n "$trimmed_msg" ]] || {
+    log_error "Invalid changelog message: empty value is not allowed."
+    return 1
+  }
+  case "$trimmed_msg" in
+    "..."|"Automated version bump and updates.")
+      log_error "Invalid changelog message: placeholder text is not allowed."
+      return 1
+      ;;
+  esac
+  print -r -- "$trimmed_msg"
+}
+
+_flow_pr_read_cached_changelog_message() {
+  local branch="$1" cache_file
+  cache_file="$(_flow_pr_changelog_cache_file "$branch")" || return 1
+  [[ -f "$cache_file" ]] || return 1
+  cat "$cache_file"
+}
+
+_flow_pr_write_cached_changelog_message() {
+  local branch="$1" changelog_msg="$2" cache_file
+  cache_file="$(_flow_pr_changelog_cache_file "$branch")" || return 1
+  print -r -- "$changelog_msg" > "$cache_file" || {
+    log_error "Failed to write changelog message cache for branch '$branch'."
+    return 1
+  }
+}
+
 _flow_pr() {
-  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs first_msg open_prs use_web=0 spec_ref=""
+  local bump_type="" pr_title="" pr_body="" version_msg="" branch base_name="" base_git_ref="" commit_logs open_prs use_web=0 spec_ref="" explicit_version_msg="" cached_version_msg="" validated_msg=""
   local -a managed_files
   while [[ $# -gt 0 ]]; do case "$1" in -h|--help) _flow_pr_usage; return 0 ;; --base) base_name="$2"; shift 2 ;; --bump) bump_type="$2"; shift 2 ;; --title) pr_title="$2"; shift 2 ;; --body) pr_body="$2"; shift 2 ;; --msg) version_msg="$2"; shift 2 ;; --web) use_web=1; shift ;; *) shift ;; esac; done
   vibe_require git || return 1; branch=$(git branch --show-current); [[ "$branch" == "main" ]] && { log_error "Cannot create PR from main branch"; return 1; }
+  explicit_version_msg="$version_msg"
   spec_ref="$(_flow_pr_bound_spec_ref)" || return 1
   [[ -n "$spec_ref" ]] && managed_files+=("$spec_ref")
   base_name="$(_flow_resolve_pr_base "$base_name" "$branch")" || return 1
@@ -75,7 +128,18 @@ _flow_pr() {
     fi
   fi
 
-  if [[ -z "$version_msg" ]]; then first_msg=$(echo "$commit_logs" | tail -n 1 | sed 's/^[a-f0-9]* //'); version_msg="${first_msg} ..."; fi
+  if [[ -n "$explicit_version_msg" ]]; then
+    validated_msg="$(_flow_pr_validate_changelog_message "$explicit_version_msg")" || return 1
+    version_msg="$validated_msg"
+    _flow_pr_write_cached_changelog_message "$branch" "$version_msg" || return 1
+  else
+    cached_version_msg="$(_flow_pr_read_cached_changelog_message "$branch" 2>/dev/null || true)"
+    if [[ -n "$cached_version_msg" ]]; then
+      validated_msg="$(_flow_pr_validate_changelog_message "$cached_version_msg")" || return 1
+      version_msg="$validated_msg"
+      log_info "Reusing cached changelog message for branch '$branch'."
+    fi
+  fi
 
   local has_pr=0
   if vibe_has gh; then
@@ -87,7 +151,12 @@ _flow_pr() {
 
   local skip_bump=0
   [[ $has_pr -eq 1 ]] && skip_bump=1
-  [[ -f CHANGELOG.md ]] && grep -qF "$version_msg" CHANGELOG.md 2>/dev/null && skip_bump=1
+  [[ -n "$version_msg" && -f CHANGELOG.md ]] && grep -qF "$version_msg" CHANGELOG.md 2>/dev/null && skip_bump=1
+
+  if [[ $skip_bump -eq 0 && -z "$version_msg" ]]; then
+    log_error "Missing changelog message. First publish on this branch must provide --msg with a non-placeholder release note."
+    return 1
+  fi
 
   if [[ $skip_bump -eq 0 ]]; then
     log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
