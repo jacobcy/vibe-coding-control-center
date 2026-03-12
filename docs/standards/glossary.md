@@ -84,6 +84,7 @@ related_docs:
 - 使用规则：
   - `feature` / `task` / `bug` 是 roadmap item 的 `type`
   - 讨论 `p0/current/next/deferred/rejected` 时使用 `roadmap item`
+  - `roadmap item` 是 planning 中间层，不是用户默认主链锚点
   - 不要把 roadmap 状态当成分支当前执行状态
 
 ### 3.3 `task`
@@ -101,6 +102,7 @@ related_docs:
 - 使用规则：
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
   - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
+  - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
   - `repo issue` 可以映射到一个或多个 `task`
 
 ### 3.3.1 `roadmap sync`
@@ -169,6 +171,7 @@ related_docs:
   - 现场态边界见 [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
 - 使用规则：
   - 讨论当前交付切片、由当前 worktree 承载的任务现场时使用 `flow`
+  - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
 ### 3.5 `pr`

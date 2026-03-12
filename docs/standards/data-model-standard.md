@@ -165,18 +165,20 @@ related_docs:
 
 补充约束：
 
-- `repo issue -> roadmap item -> task -> flow -> PR` 是默认 happy path 链路
+- 用户主视角主链是 `repo issue -> flow -> plan/spec -> commit -> PR -> done`
+- 内部桥接链保留为 `repo issue -> roadmap item -> task -> flow`
 - `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
 - roadmap item 与 task 只建立关联关系，不共享身份
 - roadmap item 是 mirrored GitHub Project item，不是 execution record
 - `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
-- task 是 execution record，不等于 GitHub Project `type=task` item 本体
+- task 是 execution record / execution bridge，不等于 GitHub Project `type=task` item 本体
 - milestone 只锚定规划窗口，不直接驱动 runtime 切换
 - GitHub 官方字段与 Vibe 扩展字段必须可双向同步，且扩展字段不得改写官方对象身份
 - task 只允许绑定一个主 PR
 - task 不允许跨多个 PR
 - roadmap item 可以关联多个 task
 - 一个 `type=feature` 的 roadmap item 可以关联多个 `task` execution record
+- roadmap item 是 planning 中间层，task 是 flow 建立后的 execution bridge
 - task 可以关联多个 issue ref
 - `flow` 只属于执行层，不承担规划层关系建模
 

@@ -151,10 +151,12 @@ related_docs:
 
 补充约束：
 
-- 默认 happy path = `repo issue -> roadmap item -> task -> flow -> PR`
+- 用户主视角主链 = `repo issue -> flow -> plan/spec -> commit -> PR -> done`
+- 内部桥接链 = `repo issue -> roadmap item -> task -> flow`
 - `roadmap` 负责 GitHub Project 规划对象
-- `task` 只负责 execution record
+- `task` 只负责 execution record / execution bridge
 - `flow` 只负责执行现场
+- `roadmap item` 是 planning 中间层，不是用户默认第一锚点
 - slash / workflow 只能调度这些对象，不得重新发明对象层级
 - GitHub 官方字段与 Vibe 扩展字段可以同时同步，但语义层级必须分离
 
