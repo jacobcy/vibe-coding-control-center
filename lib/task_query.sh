@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 # lib/task_query.sh - Read/Query operations for Task module
-
 _vibe_task_collect_openspec_tasks() {
     local repo_root="$1" changes_dir="$repo_root/openspec/changes" aggregate_file change_dir change_name
     local bridge_script="$VIBE_ROOT/scripts/openspec_bridge.sh"
@@ -56,7 +55,6 @@ _vibe_task_collect_openspec_tasks() {
                 --arg status "$change_status" --arg next_step "$next_step" \
                 '{task_id:$task_id,title:$title,framework:$framework,source_path:$source_path,status:$status,spec_standard:"openspec",spec_ref:$source_path,current_subtask_id:null,runtime_worktree_name:null,assigned_worktree:null,next_step:$next_step}')"
         fi
-
         jq --argjson t "$task_json" '. += [$t]' "$aggregate_file" > "$aggregate_file.tmp" && mv "$aggregate_file.tmp" "$aggregate_file"
     done
     jq -n --slurpfile tasks "$aggregate_file" '{"tasks":($tasks[0] // [])}'
@@ -133,7 +131,6 @@ _vibe_task_list() {
     registry_file="$common_dir/vibe/registry.json"
     _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     _vibe_task_require_file "$registry_file" "registry.json" || return 1
-
     # Validate worktree current tasks exist in registry
     missing="$(jq -r --slurpfile reg "$registry_file" '.worktrees[] | .current_task | select(. != null) as $ct | select([$reg[0].tasks[] | select(.task_id == $ct)] | length == 0)' "$worktrees_file" | head -n 1)"
     [[ -n "$missing" ]] && { vibe_die "Task not found in registry: $missing"; return 1; }
@@ -173,7 +170,6 @@ _vibe_task_list() {
         rm -f "$openspec_tasks_file"
         return 0
     fi
-
     local cur_tid="" current_branch="" repo_root wt_name
     current_branch="$(git branch --show-current 2>/dev/null || echo "")"
     repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"; wt_name="$(basename "$repo_root")"
@@ -225,7 +221,6 @@ _vibe_task_list() {
 
 _vibe_task_show() {
     local task_id="" json_out="0" common_dir registry_file task_file registry_json detail_json merged_json
-
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --json) json_out="1"; shift ;;
@@ -248,24 +243,19 @@ _vibe_task_show() {
                 ;;
         esac
     done
-
     [[ -n "$task_id" ]] || { vibe_die "Usage: vibe task show <task-id> [--json]"; return 1; }
-
     vibe_require git jq || return 1
     common_dir="$(_vibe_task_common_dir)" || return 1
     registry_file="$common_dir/vibe/registry.json"
     _vibe_task_require_file "$registry_file" "registry.json" || return 1
-
     registry_json="$(jq -c --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" | head -n 1)"
     [[ -n "$registry_json" ]] || { vibe_die "Task not found in registry: $task_id"; return 1; }
-
     task_file="$(_vibe_task_task_file "$common_dir" "$task_id")"
     if [[ -f "$task_file" ]]; then
         detail_json="$(jq -c '.' "$task_file")"
     else
         detail_json='{}'
     fi
-
     merged_json="$(jq -n \
         --argjson reg "$registry_json" \
         --argjson detail "$detail_json" \
@@ -284,12 +274,10 @@ _vibe_task_show() {
          | .runtime_worktree_name = (.runtime_worktree_name // .assigned_worktree // null)
          | .next_step = (.next_step // null)
          | del(.github_project_item_id, .content_type)' )"
-
     if [[ "$json_out" == "1" ]]; then
         echo "$merged_json"
         return 0
     fi
-
     echo "$merged_json" | jq -r '
         "Task: \(.task_id)\n" +
         "Title: \(.title)\n" +
