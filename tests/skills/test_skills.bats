@@ -295,3 +295,13 @@ SHELL
   [[ "$output" =~ "vibe-roadmap/SKILL.md" ]]
   [[ "$output" =~ "command-standard.md" ]]
 }
+
+@test "command standard freezes roadmap init as skeleton recovery only" {
+  run rg -nH \
+    "roadmap init|只创建共享真源骨架|不自动执行 `vibe roadmap sync`|不负责 task 历史恢复" \
+    "$REPO_ROOT/docs/standards/command-standard.md"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "command-standard.md" ]]
+  [[ "$output" =~ "roadmap init" ]]
+}

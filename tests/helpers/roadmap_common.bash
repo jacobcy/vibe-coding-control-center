@@ -22,7 +22,10 @@ _run_roadmap_cmd() {
         \"rev-parse --is-inside-work-tree\") return 0 ;;
         \"rev-parse --git-common-dir\") echo \"$fixture\"; return 0 ;;
         \"remote get-url origin\") echo \"git@github.com:owner/repo.git\"; return 0 ;;
-        *) command git \"\$@\" ;;
+        *)
+          echo \"unexpected git call in roadmap fixture: \$*\" >&2
+          return 97
+          ;;
       esac
     }
     "
@@ -77,4 +80,9 @@ JSON
   ]
 }
 JSON
+}
+
+make_empty_shared_state_fixture() {
+  local fixture="$1"
+  mkdir -p "$fixture"
 }

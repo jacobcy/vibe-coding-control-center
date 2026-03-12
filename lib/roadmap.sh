@@ -3,6 +3,7 @@
 
 # Load dependencies
 source "$VIBE_LIB/roadmap_render.sh"
+source "$VIBE_LIB/roadmap_init.sh"
 source "$VIBE_LIB/roadmap_store.sh"
 source "$VIBE_LIB/roadmap_query.sh"
 source "$VIBE_LIB/roadmap_audit.sh"
@@ -51,6 +52,10 @@ vibe_roadmap() {
             esac
             local common_dir="$(_vibe_roadmap_common_dir)" || return 1
             _vibe_roadmap_add "$common_dir" "$*"
+            ;;
+        init)
+            shift
+            _vibe_roadmap_init_command "$@"
             ;;
         sync)
             shift

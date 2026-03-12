@@ -88,6 +88,47 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [ "$(jq '.items | length' "$fixture/vibe/roadmap.json")" = "$initial_count" ]
 }
 
+@test "roadmap init creates missing shared-state skeleton without syncing or task recovery" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_empty_shared_state_fixture "$fixture"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap init'
+
+  [ "$status" -eq 0 ]
+  [ -d "$fixture/vibe/tasks" ]
+  [ -d "$fixture/vibe/pending-tasks" ]
+  [ -f "$fixture/vibe/roadmap.json" ]
+  [ -f "$fixture/vibe/registry.json" ]
+  [ -f "$fixture/vibe/worktrees.json" ]
+  [ "$(jq -r '.schema_version' "$fixture/vibe/roadmap.json")" = "v2" ]
+  [ "$(jq -r '.project_id // "null"' "$fixture/vibe/roadmap.json")" = "null" ]
+  [ "$(jq -r '.schema_version' "$fixture/vibe/registry.json")" = "v2" ]
+  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" = "0" ]
+  [ "$(jq -r '.schema_version' "$fixture/vibe/worktrees.json")" = "v2" ]
+  [ "$(jq '.worktrees | length' "$fixture/vibe/worktrees.json")" = "0" ]
+  [[ ! -e "$fixture/vibe/tasks/task-old" ]]
+}
+
+@test "roadmap init --force replaces corrupted shared-state files with empty skeleton data" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_empty_shared_state_fixture "$fixture"
+  mkdir -p "$fixture/vibe/tasks/task-old" "$fixture/vibe/pending-tasks"
+  printf '%s\n' 'not-json' > "$fixture/vibe/roadmap.json"
+  printf '%s\n' '{"schema_version":"v2","tasks":[{"task_id":"task-old"}]}' > "$fixture/vibe/registry.json"
+  printf '%s\n' '{"schema_version":"v2","worktrees":[{"worktree_name":"wt-old"}]}' > "$fixture/vibe/worktrees.json"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap init --force'
+
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.schema_version' "$fixture/vibe/roadmap.json")" = "v2" ]
+  [ "$(jq '.items | length' "$fixture/vibe/roadmap.json")" = "0" ]
+  [ "$(jq '.tasks | length' "$fixture/vibe/registry.json")" = "0" ]
+  [ "$(jq '.worktrees | length' "$fixture/vibe/worktrees.json")" = "0" ]
+  [[ ! -e "$fixture/vibe/tasks/task-old" ]]
+}
+
 @test "roadmap audit returns json summary when checks pass" {
   local fixture
   fixture="$(mktemp -d)"
