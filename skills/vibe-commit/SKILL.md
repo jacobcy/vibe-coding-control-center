@@ -72,7 +72,6 @@ vibe task show <task-id> --json
 
 - `warning`
   - 当前 task 缺 `issue_refs`
-  - 当前 task 有多个 `issue_refs` 但缺 `primary_issue_ref`
   - 当前 task 缺 `roadmap_item_ids`
   - 当前 task 缺 `spec_standard` 或 `spec_ref`
 
@@ -88,9 +87,7 @@ vibe task show <task-id> --json
 说明：
 
 - `task` 是 execution record / execution bridge
-- `primary_issue_ref` 若存在，它对应的 `repo issue` 才是当前 task 的 `task issue`
 - `issue_refs` / `roadmap_item_ids` / `spec_*` 是提交归类与后续补链的关键元数据
-- roadmap 仍只是 planning projection / cache；roadmap mirror 缺失不应被表述为 execution gate
 - 第一版不把缺 `spec_ref` 直接提升为硬阻断，避免历史遗留任务一次性全部卡死
 - 这里的自动补 task 只适用于“plan 唯一明确”的场景；若存在多个候选 plan / spec，不得替用户猜
 
@@ -141,22 +138,6 @@ git diff --cached --stat
    - 使用 `vibe flow pr --base <ref>` 发当前这一组 PR
    - 当前这一组 PR 创建完成前，不要提前切到下一组
 
-串行切片的默认落地顺序：
-
-1. 先在当前 flow 收敛并提交“仍属于当前 PR”的那一组改动。
-2. 对剩余分组，在临时分支上分别生成独立 commit：
-   - 临时分支只用于产出可迁移 commit
-   - 命名使用 agent 前缀，例如 `codex/tmp-...`
-   - 不在临时分支上发 PR
-3. 回到标准 flow 语义后，为每个后续分组新开一个 flow。
-4. 在对应新 flow 上执行 `git cherry-pick <sha>` 迁移该组 commit。
-5. 每迁移完一组，就立刻验证该 flow 的工作区与提交边界是否仍然单一。
-
-补充约束：
-
-- 若某个本地产物被 `.gitignore` 忽略，默认保留在现场，不强行用 `git add -f` 混入串行 PR，除非用户明确要求将该产物作为受管证据提交
-- 临时分支只是 commit 中转站，不得把它当作长期 flow 或绕过 flow 真源的交付入口
-
 ### Step 6: 发 PR 前复核
 
 先读取：
@@ -187,7 +168,6 @@ vibe flow pr --base <ref>
 - 首次发布若当前 branch 还没有已确认的 changelog message cache，agent 必须显式提供 `--msg`
 - `--msg` 不允许使用空字符串、`...` 或默认占位文案糊弄过关
 - 同一 branch 若已经提供过一次有效 `--msg`，后续重复执行 `vibe flow pr` 时默认复用缓存值，不必反复询问
-- 若本轮是按显式输入的 plan 执行改动，发布对应实现/文档改动时必须同时提交该 plan 文件，不得把 plan 留在工作区外游离
 
 ### Step 6.5: PR 发出后的强制停点
 
