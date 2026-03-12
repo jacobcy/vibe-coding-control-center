@@ -105,6 +105,7 @@ _flow_done_usage() {
   cat <<EOF
 Usage: ${CYAN}vibe flow done${NC} [--branch <ref>]
 关闭当前或指定的 flow，并删除本地/远端分支。
+若关闭的是当前分支，当前目录会回到安全的本地 ${CYAN}main${NC} 分支，可直接继续 ${CYAN}vibe flow new${NC}。
 核心职责：对未 merged PR 执行 review-gated merge gate；有 review evidence 才允许 merge + closeout。
 选项：
   --branch <ref>    指定要完成的分支 (默认: 当前分支)

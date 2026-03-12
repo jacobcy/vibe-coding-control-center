@@ -111,14 +111,6 @@ _flow_new() {
   [[ -n "$feat" ]] || { _flow_new_usage; return 1; }
   current_branch="$(git branch --show-current 2>/dev/null)"
   current_head="$(git rev-parse --verify HEAD 2>/dev/null || true)"
-  if [[ -n "$current_branch" ]]; then
-    case "$current_branch" in
-      main|master)
-        log_error "Refusing to rotate protected branch: $current_branch"
-        return 1
-        ;;
-    esac
-  fi
   branch_name="$(_flow_switch_target_branch "$feat")"
   feature_slug="$(_flow_feature_slug "$branch_name")"
   _flow_history_has_closed_feature "$feature_slug" && { log_error "Flow already existed and was closed: $feature_slug"; return 1; }
@@ -257,7 +249,7 @@ _flow_done() {
   _flow_close_branch_tasks "$branch_name" || return 1
 
   if [[ "$branch_name" == "$current_branch" ]]; then
-    _flow_checkout_detached_main || { log_error "Failed to move current worktree off branch: $branch_name"; return 1; }
+    _flow_checkout_safe_main_branch || { log_error "Failed to move current worktree onto a safe branch after closeout: $branch_name"; return 1; }
   fi
 
   if git show-ref --verify --quiet "refs/heads/$branch_name"; then

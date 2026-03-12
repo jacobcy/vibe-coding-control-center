@@ -114,9 +114,17 @@ _flow_close_branch_tasks() {
   ' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
 }
 
-_flow_checkout_detached_main() {
+_flow_checkout_safe_main_branch() {
   git fetch origin main --quiet 2>/dev/null || true
-  git checkout --detach origin/main >/dev/null 2>&1 || git checkout --detach main >/dev/null 2>&1
+  if git show-ref --verify --quiet refs/heads/main; then
+    git checkout main >/dev/null 2>&1
+    return $?
+  fi
+  if git show-ref --verify --quiet refs/remotes/origin/main; then
+    git checkout -B main origin/main >/dev/null 2>&1
+    return $?
+  fi
+  return 1
 }
 
 _flow_branch_dashboard_entry() {

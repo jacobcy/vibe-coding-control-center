@@ -45,19 +45,21 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "save-unstash" ]]
 }
 
-@test "2.4 _flow_new refuses protected main branch rotation" {
+@test "2.4 _flow_new allows a clean main branch to start the next flow" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
 
     git() {
       case "$*" in
         "branch --show-current") echo "main"; return 0 ;;
         "status --porcelain") echo ""; return 0 ;;
         "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow origin/main") echo "CHECKOUT_FROM_MAIN"; return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -65,8 +67,10 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     _flow_new next-flow
   '
 
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "protected" || "$output" =~ "main" ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "CHECKOUT_FROM_MAIN" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
 }
 
 @test "2.5 _flow_new stashes changes and creates a new branch when requested" {
@@ -472,6 +476,54 @@ JSON
   [[ "$output" =~ "自动" || "$output" =~ "默认" ]]
   [[ "$output" =~ "未提交改动" ]]
   [[ ! "$output" =~ "save-stash" ]]
+}
+
+@test "2.8.2 _flow_done leaves current directory on a branch that can immediately host the next flow" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_is_main_worktree() { return 1; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_ref() { echo "task/feature-branch"; return 0; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 0; }
+    _flow_branch_exists() { return 1; }
+    _flow_history_close() { echo "HISTORY_CLOSED"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
+    _flow_close_branch_tasks() { echo "TASKS_CLOSED"; return 0; }
+    _flow_checkout_safe_main_branch() { echo "SAFE_MAIN_BRANCH"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
+    vibe_delete_local_branch() { echo "DELETE_LOCAL:$1:$2"; return 0; }
+
+    git_branch_state="task/feature-branch"
+
+    git() {
+      case "$*" in
+        "branch --show-current") echo "$git_branch_state"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..task/feature-branch") echo ""; return 0 ;;
+        "show-ref --verify --quiet refs/heads/task/feature-branch") return 0 ;;
+        "show-ref --verify --quiet refs/remotes/origin/task/feature-branch") return 1 ;;
+        "rev-parse --verify HEAD") echo "main-head"; return 0 ;;
+        "check-ref-format --branch task/next-flow") return 0 ;;
+        "checkout -b task/next-flow origin/main") git_branch_state="task/next-flow"; echo "CHECKOUT_NEXT"; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+
+    _flow_done || exit 1
+    git_branch_state="main"
+    _flow_new next-flow || exit 1
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "SAFE_MAIN_BRANCH" ]]
+  [[ "$output" =~ "DELETE_LOCAL:task/feature-branch:force" ]]
+  [[ "$output" =~ "CHECKOUT_NEXT" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
 }
 
 @test "14. flow module no longer exposes legacy worktree-start helpers" {
