@@ -62,7 +62,7 @@ Usage: ${CYAN}vibe flow pr${NC} [options]
   --bump <type>    自动版本升级 (patch|minor|major, 默认: patch)
   --title <text>   PR 的标题 (默认: 首条 commit 标题)
   --body <text>    PR 的正文描述 (默认: 所有 commit 列表)
-  --msg <text>     写入 CHANGELOG 的版本说明 (默认: 首条 commit...)
+  --msg <text>     首次发布必须提供有效 CHANGELOG 说明；之后同 branch 自动复用已确认值
   --web            显式使用 GitHub Web 页面创建 PR；默认直接用 gh CLI 创建
 默认行为：
   - 仅当当前分支可判定为直接从 main 近切时，才会默认使用 main
@@ -70,6 +70,8 @@ Usage: ${CYAN}vibe flow pr${NC} [options]
   - 提交 PR 前会校验当前分支是否已包含远端最新 base；若落后则拒绝继续
   - 这里的 --base 是 PR 目标分支，不是创建 flow 时的起点分支
   - 默认不打开 Web；只有显式传 '--web' 时才走浏览器创建流程
+  - 首次会写 CHANGELOG 时若没有已缓存 message，必须显式传 '--msg'
+  - '--msg' 不接受空字符串、'...' 或默认占位文案；同一 branch 后续会自动复用缓存值
 EOF
 }
 

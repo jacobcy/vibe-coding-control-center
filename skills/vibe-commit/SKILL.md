@@ -153,6 +153,7 @@ git log --oneline <base>..HEAD
 - 当前 commit 只服务一个交付目标
 - 当前分支语义仍匹配这个目标
 - 当前 flow 没有被错误复用
+- 若这是该 branch 第一次写 CHANGELOG，必须准备好非占位的 `--msg`
 
 发布入口只用：
 
@@ -161,6 +162,12 @@ vibe flow pr --base <ref>
 ```
 
 不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
+
+补充约束：
+
+- 首次发布若当前 branch 还没有已确认的 changelog message cache，agent 必须显式提供 `--msg`
+- `--msg` 不允许使用空字符串、`...` 或默认占位文案糊弄过关
+- 同一 branch 若已经提供过一次有效 `--msg`，后续重复执行 `vibe flow pr` 时默认复用缓存值，不必反复询问
 
 ### Step 6.5: PR 发出后的强制停点
 
