@@ -263,6 +263,33 @@ JSON
   [[ "$output" =~ "VIBE_DIE:Failed to list vibe-task issues for repo 'owner/repo'" ]]
 }
 
+@test "shared-state: roadmap pr intake fetches for merged state and reports gh failures" {
+  run zsh -c '
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="$VIBE_ROOT/lib"
+    source "$VIBE_LIB/utils.sh" 2>/dev/null || true
+    source "$VIBE_LIB/roadmap_issue_intake.sh"
+
+    gh() {
+      printf "%s\n" "$*" > "'"$BATS_TEST_TMPDIR"'/gh-args-pr"
+      echo "API rate limit exceeded" >&2
+      return 1
+    }
+
+    vibe_die() {
+      echo "VIBE_DIE:$*" >&2
+      return 0
+    }
+
+    _vibe_roadmap_fetch_candidate_repo_prs "owner/repo"
+  '
+
+  [ "$status" -eq 1 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/gh-args-pr")" = "pr list --repo owner/repo --state merged --limit 1000 --json id,number,title,body,url" ]
+  [[ "$output" =~ "API rate limit exceeded" ]]
+  [[ "$output" =~ "VIBE_DIE:Failed to list merged PRs for repo 'owner/repo'" ]]
+}
+
 @test "shared-state: roadmap refresh updates existing mirrors and imports remote-only items" {
   local fixture; fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"

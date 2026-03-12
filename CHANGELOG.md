@@ -3,7 +3,7 @@
 ## [2.1.19] - 2026-03-12
 
 ### ✨ Changed
-- feat(roadmap): support syncing merged PRs into GitHub Project ...
+- feat(roadmap): support syncing merged PRs into the configured GitHub Project, adding merged PRs to the project when they are missing so roadmap items stay aligned with completed work.
 
 ## [2.1.18] - 2026-03-11
 
