@@ -15,7 +15,7 @@ _vibe_roadmap_create_github_draft_issue() {
         echo "Failed to create GitHub Project draft item. Make sure gh is authenticated and project_id is valid."
         return 1
     }
-    item_id="$(printf '%s' "$response" | jq -r '.data.addProjectV2DraftIssue.projectItem.id // empty')"
+    item_id="$(print -r -- "$response" | jq -r '.data.addProjectV2DraftIssue.projectItem.id // empty')"
     [[ -n "$item_id" ]] || {
         echo "Failed to parse GitHub Project item id from GraphQL response."
         return 1
@@ -72,7 +72,7 @@ _vibe_roadmap_add_project_item_from_content() {
           }
         }
       }' -F project="$project_id" -F content="$content_id" 2>/dev/null)" || return 1
-    item_id="$(printf '%s' "$response" | jq -r '.data.addProjectV2ItemById.item.id // empty')"
+    item_id="$(print -r -- "$response" | jq -r '.data.addProjectV2ItemById.item.id // empty')"
     [[ -n "$item_id" ]] || return 1
     print -r -- "$item_id"
 }
@@ -89,10 +89,10 @@ _vibe_roadmap_bootstrap_remote_item() {
         remote_item_id="$(_vibe_roadmap_add_project_item_from_content "$project_id" "$content_id")" || continue
         print -r -- "$remote_item_id|$content_type"
         return 0
-    done < <(printf '%s' "$item_json" | jq -r '.source_refs[]?')
+    done < <(print -r -- "$item_json" | jq -r '.source_refs[]?')
 
-    title="$(printf '%s' "$item_json" | jq -r '.title')"
-    description="$(printf '%s' "$item_json" | jq -r '.description // ""')"
+    title="$(print -r -- "$item_json" | jq -r '.title')"
+    description="$(print -r -- "$item_json" | jq -r '.description // ""')"
     remote_item_id="$(_vibe_roadmap_create_github_draft_issue "$project_id" "$title" "$description")" || return 1
     print -r -- "$remote_item_id|draft_issue"
 }
@@ -139,7 +139,7 @@ _vibe_roadmap_fetch_github_project_items() {
             }
           }' -F project="$project_id" -F after="$after" 2>/dev/null)" || return 1
 
-        nodes="$(printf '%s' "$response" | jq -c '
+        nodes="$(print -r -- "$response" | jq -c '
           [.data.node.items.nodes[]?
             | {
                 github_project_item_id: .id,
@@ -164,6 +164,16 @@ _vibe_roadmap_fetch_github_project_items() {
                     []
                   end
                 ),
+                source_refs: (
+                  if (.content.__typename == "Issue" or .content.__typename == "PullRequest") then
+                    [
+                      ("gh:" + .content.repository.nameWithOwner + "#" + (.content.number | tostring)),
+                      .content.url
+                    ]
+                  else
+                    []
+                  end
+                ),
                 issue_refs: (
                   if (.content.__typename == "Issue" or .content.__typename == "PullRequest") then
                     [("gh-" + (.content.number | tostring))]
@@ -174,10 +184,10 @@ _vibe_roadmap_fetch_github_project_items() {
                 remote_number: (.content.number // null)
               }
           ]')"
-        results="$(printf '%s\n%s\n' "$results" "$nodes" | jq -sc 'add')" || return 1
+        results="$(print -r -- "$results" "$nodes" | jq -sc 'add')" || return 1
 
-        has_next="$(printf '%s' "$response" | jq -r '.data.node.items.pageInfo.hasNextPage')"
-        end_cursor="$(printf '%s' "$response" | jq -r '.data.node.items.pageInfo.endCursor // empty')"
+        has_next="$(print -r -- "$response" | jq -r '.data.node.items.pageInfo.hasNextPage')"
+        end_cursor="$(print -r -- "$response" | jq -r '.data.node.items.pageInfo.endCursor // empty')"
         [[ "$has_next" == "true" && -n "$end_cursor" ]] || break
         after="$end_cursor"
     done
@@ -257,7 +267,7 @@ _vibe_roadmap_refresh_local_mirror() {
             _vibe_roadmap_import_remote_item "$common_dir" "$remote_json" || return 1
             imported_count=$((imported_count + 1))
         fi
-    done < <(printf '%s' "$remote_items" | jq -c '.[]')
+    done < <(print -r -- "$remote_items" | jq -c '.[]')
 
     echo "Refreshed $refreshed_count local roadmap mirrors from GitHub Project."
     echo "Imported $imported_count new roadmap items from GitHub Project."

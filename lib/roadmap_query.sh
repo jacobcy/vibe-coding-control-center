@@ -198,7 +198,7 @@ _vibe_roadmap_list() {
         return 0
     fi
 
-    if [[ "$(echo "$items_json" | jq 'length')" == "0" ]]; then
+    if [[ "$(print -r -- "$items_json" | jq 'length')" == "0" ]]; then
         echo "No roadmap items found."
         return 0
     fi
@@ -207,8 +207,8 @@ _vibe_roadmap_list() {
     local -a ordered_statuses=(p0 current next deferred rejected)
 
     for group_status in "${ordered_statuses[@]}"; do
-        group_items="$(echo "$items_json" | jq -c --arg status "$group_status" '[.[] | select(.status == $status)]')"
-        group_count="$(echo "$group_items" | jq 'length')"
+        group_items="$(print -r -- "$items_json" | jq -c --arg status "$group_status" '[.[] | select(.status == $status)]')"
+        group_count="$(print -r -- "$group_items" | jq 'length')"
         [[ "$group_count" == "0" ]] && continue
 
         if [[ "$first_group" == "true" ]]; then
@@ -218,9 +218,9 @@ _vibe_roadmap_list() {
         fi
 
         printf '%s\n' "$(_vibe_roadmap_group_heading "$group_status" "$group_count")"
-        echo "$group_items" | jq -c '.[]' | while read -r row; do
-            rid=$(echo "$row" | jq -r '.roadmap_item_id')
-            title=$(echo "$row" | jq -r '.title')
+        print -r -- "$group_items" | jq -c '.[]' | while read -r row; do
+            rid=$(print -r -- "$row" | jq -r '.roadmap_item_id')
+            title=$(print -r -- "$row" | jq -r '.title')
 
             if [[ "$title" == "$rid" || -z "$title" ]]; then
                 printf '  %s\n' "$rid"
@@ -262,14 +262,14 @@ _vibe_roadmap_show() {
 
     # Read fields
     local id title item_status source description tasks issues updated
-    id=$(echo "$item_json" | jq -r '.roadmap_item_id')
-    title=$(echo "$item_json" | jq -r '.title')
-    item_status=$(echo "$item_json" | jq -r '.status')
-    source=$(echo "$item_json" | jq -r '.source_type')
-    description=$(echo "$item_json" | jq -r '.description // ""')
-    tasks=$(echo "$item_json" | jq -r '.linked_task_ids | join(", ")')
-    issues=$(echo "$item_json" | jq -r '.issue_refs | join(", ")')
-    updated=$(echo "$item_json" | jq -r '.updated_at')
+    id=$(print -r -- "$item_json" | jq -r '.roadmap_item_id')
+    title=$(print -r -- "$item_json" | jq -r '.title')
+    item_status=$(print -r -- "$item_json" | jq -r '.status')
+    source=$(print -r -- "$item_json" | jq -r '.source_type')
+    description=$(print -r -- "$item_json" | jq -r '.description // ""')
+    tasks=$(print -r -- "$item_json" | jq -r '.linked_task_ids | join(", ")')
+    issues=$(print -r -- "$item_json" | jq -r '.issue_refs | join(", ")')
+    updated=$(print -r -- "$item_json" | jq -r '.updated_at')
 
     local colored_status
     colored_status=$(_vibe_roadmap_color_status "$item_status")
