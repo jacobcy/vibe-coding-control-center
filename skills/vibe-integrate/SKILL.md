@@ -79,6 +79,7 @@ vibe flow review [pr_number]
 
 - 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
 - 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
+- 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认提醒用户可在 PR 中显式 `@codex` 触发评论，再继续停留在 `/vibe-integrate`
 - 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
 
 可使用 `browser_subagent` 直接查看 PR 页面，或触发 agent 通过 review thread 给出回应：
