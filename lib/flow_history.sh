@@ -132,8 +132,63 @@ _flow_close_branch_tasks() {
   ' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
 }
 
+_flow_detect_parent_branch() {
+  local current_branch="$1" parent_branch=""
+
+  # Try to detect parent branch using merge-base --fork-point
+  # This finds the branch point where current_branch diverged from main
+  parent_branch="$(git merge-base --fork-point main "$current_branch" 2>/dev/null || true)"
+
+  if [[ -n "$parent_branch" ]]; then
+    # Found a fork point - check if there's a local branch at that point
+    local candidate_branch
+    candidate_branch="$(git branch --contains "$parent_branch" 2>/dev/null | grep -v "^\*" | head -1 | xargs || true)"
+    if [[ -n "$candidate_branch" && "$candidate_branch" != "$current_branch" ]]; then
+      echo "$candidate_branch"
+      return 0
+    fi
+  fi
+
+  # Fallback to main if no parent branch detected
+  echo "main"
+}
+
 _flow_checkout_safe_main_branch() {
-  local safe_branch
+  local current_branch="$1" parent_branch="" safe_branch
+
+  # Get current branch if not provided
+  if [[ -z "$current_branch" ]]; then
+    current_branch="$(git branch --show-current 2>/dev/null || true)"
+  fi
+
+  # Detect parent branch for the current branch
+  if [[ -n "$current_branch" && "$current_branch" != "main" ]]; then
+    parent_branch="$(_flow_detect_parent_branch "$current_branch")"
+  else
+    parent_branch="main"
+  fi
+
+  # Try to check out the parent branch locally first
+  if [[ "$parent_branch" != "main" ]]; then
+    if git show-ref --verify --quiet "refs/heads/$parent_branch"; then
+      if git checkout "$parent_branch" >/dev/null 2>&1; then
+        log_info "Checked out parent branch: $parent_branch"
+        return 0
+      fi
+    fi
+
+    # Try to fetch and check out from remote if not local
+    local remote_branch="origin/$parent_branch"
+    if git show-ref --verify --quiet "refs/remotes/$remote_branch"; then
+      git fetch origin "$parent_branch" --quiet 2>/dev/null || true
+      if git checkout -B "$parent_branch" "$remote_branch" >/dev/null 2>&1; then
+        log_info "Checked out parent branch from remote: $parent_branch"
+        return 0
+      fi
+    fi
+  fi
+
+  # Fallback to main branch checkout
   git fetch origin main --quiet 2>/dev/null || true
   if git show-ref --verify --quiet refs/heads/main; then
     if git checkout main >/dev/null 2>&1; then

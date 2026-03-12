@@ -52,6 +52,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
 
     git() {
       case "$*" in
@@ -68,6 +69,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "CHECKOUT_FROM_MAIN" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
   [[ "$output" =~ "Flow runtime ready: next-flow" ]]
 }
 
@@ -112,6 +114,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { return 0; }
 
     git() {
       case "$*" in
@@ -139,6 +142,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     source "'"$VIBE_ROOT"'/lib/flow.sh"
     _flow_history_has_closed_feature() { return 1; }
     _flow_branch_exists() { return 1; }
+    _flow_update_current_worktree_branch() { return 0; }
 
     git() {
       case "$*" in
@@ -157,34 +161,11 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "CHECKOUT_FROM_DETACHED" ]]
 }
 
-@test "2.5.0b _flow_new records legacy branch runtime for compatibility-mode unbound flows" {
-  run zsh -c '
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    _flow_history_has_closed_feature() { return 1; }
-    _flow_branch_exists() { return 1; }
-    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
-
-    git() {
-      case "$*" in
-        "branch --show-current") echo "task/existing-flow"; return 0 ;;
-        "status --porcelain") echo ""; return 0 ;;
-        "check-ref-format --branch task/next-flow") return 0 ;;
-        "checkout -b task/next-flow origin/main") echo "CHECKOUT_NO_RUNTIME"; return 0 ;;
-        *) return 0 ;;
-      esac
-    }
-
-    _flow_new next-flow
-  '
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "CHECKOUT_NO_RUNTIME" ]]
-  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
-}
-
 @test "2.5.1 _flow_new restores the original branch when runtime update fails" {
+  local branch_cleanup_marker
+  branch_cleanup_marker="$(mktemp)"
+  rm -f "$branch_cleanup_marker"
+
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -205,7 +186,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
         "stash list --format=%H %gd") echo "$last_stash_oid stash@{0}"; return 0 ;;
         "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
         "checkout task/existing-flow") echo "CHECKOUT_ORIGINAL"; return 0 ;;
-        "branch -D task/next-flow") echo "DELETE_FAILED_BRANCH"; return 0 ;;
+        "branch -D task/next-flow") : > "'"$branch_cleanup_marker"'"; return 0 ;;
         "stash apply stash@{0}") echo "RESTORED"; return 0 ;;
         "stash drop stash@{0}") echo "DROPPED"; return 0 ;;
         *) return 0 ;;
@@ -218,13 +199,17 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [ "$status" -eq 1 ]
   [[ "$output" =~ "CHECKOUT_NEW" ]]
   [[ "$output" =~ "CHECKOUT_ORIGINAL" ]]
-  [[ "$output" =~ "DELETE_FAILED_BRANCH" ]]
+  [ -f "$branch_cleanup_marker" ]
   [[ "$output" =~ "RESTORED" ]]
   [[ "$output" =~ "DROPPED" ]]
   [[ "$output" =~ "Failed to update worktree runtime state" ]]
 }
 
 @test "2.5.1a _flow_new restores detached HEAD before deleting the failed branch" {
+  local branch_cleanup_marker
+  branch_cleanup_marker="$(mktemp)"
+  rm -f "$branch_cleanup_marker"
+
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
     source "'"$VIBE_ROOT"'/lib/utils.sh"
@@ -241,7 +226,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
         "check-ref-format --branch task/next-flow") return 0 ;;
         "checkout -b task/next-flow main") echo "CHECKOUT_NEW"; return 0 ;;
         "checkout --detach abc1234") echo "RESTORE_DETACHED"; return 0 ;;
-        "branch -D task/next-flow") echo "DELETE_FAILED_BRANCH"; return 0 ;;
+        "branch -D task/next-flow") : > "'"$branch_cleanup_marker"'"; return 0 ;;
         *) return 0 ;;
       esac
     }
@@ -252,7 +237,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [ "$status" -eq 1 ]
   [[ "$output" =~ "CHECKOUT_NEW" ]]
   [[ "$output" =~ "RESTORE_DETACHED" ]]
-  [[ "$output" =~ "DELETE_FAILED_BRANCH" ]]
+  [ -f "$branch_cleanup_marker" ]
   [[ "$output" =~ "Failed to update worktree runtime state" ]]
 }
 
@@ -265,6 +250,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     _flow_branch_exists() { return 0; }
     _flow_branch_has_pr() { return 1; }
     _flow_branch_ref() { echo "origin/task/next-flow"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED"; return 0; }
 
     last_stash_message=""
 
@@ -291,6 +277,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "CHECKOUT_EXISTING" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED" ]]
   [[ "$output" =~ "APPLIED" ]]
   [[ "$output" =~ "DROPPED" ]]
   [[ "$output" =~ "Flow runtime ready: next-flow" ]]
@@ -306,6 +293,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
     _flow_branch_exists() { return 0; }
     _flow_branch_has_pr() { return 1; }
     _flow_branch_ref() { echo "origin/task/next-flow"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED"; return 0; }
 
     git() {
       case "$*" in
@@ -323,6 +311,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "CHECKOUT_EXISTING" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED" ]]
   [[ ! "$output" =~ "UNEXPECTED_STASH" ]]
 }
 
@@ -405,36 +394,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ ! "$output" =~ "UNEXPECTED_DROP" ]]
 }
 
-@test "2.6.4 _flow_switch records legacy branch runtime for compatibility-mode unbound flows" {
-  run zsh -c '
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    _flow_history_has_closed_feature() { return 1; }
-    _flow_branch_exists() { return 0; }
-    _flow_branch_has_pr() { return 1; }
-    _flow_branch_ref() { echo "origin/task/next-flow"; return 0; }
-    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
-
-    git() {
-      case "$*" in
-        "branch --show-current") echo "task/existing-flow"; return 0 ;;
-        "status --porcelain") echo ""; return 0 ;;
-        "check-ref-format --branch task/next-flow") return 0 ;;
-        "checkout -b task/next-flow origin/task/next-flow") echo "CHECKOUT_SWITCH_NO_RUNTIME"; return 0 ;;
-        *) return 0 ;;
-      esac
-    }
-
-    _flow_switch next-flow
-  '
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "CHECKOUT_SWITCH_NO_RUNTIME" ]]
-  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
-}
-
-@test "2.7 _flow_update_current_worktree_branch upserts current worktree branch for legacy compatibility mode" {
+@test "2.7 _flow_update_current_worktree_branch upserts current worktree when runtime entry is missing" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-upsert"
@@ -460,7 +420,7 @@ JSON
   [ "$output" = "wt-codex-runtime-upsert|$fixture/wt-codex-runtime-upsert|task/runtime-upsert|active" ]
 }
 
-@test "2.7.1 _flow_update_current_worktree_branch resets stale legacy task focus when branch changes" {
+@test "2.7.1 _flow_update_current_worktree_branch resolves nested directories to the worktree root" {
   local fixture
   fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe" "$fixture/wt-codex-runtime-root/subdir"
@@ -479,11 +439,11 @@ JSON
       return 0
     }
     _flow_update_current_worktree_branch "task/runtime-root"
-    jq -r ".worktrees[0].worktree_name + \"|\" + .worktrees[0].branch + \"|\" + (.worktrees[0].current_task // \"null\") + \"|\" + (.worktrees[0].tasks | length | tostring)" "'"$fixture"'/vibe/worktrees.json"
+    jq -r ".worktrees[0].worktree_name + \"|\" + .worktrees[0].worktree_path + \"|\" + .worktrees[0].branch + \"|\" + (.worktrees | length | tostring)" "'"$fixture"'/vibe/worktrees.json"
   '
 
   [ "$status" -eq 0 ]
-  [ "$output" = "wt-codex-runtime-root|task/runtime-root|null|0" ]
+  [ "$output" = "wt-codex-runtime-root|$fixture/wt-codex-runtime-root|task/runtime-root|1" ]
 }
 
 @test "2.1 _flow_new rejects legacy --base alias to keep branch semantics explicit" {
@@ -533,6 +493,7 @@ JSON
     _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
     _flow_close_branch_tasks() { echo "TASKS_CLOSED"; return 0; }
     _flow_checkout_safe_main_branch() { echo "SAFE_MAIN_BRANCH"; return 0; }
+    _flow_update_current_worktree_branch() { echo "RUNTIME_UPDATED:$1"; return 0; }
     vibe_delete_local_branch() { echo "DELETE_LOCAL:$1:$2"; return 0; }
 
     git_branch_state="task/feature-branch"
@@ -561,35 +522,8 @@ JSON
   [[ "$output" =~ "SAFE_MAIN_BRANCH" ]]
   [[ "$output" =~ "DELETE_LOCAL:task/feature-branch:force" ]]
   [[ "$output" =~ "CHECKOUT_NEXT" ]]
+  [[ "$output" =~ "RUNTIME_UPDATED:task/next-flow" ]]
   [[ "$output" =~ "Flow runtime ready: next-flow" ]]
-}
-
-@test "2.8.3 _flow_checkout_safe_main_branch falls back to a worktree-safe branch when main is locked elsewhere" {
-  run zsh -c '
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow_history.sh"
-    called_file="$(mktemp)"
-
-    git() {
-      case "$*" in
-        "fetch origin main --quiet") return 0 ;;
-        "show-ref --verify --quiet refs/heads/main") return 0 ;;
-        "checkout main") return 1 ;;
-        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
-        "show-ref --verify --quiet refs/heads/vibe/main-safe/wt-runner") return 1 ;;
-        "checkout -B vibe/main-safe/wt-runner origin/main") print -r -- "SAFE_BRANCH_CREATED" > "$called_file"; return 0 ;;
-        "rev-parse --show-toplevel") echo "/tmp/wt-runner"; return 0 ;;
-        *) return 0 ;;
-      esac
-    }
-
-    _flow_checkout_safe_main_branch
-    cat "$called_file"
-  '
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "SAFE_BRANCH_CREATED" ]]
 }
 
 @test "14. flow module no longer exposes legacy worktree-start helpers" {

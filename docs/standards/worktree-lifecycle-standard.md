@@ -129,7 +129,7 @@ related_docs:
 补充规则：
 
 - `vibe flow done` 负责关闭 flow 并删除本地/远端 branch
-- 若关闭的是当前 branch，`vibe flow done` 应先把当前目录落回安全的非 detached 基线分支：优先使用本地 `main`；若 `main` 受 `git worktree` 限制不可用，则切到当前 worktree 专用、指向 `origin/main` 的 safe branch
+- 若关闭的是当前 branch，`vibe flow done` 应先把当前目录落回安全的本地 `main` branch；若本地 `main` 缺失，则从 `origin/main` 显式恢复
 - `vibe flow done` 不负责关闭 task / issue
 - flow 关闭后，目录可以被保留或复用，但不能继续代表旧 flow；同一目录可直接继续 `vibe flow new (shell)`，不要求切换物理 worktree
 - 即使 branch 被删除，已关闭 flow 的历史也必须保留
