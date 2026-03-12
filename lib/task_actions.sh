@@ -94,24 +94,16 @@ _vibe_task_update() {
     common_dir="$(_vibe_task_common_dir)" || return 1; registry_file="$common_dir/vibe/registry.json"; worktrees_file="$common_dir/vibe/worktrees.json"; now="$(_vibe_task_now)"
     _vibe_task_require_file "$registry_file" "registry.json" || return 1; _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
-    if [[ -n "$task_status" ]]; then
-        task_status="$(_vibe_task_normalize_and_validate_status "$task_status")" || { vibe_die "Invalid task status: $task_status"; return 1; }
-    fi
-    if [[ "$spec_mode" == "set" ]]; then
-        spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "${spec_standard:-none}")" || { vibe_die "Invalid spec standard: ${spec_standard:-}"; return 1; }
-    fi
+    [[ -z "$task_status" ]] || task_status="$(_vibe_task_normalize_and_validate_status "$task_status")" || { vibe_die "Invalid task status: $task_status"; return 1; }
+    [[ "$spec_mode" != "set" ]] || spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "${spec_standard:-none}")" || { vibe_die "Invalid spec standard: ${spec_standard:-}"; return 1; }
     if [[ -n "$agent" ]]; then
         case "$agent" in codex|antigravity|trae|claude|opencode|kiro) ;; *) [[ "$force" -eq 1 ]] || { vibe_die "Unsupported agent: $agent"; return 1; } ;; esac
         email_slug="$agent"; [[ "$force" -eq 1 ]] && email_slug="$(_vibe_task_slugify "$agent")"
     fi
     if [[ "$unassign" == "true" ]]; then
-        assigned_mode="clear"
-        worktree=""
+        assigned_mode="clear"; worktree=""
     elif [[ "$bind_current" == "true" ]]; then
-        assigned_mode="set"
-        target_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-        target_name="$(basename "$target_path")"
-        worktree="$target_name"
+        assigned_mode="set"; target_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"; target_name="$(basename "$target_path")"; worktree="$target_name"
     elif [[ -n "$worktree" ]]; then
         assigned_mode="set"
     fi
@@ -124,6 +116,12 @@ _vibe_task_update() {
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
     _vibe_task_write_task_file "$common_dir" "$registry_file" "$task_id" "$now" || return 1
     _vibe_task_write_worktrees "$worktrees_file" "$target_name" "$target_path" "$task_id" "$branch" "$agent" "$bind_current" "$now" "$unassign" || return 1
+    log_success "Task updated: $task_id"
+    [[ -n "$task_status" ]] && echo "Status: $task_status"
+    [[ -n "$next_step" ]] && echo "Next Step: $next_step"
+    [[ "$spec_mode" == "set" ]] && echo "Spec Ref: ${spec_ref:-none}"
+    [[ -n "$branch" ]] && echo "Runtime Branch: $branch"
+    [[ "$bind_current" == "true" ]] && echo "Runtime Worktree: $worktree"
     case "$task_status" in
         todo) echo "💡 Next: Create an execution scene using ${CYAN}wtnew <branch>${NC} or start with ${CYAN}vnew <branch>${NC}" ;;
         in_progress) echo "💡 Next: Ensure your cockpit is ready with ${CYAN}vup${NC}; this task record is an execution record, not a roadmap item." ;;
@@ -224,7 +222,7 @@ _vibe_task_add() {
         archived_at:null
       }' > "$task_file"
     _vibe_task_sync_roadmap_links "$common_dir" "$task_id" "$roadmap_item_ids_json" "$now" || return 1
-    log_success "Task added: $task_id"
+    log_success "Task added: $task_id"; echo "Title: $title"; echo "Spec Ref: $spec_ref"
     echo "💡 Next: Run ${CYAN}wtnew <branch>${NC} or ${CYAN}vnew <branch>${NC} to start an execution scene, then bind this execution record."
 }
 _vibe_task_branch_matches_any() { local branch="$1" candidate; shift; for candidate in "$@"; do [[ -n "$candidate" && ( "$branch" == "$candidate" || "$branch" == */"$candidate" ) ]] && return 0; done; return 1; }

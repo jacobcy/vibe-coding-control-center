@@ -46,6 +46,9 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_standard' "$fixture/vibe/registry.json")" = "superpowers" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-04-new-task") | .spec_ref' "$fixture/vibe/registry.json")" = "docs/plans/2026-03-04-new-task.md" ]
   [ -f "$fixture/vibe/tasks/2026-03-04-new-task/task.json" ]
+  [[ "$output" =~ "2026-03-04-new-task" ]]
+  [[ "$output" =~ "New Task Title" ]]
+  [[ "$output" =~ "docs/plans/2026-03-04-new-task.md" ]]
 }
 
 @test "ops: vibe_task add auto-id strips path prefix from title" {
@@ -438,6 +441,8 @@ JSON
     vibe_task remove 2026-03-02-rotate-alignment
   '
   [ "$status" -eq 0 ]
+  [[ "$output" =~ "2026-03-02-rotate-alignment" ]]
+  [[ "$output" =~ "removed from registry" ]]
   [ "$(jq '[.tasks[] | select(.task_id=="2026-03-02-rotate-alignment")] | length' "$fixture/vibe/registry.json")" = "0" ]
   [ ! -f "$fixture/vibe/tasks/2026-03-02-rotate-alignment/task.json" ]
 }

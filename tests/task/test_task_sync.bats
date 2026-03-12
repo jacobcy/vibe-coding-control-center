@@ -41,3 +41,22 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "feat-A" ]]
 }
+
+@test "audit: default status output reports audit section and current data-quality state" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  printf '{"schema_version":"v1","tasks":[]}\n' > "$fixture/vibe/registry.json"
+  printf '{"schema_version":"v1","worktrees":[]}\n' > "$fixture/vibe/worktrees.json"
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task audit
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Task Registry Audit Status" ]]
+  [[ "$output" =~ "Data Quality:" ]]
+  [[ "$output" =~ "All worktrees have valid branch fields" ]]
+}

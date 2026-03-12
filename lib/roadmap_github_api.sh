@@ -79,6 +79,36 @@ _vibe_roadmap_add_project_item_from_content() {
     print -r -- "$item_id"
 }
 
+_vibe_roadmap_bootstrap_remote_item() {
+    local project_id="$1" item_json="$2"
+    local source_type title description source_ref parsed repo number content_type content_id item_id
+
+    source_type="$(printf '%s' "$item_json" | jq -r '.source_type // "local"')"
+    title="$(printf '%s' "$item_json" | jq -r '.title // "Imported Project Item"')"
+    description="$(printf '%s' "$item_json" | jq -r '.description // empty')"
+
+    if [[ "$source_type" == "github" ]]; then
+        while IFS= read -r source_ref; do
+            [[ -n "$source_ref" ]] || continue
+            parsed="$(_vibe_roadmap_parse_source_ref "$source_ref" 2>/dev/null || true)"
+            [[ -n "$parsed" ]] || continue
+            repo="${parsed%%|*}"
+            parsed="${parsed#*|}"
+            number="${parsed%%|*}"
+            content_type="${parsed##*|}"
+            content_id="$(_vibe_roadmap_resolve_content_node_id "$repo" "$number" "$content_type" 2>/dev/null || true)"
+            [[ -n "$content_id" ]] || continue
+            item_id="$(_vibe_roadmap_add_project_item_from_content "$project_id" "$content_id" 2>/dev/null || true)"
+            [[ -n "$item_id" ]] || continue
+            print -r -- "${item_id}|${content_type}"
+            return 0
+        done < <(printf '%s' "$item_json" | jq -r '.source_refs[]?')
+    fi
+
+    item_id="$(_vibe_roadmap_create_github_draft_issue "$project_id" "$title" "$description")" || return 1
+    print -r -- "${item_id}|draft_issue"
+}
+
 _vibe_roadmap_fetch_github_project_items() {
     local project_id="$1"
     local after="" response nodes has_next end_cursor results='[]'

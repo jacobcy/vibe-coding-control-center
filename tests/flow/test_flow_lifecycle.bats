@@ -127,6 +127,8 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "CHECKOUT_DEFAULT" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
+  [[ "$output" =~ "branch: task/next-flow" ]]
 }
 
 @test "2.5.0a _flow_new allows detached HEAD and creates a new branch from origin/main" {
@@ -274,6 +276,8 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "RUNTIME_UPDATED" ]]
   [[ "$output" =~ "APPLIED" ]]
   [[ "$output" =~ "DROPPED" ]]
+  [[ "$output" =~ "Flow runtime ready: next-flow" ]]
+  [[ "$output" =~ "branch: task/next-flow" ]]
 }
 
 @test "2.6.1 _flow_switch skips stash work when the worktree is already clean" {
