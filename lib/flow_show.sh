@@ -10,12 +10,16 @@ _flow_show_resolve_target() {
 }
 
 _flow_show_open_record() {
-  local target="$1" candidate_branch
+  local target="$1" candidate_branch open_status
   candidate_branch="$(_flow_switch_target_branch "$target")"
   _flow_branch_dashboard_entry "$candidate_branch" && return 0
-  local status=$?
-  [[ "$status" -ne 1 ]] && return "$status"
-  [[ "$candidate_branch" != "$target" ]] && _flow_branch_dashboard_entry "$target" && return 0
+  open_status=$?
+  [[ "$open_status" -ne 1 ]] && return "$open_status"
+  if [[ "$candidate_branch" != "$target" ]]; then
+    _flow_branch_dashboard_entry "$target" && return 0
+    open_status=$?
+    [[ "$open_status" -ne 1 ]] && return "$open_status"
+  fi
   return 1
 }
 

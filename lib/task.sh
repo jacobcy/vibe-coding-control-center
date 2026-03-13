@@ -71,7 +71,9 @@ _vibe_task_normalize_and_validate_status() {
 source "$VIBE_LIB/task_render.sh"
 source "$VIBE_LIB/task_write.sh"
 source "$VIBE_LIB/task_help.sh"
+source "$VIBE_LIB/task_query_openspec.sh"
 source "$VIBE_LIB/task_query.sh"
+source "$VIBE_LIB/task_roadmap_links.sh"
 source "$VIBE_LIB/task_actions.sh"
 source "$VIBE_LIB/task_audit.sh"
 

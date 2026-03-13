@@ -251,9 +251,33 @@ JSON
     _flow_show --json
   '
 
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 2 ]
   [[ "$output" =~ "task/refactor" ]]
   [[ "$output" =~ "Multiple active tasks" ]]
+}
+
+@test "3.1.2b _flow_show_open_record propagates fallback lookup runtime errors" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow_show.sh"
+    _flow_switch_target_branch() {
+      echo "task/runtime-fallback"
+    }
+    _flow_branch_dashboard_entry() {
+      if [[ "$1" == "task/runtime-fallback" ]]; then
+        return 1
+      fi
+      echo "Multiple active tasks on runtime branch: $1"
+      return 2
+    }
+    _flow_show_open_record "runtime-fallback"
+  '
+
+  [ "$status" -eq 2 ]
+  [[ "$output" =~ "Multiple active tasks on runtime branch: runtime-fallback" ]]
 }
 
 @test "3.2 _flow_status shows only open flow dashboard entries" {

@@ -1,49 +1,4 @@
 #!/usr/bin/env zsh
-_vibe_task_roadmap_file() {
-    echo "$1/vibe/roadmap.json"
-}
-_vibe_task_validate_roadmap_items() {
-    local common_dir="$1" roadmap_item_ids_json="$2" roadmap_file missing_ids first_missing
-    [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
-    roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
-    [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
-    jq empty "$roadmap_file" >/dev/null 2>&1 || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
-    missing_ids="$(jq -nr --argjson roadmap_item_ids "$roadmap_item_ids_json" --slurpfile roadmap "$roadmap_file" '
-      ($roadmap[0].items // [] | map(.roadmap_item_id)) as $existing
-      | $roadmap_item_ids[]
-      | . as $target
-      | select($existing | index($target) | not)
-    ')" || { vibe_die "Invalid roadmap.json: $roadmap_file"; return 1; }
-
-    if [[ -n "$missing_ids" ]]; then
-        first_missing="$(printf '%s\n' "$missing_ids" | sed -n '1p')"
-        vibe_die "Roadmap item not found: $first_missing"
-        return 1
-    fi
-}
-_vibe_task_sync_roadmap_links() {
-    local common_dir="$1" task_id="$2" roadmap_item_ids_json="$3" now="$4" roadmap_file tmp
-    [[ "${roadmap_item_ids_json:-[]}" == "[]" ]] && return 0
-    roadmap_file="$(_vibe_task_roadmap_file "$common_dir")"
-    [[ -f "$roadmap_file" ]] || { vibe_die "Missing roadmap.json: $roadmap_file"; return 1; }
-    tmp="$(mktemp)" || return 1
-    jq --arg task_id "$task_id" --arg now "$now" --argjson roadmap_item_ids "$roadmap_item_ids_json" '
-      .items |= map(
-        . as $item
-        | if ($roadmap_item_ids | index($item.roadmap_item_id)) != null then
-          .linked_task_ids = (((.linked_task_ids // []) + [$task_id]) | unique)
-          | .updated_at = $now
-        else . end
-      )
-    ' "$roadmap_file" > "$tmp" && mv "$tmp" "$roadmap_file"
-}
-_vibe_task_require_plan_binding_for_add() {
-    local spec_standard="$1" spec_ref="$2"
-    if [[ "$spec_standard" == "none" || -z "$spec_ref" ]]; then
-        vibe_die "Task creation requires a plan binding. Create or select a roadmap item via 'vibe roadmap add (shell)', then use the writing-plans skill to produce a plan, and re-run vibe task add with --spec-standard/--spec-ref."
-        return 1
-    fi
-}
 _vibe_task_update() {
     local task_id="${1:-}" task_status="" agent="" worktree="" branch="" next_step="" bind_current="false" force=0 common_dir registry_file worktrees_file now target_name="" target_path="" email_slug="" unassign="false" assigned_mode="preserve" pr_ref="" pr_mode="preserve" issue_mode="preserve" roadmap_mode="preserve" spec_standard="" spec_ref="" spec_mode="preserve"
     local existing_branch_tasks_json existing_branch_task_ids
@@ -277,7 +232,9 @@ _vibe_task_remove() {
     indexed_branch=$(jq -r --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid) | .runtime_branch // empty' "$registry_file" | head -1)
     task_title=$(jq -r --arg tid "$task_id" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" | head -1)
     [[ -n "$task_title" ]] && task_slug="$(_vibe_task_slugify "$task_title")"
-    [[ "$task_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+)$ ]] && task_suffix="${match[1]}"
+    if [[ "$task_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+)$ ]]; then
+        task_suffix="${match[1]}"
+    fi
     [[ -n "$indexed_branch" ]] && branch_candidates+=("$indexed_branch")
     branch_candidates+=("$task_id")
     [[ -n "$task_suffix" ]] && branch_candidates+=("$task_suffix")
