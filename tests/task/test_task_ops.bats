@@ -195,7 +195,7 @@ setup() {
   [ "$(jq -r '.tasks[] | select(.task_id=="old-task") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
 }
 
-@test "ops: update bind-current syncs worktree binding without local cache" {
+@test "ops: update bind-current only updates registry runtime fields without mutating worktrees.json" {
   local fixture; fixture="$(mktemp -d)"
   source "$HELPER"; make_task_fixture "$fixture"
   local wt_path="$fixture/wt-test-task"
@@ -209,11 +209,12 @@ setup() {
     vibe_task update 2026-03-02-rotate-alignment --bind-current
   '
   [ "$status" -eq 0 ]
-  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "old-task" ]
   [ ! -e "$wt_path/.vibe/current-task.json" ]
   [ ! -e "$wt_path/.vibe/focus.md" ]
   [ ! -e "$wt_path/.vibe/session.json" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_branch' "$fixture/vibe/registry.json")" = "feature/old-task" ]
 }
 
 @test "ops: task query prefers shared worktree binding over local stale cache" {
@@ -281,9 +282,41 @@ JSON
     vibe_task update 2026-03-02-rotate-alignment --bind-current
   '
   [ "$status" -eq 0 ]
-  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "2026-03-02-rotate-alignment" ]
+  [ "$(jq -r '.worktrees[] | select(.worktree_name=="wt-test-task") | .current_task' "$fixture/vibe/worktrees.json")" = "old-task" ]
   [ "$(jq -r '[.worktrees[] | select(.worktree_name=="subdir")] | length' "$fixture/vibe/worktrees.json")" = "0" ]
   [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "wt-test-task" ]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_branch' "$fixture/vibe/registry.json")" = "feature/old-task" ]
+}
+
+@test "ops: update bind-current rejects another active task on the same branch" {
+  local fixture; fixture="$(mktemp -d)"
+  source "$HELPER"; make_task_fixture "$fixture"
+  local wt_path="$fixture/wt-test-task"
+  mkdir -p "$wt_path"
+
+  jq '
+    .tasks |= map(
+      if .task_id == "old-task" then
+        .status = "in_progress"
+        | .runtime_branch = "feature/old-task"
+        | .runtime_worktree_name = "wt-test-task"
+      else . end
+    )
+  ' "$fixture/vibe/registry.json" > "$fixture/vibe/registry.json.tmp"
+  mv "$fixture/vibe/registry.json.tmp" "$fixture/vibe/registry.json"
+
+  run zsh -c '
+    cd "'"$wt_path"'"
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    vibe_task update 2026-03-02-rotate-alignment --bind-current
+  '
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "feature/old-task" ]]
+  [[ "$output" =~ "Multiple active tasks" ]]
+  [ "$(jq -r '.tasks[] | select(.task_id=="2026-03-02-rotate-alignment") | .runtime_worktree_name' "$fixture/vibe/registry.json")" = "null" ]
 }
 
 @test "ops: update accepts --issue/--roadmap-item/--pr and deduplicates refs" {

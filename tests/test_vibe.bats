@@ -160,6 +160,33 @@ JSON
   [ "$(echo "$output" | jq -r '.link.errors[0]')" = "roadmap item missing task back-link: rm-1:task-1" ]
 }
 
+@test "2.4 vibe task audit --all does not fail-fast when worktrees.json is missing" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/task.sh"
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        *) command git "$@" ;;
+      esac
+    }
+    vibe_task audit --all
+  '
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Audit Summary Report" ]]
+}
+
 @test "3. vibe help outputs Usage" {
   run vibe help
   [ "$status" -eq 0 ]

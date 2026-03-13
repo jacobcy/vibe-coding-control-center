@@ -99,3 +99,47 @@ JSON
   [ "$(echo "$output" | jq -r '.flow.status')" = "pass" ]
   [ "$(echo "$output" | jq -r '.flow.warnings | length')" = "0" ]
 }
+
+@test "flow contract: flow check tolerates missing worktrees.json when registry runtime is intact" {
+  local fixture
+  fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {"task_id":"task-main","title":"Main Task","status":"in_progress","runtime_branch":"task/refactor","source_type":"local","source_refs":[],"roadmap_item_ids":[],"issue_refs":[],"related_task_ids":[],"subtasks":[],"created_at":"2026-03-11T10:00:00+08:00","updated_at":"2026-03-11T10:00:00+08:00"}
+]}
+JSON
+  cat > "$fixture/vibe/roadmap.json" <<'JSON'
+{"schema_version":"v1","version_goal":"Ship runtime cleanup","items":[]}
+JSON
+
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    export VIBE_ROOT="'"$VIBE_ROOT"'"
+    export VIBE_LIB="'"$VIBE_ROOT"'/lib"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/check.sh"
+    vibe() {
+      case "$1 $2 $3" in
+        "roadmap audit --check-status")
+          echo "{\"checks\":{\"status\":{\"invalid_item_ids\":[]},\"version_goal\":{\"present\":true},\"links\":{\"unlinked_item_ids\":[]}}}"
+          return 0
+          ;;
+        "task audit --all")
+          return 0
+          ;;
+      esac
+      return 1
+    }
+    git() {
+      if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
+      return 0
+    }
+    vibe_check flow --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.flow.status')" = "pass" ]
+  [ "$(echo "$output" | jq -r '.flow.warnings | length')" = "1" ]
+  [ "$(echo "$output" | jq -r '.flow.warnings[0]')" = "Missing worktrees.json; flow audit is running in registry-only compatibility mode" ]
+}

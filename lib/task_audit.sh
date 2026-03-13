@@ -80,7 +80,7 @@ _task_generate_audit_summary() {
 
 vibe_task_audit() {
   local dry_run=false check_branches=false check_openspec=false check_plans=false all_checks=false
-  local common_dir worktrees_file
+  local common_dir
   local -a unregistered_branches unsynced_changes untracked_files
   local line wt_name branch pattern name has_tasks total done entry type file
 
@@ -97,8 +97,6 @@ vibe_task_audit() {
   done
 
   common_dir="$(_vibe_task_common_dir)" || return 1
-  worktrees_file="$common_dir/vibe/worktrees.json"
-  _vibe_task_require_file "$worktrees_file" "worktrees.json" || return 1
 
   if [[ "$check_branches" == "true" || "$all_checks" == "true" ]]; then
     log_step "Phase 2: Branch Registration Check"

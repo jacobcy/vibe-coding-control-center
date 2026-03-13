@@ -29,7 +29,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "Rotate Workflow Refinement" ]]
 }
 
-@test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
+@test "8. vibe flow bind in feature worktree does not mutate legacy worktrees.json state" {
   local fixture
   fixture="$(mktemp -d)"
   make_flow_task_fixture "$fixture"
@@ -43,11 +43,12 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
       if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
       if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/feature-branch"; return 0; fi
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
     _flow_bind 2026-03-02-rotate-alignment
-    jq -e ".worktrees[] | select(.worktree_name == \"wt-claude-refactor\") | .tasks | index(\"2026-03-02-rotate-alignment\")" "'"$fixture"'/vibe/worktrees.json" >/dev/null
+    jq -e "(.worktrees | length) == 0" "'"$fixture"'/vibe/worktrees.json" >/dev/null
   '
 
   [ "$status" -eq 0 ]
@@ -329,6 +330,8 @@ JSON
   [ "$(jq -r '.flows[0].state' "$fixture/vibe/flow-history.json")" = "closed" ]
   [ "$(jq -r '.flows[0].feature' "$fixture/vibe/flow-history.json")" = "feature-branch" ]
   [ "$(jq -r '.worktrees[0].branch // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
+  [ "$(jq -r '.worktrees[0].current_task // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
+  [ "$(jq -r '.worktrees[0].tasks | length' "$fixture/vibe/worktrees.json")" = "0" ]
   [ "$(jq -r '.tasks[0].runtime_branch // "null"' "$fixture/vibe/registry.json")" = "null" ]
   [ "$(jq -r '.tasks[0].runtime_worktree_name // "null"' "$fixture/vibe/registry.json")" = "null" ]
 }

@@ -72,7 +72,12 @@ _vibe_check_group_flow() {
   common_dir="$(_vibe_check_common_dir)"
   [[ -n "$common_dir" ]] || { _vibe_check_group_json "fail" "not in git repo" '["Not in a git repository"]' '[]'; return; }
   worktrees_file="$common_dir/vibe/worktrees.json"
-  [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
+  if [[ ! -f "$worktrees_file" ]]; then
+    warnings="Missing worktrees.json; flow audit is running in registry-only compatibility mode\n"
+    warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+    _vibe_check_group_json "pass" "flow audit passed (registry-only compatibility mode)" '[]' "$warnings_json"
+    return
+  fi
 
   invalid_status="$(jq -r '.worktrees[]? | select((.status // "active" | IN("active","idle","missing","stale")) | not) | "\(.worktree_name):\(.status // "null")"' "$worktrees_file")"
   errors=""
@@ -107,7 +112,6 @@ _vibe_check_group_bootstrap() {
 
   [[ -f "$reg_file" ]] || { _vibe_check_group_json "fail" "missing registry.json" '["Missing registry.json"]' '[]'; return; }
   [[ -f "$roadmap_file" ]] || { _vibe_check_group_json "fail" "missing roadmap.json" '["Missing roadmap.json"]' '[]'; return; }
-  [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
 
   while IFS= read -r line; do
     [[ -n "$line" ]] && errors+="roadmap item missing github anchor: $line\n"
@@ -121,9 +125,13 @@ _vibe_check_group_bootstrap() {
     [[ -n "$line" ]] && errors+="task illegally carries github identity: $line\n"
   done < <(jq -r '.tasks[]? | select(has("github_project_item_id") or has("content_type")) | .task_id' "$reg_file")
 
-  while IFS= read -r line; do
-    [[ -n "$line" ]] && errors+="worktree illegally carries github identity: $line\n"
-  done < <(jq -r '.worktrees[]? | select(has("github_project_item_id") or has("content_type")) | .worktree_name' "$worktrees_file")
+  if [[ -f "$worktrees_file" ]]; then
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && errors+="worktree illegally carries github identity: $line\n"
+    done < <(jq -r '.worktrees[]? | select(has("github_project_item_id") or has("content_type")) | .worktree_name' "$worktrees_file")
+  else
+    warnings+="Missing worktrees.json; skipped legacy worktree bootstrap audit\n"
+  fi
 
   errors_json="$(printf '%b' "$errors" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
   warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
@@ -141,7 +149,7 @@ _vibe_check_group_bootstrap() {
 _vibe_check_group_link() {
   local common_dir reg_file roadmap_file worktrees_file
   local task_ids_json item_ids_json wt_names_json
-  local errors errors_json group_status summary
+  local errors warnings errors_json warnings_json group_status summary
 
   common_dir="$(_vibe_check_common_dir)"
   [[ -n "$common_dir" ]] || { _vibe_check_group_json "fail" "not in git repo" '["Not in a git repository"]' '[]'; return; }
@@ -152,11 +160,15 @@ _vibe_check_group_link() {
 
   [[ -f "$reg_file" ]] || { _vibe_check_group_json "fail" "missing registry.json" '["Missing registry.json"]' '[]'; return; }
   [[ -f "$roadmap_file" ]] || { _vibe_check_group_json "fail" "missing roadmap.json" '["Missing roadmap.json"]' '[]'; return; }
-  [[ -f "$worktrees_file" ]] || { _vibe_check_group_json "fail" "missing worktrees.json" '["Missing worktrees.json"]' '[]'; return; }
 
   task_ids_json="$(jq -c '[.tasks[]?.task_id]' "$reg_file")"
   item_ids_json="$(jq -c '[.items[]?.roadmap_item_id]' "$roadmap_file")"
-  wt_names_json="$(jq -c '[.worktrees[]?.worktree_name]' "$worktrees_file")"
+  if [[ -f "$worktrees_file" ]]; then
+    wt_names_json="$(jq -c '[.worktrees[]?.worktree_name]' "$worktrees_file")"
+  else
+    wt_names_json='[]'
+    warnings="Missing worktrees.json; skipped runtime worktree existence check\n"
+  fi
 
   errors=""
 
@@ -201,6 +213,7 @@ _vibe_check_group_link() {
   done < <(jq -r '.tasks[]? | select((.status == "completed" or .status == "archived") and ((.runtime_worktree_name != null) or (.runtime_worktree_path != null) or (.runtime_branch != null) or (.runtime_agent != null))) | .task_id' "$reg_file" 2>/dev/null)
 
   errors_json="$(printf '%b' "$errors" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
+  warnings_json="$(printf '%b' "$warnings" | sed '/^$/d' | _vibe_check_lines_to_json_array)"
 
   if [[ "$(echo "$errors_json" | jq 'length')" -gt 0 ]]; then
     group_status="fail"
@@ -210,7 +223,7 @@ _vibe_check_group_link() {
     summary="link check passed"
   fi
 
-  _vibe_check_group_json "$group_status" "$summary" "$errors_json" '[]'
+  _vibe_check_group_json "$group_status" "$summary" "$errors_json" "$warnings_json"
 }
 _vibe_check_group_json_file() {
   local file="$1" base errors warnings group_status summary

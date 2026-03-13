@@ -46,48 +46,7 @@ _vibe_task_write_registry() {
 }
 
 _vibe_task_write_worktrees() {
-    local worktrees_file="$1" target_name="$2" target_path="$3" task_id="$4" branch="$5" agent="$6" bind_current="$7" now="$8" unassign="$9" tmp
-    # echo "DEBUG: wt_file=$worktrees_file target=$target_name task=$task_id bind=$bind_current unassign=$unassign" >&2
-    tmp="$(mktemp)" || return 1
-    jq --arg target_name "$target_name" --arg target_path "$target_path" --arg task_id "$task_id" \
-       --arg branch "$branch" --arg agent "$agent" --arg now "$now" \
-       --argjson bind_current "$bind_current" --argjson unassign "${unassign:-false}" '
-      .worktrees = ((.worktrees // []) as $items 
-        | if $unassign then
-            $items | map(
-              if .current_task == $task_id then .current_task = null else . end
-              | .tasks = ((.tasks // []) | map(select(. != $task_id)))
-              | .last_updated = $now
-            )
-          else
-            ([ $items[] | select(.worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path)) ] | length) as $hits
-            | if $hits == 0 and $bind_current then
-                $items + [{
-                  worktree_name: $target_name,
-                  worktree_path: $target_path,
-                  branch: (if $branch == "" then null else $branch end),
-                  current_task: $task_id,
-                  tasks: [$task_id],
-                  status: "active",
-                  dirty: false,
-                  agent: (if $agent == "" then null else $agent end),
-                  last_updated: $now
-                }]
-              else
-                $items | map(if .worktree_name == $target_name or ($target_path != "" and .worktree_path == $target_path) then
-                  (if $target_path != "" then .worktree_path = $target_path else . end)
-                  | .branch = (if $branch == "" then .branch else $branch end)
-                  | .agent = (if $agent == "" then .agent else $agent end)
-                  | (if $bind_current then 
-                      .current_task = $task_id 
-                      | .tasks = ((.tasks // []) as $t | if ($t | index($task_id)) == null then $t + [$task_id] else $t end)
-                      | .status = "active" 
-                    else . end)
-                  | .last_updated = $now
-                else . end)
-              end
-          end)
-    ' "$worktrees_file" >"$tmp" && mv "$tmp" "$worktrees_file"
+    return 0
 }
 
 _vibe_task_write_task_file() {
