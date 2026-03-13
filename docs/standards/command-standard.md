@@ -9,7 +9,7 @@ authority:
   - command-naming
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-12
+last_updated: 2026-03-13
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -68,6 +68,11 @@ related_docs:
 - `vibe task` 以 `registry.json` 为执行态真源
 - `vibe flow` 以 branch 作为开放现场锚点（解耦 `worktrees.json`），并以 `flow-history.json` 表达已关闭 flow 历史
 - `vibe check` 以各层真源文件为审计对象，不自建独立业务真源
+
+补充约束：
+
+- `roadmap.json` 当前只按 GitHub Project 规划层事实的 mirror / cache / projection / backup 理解，不承担 execution gate
+- `worktrees.json` 当前只作为兼容期 cache / audit hint，不承担开放 flow 的主身份锚点
 
 命令标准不得覆盖或重述文件级 schema；文件字段以对应数据模型标准为准。
 
@@ -156,6 +161,7 @@ related_docs:
 - `roadmap` 负责 GitHub Project 规划对象
 - `task` 只负责 execution record / execution bridge
 - `flow` 只负责执行现场
+- 若一个 task 在多个 `issue_refs` 中已有明确主闭环 issue，则该角色称为 `task issue`
 - `roadmap item` 是 planning 中间层，不是用户默认第一锚点
 - slash / workflow 只能调度这些对象，不得重新发明对象层级
 - GitHub 官方字段与 Vibe 扩展字段可以同时同步，但语义层级必须分离
@@ -294,6 +300,7 @@ provider 只允许：
 
 - 管 execution record 生命周期
 - 管 task 与 roadmap item / `repo issue` / pr 的关联
+- 管 task 的主闭环 issue 选择
 - 管 subtasks
 - 管 task 归档事实
 - 管 task 当前 runtime 绑定事实
@@ -348,6 +355,7 @@ provider 只允许：
 - `--next-step`
 - `--roadmap-item`
 - `--issue-ref`
+- `--primary-issue-ref`
 - `--pr`
 - `--bind-current`
 - `--unbind`
@@ -356,10 +364,17 @@ provider 只允许：
 
 - `roadmap_item_ids`
 - `issue_refs`
+- `primary_issue_ref`
 - `pr_ref`
 - `spec_standard`
 - `spec_ref`
 - runtime 绑定事实
+
+补充约束：
+
+- `primary_issue_ref` 若存在，必须同时出现在 `issue_refs` 中
+- `primary_issue_ref` 只表达 task 的主闭环 issue，也就是 `task issue` 的显式落点
+- `task add/update` 不得把 `task issue` 扩展成新的平行实体类型
 
 `task add/update` 不得承担：
 

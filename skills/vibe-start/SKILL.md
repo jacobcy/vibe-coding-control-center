@@ -45,6 +45,7 @@ vibe task show <task-id> --json
 检查点：
 
 - 当前 `issue_refs`
+- 当前 `primary_issue_ref`
 - 当前 `current_task`
 - 当前 flow 已绑定的 `tasks[]`
 - 每个 task 的 `status`
@@ -73,6 +74,8 @@ vibe task show <task-id> --json
 
 - `spec_standard` 存在
 - `spec_ref` 指向真实存在的 plan / spec 文件
+- 若存在 `primary_issue_ref`，按它理解当前 task 的 `task issue`
+- 若只有多个 `issue_refs` 而没有 `primary_issue_ref`，只能把这些 issue 当候选来源，不能擅自指定主闭环 issue
 
 若缺失：
 
@@ -117,3 +120,4 @@ handoff 最少记录：
 - 不得把“跳过”写成“完成”
 - 不得在缺 `spec_ref` 时继续编码
 - 不得绕过 issue 直接凭空创建 task
+- 不得把任意 `issue_ref` 默认写成当前 task 的主 issue

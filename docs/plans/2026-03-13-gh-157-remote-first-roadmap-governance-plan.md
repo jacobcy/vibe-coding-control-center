@@ -7,6 +7,8 @@ created: 2026-03-13
 last_updated: 2026-03-13
 related_docs:
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-design.md
+  - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
+  - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
   - docs/standards/data-model-standard.md
   - docs/standards/command-standard.md
   - docs/standards/git-workflow-standard.md
@@ -25,7 +27,7 @@ related_issues:
 
 **Goal:** 将当前 roadmap / issue / task / flow 的治理口径收敛到“GitHub 真源优先，本地只做 mirror / cache / backup”，并按最小依赖顺序拆出可落地实施阶段。
 
-**Architecture:** 先冻结设计契约，再解除 task 对 roadmap mirror 的硬依赖，随后重构 `vibe roadmap sync` 为 remote-first projection，最后统一 PR/issue/closeout 的交付约束。本计划刻意把设计冻结、行为解耦、sync 重构、交付规范分层，避免一次性全栈重做。
+**Architecture:** 先完成语义清理前置条件：冻结对象边界、把 `worktrees.json` 明确降级到待清退兼容层、把 `roadmap.json` 明确收敛成 projection/cache。然后再解除 task 对 roadmap mirror 的硬依赖，重构 `vibe roadmap sync` 为 remote-first projection，最后统一 PR/issue/closeout 的交付约束。
 
 **Tech Stack:** Zsh, jq, GitHub CLI, GitHub GraphQL/API, Bats, Markdown
 
@@ -34,6 +36,7 @@ related_issues:
 ## Goal / Non-goals
 
 **Goal**
+- 先完成 `docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md`
 - 固化 `#157/#158` 的总设计，明确总 issue / 分 issue / 先后依赖
 - 让 execution 入口不再被 roadmap mirror 阻塞
 - 让 roadmap sync 明确变成 GitHub Project / issue relations 的本地 projection
@@ -53,6 +56,10 @@ related_issues:
 ### 总设计
 - `#158`: 远端真源 + local-first 例外 + task 直锚 issue
 
+### 前置条件
+- 语义清理：冻结 `worktree / flow / branch / repo issue / task issue`
+- `worktrees.json` 清退：先清残留、再退出主模型
+
 ### 设计支撑
 - `#100`: 依赖语义与 ready/blocked 视图
 - `#101`: issue -> Project intake gate
@@ -63,6 +70,20 @@ related_issues:
 - `#119/#152/#153/#154/#155`: 属于同一治理母题，但不阻塞总设计冻结
 
 ## Phase Plan
+
+### Precondition Phase: 先完成语义清理
+
+**Input**
+- `docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md`
+- `docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md`
+
+**Must finish before continuing**
+- 标准层对象边界冻结
+- `worktrees.json` 不再被设计文档描述成长期现场真源
+- `roadmap.json` 统一表述为 mirror / cache / projection / backup
+- `task issue` 是否进入正式语义已有明确结论
+
+若以上未完成，不进入下面各实现 phase。
 
 ### Phase 1: 冻结 remote-first 数据模型
 
@@ -75,6 +96,7 @@ related_issues:
 **Step 1: 固化对象锚点定义**
 
 - 把 `task` 的强锚点明确成 `issue_refs + spec_standard/spec_ref`
+- 明确 `task issue` 是 `repo issue` 的 execution role，而不是新的平行共享状态实体
 - 把 `roadmap_item_ids` 明确成可选桥接，不是 execution gate
 - 把 `roadmap item` 明确成 GitHub Project projection，而不是 execution 层真源
 
@@ -82,6 +104,7 @@ related_issues:
 
 - 明确 `vibe roadmap add --local` 是显式例外，不是默认入口
 - 明确 local draft 只用于规划草稿，不覆盖 GitHub 已原生支持的关系语义
+- 明确 `roadmap.json` 当前保留的主要理由是 cache / projection / backup，而不是 execution 身份真源
 
 **Step 3: 固化 sync 方向**
 
@@ -250,9 +273,17 @@ Expected:
 - **Impact:** 设计方向正确，但用户体验最痛的点不先解决
 - **Mitigation:** 先做 task gate 解耦，再做 projection 重构
 
+### Risk 1.5: 未先完成语义清理就直接推进主计划，导致 `flow/worktree/branch` 与 `repo issue/task issue` 继续混用
+- **Impact:** 文档与实现会继续把历史残留当成正式模型，后续清退成本更高
+- **Mitigation:** 先执行语义清理前置计划，再进入 GH-157 主计划
+
 ### Risk 2: local-first 被误用成第二真源
 - **Impact:** 本地又长出一套与 GitHub 并行的关系解释层
 - **Mitigation:** `--local` 只做显式例外，并要求 sync_state / remote id 生命周期清晰
+
+### Risk 2.5: 把 `roadmap.json` 留存误解成“长期必须保留的执行真源”
+- **Impact:** cache 层重新膨胀成第二套身份模型
+- **Mitigation:** 所有文档统一写成 projection / cache / backup，并把是否继续保留留给后续运行证据决定
 
 ### Risk 3: 把 parent issue 自动关闭写成核心契约
 - **Impact:** 实现依赖不存在或不稳定的 GitHub 能力

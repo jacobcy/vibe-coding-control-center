@@ -9,7 +9,7 @@ authority:
   - adjacent-skill-conflict-resolution
 author: GPT-5.4
 created: 2026-03-10
-last_updated: 2026-03-10
+last_updated: 2026-03-13
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -57,6 +57,7 @@ related_docs:
 - 只要问题本质是 `roadmap <-> task`、task registry、task 数据质量，走 `vibe-task`。
 - 只要问题本质是 `task <-> flow`、worktree runtime、stale binding，走 `vibe-check`。
 - 其中 `vibe-task` 是 task-centered audit，`vibe-check` 是 runtime / recovery audit。
+- 此处的 `worktree runtime` 只表示物理目录承载与兼容期 hint，不把 `worktree` 视为 flow 主体。
 
 ### 2.4 Skill 治理与 Skills 管理必须分开
 
@@ -117,6 +118,7 @@ related_docs:
    - 2 到 5 个自然语言触发词
 4. 不把“审计后自动修复”“智能分析全部完成”写成默认承诺。
 5. 高风险路由措辞必须避免把 `flow` 直接说成 `worktree`；如果提到 `worktree`，只能用于说明“当前由哪个物理目录承载该 flow/现场”，不能写成“进入哪个 worktree”“继续当前 worktree 绑定的 task”这类把物理容器当成运行时主体的表述。
+6. 若提到 task 与 issue 的主从关系，必须区分 `issue_refs` 与 `primary_issue_ref`；不能把任意 `issue_ref` 默认写成 `task issue`。
 
 ## 6. 文档同步规则
 

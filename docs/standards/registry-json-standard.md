@@ -8,7 +8,7 @@ authority:
   - task-registry-fields
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-03-13
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -30,6 +30,7 @@ related_docs:
 - task 主记录（execution record）
 - task 生命周期状态
 - task 与 roadmap / repo issue / PR 的关联
+- task 的主闭环 issue 落点
 - task 采用的 spec 标准与规范引用
 - task subtasks
 - task 当前 runtime 绑定事实
@@ -85,6 +86,7 @@ related_docs:
     "roadmap-command-standard"
   ],
   "issue_refs": [],
+  "primary_issue_ref": null,
   "pr_ref": null,
   "related_task_ids": [],
   "current_subtask_id": null,
@@ -116,6 +118,7 @@ related_docs:
 - `spec_ref`
 - `roadmap_item_ids`
 - `issue_refs`
+- `primary_issue_ref`
 - `related_task_ids`
 - `subtasks`
 - `created_at`
@@ -127,6 +130,7 @@ related_docs:
 
 - `description`
 - `spec_ref`
+- `primary_issue_ref`
 - `pr_ref`
 - `current_subtask_id`
 - `runtime_worktree_name`
@@ -213,6 +217,7 @@ related_docs:
 
 - `roadmap_item_ids` 用于关联 roadmap item
 - `issue_refs` 用于关联 repo issue
+- `primary_issue_ref` 用于指定当前 task 的主闭环 issue
 - `pr_ref` 只允许单值
 - `related_task_ids` 用于 task 之间的松耦合关联
 
@@ -222,6 +227,7 @@ related_docs:
 - 若 roadmap item 的 `type=task` 需要执行，可以关联一个或多个本地 `task`
 - `roadmap_item_ids` 只表达“此 execution record 服务哪些 roadmap items”，不改变 roadmap item 类型
 - `issue_refs` 只桥接需求来源，不把 `repo issue` 变成 execution record 身份
+- `primary_issue_ref` 若存在，必须同时出现在 `issue_refs` 中；它表达的是 `task issue` 角色，而不是新的对象类型
 - `pr_ref` 只桥接当前主交付单元，不记录 PR 历史列表
 - `spec_standard` / `spec_ref` 只表达执行规范选择，不承担 roadmap 规划分类
 - 一个 task 只允许一个主 PR
@@ -259,6 +265,7 @@ related_docs:
       "source_refs": [],
       "roadmap_item_ids": [],
       "issue_refs": [],
+      "primary_issue_ref": null,
       "pr_ref": null,
       "related_task_ids": [],
       "current_subtask_id": null,

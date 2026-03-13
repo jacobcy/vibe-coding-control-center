@@ -6,6 +6,8 @@ author: GPT-5 Codex
 created: 2026-03-13
 last_updated: 2026-03-13
 related_docs:
+  - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
+  - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
   - docs/standards/data-model-standard.md
   - docs/standards/command-standard.md
   - docs/standards/git-workflow-standard.md
@@ -52,6 +54,27 @@ related_issues:
 - GitHub 不支持但业务确有需要的，只做最小本地补充
 - 本地共享状态退回 projection / cache / backup，而不是第二套关系真源
 
+## Execution Preconditions
+
+在进入本设计的正式实施前，先插入一个明确前置条件：
+
+1. 先冻结仓库术语与对象边界，避免后续实现继续带着历史混用语义推进。
+2. 再处理 `worktrees.json` 清退，把它从“现场真源”降级成兼容期 cache / audit hint，直至完全退出主模型。
+3. 最后才进入 remote-first roadmap / sync / closeout 的正式实施阶段。
+
+这样排的原因是：当前仓库仍存在“标准已说 branch 是开放 flow 锚点，但部分数据模型/实现仍把 `worktrees.json` 当现场真源”的混合状态。若不先冻结语义，后续每个实现步骤都可能继续把 `flow`、`branch`、`worktree` 混写成不同层对象。
+
+本设计因此增加三个明确前提：
+
+- `worktree` 只表示 Git 物理目录，不再承担 flow 身份语义。
+- `flow` 是对 branch 的逻辑交付现场包装；branch 是开放现场锚点，worktree 只是承载容器。
+- `roadmap.json` 当前保留，但在语义上只强调为 projection / cache / backup；是否继续长期保留这一层，留到后续实现和运行证据充分后再决定。
+
+对应交付物：
+
+- 语义冻结前置计划：`docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md`
+- `worktrees.json` 清退计划：`docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md`
+
 ## External Capability Baseline
 
 以下能力已由 GitHub 原生提供，可作为本仓库的优先语义来源：
@@ -80,8 +103,9 @@ related_issues:
 ### 1. Source of Truth
 
 - `repo issue`：来源层真源，优先来自 GitHub
+- `task issue`：不是与 `repo issue` 平行的新实体，而是 `repo issue` 在 execution 层承担主闭环职责时的角色
 - `issue dependency / parent issue / sub-issue / linked PR`：关系真源，优先来自 GitHub
-- `roadmap item`：规划投影，优先是 GitHub Project item 的本地 mirror
+- `roadmap item`：规划投影，优先是 GitHub Project item 的本地 mirror / cache
 - `task`：execution record，本地真源
 - `flow`：runtime / delivery scene，本地真源
 
@@ -90,6 +114,7 @@ related_issues:
 本轮建议把桥接关系重新定义成“强锚点 + 弱锚点”：
 
 - `task` 的强锚点：`issue_refs + spec_standard/spec_ref`
+- 若一个 task 已有明确主闭环 issue，应在语义上视作存在一个 `task issue`
 - `roadmap_item_ids`：task 的弱锚点，可选规划桥接
 - `flow`：只消费已有 task，不再承担规划补洞
 
@@ -112,6 +137,11 @@ related_issues:
 - execution gate 真源
 - 比 GitHub 更高优先级的 issue hierarchy / dependency 解释权
 - 独立于 GitHub 的长期 issue registry
+
+补充提醒：
+
+- 当前阶段保留 `roadmap.json` 的主要理由是 query 性能、离线可读性、审计与恢复，而不是继续给 execution 提供身份真源。
+- 后续若运行证据证明 remote-first 直接查询已足够稳定，可以再决定是否逐步淘汰部分 cache 能力；本设计不预先承诺永久保留本地 roadmap cache。
 
 ## Local-First Exception
 
@@ -145,6 +175,7 @@ related_issues:
 
 - 大 issue 承担母题、范围和进度汇总
 - 小 issue 承担可独立关闭的具体交付单元
+- `task issue` 是这些 `repo issue` 中对某个 task 承担主交付锚点职责的那个 issue 角色
 - 一个 task 可以对应多个小 issue
 - 一个 task 不应直接等价于一个大 issue 的完整完成
 
@@ -220,7 +251,9 @@ parent issue 自动关闭不应在本轮作为核心契约：
 先把设计层冻结，而不是立即改 shell：
 
 - 明确 remote-first / local projection 的正式口径
+- 明确 `worktree != flow != branch`，并把 `worktrees.json` 从主模型真源降级为待清退兼容层
 - 明确 `task` 的强锚点改成 `issue_refs + spec_*`
+- 明确 `task issue` 只是 `repo issue` 的 execution role，不单独创造一类平行对象
 - 明确 local-first roadmap draft 只是显式例外
 
 ### Phase 1: Unblock execution from roadmap mirror

@@ -43,10 +43,11 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 `/vibe-continue` 默认按以下顺序恢复：
 
-1. `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
+1. 当前 `git` 现场（`git branch --show-current`、`git status --short`、必要时 `gh pr view`）
 2. `$(git rev-parse --git-common-dir)/vibe/registry.json`
 3. `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`
-4. `.agent/context/task.md`（如果存在）
+4. `$(git rev-parse --git-common-dir)/vibe/worktrees.json`（如果存在，只作兼容期辅助线索）
+5. `.agent/context/task.md`（如果存在）
 
 必要时再补充：
 
@@ -58,12 +59,15 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 ### Step 1: 识别当前目录承载的 flow 对应 task
 
-优先从共享 `worktrees.json`、`registry.json` 与 task detail 识别：
+优先从 `git` 现场、共享 `registry.json` 与 task detail 识别：
 
 - 当前 task
 - `next_step`
 - `plan_path`
 - 当前 runtime 绑定事实
+- `primary_issue_ref`（若存在，它就是 `task issue` 的显式落点）
+
+`worktrees.json` 若存在，只能作为兼容期 hint，不能先于 `registry.json` 抢占当前 task 识别权。
 
 如果共享真源中无法识别当前 task，不要把 `task.md` 直接抬升成替代真源；它只能作为本地 handoff 线索。
 
