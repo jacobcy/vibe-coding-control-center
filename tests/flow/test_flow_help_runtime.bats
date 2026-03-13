@@ -7,6 +7,8 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Usage:" ]]
   [[ "$output" =~ "vibe flow" ]]
+  [[ "$output" =~ "existing execution record" ]]
+  [[ "$output" =~ "不创建 planning object" ]]
   [[ "$output" =~ "new" ]]
   [[ "$output" =~ "bind" ]]
   [[ "$output" =~ "done" ]]
