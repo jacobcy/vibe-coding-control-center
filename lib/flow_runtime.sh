@@ -149,7 +149,7 @@ _flow_update_current_worktree_branch() {
   local new_branch="$1" wt_path wt_name common_dir worktrees_file tmp now
   wt_path="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
   wt_name="$(basename "$wt_path")"
-  common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
+  common_dir="$(vibe_git_dir 2>/dev/null)" || return 0
   worktrees_file="$common_dir/vibe/worktrees.json"
   [[ -f "$worktrees_file" ]] || return 0
   now="$(_flow_now_iso)"

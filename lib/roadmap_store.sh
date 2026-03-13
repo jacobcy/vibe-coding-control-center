@@ -9,10 +9,7 @@ _vibe_roadmap_require_file() {
 }
 
 _vibe_roadmap_common_dir() {
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        vibe_die "Not in a git repository"
-    fi
-    git rev-parse --git-common-dir
+    vibe_git_dir
 }
 
 _vibe_roadmap_file() {

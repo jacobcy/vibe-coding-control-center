@@ -60,3 +60,28 @@ vibe_delete_remote_branch() {
 }
 
 vibe_die() { echo "${RED}✗ $*${NC}" >&2; return 1; }
+
+# Worktree-aware git directory resolution with caching
+# Returns the common git directory (shared across worktrees)
+# Cached in VIBE_GIT_DIR environment variable for session performance
+vibe_git_dir() {
+    if [[ -n "${VIBE_GIT_DIR:-}" ]]; then
+        echo "$VIBE_GIT_DIR"
+        return 0
+    fi
+
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        vibe_die "Not in a git repository"
+        return 1
+    fi
+
+    local git_dir
+    git_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || {
+        vibe_die "Failed to resolve git directory"
+        return 1
+    }
+
+    # Cache for session-level performance
+    export VIBE_GIT_DIR="$git_dir"
+    echo "$git_dir"
+}

@@ -8,7 +8,7 @@ source "$VIBE_LIB/flow_review.sh"
 source "$VIBE_LIB/flow_pr.sh"
 source "$VIBE_LIB/task.sh"
 source "$VIBE_LIB/flow_runtime.sh"
-_flow_registry_file() { echo "$(git rev-parse --git-common-dir)/vibe/registry.json"; }
+_flow_registry_file() { echo "$(vibe_git_dir)/vibe/registry.json"; }
 _flow_task_title() { jq -r --arg tid "$1" '.tasks[]?|select(.task_id==$tid)|.title//empty' "$2"; }
 _flow_default_agent() { _detect_agent 2>/dev/null || echo "${VIBE_DEFAULT_TOOL:-claude}"; }
 _flow_normalize_branch_name() {
