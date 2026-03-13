@@ -24,8 +24,8 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "doc-text: glossary.md locks 'flow' as runtime container" {
-  run rg -n "task 的运行时容器" "$REPO_ROOT/docs/standards/glossary.md"
+@test "doc-text: glossary.md locks 'flow' as logical delivery scene" {
+  run rg -n "逻辑交付现场包装|execution scene" "$REPO_ROOT/docs/standards/glossary.md"
   [ "$status" -eq 0 ]
 }
 

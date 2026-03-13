@@ -1,41 +1,3 @@
-# Doc-Text Regression Tests Governance Implementation Plan
-
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Isolate documentation text regression tests from behavior tests, establish governance model, and cap unlimited growth.
-
-**Architecture:** Create separate test suite for doc-text regressions, define clear entry criteria and budget limits, establish new standards document, and migrate existing text tests to new structure.
-
-**Tech Stack:** Bats (Bash Automated Testing System), Ripgrep (rg), Zsh
-
----
-
-## Background
-
-Issue #134 identifies that `tests/skills/test_skills.bats` contains growing text-based tests that check for specific phrases in documentation files. These are mixed with actual behavior tests, creating confusion about TDD applicability and encouraging unlimited expansion.
-
-**Current Problems:**
-- Text tests and behavior tests mixed in same file
-- No entry criteria for adding new text tests
-- No budget/limit constraints
-- Risk of treating doc text changes as requiring TDD
-
-**Solution:**
-- Separate text regression tests into dedicated test suite
-- Define clear governance standard with entry criteria and budget
-- Create migration path for existing text tests
-- Document when text tests are appropriate vs. when to avoid them
-
----
-
-## Task 1: Create Doc-Text Test Governance Standard
-
-**Files:**
-- Create: `docs/standards/doc-text-test-governance.md`
-
-**Step 1: Create standard document with frontmatter**
-
-```markdown
 ---
 document_type: standard
 title: Doc-Text Regression Test Governance Standard
@@ -47,7 +9,7 @@ authority:
   - doc-text-test-separation
 author: Claude Sonnet 4.5
 created: 2026-03-13
-last_updated: 2026-03-13
+last_updated: 2026-03-14
 related_docs:
   - docs/standards/glossary.md
   - docs/standards/skill-standard.md
