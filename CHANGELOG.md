@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.30] - 2026-03-13
+
+### ✨ Changed
+- isolate serena gate runtime and codify serial split flow
+
 ## [2.1.29] - 2026-03-13
 
 ### ✨ Changed
