@@ -32,7 +32,6 @@ _flow_branch_exists() {
   git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name" || git ls-remote --exit-code --heads origin "$branch_name" >/dev/null 2>&1
 }
 _flow_is_main_worktree() { local d; d=$(basename "$PWD"); [[ "$d" =~ ^wt-[^-]+-.+$ ]] && return 1 || return 0; }
-_flow_shared_dir() { local d; d="$(git rev-parse --git-common-dir)/vibe/shared"; mkdir -p "$d"; echo "$d"; }
 _flow_branch_ref() {
   local branch_name="${1#origin/}"
   git show-ref --verify --quiet "refs/heads/$branch_name" && { echo "$branch_name"; return 0; }

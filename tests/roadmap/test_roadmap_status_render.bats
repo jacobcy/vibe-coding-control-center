@@ -13,6 +13,11 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [[ "$output" =~ "Version Goal: Complete shared-state standardization" ]]
   [[ "$output" =~ "P0 (urgent):      1" ]]
   [[ "$output" =~ "Current:          1" ]]
+  [[ "$output" =~ "Roadmap Item Summary:" ]]
+  [[ "$output" =~ "GitHub Project Mirror:" ]]
+  [[ "$output" =~ "Local Execution Bridge:" ]]
+  [[ "$output" =~ "Mirrored Items:" ]]
+  [[ "$output" =~ "Remote-only Imports:" ]]
   [[ ! "$output" =~ "Current Version:" ]]
   [[ ! "$output" =~ $'\033' ]]
 }
@@ -53,21 +58,6 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Roadmap sync recommended" ]]
   [[ "$output" =~ "vibe roadmap sync --provider github --json" ]]
-}
-
-@test "roadmap status text uses clarified layer labels" {
-  local fixture
-  fixture="$(mktemp -d)"
-  make_roadmap_fixture "$fixture"
-
-  run_roadmap_fixture_cmd_no_tty "$fixture" '_vibe_roadmap_status'
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "Roadmap Item Summary:" ]]
-  [[ "$output" =~ "GitHub Project Mirror:" ]]
-  [[ "$output" =~ "Local Execution Bridge:" ]]
-  [[ "$output" =~ "Mirrored Items:" ]]
-  [[ "$output" =~ "Remote-only Imports:" ]]
 }
 
 @test "roadmap list text output avoids repeating id when title matches id" {

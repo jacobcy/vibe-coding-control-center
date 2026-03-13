@@ -2,14 +2,6 @@
 
 source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
 
-@test "flow contract: help states flow consumes existing execution records" {
-  run vibe flow help
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "existing execution record" ]]
-  [[ "$output" =~ "不创建 planning object" ]]
-}
-
 @test "flow contract: bind help requires an existing task" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"

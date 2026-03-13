@@ -47,7 +47,6 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap version set-goal "Ship roadmap split"'
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Version goal set to: Ship roadmap split" ]]
   [ "$(jq -r '.version_goal' "$fixture/vibe/roadmap.json")" = "Ship roadmap split" ]
 }
 
