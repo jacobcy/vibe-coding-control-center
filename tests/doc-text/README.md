@@ -1,3 +1,16 @@
+---
+document_type: test-docs
+title: Doc-Text Regression Tests Documentation
+status: active
+author: Claude Sonnet 4.5
+created: 2026-03-13
+last_updated: 2026-03-13
+related_docs:
+  - docs/standards/doc-text-test-governance.md
+  - tests/README.md
+  - docs/standards/doc-quality-standards.md
+---
+
 # Doc-Text Regression Tests
 
 本目录包含文档文本回归测试，用于锁定关键语义和防止概念漂移。
