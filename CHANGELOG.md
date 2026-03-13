@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.32] - 2026-03-13
+
+### ✨ Changed
+- Retire worktrees.json runtime state from flow and task paths
+
 ## [2.1.31] - 2026-03-13
 
 ### ✨ Changed
