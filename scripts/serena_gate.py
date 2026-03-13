@@ -73,6 +73,7 @@ def main():
     report_file = os.environ["SERENA_REPORT_FILE"]
     project_name = os.environ["SERENA_PROJECT_NAME"]
     base_ref = os.environ["SERENA_BASE_REF"]
+    project_root = os.environ.get("SERENA_PROJECT_ROOT", ".")
 
     report = {
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -83,7 +84,7 @@ def main():
     }
 
     try:
-        agent = SerenaAgent(project=".")
+        agent = SerenaAgent(project=project_root)
         overview_tool = agent.get_tool_by_name("get_symbols_overview")
         references_tool = agent.get_tool_by_name("find_referencing_symbols")
         for relative_file in files:

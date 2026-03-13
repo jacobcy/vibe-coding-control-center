@@ -14,7 +14,7 @@ _vibe_roadmap_dependency_graph() {
     repo="$(_vibe_roadmap_current_repo)" || return 1
     owner="${repo%%/*}"
     name="${repo#*/}"
-    [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]] || return 1
+    [[ -n "$owner" && -n "$name" ]] || return 1
     response="$(gh api graphql -f query='query($owner:String!,$repo:String!,$num:Int!){repository(owner:$owner,name:$repo){issue(number:$num){id number title blockedBy(first:20){nodes{id number title}} blocking(first:20){nodes{id number title}}}}}' -F owner="$owner" -F repo="$name" -F num="$issue_number" 2>/dev/null)" || {
         echo "Error: Failed to query GitHub issue dependency graph"
         return 1

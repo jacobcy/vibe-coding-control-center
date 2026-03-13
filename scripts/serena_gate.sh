@@ -112,6 +112,7 @@ resolve_serena_site_packages() {
 
 run_serena_python() {
   SERENA_HOME="$SERENA_RUNTIME_HOME" \
+  SERENA_PROJECT_ROOT="$ROOT" \
   "$SERENA_ARCHIVE_ROOT/bin/python3" "$ROOT/scripts/serena_gate.py"
 }
 

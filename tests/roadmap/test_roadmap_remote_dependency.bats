@@ -29,6 +29,33 @@ JSON
   [ "$(echo "$output" | jq -r '.blockedBy.nodes[0].number')" = "137" ]
 }
 
+@test "roadmap dep show accepts repos whose owner and name match" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run_roadmap_fixture_cmd "$fixture" '
+    _vibe_roadmap_current_repo() { echo "rails/rails"; }
+    gh() {
+      if [[ "$1 $2" == "auth status" ]]; then
+        return 0
+      fi
+      if [[ "$1 $2 $3" == "api graphql -f" ]]; then
+        cat <<'"'"'JSON'"'"'
+{"data":{"repository":{"issue":{"id":"ISSUE_138","number":138,"title":"Issue 138","blockedBy":{"nodes":[]},"blocking":{"nodes":[]}}}}}
+JSON
+        return 0
+      fi
+      echo "unexpected gh call: $*" >&2
+      return 98
+    }
+    vibe_roadmap dep show --issue 138 --json
+  '
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.number')" = "138" ]
+}
+
 @test "roadmap dep add mutates remote dependency relation" {
   local fixture
   fixture="$(mktemp -d)"

@@ -102,3 +102,48 @@ EOF
   [[ "$output" =~ "Serena gate: wrote" ]]
   [ "$(jq -r '.summary.files' "$fixture/.agent/reports/serena-impact.json")" = "1" ]
 }
+
+@test "serena gate python uses repository root when invoked from subdirectory" {
+  local fixture package_dir out_file
+  fixture="$(mktemp -d)"
+  package_dir="$fixture/pkg/serena"
+  out_file="$fixture/project.txt"
+  mkdir -p "$package_dir" "$fixture/subdir"
+
+  cat > "$package_dir/agent.py" <<'EOF'
+import os
+
+
+class _Tool:
+    def apply(self, **kwargs):
+        if "name_path" in kwargs:
+            return "[]"
+        return '{"kind": 12, "name_path": "demo"}'
+
+
+class SerenaAgent:
+    def __init__(self, project):
+        with open(os.environ["SERENA_AGENT_PROJECT_LOG"], "w", encoding="utf-8") as handle:
+            handle.write(project)
+
+    def get_tool_by_name(self, name):
+        return _Tool()
+
+    def execute_task(self, fn):
+        return fn()
+EOF
+
+  run env \
+    PYTHONPATH="$fixture/pkg" \
+    SERENA_TARGET_FILES_JSON='["foo.sh"]' \
+    SERENA_REPORT_FILE="$fixture/report.json" \
+    SERENA_PROJECT_NAME="fixture" \
+    SERENA_BASE_REF="main...HEAD" \
+    SERENA_PROJECT_ROOT="$fixture" \
+    SERENA_AGENT_PROJECT_LOG="$out_file" \
+    python3 "$REPO_ROOT/scripts/serena_gate.py"
+
+  [ "$status" -eq 0 ]
+  [ "$(cat "$out_file")" = "$fixture" ]
+  [ "$(jq -r '.summary.files' "$fixture/report.json")" = "1" ]
+}
