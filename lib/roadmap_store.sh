@@ -134,15 +134,3 @@ _vibe_roadmap_get_version_goal() {
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     jq -r '.version_goal // empty' "$roadmap_file"
 }
-
-_vibe_roadmap_has_version_goal() {
-    local common_dir="$1" version_goal
-    version_goal="$(_vibe_roadmap_get_version_goal "$common_dir")"
-    [[ -n "$version_goal" ]]
-}
-
-_vibe_roadmap_get_current_issues() {
-    local common_dir="$1" roadmap_file
-    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
-    jq -c '[.items[]? | select(.status == "current" or .status == "p0")]' "$roadmap_file"
-}
