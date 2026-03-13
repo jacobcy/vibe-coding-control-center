@@ -76,13 +76,6 @@ vibe task update <task-id> --next-step <step>
 
 **修改位置**：`~/.claude/settings.json` → `hooks.PreToolUse[3]`
 
-### CI 配置调整
-
-**LOC 限制**：1200 → 1500 行
-
-**修改文件**：`scripts/metrics.sh`
-
-**当前状态**：1305 行 < 1500 行 ✅
 
 ### 文件拆分优化
 

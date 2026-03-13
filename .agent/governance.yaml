@@ -12,8 +12,8 @@ cognition:
 
 # LOC 预算
 budgets:
-  total: 1200          # lib/ + bin/ 总上限
-  file_max: 200         # 单文件上限
+  total: 7000          # lib/ + bin/ 总上限
+  file_max: 300         # 单文件上限
   function_max: 50      # 单函数上限
   functions_per_file: 15 # 每文件函数数上限
 

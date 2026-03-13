@@ -43,7 +43,7 @@ Evaluate the documentation against the following checklist:
 
 1. **Completeness**: Are `docs/prds/` following standard conventions (Background, Goals, Acceptance Criteria)?
 2. **Language & Clarity**: Is the writing concise? Remove overly generic AI-speak ("In today's fast-paced digital world...").
-3. **Accuracy**: Do the documented CLI commands and architecture limits (e.g., 1200 LOC limit) match `CLAUDE.md` and `DEVELOPER.md`?
+3. **Accuracy**: Do the documented CLI commands and architecture limits (e.g., 7000 LOC limit) match `CLAUDE.md` and `DEVELOPER.md`?
 4. **Git Constraints**: Are we strictly distinguishing `.agents/` (disposable global tools directory) from `.agent/` (managed project-specific workflows)?
 
 ## 3. Output: The Doc Review Report

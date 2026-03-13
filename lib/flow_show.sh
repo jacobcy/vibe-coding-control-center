@@ -10,10 +10,16 @@ _flow_show_resolve_target() {
 }
 
 _flow_show_open_record() {
-  local target="$1" candidate_branch
+  local target="$1" candidate_branch open_status
   candidate_branch="$(_flow_switch_target_branch "$target")"
-  _flow_branch_dashboard_entry "$candidate_branch" 2>/dev/null && return 0
-  [[ "$candidate_branch" != "$target" ]] && _flow_branch_dashboard_entry "$target" 2>/dev/null && return 0
+  _flow_branch_dashboard_entry "$candidate_branch" && return 0
+  open_status=$?
+  [[ "$open_status" -ne 1 ]] && return "$open_status"
+  if [[ "$candidate_branch" != "$target" ]]; then
+    _flow_branch_dashboard_entry "$target" && return 0
+    open_status=$?
+    [[ "$open_status" -ne 1 ]] && return "$open_status"
+  fi
   return 1
 }
 
@@ -30,7 +36,11 @@ _flow_show() {
   done
   target="$(_flow_show_resolve_target "$target")" || { log_error "Unable to resolve current flow."; return 1; }
   record="$(_flow_show_open_record "$target")"
-  [[ -z "$record" ]] && record="$(_flow_history_show "$target")"
+  local open_status=$?
+  if [[ "$open_status" -ne 0 && "$open_status" -ne 1 ]]; then
+    return "$open_status"
+  fi
+  [[ -z "$record" && "$open_status" -eq 1 ]] && record="$(_flow_history_show "$target")"
   [[ -n "$record" ]] || { log_error "Flow not found: $target"; return 1; }
   current_task="$(echo "$record" | jq -r '.current_task // empty')"
   if [[ -n "$current_task" ]]; then

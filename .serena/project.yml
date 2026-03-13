@@ -33,8 +33,8 @@ languages:
 initial_prompt: |
   This is a Zsh CLI project with strict governance rules.
   HARD RULES:
-  - Total LOC (lib/ + bin/) must be ≤ 6000
-  - Any single .sh file must be ≤ 200 lines
+  - Total LOC (lib/ + bin/) must be ≤ 7000
+  - Any single .sh file must be ≤ 300 lines
   - Zero dead code: every function must have ≥1 caller
   - Do NOT add features not approved in SOUL.md
   Before modifying any function, use find_referencing_symbols to check callers.

@@ -157,30 +157,22 @@ _flow_branch_dashboard_entry() {
   worktrees_file="$(git rev-parse --git-common-dir)/vibe/worktrees.json"
   registry_file="$(_flow_registry_file)"
   branch_name="${branch#origin/}"
-  wt_data="$(jq -c --arg branch "$branch_name" '
-    .worktrees[]?
-    | select((.branch // "") == $branch or (.branch // "") == ("origin/" + $branch))
-  ' "$worktrees_file" 2>/dev/null | head -n 1)"
-  current_task="$(printf '%s' "$wt_data" | jq -r '.current_task // empty' 2>/dev/null)"
-  tasks_json="$(printf '%s' "$wt_data" | jq -c '.tasks // []' 2>/dev/null)"
+  if [[ -f "$worktrees_file" ]]; then
+    wt_data="$(jq -c --arg branch "$branch_name" '
+      .worktrees[]?
+      | select((.branch // "") == $branch or (.branch // "") == ("origin/" + $branch))
+    ' "$worktrees_file" 2>/dev/null | head -n 1)"
+  fi
+  current_task="$(_vibe_task_branch_focus_task_id "$branch_name" "$registry_file")" || return $?
+  tasks_json="$(_vibe_task_branch_active_task_ids_json "$branch_name" "$registry_file")" || return $?
   [[ -z "$tasks_json" ]] && tasks_json='[]'
 
   if [[ -z "$current_task" ]]; then
-    current_task="$(jq -r --arg branch "$branch_name" '
-      .tasks[]?
-      | select((.status // "") != "completed" and (.status // "") != "archived")
-      | select((.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch))
-      | .task_id
-    ' "$registry_file" 2>/dev/null | head -n 1)"
+    current_task="$(printf '%s' "$wt_data" | jq -r '.current_task // empty' 2>/dev/null)"
   fi
 
   if [[ "$tasks_json" == "[]" ]]; then
-    tasks_json="$(jq -c --arg branch "$branch_name" '
-      [.tasks[]?
-        | select((.status // "") != "completed" and (.status // "") != "archived")
-        | select((.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch))
-        | .task_id]
-    ' "$registry_file" 2>/dev/null)"
+    tasks_json="$(printf '%s' "$wt_data" | jq -c '.tasks // []' 2>/dev/null)"
     [[ -z "$tasks_json" ]] && tasks_json='[]'
   fi
 

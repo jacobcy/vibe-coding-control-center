@@ -29,7 +29,7 @@ setup() {
 }
 
 @test "review-code uses current LOC threshold" {
-  run grep -F "bin/ + lib/ <= 6000 LOC" \
+  run grep -F "bin/ + lib/ <= 7000 LOC" \
     "$REPO_ROOT/skills/vibe-review-code/SKILL.md"
   [ "$status" -eq 0 ]
 }

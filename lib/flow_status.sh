@@ -11,16 +11,15 @@ _flow_open_dashboard_json() {
   git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
   worktrees_file="$git_common_dir/vibe/worktrees.json"
   registry_file="$git_common_dir/vibe/registry.json"
-  [[ -f "$worktrees_file" ]] || return 1
   while IFS= read -r branch; do
     [[ -n "$branch" ]] || continue
     [[ "$branch" == "main" || "$branch" == "master" ]] && continue
     local record
-    record="$(_flow_branch_dashboard_entry "$branch" 2>/dev/null || true)"
+    record="$(_flow_branch_dashboard_entry "$branch")" || return $?
     [[ -n "$record" ]] && lines+="$record"$'\n'
   done < <(
     {
-      jq -r '.worktrees[]? | select((.branch // "") != "" and (.status // "active") != "missing") | .branch' "$worktrees_file" 2>/dev/null
+      [[ -f "$worktrees_file" ]] && jq -r '.worktrees[]? | select((.branch // "") != "" and (.status // "active") != "missing") | .branch' "$worktrees_file" 2>/dev/null
       [[ -f "$registry_file" ]] && jq -r '
         .tasks[]?
         | select((.status // "") != "completed" and (.status // "") != "archived")

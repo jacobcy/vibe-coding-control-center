@@ -106,3 +106,44 @@ JSON
   [ "$status" -eq 0 ]
   [ "$output" -eq 3 ]
 }
+
+@test "task list json: works without worktrees.json when registry runtime_branch exists" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{"schema_version":"v1","tasks":[
+  {
+    "task_id":"task-1",
+    "title":"Task One",
+    "status":"in_progress",
+    "source_type":"local",
+    "source_refs":[],
+    "roadmap_item_ids":[],
+    "issue_refs":[],
+    "related_task_ids":[],
+    "subtasks":[],
+    "runtime_branch":"feature/test",
+    "created_at":"2026-03-13T10:00:00+08:00",
+    "updated_at":"2026-03-13T10:00:00+08:00"
+  }
+]}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    git() {
+      case "$*" in
+        "rev-parse --is-inside-work-tree") echo true; return 0 ;;
+        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
+        "rev-parse --show-toplevel") echo "'"$fixture"'"; return 0 ;;
+        "branch --show-current") echo "feature/test"; return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    _vibe_task_list --json
+  '
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.tasks[0].task_id')" = "task-1" ]
+  [ "$(echo "$output" | jq -r '.worktrees | length')" -eq 0 ]
+}

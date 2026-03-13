@@ -2,6 +2,7 @@
 # lib/check.sh - Shared-state audits and schema checks
 
 [[ -f "$VIBE_LIB/check_pr_status.sh" ]] && source "$VIBE_LIB/check_pr_status.sh"
+[[ -f "$VIBE_LIB/check_groups_link.sh" ]] && source "$VIBE_LIB/check_groups_link.sh"
 [[ -f "$VIBE_LIB/check_groups.sh" ]] && source "$VIBE_LIB/check_groups.sh"
 
 _vibe_check_help() {

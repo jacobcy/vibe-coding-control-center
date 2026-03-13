@@ -29,7 +29,7 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "Rotate Workflow Refinement" ]]
 }
 
-@test "8. vibe flow bind in feature worktree updates worktrees.json with tasks array" {
+@test "8. vibe flow bind in feature worktree does not mutate legacy worktrees.json state" {
   local fixture
   fixture="$(mktemp -d)"
   make_flow_task_fixture "$fixture"
@@ -43,11 +43,12 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
       if [[ "$1" == "rev-parse" && "$2" == "--git-common-dir" ]]; then echo "'"$fixture"'"; return 0; fi
       if [[ "$1" == "rev-parse" && "$2" == "--is-inside-work-tree" ]]; then return 0; fi
       if [[ "$1" == "rev-parse" && "$2" == "--show-toplevel" ]]; then echo "'"$fixture"'/wt-claude-refactor"; return 0; fi
+      if [[ "$1" == "branch" && "$2" == "--show-current" ]]; then echo "task/feature-branch"; return 0; fi
       if [[ "$1" == "config" ]]; then return 0; fi
       return 0
     }
     _flow_bind 2026-03-02-rotate-alignment
-    jq -e ".worktrees[] | select(.worktree_name == \"wt-claude-refactor\") | .tasks | index(\"2026-03-02-rotate-alignment\")" "'"$fixture"'/vibe/worktrees.json" >/dev/null
+    jq -e "(.worktrees | length) == 0" "'"$fixture"'/vibe/worktrees.json" >/dev/null
   '
 
   [ "$status" -eq 0 ]
@@ -248,6 +249,41 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
 }
 
+@test "11.1b _flow_done blocks ambiguous branch focus before closeout" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 0; }
+    _flow_branch_dashboard_entry() {
+      echo "Multiple active tasks are bound to branch '\''feature-branch'\'': task-a, task-b" >&2
+      return 2
+    }
+    _flow_history_close() { echo "HISTORY_CLOSED"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
+    _flow_close_branch_tasks() { echo "TASKS_CLOSED"; return 0; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "other-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..feature-branch") echo ""; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done --branch feature-branch
+  '
+  [ "$status" -eq 2 ]
+  [[ "$output" =~ "Multiple active tasks" ]]
+  [[ ! "$output" =~ "HISTORY_CLOSED" ]]
+  [[ ! "$output" =~ "RUNTIME_CLOSED" ]]
+  [[ ! "$output" =~ "TASKS_CLOSED" ]]
+}
+
 @test "11.2 _flow_done accepts squash-merged PR state even when branch ancestry diverges" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
@@ -329,6 +365,8 @@ JSON
   [ "$(jq -r '.flows[0].state' "$fixture/vibe/flow-history.json")" = "closed" ]
   [ "$(jq -r '.flows[0].feature' "$fixture/vibe/flow-history.json")" = "feature-branch" ]
   [ "$(jq -r '.worktrees[0].branch // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
+  [ "$(jq -r '.worktrees[0].current_task // "null"' "$fixture/vibe/worktrees.json")" = "null" ]
+  [ "$(jq -r '.worktrees[0].tasks | length' "$fixture/vibe/worktrees.json")" = "0" ]
   [ "$(jq -r '.tasks[0].runtime_branch // "null"' "$fixture/vibe/registry.json")" = "null" ]
   [ "$(jq -r '.tasks[0].runtime_worktree_name // "null"' "$fixture/vibe/registry.json")" = "null" ]
 }

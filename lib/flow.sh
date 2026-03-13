@@ -234,7 +234,11 @@ _flow_done() {
     return 1
   fi
 
-  flow_record="$(_flow_branch_dashboard_entry "$branch_name" 2>/dev/null || true)"
+  flow_record="$(_flow_branch_dashboard_entry "$branch_name")"
+  local flow_record_status=$?
+  if [[ "$flow_record_status" -ne 0 && "$flow_record_status" -ne 1 ]]; then
+    return "$flow_record_status"
+  fi
   if [[ -n "$flow_record" ]]; then
     tasks_json="$(echo "$flow_record" | jq -c '.tasks // []')"
     current_task="$(echo "$flow_record" | jq -r '.current_task // empty')"

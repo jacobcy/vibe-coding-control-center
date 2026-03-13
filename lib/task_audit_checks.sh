@@ -32,15 +32,32 @@ _task_check_branch_registration() {
   local -a unregistered_branches
   local line wt_name branch pattern
 
-  while IFS= read -r line; do
-    wt_name=$(echo "$line" | cut -d'|' -f1)
-    branch=$(echo "$line" | cut -d'|' -f2)
-    pattern=$(_task_extract_branch_pattern "$branch")
+  if [[ -f "$worktrees_file" ]]; then
+    while IFS= read -r line; do
+      wt_name=$(echo "$line" | cut -d'|' -f1)
+      branch=$(echo "$line" | cut -d'|' -f2)
+      pattern=$(_task_extract_branch_pattern "$branch")
 
-    if [[ -n "$pattern" ]] && ! _task_is_branch_registered "$pattern" "$registry_file"; then
-      unregistered_branches+=("$wt_name|$branch|$pattern")
-    fi
-  done < <(jq -r '.worktrees[]? | select(.branch != null and .branch != "") | "\(.worktree_name)|\(.branch)"' "$worktrees_file" 2>/dev/null)
+      if [[ -n "$pattern" ]] && ! _task_is_branch_registered "$pattern" "$registry_file"; then
+        unregistered_branches+=("$wt_name|$branch|$pattern")
+      fi
+    done < <(jq -r '.worktrees[]? | select(.branch != null and .branch != "") | "\(.worktree_name)|\(.branch)"' "$worktrees_file" 2>/dev/null)
+  else
+    while IFS= read -r line; do
+      wt_name=$(echo "$line" | cut -d'|' -f1)
+      branch=$(echo "$line" | cut -d'|' -f2)
+      pattern=$(_task_extract_branch_pattern "$branch")
+
+      if [[ -n "$pattern" ]] && ! _task_is_branch_registered "$pattern" "$registry_file"; then
+        unregistered_branches+=("$wt_name|$branch|$pattern")
+      fi
+    done < <(jq -r '
+      .tasks[]?
+      | select((.status // "") != "completed" and (.status // "") != "archived")
+      | select((.runtime_branch // "") != "")
+      | "\(.runtime_worktree_name // "registry-runtime")|\(.runtime_branch)"
+    ' "$registry_file" 2>/dev/null | awk '!seen[$0]++')
+  fi
 
   [[ ${#unregistered_branches[@]} -eq 0 ]] && return 0
 

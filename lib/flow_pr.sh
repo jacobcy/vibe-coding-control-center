@@ -1,8 +1,19 @@
 #!/usr/bin/env zsh
 
 _flow_pr_bound_spec_ref() {
-  local flow_record current_task spec_ref
-  flow_record="$(_flow_show --json 2>/dev/null || true)"
+  local flow_record current_task spec_ref err_file err_text
+  err_file="$(mktemp)" || return 1
+  flow_record="$(_flow_show --json 2>"$err_file")"
+  if [[ $? -ne 0 ]]; then
+    err_text="$(cat "$err_file" 2>/dev/null)"
+    rm -f "$err_file"
+    if [[ "$err_text" == *"Multiple active tasks are bound to branch"* ]]; then
+      print -r -- "$err_text" >&2
+      return 1
+    fi
+    return 0
+  fi
+  rm -f "$err_file"
   [[ -n "$flow_record" ]] || return 0
 
   current_task="$(print -r -- "$flow_record" | jq -r '.current_task // empty' 2>/dev/null)"
