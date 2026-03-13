@@ -54,6 +54,45 @@ JSON
   ! echo "$output" | grep -F "task-completed"
 }
 
+@test "render: default view preserves runtime-bound tasks when worktrees.json is absent" {
+  local fixture; fixture="$(mktemp -d)"
+  mkdir -p "$fixture/vibe"
+  cat > "$fixture/vibe/registry.json" <<'JSON'
+{
+  "schema_version": "v2",
+  "tasks": [
+    {
+      "task_id": "task-runtime",
+      "title": "Runtime Task",
+      "status": "in_progress",
+      "source_type": "local",
+      "source_refs": [],
+      "roadmap_item_ids": [],
+      "issue_refs": [],
+      "related_task_ids": [],
+      "subtasks": [],
+      "runtime_worktree_name": "wt-runtime",
+      "runtime_worktree_path": "/tmp/wt-runtime",
+      "runtime_branch": "task/runtime",
+      "created_at": "2026-03-08T10:00:00+08:00",
+      "updated_at": "2026-03-08T10:00:00+08:00"
+    }
+  ]
+}
+JSON
+
+  run zsh -c '
+    source "'"$HELPER"'"
+    setup_task_env
+    mock_git_registry "'"$fixture"'"
+    cd "'"$fixture"'"
+    vibe_task
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "task-runtime" ]]
+  [[ "$output" =~ "wt-runtime" ]]
+}
+
 @test "render: vibe_task list supports --status/--source/--keywords filters" {
   local fixture; fixture="$(mktemp -d)"
   mkdir -p "$fixture/vibe"

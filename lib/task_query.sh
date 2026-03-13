@@ -161,6 +161,9 @@ _vibe_task_list() {
         [[ "$cleanup_worktrees_source" == "1" ]] && rm -f "$worktrees_source"
         return 0
     fi
+    if [[ "$cleanup_worktrees_source" == "1" ]]; then
+        jq -nc --slurpfile reg "$registry_file" '{schema_version:"v1", worktrees: ([($reg[0].tasks // []) | map(select((.status // "") != "completed" and (.status // "") != "archived")) | map(select((.runtime_worktree_name // .assigned_worktree // "") != "")) | group_by(.runtime_worktree_name // .assigned_worktree) | .[] | {worktree_name:(.[0].runtime_worktree_name // .[0].assigned_worktree), worktree_path:(.[0].runtime_worktree_path // null), branch:(.[0].runtime_branch // null), current_task:null, tasks:(map(.task_id) | unique), status:"active"}])}' > "$worktrees_source"
+    fi
     local cur_tid="" current_branch="" repo_root wt_name
     current_branch="$(git branch --show-current 2>/dev/null || echo "")"
     repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"; wt_name="$(basename "$repo_root")"

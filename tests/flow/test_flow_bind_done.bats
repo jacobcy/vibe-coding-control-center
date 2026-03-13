@@ -249,6 +249,41 @@ source "$BATS_TEST_DIRNAME/../helpers/flow_common.bash"
   [[ "$output" =~ "DELETE_LOCAL:feature-branch:force" ]]
 }
 
+@test "11.1b _flow_done blocks ambiguous branch focus before closeout" {
+  run zsh -c '
+    source "'"$VIBE_ROOT"'/lib/config.sh"
+    source "'"$VIBE_ROOT"'/lib/utils.sh"
+    source "'"$VIBE_ROOT"'/lib/flow.sh"
+    _flow_branch_ref() { echo "feature-branch"; }
+    _flow_history_has_closed_feature() { return 1; }
+    _flow_branch_has_pr() { return 0; }
+    _flow_branch_pr_merged() { return 0; }
+    _flow_branch_dashboard_entry() {
+      echo "Multiple active tasks are bound to branch '\''feature-branch'\'': task-a, task-b" >&2
+      return 2
+    }
+    _flow_history_close() { echo "HISTORY_CLOSED"; return 0; }
+    _flow_close_branch_runtime() { echo "RUNTIME_CLOSED"; return 0; }
+    _flow_close_branch_tasks() { echo "TASKS_CLOSED"; return 0; }
+    git() {
+      case "$*" in
+        "branch --show-current") echo "other-branch"; return 0 ;;
+        "status --porcelain") echo ""; return 0 ;;
+        "fetch origin main --quiet") return 0 ;;
+        "rev-list origin/main..feature-branch") echo ""; return 0 ;;
+        *) return 0 ;;
+      esac
+    }
+    _flow_is_main_worktree() { return 1; }
+    _flow_done --branch feature-branch
+  '
+  [ "$status" -eq 2 ]
+  [[ "$output" =~ "Multiple active tasks" ]]
+  [[ ! "$output" =~ "HISTORY_CLOSED" ]]
+  [[ ! "$output" =~ "RUNTIME_CLOSED" ]]
+  [[ ! "$output" =~ "TASKS_CLOSED" ]]
+}
+
 @test "11.2 _flow_done accepts squash-merged PR state even when branch ancestry diverges" {
   run zsh -c '
     source "'"$VIBE_ROOT"'/lib/config.sh"
