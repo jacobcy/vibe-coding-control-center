@@ -98,6 +98,7 @@ _vibe_roadmap_new_item() {
             source_type: $source_type,
             source_refs: $source_refs,
             issue_refs: $issue_refs,
+            depends_on_item_ids: [],
             linked_task_ids: [],
             github_project_item_id: null,
             content_type: "draft_issue",

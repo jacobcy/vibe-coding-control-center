@@ -37,6 +37,9 @@ _run_roadmap_cmd() {
       esac
 
       if [[ \"\$1 \$2 \$3 \$4\" == \"pr list --state merged\" ]]; then
+        if [[ -f \"$fixture/gh_merged_prs_fail\" ]]; then
+          return 1
+        fi
         if [[ -f \"$fixture/gh_merged_prs.json\" ]]; then
           cat \"$fixture/gh_merged_prs.json\"
           return 0

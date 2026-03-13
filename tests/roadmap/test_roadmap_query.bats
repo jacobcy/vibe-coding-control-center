@@ -214,3 +214,27 @@ JSON
   [ "$(echo "$output" | jq -r '.dependency_status.blockers[0].roadmap_item_id')" = "rm-1" ]
   [ "$(echo "$output" | jq -r '.dependency_status.blockers[0].reason')" = "merge_status_unavailable" ]
 }
+
+@test "gh merged pr lookup failure reports merge_status_unavailable" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+
+  jq '.items[1].depends_on_item_ids = ["rm-1"]' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  jq '.tasks = [{"task_id":"task-1","roadmap_item_ids":["rm-1"],"pr_ref":"123","status":"completed"}]' "$fixture/vibe/registry.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/registry.json"
+
+  : > "$fixture/gh_auth_ok"
+  : > "$fixture/gh_merged_prs_fail"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap show rm-2 --json'
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.dependency_status.blocked')" = "true" ]
+  [ "$(echo "$output" | jq '.dependency_status.blockers | length')" -eq 1 ]
+  [ "$(echo "$output" | jq -r '.dependency_status.blockers[0].roadmap_item_id')" = "rm-1" ]
+  [ "$(echo "$output" | jq -r '.dependency_status.blockers[0].reason')" = "merge_status_unavailable" ]
+}

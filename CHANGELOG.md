@@ -3,7 +3,7 @@
 ## [2.1.28] - 2026-03-12
 
 ### ✨ Changed
-- show roadmap dependency blockers and ready state
+- feat(roadmap): show roadmap dependency blockers and ready state
 
 ## [2.1.27] - 2026-03-12
 
