@@ -75,6 +75,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [[ "$output" =~ "Roadmap item added:" ]]
   [[ "$output" =~ "Local roadmap item" ]]
   [ "$(jq -r '.items[] | select(.title=="Local roadmap item") | .source_type' "$fixture/vibe/roadmap.json")" = "local" ]
+  [ "$(jq -c '.items[] | select(.title=="Local roadmap item") | .depends_on_item_ids' "$fixture/vibe/roadmap.json")" = "[]" ]
 }
 
 @test "roadmap add --help shows usage without creating a roadmap item" {

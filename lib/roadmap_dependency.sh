@@ -5,17 +5,26 @@
 
 _vibe_roadmap_merged_prs_json() {
     if [[ -n "${_VIBE_ROADMAP_MERGED_PRS_JSON:-}" ]]; then
-        echo "$_VIBE_ROADMAP_MERGED_PRS_JSON"
-        return 0
+        print -r -- "$_VIBE_ROADMAP_MERGED_PRS_JSON"
+        [[ "${_VIBE_ROADMAP_MERGED_PRS_JSON_VALID:-false}" == "true" ]]
+        return $?
     fi
 
     if _check_gh_available; then
         _VIBE_ROADMAP_MERGED_PRS_JSON="$(_get_merged_prs 1000)"
+        if print -r -- "$_VIBE_ROADMAP_MERGED_PRS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+            _VIBE_ROADMAP_MERGED_PRS_JSON_VALID="true"
+        else
+            _VIBE_ROADMAP_MERGED_PRS_JSON='[]'
+            _VIBE_ROADMAP_MERGED_PRS_JSON_VALID="false"
+        fi
     else
         _VIBE_ROADMAP_MERGED_PRS_JSON='[]'
+        _VIBE_ROADMAP_MERGED_PRS_JSON_VALID="false"
     fi
 
-    echo "$_VIBE_ROADMAP_MERGED_PRS_JSON"
+    print -r -- "$_VIBE_ROADMAP_MERGED_PRS_JSON"
+    [[ "$_VIBE_ROADMAP_MERGED_PRS_JSON_VALID" == "true" ]]
 }
 
 _vibe_roadmap_has_dependency_item() {
@@ -41,29 +50,33 @@ _vibe_roadmap_pr_is_merged() {
     local pr_ref="${1#\#}" merged_prs_json
     [[ -n "$pr_ref" ]] || return 1
 
-    merged_prs_json="$(_vibe_roadmap_merged_prs_json)"
-    echo "$merged_prs_json" | jq -e --arg ref "$pr_ref" '.[]? | select((.number | tostring) == $ref)' >/dev/null 2>&1
+    merged_prs_json="$(_vibe_roadmap_merged_prs_json)" || return 2
+    print -r -- "$merged_prs_json" | jq -e --arg ref "$pr_ref" '.[]? | select((.number | tostring) == $ref)' >/dev/null 2>&1
 }
 
 _vibe_roadmap_compute_dependency_status() {
     local common_dir="$1" item_id="$2"
-    local roadmap_file registry_file depends_on blockers_json blocker_count gh_available
+    local roadmap_file registry_file depends_on blockers_json blocker_count gh_available merged_prs_ready
 
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     registry_file="$common_dir/vibe/registry.json"
     depends_on="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id) | .depends_on_item_ids // []' "$roadmap_file")"
     gh_available="false"
+    merged_prs_ready="false"
     if _check_gh_available; then
         gh_available="true"
+        if _vibe_roadmap_merged_prs_json >/dev/null; then
+            merged_prs_ready="true"
+        fi
     fi
 
-    if [[ "$(echo "$depends_on" | jq 'length')" -eq 0 ]]; then
+    if [[ "$(print -r -- "$depends_on" | jq 'length')" -eq 0 ]]; then
         jq -n '{ready: true, blocked: false, blockers: []}'
         return 0
     fi
 
     blockers_json="$(
-        echo "$depends_on" | jq -r '.[]' | while read -r dep_id; do
+        print -r -- "$depends_on" | jq -r '.[]' | while read -r dep_id; do
             local matched_pr_refs has_merged_pr
 
             if ! _vibe_roadmap_has_dependency_item "$roadmap_file" "$dep_id"; then
@@ -78,6 +91,11 @@ _vibe_roadmap_compute_dependency_status() {
             fi
 
             if [[ "$gh_available" != "true" ]]; then
+                jq -c -n --arg id "$dep_id" '{roadmap_item_id: $id, reason: "merge_status_unavailable"}'
+                continue
+            fi
+
+            if [[ "$merged_prs_ready" != "true" ]]; then
                 jq -c -n --arg id "$dep_id" '{roadmap_item_id: $id, reason: "merge_status_unavailable"}'
                 continue
             fi
@@ -97,11 +115,11 @@ _vibe_roadmap_compute_dependency_status() {
         done | jq -s '. | map(select(. != null))'
     )"
 
-    blocker_count="$(echo "$blockers_json" | jq 'length')"
+    blocker_count="$(print -r -- "$blockers_json" | jq 'length')"
     if [[ "$blocker_count" -eq 0 ]]; then
         jq -n '{ready: true, blocked: false, blockers: []}'
     else
-        echo "$blockers_json" | jq -c '{ready: false, blocked: true, blockers: .}'
+        print -r -- "$blockers_json" | jq -c '{ready: false, blocked: true, blockers: .}'
     fi
 }
 
@@ -118,15 +136,15 @@ _vibe_roadmap_status_with_dependency_counts() {
         fi
     done < <(jq -r '.items[].roadmap_item_id' "$roadmap_file")
 
-    echo "$status_json" | jq -c --argjson ready "$dependency_ready" --argjson blocked "$dependency_blocked" '
+    print -r -- "$status_json" | jq -c --argjson ready "$dependency_ready" --argjson blocked "$dependency_blocked" '
         . + {dependency_counts: {ready: $ready, blocked: $blocked}}
     '
 }
 
 _vibe_roadmap_render_dependency_summary() {
     local status_json="$1" dep_ready dep_blocked
-    dep_ready="$(echo "$status_json" | jq -r '.dependency_counts.ready')"
-    dep_blocked="$(echo "$status_json" | jq -r '.dependency_counts.blocked')"
+    dep_ready="$(print -r -- "$status_json" | jq -r '.dependency_counts.ready')"
+    dep_blocked="$(print -r -- "$status_json" | jq -r '.dependency_counts.blocked')"
 
     echo "Dependency Status:"
     if _vibe_roadmap_supports_color; then
@@ -143,8 +161,8 @@ _vibe_roadmap_render_item_dependency_status() {
     local dependency_status="$1"
     local dep_ready dep_blockers
 
-    dep_ready="$(echo "$dependency_status" | jq -r '.ready')"
-    dep_blockers="$(echo "$dependency_status" | jq -r '.blockers')"
+    dep_ready="$(print -r -- "$dependency_status" | jq -r '.ready')"
+    dep_blockers="$(print -r -- "$dependency_status" | jq -r '.blockers')"
 
     if [[ "$dep_ready" == "true" ]]; then
         echo "Dependency Status: $(_vibe_roadmap_format "$GREEN" "ready")"
@@ -152,7 +170,7 @@ _vibe_roadmap_render_item_dependency_status() {
         echo "Dependency Status: $(_vibe_roadmap_format "$RED" "blocked")"
         echo ""
         echo "Blockers:"
-        echo "$dep_blockers" | jq -r '.[] | "  - \(.roadmap_item_id) (\(.reason))"'
+        print -r -- "$dep_blockers" | jq -r '.[] | "  - \(.roadmap_item_id) (\(.reason))"'
         echo ""
     fi
 }
