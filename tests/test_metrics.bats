@@ -35,7 +35,7 @@ setup() {
   reported_total=$(echo "$output" | awk -F'|' '/\| 总 LOC \|/{gsub(/ /,"",$4); print $4; exit}')
   [ "$reported_total" -eq "$expected_total" ]
 
-  reported_max=$(echo "$output" | sed -n 's/.*| 最大文件行数 | 200 | *\([0-9][0-9]*\).*/\1/p' | head -1)
+  reported_max=$(echo "$output" | sed -n 's/.*| 最大文件行数 | 300 | *\([0-9][0-9]*\).*/\1/p' | head -1)
   [ "$reported_max" -eq "$expected_max" ]
 }
 

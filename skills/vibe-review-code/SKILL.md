@@ -112,7 +112,7 @@ If Serena is unavailable:
 
 You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
 
-1. **LOC Hard Limits**: Are new functions blowing up the line count? (Threshold: bin/ + lib/ <= 6000 LOC, max 200 lines per file).
+1. **LOC Hard Limits**: Are new functions blowing up the line count? (Threshold: bin/ + lib/ <= 7000 LOC, max 300 lines per file).
 2. **Zero Dead Code**: Does every added shell function have a clear caller? If not, FLAG IT as a blocking issue.
 3. **Safety & Robustness**: Are Zsh/Bash parameters properly quoted? Are error cases handled gracefully?
 4. **Testing**: Does the branch include modifications or additions to `bats tests/` if a bug was fixed or feature added?

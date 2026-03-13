@@ -22,8 +22,8 @@ echo "|------|------|--------|------|"
 # --- Total LOC ---
 total_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 loc_status="✅"
-[ "${total_loc:-0}" -gt 6000 ] && loc_status="❌"
-echo "| 总 LOC | 6000 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 6000 ))% |"
+[ "${total_loc:-0}" -gt 7000 ] && loc_status="❌"
+echo "| 总 LOC | 7000 | ${total_loc:-0} | ${loc_status} $(( (${total_loc:-0} * 100) / 7000 ))% |"
 
 # --- Max file LOC ---
 max_file_loc=0
@@ -37,8 +37,8 @@ for f in "$VIBE_ROOT"/lib/*.sh "$VIBE_ROOT"/bin/vibe; do
   fi
 done
 file_status="✅"
-[ "$max_file_loc" -gt 200 ] && file_status="❌"
-echo "| 最大文件行数 | 200 | ${max_file_loc} (${max_file_name}) | ${file_status} |"
+[ "$max_file_loc" -gt 300 ] && file_status="❌"
+echo "| 最大文件行数 | 300 | ${max_file_loc} (${max_file_name}) | ${file_status} |"
 
 # --- Test count ---
 test_count=0

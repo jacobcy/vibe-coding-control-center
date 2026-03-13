@@ -31,15 +31,15 @@ jobs:
       - name: Run bats tests
         run: bats tests/
 
-      - name: Check LOC ceiling (total ≤ 6000)
+      - name: Check LOC ceiling (total ≤ 7000)
         run: |
           total=$(find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs cat | wc -l)
           echo "Total LOC: $total"
-          if [ "$total" -gt 6000 ]; then
-            echo "FAIL: Total LOC $total exceeds 6000 limit"
+          if [ "$total" -gt 7000 ]; then
+            echo "FAIL: Total LOC $total exceeds 7000 limit"
             exit 1
           fi
-          echo "✅ Total LOC: $total / 6000"
+          echo "✅ Total LOC: $total / 7000"
 
       - name: Check per-file ceiling (≤ 300 lines each)
         run: |

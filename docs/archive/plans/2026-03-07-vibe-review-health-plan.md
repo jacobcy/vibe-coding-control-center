@@ -42,7 +42,7 @@ lines = sum(sum(1 for _ in p.open()) for p in paths)
 print(lines)
 PY
   ```
-- Expected: 输出行数≤6000；若>6000，记录“容量超限”并标记需要 raise limit 或拆分。
+- Expected: 输出行数≤7000；若>7000，记录“容量超限”并标记需要 raise limit 或拆分。
 
 **Step 2: 查找 `TODO`/`FIXME`/占位符并标注死代码风险**
 - Run: `rg -n "TODO|FIXME|PLACEHOLDER" alias bin lib scripts skills`
@@ -53,7 +53,7 @@ PY
 - Expected: 零错误，所有 shellcheck 提示已解决；如报错，记录相关文件/行。
 
 **Step 4: 评估 `skills/vibe-review-code/SKILL.md` 说明是否还可执行**
-- Step: 手动对照 CLAUDE/DEVELOPER，确认“LOC limit”更新（6000）等说明无冲突。
+- Step: 手动对照 CLAUDE/DEVELOPER，确认“LOC limit”更新（7000）等说明无冲突。
 - Expected: 找到不一致项后在 review summary 指定修改点（如旧 1200 限制）。
 
 ### Task 3: 确认测试与执行质量
