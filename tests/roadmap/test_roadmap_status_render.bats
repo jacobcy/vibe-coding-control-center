@@ -129,3 +129,39 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [[ "$output" =~ "Status:      p0" ]]
   [[ ! "$output" =~ $'\033' ]]
 }
+
+@test "roadmap status shows ready/blocked counts" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+
+  # Add dependencies: rm-2 depends on rm-1 (no PR)
+  jq '.items[1].depends_on_item_ids = ["rm-1"]' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap status --json'
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.dependency_counts.ready')" = "2" ]
+  [ "$(echo "$output" | jq -r '.dependency_counts.blocked')" = "1" ]
+}
+
+@test "roadmap show displays blocker details" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+  tmp="$(mktemp)"
+
+  # rm-2 depends on rm-1 (no PR)
+  jq '.items[1].depends_on_item_ids = ["rm-1"]' "$fixture/vibe/roadmap.json" > "$tmp"
+  mv "$tmp" "$fixture/vibe/roadmap.json"
+
+  run_roadmap_fixture_cmd_no_tty "$fixture" 'vibe_roadmap show rm-2'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Dependency Status:" ]]
+  [[ "$output" =~ "blocked" ]]
+  [[ "$output" =~ "rm-1" ]]
+  [[ "$output" =~ "missing_pr_ref" ]]
+}

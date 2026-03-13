@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 # lib/roadmap_query.sh - Read/Query operations for Roadmap module
 [[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_store.sh" ]] && source "$VIBE_LIB/roadmap_store.sh"
+[[ -n "${VIBE_LIB:-}" && -f "$VIBE_LIB/roadmap_dependency.sh" ]] && source "$VIBE_LIB/roadmap_dependency.sh"
 
 _vibe_roadmap_status() {
     local common_dir roadmap_file output_json="false"
@@ -20,7 +21,6 @@ _vibe_roadmap_status() {
     common_dir="$(_vibe_roadmap_common_dir)" || return 1
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
-
     local status_json
     status_json="$(jq -c '{
         project_id: .project_id,
@@ -57,12 +57,11 @@ _vibe_roadmap_status() {
         recommended: ((.sync_check.missing_project_id > 0) or (.sync_check.missing_github_project_item_id > 0) or (.sync_check.missing_content_type > 0)),
         recommended_command: "vibe roadmap sync --provider github --json"
     }' "$roadmap_file")"
-
+    status_json="$(_vibe_roadmap_status_with_dependency_counts "$common_dir" "$roadmap_file" "$status_json")"
     if [[ "$output_json" == "true" ]]; then
-        echo "$status_json"
+        print -r -- "$status_json"
         return 0
     fi
-
     local version_goal project_id counts p0_count current_count next_count deferred_count rejected_count
     local official_counts official_total official_mirrored official_item_id official_content_type official_remote_only
     local sync_counts sync_missing_item_id sync_missing_content_type sync_recommended sync_command
@@ -77,7 +76,6 @@ _vibe_roadmap_status() {
     echo "Version Goal: $(_vibe_roadmap_format "$CYAN" "$version_goal")"
     echo "Project ID:   $(_vibe_roadmap_format "$CYAN" "$project_id")"
     echo ""
-
     echo "Roadmap Item Summary:"
     counts="$(echo "$status_json" | jq -r '"\(.counts.p0) \(.counts.current) \(.counts.next) \(.counts.deferred) \(.counts.rejected)"')"
     IFS=' ' read -r p0_count current_count next_count deferred_count rejected_count <<< "$counts"
@@ -96,7 +94,7 @@ _vibe_roadmap_status() {
         echo "  Rejected:         $rejected_count"
     fi
     echo ""
-
+    _vibe_roadmap_render_dependency_summary "$status_json"
     official_counts="$(echo "$status_json" | jq -r '"\(.official_layer.total_items) \(.official_layer.mirrored_items) \(.official_layer.with_github_project_item_id) \(.official_layer.with_content_type) \(.official_layer.remote_only_imports)"')"
     IFS=' ' read -r official_total official_mirrored official_item_id official_content_type official_remote_only <<< "$official_counts"
     echo "GitHub Project Mirror:"
@@ -118,7 +116,6 @@ _vibe_roadmap_status() {
         echo "  Next: $sync_command"
         echo ""
     fi
-
     extension_counts="$(echo "$status_json" | jq -r '"\(.extension_layer.with_execution_record_id) \(.extension_layer.with_spec_standard) \(.extension_layer.with_spec_ref)"')"
     IFS=' ' read -r extension_execution extension_spec_standard extension_spec_ref <<< "$extension_counts"
     echo "Local Execution Bridge:"
@@ -172,7 +169,6 @@ _vibe_roadmap_list() {
         echo "Error: --linked and --unlinked cannot be used together"
         return 1
     }
-
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
 
@@ -194,10 +190,9 @@ _vibe_roadmap_list() {
         "$roadmap_file")"
 
     if [[ "$output_json" == "true" ]]; then
-        echo "$items_json"
+        print -r -- "$items_json"
         return 0
     fi
-
     if [[ "$(print -r -- "$items_json" | jq 'length')" == "0" ]]; then
         echo "No roadmap items found."
         return 0
@@ -255,8 +250,12 @@ _vibe_roadmap_show() {
     item_json="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
     [[ -n "$item_json" ]] || { echo "Error: roadmap item not found: $item_id"; return 1; }
 
+    # Compute dependency status
+    local dependency_status
+    dependency_status="$(_vibe_roadmap_compute_dependency_status "$common_dir" "$item_id")"
+
     if [[ "$output_json" == "true" ]]; then
-        echo "$item_json"
+        print -r -- "$item_json" | jq -c --argjson dep_status "$dependency_status" '. + {dependency_status: $dep_status}'
         return 0
     fi
 
@@ -281,6 +280,9 @@ _vibe_roadmap_show() {
     echo "Source:      ${source}"
     echo "Updated:     ${updated}"
     echo ""
+
+    _vibe_roadmap_render_item_dependency_status "$dependency_status"
+
     if [[ -n "$description" ]]; then
         echo "Description:"
         echo "  ${description}"

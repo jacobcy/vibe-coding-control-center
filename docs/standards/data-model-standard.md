@@ -158,6 +158,7 @@ related_docs:
 - repo issue 与 roadmap item：多对多
 - repo issue 与 task：多对多
 - roadmap item 与 task：多对多
+- roadmap item 与 roadmap item：可以存在依赖关系，具体方案仍在参考材料中收敛
 - milestone 与 roadmap item：一对多
 - flow 与 task：一对多
 - PR 与 task：一对一
@@ -170,6 +171,7 @@ related_docs:
 - `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
 - roadmap item 与 task 只建立关联关系，不共享身份
 - roadmap item 是 mirrored GitHub Project item，不是 execution record
+- `ready` / `blocked` / `blockers` 若存在，应作为派生视图而非共享真源持久化字段
 - `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
 - task 是 execution record / execution bridge，不等于 GitHub Project `type=task` item 本体
 - milestone 只锚定规划窗口，不直接驱动 runtime 切换
@@ -206,6 +208,7 @@ related_docs:
 以下字段只能运行时计算，不能持久化为共享真源：
 
 - `dirty`
+- `ready` / `blocked` / `blockers`（若后续启用）
 - 临时统计字段
 - 仅用于显示的聚合摘要
 
@@ -233,3 +236,5 @@ related_docs:
 - 将 `dirty` 写成持久化真源字段
 - 将 `worktree_name` / `worktree_path` 当作开放 flow 的主索引
 - 将 branch 或 worktree 当作历史唯一索引
+- 在各命令或标准中单独发明依赖 gate 语义
+- 将 `ready` / `blocked` / `blockers` 持久化为真源字段
