@@ -93,6 +93,19 @@ resolve_serena_site_packages() {
     fi
   done
 
+  if uvx --from "$SERENA_SOURCE" serena --help >/dev/null 2>&1; then
+    for serena_bin in "$SERENA_CACHE_ROOT"/*/bin/serena; do
+      [[ -e "$serena_bin" ]] || continue
+      archive_root="$(dirname "$(dirname "$serena_bin")")"
+      config_path="$(find "$archive_root/lib" -path '*/site-packages/serena/config/serena_config.py' -print -quit 2>/dev/null || true)"
+      if [[ -n "$config_path" ]] && grep -q 'SERENA_HOME' "$config_path"; then
+        SERENA_SITE_PACKAGES="${config_path%/serena/config/serena_config.py}"
+        SERENA_ARCHIVE_ROOT="$archive_root"
+        return 0
+      fi
+    done
+  fi
+
   echo "ERROR: failed to locate Serena site-packages with SERENA_HOME support" >&2
   exit 3
 }
