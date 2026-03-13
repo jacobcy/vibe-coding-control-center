@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.31] - 2026-03-13
+
+### ✨ Changed
+- Freeze branch-first runtime semantics and task issue vocabulary
+
 ## [2.1.30] - 2026-03-13
 
 ### ✨ Changed
