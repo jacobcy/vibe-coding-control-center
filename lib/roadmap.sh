@@ -15,77 +15,40 @@ source "$VIBE_LIB/roadmap_help.sh"
 
 vibe_roadmap() {
     local subcommand="${1:-status}"
-
-    # Handle help flag
     case "$subcommand" in
-        -h|--help|help)
-            _vibe_roadmap_usage
-            return 0
-            ;;
+        -h|--help|help) _vibe_roadmap_usage; return 0 ;;
     esac
 
     case "$subcommand" in
-        status)
-            shift
-            _vibe_roadmap_status "$@"
-            ;;
-        list)
+        status) shift; _vibe_roadmap_status "$@" ;;
+        list|show|audit|assign)
             shift
             local common_dir="$(_vibe_roadmap_common_dir)" || return 1
-            _vibe_roadmap_list "$common_dir" "$@"
-            ;;
-        show)
-            shift
-            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
-            _vibe_roadmap_show "$common_dir" "$@"
-            ;;
-        audit)
-            shift
-            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
-            _vibe_roadmap_audit "$common_dir" "$@"
+            case "$subcommand" in
+                list) _vibe_roadmap_list "$common_dir" "$@" ;;
+                show) _vibe_roadmap_show "$common_dir" "$@" ;;
+                audit) _vibe_roadmap_audit "$common_dir" "$@" ;;
+                assign) _vibe_roadmap_assign "$common_dir" "$@" ;;
+            esac
             ;;
         add)
             shift
             case "${1:-}" in
-                -h|--help|help)
-                    _vibe_roadmap_usage
-                    return 0
-                    ;;
+                -h|--help|help) _vibe_roadmap_usage; return 0 ;;
             esac
             local common_dir="$(_vibe_roadmap_common_dir)" || return 1
             _vibe_roadmap_add "$common_dir" "$*"
             ;;
-        init)
-            shift
-            _vibe_roadmap_init_command "$@"
-            ;;
-        sync)
-            shift
-            _vibe_roadmap_sync "$@"
-            ;;
-        dep)
-            shift
-            _vibe_roadmap_dependency_command "$@"
-            ;;
-        assign)
-            shift
-            local common_dir="$(_vibe_roadmap_common_dir)" || return 1
-            _vibe_roadmap_assign "$common_dir" "$@"
-            ;;
-        classify)
-            shift
-            _vibe_roadmap_classify_handler "$@"
-            ;;
-        version)
-            shift
-            _vibe_roadmap_version "$@"
-            ;;
+        init) shift; _vibe_roadmap_init_command "$@" ;;
+        sync) shift; _vibe_roadmap_sync "$@" ;;
+        dep) shift; _vibe_roadmap_dependency_command "$@" ;;
+        classify) shift; _vibe_roadmap_classify_handler "$@" ;;
+        version) shift; _vibe_roadmap_version "$@" ;;
         *)
             vibe_die "Unknown roadmap subcommand: $subcommand"; return 1 ;;
     esac
 }
 
-# Sync subcommand handler
 _vibe_roadmap_sync() {
     local provider="github"
     local repo=""
@@ -118,7 +81,6 @@ _vibe_roadmap_sync() {
 
     local common_dir
     common_dir="$(_vibe_roadmap_common_dir)" || return 1
-
     [[ -n "$repo" ]] || repo="$(_vibe_roadmap_current_repo)" || return 1
     [[ -n "$project_id" ]] || project_id="$(_vibe_roadmap_project_id "$common_dir")" || return 1
 
@@ -158,7 +120,6 @@ _vibe_roadmap_sync() {
     esac
 }
 
-# Classify subcommand handler
 _vibe_roadmap_classify_handler() {
     local issue_id=""
     local issue_status=""
@@ -188,7 +149,6 @@ _vibe_roadmap_classify_handler() {
     _vibe_roadmap_classify "$common_dir" "$issue_id" "$issue_status"
 }
 
-# Version subcommand handler - for version cycle management
 _vibe_roadmap_version() {
     local action="$1"
     local common_dir
