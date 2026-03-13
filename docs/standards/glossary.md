@@ -9,7 +9,7 @@ authority:
   - term-aliases
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-12
+last_updated: 2026-03-13
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -91,7 +91,7 @@ related_docs:
 
 - 正式术语：`task`
 - 别称：`执行任务`
-- 定义：写入 `registry.json` 的 execution record / runtime record，必须可执行、可跟踪、可绑定现场。
+- 定义：写入 `registry.json` 的 execution record，必须可执行、可跟踪、可绑定当前 flow。
 - 边界：
   - `task` 不是外部需求入口
   - `task` 不等于 PR
@@ -105,7 +105,24 @@ related_docs:
   - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
   - `repo issue` 可以映射到一个或多个 `task`
 
-### 3.3.1 `roadmap sync`
+### 3.3.1 `task issue`
+
+- 正式术语：`task issue`
+- 别称：无
+- 定义：某个 `task` 在 execution 语义中承担主闭环职责的那个 `repo issue` 角色。
+- 边界：
+  - `task issue` 不是新的 GitHub 对象类型
+  - `task issue` 不是与 `repo issue` 平行的新实体
+  - `task issue` 不等于任意一个 `issue_ref`
+- 落点：
+  - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
+  - 命令语义见 [command-standard.md](command-standard.md)
+- 使用规则：
+  - 当一个 `task` 关联多个 `repo issue` 时，只有承担主闭环职责的那个 issue 才称为 `task issue`
+  - 若当前 task 尚未显式指定主闭环 issue，则不要把任意 `issue_ref` 默认写成 `task issue`
+  - `task issue` 只是 `repo issue` 的 execution role，不单独创造新的共享状态对象
+
+### 3.3.2 `roadmap sync`
 
 - 正式术语：`roadmap sync`
 - 别称：无
@@ -117,7 +134,7 @@ related_docs:
   - 讨论 GitHub Project item mirror 对齐时使用 `roadmap sync`
   - 不要把 `roadmap sync` 当作 task intake 或 flow 编排入口
 
-### 3.3.2 `task audit`
+### 3.3.3 `task audit`
 
 - 正式术语：`task audit`
 - 别称：无
@@ -129,7 +146,7 @@ related_docs:
   - 讨论 task registry、分支、OpenSpec、plans 的执行层核对时使用 `task audit`
   - 不要把 `task audit` 表述成 GitHub Project 同步
 
-### 3.3.3 `OpenSpec 注册`
+### 3.3.4 `OpenSpec 注册`
 
 - 正式术语：`OpenSpec 注册`
 - 别称：`OpenSpec execution spec 来源桥接`
@@ -141,7 +158,7 @@ related_docs:
   - 讨论 `spec_standard/spec_ref` 来源时使用 `OpenSpec 注册`
   - 不要把 OpenSpec change 直接说成 roadmap item 或 task 本体
 
-### 3.3.4 `milestone`
+### 3.3.5 `milestone`
 
 - 正式术语：`milestone`
 - 别称：无
@@ -160,17 +177,17 @@ related_docs:
 
 - 正式术语：`flow`
 - 别称：无
-- 定义：task 的运行时容器，表示通常由当前 worktree/branch 承载的现场语义。
+- 定义：对 branch 的逻辑交付现场包装，是 task 当前 execution scene 的表达。
 - 边界：
   - `flow` 不等于 worktree
-  - `flow` 不等于 branch
+  - `flow` 不等于 branch，但开放 flow 默认以 branch 为身份锚点
   - `flow` 不是业务愿望本身
   - `flow` 不承担规划语义
 - 落点：
   - 命令边界见 [command-standard.md](command-standard.md)
   - 现场态边界见 [data-model-standard.md](data-model-standard.md)
 - 使用规则：
-  - 讨论当前交付切片、由当前 worktree 承载的任务现场时使用 `flow`
+  - 讨论当前交付切片、由 branch 锚定且由 worktree 承载的任务现场时使用 `flow`
   - 讨论用户正在推进哪个目标时，默认优先从 `repo issue -> flow` 叙述
   - 不要把 `flow` 当作 `workflow`、`worktree` 或 `branch` 的同义词
 
@@ -307,15 +324,17 @@ related_docs:
 
 - 正式术语：`共享状态真源`
 - 别称：无
-- 定义：项目共享状态的持久化数据真源，固定为 `roadmap.json`、`registry.json`、`worktrees.json`。
+- 定义：项目共享状态的持久化数据真源集合，当前包括 `registry.json`、`roadmap.json`、`flow-history.json`，以及处于兼容清退期的 `worktrees.json`。
 - 边界：
   - `共享状态真源` 不是 shell
   - `共享状态真源` 不是 skill
+  - `worktrees.json` 当前不是开放 flow 的主身份锚点
 - 落点：
   - 边界见 [data-model-standard.md](data-model-standard.md)
 - 使用规则：
-- 讨论共享状态文件本身时使用 `共享状态真源`
-- 不要再用“物理真源”同时指 shell 和 JSON 文件
+  - 讨论共享状态文件本身时使用 `共享状态真源`
+  - `roadmap.json` 当前只按 mirror / cache / projection / backup 理解
+  - 不要再用“物理真源”同时指 shell 和 JSON 文件
 
 ### 5.7 `shell 命令`
 

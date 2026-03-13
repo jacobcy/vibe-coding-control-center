@@ -36,7 +36,7 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 - `$(git rev-parse --git-common-dir)/vibe/roadmap.json`
 - `$(git rev-parse --git-common-dir)/vibe/registry.json`
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
+- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`（兼容期 cache / audit hint）
 
 禁止：
 
@@ -87,6 +87,7 @@ vibe roadmap audit --check-links --json
 
 - roadmap 规划与版本归类属于 `vibe-roadmap`
 - Issue intake 与 GitHub 创建属于 `vibe-issue`
+- 此 skill 中的 `worktree` 只表示物理目录容器，不表示 runtime 主体；runtime 主语仍是 `task <-> flow` / branch 绑定
 
 ## Step 2: 分类问题
 

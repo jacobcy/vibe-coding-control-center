@@ -49,6 +49,7 @@ vibe flow show <feature-or-branch> --json
 - `branch`
 - `current_task`
 - `issue_refs`
+- `primary_issue_ref`
 - `pr_ref`
 - 当前 flow 是否已经满足收口前提
 
@@ -88,6 +89,11 @@ gh issue close <issue-number-or-ref>
 ```
 
 如果 issue 无法关闭，明确报出阻塞事实，不要假装 flow 已完全收口。
+
+补充口径：
+
+- `primary_issue_ref` 若存在，它对应的 `repo issue` 是当前 task 的 `task issue`，应作为主闭环 issue 优先确认
+- 其余 `issue_refs` 只表示关联来源，不等于都应由当前收口动作负责关闭
 
 ### Step 4: 关闭 flow
 

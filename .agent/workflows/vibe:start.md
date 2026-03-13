@@ -23,10 +23,12 @@ tags: [workflow, vibe, execution, orchestration]
 2. 先读取当前 flow 与 task 事实，确认：
    - 当前 flow 是否绑定 task
    - task 是否具备可解析的 `spec_standard/spec_ref`
+   - 若存在 `primary_issue_ref`，它是否已作为当前 task 的主闭环 issue 明确落点
    - 是否存在 `auto` 模式下的后续已绑定 task
 3. 委托 `skills/vibe-start/SKILL.md` 处理业务判断：
    - 从 issue 落 task
    - 选择当前 task 或 `auto` 顺序
+   - 区分 `issue_refs` 与 `primary_issue_ref`
    - 校验 execution spec
    - 缺 spec 时回退到 `/vibe-new`
    - 无 task 时回退到 `/vibe-task`

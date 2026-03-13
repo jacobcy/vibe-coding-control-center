@@ -10,7 +10,7 @@ authority:
   - state-lifecycle
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-12
+last_updated: 2026-03-13
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -49,13 +49,13 @@ related_docs:
 高层模型只定义文件分层，不重复描述文件内部字段。文件级 schema 以各自标准为准：
 
 - `roadmap.json`
-  - 规划态真源
+  - 规划层 mirror / cache / projection / backup
   - schema 见 [roadmap-json-standard.md](roadmap-json-standard.md)
 - `registry.json`
   - 执行态真源
   - schema 见 [registry-json-standard.md](registry-json-standard.md)
 - `worktrees.json`
-  - 现场态真源
+  - 开放现场的兼容期 cache / audit hint
   - 本文当前只定义其高层职责边界，尚无单独文件级 schema 标准
 - `flow-history.json`
   - flow 历史真源
@@ -65,9 +65,9 @@ related_docs:
 
 共享状态固定映射如下：
 
-- `roadmap.json` = 规划态（mirrored GitHub Project item 的本地真源）
+- `roadmap.json` = 规划层 mirror / cache / projection / backup
 - `registry.json` = 执行态（task execution record 真源）
-- `worktrees.json` = 现场态（flow runtime 真源）
+- `worktrees.json` = 开放现场的兼容期 cache / audit hint
 - `flow-history.json` = 已关闭 flow 的历史态
 
 补充约束：
@@ -81,11 +81,13 @@ related_docs:
 - `task` 是 execution record，不等于 roadmap item 的 `type=task`
 - `feature` 不是共享模型字段，只是 `type=feature` 的语义标签或 `flow new <name>` 的命名输入
 - `milestone` 属于 roadmap 规划窗口锚点，不属于 registry 或 worktree runtime 字段
-- `flow` 只属于执行层，是 task 的运行时容器，不承担规划入口语义
+- `flow` 只属于执行层，是以 branch 为身份锚点的逻辑交付现场，不承担规划入口语义
 - `spec_standard` 是 Vibe 扩展字段，用于标记 execution record 采用的规范体系
 - `execution_record_id` 是 Vibe 扩展桥接字段，用于稳定对齐 GitHub Project item 与本地 task
 - `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 只属于本地执行桥接，不参与 GitHub Project 同步
 - `flow new <name>` 中的 `name` 只是现场命名输入，不定义 feature 实体
+- `roadmap.json` 不再承担 execution gate 语义
+- `worktrees.json` 不再承担开放 flow 的主身份锚点
 
 ## 4. Naming Rules
 
@@ -171,6 +173,7 @@ related_docs:
 - `repo issue` 与 roadmap item 可以一一映射，也可以多对多关联，取决于 GitHub Project 的组织方式
 - roadmap item 与 task 只建立关联关系，不共享身份
 - roadmap item 是 mirrored GitHub Project item，不是 execution record
+- 若 task 有多个 `issue_refs`，可指定其中一个作为主闭环 issue；该角色称为 `task issue`
 - `ready` / `blocked` / `blockers` 若存在，应作为派生视图而非共享真源持久化字段
 - `type=task` 只表示 roadmap item 的规划分类，不表示本地 execution record 本体
 - task 是 execution record / execution bridge，不等于 GitHub Project `type=task` item 本体
@@ -189,7 +192,7 @@ related_docs:
 ### 7.1 Runtime Binding
 
 - 当前执行中的开放现场应以 `branch` 作为主锚点
-- `worktrees.json` 保存当前开放现场的目录容器与 branch 绑定提示
+- `worktrees.json` 只保存当前开放现场的目录容器与 branch 绑定提示，供兼容期查询与审计使用
 - `registry.json` 可以保存当前 runtime 绑定事实，尤其是 `runtime_branch`
 - task 完成后必须清空 runtime `branch` / `worktree` / `agent` 绑定
 - task 归档后必须清空 runtime `branch` / `worktree` / `agent` 绑定
@@ -198,7 +201,7 @@ related_docs:
 ### 7.2 Historical Facts
 
 - 未来规划态以 `roadmap.json` 为准
-- 当前执行态以 `registry.json` 与 `worktrees.json` 联合表达，但 branch 是优先执行锚点
+- 当前执行态以 `registry.json` 与 git 现场联合表达，branch 是优先执行锚点；`worktrees.json` 只作兼容期辅助提示
 - task 的完成与归档事实以 `registry.json` 为准
 - 已关闭 flow 的历史事实以 `flow-history.json` 为准
 - `worktrees.json` 只表达当前开放现场，不承担 flow 历史归档
@@ -227,6 +230,7 @@ related_docs:
 - 用 `roadmap.json` 记录现场信息
 - 用 `registry.json` 记录规划优先级
 - 用 `worktrees.json` 承担历史归档
+- 将 `worktrees.json` 写成开放 flow 的主身份真源
 - 用 `registry.json` 或 `worktrees.json` 冒充 flow 关闭历史
 - 将 `openspec` 写成 roadmap provider
 - 用 Vibe 扩展字段重定义 GitHub 官方对象类型
