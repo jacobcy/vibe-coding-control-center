@@ -7,7 +7,7 @@
 | Phase | Description | Status | Spec |
 |-------|-------------|--------|------|
 | 01 | Command Skeleton & Entry Points | done | [01-command-and-skeleton.md](plans/01-command-and-skeleton.md) |
-| 02 | Flow & Task Foundation (Python Core) | todo | [02-flow-task-foundation.md](plans/02-flow-task-foundation.md) |
+| 02 | Flow & Task Foundation (Python Core) | done | [02-flow-task-foundation.md](plans/02-flow-task-foundation.md) |
 | 03 | PR Domain & Publish Gate | todo | [03-pr-domain.md](plans/03-pr-domain.md) |
 | 04 | Handoff, Cutover & Refresh | todo | [04-handoff-and-cutover.md](plans/04-handoff-and-cutover.md) |
 | 05 | Polish & Legacy Retirement | todo | [05-polish-and-cleanup.md](plans/05-polish-and-cleanup.md) |

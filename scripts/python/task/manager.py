@@ -93,3 +93,42 @@ class TaskManager:
         self.store.add_issue_link(branch, issue_number, 'link')
         print(f"Linked repo issue #{issue_number} to current flow branch {branch}.")
 
+    def update(self, issue_number, status=None, next_step=None, blocked_by=None):
+        if issue_number is None:
+            branch = self._get_current_branch()
+            state = self.store.get_flow_state(branch)
+            if state and state.get('task_issue_number'):
+                issue_number = state['task_issue_number']
+            else:
+                print("Error: No task issue number provided and current branch has no bound task.")
+                return
+
+        updates = {}
+
+        # Handle status -> flow_status mapping
+        if status:
+            valid_statuses = ['active', 'blocked', 'completed']
+            if status not in valid_statuses:
+                print(f"Error: Invalid status '{status}'. Must be one of: {', '.join(valid_statuses)}")
+                return
+
+            updates['flow_status'] = status
+            if status == 'active':
+                updates['blocked_by'] = None
+            elif status == 'completed':
+                updates['blocked_by'] = None
+
+        if next_step:
+            updates['next_step'] = next_step
+
+        if blocked_by:
+            updates['blocked_by'] = blocked_by
+            updates['flow_status'] = 'blocked'
+
+        if updates:
+            branch = self._get_current_branch()
+            self.store.update_flow_state(branch, **updates)
+            print(f"Updated task/flow on branch {branch}: {updates}")
+        else:
+            print("No updates provided.")
+
