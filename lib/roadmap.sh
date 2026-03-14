@@ -4,6 +4,7 @@
 # Load dependencies
 source "$VIBE_LIB/roadmap_render.sh"
 source "$VIBE_LIB/roadmap_dependency.sh"
+source "$VIBE_LIB/roadmap_pr_dependency.sh"
 source "$VIBE_LIB/roadmap_init.sh"
 source "$VIBE_LIB/roadmap_store.sh"
 source "$VIBE_LIB/roadmap_query.sh"
