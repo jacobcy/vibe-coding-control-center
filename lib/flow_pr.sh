@@ -1,5 +1,41 @@
 #!/usr/bin/env zsh
 
+_flow_pr_detect_dependencies() {
+  local base_branch="$1" current_branch="$2"
+  local dependencies="[]"
+
+  # Only detect dependencies if base is not main
+  [[ "$base_branch" == "main" ]] && { echo "[]"; return 0; }
+
+  # Check if there's an open PR for the base branch
+  if vibe_has gh; then
+    local base_pr
+    base_pr=$(gh pr list --state open --head "$base_branch" --json number --jq '.[0].number' 2>/dev/null || true)
+    if [[ -n "$base_pr" && "$base_pr" != "null" ]]; then
+      # Convert to string to match type used in manual dependency commands
+      dependencies="[\"$base_pr\"]"
+      log_info "Detected dependency: PR #$base_pr ($base_branch)"
+    fi
+  fi
+
+  echo "$dependencies"
+}
+
+_flow_pr_save_metadata() {
+  local pr_number="$1" pr_url="$2" dependencies_json="$3"
+  local common_dir
+
+  common_dir="$(vibe_git_dir)" || return 1
+
+  # Save PR metadata to roadmap
+  _vibe_roadmap_pr_set "$common_dir" "$pr_number" "$pr_url" "$dependencies_json" || {
+    log_warn "Failed to save PR metadata to roadmap"
+    return 1
+  }
+
+  log_info "Recorded PR #$pr_number metadata in roadmap"
+}
+
 _flow_pr_bound_spec_ref() {
   local flow_record current_task spec_ref err_file err_text
   err_file="$(mktemp)" || return 1
@@ -183,15 +219,31 @@ _flow_pr() {
   log_step "Pushing changes to origin/$branch"; git push origin HEAD || return 1
   if ! vibe_has gh; then log_success "Changes pushed. Please create/view PR manually."; return 0; fi
   log_info "GitHub CLI detected. Managing PR..."
+
+  local pr_number="" pr_url=""
+
   if [[ $has_pr -eq 1 ]]; then
     log_success "Updating existing PR..."
     gh pr edit "$branch" --base "$base_name" --title "$pr_title" --body "$pr_body" || true
+    # Get existing PR number
+    pr_number=$(gh pr view "$branch" --json number --jq '.number' 2>/dev/null || true)
   else
     log_step "Creating new PR: $pr_title"
+    local pr_result
     if [[ $use_web -eq 1 ]]; then
-      gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" --web || log_warn "Failed to create PR with gh, please check manually."
+      pr_result=$(gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" --web 2>&1) || log_warn "Failed to create PR with gh, please check manually."
     else
-      gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" || log_warn "Failed to create PR with gh, please check manually."
+      pr_result=$(gh pr create --title "$pr_title" --body "$pr_body" --base "$base_name" 2>&1) || log_warn "Failed to create PR with gh, please check manually."
     fi
+    # Extract PR number and URL from result
+    pr_url=$(echo "$pr_result" | grep -oE 'https://github\.com/[^ ]+' | head -1 || true)
+    pr_number=$(echo "$pr_url" | grep -oE '[0-9]+' | tail -1 || true)
+  fi
+
+  # Record PR metadata with dependencies
+  if [[ -n "$pr_number" ]]; then
+    local dependencies
+    dependencies=$(_flow_pr_detect_dependencies "$base_name" "$branch")
+    _flow_pr_save_metadata "$pr_number" "$pr_url" "$dependencies" || true
   fi
 }

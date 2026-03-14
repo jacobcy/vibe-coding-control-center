@@ -44,7 +44,6 @@ vibe flow list
 - 当前要处理哪些 PR
 - 哪些 PR 是独立的，哪些是 stacked
 - 哪些 flow 已经进入 `open + had_pr`
-- 若 task 有 `primary_issue_ref`，它对应的 `repo issue` 才是当前整合阶段默认优先关注的 `task issue`
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把旧 handoff 继续传给下一个环节。
 
@@ -116,7 +115,6 @@ browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
 - 是否还有阻塞性的 unresolved review threads
 - merge base / stack 顺序是否正确
 - 当前分支是否还需要 review follow-up patch
-- 若需要描述 issue 归属，优先围绕 `primary_issue_ref`，其余 `issue_refs` 只作补充上下文
 
 常用证据入口：
 

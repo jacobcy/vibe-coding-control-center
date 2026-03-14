@@ -28,7 +28,7 @@ _vibe_check_help() {
   echo "  vibe check"
   echo "  vibe check check --json"
   echo "  vibe check roadmap"
-  echo "  vibe check json .git/vibe/registry.json"
+  echo "  vibe check json \$(git rev-parse --git-common-dir)/vibe/registry.json"
 }
 
 _vibe_check_render_text() {

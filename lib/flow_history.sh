@@ -132,25 +132,9 @@ _flow_close_branch_tasks() {
   ' "$registry_file" > "$tmp" && mv "$tmp" "$registry_file"
 }
 
-_flow_checkout_safe_main_branch() {
-  local safe_branch
-  git fetch origin main --quiet 2>/dev/null || true
-  if git show-ref --verify --quiet refs/heads/main; then
-    if git checkout main >/dev/null 2>&1; then
-      return 0
-    fi
-  fi
-  if git show-ref --verify --quiet refs/remotes/origin/main; then
-    safe_branch="$(_flow_safe_main_branch_name)"
-    if git show-ref --verify --quiet "refs/heads/${safe_branch}"; then
-      git checkout "$safe_branch" >/dev/null 2>&1
-      return $?
-    fi
-    git checkout -B "$safe_branch" origin/main >/dev/null 2>&1
-    return $?
-  fi
-  return 1
-}
+
+# Load checkout functions
+source "$VIBE_LIB/flow_checkout.sh"
 
 _flow_branch_dashboard_entry() {
   local branch="$1" worktrees_file registry_file branch_name wt_data current_task tasks_json pr_ref issue_refs_json title task_status next_step spec_standard spec_ref
