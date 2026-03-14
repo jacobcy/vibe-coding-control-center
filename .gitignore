@@ -47,3 +47,10 @@ wt-*/
 .agent/context/task.md
 .agent/reports/
 .envrc
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python

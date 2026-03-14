@@ -133,6 +133,14 @@ def handle_pr(subcommand, args_list, json_output=False, auto_confirm=False):
     show_parser = subparsers.add_parser("show")
 
     ready_parser = subparsers.add_parser("ready")
+    ready_parser.add_argument("--group", choices=['feature', 'bug', 'docs', 'chore'],
+                             help="Override group detection")
+    ready_parser.add_argument("--bump", type=lambda x: x.lower() == 'true',
+                             help="Override bump policy (true/false)")
+
+    review_parser = subparsers.add_parser("review")
+    review_parser.add_argument("--post", action="store_true", dest="post_to_pr",
+                               help="Post review to PR")
 
     merge_parser = subparsers.add_parser("merge")
 
@@ -149,8 +157,13 @@ def handle_pr(subcommand, args_list, json_output=False, auto_confirm=False):
         manager.draft(parsed.title, parsed.body)
     elif subcommand == "show":
         manager.show()
+    elif subcommand == "review":
+        post_to_pr = getattr(parsed, 'post_to_pr', False)
+        manager.review(post_to_pr=post_to_pr)
     elif subcommand == "ready":
-        manager.ready()
+        group = getattr(parsed, 'group', None)
+        bump = getattr(parsed, 'bump', None)
+        manager.ready(group=group, bump=bump)
     elif subcommand == "merge":
         manager.merge()
     else:
