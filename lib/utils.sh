@@ -59,4 +59,56 @@ vibe_delete_remote_branch() {
     log_warn "Failed to delete remote branch: $branch"; return 1
 }
 
+# Check if a branch is occupied by any worktree (excluding current worktree)
+# Returns 0 if occupied, 1 if not occupied
+vibe_is_branch_occupied_by_worktree() {
+    local branch="$1"
+    [[ -n "$branch" ]] || return 1
+
+    local current_worktree current_branch occupied_worktrees
+
+    # Get current worktree path
+    current_worktree="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+
+    # Get current branch in this worktree
+    current_branch="$(git branch --show-current 2>/dev/null)" || true
+
+    # If checking the current branch, it's not considered "occupied" by this worktree
+    if [[ "$branch" == "$current_branch" ]]; then
+        # Check if any OTHER worktree has this branch checked out
+        # Use -B2 to get the worktree line before the branch line
+        occupied_worktrees="$(git worktree list --porcelain 2>/dev/null | grep -B2 "branch refs/heads/$branch$" | grep "^worktree" | grep -v "$current_worktree" || true)"
+    else
+        # Check if ANY worktree has this branch checked out
+        occupied_worktrees="$(git worktree list --porcelain 2>/dev/null | grep -B2 "branch refs/heads/$branch$" | grep "^worktree" || true)"
+    fi
+
+    [[ -n "$occupied_worktrees" ]]
+}
+
 vibe_die() { echo "${RED}✗ $*${NC}" >&2; return 1; }
+
+# Worktree-aware git directory resolution with caching
+# Returns the common git directory (shared across worktrees)
+# Cached in VIBE_GIT_DIR environment variable for session performance
+vibe_git_dir() {
+    if [[ -n "${VIBE_GIT_DIR:-}" ]]; then
+        echo "$VIBE_GIT_DIR"
+        return 0
+    fi
+
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        vibe_die "Not in a git repository"
+        return 1
+    fi
+
+    local git_dir
+    git_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || {
+        vibe_die "Failed to resolve git directory"
+        return 1
+    }
+
+    # Cache for session-level performance
+    export VIBE_GIT_DIR="$git_dir"
+    echo "$git_dir"
+}

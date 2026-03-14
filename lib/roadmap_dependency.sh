@@ -174,3 +174,4 @@ _vibe_roadmap_render_item_dependency_status() {
         echo ""
     fi
 }
+

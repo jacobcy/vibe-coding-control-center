@@ -4,6 +4,7 @@
 # Load dependencies
 source "$VIBE_LIB/roadmap_render.sh"
 source "$VIBE_LIB/roadmap_dependency.sh"
+source "$VIBE_LIB/roadmap_pr_dependency.sh"
 source "$VIBE_LIB/roadmap_init.sh"
 source "$VIBE_LIB/roadmap_store.sh"
 source "$VIBE_LIB/roadmap_query.sh"
@@ -42,6 +43,7 @@ vibe_roadmap() {
         init) shift; _vibe_roadmap_init_command "$@" ;;
         sync) shift; _vibe_roadmap_sync "$@" ;;
         dep) shift; _vibe_roadmap_dependency_command "$@" ;;
+        dependency) shift; _vibe_roadmap_pr_dependency_command "$@" ;;
         classify) shift; _vibe_roadmap_classify_handler "$@" ;;
         version) shift; _vibe_roadmap_version "$@" ;;
         *)

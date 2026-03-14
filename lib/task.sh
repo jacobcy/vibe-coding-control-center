@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-_vibe_task_common_dir() { git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { vibe_die "Not in a git repository"; return 1; }; git rev-parse --git-common-dir; }
+_vibe_task_common_dir() { vibe_git_dir; }
 _vibe_task_now() { date +"%Y-%m-%dT%H:%M:%S%z"; }
 _vibe_task_today() { date +"%Y-%m-%d"; }
 _vibe_task_slug_max_len() { local n="${VIBE_TASK_SLUG_MAX_LEN:-48}"; [[ "$n" =~ ^[0-9]+$ && "$n" -ge 8 ]] || n=48; echo "$n"; }

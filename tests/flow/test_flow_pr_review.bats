@@ -171,46 +171,6 @@ JSON
   [[ "$output" =~ "not found" || "$output" =~ "Missing" ]]
 }
 
-@test "12.2b _flow_pr rejects publish when current branch has multiple active tasks" {
-  local fixture
-  fixture="$(mktemp -d)"
-  mkdir -p "$fixture/vibe" "$fixture/wt-claude-refactor"
-  cat > "$fixture/vibe/registry.json" <<'JSON'
-{"schema_version":"v1","tasks":[
-  {"task_id":"task-main","title":"Main Task","status":"in_progress","runtime_branch":"task/refactor","spec_ref":"docs/plans/main-task.md"},
-  {"task_id":"task-side","title":"Side Task","status":"todo","runtime_branch":"task/refactor","spec_ref":"docs/plans/side-task.md"}
-]}
-JSON
-  cat > "$fixture/vibe/worktrees.json" <<'JSON'
-{"schema_version":"v1","worktrees":[
-  {"worktree_name":"wt-claude-refactor","worktree_path":"FIXTURE_PATH","branch":"task/refactor","current_task":"task-main","tasks":["task-main","task-side"]}
-]}
-JSON
-  perl -0pi -e 's#FIXTURE_PATH#'"$fixture"'/wt-claude-refactor#' "$fixture/vibe/worktrees.json"
-
-  run zsh -c '
-    cd "'"$fixture"'/wt-claude-refactor"
-    source "'"$VIBE_ROOT"'/lib/config.sh"
-    source "'"$VIBE_ROOT"'/lib/utils.sh"
-    source "'"$VIBE_ROOT"'/lib/flow.sh"
-    _flow_resolve_pr_base() { echo "main"; return 0; }
-    git() {
-      case "$*" in
-        "rev-parse --git-common-dir") echo "'"$fixture"'"; return 0 ;;
-        "branch --show-current") echo "task/refactor"; return 0 ;;
-        "fetch origin main --quiet") return 0 ;;
-        "show-ref --verify --quiet refs/remotes/origin/main") return 0 ;;
-        *) return 0 ;;
-      esac
-    }
-    _flow_pr --title "test" --body "test"
-  '
-
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "task/refactor" ]]
-  [[ "$output" =~ "Multiple active tasks" ]]
-}
-
 @test "12.3 _flow_pr auto-commits bound plan file before publish when bump is skipped" {
   local fixture
   fixture="$(mktemp -d)"

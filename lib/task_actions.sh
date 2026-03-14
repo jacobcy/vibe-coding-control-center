@@ -75,7 +75,13 @@ _vibe_task_update() {
         existing_branch_tasks_json="$(_vibe_task_branch_active_tasks_json "$branch" "$registry_file")" || return 1
         existing_branch_task_ids="$(printf '%s' "$existing_branch_tasks_json" | jq -r --arg task_id "$task_id" '[.[] | select(.task_id != $task_id) | .task_id] | join(", ")' 2>/dev/null)"
         if [[ -n "$existing_branch_task_ids" ]]; then
-            vibe_die "Multiple active tasks would be bound to branch '$branch': $existing_branch_task_ids"
+            local conflict_details
+            conflict_details="$(printf '%s' "$existing_branch_tasks_json" | jq -r --arg task_id "$task_id" '
+              [.[] | select(.task_id != $task_id) |
+                "  - Task: \(.task_id)\n    Status: \(.status // "unknown")\n    Branch: \(.runtime_branch // "none")\n    Worktree: \(.runtime_worktree_path // .runtime_worktree_name // "none")"
+              ] | join("\n")
+            ' 2>/dev/null)"
+            vibe_die "Cannot bind branch '$branch': already bound to active task(s):\n$conflict_details"
             return 1
         fi
     fi

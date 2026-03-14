@@ -20,6 +20,13 @@ docs/audits/
 Thumbs.db
 Desktop.ini
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
 # Temporary Vibe Artifacts
 tmpvibe-*
 vibe-init-test*

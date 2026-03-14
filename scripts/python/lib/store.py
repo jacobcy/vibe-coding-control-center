@@ -82,6 +82,20 @@ class Vibe3Store:
                 )
             ''')
             
+            # 5. handoff_items
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS handoff_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    branch TEXT NOT NULL,
+                    type TEXT NOT NULL, -- plan, report, audit
+                    item_number INTEGER NOT NULL,
+                    actor TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            ''')
+            
             # Set schema version if not set
             cursor.execute("INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', 'v3')")
             cursor.execute("INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('store_type', 'handoff_store')")
@@ -149,4 +163,31 @@ class Vibe3Store:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM flow_state WHERE flow_status = 'active'")
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_handoff_items(self, branch, type=None):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if type:
+                cursor.execute("SELECT * FROM handoff_items WHERE branch = ? AND type = ? ORDER BY item_number", (branch, type))
+            else:
+                cursor.execute("SELECT * FROM handoff_items WHERE branch = ? ORDER BY type, item_number", (branch,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def sync_handoff_items(self, branch, type, items):
+        """
+        Sync handoff items from a list of dicts.
+        items: list of {'item_number': int, 'actor': str, 'content': str, 'created_at': str, 'updated_at': str}
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Clear existing for this branch/type
+            cursor.execute("DELETE FROM handoff_items WHERE branch = ? AND type = ?", (branch, type))
+            
+            for item in items:
+                cursor.execute('''
+                    INSERT INTO handoff_items (branch, type, item_number, actor, content, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (branch, type, item['item_number'], item['actor'], item['content'], item['created_at'], item['updated_at']))
+            conn.commit()
 
