@@ -56,7 +56,7 @@ case "$command" in
         vibe3_help
         exit 0
         ;;
-    flow|task|pr|check)
+    flow|task|pr|check|handoff)
         shift 1 2>/dev/null || true
         # Dispatch to Python core
         if [[ -f "$VIBE3_PYTHON_CORE" ]]; then
