@@ -39,22 +39,22 @@
 
 ## 4. Stacked PR Order Persistence (#153)
 
-- [ ] 4.1 Add `merge_dependencies` field to roadmap schema in `lib/roadmap_store.sh`
-- [ ] 4.2 Update `vibe flow pr` to record dependencies in PR metadata
-- [ ] 4.3 Implement `vibe roadmap dependency add` command in `lib/roadmap_dependency.sh`
-- [ ] 4.4 Implement `vibe roadmap dependency remove` command in `lib/roadmap_dependency.sh`
-- [ ] 4.5 Add circular dependency detection to dependency commands
-- [ ] 4.6 Add unmet dependency warning to merge operations in `lib/flow.sh`
-- [ ] 4.7 Ensure backward compatibility for PRs without `merge_dependencies` field
-- [ ] 4.8 Test dependency recording on PR creation
-- [ ] 4.9 Test circular dependency detection
-- [ ] 4.10 Test dependency loading from previous session
+- [x] 4.1 Add `merge_dependencies` field to roadmap schema in `lib/roadmap_store.sh`
+- [x] 4.2 Update `vibe flow pr` to record dependencies in PR metadata
+- [x] 4.3 Implement `vibe roadmap dependency add` command in `lib/roadmap_dependency.sh`
+- [x] 4.4 Implement `vibe roadmap dependency remove` command in `lib/roadmap_dependency.sh`
+- [x] 4.5 Add circular dependency detection to dependency commands
+- [x] 4.6 Add unmet dependency warning to merge operations in `lib/flow.sh`
+- [x] 4.7 Ensure backward compatibility for PRs without `merge_dependencies` field
+- [x] 4.8 Test dependency recording on PR creation
+- [x] 4.9 Test circular dependency detection
+- [x] 4.10 Test dependency loading from previous session
 - [ ] 4.11 Test merge warning with unmet dependencies
 
 ## 5. Flow-Done Clean Worktree State (#144)
 
-- [ ] 5.1 Add parent branch detection logic to `lib/flow.sh` (use `git merge-base --fork-point`)
-- [ ] 5.2 Implement parent branch checkout before deletion in `vibe flow done`
+- [x] 5.1 Add parent branch detection logic to `lib/flow.sh` (use `git merge-base --fork-point`)
+- [x] 5.2 Implement parent branch checkout before deletion in `vibe flow done`
 - [ ] 5.3 Add worktree occupancy check before branch deletion
 - [ ] 5.4 Add fallback logic when parent branch not found locally (fetch from remote)
 - [ ] 5.5 Test `flow done` in single worktree scenario

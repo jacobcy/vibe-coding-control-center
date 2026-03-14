@@ -217,6 +217,35 @@ _flow_done() {
       log_error "gh (GitHub CLI) is required to merge reviewed PRs during vibe flow done."
       return 1
     }
+
+    # Check for unmet PR dependencies before merge
+    local pr_number unmet_deps
+    pr_number=$(gh pr view "$branch_name" --json number --jq '.number' 2>/dev/null || true)
+    if [[ -n "$pr_number" ]]; then
+      local common_dir
+      common_dir="$(vibe_git_dir)" || return 1
+      unmet_deps="$(_vibe_roadmap_pr_check_unmet_dependencies "$common_dir" "$pr_number")"
+
+      if [[ "$(echo "$unmet_deps" | jq 'length')" -gt 0 ]]; then
+        log_warn "PR #$pr_number has unmet merge dependencies:"
+        echo "$unmet_deps" | jq -r '.[]' | while read -r dep; do
+          echo "  - PR #$dep must be merged first"
+        done
+        echo ""
+        log_warn "Proceeding with merge may violate the intended merge order."
+
+        # In non-interactive mode, fail. In interactive mode, prompt user.
+        if [[ -t 0 ]]; then
+          read -k 1 "?Continue anyway? [y/N] " || { echo ""; return 1; }
+          echo ""
+          [[ "$REPLY" =~ ^[Yy]$ ]] || { log_error "Merge cancelled"; return 1; }
+        else
+          log_error "Unmet dependencies detected. Resolve dependencies first or run in interactive mode."
+          return 1
+        fi
+      fi
+    fi
+
     log_step "Review evidence found. Merging PR for branch: $branch_name"
     gh pr merge "$branch_name" --merge || {
       log_error "Failed to merge PR for branch '$branch_name'. Resolve merge blockers, then re-run vibe flow done."

@@ -68,7 +68,7 @@ _vibe_roadmap_init() {
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     if [[ ! -f "$roadmap_file" ]]; then
         mkdir -p "$(dirname "$roadmap_file")" || return 1
-        jq -n '{schema_version: "v2", project_id: null, milestone: null, version_goal: null, items: []}' > "$roadmap_file" || return 1
+        jq -n '{schema_version: "v2", project_id: null, milestone: null, version_goal: null, items: [], prs: {}}' > "$roadmap_file" || return 1
     fi
 }
 
@@ -130,4 +130,51 @@ _vibe_roadmap_get_version_goal() {
     local common_dir="$1" roadmap_file
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     jq -r '.version_goal // empty' "$roadmap_file"
+}
+
+# PR metadata management functions
+
+_vibe_roadmap_pr_set() {
+    local common_dir="$1" pr_number="$2" pr_url="$3" dependencies_json="$4" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+
+    # Ensure prs field exists
+    if ! jq -e '.prs' "$roadmap_file" >/dev/null 2>&1; then
+        jq '.prs = {}' "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file" || return 1
+    fi
+
+    # Set PR metadata with merge_dependencies
+    jq --arg pr "$pr_number" \
+       --arg url "$pr_url" \
+       --argjson deps "$dependencies_json" \
+       '.prs[$pr] = {url: $url, merge_dependencies: $deps}' \
+       "$roadmap_file" > "${roadmap_file}.tmp" && mv "${roadmap_file}.tmp" "$roadmap_file" || return 1
+}
+
+_vibe_roadmap_pr_get() {
+    local common_dir="$1" pr_number="$2" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+
+    # Get PR metadata, defaulting to empty merge_dependencies if missing
+    jq -c --arg pr "$pr_number" \
+       '.prs[$pr] // {url: null, merge_dependencies: []}' \
+       "$roadmap_file"
+}
+
+_vibe_roadmap_pr_get_dependencies() {
+    local common_dir="$1" pr_number="$2" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+
+    # Get merge dependencies, defaulting to empty array if missing
+    jq -r --arg pr "$pr_number" \
+       '(.prs[$pr].merge_dependencies // []) | @json' \
+       "$roadmap_file"
+}
+
+_vibe_roadmap_pr_list() {
+    local common_dir="$1" roadmap_file
+    roadmap_file="$(_vibe_roadmap_file "$common_dir")"
+
+    # List all PR numbers
+    jq -r '.prs | keys[]?' "$roadmap_file"
 }
