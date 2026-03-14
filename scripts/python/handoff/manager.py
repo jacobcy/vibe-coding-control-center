@@ -78,12 +78,11 @@ class HandoffManager:
         }
         
         for item in db_items:
+            # JSON only keeps human-editable fields, omit timestamps
             data['items'].append({
                 "item_number": item['item_number'],
                 "actor": item['actor'],
-                "content": item['content'],
-                "created_at": item['created_at'],
-                "updated_at": item['updated_at']
+                "content": item['content']
             })
             
         with open(filepath, 'w') as f:
