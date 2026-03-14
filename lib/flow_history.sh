@@ -135,16 +135,38 @@ _flow_close_branch_tasks() {
 _flow_detect_parent_branch() {
   local current_branch="$1" parent_branch=""
 
-  # Try to detect parent branch using merge-base --fork-point
-  # This finds the branch point where current_branch diverged from main
-  parent_branch="$(git merge-base --fork-point main "$current_branch" 2>/dev/null || true)"
+  # Strategy 1: Check if current branch has an upstream configured
+  parent_branch="$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null || true)"
+  if [[ -n "$parent_branch" && "$parent_branch" != "$current_branch" && "$parent_branch" != "origin/main" && ! "$parent_branch" =~ ^origin/ ]]; then
+    echo "$parent_branch"
+    return 0
+  fi
 
-  if [[ -n "$parent_branch" ]]; then
-    # Found a fork point - check if there's a local branch at that point
-    local candidate_branch
-    candidate_branch="$(git branch --contains "$parent_branch" 2>/dev/null | grep -v "^\*" | head -1 | xargs || true)"
-    if [[ -n "$candidate_branch" && "$candidate_branch" != "$current_branch" ]]; then
-      echo "$candidate_branch"
+  # Strategy 2: Find all local branches that contain current branch's HEAD
+  # The most recent non-main branch that contains our HEAD is likely the parent
+  local candidate_branches
+  candidate_branches="$(git branch --contains "$current_branch" 2>/dev/null | grep -v "^\*" | grep -v "main" || true)"
+
+  if [[ -n "$candidate_branches" ]]; then
+    # Find the branch with the most commits in common with current branch
+    local best_parent="" best_common=0
+    while read -r branch; do
+      [[ -z "$branch" ]] && continue
+      branch="$(echo "$branch" | xargs)"  # Trim whitespace
+
+      # Count common commits
+      local common_commits
+      common_commits="$(git rev-list --count "$branch..$current_branch" 2>/dev/null || echo "999999")"
+
+      # The parent branch should have fewer commits ahead of current branch
+      if [[ "$common_commits" -lt "$best_common" || "$best_common" -eq 0 ]]; then
+        best_parent="$branch"
+        best_common="$common_commits"
+      fi
+    done <<< "$candidate_branches"
+
+    if [[ -n "$best_parent" ]]; then
+      echo "$best_parent"
       return 0
     fi
   fi

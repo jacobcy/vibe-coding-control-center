@@ -1,5 +1,30 @@
 # 更新日志
 
+## [2.1.32] - 2026-03-13
+
+### ✨ Changed
+- Retire worktrees.json runtime state from flow and task paths
+
+## [2.1.31] - 2026-03-13
+
+### ✨ Changed
+- Freeze branch-first runtime semantics and task issue vocabulary
+
+## [2.1.30] - 2026-03-13
+
+### ✨ Changed
+- isolate serena gate runtime and codify serial split flow
+
+## [2.1.29] - 2026-03-13
+
+### ✨ Changed
+- add remote issue dependency commands
+
+## [2.1.28] - 2026-03-12
+
+### ✨ Changed
+- feat(roadmap): show roadmap dependency blockers and ready state
+
 ## [2.1.27] - 2026-03-12
 
 ### ✨ Changed

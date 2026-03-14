@@ -12,7 +12,8 @@ _flow_pr_detect_dependencies() {
     local base_pr
     base_pr=$(gh pr list --state open --head "$base_branch" --json number --jq '.[0].number' 2>/dev/null || true)
     if [[ -n "$base_pr" && "$base_pr" != "null" ]]; then
-      dependencies="[$base_pr]"
+      # Convert to string to match type used in manual dependency commands
+      dependencies="[\"$base_pr\"]"
       log_info "Detected dependency: PR #$base_pr ($base_branch)"
     fi
   fi
