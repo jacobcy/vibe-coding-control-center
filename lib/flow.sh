@@ -284,7 +284,11 @@ _flow_done() {
     _flow_checkout_safe_main_branch || { log_error "Failed to move current worktree onto a safe branch after closeout: $branch_name"; return 1; }
   fi
 
-  if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+  # Check if branch is occupied by another worktree before deletion
+  if vibe_is_branch_occupied_by_worktree "$branch_name"; then
+    log_warn "Branch '$branch_name' is checked out in another worktree. Skipping local branch deletion."
+    log_info "The branch will remain until all worktrees using it are removed."
+  elif git show-ref --verify --quiet "refs/heads/$branch_name"; then
     vibe_delete_local_branch "$branch_name" "$delete_mode" || return 1
   fi
   if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then

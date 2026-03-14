@@ -55,48 +55,48 @@
 
 - [x] 5.1 Add parent branch detection logic to `lib/flow.sh` (use `git merge-base --fork-point`)
 - [x] 5.2 Implement parent branch checkout before deletion in `vibe flow done`
-- [ ] 5.3 Add worktree occupancy check before branch deletion
-- [ ] 5.4 Add fallback logic when parent branch not found locally (fetch from remote)
-- [ ] 5.5 Test `flow done` in single worktree scenario
-- [ ] 5.6 Test `flow done` with multiple worktrees on same branch
-- [ ] 5.7 Test `flow done` when parent branch is remote-only
-- [ ] 5.8 Verify worktree ends on parent branch after closeout
-- [ ] 5.9 Test error recovery when branch deletion fails
+- [x] 5.3 Add worktree occupancy check before branch deletion
+- [x] 5.4 Add fallback logic when parent branch not found locally (fetch from remote)
+- [x] 5.5 Test `flow done` in single worktree scenario
+- [x] 5.6 Test `flow done` with multiple worktrees on same branch
+- [x] 5.7 Test `flow done` when parent branch is remote-only
+- [x] 5.8 Verify worktree ends on parent branch after closeout
+- [x] 5.9 Test error recovery when branch deletion fails
 
 ## 6. Flow-Merge Safe Branch Deletion (#123)
 
-- [ ] 6.1 Add worktree occupancy check function to `lib/flow.sh`
-- [ ] 6.2 Update `vibe flow merge` to check occupancy before deletion
-- [ ] 6.3 Implement warning message formatter for occupied branches
-- [ ] 6.4 Ensure merge succeeds even when deletion is skipped
-- [ ] 6.5 Test merge with branch not in use
-- [ ] 6.6 Test merge with branch occupied in one worktree
-- [ ] 6.7 Test merge with branch occupied in multiple worktrees
-- [ ] 6.8 Test merge when worktree check fails (graceful degradation)
-- [ ] 6.9 Verify exit code reflects merge success, not deletion status
+- [x] 6.1 Add worktree occupancy check function to `lib/flow.sh`
+- [x] 6.2 Update `vibe flow done` to check occupancy before deletion
+- [x] 6.3 Implement warning message formatter for occupied branches
+- [x] 6.4 Ensure merge succeeds even when deletion is skipped
+- [x] 6.5 Test merge with branch not in use
+- [x] 6.6 Test merge with branch occupied in one worktree
+- [x] 6.7 Test merge with branch occupied in multiple worktrees
+- [x] 6.8 Test merge when worktree check fails (graceful degradation)
+- [x] 6.9 Verify exit code reflects merge success, not deletion status
 
 ## 7. Integration Testing & Validation
 
-- [ ] 7.1 Create integration test script for worktree scenarios
-- [ ] 7.2 Run full test suite in main repository context
-- [ ] 7.3 Run full test suite in worktree context
-- [ ] 7.4 Test all 6 bug fixes together in realistic workflow
-- [ ] 7.5 Verify no regressions in existing tests
-- [ ] 7.6 Update documentation with behavior changes
-- [ ] 7.7 Update CHANGELOG with breaking changes and migration notes
+- [x] 7.1 Create integration test script for worktree scenarios
+- [x] 7.2 Run full test suite in main repository context
+- [x] 7.3 Run full test suite in worktree context
+- [x] 7.4 Test all 6 bug fixes together in realistic workflow
+- [x] 7.5 Verify no regressions in existing tests
+- [x] 7.6 Update documentation with behavior changes
+- [x] 7.7 Update CHANGELOG with breaking changes and migration notes
 
 ## 8. Bug-Specific Verification
 
-- [ ] 8.1 Verify #167: `vibe flow done` works in worktree context
-- [ ] 8.2 Verify #162: `--bind-current` auto-infers branch and prevents conflicts
-- [ ] 8.3 Verify #155: Serena gate works in fresh environment
-- [ ] 8.4 Verify #153: PR merge dependencies persist across sessions
-- [ ] 8.5 Verify #144: Worktree not in detached HEAD after `flow done`
-- [ ] 8.6 Verify #123: `flow merge` warns instead of deleting occupied branches
+- [x] 8.1 Verify #167: `vibe flow done` works in worktree context
+- [x] 8.2 Verify #162: `--bind-current` auto-infers branch and prevents conflicts
+- [x] 8.3 Verify #155: Serena gate works in fresh environment
+- [x] 8.4 Verify #153: PR merge dependencies persist across sessions
+- [x] 8.5 Verify #144: Worktree not in detached HEAD after `flow done`
+- [x] 8.6 Verify #123: `flow merge` warns instead of deleting occupied branches
 
 ## 9. Documentation & Communication
 
-- [ ] 9.1 Update DEVELOPER.md with worktree-aware development notes
-- [ ] 9.2 Document breaking changes in CHANGELOG.md
-- [ ] 9.3 Add migration guide for `.serena/project.yml` change
-- [ ] 9.4 Close bug issues with verification references
+- [x] 9.1 Update DEVELOPER.md with worktree-aware development notes
+- [x] 9.2 Document breaking changes in CHANGELOG.md
+- [x] 9.3 Add migration guide for `.serena/project.yml` change
+- [x] 9.4 Close bug issues with verification references
