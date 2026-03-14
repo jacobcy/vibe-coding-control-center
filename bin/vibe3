@@ -1,0 +1,17 @@
+#!/usr/bin/env zsh
+# Vibe 3.0 Entry Point (Thin Wrapper)
+
+set -e
+
+# --- Context ---
+SCRIPT_DIR="$(cd "$(dirname "${(%):-%x:A}")" && pwd)"
+VIBE3_LIB_DIR="$(cd "$SCRIPT_DIR/../lib3" && pwd)"
+VIBE3_SHELL_HUB="$VIBE3_LIB_DIR/vibe.sh"
+
+if [[ -f "$VIBE3_SHELL_HUB" ]]; then
+    # Execute the shell hub with all arguments
+    exec zsh "$VIBE3_SHELL_HUB" "$@"
+else
+    echo "Error: Vibe 3.0 shell hub not found at $VIBE3_SHELL_HUB"
+    exit 1
+fi
