@@ -46,18 +46,6 @@ related_docs:
 ### ❌ 不做
 1. **重复记录**：不要在多个文档中定义相同的规范，以本目录文档为真源。
 2. **自由发挥**：禁止引入规范之外的第三方依赖。
-
----
-
-## 归档文档
-
-以下文档已整合至上述核心规范或已完成，仅供历史参考：
-- `_archived-00-skeleton-setup.md`
-- `_archived-01-config-management.md`
-- `_archived-04-cli-design.md`
-- `_archived-07-testing-requirements.md`
-- `_archived-08-implementation-checklist.md`
-
 ---
 
 **最后更新**：2026-03-15

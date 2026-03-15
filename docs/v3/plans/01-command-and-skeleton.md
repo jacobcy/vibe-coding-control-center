@@ -1,7 +1,7 @@
 ---
 document_type: plan
 title: Phase 01 - CLI Skeleton & Contract
-status: draft
+status: completed
 author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-15
@@ -22,12 +22,19 @@ If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3
 - [ ] Working Directory is the project root.
 - [ ] No `bin/vibe3` processes are running in the background.
 
-## 2. Directory Structure
+## 3. Directory Structure
 
 ```text
 bin/vibe3 (Executable Shell)
 ├── lib3/vibe.sh (Router Logic)
-└── scripts/python/vibe_core.py (Python Entry)
+└── scripts/python/vibe3/
+    ├── cli.py (Typer Entry, < 50 lines)
+    ├── commands/ (Command dispatch, < 100 lines each)
+    │   ├── flow.py
+    │   ├── task.py
+    │   └── pr.py
+    ├── models/ (Pydantic data models)
+    └── config/ (Configuration)
 ```
 
 ## 2. CLI Contract Requirements
@@ -45,16 +52,22 @@ Must support the following subcommands with `--help` output:
 ## 3. Technical Implementation
 
 - **Shell Layer**: `bin/vibe3` should proxy arguments to `lib3/vibe.sh`.
-- **Python Bridge**: Use `argparse` in `vibe_core.py` to handle nested subcommands.
+- **Python Bridge**: Use **typer** (not argparse) in `vibe3/cli.py` to handle nested subcommands.
 - **Error Codes**: Use standard Unix exit codes (0 for success, non-zero for errors).
+- **Output**: Use **rich** for formatted output, never use print().
+- **Architecture**: Follow strict layering (CLI → Commands → Services → Clients → Models).
 
 ## 4. Acceptance Criteria (Command-Only)
 
 - [ ] `vibe3 flow --help` exit code is 0.
 - [ ] `vibe3 task --help` exit code is 0.
 - [ ] `vibe3 --json flow status` returns a valid JSON object (even if empty).
-- [ ] `mypy scripts/python/vibe_core.py --strict` passes.
+- [ ] `mypy scripts/python/vibe3/ --strict` passes.
+- [ ] No usage of `argparse` (must use typer).
+- [ ] No usage of `print()` (must use rich or logger).
 
 ## 5. Handoff for Executor 02
-- [ ] Ensure `scripts/python/vibe_core.py` contains basic `argparse` stubs for `flow`, `task`, and `pr`.
+
+- [ ] Ensure `scripts/python/vibe3/cli.py` contains basic typer setup for `flow`, `task`, and `pr` subcommands.
+- [ ] Ensure each command file (flow.py, task.py, pr.py) has skeleton command handlers.
 - [ ] Log the completion status in `.agent/context/task.md` (or equivalent).
