@@ -34,6 +34,14 @@ _flow_show() {
       *) [[ -z "$target" ]] && target="$1"; shift ;;
     esac
   done
+  local current_branch
+  current_branch="$(git branch --show-current 2>/dev/null)"
+  if [[ "$current_branch" == "main" || "$current_branch" == "master" ]]; then
+    log_warn "Protection: Flow operations are restricted on protected branch '$current_branch'."
+    echo "💡 Hint: Use 'vibe flow new <feature>' to start a new task on a feature branch."
+    return 1
+  fi
+
   target="$(_flow_show_resolve_target "$target")" || { log_error "Unable to resolve current flow."; return 1; }
   record="$(_flow_show_open_record "$target")"
   local open_status=$?
