@@ -24,6 +24,7 @@ class TestFlowCreation:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             flow_slug="test-flow",
+            task_issue_number=None,
             latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(

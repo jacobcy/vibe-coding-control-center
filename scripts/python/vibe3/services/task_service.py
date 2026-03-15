@@ -100,6 +100,11 @@ class TaskService:
             actor=actor,
         )
 
+        # Verify flow exists before updating
+        flow_data = self.store.get_flow_state(branch)
+        if not flow_data:
+            raise RuntimeError(f"Flow not found for branch {branch}")
+
         # Update flow state
         self.store.update_flow_state(
             branch,

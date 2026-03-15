@@ -40,7 +40,7 @@ class TestFlowList:
 
     def test_list_flows_no_filter(self, mock_store) -> None:
         """Test listing all flows."""
-        mock_store.get_active_flows.return_value = [
+        mock_store.get_all_flows.return_value = [
             {
                 "branch": "branch-1",
                 "flow_slug": "flow-1",
@@ -64,11 +64,17 @@ class TestFlowList:
 
     def test_list_flows_with_status_filter(self, mock_store) -> None:
         """Test listing flows with status filter."""
-        mock_store.get_active_flows.return_value = [
+        mock_store.get_all_flows.return_value = [
             {
                 "branch": "branch-1",
                 "flow_slug": "flow-1",
                 "flow_status": "active",
+                "updated_at": "2026-03-16T00:00:00",
+            },
+            {
+                "branch": "branch-2",
+                "flow_slug": "flow-2",
+                "flow_status": "idle",
                 "updated_at": "2026-03-16T00:00:00",
             },
         ]

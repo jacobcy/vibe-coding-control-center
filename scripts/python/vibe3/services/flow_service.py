@@ -1,6 +1,7 @@
 """Flow service implementation."""
 import sys
 from pathlib import Path
+import re
 
 # Add lib to path for Vibe3Store
 lib_path = Path(__file__).parent.parent.parent / "lib"
@@ -19,6 +20,25 @@ from vibe3.models.flow import (
     IssueLink,
 )
 from store import Vibe3Store
+
+
+def parse_task_id(task_id: str) -> int:
+    """Extract numeric part from task ID.
+
+    Args:
+        task_id: Task ID string (e.g., "TASK-123", "123", "task-456")
+
+    Returns:
+        Numeric part of task ID
+
+    Raises:
+        ValueError: If no numeric part found
+    """
+    # Extract digits from the task ID
+    match = re.search(r'\d+', task_id)
+    if not match:
+        raise ValueError(f"Invalid task ID format: {task_id}")
+    return int(match.group())
 
 
 class FlowService:
@@ -58,12 +78,22 @@ class FlowService:
             actor=actor,
         )
 
+        # Parse task_id if provided
+        task_issue_number = None
+        if task_id:
+            task_issue_number = parse_task_id(task_id)
+
         # Update flow state
         self.store.update_flow_state(
             branch,
             flow_slug=slug,
+            task_issue_number=task_issue_number,
             latest_actor=actor,
         )
+
+        # Add issue link if task_id provided
+        if task_id:
+            self.store.add_issue_link(branch, task_issue_number, "task")
 
         # Add creation event
         self.store.add_event(
@@ -103,11 +133,18 @@ class FlowService:
             actor=actor,
         )
 
-        # Update flow state
+        # Parse task_id
+        task_issue_number = parse_task_id(task_id)
+
+        # Update flow state with task_issue_number
         self.store.update_flow_state(
             branch,
+            task_issue_number=task_issue_number,
             latest_actor=actor,
         )
+
+        # Add issue link
+        self.store.add_issue_link(branch, task_issue_number, "task")
 
         # Add binding event
         self.store.add_event(
@@ -168,8 +205,10 @@ class FlowService:
         """
         logger.debug("Listing flows", status=status)
 
-        flows_data = self.store.get_active_flows()
+        # Get all flows, not just active ones
+        flows_data = self.store.get_all_flows()
 
+        # Apply status filter if provided
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 

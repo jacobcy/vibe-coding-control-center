@@ -150,3 +150,10 @@ class Vibe3Store:
             cursor.execute("SELECT * FROM flow_state WHERE flow_status = 'active'")
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_all_flows(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM flow_state")
+            return [dict(row) for row in cursor.fetchall()]
+
