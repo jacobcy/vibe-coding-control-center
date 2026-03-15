@@ -209,28 +209,34 @@ for item in items:
 
 ## 测试要求
 
-### 测试覆盖率
+详细的测试标准见 **[04-test-standards.md](04-test-standards.md)**
 
-- **最低要求**：80% 代码覆盖率
-- **核心路径**：100% 覆盖
+### 核心要求
 
-### 测试结构
+- **测试覆盖率**：>= 80% 代码覆盖率，核心路径 100% 覆盖
+- **测试隔离**：使用 Mock 隔离外部依赖（GitHub API、Git 操作等）
+- **测试分层**：按架构分层组织测试目录
+
+### 测试目录结构
 
 ```
 tests/
-├── test_config/
-│   └── test_settings.py
-├── test_services/
-│   ├── test_pr_service.py
-│   ├── test_flow_service.py
-│   └── test_task_service.py
-├── test_clients/
-│   ├── test_git_client.py
-│   └── test_github_client.py
-└── test_commands/
-    ├── test_pr.py
-    ├── test_flow.py
-    └── test_task.py
+├── conftest.py                    # 共享 fixtures
+├── vibe3/
+│   ├── services/                  # Service 层测试
+│   │   ├── test_flow_service.py
+│   │   ├── test_task_service.py
+│   │   └── test_pr_service.py
+│   ├── clients/                   # Client 层测试
+│   │   ├── test_git_client.py
+│   │   └── test_github_client.py
+│   └── commands/                  # Command 层测试
+│       ├── test_flow.py
+│       ├── test_task.py
+│       └── test_pr.py
+└── fixtures/                      # 测试数据
+    ├── github_responses/
+    └── git_states/
 ```
 
 ---
@@ -263,6 +269,81 @@ tests/
 
 ---
 
+## 开发环境（强制）
+
+### 依赖管理
+
+本项目使用 **uv** 进行 Python 依赖管理。
+
+#### 安装依赖
+
+```bash
+# 安装所有依赖
+uv sync
+
+# 安装开发依赖
+uv sync --all-extras
+```
+
+#### 执行命令
+
+**所有 Python 命令必须使用 `uv run` 前缀**，确保使用正确的虚拟环境。
+
+```bash
+# ✅ 正确
+uv run pytest tests/
+uv run mypy scripts/python/
+
+# ❌ 错误
+pytest tests/  # 可能使用错误的 Python 环境
+mypy scripts/python/
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+uv run pytest tests/
+
+# 运行指定测试文件
+uv run pytest tests/vibe3/services/test_flow_service.py -v
+
+# 运行并显示覆盖率
+uv run pytest tests/ --cov=scripts/python/vibe3 --cov-report=term-missing
+```
+
+### 类型检查
+
+```bash
+# 运行 mypy 严格模式检查
+uv run mypy --strict scripts/python/vibe3/
+```
+
+### 代码质量
+
+```bash
+# 运行 ruff linter
+uv run ruff check scripts/python/
+
+# 格式化代码
+uv run black scripts/python/
+
+# 自动修复 lint 问题
+uv run ruff check --fix scripts/python/
+```
+
+### 常见问题
+
+#### Python 版本要求
+
+项目使用 Python 3.10+ 特性，确保你的 Python 版本 >= 3.10。
+
+#### 类型注解要求
+
+**类型注解是强制性的**，所有代码必须通过 `mypy --strict` 检查。
+
+---
+
 ## 工具配置
 
 ### pyproject.toml
@@ -281,6 +362,18 @@ target-version = "py310"
 [tool.black]
 line-length = 100
 target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests",
+]
 ```
 
 ---
