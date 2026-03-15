@@ -51,9 +51,12 @@ _vibe_task_update() {
     _vibe_task_require_file "$registry_file" "registry.json" || return 1
     jq -e --arg task_id "$task_id" '.tasks[]? | select(.task_id == $task_id)' "$registry_file" >/dev/null 2>&1 || { vibe_die "Task not found in registry: $task_id"; return 1; }
     [[ -z "$task_status" ]] || task_status="$(_vibe_task_normalize_and_validate_status "$task_status")" || { vibe_die "Invalid task status: $task_status"; return 1; }
-    [[ "$spec_mode" != "set" ]] || spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "${spec_standard:-none}")" || { vibe_die "Invalid spec standard: ${spec_standard:-}"; return 1; }
+    [[ "$spec_mode" != "set" ]] || spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "${spec_standard:-none}")" || {
+        vibe_die "Invalid spec standard: ${spec_standard:-}\n  支持的值: openspec, kiro, superpowers, supervisor"
+        return 1
+    }
     if [[ -n "$agent" ]]; then
-        case "$agent" in codex|antigravity|trae|claude|opencode|kiro) ;; *) [[ "$force" -eq 1 ]] || { vibe_die "Unsupported agent: $agent"; return 1; } ;; esac
+        # Accept any agent string (v2 bug fix: relaxed validation)
         email_slug="$agent"; [[ "$force" -eq 1 ]] && email_slug="$(_vibe_task_slugify "$agent")"
     fi
     if [[ "$unassign" == "true" ]]; then
@@ -111,6 +114,11 @@ _vibe_task_add() {
     local -a issue_refs roadmap_item_ids
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         echo "Usage: vibe task add <title> [--id <task-id>] [--issue <ref>]... [--roadmap-item <id>]... [--pr <ref>] [--spec-standard <standard>] [--spec-ref <ref>]"
+        echo ""
+        echo "Options:"
+        echo "  --spec-standard <standard>  Execution spec 规范体系（必填）"
+        echo "                              支持的值: openspec, kiro, superpowers, supervisor"
+        echo "  --spec-ref <ref>            Execution spec 入口或文档引用（必填）"
         return 0
     fi
     if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then title="$1"; shift; fi
@@ -131,7 +139,11 @@ _vibe_task_add() {
         esac
     done
     [[ -n "$title" ]] || { vibe_die "Missing title for task add"; return 1; }
-    spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "$spec_standard")" || { vibe_die "Invalid spec standard: $spec_standard"; return 1; }
+    local original_spec_standard="$spec_standard"
+    spec_standard="$(_vibe_task_normalize_and_validate_spec_standard "$spec_standard")" || {
+        vibe_die "Invalid spec standard: $original_spec_standard\n  支持的值: openspec, kiro, superpowers, supervisor"
+        return 1
+    }
     if [[ -z "$task_id" ]]; then local slug; slug="$(_vibe_task_slugify "$title")"; task_id="$(_vibe_task_today)-$slug"; fi
     [[ "$spec_standard" == "kiro" && -z "$spec_ref" ]] && spec_ref=".kiro/specs/$task_id"
     _vibe_task_require_plan_binding_for_add "$spec_standard" "$spec_ref" || return 1

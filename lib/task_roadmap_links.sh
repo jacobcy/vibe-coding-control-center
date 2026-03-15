@@ -44,7 +44,7 @@ _vibe_task_sync_roadmap_links() {
 _vibe_task_require_plan_binding_for_add() {
     local spec_standard="$1" spec_ref="$2"
     if [[ "$spec_standard" == "none" || -z "$spec_ref" ]]; then
-        vibe_die "Task creation requires a plan binding. Create or select a roadmap item via 'vibe roadmap add (shell)', then use the writing-plans skill to produce a plan, and re-run vibe task add with --spec-standard/--spec-ref."
+        vibe_die $'Task creation requires a plan binding.\n\n  选项 1: 从已有 plan 创建（推荐）\n    vibe task add <title> --issue <issue> \\\n      --spec-standard openspec \\\n      --spec-ref docs/plans/example.md\n\n  选项 2: 从 roadmap item 创建\n    vibe roadmap add <title> --issue <issue>\n    vibe task add <title> --spec-standard openspec --spec-ref <plan-path>'
         return 1
     fi
 }
