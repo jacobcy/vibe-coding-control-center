@@ -1279,6 +1279,671 @@ skills 不重做，但要分阶段适配：
 - 本轮不靠软链接切换正式实现
 - 本轮不假装 `v3` 的命令、目录和 Python 栈已经定稿
 
+## Specification (规格说明)
+
+本章节明确 Vibe3 Parallel Rebuild 的具体规格，作为后续实施和审核的依据。
+
+---
+
+### 1. 实施阶段规格 (Implementation Phases)
+
+#### Phase 1: 核心骨架与数据层 (Foundation)
+**目标**：建立基础架构和数据持久化层
+
+**交付物**：
+- [ ] `bin/vibe3` CLI 入口脚本
+- [ ] `scripts/python/vibe3/cli.py` Typer 应用入口 (< 50 行)
+- [ ] `scripts/python/lib/store.py` Vibe3Store SQLite 实现
+- [ ] `scripts/python/vibe3/clients/git_client.py` Git 客户端封装
+- [ ] `scripts/python/vibe3/models/flow.py` Pydantic 数据模型
+
+**验收标准**：
+- ✅ `vibe3 --help` 返回有效帮助信息
+- ✅ `handoff.db` 在 `.git/vibe3/` 正确创建
+- ✅ 数据库包含所有必需表：`flow_state`, `flow_issue_links`, `flow_events`, `schema_meta`
+- ✅ `mypy --strict` 无类型错误
+- ✅ 所有文件符合行数限制 (cli.py < 50, clients < 200, models 无限制)
+
+**依赖**：无
+
+**预估时间**：2-3 天
+
+---
+
+#### Phase 2: Flow 命令域 (Flow Domain)
+**目标**：实现完整的 flow 命令集
+
+**交付物**：
+- [ ] `scripts/python/vibe3/commands/flow.py` Flow 命令层 (< 100 行)
+- [ ] `scripts/python/vibe3/services/flow_service.py` Flow 业务逻辑 (< 300 行)
+- [ ] `scripts/python/vibe3/ui/flow_ui.py` UI 渲染层
+- [ ] 命令实现：`new`, `bind`, `show`, `status`, `list`
+
+**验收标准**：
+- ✅ `vibe3 flow new <name>` 成功创建 flow 并写入数据库
+- ✅ `vibe3 flow bind <task-id>` 绑定 task 到 flow
+- ✅ `vibe3 flow show` 显示 flow 详细信息（格式见 §5.1）
+- ✅ `vibe3 flow status` 显示所有活跃 flow 列表（格式见 §5.2）
+- ✅ `vibe3 flow status --json` 返回有效 JSON
+- ✅ `vibe3 flow list` 列出所有 flow
+- ✅ Commands 层无业务逻辑，Services 层无 UI 逻辑
+- ✅ `mypy --strict` 无类型错误
+- ✅ 单元测试覆盖核心路径
+
+**依赖**：Phase 1 完成
+
+**预估时间**：3-4 天
+
+---
+
+#### Phase 3: Task 命令域 (Task Domain)
+**目标**：实现完整的 task 命令集
+
+**交付物**：
+- [ ] `scripts/python/vibe3/commands/task.py` Task 命令层 (< 100 行)
+- [ ] `scripts/python/vibe3/services/task_service.py` Task 业务逻辑 (< 300 行)
+- [ ] `scripts/python/vibe3/ui/task_ui.py` UI 渲染层
+- [ ] 命令实现：`add`, `link`, `show`, `list`, `update`
+
+**验收标准**：
+- ✅ `vibe3 task add --repo-issue <issue>` 提升为 task issue
+- ✅ `vibe3 task link <issue>` 添加参考 issue 链接
+- ✅ `vibe3 task show` 显示 task 详情
+- ✅ `vibe3 task list` 列出所有 task
+- ✅ `vibe3 task update <id> --status <status> --group <group>` 更新 task
+- ✅ `flow_issue_links` 表的唯一约束生效（每个 flow 只有一个 task issue）
+- ✅ `mypy --strict` 无类型错误
+- ✅ 单元测试覆盖核心路径
+
+**依赖**：Phase 2 完成
+
+**预估时间**：3-4 天
+
+---
+
+#### Phase 4: PR 命令域 (PR Domain)
+**目标**：实现 PR 命令集与发布流程
+
+**交付物**：
+- [ ] `scripts/python/vibe3/commands/pr.py` PR 命令层 (< 100 行)
+- [ ] `scripts/python/vibe3/services/pr_service.py` PR 业务逻辑 (< 300 行)
+- [ ] `scripts/python/vibe3/clients/github_client.py` GitHub API 客户端
+- [ ] 命令实现：`draft`, `show`, `review`, `ready`, `merge`
+
+**验收标准**：
+- ✅ `vibe3 pr draft` 创建 draft PR 并绑定元数据
+- ✅ `vibe3 pr show` 显示 PR 详情和链路信息
+- ✅ `vibe3 pr ready` 执行 publish preflight 检查
+- ✅ `vibe3 pr review` 执行审查并支持回贴到 PR
+- ✅ `vibe3 pr merge` 合并 PR 并更新 task 状态
+- ✅ PR 描述包含 `task issue`, `repo issues`, `spec_ref`, `agent` 信息
+- ✅ `mypy --strict` 无类型错误
+- ✅ 单元测试覆盖核心路径
+
+**依赖**：Phase 3 完成
+
+**预估时间**：4-5 天
+
+---
+
+#### Phase 5: 修正与撤销命令 (Correction & Undo)
+**目标**：实现错误恢复能力
+
+**交付物**：
+- [ ] `task unlink`, `task update` 命令
+- [ ] `flow unbind`, `flow abort` 命令
+- [ ] `pr close` 命令
+- [ ] `vibe handoff auth` 系列命令
+
+**验收标准**：
+- ✅ `vibe3 task unlink --repo-issue <id>` 正确解除链接
+- ✅ `vibe3 flow unbind task` 正确解除 task 绑定
+- ✅ `vibe3 flow abort` 删除分支和 draft PR
+- ✅ `vibe3 pr close` 触发状态回退
+- ✅ `vibe3 handoff auth plan --agent claude --model sonnet-4.5` 正确写入署名
+- ✅ 所有修正操作记录到 `flow_events` 表
+- ✅ `mypy --strict` 无类型错误
+- ✅ 单元测试覆盖错误恢复路径
+
+**依赖**：Phase 4 完成
+
+**预估时间**：2-3 天
+
+---
+
+#### Phase 6: 集成测试与文档 (Integration & Documentation)
+**目标**：完整测试覆盖和文档完善
+
+**交付物**：
+- [ ] 端到端集成测试
+- [ ] `docs/v3/` 文档完善
+- [ ] 迁移指南
+- [ ] 用户手册
+
+**验收标准**：
+- ✅ 所有主链路径有集成测试覆盖
+- ✅ 测试覆盖率 ≥ 80%
+- ✅ 所有命令有完整文档说明
+- ✅ 迁移指南清晰可执行
+- ✅ 用户手册完整准确
+
+**依赖**：Phase 5 完成
+
+**预估时间**：3-4 天
+
+---
+
+### 2. 数据库规格 (Database Schema)
+
+#### 2.1 `flow_state` 表
+
+```sql
+CREATE TABLE flow_state (
+    branch TEXT PRIMARY KEY,           -- Git 分支名（flow 身份锚点）
+    flow_slug TEXT NOT NULL,           -- Flow 名称
+    task_issue_number INTEGER,         -- 主闭环 issue 编号
+    pr_number INTEGER,                 -- 关联的 PR 编号
+    spec_ref TEXT,                     -- 执行规范引用
+    plan_ref TEXT,                     -- 计划文档引用
+    report_ref TEXT,                   -- 报告文档引用
+    audit_ref TEXT,                    -- 审计文档引用
+    planner_actor TEXT,                -- 规划者身份
+    planner_session_id TEXT,           -- 规划会话 ID
+    executor_actor TEXT,               -- 执行者身份
+    executor_session_id TEXT,          -- 执行会话 ID
+    reviewer_actor TEXT,               -- 审查者身份
+    reviewer_session_id TEXT,          -- 审查会话 ID
+    latest_actor TEXT,                 -- 最后操作者
+    blocked_by TEXT,                   -- 阻塞原因
+    next_step TEXT,                    -- 下一步动作
+    flow_status TEXT NOT NULL DEFAULT 'active',  -- flow 状态
+    updated_at TEXT NOT NULL           -- 更新时间 (ISO 8601)
+)
+```
+
+**字段约束**：
+- `branch`: PRIMARY KEY, NOT NULL
+- `flow_slug`: NOT NULL, 建议格式 `^[a-z0-9-]+$`
+- `task_issue_number`: INTEGER, 可为 NULL
+- `pr_number`: INTEGER, 可为 NULL
+- `flow_status`: NOT NULL, 默认 'active', 允许值: 'active', 'idle', 'missing', 'stale'
+- `updated_at`: NOT NULL, 格式: ISO 8601 (e.g., `2026-03-15T23:42:04.604`)
+
+**索引**：
+- PRIMARY KEY: `branch`
+
+---
+
+#### 2.2 `flow_issue_links` 表
+
+```sql
+CREATE TABLE flow_issue_links (
+    branch TEXT NOT NULL,              -- Git 分支名
+    issue_number INTEGER NOT NULL,     -- Issue 编号
+    issue_role TEXT NOT NULL,          -- Issue 角色（'task' / 'related'）
+    created_at TEXT NOT NULL,          -- 创建时间 (ISO 8601)
+    PRIMARY KEY (branch, issue_number, issue_role)
+)
+```
+
+**字段约束**：
+- `branch`: NOT NULL, 外键关联 `flow_state.branch`
+- `issue_number`: NOT NULL, INTEGER
+- `issue_role`: NOT NULL, 允许值: 'task', 'related'
+- `created_at`: NOT NULL, 格式: ISO 8601
+
+**唯一约束**：
+```sql
+CREATE UNIQUE INDEX idx_flow_single_task_issue
+ON flow_issue_links(branch)
+WHERE issue_role = 'task'
+```
+
+**语义约束**：
+- 每个 flow 只能有一个 `issue_role='task'` 的记录（主闭环 issue）
+- 可以有多个 `issue_role='related'` 的记录（参考 issue）
+
+---
+
+#### 2.3 `flow_events` 表
+
+```sql
+CREATE TABLE flow_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    branch TEXT NOT NULL,              -- Git 分支名
+    event_type TEXT NOT NULL,          -- 事件类型
+    actor TEXT NOT NULL,               -- 操作者
+    detail TEXT,                       -- 事件详情
+    created_at TEXT NOT NULL           -- 创建时间 (ISO 8601)
+)
+```
+
+**字段约束**：
+- `id`: PRIMARY KEY, AUTOINCREMENT
+- `branch`: NOT NULL, 外键关联 `flow_state.branch`
+- `event_type`: NOT NULL, 允许值见下表
+- `actor`: NOT NULL, 格式: `agent/model` (e.g., `claude/sonnet-4.5`)
+- `detail`: TEXT, 可为 NULL
+- `created_at`: NOT NULL, 格式: ISO 8601
+
+**标准事件类型**：
+| event_type | 含义 | detail 格式 |
+|-----------|------|------------|
+| `flow_created` | Flow 创建 | `Flow '{slug}' created` |
+| `task_bound` | Task 绑定 | `Task '{task_id}' bound` |
+| `issue_linked` | Issue 链接 | `Issue #{issue_number} linked as {role}` |
+| `status_updated` | 状态更新 | `Status changed to {status}` |
+| `next_step_set` | 下一步设置 | `Next step: {next_step}` |
+| `planner_registered` | Planner 注册 | `Planner: {agent}/{model}` |
+| `executor_registered` | Executor 注册 | `Executor: {agent}/{model}` |
+| `reviewer_registered` | Reviewer 注册 | `Reviewer: {agent}/{model}` |
+| `flow_aborted` | Flow 废弃 | `Flow aborted: {reason}` |
+| `pr_created` | PR 创建 | `PR #{pr_number} created` |
+| `pr_merged` | PR 合并 | `PR #{pr_number} merged` |
+| `pr_closed` | PR 关闭 | `PR #{pr_number} closed` |
+
+**索引**：
+- PRIMARY KEY: `id`
+- 建议: `CREATE INDEX idx_flow_events_branch ON flow_events(branch)`
+
+---
+
+#### 2.4 `schema_meta` 表
+
+```sql
+CREATE TABLE schema_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+)
+```
+
+**字段约束**：
+- `key`: PRIMARY KEY, NOT NULL
+- `value`: NOT NULL
+
+**初始数据**：
+```sql
+INSERT INTO schema_meta (key, value) VALUES ('schema_version', 'v3');
+INSERT INTO schema_meta (key, value) VALUES ('store_type', 'handoff_store');
+```
+
+---
+
+### 3. 命令接口规格 (Command Interface Specification)
+
+#### 3.1 `vibe3 flow` 命令集
+
+##### `vibe3 flow new <name> [--task <task-id>] [--actor <actor>]`
+
+**输入参数**：
+- `name`: REQUIRED, string, flow 名称
+- `--task`: OPTIONAL, string, task ID to bind
+- `--actor`: OPTIONAL, string, 默认 "claude"
+
+**输出格式** (成功):
+```
+✓ Flow created: <name>
+  Branch: <branch>
+  Task: <task-id> (如果提供了 --task)
+```
+
+**输出格式** (失败):
+```
+✗ Failed to create flow: <error-message>
+```
+
+**数据库操作**：
+- INSERT/UPDATE `flow_state` 表
+- INSERT `flow_events` 表 (event_type='flow_created')
+
+**验收标准**：
+- ✅ flow_slug 字段正确设置
+- ✅ branch 字段为当前 git branch
+- ✅ latest_actor 字段正确设置
+- ✅ 返回码: 0 (成功), 1 (失败)
+
+---
+
+##### `vibe3 flow bind <task-id> [--actor <actor>]`
+
+**输入参数**：
+- `task-id`: REQUIRED, string, task ID to bind
+- `--actor`: OPTIONAL, string, 默认 "claude"
+
+**输出格式** (成功):
+```
+✓ Task bound to flow: <flow-slug>
+  Task: <task-id>
+```
+
+**输出格式** (失败):
+```
+✗ Failed to bind task: <error-message>
+```
+
+**数据库操作**：
+- UPDATE `flow_state` 表
+- INSERT `flow_events` 表 (event_type='task_bound')
+
+**验收标准**：
+- ✅ task 正确绑定到 flow
+- ✅ latest_actor 字段更新
+- ✅ 返回码: 0 (成功), 1 (失败)
+
+---
+
+##### `vibe3 flow show [<flow-name>]`
+
+**输入参数**：
+- `flow-name`: OPTIONAL, string, flow 名称。省略则使用当前 branch
+
+**输出格式** (文本):
+```
+Flow: <flow-slug>
+  Branch: <branch>
+  Status: <status>
+  Task Issue: #<number> (如果存在)
+  PR: #<number> (如果存在)
+  Spec: <spec-ref> (如果存在)
+  Next Step: <next-step> (如果存在)
+  Issues: #<n1>, #<n2> (如果存在)
+```
+
+**输出格式** (失败):
+```
+No flow found for branch: <branch>
+```
+
+**数据库操作**：
+- SELECT `flow_state` 表
+- SELECT `flow_issue_links` 表
+
+**验收标准**：
+- ✅ 显示完整 flow 信息
+- ✅ 包含所有关联的 issue
+- ✅ 返回码: 0 (成功), 1 (flow 不存在)
+
+---
+
+##### `vibe3 flow status [--json]`
+
+**输入参数**：
+- `--json`: OPTIONAL, boolean, 输出 JSON 格式
+
+**输出格式** (文本):
+```
+         Flow Status
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field  ┃ Value                    ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Flow   │ <flow-slug>              │
+│ Branch │ <branch>                 │
+│ Status │ <status>                 │
+└────────┴──────────────────────────┘
+```
+
+**输出格式** (JSON):
+```json
+{
+  "branch": "<branch>",
+  "flow_slug": "<flow-slug>",
+  "flow_status": "<status>",
+  "task_issue_number": <number> | null,
+  "pr_number": <number> | null,
+  "spec_ref": "<spec-ref>" | null,
+  "next_step": "<next-step>" | null,
+  "issues": [
+    {
+      "branch": "<branch>",
+      "issue_number": <number>,
+      "issue_role": "<role>"
+    }
+  ]
+}
+```
+
+**输出格式** (无 flow):
+```
+No active flow
+```
+
+**数据库操作**：
+- SELECT `flow_state` 表
+- SELECT `flow_issue_links` 表
+
+**验收标准**：
+- ✅ JSON 输出格式正确
+- ✅ 文本输出使用 Rich Table
+- ✅ 返回码: 0 (成功), 0 (无 flow)
+
+---
+
+##### `vibe3 flow list [--status <status>]`
+
+**输入参数**：
+- `--status`: OPTIONAL, string, 过滤状态 (active/idle/missing/stale)
+
+**输出格式**:
+```
+                              Flows
+┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Flow                   ┃ Branch                      ┃ Status ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ <flow-slug-1>          │ <branch-1>                  │ <status>│
+│ <flow-slug-2>          │ <branch-2>                  │ <status>│
+└────────────────────────┴─────────────────────────────┴────────┘
+```
+
+**输出格式** (无 flow):
+```
+No flows found
+```
+
+**数据库操作**：
+- SELECT `flow_state` 表 (带可选过滤)
+
+**验收标准**：
+- ✅ 列表正确显示所有 flow
+- ✅ 状态过滤生效
+- ✅ 返回码: 0 (成功), 0 (无 flow)
+
+---
+
+### 4. 代码质量规格 (Code Quality Specification)
+
+#### 4.1 类型安全
+- **要求**: 所有 Python 文件必须通过 `mypy --strict` 检查
+- **允许**: 无例外
+- **验证**: CI 自动检查
+
+#### 4.2 代码行数限制
+| 文件类型 | 行数限制 | 说明 |
+|---------|---------|------|
+| `cli.py` | < 50 行 | 只负责创建 Typer app 和注册命令 |
+| `commands/*.py` | < 100 行 | 参数定义、验证、格式化输出 |
+| `services/*.py` | < 300 行 | 业务逻辑编排 |
+| `clients/*.py` | < 200 行 | 外部系统封装 |
+| `models/*.py` | 无限制 | Pydantic 数据模型 |
+| `ui/*.py` | < 150 行 | UI 渲染逻辑 |
+
+#### 4.3 测试覆盖率
+- **最低要求**: 80% 代码覆盖率
+- **核心路径**: 100% 覆盖（flow/task 命令集）
+- **工具**: pytest + pytest-cov
+
+#### 4.4 依赖管理
+**允许的依赖** (见 [03-coding-standards.md](../v3/implementation/03-coding-standards.md)):
+- typer: CLI 框架
+- rich: 终端输出
+- pydantic: 数据验证
+- loguru: 日志
+- pytest: 测试框架
+
+**禁止的依赖**:
+- ❌ argparse (用 typer 替代)
+- ❌ ORM (SQLAlchemy, peewee)
+- ❌ Web 框架 (Django, Flask, FastAPI)
+- ❌ print() (用 logger 或 rich)
+
+---
+
+### 5. 输出格式规格 (Output Format Specification)
+
+#### 5.1 `flow show` 输出格式
+
+**完整格式**:
+```
+Flow: vibe3-parallel-rebuild
+  Branch: task/vibe3-parallel-rebuild
+  Status: active
+  Task Issue: #157
+  PR: #201 (draft)
+  Spec: docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
+  Next Step: finalize command boundary
+  Issues: #157, #158
+```
+
+**最小格式** (仅有必需字段):
+```
+Flow: test-flow
+  Branch: task/test-flow
+  Status: active
+```
+
+**验证要点**:
+- ✅ 字段顺序固定
+- ✅ 缺失字段不显示
+- ✅ 使用 Rich 颜色标注
+
+---
+
+#### 5.2 `flow status` 输出格式
+
+**列表格式**:
+```
+         Flow Status
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Field  ┃ Value                    ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Flow   │ test-flow                │
+│ Branch │ task/phase-02-foundation │
+│ Status │ active                   │
+└────────┴──────────────────────────┘
+```
+
+**JSON 格式**:
+```json
+{
+  "branch": "task/phase-02-foundation",
+  "flow_slug": "test-flow",
+  "flow_status": "active",
+  "task_issue_number": null,
+  "pr_number": null,
+  "spec_ref": null,
+  "next_step": null,
+  "issues": []
+}
+```
+
+**验证要点**:
+- ✅ JSON 格式符合 Pydantic model_dump() 输出
+- ✅ 表格使用 Rich Table
+- ✅ 日期时间字段序列化为 ISO 8601 字符串
+
+---
+
+### 6. 性能规格 (Performance Specification)
+
+#### 6.1 响应时间要求
+| 操作类型 | 响应时间要求 | 说明 |
+|---------|------------|------|
+| `flow show` | < 500ms | 本地数据库查询 |
+| `flow status` | < 1s | 本地数据库查询 |
+| `flow list` | < 2s | 本地数据库查询 |
+| `task add` | < 2s | 含 GitHub API 调用 |
+| `pr draft` | < 5s | 含 GitHub API 调用 |
+
+#### 6.2 数据库性能
+- **数据库大小**: 预期 < 10MB (1000 个 flow)
+- **查询性能**: < 100ms (本地 SQLite)
+- **写入性能**: < 50ms (本地 SQLite)
+
+---
+
+### 7. 安全规格 (Security Specification)
+
+#### 7.1 数据验证
+- **输入验证**: 所有用户输入必须通过 Pydantic 验证
+- **SQL 注入防护**: 使用参数化查询，禁止字符串拼接
+- **路径遍历防护**: 验证所有文件路径
+
+#### 7.2 身份认证
+- **GitHub Token**: 从环境变量 `GITHUB_TOKEN` 读取
+- **不存储敏感信息**: 数据库不存储 token、密码等敏感信息
+
+#### 7.3 权限控制
+- **本地数据库**: 无权限控制，信任本地用户
+- **GitHub API**: 继承 GitHub CLI 的权限模型
+
+---
+
+### 8. 错误处理规格 (Error Handling Specification)
+
+#### 8.1 错误分类
+| 错误类型 | 返回码 | 说明 |
+|---------|-------|------|
+| 成功 | 0 | 命令成功执行 |
+| 用户错误 | 1 | 参数错误、验证失败 |
+| 系统错误 | 2 | 数据库错误、网络错误 |
+| 未找到 | 0 (特殊) | flow/task 不存在 |
+
+#### 8.2 错误消息格式
+```
+✗ Failed to <action>: <error-message>
+
+Recovery: <suggested-action>
+```
+
+**示例**:
+```
+✗ Failed to create flow: Database connection error
+
+Recovery: Check if .git/vibe3/ directory exists and is writable
+```
+
+#### 8.3 日志规格
+- **日志级别**: DEBUG, INFO, WARNING, ERROR
+- **日志输出**: stderr (使用 loguru)
+- **日志格式**: `{timestamp} | {level} | {module}:{function}:{line} - {message}`
+- **生产环境**: 只显示 WARNING 及以上
+
+---
+
+### 9. 测试验收规格 (Test Acceptance Specification)
+
+#### 9.1 单元测试要求
+- **覆盖范围**: 所有 `services/` 和 `clients/` 模块
+- **Mock 策略**: 使用 Protocol 接口 Mock 外部依赖
+- **测试隔离**: 每个测试使用独立的内存数据库
+
+#### 9.2 集成测试要求
+- **测试场景**:
+  1. 创建 flow -> 绑定 task -> 创建 PR
+  2. 修正错误：unlink task -> rebind
+  3. 废弃 flow -> 验证状态
+- **数据验证**: 每个操作后验证数据库状态
+
+#### 9.3 验收标准清单
+- [ ] 所有单元测试通过 (100%)
+- [ ] 所有集成测试通过 (100%)
+- [ ] 代码覆盖率 ≥ 80%
+- [ ] `mypy --strict` 无错误
+- [ ] 所有命令有完整文档
+- [ ] 所有错误消息清晰可读
+- [ ] 性能符合规格要求
+
+---
+
 ## Recommended First Deliverables
 
 3.0 第一阶段剩余任务：
