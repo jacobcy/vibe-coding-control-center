@@ -4,6 +4,20 @@
 
 `repo issue -> task issue -> flow(branch)`
 
+## ⚠️ 实现规范（强制）
+
+**必须遵守**: [docs/v3/implementation-spec-phase2.md](../implementation-spec-phase2.md)
+
+该文档定义了：
+- ✅ 必须使用的技术栈（typer, rich, pydantic, loguru）
+- ✅ 强制的目录结构
+- ✅ 严格的分层职责
+- ✅ 类型注解要求
+- ✅ 测试要求
+- ✅ 代码量限制
+
+**违反规范将导致验收失败，不予合并。**
+
 ## 必读输入
 
 - `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
@@ -70,22 +84,39 @@
 
 ## 建议交付物
 
-- `task add --repo-issue`
-- `task link`
-- `task show`
-- `task list`
-- `task update`
-- `flow new`
-- `flow bind --issue`
-- `flow bind task <repo-issue>`
-- `flow switch`
-- `flow show`
-- `flow status`
-- `flow freeze --by`
-- **`handoff auth`**：身份注册逻辑
-- **Handoff Sync**：JSON 文件编辑后的入库同步逻辑
-- `vibe check`
-- 对应的 `tests3/flow/*` 和 `tests3/task/*`
+**文件结构**（必须符合 [实现规范](../implementation-spec-phase2.md)）:
+
+```
+scripts/python/vibe3/
+├── cli.py                    # Typer 入口
+├── commands/
+│   ├── flow.py              # flow 命令调度
+│   └── task.py              # task 命令调度
+├── services/
+│   ├── flow_service.py      # Flow 业务逻辑
+│   └── task_service.py      # Task 业务逻辑
+├── clients/
+│   ├── git_client.py        # Git 操作封装
+│   ├── github_client.py     # GitHub API 封装
+│   └── store_client.py      # SQLite 封装
+├── models/
+│   ├── flow.py              # Flow Pydantic 模型
+│   └── task.py              # Task Pydantic 模型
+└── ui/
+    └── console.py           # Rich 输出
+```
+
+**命令列表**:
+- `vibe3 flow new` - 创建新 flow
+- `vibe3 flow show` - 展示 flow 详情
+- `vibe3 flow status` - 列出所有 flow
+- `vibe3 flow bind` - 绑定 issue
+- `vibe3 task add` - 添加 task
+- `vibe3 task show` - 展示 task 详情
+
+**测试要求**:
+- 单元测试: `tests/unit/`
+- 契约测试: `tests3/flow/`, `tests3/task/`
 
 ## 验证证据 (历史记录，当前已失效)
 
@@ -105,17 +136,35 @@
 - `bin/vibe3 flow show` -> 成功展示链路
 - `bin/vibe3 flow freeze --by "#blocker"` -> 状态变为 blocked
 
-## 当前状态（清理后）
+## 验收标准
 
-- `02` 的目标和边界仍有效
-- 上一轮“已收口”结论已失效
-- 下一轮执行必须重新提交：
-  - flow/task 主链证据
-  - 绑定规则证据
-  - `vibe check` 对齐证据
-  - dirty workspace 保护证据
+**代码质量检查**（强制）:
+- [ ] `mypy scripts/python/vibe3` - 类型检查通过
+- [ ] `ruff check scripts/python/vibe3` - Lint 通过
+- [ ] `black --check scripts/python/vibe3` - 格式检查通过
+- [ ] 每个文件代码量符合规范
+- [ ] 所有公共函数有类型注解
 
-状态：**待二次执行**。不得直接跳到 `03`，除非重新验证通过。
+**功能验证**:
+- [ ] `vibe3 flow new <name>` - 创建成功
+- [ ] `vibe3 flow show` - 展示正确
+- [ ] `vibe3 flow status` - 列表正确
+- [ ] `vibe3 task add --repo-issue <id>` - 添加成功
+- [ ] dirty workspace 检查有效
+
+**测试验证**:
+- [ ] 单元测试覆盖率 > 80%
+- [ ] 契约测试全部通过
+
+**文档更新**:
+- [ ] README 包含使用说明
+- [ ] 每个命令有 help 文档
+
+**不通过条件**:
+- ❌ 违反 [实现规范](../implementation-spec-phase2.md)
+- ❌ 缺少类型注解
+- ❌ 使用了禁止的依赖
+- ❌ 测试不充分
 
 ## 进入下一轮的条件
 
