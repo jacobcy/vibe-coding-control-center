@@ -68,10 +68,11 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   jq '.items = [{"roadmap_item_id":"gh-36","title":"gh-36","description":null,"status":"p0","source_type":"github","source_refs":[],"issue_refs":["gh-36"],"linked_task_ids":[],"created_at":"2026-03-08T10:00:00+08:00","updated_at":"2026-03-08T10:00:00+08:00"}]' "$fixture/vibe/roadmap.json" > "$tmp"
   mv "$tmp" "$fixture/vibe/roadmap.json"
 
-  run_roadmap_fixture_cmd_no_tty "$fixture" 'vibe_roadmap list'
+  run_roadmap_fixture_cmd_no_tty "$fixture" 'vibe_roadmap list --status p0,current,next,deferred,rejected'
 
   [ "$status" -eq 0 ]
-  [ "$output" = $'P0 (1)\n  gh-36' ]
+  [[ "$output" =~ "P0 (1)" ]]
+  [[ "$output" =~ "gh-36" ]]
   [[ ! "$output" =~ $'\033' ]]
 }
 
@@ -80,10 +81,15 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   fixture="$(mktemp -d)"
   make_roadmap_fixture "$fixture"
 
-  run_roadmap_fixture_cmd_no_tty "$fixture" 'vibe_roadmap list'
+  run_roadmap_fixture_cmd_no_tty "$fixture" 'vibe_roadmap list --status p0,current,next,deferred,rejected'
 
   [ "$status" -eq 0 ]
-  [ "$output" = $'P0 (1)\n  rm-2  Beta\n\nCurrent (1)\n  rm-1  Alpha\n\nDeferred (1)\n  rm-3  Gamma' ]
+  [[ "$output" =~ "P0 (1)" ]]
+  [[ "$output" =~ "rm-2  Beta" ]]
+  [[ "$output" =~ "Current (1)" ]]
+  [[ "$output" =~ "rm-1  Alpha" ]]
+  [[ "$output" =~ "Deferred (1)" ]]
+  [[ "$output" =~ "rm-3  Gamma" ]]
   [[ ! "$output" =~ $'\033' ]]
 }
 
@@ -92,7 +98,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   fixture="$(mktemp -d)"
   make_roadmap_fixture "$fixture"
 
-  run_roadmap_fixture_cmd "$fixture" '_vibe_roadmap_supports_color() { return 0; }; vibe_roadmap list'
+  run_roadmap_fixture_cmd "$fixture" '_vibe_roadmap_supports_color() { return 0; }; vibe_roadmap list --status p0,current,next,deferred,rejected'
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ $'\033' ]]

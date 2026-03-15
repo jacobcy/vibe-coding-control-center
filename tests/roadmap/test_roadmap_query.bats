@@ -17,6 +17,20 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   [ "$(echo "$output" | jq -r '.[0].roadmap_item_id')" = "rm-1" ]
 }
 
+@test "roadmap list defaults to p0, current and next items when no filters" {
+  local fixture
+  fixture="$(mktemp -d)"
+  make_roadmap_fixture "$fixture"
+
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap list --json'
+
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq 'length')" -eq 2 ]
+  # JSON output is an array of items, not grouped text
+  [ "$(echo "$output" | jq -r '.[0].roadmap_item_id')" = "rm-1" ]
+  [ "$(echo "$output" | jq -r '.[1].roadmap_item_id')" = "rm-2" ]
+}
+
 @test "roadmap show returns a single roadmap item as json" {
   local fixture
   fixture="$(mktemp -d)"
@@ -56,7 +70,7 @@ source "$BATS_TEST_DIRNAME/../helpers/roadmap_common.bash"
   jq '.items[0].description = "line one\nline two"' "$fixture/vibe/roadmap.json" > "$tmp"
   mv "$tmp" "$fixture/vibe/roadmap.json"
 
-  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap list --json'
+  run_roadmap_fixture_cmd "$fixture" 'vibe_roadmap list --status p0,current,next,deferred,rejected --json'
 
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq 'length')" -eq 3 ]
