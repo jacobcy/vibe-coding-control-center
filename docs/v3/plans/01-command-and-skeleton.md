@@ -1,118 +1,73 @@
-# 01. Command And Skeleton
+---
+document_type: plan
+title: Phase 01 - CLI Skeleton & Contract
+status: completed
+author: Claude Sonnet 4.6
+created: 2026-03-15
+last_updated: 2026-03-15
+related_docs:
+  - docs/v3/plans/v3-rewrite-plan.md
+  - docs/v3/implementation/02-architecture.md
+  - docs/v3/implementation/03-coding-standards.md
+---
 
-目标：先把 `vibe3` 的实现骨架立起来，不碰旧 `lib/`，也不急着实现完整业务。
+# Phase 01: CLI Skeleton & Contract
 
-## 必读输入
+**Goal**: Establish the `vibe3` entry point and the dispatching logic to domain managers.
 
-- `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
-- `docs/plans/2026-03-13-vibe3-parallel-rebuild-plan.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/glossary.md`
-- `docs/standards/action-verbs.md`
-- `STRUCTURE.md`
+## 1. Context Anchor (Optional)
+If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3-rewrite-plan.md).
 
-## 当前上下文
+## 2. Pre-requisites (Executor Entry)
+- [ ] Working Directory is the project root.
+- [ ] No `bin/vibe3` processes are running in the background.
 
-这一阶段不是在实现完整的 `v3` 业务，而是在建立一个不会继续污染 `2.x` 的新入口。
-
-这里最容易走样的地方有两个：
-
-- 一上来就把旧 `lib/` 逻辑搬过来，导致 `v3` 只是换目录的 `v2`
-- 还没立起统一入口和错误/输出规则，就开始堆 `flow/task/pr` 业务分支
-
-这一轮的正确目标是：先把“命令壳 + 目录壳 + Python 壳 + 测试壳”定稳。
-
-这一轮只做这些事：
-
-- 建立 `v3` 的目录骨架
-- 明确 `bin/vibe3` 的命令分发入口
-- 建立 `flow / task / pr / handoff` 四个域的最小空壳
-- 建立 Python 侧最小 runtime 入口
-- 固定统一输出 / 错误 / `--json` / `-y` 规则
-- **新增**：建立 `vibe3 handoff auth` 和 `vibe3 handoff edit` 命令入口
-
-这一轮不做：
-
-- 真实 GitHub Project 写操作
-- 真实 task / flow / pr 业务逻辑
-- bump / changelog
-- review comment 回贴
-- handoff 自动刷新
-
-**设计完整性说明**：
-
-虽然本阶段只建立命令骨架，但完整的设计文档（`docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`）已包含"修正与撤销"命令集，用于错误恢复：
-
-- `task unlink / update`
-- `flow unbind / abort`
-- `pr close`
-
-这些命令将在后续阶段（02-04）逐步实现，本阶段只需确保命令分发入口能识别这些命令名即可（返回 "Not implemented in MVP" 提示）。
-
-## 真源与边界
-
-- 命令语义真源：`docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
-- 术语真源：`docs/standards/glossary.md`
-- 旧实现目录 `lib/` / `tests/` 只可参考，不可直接复制整套心智
-- 当前阶段不允许为了“跑起来”而把 `worktrees.json`、`roadmap.json` 重新拉回 `v3` 主链
-
-## 建议交付物
-
-- `bin/vibe3` 最小入口
-- `lib3/common/` 下统一错误、输出、参数校验 helper
-- `lib3/flow/`、`lib3/task/`、`lib3/pr/`、`lib3/handoff/` 的 help 与 dispatcher 空壳
-- `scripts/python/v3/` 最小入口，例如统一 `main.py` 或分域命令入口
-- `tests3/smoke/` 的最小 smoke contract
-
-建议动到的文件：
-
-- `bin/vibe3`
-- `lib3/common/`
-- `lib3/flow/`
-- `lib3/task/`
-- `lib3/pr/`
-- `scripts/python/v3/`
-- `tests3/smoke/`
-
-## 验证证据 (历史记录，当前已失效)
-
-以下证据来自上一轮失败执行，在战场清理后不再视为当前有效证据：
+## 3. Directory Structure
 
 ```text
- ✓ vibe3 --help should show usage
- ✓ vibe3 flow --help should show flow usage
- ✓ vibe3 task --help should show task usage
- ✓ vibe3 pr --help should show pr usage
- ✓ vibe3 with unknown domain should fail
- ✓ vibe3 flow with unknown command should fail with not implemented
- ✓ vibe3 flow smoke-python should call python core and return json
- ✓ vibe3 task unknown should fail with not implemented
- ✓ vibe3 pr unknown should fail with not implemented
+bin/vibe3 (Executable Shell)
+├── lib3/vibe.sh (Router Logic)
+└── scripts/python/vibe3/
+    ├── cli.py (Typer Entry, < 50 lines)
+    ├── commands/ (Command dispatch, < 100 lines each)
+    │   ├── flow.py
+    │   ├── task.py
+    │   └── pr.py
+    ├── models/ (Pydantic data models)
+    └── config/ (Configuration)
 ```
 
-手动验证：
-- `bin/vibe3 flow smoke-python --arg1 val1` -> 返回正确 JSON
-- `bin/vibe3 unknown` -> 报错 Unknown domain
-- `bin/vibe3 flow` -> 返回 flow usage
+## 2. CLI Contract Requirements
 
-## 当前状态（清理后）
+### Domain Dispatching
+Must support the following subcommands with `--help` output:
+- `vibe3 flow {new|bind|show|status}`
+- `vibe3 task {list|show|link}`
+- `vibe3 pr {draft|show|ready|merge}`
 
-- `01` 的目标和边界仍有效
-- 上一轮“已收口”结论已失效
-- 下一轮执行必须重新提交：
-  - 当前实现路径
-  - 当前 smoke test 结果
-  - 当前 CLI 契约证据
+### Global Flags
+- `--json`: Force JSON output to STDOUT.
+- `-y / --yes`: Skip all interactive prompts.
 
-状态：**待二次执行**。不得直接跳到 `02`，除非重新验证通过。
+## 3. Technical Implementation
 
-## 进入下一轮的条件
+- **Shell Layer**: `bin/vibe3` should proxy arguments to `lib3/vibe.sh`.
+- **Python Bridge**: Use **typer** (not argparse) in `vibe3/cli.py` to handle nested subcommands.
+- **Error Codes**: Use standard Unix exit codes (0 for success, non-zero for errors).
+- **Output**: Use **rich** for formatted output, never use print().
+- **Architecture**: Follow strict layering (CLI → Commands → Services → Clients → Models).
 
-只有当下面四件事都成立，才能进入 `02`：
+## 4. Acceptance Criteria (Command-Only)
 
-- 新入口存在
-- 三个域的命令壳存在
-- smoke tests 存在
-- 输出/错误契约已被验证锁住
+- [ ] `vibe3 flow --help` exit code is 0.
+- [ ] `vibe3 task --help` exit code is 0.
+- [ ] `vibe3 --json flow status` returns a valid JSON object (even if empty).
+- [ ] `mypy scripts/python/vibe3/ --strict` passes.
+- [ ] No usage of `argparse` (must use typer).
+- [ ] No usage of `print()` (must use rich or logger).
 
-做完以后再进入 `02`。
+## 5. Handoff for Executor 02
+
+- [ ] Ensure `scripts/python/vibe3/cli.py` contains basic typer setup for `flow`, `task`, and `pr` subcommands.
+- [ ] Ensure each command file (flow.py, task.py, pr.py) has skeleton command handlers.
+- [ ] Log the completion status in `.agent/context/task.md` (or equivalent).

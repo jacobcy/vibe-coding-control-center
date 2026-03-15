@@ -7,7 +7,7 @@ set -e
 # --- Context ---
 VIBE3_LIB_DIR="$(cd "$(dirname "${(%):-%x:A}")" && pwd)"
 VIBE3_ROOT="$(cd "$VIBE3_LIB_DIR/.." && pwd)"
-VIBE3_PYTHON_CORE="$VIBE3_ROOT/scripts/python/vibe_core.py"
+VIBE3_PYTHON_CORE="$VIBE3_ROOT/scripts/python/vibe3/cli.py"
 
 # --- Colors ---
 if [ -t 1 ]; then
@@ -56,12 +56,14 @@ case "$command" in
         vibe3_help
         exit 0
         ;;
-    flow|task|pr|check|handoff)
+    flow|task|pr|check)
         shift 1 2>/dev/null || true
         # Dispatch to Python core
         if [[ -f "$VIBE3_PYTHON_CORE" ]]; then
-            # We pass the domain (flow/task/pr) and the remaining args
-            python3 "$VIBE3_PYTHON_CORE" "$command" "$@"
+            # Run as module from scripts/python directory
+            cd "$VIBE3_ROOT/scripts/python"
+            python3 -m vibe3.cli "$command" "$@"
+            cd "$VIBE3_ROOT"
         else
             echo "Error: Python core not found at $VIBE3_PYTHON_CORE"
             exit 1

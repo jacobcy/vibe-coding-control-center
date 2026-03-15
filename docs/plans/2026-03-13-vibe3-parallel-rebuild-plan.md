@@ -276,58 +276,78 @@ git add docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md docs/plans/2026-0
 git commit -m "docs(vibe3): freeze pre-implementation decisions"
 ```
 
-## Task 5: 为编号实施区准备交接，而不是在本文件里继续写实现步骤
+## Task 5: 实施文档已就绪，开始按阶段执行
+
+> **🔥 状态更新**：实施文档已完成！详见 **[docs/v3/implementation/](../v3/implementation/README.md)**
 
 **Files:**
-- Create: `docs/v3/README.md`
-- Create: `docs/v3/01-command-and-skeleton.md`
-- Create: `docs/v3/02-flow-task-foundation.md`
-- Create: `docs/v3/03-pr-domain.md`
-- Create: `docs/v3/04-handoff-and-cutover.md`
-- Inspect: `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
+- ✅ Created: `docs/v3/implementation/README.md` - 实施索引
+- ✅ Created: `docs/v3/implementation/00-skeleton-setup.md` - 骨架搭建指南
+- ✅ Created: `docs/v3/implementation/01-config-management.md` - 配置管理
+- ✅ Created: `docs/v3/implementation/06-error-handling.md` - 异常处理
+- ✅ Created: `docs/v3/implementation/05-logging.md` - 日志系统
+- ✅ Created: `.agent/rules/python-standards.md` - Python 标准
+- ✅ Updated: `docs/v3/plans/v3-rewrite-plan.md` - 阶段划分
 
-**Step 1: Write the sequential handoff**
-
-- 基于已经冻结的设计，单独产出 `docs/v3/` 编号实施区
-- 不再沿用当前 `docs/plans/` 模板写 implementation plan
-- 后续执行按 `01 -> 02 -> 03 -> 04` 顺序推进
-- 做完一个编号，先收口，再进入下一个编号
-- 编号实施区应显式继承 `plan / report / audit` 与 `vibe handoff` 责任链语义
-
-**Step 2: Verify readiness**
+**Step 1: 验证实施文档完整性**
 
 Run:
 
 ```bash
-rg -n "最终结论|已冻结" docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
+ls -la docs/v3/implementation/
 ```
 
 Expected:
-- 实现入口已具备明确输入
+- ✅ 所有实施文档已创建
+- ✅ Python 标准文件已创建
 
-**Step 3: Verify numbered execution docs**
+**Step 2: 验证阶段划分**
 
 Run:
 
 ```bash
-test -f docs/v3/README.md
-test -f docs/v3/01-command-and-skeleton.md
-test -f docs/v3/02-flow-task-foundation.md
-test -f docs/v3/03-pr-domain.md
-test -f docs/v3/04-handoff-and-cutover.md
+grep -n "Phase [0-9]:" docs/v3/plans/v3-rewrite-plan.md
 ```
 
 Expected:
-- 新的编号实施区已准备好
+- ✅ Phase 0-6 已定义
+- ✅ 每个 Phase 有明确目标和验收标准
 
-**Step 4: Verify handoff**
+**Step 3: 开始执行**
 
-- `docs/plans/` 继续承载设计冻结
-- `docs/v3/` 开始承载顺序实施
+**执行顺序**：
+1. **Phase 0**（准备）：阅读设计文档（1-2 小时）
+2. **Phase 1**（骨架）：搭建基础设施（2-3 小时）
+   - 参考：[docs/v3/implementation/00-skeleton-setup.md](../v3/implementation/00-skeleton-setup.md)
+3. **Phase 2**（Client）：封装外部依赖（3-4 小时）
+4. **Phase 3**（Service）：实现业务逻辑（5-6 小时）
+5. **Phase 4**（Command）：提供命令接口（3-4 小时）
+6. **Phase 5**（测试）：验证端到端流程（2-3 小时）
+7. **Phase 6**（文档）：完善文档和发布（2-3 小时）
 
-**Step 5: Commit**
+**总时间**：18-25 小时（约 3-4 个工作日）
+
+**Step 4: Commit**
 
 ```bash
-git add docs/v3 docs/plans/2026-03-13-vibe3-parallel-rebuild-plan.md
-git commit -m "docs(v3): prepare numbered execution queue"
+git add docs/v3/implementation/
+git add .agent/rules/python-standards.md
+git add docs/v3/plans/v3-rewrite-plan.md
+git commit -m "docs(v3): complete implementation documentation with phase-based execution plan
+
+- Add Python standards (.agent/rules/python-standards.md)
+- Add skeleton setup guide (00-skeleton-setup.md)
+- Add config management guide (01-config-management.md)
+- Add error handling guide (06-error-handling.md)
+- Add logging system guide (05-logging.md)
+- Update rewrite plan with Phase 0-6 definition
+- Total estimated time: 18-25 hours"
 ```
+
+**Step 5: 开始 Phase 0**
+
+现在可以开始执行了！请查看：
+
+1. **[docs/v3/plans/v3-rewrite-plan.md](../v3/plans/v3-rewrite-plan.md)** - 了解各阶段目标
+2. **[docs/v3/implementation/README.md](../v3/implementation/README.md)** - 查看快速开始指南
+3. **[.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)** - 遵循 Python 标准

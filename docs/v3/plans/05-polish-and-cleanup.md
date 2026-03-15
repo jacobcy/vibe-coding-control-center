@@ -1,47 +1,45 @@
-# 05. Polish And Cleanup
+---
+document_type: plan
+title: Phase 05 - Polish & Cleanup
+status: draft
+author: Claude Sonnet 4.6
+created: 2026-03-15
+last_updated: 2026-03-15
+related_docs:
+  - docs/v3/plans/v3-rewrite-plan.md
+  - docs/v3/implementation/03-coding-standards.md
+---
 
-目标：在 3.0 核心能力上线并稳定运行后，进行收尾工作，清理战场。
+# Phase 05: Polish & Cleanup
 
-## 必读输入
+**Goal**: Optimize performance, remove technical debt, and ensure final production readiness.
 
-- `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
-- `docs/v3/plans/04-handoff-and-cutover.md`
+## 1. Context Anchor (Optional)
+If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3-rewrite-plan.md).
 
-## 这一轮只做这些事：
+## 2. Pre-requisites (Executor Entry)
+- [ ] All feature domains (Flow, Task, PR, Handoff) report functionally complete.
+- [ ] No critical regressions in terminal output.
 
-- **归档 2.x 遗留代码**：
-  - 将 `lib/` 移动到 `lib2/` 或进行深度清理
-  - 将 `tests/` 移动到 `tests2/`
-  - 更新所有相关引用
-- **性能优化**：
-  - 优化 SQLite 查询性能
-  - 优化 GitHub CLI / GraphQL 调用，减少延迟
-- **文档与教程**：
-  - 更新项目根目录的 `README.md`，正式声明 3.0 为默认版本
-  - 编写 `docs/v3/onboarding.md` 指导新 agent 或人类如何使用新链
-  - 更新 `AGENTS.md`，将 3.0 主链设为默认 Protocol
-- **异常链路补全**：
-  - 补齐所有“待实现”的修正与撤销命令（`pr close`, `flow abort` 等）
+## 2. Technical Health
 
-## 真源与边界
+- **Code Cleanup**: Remove all `TODO` comments, `print()` debugging statements, and unused imports.
+- **Refactoring**: Consolidate redundant logic identified during Phase 1-4 implementations.
+- **Linting**: Run `black`, `ruff`, and `mypy --strict` on the entire `scripts/python/` directory.
 
-- 3.0 已成为唯一推荐路径
-- 旧路径不再维护新功能
-- 文档与代码库状态保持一致
+## 2. Performance & Quality
 
-## 建议交付物
+- **Execution Timing**: Ensure `vibe3 flow status` (locally) completes in under 1.0 seconds.
+- **Error Handling**: Verify that all domain managers have comprehensive try-except blocks that log errors with context.
+- **Logging Audit**: Ensure logs are succinct but sufficient for another Agent to debug a failure.
 
-- 清理后的目录结构
-- 性能评估报告
-- 完整的 3.0 使用文档
-- 所有子命令的完整闭环实现
+## 3. Success Criteria (Technical)
 
-## 验证证据
+- [ ] All `scripts/python/` modules pass strict linting/typing with zero errors.
+- [ ] Average command execution time for local-only operations is < 1s.
+- [ ] No temporary files or debug artifacts remain in the workspace.
+- [ ] Comprehensive smoke test suite in `tests3/` passes with 100% success.
 
-- `vibe` 命令全路径测试通过
-- `lib/` 目录已成功迁移或归档
-- 文档已同步更新
-
-## 最终收口
-
-至此，Vibe 3.0 并行重建工作全部完成。
+## 4. Handoff for Final Reviewer
+- [ ] Provide a summary of the 5 layers' final file paths.
+- [ ] Ensure `v3-rewrite-plan.md` Checklist is fully marked based on technical evidence.
