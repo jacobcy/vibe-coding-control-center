@@ -26,18 +26,18 @@ _vibe_roadmap_status() {
         project_id: .project_id,
         version_goal: .version_goal,
         counts: {
-            p0: ([.items[]? | select(.status == "p0")] | length),
-            current: ([.items[]? | select(.status == "current")] | length),
-            next: ([.items[]? | select(.status == "next")] | length),
-            deferred: ([.items[]? | select(.status == "deferred")] | length),
-            rejected: ([.items[]? | select(.status == "rejected")] | length)
+            p0: ([.items[]? | objects | select(.status == "p0")] | length),
+            current: ([.items[]? | objects | select(.status == "current")] | length),
+            next: ([.items[]? | objects | select(.status == "next")] | length),
+            deferred: ([.items[]? | objects | select(.status == "deferred")] | length),
+            rejected: ([.items[]? | objects | select(.status == "rejected")] | length)
         },
         official_layer: {
-            total_items: ([.items[]?] | length),
-            mirrored_items: ([.items[]? | select(.github_project_item_id != null)] | length),
-            with_github_project_item_id: ([.items[]? | select(.github_project_item_id != null)] | length),
-            with_content_type: ([.items[]? | select(.content_type != null)] | length),
-            remote_only_imports: ([.items[]?
+            total_items: ([.items[]? | objects] | length),
+            mirrored_items: ([.items[]? | objects | select(.github_project_item_id != null)] | length),
+            with_github_project_item_id: ([.items[]? | objects | select(.github_project_item_id != null)] | length),
+            with_content_type: ([.items[]? | objects | select(.content_type != null)] | length),
+            remote_only_imports: ([.items[]? | objects
               | select(.source_type == "github")
               | select(.github_project_item_id != null)
               | select((.execution_record_id == null) and ((.linked_task_ids // []) | length == 0))
@@ -45,13 +45,13 @@ _vibe_roadmap_status() {
         },
         sync_check: {
             missing_project_id: (if (.project_id // null) == null then 1 else 0 end),
-            missing_github_project_item_id: ([.items[]? | select(.github_project_item_id == null)] | length),
-            missing_content_type: ([.items[]? | select(.content_type == null)] | length)
+            missing_github_project_item_id: ([.items[]? | objects | select(.github_project_item_id == null)] | length),
+            missing_content_type: ([.items[]? | objects | select(.content_type == null)] | length)
         },
         extension_layer: {
-            with_execution_record_id: ([.items[]? | select(.execution_record_id != null)] | length),
-            with_spec_standard: ([.items[]? | select((.spec_standard // "none") != "none")] | length),
-            with_spec_ref: ([.items[]? | select(.spec_ref != null)] | length)
+            with_execution_record_id: ([.items[]? | objects | select(.execution_record_id != null)] | length),
+            with_spec_standard: ([.items[]? | objects | select((.spec_standard // "none") != "none")] | length),
+            with_spec_ref: ([.items[]? | objects | select(.spec_ref != null)] | length)
         }
     } | .sync_check += {
         recommended: ((.sync_check.missing_project_id > 0) or (.sync_check.missing_github_project_item_id > 0) or (.sync_check.missing_content_type > 0)),
@@ -130,69 +130,64 @@ _vibe_roadmap_status() {
 }
 
 _vibe_roadmap_list() {
-    local common_dir="$1" output_json="false" status_filter="" source_filter="" keywords="" linked="false" unlinked="false" roadmap_file
+    local common_dir="$1" output_json="false" status_filter="" source_filter="" keywords="" linked="false" unlinked="false" show_all="false" roadmap_file
     shift
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --json)
-                output_json="true"
-                shift
-                ;;
-            --status)
-                status_filter="$2"
-                shift 2
-                ;;
-            --source)
-                source_filter="$2"
-                shift 2
-                ;;
-            --keywords)
-                keywords="$2"
-                shift 2
-                ;;
-            --linked)
-                linked="true"
-                shift
-                ;;
-            --unlinked)
-                unlinked="true"
-                shift
-                ;;
-            *)
-                echo "Error: Unknown option: $1"
-                return 1
-                ;;
+            --json) output_json="true"; shift ;;
+            --status) status_filter="$2"; shift 2 ;;
+            --source) source_filter="$2"; shift 2 ;;
+            --keywords) keywords="$2"; shift 2 ;;
+            --linked) linked="true"; shift ;;
+            --unlinked) unlinked="true"; shift ;;
+            --all) show_all="true"; shift ;;
+            *) echo "Error: Unknown option: $1"; return 1 ;;
         esac
     done
 
-    [[ "$linked" == "true" && "$unlinked" == "true" ]] && {
-        echo "Error: --linked and --unlinked cannot be used together"
-        return 1
-    }
+    # Default logic: if no filters, show active items (p0,current,next)
+    if [[ -z "$status_filter" && -z "$source_filter" && -z "$keywords" && "$linked" == "false" && "$unlinked" == "false" ]]; then
+        status_filter="p0,current,next"
+    fi
+
+    [[ "$linked" == "true" && "$unlinked" == "true" ]] && { echo "Error: --linked and --unlinked cannot be used together"; return 1; }
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
 
-    local items_json
-    items_json="$(jq -c \
-        --arg status "$status_filter" \
-        --arg source "$source_filter" \
-        --arg keywords "${keywords:l}" \
-        --argjson linked "$linked" \
-        --argjson unlinked "$unlinked" \
-        '[.items[]?
-          | select(
-              ($status == "" or .status == $status)
-              and ($source == "" or .source_type == $source)
-              and ($keywords == "" or ((.roadmap_item_id + " " + .title + " " + (.description // "")) | ascii_downcase | contains($keywords)))
-              and (($linked | not) or ((.linked_task_ids | length) > 0))
-              and (($unlinked | not) or ((.linked_task_ids | length) == 0))
-            )]' \
-        "$roadmap_file")"
+    local limit=10
+    [[ "$show_all" == "true" || "$output_json" == "true" ]] && limit=999999
+
+    # Build the main jq pipeline for filtering and sorting
+    local jq_filter
+    jq_filter='("," + $status_csv + ",") as $csv 
+      | (.items // []) 
+      | map(select(type == "object") | . as $item | $item.status as $s | select(
+          ($status_csv == "" or ($csv | contains("," + ($s // "") + ",")))
+          and ($source == "" or ($item.source_type // "") == $source)
+          and ($keywords == "" or ((($item.roadmap_item_id // "") + " " + ($item.title // "") + " " + ($item.description // "")) | ascii_downcase | contains($keywords)))
+          and (($linked | not) or (($item.linked_task_ids // [] | length) > 0))
+          and (($unlinked | not) or (($item.linked_task_ids // [] | length) == 0))
+        ))
+      | sort_by(.updated_at // "") | reverse'
 
     if [[ "$output_json" == "true" ]]; then
-        print -r -- "$items_json"
+        jq -c --arg status_csv "$status_filter" \
+              --arg source "$source_filter" \
+              --arg keywords "${keywords:l}" \
+              --argjson linked "$linked" \
+              --argjson unlinked "$unlinked" \
+              "$jq_filter" "$roadmap_file"
         return 0
     fi
+
+    local items_json
+    items_json="$(jq -c --arg status_csv "$status_filter" \
+                       --arg source "$source_filter" \
+                       --arg keywords "${keywords:l}" \
+                       --argjson linked "$linked" \
+                       --argjson unlinked "$unlinked" \
+                       "$jq_filter" "$roadmap_file")"
+
     if [[ "$(print -r -- "$items_json" | jq 'length')" == "0" ]]; then
         echo "No roadmap items found."
         return 0
@@ -201,8 +196,12 @@ _vibe_roadmap_list() {
     local first_group="true" group_status group_items group_count row rid title
     local -a ordered_statuses=(p0 current next deferred rejected)
 
+    # If limited, we apply the limit globally after sorting but before grouping
+    local limited_items
+    limited_items="$(print -r -- "$items_json" | jq -c --argjson limit "$limit" '.[0:$limit]')"
+
     for group_status in "${ordered_statuses[@]}"; do
-        group_items="$(print -r -- "$items_json" | jq -c --arg status "$group_status" '[.[] | select(.status == $status)]')"
+        group_items="$(print -r -- "$limited_items" | jq -c --arg status "$group_status" 'map(select(.status == $status))')"
         group_count="$(print -r -- "$group_items" | jq 'length')"
         [[ "$group_count" == "0" ]] && continue
 
@@ -213,22 +212,27 @@ _vibe_roadmap_list() {
         fi
 
         printf '%s\n' "$(_vibe_roadmap_group_heading "$group_status" "$group_count")"
-        print -r -- "$group_items" | jq -c '.[]' | while read -r row; do
-            rid=$(print -r -- "$row" | jq -r '.roadmap_item_id')
-            title=$(print -r -- "$row" | jq -r '.title')
-
+        # Robust iteration: pass the whole array to jq and extract fields in one command to avoid echo corruption
+        print -r -- "$group_items" | jq -r '.[] | "\(.roadmap_item_id)\t\(.title // "")"' | while IFS=$'\t' read -r rid title; do
             if [[ "$title" == "$rid" || -z "$title" ]]; then
-                printf '  %s\n' "$rid"
+                printf '  %-10s\n' "$rid"
             else
-                printf '  %s  %s\n' "$rid" "$title"
+                printf '  %-10s  %s\n' "$rid" "$title"
             fi
         done
     done
+
+    # Inform the user if items were hidden
+    local total_count
+    total_count="$(print -r -- "$items_json" | jq 'length')"
+    if [[ "$show_all" == "false" && "$total_count" -gt "$limit" ]]; then
+        printf '\n%s\n' "${CYAN}Showing 10 of $total_count items. Use --all to see the full list.${NC}"
+    fi
 }
 
 _vibe_roadmap_show() {
     local common_dir="$1" item_id="$2" output_json="false" roadmap_file item_json
-    shift 2
+    [[ $# -ge 2 ]] && shift 2 || shift $#
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -247,7 +251,7 @@ _vibe_roadmap_show() {
 
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1
-    item_json="$(jq -c --arg id "$item_id" '.items[]? | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
+    item_json="$(jq -c --arg id "$item_id" '.items[]? | objects | select(.roadmap_item_id == $id)' "$roadmap_file" | head -n 1)"
     [[ -n "$item_json" ]] || { echo "Error: roadmap item not found: $item_id"; return 1; }
 
     # Compute dependency status

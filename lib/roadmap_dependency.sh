@@ -125,16 +125,76 @@ _vibe_roadmap_compute_dependency_status() {
 
 _vibe_roadmap_status_with_dependency_counts() {
     local common_dir="$1" roadmap_file="$2" status_json="$3"
-    local dependency_ready=0 dependency_blocked=0 dep_status
+    local registry_file="$common_dir/vibe/registry.json"
+    local dependency_ready=0 dependency_blocked=0
+    local gh_available="false" merged_prs_json='[]'
 
-    while IFS= read -r item_id; do
-        dep_status="$(_vibe_roadmap_compute_dependency_status "$common_dir" "$item_id")"
-        if [[ "$(echo "$dep_status" | jq -r '.ready')" == "true" ]]; then
-            ((dependency_ready++))
-        else
-            ((dependency_blocked++))
-        fi
-    done < <(jq -r '.items[].roadmap_item_id' "$roadmap_file")
+    # Warm up cache
+    if _check_gh_available; then
+        gh_available="true"
+        merged_prs_json="$(_vibe_roadmap_merged_prs_json)"
+    fi
+
+    # Perform bulk analysis in jq to avoid shell loop overhead
+    local counts
+    counts="$(jq -c \
+        --argjson merged_prs "$merged_prs_json" \
+        --argjson gh_available "$gh_available" \
+        --slurpfile registry "$registry_file" \
+        '
+        ($registry[0].tasks // []) as $tasks
+        | (.items // []) as $items
+        | $items | map(
+            (.roadmap_item_id // "") as $id
+            | (.depends_on_item_ids // []) as $deps
+            | if ($deps | length) == 0 then
+                {ready: true}
+              else
+                [
+                    $deps[] as $dep_id
+                    | if ($items | any(.roadmap_item_id == $dep_id)) | not then
+                        {blocked: true}
+                      else
+                        [
+                            $tasks[] | select((.roadmap_item_ids // []) | index($dep_id))
+                            | .pr_ref // "" | select(. != "")
+                        ] as $pr_refs
+                        | if ($pr_refs | length) == 0 then
+                            {blocked: true}
+                          elif ($gh_available | not) then
+                            {blocked: true}
+                          else
+                            [
+                                $pr_refs[] as $ref
+                                | if ($merged_prs | any((.number | tostring) == ($ref | ltrimstr("#")))) then
+                                    "merged"
+                                  else
+                                    "open"
+                                  end
+                            ] as $statuses
+                            | if ($statuses | any(. == "merged")) then
+                                {blocked: false}
+                              else
+                                {blocked: true}
+                              end
+                          end
+                      end
+                ] as $blockers
+                | if ($blockers | any(.blocked)) then
+                    {ready: false}
+                  else
+                    {ready: true}
+                  end
+              end
+        )
+        | {
+            ready: (map(select(.ready)) | length),
+            blocked: (map(select(.ready | not)) | length)
+          }
+        ' "$roadmap_file")"
+
+    dependency_ready="$(echo "$counts" | jq -r '.ready')"
+    dependency_blocked="$(echo "$counts" | jq -r '.blocked')"
 
     print -r -- "$status_json" | jq -c --argjson ready "$dependency_ready" --argjson blocked "$dependency_blocked" '
         . + {dependency_counts: {ready: $ready, blocked: $blocked}}
