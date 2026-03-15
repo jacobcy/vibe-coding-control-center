@@ -106,8 +106,11 @@ class PRManager:
             # Update store
             self.store.update_flow_state(branch, pr_number=int(pr_number))
 
-            # Log event
-            agent = state.get('planner_actor') or state.get('executor_actor') if state else 'unknown'
+            # Log event - ensure actor is never None
+            if state:
+                agent = state.get('planner_actor') or state.get('executor_actor') or 'unknown'
+            else:
+                agent = 'unknown'
             self.store.add_event(branch, 'pr_created', agent, f"PR #{pr_number}")
 
             return pr_number
@@ -321,8 +324,11 @@ class PRManager:
             # Update flow status
             self.store.update_flow_state(branch, flow_status='ready')
 
-            # Log event
-            agent = state.get('planner_actor') or state.get('executor_actor') if state else 'unknown'
+            # Log event - ensure actor is never None
+            if state:
+                agent = state.get('planner_actor') or state.get('executor_actor') or 'unknown'
+            else:
+                agent = 'unknown'
             self.store.add_event(branch, 'pr_ready', agent, f"PR #{pr_number}, group={group}, bump={bump}")
 
             print(f"\n✅ PR is ready for review and merge")
@@ -420,8 +426,8 @@ class PRManager:
                 subprocess.check_call(cmd)
                 print(f"✓ Review posted to PR #{pr_number}")
 
-                # Log event
-                agent = state.get('reviewer_actor') if state else 'unknown'
+                # Log event - ensure actor is never None
+                agent = (state.get('reviewer_actor') or 'unknown') if state else 'unknown'
                 self.store.add_event(branch, 'pr_reviewed', agent, f"PR #{pr_number}")
             except subprocess.CalledProcessError as e:
                 print(f"Error posting review: {e}")
@@ -534,8 +540,11 @@ class PRManager:
             # Update flow status to merged
             self.store.update_flow_state(branch, flow_status='merged')
 
-            # Log event
-            agent = state.get('planner_actor') or state.get('executor_actor') if state else 'unknown'
+            # Log event - ensure actor is never None
+            if state:
+                agent = state.get('planner_actor') or state.get('executor_actor') or 'unknown'
+            else:
+                agent = 'unknown'
             self.store.add_event(branch, 'pr_merged', agent, f"PR #{pr_number}")
 
             # TODO: Update task status in registry.json to 'completed'
