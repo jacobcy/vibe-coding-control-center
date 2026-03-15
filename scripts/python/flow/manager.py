@@ -40,8 +40,6 @@ class FlowManager:
             print("Linked Issues: N/A")
 
         print(f"Spec Ref: {state['spec_ref']}")
-        if state.get('blocked_by'):
-            print(f"Blocked By: {state['blocked_by']}")
         print(f"Branch: {state['branch']}")
         print(f"PR: {state['pr_number']}" if state['pr_number'] else "PR: N/A")
 
@@ -116,16 +114,7 @@ class FlowManager:
         print(f"Switched to flow {name} ({branch_name})")
 
     def new(self, name, bind_issue=None):
-        # 1. Check for dirty workspace before creating/switching
-        try:
-            # git diff-index --quiet HEAD -- returns 1 if there are uncommitted changes, 0 if clean
-            subprocess.check_call(['git', 'diff-index', '--quiet', 'HEAD', '--'])
-        except subprocess.CalledProcessError:
-            print("Error: Your workspace has uncommitted changes.")
-            print("Please commit or stash them before creating a new flow.")
-            sys.exit(1)
-
-        # 2. Create branch if it doesn't exist
+        # 1. Create branch if it doesn't exist
         # For simplicity in this dev stage, we'll prefix with task/ if not present
         branch_name = name if name.startswith("task/") else f"task/{name}"
         
@@ -159,9 +148,4 @@ class FlowManager:
         
         self.store.add_issue_link(branch, issue_number, 'link')
         print(f"Linked repo issue #{issue_number} to flow on branch {branch}")
-
-    def freeze(self, reason):
-        branch = self._get_current_branch()
-        self.store.update_flow_state(branch, flow_status='blocked', blocked_by=reason)
-        print(f"Flow on branch {branch} is now FREEZE (blocked by: {reason})")
 
