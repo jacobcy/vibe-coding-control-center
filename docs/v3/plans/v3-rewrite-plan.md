@@ -2,12 +2,17 @@
 
 > **⚠️ Agent Instruction**: Focus ONLY on the current Phase. Do not attempt to optimize or understand the global roadmap. Your success is measured strictly by the Command-Line Acceptance Criteria below.
 
+> **数据真源**: [docs/standards/v3/handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)
+> **GitHub 调用**: [docs/standards/v3/github-remote-call-standard.md](../../standards/v3/github-remote-call-standard.md)
+
 ---
 
 ## Technical Authority (Minimum Context)
 
 - [Architecture Design](../implementation/02-architecture.md) ( Authority on File Layers)
 - [Coding Standards](../implementation/03-coding-standards.md) (Authority on Linting/Types)
+- [Data Standards](../../standards/v3/handoff-store-standard.md) (Authority on Database Schema)
+- [GitHub Standards](../../standards/v3/github-remote-call-standard.md) (Authority on Remote Calls)
 
 ---
 

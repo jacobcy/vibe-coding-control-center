@@ -4,9 +4,11 @@ title: Vibe3 Parallel Rebuild Plan
 status: proposed
 author: GPT-5 Codex
 created: 2026-03-13
-last_updated: 2026-03-13
+last_updated: 2026-03-16
 related_docs:
   - docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/plans/2026-03-13-shell-thinning-python-core-plan.md
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-implementation-plan.md
   - docs/standards/v2/command-standard.md
@@ -18,6 +20,9 @@ related_issues: []
 
 > **定位说明：** 这是 `planner` 侧的 design-freeze checklist，不是 `executor` 的 implementation playbook。
 > `executor` 可以写或维护 `docs/v3/` 下的 playbook，但不得在执行实现时反向改写本文件要冻结的语义边界。
+
+> **数据真源**: 数据库字段定义见 [docs/standards/v3/handoff-store-standard.md](../standards/v3/handoff-store-standard.md)。
+> **GitHub 调用**: 远端调用标准见 [docs/standards/v3/github-remote-call-standard.md](../standards/v3/github-remote-call-standard.md)。
 
 **Goal:** 在当前仓库内把 `vibe3` 的新语义冻结下来，尤其是 `repo issue -> task issue(Project) -> flow(branch) -> plan/spec ready -> draft PR` 这条主链，并据此收敛命令契约、目录结构、Python 栈与依赖策略；真正的实施顺序改由 `docs/v3/` 编号文档承载。
 
