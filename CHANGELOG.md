@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.1.34] - 2026-03-16
+
+### ✨ Changed
+- Add warning when using 'vibe roadmap list --json --all' without --keywords filter to prevent excessive output. Users can now use --keywords to filter results before JSON output.
+
 ## [2.1.33] - 2026-03-15
 
 ### 📚 Documentation
