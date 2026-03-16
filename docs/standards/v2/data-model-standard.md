@@ -17,9 +17,9 @@ related_docs:
   - STRUCTURE.md
   - docs/README.md
   - docs/standards/glossary.md
-  - docs/standards/command-standard.md
-  - docs/standards/registry-json-standard.md
-  - docs/standards/roadmap-json-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/registry-json-standard.md
+  - docs/standards/v2/roadmap-json-standard.md
 ---
 
 # 共享数据模型标准

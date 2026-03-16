@@ -7,7 +7,7 @@ created: 2026-03-11
 related_docs:
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
   - .agent/workflows/vibe-new.md
@@ -69,7 +69,7 @@ related_docs:
 
 ## 4. 第三责任层：架构文档保留了高强度历史语义
 
-- `docs/standards/vibe-engine-design.md` 第 3 行加了“边界补充”，但正文第 11、21、27、40、137、139 行仍持续把 flow 生命周期与 worktree 隔离/挂载/清理绑定叙述
+- `docs/standards/v2/vibe-engine-design.md` 第 3 行加了“边界补充”，但正文第 11、21、27、40、137、139 行仍持续把 flow 生命周期与 worktree 隔离/挂载/清理绑定叙述
 - 这种写法不是当前命令标准，但它对 agent 的影响更强，因为它给出了完整故事线：
   - 开任务
   - 切环境
@@ -100,14 +100,14 @@ related_docs:
 
 1. 审计 `.agent/workflows/`、`skills/`、`docs/standards/` 中所有 `flow new -> worktree` 的残留文案。
 2. 为 `action-verbs.md` 或 `command-standard.md` 增加一句反歧义说明：`flow new` 默认不是“新建物理 worktree”。
-3. 审阅 `docs/standards/vibe-engine-design.md` 这类叙事性文档，继续降低旧故事线对 agent 的误导。
+3. 审阅 `docs/standards/v2/vibe-engine-design.md` 这类叙事性文档，继续降低旧故事线对 agent 的误导。
 
 # Files To Modify
 
 - `.agent/workflows/vibe-new.md`
 - `.agent/workflows/vibe-new-flow.md`
-- `docs/standards/action-verbs.md` 或 `docs/standards/command-standard.md`
-- `docs/standards/vibe-engine-design.md`
+- `docs/standards/action-verbs.md` 或 `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/vibe-engine-design.md`
 
 # Test Command
 

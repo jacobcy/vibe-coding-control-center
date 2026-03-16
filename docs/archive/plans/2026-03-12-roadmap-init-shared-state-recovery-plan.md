@@ -51,7 +51,7 @@
 - Modify: `tests/roadmap/*`
 - Modify: `tests/flow/*` or `tests/task/*` affected by shared-state pollution risk
 - Modify: `tests/helpers/*`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `skills/vibe-roadmap/SKILL.md`
 
 ## Step Tasks
@@ -61,7 +61,7 @@
 **Files:**
 - Modify: `tests/roadmap/test_roadmap_*.bats`
 - Modify: `tests/helpers/roadmap_common.bash`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 
 **Steps:**
 1. Write a failing Bats test for `vibe roadmap init` creating missing shared state files and directories.
@@ -119,7 +119,7 @@
 ### Task 5: Align docs and roadmap skill wording
 
 **Files:**
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `skills/vibe-roadmap/SKILL.md`
 - Test: `tests/skills/test_skills.bats`
 

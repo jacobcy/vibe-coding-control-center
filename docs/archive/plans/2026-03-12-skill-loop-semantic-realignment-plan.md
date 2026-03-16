@@ -55,8 +55,8 @@
 
 ## Files To Modify
 
-- Modify: `docs/standards/skill-standard.md`
-- Modify: `docs/standards/skill-trigger-standard.md`
+- Modify: `docs/standards/v2/skill-standard.md`
+- Modify: `docs/standards/v2/skill-trigger-standard.md`
 - Modify: `docs/standards/git-workflow-standard.md`
 - Modify: `.agent/workflows/vibe:new.md`
 - Modify: `.agent/workflows/vibe:start.md`
@@ -76,8 +76,8 @@
 ### Task 1: Freeze the new source-of-truth semantics
 
 **Files:**
-- Modify: `docs/standards/skill-standard.md`
-- Modify: `docs/standards/skill-trigger-standard.md`
+- Modify: `docs/standards/v2/skill-standard.md`
+- Modify: `docs/standards/v2/skill-trigger-standard.md`
 - Modify: `docs/standards/git-workflow-standard.md`
 
 **Steps:**

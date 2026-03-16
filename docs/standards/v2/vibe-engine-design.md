@@ -11,8 +11,8 @@ last_updated: 2026-03-13
 related_docs:
   - docs/references/vibe-engine-design.md
   - docs/standards/glossary.md
-  - docs/standards/command-standard.md
-  - docs/standards/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/skill-standard.md
 ---
 
 # Vibe Workflow Engine 文档迁移说明

@@ -41,7 +41,7 @@ owner: Codex
    - 说明 worktree 复用、branch 关闭、历史留存之间的边界
    - 明确 shell 只暴露原子能力，不关闭 issue，不补 task，不做自动修复
 
-3. `docs/standards/command-standard.md` + `docs/standards/data-model-standard.md`
+3. `docs/standards/v2/command-standard.md` + `docs/standards/v2/data-model-standard.md`
    - 定义 shell 命令契约与 `flow-history.json` 的高层职责
    - 说明 `vibe flow new/switch/show/status/list/done` 的输入、输出、阻断条件、历史留存规则
 
@@ -72,8 +72,8 @@ owner: Codex
 
 - Modify: `docs/standards/git-workflow-standard.md`
 - Modify: `docs/standards/worktree-lifecycle-standard.md`
-- Modify: `docs/standards/command-standard.md`
-- Modify: `docs/standards/data-model-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
+- Modify: `docs/standards/v2/data-model-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Create: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-done/SKILL.md`

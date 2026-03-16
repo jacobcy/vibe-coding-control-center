@@ -7,7 +7,7 @@ author: Codex GPT-5
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/glossary.md
   - docs/plans/2026-03-11-roadmap-projects-sync-plan.md

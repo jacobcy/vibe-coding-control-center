@@ -12,7 +12,7 @@ related_issues:
   - gh-108
 related_docs:
   - docs/standards/git-workflow-standard.md
-  - docs/standards/handoff-governance-standard.md
+  - docs/standards/v2/handoff-governance-standard.md
   - skills/vibe-done/SKILL.md
   - skills/vibe-integrate/SKILL.md
   - skills/vibe-issue/SKILL.md
@@ -56,7 +56,7 @@ related_docs:
 
 **Files:**
 - Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/handoff-governance-standard.md`
+- Modify: `docs/standards/v2/handoff-governance-standard.md`
 
 **Step 1: 写出 failing contract 清单**
 
@@ -70,7 +70,7 @@ related_docs:
 Run:
 
 ```bash
-rg -n "terminal|merged PR|follow-up issue|新的 repo issue|roadmap item" tests/skills/test_skills.bats docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+rg -n "terminal|merged PR|follow-up issue|新的 repo issue|roadmap item" tests/skills/test_skills.bats docs/standards/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 ```
 
 Expected:
@@ -87,7 +87,7 @@ Expected:
 Run:
 
 ```bash
-rg -n "plan.*terminal|merged PR.*terminal|follow-up.*repo issue|roadmap item" docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+rg -n "plan.*terminal|merged PR.*terminal|follow-up.*repo issue|roadmap item" docs/standards/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 ```
 
 Expected:
@@ -97,7 +97,7 @@ Expected:
 **Step 5: Commit**
 
 ```bash
-git add docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+git add docs/standards/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 git commit -m "docs: define merged-pr terminal governance"
 ```
 
@@ -261,7 +261,7 @@ Expected:
 ## Planned Change Summary
 
 - Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/handoff-governance-standard.md`
+- Modify: `docs/standards/v2/handoff-governance-standard.md`
 - Modify: `skills/vibe-done/SKILL.md`
 - Modify: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-issue/SKILL.md`

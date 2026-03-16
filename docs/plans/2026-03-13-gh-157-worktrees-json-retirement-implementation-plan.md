@@ -9,9 +9,9 @@ related_docs:
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
   - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
   - docs/plans/2026-03-13-gh-157-semantic-cleanup-expansion-plan.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/registry-json-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/registry-json-standard.md
 related_issues:
   - gh-157
   - gh-152
@@ -258,8 +258,8 @@ git commit -m "refactor(runtime): stop maintaining worktrees state"
 - Modify: `tests/contracts/test_shared_state_contracts.bats`
 - Modify: `tests/contracts/test_github_project_bootstrap.bats`
 - Modify: `tests/helpers/flow_common.bash`
-- Modify: `docs/standards/data-model-standard.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/data-model-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 
 **Step 1: Write the failing tests**
 
@@ -301,7 +301,7 @@ Expected:
 **Step 5: Commit**
 
 ```bash
-git add lib/roadmap_init.sh lib/task_help.sh tests/roadmap/test_roadmap_write_audit.bats tests/test_install.bats tests/contracts/test_shared_state_contracts.bats tests/contracts/test_github_project_bootstrap.bats tests/helpers/flow_common.bash docs/standards/data-model-standard.md docs/standards/command-standard.md
+git add lib/roadmap_init.sh lib/task_help.sh tests/roadmap/test_roadmap_write_audit.bats tests/test_install.bats tests/contracts/test_shared_state_contracts.bats tests/contracts/test_github_project_bootstrap.bats tests/helpers/flow_common.bash docs/standards/v2/data-model-standard.md docs/standards/v2/command-standard.md
 git commit -m "refactor(runtime): remove worktrees bootstrap contract"
 ```
 

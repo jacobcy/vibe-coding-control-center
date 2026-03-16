@@ -7,7 +7,7 @@ related_docs:
   - docs/plans/2026-03-10-flow-switch-safe-carry-design.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
   - lib/flow.sh
   - lib/flow_runtime.sh
   - lib/flow_help.sh

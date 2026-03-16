@@ -137,7 +137,7 @@ git commit -m "refactor(flow): route rotate through flow switch"
 **Files:**
 - Modify: `docs/standards/git-workflow-standard.md`
 - Modify: `docs/standards/worktree-lifecycle-standard.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Modify: `.agent/workflows/vibe-commit.md`
 
@@ -167,7 +167,7 @@ Expected:
 **Step 4: Commit**
 
 ```bash
-git add docs/standards/git-workflow-standard.md docs/standards/worktree-lifecycle-standard.md docs/standards/command-standard.md skills/vibe-commit/SKILL.md .agent/workflows/vibe-commit.md
+git add docs/standards/git-workflow-standard.md docs/standards/worktree-lifecycle-standard.md docs/standards/v2/command-standard.md skills/vibe-commit/SKILL.md .agent/workflows/vibe-commit.md
 git commit -m "docs(flow): separate runtime flow from worktree"
 ```
 
@@ -231,7 +231,7 @@ git commit -m "docs(plan): track flow runtime separation rollout"
 - `tests/test_rotate.bats`
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
-- `docs/standards/command-standard.md`
+- `docs/standards/v2/command-standard.md`
 - `skills/vibe-commit/SKILL.md`
 - `.agent/workflows/vibe-commit.md`
 

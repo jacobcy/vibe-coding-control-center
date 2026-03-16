@@ -6,7 +6,7 @@ author: "GPT-5.4"
 related_docs:
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
   - docs/standards/doc-quality-standards.md
   - lib/flow.sh
   - lib/flow_runtime.sh

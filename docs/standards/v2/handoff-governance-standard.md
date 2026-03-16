@@ -14,7 +14,7 @@ related_docs:
   - AGENTS.md
   - CLAUDE.md
   - docs/standards/git-workflow-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
 ---
 
 # Handoff Governance Standard
