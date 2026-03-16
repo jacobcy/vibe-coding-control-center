@@ -97,13 +97,13 @@ if [[ "$skill_text" =~ 进入哪个[[:space:]]*worktree|现在该进哪个[[:spa
 fi
 
 if needs_reference 'bin/vibe[[:space:]]+'; then
-  check_reference "docs/standards/command-standard.md"
-  check_reference "docs/standards/shell-capability-design.md"
+  check_reference "docs/standards/v2/command-standard.md"
+  check_reference "docs/standards/v2/shell-capability-design.md"
 fi
 
 if needs_reference '(^|[^[:alpha:]])(flow|branch|worktree|pr)([^[:alpha:]]|$)'; then
-  check_reference "docs/standards/git-workflow-standard.md"
-  check_reference "docs/standards/worktree-lifecycle-standard.md"
+  check_reference "docs/standards/v2/git-workflow-standard.md"
+  check_reference "docs/standards/v2/worktree-lifecycle-standard.md"
 fi
 
 skill_ts="$(file_timestamp "$target")"
@@ -124,10 +124,10 @@ PY
 done < <(printf '%s\n' \
   "docs/standards/glossary.md" \
   "docs/standards/action-verbs.md" \
-  "docs/standards/command-standard.md" \
-  "docs/standards/shell-capability-design.md" \
-  "docs/standards/git-workflow-standard.md" \
-  "docs/standards/worktree-lifecycle-standard.md")
+  "docs/standards/v2/command-standard.md" \
+  "docs/standards/v2/shell-capability-design.md" \
+  "docs/standards/v2/git-workflow-standard.md" \
+  "docs/standards/v2/worktree-lifecycle-standard.md")
 
 while IFS= read -r raw_cmd; do
   [[ -z "$raw_cmd" ]] && continue
