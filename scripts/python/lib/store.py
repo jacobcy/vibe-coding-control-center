@@ -21,15 +21,18 @@ class Vibe3Store:
             cursor = conn.cursor()
 
             # 1. schema_meta
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS schema_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # 2. flow_state
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_state (
                     branch TEXT PRIMARY KEY,
                     flow_slug TEXT NOT NULL,
@@ -51,10 +54,12 @@ class Vibe3Store:
                     flow_status TEXT NOT NULL DEFAULT 'active',
                     updated_at TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # 3. flow_issue_links
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_issue_links (
                     branch TEXT NOT NULL,
                     issue_number INTEGER NOT NULL,
@@ -62,17 +67,21 @@ class Vibe3Store:
                     created_at TEXT NOT NULL,
                     PRIMARY KEY (branch, issue_number, issue_role)
                 )
-            """)
+            """
+            )
 
             # Unique index for task issue as per standard
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_single_task_issue
                 ON flow_issue_links(branch)
                 WHERE issue_role = 'task'
-            """)
+            """
+            )
 
             # 4. flow_events
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     branch TEXT NOT NULL,
@@ -81,7 +90,8 @@ class Vibe3Store:
                     detail TEXT,
                     created_at TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # Set schema version if not set
             cursor.execute(
