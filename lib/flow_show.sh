@@ -49,7 +49,14 @@ _flow_show() {
     return "$open_status"
   fi
   [[ -z "$record" && "$open_status" -eq 1 ]] && record="$(_flow_history_show "$target")"
-  [[ -n "$record" ]] || { log_error "Flow not found: $target"; return 1; }
+  [[ -n "$record" ]] || {
+    log_warn "当前 worktree 没有活跃的 flow"
+    echo ""
+    echo "💡 提示："
+    echo "  • 使用 ${CYAN}vibe flow new <feature-name>${NC} 创建新的 flow"
+    echo "  • 或使用 ${CYAN}/vibe-new <feature-name>${NC} 进入完整的流程规划"
+    return 0
+  }
   current_task="$(echo "$record" | jq -r '.current_task // empty')"
   if [[ -n "$current_task" ]]; then
     local registry_file task_json issue_refs_json

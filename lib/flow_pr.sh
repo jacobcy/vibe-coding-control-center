@@ -190,8 +190,21 @@ _flow_pr() {
 
   local has_pr=0
   if vibe_has gh; then
-    log_step "Checking for open PRs to $base_name..."; open_prs=$(gh pr list --state open --base "$base_name" --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
-    [[ -n "$open_prs" ]] && { log_warn "Blocking: Sequential merge required. Other open PRs to '$base_name' detected."; echo "$open_prs" | sed 's/^/  - /'; return 1; }
+    log_step "Checking for open PRs to $base_name..."
+    open_prs=$(gh pr list --state open --base "$base_name" --json number,headRefName,title | jq -r --arg b "$branch" '.[] | select(.headRefName != $b) | "#\(.number) \(.title) (\(.headRefName))"')
+
+    if [[ -n "$open_prs" ]]; then
+      log_warn "Blocking: Sequential merge required. Other open PRs to '$base_name' detected:"
+      echo "$open_prs" | sed 's/^/  - /'
+
+      if [[ "$force_create" != "true" ]]; then
+        echo ""
+        echo "如果确认要继续创建 PR，请使用 --force 参数"
+        return 1
+      fi
+
+      log_warn "用户已确认，继续创建 PR..."
+    fi
 
     gh pr view "$branch" >/dev/null 2>&1 && has_pr=1
   fi

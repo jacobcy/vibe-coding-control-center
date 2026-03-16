@@ -3,17 +3,81 @@ name: vibe-integrate
 description: Use when the user wants to assess, unblock, and merge one or more PRs, especially stacked PRs, based on CI state, review state, merge order, and post-PR handoff readiness.
 ---
 
-# /vibe-integrate - PR 整合编排
+# /vibe-integrate - PR 整合与合并
 
-`/vibe-integrate` 负责把 PR 从"已发出"推进到"可合并并已合并"。它延续用户主链里的 `issue -> flow -> PR` 视角，处理的是 `open + had_pr` 的 flow，而不是新的开发 flow。
+## 核心职责
 
-先读这些真源：
+`/vibe-integrate` 负责把 PR 从"已发出"推进到"可合并并已合并"。
+
+**核心职责**：处理 PR 直到可合并状态
+
+### 简单场景（快速通道）
+
+- 纯文本修改
+- 文档更新
+- 配置调整
+- **不要求 review evidence**
+
+### 复杂场景（完整流程）
+
+- 代码逻辑修改
+- 架构调整
+- **必须有 review evidence**：
+  - 优先：在线 Codex/Copilot review
+  - 备选：`vibe flow review --local` 本地 review
+
+## 停止点
+
+- PR 已合并 → 进入 `/vibe-done`
+- PR 未合并但有阻塞 → 停留并说明阻塞项
+
+## 必读文档
 
 - `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/worktree-lifecycle-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
+
+## 完整流程
+
+```
+/vibe-integrate
+  ├─ Step 1: 建立整合上下文
+  │   ├─ vibe flow show
+  │   ├─ vibe flow status
+  │   └─ 确认要处理的 PR、stacked 关系
+  │
+  ├─ Step 2: PR Review 状态审核（分层处理）
+  │   ├─ 简单场景（文档/配置）
+  │   │   └─ 跳过 review evidence 要求
+  │   │
+  │   └─ 复杂场景（代码逻辑/架构）
+  │       ├─ 检查在线 Codex/Copilot review
+  │       ├─ 无在线 review → 等待或触发 @codex comment
+  │       └─ 备选：vibe flow review --local
+  │
+  ├─ Step 3: 审核合并条件
+  │   ├─ CI 是否通过
+  │   ├─ review evidence 是否存在（复杂场景）
+  │   ├─ 阻塞性 review threads 是否已处理
+  │   └─ merge base / stack 顺序是否正确
+  │
+  ├─ Step 4: 处理阻塞项
+  │   ├─ 修复 CI 或 review 阻塞问题
+  │   ├─ 推送并重新检查状态
+  │   └─ 只修当前 PR 的 follow-up
+  │
+  ├─ Step 5: 按顺序合并
+  │   ├─ CI 通过
+  │   ├─ review evidence 存在（复杂场景）
+  │   ├─ 阻塞性 review 已处理
+  │   └─ 堆叠上游已先合并
+  │
+  └─ Step 6: 写入 handoff
+      ├─ PR 已合并 → 自动进入 /vibe-done
+      └─ 有阻塞 → 停留并说明阻塞项
+```
 
 ## 核心边界
 
@@ -29,14 +93,15 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 优先读取：
 
 ```bash
-vibe flow show --json
-vibe flow status --json
+vibe flow show
+vibe flow status
 ```
 
 必要时再看：
 
 ```bash
 vibe flow list
+vibe roadmap status
 ```
 
 结合 `.agent/context/task.md`，先确认：
@@ -47,64 +112,56 @@ vibe flow list
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把旧 handoff 继续传给下一个环节。
 
-### Step 2: PR Review 状态审核
+### Step 2: PR Review 状态审核（分层处理）
 
-**重要：此步骤的行为取决于当前 flow 是否已经有 PR。**
+**重要：根据 PR 类型选择审核策略。**
 
-#### 情况 A：已有 PR（`pr_ref` 非空）
+#### 简单场景（快速通道）
 
-必须执行 PR review 检查，不可跳过：
+满足以下任一条件，跳过 review evidence 要求：
 
-```bash
-vibe flow review [pr_number]
-```
+- 纯文本修改（README、文档、注释）
+- 配置调整（.gitignore、.editorconfig）
+- 非逻辑性变更（格式化、重命名）
 
-这是查看线上 review comments / review threads / review evidence 的标准 shell 入口。默认先用它读取评论与阻塞项，不要绕开它自行拼接 `gh pr view` 输出做主判断。
+直接进入 Step 3。
 
-`vibe flow review` 会通过 GraphQL 拉取所有行级 review thread，包含：
-- 文件路径 + 行号
-- Reviewer 身份
-- 是否已 resolved / outdated
-- 评论内容与链接
+#### 复杂场景（完整流程）
 
-同时要确认至少存在一份 `review evidence`，可接受来源为三选一：
-- Copilot 在线 review
-- Codex 在线 review / comment
-- `vibe flow review --local` 结果回贴到 PR comment
+涉及以下任一条件，必须有 review evidence：
 
-若三者都没有，本阶段的默认结论必须是：
+- 代码逻辑修改（函数、类、算法）
+- 架构调整（新增模块、重构）
+- 安全相关（认证、授权、加密）
 
-- `blocked on review evidence`
-- 不得把“CI 已绿”误报成“可 done”
+**Review evidence 来源优先级**：
 
-**等待在线 Review 完成后再继续：**
+1. **优先：在线 Codex/Copilot review**
 
-- 不可在 Codex / Copilot 的 review 尚未出现在 PR 上时就断言"无阻塞"
+   ```bash
+   vibe flow review [pr_number]
+   ```
+
+   - 检查 PR 上是否有 Codex/Copilot 的 review comment
+   - 若无在线 review，在 PR 中添加 `@codex` comment 触发 review
+   - 等待 10 分钟后重新检查
+
+2. **备选：本地 review**
+   ```bash
+   vibe flow review --local
+   ```
+
+   - 在线 review 不可用时使用
+   - 将 review 结果回贴到 PR comment
+
+**等待在线 Review 完成后再继续**：
+
+- 不可在 Codex/Copilot 的 review 尚未出现在 PR 上时就断言”无阻塞”
 - 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
 - 默认按异步场景处理：若用户当前不在线或没有急迫性，可先等待 10 分钟，再重新运行一次 `vibe flow review [pr]` 检查是否已有新的在线 review evidence
 - 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认由 agent 自动在 PR 中补一条 `@codex` comment 触发评论，再继续停留在 `/vibe-integrate`
 - 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
-- 若再次等待后仍没有任何线上 review，不要把“作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
-
-可使用 `browser_subagent` 直接查看 PR 页面，或触发 agent 通过 review thread 给出回应：
-
-```
-# 调用 subagent 审查 PR review comments 并生成反馈
-browser_subagent: 打开 PR 页面，输出所有 unresolved review thread
-```
-
-推荐 fallback 顺序：
-
-1. `vibe flow review [pr]` 读取线上 comments / threads / evidence
-2. 若用户不在线或当前没有急迫性，等待 10 分钟后再运行一次 `vibe flow review [pr]`
-3. 若仍没有 Codex 在线 review，由 agent 自动在 PR 中补一条 `@codex` comment
-4. 再等待 10 分钟后，重新运行一次 `vibe flow review [pr]`
-5. 若仍无任何线上 review，则运行 `vibe flow review --local` 或使用 browser/subagent 产出外部 review evidence
-6. 将外部 review 结果回贴到 PR comment 后，再继续判断 merge readiness
-
-#### 情况 B：尚无 PR（`pr_ref` 为空）
-
-**跳过此步骤**。此阶段是 pre-PR 本地审查，不需要等待在线 review。可直接进入 Step 3。
+- 若再次等待后仍没有任何线上 review，不要把”作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
 
 ### Step 3: 审核合并条件
 
@@ -171,6 +228,7 @@ vibe flow review <pr>
 
 ```markdown
 ## Skill Handoff
+
 - skill: vibe-integrate
 - updated_at: <ISO-8601>
 - flow: <feature-or-none>
@@ -180,6 +238,14 @@ vibe flow review <pr>
 - issues: <issue-refs-or-none>
 - completed: <本轮已合并或已解除阻塞的 PR>
 - next: <若已满足条件，交给 vibe-done；否则明确继续 vibe-integrate，并写清 review evidence / CI / unresolved threads 中哪一项仍阻塞>
+
+## Issues Found (可选)
+
+- type: <flow|doc|command|other>
+- severity: <low|medium|high>
+- description: <问题描述>
+- context: <发现场景>
+- suggestion: <改进建议（可选）>
 ```
 
 ## Restrictions

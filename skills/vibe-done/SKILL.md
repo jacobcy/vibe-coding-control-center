@@ -5,9 +5,25 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 # /vibe-done - 合并后收口
 
-`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。它在用户主链中承接 `issue -> flow -> PR -> done` 的最后一跳。
+## 核心职责
 
-先读这些真源：
+`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。
+
+**核心职责**：
+
+- 检查 PR 状态
+- PR 已合并 → 关闭 issue、清理工作区
+- 使用 `vibe flow done` shell 命令删除分支
+
+## 停止点
+
+完成后输出：
+
+- ✅ issue 已关闭
+- ✅ flow 已归档
+- ✅ 工作区已清理
+
+## 必读文档
 
 - `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/worktree-lifecycle-standard.md`
@@ -15,9 +31,34 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 - `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
-对 `vibe flow`、`vibe task` 或 `gh` 参数有任何不确定时，先运行 `--help`。
+## 完整流程
 
-进入本 skill 前，默认前提是已经经过 `/vibe-integrate`。若没有来自上一环节的 merge / gate 结论，先补读 shell 真源，不得自行脑补“现在应该 done 了”。
+```
+/vibe-done
+  ├─ Step 1: 读取当前 flow 事实
+  │   ├─ vibe flow show
+  │   └─ 确认 flow、branch、task、issue、pr
+  │
+  ├─ Step 2: 关闭 task
+  │   └─ vibe task update <task-id> --status completed --unassign
+  │
+  ├─ Step 3: 关闭 issue
+  │   └─ gh issue close <issue-number-or-ref>
+  │
+  ├─ Step 4: 关闭 flow
+  │   └─ vibe flow done
+  │       ├─ PR 已 merged → 直接收尾
+  │       ├─ PR 未 merged → 先检查 review evidence，再尝试 merge
+  │       └─ 删除本地与远端 branch
+  │
+  ├─ Step 5: 汇总并反馈问题
+  │   ├─ 从 handoff 提取 Issues Found
+  │   ├─ 创建或更新 issue（severity ≥ medium）
+  │   └─ 清理 handoff，保持整洁
+  │
+  └─ Step 6: 写入 handoff
+      └─ 输出停止点信息（流程结束）
+```
 
 ## 核心边界
 
@@ -34,13 +75,13 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 先运行：
 
 ```bash
-vibe flow show --json
+vibe flow show
 ```
 
 必要时对指定目标运行：
 
 ```bash
-vibe flow show <feature-or-branch> --json
+vibe flow show <feature-or-branch>
 ```
 
 确认：
@@ -122,22 +163,68 @@ vibe flow done --branch <ref>
 - 关闭 issue
 - 自动修复异常中间态
 
-### Step 5: 写入 handoff
+### Step 5: 汇总并反馈问题
+
+在完成 flow 收口前，必须从当前 flow 的所有 handoff 记录中提取 `Issues Found` 条目。
+
+执行问题反馈：
+
+1. **汇总问题清单**
+   - 从 `.agent/context/task.md` 读取当前 flow 的所有问题记录
+   - 按严重等级分类：high / medium / low
+
+2. **创建或更新 Issue**
+   - 严重等级 ≥ medium 的问题：使用 `gh issue create` 创建新 issue
+   - 已存在相关 issue：使用 `gh issue comment` 补充发现场景
+   - 重复出现的问题：在 issue 中添加 `severity:high` 标签
+
+   示例命令：
+
+   ```bash
+   gh issue create --title "vibe flow pr: Improve blocking logic" \
+     --body "检测到 open PR 时直接阻止，不给用户选择机会。建议添加 --force 参数。" \
+     --label "vibe-feedback,enhancement"
+   ```
+
+3. **清理 Handoff**
+   反馈完成后，清理 handoff 中当前 flow 的信息：
+   - **保留**：
+     - 当前 flow 的最终状态
+     - 关键交付物链接（PR、issue）
+
+   - **删除**：
+     - 已反馈的问题记录
+     - 过程性判断和临时状态
+
+   最终格式：
+
+   ```markdown
+   ## Flow Closure
+
+   - flow: <flow-name>
+   - status: completed | blocked
+   - pr: <pr-link>
+   - issues_closed: <issue-links>
+   - feedback_posted: <issue-links>
+   - completed_at: <ISO-8601>
+   ```
+
+### Step 6: 写入 handoff
 
 完成后必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
 
 ```markdown
-## Skill Handoff
-- skill: vibe-done
-- updated_at: <ISO-8601>
+## Flow Closure
+
 - flow: <feature-or-none>
-- branch: <closed-branch-or-none>
-- task: <task-id-or-none>
+- status: completed | blocked
 - pr: <pr-ref-or-none>
-- issues: <closed-issue-refs-or-none>
-- completed: <已关闭的 task / issue / flow>
-- next: <若已完成则写 none；若未完成则明确写“返回 vibe-integrate 处理 review evidence / CI / unresolved threads 阻塞”>
+- issues_closed: <closed-issue-refs-or-none>
+- feedback_posted: <issue-links-or-none>
+- completed_at: <ISO-8601>
 ```
+
+注意：问题记录已在 Step 5 反馈后清理，不再重复记录。
 
 若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `repo issue`，不得继续塞回旧 plan。
 
