@@ -8,7 +8,6 @@ lib_path = Path(__file__).parent.parent.parent / "lib"
 if str(lib_path) not in sys.path:
     sys.path.insert(0, str(lib_path))
 
-
 from loguru import logger  # noqa: E402
 from store import Vibe3Store  # noqa: E402
 
@@ -88,10 +87,8 @@ class PRService:
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Get current branch
+        # Get current branch and build PR body
         head_branch = self.git_client.get_current_branch()
-
-        # Build PR body with metadata
         enhanced_body = self._build_pr_body(body, metadata)
 
         # Create PR
@@ -106,14 +103,12 @@ class PRService:
 
         pr = self.github_client.create_pr(request)
 
-        # Update flow state with PR number
+        # Update flow state and add event
         self.store.update_flow_state(
             head_branch,
             pr_number=pr.number,
             latest_actor=actor,
         )
-
-        # Add PR creation event
         self.store.add_event(
             head_branch,
             "pr_created",
@@ -214,18 +209,15 @@ class PRService:
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
 
-        # Merge PR
+        # Merge PR and update flow state
         merged_pr = self.github_client.merge_pr(pr_number)
 
-        # Update flow state
         branch = pr.head_branch
         self.store.update_flow_state(
             branch,
             flow_status="merged",
             latest_actor=actor,
         )
-
-        # Add merge event
         self.store.add_event(
             branch,
             "pr_merged",
