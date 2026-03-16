@@ -7,9 +7,9 @@ author: Codex GPT-5
 created: 2026-03-08
 last_updated: 2026-03-10
 related_docs:
-  - docs/standards/command-standard.md
-  - docs/standards/shell-capability-design.md
-  - docs/standards/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/shell-capability-design.md
+  - docs/standards/v2/skill-standard.md
 ---
 
 # Shell Skill Boundary Audit
@@ -21,7 +21,7 @@ related_docs:
 
 ## 1. Audit Questions
 
-本审计使用 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/shell-capability-design.md) 中的审查原则，并将 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 作为命令语义真源。
+本审计使用 [shell-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/shell-capability-design.md) 中的审查原则，并将 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md) 作为命令语义真源。
 
 审计时统一使用以下问题：
 
@@ -80,7 +80,7 @@ related_docs:
 
 ### 2.3 Blocking: `roadmap current` 不能被解释为分支当前态
 
-依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`roadmap.current` 属于规划窗口状态，而分支当前焦点属于 `flow` / task runtime。
+依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md)，`roadmap.current` 属于规划窗口状态，而分支当前焦点属于 `flow` / task runtime。
 
 如果 shell 或 skill 将 `roadmap.current` 误解释为分支当前态，就会导致：
 
@@ -94,11 +94,11 @@ related_docs:
 
 期望：
 
-- 按 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md) 执行，不在 shell 或 skill 中重写这套语义
+- 按 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md) 执行，不在 shell 或 skill 中重写这套语义
 
 ### 2.4 Blocking: `repo issue`、`roadmap item`、`task`、`flow` 的业务概念必须明确区分
 
-依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)，`repo issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
+依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md)，`repo issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
 
 如果 shell 或 skill 混用这些概念，就会产生两类问题：
 
@@ -111,7 +111,7 @@ related_docs:
 
 期望：
 
-- 业务概念统一引用 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
+- 业务概念统一引用 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md)
 - 文件字段与关系统一引用数据模型标准
 
 ### 2.5 High: `registry.json` 标准与当前 task 写入字段不一致
@@ -124,7 +124,7 @@ related_docs:
 - `issue_refs`
 - `related_task_ids`
 
-见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md#L66) 到 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md#L109)。
+见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/registry-json-standard.md#L66) 到 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/registry-json-standard.md#L109)。
 
 但当前 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L68) 和 [task_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_write.sh#L65) 只写最小字段，尚未对齐标准。
 

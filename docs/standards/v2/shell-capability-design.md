@@ -13,8 +13,8 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/standards/glossary.md
-  - docs/standards/command-standard.md
-  - docs/standards/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/skill-standard.md
 ---
 
 # Shell Capability Design
@@ -110,10 +110,10 @@ Skill Layer 负责：
 当 Shell 设计涉及 `roadmap`、`task`、`flow` 的业务语义时，必须引用以下真源，而不是在设计文档中重复定义：
 
 - [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)
-- [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/command-standard.md)
-- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/data-model-standard.md)
-- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/registry-json-standard.md)
-- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/roadmap-json-standard.md)
+- [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md)
+- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/data-model-standard.md)
+- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/registry-json-standard.md)
+- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/roadmap-json-standard.md)
 
 设计层只回答：
 

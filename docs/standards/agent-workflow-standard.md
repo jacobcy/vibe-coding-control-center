@@ -16,10 +16,10 @@ related_docs:
   - .agent/README.md
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
-  - docs/standards/skill-standard.md
-  - docs/standards/skill-trigger-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/shell-capability-design.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/skill-trigger-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/shell-capability-design.md
 ---
 
 # Agent Workflow Standard

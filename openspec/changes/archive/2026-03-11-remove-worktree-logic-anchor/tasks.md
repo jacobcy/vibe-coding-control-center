@@ -11,4 +11,4 @@
 
 ## 3. Update Documentation
 
-- [x] 3.1 Revise `docs/standards/command-standard.md` (around line 69) to clarify that vibe flow uses branch, not `worktrees.json`, to express open site containers.
+- [x] 3.1 Revise `docs/standards/v2/command-standard.md` (around line 69) to clarify that vibe flow uses branch, not `worktrees.json`, to express open site containers.

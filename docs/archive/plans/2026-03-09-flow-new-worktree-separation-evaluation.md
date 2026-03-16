@@ -8,8 +8,8 @@ last_updated: 2026-03-09
 related_docs:
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/shell-capability-design.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/shell-capability-design.md
   - lib/flow.sh
   - scripts/rotate.sh
   - alias/worktree.sh
@@ -175,7 +175,7 @@ vibe flow new <name> --reuse-current [--save-stash]
 - `lib/flow_help.sh`
 - `tests/test_flow.bats`
 - `scripts/rotate.sh` 或其逻辑迁移目标
-- `docs/standards/command-standard.md` 或相关帮助/计划文档
+- `docs/standards/v2/command-standard.md` 或相关帮助/计划文档
 - `skills/vibe-commit/SKILL.md` 及引用它的 workflow 文档
 
 ## Test Commands

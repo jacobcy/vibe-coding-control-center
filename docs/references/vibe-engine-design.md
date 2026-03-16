@@ -6,11 +6,11 @@ author: GPT-5 Codex
 created: 2026-03-13
 last_updated: 2026-03-13
 related_docs:
-  - docs/standards/vibe-engine-design.md
+  - docs/standards/v2/vibe-engine-design.md
   - docs/standards/glossary.md
-  - docs/standards/command-standard.md
-  - docs/standards/skill-standard.md
-  - docs/standards/skill-trigger-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/skill-trigger-standard.md
 ---
 
 # Vibe Workflow Engine 历史设计参考
@@ -20,9 +20,9 @@ related_docs:
 它不是现行标准真源。当前正式语义以以下文档为准：
 
 - `docs/standards/glossary.md`
-- `docs/standards/command-standard.md`
-- `docs/standards/skill-standard.md`
-- `docs/standards/skill-trigger-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/skill-standard.md`
+- `docs/standards/v2/skill-trigger-standard.md`
 
 需要特别注意：
 

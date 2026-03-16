@@ -11,8 +11,8 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
-- `docs/standards/command-standard.md`
-- `docs/standards/handoff-governance-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 对 `vibe flow`、`vibe task` 或 `gh` 参数有任何不确定时，先运行 `--help`。

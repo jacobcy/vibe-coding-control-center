@@ -79,7 +79,7 @@ related_docs:
 - Create: `skills/vibe-roadmap/SKILL.md`
 - Modify: `skills/vibe-skills-manager/registry.json`（注册新技能）
 - Optional Modify: `AGENTS.md`（若需加入 quick start）
-- Optional Modify: `docs/standards/command-standard.md`（若新增 `vibe roadmap` CLI）
+- Optional Modify: `docs/standards/v2/command-standard.md`（若新增 `vibe roadmap` CLI）
 
 ## Test Command（实施后）
 - `bin/vibe check`

@@ -12,7 +12,7 @@ related_issues:
 related_docs:
   - skills/vibe-roadmap/SKILL.md
   - skills/vibe-issue/SKILL.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
   - tests/skills/test_skills.bats
 ---
 
@@ -51,7 +51,7 @@ related_docs:
 
 - `skills/vibe-roadmap/SKILL.md`
 - `skills/vibe-issue/SKILL.md`
-- `docs/standards/command-standard.md`
+- `docs/standards/v2/command-standard.md`
 - `tests/skills/test_skills.bats`
 
 ## Verification Command
@@ -77,7 +77,7 @@ bats tests/skills/test_skills.bats
 **Files:**
 - Modify: `skills/vibe-roadmap/SKILL.md`
 - Modify: `skills/vibe-issue/SKILL.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `tests/skills/test_skills.bats`
 
 **Step 1: Write the failing contract test for intake gate ownership**
@@ -116,7 +116,7 @@ Expected:
   - 候选 issue 不等于自动进入 GitHub Project
   - 进入 Project 需要后续 `vibe-roadmap` triage
 
-**Step 5: Update `docs/standards/command-standard.md`**
+**Step 5: Update `docs/standards/v2/command-standard.md`**
 
 - 在 `vibe roadmap` 相关章节补充边界说明：
   - `roadmap sync` 不对全部 repo issue 做自动 intake
@@ -152,7 +152,7 @@ Expected:
 Run:
 
 ```bash
-git add skills/vibe-roadmap/SKILL.md skills/vibe-issue/SKILL.md docs/standards/command-standard.md tests/skills/test_skills.bats
+git add skills/vibe-roadmap/SKILL.md skills/vibe-issue/SKILL.md docs/standards/v2/command-standard.md tests/skills/test_skills.bats
 git commit -m "docs: define roadmap intake gate responsibilities"
 ```
 
@@ -164,7 +164,7 @@ Expected:
 
 **Files:**
 - Modify: `skills/vibe-roadmap/SKILL.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `tests/skills/test_skills.bats`
 
 **Step 1: Write the failing contract test for intake view semantics**
@@ -196,7 +196,7 @@ Expected:
   - 不维护本地长期 issue cache / registry
   - 若需要审计，保存的是 triage 决策快照而不是整池 issue 真源
 
-**Step 4: Update `docs/standards/command-standard.md`**
+**Step 4: Update `docs/standards/v2/command-standard.md`**
 
 - 在 `vibe roadmap` 相关标准中补充：
   - `roadmap sync` 只同步 GitHub Project mirror
@@ -232,7 +232,7 @@ Expected:
 Run:
 
 ```bash
-git add skills/vibe-roadmap/SKILL.md docs/standards/command-standard.md tests/skills/test_skills.bats
+git add skills/vibe-roadmap/SKILL.md docs/standards/v2/command-standard.md tests/skills/test_skills.bats
 git commit -m "docs: define issue intake view without local cache"
 ```
 
@@ -244,7 +244,7 @@ Expected:
 
 - `skills/vibe-roadmap/SKILL.md`: modify, about 15-25 lines
 - `skills/vibe-issue/SKILL.md`: modify, about 6-12 lines
-- `docs/standards/command-standard.md`: modify, about 10-18 lines
+- `docs/standards/v2/command-standard.md`: modify, about 10-18 lines
 - `tests/skills/test_skills.bats`: modify, about 20-35 lines
 
 Total estimate:

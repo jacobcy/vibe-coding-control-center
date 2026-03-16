@@ -6,10 +6,10 @@ author: GPT-5 Codex
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - docs/standards/data-model-standard.md
+  - docs/standards/v2/data-model-standard.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
 related_issues:
   - gh-103
   - gh-144

@@ -10,9 +10,9 @@ related_docs:
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-plan.md
   - docs/standards/glossary.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/registry-json-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/registry-json-standard.md
 related_issues:
   - gh-157
   - gh-158
@@ -111,7 +111,7 @@ Expected:
 ## Task 2: 处理仍会被误读成现行标准的历史设计文档
 
 **Files:**
-- Modify: `docs/standards/vibe-engine-design.md`
+- Modify: `docs/standards/v2/vibe-engine-design.md`
 - Review: `docs/plans/2026-03-11-flow-worktree-semantic-confusion-analysis.md`
 
 **Step 1: 决定 `vibe-engine-design.md` 的身份**
@@ -142,8 +142,8 @@ Expected:
 ## Task 3: 扩散 `task issue` 与 roadmap cache 语义
 
 **Files:**
-- Modify: `docs/standards/skill-standard.md`
-- Modify: `docs/standards/skill-trigger-standard.md`
+- Modify: `docs/standards/v2/skill-standard.md`
+- Modify: `docs/standards/v2/skill-trigger-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Modify: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-done/SKILL.md`
@@ -164,7 +164,7 @@ Expected:
 Run:
 
 ```bash
-rg -n "primary_issue_ref|task issue|issue_refs|roadmap.*cache|roadmap.*projection|execution gate" docs/standards/skill-standard.md docs/standards/skill-trigger-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
+rg -n "primary_issue_ref|task issue|issue_refs|roadmap.*cache|roadmap.*projection|execution gate" docs/standards/v2/skill-standard.md docs/standards/v2/skill-trigger-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
 ```
 
 Expected:

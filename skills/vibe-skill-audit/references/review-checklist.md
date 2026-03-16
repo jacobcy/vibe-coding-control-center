@@ -16,12 +16,12 @@ Any "yes" is `Blocking`.
 
 - `docs/standards/glossary.md`
 - `docs/standards/action-verbs.md`
-- `docs/standards/skill-standard.md`
+- `docs/standards/v2/skill-standard.md`
 
 ### Required when the skill invokes `bin/vibe` shared-state commands
 
-- `docs/standards/command-standard.md`
-- `docs/standards/shell-capability-design.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/shell-capability-design.md`
 
 ### Required when the skill discusses current delivery flow semantics
 

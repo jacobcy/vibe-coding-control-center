@@ -15,10 +15,10 @@ related_docs:
   - CLAUDE.md
   - docs/README.md
   - docs/standards/action-verbs.md
-  - docs/standards/command-standard.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/shell-capability-design.md
-  - docs/standards/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/shell-capability-design.md
+  - docs/standards/v2/skill-standard.md
 ---
 
 # 项目术语表

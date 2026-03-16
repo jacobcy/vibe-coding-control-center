@@ -9,8 +9,8 @@ related_docs:
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-design.md
   - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
   - docs/standards/git-workflow-standard.md
 related_issues:
   - gh-157
@@ -88,8 +88,8 @@ related_issues:
 ### Phase 1: 冻结 remote-first 数据模型
 
 **Files**
-- Modify: `docs/standards/data-model-standard.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/data-model-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Modify: `docs/standards/glossary.md`
 - Modify: `docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-design.md`
 
@@ -128,7 +128,7 @@ Expected:
 - Modify: `lib/task_actions.sh`
 - Modify: `lib/task_help.sh`
 - Modify: `skills/vibe-start/SKILL.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 - Test: `tests/task/*.bats`
 
 **Step 1: 先写失败测试**
@@ -213,7 +213,7 @@ Expected:
 
 **Files**
 - Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/handoff-governance-standard.md`
+- Modify: `docs/standards/v2/handoff-governance-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Modify: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-done/SKILL.md`
@@ -240,7 +240,7 @@ Expected:
 Run:
 
 ```bash
-rg -n "close|issue|handoff|stack|PR" docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
+rg -n "close|issue|handoff|stack|PR" docs/standards/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
 ```
 
 Expected:

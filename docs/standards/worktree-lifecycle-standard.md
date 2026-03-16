@@ -16,7 +16,7 @@ related_docs:
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
   - docs/standards/git-workflow-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/command-standard.md
 ---
 
 # Worktree Lifecycle Standard

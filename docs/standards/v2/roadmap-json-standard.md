@@ -13,8 +13,8 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/standards/glossary.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
 ---
 
 # `roadmap.json` 标准

@@ -39,7 +39,7 @@
 
 **Files:**
 - Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/command-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
 
 **Step 1: 写标准补充点**
 
@@ -58,7 +58,7 @@
 
 Run:
 ```bash
-rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/command-standard.md
+rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md
 ```
 Expected:
 ```text
@@ -68,7 +68,7 @@ Expected:
 **Step 3: Commit**
 
 ```bash
-git add docs/standards/git-workflow-standard.md docs/standards/command-standard.md
+git add docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md
 git commit -m "docs(flow): define prep-only rule for open PR flows"
 ```
 
@@ -230,7 +230,7 @@ Expected:
 
 Run:
 ```bash
-rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/command-standard.md .agent/workflows/vibe-commit.md skills/vibe-commit/SKILL.md .agent/context/task.md
+rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md .agent/workflows/vibe-commit.md skills/vibe-commit/SKILL.md .agent/context/task.md
 ```
 Expected:
 ```text

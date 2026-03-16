@@ -39,8 +39,8 @@ related_issues:
 
 ## Files To Read
 
-- `docs/standards/command-standard.md`
-- `docs/standards/data-model-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/data-model-standard.md`
 - `docs/standards/git-workflow-standard.md`
 - `.agent/workflows/vibe:start.md`
 - `skills/vibe-roadmap/SKILL.md`

@@ -4,9 +4,9 @@ date: "2026-03-09"
 status: "draft"
 author: "Codex GPT-5"
 related_docs:
-  - docs/standards/skill-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/shell-capability-design.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/shell-capability-design.md
   - docs/standards/git-workflow-standard.md
   - docs/standards/worktree-lifecycle-standard.md
   - docs/standards/glossary.md
@@ -39,8 +39,8 @@ related_docs:
 
 ### 已确认的边界真源
 
-- `docs/standards/command-standard.md` 已明确 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的命令语义与层级分工。
-- `docs/standards/shell-capability-design.md` 已明确 shell 只提供原子能力，skill 不得直接写共享真源。
+- `docs/standards/v2/command-standard.md` 已明确 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的命令语义与层级分工。
+- `docs/standards/v2/shell-capability-design.md` 已明确 shell 只提供原子能力，skill 不得直接写共享真源。
 - `docs/standards/git-workflow-standard.md` 与 `docs/standards/worktree-lifecycle-standard.md` 已分别定义交付 flow 和物理 worktree 生命周期，不应由 skill 重写。
 
 ### 当前 skill 体系的明显问题
@@ -136,9 +136,9 @@ related_docs:
 
 - 术语语义：`docs/standards/glossary.md`
 - 动作词语义：`docs/standards/action-verbs.md`
-- 命令语义：`docs/standards/command-standard.md`
-- Shell/Skill 边界：`docs/standards/shell-capability-design.md`
-- Skills 层边界：`docs/standards/skill-standard.md`
+- 命令语义：`docs/standards/v2/command-standard.md`
+- Shell/Skill 边界：`docs/standards/v2/shell-capability-design.md`
+- Skills 层边界：`docs/standards/v2/skill-standard.md`
 
 若 skill 涉及 flow / branch / worktree / PR，还应检查：
 

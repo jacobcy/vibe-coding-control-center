@@ -11,7 +11,7 @@ created: 2026-03-08
 last_updated: 2026-03-08
 related_docs:
   - docs/standards/glossary.md
-  - docs/standards/registry-json-standard.md
+  - docs/standards/v2/registry-json-standard.md
   - skills/vibe-commit/SKILL.md
 ---
 

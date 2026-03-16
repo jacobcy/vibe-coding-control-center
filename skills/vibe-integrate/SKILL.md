@@ -11,8 +11,8 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 
 - `docs/standards/git-workflow-standard.md`
 - `docs/standards/worktree-lifecycle-standard.md`
-- `docs/standards/command-standard.md`
-- `docs/standards/handoff-governance-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 ## 核心边界
