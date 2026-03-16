@@ -1,4 +1,5 @@
 """Git client implementation."""
+
 import subprocess
 from typing import Protocol
 

@@ -1,8 +1,8 @@
 """Flow UI rendering."""
+
 from rich import print
 from rich.table import Table
-
-from vibe3.models.flow import FlowStatusResponse, FlowState
+from vibe3.models.flow import FlowState, FlowStatusResponse
 
 
 def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
@@ -47,9 +47,8 @@ def render_flow_status(status: FlowStatusResponse) -> None:
     if status.next_step:
         print(f"  [cyan]Next Step:[/] {status.next_step}")
     if status.issues:
-        print(
-            f"  [cyan]Issues:[/] {', '.join(f'#{i.issue_number}' for i in status.issues)}"
-        )
+        issue_list = ", ".join(f"#{i.issue_number}" for i in status.issues)
+        print(f"  [cyan]Issues:[/] {issue_list}")
 
 
 def render_flow_status_table(status: FlowStatusResponse) -> None:

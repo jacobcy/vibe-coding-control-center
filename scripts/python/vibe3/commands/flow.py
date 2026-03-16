@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """Flow command handlers."""
+
 import json
 from typing import Annotated, Literal, Optional
 
 import typer
-from vibe3.services.flow_service import FlowService
+
 from vibe3.clients.git_client import GitClient
+from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
-    render_flow_created, render_flow_bound, render_flow_status,
-    render_flow_status_table, render_flows_table, render_no_flow,
-    render_no_active_flow, render_no_flows, render_error,
+    render_error,
+    render_flow_bound,
+    render_flow_created,
+    render_flow_status,
+    render_flow_status_table,
+    render_flows_table,
+    render_no_active_flow,
+    render_no_flow,
+    render_no_flows,
 )
 
 app = typer.Typer(help="Manage logic flows (branch-centric)")
@@ -86,7 +94,10 @@ def status(
 
 @app.command()
 def list(
-    status_filter: Annotated[Optional[Literal["active", "idle", "missing", "stale"]], typer.Option("--status", help="Filter by status")] = None,
+    status_filter: Annotated[
+        Optional[Literal["active", "idle", "missing", "stale"]],
+        typer.Option("--status", help="Filter by status"),
+    ] = None,
 ) -> None:
     """List all flows."""
     service = FlowService()
