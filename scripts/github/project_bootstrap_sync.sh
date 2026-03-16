@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# scripts/github_project_bootstrap_sync.sh - Bootstrap cutover audit/dry-run/apply
+# scripts/github/project_bootstrap_sync.sh - Bootstrap cutover audit/dry-run/apply
 
 set -e
 
@@ -13,7 +13,7 @@ while [[ $# -gt 0 ]]; do
     --apply) mode="apply"; shift ;;
     --json) json_out=1; shift ;;
     --outdir) outdir="$2"; shift 2 ;;
-    *) echo "Usage: zsh scripts/github_project_bootstrap_sync.sh [--dry-run|--apply] [--json] [--outdir <dir>]"; exit 1 ;;
+    *) echo "Usage: zsh scripts/github/project_bootstrap_sync.sh [--dry-run|--apply] [--json] [--outdir <dir>]"; exit 1 ;;
   esac
 done
 

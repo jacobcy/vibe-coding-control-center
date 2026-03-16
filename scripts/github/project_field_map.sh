@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# scripts/github_project_field_map.sh - GitHub Project custom field readiness check
+# scripts/github/project_field_map.sh - GitHub Project custom field readiness check
 
 set -e
 
@@ -10,11 +10,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --check) check_mode=1; shift ;;
     --json) json_out=1; shift ;;
-    *) echo "Usage: zsh scripts/github_project_field_map.sh --check [--json]"; exit 1 ;;
+    *) echo "Usage: zsh scripts/github/project_field_map.sh --check [--json]"; exit 1 ;;
   esac
 done
 
-[[ "$check_mode" -eq 1 ]] || { echo "Usage: zsh scripts/github_project_field_map.sh --check [--json]"; exit 1; }
+[[ "$check_mode" -eq 1 ]] || { echo "Usage: zsh scripts/github/project_field_map.sh --check [--json]"; exit 1; }
 
 fields_source="${VIBE_GITHUB_PROJECT_FIELDS_JSON:-[]}"
 if [[ -f "$fields_source" ]]; then

@@ -53,8 +53,8 @@ related_docs:
 
 ## Files To Modify
 
-- Create: `scripts/github_project_bootstrap_sync.sh`
-- Create: `scripts/github_project_field_map.sh`
+- Create: `scripts/github/project_bootstrap_sync.sh`
+- Create: `scripts/github/project_field_map.sh`
 - Create: `tests/contracts/test_github_project_bootstrap.bats`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
@@ -66,7 +66,7 @@ related_docs:
 ## Task 1: 建立只读 readiness audit
 
 **Files:**
-- Create: `scripts/github_project_bootstrap_sync.sh`
+- Create: `scripts/github/project_bootstrap_sync.sh`
 - Modify: `lib/check.sh`
 - Modify: `lib/check_groups.sh`
 
@@ -90,7 +90,7 @@ related_docs:
 ## Task 2: 固化 GitHub Project 字段就绪检查
 
 **Files:**
-- Create: `scripts/github_project_field_map.sh`
+- Create: `scripts/github/project_field_map.sh`
 - Create: `artifacts/github-project-bootstrap/README.md`
 
 **Step tasks:**
@@ -111,7 +111,7 @@ related_docs:
 ## Task 3: 实现 dry-run reconcile
 
 **Files:**
-- Create: `scripts/github_project_bootstrap_sync.sh`
+- Create: `scripts/github/project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `lib/roadmap_query.sh`
 - Modify: `tests/contracts/test_github_project_bootstrap.bats`
@@ -133,7 +133,7 @@ related_docs:
 ## Task 4: 实现受控 apply 与 snapshot
 
 **Files:**
-- Create: `scripts/github_project_bootstrap_sync.sh`
+- Create: `scripts/github/project_bootstrap_sync.sh`
 - Modify: `lib/roadmap_write.sh`
 - Modify: `tests/task/test_task_sync.bats`
 
@@ -173,8 +173,8 @@ related_docs:
 ## Test Command
 
 ```bash
-zsh scripts/github_project_field_map.sh --check
-zsh scripts/github_project_bootstrap_sync.sh --dry-run
+zsh scripts/github/project_field_map.sh --check
+zsh scripts/github/project_bootstrap_sync.sh --dry-run
 bats tests/contracts/test_github_project_bootstrap.bats
 bats tests/task/test_task_sync.bats
 ```

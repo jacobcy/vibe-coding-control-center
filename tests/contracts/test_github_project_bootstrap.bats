@@ -60,7 +60,7 @@ JSON
   fixture="$(mktemp -d)"
   _make_bootstrap_fixture "$fixture"
 
-  run env VIBE_GITHUB_PROJECT_FIELDS_JSON="$fixture/fields.json" zsh scripts/github_project_field_map.sh --check --json
+  run env VIBE_GITHUB_PROJECT_FIELDS_JSON="$fixture/fields.json" zsh scripts/github/project_field_map.sh --check --json
 
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq -r '.status')" = "pass" ]
@@ -77,7 +77,7 @@ JSON
     VIBE_GITHUB_REGISTRY_FILE="$fixture/vibe/registry.json" \
     VIBE_GITHUB_PROJECT_ITEMS_JSON="$fixture/items.json" \
     VIBE_GITHUB_BOOTSTRAP_OUTDIR="$fixture/out" \
-    zsh scripts/github_project_bootstrap_sync.sh --dry-run --json
+    zsh scripts/github/project_bootstrap_sync.sh --dry-run --json
 
   [ "$status" -eq 0 ]
   [ "$(echo "$output" | jq -r '.audit.readiness.roadmap_missing_github_project_item_id[0]')" = "rm-cutover" ]
@@ -95,7 +95,7 @@ JSON
     VIBE_GITHUB_REGISTRY_FILE="$fixture/vibe/registry.json" \
     VIBE_GITHUB_PROJECT_ITEMS_JSON="$fixture/items.json" \
     VIBE_GITHUB_BOOTSTRAP_OUTDIR="$fixture/out" \
-    zsh scripts/github_project_bootstrap_sync.sh --apply --json
+    zsh scripts/github/project_bootstrap_sync.sh --apply --json
 
   [ "$status" -eq 0 ]
   [ "$(jq -r '.items[0].github_project_item_id' "$fixture/vibe/roadmap.json")" = "PVTI_cutover" ]
