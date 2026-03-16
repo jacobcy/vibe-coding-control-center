@@ -38,12 +38,12 @@
 
 ## Phase 2: Flow & Task State (SQLite)
 
-**Objective**: Implement CRUD logic for Flows and Tasks using SQLite.
+**Objective**: Implement handoff store for Flow's three-phase process (plan/execute/review).
 
 **Inputs**: `docs/v3/plans/02-flow-task-foundation.md`, `scripts/python/lib/store.py`
 **Success Criteria**:
-- [ ] Execution of `vibe3 flow new test-flow --task 101` creates a row in `flow_state` table.
-- [ ] `vibe3 flow status --json` output contains `"flow_slug": "test-flow"`.
+- [ ] Execution of `vibe3 flow new test-flow --task 101` creates handoff record in SQLite.
+- [ ] `vibe3 flow status --json` output contains `"flow_slug": "test-flow"` with handoff metadata.
 - [ ] Unit tests for `FlowManager` pass with 100% success rate.
 
 ---

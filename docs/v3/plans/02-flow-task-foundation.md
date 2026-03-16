@@ -31,13 +31,13 @@ related_docs:
 |--------|----|----|
 | 任务存储 | `registry.json` | ❌ 不使用 |
 | Flow 存储 | `worktrees.json` + `registry.json` | ❌ 不使用 |
-| 本地存储 | SQLite Handoff Store | ✅ **唯一真源** |
+| 本地存储 | SQLite Handoff Store | 执行记录与追责索引 |
 | 文件位置 | `.git/vibe3/handoff.db` | ✅ 按分支隔离 |
 
 **核心原则**（来自 [README.md](README.md)）：
-- **责任链落地**：本地只保留 flow-scoped handoff store，不再复制业务 registry/cache
-- **真源回归**：去本地化，回归 GitHub Issue / PR / Project 作为真源
-- SQLite 只是本地的 handoff store（责任链索引），不是业务真源
+- **责任链落地**：本地只保留 flow-scoped handoff store（执行记录、规范、署名、追责）
+- **真源回归**：gh CLI 是唯一真源，GitHub Issue / PR / Project 是业务真源
+- SQLite 存储 handoff/署名/追责记录，**不存储 GitHub Project 镜像**
 
 **实现规范：**
 - ✅ 必须使用的技术栈（typer, rich, pydantic, loguru）
