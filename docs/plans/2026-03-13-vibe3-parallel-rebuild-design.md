@@ -4,8 +4,10 @@ title: Vibe3 Parallel Rebuild Design
 status: proposed
 author: GPT-5 Codex
 created: 2026-03-13
-last_updated: 2026-03-13
+last_updated: 2026-03-16
 related_docs:
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/standards/glossary.md
   - docs/standards/v2/command-standard.md
   - docs/standards/v2/data-model-standard.md
@@ -1435,137 +1437,29 @@ skills 不重做，但要分阶段适配：
 
 ### 2. 数据库规格 (Database Schema)
 
-#### 2.1 `flow_state` 表
+> **真源**: 所有数据库表结构、字段约束和索引定义见 [docs/standards/v3/handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)。
+>
+> 本文档不重复定义，避免语义冲突。
 
-```sql
-CREATE TABLE flow_state (
-    branch TEXT PRIMARY KEY,           -- Git 分支名（flow 身份锚点）
-    flow_slug TEXT NOT NULL,           -- Flow 名称
-    task_issue_number INTEGER,         -- 主闭环 issue 编号
-    pr_number INTEGER,                 -- 关联的 PR 编号
-    spec_ref TEXT,                     -- 执行规范引用
-    plan_ref TEXT,                     -- 计划文档引用
-    report_ref TEXT,                   -- 报告文档引用
-    audit_ref TEXT,                    -- 审计文档引用
-    planner_actor TEXT,                -- 规划者身份
-    planner_session_id TEXT,           -- 规划会话 ID
-    executor_actor TEXT,               -- 执行者身份
-    executor_session_id TEXT,          -- 执行会话 ID
-    reviewer_actor TEXT,               -- 审查者身份
-    reviewer_session_id TEXT,          -- 审查会话 ID
-    latest_actor TEXT,                 -- 最后操作者
-    blocked_by TEXT,                   -- 阻塞原因
-    next_step TEXT,                    -- 下一步动作
-    flow_status TEXT NOT NULL DEFAULT 'active',  -- flow 状态
-    updated_at TEXT NOT NULL           -- 更新时间 (ISO 8601)
-)
-```
+#### 必需的表
 
-**字段约束**：
-- `branch`: PRIMARY KEY, NOT NULL
-- `flow_slug`: NOT NULL, 建议格式 `^[a-z0-9-]+$`
-- `task_issue_number`: INTEGER, 可为 NULL
-- `pr_number`: INTEGER, 可为 NULL
-- `flow_status`: NOT NULL, 默认 'active', 允许值: 'active', 'idle', 'missing', 'stale'
-- `updated_at`: NOT NULL, 格式: ISO 8601 (e.g., `2026-03-15T23:42:04.604`)
+详见真源文档：
 
-**索引**：
-- PRIMARY KEY: `branch`
+1. **`flow_state`** - 见 [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md) §4.1
+2. **`flow_issue_links`** - 见 [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md) §4.2
+3. **`flow_events`** - 见 [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md) §4.3
+4. **`schema_meta`** - 见 [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md) §3
 
----
+#### 关键字段说明
 
-#### 2.2 `flow_issue_links` 表
+**`session_id` 字段（预留）**:
+- 见 [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md) §4.1
+- 用途：用于记录和恢复 agent 会话
+- 现阶段：仅保留字段，不实现功能
 
-```sql
-CREATE TABLE flow_issue_links (
-    branch TEXT NOT NULL,              -- Git 分支名
-    issue_number INTEGER NOT NULL,     -- Issue 编号
-    issue_role TEXT NOT NULL,          -- Issue 角色（'task' / 'related'）
-    created_at TEXT NOT NULL,          -- 创建时间 (ISO 8601)
-    PRIMARY KEY (branch, issue_number, issue_role)
-)
-```
-
-**字段约束**：
-- `branch`: NOT NULL, 外键关联 `flow_state.branch`
-- `issue_number`: NOT NULL, INTEGER
-- `issue_role`: NOT NULL, 允许值: 'task', 'related'
-- `created_at`: NOT NULL, 格式: ISO 8601
-
-**唯一约束**：
-```sql
-CREATE UNIQUE INDEX idx_flow_single_task_issue
-ON flow_issue_links(branch)
-WHERE issue_role = 'task'
-```
-
-**语义约束**：
-- 每个 flow 只能有一个 `issue_role='task'` 的记录（主闭环 issue）
-- 可以有多个 `issue_role='related'` 的记录（参考 issue）
-
----
-
-#### 2.3 `flow_events` 表
-
-```sql
-CREATE TABLE flow_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    branch TEXT NOT NULL,              -- Git 分支名
-    event_type TEXT NOT NULL,          -- 事件类型
-    actor TEXT NOT NULL,               -- 操作者
-    detail TEXT,                       -- 事件详情
-    created_at TEXT NOT NULL           -- 创建时间 (ISO 8601)
-)
-```
-
-**字段约束**：
-- `id`: PRIMARY KEY, AUTOINCREMENT
-- `branch`: NOT NULL, 外键关联 `flow_state.branch`
-- `event_type`: NOT NULL, 允许值见下表
-- `actor`: NOT NULL, 格式: `agent/model` (e.g., `claude/sonnet-4.5`)
-- `detail`: TEXT, 可为 NULL
-- `created_at`: NOT NULL, 格式: ISO 8601
-
-**标准事件类型**：
-| event_type | 含义 | detail 格式 |
-|-----------|------|------------|
-| `flow_created` | Flow 创建 | `Flow '{slug}' created` |
-| `task_bound` | Task 绑定 | `Task '{task_id}' bound` |
-| `issue_linked` | Issue 链接 | `Issue #{issue_number} linked as {role}` |
-| `status_updated` | 状态更新 | `Status changed to {status}` |
-| `next_step_set` | 下一步设置 | `Next step: {next_step}` |
-| `planner_registered` | Planner 注册 | `Planner: {agent}/{model}` |
-| `executor_registered` | Executor 注册 | `Executor: {agent}/{model}` |
-| `reviewer_registered` | Reviewer 注册 | `Reviewer: {agent}/{model}` |
-| `flow_aborted` | Flow 废弃 | `Flow aborted: {reason}` |
-| `pr_created` | PR 创建 | `PR #{pr_number} created` |
-| `pr_merged` | PR 合并 | `PR #{pr_number} merged` |
-| `pr_closed` | PR 关闭 | `PR #{pr_number} closed` |
-
-**索引**：
-- PRIMARY KEY: `id`
-- 建议: `CREATE INDEX idx_flow_events_branch ON flow_events(branch)`
-
----
-
-#### 2.4 `schema_meta` 表
-
-```sql
-CREATE TABLE schema_meta (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-)
-```
-
-**字段约束**：
-- `key`: PRIMARY KEY, NOT NULL
-- `value`: NOT NULL
-
-**初始数据**：
-```sql
-INSERT INTO schema_meta (key, value) VALUES ('schema_version', 'v3');
-INSERT INTO schema_meta (key, value) VALUES ('store_type', 'handoff_store');
-```
+**`*_actor` 字段**:
+- 格式要求：`agent/model`
+- 示例：`codex/gpt-5.4`, `claude/sonnet-4.5`
 
 ---
 
