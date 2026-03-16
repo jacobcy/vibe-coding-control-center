@@ -45,22 +45,29 @@ related_docs:
 ### 2.2 审核流程
 
 ```
-vibe-review.sh base main
+vibe review pr 42
     ↓
-1. serena_service → impact.json (符号分析)
+1. 内部调用 vibe inspect pr 42 → 获取改动分析（JSON）
     ↓
-2. dag_service → dag.json (影响范围)
+2. serena_service → impact.json (符号分析)
     ↓
-3. pr_scoring_service → score.json (风险评分)
+3. dag_service → dag.json (影响范围)
     ↓
-4. 构建上下文 (policy + impact + dag + score)
+4. pr_scoring_service → score.json (风险评分)
     ↓
-5. codex review --base main - < context.md
+5. 构建上下文 (policy + impact + dag + score)
     ↓
-6. 解析 Codex 结果，更新风险分数
+6. codex review --base main - < context.md
     ↓
-7. GitHub API → 行级 review comments + 风险报告
+7. 解析 Codex 结果，更新风险分数
+    ↓
+8. GitHub API → 行级 review comments + 风险报告
 ```
+
+**关键设计**：
+- `vibe inspect` 提供结构化信息（metrics、structure、symbols、改动分析）
+- `vibe review` 消费 `inspect` 提供的信息，进行代码审核
+- 职责分离：信息提供 vs 问题发现
 
 ## 3. 架构设计
 
@@ -76,45 +83,41 @@ scripts/python/vibe3/
 │   └── structure_service.py  # 迁移 structure_summary.sh
 │
 ├── commands/
-│   └── review.py             # 审核命令入口
+│   └── review.py             # 审核命令入口（vibe review）
 │
 └── clients/
     └── github_client.py      # 扩展：review comments API
 ```
 
-### 3.2 统一入口
+### 3.2 命令职责分工
 
-**Shell 入口**: `scripts/vibe-review.sh`
+系统提供两个新的命令，职责清晰分离：
 
-**职责**: 调度 v3 services 和现有 CLI 工具
-
+#### `vibe inspect` - 信息提供
+提供代码分析信息，为 `vibe review` 提供上下文数据
 ```bash
-#!/usr/bin/env bash
-# vibe-review.sh - 统一审核入口
+vibe inspect                  # 综合信息
+vibe inspect --metrics        # 代码量指标
+vibe inspect --structure      # 文件结构分析
+vibe inspect --symbols        # 符号定义（命令来源/函数定义）
+vibe inspect pr 42            # PR 改动分析（输出 JSON）
+vibe inspect commit SHA       # Commit 改动分析（输出 JSON）
+vibe inspect base main        # 相对分支的改动分析（输出 JSON）
+```
 
-case “$1” in
-  uncommitted)
-    # 直接调用 Codex CLI
-    codex review --uncommitted - < .codex/review-policy.md
-    ;;
-  base)
-    # 1. Python services 准备上下文
-    python3 -m vibe3.services.serena_service --base “$2” > /tmp/impact.json
-    python3 -m vibe3.services.dag_service --impact /tmp/impact.json > /tmp/dag.json
+**架构对齐**:
+- ✅ 符合 Tier 1 (Shell 能力层) 定位：确定性操作、结构化输出
+- ✅ 复用现有 `bin/vibe` 入口
+- ✅ Python services 作为底层能力
+- ✅ 为 `vibe review` 提供结构化数据输入
 
-    # 2. 简单拼接上下文
-    cat .codex/review-policy.md /tmp/impact.json /tmp/dag.json > /tmp/context.md
-
-    # 3. 调用 Codex CLI
-    codex review --base “$2” - < /tmp/context.md
-    ;;
-  metrics)
-    python3 -m vibe3.commands.metrics
-    ;;
-  structure)
-    python3 -m vibe3.commands.structure
-    ;;
-esac
+#### `vibe review` - 代码审核
+基于 `vibe inspect` 提供的上下文，进行代码审核（发现 bug、安全、性能问题）
+```bash
+vibe review pr 42             # 审核 PR（调用 inspect pr 42 获取上下文）
+vibe review --uncommitted     # 审核未提交改动
+vibe review base main         # 审核相对分支的改动
+vibe review commit SHA        # 审核指定 commit
 ```
 
 ### 3.3 技术栈（已安装）
@@ -187,7 +190,7 @@ def post_review_comment(
 
 ### 4.3 统一入口
 
-**新建**: `scripts/vibe-review.sh`
+**命令入口**: `bin/vibe review` (通过 `commands/review.py`)
 
 **职责**: 调度 v3 services + 调用现有 CLI
 

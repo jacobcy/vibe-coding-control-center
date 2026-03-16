@@ -41,13 +41,14 @@ related_docs:
 **详见**: [phase2-integration.md](phase2-integration.md)
 
 **目标**:
-- 创建统一审核入口 (`vibe-review.sh`)
+- 创建信息提供命令 (`vibe inspect`)
+- 创建代码审核命令 (`vibe review`)
 - 集成评分系统到审核流程
 - 实现 GitHub API 集成
 
 **关键组件**:
-- Shell 统一入口
-- Review 命令
+- Inspect 命令 (Python typer) - 信息提供
+- Review 命令 (Python typer) - 代码审核
 - GitHub Client
 - Review 解析器
 
@@ -74,6 +75,8 @@ related_docs:
 ```
 git diff / PR diff
     ↓
+vibe inspect pr 42 (信息提供)
+    ↓
 Structure Summary (代码结构)
     ↓
 Serena Service (符号分析)
@@ -82,10 +85,16 @@ DAG Service (影响范围)
     ↓
 PR Scoring Service (风险评分)
     ↓
+vibe review pr 42 (代码审核)
+    ↓
 Codex Review (代码审查)
     ↓
 GitHub API (评论 & merge gate)
 ```
+
+**命令职责分工**:
+- **`vibe inspect`** - 信息提供（metrics、structure、symbols、改动分析）
+- **`vibe review`** - 代码审核（发现 bug、安全、性能问题）
 
 ---
 
@@ -125,6 +134,8 @@ PR summary comment
 | `render_prompt.py` | Context Builder | Phase 2 |
 | `post_review.py` | GitHub Client | Phase 2 |
 | `codex review` | Codex CLI | Phase 2 |
+| 信息提供命令 | `vibe inspect` | Phase 2 |
+| 审核命令 | `vibe review` | Phase 2 |
 | Git hooks | Commit Analyzer + hooks | Phase 3 |
 | GitHub Workflow | Workflow + merge gate | Phase 3 |
 
@@ -136,6 +147,11 @@ PR summary comment
 - **Scoring 决定风险级别**: 量化风险，为 merge gate 提供依据
 - **Codex 输出审查意见**: 基于结构化证据，不是盲审
 - **GitHub API 落地到 PR**: 行级 review comments + 风险报告
+
+**命令职责分离**（实施计划新增）:
+- **`vibe inspect`**: 信息提供（提供 metrics/structure/symbols/改动分析）
+- **`vibe review`**: 代码审核（发现 bug/安全/性能问题）
+- **职责关系**: `inspect` 提供结构化信息 → `review` 消费信息进行审核
 
 ### 路径配置适配
 

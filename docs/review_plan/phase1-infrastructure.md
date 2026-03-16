@@ -28,6 +28,7 @@ related_docs:
 2. **迁移现有工具** - 将 Shell/Python 工具迁移到 v3 分层架构
 3. **添加日志与错误处理** - 符合 v3 标准的日志和异常处理
 4. **编写测试** - Services 层测试覆盖率 ≥ 80%
+5. **支持命令分层** - Services 同时支持 `vibe inspect` 和 `vibe review`
 
 ---
 
@@ -355,9 +356,39 @@ PR summary comment
 
 ---
 
+## 服务层职责说明
+
+本阶段实现的服务层需要同时支持两个命令：
+
+### `vibe inspect` - 信息提供
+**职责**: 提供代码分析信息，输出结构化数据（JSON/YAML）
+
+**调用关系**:
+- `vibe inspect --metrics` → metrics_service
+- `vibe inspect --structure` → structure_service
+- `vibe inspect --symbols` → serena_service
+- `vibe inspect pr 42` → serena_service + dag_service + pr_scoring_service
+
+**输出要求**:
+- 确定性操作（相同输入 → 相同输出）
+- 结构化输出（JSON/YAML）
+- 可被 `vibe review` 消费
+
+### `vibe review` - 代码审核
+**职责**: 基于 `inspect` 提供的信息，调用 Codex 进行代码审核
+
+**调用关系**:
+- `vibe review pr 42` → 调用 `inspect pr 42` → 获取上下文 → Codex review
+
+**实现方式**:
+- 通过 subprocess 调用 `vibe inspect` 获取结构化数据
+- 构建上下文，传递给 Codex
+
+---
+
 ## 实施顺序
 
 Phase 1 完成后，进入 **Phase 2 - 审核流程集成**：
-- 创建 `vibe-review.sh` 统一入口
+- 创建 `vibe review` 统一命令
 - 集成评分系统到审核流程
 - 创建审核命令与 GitHub API 集成

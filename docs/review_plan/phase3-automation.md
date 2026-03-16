@@ -154,8 +154,8 @@ SHOULD_REVIEW=$(echo "$COMPLEXITY" | python3 -c "import json,sys; print(json.loa
 if [ "$SHOULD_REVIEW" = "True" ]; then
     echo "🔍 Commit complexity exceeds threshold, triggering review..."
 
-    # 3. 调用审核
-    "$VIBE_ROOT/scripts/vibe-review.sh" commit HEAD
+    # 3. 调用审核（使用 vibe review commit）
+    vibe review commit HEAD
 
     # 4. 检查审核结果
     if [ $? -ne 0 ]; then
@@ -292,7 +292,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
         run: |
-          ./scripts/vibe-review.sh base origin/main
+          vibe review pr ${{ github.event.pull_request.number }}
 
       - name: Post review comments
         env:
@@ -443,7 +443,7 @@ commit_analyzer → 复杂度分数
     ↓
 should_review? → Yes
     ↓
-vibe-review.sh commit HEAD
+vibe review commit HEAD
     ↓
 显示审核摘要
 ```
@@ -455,7 +455,7 @@ PR created (target: main)
     ↓
 GitHub Workflow triggered
     ↓
-vibe-review.sh base origin/main
+vibe review base origin/main
     ↓
 1. serena_service → impact.json
 2. dag_service → dag.json

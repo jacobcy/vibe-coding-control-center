@@ -23,7 +23,7 @@ related_docs:
 
 ## 目标
 
-1. **创建统一审核入口** - `vibe-review.sh` Shell 入口
+1. **创建统一审核命令** - `vibe review` (通过 `commands/review.py`)
 2. **集成评分系统** - 自动风险评分与报告生成
 3. **实现审核命令** - check、uncommitted、base、commit
 4. **GitHub API 集成** - 行级 review comments
@@ -32,99 +32,38 @@ related_docs:
 
 ## 任务清单
 
-### 1. Shell 统一入口
+### 1. 命令职责分工
 
-**位置**: `scripts/vibe-review.sh`
+系统提供两个新的命令，职责清晰分离：
+
+#### `vibe inspect` - 信息提供
+提供代码分析信息，为 `vibe review` 提供上下文数据
+
+**位置**: `commands/inspect.py`
 
 **命令列表**:
-- `vibe-review.sh check` - 检查环境（Serena、Codex、Claude）
-- `vibe-review.sh uncommitted` - 审核未提交改动
-- `vibe-review.sh base <branch>` - 审核相对分支的改动
-- `vibe-review.sh commit <sha>` - 审核指定 commit
-- `vibe-review.sh metrics` - 显示代码指标
-- `vibe-review.sh structure` - 显示代码结构
+- `vibe inspect` - 综合信息展示
+- `vibe inspect --metrics` - 显示代码量指标
+- `vibe inspect --structure` - 显示文件结构分析
+- `vibe inspect --symbols` - 显示符号定义（命令来源/函数定义）
+- `vibe inspect pr <number>` - PR 改动分析（输出 JSON）
+- `vibe inspect commit <sha>` - Commit 改动分析（输出 JSON）
+- `vibe inspect base <branch>` - 相对分支的改动分析（输出 JSON）
 
-**实现**:
-```bash
-#!/usr/bin/env bash
-# vibe-review.sh - 统一审核入口
-set -e
+**架构对齐**:
+- ✅ 符合 Tier 1 (Shell 能力层) 定位：确定性操作、结构化输出
+- ✅ 为 `vibe review` 提供结构化数据输入
 
-VIBE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+#### `vibe review` - 代码审核
+基于 `vibe inspect` 提供的上下文，进行代码审核（发现 bug、安全、性能问题）
 
-case "$1" in
-  check)
-    # 检查环境（Serena、Codex、Claude）
-    python3 -m vibe3.commands.review check
-    ;;
-  uncommitted)
-    # 直接调用 Codex CLI
-    codex review --uncommitted - < "$VIBE_ROOT/.codex/review-policy.md"
-    ;;
-  base)
-    # 1. 仓库结构摘要
-    python3 -m vibe3.services.structure_service > /tmp/structure.json
+**位置**: `commands/review.py`
 
-    # 2. 符号分析
-    python3 -m vibe3.services.serena_service --base "$2" > /tmp/impact.json
-
-    # 3. DAG 分析
-    python3 -m vibe3.services.dag_service --impact /tmp/impact.json > /tmp/dag.json
-
-    # 4. 风险评分
-    python3 -m vibe3.services.pr_scoring_service \
-      --impact /tmp/impact.json \
-      --dag /tmp/dag.json \
-      --base "$2" \
-      > /tmp/score.json
-
-    # 5. 构建上下文
-    python3 -m vibe3.services.context_builder \
-      --policy "$VIBE_ROOT/.codex/review-policy.md" \
-      --structure /tmp/structure.json \
-      --impact /tmp/impact.json \
-      --dag /tmp/dag.json \
-      --score /tmp/score.json \
-      --out /tmp/context.md
-
-    # 6. 调用 Codex CLI
-    codex review --base "$2" - < /tmp/context.md > /tmp/review.md
-
-    # 7. 更新风险分数（根据 Codex 结果）
-    python3 -m vibe3.services.pr_scoring_service \
-      --update-from-review \
-      --review /tmp/review.md \
-      --score /tmp/score.json \
-      > /tmp/final_score.json
-
-    # 输出风险报告
-    cat /tmp/final_score.json
-    ;;
-  commit)
-    codex review --commit "$2" - < "$VIBE_ROOT/.codex/review-policy.md"
-    ;;
-  metrics)
-    python3 -m vibe3.commands.metrics
-    ;;
-  structure)
-    python3 -m vibe3.commands.structure
-    ;;
-  *)
-    echo "Usage: vibe-review.sh {check|uncommitted|base|commit|metrics|structure}"
-    exit 1
-    ;;
-esac
-```
-
-**实现任务**:
-- [ ] 创建 `scripts/vibe-review.sh`
-- [ ] 实现 `check` 命令
-- [ ] 实现 `uncommitted` 命令
-- [ ] 实现 `base` 命令（集成评分系统）
-- [ ] 实现 `commit` 命令
-- [ ] 实现 `metrics` 命令
-- [ ] 实现 `structure` 命令
-- [ ] 添加错误处理和日志
+**命令列表**:
+- `vibe review pr <number>` - 审核 PR（调用 inspect pr 获取上下文）
+- `vibe review --uncommitted` - 审核未提交改动
+- `vibe review base <branch>` - 审核相对分支的改动
+- `vibe review commit <sha>` - 审核指定 commit
 
 ---
 
@@ -132,26 +71,29 @@ esac
 
 **完整流程图**（对齐参考资料架构）:
 ```
-vibe-review.sh base main
+vibe review pr 42
     ↓
-1. structure_service → structure.json (仓库结构摘要)
+1. 内部调用 vibe inspect pr 42
     ↓
-2. serena_service → impact.json (符号分析)
+2. structure_service → structure.json (仓库结构摘要)
     ↓
-3. dag_service → dag.json (影响范围)
+3. serena_service → impact.json (符号分析)
     ↓
-4. pr_scoring_service → score.json (风险评分)
+4. dag_service → dag.json (影响范围)
     ↓
-5. 构建上下文 (structure + policy + impact + dag + score + diff)
+5. pr_scoring_service → score.json (风险评分)
     ↓
-6. codex review --base main - < context.md
+6. 构建上下文 (structure + policy + impact + dag + score + diff)
     ↓
-7. 解析 Codex 结果，更新风险分数
+7. codex review --base main - < context.md
     ↓
-8. GitHub API → 行级 review comments + 风险报告
+8. 解析 Codex 结果，更新风险分数
+    ↓
+9. GitHub API → 行级 review comments + 风险报告
 ```
 
 **关键职责边界**（来自参考资料）:
+- **`vibe inspect`**: 信息提供者，输出结构化数据
 - **Structure Service**: 仓库结构摘要（代码组织、模块划分）
 - **Serena Service**: 事实层，给出符号和引用关系
 - **DAG Service**: 缩小上下文，只看影响面
@@ -161,8 +103,18 @@ vibe-review.sh base main
 
 **实现任务**:
 - [ ] 创建 `.codex/review-policy.md` (审核规则)
-- [ ] 实现 `commands/review.py`：
-  - `check` 命令 - 检查环境
+- [ ] 实现 `commands/inspect.py` 的所有子命令：
+  - `--metrics` - 调用 metrics_service 显示代码量
+  - `--structure` - 调用 structure_service 显示文件结构
+  - `--symbols` - 调用 serena_service 显示符号定义
+  - `pr` - PR 改动分析（集成 serena+dag+scoring，输出 JSON）
+  - `commit` - Commit 改动分析（输出 JSON）
+  - `base` - 相对分支的改动分析（输出 JSON）
+- [ ] 实现 `commands/review.py` 的所有子命令：
+  - `pr` - 审核 PR（调用 inspect pr 获取上下文）
+  - `--uncommitted` - 审核未提交改动
+  - `base` - 审核相对分支（调用 inspect base 获取上下文）
+  - `commit` - 审核指定 commit
 - [ ] 编排服务调用顺序（structure → serena → dag → scoring）
 - [ ] 处理中间文件（structure.json, impact.json, dag.json, score.json）
 - [ ] 实现上下文构建（`build_review_context()`）
@@ -344,66 +296,227 @@ lib/flow.sh:128 - Warning: Untested function
 
 ---
 
-### 4. Review 命令实现
+### 4. Inspect 命令实现
 
-**位置**: `commands/review.py`
+**位置**: `commands/inspect.py`
 
 **命令列表**:
-- `vibe review check` - 检查环境
-- `vibe review base <branch>` - 审核相对分支
-- `vibe review commit <sha>` - 审核指定 commit
-- `vibe review uncommitted` - 审核未提交改动
+- `vibe inspect` - 综合信息展示
+- `vibe inspect --metrics` - 显示代码量指标
+- `vibe inspect --structure` - 显示文件结构分析
+- `vibe inspect --symbols` - 显示符号定义
+- `vibe inspect pr <number>` - PR 改动分析（输出 JSON）
+- `vibe inspect commit <sha>` - Commit 改动分析（输出 JSON）
+- `vibe inspect base <branch>` - 相对分支的改动分析（输出 JSON）
 
 **实现示例**:
 ```python
 import typer
+import json
+from pathlib import Path
 from vibe3.services import (
     serena_service,
     dag_service,
-    pr_scoring_service
+    pr_scoring_service,
+    structure_service,
+    metrics_service
 )
-from vibe3.clients import github_client
 
 app = typer.Typer()
 
 @app.command()
-def check():
-    """检查环境（Serena、Codex、Claude）"""
-    # 检查 Serena
-    try:
-        serena_service.check_availability()
-        typer.echo("✅ Serena available")
-    except Exception as e:
-        typer.echo(f"❌ Serena not available: {e}")
+def inspect(
+    metrics: bool = False,
+    structure: bool = False,
+    symbols: bool = False
+):
+    """综合信息展示（默认显示所有，或指定某项）"""
+    if not any([metrics, structure, symbols]):
+        # 默认显示所有
+        metrics = structure = symbols = True
 
-    # 检查 Codex
-    # ... 类似逻辑
+    if metrics:
+        data = metrics_service.collect_metrics()
+        typer.echo("=== Metrics ===")
+        typer.echo(data)
+
+    if structure:
+        data = structure_service.analyze()
+        typer.echo("\n=== Structure ===")
+        typer.echo(data)
+
+    if symbols:
+        data = serena_service.extract_symbols()
+        typer.echo("\n=== Symbols ===")
+        typer.echo(data)
 
 @app.command()
-def base(branch: str):
-    """审核相对分支的改动"""
-    # 1. 符号分析
-    impact = serena_service.analyze_symbols(base=branch)
+def pr(pr_number: int, json_output: bool = False):
+    """PR 改动分析（输出结构化 JSON）"""
+    import tempfile
 
-    # 2. DAG 分析
-    dag = dag_service.expand_impact(impact)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. 获取 PR 改动文件列表
+        files = get_pr_files(pr_number)
 
-    # 3. 风险评分
-    score = pr_scoring_service.calculate_score(impact, dag)
+        # 2. 符号分析
+        impact = serena_service.analyze_symbols(files)
+        Path(f"{tmpdir}/impact.json").write_text(impact)
 
-    # 4. 调用 Codex
-    # ...
+        # 3. DAG 分析
+        dag = dag_service.expand_impact(impact)
+        Path(f"{tmpdir}/dag.json").write_text(dag)
 
-    # 5. 发送 GitHub review
-    # ...
+        # 4. 风险评分
+        score = pr_scoring_service.calculate_score(impact, dag)
+        Path(f"{tmpdir}/score.json").write_text(score)
+
+        # 输出 JSON
+        result = {
+            "pr": pr_number,
+            "impact": json.loads(impact),
+            "dag": json.loads(dag),
+            "score": json.loads(score)
+        }
+
+        if json_output:
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.echo("=== PR Impact Analysis ===")
+            typer.echo(f"Impact: {result['impact']}")
+            typer.echo(f"DAG: {result['dag']}")
+            typer.echo(f"Score: {result['score']}")
+
+@app.command()
+def commit(sha: str, json_output: bool = False):
+    """Commit 改动分析"""
+    # 类似 pr 命令，但分析 commit
+    pass
+
+@app.command()
+def base(branch: str, json_output: bool = False):
+    """相对分支的改动分析"""
+    # 类似 pr 命令，但分析 git diff
+    pass
 ```
 
 **实现任务**:
-- [ ] 实现 `check` 命令
-- [ ] 实现 `base` 命令
-- [ ] 实现 `commit` 命令
+- [ ] 实现 `inspect` 主命令（综合信息展示）
+- [ ] 实现 `--metrics` 选项（调用 metrics_service）
+- [ ] 实现 `--structure` 选项（调用 structure_service）
+- [ ] 实现 `--symbols` 选项（调用 serena_service）
+- [ ] 实现 `pr` 命令（PR 改动分析）
+- [ ] 实现 `commit` 命令（Commit 改动分析）
+- [ ] 实现 `base` 命令（相对分支改动分析）
+- [ ] 在 `bin/vibe` 中注册 `inspect` 命令
+
+---
+
+### 5. Review 命令实现
+
+**位置**: `commands/review.py`
+
+**命令列表**:
+- `vibe review pr <number>` - 审核 PR
+- `vibe review --uncommitted` - 审核未提交改动
+- `vibe review base <branch>` - 审核相对分支
+- `vibe review commit <sha>` - 审核指定 commit
+
+**实现示例**:
+```python
+import typer
+import json
+import subprocess
+from pathlib import Path
+from vibe3.services import context_builder
+from vibe3.commands import inspect as inspect_cmd
+
+app = typer.Typer()
+
+@app.command()
+def pr(pr_number: int):
+    """审核 PR（内部调用 inspect pr 获取上下文）"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. 调用 inspect pr 获取改动分析
+        inspect_result = subprocess.run(
+            ["vibe", "inspect", "pr", str(pr_number), "--json"],
+            capture_output=True,
+            text=True
+        )
+        context_data = json.loads(inspect_result.stdout)
+
+        # 2. 保存中间文件
+        Path(f"{tmpdir}/impact.json").write_text(json.dumps(context_data["impact"]))
+        Path(f"{tmpdir}/dag.json").write_text(json.dumps(context_data["dag"]))
+        Path(f"{tmpdir}/score.json").write_text(json.dumps(context_data["score"]))
+
+        # 3. 获取 structure
+        structure = structure_service.analyze()
+        Path(f"{tmpdir}/structure.json").write_text(structure)
+
+        # 4. 构建上下文
+        context = context_builder.build_review_context(
+            policy_path=".codex/review-policy.md",
+            structure_path=f"{tmpdir}/structure.json",
+            impact_path=f"{tmpdir}/impact.json",
+            dag_path=f"{tmpdir}/dag.json",
+            score_path=f"{tmpdir}/score.json",
+            base="main"
+        )
+
+        # 5. 调用 Codex
+        result = subprocess.run(
+            ["codex", "review", "--base", "main", "-"],
+            input=context,
+            text=True,
+            capture_output=True
+        )
+
+        typer.echo(result.stdout)
+
+        # 6. 更新风险分数（根据 Codex 结果）
+        final_score = pr_scoring_service.update_from_review(
+            review=result.stdout,
+            score=json.dumps(context_data["score"])
+        )
+
+        typer.echo("\n=== Risk Score ===")
+        typer.echo(final_score)
+
+@app.command()
+def uncommitted():
+    """审核未提交改动"""
+    import subprocess
+    policy = Path(".codex/review-policy.md").read_text()
+    result = subprocess.run(
+        ["codex", "review", "--uncommitted", "-"],
+        input=policy,
+        text=True
+    )
+    return result.returncode
+
+@app.command()
+def base(branch: str):
+    """审核相对分支（内部调用 inspect base 获取上下文）"""
+    # 类似 pr 命令，但调用 inspect base
+    pass
+
+@app.command()
+def commit(sha: str):
+    """审核指定 commit（内部调用 inspect commit 获取上下文）"""
+    # 类似 pr 命令，但调用 inspect commit
+    pass
+```
+
+**实现任务**:
+- [ ] 实现 `pr` 命令（调用 inspect pr 获取上下文）
 - [ ] 实现 `uncommitted` 命令
+- [ ] 实现 `base` 命令（调用 inspect base 获取上下文）
+- [ ] 实现 `commit` 命令（调用 inspect commit 获取上下文）
 - [ ] 添加错误处理和日志
+- [ ] 在 `bin/vibe` 中注册 `review` 命令
 
 ---
 
@@ -411,16 +524,29 @@ def base(branch: str):
 
 ### 功能验证
 
-- [ ] `vibe-review.sh check` 可以检查环境
-- [ ] `vibe-review.sh uncommitted` 可以审核未提交改动
-- [ ] `vibe-review.sh base main` 可以审核相对分支的改动
-- [ ] `vibe-review.sh commit HEAD~1` 可以审核指定 commit
+#### `vibe inspect` 命令
+- [ ] `vibe inspect` 可以展示综合信息
+- [ ] `vibe inspect --metrics` 可以显示代码量指标
+- [ ] `vibe inspect --structure` 可以显示文件结构分析
+- [ ] `vibe inspect --symbols` 可以显示符号定义
+- [ ] `vibe inspect pr 42` 可以分析 PR 改动（输出 JSON）
+- [ ] `vibe inspect commit HEAD~1` 可以分析 commit 改动（输出 JSON）
+- [ ] `vibe inspect base main` 可以分析相对分支的改动（输出 JSON）
+
+#### `vibe review` 命令
+- [ ] `vibe review pr 42` 可以审核 PR（调用 inspect pr 获取上下文）
+- [ ] `vibe review --uncommitted` 可以审核未提交改动
+- [ ] `vibe review base main` 可以审核相对分支的改动（调用 inspect base 获取上下文）
+- [ ] `vibe review commit HEAD~1` 可以审核指定 commit
+
+#### 系统集成
 - [ ] 风险评分系统集成到审核流程
 - [ ] GitHub API 可以发送行级 review comments
 
 ### 测试覆盖
 
-- [ ] `tests/commands/test_review.py` - 命令测试
+- [ ] `tests/commands/test_inspect.py` - Inspect 命令测试
+- [ ] `tests/commands/test_review.py` - Review 命令测试
 - [ ] `tests/clients/test_github_client.py` - GitHub API 测试
 - [ ] `tests/services/test_review_parser.py` - 解析器测试
 
@@ -437,9 +563,9 @@ def base(branch: str):
 ### 新增文件
 
 ```
-scripts/vibe-review.sh                           # Shell 统一入口
 .codex/review-policy.md                          # 审核规则
-scripts/python/vibe3/commands/review.py          # Review 命令
+scripts/python/vibe3/commands/inspect.py         # Inspect 命令（信息提供）
+scripts/python/vibe3/commands/review.py          # Review 命令（代码审核）
 scripts/python/vibe3/services/context_builder.py # 上下文构建器
 scripts/python/vibe3/services/review_parser.py   # Review 解析器
 ```
@@ -447,6 +573,7 @@ scripts/python/vibe3/services/review_parser.py   # Review 解析器
 ### 修改文件
 
 ```
+bin/vibe                                         # 添加 inspect 和 review 命令注册
 scripts/python/vibe3/clients/github_client.py  # 添加 review API
 ```
 
