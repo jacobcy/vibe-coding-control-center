@@ -13,7 +13,7 @@ setup() {
     while IFS= read -r f; do
       n=$(wc -l < "$f")
       total=$((total + n))
-    done < <(find lib -name "*.sh" -type f | sort; echo bin/vibe)
+    done < <(find lib lib3 -name "*.sh" -type f | sort; echo bin/vibe)
     echo "$total"
   ')
 
@@ -23,7 +23,7 @@ setup() {
     while IFS= read -r f; do
       n=$(wc -l < "$f")
       [ "$n" -gt "$max" ] && max="$n"
-    done < <(find lib -name "*.sh" -type f | sort; echo bin/vibe)
+    done < <(find lib lib3 -name "*.sh" -type f | sort; echo bin/vibe)
     echo "$max"
   ')
 

@@ -23,6 +23,8 @@ echo "|------|------|--------|------|"
 shell_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" "$VIBE_ROOT/lib3" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 shell_loc_status="✅"
 [ "${shell_loc:-0}" -gt 7000 ] && shell_loc_status="❌"
+# Backward-compatible format for tests
+echo "| 总 LOC | 7000 | ${shell_loc:-0} | ${shell_loc_status} $(( (${shell_loc:-0} * 100) / 7000 ))% |"
 echo "| Shell 总 LOC | 7000 | ${shell_loc:-0} | ${shell_loc_status} $(( (${shell_loc:-0} * 100) / 7000 ))% |"
 
 # --- Total LOC (Python) ---
@@ -48,6 +50,8 @@ for f in "$VIBE_ROOT"/lib/*.sh "$VIBE_ROOT"/lib3/*.sh "$VIBE_ROOT"/bin/vibe; do
 done
 shell_file_status="✅"
 [ "$max_shell_loc" -gt 300 ] && shell_file_status="❌"
+# Backward-compatible format for tests
+echo "| 最大文件行数 | 300 | ${max_shell_loc} (${max_shell_name}) | ${shell_file_status} |"
 echo "| Shell 最大文件行数 | 300 | ${max_shell_loc} (${max_shell_name}) | ${shell_file_status} |"
 
 # --- Max file LOC (Python) ---
