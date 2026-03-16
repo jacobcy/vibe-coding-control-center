@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Shell (v2) 结构摘要 - 提取主要函数和结构
 
-VIBE_ROOT="${VIBE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || echo '.')}" 
+# Get the script directory and resolve to repo root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Prefer git root, fallback to script root
+if GIT_ROOT="$(git -C "$SCRIPT_ROOT" rev-parse --show-toplevel 2>/dev/null)"; then
+  VIBE_ROOT="$GIT_ROOT"
+else
+  VIBE_ROOT="${VIBE_ROOT:-$SCRIPT_ROOT}"
+fi 
 
 echo "# Shell (v2) 结构摘要"
 echo ""
