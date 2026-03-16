@@ -86,3 +86,19 @@ class VersionBumpResponse(BaseModel):
     bump_type: VersionBumpType = Field(..., description="Bump type")
     next_version: str = Field(..., description="Next version")
     reason: str = Field(..., description="Reason for bump type")
+
+
+class ReviewRequest(BaseModel):
+    """Request model for PR review."""
+
+    pr_number: int = Field(..., description="PR number")
+    local: bool = Field(False, description="Use local LLM (codex)")
+    publish: bool = Field(True, description="Publish review as comment")
+
+
+class ReviewResponse(BaseModel):
+    """Response model for PR review."""
+
+    pr_number: int = Field(..., description="PR number")
+    review_body: str = Field(..., description="Review content")
+    published: bool = Field(False, description="Whether review was published")

@@ -35,6 +35,14 @@ class GitHubClientProtocol(Protocol):
         """Merge a pull request."""
         ...
 
+    def add_pr_comment(self, pr_number: int, body: str) -> None:
+        """Add comment to PR."""
+        ...
+
+    def get_pr_diff(self, pr_number: int) -> str:
+        """Get PR diff."""
+        ...
+
 
 class GitHubClient:
     """GitHub client for interacting with GitHub via gh CLI."""
@@ -99,7 +107,10 @@ class GitHubClient:
         pr_number = self._extract_pr_number(pr_url)
 
         # Get the created PR
-        return self.get_pr(pr_number)
+        pr = self.get_pr(pr_number)
+        if not pr:
+            raise RuntimeError(f"Failed to fetch created PR #{pr_number}")
+        return pr
 
     def get_pr(self, pr_number: int | None = None, branch: str | None = None) -> PRResponse | None:
         """Get PR by number or branch.
@@ -150,6 +161,7 @@ class GitHubClient:
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
+            metadata=None,
         )
 
     def update_pr(self, request: UpdatePRRequest) -> PRResponse:
@@ -194,7 +206,10 @@ class GitHubClient:
                     check=True,
                 )
 
-        return self.get_pr(request.number)
+        pr = self.get_pr(request.number)
+        if not pr:
+            raise RuntimeError(f"Failed to fetch updated PR #{request.number}")
+        return pr
 
     def mark_ready(self, pr_number: int) -> PRResponse:
         """Mark PR as ready for review.
@@ -217,7 +232,10 @@ class GitHubClient:
             check=True,
         )
 
-        return self.get_pr(pr_number)
+        pr = self.get_pr(pr_number)
+        if not pr:
+            raise RuntimeError(f"Failed to fetch PR #{pr_number} after marking ready")
+        return pr
 
     def merge_pr(self, pr_number: int) -> PRResponse:
         """Merge a pull request.
@@ -240,7 +258,10 @@ class GitHubClient:
             check=True,
         )
 
-        return self.get_pr(pr_number)
+        pr = self.get_pr(pr_number)
+        if not pr:
+            raise RuntimeError(f"Failed to fetch PR #{pr_number} after merge")
+        return pr
 
     def _extract_pr_number(self, pr_url: str) -> int:
         """Extract PR number from URL.
@@ -253,3 +274,34 @@ class GitHubClient:
         """
         # Extract from URL like https://github.com/owner/repo/pull/123
         return int(pr_url.rstrip("/").split("/")[-1])
+
+    def add_pr_comment(self, pr_number: int, body: str) -> None:
+        """Add comment to PR.
+
+        Args:
+            pr_number: PR number
+            body: Comment body
+        """
+        logger.info("Adding comment to PR", pr_number=pr_number)
+        subprocess.run(
+            ["gh", "pr", "comment", str(pr_number), "--body", body],
+            check=True,
+        )
+
+    def get_pr_diff(self, pr_number: int) -> str:
+        """Get PR diff.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            PR diff text
+        """
+        logger.info("Getting PR diff", pr_number=pr_number)
+        result = subprocess.run(
+            ["gh", "pr", "diff", str(pr_number)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout

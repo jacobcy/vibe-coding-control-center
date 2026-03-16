@@ -2,7 +2,7 @@
 from rich import print
 from rich.table import Table
 
-from vibe3.models.pr import PRResponse, VersionBumpResponse
+from vibe3.models.pr import PRResponse, ReviewResponse, VersionBumpResponse
 
 
 def render_pr_created(pr: PRResponse) -> None:
@@ -143,3 +143,20 @@ def render_warning(message: str) -> None:
         message: Warning message
     """
     print(f"[yellow]Warning:[/] {message}")
+
+
+def render_pr_review(response: ReviewResponse) -> None:
+    """Render PR review.
+
+    Args:
+        response: Review response
+    """
+    print(f"[green]✓[/] Review completed for PR #{response.pr_number}")
+
+    if response.published:
+        print("[dim]Review has been published as a comment[/]")
+    else:
+        print("[dim]Review was not published[/]")
+
+    print(f"\n[bold]Review Content:[/]\n")
+    print(response.review_body)

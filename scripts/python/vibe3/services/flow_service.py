@@ -92,7 +92,7 @@ class FlowService:
         )
 
         # Add issue link if task_id provided
-        if task_id:
+        if task_id and task_issue_number is not None:
             self.store.add_issue_link(branch, task_issue_number, "task")
 
         # Add creation event

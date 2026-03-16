@@ -17,11 +17,13 @@ from vibe3.models.pr import (
     CreatePRRequest,
     PRMetadata,
     PRResponse,
+    ReviewResponse,
     UpdatePRRequest,
     VersionBumpRequest,
     VersionBumpResponse,
-    VersionBumpType,
 )
+from vibe3.services.review_service import ReviewService
+from vibe3.services.version_service import VersionService
 from store import Vibe3Store
 
 
@@ -33,6 +35,8 @@ class PRService:
         github_client: GitHubClientProtocol | None = None,
         git_client: GitClient | None = None,
         store: Vibe3Store | None = None,
+        version_service: VersionService | None = None,
+        review_service: ReviewService | None = None,
     ) -> None:
         """Initialize PR service.
 
@@ -40,10 +44,14 @@ class PRService:
             github_client: GitHub client for API operations
             git_client: Git client for repository operations
             store: Vibe3Store instance for persistence
+            version_service: Version service for version calculations
+            review_service: Review service for PR review
         """
         self.github_client = github_client or GitHubClient()
         self.git_client = git_client or GitClient()
         self.store = store or Vibe3Store()
+        self.version_service = version_service or VersionService()
+        self.review_service = review_service or ReviewService()
 
     def create_draft_pr(
         self,
@@ -235,45 +243,19 @@ class PRService:
 
         Returns:
             Version bump response
+
+        Raises:
+            RuntimeError: If PR not found
         """
         logger.info("Calculating version bump", pr_number=pr_number, group=group)
 
-        # Get PR
+        # Get PR to verify it exists
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
 
-        # Determine bump type based on group
-        # TODO: Implement actual version calculation logic
-        # For now, use simple rules from the plan:
-        # - feature: minor version
-        # - bug: patch version
-        # - docs/chore: no bump (unless explicit --bump)
-
-        if group == "feature":
-            bump_type = VersionBumpType.MINOR
-            reason = "Feature tasks trigger minor version bump"
-        elif group == "bug":
-            bump_type = VersionBumpType.PATCH
-            reason = "Bug fixes trigger patch version bump"
-        elif group in ("docs", "chore"):
-            bump_type = VersionBumpType.NONE
-            reason = "Docs/chore tasks do not trigger version bump by default"
-        else:
-            # Default to patch for unknown groups
-            bump_type = VersionBumpType.PATCH
-            reason = "Default to patch version bump"
-
-        # TODO: Get current version from version file or package.json
-        current_version = "0.1.0"
-        next_version = self._calculate_next_version(current_version, bump_type)
-
-        return VersionBumpResponse(
-            current_version=current_version,
-            bump_type=bump_type,
-            next_version=next_version,
-            reason=reason,
-        )
+        # Use version service for calculation (reads from VERSION file)
+        return self.version_service.calculate_bump(group)
 
     def _build_pr_body(self, body: str, metadata: PRMetadata | None = None) -> str:
         """Build PR body with metadata.
@@ -303,33 +285,17 @@ class PRService:
 
         return body + metadata_section
 
-    def _calculate_next_version(self, current: str, bump_type: VersionBumpType) -> str:
-        """Calculate next version based on bump type.
+    def review_pr(self, pr_number: int, publish: bool = True) -> "ReviewResponse":
+        """Review PR using local LLM (codex).
 
         Args:
-            current: Current version (semver)
-            bump_type: Version bump type
+            pr_number: PR number
+            publish: Whether to publish review as comment
 
         Returns:
-            Next version
+            Review response
+
+        Raises:
+            RuntimeError: If PR not found or codex unavailable
         """
-        if bump_type == VersionBumpType.NONE:
-            return current
-
-        parts = current.split(".")
-        if len(parts) != 3:
-            raise ValueError(f"Invalid version format: {current}")
-
-        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
-
-        if bump_type == VersionBumpType.MAJOR:
-            major += 1
-            minor = 0
-            patch = 0
-        elif bump_type == VersionBumpType.MINOR:
-            minor += 1
-            patch = 0
-        elif bump_type == VersionBumpType.PATCH:
-            patch += 1
-
-        return f"{major}.{minor}.{patch}"
+        return self.review_service.review_pr(pr_number, publish)
