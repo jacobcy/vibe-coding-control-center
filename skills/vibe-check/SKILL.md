@@ -51,17 +51,17 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 先运行：
 
 ```bash
-vibe check --json
+vibe check
 ```
 
 必要时补充定向检查：
 
 ```bash
-vibe check link --json
-vibe roadmap audit --check-links --json
+vibe check link
+vibe roadmap audit --check-links
 ```
 
-若要核对 execution spec 证据，可额外读取 `vibe task list --json` 或 `vibe task show <task-id> --json` 的 `spec_standard/spec_ref` 字段。
+若要核对 execution spec 证据，可额外读取 `vibe task list` 或 `vibe task show <task-id> ` 的 `spec_standard/spec_ref` 字段。
 
 ## 职责边界
 
@@ -152,13 +152,13 @@ vibe task update "$task_id" --bind-current
 修复后必须重新运行：
 
 ```bash
-vibe check --json
+vibe check
 ```
 
 若修的是链接问题，额外运行：
 
 ```bash
-vibe check link --json
+vibe check link
 ```
 
 ## Step 5: 报告
@@ -185,7 +185,7 @@ vibe check link --json
   reason: shell 无法仅凭审计结果判断应解绑还是重绑
 
 验证结果：
-- vibe check link --json -> clean
+- vibe check link  -> clean
 ```
 
 ## 与其他命令的关系

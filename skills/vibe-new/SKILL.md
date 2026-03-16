@@ -3,21 +3,66 @@ name: vibe-new
 description: Use when the user wants to create or intake the next delivery target from roadmap items, handoff blockers, or missing task specs, and needs plan/task binding without entering implementation.
 ---
 
-# /vibe-new - Intake, Plan, And Task Binding
+# /vibe-new - 创建 Flow 与同步 Issue
 
-`vibe-new` 只处理旧 flow 到新 flow 的转换，不进入执行，也不创建 task。它负责决定主 issue，并把用户主链推进到对应的 `flow` 语义。
+## 核心职责
 
-先读这些真源：
+`vibe-new` 只负责创建逻辑 flow 并同步 issue，不进入执行，也不创建 task。
 
-- `docs/standards/glossary.md`
-- `docs/standards/action-verbs.md`
-- `docs/standards/v2/skill-standard.md`
-- `docs/standards/v2/skill-trigger-standard.md`
-- `docs/standards/v2/git-workflow-standard.md`
-- `docs/standards/v2/handoff-governance-standard.md`
-- `.agent/context/task.md`
+**核心职责**：
 
-只要 shell 参数或对象归属不确定，先运行对应 `vibe <command> -h`。
+- 创建逻辑 flow（不创建物理 worktree）
+- 没指定 issue → 通过 `/vibe-issue` 创建 issue
+- 有 issue → `vibe roadmap sync` 同步 issue 到本地
+- 不创建 task，不进入执行
+
+## 停止点
+
+完成后输出：
+
+- ✅ flow 已创建
+- ✅ issue 已同步
+- **下一步**：使用 `/vibe-start` 开始执行
+
+## 必读文档
+
+- `docs/standards/v2/git-workflow-standard.md` (flow 生命周期)
+- `.agent/context/task.md` (当前上下文)
+
+相关文档：
+
+- 术语：`docs/standards/glossary.md`
+- 动作语义：`docs/standards/action-verbs.md`
+- Skill 标准：`docs/standards/v2/skill-standard.md`
+
+## 完整流程
+
+```
+/vibe-new <feature>
+  ├─ Step 1: 读取当前上下文
+  │   ├─ vibe flow show
+  │   ├─ vibe roadmap status
+  │   └─ 检查当前 flow、roadmap 窗口、handoff blocker
+  │
+  ├─ Step 2: 选择 intake 来源
+  │   ├─ 当前 flow 需要切换到新 issue
+  │   ├─ handoff blocker
+  │   ├─ roadmap item / repo issue
+  │   └─ 用户显式指定的目标
+  │
+  ├─ Step 3: 补齐上游规划对象
+  │   ├─ 缺 issue → 调用 /vibe-issue
+  │   ├─ 缺 roadmap item → vibe roadmap add
+  │   └─ 缺 plan → 委托 writing-plans
+  │
+  ├─ Step 4: 处理 flow 现场
+  │   ├─ 创建逻辑 flow：vibe flow new <slug> --branch origin/main
+  │   └─ 同步 issue：vibe roadmap sync
+  │
+  └─ Step 5: 写入 handoff 与停止
+      ├─ 更新 .agent/context/task.md
+      └─ 输出停止点信息，等待用户执行 /vibe-start
+```
 
 ## 核心边界
 
@@ -32,15 +77,16 @@ description: Use when the user wants to create or intake the next delivery targe
 优先读取：
 
 ```bash
-vibe flow show --json
-vibe roadmap status --json
+vibe flow show
+vibe roadmap status
 ```
 
 必要时补充：
 
 ```bash
-vibe task list --json
-vibe task show <task-id> --json
+vibe task list
+vibe task show <task-id>
+vibe roadmap list
 ```
 
 检查点：
@@ -91,6 +137,7 @@ vibe flow new <slug> --branch origin/main
 
 ```markdown
 ## Skill Handoff
+
 - skill: vibe-new
 - updated_at: <ISO-8601>
 - target: <issue-or-roadmap-item>
@@ -98,6 +145,14 @@ vibe flow new <slug> --branch origin/main
 - task: none
 - flow: <flow-or-none>
 - next: /vibe-start
+
+## Issues Found (可选)
+
+- type: <flow|doc|command|other>
+- severity: <low|medium|high>
+- description: <问题描述>
+- context: <发现场景>
+- suggestion: <改进建议（可选）>
 ```
 
 然后停止，不进入执行。

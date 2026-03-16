@@ -3,23 +3,69 @@ name: vibe-commit
 description: Use when the user wants to classify dirty changes, create serial commits, split work into one PR or multiple PRs, and prepare publication from the correct flow without handling merge or post-merge closure.
 ---
 
-# /vibe-commit - 串行提交与 PR 切片
+# /vibe-commit - 提交代码与创建 PR
 
-`/vibe-commit` 只负责编排提交与发 PR 之前的判断，不负责 merge、关 issue、关 task、关 flow。
+## 核心职责
 
-一旦 PR 创建成功，本 skill 的默认停点就是：
+`/vibe-commit` 只负责编排提交与创建 PR，不负责 merge、关 issue、关 task、关 flow。
 
-- 进入 `/vibe-integrate`
-- 等待 review evidence、CI 与 merge readiness
-- 不直接跳到 `/vibe-done`
+**核心职责**：
 
-先读这些真源：
+- 分组提交代码
+- 处理 commit message（利用已有的 git hooks 自动格式化）
+- 根据策略创建 PR：
+  - 单个 PR
+  - 并行 PR（多个 worktree）
+  - 串行 PR（stacked PR）
+
+## 停止点
+
+PR 创建后 → 自动进入 `/vibe-integrate`
+
+## 必读文档
 
 - `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/worktree-lifecycle-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
+
+## 完整流程
+
+```
+/vibe-commit [--strategy <single|parallel|stacked>]
+  ├─ Step 1: 读取当前 flow 与上下文
+  │   ├─ vibe flow show
+  │   └─ 检查 issue、flow、branch、task、pr
+  │
+  ├─ Step 2: 运行提交前 metadata preflight
+  │   ├─ vibe task show <task-id>
+  │   └─ 检查 task 的 issue_refs、roadmap_item_ids、spec_* 等元数据
+  │
+  ├─ Step 3: 审计工作区
+  │   ├─ git status --short
+  │   ├─ git diff --stat
+  │   └─ 分类：commit now / stash / discard
+  │
+  ├─ Step 4: 组织 commit
+  │   ├─ 每组变更包含哪些文件
+  │   ├─ 每条 commit 草案
+  │   └─ git hooks 自动格式化 commit message
+  │
+  ├─ Step 5: 处理串行多 PR（如需要）
+  │   ├─ 列出待发布分组
+  │   ├─ 从正确基线进入新的逻辑 flow
+  │   └─ 依次 cherry-pick、验证、发 PR
+  │
+  ├─ Step 6: 发 PR 前复核
+  │   ├─ 工作区已干净
+  │   ├─ commit 只服务一个交付目标
+  │   └─ vibe flow pr --base <ref>
+  │
+  └─ Step 7: 写入 handoff 与自动进入 /vibe-integrate
+      ├─ 更新 .agent/context/task.md
+      └─ 自动进入 /vibe-integrate
+```
 
 只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
 
@@ -36,13 +82,13 @@ description: Use when the user wants to classify dirty changes, create serial co
 优先读取：
 
 ```bash
-vibe flow show --json
+vibe flow show
 ```
 
 如果当前 flow 不可解析，再退回：
 
 ```bash
-vibe flow status --json
+vibe flow status
 vibe flow list
 ```
 
@@ -58,10 +104,10 @@ vibe flow list
 
 在做任何 commit 分类前，必须先检查当前 execution record 的最小完整性。
 
-若 `vibe flow show --json` 返回了 `current_task`，继续读取：
+若 `vibe flow show ` 返回了 `current_task`，继续读取：
 
 ```bash
-vibe task show <task-id> --json
+vibe task show <task-id>
 ```
 
 第一版规则：
@@ -192,6 +238,7 @@ vibe flow pr --base <ref>
 
 ```markdown
 ## Skill Handoff
+
 - skill: vibe-commit
 - updated_at: <ISO-8601>
 - flow: <feature-or-none>
@@ -200,7 +247,15 @@ vibe flow pr --base <ref>
 - pr: <pr-ref-or-none>
 - issues: <issue-refs-or-none>
 - completed: <本轮已完成的提交/PR 草案>
-- next: <若 PR 已创建，明确写“进入 vibe-integrate 检查 review evidence / CI / merge readiness”；否则写继续 commit 的动作>
+- next: <若 PR 已创建，明确写”进入 vibe-integrate 检查 review evidence / CI / merge readiness”；否则写继续 commit 的动作>
+
+## Issues Found (可选)
+
+- type: <flow|doc|command|other>
+- severity: <low|medium|high>
+- description: <问题描述>
+- context: <发现场景>
+- suggestion: <改进建议（可选）>
 ```
 
 `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v2/handoff-governance-standard.md` 为准。

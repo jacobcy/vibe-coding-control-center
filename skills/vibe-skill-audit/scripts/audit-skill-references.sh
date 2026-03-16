@@ -145,7 +145,7 @@ while IFS= read -r raw_cmd; do
   if [[ "${#parts[@]}" -ge 3 ]]; then
     subcmd="${parts[2]}"
     case "$subcmd" in
-      --help|-h|help|--json|check|json)
+      --help|-h|help|check|json)
         ;;
       *)
         if ! subcommand_exists "$domain" "$subcmd"; then

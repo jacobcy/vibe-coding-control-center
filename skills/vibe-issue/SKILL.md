@@ -17,9 +17,9 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 标准真源：
 
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v2/skill-standard.md`、`docs/standards/v2/command-standard.md`、`docs/standards/v2/shell-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v2/skill-trigger-standard.md` 为准。
-- 若涉及 worktree / flow 生命周期语义，以 `docs/standards/v2/git-workflow-standard.md`、`docs/standards/v2/worktree-lifecycle-standard.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/v2/skill-standard.md` 为准。
+
+相关标准文档目录：`docs/standards/`
 
 ## 核心原则
 
@@ -41,14 +41,14 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ### Step 2: 智能查重 (Semantic Check)
 
-- 运行 `gh issue list --search "<标题>" --state all --json number,title,state`。
+- 运行 `gh issue list --search "<标题>" --state all  number,title,state`。
 - 分析搜索结果：
   - **高相似度**：展示重复 Issue，建议用户在原 Issue 下评论或合并。
   - **低相似度**：继续创建流程。
 
 ### Step 3: Roadmap 上下文检查
 
-- 必须先运行 `vibe roadmap list --json` 检查是否已有对应 `roadmap item`。
+- 必须先运行 `vibe roadmap list` 检查是否已有对应 `roadmap item`。
 - 如果 Issue 标题与某个 Roadmap Item 匹配，只记录上下文供后续 `vibe-roadmap` 参考。
 - `roadmap item` 只解释为 GitHub Project item mirror，不把 issue 直接当作本地 task，也不在这里决定 roadmap 排期。
 
@@ -86,3 +86,19 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - 若 `gh` 未登录：提示用户进行授权。
 - 若没有模板文件：使用内置的基础 markdown 结构。
+
+## Handoff 记录
+
+完成当前 skill 后，若发现流程、文档或命令问题，需在 `.agent/context/task.md` 记录：
+
+```markdown
+## Issues Found
+
+- type: <flow|doc|command|other>
+- severity: <low|medium|high>
+- description: <问题描述>
+- context: <发现场景>
+- suggestion: <改进建议（可选）>
+```
+
+详细规则见 `docs/standards/v2/handoff-governance-standard.md` 第 6 节。
