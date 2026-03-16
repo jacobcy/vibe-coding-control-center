@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
+from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest  # type: ignore
 
 
 class GitHubClientProtocol(Protocol):
