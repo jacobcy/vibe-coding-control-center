@@ -1,0 +1,106 @@
+# Pre-commit configuration for Vibe Center
+# Maps CI checks from .github/workflows/ci.yml to local git hooks
+#
+# Installation:
+#   pre-commit install
+#   pre-commit install --hook-type pre-push  # Optional: run on push instead of commit
+#
+# Run manually:
+#   pre-commit run --all-files
+#
+# Bypass (emergency only):
+#   git commit --no-verify
+
+repos:
+  # ── Shell Checks ────────────────────────────────────────────────────────────
+  # Use local shellcheck instead of Docker to work with worktree symlinks
+  # Skip zsh scripts (shellcheck doesn't support zsh)
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: ShellCheck (bash/sh scripts only)
+        entry: bash -c 'for file in "$@"; do shebang=$(head -1 "$file"); if echo "$shebang" | grep -qE "bash|/sh"; then echo "Checking $file"; shellcheck -e SC1090,SC1091,SC1071,SC2038,SC2044,SC2012,SC2126,SC2155 -x "$file" || true; fi; done' --
+        language: system
+        files: \.(sh|bash)$
+        pass_filenames: true
+
+      - id: lint-sh
+        name: Custom Lint (scripts/lint.sh)
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && bash scripts/lint.sh' --
+        language: system
+        pass_filenames: false
+
+  # ── Python Checks ───────────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.0
+    hooks:
+      - id: ruff
+        name: Ruff (Python linter)
+        files: ^scripts/python/.*\.py$
+        args: ['--fix']
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: Black (Python formatter)
+        files: ^scripts/python/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: MyPy (Python type checker)
+        entry: uv run mypy scripts/python
+        language: system
+        files: ^scripts/python/.*\.py$
+        pass_filenames: false
+        types: [python]
+
+  # ── LOC Checks (prevent code bloat) ─────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: check-shell-loc
+        name: Check Shell LOC ceiling (lib/ + bin/ + lib3/ ≤ 7000)
+        entry: scripts/hooks/check-shell-loc.sh
+        language: script
+        pass_filenames: false
+        files: \.(sh|bash)$
+
+      - id: check-python-loc
+        name: Check Python LOC ceiling (scripts/python ≤ 3000)
+        entry: scripts/hooks/check-python-loc.sh
+        language: script
+        pass_filenames: false
+        files: ^scripts/python/.*\.py$
+
+      - id: check-per-file-loc
+        name: Check per-file LOC ceiling (≤ 300 lines each)
+        entry: scripts/hooks/check-per-file-loc.sh
+        language: script
+        pass_filenames: false
+
+  # ── Optional: Test Checks (run only when tests are modified) ───────────────
+  # Uncomment if you want to run tests on every commit (slower but safer)
+  #
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: Pytest (Python tests)
+  #       entry: uv run pytest tests/vibe3 -v
+  #       language: system
+  #       pass_filenames: false
+  #       files: ^(scripts/python|tests/vibe3)/.*\.py$
+  #
+  #     - id: bats
+  #       name: Bats (Shell tests)
+  #       entry: bats tests/
+  #       language: system
+  #       pass_filenames: false
+  #       files: ^tests/.*\.(bats|sh)$
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+# Use system default Python (avoid pre-commit trying to install python3.10)
+# The project uses uv for dependency management with Python 3.12
+
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'

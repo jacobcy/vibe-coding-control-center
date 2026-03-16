@@ -100,7 +100,17 @@ _flow_review() {
   log_step "Fetching PR status for '$target'..."
 
   pr_info=$(gh pr view "$target" --json number,title,state,reviewDecision,mergeable,url,statusCheckRollup,comments 2>/dev/null)
-  [[ $? -ne 0 ]] && { log_warn "No open PR found for '$target'. Running local health check..."; vibe check; return 0; }
+  if [[ $? -ne 0 ]]; then
+    log_warn "当前分支 '$target' 没有关联的 PR"
+    echo ""
+    echo "💡 提示："
+    echo "  • 使用 ${CYAN}vibe flow pr --base <base-branch>${NC} 创建 PR"
+    echo "  • 或使用 ${CYAN}/vibe-commit${NC} 提交代码并创建 PR"
+    echo ""
+    echo "正在执行本地健康检查..."
+    vibe check
+    return 0
+  fi
   number=$(printf '%s\n' "$pr_info" | jq -r '.number')
   title=$(printf '%s\n' "$pr_info" | jq -r '.title')
   state=$(printf '%s\n' "$pr_info" | jq -r '.state')
@@ -260,35 +270,17 @@ _flow_review_local() {
 }
 
 _flow_review_usage() {
-  echo "${BOLD}Vibe Flow Review${NC}"
+  echo "${BOLD}Vibe Flow Review${NC} - 审计 PR 或执行本地 AI 代码审查"
   echo ""
   echo "Usage: ${CYAN}vibe flow review${NC} [options] [<pr-or-branch>|--branch <ref>]"
   echo ""
-  echo "审计 PR 的实时真源状态（CI 结果、评审意见、合规性），或执行本地 AI 代码审查。"
-  echo ""
-  echo "核心职责："
-  echo "  1. 状态提取：拉取云端 PR 的评审决策 (Review Decision)"
-  echo "  2. 质量审计：实时拉取 CI/Checks 运行状态 (GitHub Actions)"
-  echo "  3. 交互查看：显示最近 3 条 review comments"
-  echo "  4. 本地审查：使用 --local 调用本地 LLM 进行深度静态分析"
-  echo ""
   echo "选项："
-  echo "  --local          自动选择本地 LLM（优先 codex，fallback copilot）"
-  echo "  --local=codex    强制使用 Codex 本地审查"
-  echo "  --local=copilot  强制使用 GitHub Copilot 审查"
-  echo "  --json           输出 PR 详细数据与结构化 review evidence（用于程序化调用）"
-  echo "  --branch <ref>   指定要查看的分支或 PR 号 (默认: 当前分支)"
-  echo ""
-  echo "本地 LLM 工具："
-  echo "  ${GREEN}codex${NC}    - OpenAI Codex CLI (推荐，专业审查能力)"
-  echo "             安装: npm install -g @openai/codex"
-  echo "  ${GREEN}copilot${NC}  - GitHub Copilot CLI (通用助手)"
-  echo "             安装: 安装 GitHub Copilot CLI 扩展"
+  echo "  --local[=codex|copilot]  本地审查（默认自动选择）"
+  echo "  --json                   JSON 输出（含 reviewEvidence）"
+  echo "  --branch <ref>           指定分支或 PR 号（默认: 当前分支）"
   echo ""
   echo "示例："
-  echo "  ${CYAN}vibe flow review${NC}              # 查看当前分支的 PR 状态"
-  echo "  ${CYAN}vibe flow review 42${NC}           # 查看 PR #42 的状态"
-  echo "  ${CYAN}vibe flow review --local${NC}      # 本地审查（自动选择 LLM）"
-  echo "  ${CYAN}vibe flow review --local=codex${NC}    # 强制使用 codex"
-  echo "  ${CYAN}vibe flow review --json${NC}       # JSON 输出，含 reviewEvidence 摘要"
+  echo "  ${CYAN}vibe flow review${NC}              # 查看 PR 状态"
+  echo "  ${CYAN}vibe flow review --local${NC}      # 本地 AI 审查"
+  echo "  ${CYAN}vibe flow review --json${NC}       # JSON 输出"
 }
