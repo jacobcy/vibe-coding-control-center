@@ -19,25 +19,23 @@ echo ""
 echo "| 指标 | 上限 | 当前值 | 状态 |"
 echo "|------|------|--------|------|"
 
-# --- Total LOC (Shell) ---
+# --- Total LOC (Shell/v2) ---
 shell_loc=$(find "$VIBE_ROOT/lib" "$VIBE_ROOT/bin" "$VIBE_ROOT/lib3" -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 shell_loc_status="✅"
 [ "${shell_loc:-0}" -gt 7000 ] && shell_loc_status="❌"
-# Backward-compatible format for tests
-echo "| 总 LOC | 7000 | ${shell_loc:-0} | ${shell_loc_status} $(( (${shell_loc:-0} * 100) / 7000 ))% |"
-echo "| Shell 总 LOC | 7000 | ${shell_loc:-0} | ${shell_loc_status} $(( (${shell_loc:-0} * 100) / 7000 ))% |"
+echo "| Shell 总 LOC (v2) | 7000 | ${shell_loc:-0} | ${shell_loc_status} $(( (${shell_loc:-0} * 100) / 7000 ))% |"
 
-# --- Total LOC (Python) ---
+# --- Total LOC (Python/v3) ---
 python_loc=$(find "$VIBE_ROOT/scripts/python" -name '*.py' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 python_loc_status="✅"
 [ "${python_loc:-0}" -gt 3000 ] && python_loc_status="❌"
-echo "| Python 总 LOC | 3000 | ${python_loc:-0} | ${python_loc_status} $(( (${python_loc:-0} * 100) / 3000 ))% |"
+echo "| Python 总 LOC (v3) | 3000 | ${python_loc:-0} | ${python_loc_status} $(( (${python_loc:-0} * 100) / 3000 ))% |"
 
 # --- Total LOC (Tests) ---
 test_loc=$(find "$VIBE_ROOT/tests" -name '*.bats' -o -name '*.py' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 echo "| 测试代码 LOC | - | ${test_loc:-0} | 📊 |"
 
-# --- Max file LOC (Shell) ---
+# --- Max file LOC (Shell/v2) ---
 max_shell_loc=0
 max_shell_name=""
 for f in "$VIBE_ROOT"/lib/*.sh "$VIBE_ROOT"/lib3/*.sh "$VIBE_ROOT"/bin/vibe; do
@@ -50,11 +48,9 @@ for f in "$VIBE_ROOT"/lib/*.sh "$VIBE_ROOT"/lib3/*.sh "$VIBE_ROOT"/bin/vibe; do
 done
 shell_file_status="✅"
 [ "$max_shell_loc" -gt 300 ] && shell_file_status="❌"
-# Backward-compatible format for tests
-echo "| 最大文件行数 | 300 | ${max_shell_loc} (${max_shell_name}) | ${shell_file_status} |"
-echo "| Shell 最大文件行数 | 300 | ${max_shell_loc} (${max_shell_name}) | ${shell_file_status} |"
+echo "| Shell 最大文件行数 (v2) | 300 | ${max_shell_loc} (${max_shell_name}) | ${shell_file_status} |"
 
-# --- Max file LOC (Python) ---
+# --- Max file LOC (Python/v3) ---
 max_python_loc=0
 max_python_name=""
 for f in $(find "$VIBE_ROOT/scripts/python/vibe3" -name '*.py' 2>/dev/null); do
@@ -67,7 +63,7 @@ for f in $(find "$VIBE_ROOT/scripts/python/vibe3" -name '*.py' 2>/dev/null); do
 done
 python_file_status="✅"
 [ "$max_python_loc" -gt 300 ] && python_file_status="❌"
-echo "| Python 最大文件行数 | 300 | ${max_python_loc} (${max_python_name}) | ${python_file_status} |"
+echo "| Python 最大文件行数 (v3) | 300 | ${max_python_loc} (${max_python_name}) | ${python_file_status} |"
 
 # --- Test count (Shell) ---
 shell_test_count=0
