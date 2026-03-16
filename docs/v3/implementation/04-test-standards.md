@@ -6,8 +6,10 @@ author: Claude Sonnet 4.6
 created: 2026-03-16
 last_updated: 2026-03-16
 related_docs:
-  - docs/v3/implementation/03-coding-standards.md
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/implementation/02-architecture.md
+  - docs/v3/implementation/03-coding-standards.md
 ---
 
 # Vibe 3.0 - 测试标准
