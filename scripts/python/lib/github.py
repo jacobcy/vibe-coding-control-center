@@ -1,10 +1,11 @@
 import json
 import subprocess
+from typing import Any
 
 
 class GitHubHelper:
     @staticmethod
-    def list_issues(limit=30, state="open"):
+    def list_issues(limit: int = 30, state: str = "open") -> list[dict[str, Any]]:
         cmd = [
             "gh",
             "issue",
@@ -20,10 +21,10 @@ class GitHubHelper:
         if result.returncode != 0:
             print(f"Error calling gh: {result.stderr}")
             return []
-        return json.loads(result.stdout)
+        return json.loads(result.stdout)  # type: ignore
 
     @staticmethod
-    def view_issue(issue_number):
+    def view_issue(issue_number: int) -> dict[str, Any] | None:
         cmd = [
             "gh",
             "issue",
@@ -36,4 +37,4 @@ class GitHubHelper:
         if result.returncode != 0:
             print(f"Error calling gh: {result.stderr}")
             return None
-        return json.loads(result.stdout)
+        return json.loads(result.stdout)  # type: ignore
