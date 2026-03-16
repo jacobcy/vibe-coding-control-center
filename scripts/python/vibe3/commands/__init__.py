@@ -1,4 +1,4 @@
 """Commands package."""
-from . import flow, task, pr
+from . import flow, pr, task
 
 __all__ = ["flow", "task", "pr"]

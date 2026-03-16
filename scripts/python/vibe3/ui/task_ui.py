@@ -1,6 +1,5 @@
 """Task UI rendering."""
 from rich import print
-
 from vibe3.models.flow import FlowState, IssueLink
 
 
@@ -10,7 +9,7 @@ def render_issue_linked(link: IssueLink) -> None:
     Args:
         link: Created issue link
     """
-    print(f"[green]✓ Issue linked to flow[/]")
+    print("[green]✓ Issue linked to flow[/]")
     print(f"  [cyan]Issue:[/] #{link.issue_number}")
     print(f"  [cyan]Role:[/] {link.issue_role}")
     print(f"  [cyan]Branch:[/] {link.branch}")

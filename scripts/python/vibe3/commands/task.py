@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Task command handlers."""
 import re
-import typer
 from typing import Literal
+
+import typer
 from rich import print
 
 from vibe3.clients.git_client import GitClient
@@ -54,7 +55,9 @@ def show(
 @app.command()
 def link(
     issue_url: str = typer.Argument(..., help="Issue URL or number"),
-    role: Literal["task", "related"] = typer.Option("related", help="Issue role (task/related)"),
+    role: Literal["task", "related"] = typer.Option(
+        "related", help="Issue role (task/related)"
+    ),
     actor: str = typer.Option("unknown", help="Actor linking the issue")
 ) -> None:
     """Link an issue to current flow.

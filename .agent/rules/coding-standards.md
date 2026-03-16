@@ -12,8 +12,17 @@
 - 变量与路径必须正确引用。
 - 共用函数优先复用 `lib/utils.sh`。
 
+## Python Implementation (v3)
+- 使用 Python 3.10+ 特性。
+- 类型注解必须完整，通过 `mypy --strict` 检查。
+- 代码格式化使用 `black`，行宽 88 字符。
+- Lint 检查使用 `ruff`，启用规则 `E, F, I, N, W`。
+- 测试框架使用 `pytest`，测试文件放在 `tests/vibe3/`。
+- 依赖管理使用 `uv`，配置文件为根目录 `pyproject.toml`。
+
 ## Size And Complexity
-- `lib/ + bin/` 总行数不应超过 7000。
+- `lib/ + bin/ + lib3/` 总行数不应超过 7000。
+- `scripts/python/` 总行数不应超过 3000。
 - 单文件不应超过 300 行。
 - 超过 150 行或包含密集数据转换的非核心逻辑，应优先迁移到 `scripts/`。
 - 每个 `.sh` 文件只解决一个基础问题。
