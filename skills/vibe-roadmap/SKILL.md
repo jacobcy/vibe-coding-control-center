@@ -74,7 +74,7 @@ intake gate 约束：
 
 ### Step 1: 检查版本目标
 
-先运行 `vibe roadmap status --json` 获取当前版本目标状态；必要时再补充文本输出：
+先运行 `vibe roadmap status` 获取当前版本目标状态；必要时再补充文本输出：
 
 - 当前版本目标是什么
 - 有哪些 `repo issue` / roadmap item 等待分类
