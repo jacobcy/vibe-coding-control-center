@@ -25,7 +25,43 @@ description: Use when the user wants to execute the current flow's bound tasks f
 - 不允许：创建新的 roadmap item 或 plan；绕过 plan 自由编码；跨 worktree 调度
 - 若发现当前 flow 已有 PR，本 skill 只能处理该 flow 合法范围内的 follow-up 或当前已绑定 task，不得把新目标堆进当前 flow
 
+## Prerequisites
+
+在运行 `vibe-start` 之前，确保以下对象已存在：
+
+1. ✅ **Repo Issue** 已创建（`gh issue view <number>`）
+2. ✅ **Roadmap Item** 已创建（`vibe roadmap list` 检查）
+3. ✅ **Plan Document** 已存在（例如 `docs/plans/example.md`）
+4. ✅ **Task 已创建** 并具备 `spec_standard` 和 `spec_ref`（`vibe task show <task-id>` 检查）
+5. ✅ **Task 已绑定到当前 flow**（`vibe flow show` 检查）
+
+若缺少任何前置对象：
+- 先运行 `/vibe-new` 创建 flow 并绑定主 issue
+- 或手动补齐缺失对象后重新进入
+
 ## Workflow
+
+### Step 0: Check Prerequisites
+
+在执行前，验证所有前置对象已就位：
+
+```bash
+# 检查当前 flow 状态
+vibe flow show --json
+
+# 检查 task 是否已创建并绑定
+vibe task list --json
+
+# 检查 plan 文件是否存在
+ls docs/plans/<plan-name>.md
+```
+
+若发现缺失：
+- 缺少 issue → 运行 `/vibe-issue`
+- 缺少 roadmap item → 运行 `/vibe-roadmap`
+- 缺少 plan → 委托 `writing-plans` 或手动创建
+- 缺少 task → 使用 `vibe task add --spec-standard <standard> --spec-ref <plan-path>`
+- task 未绑定 flow → 使用 `vibe task update --bind-current`
 
 ### Step 1: 读取当前 flow、issue 与 task
 
