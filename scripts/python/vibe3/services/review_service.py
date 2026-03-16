@@ -109,10 +109,16 @@ Diff:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=600,  # 10 minutes timeout for codex review
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Codex execution failed: {e.stderr}") from e
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(
+                "Codex review timed out after 600 seconds. "
+                "The PR diff may be too large."
+            )
         except FileNotFoundError:
             raise RuntimeError(
                 "Codex not found. Please install: npm install -g @openai/codex"
