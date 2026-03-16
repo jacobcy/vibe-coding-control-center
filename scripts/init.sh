@@ -81,19 +81,14 @@ if command -v git &> /dev/null; then
     fi
   fi
 
-  # Ensure main worktree has .venv
-  if [[ ! -d "$shared_venv" ]]; then
+  # Ensure main worktree has .venv (only if uv is available)
+  if [[ ! -d "$shared_venv" ]] && command -v uv &> /dev/null; then
     echo "📦 Creating shared .venv in main worktree..."
     (
       cd "$main_worktree" || exit 1
-      if command -v uv &> /dev/null; then
-        uv venv
-        uv sync --dev
-      else
-        python3 -m venv .venv
-        echo "  → Installed base venv. Run 'uv sync --dev' for full dependencies."
-      fi
-    )
+      uv venv
+      uv sync --dev
+    ) || echo -e "\033[1;33m⚠️  Warning: Failed to create shared .venv\033[0m"
   fi
 fi
 
