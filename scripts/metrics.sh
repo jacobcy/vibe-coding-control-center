@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # scripts/metrics.sh — MSC health metrics dashboard
 # Outputs YAML with v2 (Shell) and v3 (Python) metrics separated
+#
+# Usage:
+#   bash scripts/metrics.sh
+#
+# Related commands:
+#   bash scripts/shell_structure_summary.sh   # Shell 代码结构详情
+#   bash scripts/python_structure_summary.sh  # Python 代码结构详情
+#
+# For detailed analysis of specific files:
+#   bash scripts/shell_structure_summary.sh lib/flow.sh
+#   bash scripts/python_structure_summary.sh services/pr_service.py
 
 set -e
 
