@@ -6,6 +6,8 @@ author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-16
 related_docs:
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/plans/v3-rewrite-plan.md
   - docs/v3/implementation/02-architecture.md
   - docs/v3/implementation/03-coding-standards.md
@@ -25,19 +27,21 @@ related_docs:
 
 ### 数据存储方案（v3 vs v2）
 
+**数据库字段真源**: [docs/standards/v3/handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)
+
 **v3 使用 SQLite Handoff Store，不再使用 JSON 文件：**
 
 | 对比项 | v2 | v3 |
 |--------|----|----|
 | 任务存储 | `registry.json` | ❌ 不使用 |
 | Flow 存储 | `worktrees.json` + `registry.json` | ❌ 不使用 |
-| 本地存储 | SQLite Handoff Store | ✅ **唯一真源** |
+| 本地存储 | SQLite Handoff Store | 执行记录与追责索引 |
 | 文件位置 | `.git/vibe3/handoff.db` | ✅ 按分支隔离 |
 
 **核心原则**（来自 [README.md](README.md)）：
-- **责任链落地**：本地只保留 flow-scoped handoff store，不再复制业务 registry/cache
-- **真源回归**：去本地化，回归 GitHub Issue / PR / Project 作为真源
-- SQLite 只是本地的 handoff store（责任链索引），不是业务真源
+- **责任链落地**：本地只保留 flow-scoped handoff store（执行记录、规范、署名、追责）
+- **真源回归**：gh CLI 是唯一真源，GitHub Issue / PR / Project 是业务真源
+- SQLite 存储 handoff/署名/追责记录，**不存储 GitHub Project 镜像**
 
 **实现规范：**
 - ✅ 必须使用的技术栈（typer, rich, pydantic, loguru）

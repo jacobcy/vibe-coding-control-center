@@ -10,11 +10,11 @@ last_updated: "2026-03-10"
 related_docs:
   - docs/standards/doc-quality-standards.md
   - docs/standards/doc-organization.md
-  - docs/standards/skill-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/shell-capability-design.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/shell-capability-design.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - skills/vibe-continue/SKILL.md
   - skills/vibe-save/SKILL.md
   - .agent/workflows/vibe-start.md

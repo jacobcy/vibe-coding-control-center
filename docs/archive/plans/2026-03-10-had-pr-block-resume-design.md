@@ -156,9 +156,9 @@
 - `lib/flow_status.sh`
 - `lib/flow_list.sh`
 - `lib/flow_help.sh`
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/command-standard.md`
-- `docs/standards/data-model-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/data-model-standard.md`
 - `tests/flow/test_flow_lifecycle.bats`
 - `tests/flow/test_flow_help_runtime.bats`
 

@@ -4,9 +4,9 @@ date: "2026-03-10"
 status: "draft"
 author: "GPT-5.4"
 related_docs:
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
+  - docs/standards/v2/command-standard.md
   - docs/standards/doc-quality-standards.md
   - lib/flow.sh
   - lib/flow_runtime.sh
@@ -255,9 +255,9 @@ helper 需要覆盖三段能力：
 - [lib/flow_help.sh](lib/flow_help.sh)
   - 移除 `switch` 的 `--save-stash`
   - 明确写出 dirty worktree 会自动安全带入
-- [docs/standards/git-workflow-standard.md](docs/standards/git-workflow-standard.md)
+- [docs/standards/v2/git-workflow-standard.md](docs/standards/v2/git-workflow-standard.md)
   - 若提到 `switch` 行为，需更新为默认安全 carry
-- [docs/standards/worktree-lifecycle-standard.md](docs/standards/worktree-lifecycle-standard.md)
+- [docs/standards/v2/worktree-lifecycle-standard.md](docs/standards/v2/worktree-lifecycle-standard.md)
   - 若提到目录复用时的残留改动处理，需同步新语义
 
 ## Testing Strategy

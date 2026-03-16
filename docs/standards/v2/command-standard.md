@@ -16,11 +16,11 @@ related_docs:
   - STRUCTURE.md
   - docs/README.md
   - docs/standards/glossary.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/skill-standard.md
-  - docs/standards/registry-json-standard.md
-  - docs/standards/roadmap-json-standard.md
-  - docs/standards/shell-capability-design.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/registry-json-standard.md
+  - docs/standards/v2/roadmap-json-standard.md
+  - docs/standards/v2/shell-capability-design.md
 ---
 
 # 共享状态命令标准

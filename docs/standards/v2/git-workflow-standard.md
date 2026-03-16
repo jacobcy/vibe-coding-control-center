@@ -15,8 +15,8 @@ related_docs:
   - CLAUDE.md
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
-  - docs/standards/command-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
 ---
 
 # Git Workflow Standard

@@ -6,6 +6,8 @@ author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-16
 related_docs:
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/plans/v3-rewrite-plan.md
   - docs/v3/implementation/02-architecture.md
   - docs/v3/implementation/03-coding-standards.md
@@ -20,9 +22,14 @@ related_docs:
 If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3-rewrite-plan.md).
 
 ## 2. Pre-requisites (Executor Entry)
-- [ ] `Vibe3Store` can successfully write/read from SQLite.
+- [ ] `Vibe3Store` can successfully write/read handoff records from SQLite.
 - [ ] Environment variables for GitHub API (or `gh` CLI auth) are verified.
 - [ ] Phase 02 Flow/Task domain commands are functional.
+
+**重要澄清**：
+- SQLite 存储 handoff 记录（执行过程、规范、署名、追责）
+- PR 数据通过 `gh` CLI 实时读取，不做本地缓存
+- Task 状态通过 `gh project item` 实时读取，不做本地镜像
 
 ## 3. Architecture Constraints (引用)
 
@@ -39,9 +46,11 @@ If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3
 
 ## 4. Interaction Requirements
 
+**GitHub 调用标准**: 见 [github-remote-call-standard.md](../../standards/v3/github-remote-call-standard.md)
+
 - **Metadata Injection**: Automatically inject Task ID, Flow Slug, and Group ID into the PR Description.
 - **State Feedback**: Fetch PR status (draft, open, merged) and reflect it in `flow status --json`.
-- **API Helper**: Use `scripts/python/lib/github.py` for all GH interactions (wraps `gh` CLI).
+- **API Helper**: Use `gh` CLI for all GH interactions (wraps `gh` CLI).
 
 ## 2. Technical Requirements
 

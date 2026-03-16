@@ -4,8 +4,8 @@ date: "2026-03-10"
 status: "draft"
 author: "GPT-5.4"
 related_docs:
-  - docs/standards/shell-capability-design.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/shell-capability-design.md
+  - docs/standards/v2/git-workflow-standard.md
   - docs/standards/glossary.md
   - docs/tasks/2026-03-10-continue-save-start-audit/README.md
   - docs/tasks/2026-03-10-continue-save-start-audit/findings-2026-03-10.md

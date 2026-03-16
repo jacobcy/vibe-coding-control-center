@@ -6,7 +6,7 @@ author: "Codex GPT-5"
 created: "2026-03-02"
 last_updated: "2026-03-10"
 related_docs:
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md
   - .agent/context/task.md
   - .agent/context/memory.md
@@ -14,7 +14,7 @@ related_docs:
 
 # Task: Cross-Worktree Task Registry
 
-> 历史语义说明（2026-03-10）：本归档文档已按现行标准做语义归一化。若文中提到 worktree，应理解为承载 flow 的物理目录，而不是任务运行时主体。现行真源以 `docs/standards/glossary.md` 和 `docs/standards/git-workflow-standard.md` 为准。
+> 历史语义说明（2026-03-10）：本归档文档已按现行标准做语义归一化。若文中提到 worktree，应理解为承载 flow 的物理目录，而不是任务运行时主体。现行真源以 `docs/standards/glossary.md` 和 `docs/standards/v2/git-workflow-standard.md` 为准。
 
 ## 概述
 
@@ -46,7 +46,7 @@ related_docs:
 
 ### Related Design
 - [session-checkpoint plan](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md)
-- [git-workflow standard](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)
+- [git-workflow standard](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/git-workflow-standard.md)
 
 ## 关键约束
 
@@ -88,5 +88,5 @@ related_docs:
 
 ## 参考
 
-- [Git Workflow & Worktree Lifecycle Standard](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)
+- [Git Workflow & Worktree Lifecycle Standard](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/git-workflow-standard.md)
 - [Session Checkpoint 实施计划](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md)

@@ -10,7 +10,7 @@ related_docs:
   - scripts/bump.sh
   - lib/flow_help.sh
   - skills/vibe-commit/SKILL.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
 related_issues: []
 ---
 

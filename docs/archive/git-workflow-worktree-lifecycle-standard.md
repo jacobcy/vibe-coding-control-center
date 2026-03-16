@@ -10,8 +10,8 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/README.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
 ---
 
 # Git Workflow & Worktree Lifecycle Standard
@@ -21,8 +21,8 @@ related_docs:
 > This file mixed delivery workflow semantics and worktree lifecycle rules.
 > Current standards:
 >
-> - [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)
-> - [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/worktree-lifecycle-standard.md)
+> - [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/git-workflow-standard.md)
+> - [worktree-lifecycle-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/worktree-lifecycle-standard.md)
 
 ## Archived Content
 

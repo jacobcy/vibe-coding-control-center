@@ -11,8 +11,8 @@ related_issues:
   - gh-99
   - gh-108
 related_docs:
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/handoff-governance-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/handoff-governance-standard.md
   - skills/vibe-done/SKILL.md
   - skills/vibe-integrate/SKILL.md
   - skills/vibe-issue/SKILL.md
@@ -55,8 +55,8 @@ related_docs:
 ## Task 1: 固化 `gh-99` 的 merged PR terminal 规则
 
 **Files:**
-- Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/handoff-governance-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
+- Modify: `docs/standards/v2/handoff-governance-standard.md`
 
 **Step 1: 写出 failing contract 清单**
 
@@ -70,7 +70,7 @@ related_docs:
 Run:
 
 ```bash
-rg -n "terminal|merged PR|follow-up issue|新的 repo issue|roadmap item" tests/skills/test_skills.bats docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+rg -n "terminal|merged PR|follow-up issue|新的 repo issue|roadmap item" tests/skills/test_skills.bats docs/standards/v2/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 ```
 
 Expected:
@@ -87,7 +87,7 @@ Expected:
 Run:
 
 ```bash
-rg -n "plan.*terminal|merged PR.*terminal|follow-up.*repo issue|roadmap item" docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+rg -n "plan.*terminal|merged PR.*terminal|follow-up.*repo issue|roadmap item" docs/standards/v2/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 ```
 
 Expected:
@@ -97,7 +97,7 @@ Expected:
 **Step 5: Commit**
 
 ```bash
-git add docs/standards/git-workflow-standard.md docs/standards/handoff-governance-standard.md
+git add docs/standards/v2/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md
 git commit -m "docs: define merged-pr terminal governance"
 ```
 
@@ -248,7 +248,7 @@ Expected:
 
 补充人工验证：
 
-1. 打开 `docs/standards/git-workflow-standard.md`，确认 merged PR 后旧 plan 只允许补证据与 follow-up 链接
+1. 打开 `docs/standards/v2/git-workflow-standard.md`，确认 merged PR 后旧 plan 只允许补证据与 follow-up 链接
 2. 打开 `skills/vibe-done/SKILL.md`，确认收口阶段不会把新需求塞回旧 plan
 3. 打开 `skills/vibe-issue/SKILL.md` 与 `skills/vibe-roadmap/SKILL.md`，确认主 issue / sub-issue 判断被明确留在 skill 编排层
 
@@ -260,8 +260,8 @@ Expected:
 
 ## Planned Change Summary
 
-- Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/handoff-governance-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
+- Modify: `docs/standards/v2/handoff-governance-standard.md`
 - Modify: `skills/vibe-done/SKILL.md`
 - Modify: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-issue/SKILL.md`

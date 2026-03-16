@@ -8,10 +8,10 @@ last_updated: 2026-03-13
 related_docs:
   - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/handoff-governance-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/handoff-governance-standard.md
 related_issues:
   - gh-157
   - gh-158

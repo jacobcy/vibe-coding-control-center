@@ -15,10 +15,10 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 先读这些真源：
 
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/worktree-lifecycle-standard.md`
-- `docs/standards/command-standard.md`
-- `docs/standards/handoff-governance-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/worktree-lifecycle-standard.md`
+- `docs/standards/v2/command-standard.md`
+- `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
@@ -203,7 +203,7 @@ vibe flow pr --base <ref>
 - next: <若 PR 已创建，明确写“进入 vibe-integrate 检查 review evidence / CI / merge readiness”；否则写继续 commit 的动作>
 ```
 
-`.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/handoff-governance-standard.md` 为准。
+`.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v2/handoff-governance-standard.md` 为准。
 
 ## Restrictions
 

@@ -1,6 +1,6 @@
 ## Context
 
-Historically, the vibe flow system used `worktree/path` and `worktrees.json` as a semantic anchor to determine the current flow and binding state. However, the standard `docs/standards/git-workflow-standard.md` explicitly states that flows bind only to branches, not worktrees. Relying on physical directories for logical state leads to bugs and data inconsistencies (e.g., when a worktree is moved or removed, the flow state breaks).
+Historically, the vibe flow system used `worktree/path` and `worktrees.json` as a semantic anchor to determine the current flow and binding state. However, the standard `docs/standards/v2/git-workflow-standard.md` explicitly states that flows bind only to branches, not worktrees. Relying on physical directories for logical state leads to bugs and data inconsistencies (e.g., when a worktree is moved or removed, the flow state breaks).
 
 ## Goals / Non-Goals
 
@@ -8,7 +8,7 @@ Historically, the vibe flow system used `worktree/path` and `worktrees.json` as 
 - Decouple all runtime flow logic from `worktree/path` and `worktrees.json`.
 - Treat worktrees merely as "open site containers" without attaching logical flow state to their filesystem paths.
 - Clean up `lib/flow_runtime.sh`, `lib/task_query.sh`, `lib/check_pr_status.sh`, `lib/task_audit.sh`, `lib/task_audit_branches.sh`, and `lib/task_actions.sh`.
-- Rectify documentation `docs/standards/command-standard.md` that still portrays worktrees as logical anchors.
+- Rectify documentation `docs/standards/v2/command-standard.md` that still portrays worktrees as logical anchors.
 
 **Non-Goals:**
 - Completely remove the ability to use worktrees for development. Worktrees will still be used, but merely as physical directories checked out to branches.

@@ -13,8 +13,8 @@ related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/standards/glossary.md
-  - docs/standards/data-model-standard.md
-  - docs/standards/command-standard.md
+  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v2/command-standard.md
 ---
 
 # `registry.json` 标准
@@ -95,7 +95,7 @@ related_docs:
   "runtime_worktree_path": "/path/to/wt-claude-refactor",
   "runtime_branch": "claude/refactor",
   "runtime_agent": "claude",
-  "next_step": "Rewrite docs/standards/command-standard.md",
+  "next_step": "Rewrite docs/standards/v2/command-standard.md",
   "created_at": "2026-03-08T10:00:00+08:00",
   "updated_at": "2026-03-08T10:30:00+08:00",
   "completed_at": null,

@@ -9,9 +9,9 @@ author: Codex GPT-5
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - docs/standards/skill-standard.md
-  - docs/standards/skill-trigger-standard.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/skill-standard.md
+  - docs/standards/v2/skill-trigger-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - skills/vibe-issue/SKILL.md
   - skills/vibe-roadmap/SKILL.md
   - skills/vibe-task/SKILL.md
@@ -29,8 +29,8 @@ related_docs:
 
 正式定义看：
 
-- `docs/standards/skill-standard.md`
-- `docs/standards/skill-trigger-standard.md`
+- `docs/standards/v2/skill-standard.md`
+- `docs/standards/v2/skill-trigger-standard.md`
 - 各自的 `skills/*/SKILL.md`
 
 ## 主链路

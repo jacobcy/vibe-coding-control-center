@@ -181,7 +181,7 @@ related_issues:
 
 ### Task 5：文档与帮助更新
 - 文件：
-  - 修改 `docs/standards/command-standard.md`
+  - 修改 `docs/standards/v2/command-standard.md`
   - 修改 `CHANGELOG.md`
 - 测试：
   - 命令帮助快照检查（若已有）

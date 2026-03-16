@@ -26,22 +26,22 @@ owner: Codex
 
 ## 结论
 
-不要把所有内容继续堆进 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-fix-pr-base-selection/docs/standards/git-workflow-standard.md)。
+不要把所有内容继续堆进 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-fix-pr-base-selection/docs/standards/v2/git-workflow-standard.md)。
 
 推荐拆成三层：
 
-1. `docs/standards/git-workflow-standard.md`
+1. `docs/standards/v2/git-workflow-standard.md`
    - 只定义交付 workflow 语义
    - 回答何时 `new`、何时 `switch`、何时 `done`
    - 定义 `open + no_pr` / `open + had_pr` / `closed` 这类 lifecycle 状态
    - 定义 `show` / `status` / `list` 的用途差异
 
-2. `docs/standards/worktree-lifecycle-standard.md`
+2. `docs/standards/v2/worktree-lifecycle-standard.md`
    - 只定义物理目录与 flow 关闭后的关系
    - 说明 worktree 复用、branch 关闭、历史留存之间的边界
    - 明确 shell 只暴露原子能力，不关闭 issue，不补 task，不做自动修复
 
-3. `docs/standards/command-standard.md` + `docs/standards/data-model-standard.md`
+3. `docs/standards/v2/command-standard.md` + `docs/standards/v2/data-model-standard.md`
    - 定义 shell 命令契约与 `flow-history.json` 的高层职责
    - 说明 `vibe flow new/switch/show/status/list/done` 的输入、输出、阻断条件、历史留存规则
 
@@ -70,10 +70,10 @@ owner: Codex
 
 ## 文档
 
-- Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/worktree-lifecycle-standard.md`
-- Modify: `docs/standards/command-standard.md`
-- Modify: `docs/standards/data-model-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
+- Modify: `docs/standards/v2/worktree-lifecycle-standard.md`
+- Modify: `docs/standards/v2/command-standard.md`
+- Modify: `docs/standards/v2/data-model-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Create: `skills/vibe-integrate/SKILL.md`
 - Modify: `skills/vibe-done/SKILL.md`

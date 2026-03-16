@@ -9,9 +9,9 @@ last_updated: 2026-03-11
 related_docs:
   - skills/vibe-commit/SKILL.md
   - .agent/workflows/vibe:commit.md
-  - docs/standards/command-standard.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/handoff-governance-standard.md
+  - docs/standards/v2/command-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/handoff-governance-standard.md
   - docs/standards/glossary.md
   - lib/task_actions.sh
   - lib/task_write.sh

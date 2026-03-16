@@ -6,9 +6,9 @@
 
 当前有效真源仍以：
 
-- `docs/standards/data-model-standard.md`
-- `docs/standards/roadmap-json-standard.md`
-- `docs/standards/command-standard.md`
+- `docs/standards/v2/data-model-standard.md`
+- `docs/standards/v2/roadmap-json-standard.md`
+- `docs/standards/v2/command-standard.md`
 
 为准。
 

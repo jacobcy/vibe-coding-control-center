@@ -11,10 +11,10 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 - `docs/standards/glossary.md`
 - `docs/standards/action-verbs.md`
-- `docs/standards/skill-standard.md`
-- `docs/standards/skill-trigger-standard.md`
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/handoff-governance-standard.md`
+- `docs/standards/v2/skill-standard.md`
+- `docs/standards/v2/skill-trigger-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 只要 shell 参数不确定，先运行对应 `vibe <command> -h`。

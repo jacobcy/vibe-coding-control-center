@@ -5,7 +5,7 @@ status: proposed
 author: Codex GPT-5
 created: 2026-03-11
 related_docs:
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - .agent/workflows/vibe-commit.md
   - skills/vibe-commit/SKILL.md
   - skills/vibe-integrate/SKILL.md
