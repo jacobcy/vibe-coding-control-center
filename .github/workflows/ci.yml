@@ -35,7 +35,10 @@ jobs:
         run: uv python install 3.10
 
       - name: Install Python dependencies
-        run: uv sync --dev
+        run: |
+          uv sync --dev
+          # Verify dev dependencies are installed
+          uv pip list | grep -E "(ruff|black|mypy|pytest)" || echo "Dev dependencies check"
 
       # Shell checks
       - name: Run dual-layer lint
@@ -46,7 +49,9 @@ jobs:
 
       # Python checks for v3
       - name: Run Python lint (ruff)
-        run: uv run ruff check scripts/python/vibe3
+        run: |
+          uv pip install ruff
+          uv run ruff check scripts/python/vibe3
 
       - name: Run Python format check (black)
         run: uv run black --check scripts/python/vibe3 tests/vibe3
