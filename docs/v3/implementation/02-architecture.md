@@ -4,8 +4,10 @@ title: Vibe 3.0 - Architecture Design
 status: active
 author: Claude Sonnet 4.6
 created: 2026-03-15
-last_updated: 2026-03-15
+last_updated: 2026-03-16
 related_docs:
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/plans/v3-rewrite-plan.md
   - docs/v3/implementation/03-coding-standards.md
   - .agent/rules/python-standards.md
@@ -62,6 +64,7 @@ scripts/python/vibe3/
 ### Layer 4: Clients (clients/)
 - **职责**：封装外部系统（Git, GitHub, SQLite）。
 - **要求**：必须提供 Protocol 接口，支持单元测试 Mock。
+- **约束**：见 [github-remote-call-standard.md](../../standards/v3/github-remote-call-standard.md)
 
 ### Layer 5: Models (models/)
 - **职责**：Pydantic 数据验证模型。

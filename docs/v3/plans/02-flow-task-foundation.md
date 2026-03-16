@@ -6,6 +6,8 @@ author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-16
 related_docs:
+  - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/plans/v3-rewrite-plan.md
   - docs/v3/implementation/02-architecture.md
   - docs/v3/implementation/03-coding-standards.md
@@ -24,6 +26,8 @@ related_docs:
 - [04-test-standards.md](../implementation/04-test-standards.md) - 测试标准
 
 ### 数据存储方案（v3 vs v2）
+
+**数据库字段真源**: [docs/standards/v3/handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)
 
 **v3 使用 SQLite Handoff Store，不再使用 JSON 文件：**
 
