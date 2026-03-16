@@ -19,7 +19,9 @@ class GitHubClientProtocol(Protocol):
         """Create a pull request."""
         ...
 
-    def get_pr(self, pr_number: int | None = None, branch: str | None = None) -> PRResponse | None:
+    def get_pr(
+        self, pr_number: int | None = None, branch: str | None = None
+    ) -> PRResponse | None:
         """Get PR by number or branch."""
         ...
 
@@ -112,7 +114,9 @@ class GitHubClient:
             raise RuntimeError(f"Failed to fetch created PR #{pr_number}")
         return pr
 
-    def get_pr(self, pr_number: int | None = None, branch: str | None = None) -> PRResponse | None:
+    def get_pr(
+        self, pr_number: int | None = None, branch: str | None = None
+    ) -> PRResponse | None:
         """Get PR by number or branch.
 
         Args:
@@ -139,7 +143,15 @@ class GitHubClient:
             target = result.stdout.strip()
 
         result = subprocess.run(
-            ["gh", "pr", "view", target, "--json", "number,title,body,state,headRefName,baseRefName,url,isDraft,createdAt,updatedAt,mergedAt"],
+            [
+                "gh",
+                "pr",
+                "view",
+                target,
+                "--json",
+                "number,title,body,state,headRefName,baseRefName,"
+                "url,isDraft,createdAt,updatedAt,mergedAt",
+            ],
             capture_output=True,
             text=True,
         )

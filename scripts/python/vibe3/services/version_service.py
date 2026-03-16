@@ -1,7 +1,7 @@
 """Version service implementation."""
 from pathlib import Path
 
-from vibe3.models.pr import VersionBumpType, VersionBumpResponse
+from vibe3.models.pr import VersionBumpResponse, VersionBumpType
 
 
 class VersionService:
@@ -54,7 +54,8 @@ class VersionService:
 
         Raises:
             ValueError: If version format is invalid
-            FileNotFoundError: If VERSION file doesn't exist (when current_version is None)
+            FileNotFoundError: If VERSION file doesn't exist
+                (when current_version is None)
         """
         # Read version from file if not provided
         if current_version is None:

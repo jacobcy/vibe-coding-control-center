@@ -1,7 +1,6 @@
 """PR UI components."""
 from rich import print
 from rich.table import Table
-
 from vibe3.models.pr import PRResponse, ReviewResponse, VersionBumpResponse
 
 
@@ -11,7 +10,7 @@ def render_pr_created(pr: PRResponse) -> None:
     Args:
         pr: PR response
     """
-    print(f"[green]✓[/] Draft PR created successfully!")
+    print("[green]✓[/] Draft PR created successfully!")
     print(f"\n[cyan]PR #{pr.number}[/]: {pr.title}")
     print(f"[dim]{pr.url}[/]")
     print(f"\nBranch: [yellow]{pr.head_branch}[/] → [yellow]{pr.base_branch}[/]")
@@ -59,7 +58,7 @@ def render_pr_details(pr: PRResponse) -> None:
 
     # Body
     if pr.body:
-        print(f"\n[bold]Description:[/]")
+        print("\n[bold]Description:[/]")
         # Show first 200 characters of body
         body_preview = pr.body[:200]
         if len(pr.body) > 200:
@@ -93,7 +92,7 @@ def render_version_bump(response: VersionBumpResponse) -> None:
     Args:
         response: Version bump response
     """
-    print(f"\n[bold]Version Bump Calculation[/]")
+    print("\n[bold]Version Bump Calculation[/]")
     print(f"\nCurrent version: [cyan]{response.current_version}[/]")
     print(f"Bump type: [yellow]{response.bump_type.value}[/]")
     print(f"Next version: [green]{response.next_version}[/]")
@@ -158,5 +157,5 @@ def render_pr_review(response: ReviewResponse) -> None:
     else:
         print("[dim]Review was not published[/]")
 
-    print(f"\n[bold]Review Content:[/]\n")
+    print("\n[bold]Review Content:[/]\n")
     print(response.review_body)

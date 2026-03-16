@@ -7,24 +7,21 @@ lib_path = Path(__file__).parent.parent.parent / "lib"
 if str(lib_path) not in sys.path:
     sys.path.insert(0, str(lib_path))
 
-from typing import Literal
 
-from loguru import logger
+from loguru import logger  # noqa: E402
+from store import Vibe3Store  # noqa: E402
 
-from vibe3.clients.github_client import GitHubClient, GitHubClientProtocol
-from vibe3.clients.git_client import GitClient
-from vibe3.models.pr import (
+from vibe3.clients.git_client import GitClient  # noqa: E402
+from vibe3.clients.github_client import GitHubClient, GitHubClientProtocol  # noqa: E402
+from vibe3.models.pr import (  # noqa: E402
     CreatePRRequest,
     PRMetadata,
     PRResponse,
     ReviewResponse,
-    UpdatePRRequest,
-    VersionBumpRequest,
     VersionBumpResponse,
 )
-from vibe3.services.review_service import ReviewService
-from vibe3.services.version_service import VersionService
-from store import Vibe3Store
+from vibe3.services.review_service import ReviewService  # noqa: E402
+from vibe3.services.version_service import VersionService  # noqa: E402
 
 
 class PRService:
@@ -86,7 +83,9 @@ class PRService:
 
         # Check auth
         if not self.github_client.check_auth():
-            raise RuntimeError("Not authenticated to GitHub. Run 'gh auth login' first.")
+            raise RuntimeError(
+                "Not authenticated to GitHub. Run 'gh auth login' first."
+            )
 
         # Get current branch
         head_branch = self.git_client.get_current_branch()
@@ -124,7 +123,9 @@ class PRService:
         logger.info("Draft PR created", pr_number=pr.number, url=pr.url)
         return pr
 
-    def get_pr(self, pr_number: int | None = None, branch: str | None = None) -> PRResponse | None:
+    def get_pr(
+        self, pr_number: int | None = None, branch: str | None = None
+    ) -> PRResponse | None:
         """Get PR details.
 
         Args:
@@ -158,7 +159,9 @@ class PRService:
 
         # Check auth
         if not self.github_client.check_auth():
-            raise RuntimeError("Not authenticated to GitHub. Run 'gh auth login' first.")
+            raise RuntimeError(
+                "Not authenticated to GitHub. Run 'gh auth login' first."
+            )
 
         # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)
@@ -201,7 +204,9 @@ class PRService:
 
         # Check auth
         if not self.github_client.check_auth():
-            raise RuntimeError("Not authenticated to GitHub. Run 'gh auth login' first.")
+            raise RuntimeError(
+                "Not authenticated to GitHub. Run 'gh auth login' first."
+            )
 
         # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)

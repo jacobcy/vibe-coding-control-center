@@ -5,11 +5,16 @@ from typing import Optional
 
 import typer
 
-from vibe3.services.pr_service import PRService
 from vibe3.models.pr import PRMetadata
+from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import (
-    render_error, render_pr_created, render_pr_details, render_pr_merged, render_pr_ready,
-    render_pr_review, render_version_bump,
+    render_error,
+    render_pr_created,
+    render_pr_details,
+    render_pr_merged,
+    render_pr_ready,
+    render_pr_review,
+    render_version_bump,
 )
 
 app = typer.Typer(help="Manage Pull Requests")
@@ -37,9 +42,16 @@ def draft(
         service = PRService()
         metadata = None
         if any([task, flow, spec, planner, executor]):
-            metadata = PRMetadata(task_issue=task, flow_slug=flow, spec_ref=spec,
-                                   planner=planner, executor=executor)
-        pr = service.create_draft_pr(title=title, body=body, base_branch=base, metadata=metadata)
+            metadata = PRMetadata(
+                task_issue=task,
+                flow_slug=flow,
+                spec_ref=spec,
+                planner=planner,
+                executor=executor,
+            )
+        pr = service.create_draft_pr(
+            title=title, body=body, base_branch=base, metadata=metadata
+        )
         render_pr_created(pr)
     except Exception as e:
         _handle_error("Failed to create draft PR", e)

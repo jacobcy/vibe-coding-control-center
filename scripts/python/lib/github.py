@@ -1,10 +1,21 @@
-import subprocess
 import json
+import subprocess
+
 
 class GitHubHelper:
     @staticmethod
     def list_issues(limit=30, state="open"):
-        cmd = ["gh", "issue", "list", "--limit", str(limit), "--state", state, "--json", "number,title,state,updatedAt,labels"]
+        cmd = [
+            "gh",
+            "issue",
+            "list",
+            "--limit",
+            str(limit),
+            "--state",
+            state,
+            "--json",
+            "number,title,state,updatedAt,labels",
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"Error calling gh: {result.stderr}")
@@ -13,7 +24,14 @@ class GitHubHelper:
 
     @staticmethod
     def view_issue(issue_number):
-        cmd = ["gh", "issue", "view", str(issue_number), "--json", "number,title,body,state,updatedAt,labels,comments"]
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            str(issue_number),
+            "--json",
+            "number,title,body,state,updatedAt,labels,comments",
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"Error calling gh: {result.stderr}")

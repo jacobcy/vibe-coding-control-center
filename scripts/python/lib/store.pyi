@@ -1,7 +1,6 @@
 """Type stubs for store module."""
 from typing import Any
 
-
 class Vibe3Store:
     """Vibe3Store type stub."""
 

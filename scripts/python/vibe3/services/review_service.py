@@ -110,4 +110,6 @@ Diff:
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Codex execution failed: {e.stderr}") from e
         except FileNotFoundError:
-            raise RuntimeError("Codex not found. Please install: npm install -g @openai/codex")
+            raise RuntimeError(
+                "Codex not found. Please install: npm install -g @openai/codex"
+            )
