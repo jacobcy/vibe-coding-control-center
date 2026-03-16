@@ -1,4 +1,5 @@
 """Tests for Task issue linking functionality."""
+
 import pytest
 from vibe3.services.task_service import TaskService
 from vibe3.models.flow import IssueLink

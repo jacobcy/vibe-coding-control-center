@@ -1,25 +1,23 @@
 """Flow service implementation."""
+
+import re
 import sys
 from pathlib import Path
-import re
+from typing import Literal
+
+from loguru import logger
 
 # Add lib to path for Vibe3Store
 lib_path = Path(__file__).parent.parent.parent / "lib"
 if str(lib_path) not in sys.path:
     sys.path.insert(0, str(lib_path))
+from store import Vibe3Store  # noqa: E402
 
-from datetime import datetime
-from typing import Literal
-
-from loguru import logger
-
-from vibe3.models.flow import (
-    CreateFlowRequest,
+from vibe3.models.flow import (  # noqa: E402
     FlowState,
     FlowStatusResponse,
     IssueLink,
 )
-from store import Vibe3Store
 
 
 def parse_task_id(task_id: str) -> int:
@@ -35,7 +33,7 @@ def parse_task_id(task_id: str) -> int:
         ValueError: If no numeric part found
     """
     # Extract digits from the task ID
-    match = re.search(r'\d+', task_id)
+    match = re.search(r"\d+", task_id)
     if not match:
         raise ValueError(f"Invalid task ID format: {task_id}")
     return int(match.group())
@@ -92,7 +90,7 @@ class FlowService:
         )
 
         # Add issue link if task_id provided
-        if task_id:
+        if task_id and task_issue_number is not None:
             self.store.add_issue_link(branch, task_issue_number, "task")
 
         # Add creation event

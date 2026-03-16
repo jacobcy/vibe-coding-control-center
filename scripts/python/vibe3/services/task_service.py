@@ -1,18 +1,18 @@
 """Task service implementation."""
+
 import sys
 from pathlib import Path
+from typing import Literal
+
+from loguru import logger
 
 # Add lib to path for Vibe3Store
 lib_path = Path(__file__).parent.parent.parent / "lib"
 if str(lib_path) not in sys.path:
     sys.path.insert(0, str(lib_path))
+from store import Vibe3Store  # noqa: E402
 
-from typing import Literal
-
-from loguru import logger
-
-from vibe3.models.flow import FlowState, IssueLink
-from store import Vibe3Store
+from vibe3.models.flow import FlowState, IssueLink  # noqa: E402
 
 
 class TaskService:

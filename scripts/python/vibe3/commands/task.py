@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Task command handlers."""
+
 import re
-import typer
 from typing import Literal
+
+import typer
 from rich import print
 
 from vibe3.clients.git_client import GitClient
@@ -44,9 +46,7 @@ def list() -> None:
 
 
 @app.command()
-def show(
-    task_id: str = typer.Argument(..., help="Task ID")
-) -> None:
+def show(task_id: str = typer.Argument(..., help="Task ID")) -> None:
     """Show task details."""
     print(f"[cyan]Task:[/] {task_id}")
 
@@ -54,8 +54,10 @@ def show(
 @app.command()
 def link(
     issue_url: str = typer.Argument(..., help="Issue URL or number"),
-    role: Literal["task", "related"] = typer.Option("related", help="Issue role (task/related)"),
-    actor: str = typer.Option("unknown", help="Actor linking the issue")
+    role: Literal["task", "related"] = typer.Option(
+        "related", help="Issue role (task/related)"
+    ),
+    actor: str = typer.Option("unknown", help="Actor linking the issue"),
 ) -> None:
     """Link an issue to current flow.
 

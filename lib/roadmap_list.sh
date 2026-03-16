@@ -23,6 +23,17 @@ _vibe_roadmap_list() {
         status_filter="p0,current,next"
     fi
 
+    # Warning for --json without filters (may produce large output)
+    if [[ "$output_json" == "true" && -z "$keywords" && "$show_all" == "true" ]]; then
+        echo "${YELLOW}WARNING: JSON output without --keywords filter may produce large data. Consider using --keywords to filter results.${NC}" >&2
+        # Ask for confirmation in interactive mode
+        if [[ -t 0 && -z "${VIBE_FORCE:-}" ]]; then
+            echo -n "Continue? [y/N] "
+            read -r response
+            [[ "$response" =~ ^[Yy]$ ]] || return 0
+        fi
+    fi
+
     [[ "$linked" == "true" && "$unlinked" == "true" ]] && { echo "Error: --linked and --unlinked cannot be used together"; return 1; }
     roadmap_file="$(_vibe_roadmap_file "$common_dir")"
     _vibe_roadmap_require_file "$roadmap_file" "roadmap.json" || return 1

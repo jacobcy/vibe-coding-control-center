@@ -66,7 +66,7 @@ _vibe_roadmap_status() {
     local official_counts official_total official_mirrored official_item_id official_content_type official_remote_only
     local sync_counts sync_missing_item_id sync_missing_content_type sync_recommended sync_command
     local extension_counts extension_execution extension_spec_standard extension_spec_ref
-    version_goal="$(echo "$status_json" | jq -r '.version_goal // "none"')"
+    version_goal="$(echo "$status_json" | jq -r '.version_goal // empty' | grep -v '^null$' || echo "none")"
     project_id="$(echo "$status_json" | jq -r '.project_id // "none"')"
 
     echo "========================================"

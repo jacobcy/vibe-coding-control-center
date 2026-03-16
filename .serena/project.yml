@@ -27,18 +27,27 @@ project_name: "vibe-center"
 # Note that when using the JetBrains backend, language servers are not used and this list is correspondingly ignored.
 languages:
 - bash
+- python
 
 # initial prompt for the project. It will always be given to the LLM upon activating the project
 # (contrary to the memories, which are loaded on demand).
 initial_prompt: |
-  This is a Zsh CLI project with strict governance rules.
-  HARD RULES:
-  - Total LOC (lib/ + bin/) must be ≤ 7000
+  This is a Zsh CLI project (v2) and Python CLI project (v3) with strict governance rules.
+
+  HARD RULES (v2 - Shell):
+  - Total LOC (lib/ + bin/ + lib3/) must be ≤ 7000
   - Any single .sh file must be ≤ 300 lines
   - Zero dead code: every function must have ≥1 caller
   - Do NOT add features not approved in SOUL.md
   Before modifying any function, use find_referencing_symbols to check callers.
   After modification, run: zsh -n <file> && bats tests/
+
+  HARD RULES (v3 - Python):
+  - Total LOC (scripts/python/) must be ≤ 3000
+  - Any single .py file must be ≤ 300 lines
+  - Zero dead code: every function must have ≥1 caller
+  - Type hints required (mypy --strict)
+  - Run: uv run ruff check && uv run mypy && uv run pytest
 
 # list of tool names to exclude. We recommend not excluding any tools, see the readme for more details.
 # Below is the complete list of tools for convenience.

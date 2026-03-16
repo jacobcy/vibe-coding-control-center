@@ -13,7 +13,7 @@ setup() {
     while IFS= read -r f; do
       n=$(wc -l < "$f")
       total=$((total + n))
-    done < <(find lib -name "*.sh" -type f | sort; echo bin/vibe)
+    done < <(find lib lib3 -name "*.sh" -type f | sort; echo bin/vibe)
     echo "$total"
   ')
 
@@ -23,7 +23,7 @@ setup() {
     while IFS= read -r f; do
       n=$(wc -l < "$f")
       [ "$n" -gt "$max" ] && max="$n"
-    done < <(find lib -name "*.sh" -type f | sort; echo bin/vibe)
+    done < <(find lib lib3 -name "*.sh" -type f | sort; echo bin/vibe)
     echo "$max"
   ')
 
@@ -32,10 +32,11 @@ setup() {
 
   [ "$status" -eq 0 ]
 
-  reported_total=$(echo "$output" | awk -F'|' '/\| 总 LOC \|/{gsub(/ /,"",$4); print $4; exit}')
+  # Parse YAML output for v2_shell metrics
+  reported_total=$(echo "$output" | awk '/v2_shell:/,/v3_python:/' | awk '/total_loc:/,/max_file_loc:/' | grep "current:" | head -1 | awk '{print $2}')
   [ "$reported_total" -eq "$expected_total" ]
 
-  reported_max=$(echo "$output" | sed -n 's/.*| 最大文件行数 | 300 | *\([0-9][0-9]*\).*/\1/p' | head -1)
+  reported_max=$(echo "$output" | awk '/v2_shell:/,/v3_python:/' | awk '/max_file_loc:/,/tests:/' | grep "current:" | head -1 | awk '{print $2}')
   [ "$reported_max" -eq "$expected_max" ]
 }
 
