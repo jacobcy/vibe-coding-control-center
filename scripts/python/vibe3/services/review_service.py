@@ -4,7 +4,8 @@ import subprocess
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient, GitHubClientProtocol
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.pr import PRResponse, ReviewResponse
 
 

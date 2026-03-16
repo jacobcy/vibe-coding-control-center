@@ -12,7 +12,8 @@ from loguru import logger  # noqa: E402
 from store import Vibe3Store  # noqa: E402
 
 from vibe3.clients.git_client import GitClient  # noqa: E402
-from vibe3.clients.github_client import GitHubClient, GitHubClientProtocol  # noqa: E402
+from vibe3.clients.github_client import GitHubClient  # noqa: E402
+from vibe3.clients.protocols import GitHubClientProtocol  # noqa: E402
 from vibe3.models.pr import (  # noqa: E402
     CreatePRRequest,
     PRMetadata,
