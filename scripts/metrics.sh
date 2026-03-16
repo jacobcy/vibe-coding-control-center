@@ -144,7 +144,7 @@ echo "  tests:"
 echo "    min_required: 5"
 python_test_count=0
 if command -v pytest > /dev/null 2>&1; then
-  python_test_count=$(find "$VIBE_ROOT/tests/vibe3" -name 'test_*.py' -exec grep -l "def test_" {} \; 2>/dev/null | wc -l | awk '{print $1}')
+  python_test_count=$(pytest --collect-only "$VIBE_ROOT/tests/vibe3" 2>/dev/null | grep -c "<Function" || echo 0)
 fi
 python_test_status="fail"
 [ "${python_test_count:-0}" -ge 5 ] && python_test_status="pass"
@@ -154,7 +154,7 @@ echo "    status: ${python_test_status}"
 echo "  ruff_lint_errors:"
 ruff_errors=0
 if command -v ruff > /dev/null 2>&1; then
-  ruff_errors=$(ruff check "$VIBE_ROOT/scripts/python/vibe3" 2>&1 | grep -v "^warning" | grep -v "^All checks" | grep -c "^[A-Z]" || true)
+  ruff_errors=$(ruff check "$VIBE_ROOT/scripts/python" 2>&1 | grep -v "^warning" | grep -v "^All checks" | grep -c "^[A-Z]" || true)
 fi
 ruff_status="pass"
 [ "${ruff_errors:-0}" -gt 0 ] && ruff_status="fail"

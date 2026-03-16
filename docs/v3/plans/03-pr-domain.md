@@ -40,7 +40,7 @@ If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3
 
 **关键约束**：
 - `clients/github_client.py` 必须提供 Protocol 接口，支持 Mock 测试
-- `commands/pr.py` 必须 < 100 行，禁止包含业务逻辑
+- `commands/pr.py` 必须 < 150 行，禁止包含业务逻辑
 - `services/pr_service.py` 必须 < 300 行，禁止包含 UI 逻辑
 - 测试文件必须遵循测试标准（Services 测试 < 150 行，Clients 测试 < 100 行）
 

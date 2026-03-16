@@ -49,13 +49,13 @@ jobs:
 
       # Python checks for v3
       - name: Run Python lint (ruff)
-        run: uv run ruff check scripts/python/vibe3
+        run: uv run ruff check scripts/python
 
       - name: Run Python format check (black)
-        run: uv run black --check scripts/python/vibe3 tests/vibe3
+        run: uv run black --check scripts/python tests/vibe3
 
       - name: Run Python type check (mypy)
-        run: uv run mypy scripts/python/vibe3
+        run: uv run mypy scripts/python
 
       - name: Run Python tests (pytest)
         run: uv run pytest tests/vibe3 -v
