@@ -103,7 +103,7 @@ echo "| Zsh 语法检查 | PASS | ${zsh_status} | ${zsh_status} |"
 # --- Python lint (ruff) ---
 ruff_errors=0
 if command -v ruff > /dev/null 2>&1; then
-  ruff_errors=$(ruff check "$VIBE_ROOT/scripts/python/vibe3" 2>&1 | grep -c "^[A-Z]" || true)
+  ruff_errors=$(ruff check "$VIBE_ROOT/scripts/python/vibe3" 2>&1 | grep -v "^warning" | grep -v "^All checks" | grep -c "^[A-Z]" || true)
 fi
 ruff_status="✅"
 [ "${ruff_errors:-0}" -gt 0 ] && ruff_status="❌"
