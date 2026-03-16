@@ -1,4 +1,5 @@
 """Task UI rendering."""
+
 from rich import print
 from vibe3.models.flow import FlowState, IssueLink
 

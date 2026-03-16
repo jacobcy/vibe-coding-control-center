@@ -1,4 +1,5 @@
 """Protocol definitions for clients."""
+
 from typing import Protocol
 
 from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest

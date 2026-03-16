@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Task command handlers."""
+
 import re
 from typing import Literal
 
@@ -45,9 +46,7 @@ def list() -> None:
 
 
 @app.command()
-def show(
-    task_id: str = typer.Argument(..., help="Task ID")
-) -> None:
+def show(task_id: str = typer.Argument(..., help="Task ID")) -> None:
     """Show task details."""
     print(f"[cyan]Task:[/] {task_id}")
 
@@ -58,7 +57,7 @@ def link(
     role: Literal["task", "related"] = typer.Option(
         "related", help="Issue role (task/related)"
     ),
-    actor: str = typer.Option("unknown", help="Actor linking the issue")
+    actor: str = typer.Option("unknown", help="Actor linking the issue"),
 ) -> None:
     """Link an issue to current flow.
 

@@ -3,14 +3,12 @@
 Vibe 3.0 CLI Entry Point
 Thin wrapper that sets up Typer app and registers subcommands.
 """
+
 import typer
 
 from vibe3.commands import flow, pr, task
 
-app = typer.Typer(
-    name="vibe3",
-    help="Vibe 3.0 - Development orchestration tool"
-)
+app = typer.Typer(name="vibe3", help="Vibe 3.0 - Development orchestration tool")
 
 # Register subcommands
 app.add_typer(flow.app, name="flow")

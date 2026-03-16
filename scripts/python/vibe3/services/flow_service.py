@@ -1,4 +1,5 @@
 """Flow service implementation."""
+
 import re
 import sys
 from pathlib import Path
@@ -32,7 +33,7 @@ def parse_task_id(task_id: str) -> int:
         ValueError: If no numeric part found
     """
     # Extract digits from the task ID
-    match = re.search(r'\d+', task_id)
+    match = re.search(r"\d+", task_id)
     if not match:
         raise ValueError(f"Invalid task ID format: {task_id}")
     return int(match.group())
