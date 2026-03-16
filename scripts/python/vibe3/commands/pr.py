@@ -70,6 +70,8 @@ def show(
             render_error("PR not found")
             raise typer.Exit(1)
         render_pr_details(pr)
+    except typer.Exit:
+        raise  # Let typer.Exit pass through
     except Exception as e:
         _handle_error("Failed to get PR", e)
 

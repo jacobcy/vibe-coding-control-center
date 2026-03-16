@@ -102,8 +102,10 @@ Diff:
             RuntimeError: If codex execution fails
         """
         try:
+            # Use stdin to avoid E2BIG on large PRs
             result = subprocess.run(
-                ["codex", "exec", "--full-auto", prompt],
+                ["codex", "exec", "--full-auto"],
+                input=prompt,
                 capture_output=True,
                 text=True,
                 check=True,
