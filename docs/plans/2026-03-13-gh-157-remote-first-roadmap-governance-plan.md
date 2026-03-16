@@ -11,7 +11,7 @@ related_docs:
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-plan.md
   - docs/standards/v2/data-model-standard.md
   - docs/standards/v2/command-standard.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
 related_issues:
   - gh-157
   - gh-158
@@ -212,7 +212,7 @@ Expected:
 ### Phase 4: 统一 PR / issue / closeout 交付规则
 
 **Files**
-- Modify: `docs/standards/git-workflow-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
 - Modify: `docs/standards/v2/handoff-governance-standard.md`
 - Modify: `skills/vibe-commit/SKILL.md`
 - Modify: `skills/vibe-integrate/SKILL.md`
@@ -240,7 +240,7 @@ Expected:
 Run:
 
 ```bash
-rg -n "close|issue|handoff|stack|PR" docs/standards/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
+rg -n "close|issue|handoff|stack|PR" docs/standards/v2/git-workflow-standard.md docs/standards/v2/handoff-governance-standard.md skills/vibe-commit/SKILL.md skills/vibe-integrate/SKILL.md skills/vibe-done/SKILL.md
 ```
 
 Expected:

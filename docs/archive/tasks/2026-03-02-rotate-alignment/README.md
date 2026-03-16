@@ -9,7 +9,7 @@ related_docs:
   - scripts/rotate.sh
   - lib/flow.sh
   - lib/task.sh
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
 ---
 
 # Task: Rotate Workflow Refinement

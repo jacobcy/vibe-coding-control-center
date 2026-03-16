@@ -13,7 +13,7 @@ description: Use when the user wants to create or intake the next delivery targe
 - `docs/standards/action-verbs.md`
 - `docs/standards/v2/skill-standard.md`
 - `docs/standards/v2/skill-trigger-standard.md`
-- `docs/standards/git-workflow-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`
 

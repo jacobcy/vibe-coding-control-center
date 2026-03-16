@@ -8,8 +8,8 @@ related_docs:
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
   - docs/standards/v2/command-standard.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - .agent/workflows/vibe-new.md
   - .agent/workflows/vibe-new-flow.md
   - lib/flow.sh

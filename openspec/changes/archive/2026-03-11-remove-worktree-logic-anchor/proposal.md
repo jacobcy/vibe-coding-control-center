@@ -1,6 +1,6 @@
 ## Why
 
-Currently, several parts of the system treat `worktree/path` and `worktrees.json` as logical anchors for a flow or task, rather than just "open site containers". According to `docs/standards/git-workflow-standard.md`, flows should only be bound to branches, not worktrees. This change removes these legacy worktree dependencies to align the codebase with the updated standard and prevent data quality issues related to worktree path bindings.
+Currently, several parts of the system treat `worktree/path` and `worktrees.json` as logical anchors for a flow or task, rather than just "open site containers". According to `docs/standards/v2/git-workflow-standard.md`, flows should only be bound to branches, not worktrees. This change removes these legacy worktree dependencies to align the codebase with the updated standard and prevent data quality issues related to worktree path bindings.
 
 ## What Changes
 

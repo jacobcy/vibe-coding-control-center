@@ -57,7 +57,7 @@
 
 - Modify: `docs/standards/v2/skill-standard.md`
 - Modify: `docs/standards/v2/skill-trigger-standard.md`
-- Modify: `docs/standards/git-workflow-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
 - Modify: `.agent/workflows/vibe:new.md`
 - Modify: `.agent/workflows/vibe:start.md`
 - Modify: `.agent/workflows/vibe:task.md`
@@ -78,7 +78,7 @@
 **Files:**
 - Modify: `docs/standards/v2/skill-standard.md`
 - Modify: `docs/standards/v2/skill-trigger-standard.md`
-- Modify: `docs/standards/git-workflow-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
 
 **Steps:**
 1. Write failing doc-regression test for the new `vibe-new / vibe-start / vibe-task / vibe-check` boundaries.

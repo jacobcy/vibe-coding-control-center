@@ -41,7 +41,7 @@ related_issues:
 
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/data-model-standard.md`
-- `docs/standards/git-workflow-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
 - `.agent/workflows/vibe:start.md`
 - `skills/vibe-roadmap/SKILL.md`
 - `skills/vibe-start/SKILL.md`

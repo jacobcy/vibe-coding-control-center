@@ -23,7 +23,7 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 - `docs/standards/v2/skill-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/shell-capability-design.md`
-- `docs/standards/git-workflow-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `docs/standards/glossary.md`
 

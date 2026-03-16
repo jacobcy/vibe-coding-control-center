@@ -14,7 +14,7 @@
 
 ## 当前核实结论
 
-1. 标准已经写明 `open + had_pr` 的 flow 不能继续作为“下一个新目标”的开发现场复用，见 `docs/standards/git-workflow-standard.md`。
+1. 标准已经写明 `open + had_pr` 的 flow 不能继续作为“下一个新目标”的开发现场复用，见 `docs/standards/v2/git-workflow-standard.md`。
 2. 当前 `vibe flow new (shell)` 只检查目标 branch 是否已有 PR 历史，不检查“当前所在 branch 是否已经 had_pr”，因此仍可能从一个未关闭 PR 的 flow 直接切出新 flow。
 3. `.agent/workflows/vibe-commit.md` 当前只写了 review/commit/PR slicing 规则，没有把“当前 flow 已 had_pr 时只能准备、不得执行”的行为写成硬 gate。
 4. 当前 `.agent/context/task.md` 已与事实不一致：GitHub 上实际已有 PR `#89` open，但 handoff 仍写“没有正式 PR”。
@@ -38,7 +38,7 @@
 ## Task 1: 补标准真源
 
 **Files:**
-- Modify: `docs/standards/git-workflow-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
 - Modify: `docs/standards/v2/command-standard.md`
 
 **Step 1: 写标准补充点**
@@ -58,7 +58,7 @@
 
 Run:
 ```bash
-rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md
+rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/v2/git-workflow-standard.md docs/standards/v2/command-standard.md
 ```
 Expected:
 ```text
@@ -68,7 +68,7 @@ Expected:
 **Step 3: Commit**
 
 ```bash
-git add docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md
+git add docs/standards/v2/git-workflow-standard.md docs/standards/v2/command-standard.md
 git commit -m "docs(flow): define prep-only rule for open PR flows"
 ```
 
@@ -230,7 +230,7 @@ Expected:
 
 Run:
 ```bash
-rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/git-workflow-standard.md docs/standards/v2/command-standard.md .agent/workflows/vibe-commit.md skills/vibe-commit/SKILL.md .agent/context/task.md
+rg -n "准备期|不得执行|vibe-issue|vibe-task|had_pr" docs/standards/v2/git-workflow-standard.md docs/standards/v2/command-standard.md .agent/workflows/vibe-commit.md skills/vibe-commit/SKILL.md .agent/context/task.md
 ```
 Expected:
 ```text
