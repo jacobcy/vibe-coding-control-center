@@ -1,4 +1,5 @@
 """Version service implementation."""
+
 from pathlib import Path
 
 from vibe3.models.pr import VersionBumpResponse, VersionBumpType

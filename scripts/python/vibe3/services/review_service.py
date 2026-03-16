@@ -1,4 +1,5 @@
 """Review service implementation."""
+
 import subprocess
 
 from loguru import logger

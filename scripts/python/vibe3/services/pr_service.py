@@ -1,4 +1,5 @@
 """PR service implementation."""
+
 import sys
 from pathlib import Path
 

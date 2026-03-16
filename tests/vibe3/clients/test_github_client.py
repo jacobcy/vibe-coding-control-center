@@ -1,4 +1,5 @@
 """Tests for GitHub client."""
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -21,7 +22,9 @@ def mock_subprocess() -> MagicMock:
         yield mock
 
 
-def test_check_auth_success(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_check_auth_success(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test auth check success."""
     mock_subprocess.return_value.returncode = 0
 
@@ -35,7 +38,9 @@ def test_check_auth_success(github_client: GitHubClient, mock_subprocess: MagicM
     )
 
 
-def test_check_auth_failure(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_check_auth_failure(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test auth check failure."""
     mock_subprocess.return_value.returncode = 1
 
@@ -44,7 +49,9 @@ def test_check_auth_failure(github_client: GitHubClient, mock_subprocess: MagicM
     assert result is False
 
 
-def test_create_pr_success(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_create_pr_success(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test create PR success."""
     # Mock create PR
     mock_subprocess.return_value.stdout = "https://github.com/org/repo/pull/123\n"
@@ -91,7 +98,9 @@ def test_create_pr_success(github_client: GitHubClient, mock_subprocess: MagicMo
         mock_subprocess.assert_called()
 
 
-def test_get_pr_by_number(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_get_pr_by_number(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test get PR by number."""
     pr_data = {
         "number": 123,
@@ -118,7 +127,9 @@ def test_get_pr_by_number(github_client: GitHubClient, mock_subprocess: MagicMoc
     assert pr.head_branch == "feature-branch"
 
 
-def test_get_pr_not_found(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_get_pr_not_found(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test get PR not found."""
     mock_subprocess.return_value.returncode = 1
 
@@ -127,7 +138,9 @@ def test_get_pr_not_found(github_client: GitHubClient, mock_subprocess: MagicMoc
     assert pr is None
 
 
-def test_mark_ready_success(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_mark_ready_success(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test mark PR as ready."""
     mock_subprocess.return_value.returncode = 0
 
@@ -140,7 +153,9 @@ def test_mark_ready_success(github_client: GitHubClient, mock_subprocess: MagicM
         mock_subprocess.assert_called()
 
 
-def test_merge_pr_success(github_client: GitHubClient, mock_subprocess: MagicMock) -> None:
+def test_merge_pr_success(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
     """Test merge PR success."""
     mock_subprocess.return_value.returncode = 0
 

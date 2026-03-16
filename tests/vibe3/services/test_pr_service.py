@@ -1,4 +1,5 @@
 """Tests for PR service."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -34,7 +35,9 @@ def mock_store() -> MagicMock:
         yield mock
 
 
-def test_create_draft_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:
+def test_create_draft_pr_success(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
     """Test create draft PR success."""
     mock_github_client.check_auth.return_value = True
     mock_github_client.get_current_branch.return_value = "feature-branch"
@@ -67,7 +70,9 @@ def test_create_draft_pr_success(pr_service: PRService, mock_github_client: Magi
             mock_github_client.create_pr.assert_called_once()
 
 
-def test_create_draft_pr_auth_failure(pr_service: PRService, mock_github_client: MagicMock) -> None:
+def test_create_draft_pr_auth_failure(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
     """Test create draft PR auth failure."""
     mock_github_client.check_auth.return_value = False
 
@@ -97,7 +102,9 @@ def test_get_pr_success(pr_service: PRService, mock_github_client: MagicMock) ->
         mock_github_client.get_pr.assert_called_once_with(123, None)
 
 
-def test_mark_ready_success(pr_service: PRService, mock_github_client: MagicMock) -> None:
+def test_mark_ready_success(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
     """Test mark PR as ready success."""
     mock_pr = PRResponse(
         number=123,

@@ -1,4 +1,5 @@
 """GitHub client implementation."""
+
 import json
 import subprocess
 from typing import Protocol
@@ -87,11 +88,17 @@ class GitHubClient:
         )
 
         cmd = [
-            "gh", "pr", "create",
-            "--title", request.title,
-            "--body", request.body,
-            "--base", request.base_branch,
-            "--head", request.head_branch,
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            request.title,
+            "--body",
+            request.body,
+            "--base",
+            request.base_branch,
+            "--head",
+            request.head_branch,
         ]
 
         if request.draft:

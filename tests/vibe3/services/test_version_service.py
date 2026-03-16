@@ -1,4 +1,5 @@
 """Tests for Version service."""
+
 import tempfile
 from pathlib import Path
 
@@ -28,7 +29,9 @@ def version_service_with_file() -> VersionService:
     version_file.unlink()
 
 
-def test_get_current_version_from_file(version_service_with_file: VersionService) -> None:
+def test_get_current_version_from_file(
+    version_service_with_file: VersionService,
+) -> None:
     """Test reading version from VERSION file."""
     version = version_service_with_file.get_current_version()
     assert version == "1.2.3"
@@ -41,7 +44,9 @@ def test_get_current_version_file_not_found() -> None:
         service.get_current_version()
 
 
-def test_calculate_bump_reads_from_file(version_service_with_file: VersionService) -> None:
+def test_calculate_bump_reads_from_file(
+    version_service_with_file: VersionService,
+) -> None:
     """Test calculate_bump reads from VERSION file when current_version is None."""
     response = version_service_with_file.calculate_bump(group="feature")
 
