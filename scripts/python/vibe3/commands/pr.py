@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """PR command handlers."""
+
 from typing import Optional
 
 import typer

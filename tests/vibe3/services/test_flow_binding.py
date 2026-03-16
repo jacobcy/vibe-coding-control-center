@@ -1,4 +1,5 @@
 """Tests for Flow binding functionality."""
+
 from vibe3.services.flow_service import FlowService
 from vibe3.models.flow import FlowState
 
@@ -24,11 +25,7 @@ class TestFlowBinding:
             task_issue_number=123,
             latest_actor="test-actor",
         )
-        mock_store.add_issue_link.assert_called_once_with(
-            "test-branch",
-            123,
-            "task"
-        )
+        mock_store.add_issue_link.assert_called_once_with("test-branch", 123, "task")
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "task_bound",
