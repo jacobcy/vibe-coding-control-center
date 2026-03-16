@@ -36,6 +36,24 @@ _vibe_task_branch_active_task_ids_json() {
     printf '%s' "$tasks_json" | jq -c '[.[].task_id]'
 }
 
+# Get all tasks (including completed/archived) for a branch - used by flow done
+_vibe_task_branch_all_tasks_json() {
+    local branch="${1#origin/}" registry_file="${2:-}"
+    [[ -n "$registry_file" ]] || registry_file="$(_vibe_task_common_dir 2>/dev/null)/vibe/registry.json"
+    [[ -f "$registry_file" ]] || { echo '[]'; return 0; }
+    jq -c --arg branch "$branch" '
+      [.tasks[]?
+        | select((.runtime_branch // "") == $branch or (.runtime_branch // "") == ("origin/" + $branch))
+      ]
+    ' "$registry_file" 2>/dev/null
+}
+
+_vibe_task_branch_all_task_ids_json() {
+    local branch="${1#origin/}" registry_file="${2:-}" tasks_json
+    tasks_json="$(_vibe_task_branch_all_tasks_json "$branch" "$registry_file")" || return 1
+    printf '%s' "$tasks_json" | jq -c '[.[].task_id]'
+}
+
 _vibe_task_count_by_branch() {
     local branch="$1" common_dir worktrees_file registry_file count
     common_dir="$(_vibe_task_common_dir)" || { echo "0"; return 0; }
