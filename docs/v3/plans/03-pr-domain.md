@@ -20,9 +20,14 @@ related_docs:
 If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3-rewrite-plan.md).
 
 ## 2. Pre-requisites (Executor Entry)
-- [ ] `Vibe3Store` can successfully write/read from SQLite.
+- [ ] `Vibe3Store` can successfully write/read handoff records from SQLite.
 - [ ] Environment variables for GitHub API (or `gh` CLI auth) are verified.
 - [ ] Phase 02 Flow/Task domain commands are functional.
+
+**重要澄清**：
+- SQLite 存储 handoff 记录（执行过程、规范、署名、追责）
+- PR 数据通过 `gh` CLI 实时读取，不做本地缓存
+- Task 状态通过 `gh project item` 实时读取，不做本地镜像
 
 ## 3. Architecture Constraints (引用)
 
