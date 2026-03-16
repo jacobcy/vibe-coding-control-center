@@ -9,7 +9,7 @@ last_updated: 2026-03-11
 related_docs:
   - AGENTS.md
   - CLAUDE.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - skills/vibe-save/SKILL.md
   - skills/vibe-continue/SKILL.md
   - skills/vibe-commit/SKILL.md

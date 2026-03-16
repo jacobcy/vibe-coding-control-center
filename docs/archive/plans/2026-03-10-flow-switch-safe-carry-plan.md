@@ -5,8 +5,8 @@ status: "draft"
 author: "GPT-5.4"
 related_docs:
   - docs/plans/2026-03-10-flow-switch-safe-carry-design.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - docs/standards/v2/command-standard.md
   - lib/flow.sh
   - lib/flow_runtime.sh
@@ -176,8 +176,8 @@ Expected:
 ### Task 6: 同步文档与标准
 
 **Files:**
-- Modify: `docs/standards/git-workflow-standard.md`
-- Modify: `docs/standards/worktree-lifecycle-standard.md`
+- Modify: `docs/standards/v2/git-workflow-standard.md`
+- Modify: `docs/standards/v2/worktree-lifecycle-standard.md`
 - Modify: `docs/plans/2026-03-10-flow-switch-safe-carry-design.md`
 
 **Step 1: 同步 `switch` 默认安全 carry 的描述**

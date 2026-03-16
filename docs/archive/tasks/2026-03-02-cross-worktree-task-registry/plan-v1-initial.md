@@ -7,7 +7,7 @@ created: "2026-03-02"
 last_updated: "2026-03-10"
 related_docs:
   - docs/tasks/2026-03-02-cross-worktree-task-registry/README.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - docs/tasks/2026-03-01-session-lifecycle/plan-v1-checkpoint.md
 ---
 

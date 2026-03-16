@@ -6,7 +6,7 @@ author: "GPT-5.4"
 related_docs:
   - docs/plans/2026-03-10-remove-local-vibe-cache-design.md
   - docs/standards/v2/shell-capability-design.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - docs/standards/glossary.md
   - lib/task_write.sh
   - lib/task_query.sh

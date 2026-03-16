@@ -6,8 +6,8 @@ author: Codex GPT-5
 created: 2026-03-09
 last_updated: 2026-03-09
 related_docs:
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - docs/standards/v2/command-standard.md
   - docs/standards/v2/shell-capability-design.md
   - lib/flow.sh

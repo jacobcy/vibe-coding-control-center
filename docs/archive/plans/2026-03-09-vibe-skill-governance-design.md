@@ -7,8 +7,8 @@ related_docs:
   - docs/standards/v2/skill-standard.md
   - docs/standards/v2/command-standard.md
   - docs/standards/v2/shell-capability-design.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
   - skills/vibe-task/SKILL.md
@@ -41,7 +41,7 @@ related_docs:
 
 - `docs/standards/v2/command-standard.md` 已明确 `vibe roadmap`、`vibe task`、`vibe flow`、`vibe check` 的命令语义与层级分工。
 - `docs/standards/v2/shell-capability-design.md` 已明确 shell 只提供原子能力，skill 不得直接写共享真源。
-- `docs/standards/git-workflow-standard.md` 与 `docs/standards/worktree-lifecycle-standard.md` 已分别定义交付 flow 和物理 worktree 生命周期，不应由 skill 重写。
+- `docs/standards/v2/git-workflow-standard.md` 与 `docs/standards/v2/worktree-lifecycle-standard.md` 已分别定义交付 flow 和物理 worktree 生命周期，不应由 skill 重写。
 
 ### 当前 skill 体系的明显问题
 
@@ -142,8 +142,8 @@ related_docs:
 
 若 skill 涉及 flow / branch / worktree / PR，还应检查：
 
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/worktree-lifecycle-standard.md`
 
 ### 4. 生命周期与 flow 对齐
 

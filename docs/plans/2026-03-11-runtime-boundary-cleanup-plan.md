@@ -7,8 +7,8 @@ created: 2026-03-11
 last_updated: 2026-03-11
 related_docs:
   - docs/standards/v2/data-model-standard.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - .agent/context/task.md
 ---
 
@@ -71,7 +71,7 @@ related_docs:
 
 **Files**
 - Modify: `docs/standards/v2/data-model-standard.md`
-- Modify: `docs/standards/worktree-lifecycle-standard.md`
+- Modify: `docs/standards/v2/worktree-lifecycle-standard.md`
 
 **Steps**
 1. 识别文档中仍把 `worktree` 写成 runtime 主语的段落

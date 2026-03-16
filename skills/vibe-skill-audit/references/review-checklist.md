@@ -25,8 +25,8 @@ Any "yes" is `Blocking`.
 
 ### Required when the skill discusses current delivery flow semantics
 
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/worktree-lifecycle-standard.md`
 
 ## 3. Command Reality Checks
 

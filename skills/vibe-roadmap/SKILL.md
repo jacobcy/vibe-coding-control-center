@@ -35,7 +35,7 @@ intake gate 约束：
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
 - Skill 与 Shell 边界以 `docs/standards/v2/skill-standard.md`、`docs/standards/v2/command-standard.md`、`docs/standards/v2/shell-capability-design.md` 为准。
 - 触发时机与相邻 skill 分流以 `docs/standards/v2/skill-trigger-standard.md` 为准。
-- roadmap / flow / worktree 语义以 `docs/standards/git-workflow-standard.md`、`docs/standards/worktree-lifecycle-standard.md` 为准。
+- roadmap / flow / worktree 语义以 `docs/standards/v2/git-workflow-standard.md`、`docs/standards/v2/worktree-lifecycle-standard.md` 为准。
 
 **Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
 

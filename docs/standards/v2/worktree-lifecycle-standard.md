@@ -15,7 +15,7 @@ related_docs:
   - CLAUDE.md
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
-  - docs/standards/git-workflow-standard.md
+  - docs/standards/v2/git-workflow-standard.md
   - docs/standards/v2/command-standard.md
 ---
 
@@ -23,7 +23,7 @@ related_docs:
 
 本文档定义 `worktree` 的物理生命周期规则，只回答目录现场如何创建、复用、清理与回收，以及 flow 关闭后目录与历史如何分离。
 
-`flow`、`workflow`、`worktree`、`branch` 的正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。交付流程语义见 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/git-workflow-standard.md)。
+`flow`、`workflow`、`worktree`、`branch` 的正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。交付流程语义见 [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/git-workflow-standard.md)。
 
 ## 1. Scope
 

@@ -13,8 +13,8 @@ related_docs:
   - docs/standards/v2/skill-standard.md
   - docs/standards/v2/command-standard.md
   - docs/standards/v2/shell-capability-design.md
-  - docs/standards/git-workflow-standard.md
-  - docs/standards/worktree-lifecycle-standard.md
+  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v2/worktree-lifecycle-standard.md
   - skills/vibe-continue/SKILL.md
   - skills/vibe-save/SKILL.md
   - .agent/workflows/vibe-start.md

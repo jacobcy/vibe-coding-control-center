@@ -15,8 +15,8 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 先读这些真源：
 
-- `docs/standards/git-workflow-standard.md`
-- `docs/standards/worktree-lifecycle-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v2/worktree-lifecycle-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `.agent/context/task.md`

@@ -24,7 +24,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - `docs/standards/v2/skill-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/shell-capability-design.md`
-- `docs/standards/git-workflow-standard.md`
+- `docs/standards/v2/git-workflow-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
 - `docs/standards/glossary.md`
 

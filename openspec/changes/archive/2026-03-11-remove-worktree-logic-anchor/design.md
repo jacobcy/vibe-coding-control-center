@@ -1,6 +1,6 @@
 ## Context
 
-Historically, the vibe flow system used `worktree/path` and `worktrees.json` as a semantic anchor to determine the current flow and binding state. However, the standard `docs/standards/git-workflow-standard.md` explicitly states that flows bind only to branches, not worktrees. Relying on physical directories for logical state leads to bugs and data inconsistencies (e.g., when a worktree is moved or removed, the flow state breaks).
+Historically, the vibe flow system used `worktree/path` and `worktrees.json` as a semantic anchor to determine the current flow and binding state. However, the standard `docs/standards/v2/git-workflow-standard.md` explicitly states that flows bind only to branches, not worktrees. Relying on physical directories for logical state leads to bugs and data inconsistencies (e.g., when a worktree is moved or removed, the flow state breaks).
 
 ## Goals / Non-Goals
 

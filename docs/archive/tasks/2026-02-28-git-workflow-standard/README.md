@@ -36,7 +36,7 @@ title: Git Workflow & Worktree Lifecycle Standard
 
 ## 2. Execution Plan (执行计划)
 
-- [x] **Step 1:** 创建标准文档 `docs/standards/git-workflow-standard.md`，将上述 4 个模块详细记录，确保附带 frontmatter。
+- [x] **Step 1:** 创建标准文档 `docs/standards/v2/git-workflow-standard.md`，将上述 4 个模块详细记录，确保附带 frontmatter。
 - [x] **Step 2:** 更新 `docs/prds/vibe-workflow-paradigm.md`，在 Test/Code/Audit Gate 流程说明中，注入以上 Commit 与 Push 的硬规则（如 Code Gate 后需要 Commit，未过 Audit 禁止 Push）。
 - [x] **Step 3:** 更新 `.agent/context/task.md` 记录当前任务的执行和变更，作为 Backlog 清理。
 - [x] **Step 4:** 若有必要，向 `CLAUDE.md` 补充一条关于“严控 Push 并在本地 Worktree 高频 Commit”的一句话指引，以及指路 `git-workflow-standard.md`。
