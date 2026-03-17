@@ -22,19 +22,23 @@ class GitHubClient:
                 text=True,
             )
             return result.returncode == 0
-        except Exception as e:
-            logger.error("Failed to check auth", error=str(e))
+        except Exception:
+            logger.bind(
+                external="github",
+                operation="check_auth",
+            ).error("Failed to check auth")
             return False
 
     def create_pr(self, request: CreatePRRequest) -> PRResponse:
         """Create a pull request."""
-        logger.info(
-            "Creating PR",
+        logger.bind(
+            external="github",
+            operation="create_pr",
             title=request.title,
             head=request.head_branch,
             base=request.base_branch,
             draft=request.draft,
-        )
+        ).debug("Calling GitHub API: create_pull_request")
 
         cmd = [
             "gh",
@@ -74,7 +78,12 @@ class GitHubClient:
         self, pr_number: int | None = None, branch: str | None = None
     ) -> PRResponse | None:
         """Get PR by number or branch."""
-        logger.debug("Getting PR", pr_number=pr_number, branch=branch)
+        logger.bind(
+            external="github",
+            operation="get_pr",
+            pr_number=pr_number,
+            branch=branch,
+        ).debug("Calling GitHub API: get_pull_request")
 
         target = str(pr_number) if pr_number else branch
         if not target:
@@ -102,7 +111,7 @@ class GitHubClient:
         )
 
         if result.returncode != 0:
-            logger.warning("PR not found", target=target)
+            logger.bind(external="github", target=target).warning("PR not found")
             return None
 
         data = json.loads(result.stdout)
@@ -123,7 +132,11 @@ class GitHubClient:
 
     def update_pr(self, request: UpdatePRRequest) -> PRResponse:
         """Update a pull request."""
-        logger.info("Updating PR", number=request.number)
+        logger.bind(
+            external="github",
+            operation="update_pr",
+            number=request.number,
+        ).debug("Calling GitHub API: update_pull_request")
 
         cmd = ["gh", "pr", "edit", str(request.number)]
 
@@ -160,7 +173,11 @@ class GitHubClient:
 
     def mark_ready(self, pr_number: int) -> PRResponse:
         """Mark PR as ready for review."""
-        logger.info("Marking PR as ready", pr_number=pr_number)
+        logger.bind(
+            external="github",
+            operation="mark_ready",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: mark_ready_for_review")
 
         subprocess.run(
             ["gh", "pr", "ready", str(pr_number)],
@@ -176,7 +193,11 @@ class GitHubClient:
 
     def merge_pr(self, pr_number: int) -> PRResponse:
         """Merge a pull request."""
-        logger.info("Merging PR", pr_number=pr_number)
+        logger.bind(
+            external="github",
+            operation="merge_pr",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: merge_pull_request")
 
         subprocess.run(
             ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"],
@@ -197,7 +218,11 @@ class GitHubClient:
 
     def add_pr_comment(self, pr_number: int, body: str) -> None:
         """Add comment to PR."""
-        logger.info("Adding comment to PR", pr_number=pr_number)
+        logger.bind(
+            external="github",
+            operation="add_comment",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: add_pr_comment")
         subprocess.run(
             ["gh", "pr", "comment", str(pr_number), "--body", body],
             check=True,
@@ -205,7 +230,11 @@ class GitHubClient:
 
     def get_pr_diff(self, pr_number: int) -> str:
         """Get PR diff."""
-        logger.info("Getting PR diff", pr_number=pr_number)
+        logger.bind(
+            external="github",
+            operation="get_diff",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: get_pr_diff")
         result = subprocess.run(
             ["gh", "pr", "diff", str(pr_number)],
             capture_output=True,
@@ -216,7 +245,12 @@ class GitHubClient:
 
     def list_issues(self, limit: int = 30, state: str = "open") -> list[dict[str, Any]]:
         """List GitHub issues."""
-        logger.debug("Listing issues", limit=limit, state=state)
+        logger.bind(
+            external="github",
+            operation="list_issues",
+            limit=limit,
+            state=state,
+        ).debug("Calling GitHub API: list_issues")
         cmd = [
             "gh",
             "issue",
@@ -230,13 +264,19 @@ class GitHubClient:
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            logger.error("Failed to list issues", error=result.stderr)
+            logger.bind(external="github", error=result.stderr).error(
+                "Failed to list issues"
+            )
             return []
         return json.loads(result.stdout)  # type: ignore
 
     def view_issue(self, issue_number: int) -> dict[str, Any] | None:
         """View a GitHub issue."""
-        logger.debug("Viewing issue", issue_number=issue_number)
+        logger.bind(
+            external="github",
+            operation="view_issue",
+            issue_number=issue_number,
+        ).debug("Calling GitHub API: view_issue")
         cmd = [
             "gh",
             "issue",
@@ -247,6 +287,8 @@ class GitHubClient:
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            logger.error("Failed to view issue", error=result.stderr)
+            logger.bind(external="github", error=result.stderr).error(
+                "Failed to view issue"
+            )
             return None
         return json.loads(result.stdout)  # type: ignore

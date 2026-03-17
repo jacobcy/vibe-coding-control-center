@@ -116,7 +116,7 @@ You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
 2. **Zero Dead Code**: Does every added shell function have a clear caller? If not, FLAG IT as a blocking issue.
 3. **Safety & Robustness**: Are Zsh/Bash parameters properly quoted? Are error cases handled gracefully?
 4. **Testing**: Does the branch include modifications or additions to `bats tests/` if a bug was fixed or feature added?
-5. **Linting Check**: Has the user passed `bash scripts/lint.sh`? Run it if unsure.
+5. **Linting Check**: Has the user passed `bash scripts/hooks/lint.sh`? Run it if unsure.
 
 ## 3.1 Document Governance Check
 

@@ -37,7 +37,12 @@ class ReviewService:
         Raises:
             RuntimeError: If PR not found or codex unavailable
         """
-        logger.info("Reviewing PR", pr_number=pr_number, publish=publish)
+        logger.bind(
+            domain="review",
+            action="review_pr",
+            pr_number=pr_number,
+            publish=publish,
+        ).info("Reviewing PR")
 
         # Get PR details
         pr = self.github_client.get_pr(pr_number)
@@ -58,7 +63,7 @@ class ReviewService:
         if publish:
             self.github_client.add_pr_comment(pr_number, review_body)
             published = True
-            logger.info("Review published to PR", pr_number=pr_number)
+            logger.bind(pr_number=pr_number).success("Review published to PR")
 
         return ReviewResponse(
             pr_number=pr_number,

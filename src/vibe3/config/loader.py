@@ -22,19 +22,25 @@ def find_config_file() -> Path | None:
     # Check current directory for .vibe/config.yaml
     project_config = Path(".vibe/config.yaml")
     if project_config.exists():
-        logger.debug("Found project config", path=str(project_config))
+        logger.bind(domain="config", action="find", path=str(project_config)).debug(
+            "Found project config"
+        )
         return project_config
 
     # Check for config/settings.yaml
     default_config = Path("config/settings.yaml")
     if default_config.exists():
-        logger.debug("Found default config", path=str(default_config))
+        logger.bind(domain="config", action="find", path=str(default_config)).debug(
+            "Found default config"
+        )
         return default_config
 
     # Check global config
     global_config = Path.home() / ".vibe" / "config.yaml"
     if global_config.exists():
-        logger.debug("Found global config", path=str(global_config))
+        logger.bind(domain="config", action="find", path=str(global_config)).debug(
+            "Found global config"
+        )
         return global_config
 
     logger.warning("No config file found, using defaults")
@@ -51,7 +57,9 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
     Returns:
         VibeConfig instance with loaded or default values
     """
-    logger.debug("Loading configuration", config_path=str(config_path))
+    logger.bind(domain="config", action="load", config_path=str(config_path)).debug(
+        "Loading configuration"
+    )
 
     # Find config file if not provided
     if config_path is None:

@@ -5,19 +5,16 @@ import json
 from typing import Annotated, Literal, Optional
 
 import typer
+from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
-    render_error,
     render_flow_bound,
     render_flow_created,
     render_flow_status,
     render_flow_status_table,
     render_flows_table,
-    render_no_active_flow,
-    render_no_flow,
-    render_no_flows,
 )
 
 app = typer.Typer(help="Manage logic flows (branch-centric)")
@@ -30,15 +27,15 @@ def new(
     actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "claude",
 ) -> None:
     """Create a new flow."""
+    logger.bind(command="flow new", name=name, task=task, actor=actor).info(
+        "Creating new flow"
+    )
+
     git = GitClient()
     service = FlowService()
     branch = git.get_current_branch()
-    try:
-        flow = service.create_flow(slug=name, branch=branch, task_id=task, actor=actor)
-        render_flow_created(flow, task)
-    except Exception as e:
-        render_error(f"Failed to create flow: {e}")
-        raise typer.Exit(1)
+    flow = service.create_flow(slug=name, branch=branch, task_id=task, actor=actor)
+    render_flow_created(flow, task)
 
 
 @app.command()
@@ -47,15 +44,15 @@ def bind(
     actor: Annotated[str, typer.Option(help="Actor binding the task")] = "claude",
 ) -> None:
     """Bind a task to current flow."""
+    logger.bind(command="flow bind", task_id=task_id, actor=actor).info(
+        "Binding task to flow"
+    )
+
     git = GitClient()
     service = FlowService()
     branch = git.get_current_branch()
-    try:
-        flow = service.bind_flow(branch=branch, task_id=task_id, actor=actor)
-        render_flow_bound(flow, task_id)
-    except Exception as e:
-        render_error(f"Failed to bind task: {e}")
-        raise typer.Exit(1)
+    flow = service.bind_flow(branch=branch, task_id=task_id, actor=actor)
+    render_flow_bound(flow, task_id)
 
 
 @app.command()
@@ -63,12 +60,14 @@ def show(
     flow_name: Annotated[Optional[str], typer.Argument(help="Flow to show")] = None,
 ) -> None:
     """Show flow details."""
+    logger.bind(command="flow show", flow_name=flow_name).info("Showing flow details")
+
     git = GitClient()
     service = FlowService()
     branch = flow_name if flow_name else git.get_current_branch()
     status = service.get_flow_status(branch)
     if not status:
-        render_no_flow(branch)
+        logger.error(f"Flow not found: {branch}")
         raise typer.Exit(1)
     render_flow_status(status)
 
@@ -78,6 +77,10 @@ def status(
     json_output: Annotated[bool, typer.Option("--json", help="JSON output")] = False,
 ) -> None:
     """Show flow status."""
+    logger.bind(command="flow status", json_output=json_output).info(
+        "Getting flow status"
+    )
+
     git = GitClient()
     service = FlowService()
     branch = git.get_current_branch()
@@ -87,7 +90,7 @@ def status(
         typer.echo(json.dumps(output, indent=2, default=str))
     else:
         if not flow_status:
-            render_no_active_flow()
+            logger.info("No active flow on current branch")
             raise typer.Exit(0)
         render_flow_status_table(flow_status)
 
@@ -100,9 +103,11 @@ def list(
     ] = None,
 ) -> None:
     """List all flows."""
+    logger.bind(command="flow list", status_filter=status_filter).info("Listing flows")
+
     service = FlowService()
     flows = service.list_flows(status=status_filter)
     if not flows:
-        render_no_flows()
+        logger.info("No flows found")
         raise typer.Exit(0)
     render_flows_table(flows)

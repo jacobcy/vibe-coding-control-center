@@ -27,7 +27,11 @@ class SQLiteClient:
 
         self.db_path = db_path
         self._init_db()
-        logger.info("SQLite client initialized", db_path=db_path)
+        logger.bind(
+            external="sqlite",
+            operation="init",
+            db_path=db_path,
+        ).debug("SQLite client initialized")
 
     def _init_db(self) -> None:
         """Initialize database schema."""
@@ -117,7 +121,9 @@ class SQLiteClient:
                 "VALUES ('store_type', 'handoff_store')"
             )
             conn.commit()
-            logger.debug("Database schema initialized")
+            logger.bind(external="sqlite", operation="init_schema").debug(
+                "Database schema initialized"
+            )
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
         """Get flow state by branch.
@@ -134,9 +140,13 @@ class SQLiteClient:
             cursor.execute("SELECT * FROM flow_state WHERE branch = ?", (branch,))
             row = cursor.fetchone()
             if row:
-                logger.debug("Retrieved flow state", branch=branch)
+                logger.bind(
+                    external="sqlite", operation="get_flow_state", branch=branch
+                ).debug("Retrieved flow state")
                 return dict(row)
-            logger.debug("No flow state found", branch=branch)
+            logger.bind(
+                external="sqlite", operation="get_flow_state", branch=branch
+            ).debug("No flow state found")
             return None
 
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
@@ -166,7 +176,12 @@ class SQLiteClient:
             query = f"UPDATE flow_state SET {set_clause} WHERE branch = ?"
             cursor.execute(query, values + [branch])
             conn.commit()
-            logger.debug("Updated flow state", branch=branch, fields=fields)
+            logger.bind(
+                external="sqlite",
+                operation="update_flow_state",
+                branch=branch,
+                fields=fields,
+            ).debug("Updated flow state")
 
     def add_event(
         self, branch: str, event_type: str, actor: str, detail: str | None = None
@@ -190,7 +205,12 @@ class SQLiteClient:
                 (branch, event_type, actor, detail, now),
             )
             conn.commit()
-            logger.debug("Added event", branch=branch, event_type=event_type)
+            logger.bind(
+                external="sqlite",
+                operation="add_event",
+                branch=branch,
+                event_type=event_type,
+            ).debug("Added event")
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         """Add issue link to flow.
@@ -212,9 +232,13 @@ class SQLiteClient:
                 (branch, issue_number, role, now),
             )
             conn.commit()
-            logger.debug(
-                "Added issue link", branch=branch, issue=issue_number, role=role
-            )
+            logger.bind(
+                external="sqlite",
+                operation="add_issue_link",
+                branch=branch,
+                issue=issue_number,
+                role=role,
+            ).debug("Added issue link")
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
         """Get issue links for branch.
@@ -230,7 +254,12 @@ class SQLiteClient:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM flow_issue_links WHERE branch = ?", (branch,))
             links = [dict(row) for row in cursor.fetchall()]
-            logger.debug("Retrieved issue links", branch=branch, count=len(links))
+            logger.bind(
+                external="sqlite",
+                operation="get_issue_links",
+                branch=branch,
+                count=len(links),
+            ).debug("Retrieved issue links")
             return links
 
     def get_active_flows(self) -> list[dict[str, Any]]:
@@ -244,7 +273,9 @@ class SQLiteClient:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM flow_state WHERE flow_status = 'active'")
             flows = [dict(row) for row in cursor.fetchall()]
-            logger.debug("Retrieved active flows", count=len(flows))
+            logger.bind(
+                external="sqlite", operation="get_active_flows", count=len(flows)
+            ).debug("Retrieved active flows")
             return flows
 
     def get_all_flows(self) -> list[dict[str, Any]]:
@@ -258,5 +289,7 @@ class SQLiteClient:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM flow_state")
             flows = [dict(row) for row in cursor.fetchall()]
-            logger.debug("Retrieved all flows", count=len(flows))
+            logger.bind(
+                external="sqlite", operation="get_all_flows", count=len(flows)
+            ).debug("Retrieved all flows")
             return flows

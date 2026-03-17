@@ -66,13 +66,14 @@ class PRService:
         Raises:
             RuntimeError: If PR creation fails
         """
-        logger.info(
-            "Creating draft PR",
+        logger.bind(
+            domain="pr",
+            action="create_draft",
             title=title,
-            base=base_branch,
+            base_branch=base_branch,
             metadata=metadata,
             actor=actor,
-        )
+        ).info("Creating draft PR")
 
         # Check auth
         if not self.github_client.check_auth():
@@ -98,18 +99,13 @@ class PRService:
 
         # Update flow state and add event
         self.store.update_flow_state(
-            head_branch,
-            pr_number=pr.number,
-            latest_actor=actor,
+            head_branch, pr_number=pr.number, latest_actor=actor
         )
         self.store.add_event(
-            head_branch,
-            "pr_created",
-            actor,
-            f"Draft PR #{pr.number} created: {pr.url}",
+            head_branch, "pr_created", actor, f"Draft PR #{pr.number} created: {pr.url}"
         )
 
-        logger.info("Draft PR created", pr_number=pr.number, url=pr.url)
+        logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
         return pr
 
     def get_pr(
@@ -124,7 +120,9 @@ class PRService:
         Returns:
             PR response or None if not found
         """
-        logger.debug("Getting PR", pr_number=pr_number, branch=branch)
+        logger.bind(
+            domain="pr", action="get", pr_number=pr_number, branch=branch
+        ).debug("Getting PR")
 
         if branch is None and pr_number is None:
             branch = self.git_client.get_current_branch()
@@ -144,7 +142,9 @@ class PRService:
         Raises:
             RuntimeError: If operation fails
         """
-        logger.info("Marking PR as ready", pr_number=pr_number, actor=actor)
+        logger.bind(
+            domain="pr", action="mark_ready", pr_number=pr_number, actor=actor
+        ).info("Marking PR as ready")
 
         # Check auth
         if not self.github_client.check_auth():
@@ -158,7 +158,7 @@ class PRService:
             raise RuntimeError(f"PR #{pr_number} not found")
 
         if not pr.draft:
-            logger.warning("PR is not a draft", pr_number=pr_number)
+            logger.bind(pr_number=pr_number).warning("PR is not a draft")
             return pr
 
         # Mark as ready
@@ -167,13 +167,10 @@ class PRService:
         # Add event
         branch = pr.head_branch
         self.store.add_event(
-            branch,
-            "pr_ready",
-            actor,
-            f"PR #{pr_number} marked as ready for review",
+            branch, "pr_ready", actor, f"PR #{pr_number} marked as ready for review"
         )
 
-        logger.info("PR marked as ready", pr_number=pr_number)
+        logger.bind(pr_number=pr_number).success("PR marked as ready")
         return updated_pr
 
     def merge_pr(self, pr_number: int, actor: str = "unknown") -> PRResponse:
@@ -189,7 +186,9 @@ class PRService:
         Raises:
             RuntimeError: If merge fails
         """
-        logger.info("Merging PR", pr_number=pr_number, actor=actor)
+        logger.bind(domain="pr", action="merge", pr_number=pr_number, actor=actor).info(
+            "Merging PR"
+        )
 
         # Check auth
         if not self.github_client.check_auth():
@@ -218,7 +217,7 @@ class PRService:
             f"PR #{pr_number} merged",
         )
 
-        logger.info("PR merged", pr_number=pr_number)
+        logger.bind(pr_number=pr_number).success("PR merged")
         return merged_pr
 
     def calculate_version_bump(
@@ -238,7 +237,12 @@ class PRService:
         Raises:
             RuntimeError: If PR not found
         """
-        logger.info("Calculating version bump", pr_number=pr_number, group=group)
+        logger.bind(
+            domain="pr",
+            action="calculate_version_bump",
+            pr_number=pr_number,
+            group=group,
+        ).info("Calculating version bump")
 
         # Get PR to verify it exists
         pr = self.github_client.get_pr(pr_number)

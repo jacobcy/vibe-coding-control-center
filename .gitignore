@@ -1,58 +1,122 @@
-# Secrets
-config/keys.env
-*.env
-!config/keys.template.env
-
-# Logs
-*.log
-docs/audits/
-
-# System
+# =============================================================================
+# OS & System
+# =============================================================================
 .DS_Store
-.aider*
+Thumbs.db
+Desktop.ini
 
-# Editor & OS artifacts
+# =============================================================================
+# Editor & IDE
+# =============================================================================
+.idea/
+.vscode/
+*.iml
 *.swp
 *.swo
 *~
 *.orig
 *.bak
-Thumbs.db
-Desktop.ini
 
-# Temporary Vibe Artifacts
+# =============================================================================
+# Secrets & Environment
+# =============================================================================
+*.env
+!config/keys.template.env
+config/keys.env
+.envrc
+
+# =============================================================================
+# Logs & Temporary Files
+# =============================================================================
+*.log
+temp/
 tmpvibe-*
 vibe-init-test*
 **/var/folders/**/*vibe-init-test*
-temp/
 
-# Worktrees
-wt-*/
-.worktrees/
-
-# Vibe artifacts
-# Local worktree cache only; shared task truth lives in git-common-dir/vibe/
-.vibe/
-.repomix/
-
-# Tool-specific directories (symlinks only, see DEVELOPER.md)
-.agent/skills/
-.github/prompts/
-.codex
-.trae/
-.claude/
-.agents/
-
-# AI Local Context (Scratchpad for current worktree only)
-.agent/context/task.md
-.agent/reports/
-.envrc
-
+# =============================================================================
 # Python
-.venv
+# =============================================================================
+# Virtual environments
 .venv/
+.tox/
+.nox/
+
+# Build & distribution
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
+.eggs/
+pip-wheel-metadata/
+
+# Compiled & extensions
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Test & coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type checkers & linters
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# Node / JavaScript
+# =============================================================================
+node_modules/
+.npm/
+.yarn/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+.next/
+.nuxt/
+.cache/
+*.tsbuildinfo
+
+# =============================================================================
+# Archives & Binaries
+# =============================================================================
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.dmg
+*.pkg
+*.deb
+*.rpm
+
+# =============================================================================
+# Project: Vibe / Agent
+# =============================================================================
+# Worktrees
+wt-*/
+.worktrees/
+
+# Local runtime artifacts (not shared)
+.vibe/
+.repomix/
+.agent/context/task.md
+.agent/reports/
+docs/audits/
+
+# Tool-specific directories (symlinks only, see DEVELOPER.md)
+.agent/skills/
+.agents/
+.github/prompts/
+.codex
+.trae/
+.claude/
+.aider*

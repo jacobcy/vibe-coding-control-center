@@ -51,7 +51,7 @@ related_docs:
 
 - [ ] **2.1 创建 `.pre-commit-config.yaml`**
   - 映射以下 CI 检查到 pre-commit hooks：
-    - Shell lint (shellcheck + scripts/lint.sh)
+    - Shell lint (shellcheck + scripts/hooks/lint.sh)
     - Python lint (ruff, black, mypy)
     - Bats tests (可选，仅对修改 tests/ 时触发)
     - LOC checks (可选，防止代码膨胀)

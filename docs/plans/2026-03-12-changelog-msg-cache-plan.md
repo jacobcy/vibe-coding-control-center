@@ -7,7 +7,7 @@ created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
   - lib/flow_pr.sh
-  - scripts/bump.sh
+  - scripts/hooks/bump.sh
   - lib/flow_help.sh
   - skills/vibe-commit/SKILL.md
   - docs/standards/v2/git-workflow-standard.md
@@ -46,7 +46,7 @@ related_issues: []
 
 - `lib/flow_pr.sh` 若未传 `--msg`，会从 commit message 推导 `version_msg`
 - 推导逻辑会自动拼出 `...`
-- `scripts/bump.sh` 再把该字符串直接写进 `CHANGELOG.md`
+- `scripts/hooks/bump.sh` 再把该字符串直接写进 `CHANGELOG.md`
 
 这导致两个问题：
 
@@ -84,7 +84,7 @@ related_issues: []
 ## Files To Modify
 
 - `lib/flow_pr.sh`
-- `scripts/bump.sh`
+- `scripts/hooks/bump.sh`
 - `lib/flow_help.sh`
 - `skills/vibe-commit/SKILL.md`
 - `tests/flow/test_flow_pr_review.bats`
@@ -118,7 +118,7 @@ bats tests/flow/test_flow_pr_review.bats
 
 **Files**
 - Modify: `lib/flow_pr.sh`
-- Modify: `scripts/bump.sh`
+- Modify: `scripts/hooks/bump.sh`
 
 **Steps**
 1. 在 `lib/flow_pr.sh` 中增加 branch -> cache file 的解析 helper，目录固定为 `.git/vibe/changelog-msg/`。
@@ -126,7 +126,7 @@ bats tests/flow/test_flow_pr_review.bats
 3. 调整 `vibe flow pr` 的 message 解析顺序：显式 `--msg` 优先，其次 branch 缓存，否则阻断。
 4. 当显式 `--msg` 通过校验时，写入 branch 缓存；缓存命中时直接复用。
 5. 移除当前自动拼接 `...` 的逻辑，确保 shell 不再生成占位 changelog。
-6. 让 `scripts/bump.sh` 只负责根据已提供的 message 写 CHANGELOG，不再默许默认占位文案参与正常发布。
+6. 让 `scripts/hooks/bump.sh` 只负责根据已提供的 message 写 CHANGELOG，不再默许默认占位文案参与正常发布。
 
 **Run command**
 

@@ -28,7 +28,7 @@ setup() {
   ')
 
   run env VIBE_ROOT="$BATS_TEST_TMPDIR/not-a-repo" bash -lc \
-    'cd "'"$REPO_ROOT"'" && bash scripts/metrics.sh'
+    'cd "'"$REPO_ROOT"'" && bash scripts/tools/metrics.sh'
 
   [ "$status" -eq 0 ]
 

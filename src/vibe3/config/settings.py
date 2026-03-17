@@ -5,12 +5,30 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
+class TestFileLimitsConfig(BaseModel):
+    """Per-layer test file line limits."""
+
+    services: int = Field(
+        default=180, description="Services layer max lines per test file"
+    )
+    clients: int = Field(
+        default=200, description="Clients layer max lines per test file"
+    )
+    commands: int = Field(
+        default=80, description="Commands layer max lines per test file"
+    )
+
+
 class CodeLimitsConfig(BaseModel):
     """Code size limits configuration."""
 
     total_loc: int = Field(description="Total lines of code limit")
     max_file_loc: int = Field(description="Maximum lines per file")
     min_tests: int = Field(description="Minimum number of tests")
+    test_file_loc: TestFileLimitsConfig = Field(
+        default_factory=TestFileLimitsConfig,
+        description="Per-layer test file line limits",
+    )
 
 
 class V2ShellLimits(BaseModel):

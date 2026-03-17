@@ -4,11 +4,11 @@
 from typing import Optional
 
 import typer
+from loguru import logger
 
 from vibe3.models.pr import PRMetadata
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import (
-    render_error,
     render_pr_created,
     render_pr_details,
     render_pr_merged,
@@ -18,12 +18,6 @@ from vibe3.ui.pr_ui import (
 )
 
 app = typer.Typer(help="Manage Pull Requests")
-
-
-def _handle_error(message: str, error: Exception) -> None:
-    """Handle error and exit."""
-    render_error(f"{message}: {error}")
-    raise typer.Exit(1)
 
 
 @app.command()
@@ -38,23 +32,22 @@ def draft(
     executor: Optional[str] = typer.Option(None, help="Executor agent"),
 ) -> None:
     """Create draft PR."""
-    try:
-        service = PRService()
-        metadata = None
-        if any([task, flow, spec, planner, executor]):
-            metadata = PRMetadata(
-                task_issue=task,
-                flow_slug=flow,
-                spec_ref=spec,
-                planner=planner,
-                executor=executor,
-            )
-        pr = service.create_draft_pr(
-            title=title, body=body, base_branch=base, metadata=metadata
+    logger.bind(command="pr draft", title=title, base=base).info("Creating draft PR")
+
+    service = PRService()
+    metadata = None
+    if any([task, flow, spec, planner, executor]):
+        metadata = PRMetadata(
+            task_issue=task,
+            flow_slug=flow,
+            spec_ref=spec,
+            planner=planner,
+            executor=executor,
         )
-        render_pr_created(pr)
-    except Exception as e:
-        _handle_error("Failed to create draft PR", e)
+    pr = service.create_draft_pr(
+        title=title, body=body, base_branch=base, metadata=metadata
+    )
+    render_pr_created(pr)
 
 
 @app.command()
@@ -63,39 +56,38 @@ def show(
     branch: Optional[str] = typer.Option(None, "-b", help="Branch name"),
 ) -> None:
     """Show PR details."""
-    try:
-        service = PRService()
-        pr = service.get_pr(pr_number, branch)
-        if not pr:
-            render_error("PR not found")
-            raise typer.Exit(1)
-        render_pr_details(pr)
-    except typer.Exit:
-        raise  # Let typer.Exit pass through
-    except Exception as e:
-        _handle_error("Failed to get PR", e)
+    logger.bind(command="pr show", pr_number=pr_number, branch=branch).info(
+        "Fetching PR details"
+    )
+
+    service = PRService()
+    pr = service.get_pr(pr_number, branch)
+    if not pr:
+        logger.error("PR not found")
+        raise typer.Exit(1)
+    render_pr_details(pr)
 
 
 @app.command()
 def ready(pr_number: int = typer.Argument(..., help="PR number")) -> None:
     """Mark PR as ready for review."""
-    try:
-        service = PRService()
-        pr = service.mark_ready(pr_number)
-        render_pr_ready(pr)
-    except Exception as e:
-        _handle_error("Failed to mark PR as ready", e)
+    logger.bind(command="pr ready", pr_number=pr_number).info(
+        "Marking PR as ready for review"
+    )
+
+    service = PRService()
+    pr = service.mark_ready(pr_number)
+    render_pr_ready(pr)
 
 
 @app.command()
 def merge(pr_number: int = typer.Argument(..., help="PR number")) -> None:
     """Merge PR."""
-    try:
-        service = PRService()
-        pr = service.merge_pr(pr_number)
-        render_pr_merged(pr)
-    except Exception as e:
-        _handle_error("Failed to merge PR", e)
+    logger.bind(command="pr merge", pr_number=pr_number).info("Merging PR")
+
+    service = PRService()
+    pr = service.merge_pr(pr_number)
+    render_pr_merged(pr)
 
 
 @app.command()
@@ -104,12 +96,13 @@ def version_bump(
     group: Optional[str] = typer.Option(None, "-g", help="Task group"),
 ) -> None:
     """Calculate version bump for PR."""
-    try:
-        service = PRService()
-        response = service.calculate_version_bump(pr_number, group)
-        render_version_bump(response)
-    except Exception as e:
-        _handle_error("Failed to calculate version bump", e)
+    logger.bind(command="pr version-bump", pr_number=pr_number, group=group).info(
+        "Calculating version bump"
+    )
+
+    service = PRService()
+    response = service.calculate_version_bump(pr_number, group)
+    render_version_bump(response)
 
 
 @app.command()
@@ -118,9 +111,10 @@ def review(
     publish: bool = typer.Option(True, help="Publish review as comment"),
 ) -> None:
     """Review PR using local LLM (codex)."""
-    try:
-        service = PRService()
-        response = service.review_pr(pr_number, publish)
-        render_pr_review(response)
-    except Exception as e:
-        _handle_error("Failed to review PR", e)
+    logger.bind(command="pr review", pr_number=pr_number, publish=publish).info(
+        "Reviewing PR"
+    )
+
+    service = PRService()
+    response = service.review_pr(pr_number, publish)
+    render_pr_review(response)

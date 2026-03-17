@@ -5,12 +5,14 @@ Thin wrapper that sets up Typer app and registers subcommands.
 """
 
 import sys
+from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.commands import flow, pr, task
 from vibe3.exceptions import SystemError, UserError
+from vibe3.observability import setup_logging
 
 app = typer.Typer(name="vibe3", help="Vibe 3.0 - Development orchestration tool")
 
@@ -18,6 +20,18 @@ app = typer.Typer(name="vibe3", help="Vibe 3.0 - Development orchestration tool"
 app.add_typer(flow.app, name="flow")
 app.add_typer(task.app, name="task")
 app.add_typer(pr.app, name="pr")
+
+
+@app.callback()
+def main_callback(
+    verbose: Annotated[int, typer.Option("-v", count=True)] = 0,
+) -> None:
+    """Vibe 3.0 - Development orchestration tool.
+
+    Args:
+        verbose: Verbosity level (-v for INFO, -vv for DEBUG)
+    """
+    setup_logging(verbose=verbose)
 
 
 @app.command()

@@ -133,7 +133,7 @@ def check_shell_metrics() -> dict:
 
 **目标**: 迁移现有逻辑到 v3 架构，支持统一改动分析
 
-**现有代码**: `scripts/review-tools/serena_gate.py` (147 行)
+**现有代码**: `scripts/tools/serena_gate.py` (147 行)
 
 **架构分层**:
 - `clients/serena_client.py` - 封装 Serena agent 操作
@@ -185,7 +185,7 @@ Phase 1 提供的能力层将通过统一接口被 Phase 2 的编排层调用。
 
 **目标**: Shell → Python，使用配置系统，消除硬编码
 
-**现有代码**: `scripts/review-tools/metrics.sh` (186 行)
+**现有代码**: `scripts/tools/metrics.sh` (186 行)
 
 **架构分层**:
 - `services/metrics_service.py` - 业务逻辑，从配置读取限制
@@ -214,7 +214,7 @@ Phase 1 提供的能力层将通过统一接口被 Phase 2 的编排层调用。
 
 **目标**: Shell → Python，添加日志
 
-**现有代码**: `scripts/review-tools/structure_summary.sh` (169 行)
+**现有代码**: `scripts/tools/structure_summary.sh` (169 行)
 
 **架构分层**:
 - `services/structure_service.py` - 分析文件结构

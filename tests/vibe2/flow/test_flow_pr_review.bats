@@ -356,12 +356,12 @@ JSON
   fixture="$(mktemp -d)"
   cd "$fixture"
   mkdir -p scripts
-  cat > scripts/bump.sh <<'EOF'
+  cat > scripts/hooks/bump.sh <<'EOF'
 #!/usr/bin/env bash
 echo "BUMP_SHOULD_NOT_RUN"
 exit 0
 EOF
-  chmod +x scripts/bump.sh
+  chmod +x scripts/hooks/bump.sh
   echo "2.1.4" > VERSION
   echo "# Changelog" > CHANGELOG.md
 
@@ -405,12 +405,12 @@ EOF
   fixture="$(mktemp -d)"
   cd "$fixture"
   mkdir -p scripts
-  cat > scripts/bump.sh <<'EOF'
+  cat > scripts/hooks/bump.sh <<'EOF'
 #!/usr/bin/env bash
 touch bump_called
 exit 0
 EOF
-  chmod +x scripts/bump.sh
+  chmod +x scripts/hooks/bump.sh
   echo "2.1.4" > VERSION
   echo "# Changelog" > CHANGELOG.md
 
@@ -497,14 +497,14 @@ EOF
   fixture="$(mktemp -d)"
   cd "$fixture"
   mkdir -p scripts
-  cat > scripts/bump.sh <<'EOF'
+  cat > scripts/hooks/bump.sh <<'EOF'
 #!/usr/bin/env bash
 echo "2.1.4" > VERSION
 echo "# Changelog" > CHANGELOG.md
 echo "- fresh release note" >> CHANGELOG.md
 exit 0
 EOF
-  chmod +x scripts/bump.sh
+  chmod +x scripts/hooks/bump.sh
   echo "2.1.3" > VERSION
   echo "# Changelog" > CHANGELOG.md
 
@@ -755,12 +755,12 @@ EOF
   fixture="$(mktemp -d)"
   cd "$fixture"
   mkdir -p scripts
-  cat > scripts/bump.sh <<'EOF'
+  cat > scripts/hooks/bump.sh <<'EOF'
 #!/usr/bin/env bash
 touch bump_called
 exit 0
 EOF
-  chmod +x scripts/bump.sh
+  chmod +x scripts/hooks/bump.sh
   echo "2.1.4" > VERSION
   echo "# Changelog" > CHANGELOG.md
   run zsh -c '

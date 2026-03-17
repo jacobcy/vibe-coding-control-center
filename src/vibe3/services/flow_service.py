@@ -61,13 +61,14 @@ class FlowService:
         Returns:
             Created flow state
         """
-        logger.info(
-            "Creating flow",
+        logger.bind(
+            domain="flow",
+            action="create",
             slug=slug,
             branch=branch,
             task_id=task_id,
             actor=actor,
-        )
+        ).info("Creating flow")
 
         # Parse task_id if provided
         task_issue_number = None
@@ -117,12 +118,13 @@ class FlowService:
         Returns:
             Updated flow state
         """
-        logger.info(
-            "Binding task to flow",
+        logger.bind(
+            domain="flow",
+            action="bind_task",
             branch=branch,
             task_id=task_id,
             actor=actor,
-        )
+        ).info("Binding task to flow")
 
         # Parse task_id
         task_issue_number = parse_task_id(task_id)
@@ -161,7 +163,11 @@ class FlowService:
         Returns:
             Flow status response or None if not found
         """
-        logger.debug("Getting flow status", branch=branch)
+        logger.bind(
+            domain="flow",
+            action="get_status",
+            branch=branch,
+        ).debug("Getting flow status")
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
@@ -194,7 +200,11 @@ class FlowService:
         Returns:
             List of flow states
         """
-        logger.debug("Listing flows", status=status)
+        logger.bind(
+            domain="flow",
+            action="list",
+            status=status,
+        ).debug("Listing flows")
 
         # Get all flows, not just active ones
         flows_data = self.store.get_all_flows()

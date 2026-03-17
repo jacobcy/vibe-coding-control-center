@@ -143,9 +143,9 @@ vibe review commit SHA        # 审核指定 commit
 
 | 原工具 | 原位置 | 迁移目标 | v3 位置 | 改造内容 |
 |--------|--------|----------|---------|----------|
-| `serena_gate.py` | `scripts/review-tools/` | Service | `services/serena_service.py` | +日志/类型/错误处理 |
-| `metrics.sh` | `scripts/review-tools/` | Service | `services/metrics_service.py` | Shell→Python |
-| `structure_summary.sh` | `scripts/review-tools/` | Service | `services/structure_service.py` | Shell→Python |
+| `serena_gate.py` | `scripts/tools/` | Service | `services/serena_service.py` | +日志/类型/错误处理 |
+| `metrics.sh` | `scripts/tools/` | Service | `services/metrics_service.py` | Shell→Python |
+| `structure_summary.sh` | `scripts/tools/` | Service | `services/structure_service.py` | Shell→Python |
 | - | - | Service | `services/dag_service.py` | 新增：DAG 分析 |
 | - | - | Service | `services/pr_scoring_service.py` | 新增：PR 风险评分 |
 

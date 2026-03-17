@@ -37,13 +37,14 @@ class TaskService:
         Returns:
             Created issue link
         """
-        logger.info(
-            "Linking issue to flow",
+        logger.bind(
+            domain="task",
+            action="link_issue",
             branch=branch,
             issue_number=issue_number,
             role=role,
             actor=actor,
-        )
+        ).info("Linking issue to flow")
 
         # Add issue link
         self.store.add_issue_link(branch, issue_number, role)
@@ -86,12 +87,13 @@ class TaskService:
         Returns:
             Updated flow state
         """
-        logger.info(
-            "Updating task status",
+        logger.bind(
+            domain="task",
+            action="update_status",
             branch=branch,
             status=status,
             actor=actor,
-        )
+        ).info("Updating task status")
 
         # Verify flow exists before updating
         flow_data = self.store.get_flow_state(branch)
@@ -129,7 +131,11 @@ class TaskService:
         Returns:
             Flow state or None if not found
         """
-        logger.debug("Getting task", branch=branch)
+        logger.bind(
+            domain="task",
+            action="get",
+            branch=branch,
+        ).debug("Getting task")
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
@@ -153,12 +159,13 @@ class TaskService:
         Returns:
             Updated flow state
         """
-        logger.info(
-            "Setting next step",
+        logger.bind(
+            domain="task",
+            action="set_next_step",
             branch=branch,
             next_step=next_step,
             actor=actor,
-        )
+        ).info("Setting next step")
 
         # Update flow state
         self.store.update_flow_state(

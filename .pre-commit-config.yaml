@@ -25,8 +25,8 @@ repos:
         pass_filenames: true
 
       - id: lint-sh
-        name: Custom Lint (scripts/lint.sh)
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && bash scripts/lint.sh' --
+        name: Custom Lint (scripts/hooks/lint.sh)
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && bash scripts/hooks/lint.sh' --
         language: system
         pass_filenames: false
 

@@ -104,7 +104,11 @@ class SerenaClient:
         """
         self.project_root = project_root
         self._agent = None
-        logger.debug("Serena client initialized", project_root=project_root)
+        logger.bind(
+            external="serena",
+            operation="init",
+            project_root=project_root,
+        ).debug("Serena client initialized")
 
     def _get_agent(self):  # type: ignore[no-untyped-def]
         """Get or create Serena agent.
@@ -120,9 +124,11 @@ class SerenaClient:
                 from serena.agent import SerenaAgent  # type: ignore[import-not-found]
 
                 self._agent = SerenaAgent(project=self.project_root)
-                logger.debug("Serena agent created")
+                logger.bind(external="serena").debug("Serena agent created")
             except Exception as e:
-                logger.exception("Failed to create Serena agent")
+                logger.bind(external="serena").exception(
+                    "Failed to create Serena agent"
+                )
                 raise SerenaError("create agent", str(e)) from e
         return self._agent
 
@@ -146,11 +152,12 @@ class SerenaClient:
             result = agent.execute_task(lambda: tool.apply(relative_path=relative_file))
             return json.loads(result)  # type: ignore[no-any-return]
         except Exception as e:
-            logger.error(
-                "Failed to get symbols overview",
+            logger.bind(
+                external="serena",
+                operation="get_symbols_overview",
                 file=relative_file,
                 error=str(e),
-            )
+            ).error("Failed to get symbols overview")
             raise SerenaError("get_symbols_overview", str(e)) from e
 
     def find_references(
@@ -176,10 +183,11 @@ class SerenaClient:
             )
             return json.loads(result)  # type: ignore[no-any-return]
         except Exception as e:
-            logger.error(
-                "Failed to find references",
+            logger.bind(
+                external="serena",
+                operation="find_references",
                 symbol=name_path,
                 file=relative_file,
                 error=str(e),
-            )
+            ).error("Failed to find references")
             raise SerenaError("find_referencing_symbols", str(e)) from e

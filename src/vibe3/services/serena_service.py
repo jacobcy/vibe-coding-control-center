@@ -22,7 +22,7 @@ class SerenaService:
             client: Serena client instance
         """
         self.client = client or SerenaClient()
-        logger.info("Serena service initialized")
+        logger.bind(domain="serena", action="init").debug("Serena service initialized")
 
     def analyze_file(self, relative_file: str) -> dict:
         """Analyze symbols in a file.
@@ -33,7 +33,11 @@ class SerenaService:
         Returns:
             File analysis dict with symbols and references
         """
-        logger.info("Analyzing file", file=relative_file)
+        logger.bind(
+            domain="serena",
+            action="analyze_file",
+            file=relative_file,
+        ).info("Analyzing file")
 
         try:
             overview = self.client.get_symbols_overview(relative_file)
@@ -59,11 +63,10 @@ class SerenaService:
                         }
                     )
 
-            logger.info(
-                "File analyzed",
+            logger.bind(
                 file=relative_file,
                 symbol_count=len(symbols),
-            )
+            ).success("File analyzed")
 
             return {
                 "file": relative_file,
@@ -72,7 +75,10 @@ class SerenaService:
             }
 
         except SerenaError as e:
-            logger.error("File analysis failed", file=relative_file, error=str(e))
+            logger.bind(
+                file=relative_file,
+                error=str(e),
+            ).error("File analysis failed")
             return {
                 "file": relative_file,
                 "status": "error",
@@ -89,7 +95,11 @@ class SerenaService:
         Returns:
             Analysis report dict
         """
-        logger.info("Analyzing files", file_count=len(files))
+        logger.bind(
+            domain="serena",
+            action="analyze_files",
+            file_count=len(files),
+        ).info("Analyzing files")
 
         report: dict[str, str | dict | list[dict]] = {
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -122,11 +132,10 @@ class SerenaService:
             "symbol_errors": symbol_errors,
         }
 
-        logger.info(
-            "Files analyzed",
+        logger.bind(
             total_files=len(files),
             file_errors=file_errors,
             symbol_errors=symbol_errors,
-        )
+        ).success("Files analyzed")
 
         return report
