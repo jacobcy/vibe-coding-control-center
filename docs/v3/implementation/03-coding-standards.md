@@ -149,35 +149,7 @@ from vibe3.models.pr import PRRequest
 
 ## 错误处理（强制）
 
-### 禁止裸 except
-
-```python
-# ❌ 错误：裸 except
-try:
-    result = risky_operation()
-except:
-    return None
-
-# ✅ 正确：捕获具体异常
-try:
-    result = risky_operation()
-except ValueError as e:
-    logger.error(f"Value error: {e}")
-    raise
-except NetworkError as e:
-    logger.error(f"Network error: {e}")
-    raise
-```
-
-### 异常链
-
-```python
-# ✅ 正确：使用异常链
-try:
-    result = subprocess.run(cmd)
-except subprocess.CalledProcessError as e:
-    raise GitError("create PR", str(e)) from e
-```
+详见 **[06-error-handling.md](06-error-handling.md)**
 
 ---
 
@@ -187,59 +159,9 @@ except subprocess.CalledProcessError as e:
 
 ---
 
-## 性能优化
-
-### 避免常见陷阱
-
-```python
-# ✅ 正确：使用 lazy formatting
-logger.debug("Processing item {}", item_id)
-
-# ❌ 错误：立即格式化
-logger.debug(f"Processing item {item_id}")
-
-# ✅ 正确：使用 join 连接字符串
-result = "".join(items)
-
-# ❌ 错误：循环拼接字符串
-result = ""
-for item in items:
-    result += item
-```
-
----
-
 ## 测试要求
 
-详细的测试标准见 **[04-test-standards.md](04-test-standards.md)**
-
-### 核心要求
-
-- **测试覆盖率**：>= 80% 代码覆盖率，核心路径 100% 覆盖
-- **测试隔离**：使用 Mock 隔离外部依赖（GitHub API、Git 操作等）
-- **测试分层**：按架构分层组织测试目录
-
-### 测试目录结构
-
-```
-tests/
-├── conftest.py                    # 共享 fixtures
-├── vibe3/
-│   ├── services/                  # Service 层测试
-│   │   ├── test_flow_service.py
-│   │   ├── test_task_service.py
-│   │   └── test_pr_service.py
-│   ├── clients/                   # Client 层测试
-│   │   ├── test_git_client.py
-│   │   └── test_github_client.py
-│   └── commands/                  # Command 层测试
-│       ├── test_flow.py
-│       ├── test_task.py
-│       └── test_pr.py
-└── fixtures/                      # 测试数据
-    ├── github_responses/
-    └── git_states/
-```
+详见 **[04-test-standards.md](04-test-standards.md)**
 
 ---
 

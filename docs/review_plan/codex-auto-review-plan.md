@@ -97,13 +97,18 @@ scripts/python/vibe3/
 提供代码分析信息，为 `vibe review` 提供上下文数据
 ```bash
 vibe inspect                  # 综合信息
-vibe inspect --metrics        # 代码量指标
-vibe inspect --structure      # 文件结构分析
-vibe inspect --symbols        # 符号定义（命令来源/函数定义）
+vibe inspect metrics          # 代码量指标
+vibe inspect structure        # 文件结构分析
+vibe inspect symbols [file]   # 代码符号分析
+  # 详见: phase2-integration.md Section 4.1
+vibe inspect commands [cmd]   # 命令结构查看（静态分析）
+  # 详见: references/symbol-vs-command-design.md
 vibe inspect pr 42            # PR 改动分析（输出 JSON）
 vibe inspect commit SHA       # Commit 改动分析（输出 JSON）
 vibe inspect base main        # 相对分支的改动分析（输出 JSON）
 ```
+
+**参数用法**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/implementation/07-command-standards.md)
 
 **架构对齐**:
 - ✅ 符合 Tier 1 (Shell 能力层) 定位：确定性操作、结构化输出
@@ -115,10 +120,13 @@ vibe inspect base main        # 相对分支的改动分析（输出 JSON）
 基于 `vibe inspect` 提供的上下文，进行代码审核（发现 bug、安全、性能问题）
 ```bash
 vibe review pr 42             # 审核 PR（调用 inspect pr 42 获取上下文）
+vibe review pr 42 --trace     # 审核 PR 并追踪执行过程（调试模式）
 vibe review --uncommitted     # 审核未提交改动
 vibe review base main         # 审核相对分支的改动
 vibe review commit SHA        # 审核指定 commit
 ```
+
+**参数用法**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/implementation/07-command-standards.md)
 
 ### 3.3 技术栈（已安装）
 
@@ -250,24 +258,26 @@ def analyze_symbols(files: list[str]) -> dict[str, Any]:
 
 ## 6. 质量标准
 
-所有实现必须遵循 v3 标准：
+所有实现必须遵循 v3 标准，详见 **[phase1-infrastructure.md 验收标准](phase1-infrastructure.md#验收标准)**。
 
-1. **编码标准**: [docs/v3/implementation/03-coding-standards.md](../v3/implementation/03-coding-standards.md)
-   - 函数 ≤ 50 行，文件 ≤ 300 行
-   - 强制类型注解
-   - 使用 loguru
-
-2. **测试标准**: [docs/v3/implementation/04-test-standards.md](../v3/implementation/04-test-standards.md)
-   - Services ≥ 80%
-   - 使用 pytest + mock
-
-3. **日志标准**: [docs/v3/implementation/05-logging.md](../v3/implementation/05-logging.md)
-   - `logger.bind()` 绑定上下文
-   - `logger.exception()` 记录异常
-
-4. **错误处理**: [docs/v3/implementation/06-error-handling.md](../v3/implementation/06-error-handling.md)
-   - 统一异常层级
+核心要求:
+- 编码标准: [docs/v3/implementation/03-coding-standards.md](../v3/implementation/03-coding-standards.md)
+- 测试标准: Services ≥ 80% 覆盖率
+- 日志标准: 使用 loguru + context binding
+- 错误处理: 统一异常层级
 
 ---
 
 更多执行细节请参考 **[Codex Review 实施阶段计划](codex-review-phases.md)**。
+
+---
+
+## 设计参考文档
+
+本实施计划涉及多个设计决策，详见 `references/` 目录：
+
+- **[改动分析架构](references/change-analysis-architecture.md)** - 统一改动源抽象（PR/Commit/Branch/Uncommitted）
+- **[Phase1/Phase2 衔接](references/phase1-phase2-integration.md)** - 能力层与编排层的关系
+- **[调用追踪 vs DAG](references/call-tracing-vs-dag.md)** - 两个容易混淆的概念澄清
+- **[命令调试设计](references/command-debug-design.md)** - 静态检查 vs 动态追踪
+- **[符号 vs 命令设计](references/symbol-vs-command-design.md)** - 命令语义规范和子命令设计

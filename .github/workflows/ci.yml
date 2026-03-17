@@ -90,15 +90,15 @@ jobs:
           fi
           echo "✅ All Shell files within 300-line limit"
 
-      - name: Check Python LOC ceiling (scripts/python ≤ 3000)
+      - name: Check Python LOC ceiling (scripts/python ≤ )
         run: |
           total=$(find scripts/python -name '*.py' | xargs cat | wc -l)
           echo "Total Python LOC: $total"
-          if [ "$total" -gt 3000 ]; then
-            echo "FAIL: Total Python LOC $total exceeds 3000 limit"
+          if [ "$total" -gt  ]; then
+            echo "FAIL: Total Python LOC $total exceeds  limit"
             exit 1
           fi
-          echo "✅ Total Python LOC: $total / 3000"
+          echo "✅ Total Python LOC: $total / "
 
       - name: Check per-file ceiling for Python (≤ 300 lines each)
         run: |

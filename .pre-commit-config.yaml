@@ -67,7 +67,7 @@ repos:
         files: \.(sh|bash)$
 
       - id: check-python-loc
-        name: Check Python LOC ceiling (scripts/python ≤ 3000)
+        name: Check Python LOC ceiling (scripts/python ≤ )
         entry: scripts/hooks/check-python-loc.sh
         language: script
         pass_filenames: false

@@ -96,6 +96,8 @@ GitHub API (评论 & merge gate)
 - **`vibe inspect`** - 信息提供（metrics、structure、symbols、改动分析）
 - **`vibe review`** - 代码审核（发现 bug、安全、性能问题）
 
+**参数标准**: 所有命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/implementation/07-command-standards.md)
+
 ---
 
 ## 参考资料对齐

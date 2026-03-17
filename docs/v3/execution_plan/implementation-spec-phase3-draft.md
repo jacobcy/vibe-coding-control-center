@@ -151,9 +151,9 @@ def merge(
 ```
 
 **状态收口**:
-- 更新 GitHub Project task 状态为 `completed`（通过 `gh project item edit`）
-- 记录 handoff 信息到 SQLite（merge 证据、agent 署名、追责记录）
-- 关闭 task issue (如果配置了自动关闭，通过 `gh issue close`)
+- 更新 SQLite task 状态为 `completed`
+- 关闭 task issue (如果配置了自动关闭)
+- 更新 handoff store
 
 ---
 

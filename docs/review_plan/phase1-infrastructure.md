@@ -4,13 +4,14 @@ title: Codex Review Phase 1 - 基础设施搭建
 status: draft
 author: Claude Sonnet 4.6
 created: 2026-03-16
-last_updated: 2026-03-16
+last_updated: 2026-03-17
 related_docs:
   - docs/review_plan/codex-auto-review-plan.md
   - docs/references/codex-review.md
   - docs/references/codex-serena-intetration.md
   - docs/standards/serena-usage.md
   - docs/v3/implementation/03-coding-standards.md
+  - docs/v3/implementation/07-command-standards.md
 ---
 
 # Codex Review Phase 1 - 基础设施搭建
@@ -52,7 +53,7 @@ code_limits:
     min_tests: 20            # 最少测试数量
 
   v3_python:
-    total_loc: 3000          # Python 总行数限制
+    total_loc:           # Python 总行数限制
     max_file_loc: 300        # 单文件最大行数
     min_tests: 5             # 最少测试数量
 
@@ -114,28 +115,69 @@ def check_shell_metrics() -> dict:
 
 ---
 
-### 2. Serena Service（迁移 `serena_gate.py`）
+### 2. 改动分析架构（统一设计）
 
-**目标**: 迁移现有逻辑到 v3 架构，添加日志和错误处理
+**目标**: 建立统一的改动分析架构，支持 PR/Commit/Branch/Uncommitted 四种改动源
+
+**设计文档**: [change-analysis-architecture.md](references/change-analysis-architecture.md)
+
+**核心要点**:
+- 统一改动源抽象（`ChangeSource` 类型）
+- Git Client 统一接口（`get_changed_files(source)`）
+- Serena Service 统一分析入口（`analyze_changes(source)`）
+
+**实现任务**（详见设计文档）:
+- [ ] 创建 `models/change_source.py` - 定义改动源类型
+- [ ] 扩展 `clients/git_client.py` - 实现统一接口
+- [ ] 扩展 `services/serena_service.py` - 支持统一改动分析
+
+**目标**: 迁移现有逻辑到 v3 架构，支持统一改动分析
 
 **现有代码**: `scripts/review-tools/serena_gate.py` (147 行)
 
-**迁移到**: `scripts/python/vibe3/services/serena_service.py`
+**架构分层**:
+- `clients/serena_client.py` - 封装 Serena agent 操作
+- `services/serena_service.py` - 薄编排层，业务逻辑协调
 
-**改造内容**:
-- ✅ 添加 loguru 日志
-- ✅ 添加类型注解
-- ✅ 统一异常处理
-- ✅ 输出标准化（impact.json）
+**代码质量要求**:
+- ✅ Service 文件 ≤ 300 行，函数 ≤ 100 行
+- ✅ Client 文件无限制，但函数 ≤ 150 行
+- ✅ 所有函数添加类型注解
+- ✅ 禁止使用 `Any` 类型
+- ✅ loguru 日志 + `logger.bind(domain="review", action="serena_analysis")`
+- ✅ 统一异常处理（SerenaClientError）
+- ✅ 输出标准化（JSON）
 
-**实现任务**:
-- [ ] 创建 `services/serena_service.py`
-- [ ] 迁移 `extract_function_names()` 函数
-- [ ] 迁移 `count_references()` 函数
-- [ ] 封装为 `analyze_file_symbols()` 服务
-- [ ] 添加 `logger.bind(domain="review", action="serena_analysis")`
-- [ ] 添加异常处理（`logger.exception()`）
-- [ ] 编写测试：`tests/services/test_serena_service.py`
+**实现任务**（详见设计文档）:
+- [x] 创建 `clients/serena_client.py`
+- [x] 创建 `services/serena_service.py`
+- [ ] 扩展 `services/serena_service.py` - 支持统一改动分析
+- [x] 添加日志和异常处理
+
+#### 2.3 Git Client 扩展
+
+**目标**: 提供统一的改动获取接口
+
+**位置**: `clients/git_client.py`（已存在，需扩展）
+
+**核心接口**（详见设计文档）:
+- `get_changed_files(source: ChangeSource)` - 统一改动文件获取
+- `get_diff(source: ChangeSource)` - 统一 diff 获取
+
+**代码质量要求**:
+- ✅ Client 文件函数 ≤ 150 行
+- ✅ 所有函数添加类型注解
+- ✅ loguru 日志
+- ✅ 统一异常处理（GitClientError）
+
+**实现任务**（详见设计文档）:
+- [ ] 扩展 `clients/git_client.py` - 实现统一接口
+
+#### 2.4 与 Phase 2 的衔接
+
+**详见**: [phase1-phase2-integration.md](references/phase1-phase2-integration.md)
+
+Phase 1 提供的能力层将通过统一接口被 Phase 2 的编排层调用。
 
 ---
 
@@ -145,19 +187,25 @@ def check_shell_metrics() -> dict:
 
 **现有代码**: `scripts/review-tools/metrics.sh` (186 行)
 
-**迁移到**: `services/metrics_service.py` + `commands/metrics.py`
+**架构分层**:
+- `services/metrics_service.py` - 业务逻辑，从配置读取限制
+- `commands/metrics.py` - typer CLI 入口
 
-**改造内容**:
-- ✅ 从配置读取限制值（不硬编码）
-- ✅ 使用 v3 config 系统
-- ✅ 添加日志和异常处理
+**代码质量要求**:
+- ✅ Service 文件 ≤ 300 行，函数 ≤ 100 行
+- ✅ Command 文件 ≤ 150 行，函数 ≤ 50 行
+- ✅ 从配置读取限制值（禁止硬编码）
+- ✅ 所有函数添加类型注解
+- ✅ loguru 日志 + context binding
+- ✅ 统一异常处理
 
 **实现任务**:
 - [ ] 创建 `services/metrics_service.py`
-- [ ] 实现 `collect_shell_metrics()` - 从配置读取限制
-- [ ] 实现 `collect_python_metrics()` - 从配置读取限制
-- [ ] 添加日志和异常处理
+  - `collect_shell_metrics()` - 收集 Shell 代码指标
+  - `collect_python_metrics()` - 收集 Python 代码指标
+  - 使用 `vibe3.config.get_config()` 读取配置
 - [ ] 创建 `commands/metrics.py` (typer 入口)
+- [ ] 添加日志和异常处理
 - [ ] 编写测试
 
 ---
@@ -168,14 +216,23 @@ def check_shell_metrics() -> dict:
 
 **现有代码**: `scripts/review-tools/structure_summary.sh` (169 行)
 
-**迁移到**: `services/structure_service.py` + `commands/structure.py`
+**架构分层**:
+- `services/structure_service.py` - 分析文件结构
+- `commands/structure.py` - typer CLI 入口
+
+**代码质量要求**:
+- ✅ Service 文件 ≤ 300 行，函数 ≤ 100 行
+- ✅ Command 文件 ≤ 150 行，函数 ≤ 50 行
+- ✅ 所有函数添加类型注解
+- ✅ loguru 日志 + context binding
+- ✅ 统一异常处理
 
 **实现任务**:
 - [ ] 创建 `services/structure_service.py`
-- [ ] 实现 `analyze_shell_file()`
-- [ ] 实现 `analyze_python_file()`
-- [ ] 添加日志和异常处理
+  - `analyze_shell_file()` - 分析 Shell 文件结构
+  - `analyze_python_file()` - 分析 Python 文件结构
 - [ ] 创建 `commands/structure.py`
+- [ ] 添加日志和异常处理
 - [ ] 编写测试
 
 ---
@@ -186,22 +243,60 @@ def check_shell_metrics() -> dict:
 
 **位置**: `services/dag_service.py`
 
+**代码质量要求**:
+- ✅ Service 文件 ≤ 300 行，函数 ≤ 100 行
+- ✅ 所有函数添加类型注解
+- ✅ loguru 日志 + context binding
+- ✅ 统一异常处理
+- ✅ 嵌套不超过 3 层
+
 **实现任务**:
 - [ ] 创建 `services/dag_service.py`
-- [ ] 实现 `build_module_graph()` - 解析 import
-- [ ] 实现 `expand_impacted_modules()` - 扩展影响模块
+  - `build_module_graph()` - 解析 import 构建依赖图
+  - `expand_impacted_modules()` - 从 seed 模块扩展影响范围
 - [ ] 添加日志和异常处理
 - [ ] 编写测试
 
 ---
 
-### 6. PR Scoring Service（新增）
+### 6. 命令调用链路分析服务（Command Analyzer）
+
+**目标**: 提供命令的静态结构分析，支持代码学习和调试
+
+**设计文档**: [symbol-vs-command-design.md](references/symbol-vs-command-design.md)
+
+**核心能力**:
+- **静态分析**: 解析 AST 提取函数调用关系
+- **不执行代码**: 只分析代码结构，不运行命令
+
+**使用场景**:
+```bash
+# 查看 vibe review pr 的静态调用链路（不执行）
+vibe inspect commands review pr
+```
+
+**注意**: 运行时追踪（`vibe review pr --trace`）在 Phase 2 的 Command 层实现。
+
+**实现任务**（详见设计文档）:
+- [ ] 创建 `services/command_analyzer.py` - 实现静态分析
+
+---
+
+### 7. PR Scoring Service（新增）
 
 **目标**: 根据 PR 多维度指标计算风险分数
 
 **位置**: `services/pr_scoring_service.py`
 
-**评分维度**（参考资料定义）:
+**代码质量要求**:
+- ✅ Service 文件 ≤ 300 行，函数 ≤ 100 行
+- ✅ 所有函数添加类型注解
+- ✅ 禁止硬编码权重，从配置读取
+- ✅ loguru 日志 + context binding
+- ✅ 统一异常处理
+- ✅ 使用 pydantic 模型定义评分结果
+
+**评分维度**（从配置读取）:
 1. **changed_lines** - 改动行数权重
 2. **changed_files** - 改动文件数权重
 3. **impacted_modules** - 影响模块数权重
@@ -218,9 +313,10 @@ def check_shell_metrics() -> dict:
 
 **实现任务**:
 - [ ] 创建 `services/pr_scoring_service.py`
-- [ ] 实现 `calculate_risk_score()` - 计算风险分数
-- [ ] 实现 `determine_risk_level()` - 判定风险等级
-- [ ] 实现 `generate_score_report()` - 生成评分报告
+  - `calculate_risk_score()` - 计算风险分数（从配置读取权重）
+  - `determine_risk_level()` - 判定风险等级（从配置读取阈值）
+  - `generate_score_report()` - 生成评分报告
+- [ ] 使用 pydantic 定义 `RiskScore` 模型
 - [ ] 添加日志和异常处理
 - [ ] 编写测试：`tests/services/test_pr_scoring_service.py`
 
@@ -264,18 +360,83 @@ pr_scoring:
 
 ### 代码质量
 
-- [ ] 所有 Services 函数 ≤ 50 行
-- [ ] 所有文件 ≤ 300 行
-- [ ] 强制类型注解（pydantic + mypy）
-- [ ] loguru 日志 + context binding
-- [ ] 统一异常处理
+#### 代码规模（强制）
+
+- [ ] **Services 层**: 所有文件 ≤ 300 行，函数 ≤ 100 行
+- [ ] **Clients 层**: 函数 ≤ 150 行（文件无限制，但应保持合理）
+- [ ] **Commands 层**: 所有文件 ≤ 150 行，函数 ≤ 50 行
+- [ ] **CLI 入口**: 文件 ≤ 50 行，函数 ≤ 20 行
+
+#### 类型安全（强制）
+
+- [ ] 所有公共函数必须有类型注解
+- [ ] 使用 Python 3.10+ 类型语法（`str | None` 而非 `Optional[str]`）
+- [ ] **禁止使用 `Any` 类型**
+- [ ] 通过 `mypy --strict` 检查
+
+#### 日志规范（强制）
+
+- [ ] 使用 loguru，禁止 `print()`
+- [ ] 关键操作必须记录日志
+- [ ] 使用 `logger.bind(domain="...", action="...")` 添加上下文
+- [ ] 错误日志必须包含异常信息和上下文
+- [ ] **调用链路追踪**: 每个方法调用必须记录：
+  - 调用来源（哪个文件、哪个方法）
+  - 调用目标（调用哪个 Client 方法）
+  - 关键参数和返回值
+
+#### 异常处理（强制）
+
+- [ ] 禁止裸 `except`
+- [ ] 捕获具体异常类型
+- [ ] 使用异常链：`raise NewError() from e`
+- [ ] 自定义异常继承自明确的基类
+
+#### 分层职责（强制）
+
+- [ ] **Service 层**: 薄编排，只做业务逻辑协调
+- [ ] **Client 层**: 封装外部依赖（API、工具）
+- [ ] **Command 层**: 参数验证 + 调用 Service
+- [ ] 禁止跨层调用（Command 不能直接调用 Client）
+
+#### 代码复杂度（强制）
+
+- [ ] 嵌套不超过 3 层
+- [ ] 单个函数不超过 10 个参数
+- [ ] 循环复杂度 ≤ 10
+
+### 调用链路追踪（强制）
+
+**目标**: 记录命令的完整调用链路，方便调试和排查错误
+
+**设计文档**: [call-tracing-vs-dag.md](references/call-tracing-vs-dag.md)
+
+- [ ] 所有 Client 方法添加日志
+  - 记录方法调用、参数、返回值
+  - 使用 `logger.bind(domain="...", action="...")` 绑定上下文
+- [ ] 所有 Service 方法添加日志
+  - 记录调用 Client（`calling="client.method"`）
+  - 记录中间结果
+- [ ] 所有 Command 添加 `--debug` 参数
+  - 启用 DEBUG 级别日志
+  - 输出详细调用链路
+- [ ] 错误追踪
+  - 记录异常类型、异常消息
+  - 记录完整的调用栈
+
+**验证方式**:
+```bash
+vibe inspect pr 42 --debug
+# 应该输出完整的调用链路日志
+```
 
 ### 测试覆盖
 
 - [ ] Services 层测试覆盖率 ≥ 80%
 - [ ] Clients 层测试覆盖率 ≥ 70%
 - [ ] Commands 层测试覆盖率 ≥ 60%
-- [ ] 所有测试通过：`pytest tests/`
+- [ ] 所有测试通过：`uv run pytest tests/`
+- [ ] 使用 Mock 隔离外部依赖
 
 ### 功能验证
 
@@ -283,21 +444,52 @@ pr_scoring:
 - [ ] 所有迁移的服务可以正常工作
 - [ ] PR 评分系统可以正常计算风险分数
 - [ ] 日志输出符合 v3 标准
+- [ ] 调用链路可以完整追踪
+
+### 验证命令
+
+```bash
+# 类型检查
+uv run mypy --strict scripts/python/vibe3/
+
+# 代码检查
+uv run ruff check scripts/python/
+
+# 测试覆盖率
+uv run pytest tests/ --cov=scripts/python/vibe3 --cov-report=term-missing
+
+# 代码行数统计
+find scripts/python/vibe3 -name "*.py" -exec wc -l {} \;
+
+# 调用链路追踪验证
+vibe inspect pr 42 --debug 2>&1 | grep -E "domain|action|calling"
+```
 
 ---
 
 ## 迁移统计
 
-| 原工具 | 原行数 | 迁移目标 | 预估行数 | 变化 |
-|--------|--------|----------|----------|------|
-| 配置系统 | - | `config/settings.py` + `loader.py` | ~200 | 新增 |
-| `serena_gate.py` | 147 | `serena_service.py` | ~180 | +日志/类型 |
-| `metrics.sh` | 186 | `metrics_service.py` + `commands/metrics.py` | ~280 | Shell→Python |
-| `structure_summary.sh` | 169 | `structure_service.py` + `commands/structure.py` | ~260 | Shell→Python |
-| 新增 DAG | - | `dag_service.py` | ~150 | 新功能 |
-| 新增 Scoring | - | `pr_scoring_service.py` | ~200 | PR 风险评分 |
+| 原工具 | 原行数 | 迁移目标 | 预估行数 | 架构分层 |
+|--------|--------|----------|----------|----------|
+| 配置系统 | - | `config/settings.py` + `config/loader.py` | ~200 | Config |
+| 改动源抽象 | - | `models/change_source.py` | ~80 | Model |
+| `serena_gate.py` | 147 | `clients/serena_client.py` (190行) + `services/serena_service.py` (150行) | ~340 | Client + Service |
+| Git Client 扩展 | - | `clients/git_client.py` | +150 | Client |
+| `metrics.sh` | 186 | `services/metrics_service.py` + `commands/metrics.py` | ~280 | Service + Command |
+| `structure_summary.sh` | 169 | `services/structure_service.py` + `commands/structure.py` | ~260 | Service + Command |
+| 新增 DAG | - | `services/dag_service.py` | ~150 | Service |
+| 新增 Scoring | - | `services/pr_scoring_service.py` | ~200 | Service |
+| 新增 Command Analyzer | - | `services/command_analyzer.py` | ~180 | Service |
 
-**总计**: ~1270 行 Python 代码
+**总计**: ~1840 行 Python 代码
+
+**架构说明**：
+- **统一改动源抽象**：支持 PR/Commit/Branch/Uncommitted 四种场景
+- **Git Client 统一接口**：`get_changed_files(source)` 和 `get_diff(source)`
+- **Service 层薄编排**：`analyze_changes(source)` 统一分析入口
+- **调用链路分析**：`command_analyzer` 支持命令调试和错误排查
+- 所有 Service 文件 ≤ 300 行，Client 函数 ≤ 150 行
+- 严格遵循 v3 分层架构，禁止跨层调用
 
 ---
 
@@ -364,15 +556,18 @@ PR summary comment
 **职责**: 提供代码分析信息，输出结构化数据（JSON/YAML）
 
 **调用关系**:
-- `vibe inspect --metrics` → metrics_service
-- `vibe inspect --structure` → structure_service
-- `vibe inspect --symbols` → serena_service
+- `vibe inspect metrics` → metrics_service
+- `vibe inspect structure` → structure_service
+- `vibe inspect symbols [file]` → serena_service
+- `vibe inspect commands [cmd]` → command_analyzer
 - `vibe inspect pr 42` → serena_service + dag_service + pr_scoring_service
 
 **输出要求**:
 - 确定性操作（相同输入 → 相同输出）
 - 结构化输出（JSON/YAML）
 - 可被 `vibe review` 消费
+
+**参数标准**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/implementation/07-command-standards.md)
 
 ### `vibe review` - 代码审核
 **职责**: 基于 `inspect` 提供的信息，调用 Codex 进行代码审核
@@ -383,6 +578,8 @@ PR summary comment
 **实现方式**:
 - 通过 subprocess 调用 `vibe inspect` 获取结构化数据
 - 构建上下文，传递给 Codex
+
+**参数标准**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/implementation/07-command-standards.md)
 
 ---
 

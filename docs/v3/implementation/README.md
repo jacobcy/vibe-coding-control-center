@@ -4,7 +4,7 @@ title: Vibe 3.0 Implementation Documentation Index
 status: active
 author: Claude Sonnet 4.6
 created: 2026-03-15
-last_updated: 2026-03-16
+last_updated: 2026-03-17
 related_docs:
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
@@ -12,6 +12,7 @@ related_docs:
   - docs/v3/implementation/01-data-standard.md
   - docs/v3/implementation/02-architecture.md
   - docs/v3/implementation/03-coding-standards.md
+  - docs/v3/implementation/07-command-standards.md
   - .agent/rules/python-standards.md
 ---
 
@@ -26,10 +27,12 @@ related_docs:
 
 1. **[数据标准](01-data-standard.md)** - 架构澄清、真源层级、错误示例（必读 🔴）
 2. **[架构设计](02-architecture.md)** - 目录结构、分层职责与技术栈约束（必读 🔴）
-3. **[编码标准](03-coding-standards.md)** - 类型注解、复杂度控制与错误处理规范（必读 🔴）
+3. **[编码标准](03-coding-standards.md)** - 类型注解、复杂度控制与最佳实践（必读 🔴）
 4. **[测试标准](04-test-standards.md)** - 测试分层、覆盖率要求、Mock 规范（必读 🔴）
 5. **[日志系统](05-logging.md)** - 面向 Agent 的结构化日志规范（必读 🔴）
-6. **[异常处理](06-error-handling.md)** - 异常层级、统一捕获实现指南
+6. **[异常处理](06-error-handling.md)** - 异常层级、统一捕获实现指南（必读 🔴）
+7. **[命令参数标准](07-command-standards.md)** - 统一参数规范、追踪、输出格式（必读 🔴）
+8. **[命令参数快速参考](08-command-quick-ref.md)** - 核心参数速查表（推荐 📖）
 
 ---
 
@@ -39,10 +42,12 @@ related_docs:
 |------|------|--------|
 | [01-data-standard.md](01-data-standard.md) | 数据架构澄清、gh CLI 真源、错误示例 | 🔴 必读 |
 | [02-architecture.md](02-architecture.md) | 架构设计原则、分层职责、禁止使用的依赖 | 🔴 必读 |
-| [03-coding-standards.md](03-coding-standards.md) | 编码风格、复杂度限制、类型检查、测试要求 | 🔴 必读 |
+| [03-coding-standards.md](03-coding-standards.md) | 编码风格、复杂度限制、类型检查 | 🔴 必读 |
 | [04-test-standards.md](04-test-standards.md) | 测试分层、覆盖率要求、Mock 规范 | 🔴 必读 |
 | [05-logging.md](05-logging.md) | Agent 友好的日志字段绑定、DEBUG 格式标准 | 🔴 必读 |
 | [06-error-handling.md](06-error-handling.md) | 异常类定义与 CLI 层统一捕获 | 🔴 必读 |
+| [07-command-standards.md](07-command-standards.md) | 统一参数规范、追踪、输出格式、交互确认 | 🔴 必读 |
+| [08-command-quick-ref.md](08-command-quick-ref.md) | 核心参数速查表 | 📖 推荐 |
 
 ---
 
