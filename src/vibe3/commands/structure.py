@@ -24,7 +24,9 @@ def _noop() -> Iterator[None]:
 def show(
     file_path: Annotated[str, typer.Argument(help="文件路径")],
     json_output: Annotated[bool, typer.Option("--json", help="JSON 输出")] = False,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
 ) -> None:
     """分析并显示文件结构."""
     if trace:
