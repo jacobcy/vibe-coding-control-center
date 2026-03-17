@@ -47,7 +47,9 @@ def parse_issue_url(issue_url: str) -> int:
 
 @app.command()
 def list(
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """List all tasks."""
@@ -80,7 +82,9 @@ def list(
 @app.command()
 def show(
     task_id: Annotated[str, typer.Argument(help="Branch name or task ID")],
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show task details."""
@@ -121,7 +125,9 @@ def link(
         Literal["task", "related"], typer.Option(help="Issue role")
     ] = "related",
     actor: Annotated[str, typer.Option(help="Actor linking the issue")] = "unknown",
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Link an issue to current flow."""

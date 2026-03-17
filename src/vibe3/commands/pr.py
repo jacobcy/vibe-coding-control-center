@@ -40,7 +40,9 @@ def draft(
     spec: Annotated[str | None, typer.Option(help="Spec reference")] = None,
     planner: Annotated[str | None, typer.Option(help="Planner agent")] = None,
     executor: Annotated[str | None, typer.Option(help="Executor agent")] = None,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Create draft PR."""
@@ -81,7 +83,9 @@ def draft(
 def show(
     pr_number: Annotated[int | None, typer.Argument(help="PR number")] = None,
     branch: Annotated[str | None, typer.Option("-b", help="Branch name")] = None,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show PR details."""
@@ -110,8 +114,12 @@ def show(
 @app.command()
 def ready(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
-    yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")] = False,  # noqa: E501
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    yes: Annotated[
+        bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
+    ] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Mark PR as ready for review."""
@@ -149,8 +157,12 @@ def ready(
 @app.command()
 def merge(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
-    yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")] = False,  # noqa: E501
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    yes: Annotated[
+        bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
+    ] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Merge PR."""
@@ -184,7 +196,9 @@ def merge(
 def version_bump(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     group: Annotated[str | None, typer.Option("-g", help="Task group")] = None,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Calculate version bump for PR."""
@@ -214,7 +228,9 @@ def version_bump(
 def review(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     publish: Annotated[bool, typer.Option(help="Publish review as comment")] = True,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Review PR using local LLM (codex)."""

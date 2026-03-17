@@ -37,7 +37,9 @@ def _render_layer(name: str, m: LayerMetrics) -> None:
 @app.command()
 def show(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 输出")] = False,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,  # noqa: E501
 ) -> None:
     """显示代码量指标."""
     if trace:
