@@ -33,7 +33,7 @@ related_docs:
 ### 2. 符合业界标准
 
 遵循 Unix/Linux 和 Python CLI 最佳实践：
-- ✅ 短选项（`-v`）和长选项（`--verbose`）并存
+- ✅ 短选项（`-y`）和长选项（`--yes`）并存
 - ✅ 布尔选项不带参数（`--trace`）
 - ✅ 帮助信息清晰（`-h/--help` 由 typer 自动提供）
 
@@ -45,23 +45,24 @@ related_docs:
 
 | 参数 | 短选项 | 长选项 | 类型 | 默认值 | 用途 |
 |------|--------|--------|------|--------|------|
-| **追踪** | - | `--trace` | bool | False | 启用运行时调用链路追踪 |
-| **详细** | `-v` | `--verbose` | bool | False | 启用详细输出（DEBUG 日志） |
+| **追踪** | - | `--trace` | bool | False | 启用调用链路追踪 + DEBUG 日志 |
 | **JSON** | - | `--json` | bool | False | JSON 格式输出 |
 | **确认** | `-y` | `--yes` | bool | False | 自动确认交互（默认拒绝） |
 | **帮助** | `-h` | `--help` | - | - | 显示帮助（typer 自动提供） |
+
+> **注意**：`--verbose` / `-v` 已合并入 `--trace`，不单独存在。`--trace` 同时启用调用链路追踪和 DEBUG 级别日志输出，避免两个参数语义重叠造成混淆。
 
 ---
 
 ## 参数详细说明
 
-### 1. `--trace` - 运行时追踪
+### 1. `--trace` - 调用链路追踪 + DEBUG 日志
 
-**用途**: 启用运行时调用链路追踪，记录函数调用、参数和返回值
+**用途**: 同时启用运行时调用链路追踪和 DEBUG 级别日志输出
 
 **行为**:
-- 追踪所有函数调用（通过 `sys.settrace`）
-- 输出调用栈、参数、返回值
+- 设置日志级别为 DEBUG（输出所有 `logger.debug(...)` 内容）
+- 追踪函数调用链路（调用栈、参数、返回值）
 - 标记错误位置
 - 不影响命令执行结果
 
@@ -85,30 +86,6 @@ commands/review.py::pr(pr_number=42)
 ```
 
 **详细实现**: 见 [../../trace/references/command-debug-design.md](../../v3/trace/references/command-debug-design.md)
-
----
-
-### 2. `-v/--verbose` - 详细输出
-
-**用途**: 启用详细输出，显示 DEBUG 级别日志
-
-**行为**:
-- 设置日志级别为 DEBUG
-- 输出详细调试信息
-- 不追踪调用链路
-
-**使用场景**:
-```bash
-# 查看详细日志
-vibe review pr 42 --verbose
-
-# 调试信息不足时
-vibe inspect metrics -v
-```
-
----
-
-### 3. `--json` - JSON 输出
 
 **用途**: 以 JSON 格式输出结果，便于脚本解析
 
@@ -182,25 +159,23 @@ vibe inspect --help
 核心参数可以自由组合：
 
 ```bash
-# 追踪 + 详细
-vibe review pr 42 --trace --verbose
-
-# JSON + 详细
-vibe inspect metrics --json -v
-
-# 追踪 + JSON
+# 追踪（含 DEBUG 日志）+ JSON
 vibe inspect pr 42 --trace --json
+
+# 仅 JSON 输出
+vibe inspect metrics --json
+
+# 追踪调试
+vibe review pr 42 --trace
 ```
 
 ### 冲突处理
 
 | 组合 | 冲突？ | 说明 |
 |------|--------|------|
-| `--trace` + `--verbose` | ✅ 允许 | 追踪 + DEBUG 日志 |
-| `--json` + `--verbose` | ⚠️ 不推荐 | JSON 输出与详细日志格式冲突 |
-| `--trace` + `--json` | ✅ 允许 | JSON 输出追踪结果 |
+| `--trace` + `--json` | ✅ 允许 | JSON 格式输出追踪结果 |
 
-**建议**: `--json` 与 `--verbose` 不要同时使用，输出格式会混乱。
+**建议**: `--json` 与 `--trace` 同时使用时，追踪日志输出到 stderr，JSON 结果输出到 stdout，互不干扰。
 
 ---
 
@@ -210,7 +185,7 @@ vibe inspect pr 42 --trace --json
 
 ```python
 import typer
-from typing import Optional
+from typing import Annotated
 
 app = typer.Typer()
 
@@ -220,31 +195,26 @@ def example_command(
     target: str,
 
     # 核心参数集（强制）
-    trace: bool = typer.Option(False, "--trace", help="Enable runtime call tracing"),
-    verbose: bool = typer.Option(False, "-v", "--verbose", help="Enable verbose output (DEBUG logs)"),
-    json_output: bool = typer.Option(False, "--json", help="Output in JSON format"),
-    yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm interactions"),
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认交互")] = False,
 
     # 命令特定参数（可选）
     option1: str = typer.Option("default", "--option1", help="Specific option"),
 ):
     """Example command with standard parameters"""
-    # 1. 处理 verbose
-    if verbose:
+    # 1. 处理 trace（同时启用 DEBUG 日志 + 调用链路追踪）
+    if trace:
         import sys
         from loguru import logger
+        from vibe3.observability.trace import trace_context
         logger.remove()
         logger.add(sys.stderr, level="DEBUG")
 
-    # 2. 处理 trace
-    if trace:
-        from vibe3.utils.tracing import enable_tracing
-        enable_tracing()
-
-    # 3. 执行核心逻辑
+    # 2. 执行核心逻辑
     result = _do_something(target, option1)
 
-    # 4. 处理输出格式
+    # 3. 处理输出格式
     if json_output:
         typer.echo_json(result)
     else:
@@ -270,9 +240,7 @@ def test_command_has_standard_params():
     sig = inspect.signature(example_command)
     params = sig.parameters
 
-    # 必须包含核心参数
     assert "trace" in params, "Missing --trace parameter"
-    assert "verbose" in params, "Missing --verbose parameter"
     assert "json_output" in params, "Missing --json parameter"
     assert "yes" in params, "Missing --yes parameter"
 ```
@@ -288,10 +256,9 @@ def test_param_defaults():
     sig = inspect.signature(example_command)
     params = sig.parameters
 
-    assert params["trace"].default == False
-    assert params["verbose"].default == False
-    assert params["json_output"].default == False
-    assert params["yes"].default == False
+    assert params["trace"].default is False
+    assert params["json_output"].default is False
+    assert params["yes"].default is False
 ```
 
 #### 3. 功能测试
@@ -316,7 +283,7 @@ def test_trace_parameter():
 def test_param_combinations():
     """测试参数组合"""
     # trace + verbose
-    result = runner.invoke(app, ["target", "--trace", "--verbose"])
+    result = runner.invoke(app, ["target", "--trace"])
     assert result.exit_code == 0
 ```
 
@@ -326,7 +293,7 @@ def test_param_combinations():
 
 ### 代码审查清单
 
-- [ ] 所有命令包含核心参数集（`--trace`, `--verbose`, `--json`, `--yes`）
+- [ ] 所有命令包含核心参数集（`--trace`, `--json`, `--yes`）
 - [ ] 参数命名符合标准（短选项 + 长选项）
 - [ ] 参数默认值正确（均为 `False`）
 - [ ] 帮助信息清晰（`help="..."`）
@@ -436,8 +403,7 @@ def command(target: str, trace: bool = False):
 
 | 参数 | 短选项 | 长选项 | 默认值 | 用途 |
 |------|--------|--------|--------|------|
-| 追踪 | - | `--trace` | False | 运行时调用链路追踪 |
-| 详细 | `-v` | `--verbose` | False | 详细输出（DEBUG 日志） |
+| 追踪 | - | `--trace` | False | 调用链路追踪 + DEBUG 日志 |
 | JSON | - | `--json` | False | JSON 格式输出 |
 | 确认 | `-y` | `--yes` | False | 自动确认交互 |
 | 帮助 | `-h` | `--help` | - | 显示帮助（typer 提供） |

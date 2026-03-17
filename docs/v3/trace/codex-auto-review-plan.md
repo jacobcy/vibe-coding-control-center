@@ -108,7 +108,7 @@ vibe inspect commit SHA       # Commit 改动分析（输出 JSON）
 vibe inspect base main        # 相对分支的改动分析（输出 JSON）
 ```
 
-**参数用法**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/infrastructure/07-command-standards.md)
+**参数用法**: 所有子命令支持核心参数集（`--trace`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/infrastructure/07-command-standards.md)
 
 **架构对齐**:
 - ✅ 符合 Tier 1 (Shell 能力层) 定位：确定性操作、结构化输出
@@ -126,7 +126,7 @@ vibe review base main         # 审核相对分支的改动
 vibe review commit SHA        # 审核指定 commit
 ```
 
-**参数用法**: 所有子命令支持核心参数集（`--trace`, `-v/--verbose`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/infrastructure/07-command-standards.md)
+**参数用法**: 所有子命令支持核心参数集（`--trace`, `--json`, `-y/--yes`），详见 [v3 命令参数标准](../v3/infrastructure/07-command-standards.md)
 
 ### 3.3 技术栈（已安装）
 

@@ -13,10 +13,8 @@
 ### 1.2 示例
 
 ```bash
-vibe inspect pr 42 --debug
+vibe inspect pr 42 --trace
 ```
-
-**输出**:
 ```
 vibe inspect pr 42
 └─ commands/inspect.py::pr()
@@ -105,7 +103,7 @@ vibe inspect pr 42
 
 **用户执行**:
 ```bash
-vibe inspect pr 42 --debug
+vibe inspect pr 42 --trace
 ```
 
 **日志输出**:

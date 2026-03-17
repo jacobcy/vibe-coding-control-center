@@ -163,7 +163,7 @@ vibe inspect base main          # 相对分支的改动分析
 
 **选项**：
 - `--json` - JSON 输出格式
-- `--debug` - 详细日志
+- `--trace` - 调用链路追踪 + DEBUG 日志
 
 ---
 
@@ -182,8 +182,8 @@ vibe review commit SHA         # 审核指定 commit
 ```
 
 **选项**：
-- `--trace` - 运行时追踪（动态）
-- `--debug` - 详细日志
+- `--trace` - 调用链路追踪 + DEBUG 日志（运行时）
+- `--json` - JSON 输出格式
 
 ---
 

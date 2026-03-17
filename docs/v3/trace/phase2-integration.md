@@ -76,8 +76,7 @@ Phase 1 提供能力层，Phase 2 提供编排层，职责清晰分离。
 
 | 参数 | 用途 | 示例 |
 |------|------|------|
-| `--trace` | 运行时追踪 | `vibe inspect pr 42 --trace` |
-| `-v, --verbose` | 详细日志 | `vibe inspect metrics -v` |
+| `--trace` | 调用链路追踪 + DEBUG 日志 | `vibe inspect pr 42 --trace` |
 | `--json` | JSON 输出 | `vibe inspect pr 42 --json` |
 | `-y, --yes` | 自动确认 | `vibe inspect clean --yes` |
 
@@ -101,15 +100,14 @@ Phase 1 提供能力层，Phase 2 提供编排层，职责清晰分离。
 
 | 参数 | 用途 | 示例 |
 |------|------|------|
-| `--trace` | 运行时追踪 | `vibe review pr 42 --trace` |
-| `-v, --verbose` | 详细日志 | `vibe review pr 42 -v` |
+| `--trace` | 调用链路追踪 + DEBUG 日志 | `vibe review pr 42 --trace` |
 | `--json` | JSON 输出 | `vibe review pr 42 --json` |
 | `-y, --yes` | 自动确认 | `vibe review clean --yes` |
 
 **详细说明**: [v3 命令参数标准](../../v3/infrastructure/07-command-standards.md)
 
 **追踪特性**:
-- `--trace` 参数启用运行时调用链路追踪
+- `--trace` 参数同时启用调用链路追踪和 DEBUG 日志
 - 输出参数、返回值、错误位置
 - 用于调试和性能分析
 

@@ -21,8 +21,7 @@ related_docs:
 
 | 参数 | 短选项 | 长选项 | 用途 | 示例 |
 |------|--------|--------|------|------|
-| 追踪 | - | `--trace` | 运行时调用链路追踪 | `vibe review pr 42 --trace` |
-| 详细 | `-v` | `--verbose` | 详细输出（DEBUG 日志） | `vibe inspect metrics -v` |
+| 追踪 | - | `--trace` | 调用链路追踪 + DEBUG 日志 | `vibe review pr 42 --trace` |
 | JSON | - | `--json` | JSON 格式输出 | `vibe inspect pr 42 --json` |
 | 确认 | `-y` | `--yes` | 自动确认交互 | `vibe clean --yes` |
 | 帮助 | `-h` | `--help` | 显示帮助 | `vibe review --help` |
@@ -42,12 +41,11 @@ params = sig.parameters
 
 # 检查核心参数
 assert "trace" in params
-assert "verbose" in params
 assert "json_output" in params
 assert "yes" in params
 
 # 检查默认值
-assert all(params[p].default == False for p in ["trace", "verbose", "json_output", "yes"])
+assert all(params[p].default is False for p in ["trace", "json_output", "yes"])
 ```
 
 ---
