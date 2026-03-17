@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 
 # Paths
@@ -18,7 +17,7 @@ COMMON = [
     "doc-text-test-governance.md",
     "glossary.md",
     "serena-usage.md",
-    "agent-workflow-standard.md"
+    "agent-workflow-standard.md",
 ]
 
 LEGACY = [
@@ -32,14 +31,12 @@ LEGACY = [
     "skill-standard.md",
     "skill-trigger-standard.md",
     "vibe-engine-design.md",
-    "git-workflow-standard.md",          # v2 workflow 标准
-    "worktree-lifecycle-standard.md"     # v2 worktree 标准
+    "git-workflow-standard.md",  # v2 workflow 标准
+    "worktree-lifecycle-standard.md",  # v2 worktree 标准
 ]
 
-V3_EXCLUSIVE = [
-    "github-remote-call-standard.md",
-    "handoff-store-standard.md"
-]
+V3_EXCLUSIVE = ["github-remote-call-standard.md", "handoff-store-standard.md"]
+
 
 def move_legacy_files():
     """Move legacy v2 files to v2 directory using git mv."""
@@ -63,6 +60,7 @@ def move_legacy_files():
             print(f"⚠ {f} not found in either location")
 
     return moved_count
+
 
 def update_references():
     """Update markdown path references repository-wide."""
@@ -98,6 +96,7 @@ def update_references():
 
     print(f"\n✓ 更新了 {updated_count} 个文件的引用")
 
+
 if __name__ == "__main__":
     print("=== Standards Reorganization Script ===")
     print(f"将移动 {len(LEGACY)} 个 v2 遗留文件到 v2/")
@@ -111,7 +110,7 @@ if __name__ == "__main__":
     print()
 
     confirm = input("执行移动和引用更新？(y/n): ")
-    if confirm.lower() == 'y':
+    if confirm.lower() == "y":
         print("\n=== Step 1: 移动文件 ===")
         moved = move_legacy_files()
         print(f"✓ 移动了 {moved} 个文件")
@@ -121,6 +120,9 @@ if __name__ == "__main__":
 
         print("\n✓ 完成！")
         print("  运行 'git status' 查看变更")
-        print("  提交: git add . && git commit -m 'chore: move v2 workflow standards to v2/'")
+        print(
+            "  提交: git add . && git commit -m 'chore: move v2 "
+            "workflow standards to v2/'"
+        )
     else:
         print("已取消")

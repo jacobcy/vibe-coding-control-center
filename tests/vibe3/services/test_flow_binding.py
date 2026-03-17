@@ -1,7 +1,7 @@
 """Tests for Flow binding functionality."""
 
-from vibe3.services.flow_service import FlowService
 from vibe3.models.flow import FlowState
+from vibe3.services.flow_service import FlowService
 
 
 class TestFlowBinding:

@@ -1,0 +1,78 @@
+# GitHub PR 自动标签配置
+# 详见: docs/standards/github-labels-standard.md
+
+# 类型标签 (根据分支名)
+type/feature:
+  - head_branch: ['^feat/', '^feature/']
+
+type/fix:
+  - head_branch: ['^fix/', '^bugfix/']
+
+type/refactor:
+  - head_branch: ['^refactor/']
+
+type/docs:
+  - head_branch: ['^docs/', '^documentation/']
+
+type/test:
+  - head_branch: ['^test/', '^testing/']
+
+type/chore:
+  - head_branch: ['^chore/']
+
+# 范围标签 (根据文件路径)
+scope/python:
+  - 'src/vibe3/**/*.py'
+
+scope/shell-script:
+  - 'lib/**/*.sh'
+  - 'scripts/**/*.sh'
+
+scope/documentation:
+  - 'docs/**'
+  - '**/*.md'
+  - 'LICENSE'
+
+scope/infrastructure:
+  - '.github/**'
+  - '.pre-commit-config.yaml'
+  - 'scripts/hooks/**'
+
+scope/skill:
+  - 'skills/**'
+  - '.agent/workflows/**'
+
+scope/supervisor:
+  - '.agent/rules/**'
+  - '.agent/context/**'
+
+# 组件标签 (根据文件路径)
+component/cli:
+  - 'src/vibe3/cli.py'
+  - 'src/vibe3/commands/*.py'
+
+component/flow:
+  - 'src/vibe3/commands/flow.py'
+  - 'src/vibe3/services/flow_service.py'
+
+component/pr:
+  - 'src/vibe3/commands/pr.py'
+  - 'src/vibe3/services/pr_service.py'
+  - 'src/vibe3/clients/github_client.py'
+
+component/task:
+  - 'src/vibe3/commands/task.py'
+  - 'src/vibe3/services/task_service.py'
+
+component/logger:
+  - 'src/vibe3/observability/**'
+
+component/client:
+  - 'src/vibe3/clients/**'
+
+component/config:
+  - 'src/vibe3/config/**'
+
+# 特殊标签
+breaking-change:
+  - head_branch: ['^breaking/', '^breaking-change/']

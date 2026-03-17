@@ -6,6 +6,11 @@
       "sourceType": "github",
       "computedHash": "5cafa1558b0b6bd4d4c71f23d5567b7fcbbcdb4b0a50b0c5f69a80a3cebaf9b8"
     },
+    "codeagent": {
+      "source": "cexll/myclaude",
+      "sourceType": "github",
+      "computedHash": "436d68bd9465be3355793c32bbd661d83a97e5a14db007d3594eb50d597377f9"
+    },
     "dispatching-parallel-agents": {
       "source": "obra/superpowers",
       "sourceType": "github",

@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.pr_service import PRService
 from vibe3.models.pr import PRMetadata, PRResponse, PRState
+from vibe3.services.pr_service import PRService
 
 
 @pytest.fixture

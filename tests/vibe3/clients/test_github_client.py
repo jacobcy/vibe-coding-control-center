@@ -58,19 +58,6 @@ def test_create_pr_success(
     mock_subprocess.return_value.returncode = 0
 
     # Mock get_pr
-    pr_data = {
-        "number": 123,
-        "title": "Test PR",
-        "body": "Test body",
-        "state": "OPEN",
-        "headRefName": "feature-branch",
-        "baseRefName": "main",
-        "url": "https://github.com/org/repo/pull/123",
-        "isDraft": True,
-        "createdAt": "2026-03-16T10:00:00Z",
-        "updatedAt": "2026-03-16T10:00:00Z",
-        "mergedAt": None,
-    }
 
     with patch.object(github_client, "get_pr") as mock_get_pr:
         mock_get_pr.return_value = MagicMock(

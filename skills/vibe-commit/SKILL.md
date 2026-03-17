@@ -28,6 +28,7 @@ PR 创建后 → 自动进入 `/vibe-integrate`
 - `docs/standards/v2/worktree-lifecycle-standard.md`
 - `docs/standards/v2/command-standard.md`
 - `docs/standards/v2/handoff-governance-standard.md`
+- `docs/standards/github-labels-standard.md`
 - `.agent/context/task.md`
 
 ## 完整流程
@@ -216,7 +217,63 @@ vibe flow pr --base <ref>
 - 同一 branch 若已经提供过一次有效 `--msg`，后续重复执行 `vibe flow pr` 时默认复用缓存值，不必反复询问
 - 若本轮是按显式输入的 plan 执行改动，发布对应实现/文档改动时必须同时提交该 plan 文件，不得把 plan 留在工作区外游离
 
-### Step 6.5: PR 发出后的强制停点
+### Step 6.5: 自动应用标签与智能审查
+
+PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standards/github-labels-standard.md`）：
+
+**类型标签（根据 PR 标题）**：
+- 标题以 `feat:` 或 `feature:` 开头 → 添加 `type/feature` → **触发 Codex AI 审查**
+- 标题以 `fix:` 或 `bugfix:` 开头 → 添加 `type/fix` → **触发 Copilot AI 审查**
+- 标题以 `refactor:` 开头 → 添加 `type/refactor` → **自动运行本地测试**
+- 标题以 `docs:` 或 `documentation:` 开头 → 添加 `type/docs` → **需要手动决定是否测试**
+- 标题以 `test:` 或 `testing:` 开头 → 添加 `type/test` → **需要手动决定是否测试**
+- 标题以 `chore:` 开头 → 添加 `type/chore` → **需要手动决定是否测试**
+
+**智能审查策略**：
+
+| 标签类型 | 审查方式 | 自动化程度 |
+|---------|---------|-----------|
+| `type/feat` | Codex AI 审查 | ✅ 全自动 - 在 PR 中评论 `@codex review` |
+| `type/fix` | Copilot AI 审查 | ✅ 全自动 - 请求 Copilot 作为审查者 |
+| `type/refactor` | 本地测试 | ✅ 全自动 - 运行 lint + pytest + bats |
+| `type/docs` | 人工审查 | ⏸️ 需要手动决定是否测试 |
+| `type/test` | 人工审查 | ⏸️ 需要手动决定是否测试 |
+| `type/chore` | 人工审查 | ⏸️ 需要手动决定是否测试 |
+
+详见 `docs/standards/github-code-review-standard.md`。
+
+**范围标签（根据文件路径）**：
+- 包含 `src/vibe3/**/*.py` → 添加 `scope/python`
+- 包含 `lib/**/*.sh` 或 `scripts/**/*.sh` → 添加 `scope/shell-script`
+- 包含 `docs/**` 或 `*.md` → 添加 `scope/documentation`
+- 包含 `.github/**` 或 `.pre-commit-config.yaml` → 添加 `scope/infrastructure`
+
+**组件标签（根据文件路径）**：
+- 包含 `src/vibe3/cli.py` 或 `src/vibe3/commands/*.py` → 添加 `component/cli`
+- 包含 `flow.py` 或 `flow_service.py` → 添加 `component/flow`
+- 包含 `pr.py` 或 `pr_service.py` → 添加 `component/pr`
+- 包含 `task.py` 或 `task_service.py` → 添加 `component/task`
+- 包含 `src/vibe3/observability/**` → 添加 `component/logger`
+- 包含 `src/vibe3/clients/**` → 添加 `component/client`
+
+**状态标签**：
+- PR 创建后 → 自动添加 `status/ready-for-review`
+
+**执行方式**：
+```bash
+# 查看当前 PR
+gh pr view <pr-number>
+
+# 添加标签
+gh pr edit <pr-number> --add-label "type/feature,scope/python,status/ready-for-review"
+```
+
+**注意事项**：
+- 如果 GitHub Actions 已配置自动打标签（`.github/workflows/label.yml`），则无需手动执行
+- 每个 PR 至少应有一个类型标签
+- 标签应与 PR 内容一致，不要误导性标签
+
+### Step 7: PR 发出后的强制停点
 
 `vibe flow pr` 成功后，必须立即把当前 flow 视为 `open + had_pr`。
 
@@ -232,7 +289,7 @@ vibe flow pr --base <ref>
 - 先确认或补齐 review evidence
 - 再决定是否已满足 `vibe flow done` 的收口条件
 
-### Step 7: 写入 handoff
+### Step 8: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
 

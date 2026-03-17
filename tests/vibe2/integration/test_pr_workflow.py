@@ -11,9 +11,9 @@ Requirements:
     - Test repository (can be created dynamically)
     - Codex CLI installed (optional, for review tests)
 """
+
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 # Add scripts to path
@@ -21,7 +21,7 @@ scripts_path = Path(__file__).parent.parent.parent / "scripts" / "python"
 if str(scripts_path) not in sys.path:
     sys.path.insert(0, str(scripts_path))
 
-from loguru import logger
+from loguru import logger  # noqa: E402
 
 
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -39,7 +39,7 @@ def test_gh_auth() -> bool:
             return True
         else:
             logger.error("✗ GitHub CLI not authenticated")
-            logger.error(f"  Run: gh auth login")
+            logger.error("  Run: gh auth login")
             return False
     except FileNotFoundError:
         logger.error("✗ GitHub CLI not found")
@@ -72,7 +72,7 @@ def test_pr_draft_creation() -> bool:
 
     # This is a placeholder - in real scenario, would create test repo
     logger.warning("  Skipping: Requires test repository setup")
-    logger.info("  Manual test: python -m vibe3.commands.pr draft -t 'Test PR' -b 'Description'")
+    logger.info("  Manual test: python -m vibe3.commands.pr draft -t 'Test PR'")
     return True
 
 
@@ -90,14 +90,14 @@ def test_pr_workflow_integration() -> bool:
     for name, test_func in tests:
         logger.info(f"\n{'='*60}")
         logger.info(f"Test: {name}")
-        logger.info('='*60)
+        logger.info("=" * 60)
         result = test_func()
         results.append((name, result))
 
     # Summary
     logger.info(f"\n{'='*60}")
     logger.info("Test Summary")
-    logger.info('='*60)
+    logger.info("=" * 60)
     passed = sum(1 for _, r in results if r)
     total = len(results)
 
@@ -113,7 +113,7 @@ def test_pr_workflow_integration() -> bool:
 def main() -> int:
     """Run integration tests."""
     logger.info("Vibe3 PR Integration Tests")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     success = test_pr_workflow_integration()
 

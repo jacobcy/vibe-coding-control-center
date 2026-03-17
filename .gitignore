@@ -118,5 +118,7 @@ docs/audits/
 .github/prompts/
 .codex
 .trae/
+.kiro/
 .claude/
+!.claude/rules/  # Exception: share project-specific rules with team
 .aider*

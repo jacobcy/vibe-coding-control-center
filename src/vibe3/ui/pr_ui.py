@@ -2,6 +2,7 @@
 
 from rich import print
 from rich.table import Table
+
 from vibe3.models.pr import PRResponse, ReviewResponse, VersionBumpResponse
 
 

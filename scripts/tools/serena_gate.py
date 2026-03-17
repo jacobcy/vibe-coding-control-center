@@ -89,7 +89,9 @@ def main():
         references_tool = agent.get_tool_by_name("find_referencing_symbols")
         for relative_file in files:
             try:
-                overview_raw = agent.execute_task(lambda rel=relative_file: overview_tool.apply(relative_path=rel))
+                overview_raw = agent.execute_task(
+                    lambda rel=relative_file: overview_tool.apply(relative_path=rel)
+                )
                 overview = json.loads(overview_raw)
             except Exception as exc:
                 report["files"].append(
@@ -106,13 +108,30 @@ def main():
             for function_name in extract_function_names(overview):
                 try:
                     refs_raw = agent.execute_task(
-                        lambda fn=function_name, rel=relative_file: references_tool.apply(name_path=fn, relative_path=rel)
+                        lambda fn=function_name, rel=relative_file: (
+                            references_tool.apply(name_path=fn, relative_path=rel)
+                        )
                     )
                     refs = json.loads(refs_raw)
-                    symbols.append({"name": function_name, "status": "ok", "references": count_references(refs)})
+                    symbols.append(
+                        {
+                            "name": function_name,
+                            "status": "ok",
+                            "references": count_references(refs),
+                        }
+                    )
                 except Exception as exc:
-                    symbols.append({"name": function_name, "status": "error", "references": 0, "error": str(exc)})
-            report["files"].append({"file": relative_file, "status": "ok", "symbols": symbols})
+                    symbols.append(
+                        {
+                            "name": function_name,
+                            "status": "error",
+                            "references": 0,
+                            "error": str(exc),
+                        }
+                    )
+            report["files"].append(
+                {"file": relative_file, "status": "ok", "symbols": symbols}
+            )
     except Exception as exc:
         report["health_check"] = {"status": "error", "log": str(exc)}
 
