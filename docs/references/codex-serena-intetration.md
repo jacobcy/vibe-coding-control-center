@@ -684,8 +684,8 @@ jobs:
 
       - name: Generate repository structure summary
         run: |
-          chmod +x scripts/python_structure_summary.sh
-          ./scripts/python_structure_summary.sh > structure_summary.txt
+          chmod +x src_structure_summary.sh
+          ./src_structure_summary.sh > structure_summary.txt
 
       - name: Build Serena impact json
         run: |

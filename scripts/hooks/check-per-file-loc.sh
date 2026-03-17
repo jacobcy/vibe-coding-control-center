@@ -17,7 +17,7 @@ for f in lib/*.sh lib3/*.sh bin/vibe; do
 done
 
 # Check Python files
-for f in $(find scripts/python/vibe3 -name "*.py" 2>/dev/null); do
+for f in $(find src/vibe3 -name "*.py" 2>/dev/null); do
   [ -f "$f" ] || continue
   lines=$(wc -l < "$f")
   if [ "$lines" -gt 300 ]; then

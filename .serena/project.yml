@@ -43,7 +43,7 @@ initial_prompt: |
   After modification, run: zsh -n <file> && bats tests/
 
   HARD RULES (v3 - Python):
-  - Total LOC (scripts/python/) must be ≤ 
+  - Total LOC (src/) must be ≤ 
   - Any single .py file must be ≤ 300 lines
   - Zero dead code: every function must have ≥1 caller
   - Type hints required (mypy --strict)

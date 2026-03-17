@@ -36,7 +36,7 @@ repos:
     hooks:
       - id: ruff
         name: Ruff (Python linter)
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
         args: ['--fix']
 
   - repo: https://github.com/psf/black-pre-commit-mirror
@@ -44,15 +44,15 @@ repos:
     hooks:
       - id: black
         name: Black (Python formatter)
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
 
   - repo: local
     hooks:
       - id: mypy
         name: MyPy (Python type checker)
-        entry: uv run mypy scripts/python
+        entry: uv run mypy src
         language: system
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
         pass_filenames: false
         types: [python]
 
@@ -67,11 +67,11 @@ repos:
         files: \.(sh|bash)$
 
       - id: check-python-loc
-        name: Check Python LOC ceiling (scripts/python ≤ )
+        name: Check Python LOC ceiling (src ≤ )
         entry: scripts/hooks/check-python-loc.sh
         language: script
         pass_filenames: false
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
 
       - id: check-per-file-loc
         name: Check per-file LOC ceiling (≤ 300 lines each)
@@ -89,7 +89,7 @@ repos:
   #       entry: uv run pytest tests/vibe3 -v
   #       language: system
   #       pass_filenames: false
-  #       files: ^(scripts/python|tests/vibe3)/.*\.py$
+  #       files: ^(src|tests/vibe3)/.*\.py$
   #
   #     - id: bats
   #       name: Bats (Shell tests)

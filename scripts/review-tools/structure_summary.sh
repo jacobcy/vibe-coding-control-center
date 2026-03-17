@@ -149,16 +149,16 @@ fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "v3" ]; then
   echo "┌─────────────────────────────────────────────────────────────┐"
-  echo "│                  v3 - Python (scripts/python/)                │"
+  echo "│                  v3 - Python (src/)                │"
   echo "└─────────────────────────────────────────────────────────────┘"
   echo ""
   
-  show_module "vibe3/" "$VIBE_ROOT/scripts/python/vibe3" "*.py"
+  show_module "vibe3/" "$VIBE_ROOT/src/vibe3" "*.py"
   
-  module_count=$(find "$VIBE_ROOT/scripts/python/vibe3" -type d -mindepth 1 -maxdepth 1 ! -name "__pycache__" 2>/dev/null | wc -l | awk '{print $1}')
-  file_count=$(find "$VIBE_ROOT/scripts/python/vibe3" -name "*.py" 2>/dev/null | wc -l | awk '{print $1}')
-  class_count=$(grep -r "^class " "$VIBE_ROOT/scripts/python/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
-  func_count=$(grep -r "^def " "$VIBE_ROOT/scripts/python/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
+  module_count=$(find "$VIBE_ROOT/src/vibe3" -type d -mindepth 1 -maxdepth 1 ! -name "__pycache__" 2>/dev/null | wc -l | awk '{print $1}')
+  file_count=$(find "$VIBE_ROOT/src/vibe3" -name "*.py" 2>/dev/null | wc -l | awk '{print $1}')
+  class_count=$(grep -r "^class " "$VIBE_ROOT/src/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
+  func_count=$(grep -r "^def " "$VIBE_ROOT/src/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
   
   echo "统计: $module_count 模块, $file_count 文件 | $class_count 类, $func_count 函数"
   echo ""

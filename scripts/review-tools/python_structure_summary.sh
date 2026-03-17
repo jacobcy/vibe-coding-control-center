@@ -17,7 +17,7 @@ echo ""
 echo "## 模块结构"
 echo ""
 
-for module_dir in "$VIBE_ROOT"/scripts/python/vibe3/*/; do
+for module_dir in "$VIBE_ROOT"/src/vibe3/*/; do
     [ -d "$module_dir" ] || continue
     module_name=$(basename "$module_dir")
     
@@ -46,17 +46,17 @@ echo "## 统计"
 echo ""
 
 # 统计模块
-module_count=$(find "$VIBE_ROOT/scripts/python/vibe3" -type d -mindepth 1 -maxdepth 1 | wc -l | awk '{print $1}')
+module_count=$(find "$VIBE_ROOT/src/vibe3" -type d -mindepth 1 -maxdepth 1 | wc -l | awk '{print $1}')
 echo "- 模块数: $module_count"
 
 # 统计文件
-file_count=$(find "$VIBE_ROOT/scripts/python/vibe3" -name "*.py" | wc -l | awk '{print $1}')
+file_count=$(find "$VIBE_ROOT/src/vibe3" -name "*.py" | wc -l | awk '{print $1}')
 echo "- Python 文件数: $file_count"
 
 # 统计类
-class_count=$(grep -r "^class " "$VIBE_ROOT/scripts/python/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
+class_count=$(grep -r "^class " "$VIBE_ROOT/src/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
 echo "- 类定义数: $class_count"
 
 # 统计函数
-function_count=$(grep -r "^def " "$VIBE_ROOT/scripts/python/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
+function_count=$(grep -r "^def " "$VIBE_ROOT/src/vibe3" 2>/dev/null | wc -l | awk '{print $1}')
 echo "- 函数定义数: $function_count"

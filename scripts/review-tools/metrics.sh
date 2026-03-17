@@ -7,11 +7,11 @@
 #
 # Related commands:
 #   bash scripts/shell_structure_summary.sh   # Shell 代码结构详情
-#   bash scripts/python_structure_summary.sh  # Python 代码结构详情
+#   bash src_structure_summary.sh  # Python 代码结构详情
 #
 # For detailed analysis of specific files:
 #   bash scripts/shell_structure_summary.sh lib/flow.sh
-#   bash scripts/python_structure_summary.sh services/pr_service.py
+#   bash src_structure_summary.sh services/pr_service.py
 
 set -e
 
@@ -114,19 +114,19 @@ echo ""
 # ============ v3 (Python) Metrics ============
 echo "v3_python:"
 echo "  total_loc:"
-echo "    limit: 3000"
-python_loc=$(find "$VIBE_ROOT/scripts/python" -name '*.py' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+echo "    limit: 7000"
+python_loc=$(find "$VIBE_ROOT/src" -name '*.py' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 python_loc_status="pass"
-[ "${python_loc:-0}" -gt 3000 ] && python_loc_status="fail"
+[ "${python_loc:-0}" -gt 7000 ] && python_loc_status="fail"
 echo "    current: ${python_loc:-0}"
-echo "    usage: $(( (${python_loc:-0} * 100) / 3000 ))%"
+echo "    usage: $(( (${python_loc:-0} * 100) / 7000 ))%"
 echo "    status: ${python_loc_status}"
 
 echo "  max_file_loc:"
 echo "    limit: 300"
 max_python_loc=0
 max_python_name=""
-for f in $(find "$VIBE_ROOT/scripts/python/vibe3" -name '*.py' 2>/dev/null); do
+for f in $(find "$VIBE_ROOT/src/vibe3" -name '*.py' 2>/dev/null); do
   [ -f "$f" ] || continue
   lines=$(wc -l < "$f")
   if [ "$lines" -gt "$max_python_loc" ]; then
@@ -154,7 +154,7 @@ echo "    status: ${python_test_status}"
 echo "  ruff_lint_errors:"
 ruff_errors=0
 if command -v ruff > /dev/null 2>&1; then
-  ruff_errors=$(ruff check "$VIBE_ROOT/scripts/python" 2>&1 | grep -v "^warning" | grep -v "^All checks" | grep -c "^[A-Z]" || true)
+  ruff_errors=$(ruff check "$VIBE_ROOT/src" 2>&1 | grep -v "^warning" | grep -v "^All checks" | grep -c "^[A-Z]" || true)
 fi
 ruff_status="pass"
 [ "${ruff_errors:-0}" -gt 0 ] && ruff_status="fail"

@@ -5,7 +5,7 @@
 set -e
 
 # Read limit from config
-LIMIT=$(PYTHONPATH=scripts/python uv run python -m vibe3.config.get \
+LIMIT=$(PYTHONPATH=src uv run python -m vibe3.config.get \
     code_limits.v2_shell.total_loc \
     -c config/settings.yaml \
     --quiet 2>/dev/null || echo 7000)

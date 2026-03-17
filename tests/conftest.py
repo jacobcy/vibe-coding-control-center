@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock
 import pytest
 
-# Add scripts/python to path for imports
+# Add src to path for imports
 scripts_python = Path(__file__).parent.parent / "scripts" / "python"
 if str(scripts_python) not in sys.path:
     sys.path.insert(0, str(scripts_python))

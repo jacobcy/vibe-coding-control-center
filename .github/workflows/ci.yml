@@ -49,13 +49,13 @@ jobs:
 
       # Python checks for v3
       - name: Run Python lint (ruff)
-        run: uv run ruff check scripts/python
+        run: uv run ruff check src
 
       - name: Run Python format check (black)
-        run: uv run black --check scripts/python tests/vibe3
+        run: uv run black --check src tests/vibe3
 
       - name: Run Python type check (mypy)
-        run: uv run mypy scripts/python
+        run: uv run mypy src
 
       - name: Run Python tests (pytest)
         run: uv run pytest tests/vibe3 -v
@@ -90,9 +90,9 @@ jobs:
           fi
           echo "✅ All Shell files within 300-line limit"
 
-      - name: Check Python LOC ceiling (scripts/python ≤ )
+      - name: Check Python LOC ceiling (src ≤ )
         run: |
-          total=$(find scripts/python -name '*.py' | xargs cat | wc -l)
+          total=$(find src -name '*.py' | xargs cat | wc -l)
           echo "Total Python LOC: $total"
           if [ "$total" -gt  ]; then
             echo "FAIL: Total Python LOC $total exceeds  limit"
@@ -103,7 +103,7 @@ jobs:
       - name: Check per-file ceiling for Python (≤ 300 lines each)
         run: |
           failed=0
-          for f in $(find scripts/python/vibe3 -name '*.py'); do
+          for f in $(find src/vibe3 -name '*.py'); do
             [ -f "$f" ] || continue
             lines=$(wc -l < "$f")
             if [ "$lines" -gt 300 ]; then

@@ -6,7 +6,7 @@ author: Claude Sonnet 4.6
 created: 2026-03-16
 last_updated: 2026-03-16
 related_docs:
-  - docs/v3/implementation/04-test-standards.md
+  - docs/v3/infrastructure/04-test-standards.md
   - tests/conftest.py
 ---
 
@@ -48,11 +48,11 @@ related_docs:
 - 更务实，避免过度碎片化
 
 **影响文档**：
-- [04-test-standards.md](docs/v3/implementation/04-test-standards.md) - 测试标准文档
-- [02-flow-task-foundation.md](docs/v3/plans/02-flow-task-foundation.md) - Phase 02 计划
-- [03-pr-domain.md](docs/v3/plans/03-pr-domain.md) - Phase 03 计划
-- [04-handoff-and-cutover.md](docs/v3/plans/04-handoff-and-cutover.md) - Phase 04 计划
-- [05-polish-and-cleanup.md](docs/v3/plans/05-polish-and-cleanup.md) - Phase 05 计划
+- [04-test-standards.md](docs/v3/infrastructure/04-test-standards.md) - 测试标准文档
+- [02-flow-task-foundation.md](docs/v3/handoff/02-flow-task-foundation.md) - Phase 02 计划
+- [03-pr-domain.md](docs/v3/handoff/03-pr-domain.md) - Phase 03 计划
+- [04-handoff-and-cutover.md](docs/v3/handoff/04-handoff-and-cutover.md) - Phase 04 计划
+- [05-polish-and-cleanup.md](docs/v3/handoff/05-polish-and-cleanup.md) - Phase 05 计划
 
 ### 2. 创建共享 Fixtures ✅
 
@@ -229,7 +229,7 @@ class TestFlowBinding:
 
 ```bash
 # 运行测试并生成覆盖率报告
-uv run pytest tests/ --cov=scripts/python/vibe3 --cov-report=html
+uv run pytest tests/ --cov=src/vibe3 --cov-report=html
 ```
 
 ### 持续监控

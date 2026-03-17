@@ -20,12 +20,12 @@ review_scope:
     - "lib/flow"             # Flow 核心逻辑
     - "lib/git"              # Git 操作
     - "lib/github"           # GitHub 集成
-    - "scripts/python/vibe3/services/"  # v3 服务层
+    - "src/vibe3/services/"  # v3 服务层
 
   public_api_paths:          # 公开 API（兼容性检查）
     - "bin/vibe"             # 主入口
     - "lib/flow.sh"          # Flow 公开接口
-    - "scripts/python/vibe3/commands/"  # v3 命令层
+    - "src/vibe3/commands/"  # v3 命令层
 
 # 质量标准
 quality:

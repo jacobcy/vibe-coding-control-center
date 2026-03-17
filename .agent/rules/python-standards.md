@@ -7,8 +7,8 @@ author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-15
 related_docs:
-  - docs/v3/implementation/02-architecture.md
-  - docs/v3/implementation/03-coding-standards.md
+  - docs/v3/infrastructure/02-architecture.md
+  - docs/v3/infrastructure/03-coding-standards.md
   - docs/standards/glossary.md
   - SOUL.md
   - CLAUDE.md
@@ -129,7 +129,7 @@ from vibe3.models.pr import PRRequest
 ### 目录结构（强制）
 
 ```
-scripts/python/vibe3/
+src/vibe3/
 ├── cli.py                    # Typer 入口
 ├── commands/                 # 命令调度层（薄层）
 │   ├── pr.py                # PR 命令
@@ -473,7 +473,7 @@ target-version = ["py310"]
 
 ## 参考文档
 
-- **[docs/v3/implementation/](../../docs/v3/implementation/README.md)** - 实施指南
+- **[docs/v3/infrastructure/](../../docs/v3/infrastructure/README.md)** - 实施指南
 - **[SOUL.md](../../SOUL.md)** - 项目宪法
 - **[CLAUDE.md](../../CLAUDE.md)** - 项目上下文
 
