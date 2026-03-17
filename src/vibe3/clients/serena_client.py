@@ -7,7 +7,7 @@ from typing import Union
 
 from loguru import logger
 
-from vibe3.models.exceptions import SerenaError
+from vibe3.exceptions import SerenaError
 
 # Add lib to path for Vibe3Store
 lib_path = Path(__file__).parent.parent.parent.parent.parent / "lib"

@@ -10,7 +10,7 @@ import typer
 from loguru import logger
 
 from vibe3.commands import flow, pr, task
-from vibe3.models.exceptions import SystemError, UserError
+from vibe3.exceptions import SystemError, UserError
 
 app = typer.Typer(name="vibe3", help="Vibe 3.0 - Development orchestration tool")
 
