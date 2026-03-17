@@ -33,7 +33,7 @@ def new(
     name: Annotated[str, typer.Argument(help="Flow name")],
     task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
     actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "claude",
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Create a new flow."""
@@ -65,7 +65,7 @@ def new(
 def bind(
     task_id: Annotated[str, typer.Argument(help="Task ID to bind")],
     actor: Annotated[str, typer.Option(help="Actor binding the task")] = "claude",
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Bind a task to current flow."""
@@ -96,7 +96,7 @@ def bind(
 @app.command()
 def show(
     flow_name: Annotated[str | None, typer.Argument(help="Flow to show")] = None,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show flow details."""
@@ -127,7 +127,7 @@ def show(
 @app.command()
 def status(
     json_output: Annotated[bool, typer.Option("--json", help="JSON output")] = False,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
 ) -> None:
     """Show flow status."""
     if trace:
@@ -160,7 +160,7 @@ def list(
         Literal["active", "idle", "missing", "stale"] | None,
         typer.Option("--status", help="Filter by status"),
     ] = None,
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
+    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """List all flows."""
