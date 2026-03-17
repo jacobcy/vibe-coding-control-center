@@ -67,17 +67,24 @@ repos:
         files: \.(sh|bash)$
 
       - id: check-python-loc
-        name: Check Python LOC ceiling (src ≤ )
+        name: Check Python LOC ceiling (src ≤ config:code_limits.v3_python.total_loc)
         entry: scripts/hooks/check-python-loc.sh
         language: script
         pass_filenames: false
         files: ^src/.*\.py$
 
       - id: check-per-file-loc
-        name: Check per-file LOC ceiling (≤ 300 lines each)
+        name: Check per-file LOC ceiling (src ≤ config:code_limits.v3_python.max_file_loc)
         entry: scripts/hooks/check-per-file-loc.sh
         language: script
         pass_filenames: false
+
+      - id: check-test-file-loc
+        name: Check test file LOC ceiling (layer-aware)
+        entry: scripts/hooks/check-test-file-loc.sh
+        language: script
+        pass_filenames: false
+        files: ^tests/vibe3/.*\.py$
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)
