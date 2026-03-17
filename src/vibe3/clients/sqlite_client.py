@@ -39,15 +39,18 @@ class SQLiteClient:
             cursor = conn.cursor()
 
             # schema_meta
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS schema_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # flow_state
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_state (
                     branch TEXT PRIMARY KEY,
                     flow_slug TEXT NOT NULL,
@@ -69,10 +72,12 @@ class SQLiteClient:
                     flow_status TEXT NOT NULL DEFAULT 'active',
                     updated_at TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # flow_issue_links
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_issue_links (
                     branch TEXT NOT NULL,
                     issue_number INTEGER NOT NULL,
@@ -80,17 +85,21 @@ class SQLiteClient:
                     created_at TEXT NOT NULL,
                     PRIMARY KEY (branch, issue_number, issue_role)
                 )
-            """)
+            """
+            )
 
             # Unique index for task issue
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_single_task_issue
                 ON flow_issue_links(branch)
                 WHERE issue_role = 'task'
-            """)
+            """
+            )
 
             # flow_events
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS flow_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     branch TEXT NOT NULL,
@@ -99,7 +108,8 @@ class SQLiteClient:
                     detail TEXT,
                     created_at TEXT NOT NULL
                 )
-            """)
+            """
+            )
 
             # Set schema version if not set
             cursor.execute(
