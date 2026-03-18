@@ -88,7 +88,7 @@ class PRMixin:
                 target,
                 "--json",
                 "number,title,body,state,headRefName,baseRefName,"
-                "url,isDraft,createdAt,updatedAt,mergedAt",
+                "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
             ],
             capture_output=True,
             text=True,
@@ -99,6 +99,15 @@ class PRMixin:
             return None
 
         data = json.loads(result.stdout)
+
+        # Determine is_ready: not a draft
+        is_ready = not bool(data.get("isDraft", True))
+
+        # Determine ci_passed: check statusCheckRollup
+        # statusCheckRollup can be null, "SUCCESS", "FAILURE", "PENDING", etc.
+        status_rollup = data.get("statusCheckRollup")
+        ci_passed = status_rollup == "SUCCESS" if status_rollup else False
+
         return PRResponse(
             number=int(data["number"]),
             title=str(data["title"]),
@@ -108,6 +117,8 @@ class PRMixin:
             base_branch=str(data["baseRefName"]),
             url=str(data["url"]),
             draft=bool(data.get("isDraft", False)),
+            is_ready=is_ready,
+            ci_passed=ci_passed,
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),

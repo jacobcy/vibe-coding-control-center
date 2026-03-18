@@ -10,7 +10,6 @@ from vibe3.models.pr import (
     CreatePRRequest,
     PRMetadata,
     PRResponse,
-    ReviewResponse,
     VersionBumpResponse,
 )
 from vibe3.services.review_service import ReviewService
@@ -294,3 +293,24 @@ class PRService:
             RuntimeError: If PR not found or codex unavailable
         """
         return self.review_service.review_pr(pr_number, publish)
+
+    def get_pending_review_comments(self, pr_number: int) -> list[dict[str, str]]:
+        """Get pending review comments that need response.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            List of pending comments with author and body
+
+        Note:
+            This is a placeholder implementation. The actual implementation
+            will need to query GitHub API for unresolved review comments.
+        """
+        logger.bind(
+            domain="pr", action="get_pending_review_comments", pr_number=pr_number
+        ).debug("Getting pending review comments")
+
+        # TODO: Implement actual GitHub API call
+        # For now, return empty list as placeholder
+        return []
