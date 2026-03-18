@@ -5,6 +5,10 @@
 # Limits:
 #   default: 200 lines (most test files should fit)
 #   max: 300 lines (special cases with justification)
+#
+# Exit codes:
+#   0: All files within default limit
+#   1: Some files exceed max limit (or warnings with strict mode)
 
 set -e
 
@@ -16,27 +20,47 @@ get_limit() {
 LIMIT_DEFAULT=$(get_limit "code_limits.v3_python.test_file_loc.default" 200)
 LIMIT_MAX=$(get_limit "code_limits.v3_python.test_file_loc.max" 300)
 
-failed=0
+warnings=0
+errors=0
 
 check_file() {
   local f="$1"
-  local limit="$2"
   local lines
   lines=$(wc -l < "$f")
-  if [ "$lines" -gt "$limit" ]; then
-    echo "FAIL: $f has $lines lines (limit: $limit)"
-    failed=$((failed + 1))
+
+  # Check max limit (error)
+  if [ "$lines" -gt "$LIMIT_MAX" ]; then
+    echo "❌ ERROR: $f has $lines lines (max: $LIMIT_MAX)"
+    errors=$((errors + 1))
+  # Check default limit (warning)
+  elif [ "$lines" -gt "$LIMIT_DEFAULT" ]; then
+    echo "⚠️  WARNING: $f has $lines lines (default: $LIMIT_DEFAULT, max: $LIMIT_MAX)"
+    warnings=$((warnings + 1))
   fi
 }
 
 for f in $(find tests/vibe3 -name "test_*.py" 2>/dev/null); do
-  check_file "$f" "$LIMIT_MAX"
+  check_file "$f"
 done
 
-if [ "$failed" -gt 0 ]; then
-  echo "FAIL: $failed test files exceed $LIMIT_MAX line limit"
-  echo "Tip: Default limit is $LIMIT_DEFAULT lines. Use up to $LIMIT_MAX for special cases."
+# Report results
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Test file LOC check results:"
+echo "  - Default limit: $LIMIT_DEFAULT lines"
+echo "  - Max limit: $LIMIT_MAX lines"
+echo "  - Warnings: $warnings files (default → max)"
+echo "  - Errors: $errors files (exceed max)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "$errors" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Split large test files into smaller, focused modules"
   exit 1
+elif [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Consider refactoring files exceeding default limit"
+  echo "   (Warnings are allowed, but keep below max limit)"
 else
-  echo "✅ All test files within limit (max: $LIMIT_MAX lines, default: $LIMIT_DEFAULT)"
+  echo "✅ All test files within default limit ($LIMIT_DEFAULT lines)"
 fi
