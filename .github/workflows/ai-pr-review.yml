@@ -34,7 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
         run: |
-          uv run vibe review pr ${{ github.event.pull_request.number }} --publish
+          uv run python src/vibe3/cli.py review pr ${{ github.event.pull_request.number }} --publish
 
       - name: Remove ready-for-review label
         # review 完成后移除标签，避免重复触发
