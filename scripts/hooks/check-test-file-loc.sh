@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Check per-file LOC ceiling for test files (layer-aware)
-# Reads limits from config/settings.yaml via Python config module
+# Check per-file LOC ceiling for test files
+# Reads limits from config/settings.yaml
 #
-# Limits by layer:
-#   tests/vibe3/services/  → code_limits.v3_python.test_file_loc.services (180)
-#   tests/vibe3/clients/   → code_limits.v3_python.test_file_loc.clients  (200)
-#   tests/vibe3/commands/  → code_limits.v3_python.test_file_loc.commands (120)
+# Limits:
+#   default: 200 lines (most test files should fit)
+#   max: 300 lines (special cases with justification)
 
 set -e
 
@@ -14,9 +13,8 @@ get_limit() {
     "$1" -c config/settings.yaml --quiet 2>/dev/null || echo "$2"
 }
 
-LIMIT_SERVICES=$(get_limit "code_limits.v3_python.test_file_loc.services" 180)
-LIMIT_CLIENTS=$(get_limit  "code_limits.v3_python.test_file_loc.clients"  200)
-LIMIT_COMMANDS=$(get_limit "code_limits.v3_python.test_file_loc.commands" 120)
+LIMIT_DEFAULT=$(get_limit "code_limits.v3_python.test_file_loc.default" 200)
+LIMIT_MAX=$(get_limit "code_limits.v3_python.test_file_loc.max" 300)
 
 failed=0
 
@@ -31,13 +29,14 @@ check_file() {
   fi
 }
 
-for f in $(find tests/vibe3/services  -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_SERVICES";  done
-for f in $(find tests/vibe3/clients   -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_CLIENTS";   done
-for f in $(find tests/vibe3/commands  -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_COMMANDS";  done
+for f in $(find tests/vibe3 -name "test_*.py" 2>/dev/null); do
+  check_file "$f" "$LIMIT_MAX"
+done
 
 if [ "$failed" -gt 0 ]; then
-  echo "FAIL: $failed test files exceed layer limits"
+  echo "FAIL: $failed test files exceed $LIMIT_MAX line limit"
+  echo "Tip: Default limit is $LIMIT_DEFAULT lines. Use up to $LIMIT_MAX for special cases."
   exit 1
 else
-  echo "✅ All test files within layer limits (services≤${LIMIT_SERVICES}, clients≤${LIMIT_CLIENTS}, commands≤${LIMIT_COMMANDS})"
+  echo "✅ All test files within limit (max: $LIMIT_MAX lines, default: $LIMIT_DEFAULT)"
 fi

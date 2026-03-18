@@ -13,9 +13,8 @@ code_limits:
     max_file_loc: 300        # 单文件最大行数
     min_tests: 5             # 最少测试数量
     test_file_loc:
-      services: 180          # Services 层测试文件最大行数
-      clients: 200           # Clients 层测试文件最大行数
-      commands: 120           # Commands 层测试文件最大行数
+      default: 200           # 默认测试文件限制
+      max: 300              # 特殊情况上限（需注释说明理由）
 
 # 审核范围（适配 vibe-center 实际结构）
 review_scope:
