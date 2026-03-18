@@ -30,6 +30,39 @@ related_docs:
 - **最低版本**：Python 3.10+
 - **类型语法**：使用 Python 3.10+ 类型语法（`str | None` 而非 `Optional[str]`）
 
+### 依赖管理（强制）
+
+**本项目使用 uv 管理依赖和虚拟环境**：
+- **配置文件**：`pyproject.toml`（项目根目录）
+- **安装依赖**：`uv sync`
+- **添加依赖**：`uv add <package>`
+- **移除依赖**：`uv remove <package>`
+- **运行命令**：`uv run <command>`
+- **运行 Python**：`uv run python`（**禁止直接使用 `python` 或 `python3`**）
+
+**禁止**：
+- ❌ 使用 `python`、`python3`、`pip`、`pip3` 等命令
+- ❌ 手动创建虚拟环境（`python -m venv`）
+- ❌ 使用 `requirements.txt`（统一用 `pyproject.toml`）
+
+**正确示例**：
+```bash
+# ✅ 运行 Python 脚本
+uv run python src/vibe3/cli.py
+
+# ✅ 运行测试
+uv run pytest
+
+# ✅ 运行 mypy
+uv run mypy src/vibe3
+
+# ❌ 错误：直接使用 python
+python src/vibe3/cli.py
+
+# ❌ 错误：使用 pip
+pip install requests
+```
+
 ### 核心依赖（必须）
 
 | 包名 | 版本 | 用途 | 强制程度 |

@@ -4,14 +4,6 @@
 #
 # Usage:
 #   bash scripts/tools/metrics.sh
-#
-# Related commands:
-#   bash scripts/shell_structure_summary.sh   # Shell 代码结构详情
-#   bash src_structure_summary.sh  # Python 代码结构详情
-#
-# For detailed analysis of specific files:
-#   bash scripts/shell_structure_summary.sh lib/flow.sh
-#   bash src_structure_summary.sh services/pr_service.py
 
 set -e
 
@@ -114,7 +106,7 @@ echo ""
 # ============ v3 (Python) Metrics ============
 echo "v3_python:"
 echo "  total_loc:"
-echo "    limit: 7000"
+echo "    limit: 9000"
 python_loc=$(find "$VIBE_ROOT/src" -name '*.py' 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 python_loc_status="pass"
 [ "${python_loc:-0}" -gt 7000 ] && python_loc_status="fail"

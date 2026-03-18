@@ -80,7 +80,7 @@ src/vibe3/
 │   ├── dag_service.py        # 新增：DAG 分析
 │   ├── pr_scoring_service.py # 新增：PR 风险评分
 │   ├── metrics_service.py    # 迁移 metrics.sh
-│   └── structure_service.py  # 迁移 structure_summary.sh
+│   └── structure_service.py  # 结构分析
 │
 ├── commands/
 │   └── review.py             # 审核命令入口（vibe review）
@@ -145,7 +145,6 @@ vibe review commit SHA        # 审核指定 commit
 |--------|--------|----------|---------|----------|
 | `serena_gate.py` | `scripts/tools/` | Service | `services/serena_service.py` | +日志/类型/错误处理 |
 | `metrics.sh` | `scripts/tools/` | Service | `services/metrics_service.py` | Shell→Python |
-| `structure_summary.sh` | `scripts/tools/` | Service | `services/structure_service.py` | Shell→Python |
 | - | - | Service | `services/dag_service.py` | 新增：DAG 分析 |
 | - | - | Service | `services/pr_scoring_service.py` | 新增：PR 风险评分 |
 

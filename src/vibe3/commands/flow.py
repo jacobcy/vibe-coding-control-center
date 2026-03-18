@@ -20,7 +20,11 @@ from vibe3.ui.flow_ui import (
     render_flows_table,
 )
 
-app = typer.Typer(help="Manage logic flows (branch-centric)")
+app = typer.Typer(
+    help="Manage logic flows (branch-centric)",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+)
 
 
 @contextmanager

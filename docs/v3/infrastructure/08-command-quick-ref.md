@@ -4,7 +4,7 @@ title: Vibe 3.0 - 命令参数快速参考
 status: active
 author: Claude Sonnet 4.6
 created: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-18
 related_docs:
   - docs/v3/infrastructure/07-command-standards.md
 ---
@@ -15,37 +15,87 @@ related_docs:
 
 ---
 
-## 核心参数集
+## 三层参数结构
 
-所有 `vibe` 命令必须支持以下参数：
-
-| 参数 | 短选项 | 长选项 | 用途 | 示例 |
-|------|--------|--------|------|------|
-| 追踪 | - | `--trace` | 调用链路追踪 + DEBUG 日志 | `vibe review pr 42 --trace` |
-| JSON | - | `--json` | JSON 格式输出 | `vibe inspect pr 42 --json` |
-| 确认 | `-y` | `--yes` | 自动确认交互 | `vibe clean --yes` |
-| 帮助 | `-h` | `--help` | 显示帮助 | `vibe review --help` |
+```
+全局层     vibe3 -v/-vv [COMMAND]
+命令组层   vibe3 flow/inspect/review/... [-h]
+子命令层   vibe3 flow new NAME [--trace] [--json] [-y]
+```
 
 ---
 
-## 快速验证
+## 全局层参数（`vibe3`）
 
-验证命令是否符合标准：
+| 参数 | 说明 |
+|------|------|
+| `-v` | INFO 日志 |
+| `-vv` | DEBUG 日志 |
+| `-h` / `--help` | 显示帮助 |
+| （无参数） | 显示帮助 |
 
-```python
-import inspect
-from vibe3.commands.example import example_command
+```bash
+vibe3 -v flow list
+vibe3 -vv inspect pr 42
+vibe3 -h
+vibe3 help
+```
 
-sig = inspect.signature(example_command)
-params = sig.parameters
+---
 
-# 检查核心参数
-assert "trace" in params
-assert "json_output" in params
-assert "yes" in params
+## 子命令层参数（所有叶子命令）
 
-# 检查默认值
-assert all(params[p].default is False for p in ["trace", "json_output", "yes"])
+| 参数 | 短选项 | 用途 |
+|------|--------|------|
+| `--trace` | - | 调用链路追踪 + DEBUG（比 `-vv` 更重量级） |
+| `--json` | - | JSON 格式输出到 stdout |
+| `--yes` | `-y` | 自动确认（破坏性操作） |
+| `--help` | `-h` | 显示帮助 |
+
+```bash
+vibe3 inspect pr 42 --trace
+vibe3 inspect pr 42 --json | jq '.score'
+vibe3 inspect pr 42 --trace --json
+vibe3 review pr 42 --help
+vibe3 flow new my-feature -h
+```
+
+---
+
+## `-v` vs `--trace` 对比
+
+| | `-v` / `-vv` | `--trace` |
+|---|---|---|
+| 作用域 | 全局 | 子命令 |
+| 日志级别 | INFO / DEBUG | DEBUG |
+| 调用链追踪 | ❌ | ✅ |
+| 性能开销 | 低 | 高 |
+| 典型用途 | agent 日常调用 | 深度排查 |
+
+---
+
+## 常用命令示例
+
+```bash
+# 查看帮助（任意层级）
+vibe3 -h
+vibe3 flow -h
+vibe3 inspect pr -h
+
+# 分析 PR
+vibe3 inspect pr 42
+vibe3 inspect pr 42 --json
+vibe3 inspect pr 42 --trace
+
+# 代码审核
+vibe3 review pr 42
+vibe3 review pr 42 --publish
+vibe3 -v review pr 42          # INFO 日志 + 审核
+
+# 查看流程
+vibe3 flow list
+vibe3 flow status
+vibe3 -vv flow new my-feature  # DEBUG 日志 + 创建
 ```
 
 ---

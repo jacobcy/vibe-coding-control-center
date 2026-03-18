@@ -1,4 +1,4 @@
-"""Structure service - 分析文件结构，迁移自 structure_summary.sh."""
+"""Structure service - 分析文件结构"""
 
 import ast
 import re

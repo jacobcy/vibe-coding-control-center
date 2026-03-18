@@ -127,6 +127,36 @@ class SQLiteError(SystemError):
         self.operation = operation
 
 
+class CommitAnalyzerError(SystemError):
+    """CommitAnalyzer git command failed."""
+
+    def __init__(self, operation: str, details: str) -> None:
+        """Initialize CommitAnalyzerError.
+
+        Args:
+            operation: CommitAnalyzer operation that failed
+            details: Error details
+        """
+        super().__init__(f"CommitAnalyzer {operation} failed: {details}")
+        self.operation = operation
+        self.details = details
+
+
+class HookManagerError(SystemError):
+    """HookManager hook install/uninstall failed."""
+
+    def __init__(self, operation: str, details: str) -> None:
+        """Initialize HookManagerError.
+
+        Args:
+            operation: HookManager operation that failed (e.g., 'install', 'uninstall')
+            details: Error details
+        """
+        super().__init__(f"HookManager {operation} failed: {details}")
+        self.operation = operation
+        self.details = details
+
+
 # ========== Business Errors ==========
 
 

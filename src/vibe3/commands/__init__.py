@@ -1,5 +1,5 @@
 """Commands package."""
 
-from . import flow, pr, task
+from . import flow, hooks, inspect, pr, review, task
 
-__all__ = ["flow", "task", "pr"]
+__all__ = ["flow", "task", "pr", "hooks", "inspect", "review"]

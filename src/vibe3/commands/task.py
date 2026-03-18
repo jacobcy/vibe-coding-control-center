@@ -15,7 +15,9 @@ from vibe3.observability.trace import trace_context
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import render_issue_linked
 
-app = typer.Typer(help="Manage execution tasks")
+app = typer.Typer(
+    help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
+)
 
 
 @contextmanager

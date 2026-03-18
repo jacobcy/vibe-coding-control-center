@@ -82,11 +82,12 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
                 path=str(config_path),
                 error=str(e),
             )
-            return VibeConfig()
+            # 降级到从默认配置文件读取
+            return VibeConfig.get_defaults()
 
-    # Return default config
-    logger.info("Using default configuration")
-    return VibeConfig()
+    # Return default config (from config/settings.yaml if exists)
+    logger.info("Using default configuration from config/settings.yaml")
+    return VibeConfig.get_defaults()
 
 
 def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig:

@@ -12,7 +12,7 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.metrics_service import LayerMetrics, MetricsError, collect_metrics
 
-app = typer.Typer(help="查看代码量指标")
+app = typer.Typer(help="查看代码量指标", rich_markup_mode="rich")
 
 
 @contextmanager

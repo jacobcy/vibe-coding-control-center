@@ -210,8 +210,6 @@ Phase 1 提供的能力层将通过统一接口被 Phase 2 的编排层调用。
 
 **目标**: Shell → Python，添加日志
 
-**现有代码**: `scripts/tools/structure_summary.sh` (169 行)
-
 **架构分层**:
 - `services/structure_service.py` - 分析文件结构
 - `commands/structure.py` - typer CLI 入口
@@ -472,7 +470,6 @@ vibe inspect pr 42 --trace 2>&1 | grep -E "domain|action|calling"
 | `serena_gate.py` | 147 | `clients/serena_client.py` (190行) + `services/serena_service.py` (150行) | ~340 | Client + Service |
 | Git Client 扩展 | - | `clients/git_client.py` | +150 | Client |
 | `metrics.sh` | 186 | `services/metrics_service.py` + `commands/metrics.py` | ~280 | Service + Command |
-| `structure_summary.sh` | 169 | `services/structure_service.py` + `commands/structure.py` | ~260 | Service + Command |
 | 新增 DAG | - | `services/dag_service.py` | ~150 | Service |
 | 新增 Scoring | - | `services/pr_scoring_service.py` | ~200 | Service |
 | 新增 Command Analyzer | - | `services/command_analyzer.py` | ~180 | Service |
@@ -499,7 +496,7 @@ vibe inspect pr 42 --trace 2>&1 | grep -E "domain|action|calling"
 ```
 PR diff
   ↓
-python_structure_summary.sh
+python structure summary
   ↓
 Serena adapter（抽取 changed symbols / references）
   ↓
@@ -517,7 +514,7 @@ PR summary comment
 ```
 
 **实施计划对应**:
-- `python_structure_summary.sh` → Structure Service
+- `pythons tructure summary` → Structure Service
 - `Serena adapter` → Serena Service
 - `Review DAG` → DAG Service
 - `Risk scoring` → PR Scoring Service

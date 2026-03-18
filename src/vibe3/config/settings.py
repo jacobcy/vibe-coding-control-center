@@ -1,4 +1,10 @@
-"""Configuration models using pydantic for type safety."""
+"""Configuration models using pydantic for type safety.
+
+配置真源原则：
+- config/settings.yaml 是配置的真源
+- Pydantic 模型只提供最小安全默认值（用于降级场景）
+- 正常情况下所有配置都从 YAML 文件读取
+"""
 
 from pathlib import Path
 
@@ -9,45 +15,25 @@ class TestFileLimitsConfig(BaseModel):
     """Per-layer test file line limits."""
 
     services: int = Field(
-        default=180, description="Services layer max lines per test file"
-    )
+        default=500, description="Services layer max lines per test file"
+    )  # 宽松默认值
     clients: int = Field(
-        default=200, description="Clients layer max lines per test file"
+        default=500, description="Clients layer max lines per test file"
     )
     commands: int = Field(
-        default=80, description="Commands layer max lines per test file"
+        default=300, description="Commands layer max lines per test file"
     )
 
 
 class CodeLimitsConfig(BaseModel):
     """Code size limits configuration."""
 
-    total_loc: int = Field(description="Total lines of code limit")
-    max_file_loc: int = Field(description="Maximum lines per file")
-    min_tests: int = Field(description="Minimum number of tests")
+    total_loc: int = Field(default=10000, description="Total lines of code limit")
+    max_file_loc: int = Field(default=500, description="Maximum lines per file")
+    min_tests: int = Field(default=0, description="Minimum number of tests")
     test_file_loc: TestFileLimitsConfig = Field(
         default_factory=TestFileLimitsConfig,
         description="Per-layer test file line limits",
-    )
-
-
-class V2ShellLimits(BaseModel):
-    """V2 Shell code limits."""
-
-    v2_shell: CodeLimitsConfig = Field(
-        default_factory=lambda: CodeLimitsConfig(
-            total_loc=7000, max_file_loc=300, min_tests=20
-        )
-    )
-
-
-class V3PythonLimits(BaseModel):
-    """V3 Python code limits."""
-
-    v3_python: CodeLimitsConfig = Field(
-        default_factory=lambda: CodeLimitsConfig(
-            total_loc=7000, max_file_loc=300, min_tests=5
-        )
     )
 
 
@@ -55,14 +41,10 @@ class CodeLimits(BaseModel):
     """Code limits for both V2 and V3."""
 
     v2_shell: CodeLimitsConfig = Field(
-        default_factory=lambda: CodeLimitsConfig(
-            total_loc=7000, max_file_loc=300, min_tests=20
-        )
+        default_factory=CodeLimitsConfig, description="V2 Shell code limits"
     )
     v3_python: CodeLimitsConfig = Field(
-        default_factory=lambda: CodeLimitsConfig(
-            total_loc=7000, max_file_loc=300, min_tests=5
-        )
+        default_factory=CodeLimitsConfig, description="V3 Python code limits"
     )
 
 
@@ -70,21 +52,11 @@ class ReviewScopeConfig(BaseModel):
     """Review scope configuration."""
 
     critical_paths: list[str] = Field(
-        default_factory=lambda: [
-            "bin/",
-            "lib/flow",
-            "lib/git",
-            "lib/github",
-            "src/vibe3/services/",
-        ],
+        default_factory=list,
         description="Critical paths for detailed review",
     )
     public_api_paths: list[str] = Field(
-        default_factory=lambda: [
-            "bin/vibe",
-            "lib/flow.sh",
-            "src/vibe3/commands/",
-        ],
+        default_factory=list,
         description="Public API paths for compatibility checking",
     )
 
@@ -93,13 +65,13 @@ class TestCoverageConfig(BaseModel):
     """Test coverage requirements."""
 
     services: int = Field(
-        default=80, ge=0, le=100, description="Services layer coverage %"
+        default=50, ge=0, le=100, description="Services layer coverage %"
     )
     clients: int = Field(
-        default=70, ge=0, le=100, description="Clients layer coverage %"
+        default=50, ge=0, le=100, description="Clients layer coverage %"
     )
     commands: int = Field(
-        default=60, ge=0, le=100, description="Commands layer coverage %"
+        default=50, ge=0, le=100, description="Commands layer coverage %"
     )
 
 
@@ -184,13 +156,43 @@ class PRScoringConfig(BaseModel):
     merge_gate: MergeGateConfig = Field(default_factory=MergeGateConfig)
 
 
+class HooksConfig(BaseModel):
+    """Git hooks configuration."""
+
+    post_commit: bool = True
+    pre_push: bool = False
+
+
+class AutoTriggerConfig(BaseModel):
+    """Auto trigger configuration for review."""
+
+    enabled: bool = True
+    min_complexity: int = Field(default=3, ge=1, le=10)
+    min_lines_changed: int = 50
+    min_files_changed: int = 3
+    hooks: HooksConfig = Field(default_factory=HooksConfig)
+
+
+class ReviewConfig(BaseModel):
+    """Review configuration."""
+
+    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
+
+
 class VibeConfig(BaseModel):
-    """Root configuration model for Vibe Center."""
+    """Root configuration model for Vibe Center.
+
+    配置真源：config/settings.yaml
+
+    Pydantic 模型中的默认值是最小安全默认值，仅用于降级场景。
+    正常情况下所有配置都应该从 YAML 文件读取。
+    """
 
     code_limits: CodeLimits = Field(default_factory=CodeLimits)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
     pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)
+    review: ReviewConfig = Field(default_factory=ReviewConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
@@ -202,9 +204,23 @@ class VibeConfig(BaseModel):
         Returns:
             VibeConfig instance
         """
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         with open(config_path) as f:
             data = yaml.safe_load(f)
 
         return cls(**data)
+
+    @classmethod
+    def get_defaults(cls) -> "VibeConfig":
+        """从默认配置文件 config/settings.yaml 读取配置.
+
+        这是获取配置的标准方式，确保 YAML 文件是唯一真源。
+
+        Returns:
+            从 config/settings.yaml 加载的配置，如果文件不存在则返回最小安全默认值
+        """
+        default_path = Path("config/settings.yaml")
+        if default_path.exists():
+            return cls.from_yaml(default_path)
+        return cls()

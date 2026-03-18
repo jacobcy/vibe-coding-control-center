@@ -4,7 +4,7 @@ title: Vibe 3.0 - 命令参数标准
 status: active
 author: Claude Sonnet 4.6
 created: 2026-03-17
-last_updated: 2026-03-17
+last_updated: 2026-03-18
 related_docs:
   - docs/v3/infrastructure/02-architecture.md
   - docs/v3/infrastructure/03-coding-standards.md
@@ -21,404 +21,250 @@ related_docs:
 
 ---
 
+## 命令层级结构
+
+Vibe 3.0 CLI 分为三层：
+
+```
+vibe3                          ← 全局层（Global）
+├── flow                       ← 命令组层（Group）
+│   ├── new
+│   ├── list
+│   └── ...
+├── inspect                    ← 命令组层（Group）
+│   ├── pr
+│   ├── metrics
+│   └── ...
+└── review                     ← 命令组层（Group）
+    ├── pr                     ← 子命令层（Subcommand）
+    └── ...
+```
+
+每层的参数职责不同，见下表。
+
+---
+
+## 各层参数职责
+
+### 全局层（`vibe3`）
+
+| 参数 | 短选项 | 类型 | 默认值 | 用途 |
+|------|--------|------|--------|------|
+| `-v` | `-v` | count | 0 | 日志级别：`-v` INFO，`-vv` DEBUG |
+| `--help` | `-h` | - | - | 显示帮助 |
+
+- 不加任何参数 → 显示帮助（`no_args_is_help=True`）
+- `vibe3 help` → 显示帮助（等同于 `vibe3 --help`）
+- `-v` 全局生效，影响所有子命令的日志输出
+
+### 命令组层（`flow` / `task` / `pr` / `inspect` / `review` / `hooks`）
+
+| 参数 | 短选项 | 用途 |
+|------|--------|------|
+| `--help` | `-h` | 显示该组的子命令列表 |
+
+- 不加任何参数 → 显示帮助（`no_args_is_help=True`）
+- 命令组本身不执行逻辑，只路由到子命令
+
+### 子命令层（`flow new` / `inspect pr` / `review pr` 等）
+
+| 参数 | 短选项 | 长选项 | 类型 | 默认值 | 用途 |
+|------|--------|--------|------|--------|------|
+| 追踪 | - | `--trace` | bool | False | 调用链路追踪 + DEBUG 日志 |
+| JSON | - | `--json` | bool | False | JSON 格式输出 |
+| 确认 | `-y` | `--yes` | bool | False | 自动确认交互（破坏性操作） |
+| 帮助 | `-h` | `--help` | - | - | 显示帮助 |
+
+---
+
 ## 核心原则
 
 ### 1. 一致性优先
 
-所有命令必须提供一致的参数体验：
 - ✅ 相同功能的参数名称相同
 - ✅ 相同功能的参数行为相同
-- ✅ 所有命令支持核心参数集
+- ✅ 所有子命令支持核心参数集（`--trace`、`--json`）
 
 ### 2. 符合业界标准
 
-遵循 Unix/Linux 和 Python CLI 最佳实践：
-- ✅ 短选项（`-y`）和长选项（`--yes`）并存
-- ✅ 布尔选项不带参数（`--trace`）
-- ✅ 帮助信息清晰（`-h/--help` 由 typer 自动提供）
-
----
-
-## 核心参数集（强制）
-
-所有 `vibe` 命令必须支持以下核心参数：
-
-| 参数 | 短选项 | 长选项 | 类型 | 默认值 | 用途 |
-|------|--------|--------|------|--------|------|
-| **追踪** | - | `--trace` | bool | False | 启用调用链路追踪 + DEBUG 日志 |
-| **JSON** | - | `--json` | bool | False | JSON 格式输出 |
-| **确认** | `-y` | `--yes` | bool | False | 自动确认交互（默认拒绝） |
-| **帮助** | `-h` | `--help` | - | - | 显示帮助（typer 自动提供） |
-
-> **注意**：`--verbose` / `-v` 已合并入 `--trace`，不单独存在。`--trace` 同时启用调用链路追踪和 DEBUG 级别日志输出，避免两个参数语义重叠造成混淆。
+- ✅ `-h` 是 `--help` 的简写，全局所有层级生效
+- ✅ 布尔选项不带参数（`--trace`、`--json`）
+- ✅ 不加参数时显示帮助，不报错
 
 ---
 
 ## 参数详细说明
 
-### 1. `--trace` - 调用链路追踪 + DEBUG 日志
+### `-v / -vv` — 全局日志级别
 
-**用途**: 同时启用运行时调用链路追踪和 DEBUG 级别日志输出
+**作用域**: 全局层，影响所有子命令
 
 **行为**:
-- 设置日志级别为 DEBUG（输出所有 `logger.debug(...)` 内容）
-- 追踪函数调用链路（调用栈、参数、返回值）
-- 标记错误位置
-- 不影响命令执行结果
+- 不加 `-v`：WARNING 级别（默认静默）
+- `-v`：INFO 级别
+- `-vv`：DEBUG 级别
 
 **使用场景**:
 ```bash
-# 调试命令执行过程
-vibe review pr 42 --trace
-
-# 追踪错误位置
-vibe inspect pr 42 --trace
+vibe3 -v flow list          # INFO 日志
+vibe3 -vv inspect pr 42     # DEBUG 日志
 ```
 
-**输出示例**:
-```
-commands/review.py::pr(pr_number=42)
-  ├─ clients/git_client.py::get_diff()
-  │  └─ ✓ return: 234 lines
-  ├─ services/serena_service.py::analyze_changes()
-  │  └─ ✓ return: impact.json
-  ❌ ERROR in subprocess.run("codex review")
-```
+---
 
-**详细实现**: 见 [../../trace/references/command-debug-design.md](../../v3/trace/references/command-debug-design.md)
+### `--trace` — 调用链路追踪
 
-**用途**: 以 JSON 格式输出结果，便于脚本解析
+**作用域**: 子命令层
 
 **行为**:
-- 输出结构化 JSON 数据
-- 不包含人类可读的格式化
+- 设置日志级别为 DEBUG
+- 启用 `sys.settrace` 运行时调用链追踪，打印每个 vibe3 内部函数调用
+- 比 `-vv` 更重量级，用于深度调试
+
+**使用场景**:
+```bash
+vibe3 review pr 42 --trace
+vibe3 inspect pr 42 --trace
+```
+
+**与 `-vv` 的区别**:
+
+| | `-vv` | `--trace` |
+|---|---|---|
+| 日志级别 | DEBUG | DEBUG |
+| 调用链追踪 | ❌ | ✅ `sys.settrace` |
+| 性能开销 | 低 | 高 |
+| 适用场景 | 日常调试 | 深度排查 |
+
+---
+
+### `--json` — JSON 输出
+
+**作用域**: 子命令层
+
+**行为**:
+- 输出结构化 JSON 到 stdout
+- 追踪日志输出到 stderr，互不干扰
 - 适合管道和脚本处理
 
 **使用场景**:
 ```bash
-# 脚本化处理
-vibe inspect pr 42 --json | jq '.impact'
-
-# 集成到其他工具
-RESULT=$(vibe inspect metrics --json)
+vibe3 inspect pr 42 --json | jq '.impact'
+RESULT=$(vibe3 inspect metrics --json)
 ```
 
 ---
 
-### 4. `-y/--yes` - 自动确认
+### `-y / --yes` — 自动确认
 
-**用途**: 自动确认交互式操作，跳过用户确认
+**作用域**: 子命令层（破坏性操作）
 
 **行为**:
 - 默认：拒绝所有需要用户确认的操作
-- `-y`：自动确认所有操作
-- 主要用于破坏性操作（删除、重置等）
+- `-y`：自动确认，用于脚本化
 
 **使用场景**:
 ```bash
-# 默认：需要确认
-vibe clean
-
-# 自动确认（用于脚本）
-vibe clean --yes
-
-# 破坏性操作
-vibe reset --yes
+vibe3 clean --yes
+vibe3 reset --yes
 ```
-
-**安全原则**:
-- ✅ 默认拒绝，明确确认
-- ✅ 破坏性操作必须要求确认
-- ✅ 只在明确指定 `-y` 时自动确认
 
 ---
 
-### 5. `-h/--help` - 帮助信息
+### `-h / --help` — 帮助
 
-**用途**: 显示命令帮助信息
+**作用域**: 全局所有层级
 
 **行为**:
-- 由 typer 自动提供
-- 显示命令描述、参数说明、示例
-
-**实现**: 无需手动实现，typer 自动处理
+- 所有层级均支持 `-h` 作为 `--help` 的简写
+- 不加参数时（命令组/全局）自动显示帮助
 
 **使用场景**:
 ```bash
-# 查看命令帮助
-vibe review --help
-vibe inspect --help
+vibe3 -h
+vibe3 flow -h
+vibe3 inspect pr -h
 ```
-
----
-
-## 参数组合规则
-
-### 可组合性
-
-核心参数可以自由组合：
-
-```bash
-# 追踪（含 DEBUG 日志）+ JSON
-vibe inspect pr 42 --trace --json
-
-# 仅 JSON 输出
-vibe inspect metrics --json
-
-# 追踪调试
-vibe review pr 42 --trace
-```
-
-### 冲突处理
-
-| 组合 | 冲突？ | 说明 |
-|------|--------|------|
-| `--trace` + `--json` | ✅ 允许 | JSON 格式输出追踪结果 |
-
-**建议**: `--json` 与 `--trace` 同时使用时，追踪日志输出到 stderr，JSON 结果输出到 stdout，互不干扰。
 
 ---
 
 ## 实现模板
 
-### 标准命令模板
+### 子命令标准模板
 
 ```python
 import typer
 from typing import Annotated
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=True, rich_markup_mode="rich")
+
+_TRACE_OPT = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")]
+_JSON_OPT  = Annotated[bool, typer.Option("--json",  help="JSON 格式输出")]
 
 @app.command()
-def example_command(
-    # 位置参数
-    target: str,
+def example(
+    target: Annotated[str, typer.Argument(help="目标")],
+    trace: _TRACE_OPT = False,
+    json_out: _JSON_OPT = False,
+    yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认")] = False,
+) -> None:
+    """命令描述。
 
-    # 核心参数集（强制）
-    trace: Annotated[bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-    yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认交互")] = False,
-
-    # 命令特定参数（可选）
-    option1: str = typer.Option("default", "--option1", help="Specific option"),
-):
-    """Example command with standard parameters"""
-    # 1. 处理 trace（同时启用 DEBUG 日志 + 调用链路追踪）
+    Example: vibe3 group example TARGET
+    """
     if trace:
-        import sys
-        from loguru import logger
-        from vibe3.observability.trace import trace_context
-        logger.remove()
-        logger.add(sys.stderr, level="DEBUG")
+        from vibe3.commands.xxx_helpers import enable_trace
+        enable_trace()
 
-    # 2. 执行核心逻辑
-    result = _do_something(target, option1)
+    result = _do_something(target)
 
-    # 3. 处理输出格式
-    if json_output:
-        typer.echo_json(result)
+    if json_out:
+        typer.echo(json.dumps(result))
     else:
-        _print_human_readable(result)
+        _render(result)
 ```
 
 ---
 
 ## 测试标准
 
-### 强制测试项
-
-每个命令必须包含以下测试：
-
-#### 1. 参数存在性测试
+每个子命令必须包含：
 
 ```python
-def test_command_has_standard_params():
-    """测试命令包含所有核心参数"""
-    from vibe3.commands.example import example_command
-    import inspect
+def test_missing_arg_shows_error():
+    """缺少必填参数 → 友好错误，非崩溃"""
+    result = runner.invoke(app, ["subcommand"])
+    assert result.exit_code != 0
+    assert "missing" in result.output.lower() or "error" in result.output.lower()
 
-    sig = inspect.signature(example_command)
-    params = sig.parameters
-
-    assert "trace" in params, "Missing --trace parameter"
-    assert "json_output" in params, "Missing --json parameter"
-    assert "yes" in params, "Missing --yes parameter"
-```
-
-#### 2. 参数默认值测试
-
-```python
-def test_param_defaults():
-    """测试参数默认值正确"""
-    from vibe3.commands.example import example_command
-    import inspect
-
-    sig = inspect.signature(example_command)
-    params = sig.parameters
-
-    assert params["trace"].default is False
-    assert params["json_output"].default is False
-    assert params["yes"].default is False
-```
-
-#### 3. 功能测试
-
-```python
-from typer.testing import CliRunner
-from vibe3.commands.example import app
-
-runner = CliRunner()
-
-def test_trace_parameter():
-    """测试 --trace 参数"""
-    result = runner.invoke(app, ["target", "--trace"])
+def test_help():
+    result = runner.invoke(app, ["subcommand", "--help"])
     assert result.exit_code == 0
-    # 验证追踪输出
-    assert "├─" in result.stdout or "trace" in result.stdout.lower()
-```
 
-#### 4. 参数组合测试
-
-```python
-def test_param_combinations():
-    """测试参数组合"""
-    # trace + verbose
-    result = runner.invoke(app, ["target", "--trace"])
+def test_json_output():
+    with patch(...):
+        result = runner.invoke(app, ["subcommand", "arg", "--json"])
     assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert "expected_key" in data
 ```
 
 ---
 
-## 验收标准
+## 验收清单
 
-### 代码审查清单
-
-- [ ] 所有命令包含核心参数集（`--trace`, `--json`, `--yes`）
-- [ ] 参数命名符合标准（短选项 + 长选项）
-- [ ] 参数默认值正确（均为 `False`）
-- [ ] 帮助信息清晰（`help="..."`）
-- [ ] 参数行为符合文档说明
-- [ ] 包含参数测试（存在性、默认值、功能）
-- [ ] 参数可组合使用
-
-### 测试覆盖率
-
-- [ ] 参数存在性测试：100%
-- [ ] 参数默认值测试：100%
-- [ ] 参数功能测试：≥80%
-- [ ] 参数组合测试：≥80%
-
----
-
-## 最佳实践
-
-### 1. 保持参数语义一致
-
-```python
-# ✅ 正确：所有命令的 --json 行为一致
-vibe inspect pr 42 --json  # 输出 JSON
-vibe review pr 42 --json   # 输出 JSON
-
-# ❌ 错误：不同命令的 --json 行为不同
-vibe inspect pr 42 --json  # 输出 JSON
-vibe review pr 42 --json   # 输出 YAML（不一致！）
-```
-
-### 2. 避免参数爆炸
-
-```python
-# ✅ 正确：核心参数 + 必要的特定参数
-@app.command()
-def command(
-    target: str,
-    trace: bool = False,
-    verbose: bool = False,
-    specific: str = "value",  # 命令特定参数
-):
-    ...
-
-# ❌ 错误：参数过多
-@app.command()
-def command(
-    target: str,
-    trace: bool = False,
-    verbose: bool = False,
-    option1: str = "...",
-    option2: str = "...",
-    option3: str = "...",
-    option4: str = "...",
-    option5: str = "...",
-    option6: str = "...",  # 参数太多！
-):
-    ...
-```
-
-### 3. 提供清晰的帮助信息
-
-```python
-# ✅ 正确：清晰的帮助信息
-@app.command()
-def command(
-    target: str = typer.Argument(..., help="Target file or directory"),
-    trace: bool = typer.Option(False, "--trace", help="Enable runtime call tracing"),
-):
-    """Command description
-
-    Detailed description of what this command does.
-
-    Examples:
-        vibe command target --trace
-        vibe command target --json
-    """
-    ...
-
-# ❌ 错误：缺少帮助信息
-@app.command()
-def command(target: str, trace: bool = False):
-    """Command"""  # 描述太简略
-    ...
-```
+- [ ] 子命令包含 `--trace`、`--json`
+- [ ] 破坏性操作包含 `-y/--yes`
+- [ ] 所有层级支持 `-h`
+- [ ] 命令组和全局不加参数时显示帮助
+- [ ] 帮助信息包含 `Example:` 示例
+- [ ] 测试覆盖：缺参数、`--help`、`--json`
 
 ---
 
 ## 交叉引用
 
-### 相关文档
-
-- **架构标准**: [02-architecture.md](02-architecture.md) - 分层架构定义
-- **编码标准**: [03-coding-standards.md](03-coding-standards.md) - 代码风格和复杂度
-- **日志标准**: [05-logging.md](05-logging.md) - 日志输出规范
-- **命令调试设计**: [../../v3/trace/references/command-debug-design.md](../../v3/trace/references/command-debug-design.md) - 静态检查 vs 动态追踪
-
-### 实施文档
-
-- **Phase 1 实施**: [../../v3/trace/phase1-infrastructure.md](../../v3/trace/phase1-infrastructure.md)
-- **Phase 2 实施**: [../../v3/trace/phase2-integration.md](../../v3/trace/phase2-integration.md)
-
----
-
-## 总结
-
-### 核心参数集
-
-| 参数 | 短选项 | 长选项 | 默认值 | 用途 |
-|------|--------|--------|--------|------|
-| 追踪 | - | `--trace` | False | 调用链路追踪 + DEBUG 日志 |
-| JSON | - | `--json` | False | JSON 格式输出 |
-| 确认 | `-y` | `--yes` | False | 自动确认交互 |
-| 帮助 | `-h` | `--help` | - | 显示帮助（typer 提供） |
-
-### 实施要求
-
-1. ✅ 所有命令必须支持核心参数集
-2. ✅ 参数命名和行为必须一致
-3. ✅ 包含完整的参数测试
-4. ✅ 提供清晰的帮助信息
-5. ✅ 参数可组合使用
-
-### 验收标准
-
-- 参数存在性测试：100%
-- 参数默认值测试：100%
-- 参数功能测试：≥80%
-- 参数组合测试：≥80%
+- **架构标准**: [02-architecture.md](02-architecture.md)
+- **编码标准**: [03-coding-standards.md](03-coding-standards.md)
+- **日志标准**: [05-logging.md](05-logging.md)
+- **命令调试设计**: [../../v3/trace/references/command-debug-design.md](../../v3/trace/references/command-debug-design.md)

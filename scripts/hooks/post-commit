@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# post-commit hook - 自动审核
+# Feature: codex-review-phase3-automation
+set -euo pipefail
+
+# 检查 post_commit hook 是否启用（通过 vibe3 配置）
+HOOK_ENABLED=$(python3 -m vibe3 review config-get review.auto_trigger.hooks.post_commit 2>/dev/null || echo "true")
+if [ "$HOOK_ENABLED" = "false" ]; then
+    exit 0
+fi
+
+# 分析 commit 复杂度
+ANALYSIS=$(python3 -m vibe3 review analyze-commit HEAD --json 2>/dev/null) || {
+    echo "⚠ CommitAnalyzer failed, skipping review" >&2
+    exit 1
+}
+
+SHOULD_REVIEW=$(echo "$ANALYSIS" | python3 -c "import json,sys; print(json.load(sys.stdin)['should_review'])" 2>/dev/null || echo "False")
+
+if [ "$SHOULD_REVIEW" != "True" ]; then
+    exit 0
+fi
+
+echo "🔍 Commit complexity exceeds threshold, triggering review..."
+
+# 执行审核
+REVIEW_OUTPUT=$(vibe review commit HEAD 2>&1) || true
+EXIT_CODE=$?
+
+echo "$REVIEW_OUTPUT"
+
+# 提取 verdict
+VERDICT=$(echo "$REVIEW_OUTPUT" | grep -oP '(?<=Verdict: )\w+' | head -1 || echo "PASS")
+
+if [ "$VERDICT" = "MAJOR" ] || [ "$VERDICT" = "BLOCK" ]; then
+    echo "⚠ 建议在 push 前处理审核意见（Verdict: $VERDICT）"
+fi
+
+if [ $EXIT_CODE -ne 0 ]; then
+    exit 1
+fi

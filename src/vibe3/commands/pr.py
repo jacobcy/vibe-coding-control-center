@@ -21,7 +21,9 @@ from vibe3.ui.pr_ui import (
     render_version_bump,
 )
 
-app = typer.Typer(help="Manage Pull Requests")
+app = typer.Typer(
+    help="Manage Pull Requests", no_args_is_help=True, rich_markup_mode="rich"
+)
 
 
 @contextmanager

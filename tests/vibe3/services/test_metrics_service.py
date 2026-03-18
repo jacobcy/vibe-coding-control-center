@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.config.loader import get_config
 from vibe3.services.metrics_service import (
     FileMetrics,
     LayerMetrics,
@@ -18,52 +19,68 @@ MOCK_FILES = [
 ]
 
 
+def get_v2_limits():
+    """获取 V2 Shell 配置限制."""
+    config = get_config()
+    return config.code_limits.v2_shell
+
+
+def get_v3_limits():
+    """获取 V3 Python 配置限制."""
+    config = get_config()
+    return config.code_limits.v3_python
+
+
 class TestLayerMetrics:
     """LayerMetrics 模型测试."""
 
     def test_total_ok_within_limit(self) -> None:
+        limits = get_v3_limits()
         m = LayerMetrics(
             total_loc=100,
             file_count=2,
             max_file_loc=80,
             files=MOCK_FILES,
-            limit_total=7000,
-            limit_file=300,
+            limit_total=limits.total_loc,
+            limit_file=limits.max_file_loc,
         )
         assert m.total_ok is True
 
     def test_total_ok_exceeds_limit(self) -> None:
+        limits = get_v3_limits()
         m = LayerMetrics(
-            total_loc=8000,
+            total_loc=limits.total_loc + 1000,
             file_count=2,
             max_file_loc=80,
             files=MOCK_FILES,
-            limit_total=7000,
-            limit_file=300,
+            limit_total=limits.total_loc,
+            limit_file=limits.max_file_loc,
         )
         assert m.total_ok is False
 
     def test_violations_detected(self) -> None:
-        files = [FileMetrics(path="big.py", loc=400)]
+        limits = get_v3_limits()
+        files = [FileMetrics(path="big.py", loc=limits.max_file_loc + 100)]
         m = LayerMetrics(
-            total_loc=400,
+            total_loc=limits.max_file_loc + 100,
             file_count=1,
-            max_file_loc=400,
+            max_file_loc=limits.max_file_loc + 100,
             files=files,
-            limit_total=7000,
-            limit_file=300,
+            limit_total=limits.total_loc,
+            limit_file=limits.max_file_loc,
         )
         assert len(m.violations) == 1
         assert m.violations[0].path == "big.py"
 
     def test_no_violations(self) -> None:
+        limits = get_v3_limits()
         m = LayerMetrics(
             total_loc=200,
             file_count=2,
             max_file_loc=120,
             files=MOCK_FILES,
-            limit_total=7000,
-            limit_file=300,
+            limit_total=limits.total_loc,
+            limit_file=limits.max_file_loc,
         )
         assert m.violations == []
 
@@ -77,6 +94,8 @@ class TestCollectPythonMetrics:
         src.mkdir(parents=True)
         (src / "foo.py").write_text("def foo():\n    pass\n")
 
+        limits = get_v3_limits()
+
         with patch("vibe3.services.metrics_service.Path") as mock_path_cls:
             mock_root = MagicMock()
             mock_root.exists.return_value = True
@@ -87,7 +106,7 @@ class TestCollectPythonMetrics:
                 result = collect_python_metrics()
 
         assert result.file_count >= 0
-        assert result.limit_total == 7000
+        assert result.limit_total == limits.total_loc
 
     def test_raises_when_src_missing(self) -> None:
         with patch("vibe3.services.metrics_service.Path") as mock_path_cls:

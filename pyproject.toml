@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-vibe3 = "vibe3.cli:app"
+vibe3 = "vibe3.cli:main"
 
 [project.optional-dependencies]
 dev = [

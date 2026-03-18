@@ -12,7 +12,7 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.structure_service import StructureError, analyze_file
 
-app = typer.Typer(help="分析文件结构")
+app = typer.Typer(help="分析文件结构", rich_markup_mode="rich")
 
 
 @contextmanager
