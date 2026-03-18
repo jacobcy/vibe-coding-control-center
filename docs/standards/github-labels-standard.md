@@ -29,6 +29,7 @@
 | `type/docs` | `#0075ca` | 文档更新 | 更新 README、添加 API 文档 |
 | `type/test` | `#0e8a16` | 测试相关 | 添加单元测试、修复测试 |
 | `type/chore` | `#fef2c0` | 杂项改动 | 更新依赖、修改构建脚本 |
+| `type/task` | `#8fc5e3` | 任务驱动的工作 | 综合性任务，包含多种类型改动 |
 
 **自动应用规则**：
 - PR 标题包含 `feat:` → 自动添加 `type/feature`
@@ -37,6 +38,7 @@
 - PR 标题包含 `docs:` → 自动添加 `type/docs`
 - PR 标题包含 `test:` → 自动添加 `type/test`
 - PR 标题包含 `chore:` → 自动添加 `type/chore`
+- 分支名以 `task/` 开头 → 自动添加 `type/task`（综合性任务，可能需要审查后手动调整具体类型）
 
 ---
 

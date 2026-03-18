@@ -20,6 +20,9 @@ type/test:
 type/chore:
   - head_branch: ['^chore/']
 
+type/task:
+  - head_branch: ['^task/']
+
 # 范围标签 (根据文件路径)
 scope/python:
   - 'src/vibe3/**/*.py'
