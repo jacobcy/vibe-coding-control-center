@@ -9,6 +9,12 @@ from pydantic import BaseModel
 
 from vibe3.exceptions import VibeError
 from vibe3.models.inspection import CallNode, CommandInspection
+from vibe3.services.command_analyzer_helpers import (
+    find_callee_file,
+    find_command_file,
+    should_expand,
+    should_show_in_tree,
+)
 
 
 class CommandAnalyzerError(VibeError):
@@ -85,23 +91,6 @@ def _extract_calls(file_path: str, func_name: str) -> list[CallEdge]:
     return edges
 
 
-def _find_command_file(
-    command: str, commands_root: str = "src/vibe3/commands"
-) -> str | None:
-    """在 commands 目录查找命令对应的文件.
-
-    Args:
-        command: 命令名（如 "pr" 或 "flow"）
-        commands_root: commands 目录路径
-
-    Returns:
-        文件路径或 None
-    """
-    root = Path(commands_root)
-    candidate = root / f"{command}.py"
-    return str(candidate) if candidate.exists() else None
-
-
 def analyze_command(
     command: str,
     subcommand: str | None = None,
@@ -124,7 +113,7 @@ def analyze_command(
     log = logger.bind(domain="command_analyzer", action="analyze", command=full_cmd)
     log.info("Analyzing command call chain")
 
-    file_path = _find_command_file(command, commands_root)
+    file_path = find_command_file(command, subcommand, commands_root)
     if not file_path:
         raise CommandAnalyzerError(f"Command file not found: {command}.py")
 
@@ -177,15 +166,19 @@ def build_call_tree(
     except CommandAnalyzerError:
         return []
 
-    # Build call nodes
+    # Build call nodes, filtering out noise
     nodes: list[CallNode] = []
     for edge in edges:
+        # Filter out decorators, builtins, and noise
+        if not should_show_in_tree(edge.callee):
+            continue
+
         node = CallNode(name=edge.callee, line=edge.line)
 
         # Recursively expand if should expand
         if should_expand(edge.callee):
             # Try to find the callee file
-            callee_file = _find_callee_file(edge.callee, file_path)
+            callee_file = find_callee_file(edge.callee, file_path)
             if callee_file:
                 node.calls = build_call_tree(
                     callee_file, edge.callee, visited, max_depth - 1
@@ -194,67 +187,6 @@ def build_call_tree(
         nodes.append(node)
 
     return nodes
-
-
-def should_expand(callee: str) -> bool:
-    """判断是否应该展开某个调用.
-
-    Args:
-        callee: 调用目标名称
-
-    Returns:
-        是否应该展开
-    """
-    # Don't expand built-in or standard library calls
-    builtin_prefixes = (
-        "logger.",
-        "print",
-        "len",
-        "str",
-        "int",
-        "dict",
-        "list",
-        "typer.",
-        "json.",
-        "yaml.",
-    )
-
-    for prefix in builtin_prefixes:
-        if callee.startswith(prefix) or callee == prefix.rstrip("."):
-            return False
-
-    # Expand service, client, and helper calls
-    expand_patterns = ("service.", "client.", "_client", "helper", "ops")
-    return any(pattern in callee for pattern in expand_patterns)
-
-
-def _find_callee_file(callee: str, caller_file: str) -> str | None:
-    """查找被调用函数所在的文件.
-
-    Args:
-        callee: 调用目标名称（如 "service.get_pr"）
-        caller_file: 调用者文件路径
-
-    Returns:
-        被调用者文件路径或 None
-    """
-    # Heuristic: look for patterns like "service.xxx" -> "services/xxx_service.py"
-    parts = callee.split(".")
-    if len(parts) >= 2:
-        obj_name = parts[0]
-
-        # Common patterns
-        patterns = [
-            f"src/vibe3/services/{obj_name}_service.py",
-            f"src/vibe3/clients/{obj_name}_client.py",
-            f"src/vibe3/clients/{obj_name}_ops.py",
-        ]
-
-        for pattern in patterns:
-            if Path(pattern).exists():
-                return pattern
-
-    return None
 
 
 def _calculate_max_depth(nodes: list[CallNode]) -> int:
