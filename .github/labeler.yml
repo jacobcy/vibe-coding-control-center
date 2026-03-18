@@ -1,23 +1,31 @@
 # GitHub PR 自动标签配置
 # 详见: docs/standards/github-labels-standard.md
 
-# 类型标签 (根据分支名)
+# 类型标签 (根据标题和分支名)
+# 优先级：标题前缀 > 分支名前缀
+
 type/feature:
+  - title: ['^feat:', '^feature:']
   - head_branch: ['^feat/', '^feature/']
 
 type/fix:
+  - title: ['^fix:', '^bugfix:']
   - head_branch: ['^fix/', '^bugfix/']
 
 type/refactor:
+  - title: ['^refactor:']
   - head_branch: ['^refactor/']
 
 type/docs:
+  - title: ['^docs:', '^documentation:']
   - head_branch: ['^docs/', '^documentation/']
 
 type/test:
+  - title: ['^test:', '^testing:']
   - head_branch: ['^test/', '^testing/']
 
 type/chore:
+  - title: ['^chore:']
   - head_branch: ['^chore/']
 
 type/task:

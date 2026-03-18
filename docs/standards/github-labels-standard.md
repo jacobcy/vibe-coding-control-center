@@ -32,13 +32,19 @@
 | `type/task` | `#8fc5e3` | 任务驱动的工作 | 综合性任务，包含多种类型改动 |
 
 **自动应用规则**：
+- **优先级**：标题前缀 > 分支名前缀
 - PR 标题包含 `feat:` → 自动添加 `type/feature`
 - PR 标题包含 `fix:` → 自动添加 `type/fix`
 - PR 标题包含 `refactor:` → 自动添加 `type/refactor`
 - PR 标题包含 `docs:` → 自动添加 `type/docs`
 - PR 标题包含 `test:` → 自动添加 `type/test`
 - PR 标题包含 `chore:` → 自动添加 `type/chore`
-- 分支名以 `task/` 开头 → 自动添加 `type/task`（综合性任务，可能需要审查后手动调整具体类型）
+- 分支名以 `task/` 开头且标题无类型前缀 → 自动添加 `type/task`（综合性任务，可能需要审查后手动调整具体类型）
+
+**示例**：
+- 标题 `feat: add new CLI command` → `type/feature` ✅
+- 分支 `task/codex-auto-review` + 标题 `feat: ...` → `type/feature` ✅（标题优先）
+- 分支 `task/codex-auto-review` + 标题 `update README` → `type/task` ✅（无类型前缀）
 
 ---
 
