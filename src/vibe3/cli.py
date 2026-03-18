@@ -51,6 +51,7 @@ def main_callback(
         int,
         typer.Option(
             "-v",
+            "--verbose",
             count=True,
             help="Verbosity (-v INFO, -vv DEBUG)",
             show_default=False,
