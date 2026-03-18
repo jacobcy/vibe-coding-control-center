@@ -18,7 +18,7 @@ def github_client() -> GitHubClient:
 @pytest.fixture
 def mock_subprocess() -> MagicMock:
     """Mock subprocess.run."""
-    with patch("vibe3.clients.github_client.subprocess.run") as mock:
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock:
         yield mock
 
 
