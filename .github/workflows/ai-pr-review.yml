@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     # 只在打上 ready-for-review 标签时触发
     if: ${{ github.event.label.name == 'status/ready-for-review' }}
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
