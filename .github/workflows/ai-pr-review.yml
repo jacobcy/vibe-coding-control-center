@@ -3,10 +3,13 @@ name: AI PR Review
 on:
   pull_request:
     branches: [main, v3-dev]
+    types: [opened, synchronize, reopened]
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    # 跳过 draft PR
+    if: ${{ !github.event.pull_request.draft }}
 
     steps:
       - uses: actions/checkout@v4

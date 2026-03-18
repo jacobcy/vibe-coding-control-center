@@ -101,6 +101,7 @@ def pr(
             body=summary,
             event=event,
             comments=github_comments if github_comments else None,
+            dismiss_previous=True,  # 避免重复 review
         )
         log.success("Review published to GitHub")
 
