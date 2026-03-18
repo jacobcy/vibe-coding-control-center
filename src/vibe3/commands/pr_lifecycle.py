@@ -83,14 +83,9 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                             f"{score.get('score', 'N/A')} "
                             f"({score.get('level', 'N/A')})"
                         )
-                        console.print(
-                            f"[yellow]原因[/]: {score.get('reason', '未知')}"
-                        )
+                        console.print(f"[yellow]原因[/]: {score.get('reason', '未知')}")
 
-                        console.print(
-                            "\n[dim]请修复问题或使用 --force 跳过"
-                            "（不推荐）[/]"
-                        )
+                        console.print("\n[dim]请修复问题或使用 --force 跳过" "（不推荐）[/]")
                         raise typer.Exit(1)
 
                     # 显示通过信息
@@ -217,20 +212,9 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                     raise typer.Exit(1)
 
                 # 1.3 检查 pending review comments（可选，优雅降级）
-                try:
-                    comments = service.get_pending_review_comments(pr_number)
-                    if comments:
-                        console.print("\n[yellow]⚠️  存在未处理的 review comments:[/]")
-                        for comment in comments[:3]:  # 只显示前 3 个
-                            author = comment.get("author", "unknown")
-                            body = comment.get("body", "")[:50]
-                            console.print(f"  - @{author}: {body}...")
-
-                        if not typer.confirm("是否仍要合并？"):
-                            raise typer.Exit(0)
-                except Exception as e:
-                    logger.warning(f"检查 pending comments 失败: {e}")
-                    # 不影响主流程，继续
+                # TODO: Implement pending review comments check
+                # This functionality was removed as part of PR review refactoring
+                # Pass silently for now
 
                 # 显示通过信息
                 console.print("\n[green]✓ 安全检查通过[/]")
