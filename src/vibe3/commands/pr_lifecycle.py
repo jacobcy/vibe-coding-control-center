@@ -25,6 +25,9 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         force: Annotated[
             bool, typer.Option("--force", help="跳过质量门禁检查")
         ] = False,  # noqa: E501
+        skip_coverage: Annotated[
+            bool, typer.Option("--skip-coverage", help="跳过覆盖率检查")
+        ] = False,  # noqa: E501
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
@@ -38,8 +41,10 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         """Mark PR as ready with quality gates.
 
         质量门禁检查:
+        - 覆盖率检查（分层覆盖率统计）
         - 风险评分检查（来自 inspect pr）
 
+        使用 --skip-coverage 跳过覆盖率检查.
         使用 --force 跳过所有检查（不推荐）.
         """
         if json_output and yaml_output:
@@ -63,48 +68,18 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             if not force:
                 from rich.console import Console
 
+                from vibe3.commands.pr_quality_gates import (
+                    run_coverage_gate,
+                    run_risk_gate,
+                )
+
                 console = Console()
 
-                try:
-                    from vibe3.commands.review_helpers import run_inspect_json
+                # 1.1 覆盖率检查
+                run_coverage_gate(console, skip_coverage)
 
-                    # 调用 inspect pr 获取风险评分
-                    analysis = run_inspect_json(["pr", str(pr_number)])
-                    score_data = analysis.get("score", {})
-                    # Type assertion for score dict
-                    score = score_data if isinstance(score_data, dict) else {}
-
-                    # 检查是否被 block
-                    if score.get("block", False):
-                        console.print("\n[red]✗ 质量门禁失败[/]")
-                        console.print("[red]PR 被阻断：高风险变更[/]")
-                        console.print(
-                            "\n[yellow]风险评分[/]: "
-                            f"{score.get('score', 'N/A')} "
-                            f"({score.get('level', 'N/A')})"
-                        )
-                        console.print(f"[yellow]原因[/]: {score.get('reason', '未知')}")
-
-                        console.print("\n[dim]请修复问题或使用 --force 跳过" "（不推荐）[/]")
-                        raise typer.Exit(1)
-
-                    # 显示通过信息
-                    console.print("\n[green]✓ 质量门禁通过[/]")
-                    console.print(f"[cyan]风险等级[/]: {score.get('level', 'N/A')}")
-                    console.print(f"[cyan]风险评分[/]: {score.get('score', 'N/A')}")
-
-                except Exception as e:
-                    logger.error(f"质量门禁检查失败: {e}")
-                    from rich.console import Console
-
-                    console = Console()
-
-                    console.print("\n[yellow]⚠️  警告：质量门禁检查失败[/]")
-                    console.print(f"[yellow]错误：{e}[/]")
-
-                    # 询问是否继续
-                    if not typer.confirm("是否在没有质量检查的情况下继续？"):
-                        raise typer.Exit(1)
+                # 1.2 风险评分检查
+                run_risk_gate(console, pr_number)
 
             else:
                 from rich.console import Console
