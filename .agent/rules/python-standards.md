@@ -489,8 +489,9 @@ requires-python = ">=3.10"
 
 [tool.mypy]
 python_version = "3.10"
+strict = true
 warn_return_any = true
-disallow_untyped_defs = true
+warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 88
