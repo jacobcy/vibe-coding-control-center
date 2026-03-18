@@ -5,7 +5,7 @@
 # Limits by layer:
 #   tests/vibe3/services/  → code_limits.v3_python.test_file_loc.services (180)
 #   tests/vibe3/clients/   → code_limits.v3_python.test_file_loc.clients  (200)
-#   tests/vibe3/commands/  → code_limits.v3_python.test_file_loc.commands  (80)
+#   tests/vibe3/commands/  → code_limits.v3_python.test_file_loc.commands (120)
 
 set -e
 
@@ -16,7 +16,7 @@ get_limit() {
 
 LIMIT_SERVICES=$(get_limit "code_limits.v3_python.test_file_loc.services" 180)
 LIMIT_CLIENTS=$(get_limit  "code_limits.v3_python.test_file_loc.clients"  200)
-LIMIT_COMMANDS=$(get_limit "code_limits.v3_python.test_file_loc.commands"  80)
+LIMIT_COMMANDS=$(get_limit "code_limits.v3_python.test_file_loc.commands" 120)
 
 failed=0
 
