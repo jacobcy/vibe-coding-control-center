@@ -11,6 +11,19 @@ code_limits:
     v2_shell: 7000         # Shell 总行数限制
     v3_python: 9000        # Python 总行数限制
 
+  # 统计口径（路径定义）
+  code_paths:
+    v2_shell:              # Shell 源代码路径
+      - "lib/"
+      - "lib3/"
+      - "bin/vibe"
+    v3_python:             # Python 源代码路径
+      - "src/vibe3/"
+
+  test_paths:
+    v3_python:             # Python 测试路径
+      - "tests/vibe3/"
+
 # 审核范围（适配 vibe-center 实际结构）
 review_scope:
   critical_paths:            # 关键路径（重点审核）

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Check Shell LOC ceiling (lib/ + bin/ + lib3/)
+# Check Shell LOC ceiling
 # Reads limit from config/settings.yaml
+#
+# Code paths (defined in config/settings.yaml:code_limits.code_paths.v2_shell):
+#   - lib/
+#   - lib3/
+#   - bin/vibe
 
 set -e
 
@@ -10,6 +15,7 @@ LIMIT=$(PYTHONPATH=src uv run python -m vibe3.config.get \
     -c config/settings.yaml \
     --quiet 2>/dev/null || echo 7000)
 
+# Count total lines (paths defined in config: code_limits.code_paths.v2_shell)
 total=$(find lib/ bin/ lib3/ -name "*.sh" -o -name "vibe" 2>/dev/null | xargs cat 2>/dev/null | wc -l)
 
 if [ "$total" -gt "$LIMIT" ]; then

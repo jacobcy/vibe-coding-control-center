@@ -6,6 +6,10 @@
 #   default: 200 lines (most files should fit)
 #   max: 300 lines (special cases with justification)
 #
+# Code paths (defined in config/settings.yaml:code_limits.code_paths):
+#   Shell: lib/, lib3/, bin/vibe
+#   Python: src/vibe3/
+#
 # Exit codes:
 #   0: All files within default limit
 #   1: Some files exceed max limit
@@ -40,13 +44,13 @@ check_file() {
   fi
 }
 
-# Check Shell files
+# Check Shell files (paths defined in config: code_limits.code_paths.v2_shell)
 for f in lib/*.sh lib3/*.sh bin/vibe; do
   [ -f "$f" ] || continue
   check_file "$f"
 done
 
-# Check Python files
+# Check Python files (paths defined in config: code_limits.code_paths.v3_python)
 for f in $(find src/vibe3 -name "*.py" -not -name "__init__.py" 2>/dev/null); do
   [ -f "$f" ] || continue
   check_file "$f"

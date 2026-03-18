@@ -6,6 +6,9 @@
 #   default: 200 lines (most test files should fit)
 #   max: 300 lines (special cases with justification)
 #
+# Test paths (defined in config/settings.yaml:code_limits.test_paths):
+#   Python: tests/vibe3/
+#
 # Exit codes:
 #   0: All files within default limit
 #   1: Some files exceed max limit (or warnings with strict mode)
@@ -40,6 +43,7 @@ check_file() {
   fi
 }
 
+# Check Python test files (paths defined in config: code_limits.test_paths.v3_python)
 for f in $(find tests/vibe3 -name "test_*.py" 2>/dev/null); do
   check_file "$f"
 done
