@@ -19,12 +19,18 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
     @app.command()
     def ready(
         pr_number: Annotated[int, typer.Argument(help="PR number")],
-        yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")] = False,
+        yes: Annotated[
+            bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
+        ] = False,  # noqa: E501
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
-        json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-        yaml_output: Annotated[bool, typer.Option("--yaml", help="YAML 格式输出")] = False,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="JSON 格式输出")
+        ] = False,  # noqa: E501
+        yaml_output: Annotated[
+            bool, typer.Option("--yaml", help="YAML 格式输出")
+        ] = False,  # noqa: E501
     ) -> None:
         """Mark PR as ready for review."""
         if json_output and yaml_output:
@@ -72,12 +78,18 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
     @app.command()
     def merge(
         pr_number: Annotated[int, typer.Argument(help="PR number")],
-        yes: Annotated[bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")] = False,
+        yes: Annotated[
+            bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
+        ] = False,  # noqa: E501
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
-        json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-        yaml_output: Annotated[bool, typer.Option("--yaml", help="YAML 格式输出")] = False,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="JSON 格式输出")
+        ] = False,  # noqa: E501
+        yaml_output: Annotated[
+            bool, typer.Option("--yaml", help="YAML 格式输出")
+        ] = False,  # noqa: E501
     ) -> None:
         """Merge PR."""
         if json_output and yaml_output:

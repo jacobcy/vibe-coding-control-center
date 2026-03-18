@@ -29,8 +29,12 @@ def register_query_commands(app: typer.Typer) -> None:
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
-        json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-        yaml_output: Annotated[bool, typer.Option("--yaml", help="YAML 格式输出")] = False,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="JSON 格式输出")
+        ] = False,  # noqa: E501
+        yaml_output: Annotated[
+            bool, typer.Option("--yaml", help="YAML 格式输出")
+        ] = False,  # noqa: E501
     ) -> None:
         """Show PR details."""
         if json_output and yaml_output:
@@ -87,8 +91,12 @@ def register_query_commands(app: typer.Typer) -> None:
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
-        json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-        yaml_output: Annotated[bool, typer.Option("--yaml", help="YAML 格式输出")] = False,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="JSON 格式输出")
+        ] = False,  # noqa: E501
+        yaml_output: Annotated[
+            bool, typer.Option("--yaml", help="YAML 格式输出")
+        ] = False,  # noqa: E501
     ) -> None:
         """Calculate version bump for PR."""
         if json_output and yaml_output:
