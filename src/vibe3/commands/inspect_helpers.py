@@ -5,6 +5,7 @@ from typing import Union
 
 from loguru import logger
 
+from vibe3.config.loader import load_config
 from vibe3.models.change_source import BranchSource, CommitSource, PRSource
 from vibe3.services import dag_service
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
@@ -74,20 +75,20 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     dag = dag_service.expand_impacted_modules(changed_files)
 
     # 3. 风险评分
+    # Read critical and public API paths from config
+    config = load_config()
+    critical_paths = config.review_scope.critical_paths
+    public_api_paths = config.review_scope.public_api_paths
+
     dims = PRDimensions(
         changed_files=len(changed_files),
         impacted_modules=len(dag.impacted_modules),
         changed_lines=0,  # 需要从 diff 计算
         critical_path_touch=any(
-            any(
-                p in str(f)
-                for p in ["bin/", "lib/flow", "lib/git", "src/vibe3/services/"]
-            )
-            for f in changed_files
+            any(p in str(f) for p in critical_paths) for f in changed_files
         ),
         public_api_touch=any(
-            any(p in str(f) for p in ["bin/vibe", "lib/flow.sh", "src/vibe3/commands/"])
-            for f in changed_files
+            any(p in str(f) for p in public_api_paths) for f in changed_files
         ),
     )
     score = generate_score_report(dims)

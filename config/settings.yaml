@@ -8,19 +8,27 @@ code_limits:
     max: 300              # 单文件最大限制（所有类型）
 
   total_file_loc:
-    v2_shell: 7000         # Shell 总行数限制
-    v3_python: 9000        # Python 总行数限制
+    v2_shell: 7000         # Shell 核心代码总行数
+    v3_python: 9000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
-    v2_shell:              # Shell 源代码路径
+    v2_shell:              # Shell 核心代码路径
       - "lib/"
       - "lib3/"
       - "bin/vibe"
-    v3_python:             # Python 源代码路径
+    v3_python:             # Python 核心代码路径
       - "src/vibe3/"
 
+  scripts_paths:
+    v2_shell:              # Shell 工具脚本路径
+      - "scripts/"
+    v3_python:             # Python 工具脚本路径
+      - "scripts/"
+
   test_paths:
+    v2_shell:              # Shell 测试路径
+      - "tests/vibe2/"
     v3_python:             # Python 测试路径
       - "tests/vibe3/"
 

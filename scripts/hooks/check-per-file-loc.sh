@@ -10,6 +10,12 @@
 #   Shell: lib/, lib3/, bin/vibe
 #   Python: src/vibe3/
 #
+# Scripts paths (defined in config/settings.yaml:code_limits.scripts_paths):
+#   Shell: scripts/ (*.sh files)
+#   Python: scripts/ (*.py files)
+#
+# Note: scripts/ are checked for single-file limits but NOT counted in total LOC
+#
 # Exit codes:
 #   0: All files within default limit
 #   1: Some files exceed max limit
@@ -50,8 +56,20 @@ for f in lib/*.sh lib3/*.sh bin/vibe; do
   check_file "$f"
 done
 
+# Check scripts/*.sh files
+for f in $(find scripts/ -name "*.sh" 2>/dev/null); do
+  [ -f "$f" ] || continue
+  check_file "$f"
+done
+
 # Check Python files (paths defined in config: code_limits.code_paths.v3_python)
 for f in $(find src/vibe3 -name "*.py" -not -name "__init__.py" 2>/dev/null); do
+  [ -f "$f" ] || continue
+  check_file "$f"
+done
+
+# Check scripts/*.py files
+for f in $(find scripts/ -name "*.py" 2>/dev/null); do
   [ -f "$f" ] || continue
   check_file "$f"
 done
