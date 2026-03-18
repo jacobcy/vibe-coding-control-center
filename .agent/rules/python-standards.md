@@ -489,16 +489,15 @@ requires-python = ">=3.10"
 
 [tool.mypy]
 python_version = "3.10"
-strict = true
 warn_return_any = true
-warn_unused_ignores = true
+disallow_untyped_defs = true
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py310"
 
 [tool.black]
-line-length = 100
+line-length = 88
 target-version = ["py310"]
 ```
 
