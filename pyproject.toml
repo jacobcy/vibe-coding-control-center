@@ -13,6 +13,31 @@ dependencies = [
 [project.scripts]
 vibe3 = "vibe3.cli:main"
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# This project uses uv for dependency management
+# Run `uv sync` to install dependencies
+# Run `uv run pytest` to run tests
+# Run `uv run mypy` to run type checking
+
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+disallow_untyped_defs = true
+
 [dependency-groups]
 dev = [
     "mypy>=1.5.0",

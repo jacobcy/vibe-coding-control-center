@@ -31,11 +31,18 @@ def _mock_inspect_data():
 def _patch_review_deps(verdict: str = "PASS"):
     """返回 patch 上下文列表，mock 掉所有外部依赖。"""
     return [
-        patch("vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()),
+        patch(
+            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
+        ),
         patch("vibe3.commands.review.GitClient"),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
-        patch("vibe3.commands.review.call_codex", return_value="## Review\nLooks good."),
-        patch("vibe3.commands.review.parse_codex_review", return_value=_mock_review(verdict)),
+        patch(
+            "vibe3.commands.review.call_codex", return_value="## Review\nLooks good."
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review(verdict),
+        ),
     ]
 
 

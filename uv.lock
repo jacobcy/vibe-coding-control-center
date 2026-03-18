@@ -934,7 +934,7 @@ wheels = [
 [[package]]
 name = "vibe3"
 version = "3.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "loguru" },
     { name = "pydantic" },

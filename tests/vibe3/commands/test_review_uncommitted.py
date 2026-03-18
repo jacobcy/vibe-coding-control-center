@@ -33,10 +33,12 @@ def test_review_uncommitted_no_changes():
 def test_review_uncommitted_with_changes():
     mock_git = MagicMock()
     mock_git.return_value.get_diff.return_value = "diff --git a/foo.py ..."
-    with patch("vibe3.commands.review.GitClient", mock_git), \
-         patch("vibe3.commands.review.build_review_context", return_value="ctx"), \
-         patch("vibe3.commands.review.call_codex", return_value="## Review"), \
-         patch("vibe3.commands.review.parse_codex_review", return_value=_mock_review()):
+    with (
+        patch("vibe3.commands.review.GitClient", mock_git),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch("vibe3.commands.review.call_codex", return_value="## Review"),
+        patch("vibe3.commands.review.parse_codex_review", return_value=_mock_review()),
+    ):
         result = runner.invoke(app, ["uncommitted"])
     assert result.exit_code == 0
 

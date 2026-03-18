@@ -8,7 +8,6 @@ from typer.testing import CliRunner
 
 from vibe3.cli import app
 
-
 runner = CliRunner()
 
 
@@ -75,9 +74,7 @@ class TestInspectOutputIntegration:
 
     def test_inspect_commands_mermaid_format(self) -> None:
         """Test inspect commands --mermaid outputs Mermaid diagram."""
-        result = runner.invoke(
-            app, ["inspect", "commands", "pr", "show", "--mermaid"]
-        )
+        result = runner.invoke(app, ["inspect", "commands", "pr", "show", "--mermaid"])
         assert result.exit_code == 0
         # Should contain Mermaid markers
         assert "```mermaid" in result.output

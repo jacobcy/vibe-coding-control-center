@@ -129,9 +129,7 @@ def test_command_inspection_to_tree_nested() -> None:
     """Test ASCII tree with nested calls."""
     grandchild1 = CallNode(name="sqlite_client.get_pr", line=125)
     grandchild2 = CallNode(name="git_client.get_current_branch", line=63)
-    child = CallNode(
-        name="service.get_pr", line=104, calls=[grandchild1, grandchild2]
-    )
+    child = CallNode(name="service.get_pr", line=104, calls=[grandchild1, grandchild2])
     root = CallNode(name="show", line=84, calls=[child])
 
     inspection = CommandInspection(

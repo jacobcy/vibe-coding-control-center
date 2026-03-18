@@ -18,6 +18,7 @@ def _mock_metrics():
     from vibe3.services.metrics_service import LayerMetrics, MetricsReport
 
     from vibe3.services.metrics_service import FileMetrics
+
     layer = LayerMetrics(
         total_loc=100,
         limit_total=5000,

@@ -32,8 +32,10 @@ def test_install_hooks_success(tmp_path):
     git_hooks = tmp_path / ".git" / "hooks"
     git_hooks.mkdir(parents=True)
 
-    with patch("vibe3.commands.hooks._ROOT", tmp_path), \
-         patch("os.access", return_value=True):
+    with (
+        patch("vibe3.commands.hooks._ROOT", tmp_path),
+        patch("os.access", return_value=True),
+    ):
         result = runner.invoke(app, ["install-hooks"])
 
     assert result.exit_code == 0
