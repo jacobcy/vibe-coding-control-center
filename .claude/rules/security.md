@@ -5,24 +5,29 @@ paths:
 ---
 # Python Security
 
-> This file extends [common/security.md](../common/security.md) with Python specific content.
-
 ## Secret Management
+
+本项目使用 **direnv** 管理环境变量（不使用 python-dotenv）：
+
+```bash
+# .envrc 文件（项目根目录）
+export GITHUB_TOKEN="ghp_xxx"
+export OPENAI_API_KEY="sk-xxx"
+```
+
+在 Python 中访问环境变量：
 
 ```python
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 api_key = os.environ["OPENAI_API_KEY"]  # Raises KeyError if missing
 ```
 
 ## Security Scanning
 
-- Use **bandit** for static security analysis:
+- 运行 **pre-commit** 进行自动检查（包含 ruff、black、mypy）：
   ```bash
-  bandit -r src/
+  pre-commit run --all-files
   ```
 
 ## Reference

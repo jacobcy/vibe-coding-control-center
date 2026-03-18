@@ -1,0 +1,58 @@
+# Skills 期望配置
+# 声明本项目期望安装的 skills，用于 Skill 分析差距
+
+# 本项目使用的 Agents
+agents:
+  - claude-code
+  - antigravity
+  - codex
+  - kiro
+  - copilot
+
+# 全局期望 - 所有项目共享
+global:
+  # Claude Code 全局期望
+  claude:
+    expected:
+      ECC:
+        description: Everything Claude Code 技能集，包含 37+ skills（api-design, python-patterns, tdd-workflow 等）
+        install: claude plugin add <ecc-plugin-name>
+        # Claude Code 主要使用 ECC，已涵盖 Superpowers 的能力
+
+  # 其他 Agents 全局期望
+  agents:
+    expected:
+      superpowers:
+        description: 开发方法论工具集，包含 brainstorming, systematic-debugging, writing-plans 等 14+ skills
+        install: npx skills add obra/superpowers -g --agent antigravity codex kiro -y
+        # 其他 Agents (Antigravity, Codex, Kiro) 主要使用 Superpowers
+
+# 项目级期望 - 当前项目专属
+project:
+  # Claude Code 项目级期望
+  claude:
+    expected:
+      vibe-star:
+        description: 本项目原生 vibe-* 系列 skills（vibe-check, vibe-commit 等 16 个）
+        install: scripts/init.sh (自动 symlink 到 .claude/skills/)
+
+  # 其他 Agents 项目级期望
+  agents:
+    expected:
+      vibe-star:
+        description: 本项目原生 vibe-* 系列 skills
+        install: scripts/init.sh (自动 symlink 到 .agent/skills/)
+
+  # 独立扩展 - 自己管理的工具
+  managed:
+    openspec:
+      description: OpenSpec 工具链，包含 openspec-new-change, openspec-apply-change 等 10+ 命令
+      install: openspec init --tools antigravity,claude,codex,trae
+      # OpenSpec 自己管理，不通过 npx skills 或 claude plugin
+
+  # 项目独有 - 特定需求
+  additional: []
+    # 示例：
+    # some-project-skill:
+    #   description: 项目特定的需求，例如数据库迁移工具
+    #   install: npx skills add namespace/skill-name --agent antigravity codex -y
