@@ -1,6 +1,6 @@
 # Phase 3 Implementation Spec (Draft)
 
-**状态**: 建议补充到 `docs/v3/plans/03-pr-domain.md`
+**状态**: 建议补充到 `docs/v3/handoff/03-pr-domain.md`
 **作者**: Claude Sonnet 4.6
 **时间**: 2026-03-16
 
@@ -9,8 +9,8 @@
 ## ⚠️ 实现规范（强制）
 
 **必须遵守**:
-- [docs/v3/implementation/02-architecture.md](../implementation/02-architecture.md)
-- [docs/v3/implementation/03-coding-standards.md](../implementation/03-coding-standards.md)
+- [docs/v3/infrastructure/02-architecture.md](../implementation/02-architecture.md)
+- [docs/v3/infrastructure/03-coding-standards.md](../implementation/03-coding-standards.md)
 - [.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)
 
 该文档定义了：
@@ -151,9 +151,9 @@ def merge(
 ```
 
 **状态收口**:
-- 更新 GitHub Project task 状态为 `completed`（通过 `gh project item edit`）
-- 记录 handoff 信息到 SQLite（merge 证据、agent 署名、追责记录）
-- 关闭 task issue (如果配置了自动关闭，通过 `gh issue close`)
+- 更新 SQLite task 状态为 `completed`
+- 关闭 task issue (如果配置了自动关闭)
+- 更新 handoff store
 
 ---
 
@@ -162,7 +162,7 @@ def merge(
 ### 必须创建的文件
 
 ```
-scripts/python/vibe3/
+src/vibe3/
 ├── commands/
 │   └── pr.py                  # PR 命令层 (< 100 行)
 ├── services/
@@ -318,10 +318,10 @@ Phase 3 被认为成功完成，当且仅当：
 
 ## 参考文档
 
-- [docs/v3/implementation/02-architecture.md](../implementation/02-architecture.md) - 架构设计
-- [docs/v3/implementation/03-coding-standards.md](../implementation/03-coding-standards.md) - 编码标准
-- [docs/v3/implementation/05-logging.md](../implementation/05-logging.md) - 日志规范
-- [docs/v3/implementation/06-error-handling.md](../implementation/06-error-handling.md) - 异常处理
+- [docs/v3/infrastructure/02-architecture.md](../implementation/02-architecture.md) - 架构设计
+- [docs/v3/infrastructure/03-coding-standards.md](../implementation/03-coding-standards.md) - 编码标准
+- [docs/v3/infrastructure/05-logging.md](../implementation/05-logging.md) - 日志规范
+- [docs/v3/infrastructure/06-error-handling.md](../implementation/06-error-handling.md) - 异常处理
 - [.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md) - Python 标准
 
 ---

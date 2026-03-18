@@ -156,7 +156,7 @@ Run:
 
 ```bash
 bats tests/task
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 ```
 
 Expected:
@@ -202,7 +202,7 @@ Run:
 
 ```bash
 bats tests/roadmap
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 ```
 
 Expected:

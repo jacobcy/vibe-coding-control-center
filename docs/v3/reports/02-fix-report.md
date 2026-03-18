@@ -7,7 +7,7 @@ created: 2026-03-16
 last_updated: 2026-03-16
 related_docs:
   - docs/v3/reports/02-manual-review-report.md
-  - docs/v3/plans/02-flow-task-foundation.md
+  - docs/v3/handoff/02-flow-task-foundation.md
 ---
 
 # Phase 02 阻塞问题修复报告
@@ -34,14 +34,14 @@ related_docs:
 **问题**: mypy --strict 有 4 个错误
 
 **修复方案**:
-1. 创建 `scripts/python/lib/store.pyi` 类型提示文件
+1. 创建 `src/vibe3/clients/sqlite_client.pyi` 类型提示文件
 2. 修复 `flow_service.py` 和 `task_service.py` 中的 Path vs str 比较问题
 3. 在 `pyproject.toml` 中添加 `mypy_path` 配置
 4. 为 `task.py` 和 `flow.py` 添加正确的类型注解
 
 **验证结果**:
 ```bash
-$ uv run mypy --strict scripts/python/vibe3/
+$ uv run mypy --strict src/vibe3/
 Success: no issues found in 16 source files
 ```
 
@@ -88,7 +88,7 @@ $ uv run pytest tests/vibe3/services/ -v
 **修复方案**:
 1. 实现 `parse_issue_url()` 函数解析 GitHub issue URL 或数字
 2. 实现完整的 `link` 命令，调用 `TaskService.link_issue()`
-3. 创建 `scripts/python/vibe3/ui/task_ui.py` UI 渲染模块
+3. 创建 `src/vibe3/ui/task_ui.py` UI 渲染模块
 4. 添加正确的类型注解 (Literal["task", "related"])
 
 **实现功能**:
@@ -118,8 +118,8 @@ vibe3 task link 102 --role related --actor claude
 ### 2. 项目结构完善
 
 新增文件:
-- `scripts/python/lib/store.pyi` - 类型提示文件
-- `scripts/python/vibe3/ui/task_ui.py` - Task UI 渲染
+- `src/vibe3/clients/sqlite_client.pyi` - 类型提示文件
+- `src/vibe3/ui/task_ui.py` - Task UI 渲染
 - `tests/conftest.py` - 测试配置
 - `tests/vibe3/services/test_flow_service.py` - FlowService 测试
 - `tests/vibe3/services/test_task_service.py` - TaskService 测试

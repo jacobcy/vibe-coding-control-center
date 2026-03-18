@@ -44,7 +44,7 @@
 ```bash
 bin/vibe check       # 环境诊断
 bats tests/          # 运行所有测试（应看到 20 tests, 0 failures）
-bash scripts/lint.sh # 双层 lint 检查（0 errors）
+bash scripts/hooks/lint.sh # 双层 lint 检查（0 errors）
 ```
 
 ---
@@ -105,7 +105,7 @@ Serena 是一个 MCP 工具，提供代码结构的 AST 级查询能力。
 每次修改 Shell 代码后，**必须运行**：
 
 ```bash
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 ```
 
 这个脚本做两件事：
@@ -150,7 +150,7 @@ bats tests/
 
 `.github/workflows/ci.yml` 在每次 Push 和 PR 时自动运行：
 
-1. `bash scripts/lint.sh` — 双层 lint
+1. `bash scripts/hooks/lint.sh` — 双层 lint
 2. `bats tests/` — 所有测试
 3. LOC 总量检查（`find lib/ bin/ | xargs wc -l` ≤ 7000）
 4. 单文件行数检查（每个文件 ≤ 300 行）
@@ -162,7 +162,7 @@ bats tests/
 随时运行以下命令查看项目健康状态：
 
 ```bash
-bash scripts/metrics.sh
+bash scripts/tools/metrics.sh
 ```
 
 输出示例：
@@ -214,13 +214,13 @@ bin/vibe flow start <feature-name>
 
 ```bash
 # 1. 语法和质量检查
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 
 # 2. 运行所有测试
 bats tests/
 
 # 3. 查看健康度
-bash scripts/metrics.sh
+bash scripts/tools/metrics.sh
 ```
 
 **出现 ❌ 立刻修复，不要积累问题。**
@@ -294,9 +294,9 @@ bin/vibe flow pr               # 创建 PR
 bin/vibe flow done             # 清理 worktree
 
 # 质量验证（每次改代码后必跑）
-bash scripts/lint.sh           # 双层 lint
+bash scripts/hooks/lint.sh           # 双层 lint
 bats tests/                    # 所有测试
-bash scripts/metrics.sh        # 健康度仪表盘
+bash scripts/tools/metrics.sh        # 健康度仪表盘
 
 # 环境和工具
 bin/vibe check                 # 环境诊断

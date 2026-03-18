@@ -28,6 +28,11 @@ vibe check
 vibe tool
 vibe keys <list|set|get|init>
 vibe flow <start|review|pr|done|status|sync>
+
+# V3 Python CLI (新特性)
+uv run python src/vibe3/cli.py pr show --json     # JSON 格式输出
+uv run python src/vibe3/cli.py pr show --yaml     # YAML 格式输出
+uv run python src/vibe3/cli.py inspect commands pr show --tree  # ASCII 调用树
 ```
 
 ## 架构分层 (三层解耦)

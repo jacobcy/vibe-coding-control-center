@@ -7,7 +7,7 @@ created: 2026-03-16
 last_updated: 2026-03-16
 related_docs:
   - docs/v3/reports/02-manual-review-report.md
-  - docs/v3/plans/02-flow-task-foundation.md
+  - docs/v3/handoff/02-flow-task-foundation.md
 ---
 
 # Phase 02 阻塞项清理确认报告
@@ -41,14 +41,14 @@ Found 4 errors in 2 files:
    ```
 
 2. **store 模块导入** ✅
-   - 添加了类型存根文件 `scripts/python/lib/store.pyi`
+   - 添加了类型存根文件 `src/vibe3/clients/sqlite_client.pyi`
    - 定义了 Vibe3Store 的类型接口
-   - pyproject.toml 已配置 `mypy_path = "scripts/python/lib"`
+   - pyproject.toml 已配置 `mypy_path = "src/lib"`
 
 **验证结果**:
 ```bash
-$ mypy --strict scripts/python/vibe3/services/flow_service.py
-$ mypy --strict scripts/python/vibe3/services/task_service.py
+$ mypy --strict src/vibe3/services/flow_service.py
+$ mypy --strict src/vibe3/services/task_service.py
 Success: no issues found in 2 source files ✅
 ```
 
@@ -95,7 +95,7 @@ tests/vibe3/services/
 
 **实现内容**:
 
-1. **完整的命令实现** ([commands/task.py](scripts/python/vibe3/commands/task.py)):
+1. **完整的命令实现** ([commands/task.py](src/vibe3/commands/task.py)):
    ```python
    @app.command()
    def link(
@@ -131,7 +131,7 @@ tests/vibe3/services/
        # Support both URL and number formats
    ```
 
-3. **UI 渲染模块** ([ui/task_ui.py](scripts/python/vibe3/ui/task_ui.py)):
+3. **UI 渲染模块** ([ui/task_ui.py](src/vibe3/ui/task_ui.py)):
    ```python
    def render_issue_linked(link: IssueLink) -> None:
        """Render issue linking success message."""

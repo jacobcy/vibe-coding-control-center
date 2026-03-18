@@ -23,14 +23,17 @@ Tests that verify shell command behavior, output, exit codes, and side effects.
 **Run**:
 ```bash
 # Run all behavior tests
-bats tests/ --filter '!^tests/doc-text/'
+bats tests/vibe2/
 
 # Run specific test suites
-bats tests/skills/          # Skills behavior tests
-bats tests/flow/            # Flow command behavior tests
-bats tests/roadmap/         # Roadmap command behavior tests
-bats tests/task/            # Task command behavior tests
-bats tests/contracts/       # Contract tests
+bats tests/vibe2/skills/          # Skills behavior tests
+bats tests/vibe2/flow/            # Flow command behavior tests
+bats tests/vibe2/roadmap/         # Roadmap command behavior tests
+bats tests/vibe2/task/            # Task command behavior tests
+bats tests/vibe2/contracts/       # Contract tests
+bats tests/vibe2/helpers/         # Helper function tests
+bats tests/vibe2/integration/     # Integration tests
+bats tests/vibe2/tools/           # Tool script tests
 ```
 
 **Purpose**: Verify that `vibe` commands and shell functions work correctly.
@@ -59,62 +62,75 @@ bats tests/doc-text/test_workflow_constraints.bats
 
 ```bash
 # Run all tests
-bats tests/
+bats tests/vibe2/
 
-# Run only behavior tests (exclude doc-text)
-bats tests/ --filter '!^tests/doc-text/'
+# Run only behavior tests (vibe2)
+bats tests/vibe2/
 
 # Run only doc-text tests
-bats tests/doc-text/
+bats tests/vibe2/doc-text/
 
 # Run specific test file
-bats tests/skills/test_skills.bats
+bats tests/vibe2/skills/test_skills.bats
 
 # Run with verbose output
-bats -t tests/skills/test_skills.bats
+bats -t tests/vibe2/skills/test_skills.bats
 ```
 
 ## Test Structure
 
 ```
 tests/
-├── contracts/              # Contract tests
-│   ├── check_help.sh
-│   ├── test_flow_contract.bats
-│   ├── test_github_project_bootstrap.bats
-│   ├── test_roadmap_contract.bats
-│   └── test_shared_state_contracts.bats
-├── doc-text/              # Doc-text regression tests (isolated)
-│   ├── README.md
-│   ├── test_terminology_locks.bats
-│   └── test_workflow_constraints.bats
-├── flow/                  # Flow command behavior tests
-│   ├── test_flow_bind_done.bats
-│   ├── test_flow_help_runtime.bats
-│   ├── test_flow_lifecycle.bats
-│   └── test_flow_pr_review.bats
-├── roadmap/               # Roadmap command behavior tests
-│   ├── test_roadmap_query.bats
-│   ├── test_roadmap_status_render.bats
-│   ├── test_roadmap_sync_intake.bats
-│   └── test_roadmap_write_audit.bats
-├── skills/                # Skills behavior tests
-│   ├── test_review_skills.bats
-│   └── test_skills.bats    # Only behavior tests (doc-text tests moved)
-├── task/                  # Task command behavior tests
-│   ├── test_task_core.bats
-│   ├── test_task_count_by_branch.bats
-│   ├── test_task_ops.bats
-│   ├── test_task_render.bats
-│   └── test_task_sync.bats
-├── test_install.bats
-├── test_install_gh_noninteractive.bats
-├── test_keys.bats
-├── test_metrics.bats
-├── test_utils.bats
-├── test_vibe.bats
-├── test_vibe_skill.bats
-└── test_worktree_alias.bats
+├── vibe2/                     # Vibe 2.x test suite (shell)
+│   ├── contracts/             # Contract tests
+│   │   ├── check_help.sh
+│   │   ├── test_flow_contract.bats
+│   │   ├── test_github_project_bootstrap.bats
+│   │   ├── test_keys_contract.bats
+│   │   ├── test_roadmap_contract.bats
+│   │   ├── test_shared_state_contracts.bats
+│   │   ├── test_vibe_check.bats
+│   │   ├── test_vibe_contract.bats
+│   │   └── test_worktree_alias.bats
+│   ├── doc-text/              # Doc-text regression tests (isolated)
+│   │   ├── README.md
+│   │   ├── test_terminology_locks.bats
+│   │   └── test_workflow_constraints.bats
+│   ├── flow/                  # Flow command behavior tests
+│   │   ├── test_flow_bind_done.bats
+│   │   ├── test_flow_help_runtime.bats
+│   │   ├── test_flow_lifecycle.bats
+│   │   ├── test_flow_pr_linking.bats
+│   │   └── test_flow_pr_review.bats
+│   ├── helpers/               # Helper function tests
+│   │   └── test_utils.bats
+│   ├── integration/           # Integration tests
+│   │   ├── test_install.bats
+│   │   ├── test_install_gh_noninteractive.bats
+│   │   ├── test_serena_gate.bats
+│   │   └── test_vibe_integration.bats
+│   ├── roadmap/               # Roadmap command behavior tests
+│   │   ├── test_roadmap_query.bats
+│   │   ├── test_roadmap_remote_dependency.bats
+│   │   ├── test_roadmap_status_render.bats
+│   │   ├── test_roadmap_sync_intake.bats
+│   │   ├── test_roadmap_sync_linking.bats
+│   │   └── test_roadmap_write_audit.bats
+│   ├── skills/                # Skills behavior tests
+│   │   ├── test_review_skills.bats
+│   │   ├── test_skills.bats
+│   │   └── test_vibe_skill_audit.bats
+│   ├── task/                  # Task command behavior tests
+│   │   ├── test_task_core.bats
+│   │   ├── test_task_count_by_branch.bats
+│   │   ├── test_task_ops.bats
+│   │   ├── test_task_render.bats
+│   │   └── test_task_sync.bats
+│   └── tools/                 # Tool script tests
+│       └── test_metrics.bats
+└── vibe3/                     # Vibe 3.x test suite (Python)
+    ├── clients/
+    └── services/
 ```
 
 ## Writing New Tests
@@ -123,36 +139,51 @@ tests/
 
 Add to appropriate directory based on tested component:
 
-**Skills Tests** (`tests/skills/`):
+**Skills Tests** (`tests/vibe2/skills/`):
 - Test `vibe skills` command behavior
 - Test skill synchronization behavior
 - Test skill execution effects
 
-**Flow Tests** (`tests/flow/`):
+**Flow Tests** (`tests/vibe2/flow/`):
 - Test `vibe flow` command behavior
 - Test flow lifecycle and state transitions
 - Test flow binding and unbinding
 
-**Roadmap Tests** (`tests/roadmap/`):
+**Roadmap Tests** (`tests/vibe2/roadmap/`):
 - Test `vibe roadmap` command behavior
 - Test roadmap query and status rendering
 - Test roadmap sync and intake
 
-**Task Tests** (`tests/task/`):
+**Task Tests** (`tests/vibe2/task/`):
 - Test `vibe task` command behavior
 - Test task operations and rendering
 - Test task synchronization
 
-**Contract Tests** (`tests/contracts/`):
+**Contract Tests** (`tests/vibe2/contracts/`):
 - Test command contracts and invariants
 - Test shared state contracts
 - Test GitHub Project integration contracts
+- Test keys, vibe, worktree alias contracts
+
+**Helper Tests** (`tests/vibe2/helpers/`):
+- Test utility function behavior
+- Test logging functions
+- Test helper functions required by aliases
+
+**Integration Tests** (`tests/vibe2/integration/`):
+- Test installation scripts
+- Test serena gate integration
+- Test vibe command integration
+
+**Tools Tests** (`tests/vibe2/tools/`):
+- Test metrics script behavior
+- Test other tool scripts
 
 ### Doc-Text Tests
 
 **Before adding**, ensure you meet entry criteria in [Doc-Text Test Governance Standard](../docs/standards/doc-text-test-governance.md).
 
-Add to `tests/doc-text/` with appropriate file name:
+Add to `tests/vibe2/doc-text/` with appropriate file name:
 - `test_terminology_locks.bats` for terminology definitions
 - `test_workflow_constraints.bats` for workflow constraint text
 - New files only if justified and within budget (10 files max)

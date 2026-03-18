@@ -46,7 +46,7 @@ status: planning
   
 2. **规范化提示词链**:
    - Orchestrator 需要能读懂 `docs/standards/serena-usage.md` 和 `.github/workflows/ci.yml` 里面约定的东西。
-   - 配置它在到达 Execution Phase 的时候，透明、静默地去运行 `scripts/lint.sh`, `scripts/metrics.sh` 并获取输出结果进行 3 次重试。
+   - 配置它在到达 Execution Phase 的时候，透明、静默地去运行 `scripts/hooks/lint.sh`, `scripts/tools/metrics.sh` 并获取输出结果进行 3 次重试。
 
 ### Phase 3: "拒绝的艺术"与容错
 
@@ -61,7 +61,7 @@ status: planning
 执行本计划前，需确保以下模块完全健康：
 - [x] `bin/vibe flow` 相关的基础 Shell 行为完备
 - [x] Serena AST 基本集成跑通
-- [x] `scripts/lint.sh` & `scripts/metrics.sh` 双层诊断与度量可用
+- [x] `scripts/hooks/lint.sh` & `scripts/tools/metrics.sh` 双层诊断与度量可用
 - [x] Bats 核心代码测试环境支持
 
 ## 5. 预期影响

@@ -42,7 +42,7 @@ related_docs:
 
 ## Test Commands
 - `bats tests/test_roadmap.bats tests/test_vibe.bats`
-- `bash scripts/lint.sh`
+- `bash scripts/hooks/lint.sh`
 
 ## Expected Result
 - `roadmap status/list/show` 在非 TTY 下不输出 ANSI 转义序列

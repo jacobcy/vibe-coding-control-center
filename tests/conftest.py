@@ -1,10 +1,12 @@
 """Configure Python path for tests."""
+
 import sys
 from pathlib import Path
 from unittest.mock import Mock
+
 import pytest
 
-# Add scripts/python to path for imports
+# Add src to path for imports
 scripts_python = Path(__file__).parent.parent / "scripts" / "python"
 if str(scripts_python) not in sys.path:
     sys.path.insert(0, str(scripts_python))
@@ -13,6 +15,7 @@ if str(scripts_python) not in sys.path:
 # ============================================================
 # Flow Service Fixtures
 # ============================================================
+
 
 @pytest.fixture
 def flow_state_data():
@@ -61,6 +64,7 @@ def mock_store_with_task(flow_state_data):
 # ============================================================
 # Task Service Fixtures
 # ============================================================
+
 
 @pytest.fixture
 def issue_link_data():

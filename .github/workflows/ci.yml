@@ -14,16 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install bats-core
+      - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y bats
-
-      - name: Install shellcheck
-        run: sudo apt-get install -y shellcheck
-
-      - name: Install zsh
-        run: sudo apt-get install -y zsh
+          sudo apt-get install -y bats shellcheck zsh
 
       # Setup Python environment for v3
       - name: Install uv
@@ -32,89 +26,40 @@ jobs:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install 3.10
+        run: uv python install 3.12
 
       - name: Install Python dependencies
-        run: |
-          uv sync --dev
-          # Install dev tools explicitly
-          uv pip install ruff black mypy pytest
+        run: uv sync --dev
 
       # Shell checks
       - name: Run dual-layer lint
-        run: bash scripts/lint.sh
+        run: bash scripts/hooks/lint.sh
 
       - name: Run bats tests
-        run: bats tests/
+        run: bats tests/vibe2/
 
       # Python checks for v3
       - name: Run Python lint (ruff)
-        run: uv run ruff check scripts/python
+        run: uv run ruff check src
 
       - name: Run Python format check (black)
-        run: uv run black --check scripts/python tests/vibe3
+        run: uv run black --check src tests/vibe3
 
       - name: Run Python type check (mypy)
-        run: uv run mypy scripts/python
+        run: uv run mypy src
 
       - name: Run Python tests (pytest)
         run: uv run pytest tests/vibe3 -v
 
-      # LOC checks for all code
-      - name: Check Shell LOC ceiling (lib/ + bin/ + lib3/ ≤ 7000)
-        run: |
-          total=$(find lib/ bin/ lib3/ -name '*.sh' -o -name 'vibe' 2>/dev/null | xargs cat 2>/dev/null | wc -l)
-          echo "Total Shell LOC: $total"
-          if [ "$total" -gt 7000 ]; then
-            echo "FAIL: Total Shell LOC $total exceeds 7000 limit"
-            exit 1
-          fi
-          echo "✅ Total Shell LOC: $total / 7000"
+      # LOC checks — delegate to hook scripts which read limits from config/settings.yaml
+      - name: Check Shell LOC ceiling
+        run: bash scripts/hooks/check-shell-loc.sh
 
-      - name: Check per-file ceiling for Shell (≤ 300 lines each)
-        run: |
-          failed=0
-          for f in lib/*.sh lib3/*.sh bin/vibe; do
-            [ -f "$f" ] || continue
-            lines=$(wc -l < "$f")
-            if [ "$lines" -gt 300 ]; then
-              echo "FAIL: $f has $lines lines (limit: 300)"
-              failed=$((failed + 1))
-            else
-              echo "  ✅ $f: $lines lines"
-            fi
-          done
-          if [ "$failed" -gt 0 ]; then
-            echo "FAIL: $failed files exceed the 300-line limit"
-            exit 1
-          fi
-          echo "✅ All Shell files within 300-line limit"
+      - name: Check Python LOC ceiling
+        run: bash scripts/hooks/check-python-loc.sh
 
-      - name: Check Python LOC ceiling (scripts/python ≤ 3000)
-        run: |
-          total=$(find scripts/python -name '*.py' | xargs cat | wc -l)
-          echo "Total Python LOC: $total"
-          if [ "$total" -gt 3000 ]; then
-            echo "FAIL: Total Python LOC $total exceeds 3000 limit"
-            exit 1
-          fi
-          echo "✅ Total Python LOC: $total / 3000"
+      - name: Check per-file LOC ceiling (production code)
+        run: bash scripts/hooks/check-per-file-loc.sh
 
-      - name: Check per-file ceiling for Python (≤ 300 lines each)
-        run: |
-          failed=0
-          for f in $(find scripts/python/vibe3 -name '*.py'); do
-            [ -f "$f" ] || continue
-            lines=$(wc -l < "$f")
-            if [ "$lines" -gt 300 ]; then
-              echo "FAIL: $f has $lines lines (limit: 300)"
-              failed=$((failed + 1))
-            else
-              echo "  ✅ $f: $lines lines"
-            fi
-          done
-          if [ "$failed" -gt 0 ]; then
-            echo "FAIL: $failed files exceed the 300-line limit"
-            exit 1
-          fi
-          echo "✅ All Python files within 300-line limit"
+      - name: Check per-file LOC ceiling (test code, layer-aware)
+        run: bash scripts/hooks/check-test-file-loc.sh

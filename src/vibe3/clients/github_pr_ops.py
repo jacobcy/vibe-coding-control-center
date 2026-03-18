@@ -1,0 +1,196 @@
+"""GitHub client PR operations."""
+
+import json
+import subprocess
+from typing import Any, cast
+
+from loguru import logger
+
+from vibe3.exceptions import PRNotFoundError
+from vibe3.models.pr import CreatePRRequest, PRResponse, PRState, UpdatePRRequest
+
+
+class PRMixin:
+    """Mixin for PR-related operations."""
+
+    def create_pr(self: Any, request: CreatePRRequest) -> PRResponse:
+        """Create a pull request."""
+        logger.bind(
+            external="github",
+            operation="create_pr",
+            title=request.title,
+            head=request.head_branch,
+            base=request.base_branch,
+            draft=request.draft,
+        ).debug("Calling GitHub API: create_pull_request")
+
+        cmd = [
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            request.title,
+            "--body",
+            request.body,
+            "--base",
+            request.base_branch,
+            "--head",
+            request.head_branch,
+        ]
+
+        if request.draft:
+            cmd.append("--draft")
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Parse PR URL from output
+        pr_url = result.stdout.strip()
+        pr_number = self._extract_pr_number(pr_url)
+
+        # Get the created PR
+        pr = self.get_pr(pr_number)
+        if pr is None:
+            raise PRNotFoundError(pr_number)
+        return cast(PRResponse, pr)
+
+    def get_pr(
+        self: Any, pr_number: int | None = None, branch: str | None = None
+    ) -> PRResponse | None:
+        """Get PR by number or branch."""
+        logger.bind(
+            external="github",
+            operation="get_pr",
+            pr_number=pr_number,
+            branch=branch,
+        ).debug("Calling GitHub API: get_pull_request")
+
+        target = str(pr_number) if pr_number else branch
+        if not target:
+            # Try current branch
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            target = result.stdout.strip()
+
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                target,
+                "--json",
+                "number,title,body,state,headRefName,baseRefName,"
+                "url,isDraft,createdAt,updatedAt,mergedAt",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            logger.bind(external="github", target=target).warning("PR not found")
+            return None
+
+        data = json.loads(result.stdout)
+        return PRResponse(
+            number=int(data["number"]),
+            title=str(data["title"]),
+            body=str(data.get("body", "")),
+            state=PRState(data["state"]),
+            head_branch=str(data["headRefName"]),
+            base_branch=str(data["baseRefName"]),
+            url=str(data["url"]),
+            draft=bool(data.get("isDraft", False)),
+            created_at=data.get("createdAt"),
+            updated_at=data.get("updatedAt"),
+            merged_at=data.get("mergedAt"),
+            metadata=None,
+        )
+
+    def update_pr(self: Any, request: UpdatePRRequest) -> PRResponse:
+        """Update a pull request."""
+        logger.bind(
+            external="github",
+            operation="update_pr",
+            number=request.number,
+        ).debug("Calling GitHub API: update_pull_request")
+
+        cmd = ["gh", "pr", "edit", str(request.number)]
+
+        if request.title:
+            cmd.extend(["--title", request.title])
+        if request.body:
+            cmd.extend(["--body", request.body])
+        if request.base_branch:
+            cmd.extend(["--base", request.base_branch])
+
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Handle draft status separately
+        if request.draft is not None:
+            if request.draft:
+                subprocess.run(
+                    ["gh", "pr", "ready", str(request.number), "--undo"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            else:
+                subprocess.run(
+                    ["gh", "pr", "ready", str(request.number)],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+
+        pr = self.get_pr(request.number)
+        if pr is None:
+            raise PRNotFoundError(request.number)
+        return cast(PRResponse, pr)
+
+    def mark_ready(self: Any, pr_number: int) -> PRResponse:
+        """Mark PR as ready for review."""
+        logger.bind(
+            external="github",
+            operation="mark_ready",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: mark_ready_for_review")
+
+        subprocess.run(
+            ["gh", "pr", "ready", str(pr_number)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        pr = self.get_pr(pr_number)
+        if pr is None:
+            raise PRNotFoundError(pr_number)
+        return cast(PRResponse, pr)
+
+    def merge_pr(self: Any, pr_number: int) -> PRResponse:
+        """Merge a pull request."""
+        logger.bind(
+            external="github",
+            operation="merge_pr",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: merge_pull_request")
+
+        subprocess.run(
+            ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        pr = self.get_pr(pr_number)
+        if pr is None:
+            raise PRNotFoundError(pr_number)
+        return cast(PRResponse, pr)

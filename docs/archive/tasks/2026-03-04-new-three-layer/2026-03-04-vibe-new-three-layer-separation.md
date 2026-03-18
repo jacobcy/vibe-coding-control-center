@@ -23,7 +23,7 @@
 
 - Zsh shell scripts
 - bats
-- `scripts/lint.sh`
+- `scripts/hooks/lint.sh`
 
 ## Current Findings
 
@@ -223,7 +223,7 @@ bats tests/test_vibe.bats
 
 **Test command**
 ```bash
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 bats tests/test_vibe.bats tests/test_skills.bats tests/test_utils.bats tests/test_task*.bats
 ```
 

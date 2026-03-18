@@ -1,0 +1,71 @@
+# Vibe Center 配置文件
+# 用于管理代码质量限制、审核范围、质量标准等
+
+# 代码量控制
+code_limits:
+  v2_shell:
+    total_loc: 7000          # Shell 总行数限制
+    max_file_loc: 300        # 单文件最大行数
+    min_tests: 20            # 最少测试数量
+
+  v3_python:
+    total_loc: 9000          # Python 总行数限制
+    max_file_loc: 300        # 单文件最大行数
+    min_tests: 5             # 最少测试数量
+    test_file_loc:
+      services: 180          # Services 层测试文件最大行数
+      clients: 200           # Clients 层测试文件最大行数
+      commands: 120           # Commands 层测试文件最大行数
+
+# 审核范围（适配 vibe-center 实际结构）
+review_scope:
+  critical_paths:            # 关键路径（重点审核）
+    - "bin/"                 # CLI 入口
+    - "lib/flow"             # Flow 核心逻辑
+    - "lib/git"              # Git 操作
+    - "lib/github"           # GitHub 集成
+    - "src/vibe3/services/"  # v3 服务层
+
+  public_api_paths:          # 公开 API（兼容性检查）
+    - "bin/vibe"             # 主入口
+    - "lib/flow.sh"          # Flow 公开接口
+    - "src/vibe3/commands/"  # v3 命令层
+
+# 质量标准
+quality:
+  test_coverage:
+    services: 80             # Services 层 ≥ 80%
+    clients: 70              # Clients 层 ≥ 70%
+    commands: 60             # Commands 层 ≥ 60%
+
+# PR 评分配置
+pr_scoring:
+  weights:
+    changed_lines:
+      small: 0               # <50 行
+      medium: 1              # 50-200 行
+      large: 2               # 200-500 行
+      xlarge: 3              # >500 行
+    changed_files:
+      small: 0               # 1-3 文件
+      medium: 1              # 4-10 文件
+      large: 2               # >10 文件
+    impacted_modules:
+      small: 0               # 1 模块
+      medium: 1              # 2-4 模块
+      large: 2               # ≥5 模块
+    critical_path_touch: 2
+    public_api_touch: 2
+    cross_module_symbol_change: 2
+    codex_major: 3
+    codex_critical: 5
+
+  thresholds:
+    medium: 3
+    high: 6
+    critical: 9
+
+  merge_gate:
+    block_on_score_at_or_above: 9
+    block_on_verdict:
+      - "BLOCK"

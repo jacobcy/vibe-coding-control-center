@@ -4,9 +4,9 @@
 
 **Goal:** Fix the ShellCheck/parsing failures in `lib/roadmap_query.sh` so CI lint passes, rerun the verification suite, and publish the result plus review reply on PR #51.
 
-**Architecture:** Keep `lib/roadmap_query.sh` as a small Zsh helper invoked by `bin/vibe roadmap`, but rewrite the offending multi-line heredoc/inline brace syntax to Bash-friendly constructs so `scripts/lint.sh`’s `shellcheck -s bash -S error` still succeeds. Repeat the same verification steps locally and articulate the fix/respond on GitHub.
+**Architecture:** Keep `lib/roadmap_query.sh` as a small Zsh helper invoked by `bin/vibe roadmap`, but rewrite the offending multi-line heredoc/inline brace syntax to Bash-friendly constructs so `scripts/hooks/lint.sh`’s `shellcheck -s bash -S error` still succeeds. Repeat the same verification steps locally and articulate the fix/respond on GitHub.
 
-**Tech Stack:** Zsh scripts for CLI, `shellcheck` (Bash) lint, `scripts/lint.sh`, GitHub CLI (`gh`) for PR reviews.
+**Tech Stack:** Zsh scripts for CLI, `shellcheck` (Bash) lint, `scripts/hooks/lint.sh`, GitHub CLI (`gh`) for PR reviews.
 
 ---
 
@@ -32,11 +32,11 @@
 ### Task 2: Rerun lint/test gating commands
 
 **Files:**
-- Verify: `scripts/lint.sh`
+- Verify: `scripts/hooks/lint.sh`
 - Verify: `tests/test_install_gh_noninteractive.bats`
 
-**Step 1: Run `scripts/lint.sh`**
-  - Command: `bash scripts/lint.sh`
+**Step 1: Run `scripts/hooks/lint.sh`**
+  - Command: `bash scripts/hooks/lint.sh`
   - Expected: prints both layers (Zsh syntax + ShellCheck) and exits with code 0.
 
 **Step 2: Run `bats tests/test_install_gh_noninteractive.bats`**
@@ -51,7 +51,7 @@
 - None (GitHub PR review only)
 
 **Step 1: Respond to the Copilot review summary comment**
-  - Command: `gh pr review 51 --repo jacobcy/vibe-coding-control-center --comment -b "Thanks for the thorough review. ShellCheck was tripping on lib/roadmap_query.sh’s heredoc style; I rewrote that helper and reran scripts/lint.sh and the new install test locally. CI should pass now."`
+  - Command: `gh pr review 51 --repo jacobcy/vibe-coding-control-center --comment -b "Thanks for the thorough review. ShellCheck was tripping on lib/roadmap_query.sh’s heredoc style; I rewrote that helper and reran scripts/hooks/lint.sh and the new install test locally. CI should pass now."`
   - Expected: comment posted.
 
 **Step 2: Push the branch to update PR #51**

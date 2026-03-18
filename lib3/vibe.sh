@@ -1,13 +1,13 @@
 #!/usr/bin/env zsh
 # Vibe 3.0 Shell Wrapper (Hub)
-# All logic should eventually be handled by Python core in scripts/python/
+# All logic should eventually be handled by Python core in src/
 
 set -e
 
 # --- Context ---
 VIBE3_LIB_DIR="$(cd "$(dirname "${(%):-%x:A}")" && pwd)"
 VIBE3_ROOT="$(cd "$VIBE3_LIB_DIR/.." && pwd)"
-VIBE3_PYTHON_CORE="$VIBE3_ROOT/scripts/python/vibe3/cli.py"
+VIBE3_PYTHON_CORE="$VIBE3_ROOT/src/vibe3/cli.py"
 
 # --- Colors ---
 if [ -t 1 ]; then
@@ -60,8 +60,8 @@ case "$command" in
         shift 1 2>/dev/null || true
         # Dispatch to Python core
         if [[ -f "$VIBE3_PYTHON_CORE" ]]; then
-            # Run as module from scripts/python directory
-            cd "$VIBE3_ROOT/scripts/python"
+            # Run as module from src directory
+            cd "$VIBE3_ROOT/src"
             python3 -m vibe3.cli "$command" "$@"
             cd "$VIBE3_ROOT"
         else
