@@ -3,22 +3,13 @@
 
 # 代码量控制
 code_limits:
-  v2_shell:
-    total_loc: 7000          # Shell 总行数限制
-    min_tests: 20            # 最少测试数量
-    file_loc:
-      default: 200           # 默认单文件限制
-      max: 300              # 特殊情况上限
+  single_file_loc:
+    default: 200           # 单文件默认限制（所有类型）
+    max: 300              # 单文件最大限制（所有类型）
 
-  v3_python:
-    total_loc: 9000          # Python 总行数限制
-    min_tests: 5             # 最少测试数量
-    file_loc:
-      default: 200           # 默认单文件限制（源代码）
-      max: 300              # 特殊情况上限
-    test_file_loc:
-      default: 200           # 默认测试文件限制
-      max: 300              # 特殊情况上限
+  total_file_loc:
+    v2_shell: 7000         # Shell 总行数限制
+    v3_python: 9000        # Python 总行数限制
 
 # 审核范围（适配 vibe-center 实际结构）
 review_scope:

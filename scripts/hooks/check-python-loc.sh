@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Check Python LOC ceiling (src)
-# Reads limit from config/settings.yaml via Python config module
+# Reads limit from config/settings.yaml
 
 set -e
 
 # Read limit from config
 LIMIT=$(PYTHONPATH=src uv run python -m vibe3.config.get \
-    code_limits.v3_python.total_loc \
+    code_limits.total_file_loc.v3_python \
     -c config/settings.yaml \
-    --quiet 2>/dev/null || echo 7000)
+    --quiet 2>/dev/null || echo 9000)
 
 total=$(find src -name "*.py" | xargs cat | wc -l)
 

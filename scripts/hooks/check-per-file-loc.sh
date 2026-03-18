@@ -17,9 +17,9 @@ get_limit() {
     "$1" -c config/settings.yaml --quiet 2>/dev/null || echo "$2"
 }
 
-# Get limits (unified for both Shell and Python)
-LIMIT_DEFAULT=$(get_limit "code_limits.v3_python.file_loc.default" 200)
-LIMIT_MAX=$(get_limit "code_limits.v3_python.file_loc.max" 300)
+# Get limits (unified for all file types)
+LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 200)
+LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
 
 warnings=0
 errors=0
