@@ -2,11 +2,13 @@
 
 import ast
 from pathlib import Path
+from typing import Set
 
 from loguru import logger
 from pydantic import BaseModel
 
 from vibe3.exceptions import VibeError
+from vibe3.models.inspection import CallNode, CommandInspection
 
 
 class CommandAnalyzerError(VibeError):
@@ -104,7 +106,7 @@ def analyze_command(
     command: str,
     subcommand: str | None = None,
     commands_root: str = "src/vibe3/commands",
-) -> CommandCallChain:
+) -> CommandInspection:
     """静态分析命令调用链路.
 
     Args:
@@ -113,7 +115,7 @@ def analyze_command(
         commands_root: commands 目录路径
 
     Returns:
-        命令调用链路
+        命令检查结果（包含层次化调用树）
 
     Raises:
         CommandAnalyzerError: 分析失败
@@ -127,16 +129,150 @@ def analyze_command(
         raise CommandAnalyzerError(f"Command file not found: {command}.py")
 
     target_func = subcommand or command
-    calls = _extract_calls(file_path, target_func)
 
-    # 简单估算调用深度（唯一 callee 数量）
-    depth = len({e.callee for e in calls})
+    # Build hierarchical call tree
+    visited: Set[tuple[str, str]] = set()
+    call_tree = build_call_tree(file_path, target_func, visited)
 
-    result = CommandCallChain(
+    # Calculate max depth
+    depth = _calculate_max_depth(call_tree)
+
+    result = CommandInspection(
         command=full_cmd,
-        file_path=file_path,
-        calls=calls,
+        file=file_path,
         call_depth=depth,
+        call_tree=call_tree,
     )
-    log.bind(calls=len(calls), depth=depth).success("Command analysis complete")
+    log.bind(calls=len(call_tree), depth=depth).success("Command analysis complete")
     return result
+
+
+def build_call_tree(
+    file_path: str,
+    func_name: str,
+    visited: Set[tuple[str, str]],
+    max_depth: int = 10,
+) -> list[CallNode]:
+    """递归构建调用树.
+
+    Args:
+        file_path: Python 文件路径
+        func_name: 目标函数名
+        visited: 已访问的 (file, func) 集合（防止循环）
+        max_depth: 最大递归深度
+
+    Returns:
+        调用节点列表
+    """
+    # Prevent infinite recursion
+    key = (file_path, func_name)
+    if key in visited or max_depth <= 0:
+        return []
+
+    visited.add(key)
+
+    # Extract call edges
+    try:
+        edges = _extract_calls(file_path, func_name)
+    except CommandAnalyzerError:
+        return []
+
+    # Build call nodes
+    nodes: list[CallNode] = []
+    for edge in edges:
+        node = CallNode(name=edge.callee, line=edge.line)
+
+        # Recursively expand if should expand
+        if should_expand(edge.callee):
+            # Try to find the callee file
+            callee_file = _find_callee_file(edge.callee, file_path)
+            if callee_file:
+                node.calls = build_call_tree(
+                    callee_file, edge.callee, visited, max_depth - 1
+                )
+
+        nodes.append(node)
+
+    return nodes
+
+
+def should_expand(callee: str) -> bool:
+    """判断是否应该展开某个调用.
+
+    Args:
+        callee: 调用目标名称
+
+    Returns:
+        是否应该展开
+    """
+    # Don't expand built-in or standard library calls
+    builtin_prefixes = (
+        "logger.",
+        "print",
+        "len",
+        "str",
+        "int",
+        "dict",
+        "list",
+        "typer.",
+        "json.",
+        "yaml.",
+    )
+
+    for prefix in builtin_prefixes:
+        if callee.startswith(prefix) or callee == prefix.rstrip("."):
+            return False
+
+    # Expand service, client, and helper calls
+    expand_patterns = ("service.", "client.", "_client", "helper", "ops")
+    return any(pattern in callee for pattern in expand_patterns)
+
+
+def _find_callee_file(callee: str, caller_file: str) -> str | None:
+    """查找被调用函数所在的文件.
+
+    Args:
+        callee: 调用目标名称（如 "service.get_pr"）
+        caller_file: 调用者文件路径
+
+    Returns:
+        被调用者文件路径或 None
+    """
+    # Heuristic: look for patterns like "service.xxx" -> "services/xxx_service.py"
+    parts = callee.split(".")
+    if len(parts) >= 2:
+        obj_name = parts[0]
+
+        # Common patterns
+        patterns = [
+            f"src/vibe3/services/{obj_name}_service.py",
+            f"src/vibe3/clients/{obj_name}_client.py",
+            f"src/vibe3/clients/{obj_name}_ops.py",
+        ]
+
+        for pattern in patterns:
+            if Path(pattern).exists():
+                return pattern
+
+    return None
+
+
+def _calculate_max_depth(nodes: list[CallNode]) -> int:
+    """计算调用树的最大深度.
+
+    Args:
+        nodes: 调用节点列表
+
+    Returns:
+        最大深度
+    """
+    if not nodes:
+        return 0
+
+    max_child_depth = 0
+    for node in nodes:
+        if node.calls:
+            child_depth = _calculate_max_depth(node.calls)
+            max_child_depth = max(max_child_depth, child_depth)
+
+    return 1 + max_child_depth

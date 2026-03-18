@@ -151,14 +151,23 @@ def commands(
     command: Annotated[str, typer.Argument(help="Command name")] = "",
     subcommand: Annotated[str, typer.Argument(help="Subcommand name")] = "",
     json_out: _JSON_OPT = False,
+    yaml_out: Annotated[bool, typer.Option("--yaml", help="Output as YAML")] = False,
+    tree_out: Annotated[
+        bool, typer.Option("--tree", help="Output as ASCII tree")
+    ] = False,
+    mermaid_out: Annotated[
+        bool, typer.Option("--mermaid", help="Output as Mermaid diagram")
+    ] = False,
     trace: _TRACE_OPT = False,
 ) -> None:
     """Show vibe command structure (static analysis, no execution).
 
     Examples:
         vibe inspect commands
-        vibe inspect commands review
-        vibe inspect commands review pr
+        vibe inspect commands pr
+        vibe inspect commands pr show --yaml
+        vibe inspect commands pr show --tree
+        vibe inspect commands pr show --mermaid
     """
     if trace:
         enable_trace()
@@ -169,15 +178,18 @@ def commands(
 
     result = command_analyzer.analyze_command(command, subcommand or None)
 
+    # Output in requested format
     if json_out:
-        typer.echo(json.dumps(result.model_dump(), indent=2))
-        return
-
-    typer.echo(f"=== Call Chain: vibe {result.command} ===")
-    typer.echo(f"  File  : {result.file_path}")
-    typer.echo(f"  Depth : {result.call_depth}")
-    for edge in result.calls:
-        typer.echo(f"  L{edge.line:4d}  {edge.caller} → {edge.callee}")
+        typer.echo(result.to_json())
+    elif yaml_out:
+        typer.echo(result.to_yaml())
+    elif tree_out:
+        typer.echo(result.to_tree())
+    elif mermaid_out:
+        typer.echo(result.to_mermaid())
+    else:
+        # Default: YAML format
+        typer.echo(result.to_yaml())
 
 
 @app.command()
