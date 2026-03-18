@@ -1,89 +1,103 @@
 # GitHub PR 自动标签配置
 # 详见: docs/standards/github-labels-standard.md
 
-# 类型标签 (根据标题和分支名)
-# 优先级：标题前缀 > 分支名前缀
-
+# 类型标签 (根据分支名)
 type/feature:
-  - title: ['^feat:', '^feature:']
-  - head_branch: ['^feat/', '^feature/']
+  - head-branch: ['^feat/', '^feature/']
 
 type/fix:
-  - title: ['^fix:', '^bugfix:']
-  - head_branch: ['^fix/', '^bugfix/']
+  - head-branch: ['^fix/', '^bugfix/']
 
 type/refactor:
-  - title: ['^refactor:']
-  - head_branch: ['^refactor/']
+  - head-branch: ['^refactor/']
 
 type/docs:
-  - title: ['^docs:', '^documentation:']
-  - head_branch: ['^docs/', '^documentation/']
+  - head-branch: ['^docs/', '^documentation/']
 
 type/test:
-  - title: ['^test:', '^testing:']
-  - head_branch: ['^test/', '^testing/']
+  - head-branch: ['^test/', '^testing/']
 
 type/chore:
-  - title: ['^chore:']
-  - head_branch: ['^chore/']
+  - head-branch: ['^chore/']
 
 type/task:
-  - head_branch: ['^task/']
+  - head-branch: ['^task/']
 
 # 范围标签 (根据文件路径)
 scope/python:
-  - 'src/vibe3/**/*.py'
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/**/*.py'
 
 scope/shell-script:
-  - 'lib/**/*.sh'
-  - 'scripts/**/*.sh'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'lib/**/*.sh'
+      - 'scripts/**/*.sh'
 
 scope/documentation:
-  - 'docs/**'
-  - '**/*.md'
-  - 'LICENSE'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
 
 scope/infrastructure:
-  - '.github/**'
-  - '.pre-commit-config.yaml'
-  - 'scripts/hooks/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**'
+      - '.pre-commit-config.yaml'
+      - 'scripts/hooks/**'
 
 scope/skill:
-  - 'skills/**'
-  - '.agent/workflows/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'skills/**'
+      - '.agent/workflows/**'
 
 scope/supervisor:
-  - '.agent/rules/**'
-  - '.agent/context/**'
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.agent/rules/**'
+      - '.agent/context/**'
 
 # 组件标签 (根据文件路径)
 component/cli:
-  - 'src/vibe3/cli.py'
-  - 'src/vibe3/commands/*.py'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/cli.py'
+      - 'src/vibe3/commands/*.py'
 
 component/flow:
-  - 'src/vibe3/commands/flow.py'
-  - 'src/vibe3/services/flow_service.py'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/flow.py'
+      - 'src/vibe3/services/flow_service.py'
 
 component/pr:
-  - 'src/vibe3/commands/pr.py'
-  - 'src/vibe3/services/pr_service.py'
-  - 'src/vibe3/clients/github_client.py'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/pr*.py'
+      - 'src/vibe3/services/pr_service.py'
+      - 'src/vibe3/clients/github_pr_ops.py'
 
 component/task:
-  - 'src/vibe3/commands/task.py'
-  - 'src/vibe3/services/task_service.py'
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/task.py'
+      - 'src/vibe3/services/task_service.py'
 
 component/logger:
-  - 'src/vibe3/observability/**'
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/observability/**'
 
 component/client:
-  - 'src/vibe3/clients/**'
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/clients/**'
 
 component/config:
-  - 'src/vibe3/config/**'
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/config/**'
 
 # 特殊标签
 breaking-change:
-  - head_branch: ['^breaking/', '^breaking-change/']
+  - head-branch: ['^breaking/', '^breaking-change/']
