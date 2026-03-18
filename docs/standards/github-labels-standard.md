@@ -98,8 +98,15 @@
 
 **应用规则**：
 - Issue 被分配时 → 自动添加 `status/in-progress`
-- PR 创建后 → 自动添加 `status/ready-for-review`
+- PR 创建后 → 开发者手动添加 `status/ready-for-review`（触发 AI review）
+- AI review 完成后 → 自动移除 `status/ready-for-review`（避免重复触发）
 - 发现阻塞时 → 手动添加 `status/blocked`
+
+**AI Review 触发机制**：
+1. 开发者完成开发，手动添加 `status/ready-for-review` 标签
+2. GitHub Action 自动触发 AI review
+3. Review 完成后自动移除标签
+4. 如需重新 review，再次添加标签即可
 
 ---
 
