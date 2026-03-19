@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.review_runner import AgentType, ReviewAgentOptions
+from vibe3.services.review_runner import ReviewAgentOptions
 
 
 class TestInspectScoreTrigger:
@@ -60,7 +60,7 @@ class TestReviewAgentOptionsForPrePush:
     def test_default_options_suitable_for_pre_push(self) -> None:
         """Default options should be suitable for pre-push review."""
         options = ReviewAgentOptions()
-        assert options.agent == AgentType.CODEX
+        assert options.agent == "code-reviewer"
         assert options.model is None  # Use default model
         assert options.timeout_seconds == 600  # 10 minutes
 

@@ -10,8 +10,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.services.review_runner import (
-    AgentBackend,
-    AgentType,
     ReviewAgentOptions,
     ReviewAgentResult,
     run_review_agent,
@@ -22,24 +20,21 @@ class TestReviewAgentOptions:
     """Tests for ReviewAgentOptions dataclass - immutable configuration."""
 
     def test_default_options(self) -> None:
-        """Default options should be codex agent with default settings."""
+        """Default options should be code-reviewer agent with default settings."""
         options = ReviewAgentOptions()
-        assert options.agent == AgentType.CODEX
-        assert options.backend == AgentBackend.CODEX
+        assert options.agent == "code-reviewer"
         assert options.model is None
         assert options.timeout_seconds == 600
 
     def test_custom_options(self) -> None:
-        """Should support custom agent, model, and backend."""
+        """Should support custom agent, model."""
         options = ReviewAgentOptions(
-            agent=AgentType.CODEX,
+            agent="code-reviewer",
             model="gpt-5.4",
-            backend=AgentBackend.CODEX,
             timeout_seconds=300,
         )
-        assert options.agent == AgentType.CODEX
+        assert options.agent == "code-reviewer"
         assert options.model == "gpt-5.4"
-        assert options.backend == AgentBackend.CODEX
         assert options.timeout_seconds == 300
 
     def test_options_are_frozen(self) -> None:
@@ -54,34 +49,6 @@ class TestReviewAgentOptions:
         assert options.model == "claude-3-opus"
 
 
-class TestAgentTypeEnum:
-    """Tests for AgentType enum - supports future extension."""
-
-    def test_codex_agent_type(self) -> None:
-        """Should have CODEX agent type for reviewer."""
-        assert AgentType.CODEX == "codex"
-
-    def test_planner_agent_type_exists(self) -> None:
-        """Should have PLANNER agent type for future use."""
-        assert AgentType.PLANNER == "planner"
-
-    def test_executor_agent_type_exists(self) -> None:
-        """Should have EXECUTOR agent type for future use."""
-        assert AgentType.EXECUTOR == "executor"
-
-
-class TestAgentBackendEnum:
-    """Tests for AgentBackend enum - supports multiple backends."""
-
-    def test_codex_backend(self) -> None:
-        """Should have CODEX backend."""
-        assert AgentBackend.CODEX == "codex"
-
-    def test_claude_backend(self) -> None:
-        """Should have CLAUDE backend for future use."""
-        assert AgentBackend.CLAUDE == "claude"
-
-
 class TestRunReviewAgent:
     """Tests for run_review_agent function."""
 
@@ -92,7 +59,7 @@ class TestRunReviewAgent:
                 args=[], returncode=0, stdout="VERDICT: PASS", stderr=""
             )
             options = ReviewAgentOptions(
-                agent=AgentType.CODEX,
+                agent="code-reviewer",
                 model="gpt-5.4",
             )
             result = run_review_agent("prompt body", options)
@@ -104,7 +71,6 @@ class TestRunReviewAgent:
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "codeagent-wrapper" in command[0]
-        assert "--backend" in command
         assert "--agent" in command
         assert "--model" in command
 
@@ -114,7 +80,7 @@ class TestRunReviewAgent:
             mock_run.return_value = CompletedProcess(
                 args=[], returncode=0, stdout="VERDICT: PASS", stderr=""
             )
-            options = ReviewAgentOptions(agent=AgentType.CODEX)
+            options = ReviewAgentOptions(agent="code-reviewer")
             result = run_review_agent("prompt body", options)
 
         assert result.exit_code == 0
@@ -130,7 +96,7 @@ class TestRunReviewAgent:
             mock_run.return_value = CompletedProcess(
                 args=[], returncode=1, stdout="", stderr="Error: something failed"
             )
-            options = ReviewAgentOptions(agent=AgentType.CODEX)
+            options = ReviewAgentOptions(agent="code-reviewer")
 
             with pytest.raises(RuntimeError) as exc_info:
                 run_review_agent("prompt body", options)
@@ -142,7 +108,7 @@ class TestRunReviewAgent:
         """Runner should give clear error when wrapper not found."""
         with patch("vibe3.services.review_runner.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
-            options = ReviewAgentOptions(agent=AgentType.CODEX)
+            options = ReviewAgentOptions(agent="code-reviewer")
 
             with pytest.raises(FileNotFoundError) as exc_info:
                 run_review_agent("prompt body", options)
@@ -158,7 +124,7 @@ class TestRunReviewAgent:
                 cmd=["codeagent-wrapper"], timeout=300
             )
             options = ReviewAgentOptions(
-                agent=AgentType.CODEX,
+                agent="code-reviewer",
                 timeout_seconds=300,
             )
 
@@ -171,7 +137,7 @@ class TestRunReviewAgent:
             mock_run.return_value = CompletedProcess(
                 args=[], returncode=0, stdout="Result", stderr=""
             )
-            options = ReviewAgentOptions(agent=AgentType.CODEX)
+            options = ReviewAgentOptions(agent="code-reviewer")
             run_review_agent("my custom prompt", options)
 
         call_kwargs = mock_run.call_args[1]

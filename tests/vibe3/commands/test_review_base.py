@@ -116,7 +116,7 @@ def test_review_base_with_agent_and_model():
     # Verify options were passed to run_review_agent
     call_args = mock_run.call_args
     options = call_args[0][1]
-    assert options.agent.value == "codex"
+    assert options.agent == "codex"
     assert options.model == "gpt-5.4"
 
 

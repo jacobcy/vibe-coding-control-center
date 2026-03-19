@@ -14,7 +14,7 @@ runner = CliRunner()
 
 
 def test_inspect_base_default_main():
-    """Test inspect base with default main branch."""
+    """Test inspect base with default origin/main branch."""
     mock_git = MagicMock()
     mock_git.get_changed_files.return_value = ["tests/test_foo.py", "docs/README.md"]
 
@@ -29,7 +29,7 @@ def test_inspect_base_default_main():
                 result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
-    assert "feature/test vs main" in result.output
+    assert "feature/test vs origin/main" in result.output
     assert "No core files changed" in result.output
 
 
@@ -104,14 +104,17 @@ def test_inspect_base_json_output():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-                        result = runner.invoke(app, ["base", "--json"])
+                        # Mock score generation to avoid config loading
+                        with patch("vibe3.services.pr_scoring_service.generate_score_report") as mock_score:
+                            mock_score.return_value = {"score": 5, "level": "MEDIUM", "block": False}
+                            result = runner.invoke(app, ["base", "--json"])
 
     assert result.exit_code == 0
     import json
 
     data = json.loads(result.output)
     assert data["current_branch"] == "feature/test"
-    assert data["base_branch"] == "main"
+    assert data["base_branch"] == "origin/main"
     assert data["core_changed"] == 1
     assert data["total_changed"] == 1
     assert len(data["core_files"]) == 1
@@ -137,7 +140,10 @@ def test_inspect_base_json_custom_branch():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-                        result = runner.invoke(app, ["base", "develop", "--json"])
+                        # Mock score generation to avoid config loading
+                        with patch("vibe3.services.pr_scoring_service.generate_score_report") as mock_score:
+                            mock_score.return_value = {"score": 5, "level": "MEDIUM", "block": False}
+                            result = runner.invoke(app, ["base", "develop", "--json"])
 
     assert result.exit_code == 0
     import json
