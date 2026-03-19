@@ -67,7 +67,8 @@ def test_review_analyze_commit_command_removed():
 
 def test_review_base_help_mentions_agent_and_model_options():
     """vibe review base --help should mention --agent and --model options."""
-    result = runner.invoke(app, ["base", "--help"])
+    # Disable color codes in output
+    result = runner.invoke(app, ["base", "--help"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
     assert "--agent" in result.output
     assert "--model" in result.output
@@ -75,7 +76,8 @@ def test_review_base_help_mentions_agent_and_model_options():
 
 def test_review_pr_help_mentions_agent_and_model_options():
     """vibe review pr --help should mention --agent and --model options."""
-    result = runner.invoke(app, ["pr", "--help"])
+    # Disable color codes in output
+    result = runner.invoke(app, ["pr", "--help"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
     assert "--agent" in result.output
     assert "--model" in result.output
