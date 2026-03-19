@@ -11,7 +11,11 @@ from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.models.change_source import BranchSource, PRSource
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
-from vibe3.services.review_runner import AgentType, ReviewAgentOptions, run_review_agent
+from vibe3.services.review_runner import (
+    AgentBackend,
+    ReviewAgentOptions,
+    run_review_agent,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -24,8 +28,8 @@ app = typer.Typer(
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
-_AGENT_OPT = Annotated[
-    str, typer.Option("--agent", help="Agent preset for codeagent-wrapper")
+_BACKEND_OPT = Annotated[
+    str, typer.Option("--backend", help="Backend for codeagent-wrapper (codex, claude)")
 ]
 _MODEL_OPT = Annotated[
     str | None, typer.Option("--model", help="Model override for codeagent-wrapper")
@@ -36,7 +40,7 @@ _MODEL_OPT = Annotated[
 def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     trace: _TRACE_OPT = False,
-    agent: _AGENT_OPT = "codex",
+    backend: _BACKEND_OPT = "codex",
     model: _MODEL_OPT = None,
 ) -> None:
     """Review a PR locally (generates review output, does not publish to GitHub).
@@ -71,7 +75,7 @@ def pr(
 
     # 4. Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
-        agent=AgentType(agent),
+        backend=AgentBackend(backend),
         model=model,
     )
     result = run_review_agent(context, options)
@@ -94,7 +98,7 @@ def base(
         typer.Argument(help="Base branch to compare against (default: origin/main)"),
     ] = "origin/main",
     trace: _TRACE_OPT = False,
-    agent: _AGENT_OPT = "codex",
+    backend: _BACKEND_OPT = "codex",
     model: _MODEL_OPT = None,
 ) -> None:
     """Review current branch changes relative to base branch.
@@ -136,7 +140,7 @@ def base(
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
-        agent=AgentType(agent),
+        backend=AgentBackend(backend),
         model=model,
     )
     result = run_review_agent(context, options)
