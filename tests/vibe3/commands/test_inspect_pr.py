@@ -32,21 +32,29 @@ def test_inspect_pr_missing_arg_shows_error():
 
 
 def test_inspect_pr_with_number():
+    """Test inspect pr with PR number."""
     with patch(
-        "vibe3.commands.inspect.build_change_analysis",
-        return_value=_mock_change_analysis(),
-    ):
-        result = runner.invoke(app, ["pr", "42"])
+        "vibe3.commands.inspect_change.validate_pr_number"
+    ):  # Skip PR validation
+        with patch(
+            "vibe3.commands.inspect_change.build_change_analysis",
+            return_value=_mock_change_analysis(),
+        ):
+            result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
     assert "PR #42" in result.output
 
 
 def test_inspect_pr_json():
+    """Test inspect pr JSON output."""
     with patch(
-        "vibe3.commands.inspect.build_change_analysis",
-        return_value=_mock_change_analysis(),
-    ):
-        result = runner.invoke(app, ["pr", "42", "--json"])
+        "vibe3.commands.inspect_change.validate_pr_number"
+    ):  # Skip PR validation
+        with patch(
+            "vibe3.commands.inspect_change.build_change_analysis",
+            return_value=_mock_change_analysis(),
+        ):
+            result = runner.invoke(app, ["pr", "42", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["identifier"] == "42"

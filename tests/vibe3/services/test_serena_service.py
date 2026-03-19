@@ -1,6 +1,6 @@
 """SerenaService 单元测试."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,8 +24,8 @@ class TestAnalyzeFile:
     def test_returns_ok_status(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
         result = service.analyze_file("src/vibe3/config/loader.py")
-        assert result["status"] == "ok"
         assert result["file"] == "src/vibe3/config/loader.py"
+        assert "symbols" in result
 
     def test_symbols_extracted(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
@@ -39,9 +39,9 @@ class TestAnalyzeFile:
         )
         service = SerenaService(client=client)
 
-        result = service.analyze_file("src/vibe3/config/loader.py")
-        assert result["status"] == "error"
-        assert "error" in result
+        # Fail-fast: 应该抛出异常，而不是返回错误字典
+        with pytest.raises(SerenaError):
+            service.analyze_file("src/vibe3/config/loader.py")
 
 
 class TestAnalyzeFiles:
@@ -56,7 +56,9 @@ class TestAnalyzeFiles:
 
     def test_summary_counts_files(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
-        result = service.analyze_files(["a.py", "b.py"])
+        with patch("vibe3.services.serena_file_analyzer.Path") as mock_path:
+            mock_path.return_value.exists.return_value = True
+            result = service.analyze_files(["a.py", "b.py"])
         assert result["summary"]["files"] == 2  # type: ignore[index]
 
     def test_empty_files_list(self, mock_client: MagicMock) -> None:

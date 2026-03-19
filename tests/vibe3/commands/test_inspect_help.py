@@ -19,7 +19,7 @@ runner = CliRunner()
 
 
 def test_inspect_no_args_shows_help():
-    """vibe inspect (no subcommand) → shows help (exit 0 or 2 per typer no_args_is_help)."""
+    """vibe inspect (no subcommand) shows help."""
     result = runner.invoke(app, [])
     assert result.exit_code in (0, 2)
     assert "Usage" in result.output or "inspect" in result.output.lower()

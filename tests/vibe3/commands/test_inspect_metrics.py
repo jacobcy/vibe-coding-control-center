@@ -17,15 +17,12 @@ def _mock_metrics():
     """Minimal MetricsReport mock."""
     from vibe3.services.metrics_service import LayerMetrics, MetricsReport
 
-    from vibe3.services.metrics_service import FileMetrics
-
     layer = LayerMetrics(
         total_loc=100,
         limit_total=5000,
-        total_ok=True,
         max_file_loc=50,
-        limit_file=300,
-        file_ok=True,
+        limit_file_default=200,
+        limit_file_max=300,
         file_count=5,
         files=[],
     )

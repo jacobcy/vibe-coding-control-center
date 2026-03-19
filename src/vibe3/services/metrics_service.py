@@ -32,7 +32,8 @@ class LayerMetrics(BaseModel):
     max_file_loc: int
     files: list[FileMetrics]
     limit_total: int
-    limit_file: int
+    limit_file_default: int  # 默认限制（warning）
+    limit_file_max: int  # 最大限制（error）
 
     @property
     def total_ok(self) -> bool:
@@ -40,11 +41,22 @@ class LayerMetrics(BaseModel):
 
     @property
     def file_ok(self) -> bool:
-        return self.max_file_loc <= self.limit_file
+        """最大文件未超过上限."""
+        return self.max_file_loc <= self.limit_file_max
 
     @property
-    def violations(self) -> list[FileMetrics]:
-        return [f for f in self.files if f.loc > self.limit_file]
+    def warnings(self) -> list[FileMetrics]:
+        """超过默认限制但未超过最大限制的文件."""
+        return [
+            f
+            for f in self.files
+            if f.loc > self.limit_file_default and f.loc <= self.limit_file_max
+        ]
+
+    @property
+    def errors(self) -> list[FileMetrics]:
+        """超过最大限制的文件."""
+        return [f for f in self.files if f.loc > self.limit_file_max]
 
 
 class MetricsReport(BaseModel):
@@ -107,7 +119,7 @@ def collect_shell_metrics() -> LayerMetrics:
 
     try:
         config = get_config()
-        limits = config.code_limits.v2_shell
+        limits = config.code_limits
 
         root = Path(".")
         files: list[FileMetrics] = []
@@ -122,8 +134,9 @@ def collect_shell_metrics() -> LayerMetrics:
             file_count=len(files),
             max_file_loc=max_loc,
             files=files,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v2_shell,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
         log.bind(total_loc=total, file_count=len(files)).success(
             "Shell metrics collected"
@@ -148,7 +161,7 @@ def collect_python_metrics() -> LayerMetrics:
 
     try:
         config = get_config()
-        limits = config.code_limits.v3_python
+        limits = config.code_limits
 
         root = Path("src/vibe3")
         if not root.exists():
@@ -166,8 +179,9 @@ def collect_python_metrics() -> LayerMetrics:
             file_count=len(files),
             max_file_loc=max_loc,
             files=files,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
         log.bind(total_loc=total, file_count=len(files)).success(
             "Python metrics collected"

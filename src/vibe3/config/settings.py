@@ -11,6 +11,76 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
+class SingleFileLocConfig(BaseModel):
+    """单文件行数限制."""
+
+    default: int = Field(default=200, description="单文件默认限制")
+    max: int = Field(default=300, description="单文件最大限制")
+
+
+class TotalFileLocConfig(BaseModel):
+    """总行数限制."""
+
+    v2_shell: int = Field(default=7000, description="Shell 核心代码总行数")
+    v3_python: int = Field(default=9000, description="Python 核心代码总行数")
+
+
+class CodePathsConfig(BaseModel):
+    """代码路径配置."""
+
+    v2_shell: list[str] = Field(
+        default_factory=list,
+        description="Shell 核心代码路径",
+    )
+    v3_python: list[str] = Field(
+        default_factory=list,
+        description="Python 核心代码路径",
+    )
+
+
+class ScriptsPathsConfig(BaseModel):
+    """脚本路径配置."""
+
+    v2_shell: list[str] = Field(
+        default_factory=list,
+        description="Shell 脚本路径",
+    )
+    v3_python: list[str] = Field(
+        default_factory=list,
+        description="Python 脚本路径",
+    )
+
+
+class TestPathsConfig(BaseModel):
+    """测试路径配置."""
+
+    v2_shell: list[str] = Field(default_factory=list, description="Shell 测试路径")
+    v3_python: list[str] = Field(default_factory=list, description="Python 测试路径")
+
+
+class CodeLimitsConfig(BaseModel):
+    """代码量限制配置.
+
+    与 config/settings.yaml 结构完全对应。
+    """
+
+    single_file_loc: SingleFileLocConfig = Field(
+        default_factory=SingleFileLocConfig, description="单文件行数限制"
+    )
+    total_file_loc: TotalFileLocConfig = Field(
+        default_factory=TotalFileLocConfig, description="总行数限制"
+    )
+    code_paths: CodePathsConfig = Field(
+        default_factory=CodePathsConfig, description="代码路径"
+    )
+    scripts_paths: ScriptsPathsConfig = Field(
+        default_factory=ScriptsPathsConfig, description="脚本路径"
+    )
+    test_paths: TestPathsConfig = Field(
+        default_factory=TestPathsConfig, description="测试路径"
+    )
+
+
 class TestFileLimitsConfig(BaseModel):
     """Per-layer test file line limits."""
 
@@ -22,29 +92,6 @@ class TestFileLimitsConfig(BaseModel):
     )
     commands: int = Field(
         default=300, description="Commands layer max lines per test file"
-    )
-
-
-class CodeLimitsConfig(BaseModel):
-    """Code size limits configuration."""
-
-    total_loc: int = Field(default=10000, description="Total lines of code limit")
-    max_file_loc: int = Field(default=500, description="Maximum lines per file")
-    min_tests: int = Field(default=0, description="Minimum number of tests")
-    test_file_loc: TestFileLimitsConfig = Field(
-        default_factory=TestFileLimitsConfig,
-        description="Per-layer test file line limits",
-    )
-
-
-class CodeLimits(BaseModel):
-    """Code limits for both V2 and V3."""
-
-    v2_shell: CodeLimitsConfig = Field(
-        default_factory=CodeLimitsConfig, description="V2 Shell code limits"
-    )
-    v3_python: CodeLimitsConfig = Field(
-        default_factory=CodeLimitsConfig, description="V3 Python code limits"
     )
 
 
@@ -188,7 +235,7 @@ class VibeConfig(BaseModel):
     正常情况下所有配置都应该从 YAML 文件读取。
     """
 
-    code_limits: CodeLimits = Field(default_factory=CodeLimits)
+    code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
     pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)

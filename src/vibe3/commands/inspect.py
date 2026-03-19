@@ -5,13 +5,16 @@ from typing import Annotated
 
 import typer
 
-from vibe3.commands.inspect_helpers import build_change_analysis, enable_trace
+from vibe3.commands.inspect_base import register as register_base
+from vibe3.commands.inspect_change import register as register_change
+from vibe3.commands.inspect_symbols import register as register_symbols
 from vibe3.services import (
     command_analyzer,
+    dag_service,
     metrics_service,
     structure_service,
 )
-from vibe3.services.serena_service import SerenaService
+from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="inspect",
@@ -24,6 +27,11 @@ _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
+
+# Register extracted commands
+register_symbols(app)
+register_base(app)
+register_change(app)
 
 
 @app.command()
@@ -49,10 +57,20 @@ def metrics(
         f"{'✅' if shell.total_ok else '❌'}"
     )
     typer.echo(
-        f"  Max file  : {shell.max_file_loc} / {shell.limit_file} "
+        f"  Max file  : {shell.max_file_loc} / {shell.limit_file_max} "
         f"{'✅' if shell.file_ok else '❌'}"
     )
     typer.echo(f"  Files     : {shell.file_count}")
+
+    # 显示 Shell 警告和错误
+    if shell.errors:
+        typer.echo(f"  ❌ 超限文件 ({len(shell.errors)}):")
+        for f in shell.errors:
+            typer.echo(f"    {f.path}: {f.loc} 行 > {shell.limit_file_max}")
+    if shell.warnings:
+        typer.echo(f"  ⚠️  大文件 ({len(shell.warnings)}):")
+        for f in shell.warnings:
+            typer.echo(f"    {f.path}: {f.loc} 行 > {shell.limit_file_default}")
 
     typer.echo("\n=== Python Metrics ===")
     typer.echo(
@@ -60,15 +78,20 @@ def metrics(
         f"{'✅' if python.total_ok else '❌'}"
     )
     typer.echo(
-        f"  Max file  : {python.max_file_loc} / {python.limit_file} "
+        f"  Max file  : {python.max_file_loc} / {python.limit_file_max} "
         f"{'✅' if python.file_ok else '❌'}"
     )
     typer.echo(f"  Files     : {python.file_count}")
 
-    if python.violations:
-        typer.echo("\n⚠️  Violations:")
-        for v in python.violations:
-            typer.echo(f"  {v.path}: {v.loc} lines")
+    # 显示 Python 警告和错误
+    if python.errors:
+        typer.echo(f"  ❌ 超限文件 ({len(python.errors)}):")
+        for f in python.errors:
+            typer.echo(f"    {f.path}: {f.loc} 行 > {python.limit_file_max}")
+    if python.warnings:
+        typer.echo(f"  ⚠️  大文件 ({len(python.warnings)}):")
+        for f in python.warnings:
+            typer.echo(f"    {f.path}: {f.loc} 行 > {python.limit_file_default}")
 
 
 @app.command()
@@ -77,12 +100,29 @@ def structure(
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
-    """Show file structure analysis (functions, LOC)."""
+    """Show file structure analysis (functions, LOC, dependencies)."""
     if trace:
         enable_trace()
 
     if file:
         result = structure_service.analyze_file(file)
+
+        # 添加依赖关系分析（仅 Python 文件）
+        if file.endswith(".py"):
+            # 提取 imports
+            result.imports = dag_service._extract_imports(file)
+
+            # 计算反向依赖（谁导入了我）
+            module_graph = dag_service.build_module_graph()
+            current_module = dag_service._file_to_module(file)
+
+            # 构建反向依赖映射
+            imported_by: list[str] = []
+            for module, node in module_graph.items():
+                if current_module in node.imports:
+                    imported_by.append(module)
+            result.imported_by = sorted(imported_by)
+
         if json_out:
             typer.echo(json.dumps(result.model_dump(), indent=2))
         else:
@@ -92,6 +132,17 @@ def structure(
             typer.echo(f"  Functions : {result.function_count}")
             for fn in result.functions:
                 typer.echo(f"    L{fn.line:4d}  {fn.name}  ({fn.loc} lines)")
+
+            # 显示依赖关系
+            if result.imports:
+                typer.echo(f"\n  Imports ({len(result.imports)}):")
+                for imp in result.imports:
+                    typer.echo(f"    - {imp}")
+
+            if result.imported_by:
+                typer.echo(f"\n  Imported by ({len(result.imported_by)}):")
+                for imp_by in result.imported_by:
+                    typer.echo(f"    - {imp_by}")
     else:
         # 分析整个 src/vibe3 目录
         from pathlib import Path
@@ -100,11 +151,9 @@ def structure(
         for p in sorted(Path("src/vibe3").glob("**/*.py")):
             if "__pycache__" in str(p):
                 continue
-            try:
-                file_struct = structure_service.analyze_python_file(str(p))
-                results.append(file_struct.model_dump())
-            except Exception:
-                pass
+            # Fail-fast: 不允许静默失败
+            file_struct = structure_service.analyze_python_file(str(p))
+            results.append(file_struct.model_dump())
 
         if json_out:
             typer.echo(json.dumps(results, indent=2))
@@ -115,35 +164,6 @@ def structure(
                     f"  {r['path']}: {r['total_loc']} LOC, "
                     f"{r['function_count']} functions"
                 )
-
-
-@app.command()
-def symbols(
-    file: Annotated[str, typer.Argument(help="File or directory to analyze")] = ".",
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Show code symbols (functions, classes, references).
-
-    Examples:
-        vibe inspect symbols
-        vibe inspect symbols src/vibe3/services/flow_service.py
-    """
-    if trace:
-        enable_trace()
-
-    svc = SerenaService()
-    result = svc.analyze_file(file)
-
-    if json_out:
-        typer.echo(json.dumps(result, indent=2))
-        return
-
-    typer.echo(f"=== Symbols: {file} ===")
-    typer.echo(f"  Status  : {result['status']}")
-    for sym in result.get("symbols", []):
-        refs = sym.get("references", 0)
-        typer.echo(f"  {sym['name']}  ({refs} refs)")
 
 
 @app.command()
@@ -190,85 +210,3 @@ def commands(
     else:
         # Default: YAML format
         typer.echo(result.to_yaml())
-
-
-@app.command()
-def pr(
-    pr_number: Annotated[int, typer.Argument(help="PR number")],
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """PR change analysis (serena + dag + scoring).
-
-    Example: vibe inspect pr 42
-    """
-    if trace:
-        enable_trace()
-
-    result = build_change_analysis("pr", str(pr_number))
-
-    if json_out:
-        typer.echo(json.dumps(result, indent=2, default=str))
-        return
-
-    score = result["score"]
-    assert isinstance(score, dict)
-    typer.echo(f"=== PR #{pr_number} Analysis ===")
-    typer.echo(f"  Changed files    : {len(result['impact'].get('changed_files', []))}")  # type: ignore
-    typer.echo(f"  Impacted modules : {len(result['dag']['impacted_modules'])}")  # type: ignore
-    typer.echo(f"  Risk score       : {score['score']} ({score['level']})")
-    typer.echo(f"  Block            : {score['block']}")
-
-
-@app.command()
-def commit(
-    sha: Annotated[str, typer.Argument(help="Commit SHA")],
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Commit change analysis.
-
-    Example: vibe inspect commit HEAD~1
-    """
-    if trace:
-        enable_trace()
-
-    result = build_change_analysis("commit", sha)
-
-    if json_out:
-        typer.echo(json.dumps(result, indent=2, default=str))
-        return
-
-    score = result["score"]
-    assert isinstance(score, dict)
-    typer.echo(f"=== Commit {sha} Analysis ===")
-    typer.echo(f"  Changed files    : {len(result['impact'].get('changed_files', []))}")  # type: ignore
-    typer.echo(f"  Impacted modules : {len(result['dag']['impacted_modules'])}")  # type: ignore
-    typer.echo(f"  Risk score       : {score['score']} ({score['level']})")
-
-
-@app.command()
-def base(
-    branch: Annotated[str, typer.Argument(help="Branch to compare against main")],
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Branch change analysis (relative to main).
-
-    Example: vibe inspect base feature/my-branch
-    """
-    if trace:
-        enable_trace()
-
-    result = build_change_analysis("branch", branch)
-
-    if json_out:
-        typer.echo(json.dumps(result, indent=2, default=str))
-        return
-
-    score = result["score"]
-    assert isinstance(score, dict)
-    typer.echo(f"=== Branch {branch} Analysis ===")
-    typer.echo(f"  Changed files    : {len(result['impact'].get('changed_files', []))}")  # type: ignore
-    typer.echo(f"  Impacted modules : {len(result['dag']['impacted_modules'])}")  # type: ignore
-    typer.echo(f"  Risk score       : {score['score']} ({score['level']})")

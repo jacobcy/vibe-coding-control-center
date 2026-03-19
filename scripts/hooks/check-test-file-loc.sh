@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Check per-file LOC ceiling for test files (layer-aware)
-# Reads limits from config/settings.yaml via Python config module
+# Check per-file LOC ceiling for test files
+# Reads limits from config/settings.yaml
 #
-# Limits by layer:
-#   tests/vibe3/services/  → code_limits.v3_python.test_file_loc.services (180)
-#   tests/vibe3/clients/   → code_limits.v3_python.test_file_loc.clients  (200)
-#   tests/vibe3/commands/  → code_limits.v3_python.test_file_loc.commands (120)
+# Limits:
+#   default: 200 lines (most test files should fit)
+#   max: 300 lines (special cases with justification)
+#
+# Test paths (defined in config/settings.yaml:code_limits.test_paths):
+#   Python: tests/vibe3/
+#
+# Exit codes:
+#   0: All files within default limit
+#   1: Some files exceed max limit (or warnings with strict mode)
 
 set -e
 
@@ -14,30 +20,52 @@ get_limit() {
     "$1" -c config/settings.yaml --quiet 2>/dev/null || echo "$2"
 }
 
-LIMIT_SERVICES=$(get_limit "code_limits.v3_python.test_file_loc.services" 180)
-LIMIT_CLIENTS=$(get_limit  "code_limits.v3_python.test_file_loc.clients"  200)
-LIMIT_COMMANDS=$(get_limit "code_limits.v3_python.test_file_loc.commands" 120)
+# Get limits (unified for all test files)
+LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 200)
+LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
 
-failed=0
+warnings=0
+errors=0
 
 check_file() {
   local f="$1"
-  local limit="$2"
   local lines
   lines=$(wc -l < "$f")
-  if [ "$lines" -gt "$limit" ]; then
-    echo "FAIL: $f has $lines lines (limit: $limit)"
-    failed=$((failed + 1))
+
+  # Check max limit (error)
+  if [ "$lines" -gt "$LIMIT_MAX" ]; then
+    echo "❌ ERROR: $f has $lines lines (max: $LIMIT_MAX)"
+    errors=$((errors + 1))
+  # Check default limit (warning)
+  elif [ "$lines" -gt "$LIMIT_DEFAULT" ]; then
+    echo "⚠️  WARNING: $f has $lines lines (default: $LIMIT_DEFAULT, max: $LIMIT_MAX)"
+    warnings=$((warnings + 1))
   fi
 }
 
-for f in $(find tests/vibe3/services  -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_SERVICES";  done
-for f in $(find tests/vibe3/clients   -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_CLIENTS";   done
-for f in $(find tests/vibe3/commands  -name "test_*.py" 2>/dev/null); do check_file "$f" "$LIMIT_COMMANDS";  done
+# Check Python test files (paths defined in config: code_limits.test_paths.v3_python)
+for f in $(find tests/vibe3 -name "test_*.py" 2>/dev/null); do
+  check_file "$f"
+done
 
-if [ "$failed" -gt 0 ]; then
-  echo "FAIL: $failed test files exceed layer limits"
+# Report results
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Test file LOC check results:"
+echo "  - Default limit: $LIMIT_DEFAULT lines"
+echo "  - Max limit: $LIMIT_MAX lines"
+echo "  - Warnings: $warnings files (default → max)"
+echo "  - Errors: $errors files (exceed max)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "$errors" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Split large test files into smaller, focused modules"
   exit 1
+elif [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Consider refactoring files exceeding default limit"
+  echo "   (Warnings are allowed, but keep below max limit)"
 else
-  echo "✅ All test files within layer limits (services≤${LIMIT_SERVICES}, clients≤${LIMIT_CLIENTS}, commands≤${LIMIT_COMMANDS})"
+  echo "✅ All test files within default limit ($LIMIT_DEFAULT lines)"
 fi

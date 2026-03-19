@@ -109,6 +109,7 @@ wt-*/
 # Local runtime artifacts (not shared)
 .vibe/
 .repomix/
+.hypothesis/
 .agent/context/task.md
 .agent/reports/
 docs/audits/

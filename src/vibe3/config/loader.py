@@ -6,6 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import ConfigError
 
 
 def find_config_file() -> Path | None:
@@ -72,18 +73,18 @@ def load_config(config_path: Path | None = None) -> VibeConfig:
             logger.info(
                 "Configuration loaded from file",
                 path=str(config_path),
-                code_limits_v2_shell_total_loc=config.code_limits.v2_shell.total_loc,
-                code_limits_v3_python_total_loc=config.code_limits.v3_python.total_loc,
+                code_limits_v2_shell_total_loc=config.code_limits.total_file_loc.v2_shell,
+                code_limits_v3_python_total_loc=config.code_limits.total_file_loc.v3_python,
             )
             return config
         except Exception as e:
+            # Fail-fast: 配置文件存在但加载失败，立即抛出
             logger.error(
-                "Failed to load config file, using defaults",
+                "Failed to load config file",
                 path=str(config_path),
                 error=str(e),
             )
-            # 降级到从默认配置文件读取
-            return VibeConfig.get_defaults()
+            raise ConfigError(f"Failed to load config file {config_path}: {e}") from e
 
     # Return default config (from config/settings.yaml if exists)
     logger.info("Using default configuration from config/settings.yaml")
@@ -111,7 +112,7 @@ def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig
     # Apply environment variable overrides
     if env_total_loc := os.getenv("VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC"):
         try:
-            config.code_limits.v2_shell.total_loc = int(env_total_loc)
+            config.code_limits.total_file_loc.v2_shell = int(env_total_loc)
             logger.debug(
                 "Applied env override",
                 key="VIBE_CODE_LIMITS_V2_SHELL_TOTAL_LOC",
@@ -126,7 +127,7 @@ def get_config_with_env_override(config: VibeConfig | None = None) -> VibeConfig
 
     if env_total_loc := os.getenv("VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC"):
         try:
-            config.code_limits.v3_python.total_loc = int(env_total_loc)
+            config.code_limits.total_file_loc.v3_python = int(env_total_loc)
             logger.debug(
                 "Applied env override",
                 key="VIBE_CODE_LIMITS_V3_PYTHON_TOTAL_LOC",

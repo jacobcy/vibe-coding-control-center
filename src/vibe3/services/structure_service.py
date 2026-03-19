@@ -33,6 +33,8 @@ class FileStructure(BaseModel):
     total_loc: int
     functions: list[FunctionInfo]
     function_count: int
+    imports: list[str] = []  # 该文件导入的模块
+    imported_by: list[str] = []  # 导入该文件的其他模块
 
 
 def analyze_python_file(file_path: str) -> FileStructure:

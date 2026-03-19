@@ -32,7 +32,7 @@ repos:
 
   # ── Python Checks ───────────────────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
+    rev: v0.15.6
     hooks:
       - id: ruff
         name: Ruff (Python linter)
@@ -40,7 +40,7 @@ repos:
         args: ['--fix']
 
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 23.12.1
+    rev: 26.3.1
     hooks:
       - id: black
         name: Black (Python formatter)
@@ -74,17 +74,27 @@ repos:
         files: ^src/.*\.py$
 
       - id: check-per-file-loc
-        name: Check per-file LOC ceiling (src ≤ config:code_limits.v3_python.max_file_loc)
+        name: "Check source file LOC (default: 200, max: 300)"
         entry: scripts/hooks/check-per-file-loc.sh
         language: script
         pass_filenames: false
 
       - id: check-test-file-loc
-        name: Check test file LOC ceiling (layer-aware)
+        name: "Check test file LOC (default: 200, max: 300)"
         entry: scripts/hooks/check-test-file-loc.sh
         language: script
         pass_filenames: false
         files: ^tests/vibe3/.*\.py$
+
+  # ── Pre-push Checks (run on push, not commit) ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pre-push-checks
+        name: Pre-push checks (coverage + risk-based review)
+        entry: scripts/hooks/pre-push.sh
+        language: script
+        pass_filenames: false
+        stages: [push]
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)

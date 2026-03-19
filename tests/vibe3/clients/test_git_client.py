@@ -1,6 +1,5 @@
 """GitClient 单元测试."""
 
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +15,21 @@ from vibe3.models.change_source import (
 
 BRANCH = "feature/test"
 SHA = "abc1234"
+
+
+class TestGitClientInit:
+    """GitClient 初始化测试."""
+
+    def test_init_without_github_client(self) -> None:
+        """测试不注入 GitHubClient."""
+        client = GitClient()
+        assert client._github_client is None
+
+    def test_init_with_github_client(self) -> None:
+        """测试注入 GitHubClient."""
+        mock_gh = MagicMock()
+        client = GitClient(github_client=mock_gh)
+        assert client._github_client is mock_gh
 
 
 class TestGetCurrentBranch:
@@ -62,20 +76,21 @@ class TestGetChangedFiles:
             files = client.get_changed_files(BranchSource(branch=BRANCH, base="main"))
         assert files == ["z.py"]
 
-    def test_pr_source_calls_gh_cli(self, client: GitClient) -> None:
-        mock_result = MagicMock()
-        mock_result.stdout = "pr_file.py\n"
-        with patch("subprocess.run", return_value=mock_result):
-            files = client.get_changed_files(PRSource(pr_number=42))
-        assert "pr_file.py" in files
+    def test_pr_source_with_github_client(self, client: GitClient) -> None:
+        """测试 PR source 使用注入的 GitHubClient."""
+        mock_gh = MagicMock()
+        mock_gh.get_pr_files.return_value = ["pr_file.py"]
 
-    def test_pr_source_raises_on_gh_failure(self, client: GitClient) -> None:
-        with patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "gh", stderr=b"not found"),
-        ):
-            with pytest.raises(GitError):
-                client.get_changed_files(PRSource(pr_number=99))
+        client_with_dep = GitClient(github_client=mock_gh)
+        files = client_with_dep.get_changed_files(PRSource(pr_number=42))
+
+        assert "pr_file.py" in files
+        mock_gh.get_pr_files.assert_called_once_with(42)
+
+    def test_pr_source_without_github_client_raises(self, client: GitClient) -> None:
+        """测试 PR source 但未注入 GitHubClient 时抛出错误."""
+        with pytest.raises(GitError, match="requires GitHubClient"):
+            client.get_changed_files(PRSource(pr_number=99))
 
 
 class TestGetDiff:
@@ -99,3 +114,19 @@ class TestGetDiff:
         with patch.object(client, "_run", return_value="branch diff"):
             diff = client.get_diff(BranchSource(branch=BRANCH))
         assert diff == "branch diff"
+
+    def test_pr_diff_with_github_client(self, client: GitClient) -> None:
+        """测试 PR diff 使用注入的 GitHubClient."""
+        mock_gh = MagicMock()
+        mock_gh.get_pr_diff.return_value = "pr diff content"
+
+        client_with_dep = GitClient(github_client=mock_gh)
+        diff = client_with_dep.get_diff(PRSource(pr_number=42))
+
+        assert diff == "pr diff content"
+        mock_gh.get_pr_diff.assert_called_once_with(42)
+
+    def test_pr_diff_without_github_client_raises(self, client: GitClient) -> None:
+        """测试 PR diff 但未注入 GitHubClient 时抛出错误."""
+        with pytest.raises(GitError, match="requires GitHubClient"):
+            client.get_diff(PRSource(pr_number=99))

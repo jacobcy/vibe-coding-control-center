@@ -22,13 +22,13 @@ MOCK_FILES = [
 def get_v2_limits():
     """获取 V2 Shell 配置限制."""
     config = get_config()
-    return config.code_limits.v2_shell
+    return config.code_limits
 
 
 def get_v3_limits():
     """获取 V3 Python 配置限制."""
     config = get_config()
-    return config.code_limits.v3_python
+    return config.code_limits
 
 
 class TestLayerMetrics:
@@ -41,36 +41,57 @@ class TestLayerMetrics:
             file_count=2,
             max_file_loc=80,
             files=MOCK_FILES,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
         assert m.total_ok is True
 
     def test_total_ok_exceeds_limit(self) -> None:
         limits = get_v3_limits()
         m = LayerMetrics(
-            total_loc=limits.total_loc + 1000,
+            total_loc=limits.total_file_loc.v3_python + 1000,
             file_count=2,
             max_file_loc=80,
             files=MOCK_FILES,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
         assert m.total_ok is False
 
     def test_violations_detected(self) -> None:
         limits = get_v3_limits()
-        files = [FileMetrics(path="big.py", loc=limits.max_file_loc + 100)]
+        files = [FileMetrics(path="big.py", loc=limits.single_file_loc.max + 100)]
         m = LayerMetrics(
-            total_loc=limits.max_file_loc + 100,
+            total_loc=limits.single_file_loc.max + 100,
             file_count=1,
-            max_file_loc=limits.max_file_loc + 100,
+            max_file_loc=limits.single_file_loc.max + 100,
             files=files,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
-        assert len(m.violations) == 1
-        assert m.violations[0].path == "big.py"
+        assert len(m.errors) == 1
+        assert m.errors[0].path == "big.py"
+
+    def test_warnings_detected(self) -> None:
+        """文件超过默认限制但未超过最大限制."""
+        limits = get_v3_limits()
+        # 文件超过 200 但未超过 300
+        files = [FileMetrics(path="medium.py", loc=250)]
+        m = LayerMetrics(
+            total_loc=250,
+            file_count=1,
+            max_file_loc=250,
+            files=files,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
+        )
+        assert len(m.warnings) == 1
+        assert len(m.errors) == 0
+        assert m.warnings[0].path == "medium.py"
 
     def test_no_violations(self) -> None:
         limits = get_v3_limits()
@@ -79,10 +100,12 @@ class TestLayerMetrics:
             file_count=2,
             max_file_loc=120,
             files=MOCK_FILES,
-            limit_total=limits.total_loc,
-            limit_file=limits.max_file_loc,
+            limit_total=limits.total_file_loc.v3_python,
+            limit_file_default=limits.single_file_loc.default,
+            limit_file_max=limits.single_file_loc.max,
         )
-        assert m.violations == []
+        assert m.errors == []
+        assert m.warnings == []
 
 
 class TestCollectPythonMetrics:
@@ -106,7 +129,7 @@ class TestCollectPythonMetrics:
                 result = collect_python_metrics()
 
         assert result.file_count >= 0
-        assert result.limit_total == limits.total_loc
+        assert result.limit_total == limits.total_file_loc.v3_python
 
     def test_raises_when_src_missing(self) -> None:
         with patch("vibe3.services.metrics_service.Path") as mock_path_cls:

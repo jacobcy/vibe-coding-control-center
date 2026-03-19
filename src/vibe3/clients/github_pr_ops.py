@@ -88,7 +88,7 @@ class PRMixin:
                 target,
                 "--json",
                 "number,title,body,state,headRefName,baseRefName,"
-                "url,isDraft,createdAt,updatedAt,mergedAt",
+                "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
             ],
             capture_output=True,
             text=True,
@@ -99,6 +99,15 @@ class PRMixin:
             return None
 
         data = json.loads(result.stdout)
+
+        # Determine is_ready: not a draft
+        is_ready = not bool(data.get("isDraft", True))
+
+        # Determine ci_passed: check statusCheckRollup
+        # statusCheckRollup can be null, "SUCCESS", "FAILURE", "PENDING", etc.
+        status_rollup = data.get("statusCheckRollup")
+        ci_passed = status_rollup == "SUCCESS" if status_rollup else False
+
         return PRResponse(
             number=int(data["number"]),
             title=str(data["title"]),
@@ -108,6 +117,8 @@ class PRMixin:
             base_branch=str(data["baseRefName"]),
             url=str(data["url"]),
             draft=bool(data.get("isDraft", False)),
+            is_ready=is_ready,
+            ci_passed=ci_passed,
             created_at=data.get("createdAt"),
             updated_at=data.get("updatedAt"),
             merged_at=data.get("mergedAt"),
@@ -194,3 +205,50 @@ class PRMixin:
         if pr is None:
             raise PRNotFoundError(pr_number)
         return cast(PRResponse, pr)
+
+    def get_pr_commits(self: Any, pr_number: int) -> list[str]:
+        """Get list of commit SHAs for a PR.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            List of commit SHA strings
+
+        Raises:
+            subprocess.CalledProcessError: If gh command fails
+        """
+        logger.bind(
+            external="github",
+            operation="get_pr_commits",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: get_pr_commits")
+
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                str(pr_number),
+                "--json",
+                "commits",
+                "--jq",
+                ".commits[].oid",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Parse commit SHAs from output
+        commits = [
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        ]
+
+        logger.bind(
+            external="github",
+            pr_number=pr_number,
+            commit_count=len(commits),
+        ).debug("Retrieved PR commits")
+
+        return commits

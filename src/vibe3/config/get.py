@@ -19,7 +19,7 @@ def get_config_value(path: str, config_path: Path | None = None) -> Any:
     """Get a configuration value by dot-separated path.
 
     Args:
-        path: Dot-separated path like "code_limits.v3_python.total_loc"
+        path: Dot-separated path like "code_limits.total_file_loc.v3_python"
         config_path: Optional path to config file
 
     Returns:
@@ -48,8 +48,8 @@ def main() -> None:
         description="Get configuration value by path",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  code_limits.v3_python.total_loc
-  code_limits.v2_shell.total_loc
+  code_limits.total_file_loc.v3_python
+  code_limits.total_file_loc.v2_shell
   quality.test_coverage.services""",
     )
     parser.add_argument("path", help="Dot-separated config path")

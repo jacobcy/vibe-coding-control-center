@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# commit-msg hook: 检查commit格式 + 附加AST分析
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# 1. 检查commit message格式
+FIRST_LINE=$(echo "$COMMIT_MSG" | head -1)
+VALID_TYPES="feat|fix|refactor|docs|test|chore|perf|ci|build|revert"
+
+if ! echo "$FIRST_LINE" | grep -qE "^(${VALID_TYPES})(\(.+\))?:\s.+"; then
+    echo "❌ Commit message 格式错误!"
+    echo ""
+    echo "Expected: <type>(<scope>)?: <description>"
+    echo ""
+    echo "Types: ${VALID_TYPES}"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add new feature"
+    echo "  fix(core): correct calculation error"
+    echo ""
+    echo "See: https://www.conventionalcommits.org/"
+    exit 1
+fi
+
+# 2. 附加AST分析（只对新commit）
+if [ "$COMMIT_SOURCE" = "message" ] || [ "$COMMIT_SOURCE" = "" ]; then
+    # 分析暂存的改动
+    AST_INFO=$(uv run python -c "
+import json
+import sys
+
+try:
+    from vibe3.services.serena_service import SerenaService
+    from vibe3.clients.git_client import GitClient
+    from vibe3.models.change_source import BranchSource
+    
+    git = GitClient()
+    files = git.get_changed_files(BranchSource(branch='HEAD'))
+    python_files = [f for f in files if f.endswith('.py')]
+    
+    if not python_files:
+        sys.exit(0)
+    
+    service = SerenaService()
+    
+    # 改动范围
+    impact = service.analyze_changes(BranchSource(branch='HEAD'))
+    changed_files = len(impact.get('changed_files', []))
+    
+    # 影响模块
+    from vibe3.services import dag_service
+    dag = dag_service.expand_impacted_modules(files)
+    modules = dag.impacted_modules[:5]
+    
+    # 触及路径
+    from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
+    from vibe3.config.loader import get_config
+    
+    config = get_config()
+    critical_paths = config.review_scope.critical_paths
+    public_api_paths = config.review_scope.public_api_paths
+    
+    touches = []
+    if any(any(p in str(f) for p in critical_paths) for f in files):
+        touches.append('critical paths')
+    if any(any(p in str(f) for p in public_api_paths) for f in files):
+        touches.append('public API')
+    
+    # 生成附加信息
+    lines = ['', '---', '## AST Analysis']
+    lines.append(f'- Files: {changed_files}')
+    if modules:
+        lines.append(f'- Impact: {', '.join(modules)}')
+    if touches:
+        lines.append(f'- Touches: {', '.join(touches)}')
+    
+    print('\n'.join(lines))
+except Exception as e:
+    # 静默失败，不阻断commit
+    pass
+" 2>/dev/null)
+
+    # 附加到commit message
+    if [ -n "$AST_INFO" ]; then
+        echo "$AST_INFO" >> "$COMMIT_MSG_FILE"
+    fi
+fi
+
+exit 0

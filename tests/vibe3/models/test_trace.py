@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from vibe3.models.trace import ExecutionStep, TraceOutput
 
 

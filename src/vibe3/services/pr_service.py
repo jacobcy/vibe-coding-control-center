@@ -10,10 +10,8 @@ from vibe3.models.pr import (
     CreatePRRequest,
     PRMetadata,
     PRResponse,
-    ReviewResponse,
     VersionBumpResponse,
 )
-from vibe3.services.review_service import ReviewService
 from vibe3.services.version_service import VersionService
 
 
@@ -26,7 +24,6 @@ class PRService:
         git_client: GitClient | None = None,
         store: SQLiteClient | None = None,
         version_service: VersionService | None = None,
-        review_service: ReviewService | None = None,
     ) -> None:
         """Initialize PR service.
 
@@ -35,13 +32,11 @@ class PRService:
             git_client: Git client for repository operations
             store: SQLiteClient instance for persistence
             version_service: Version service for version calculations
-            review_service: Review service for PR review
         """
         self.github_client = github_client or GitHubClient()
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
         self.version_service = version_service or VersionService()
-        self.review_service = review_service or ReviewService()
 
     def create_draft_pr(
         self,
@@ -279,18 +274,3 @@ class PRService:
             metadata_section += f"**Executor:** {metadata.executor}\n"
 
         return body + metadata_section
-
-    def review_pr(self, pr_number: int, publish: bool = True) -> "ReviewResponse":
-        """Review PR using local LLM (codex).
-
-        Args:
-            pr_number: PR number
-            publish: Whether to publish review as comment
-
-        Returns:
-            Review response
-
-        Raises:
-            RuntimeError: If PR not found or codex unavailable
-        """
-        return self.review_service.review_pr(pr_number, publish)

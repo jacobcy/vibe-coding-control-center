@@ -9,7 +9,6 @@ import typer
 from vibe3.commands.pr_create import register_draft_command
 from vibe3.commands.pr_lifecycle import register_lifecycle_commands
 from vibe3.commands.pr_query import register_query_commands
-from vibe3.commands.pr_review import register_review_command
 
 app = typer.Typer(
     help="Manage Pull Requests", no_args_is_help=True, rich_markup_mode="rich"
@@ -19,4 +18,3 @@ app = typer.Typer(
 register_draft_command(app)
 register_query_commands(app)
 register_lifecycle_commands(app)
-register_review_command(app)

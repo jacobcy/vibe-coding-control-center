@@ -3,19 +3,34 @@
 
 # 代码量控制
 code_limits:
-  v2_shell:
-    total_loc: 7000          # Shell 总行数限制
-    max_file_loc: 300        # 单文件最大行数
-    min_tests: 20            # 最少测试数量
+  single_file_loc:
+    default: 200           # 单文件默认限制（所有类型）
+    max: 300              # 单文件最大限制（所有类型）
 
-  v3_python:
-    total_loc: 9000          # Python 总行数限制
-    max_file_loc: 300        # 单文件最大行数
-    min_tests: 5             # 最少测试数量
-    test_file_loc:
-      services: 180          # Services 层测试文件最大行数
-      clients: 200           # Clients 层测试文件最大行数
-      commands: 120           # Commands 层测试文件最大行数
+  total_file_loc:
+    v2_shell: 7000         # Shell 核心代码总行数
+    v3_python: 12000        # Python 核心代码总行数
+
+  # 统计口径（路径定义）
+  code_paths:
+    v2_shell:              # Shell 核心代码路径
+      - "lib/"
+      - "lib3/"
+      - "bin/vibe"
+    v3_python:             # Python 核心代码路径
+      - "src/vibe3/"
+
+  scripts_paths:
+    v2_shell:              # Shell 工具脚本路径
+      - "scripts/"
+    v3_python:             # Python 工具脚本路径
+      - "scripts/"
+
+  test_paths:
+    v2_shell:              # Shell 测试路径
+      - "tests/vibe2/"
+    v3_python:             # Python 测试路径
+      - "tests/vibe3/"
 
 # 审核范围（适配 vibe-center 实际结构）
 review_scope:

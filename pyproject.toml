@@ -1,13 +1,14 @@
 [project]
 name = "vibe3"
 version = "3.0.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
     "pyyaml>=6.0.3",
+    "serena-agent @ git+https://github.com/oraios/serena@v0.1.4",
 ]
 
 [project.scripts]
@@ -35,18 +36,23 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["vibe3"]
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 disallow_untyped_defs = true
+ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
     "mypy>=1.5.0",
     "pytest>=7.4.0",
     "pytest-cov>=7.0.0",
-    "ruff>=0.1.0",
-    "black>=23.0.0",
+    "ruff==0.15.6",
+    "black==26.3.1",
     "pre-commit>=3.0.0",
     "types-pyyaml>=6.0.12.20250915",
+    "hypothesis>=6.151.9",
 ]

@@ -121,7 +121,9 @@ class SerenaClient:
         """
         if self._agent is None:
             try:
-                from serena.agent import SerenaAgent  # type: ignore[import-not-found]
+                from serena.agent import (
+                    SerenaAgent,  # type: ignore[import-not-found,import-untyped]
+                )
 
                 self._agent = SerenaAgent(project=self.project_root)
                 logger.bind(external="serena").debug("Serena agent created")

@@ -4,6 +4,22 @@
 
 术语以 [docs/standards/glossary.md](../../docs/standards/glossary.md) 为准，动作词以 [docs/standards/action-verbs.md](../../docs/standards/action-verbs.md) 为准。
 
+## Execution Modes
+
+### 常规模式（默认）
+- 默认使用完整流程：先讨论/计划，再实现
+- 适用于新功能、重构、语义调整、影响面不明的修复
+- 必须遵循：计划 → TDD → 实现 → Code Review → Commit
+
+### 快速模式
+- **仅在用户明确要求"快速模式"时启用**
+- 适用场景：紧急 bug 修复、共享状态损坏、必须先恢复可用性
+- 启用后可跳过：计划文档、测试先行
+- 仍然必须：
+  - 保持最小改动
+  - 提供验证步骤
+  - 说明未补测试的风险
+
 ## Context First
 - 开始前先读取：`git status`、`git log`、`.agent/context/*`。
 - 任何结论都需要对应证据（命令、diff、测试结果）。
