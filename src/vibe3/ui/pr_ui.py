@@ -1,6 +1,7 @@
 """PR UI components."""
 
 from rich.table import Table
+
 from vibe3.models.pr import PRResponse, ReviewResponse, VersionBumpResponse
 from vibe3.ui.console import console
 

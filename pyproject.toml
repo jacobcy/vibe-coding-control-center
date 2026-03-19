@@ -36,6 +36,9 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["vibe3"]
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
