@@ -43,8 +43,7 @@ def test_review_commit_command_removed():
     result = runner.invoke(app, ["commit", "HEAD"])
     assert result.exit_code != 0
     assert (
-        "no such command" in result.output.lower()
-        or "error" in result.output.lower()
+        "no such command" in result.output.lower() or "error" in result.output.lower()
     )
 
 
@@ -53,8 +52,7 @@ def test_review_uncommitted_command_removed():
     result = runner.invoke(app, ["uncommitted"])
     assert result.exit_code != 0
     assert (
-        "no such command" in result.output.lower()
-        or "error" in result.output.lower()
+        "no such command" in result.output.lower() or "error" in result.output.lower()
     )
 
 
@@ -63,8 +61,7 @@ def test_review_analyze_commit_command_removed():
     result = runner.invoke(app, ["analyze-commit", "HEAD"])
     assert result.exit_code != 0
     assert (
-        "no such command" in result.output.lower()
-        or "error" in result.output.lower()
+        "no such command" in result.output.lower() or "error" in result.output.lower()
     )
 
 

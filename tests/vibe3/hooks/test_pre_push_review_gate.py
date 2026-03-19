@@ -16,30 +16,22 @@ class TestInspectScoreTrigger:
 
     def test_should_trigger_review_on_high_risk(self) -> None:
         """High risk score should trigger review."""
-        inspect_data = {
-            "score": {"score": 8, "risk_level": "HIGH", "block": False}
-        }
+        inspect_data = {"score": {"score": 8, "risk_level": "HIGH", "block": False}}
         assert self._should_trigger_review(inspect_data) is True
 
     def test_should_trigger_review_on_critical_risk(self) -> None:
         """Critical risk score should trigger review."""
-        inspect_data = {
-            "score": {"score": 10, "risk_level": "CRITICAL", "block": True}
-        }
+        inspect_data = {"score": {"score": 10, "risk_level": "CRITICAL", "block": True}}
         assert self._should_trigger_review(inspect_data) is True
 
     def test_should_not_trigger_review_on_low_risk(self) -> None:
         """Low risk score should not trigger review."""
-        inspect_data = {
-            "score": {"score": 3, "risk_level": "LOW", "block": False}
-        }
+        inspect_data = {"score": {"score": 3, "risk_level": "LOW", "block": False}}
         assert self._should_trigger_review(inspect_data) is False
 
     def test_should_not_trigger_review_on_medium_risk(self) -> None:
         """Medium risk score should not trigger review."""
-        inspect_data = {
-            "score": {"score": 5, "risk_level": "MEDIUM", "block": False}
-        }
+        inspect_data = {"score": {"score": 5, "risk_level": "MEDIUM", "block": False}}
         assert self._should_trigger_review(inspect_data) is False
 
     def test_handles_missing_score_gracefully(self) -> None:
@@ -77,9 +69,7 @@ class TestInspectJsonOutput:
         """Inspect JSON output should contain score section."""
         from vibe3.commands.review_helpers import run_inspect_json
 
-        with patch(
-            "vibe3.commands.review_helpers.subprocess.run"
-        ) as mock_run:
+        with patch("vibe3.commands.review_helpers.subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.returncode = 0
             mock_result.stdout = json.dumps(

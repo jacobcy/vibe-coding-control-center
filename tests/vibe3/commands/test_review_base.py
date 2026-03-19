@@ -49,7 +49,9 @@ def _patch_review_deps(verdict: str = "PASS"):
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review(verdict),
         ),
-        patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"),
+        patch(
+            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+        ),
     ]
 
 
@@ -107,7 +109,9 @@ def test_review_base_with_agent_and_model():
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
-        patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"),
+        patch(
+            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+        ),
     ):
         result = runner.invoke(
             app, ["base", "origin/develop", "--agent", "codex", "--model", "gpt-5.4"]

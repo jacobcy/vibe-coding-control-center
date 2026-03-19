@@ -37,8 +37,8 @@ class TestBuildReviewContext:
             mock_read.return_value = "# Review Policy\nTest policy content"
             context = build_review_context(
                 diff="diff content",
-                impact='{}',
-                dag='{}',
+                impact="{}",
+                dag="{}",
                 score='{"score": 5}',
             )
 

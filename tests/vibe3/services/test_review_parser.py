@@ -145,9 +145,7 @@ class TestParsedReview:
 
     def test_parsed_review_creation(self) -> None:
         """Should create parsed review with correct attributes."""
-        comments = [
-            ReviewComment(path="a.py", line=1, severity="MAJOR", body="issue")
-        ]
+        comments = [ReviewComment(path="a.py", line=1, severity="MAJOR", body="issue")]
         review = ParsedReview(comments=comments, verdict="MAJOR", raw="raw output")
         assert review.verdict == "MAJOR"
         assert len(review.comments) == 1
@@ -161,7 +159,9 @@ class TestConvertToGithubFormat:
         """Should convert single comment to GitHub format."""
         review = ParsedReview(
             comments=[
-                ReviewComment(path="src/foo.py", line=42, severity="MAJOR", body="Issue")
+                ReviewComment(
+                    path="src/foo.py", line=42, severity="MAJOR", body="Issue"
+                )
             ],
             verdict="MAJOR",
             raw="raw",

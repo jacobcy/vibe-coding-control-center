@@ -105,8 +105,14 @@ def test_inspect_base_json_output():
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
                         # Mock score generation to avoid config loading
-                        with patch("vibe3.services.pr_scoring_service.generate_score_report") as mock_score:
-                            mock_score.return_value = {"score": 5, "level": "MEDIUM", "block": False}
+                        with patch(
+                            "vibe3.services.pr_scoring_service.generate_score_report"
+                        ) as mock_score:
+                            mock_score.return_value = {
+                                "score": 5,
+                                "level": "MEDIUM",
+                                "block": False,
+                            }
                             result = runner.invoke(app, ["base", "--json"])
 
     assert result.exit_code == 0
@@ -141,8 +147,14 @@ def test_inspect_base_json_custom_branch():
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
                         # Mock score generation to avoid config loading
-                        with patch("vibe3.services.pr_scoring_service.generate_score_report") as mock_score:
-                            mock_score.return_value = {"score": 5, "level": "MEDIUM", "block": False}
+                        with patch(
+                            "vibe3.services.pr_scoring_service.generate_score_report"
+                        ) as mock_score:
+                            mock_score.return_value = {
+                                "score": 5,
+                                "level": "MEDIUM",
+                                "block": False,
+                            }
                             result = runner.invoke(app, ["base", "develop", "--json"])
 
     assert result.exit_code == 0
