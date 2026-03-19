@@ -1,4 +1,5 @@
 """Tests for CoverageService."""
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -107,9 +108,7 @@ def test_analyze_layer(
     sample_coverage_data: dict,
 ) -> None:
     """Test _analyze_layer method."""
-    services_cov = coverage_service._analyze_layer(
-        sample_coverage_data, "services"
-    )
+    services_cov = coverage_service._analyze_layer(sample_coverage_data, "services")
 
     assert services_cov.layer_name == "services"
     assert services_cov.covered_lines == 1000
@@ -124,9 +123,7 @@ def test_analyze_layer(
     assert clients_cov.total_lines == 600
     assert clients_cov.coverage_percent == pytest.approx(83.33, rel=0.01)
 
-    commands_cov = coverage_service._analyze_layer(
-        sample_coverage_data, "commands"
-    )
+    commands_cov = coverage_service._analyze_layer(sample_coverage_data, "commands")
 
     assert commands_cov.layer_name == "commands"
     assert commands_cov.covered_lines == 1350

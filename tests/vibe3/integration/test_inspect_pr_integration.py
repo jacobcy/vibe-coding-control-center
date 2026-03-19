@@ -15,21 +15,19 @@ from vibe3.commands.inspect_helpers import PRCriticalAnalysis, build_pr_analysis
 @pytest.fixture
 def mock_all_dependencies():
     """Mock all external dependencies for PR analysis."""
-    with patch(
-        "vibe3.commands.inspect_pr_helpers._get_pr_changed_files"
-    ) as mock_files, patch(
-        "vibe3.commands.inspect_pr_helpers._filter_critical_files"
-    ) as mock_filter, patch(
-        "vibe3.commands.inspect_pr_helpers._analyze_critical_files"
-    ) as mock_analyze, patch(
-        "vibe3.commands.inspect_pr_helpers._calculate_risk_score"
-    ) as mock_score, patch(
-        "vibe3.commands.inspect_pr_helpers._get_recent_commits"
-    ) as mock_commits, patch(
-        "vibe3.commands.inspect_pr_helpers._get_pr_commit_count"
-    ) as mock_count, patch(
-        "vibe3.commands.inspect_pr_helpers.dag_service"
-    ) as mock_dag:
+    with (
+        patch("vibe3.commands.inspect_pr_helpers._get_pr_changed_files") as mock_files,
+        patch(
+            "vibe3.commands.inspect_pr_helpers._filter_critical_files"
+        ) as mock_filter,
+        patch(
+            "vibe3.commands.inspect_pr_helpers._analyze_critical_files"
+        ) as mock_analyze,
+        patch("vibe3.commands.inspect_pr_helpers._calculate_risk_score") as mock_score,
+        patch("vibe3.commands.inspect_pr_helpers._get_recent_commits") as mock_commits,
+        patch("vibe3.commands.inspect_pr_helpers._get_pr_commit_count") as mock_count,
+        patch("vibe3.commands.inspect_pr_helpers.dag_service") as mock_dag,
+    ):
         # Setup default returns
         mock_files.return_value = [
             "src/vibe3/config/settings.py",
@@ -238,9 +236,7 @@ def test_build_pr_analysis_dag_integration(mock_all_dependencies):
 
 def test_build_pr_analysis_error_handling():
     """Test error handling in build_pr_analysis."""
-    with patch(
-        "vibe3.commands.inspect_pr_helpers._get_pr_changed_files"
-    ) as mock_files:
+    with patch("vibe3.commands.inspect_pr_helpers._get_pr_changed_files") as mock_files:
         # Simulate error getting files
         mock_files.side_effect = Exception("GitHub API error")
 
@@ -261,21 +257,26 @@ def test_build_pr_analysis_commit_count_error(mock_all_dependencies):
 
 def test_build_pr_analysis_dataclass_fields():
     """Test that PRCriticalAnalysis dataclass has all expected fields."""
-    with patch(
-        "vibe3.commands.inspect_pr_helpers._get_pr_changed_files",
-        return_value=["file.py"],
-    ), patch(
-        "vibe3.commands.inspect_pr_helpers._filter_critical_files", return_value=[]
-    ), patch(
-        "vibe3.commands.inspect_pr_helpers._analyze_critical_files",
-        return_value=({}, {}),
-    ), patch(
-        "vibe3.commands.inspect_pr_helpers.dag_service.expand_impacted_modules"
-    ) as mock_dag, patch(
-        "vibe3.commands.inspect_pr_helpers._calculate_risk_score",
-        return_value={"score": 1},
-    ), patch(
-        "vibe3.commands.inspect_pr_helpers._get_pr_commit_count", return_value=1
+    with (
+        patch(
+            "vibe3.commands.inspect_pr_helpers._get_pr_changed_files",
+            return_value=["file.py"],
+        ),
+        patch(
+            "vibe3.commands.inspect_pr_helpers._filter_critical_files", return_value=[]
+        ),
+        patch(
+            "vibe3.commands.inspect_pr_helpers._analyze_critical_files",
+            return_value=({}, {}),
+        ),
+        patch(
+            "vibe3.commands.inspect_pr_helpers.dag_service.expand_impacted_modules"
+        ) as mock_dag,
+        patch(
+            "vibe3.commands.inspect_pr_helpers._calculate_risk_score",
+            return_value={"score": 1},
+        ),
+        patch("vibe3.commands.inspect_pr_helpers._get_pr_commit_count", return_value=1),
     ):
         mock_dag_result = MagicMock()
         mock_dag_result.impacted_modules = []

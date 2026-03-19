@@ -1,6 +1,5 @@
 """Tests for command analyzer call tree building."""
 
-
 from vibe3.services.command_analyzer import (
     _calculate_max_depth,
     should_expand,

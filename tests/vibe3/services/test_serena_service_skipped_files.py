@@ -107,8 +107,7 @@ def test_get_changed_functions_missing_file(temp_dir):
     from vibe3.models.change_source import CommitSource
 
     result = service.get_changed_functions(
-        str(temp_dir / "deleted.py"),
-        source=CommitSource(sha="abc123")
+        str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")
     )
 
     # Should return empty list for missing file

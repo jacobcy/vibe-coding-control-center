@@ -1,6 +1,5 @@
 """Tests for LayerCoverage model."""
 
-
 from vibe3.models.coverage import LayerCoverage
 
 

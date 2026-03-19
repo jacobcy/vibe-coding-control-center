@@ -1,4 +1,5 @@
 """Coverage service for running pytest with coverage analysis."""
+
 from __future__ import annotations
 
 import json

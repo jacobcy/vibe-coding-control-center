@@ -1,4 +1,5 @@
 """Coverage models for layer-based coverage checking."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel

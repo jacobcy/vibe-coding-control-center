@@ -1,4 +1,5 @@
 """Shared fixtures for PR command tests."""
+
 import pytest
 
 from vibe3.models.coverage import CoverageReport, LayerCoverage

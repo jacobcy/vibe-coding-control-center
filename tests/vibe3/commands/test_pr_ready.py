@@ -28,13 +28,13 @@ def test_pr_ready_with_coverage_passing(
     mock_pr_response, mock_coverage_all_passing, mock_inspect_passing
 ):
     """pr ready with coverage gate passing."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
-    ) as mock_pr_service, patch(
-        "vibe3.commands.review_helpers.run_inspect_json",
-        return_value=mock_inspect_passing,
+    with (
+        patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=mock_inspect_passing,
+        ),
     ):
         mock_cov_instance = MagicMock()
         mock_cov_instance.run_coverage_check.return_value = mock_coverage_all_passing
@@ -53,10 +53,9 @@ def test_pr_ready_with_coverage_passing(
 
 def test_pr_ready_with_coverage_failing(mock_coverage_failing):
     """pr ready with coverage gate failing and no --yes → exit 1."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
+    with (
+        patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
+        patch("vibe3.commands.pr_lifecycle.PRService"),
     ):
         mock_cov_instance = MagicMock()
         mock_cov_instance.run_coverage_check.return_value = mock_coverage_failing
@@ -72,13 +71,13 @@ def test_pr_ready_with_coverage_failing(mock_coverage_failing):
 
 def test_pr_ready_yes_bypass_coverage(mock_pr_response, mock_inspect_passing):
     """pr ready --yes bypasses coverage gate."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ), patch(
-        "vibe3.commands.pr_lifecycle.PRService"
-    ) as mock_pr_service, patch(
-        "vibe3.commands.review_helpers.run_inspect_json",
-        return_value=mock_inspect_passing,
+    with (
+        patch("vibe3.services.coverage_service.CoverageService"),
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=mock_inspect_passing,
+        ),
     ):
         mock_pr_instance = MagicMock()
         mock_pr_instance.mark_ready.return_value = mock_pr_response
@@ -92,15 +91,12 @@ def test_pr_ready_yes_bypass_coverage(mock_pr_response, mock_inspect_passing):
 
 def test_pr_ready_coverage_exception_handling():
     """pr ready handles coverage check exceptions gracefully."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
+    with (
+        patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
+        patch("vibe3.commands.pr_lifecycle.PRService"),
     ):
         mock_cov_instance = MagicMock()
-        mock_cov_instance.run_coverage_check.side_effect = RuntimeError(
-            "pytest failed"
-        )
+        mock_cov_instance.run_coverage_check.side_effect = RuntimeError("pytest failed")
         mock_cov_service.return_value = mock_cov_instance
 
         result = runner.invoke(app, ["ready", "123", "--yes"])
@@ -116,13 +112,13 @@ def test_pr_ready_json_output(
     mock_pr_response, mock_coverage_all_passing, mock_inspect_passing
 ):
     """pr ready --json outputs JSON format."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
-    ) as mock_pr_service, patch(
-        "vibe3.commands.review_helpers.run_inspect_json",
-        return_value=mock_inspect_passing,
+    with (
+        patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=mock_inspect_passing,
+        ),
     ):
         mock_cov_instance = MagicMock()
         mock_cov_instance.run_coverage_check.return_value = mock_coverage_all_passing
@@ -143,13 +139,13 @@ def test_pr_ready_yaml_output(
     mock_pr_response, mock_coverage_all_passing, mock_inspect_passing
 ):
     """pr ready --yaml outputs YAML format."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
-    ) as mock_pr_service, patch(
-        "vibe3.commands.review_helpers.run_inspect_json",
-        return_value=mock_inspect_passing,
+    with (
+        patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=mock_inspect_passing,
+        ),
     ):
         mock_cov_instance = MagicMock()
         mock_cov_instance.run_coverage_check.return_value = mock_coverage_all_passing

@@ -1,6 +1,5 @@
 """Integration tests for trace output functionality."""
 
-
 from typer.testing import CliRunner
 
 from vibe3.cli import app
