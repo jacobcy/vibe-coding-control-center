@@ -94,7 +94,7 @@ repos:
         entry: scripts/hooks/pre-push.sh
         language: script
         pass_filenames: false
-        stages: [push]
+        stages: [pre-push]
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)

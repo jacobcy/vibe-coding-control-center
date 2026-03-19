@@ -1,7 +1,7 @@
 [project]
 name = "vibe3"
 version = "3.0.0"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.12"
 dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
@@ -28,7 +28,7 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ['py310', 'py311', 'py312']
+target-version = ['py312']
 
 [tool.ruff]
 line-length = 88
@@ -40,7 +40,7 @@ select = ["E", "F", "I", "N", "W"]
 known-first-party = ["vibe3"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
