@@ -34,9 +34,9 @@ class TestShellMetricsCollector:
         """
         metrics = collect_shell_metrics()
         # 修复后至少应该有 52 个文件
-        assert metrics.file_count >= 52, (
-            f"期望至少 52 个文件，实际 {metrics.file_count} 个"
-        )
+        assert (
+            metrics.file_count >= 52
+        ), f"期望至少 52 个文件，实际 {metrics.file_count} 个"
 
     def test_total_loc_increased_after_fix(self) -> None:
         """验证修复后总行数增加.
@@ -46,9 +46,9 @@ class TestShellMetricsCollector:
         """
         metrics = collect_shell_metrics()
         # lib3/vibe.sh 有 82 行，所以至少应该增加这么多
-        assert metrics.total_loc >= 6764, (
-            f"期望至少 6764 行，实际 {metrics.total_loc} 行"
-        )
+        assert (
+            metrics.total_loc >= 6764
+        ), f"期望至少 6764 行，实际 {metrics.total_loc} 行"
 
     def test_uses_config_paths_not_hardcoded(self) -> None:
         """验证使用配置路径而不是硬编码.
