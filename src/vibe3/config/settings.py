@@ -10,8 +10,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from vibe3.config.review_config import AgentConfig
-
 
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
@@ -110,6 +108,27 @@ class ReviewScopeConfig(BaseModel):
     )
 
 
+class AgentConfig(BaseModel):
+    """Agent configuration for codeagent-wrapper.
+
+    Two mutually exclusive modes:
+    1. Use preset: agent (e.g., "code-reviewer")
+    2. Direct specification: backend + model (optional)
+    """
+
+    agent: str | None = Field(default=None, description="Agent preset name")
+    backend: str | None = Field(default=None, description="Backend name")
+    model: str | None = Field(default=None, description="Model name (optional)")
+
+    def validate_mutually_exclusive(self) -> None:
+        """Validate that agent and backend are not both specified."""
+        if self.agent and self.backend:
+            raise ValueError(
+                "agent and backend are mutually exclusive. "
+                "Use either agent preset OR backend+model, not both."
+            )
+
+
 class HooksConfig(BaseModel):
     """Git hooks configuration."""
 
@@ -134,18 +153,16 @@ class ReviewConfig(BaseModel):
         default=".codex/review-policy.md",
         description="Path to review policy file",
     )
+    tools_guide_file: str = Field(
+        default=".agent/rules/cli-usage.md",
+        description="Path to tools guide file",
+    )
     agent_config: AgentConfig = Field(
         default_factory=AgentConfig,
         description="codeagent-wrapper configuration",
     )
-    output_format: str = Field(
-        default="",
-        description="Output format requirements (natural language)",
-    )
-    review_task: str = Field(
-        default="",
-        description="Review task guidance (natural language)",
-    )
+    output_format: str = Field(default="", description="Output format requirements")
+    review_task: str = Field(default="", description="Review task guidance")
     auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 

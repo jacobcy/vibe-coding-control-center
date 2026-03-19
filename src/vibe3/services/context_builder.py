@@ -30,6 +30,7 @@ def build_review_context(
     We provide AST-level insights they can't get from diff:
     - Which functions were changed (symbol-level)
     - Who calls these functions (DAG impact)
+    - Tools available for deeper analysis
 
     Args:
         policy_path: path to review-policy.md (reads from config if None)
@@ -59,6 +60,18 @@ def build_review_context(
         raise ContextBuilderError(f"Cannot read policy: {e}") from e
 
     sections: list[str] = [policy]
+
+    # Add tools guide (project-specific analysis tools)
+    if config.review.tools_guide_file:
+        tools_guide_path = Path(config.review.tools_guide_file)
+        if tools_guide_path.exists():
+            try:
+                tools_guide = tools_guide_path.read_text(encoding="utf-8")
+                sections.append(f"## Available Tools\n\n{tools_guide}")
+            except OSError as e:
+                log.bind(
+                    error=str(e), path=str(tools_guide_path)
+                ).warning("Could not read tools guide")
 
     # Add AST-level analysis if available
     if changed_symbols or symbol_dag:

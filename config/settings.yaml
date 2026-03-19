@@ -49,6 +49,7 @@ review_scope:
 # Review 配置
 review:
   policy_file: ".codex/review-policy.md"  # Review policy 文件路径
+  tools_guide_file: ".agent/rules/cli-usage.md"  # 工具使用指南文件路径
 
   # codeagent-wrapper 调用配置（二选一）
   agent_config:
