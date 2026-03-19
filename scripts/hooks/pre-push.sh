@@ -41,7 +41,7 @@ RISK_LEVEL=$(echo "$INSPECT_JSON" | uv run python -c "
 import json
 import sys
 data = json.load(sys.stdin)
-print(data.get('score', {}).get('risk_level', 'LOW'))
+print(data.get('score', {}).get('level', 'LOW'))
 ")
 
 RISK_SCORE=$(echo "$INSPECT_JSON" | uv run python -c "
