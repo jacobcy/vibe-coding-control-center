@@ -69,9 +69,9 @@ def build_review_context(
                 tools_guide = tools_guide_path.read_text(encoding="utf-8")
                 sections.append(f"## Available Tools\n\n{tools_guide}")
             except OSError as e:
-                log.bind(
-                    error=str(e), path=str(tools_guide_path)
-                ).warning("Could not read tools guide")
+                log.bind(error=str(e), path=str(tools_guide_path)).warning(
+                    "Could not read tools guide"
+                )
 
     # Add AST-level analysis if available
     if changed_symbols or symbol_dag:

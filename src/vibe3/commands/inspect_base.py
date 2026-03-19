@@ -116,7 +116,9 @@ def register(app: typer.Typer) -> None:
                 for file in existing_files:
                     # Skip test files to save tokens
                     is_test = (
-                        "/tests/" in file
+                        file.startswith("tests/")
+                        or file.startswith("test/")
+                        or "/tests/" in file
                         or "/test/" in file
                         or file.startswith("test_")
                         or file.endswith("_test.py")

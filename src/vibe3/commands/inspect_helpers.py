@@ -126,7 +126,9 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         for file in changed_files:
             # Skip test files
             is_test = (
-                "/tests/" in file
+                file.startswith("tests/")
+                or file.startswith("test/")
+                or "/tests/" in file
                 or "/test/" in file
                 or file.startswith("test_")
                 or file.endswith("_test.py")
