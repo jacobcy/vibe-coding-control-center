@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check Shell LOC ceiling (core code only)
-# Delegates to metrics_service for consistent LOC counting.
+# Delegates to shell_metrics_collector for consistent LOC counting.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v2_shell):
 #   - lib/
@@ -12,7 +12,7 @@
 set -e
 
 result=$(PYTHONPATH=src uv run python -c "
-from vibe3.services.metrics_service import collect_shell_metrics
+from vibe3.services.shell_metrics_collector import collect_shell_metrics
 m = collect_shell_metrics()
 print(f'{m.total_loc} {m.limit_total}')
 " 2>/dev/null)

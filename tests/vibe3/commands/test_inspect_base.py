@@ -76,7 +76,6 @@ def test_inspect_base_with_core_files():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-
                         result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
@@ -105,7 +104,6 @@ def test_inspect_base_json_output():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-
                         result = runner.invoke(app, ["base", "--json"])
 
     assert result.exit_code == 0
@@ -139,7 +137,6 @@ def test_inspect_base_json_custom_branch():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-
                         result = runner.invoke(app, ["base", "develop", "--json"])
 
     assert result.exit_code == 0

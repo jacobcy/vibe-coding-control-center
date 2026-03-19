@@ -47,9 +47,10 @@ def test_bug2_check_shell_loc_uses_own_logic():
     预期 FAIL（证明 bug 存在）：check-shell-loc.sh 使用独立 find+wc 逻辑。
     """
     content = Path("scripts/hooks/check-shell-loc.sh").read_text()
+    # 修复后使用 shell_metrics_collector（metrics 服务的子模块）
     assert (
-        "metrics_service" in content
-    ), "BUG CONFIRMED: check-shell-loc.sh 未使用 metrics_service"
+        "shell_metrics_collector" in content or "metrics_service" in content
+    ), "BUG CONFIRMED: check-shell-loc.sh 未使用 metrics 服务"
 
 
 # ---------------------------------------------------------------------------
