@@ -55,15 +55,13 @@ class ReviewAgentOptions:
     - Easy testing and debugging
 
     Attributes:
-        agent: The agent type to use (default: CODEX for reviewer)
-        backend: The backend to use (default: CODEX)
+        agent: The agent preset name (default: code-reviewer)
         model: Optional model override (e.g., "gpt-5.4", "claude-3-opus")
         timeout_seconds: Maximum execution time (default: 600 seconds)
 
     """
 
-    agent: AgentType = AgentType.CODEX
-    backend: AgentBackend = AgentBackend.CODEX
+    agent: str = "code-reviewer"
     model: str | None = None
     timeout_seconds: int = 600
 
@@ -118,15 +116,14 @@ def run_review_agent(prompt: str, options: ReviewAgentOptions) -> ReviewAgentRes
     # Build command
     command: list[str] = [
         str(wrapper_path),
-        "--backend",
-        options.backend.value,
+        "--agent",
+        options.agent,
     ]
 
     if options.model:
         command.extend(["--model", options.model])
 
-    # Add stdin input and working directory
-    command.extend(["-", "."])
+    command.extend(["-", "."])  # Read from stdin
 
     try:
         result = run(

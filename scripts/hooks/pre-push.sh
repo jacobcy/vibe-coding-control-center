@@ -60,7 +60,7 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     echo "  Running local review before push..."
     echo ""
 
-    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base --backend claude 2>&1) || {
+    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base --agent code-reviewer 2>&1) || {
         REVIEW_EXIT=$?
         echo "ERROR: Review failed with exit code $REVIEW_EXIT"
         echo "$REVIEW_RESULT"
