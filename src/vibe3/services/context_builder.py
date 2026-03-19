@@ -34,19 +34,14 @@ Where:
 
 def build_review_context(
     policy_path: str = ".codex/review-policy.md",
-    structure: str | None = None,
-    impact: str | None = None,
-    dag: str | None = None,
-    score: str | None = None,
 ) -> str:
-    """Build complete context for codeagent-wrapper review.
+    """Build review context - just the policy and output format.
+
+    Reviewer (most expensive model) runs git diff themselves.
+    They don't need our internal decision metadata (impact/dag/score).
 
     Args:
         policy_path: path to review-policy.md
-        structure: repository structure summary (JSON string)
-        impact: symbol analysis result (JSON string)
-        dag: impact DAG (JSON string)
-        score: risk score (JSON string)
 
     Returns:
         Complete context string
@@ -64,24 +59,11 @@ def build_review_context(
 
     sections: list[str] = [policy]
 
-    # Build Inspect Summary if any inspect data is provided
-    if impact or dag or score:
-        inspect_parts: list[str] = []
-        if score:
-            inspect_parts.append(f"### Risk Score\n```json\n{score}\n```")
-        if impact:
-            inspect_parts.append(f"### Impact Analysis\n```json\n{impact}\n```")
-        if dag:
-            inspect_parts.append(f"### Impact DAG\n```json\n{dag}\n```")
-
-        inspect_summary = "## Inspect Summary\n" + "\n\n".join(inspect_parts)
-        sections.append(inspect_summary)
-
     # Add review task guidance
     review_task = """## Review Task
+- Run `git diff <base>...HEAD` to see changes
 - Review only changed code, not the entire codebase
 - Prioritize: correctness, regression risk, config drift, deleted-file risk
-- Use inspect score as triage priority, not as sole decision factor
 - Focus on actionable, specific findings"""
     sections.append(review_task)
 

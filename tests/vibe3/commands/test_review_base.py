@@ -21,46 +21,13 @@ def _mock_review(verdict: str = "PASS"):
     return m
 
 
-def _mock_inspect_data():
-    return {
-        "impact": {"changed_files": ["a.py"]},
-        "dag": {"impacted_modules": ["mod_a"]},
-        "score": {"score": 3, "level": "LOW", "block": False, "risk_level": "LOW"},
-    }
-
-
 def _mock_agent_result(stdout: str = "## Review\nLooks good."):
     return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
 
 
-def _patch_review_deps(verdict: str = "PASS"):
-    """Return patch context list, mocking all external dependencies."""
-    return [
-        patch(
-            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
-        ),
-        patch("vibe3.commands.review.GitClient"),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
-        patch(
-            "vibe3.commands.review.run_review_agent",
-            return_value=_mock_agent_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review(verdict),
-        ),
-        patch(
-            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
-        ),
-    ]
-
-
 def test_review_base_defaults_to_origin_main():
-    """Test that review base defaults to origin/main when no branch specified."""
+    """Test that review base works without any inspect calls."""
     with (
-        patch(
-            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
-        ) as mock_inspect,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -76,13 +43,20 @@ def test_review_base_defaults_to_origin_main():
     ):
         result = runner.invoke(app, ["base"])
         assert result.exit_code == 0
-        # Verify inspect was called with origin/main
-        mock_inspect.assert_called_once_with(["base", "origin/main"])
 
 
 def test_review_base_pass():
-    patches = _patch_review_deps()
-    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+    with (
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch(
+            "vibe3.commands.review.run_review_agent",
+            return_value=_mock_agent_result(),
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+    ):
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
 
@@ -90,10 +64,6 @@ def test_review_base_pass():
 def test_review_base_with_agent_and_model():
     """Test that --agent and --model options are passed through."""
     with (
-        patch(
-            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
-        ),
-        patch("vibe3.commands.review.GitClient"),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",

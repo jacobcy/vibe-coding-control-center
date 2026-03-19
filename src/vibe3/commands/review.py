@@ -1,12 +1,10 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-import json
 from typing import Annotated
 
 import typer
 from loguru import logger
 
-from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
@@ -54,17 +52,10 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting local PR review")
 
-    # 1. Get inspect analysis result
-    inspect_data = run_inspect_json(["pr", str(pr_number)])
+    # Build context (just policy and format - reviewer runs git diff themselves)
+    context = build_review_context()
 
-    # 2. Build context
-    context = build_review_context(
-        impact=json.dumps(inspect_data.get("impact"), indent=2),
-        dag=json.dumps(inspect_data.get("dag"), indent=2),
-        score=json.dumps(inspect_data.get("score"), indent=2),
-    )
-
-    # 4. Call agent via codeagent-wrapper
+    # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
         agent=agent,
         model=model,
@@ -117,34 +108,8 @@ def base(
     )
     log.info("Reviewing branch changes")
 
-    inspect_data = run_inspect_json(["base", base_branch])
-
-    # Build impact info from inspect base output
-    # inspect base returns: core_files, total_changed, core_changed,
-    # score, impacted_modules
-    # We construct impact info similar to inspect pr format
-    # for context builder
-    impact_info = {
-        "core_files": inspect_data.get("core_files", []),
-        "total_changed": inspect_data.get("total_changed", 0),
-        "core_changed": inspect_data.get("core_changed", 0),
-    }
-
-    # Build DAG info from impacted_modules
-    dag_info = None
-    impacted_modules = inspect_data.get("impacted_modules", [])
-    if impacted_modules:
-        assert isinstance(impacted_modules, list)
-        dag_info = {
-            "impacted_modules": impacted_modules,
-            "total_impacted": len(impacted_modules),
-        }
-
-    context = build_review_context(
-        impact=json.dumps(impact_info, indent=2),
-        dag=json.dumps(dag_info, indent=2) if dag_info else None,
-        score=json.dumps(inspect_data.get("score"), indent=2),
-    )
+    # Build context (just policy and format - reviewer runs git diff themselves)
+    context = build_review_context()
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
