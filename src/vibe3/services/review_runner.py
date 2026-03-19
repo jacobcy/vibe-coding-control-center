@@ -120,8 +120,6 @@ def run_review_agent(prompt: str, options: ReviewAgentOptions) -> ReviewAgentRes
         str(wrapper_path),
         "--backend",
         options.backend.value,
-        "--agent",
-        options.agent.value,
     ]
 
     if options.model:
