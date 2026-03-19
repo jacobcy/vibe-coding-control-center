@@ -82,7 +82,7 @@ review:
   # Custom review prompt (optional)
   # If provided, will be added to the beginning of review context
   # Can be overridden via command line: vibe3 review pr 42 --message "Focus on security"
-  # review_prompt: ""
+  review_prompt: "/code-review"
 
 # 质量标准
 quality:
