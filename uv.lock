@@ -1198,13 +1198,13 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "black", specifier = ">=23.0.0" },
+    { name = "black", specifier = "==26.3.1" },
     { name = "hypothesis", specifier = ">=6.151.9" },
     { name = "mypy", specifier = ">=1.5.0" },
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.1.0" },
+    { name = "ruff", specifier = "==0.15.6" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
 

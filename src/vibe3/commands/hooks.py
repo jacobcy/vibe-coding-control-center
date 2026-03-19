@@ -162,8 +162,9 @@ def list_hooks() -> None:
 
 @app.command("enable")
 def enable_hook(
-    hook_name: str
-    | None = typer.Argument(None, help=f"Hook to enable: {', '.join(_VALID_HOOKS)}"),
+    hook_name: str | None = typer.Argument(
+        None, help=f"Hook to enable: {', '.join(_VALID_HOOKS)}"
+    ),
     all_hooks: bool = typer.Option(False, "--all", help="Enable all hooks at once"),
 ) -> None:
     """Enable a Git hook (activates it by copying script to .git/hooks/).
@@ -209,8 +210,9 @@ def enable_hook(
 
 @app.command("disable")
 def disable_hook(
-    hook_name: str
-    | None = typer.Argument(None, help=f"Hook to disable: {', '.join(_VALID_HOOKS)}"),
+    hook_name: str | None = typer.Argument(
+        None, help=f"Hook to disable: {', '.join(_VALID_HOOKS)}"
+    ),
     all_hooks: bool = typer.Option(False, "--all", help="Disable all hooks at once"),
 ) -> None:
     """Disable a Git hook (deactivates it by removing script from .git/hooks/).

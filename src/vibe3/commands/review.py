@@ -86,9 +86,7 @@ def pr(
         event = (
             "REQUEST_CHANGES"
             if review.verdict == "BLOCK"
-            else "APPROVE"
-            if review.verdict == "PASS"
-            else "COMMENT"
+            else "APPROVE" if review.verdict == "PASS" else "COMMENT"
         )
         summary = (
             f"**Automated Review** — Risk score: "
