@@ -6,9 +6,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
 from vibe3.commands.review_helpers import run_inspect_json
-from vibe3.models.change_source import BranchSource, PRSource
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
@@ -59,15 +57,8 @@ def pr(
     # 1. Get inspect analysis result
     inspect_data = run_inspect_json(["pr", str(pr_number)])
 
-    # 2. Get diff
-    from vibe3.clients.github_client import GitHubClient
-
-    git = GitClient(github_client=GitHubClient())
-    diff = git.get_diff(PRSource(pr_number=pr_number))
-
-    # 3. Build context
+    # 2. Build context
     context = build_review_context(
-        diff=diff,
         impact=json.dumps(inspect_data.get("impact"), indent=2),
         dag=json.dumps(inspect_data.get("dag"), indent=2),
         score=json.dumps(inspect_data.get("score"), indent=2),
@@ -128,9 +119,6 @@ def base(
 
     inspect_data = run_inspect_json(["base", base_branch])
 
-    git = GitClient()
-    diff = git.get_diff(BranchSource(branch=current_branch, base=base_branch))
-
     # Build impact info from inspect base output
     # inspect base returns: core_files, total_changed, core_changed,
     # score, impacted_modules
@@ -153,7 +141,6 @@ def base(
         }
 
     context = build_review_context(
-        diff=diff,
         impact=json.dumps(impact_info, indent=2),
         dag=json.dumps(dag_info, indent=2) if dag_info else None,
         score=json.dumps(inspect_data.get("score"), indent=2),

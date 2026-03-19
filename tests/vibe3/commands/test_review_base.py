@@ -61,7 +61,6 @@ def test_review_base_defaults_to_origin_main():
         patch(
             "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
         ) as mock_inspect,
-        patch("vibe3.commands.review.GitClient") as mock_git,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -79,11 +78,6 @@ def test_review_base_defaults_to_origin_main():
         assert result.exit_code == 0
         # Verify inspect was called with origin/main
         mock_inspect.assert_called_once_with(["base", "origin/main"])
-        # Verify GitClient.get_diff was called with origin/main
-        mock_git.return_value.get_diff.assert_called_once()
-        call_args = mock_git.return_value.get_diff.call_args[0][0]
-        assert call_args.base == "origin/main"
-        assert call_args.branch == "feature/test"
 
 
 def test_review_base_pass():

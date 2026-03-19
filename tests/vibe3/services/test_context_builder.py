@@ -14,11 +14,10 @@ class TestBuildReviewContext:
     """Tests for build_review_context function."""
 
     def test_build_review_context_includes_required_sections(self) -> None:
-        """Context should include Risk Score, Impact DAG, Git Diff, and output format."""
+        """Context should include Risk Score, Impact DAG, and output format."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
             context = build_review_context(
-                diff="diff --git a/x.py b/x.py\n+new line",
                 impact='{"symbols": ["func_a"]}',
                 dag='{"nodes": ["mod_a"]}',
                 score='{"score": 7, "risk_level": "HIGH"}',
@@ -27,16 +26,13 @@ class TestBuildReviewContext:
         # Required sections
         assert "Risk Score" in context
         assert "Impact DAG" in context
-        assert "Git Diff" in context
         assert "Output format requirements" in context
-        assert "diff --git a/x.py" in context
 
     def test_build_review_context_includes_verdict_format(self) -> None:
         """Context should specify VERDICT output format."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
             context = build_review_context(
-                diff="diff content",
                 impact="{}",
                 dag="{}",
                 score='{"score": 5}',
@@ -50,7 +46,6 @@ class TestBuildReviewContext:
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
             context = build_review_context(
-                diff="diff content",
                 impact='{"changed_files": ["a.py"]}',
                 dag='{"impacted_modules": ["mod_a"]}',
                 score='{"score": 3, "risk_level": "LOW"}',
@@ -58,16 +53,14 @@ class TestBuildReviewContext:
 
         assert "Inspect Summary" in context
 
-    def test_build_review_context_minimal_diff_only(self) -> None:
-        """Context should work with minimal diff-only input."""
+    def test_build_review_context_minimal_no_diff(self) -> None:
+        """Context should work with minimal inspect-only input."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
-            context = build_review_context(
-                diff="diff --git a/x.py b/x.py\n+new line",
-            )
+            context = build_review_context()
 
-        assert "Git Diff" in context
-        assert "diff --git a/x.py" in context
+        assert "Review Task" in context
+        assert "Output format requirements" in context
 
     def test_build_review_context_handles_missing_policy(self) -> None:
         """Should raise error when policy file is missing."""
@@ -75,4 +68,4 @@ class TestBuildReviewContext:
             mock_read.side_effect = OSError("File not found")
 
             with pytest.raises(Exception):  # ContextBuilderError
-                build_review_context(diff="diff content")
+                build_review_context()

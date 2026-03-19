@@ -33,7 +33,6 @@ Where:
 
 
 def build_review_context(
-    diff: str,
     policy_path: str = ".codex/review-policy.md",
     structure: str | None = None,
     impact: str | None = None,
@@ -43,7 +42,6 @@ def build_review_context(
     """Build complete context for codeagent-wrapper review.
 
     Args:
-        diff: git diff output
         policy_path: path to review-policy.md
         structure: repository structure summary (JSON string)
         impact: symbol analysis result (JSON string)
@@ -86,9 +84,6 @@ def build_review_context(
 - Use inspect score as triage priority, not as sole decision factor
 - Focus on actionable, specific findings"""
     sections.append(review_task)
-
-    # Add Git Diff
-    sections.append(f"## Git Diff\n```diff\n{diff}\n```")
 
     # Add output format requirements
     sections.append(OUTPUT_FORMAT_SECTION)
