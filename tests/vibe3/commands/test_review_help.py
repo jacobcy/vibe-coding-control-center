@@ -8,11 +8,19 @@ Note: This file only contains general help tests. Subcommand tests are split int
 - test_review_base.py
 """
 
+import re
+
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 def test_review_no_args_shows_help():
@@ -67,17 +75,19 @@ def test_review_analyze_commit_command_removed():
 
 def test_review_base_help_mentions_agent_and_model_options():
     """vibe review base --help should mention --agent and --model options."""
-    # Disable color codes in output
-    result = runner.invoke(app, ["base", "--help"], env={"NO_COLOR": "1"})
+    result = runner.invoke(app, ["base", "--help"])
     assert result.exit_code == 0
-    assert "--agent" in result.output
-    assert "--model" in result.output
+    # Strip ANSI codes before checking
+    output = _strip_ansi(result.output)
+    assert "--agent" in output
+    assert "--model" in output
 
 
 def test_review_pr_help_mentions_agent_and_model_options():
     """vibe review pr --help should mention --agent and --model options."""
-    # Disable color codes in output
-    result = runner.invoke(app, ["pr", "--help"], env={"NO_COLOR": "1"})
+    result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
-    assert "--agent" in result.output
-    assert "--model" in result.output
+    # Strip ANSI codes before checking
+    output = _strip_ansi(result.output)
+    assert "--agent" in output
+    assert "--model" in output
