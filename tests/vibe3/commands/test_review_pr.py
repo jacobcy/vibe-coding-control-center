@@ -43,7 +43,7 @@ def test_review_pr_missing_arg_shows_error():
 def test_review_pr_pass():
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
@@ -64,7 +64,7 @@ def test_review_pr_pass():
 def test_review_pr_block_exits_1():
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
@@ -91,7 +91,7 @@ def test_review_pr_with_agent_and_model():
     """Test that --agent and --model options are passed through."""
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
@@ -127,7 +127,7 @@ def test_review_pr_is_local_only():
     """review pr should not call GitHub publish methods."""
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),

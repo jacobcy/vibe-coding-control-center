@@ -46,6 +46,28 @@ review_scope:
     - "lib/flow.sh"          # Flow 公开接口
     - "src/vibe3/commands/"  # v3 命令层
 
+# Review 配置
+review:
+  policy_file: ".codex/review-policy.md"  # Review policy 文件路径
+  output_format: |
+    Each finding should follow this format:
+    path/to/file.py:42 [MAJOR] concise issue description
+
+    The final line must be:
+    VERDICT: PASS | MAJOR | BLOCK
+
+    Where:
+    - PASS: No significant issues found
+    - MAJOR: Issues found that should be addressed before merge
+    - BLOCK: Critical issues that must be fixed before merge
+
+  review_task: |
+    - Run `git diff <base>...HEAD` to see file changes
+    - Review only changed code, not the entire codebase
+    - Use AST analysis to understand function-level impact
+    - Prioritize: correctness, regression risk, API breaks
+    - Focus on actionable, specific findings
+
 # 质量标准
 quality:
   test_coverage:

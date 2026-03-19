@@ -108,6 +108,41 @@ class ReviewScopeConfig(BaseModel):
     )
 
 
+class HooksConfig(BaseModel):
+    """Git hooks configuration."""
+
+    post_commit: bool = True
+    pre_push: bool = False
+
+
+class AutoTriggerConfig(BaseModel):
+    """Auto trigger configuration for review."""
+
+    enabled: bool = True
+    min_complexity: int = Field(default=3, ge=1, le=10)
+    min_lines_changed: int = 50
+    min_files_changed: int = 3
+    hooks: HooksConfig = Field(default_factory=HooksConfig)
+
+
+class ReviewConfig(BaseModel):
+    """Review configuration."""
+
+    policy_file: str = Field(
+        default=".codex/review-policy.md",
+        description="Path to review policy file",
+    )
+    output_format: str = Field(
+        default="",
+        description="Output format requirements (natural language)",
+    )
+    review_task: str = Field(
+        default="",
+        description="Review task guidance (natural language)",
+    )
+    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
+
+
 class TestCoverageConfig(BaseModel):
     """Test coverage requirements."""
 
@@ -201,29 +236,6 @@ class PRScoringConfig(BaseModel):
     weights: PRScoringWeights = Field(default_factory=PRScoringWeights)
     thresholds: PRScoringThresholds = Field(default_factory=PRScoringThresholds)
     merge_gate: MergeGateConfig = Field(default_factory=MergeGateConfig)
-
-
-class HooksConfig(BaseModel):
-    """Git hooks configuration."""
-
-    post_commit: bool = True
-    pre_push: bool = False
-
-
-class AutoTriggerConfig(BaseModel):
-    """Auto trigger configuration for review."""
-
-    enabled: bool = True
-    min_complexity: int = Field(default=3, ge=1, le=10)
-    min_lines_changed: int = 50
-    min_files_changed: int = 3
-    hooks: HooksConfig = Field(default_factory=HooksConfig)
-
-
-class ReviewConfig(BaseModel):
-    """Review configuration."""
-
-    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 
 class VibeConfig(BaseModel):

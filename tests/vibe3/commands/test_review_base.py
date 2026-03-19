@@ -37,7 +37,7 @@ def test_review_base_defaults_to_origin_main():
     """Test that review base works with AST analysis."""
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
@@ -60,7 +60,7 @@ def test_review_base_defaults_to_origin_main():
 def test_review_base_pass():
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
@@ -84,7 +84,7 @@ def test_review_base_with_agent_and_model():
     """Test that --agent and --model options are passed through."""
     with (
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
