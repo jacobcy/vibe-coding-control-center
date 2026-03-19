@@ -32,7 +32,7 @@ bash scripts/hooks/check-shell-loc.sh || {
 
 # 4. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."
-INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base main --json 2>/dev/null) || {
+INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json 2>/dev/null) || {
     echo "ERROR: Inspect failed - cannot assess risk"
     exit 1
 }
@@ -60,7 +60,7 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     echo "  Running local review before push..."
     echo ""
 
-    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base main --agent codex 2>&1) || {
+    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base --agent codex 2>&1) || {
         REVIEW_EXIT=$?
         echo "ERROR: Review failed with exit code $REVIEW_EXIT"
         echo "$REVIEW_RESULT"

@@ -49,19 +49,45 @@ def _patch_review_deps(verdict: str = "PASS"):
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review(verdict),
         ),
+        patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"),
     ]
 
 
-def test_review_base_missing_arg_shows_error():
-    result = runner.invoke(app, ["base"])
-    assert result.exit_code != 0
-    assert "missing" in result.output.lower() or "error" in result.output.lower()
+def test_review_base_defaults_to_origin_main():
+    """Test that review base defaults to origin/main when no branch specified."""
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
+        ) as mock_inspect,
+        patch("vibe3.commands.review.GitClient") as mock_git,
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch(
+            "vibe3.commands.review.run_review_agent",
+            return_value=_mock_agent_result(),
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+        patch(
+            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+        ),
+    ):
+        result = runner.invoke(app, ["base"])
+        assert result.exit_code == 0
+        # Verify inspect was called with origin/main
+        mock_inspect.assert_called_once_with(["base", "origin/main"])
+        # Verify GitClient.get_diff was called with origin/main
+        mock_git.return_value.get_diff.assert_called_once()
+        call_args = mock_git.return_value.get_diff.call_args[0][0]
+        assert call_args.base == "origin/main"
+        assert call_args.branch == "feature/test"
 
 
 def test_review_base_pass():
     patches = _patch_review_deps()
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
-        result = runner.invoke(app, ["base", "feature/my-branch"])
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
 
 
@@ -81,9 +107,10 @@ def test_review_base_with_agent_and_model():
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
+        patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"),
     ):
         result = runner.invoke(
-            app, ["base", "feature/my-branch", "--agent", "codex", "--model", "gpt-5.4"]
+            app, ["base", "origin/develop", "--agent", "codex", "--model", "gpt-5.4"]
         )
     assert result.exit_code == 0
     # Verify options were passed to run_review_agent

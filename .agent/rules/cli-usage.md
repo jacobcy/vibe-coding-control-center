@@ -30,14 +30,17 @@ uv run python src/vibe3/cli.py inspect --help
 
 **review 命令**（基于 inspect 上下文 + codeagent-wrapper）：
 ```bash
-# 审查分支改动（本地）
-uv run python src/vibe3/cli.py review base main
+# 审查当前分支 vs origin/main（推荐）
+uv run python src/vibe3/cli.py review base
+
+# 审查当前分支 vs origin/develop
+uv run python src/vibe3/cli.py review base origin/develop
 
 # 审查 PR（本地，不发布到 GitHub）
 uv run python src/vibe3/cli.py review pr 42
 
 # 指定 agent 和 model
-uv run python src/vibe3/cli.py review base main --agent codex --model gpt-5.4
+uv run python src/vibe3/cli.py review base --agent codex --model gpt-5.4
 
 # 详细帮助
 uv run python src/vibe3/cli.py review --help
@@ -47,9 +50,10 @@ uv run python src/vibe3/cli.py review --help
 - review 命令内部调用 `inspect` 获取风险评分和影响分析
 - 输出格式要求：`path/to/file.py:42 [MAJOR] issue description`
 - VERDICT 输出：`PASS | MAJOR | BLOCK`
+- **默认对比 origin/main**（适合禁止在 main 上开发的项目）
 
 **pre-push 自动审查**：
-- pre-push hook 会自动运行 `inspect base main --json` 获取风险评分
+- pre-push hook 会自动运行 `inspect base --json` 获取风险评分
 - 当风险等级为 HIGH 或 CRITICAL 时，自动触发本地 review
 - CRITICAL 风险且 VERDICT 为 BLOCK 时，会阻断 push
 

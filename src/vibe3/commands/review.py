@@ -89,25 +89,43 @@ def pr(
 
 @app.command()
 def base(
-    branch: Annotated[str, typer.Argument(help="Branch to review against main")],
+    base_branch: Annotated[
+        str,
+        typer.Argument(help="Base branch to compare against (default: origin/main)"),
+    ] = "origin/main",
     trace: _TRACE_OPT = False,
     agent: _AGENT_OPT = "codex",
     model: _MODEL_OPT = None,
 ) -> None:
-    """Review branch changes relative to main.
+    """Review current branch changes relative to base branch.
 
-    Example: vibe review base feature/my-branch
+    By default, compares current branch against origin/main (recommended for projects
+    that don't develop on main branch locally).
+
+    Examples:
+        vibe review base                 # Compare current branch vs origin/main
+        vibe review base origin/develop  # Compare current branch vs origin/develop
+        vibe review base main            # Compare current branch vs local main
     """
     if trace:
         enable_trace()
 
-    log = logger.bind(domain="review", action="base", branch=branch)
+    from vibe3.utils.git_helpers import get_current_branch
+
+    current_branch = get_current_branch()
+
+    log = logger.bind(
+        domain="review",
+        action="base",
+        current_branch=current_branch,
+        base_branch=base_branch,
+    )
     log.info("Reviewing branch changes")
 
-    inspect_data = run_inspect_json(["base", branch])
+    inspect_data = run_inspect_json(["base", base_branch])
 
     git = GitClient()
-    diff = git.get_diff(BranchSource(branch=branch))
+    diff = git.get_diff(BranchSource(branch=current_branch, base=base_branch))
 
     context = build_review_context(
         diff=diff,

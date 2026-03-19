@@ -16,8 +16,10 @@ def register(app: typer.Typer) -> None:
     def base(
         base_branch: Annotated[
             str,
-            typer.Argument(help="Base branch to compare against (default: main)"),
-        ] = "main",
+            typer.Argument(
+                help="Base branch to compare against (default: origin/main)"
+            ),
+        ] = "origin/main",
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
@@ -31,8 +33,9 @@ def register(app: typer.Typer) -> None:
         Shows impact scope, not detailed diffs.
 
         Examples:
-            vibe inspect base          # Compare current branch vs main
-            vibe inspect base develop  # Compare current branch vs develop
+            vibe inspect base                # Compare current branch vs origin/main
+            vibe inspect base origin/develop # Compare current branch vs origin/develop
+            vibe inspect base main           # Compare current branch vs local main
         """
         import json
 
