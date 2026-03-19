@@ -1,4 +1,16 @@
-"""Review parser - 解析 Codex 输出的审核结果."""
+"""Review parser - Parse output from codeagent-wrapper.
+
+This module parses the output from codeagent-wrapper review agent.
+It is designed to be robust against wrapper output noise such as:
+- Session/log preamble
+- Markdown headers
+- Extra newlines
+- Timestamp logs
+
+Output format expected:
+    path/to/file.py:42 [MAJOR] concise issue description
+    VERDICT: PASS | MAJOR | BLOCK
+"""
 
 import re
 
@@ -9,14 +21,14 @@ from vibe3.exceptions import VibeError
 
 
 class ReviewParserError(VibeError):
-    """解析失败."""
+    """Parse failed."""
 
     def __init__(self, details: str) -> None:
         super().__init__(f"Review parse failed: {details}", recoverable=False)
 
 
 class ReviewComment(BaseModel):
-    """单条审核意见."""
+    """Single review comment."""
 
     path: str
     line: int
@@ -25,14 +37,14 @@ class ReviewComment(BaseModel):
 
 
 class ParsedReview(BaseModel):
-    """解析后的完整审核结果."""
+    """Parsed review result."""
 
     comments: list[ReviewComment]
     verdict: str  # PASS | MAJOR | BLOCK
     raw: str
 
 
-# 匹配 "path/to/file.py:42 [MAJOR] description"
+# Match "path/to/file.py:42 [MAJOR] description"
 _COMMENT_RE = re.compile(
     r"^([^\s:]+):(\d+)\s+\[(CRITICAL|MAJOR|MINOR)\]\s+(.+)$",
     re.MULTILINE,
@@ -41,16 +53,21 @@ _VERDICT_RE = re.compile(r"VERDICT:\s*(PASS|MAJOR|BLOCK)", re.IGNORECASE)
 
 
 def parse_codex_review(raw: str) -> ParsedReview:
-    """解析 Codex 输出的审核结果.
+    """Parse codeagent-wrapper review output.
+
+    This function is robust against output noise and will:
+    - Ignore preamble/log lines from wrapper
+    - Extract findings matching the expected format
+    - Default to PASS verdict if none found
 
     Args:
-        raw: Codex 原始输出
+        raw: Raw output from codeagent-wrapper
 
     Returns:
-        解析后的审核结果
+        Parsed review result
     """
     log = logger.bind(domain="review_parser", action="parse_codex_review")
-    log.info("Parsing Codex review output")
+    log.info("Parsing review output")
 
     comments = [
         ReviewComment(
@@ -76,14 +93,18 @@ def parse_codex_review(raw: str) -> ParsedReview:
     return ParsedReview(comments=comments, verdict=verdict, raw=raw)
 
 
+# Alias for clarity - same function, more descriptive name
+parse_review_output = parse_codex_review
+
+
 def convert_to_github_format(review: ParsedReview) -> list[dict[str, object]]:
-    """将解析结果转换为 GitHub API review comments 格式.
+    """Convert parsed review to GitHub API review comments format.
 
     Args:
-        review: 解析后的审核结果
+        review: Parsed review result
 
     Returns:
-        GitHub API 格式的 comment 列表
+        List of GitHub API format comments
     """
     return [
         {

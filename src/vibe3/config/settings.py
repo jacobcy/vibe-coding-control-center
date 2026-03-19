@@ -28,27 +28,17 @@ class TotalFileLocConfig(BaseModel):
 class CodePathsConfig(BaseModel):
     """代码路径配置."""
 
-    v2_shell: list[str] = Field(
-        default_factory=list,
-        description="Shell 核心代码路径",
-    )
+    v2_shell: list[str] = Field(default_factory=list, description="Shell 核心代码路径")
     v3_python: list[str] = Field(
-        default_factory=list,
-        description="Python 核心代码路径",
+        default_factory=list, description="Python 核心代码路径"
     )
 
 
 class ScriptsPathsConfig(BaseModel):
     """脚本路径配置."""
 
-    v2_shell: list[str] = Field(
-        default_factory=list,
-        description="Shell 脚本路径",
-    )
-    v3_python: list[str] = Field(
-        default_factory=list,
-        description="Python 脚本路径",
-    )
+    v2_shell: list[str] = Field(default_factory=list, description="Shell 脚本路径")
+    v3_python: list[str] = Field(default_factory=list, description="Python 脚本路径")
 
 
 class TestPathsConfig(BaseModel):
@@ -64,21 +54,11 @@ class CodeLimitsConfig(BaseModel):
     与 config/settings.yaml 结构完全对应。
     """
 
-    single_file_loc: SingleFileLocConfig = Field(
-        default_factory=SingleFileLocConfig, description="单文件行数限制"
-    )
-    total_file_loc: TotalFileLocConfig = Field(
-        default_factory=TotalFileLocConfig, description="总行数限制"
-    )
-    code_paths: CodePathsConfig = Field(
-        default_factory=CodePathsConfig, description="代码路径"
-    )
-    scripts_paths: ScriptsPathsConfig = Field(
-        default_factory=ScriptsPathsConfig, description="脚本路径"
-    )
-    test_paths: TestPathsConfig = Field(
-        default_factory=TestPathsConfig, description="测试路径"
-    )
+    single_file_loc: SingleFileLocConfig = Field(default_factory=SingleFileLocConfig)
+    total_file_loc: TotalFileLocConfig = Field(default_factory=TotalFileLocConfig)
+    code_paths: CodePathsConfig = Field(default_factory=CodePathsConfig)
+    scripts_paths: ScriptsPathsConfig = Field(default_factory=ScriptsPathsConfig)
+    test_paths: TestPathsConfig = Field(default_factory=TestPathsConfig)
 
 
 class TestFileLimitsConfig(BaseModel):
@@ -86,7 +66,7 @@ class TestFileLimitsConfig(BaseModel):
 
     services: int = Field(
         default=500, description="Services layer max lines per test file"
-    )  # 宽松默认值
+    )
     clients: int = Field(
         default=500, description="Clients layer max lines per test file"
     )
@@ -99,13 +79,69 @@ class ReviewScopeConfig(BaseModel):
     """Review scope configuration."""
 
     critical_paths: list[str] = Field(
-        default_factory=list,
-        description="Critical paths for detailed review",
+        default_factory=list, description="Critical paths for detailed review"
     )
     public_api_paths: list[str] = Field(
-        default_factory=list,
-        description="Public API paths for compatibility checking",
+        default_factory=list, description="Public API paths for compatibility checking"
     )
+
+
+class AgentConfig(BaseModel):
+    """Agent configuration for codeagent-wrapper.
+
+    Two mutually exclusive modes:
+    1. Use preset: agent (e.g., "code-reviewer")
+    2. Direct specification: backend + model (optional)
+    """
+
+    agent: str | None = Field(default=None, description="Agent preset name")
+    backend: str | None = Field(default=None, description="Backend name")
+    model: str | None = Field(default=None, description="Model name (optional)")
+
+    def validate_mutually_exclusive(self) -> None:
+        """Validate that agent and backend are not both specified."""
+        if self.agent and self.backend:
+            raise ValueError(
+                "agent and backend are mutually exclusive. "
+                "Use either agent preset OR backend+model, not both."
+            )
+
+
+class HooksConfig(BaseModel):
+    """Git hooks configuration."""
+
+    post_commit: bool = True
+    pre_push: bool = False
+
+
+class AutoTriggerConfig(BaseModel):
+    """Auto trigger configuration for review."""
+
+    enabled: bool = True
+    min_complexity: int = Field(default=3, ge=1, le=10)
+    min_lines_changed: int = 50
+    min_files_changed: int = 3
+    hooks: HooksConfig = Field(default_factory=HooksConfig)
+
+
+class ReviewConfig(BaseModel):
+    """Review configuration."""
+
+    policy_file: str = Field(
+        default=".codex/review-policy.md", description="Path to review policy file"
+    )
+    tools_guide_file: str = Field(
+        default=".agent/rules/cli-usage.md", description="Path to tools guide file"
+    )
+    agent_config: AgentConfig = Field(
+        default_factory=AgentConfig, description="codeagent-wrapper configuration"
+    )
+    output_format: str = Field(default="", description="Output format requirements")
+    review_task: str = Field(default="", description="Review task guidance")
+    review_prompt: str = Field(
+        default="", description="Custom review prompt (optional)"
+    )
+    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 
 class TestCoverageConfig(BaseModel):
@@ -201,29 +237,6 @@ class PRScoringConfig(BaseModel):
     weights: PRScoringWeights = Field(default_factory=PRScoringWeights)
     thresholds: PRScoringThresholds = Field(default_factory=PRScoringThresholds)
     merge_gate: MergeGateConfig = Field(default_factory=MergeGateConfig)
-
-
-class HooksConfig(BaseModel):
-    """Git hooks configuration."""
-
-    post_commit: bool = True
-    pre_push: bool = False
-
-
-class AutoTriggerConfig(BaseModel):
-    """Auto trigger configuration for review."""
-
-    enabled: bool = True
-    min_complexity: int = Field(default=3, ge=1, le=10)
-    min_lines_changed: int = 50
-    min_files_changed: int = 3
-    hooks: HooksConfig = Field(default_factory=HooksConfig)
-
-
-class ReviewConfig(BaseModel):
-    """Review configuration."""
-
-    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 
 class VibeConfig(BaseModel):

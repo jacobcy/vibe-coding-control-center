@@ -1,63 +1,133 @@
-"""Context builder - 将多个数据源构建成 Codex review 的输入上下文."""
+"""Context builder - Build context for codeagent-wrapper review.
+
+This module constructs a stable prompt format for the review agent.
+"""
 
 from pathlib import Path
 
 from loguru import logger
 
+from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
 
 
 class ContextBuilderError(VibeError):
-    """上下文构建失败."""
+    """Context build failed."""
 
     def __init__(self, details: str) -> None:
         super().__init__(f"Context build failed: {details}", recoverable=False)
 
 
 def build_review_context(
-    diff: str,
-    policy_path: str = ".codex/review-policy.md",
-    structure: str | None = None,
-    impact: str | None = None,
-    dag: str | None = None,
-    score: str | None = None,
+    policy_path: str | None = None,
+    changed_symbols: dict[str, list[str]] | None = None,
+    symbol_dag: dict[str, list[str]] | None = None,
+    config: VibeConfig | None = None,
 ) -> str:
-    """构建 Codex review 的完整上下文.
+    """Build review context with AST-level analysis.
+
+    Reviewer runs git diff themselves to see file-level changes.
+    We provide AST-level insights they can't get from diff:
+    - Which functions were changed (symbol-level)
+    - Who calls these functions (DAG impact)
+    - Tools available for deeper analysis
 
     Args:
-        diff: git diff 输出
-        policy_path: review-policy.md 路径
-        structure: 仓库结构摘要（JSON 字符串）
-        impact: Serena 符号分析结果（JSON 字符串）
-        dag: 影响范围图（JSON 字符串）
-        score: 风险评分（JSON 字符串）
+        policy_path: path to review-policy.md (reads from config if None)
+        changed_symbols: file -> list of changed function names
+        symbol_dag: function -> list of caller locations
+        config: VibeConfig instance (loads from settings.yaml if None)
 
     Returns:
-        完整的上下文字符串
+        Complete context string
 
     Raises:
-        ContextBuilderError: 构建失败
+        ContextBuilderError: build failed
     """
     log = logger.bind(domain="context_builder", action="build_review_context")
     log.info("Building review context")
 
+    # Load config if not provided
+    if config is None:
+        config = VibeConfig.get_defaults()
+
+    # Use policy_path from parameter or config
+    actual_policy_path = policy_path or config.review.policy_file
+
     try:
-        policy = Path(policy_path).read_text(encoding="utf-8")
+        policy = Path(actual_policy_path).read_text(encoding="utf-8")
     except OSError as e:
         raise ContextBuilderError(f"Cannot read policy: {e}") from e
 
     sections: list[str] = [policy]
 
-    if structure:
-        sections.append(f"## Repository Structure Summary\n{structure}")
-    if impact:
-        sections.append(f"## Serena Impact Analysis\n```json\n{impact}\n```")
-    if dag:
-        sections.append(f"## Impact DAG\n```json\n{dag}\n```")
-    if score:
-        sections.append(f"## Risk Score\n```json\n{score}\n```")
+    # Add tools guide (project-specific analysis tools)
+    if config.review.tools_guide_file:
+        tools_guide_path = Path(config.review.tools_guide_file)
+        if tools_guide_path.exists():
+            try:
+                tools_guide = tools_guide_path.read_text(encoding="utf-8")
+                sections.append(f"## Available Tools\n\n{tools_guide}")
+            except OSError as e:
+                log.bind(error=str(e), path=str(tools_guide_path)).warning(
+                    "Could not read tools guide"
+                )
 
-    sections.append(f"## Git Diff\n```diff\n{diff}\n```")
+    # Add AST-level analysis if available
+    if changed_symbols or symbol_dag:
+        ast_parts: list[str] = []
+        if changed_symbols:
+            import json
+
+            symbols_json = json.dumps(changed_symbols, indent=2)
+            ast_parts.append(
+                f"### Changed Functions (AST Analysis)\n"
+                f"```json\n{symbols_json}\n```"
+            )
+        if symbol_dag:
+            import json
+
+            dag_json = json.dumps(symbol_dag, indent=2)
+            ast_parts.append(
+                f"### Function Call Chain (DAG)\n" f"```json\n{dag_json}\n```"
+            )
+
+        ast_section = "## AST Analysis\n" + "\n\n".join(ast_parts)
+        sections.append(ast_section)
+
+    # Add review task guidance from config
+    review_task_text = config.review.review_task
+    if review_task_text:
+        review_task = f"## Review Task\n{review_task_text}"
+    else:
+        # Fallback if not configured
+        review_task = """## Review Task
+- Run `git diff <base>...HEAD` to see file changes
+- Review only changed code, not the entire codebase
+- Use AST analysis to understand function-level impact
+- Prioritize: correctness, regression risk, API breaks
+- Focus on actionable, specific findings"""
+    sections.append(review_task)
+
+    # Add output format requirements from config
+    output_format_text = config.review.output_format
+    if output_format_text:
+        output_format_section = f"## Output format requirements\n{output_format_text}"
+    else:
+        # Fallback if not configured
+        output_format_section = """## Output format requirements
+
+Each finding should follow this format:
+path/to/file.py:42 [MAJOR] concise issue description
+
+The final line must be:
+VERDICT: PASS | MAJOR | BLOCK
+
+Where:
+- PASS: No significant issues found
+- MAJOR: Issues found that should be addressed before merge
+- BLOCK: Critical issues that must be fixed before merge"""
+    sections.append(output_format_section)
 
     context = "\n\n---\n\n".join(sections)
     log.bind(context_len=len(context)).success("Review context built")
@@ -65,17 +135,17 @@ def build_review_context(
 
 
 def get_git_diff(base: str = "main", head: str = "HEAD") -> str:
-    """获取 git diff 输出.
+    """Get git diff output.
 
     Args:
-        base: 基准分支或 commit
-        head: 目标分支或 commit
+        base: base branch or commit
+        head: target branch or commit
 
     Returns:
-        diff 文本
+        diff text
 
     Raises:
-        ContextBuilderError: git 命令失败
+        ContextBuilderError: git command failed
     """
     import subprocess
 

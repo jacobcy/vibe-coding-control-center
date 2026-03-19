@@ -1,8 +1,17 @@
-"""CommitAnalyzer — 分析单次 commit 改动规模，计算复杂度分数，决定是否触发审核."""
+"""CommitAnalyzer - DEPRECATED: Use inspect-based risk score instead.
+
+This module is deprecated and will be removed in a future version.
+
+The complexity-based trigger has been replaced with inspect-score trigger
+in the pre-push hook. Use `vibe3 inspect base main --json` to get risk scores.
+
+See: docs/plans/2026-03-19-vibe3-review-codeagent-wrapper-plan.md
+"""
 
 import json
 import re
 import subprocess
+import warnings
 from pathlib import Path
 from typing import TypedDict
 
@@ -10,6 +19,14 @@ from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import CommitAnalyzerError
+
+# Emit deprecation warning when module is used
+warnings.warn(
+    "commit_analyzer is deprecated. Use inspect-based risk score instead. "
+    "See: vibe3 inspect base main --json",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class CommitAnalysisResult(TypedDict):

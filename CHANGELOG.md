@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.2.1] - 2026-03-19
+
+### ✨ Changed
+- Refactor v3 review to use codeagent-wrapper
+
 ## [2.1.34] - 2026-03-16
 
 ### ✨ Changed

@@ -1,26 +1,20 @@
-"""Review command - 代码审核层,基于 inspect 提供的上下文调用 Codex."""
+"""Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-import json
-from typing import Annotated
+from typing import Annotated, Optional, cast
 
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.commands.review_helpers import call_codex, run_inspect_json
-from vibe3.models.change_source import (
-    BranchSource,
-    CommitSource,
-    PRSource,
-    UncommittedSource,
-)
+from vibe3.commands.review_helpers import run_inspect_json
+from vibe3.config.settings import VibeConfig
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.review_parser import convert_to_github_format, parse_codex_review
+from vibe3.services.review_parser import parse_codex_review
+from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review using Codex",
+    help="Code review using inspect context and codeagent-wrapper",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -28,8 +22,13 @@ app = typer.Typer(
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
-_PUBLISH_OPT = Annotated[
-    bool, typer.Option("--publish", help="Post review comments to GitHub")
+_DRY_RUN_OPT = Annotated[
+    bool,
+    typer.Option("--dry-run", help="Print command and prompt without executing"),
+]
+_MESSAGE_OPT = Annotated[
+    Optional[str],
+    typer.Option("--message", "-m", help="Custom prompt (skips context building)"),
 ]
 
 
@@ -37,119 +36,62 @@ _PUBLISH_OPT = Annotated[
 def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     trace: _TRACE_OPT = False,
-    publish: _PUBLISH_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review a PR (calls inspect pr internally for context).
+    """Review a PR locally (generates review output, does not publish to GitHub).
 
-    Example: vibe review pr 42
+    This command is for local review only. To publish review to GitHub,
+    use `pr ready` command instead.
+
+    Examples:
+        vibe review pr 42
+        vibe review pr 42 --dry-run  # Print command and prompt only
+        vibe review pr 42 -m "Focus on security issues"  # Custom prompt
     """
     if trace:
         enable_trace()
 
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting PR review")
+    log.info("Starting local PR review")
 
-    # 1. 获取 inspect 分析结果
+    # Load config
+    config = VibeConfig.get_defaults()
+
+    # Always build full context with AST analysis
     inspect_data = run_inspect_json(["pr", str(pr_number)])
-
-    # 2. 获取 diff
-    from vibe3.clients.github_client import GitHubClient
-
-    git = GitClient(github_client=GitHubClient())
-    diff = git.get_diff(PRSource(pr_number=pr_number))
-
-    # 3. 构建上下文
-    context = build_review_context(
-        diff=diff,
-        impact=json.dumps(inspect_data.get("impact"), indent=2),
-        dag=json.dumps(inspect_data.get("dag"), indent=2),
-        score=json.dumps(inspect_data.get("score"), indent=2),
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+    prompt_file_content = build_review_context(
+        changed_symbols=changed_symbols,
+        config=config,
     )
 
-    # 4. 调用 Codex
-    raw = call_codex(context)
-    review = parse_codex_review(raw)
+    # Determine task: custom message, config default, or None
+    task = None
+    if message:
+        task = message
+        log.bind(task_type="custom").info("Using custom task")
+    elif config.review.review_prompt:
+        task = config.review.review_prompt
+        log.bind(task_type="config").info("Using configured task")
+    else:
+        log.bind(task_type="none").info("No custom task, using prompt file only")
 
-    typer.echo(raw)
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
+    # Call agent via codeagent-wrapper
+    options = ReviewAgentOptions(
+        agent=config.review.agent_config.agent,
+        backend=config.review.agent_config.backend,
+        model=config.review.agent_config.model,
     )
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
-    # 5. 发布到 GitHub（含行级 comments + Merge Gate）
-    if publish:
-        from vibe3.clients.github_client import GitHubClient
-
-        gh = GitHubClient()
-
-        # 7.1 行级 comments 发布
-        github_comments = convert_to_github_format(review) if review.comments else []
-        event = (
-            "REQUEST_CHANGES"
-            if review.verdict == "BLOCK"
-            else "APPROVE" if review.verdict == "PASS" else "COMMENT"
-        )
-        summary = (
-            f"**Automated Review** — Risk score: "
-            f"{inspect_data.get('score', {}).get('score', '?')}\n\n"  # type: ignore
-            f"Verdict: **{review.verdict}**"
-        )
-
-        log.bind(event=event, comment_count=len(github_comments)).info(
-            "Publishing review to GitHub"
-        )
-        gh.create_review(
-            pr_number,
-            body=summary,
-            event=event,
-            comments=github_comments if github_comments else None,
-            dismiss_previous=True,  # 避免重复 review
-        )
-        log.success("Review published to GitHub")
-
-        # 7.2 Merge Gate
-        risk_level = str(inspect_data.get("score", {}).get("risk_level", "LOW"))  # type: ignore
-        sha = gh.get_pr_head_sha(pr_number)
-        log.bind(risk_level=risk_level).info("Setting commit status")
-        if risk_level == "CRITICAL":
-            gh.create_commit_status(
-                sha,
-                state="failure",
-                description="CRITICAL risk score - review required",
-            )
-        else:
-            gh.create_commit_status(
-                sha,
-                state="success",
-                description=f"{risk_level} risk score",
-            )
-
-    if review.verdict == "BLOCK":
-        raise typer.Exit(1)
-
-
-@app.command()
-def uncommitted(
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Review uncommitted changes.
-
-    Example: vibe review --uncommitted
-    """
-    if trace:
-        enable_trace()
-
-    log = logger.bind(domain="review", action="uncommitted")
-    log.info("Reviewing uncommitted changes")
-
-    git = GitClient()
-    diff = git.get_diff(UncommittedSource())
-
-    if not diff.strip():
-        typer.echo("No uncommitted changes found.")
+    if dry_run:
         return
 
-    context = build_review_context(diff=diff)
-    raw = call_codex(context)
+    raw = result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(raw)
@@ -163,102 +105,84 @@ def uncommitted(
 
 @app.command()
 def base(
-    branch: Annotated[str, typer.Argument(help="Branch to review against main")],
+    base_branch: Annotated[
+        str,
+        typer.Argument(help="Base branch to compare against (default: origin/main)"),
+    ] = "origin/main",
     trace: _TRACE_OPT = False,
-    publish: _PUBLISH_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review branch changes relative to main.
+    """Review current branch changes relative to base branch.
 
-    Example: vibe review base feature/my-branch
+    By default, compares current branch against origin/main (recommended for projects
+    that don't develop on main branch locally).
+
+    Examples:
+        vibe review base                 # Compare current branch vs origin/main
+        vibe review base origin/develop  # Compare current branch vs origin/develop
+        vibe review base main            # Compare current branch vs local main
+        vibe review base --dry-run       # Print command and prompt only
+        vibe review base -m "Focus on security"  # Custom task
     """
     if trace:
         enable_trace()
 
-    log = logger.bind(domain="review", action="base", branch=branch)
+    from vibe3.utils.git_helpers import get_current_branch
+
+    current_branch = get_current_branch()
+
+    log = logger.bind(
+        domain="review",
+        action="base",
+        current_branch=current_branch,
+        base_branch=base_branch,
+    )
     log.info("Reviewing branch changes")
 
-    inspect_data = run_inspect_json(["base", branch])
+    # Load config
+    config = VibeConfig.get_defaults()
 
-    git = GitClient()
-    diff = git.get_diff(BranchSource(branch=branch))
-
-    context = build_review_context(
-        diff=diff,
-        impact=json.dumps(inspect_data.get("impact"), indent=2),
-        dag=json.dumps(inspect_data.get("dag"), indent=2),
-        score=json.dumps(inspect_data.get("score"), indent=2),
+    # Always build full context with AST analysis
+    inspect_data = run_inspect_json(["base", base_branch])
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+    prompt_file_content = build_review_context(
+        changed_symbols=changed_symbols,
+        config=config,
     )
 
-    raw = call_codex(context)
-    review = parse_codex_review(raw)
-
-    typer.echo(raw)
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
-    )
-
-    if review.verdict == "BLOCK":
-        raise typer.Exit(1)
-
-
-@app.command()
-def commit(
-    sha: Annotated[str, typer.Argument(help="Commit SHA")],
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Review a specific commit.
-
-    Example: vibe review commit HEAD~1
-    """
-    if trace:
-        enable_trace()
-
-    log = logger.bind(domain="review", action="commit", sha=sha)
-    log.info("Reviewing commit")
-
-    inspect_data = run_inspect_json(["commit", sha])
-
-    git = GitClient()
-    diff = git.get_diff(CommitSource(sha=sha))
-
-    context = build_review_context(
-        diff=diff,
-        impact=json.dumps(inspect_data.get("impact"), indent=2),
-        dag=json.dumps(inspect_data.get("dag"), indent=2),
-        score=json.dumps(inspect_data.get("score"), indent=2),
-    )
-
-    raw = call_codex(context)
-    review = parse_codex_review(raw)
-
-    typer.echo(raw)
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
-    )
-
-    if review.verdict == "BLOCK":
-        raise typer.Exit(1)
-
-
-@app.command("analyze-commit")
-def analyze_commit_cmd(
-    sha: Annotated[str, typer.Argument(help="Commit SHA (e.g. HEAD, abc123)")],
-    as_json: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
-) -> None:
-    """Analyze commit complexity to determine if review should be triggered.
-
-    Example: vibe review analyze-commit HEAD
-    """
-    from vibe3.services.commit_analyzer import analyze_commit, analyze_commit_json
-
-    log = logger.bind(domain="review", action="analyze_commit", sha=sha)
-    log.info("Analyzing commit complexity")
-
-    if as_json:
-        typer.echo(analyze_commit_json(sha))
+    # Determine task: custom message, config default, or None
+    task = None
+    if message:
+        task = message
+        log.bind(task_type="custom").info("Using custom task")
+    elif config.review.review_prompt:
+        task = config.review.review_prompt
+        log.bind(task_type="config").info("Using configured task")
     else:
-        result = analyze_commit(sha)
-        typer.echo(f"Lines changed:    {result['lines_changed']}")
-        typer.echo(f"Files changed:    {result['files_changed']}")
-        typer.echo(f"Complexity score: {result['complexity_score']}/10")
-        typer.echo(f"Should review:    {result['should_review']}")
+        log.bind(task_type="none").info("No custom task, using prompt file only")
+
+    # Call agent via codeagent-wrapper
+    options = ReviewAgentOptions(
+        agent=config.review.agent_config.agent,
+        backend=config.review.agent_config.backend,
+        model=config.review.agent_config.model,
+    )
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+
+    if dry_run:
+        return
+
+    raw = result.stdout
+    review = parse_codex_review(raw)
+
+    typer.echo(raw)
+    typer.echo(
+        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
+    )
+
+    if review.verdict == "BLOCK":
+        raise typer.Exit(1)

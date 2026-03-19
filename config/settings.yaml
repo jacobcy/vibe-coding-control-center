@@ -46,6 +46,44 @@ review_scope:
     - "lib/flow.sh"          # Flow 公开接口
     - "src/vibe3/commands/"  # v3 命令层
 
+# Review 配置
+review:
+  policy_file: ".codex/review-policy.md"  # Review policy 文件路径
+  tools_guide_file: ".agent/rules/cli-usage.md"  # 工具使用指南文件路径
+
+  # codeagent-wrapper 调用配置（二选一）
+  agent_config:
+    # 方式1: 使用 agent preset（推荐）
+    agent: "code-reviewer"
+
+    # 方式2: 直接指定 backend 和 model（如果不用 preset）
+    # backend: "claude"
+    # model: "claude-3-opus"  # 可选
+
+  output_format: |
+    Each finding should follow this format:
+    path/to/file.py:42 [MAJOR] concise issue description
+
+    The final line must be:
+    VERDICT: PASS | MAJOR | BLOCK
+
+    Where:
+    - PASS: No significant issues found
+    - MAJOR: Issues found that should be addressed before merge
+    - BLOCK: Critical issues that must be fixed before merge
+
+  review_task: |
+    - Run `git diff <base>...HEAD` to see file changes
+    - Review only changed code, not the entire codebase
+    - Use AST analysis to understand function-level impact
+    - Prioritize: correctness, regression risk, API breaks
+    - Focus on actionable, specific findings
+
+  # Custom review prompt (optional)
+  # If provided, will be added to the beginning of review context
+  # Can be overridden via command line: vibe3 review pr 42 --message "Focus on security"
+  review_prompt: "/code-review"
+
 # 质量标准
 quality:
   test_coverage:
