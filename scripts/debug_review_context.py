@@ -10,9 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.services.context_builder import build_review_context
-from vibe3.clients.git_client import GitClient
-from vibe3.models.change_source import BranchSource
-from vibe3.utils.git_helpers import get_current_branch
 
 
 def main():
@@ -44,12 +41,6 @@ def main():
     print("Running inspect base...", file=sys.stderr)
     inspect_data = run_inspect_json(["base", args.base])
 
-    # Get git diff
-    print("Getting git diff...", file=sys.stderr)
-    current_branch = get_current_branch()
-    git = GitClient()
-    diff = git.get_diff(BranchSource(branch=current_branch, base=args.base))
-
     # Build impact info
     impact_info = {
         "core_files": inspect_data.get("core_files", []),
@@ -67,10 +58,9 @@ def main():
             "total_impacted": len(impacted_modules),
         }
 
-    # Build context
+    # Build context (no diff - reviewer runs git diff themselves)
     print("Building context...", file=sys.stderr)
     context = build_review_context(
-        diff=diff,
         impact=json.dumps(impact_info, indent=2),
         dag=json.dumps(dag_info, indent=2) if dag_info else None,
         score=json.dumps(inspect_data.get("score"), indent=2),
@@ -100,7 +90,6 @@ def main():
     # Summary stats
     print("\n=== Stats ===", file=sys.stderr)
     print(f"Total context size: {len(context)} chars", file=sys.stderr)
-    print(f"Diff size: {len(diff)} chars", file=sys.stderr)
     print(f"Impact info: {len(json.dumps(impact_info))} chars", file=sys.stderr)
     print(f"Core files: {len(impact_info['core_files'])}", file=sys.stderr)
     print(f"Total changed: {impact_info['total_changed']}", file=sys.stderr)
