@@ -1,7 +1,7 @@
 """Tests for vibe review pr subcommand.
 
 Tests CLI surface: argument validation, help output, exit codes.
-All external services (Codex, GitHub, Git) are mocked.
+All external services (codeagent-wrapper, GitHub, Git) are mocked.
 """
 
 from unittest.mock import MagicMock, patch
@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
+from vibe3.services.review_runner import ReviewAgentResult
 
 runner = CliRunner()
 
@@ -28,8 +29,12 @@ def _mock_inspect_data():
     }
 
 
+def _mock_agent_result(stdout: str = "## Review\nLooks good."):
+    return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
+
+
 def _patch_review_deps(verdict: str = "PASS"):
-    """返回 patch 上下文列表，mock 掉所有外部依赖。"""
+    """Return patch context list, mocking all external dependencies."""
     return [
         patch(
             "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
@@ -38,7 +43,8 @@ def _patch_review_deps(verdict: str = "PASS"):
         patch("vibe3.clients.github_client.GitHubClient"),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.call_codex", return_value="## Review\nLooks good."
+            "vibe3.commands.review.run_review_agent",
+            return_value=_mock_agent_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -48,7 +54,7 @@ def _patch_review_deps(verdict: str = "PASS"):
 
 
 def test_review_pr_missing_arg_shows_error():
-    """vibe review pr (缺少 PR 号) → 友好错误，非崩溃。"""
+    """vibe review pr (missing PR number) -> friendly error, not crash."""
     result = runner.invoke(app, ["pr"])
     assert result.exit_code != 0
     assert "missing" in result.output.lower() or "error" in result.output.lower()
@@ -73,3 +79,32 @@ def test_review_pr_help():
     result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
     assert "PR number" in result.output
+
+
+def test_review_pr_with_agent_and_model():
+    """Test that --agent and --model options are passed through."""
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
+        ),
+        patch("vibe3.commands.review.GitClient"),
+        patch("vibe3.clients.github_client.GitHubClient"),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch(
+            "vibe3.commands.review.run_review_agent",
+            return_value=_mock_agent_result(),
+        ) as mock_run,
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+    ):
+        result = runner.invoke(
+            app, ["pr", "42", "--agent", "codex", "--model", "gpt-5.4"]
+        )
+    assert result.exit_code == 0
+    # Verify options were passed to run_review_agent
+    call_args = mock_run.call_args
+    options = call_args[0][1]
+    assert options.agent.value == "codex"
+    assert options.model == "gpt-5.4"

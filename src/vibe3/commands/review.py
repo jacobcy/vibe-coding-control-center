@@ -1,4 +1,4 @@
-"""Review command - 代码审核层,基于 inspect 提供的上下文调用 codeagent-wrapper."""
+"""Review command - Code review layer using inspect context and codeagent-wrapper."""
 
 import json
 from typing import Annotated
@@ -7,10 +7,11 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
-from vibe3.commands.review_helpers import call_codex, run_inspect_json
+from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.models.change_source import BranchSource, PRSource
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import convert_to_github_format, parse_codex_review
+from vibe3.services.review_runner import AgentType, ReviewAgentOptions, run_review_agent
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -26,6 +27,12 @@ _TRACE_OPT = Annotated[
 _PUBLISH_OPT = Annotated[
     bool, typer.Option("--publish", help="Post review comments to GitHub")
 ]
+_AGENT_OPT = Annotated[
+    str, typer.Option("--agent", help="Agent preset for codeagent-wrapper")
+]
+_MODEL_OPT = Annotated[
+    str | None, typer.Option("--model", help="Model override for codeagent-wrapper")
+]
 
 
 @app.command()
@@ -33,6 +40,8 @@ def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     trace: _TRACE_OPT = False,
     publish: _PUBLISH_OPT = False,
+    agent: _AGENT_OPT = "codex",
+    model: _MODEL_OPT = None,
 ) -> None:
     """Review a PR (calls inspect pr internally for context).
 
@@ -44,16 +53,16 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting PR review")
 
-    # 1. 获取 inspect 分析结果
+    # 1. Get inspect analysis result
     inspect_data = run_inspect_json(["pr", str(pr_number)])
 
-    # 2. 获取 diff
+    # 2. Get diff
     from vibe3.clients.github_client import GitHubClient
 
     git = GitClient(github_client=GitHubClient())
     diff = git.get_diff(PRSource(pr_number=pr_number))
 
-    # 3. 构建上下文
+    # 3. Build context
     context = build_review_context(
         diff=diff,
         impact=json.dumps(inspect_data.get("impact"), indent=2),
@@ -61,8 +70,13 @@ def pr(
         score=json.dumps(inspect_data.get("score"), indent=2),
     )
 
-    # 4. 调用 Codex
-    raw = call_codex(context)
+    # 4. Call agent via codeagent-wrapper
+    options = ReviewAgentOptions(
+        agent=AgentType(agent),
+        model=model,
+    )
+    result = run_review_agent(context, options)
+    raw = result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(raw)
@@ -70,13 +84,13 @@ def pr(
         f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
     )
 
-    # 5. 发布到 GitHub（含行级 comments + Merge Gate）
+    # 5. Publish to GitHub (with line-level comments + Merge Gate)
     if publish:
         from vibe3.clients.github_client import GitHubClient
 
         gh = GitHubClient()
 
-        # 7.1 行级 comments 发布
+        # 7.1 Line-level comments publishing
         github_comments = convert_to_github_format(review) if review.comments else []
         event = (
             "REQUEST_CHANGES"
@@ -97,7 +111,7 @@ def pr(
             body=summary,
             event=event,
             comments=github_comments if github_comments else None,
-            dismiss_previous=True,  # 避免重复 review
+            dismiss_previous=True,  # Avoid duplicate reviews
         )
         log.success("Review published to GitHub")
 
@@ -127,6 +141,8 @@ def base(
     branch: Annotated[str, typer.Argument(help="Branch to review against main")],
     trace: _TRACE_OPT = False,
     publish: _PUBLISH_OPT = False,
+    agent: _AGENT_OPT = "codex",
+    model: _MODEL_OPT = None,
 ) -> None:
     """Review branch changes relative to main.
 
@@ -150,7 +166,13 @@ def base(
         score=json.dumps(inspect_data.get("score"), indent=2),
     )
 
-    raw = call_codex(context)
+    # Call agent via codeagent-wrapper
+    options = ReviewAgentOptions(
+        agent=AgentType(agent),
+        model=model,
+    )
+    result = run_review_agent(context, options)
+    raw = result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(raw)
