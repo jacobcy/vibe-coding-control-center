@@ -83,17 +83,41 @@ def register(app: typer.Typer) -> None:
                 )
 
         if json_out:
+            from vibe3.services.pr_scoring_service import (
+                PRDimensions,
+                generate_score_report,
+            )
+
+            # Calculate score
+            has_critical = any(f["critical_path"] for f in core_files)
+            has_public_api = any(f["public_api"] for f in core_files)
+
+            # Get impacted modules for scoring
+            impacted_modules = []
+            if core_files:
+                core_paths = [f["path"] for f in core_files]
+                dag = dag_service.expand_impacted_modules(core_paths)
+                impacted_modules = dag.impacted_modules
+
+            dims = PRDimensions(
+                changed_files=len(changed_files),
+                changed_lines=0,  # Not calculated in base command
+                impacted_modules=len(impacted_modules),
+                critical_path_touch=has_critical,
+                public_api_touch=has_public_api,
+            )
+            score_report = generate_score_report(dims)
+
             result = {
                 "current_branch": current_branch,
                 "base_branch": base_branch,
                 "core_files": core_files,
                 "total_changed": len(changed_files),
                 "core_changed": len(core_files),
+                "score": score_report,  # Add score for pre-push hook
             }
             if core_files:
-                core_paths = [f["path"] for f in core_files]
-                dag = dag_service.expand_impacted_modules(core_paths)
-                result["impacted_modules"] = dag.impacted_modules
+                result["impacted_modules"] = impacted_modules
 
             typer.echo(json.dumps(result, indent=2, default=str))
             return
