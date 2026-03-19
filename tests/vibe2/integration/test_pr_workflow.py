@@ -88,14 +88,14 @@ def test_pr_workflow_integration() -> bool:
 
     results = []
     for name, test_func in tests:
-        logger.info(f"\n{'='*60}")
+        logger.info(f"\n{'=' * 60}")
         logger.info(f"Test: {name}")
         logger.info("=" * 60)
         result = test_func()
         results.append((name, result))
 
     # Summary
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'=' * 60}")
     logger.info("Test Summary")
     logger.info("=" * 60)
     passed = sum(1 for _, r in results if r)

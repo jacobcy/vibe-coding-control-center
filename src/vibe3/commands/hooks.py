@@ -141,7 +141,7 @@ def list_hooks() -> None:
                 f" {shell_loc} / {shell_lim} {shell_icon}"
             )
             console.print(
-                f"  [green]•[/green] Python LOC :" f" {py_loc} / {py_lim} {python_icon}"
+                f"  [green]•[/green] Python LOC : {py_loc} / {py_lim} {python_icon}"
             )
         except MetricsError:
             console.print(
