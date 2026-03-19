@@ -113,6 +113,28 @@ _flow_done() {
   if [[ "$flow_record_status" -ne 0 && "$flow_record_status" -ne 1 ]]; then
     return "$flow_record_status"
   fi
+
+  # If no active tasks found, try to find completed tasks for this branch
+  # This handles the case where task was marked completed before flow done
+  if [[ -z "$flow_record" ]]; then
+    local registry_file all_tasks_json
+    registry_file="$(_flow_registry_file)"
+    if [[ -f "$registry_file" ]]; then
+      all_tasks_json="$(_vibe_task_branch_all_tasks_json "$branch_name" "$registry_file")" || all_tasks_json='[]'
+      if [[ "$all_tasks_json" != "[]" ]]; then
+        current_task="$(printf '%s' "$all_tasks_json" | jq -r '.[0].task_id // empty' 2>/dev/null)"
+        tasks_json="$(printf '%s' "$all_tasks_json" | jq -c '[.[].task_id]')"
+        if [[ -n "$current_task" ]]; then
+          title="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .title // empty' "$registry_file" 2>/dev/null | head -n 1)"
+          task_status="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .status // empty' "$registry_file" 2>/dev/null | head -n 1)"
+          pr_ref="$(jq -r --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | .pr_ref // empty' "$registry_file" 2>/dev/null | head -n 1)"
+          issue_refs_json="$(jq -c --arg tid "$current_task" '.tasks[]? | select(.task_id == $tid) | (.issue_refs // [])' "$registry_file" 2>/dev/null | head -n 1)"
+          [[ -z "$issue_refs_json" ]] && issue_refs_json='[]'
+        fi
+      fi
+    fi
+  fi
+
   if [[ -n "$flow_record" ]]; then
     tasks_json="$(echo "$flow_record" | jq -c '.tasks // []')"
     current_task="$(echo "$flow_record" | jq -r '.current_task // empty')"
