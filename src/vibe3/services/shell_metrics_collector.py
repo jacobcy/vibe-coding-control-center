@@ -21,7 +21,11 @@ class ShellMetricsError(VibeError):
 
 
 def collect_shell_metrics() -> LayerMetrics:
-    """收集 Shell 代码指标（bin/ + lib/）.
+    """收集 Shell 代码指标.
+
+    路径来源: config.code_limits.code_paths.v2_shell
+    - 目录路径 (如 "lib/") 会自动展开为 "**/*.sh"
+    - 文件路径 (如 "bin/vibe") 直接使用
 
     Returns:
         Shell 层指标
@@ -38,7 +42,16 @@ def collect_shell_metrics() -> LayerMetrics:
 
         root = Path(".")
         files: list[FileMetrics] = []
-        for pattern in ["bin/**/*.sh", "lib/**/*.sh", "bin/vibe"]:
+
+        # 从配置真源读取 Shell 代码路径
+        for path in limits.code_paths.v2_shell:
+            # 判断是目录还是文件
+            if path.endswith("/"):
+                # 目录路径: lib/ -> lib/**/*.sh
+                pattern = f"{path}**/*.sh"
+            else:
+                # 文件路径: bin/vibe -> bin/vibe
+                pattern = path
             files.extend(_collect_files(pattern, root))
 
         total = sum(f.loc for f in files)
