@@ -51,6 +51,8 @@ def metrics(
 
     shell = report.shell
     python = report.python
+
+    # Shell Metrics
     typer.echo("=== Shell Metrics ===")
     typer.echo(
         f"  Total LOC : {shell.total_loc} / {shell.limit_total} "
@@ -62,7 +64,6 @@ def metrics(
     )
     typer.echo(f"  Files     : {shell.file_count}")
 
-    # 显示 Shell 警告和错误
     if shell.errors:
         typer.echo(f"  ❌ 超限文件 ({len(shell.errors)}):")
         for f in shell.errors:
@@ -72,6 +73,15 @@ def metrics(
         for f in shell.warnings:
             typer.echo(f"    {f.path}: {f.loc} 行 > {shell.limit_file_default}")
 
+    # Scripts Metrics
+    if report.scripts:
+        scripts = report.scripts
+        typer.echo("\n=== Scripts Metrics ===")
+        typer.echo(f"  Total LOC : {scripts.total_loc}")
+        typer.echo(f"  Max file  : {scripts.max_file_loc}")
+        typer.echo(f"  Files     : {scripts.file_count}")
+
+    # Python Metrics
     typer.echo("\n=== Python Metrics ===")
     typer.echo(
         f"  Total LOC : {python.total_loc} / {python.limit_total} "
@@ -83,7 +93,6 @@ def metrics(
     )
     typer.echo(f"  Files     : {python.file_count}")
 
-    # 显示 Python 警告和错误
     if python.errors:
         typer.echo(f"  ❌ 超限文件 ({len(python.errors)}):")
         for f in python.errors:
@@ -92,6 +101,25 @@ def metrics(
         typer.echo(f"  ⚠️  大文件 ({len(python.warnings)}):")
         for f in python.warnings:
             typer.echo(f"    {f.path}: {f.loc} 行 > {python.limit_file_default}")
+
+    # Python 分层展示
+    if python.subdirs:
+        typer.echo("\n  By Directory:")
+        for subdir in python.subdirs:
+            typer.echo(
+                f"    {subdir.name + '/':<14}: {subdir.loc:>5} LOC, "
+                f"{subdir.file_count:>2} files, max {subdir.max_file_loc}"
+            )
+
+    # Dead Functions Warning
+    if report.dead_functions:
+        typer.echo("\n=== Dead Functions Warning ===")
+        typer.echo(f"  Potentially unused functions ({len(report.dead_functions)}):")
+        for df in report.dead_functions:
+            typer.echo(f"    {df.name} in {df.file}")
+        typer.echo(
+            "\n  Note: Some functions may be entry points or used via reflection"
+        )
 
 
 @app.command()
