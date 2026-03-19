@@ -37,14 +37,14 @@ INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json 2>/dev/null) |
     exit 1
 }
 
-RISK_LEVEL=$(echo "$INSPECT_JSON" | python -c "
+RISK_LEVEL=$(echo "$INSPECT_JSON" | uv run python -c "
 import json
 import sys
 data = json.load(sys.stdin)
 print(data.get('score', {}).get('risk_level', 'LOW'))
 ")
 
-RISK_SCORE=$(echo "$INSPECT_JSON" | python -c "
+RISK_SCORE=$(echo "$INSPECT_JSON" | uv run python -c "
 import json
 import sys
 data = json.load(sys.stdin)
