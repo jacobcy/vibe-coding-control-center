@@ -2,7 +2,6 @@
 
 import json
 import subprocess
-import sys
 
 import typer
 from loguru import logger
@@ -21,7 +20,7 @@ def run_inspect_json(args: list[str]) -> dict[str, object]:
         typer.Exit: if inspect call fails
     """
     result = subprocess.run(
-        [sys.executable, "-m", "vibe3", "inspect", *args, "--json"],
+        ["uv", "run", "python", "-m", "vibe3", "inspect", *args, "--json"],
         capture_output=True,
         text=True,
     )
