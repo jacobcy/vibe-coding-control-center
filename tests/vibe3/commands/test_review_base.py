@@ -25,9 +25,21 @@ def _mock_agent_result(stdout: str = "## Review\nLooks good."):
     return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
 
 
+def _mock_inspect_data():
+    return {
+        "changed_symbols": {
+            "src/review.py": ["build_review_context", "run_inspect_json"]
+        }
+    }
+
+
 def test_review_base_defaults_to_origin_main():
-    """Test that review base works without any inspect calls."""
+    """Test that review base works with AST analysis."""
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -47,6 +59,10 @@ def test_review_base_defaults_to_origin_main():
 
 def test_review_base_pass():
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -56,6 +72,9 @@ def test_review_base_pass():
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
+        patch(
+            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+        ),
     ):
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
@@ -64,6 +83,10 @@ def test_review_base_pass():
 def test_review_base_with_agent_and_model():
     """Test that --agent and --model options are passed through."""
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",

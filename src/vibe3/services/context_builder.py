@@ -34,14 +34,20 @@ Where:
 
 def build_review_context(
     policy_path: str = ".codex/review-policy.md",
+    changed_symbols: dict[str, list[str]] | None = None,
+    symbol_dag: dict[str, list[str]] | None = None,
 ) -> str:
-    """Build review context - just the policy and output format.
+    """Build review context with AST-level analysis.
 
-    Reviewer (most expensive model) runs git diff themselves.
-    They don't need our internal decision metadata (impact/dag/score).
+    Reviewer runs git diff themselves to see file-level changes.
+    We provide AST-level insights they can't get from diff:
+    - Which functions were changed (symbol-level)
+    - Who calls these functions (DAG impact)
 
     Args:
         policy_path: path to review-policy.md
+        changed_symbols: file -> list of changed function names
+        symbol_dag: function -> list of caller locations
 
     Returns:
         Complete context string
@@ -59,11 +65,34 @@ def build_review_context(
 
     sections: list[str] = [policy]
 
+    # Add AST-level analysis if available
+    if changed_symbols or symbol_dag:
+        ast_parts: list[str] = []
+        if changed_symbols:
+            import json
+
+            symbols_json = json.dumps(changed_symbols, indent=2)
+            ast_parts.append(
+                f"### Changed Functions (AST Analysis)\n"
+                f"```json\n{symbols_json}\n```"
+            )
+        if symbol_dag:
+            import json
+
+            dag_json = json.dumps(symbol_dag, indent=2)
+            ast_parts.append(
+                f"### Function Call Chain (DAG)\n" f"```json\n{dag_json}\n```"
+            )
+
+        ast_section = "## AST Analysis\n" + "\n\n".join(ast_parts)
+        sections.append(ast_section)
+
     # Add review task guidance
     review_task = """## Review Task
-- Run `git diff <base>...HEAD` to see changes
+- Run `git diff <base>...HEAD` to see file changes
 - Review only changed code, not the entire codebase
-- Prioritize: correctness, regression risk, config drift, deleted-file risk
+- Use AST analysis to understand function-level impact
+- Prioritize: correctness, regression risk, API breaks
 - Focus on actionable, specific findings"""
     sections.append(review_task)
 

@@ -1,6 +1,6 @@
 """Tests for context_builder service.
 
-Tests the minimal context construction for codeagent-wrapper.
+Tests the context construction with AST-level analysis.
 """
 
 from unittest.mock import patch
@@ -13,16 +13,19 @@ from vibe3.services.context_builder import build_review_context
 class TestBuildReviewContext:
     """Tests for build_review_context function."""
 
-    def test_build_review_context_includes_required_sections(self) -> None:
-        """Context should include policy, task guidance, and output format."""
+    def test_build_review_context_with_ast_analysis(self) -> None:
+        """Context should include AST analysis when provided."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
-            context = build_review_context()
+            changed_symbols = {
+                "src/review.py": ["build_review_context", "run_inspect_json"]
+            }
+            context = build_review_context(changed_symbols=changed_symbols)
 
-        # Required sections
-        assert "Review Policy" in context
-        assert "Review Task" in context
-        assert "Output format requirements" in context
+        # Should include AST analysis
+        assert "Changed Functions" in context
+        assert "build_review_context" in context
+        assert "run_inspect_json" in context
 
     def test_build_review_context_includes_verdict_format(self) -> None:
         """Context should specify VERDICT output format."""
@@ -33,17 +36,20 @@ class TestBuildReviewContext:
         assert "VERDICT:" in context
         assert "PASS" in context or "MAJOR" in context or "BLOCK" in context
 
-    def test_build_review_context_is_minimal(self) -> None:
-        """Context should be minimal - reviewer runs git diff themselves."""
+    def test_build_review_context_minimal_without_ast(self) -> None:
+        """Context should work without AST analysis (reviewer uses git diff)."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
             context = build_review_context()
 
+        # Should include policy and task guidance
+        assert "Review Policy" in context
+        assert "Review Task" in context
+        assert "Output format requirements" in context
         # Should NOT include our internal decision metadata
-        assert "Risk Score" not in context
-        assert "Impact Analysis" not in context
-        assert "Impact DAG" not in context
-        assert "Inspect Summary" not in context
+        assert "core_files" not in context.lower()
+        assert "risk score" not in context.lower()
+        assert "total_changed" not in context.lower()
 
     def test_build_review_context_handles_missing_policy(self) -> None:
         """Should raise error when policy file is missing."""

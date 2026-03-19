@@ -103,6 +103,24 @@ def register(app: typer.Typer) -> None:
                 generate_score_report,
             )
 
+            # Get AST-level analysis: changed functions
+            changed_symbols_by_file: dict[str, list[str]] = {}
+            if existing_files:
+                from vibe3.services.serena_service import SerenaService
+
+                svc = SerenaService(git_client=git)
+                for file in existing_files:
+                    if file.endswith(".py"):
+                        try:
+                            changed_funcs = svc.get_changed_functions(
+                                file, source=source
+                            )
+                            if changed_funcs:
+                                changed_symbols_by_file[file] = changed_funcs
+                        except Exception:
+                            # Skip files that can't be analyzed
+                            pass
+
             # Calculate score
             has_critical = any(f["critical_path"] for f in core_files)
             has_public_api = any(f["public_api"] for f in core_files)
@@ -139,6 +157,8 @@ def register(app: typer.Typer) -> None:
             }
             if core_files:
                 result["impacted_modules"] = impacted_modules
+            if changed_symbols_by_file:
+                result["changed_symbols"] = changed_symbols_by_file
 
             typer.echo(json.dumps(result, indent=2, default=str))
             return

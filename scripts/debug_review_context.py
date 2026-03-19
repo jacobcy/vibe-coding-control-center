@@ -41,29 +41,13 @@ def main():
     print("Running inspect base...", file=sys.stderr)
     inspect_data = run_inspect_json(["base", args.base])
 
-    # Build impact info
-    impact_info = {
-        "core_files": inspect_data.get("core_files", []),
-        "total_changed": inspect_data.get("total_changed", 0),
-        "core_changed": inspect_data.get("core_changed", 0),
-    }
+    # Extract AST-level analysis
+    changed_symbols = inspect_data.get("changed_symbols", {})
 
-    # Build DAG info
-    dag_info = None
-    impacted_modules = inspect_data.get("impacted_modules", [])
-    if impacted_modules:
-        assert isinstance(impacted_modules, list)
-        dag_info = {
-            "impacted_modules": impacted_modules,
-            "total_impacted": len(impacted_modules),
-        }
-
-    # Build context (no diff - reviewer runs git diff themselves)
+    # Build context with AST analysis
     print("Building context...", file=sys.stderr)
     context = build_review_context(
-        impact=json.dumps(impact_info, indent=2),
-        dag=json.dumps(dag_info, indent=2) if dag_info else None,
-        score=json.dumps(inspect_data.get("score"), indent=2),
+        changed_symbols=changed_symbols if changed_symbols else None,
     )
 
     # Output

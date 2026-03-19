@@ -25,6 +25,14 @@ def _mock_agent_result(stdout: str = "## Review\nLooks good."):
     return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
 
 
+def _mock_inspect_data():
+    return {
+        "changed_symbols": {
+            "src/review.py": ["build_review_context", "run_inspect_json"]
+        }
+    }
+
+
 def test_review_pr_missing_arg_shows_error():
     """vibe review pr (missing PR number) -> friendly error, not crash."""
     result = runner.invoke(app, ["pr"])
@@ -34,6 +42,10 @@ def test_review_pr_missing_arg_shows_error():
 
 def test_review_pr_pass():
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -51,6 +63,10 @@ def test_review_pr_pass():
 
 def test_review_pr_block_exits_1():
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -74,6 +90,10 @@ def test_review_pr_help():
 def test_review_pr_with_agent_and_model():
     """Test that --agent and --model options are passed through."""
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -106,6 +126,10 @@ def test_review_pr_does_not_have_publish_option():
 def test_review_pr_is_local_only():
     """review pr should not call GitHub publish methods."""
     with (
+        patch(
+            "vibe3.commands.review_helpers.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",

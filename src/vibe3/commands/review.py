@@ -1,10 +1,11 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from loguru import logger
 
+from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
@@ -52,8 +53,17 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting local PR review")
 
-    # Build context (just policy and format - reviewer runs git diff themselves)
-    context = build_review_context()
+    # Get AST-level analysis (changed functions, not file lists)
+    inspect_data = run_inspect_json(["pr", str(pr_number)])
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+
+    # Build context with AST analysis
+    context = build_review_context(
+        changed_symbols=changed_symbols,
+    )
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
@@ -108,8 +118,17 @@ def base(
     )
     log.info("Reviewing branch changes")
 
-    # Build context (just policy and format - reviewer runs git diff themselves)
-    context = build_review_context()
+    # Get AST-level analysis (changed functions, not file lists)
+    inspect_data = run_inspect_json(["base", base_branch])
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+
+    # Build context with AST analysis
+    context = build_review_context(
+        changed_symbols=changed_symbols,
+    )
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
