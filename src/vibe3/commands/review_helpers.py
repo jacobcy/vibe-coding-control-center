@@ -20,7 +20,7 @@ def run_inspect_json(args: list[str]) -> dict[str, object]:
         typer.Exit: if inspect call fails
     """
     result = subprocess.run(
-        ["uv", "run", "python", "-m", "vibe3", "inspect", *args, "--json"],
+        ["uv", "run", "python", "src/vibe3/cli.py", "inspect", *args, "--json"],
         capture_output=True,
         text=True,
     )
