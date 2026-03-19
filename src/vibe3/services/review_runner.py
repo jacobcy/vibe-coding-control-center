@@ -124,58 +124,71 @@ def run_review_agent(
         TimeoutExpired: If the agent exceeds the timeout
 
     """
+    import tempfile
+
     wrapper_path = DEFAULT_WRAPPER_PATH
 
-    # Build command
-    command: list[str] = [str(wrapper_path)]
-
-    # Add agent preset OR backend+model
-    if options.agent:
-        command.extend(["--agent", options.agent])
-    elif options.backend:
-        command.extend(["--backend", options.backend])
-        if options.model:
-            command.extend(["--model", options.model])
-    else:
-        # Fallback to default agent if nothing specified
-        command.extend(["--agent", "code-reviewer"])
-
-    command.extend(["-", "."])  # Read from stdin
-
-    # Dry-run mode: print command and prompt
-    if dry_run:
-        print("=== Command ===")
-        print(" ".join(command))
-        print("\n=== Prompt ===")
-        print(prompt)
-        print("\n=== End ===")
-        # Return a mock success result
-        return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
+    # Write prompt to temporary file
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False
+    ) as prompt_file:
+        prompt_file.write(prompt)
+        prompt_file_path = prompt_file.name
 
     try:
-        result = run(
-            command,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=options.timeout_seconds,
-            check=False,
-        )
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"codeagent-wrapper not found at {wrapper_path}. "
-            "Please ensure it is installed and accessible."
-        ) from None
+        # Build command
+        command: list[str] = [str(wrapper_path)]
 
-    agent_result = ReviewAgentResult.from_completed_process(result)
+        # Add agent preset OR backend+model
+        if options.agent:
+            command.extend(["--agent", options.agent])
+        elif options.backend:
+            command.extend(["--backend", options.backend])
+            if options.model:
+                command.extend(["--model", options.model])
+        else:
+            # Fallback to default agent if nothing specified
+            command.extend(["--agent", "code-reviewer"])
 
-    if not agent_result.is_success():
-        stderr_preview = (
-            agent_result.stderr[:500] if agent_result.stderr else "(no stderr)"
-        )
-        raise RuntimeError(
-            f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"
-            f"{stderr_preview}"
-        )
+        command.extend(["--prompt-file", prompt_file_path])
+        command.append("/code-review")
 
-    return agent_result
+        # Dry-run mode: print command and prompt
+        if dry_run:
+            print("=== Command ===")
+            print(" ".join(command))
+            print(f"\n=== Prompt File: {prompt_file_path} ===")
+            print(prompt)
+            print("\n=== End ===")
+            # Return a mock success result
+            return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
+
+        try:
+            result = run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=options.timeout_seconds,
+                check=False,
+            )
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"codeagent-wrapper not found at {wrapper_path}. "
+                "Please ensure it is installed and accessible."
+            ) from None
+
+        agent_result = ReviewAgentResult.from_completed_process(result)
+
+        if not agent_result.is_success():
+            stderr_preview = (
+                agent_result.stderr[:500] if agent_result.stderr else "(no stderr)"
+            )
+            raise RuntimeError(
+                f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"
+                f"{stderr_preview}"
+            )
+
+        return agent_result
+    finally:
+        # Clean up temporary file
+        Path(prompt_file_path).unlink(missing_ok=True)

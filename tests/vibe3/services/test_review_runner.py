@@ -153,8 +153,8 @@ class TestRunReviewAgent:
             with pytest.raises(subprocess.TimeoutExpired):
                 run_review_agent("prompt body", options)
 
-    def test_run_review_passes_prompt_as_stdin(self) -> None:
-        """Runner should pass prompt as stdin input."""
+    def test_run_review_uses_prompt_file(self) -> None:
+        """Runner should pass prompt via temporary file."""
         with patch("vibe3.services.review_runner.run") as mock_run:
             mock_run.return_value = CompletedProcess(
                 args=[], returncode=0, stdout="Result", stderr=""
@@ -162,8 +162,15 @@ class TestRunReviewAgent:
             options = ReviewAgentOptions(agent="code-reviewer")
             run_review_agent("my custom prompt", options)
 
-        call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["input"] == "my custom prompt"
+        # Check that command includes --prompt-file
+        call_args = mock_run.call_args[0]
+        command = call_args[0]
+        assert "--prompt-file" in command
+        # The prompt file path should be a temp file
+        prompt_file_idx = command.index("--prompt-file") + 1
+        assert command[prompt_file_idx].startswith("/tmp") or "/var/folders" in command[prompt_file_idx]
+        # The last argument should be /code-review
+        assert command[-1] == "/code-review"
 
 
 class TestReviewAgentResult:
