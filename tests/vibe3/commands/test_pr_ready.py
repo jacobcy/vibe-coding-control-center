@@ -21,7 +21,8 @@ def test_pr_ready_help():
     result = runner.invoke(app, ["ready", "--help"])
     assert result.exit_code == 0
     assert "PR number" in result.output
-    assert "--yes" in result.output
+    # Check for -yes or --yes (may have ANSI color codes)
+    assert "-yes" in result.output or "--yes" in result.output
 
 
 def test_pr_ready_with_coverage_passing(
