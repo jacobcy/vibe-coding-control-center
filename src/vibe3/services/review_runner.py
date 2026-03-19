@@ -7,6 +7,8 @@ Design principles:
 - Immutable configuration (frozen dataclass)
 - Enum-based agent types for type safety and future extension
 - Clear separation between configuration and execution
+
+NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 """
 
 from dataclasses import dataclass
