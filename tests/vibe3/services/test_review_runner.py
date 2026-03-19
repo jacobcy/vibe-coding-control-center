@@ -160,7 +160,7 @@ class TestRunReviewAgent:
                 args=[], returncode=0, stdout="Result", stderr=""
             )
             options = ReviewAgentOptions(agent="code-reviewer")
-            run_review_agent("my custom prompt", options)
+            run_review_agent("my prompt file content", options, task="custom task")
 
         # Check that command includes --prompt-file
         call_args = mock_run.call_args[0]
@@ -169,8 +169,8 @@ class TestRunReviewAgent:
         # The prompt file path should be a temp file
         prompt_file_idx = command.index("--prompt-file") + 1
         assert command[prompt_file_idx].startswith("/tmp") or "/var/folders" in command[prompt_file_idx]
-        # The last argument should be /code-review
-        assert command[-1] == "/code-review"
+        # The last argument should be the custom task
+        assert command[-1] == "custom task"
 
 
 class TestReviewAgentResult:

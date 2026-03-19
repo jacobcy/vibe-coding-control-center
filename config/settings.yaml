@@ -79,6 +79,11 @@ review:
     - Prioritize: correctness, regression risk, API breaks
     - Focus on actionable, specific findings
 
+  # Custom review prompt (optional)
+  # If provided, will be added to the beginning of review context
+  # Can be overridden via command line: vibe3 review pr 42 --message "Focus on security"
+  # review_prompt: ""
+
 # 质量标准
 quality:
   test_coverage:

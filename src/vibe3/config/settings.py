@@ -138,6 +138,9 @@ class ReviewConfig(BaseModel):
     )
     output_format: str = Field(default="", description="Output format requirements")
     review_task: str = Field(default="", description="Review task guidance")
+    review_prompt: str = Field(
+        default="", description="Custom review prompt (optional)"
+    )
     auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 

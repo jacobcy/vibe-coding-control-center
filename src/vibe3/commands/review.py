@@ -1,6 +1,6 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-from typing import Annotated, cast
+from typing import Annotated, Optional, cast
 
 import typer
 from loguru import logger
@@ -26,6 +26,10 @@ _DRY_RUN_OPT = Annotated[
     bool,
     typer.Option("--dry-run", help="Print command and prompt without executing"),
 ]
+_MESSAGE_OPT = Annotated[
+    Optional[str],
+    typer.Option("--message", "-m", help="Custom prompt (skips context building)"),
+]
 
 
 @app.command()
@@ -33,14 +37,17 @@ def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    message: _MESSAGE_OPT = None,
 ) -> None:
     """Review a PR locally (generates review output, does not publish to GitHub).
 
     This command is for local review only. To publish review to GitHub,
     use `pr ready` command instead.
 
-    Example: vibe review pr 42
-    Example: vibe review pr 42 --dry-run  # Print command and prompt only
+    Examples:
+        vibe review pr 42
+        vibe review pr 42 --dry-run  # Print command and prompt only
+        vibe review pr 42 -m "Focus on security issues"  # Custom prompt
     """
     if trace:
         enable_trace()
@@ -51,18 +58,27 @@ def pr(
     # Load config
     config = VibeConfig.get_defaults()
 
-    # Get AST-level analysis (changed functions, not file lists)
+    # Always build full context with AST analysis
     inspect_data = run_inspect_json(["pr", str(pr_number)])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
-
-    # Build context with AST analysis
-    context = build_review_context(
+    prompt_file_content = build_review_context(
         changed_symbols=changed_symbols,
         config=config,
     )
+
+    # Determine task: custom message, config default, or None
+    task = None
+    if message:
+        task = message
+        log.bind(task_type="custom").info("Using custom task")
+    elif config.review.review_prompt:
+        task = config.review.review_prompt
+        log.bind(task_type="config").info("Using configured task")
+    else:
+        log.bind(task_type="none").info("No custom task, using prompt file only")
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
@@ -70,7 +86,7 @@ def pr(
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
     )
-    result = run_review_agent(context, options, dry_run=dry_run)
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
     if dry_run:
         return
@@ -95,6 +111,7 @@ def base(
     ] = "origin/main",
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    message: _MESSAGE_OPT = None,
 ) -> None:
     """Review current branch changes relative to base branch.
 
@@ -106,6 +123,7 @@ def base(
         vibe review base origin/develop  # Compare current branch vs origin/develop
         vibe review base main            # Compare current branch vs local main
         vibe review base --dry-run       # Print command and prompt only
+        vibe review base -m "Focus on security"  # Custom task
     """
     if trace:
         enable_trace()
@@ -125,18 +143,27 @@ def base(
     # Load config
     config = VibeConfig.get_defaults()
 
-    # Get AST-level analysis (changed functions, not file lists)
+    # Always build full context with AST analysis
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
-
-    # Build context with AST analysis
-    context = build_review_context(
+    prompt_file_content = build_review_context(
         changed_symbols=changed_symbols,
         config=config,
     )
+
+    # Determine task: custom message, config default, or None
+    task = None
+    if message:
+        task = message
+        log.bind(task_type="custom").info("Using custom task")
+    elif config.review.review_prompt:
+        task = config.review.review_prompt
+        log.bind(task_type="config").info("Using configured task")
+    else:
+        log.bind(task_type="none").info("No custom task, using prompt file only")
 
     # Call agent via codeagent-wrapper
     options = ReviewAgentOptions(
@@ -144,7 +171,7 @@ def base(
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
     )
-    result = run_review_agent(context, options, dry_run=dry_run)
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
     if dry_run:
         return

@@ -106,13 +106,17 @@ class ReviewAgentResult:
 
 
 def run_review_agent(
-    prompt: str, options: ReviewAgentOptions, dry_run: bool = False
+    prompt_file_content: str,
+    options: ReviewAgentOptions,
+    task: str | None = None,
+    dry_run: bool = False,
 ) -> ReviewAgentResult:
     """Run a review agent using codeagent-wrapper.
 
     Args:
-        prompt: The prompt/instructions to send to the agent
+        prompt_file_content: Content to write to prompt file (review context)
         options: Configuration for the agent run
+        task: Optional task/instruction (custom message or default)
         dry_run: If True, print command and prompt without executing
 
     Returns:
@@ -128,18 +132,18 @@ def run_review_agent(
 
     wrapper_path = DEFAULT_WRAPPER_PATH
 
-    # Write prompt to temporary file
+    # Write prompt file content to temporary file
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False
     ) as prompt_file:
-        prompt_file.write(prompt)
+        prompt_file.write(prompt_file_content)
         prompt_file_path = prompt_file.name
 
     try:
-        # Build command
+        # Build command: wrapper --agent <agent> --prompt-file <file> [task]
         command: list[str] = [str(wrapper_path)]
 
-        # Add agent preset OR backend+model
+        # Add agent preset or backend+model
         if options.agent:
             command.extend(["--agent", options.agent])
         elif options.backend:
@@ -150,15 +154,21 @@ def run_review_agent(
             # Fallback to default agent if nothing specified
             command.extend(["--agent", "code-reviewer"])
 
+        # Add prompt file
         command.extend(["--prompt-file", prompt_file_path])
-        command.append("/code-review")
+
+        # Add task if provided
+        if task:
+            command.append(task)
 
         # Dry-run mode: print command and prompt
         if dry_run:
             print("=== Command ===")
             print(" ".join(command))
             print(f"\n=== Prompt File: {prompt_file_path} ===")
-            print(prompt)
+            print(prompt_file_content)
+            if task:
+                print(f"\n=== Task ===\n{task}")
             print("\n=== End ===")
             # Return a mock success result
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
