@@ -1,7 +1,7 @@
 """Tests for vibe review general help and no-args behavior.
 
 Tests CLI surface: argument validation, help output, exit codes.
-All external services (Codex, GitHub, Git) are mocked.
+All external services (codeagent-wrapper, GitHub, Git) are mocked.
 
 Note: This file only contains general help tests. Subcommand tests are split into:
 - test_review_pr.py
@@ -42,18 +42,43 @@ def test_review_commit_command_removed():
     """vibe review commit -> should fail (command removed)."""
     result = runner.invoke(app, ["commit", "HEAD"])
     assert result.exit_code != 0
-    assert "no such command" in result.output.lower() or "error" in result.output.lower()
+    assert (
+        "no such command" in result.output.lower()
+        or "error" in result.output.lower()
+    )
 
 
 def test_review_uncommitted_command_removed():
     """vibe review uncommitted -> should fail (command removed)."""
     result = runner.invoke(app, ["uncommitted"])
     assert result.exit_code != 0
-    assert "no such command" in result.output.lower() or "error" in result.output.lower()
+    assert (
+        "no such command" in result.output.lower()
+        or "error" in result.output.lower()
+    )
 
 
 def test_review_analyze_commit_command_removed():
     """vibe review analyze-commit -> should fail (command removed)."""
     result = runner.invoke(app, ["analyze-commit", "HEAD"])
     assert result.exit_code != 0
-    assert "no such command" in result.output.lower() or "error" in result.output.lower()
+    assert (
+        "no such command" in result.output.lower()
+        or "error" in result.output.lower()
+    )
+
+
+def test_review_base_help_mentions_agent_and_model_options():
+    """vibe review base --help should mention --agent and --model options."""
+    result = runner.invoke(app, ["base", "--help"])
+    assert result.exit_code == 0
+    assert "--agent" in result.output
+    assert "--model" in result.output
+
+
+def test_review_pr_help_mentions_agent_and_model_options():
+    """vibe review pr --help should mention --agent and --model options."""
+    result = runner.invoke(app, ["pr", "--help"])
+    assert result.exit_code == 0
+    assert "--agent" in result.output
+    assert "--model" in result.output
