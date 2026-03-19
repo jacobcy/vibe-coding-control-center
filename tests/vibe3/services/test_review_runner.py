@@ -168,7 +168,10 @@ class TestRunReviewAgent:
         assert "--prompt-file" in command
         # The prompt file path should be a temp file
         prompt_file_idx = command.index("--prompt-file") + 1
-        assert command[prompt_file_idx].startswith("/tmp") or "/var/folders" in command[prompt_file_idx]
+        assert (
+            command[prompt_file_idx].startswith("/tmp")
+            or "/var/folders" in command[prompt_file_idx]
+        )
         # The last argument should be the custom task
         assert command[-1] == "custom task"
 
