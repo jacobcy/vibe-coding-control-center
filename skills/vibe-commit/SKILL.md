@@ -48,8 +48,15 @@ PR 创建后 → 自动进入 `/vibe-integrate`
   │   ├─ git diff --stat
   │   └─ 分类：commit now / stash / discard
   │
+  ├─ Step 3.5: Pre-commit 强制验证与格式化
+  │   ├─ uv run black src tests/vibe3
+  │   ├─ uv run ruff check --fix src tests/vibe3
+  │   ├─ 若有修改：提交临时 commit → soft reset
+  │   ├─ pre-commit run --all-files
+  │   └─ Hard block: 任何错误必须修复，禁止跳过
+  │
   ├─ Step 4: 组织 commit
-  │   ├─ 每组变更包含哪些文件
+  │   ├─ 每组变更包含哪些文件（含格式化修改）
   │   ├─ 每条 commit 草案
   │   └─ git hooks 自动格式化 commit message
   │
@@ -159,6 +166,98 @@ git diff --cached --stat
 - 哪些文件进入当前 commit
 - 哪些内容会被 stash
 - 哪些内容会被 discard
+
+### Step 3.5: Pre-commit 强制验证与格式化
+
+**这是硬规定，不可跳过。**
+
+在组织任何 commit 之前，必须确保所有待提交文件通过 pre-commit 检查。项目使用 Python pre-commit 框架，配置见 `.pre-commit-config.yaml`。
+
+**核心理念**：先对所有改动统一格式化，再按功能分组提交，避免单独的格式化 commit 打乱提交历史。
+
+**执行步骤**：
+
+1. **运行格式化工具（对所有改动）**：
+   ```bash
+   # 格式化所有 Python 代码
+   uv run black src tests/vibe3
+
+   # 运行 ruff linter 并自动修复
+   uv run ruff check --fix src tests/vibe3
+   ```
+
+2. **检查是否有格式化修改**：
+   ```bash
+   # 查看哪些文件被修改
+   git status --short
+   git diff --stat
+   ```
+
+3. **提交临时格式化 commit（如果有修改）**：
+   - 若有文件被 black 或 ruff 修改：
+     ```bash
+     # 暂存所有格式化修改
+     git add -A
+
+     # 提交临时格式化 commit
+     git commit -m "temp: pre-commit format (will be squashed)"
+     ```
+
+4. **撤销临时 commit（保留修改在工作区）**：
+   ```bash
+   # Soft reset：撤销 commit，但保留所有修改在工作区
+   git reset HEAD~1
+
+   # 确认修改已回到工作区
+   git status --short
+   ```
+
+5. **运行 pre-commit 验证**：
+   ```bash
+   # 对所有文件运行 pre-commit 检查
+   pre-commit run --all-files
+   ```
+
+6. **处理错误**：
+   - **Hard Block 规则**：
+     - 若 pre-commit 报告错误（如 mypy 类型错误、shellcheck 错误、LOC 超限）：
+       - 必须修复所有错误
+       - 不允许使用 `git commit --no-verify` 跳过
+       - 不允许继续后续步骤
+     - 修复后重新执行步骤 1-5，直到所有检查通过
+
+7. **确认准备就绪**：
+   ```bash
+   # 确认工作区包含所有改动（包括格式化修改）
+   git status --short
+   git diff --stat
+   ```
+
+**关键点**：
+- 此时工作区包含：原始改动 + 格式化修改
+- 接下来的 Step 4 将按功能分组提交
+- 每个功能 commit 都会包含相应的格式化修改
+- 不会有单独的 "style: ..." commit 打乱历史
+
+**常见检查项**（见 `.pre-commit-config.yaml`）：
+- **Shell**: shellcheck、自定义 lint
+- **Python**: ruff (linter + auto-fix)、black (formatter)、mypy (type checker)
+- **LOC 限制**:
+  - Shell 总 LOC ≤ 7000
+  - Python 总 LOC ≤ config:code_limits.v3_python.total_loc
+  - 单文件 LOC ≤ 300 (测试文件 ≤ 300)
+
+**边界约束**：
+- 不允许使用 `--no-verify` 跳过 pre-commit
+- 不允许在有 pre-commit 错误的情况下继续分组提交
+- 不允许保留临时格式化 commit，必须 soft reset
+- 格式化修改必须分散到各个功能 commit 中
+
+**验证证据**：
+完成此步骤后，必须向用户展示：
+- `uv run black src tests/vibe3` 和 `uv run ruff check --fix src tests/vibe3` 的输出
+- pre-commit 所有检查通过的输出
+- `git status` 显示所有改动（包括格式化）都在工作区
 
 ### Step 4: 组织 commit
 
@@ -319,8 +418,15 @@ gh pr edit <pr-number> --add-label "type/feature,scope/python,status/ready-for-r
 
 ## Restrictions
 
+- **Pre-commit 硬规定**：
+  - 不得使用 `git commit --no-verify` 跳过 pre-commit 检查
+  - 不得在有 pre-commit 错误（如 mypy、shellcheck、LOC 超限）的情况下继续提交
+  - 必须在组织 commit 分组前完成 pre-commit 验证
+  - 格式化流程：对所有改动统一格式化 → 提交临时 commit → soft reset → 分组提交
+  - 不得保留单独的格式化 commit，格式化修改必须分散到各功能 commit 中
+  - 若 pre-commit 自动修复了格式，必须按上述流程处理后再进行分组提交
 - 不得在用户确认前静默执行 `git commit`
-- 不得把“是否拆多个 PR”的判断偷换成“先发一个再说”
+- 不得把”是否拆多个 PR”的判断偷换成”先发一个再说”
 - 不得把 `stash` 当垃圾桶
 - 不得把 `discard` 当默认处理方式
 - 不得在 skill 层发明 `rebase --onto`、`reset --hard` 等替代串行拆 PR 的主流程
