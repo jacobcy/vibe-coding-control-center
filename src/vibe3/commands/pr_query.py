@@ -79,11 +79,9 @@ def register_query_commands(app: typer.Typer) -> None:
             # Get change analysis if pr_number is provided
             analysis = None
             if pr_number:
-                try:
-                    analysis = run_inspect_json(["pr", str(pr_number)])
-                    logger.debug("Successfully retrieved change analysis")
-                except Exception as e:
-                    logger.warning(f"Failed to get change analysis: {e}")
+                # Fail-fast: 如果分析失败，立即抛出
+                analysis = run_inspect_json(["pr", str(pr_number)])
+                logger.debug("Successfully retrieved change analysis")
 
             if trace_output or json_output or yaml_output:
                 # Merge basic info and analysis results

@@ -6,16 +6,17 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.github_review_management import ReviewManagementMixin
+from vibe3.exceptions import GitHubError, UserError
 
-class ReviewMixin:
+
+class ReviewMixin(ReviewManagementMixin):
     """Mixin for review-related operations."""
 
     def add_pr_comment(self: Any, pr_number: int, body: str) -> None:
         """Add comment to PR."""
         logger.bind(
-            external="github",
-            operation="add_comment",
-            pr_number=pr_number,
+            external="github", operation="add_comment", pr_number=pr_number
         ).debug("Calling GitHub API: add_pr_comment")
         subprocess.run(
             ["gh", "pr", "comment", str(pr_number), "--body", body],
@@ -23,110 +24,88 @@ class ReviewMixin:
         )
 
     def get_pr_diff(self: Any, pr_number: int) -> str:
-        """Get PR diff."""
+        """Get PR diff.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            PR diff content
+
+        Raises:
+            UserError: If PR has too many files (>300) for GitHub API
+            GitHubError: If gh command fails for other reasons
+        """
         logger.bind(
             external="github",
             operation="get_diff",
             pr_number=pr_number,
         ).debug("Calling GitHub API: get_pr_diff")
-        result = subprocess.run(
-            ["gh", "pr", "diff", str(pr_number)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout
+        try:
+            result = subprocess.run(
+                ["gh", "pr", "diff", str(pr_number)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.strip() if e.stderr else "Failed to get PR diff"
+            # Check for GitHub's 300 file limit
+            if "diff exceeded the maximum number of files" in error_msg:
+                raise UserError(
+                    f"PR #{pr_number} has too many files (GitHub limit: 300).\n"
+                    f"  Cannot analyze PRs with >300 files via GitHub API.\n"
+                    f"  Alternatives:\n"
+                    f"    1. Checkout the PR locally and use 'vibe inspect branch'\n"
+                    f"    2. View file list at: https://github.com/.../pull/{pr_number}/files"
+                ) from e
+            raise GitHubError(
+                status_code=e.returncode,
+                message=error_msg,
+            ) from e
 
-    def list_reviews(self: Any, pr_number: int) -> list[dict[str, Any]]:
-        """List all reviews on a PR.
+    def get_pr_files(self: Any, pr_number: int) -> list[str]:
+        """Get list of files changed in PR.
 
         Args:
-            pr_number: PR 编号
+            pr_number: PR number
 
         Returns:
-            List of review dicts
+            List of changed file paths
+
+        Raises:
+            UserError: If PR has too many files (>300) for GitHub API
+            GitHubError: If gh command fails for other reasons
         """
         logger.bind(
             external="github",
-            operation="list_reviews",
+            operation="get_pr_files",
             pr_number=pr_number,
-        ).debug("Calling GitHub API: list_reviews")
-
-        result = subprocess.run(
-            [
-                "gh",
-                "api",
-                f"/repos/{{owner}}/{{repo}}/pulls/{pr_number}/reviews",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return json.loads(result.stdout)  # type: ignore[no-any-return]
-
-    def dismiss_review(self: Any, pr_number: int, review_id: int, message: str) -> None:
-        """Dismiss a review.
-
-        Args:
-            pr_number: PR 编号
-            review_id: Review ID
-            message: Dismissal message
-        """
-        logger.bind(
-            external="github",
-            operation="dismiss_review",
-            pr_number=pr_number,
-            review_id=review_id,
-        ).debug("Calling GitHub API: dismiss_review")
-
-        subprocess.run(
-            [
-                "gh",
-                "api",
-                f"/repos/{{owner}}/{{repo}}/pulls/{pr_number}/reviews/{review_id}/dismissals",
-                "--method",
-                "PUT",
-                "--field",
-                f"message={message}",
-            ],
-            check=True,
-        )
-
-    def dismiss_bot_reviews(
-        self: Any, pr_number: int, bot_name: str = "github-actions[bot]"
-    ) -> None:
-        """Dismiss all pending reviews from a bot.
-
-        Args:
-            pr_number: PR 编号
-            bot_name: Bot user name to filter
-        """
-        log = logger.bind(
-            external="github",
-            operation="dismiss_bot_reviews",
-            pr_number=pr_number,
-            bot_name=bot_name,
-        )
-        log.debug("Checking for existing bot reviews")
-
-        reviews = self.list_reviews(pr_number)
-        bot_reviews = [
-            r
-            for r in reviews
-            if r.get("user", {}).get("login") == bot_name
-            and r.get("state") == "PENDING"
-        ]
-
-        if bot_reviews:
-            log.bind(count=len(bot_reviews)).info("Dismissing existing bot reviews")
-            for review in bot_reviews:
-                self.dismiss_review(
-                    pr_number,
-                    review["id"],
-                    "Dismissing outdated review - new review in progress",
-                )
-        else:
-            log.debug("No pending bot reviews found")
+        ).debug("Calling GitHub API: get_pr_files")
+        try:
+            result = subprocess.run(
+                ["gh", "pr", "diff", str(pr_number), "--name-only"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return [f for f in result.stdout.splitlines() if f.strip()]
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.strip() if e.stderr else "Failed to get PR files"
+            # Check for GitHub's 300 file limit
+            if "diff exceeded the maximum number of files" in error_msg:
+                raise UserError(
+                    f"PR #{pr_number} has too many files (GitHub limit: 300).\n"
+                    f"  Cannot analyze PRs with >300 files via GitHub API.\n"
+                    f"  Alternatives:\n"
+                    f"    1. Checkout the PR locally and use 'vibe inspect branch'\n"
+                    f"    2. View file list at: https://github.com/.../pull/{pr_number}/files"
+                ) from e
+            raise GitHubError(
+                status_code=e.returncode,
+                message=error_msg,
+            ) from e
 
     def post_review_comment(
         self: Any,
@@ -155,7 +134,6 @@ class ReviewMixin:
             path=path,
             line=line,
         ).debug("Calling GitHub API: post_review_comment")
-
         result = subprocess.run(
             [
                 "gh",
@@ -209,11 +187,9 @@ class ReviewMixin:
             comment_count=len(comments or []),
         )
         log.debug("Calling GitHub API: create_review")
-
         # 先 dismiss 之前的 bot reviews（避免重复）
         if dismiss_previous:
             self.dismiss_bot_reviews(pr_number)
-
         payload = json.dumps(
             {
                 "body": body,
@@ -221,7 +197,6 @@ class ReviewMixin:
                 "comments": comments or [],
             }
         )
-
         result = subprocess.run(
             [
                 "gh",
@@ -242,5 +217,4 @@ class ReviewMixin:
             raise GitHubError(
                 status_code=result.returncode, message=result.stderr.strip()
             )
-
         return json.loads(result.stdout)  # type: ignore[no-any-return]

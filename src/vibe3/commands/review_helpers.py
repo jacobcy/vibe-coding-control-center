@@ -3,35 +3,9 @@
 import json
 import subprocess
 import sys
-from typing import Any
 
 import typer
 from loguru import logger
-
-
-def enable_trace() -> None:
-    """启用 DEBUG 日志 + 运行时调用追踪."""
-    logger.remove()
-    logger.add(sys.stderr, level="DEBUG")
-
-    indent = [0]
-
-    def _tracer(frame: object, event: str, arg: object) -> Any:
-        import types
-
-        assert isinstance(frame, types.FrameType)
-        if event == "call" and "vibe3" in frame.f_code.co_filename:
-            fn = frame.f_code.co_name
-            logger.debug(
-                f"{'  ' * indent[0]}→ "
-                f"{frame.f_code.co_filename.split('vibe3/')[-1]}::{fn}()"
-            )
-            indent[0] += 1
-        elif event == "return" and "vibe3" in frame.f_code.co_filename:
-            indent[0] = max(0, indent[0] - 1)
-        return _tracer
-
-    sys.settrace(_tracer)  # type: ignore[arg-type]
 
 
 def run_inspect_json(args: list[str]) -> dict[str, object]:

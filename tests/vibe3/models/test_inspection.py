@@ -1,6 +1,5 @@
 """Tests for inspection models."""
 
-import pytest
 
 from vibe3.models.inspection import CallNode, CommandInspection
 

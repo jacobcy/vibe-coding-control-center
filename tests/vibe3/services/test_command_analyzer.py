@@ -1,6 +1,5 @@
 """Tests for command analyzer call tree building."""
 
-import pytest
 
 from vibe3.services.command_analyzer import (
     _calculate_max_depth,
@@ -37,7 +36,6 @@ def test_should_not_expand_json_yaml() -> None:
 
 def test_calculate_max_depth_empty() -> None:
     """Test max depth calculation with empty list."""
-    from vibe3.models.inspection import CallNode
 
     depth = _calculate_max_depth([])
     assert depth == 0
@@ -71,7 +69,7 @@ def test_calculate_max_depth_multiple_branches() -> None:
 
     # Create structure with different depths
     leaf1 = CallNode(name="leaf1", line=30)
-    leaf2 = CallNode(name="leaf2", line=40)
+    CallNode(name="leaf2", line=40)
     branch1 = CallNode(name="branch1", line=20, calls=[leaf1])
     branch2 = CallNode(name="branch2", line=25)  # No children
     root = CallNode(name="root", line=10, calls=[branch1, branch2])

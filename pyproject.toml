@@ -1,13 +1,14 @@
 [project]
 name = "vibe3"
 version = "3.0.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
     "pyyaml>=6.0.3",
+    "serena-agent @ git+https://github.com/oraios/serena@v0.1.4",
 ]
 
 [project.scripts]
@@ -49,4 +50,5 @@ dev = [
     "black>=23.0.0",
     "pre-commit>=3.0.0",
     "types-pyyaml>=6.0.12.20250915",
+    "hypothesis>=6.151.9",
 ]

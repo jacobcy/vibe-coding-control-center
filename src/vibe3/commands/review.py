@@ -7,7 +7,7 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
-from vibe3.commands.review_helpers import call_codex, enable_trace, run_inspect_json
+from vibe3.commands.review_helpers import call_codex, run_inspect_json
 from vibe3.models.change_source import (
     BranchSource,
     CommitSource,
@@ -16,6 +16,7 @@ from vibe3.models.change_source import (
 )
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import convert_to_github_format, parse_codex_review
+from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
@@ -52,7 +53,9 @@ def pr(
     inspect_data = run_inspect_json(["pr", str(pr_number)])
 
     # 2. 获取 diff
-    git = GitClient()
+    from vibe3.clients.github_client import GitHubClient
+
+    git = GitClient(github_client=GitHubClient())
     diff = git.get_diff(PRSource(pr_number=pr_number))
 
     # 3. 构建上下文
@@ -83,7 +86,9 @@ def pr(
         event = (
             "REQUEST_CHANGES"
             if review.verdict == "BLOCK"
-            else "APPROVE" if review.verdict == "PASS" else "COMMENT"
+            else "APPROVE"
+            if review.verdict == "PASS"
+            else "COMMENT"
         )
         summary = (
             f"**Automated Review** — Risk score: "

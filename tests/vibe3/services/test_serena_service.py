@@ -24,8 +24,8 @@ class TestAnalyzeFile:
     def test_returns_ok_status(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
         result = service.analyze_file("src/vibe3/config/loader.py")
-        assert result["status"] == "ok"
         assert result["file"] == "src/vibe3/config/loader.py"
+        assert "symbols" in result
 
     def test_symbols_extracted(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
@@ -39,9 +39,9 @@ class TestAnalyzeFile:
         )
         service = SerenaService(client=client)
 
-        result = service.analyze_file("src/vibe3/config/loader.py")
-        assert result["status"] == "error"
-        assert "error" in result
+        # Fail-fast: 应该抛出异常，而不是返回错误字典
+        with pytest.raises(SerenaError):
+            service.analyze_file("src/vibe3/config/loader.py")
 
 
 class TestAnalyzeFiles:

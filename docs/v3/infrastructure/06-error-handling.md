@@ -4,98 +4,64 @@ title: Vibe 3.0 - Error Handling
 status: active
 author: Claude Sonnet 4.6
 created: 2026-03-15
-last_updated: 2026-03-16
+last_updated: 2026-03-19
 related_docs:
+  - docs/standards/error-handling.md  # 错误处理规范（权威）
+  - docs/standards/error-handling-fix-summary.md  # 修复总结
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
   - docs/v3/infrastructure/02-architecture.md
   - docs/v3/infrastructure/03-coding-standards.md
 ---
 
-# Vibe 3.0 - 异常处理
+# Vibe 3.0 - 异常处理实现指南
 
-## 设计原则
-
-**简单但统一**：
-- ✅ 统一的异常基类
-- ✅ 区分用户错误和系统错误
-- ✅ CLI 层统一捕获和展示
-- ❌ 不做复杂的异常层级
-- ❌ 不做异常恢复机制
+> **权威规范**：[docs/standards/error-handling.md](../../standards/error-handling.md)
+> **本文档定位**：实现指南，提供代码示例和架构说明
 
 ---
 
-## 异常层级（最小化）
+## 核心原则
+
+**简单但统一**：
+- ✅ 统一的异常基类
+- ✅ 区分 **SystemError**、**UserError**、**BatchError** 三类错误
+- ✅ CLI 层统一捕获和展示
+- ✅ **统一使用 `--yes` 参数绕过业务逻辑错误**
+
+**详细规范请参考**：[错误处理规范](../../standards/error-handling.md)
+
+---
+
+## 异常层级实现
+
+详见：[src/vibe3/exceptions/__init__.py](../../../src/vibe3/exceptions/__init__.py)
 
 ```python
-# exceptions/__init__.py
-from typing import Optional
+# exceptions/__init__.py (简化版)
 
 class VibeError(Exception):
     """所有 Vibe 异常的基类"""
-
     def __init__(self, message: str, recoverable: bool = False):
         self.message = message
-        self.recoverable = recoverable  # 用户是否可以修正
+        self.recoverable = recoverable
         super().__init__(message)
 
-
-# ========== 用户错误（可恢复）==========
-
+# 用户错误（可恢复，提供 --yes 绕过）
 class UserError(VibeError):
-    """用户输入错误，可通过修正参数解决"""
-    recoverable = True
+    def __init__(self, message: str):
+        super().__init__(message, recoverable=True)
 
-
-class ValidationError(UserError):
-    """参数验证失败"""
-    pass
-
-
-class ConfigError(UserError):
-    """配置错误"""
-    pass
-
-
-# ========== 系统错误（不可恢复）==========
-
+# 系统错误（不可恢复，立即抛出）
 class SystemError(VibeError):
-    """系统级错误，需要人工介入"""
-    recoverable = False
+    def __init__(self, message: str):
+        super().__init__(message, recoverable=False)
 
-
-class GitError(SystemError):
-    """Git 操作失败"""
-
-    def __init__(self, operation: str, details: str):
-        super().__init__(f"Git {operation} failed: {details}")
-        self.operation = operation
-
-
-class GitHubError(SystemError):
-    """GitHub API 错误"""
-
-    def __init__(self, status_code: int, message: str):
-        super().__init__(f"GitHub API error ({status_code}): {message}")
-        self.status_code = status_code
-
-
-# ========== 业务错误 ==========
-
-class PRNotFoundError(VibeError):
-    """PR 不存在"""
-
-    def __init__(self, pr_number: int):
-        super().__init__(f"PR #{pr_number} not found", recoverable=False)
-        self.pr_number = pr_number
-
-
-class FlowNotFoundError(VibeError):
-    """Flow 不存在"""
-
-    def __init__(self, flow_slug: str):
-        super().__init__(f"Flow '{flow_slug}' not found", recoverable=False)
-        self.flow_slug = flow_slug
+# 批量错误（继续执行，最后报告）
+class BatchError(SystemError):
+    def __init__(self, message: str, errors: list[dict]):
+        super().__init__(f"{message} ({len(errors)} failures)")
+        self.errors = errors
 ```
 
 ---
@@ -104,104 +70,127 @@ class FlowNotFoundError(VibeError):
 
 ### Layer 1: CLI 层（统一捕获）
 
+CLI 层负责捕获所有异常，根据类型显示不同格式的错误信息。
+
 ```python
 # cli.py
 import sys
-import typer
-from loguru import logger
-from exceptions import VibeError, UserError, SystemError
+from typer import Exit
+from rich.console import Console
+from vibe3.exceptions import UserError, SystemError, BatchError
 
 def main():
     """CLI 入口，统一异常处理"""
     try:
         app()
     except UserError as e:
-        # 用户错误：简洁提示
-        logger.error(e.message)
-        if e.recoverable:
-            logger.info("Please check your input and try again")
+        # 用户错误：简洁提示 + 提示使用 --yes 绕过
+        console = Console()
+        console.print(f"\n[yellow]⚠️  {e.message}[/]")
+        console.print("[dim]Use --yes to bypass this check[/]")
+        sys.exit(1)
+
+    except BatchError as e:
+        # 批量错误：显示汇总
+        console = Console()
+        console.print(f"\n[red]❌ Batch operation failed: {len(e.errors)} errors[/]")
+        for error in e.errors[:5]:
+            console.print(f"  [red]✗ {error.get('file', 'unknown')}: {error['error']}[/]")
         sys.exit(1)
 
     except SystemError as e:
         # 系统错误：显示详情
-        logger.exception("System error occurred")
-        sys.exit(2)
-
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user")
-        sys.exit(130)
+        console = Console()
+        console.print(f"\n[red]❌ System error: {e.message}[/]")
+        console.print("[dim]This is a bug. Please report to developers.[/]")
+        sys.exit(99)
 
     except Exception as e:
         # 未知错误：打印完整栈
         logger.exception("Unexpected error")
         sys.exit(99)
-
-app = typer.Typer(
-    name="vibe3",
-    help="Vibe 3.0 - AI Development Orchestrator",
-    add_completion=False,
-)
-
-if __name__ == "__main__":
-    main()
 ```
 
-### Layer 2: Command 层（转换异常）
+### Layer 2: Command 层（业务错误处理）
+
+Command 层处理业务错误，提供 `--yes` 绕过选项。
 
 ```python
-# commands/pr.py
+# commands/pr_lifecycle.py
 import typer
-from loguru import logger
-from services.pr_service import PRService
-from exceptions import GitHubError, PRNotFoundError
-
-app = typer.Typer()
 
 @app.command()
-def show(pr_number: int):
-    """Show PR details"""
-    try:
-        service = PRService()
-        pr = service.get_pr(pr_number)
-        logger.success(f"PR #{pr.number}: {pr.title}")
-    except GitHubError as e:
-        if e.status_code == 404:
-            raise PRNotFoundError(pr_number) from e
-        raise  # 重新抛出，让 CLI 层处理
+def ready(
+    pr_number: int,
+    yes: bool = typer.Option(False, "--yes", help="绕过业务逻辑检查并自动确认"),
+):
+    """Mark PR as ready with quality gates."""
+    # 业务错误：使用 --yes 绕过
+    run_coverage_gate(yes=yes)
+
+    # 系统错误：自然抛出
+    service = PRService()
+    service.mark_ready(pr_number)
+
+def run_coverage_gate(yes: bool = False) -> None:
+    """运行覆盖率检查（业务错误）"""
+    if yes:
+        console.print("[yellow]⚠️  Skipping coverage gate (--yes)[/]")
+        return
+
+    coverage_service = CoverageService()
+    # 系统错误：如果服务调用失败，会自然抛出 SystemError
+    coverage = coverage_service.run_coverage_check()
+
+    # 业务错误：覆盖率不足，可通过 --yes 绕过
+    if not coverage.all_passing:
+        console.print("[red]✗ Coverage gate failed[/]")
+        console.print("[dim]Increase coverage or use --yes to bypass[/]")
+        raise Exit(1)
 ```
 
-### Layer 3: Service 层（记录日志）
+### Layer 3: Service 层（系统错误处理）
+
+Service 层处理系统错误，立即抛出，不捕获。
 
 ```python
-# services/pr_service.py
-from loguru import logger
-from clients.github_client import GitHubClient
-from exceptions import GitError, PRNotFoundError
+# services/serena_service.py
+from exceptions import SerenaError
 
-class PRService:
-    def __init__(self):
-        self.gh = GitHubClient()
+class SerenaService:
+    def analyze_file(self, file: str) -> dict:
+        """分析单个文件（系统错误）"""
+        # 系统错误：立即抛出，不捕获，不降级
+        overview = self.client.get_symbols_overview(file)
+        return {"symbols": overview}
 
-    def get_pr(self, pr_number: int):
-        """获取 PR 详情"""
-        logger.info(f"Fetching PR #{pr_number}")
+    def analyze_files(self, files: list[str]) -> list:
+        """批量分析文件（批量错误）"""
+        results = []
+        errors = []
 
-        try:
-            pr = self.gh.get_pr(pr_number)
-            logger.debug(f"PR fetched: {pr.title}")
-            return pr
-        except GitError as e:
-            logger.error(f"Failed to fetch PR #{pr_number}: {e}")
-            raise
+        for file in files:
+            try:
+                result = self.analyze_file(file)
+                results.append(result)
+            except SerenaError as e:
+                errors.append({"file": file, "error": str(e)})
+                # 继续处理其他文件
+
+        if errors:
+            # 批量错误：收集后统一报告
+            raise BatchError("Batch analysis failed", errors)
+
+        return results
 ```
 
 ### Layer 4: Client 层（抛出具体异常）
 
+Client 层负责与外部系统交互，抛出具体的异常类型。
+
 ```python
 # clients/github_client.py
-import subprocess
 from exceptions import GitError, GitHubError
-from models.pr import PR
 
 class GitHubClient:
     def get_pr(self, pr_number: int) -> PR:
@@ -222,125 +211,30 @@ class GitHubClient:
 
 ---
 
-## 错误消息规范
-
-### 用户错误（简洁）
-
-```python
-# ✅ 正确：简洁提示
-raise ValidationError("PR number must be positive integer")
-
-# 输出：
-# ERROR: PR number must be positive integer
-# Please check your input and try again
-```
-
-### 系统错误（详细）
-
-```python
-# ✅ 正确：包含上下文
-raise GitError("create PR", "authentication failed")
-
-# 输出：
-# ERROR: Git create PR failed: authentication failed
-# System error occurred
-# [完整错误栈]
-```
-
-### 业务错误（友好）
-
-```python
-# ✅ 正确：清晰说明
-raise PRNotFoundError(123)
-
-# 输出：
-# ERROR: PR #123 not found
-```
-
----
-
-## 预留的扩展点
-
-### 1. 异常恢复（将来）
-
-```python
-# 预留接口，现在不实现
-class RecoverableError(VibeError):
-    """可恢复的错误"""
-
-    def suggest_fix(self) -> list[str]:
-        """建议的修复方案"""
-        # TODO: 将来可以提供智能修复建议
-        return []
-```
-
-### 2. 异常链追踪（将来）
-
-```python
-# 预留字段，现在不实现
-class VibeError(Exception):
-    def __init__(self, message: str, context: dict | None = None):
-        self.context = context or {}  # 预留上下文字段
-        super().__init__(message)
-```
-
----
-
 ## 测试示例
 
 ```python
 # tests/test_exceptions.py
 import pytest
-from exceptions import VibeError, UserError, PRNotFoundError
+from vibe3.exceptions import UserError, SystemError, BatchError
 
 def test_user_error_recoverable():
     """测试用户错误可恢复"""
     error = UserError("test")
     assert error.recoverable is True
 
-def test_pr_not_found_error():
-    """测试 PR 不存在错误"""
-    error = PRNotFoundError(123)
-    assert error.pr_number == 123
-    assert "123" in error.message
+def test_system_error_not_recoverable():
+    """测试系统错误不可恢复"""
+    error = SystemError("test")
+    assert error.recoverable is False
 
-def test_exception_chain():
-    """测试异常链"""
-    with pytest.raises(PRNotFoundError):
-        try:
-            raise ValueError("original error")
-        except ValueError as e:
-            raise PRNotFoundError(123) from e
+def test_batch_error_collects_errors():
+    """测试批量错误收集"""
+    errors = [{"file": "a.py", "error": "syntax error"}]
+    error = BatchError("Failed", errors)
+    assert len(error.errors) == 1
+    assert "1 failures" in error.message
 ```
-
----
-
-## 常见问题
-
-### Q: 为什么不使用 Python 内置异常？
-
-```python
-# ❌ 不推荐：使用内置异常
-raise ValueError("Invalid PR number")
-
-# ✅ 推荐：使用自定义异常
-raise ValidationError("Invalid PR number")
-```
-
-**原因**：
-- 自定义异常可以统一捕获 `VibeError`
-- 可以区分用户错误和系统错误
-- 可以添加额外字段（如 `recoverable`）
-
-### Q: 什么时候用哪种异常？
-
-| 场景 | 异常类型 |
-|------|----------|
-| 用户输入错误参数 | `ValidationError` |
-| 配置文件格式错误 | `ConfigError` |
-| Git 命令失败 | `GitError` |
-| GitHub API 调用失败 | `GitHubError` |
-| PR/Flow 不存在 | `PRNotFoundError` / `FlowNotFoundError` |
 
 ---
 
@@ -349,14 +243,11 @@ raise ValidationError("Invalid PR number")
 ✅ **必须实现**：
 - 统一的异常基类 `VibeError`
 - CLI 层统一异常处理
-- 区分 `UserError` 和 `SystemError`
+- 区分 `SystemError`、`UserError`、`BatchError` 三类错误
+- **统一使用 `--yes` 参数绕过业务逻辑错误**
 
-⏸️ **暂不实现**（预留接口）：
-- 异常恢复机制
-- 智能修复建议
-- 复杂的异常追踪
+📚 **详细规范**：[错误处理规范](../../standards/error-handling.md)
 
-🎯 **目标**：
-- 30 分钟内完成
-- 代码 < 150 行
-- 覆盖 90% 常见错误场景
+🎯 **相关文档**：
+- [错误处理修复总结](../../standards/error-handling-fix-summary.md)
+- [CLAUDE.md - HARD RULES 第11条](../../../CLAUDE.md)

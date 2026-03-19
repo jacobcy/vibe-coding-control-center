@@ -21,8 +21,7 @@ def test_pr_ready_help():
     result = runner.invoke(app, ["ready", "--help"])
     assert result.exit_code == 0
     assert "PR number" in result.output
-    assert "--force" in result.output
-    assert "--skip-coverage" in result.output
+    assert "--yes" in result.output
 
 
 def test_pr_ready_with_coverage_passing(
@@ -48,12 +47,12 @@ def test_pr_ready_with_coverage_passing(
         result = runner.invoke(app, ["ready", "123", "--yes"])
 
         assert result.exit_code == 0
-        assert "Coverage gate passed" in result.output
-        assert "85.0%" in result.output or "86.8%" in result.output
+        # With --yes, coverage gate is bypassed
+        assert "Skipping coverage gate" in result.output
 
 
 def test_pr_ready_with_coverage_failing(mock_coverage_failing):
-    """pr ready with coverage gate failing → exit 1."""
+    """pr ready with coverage gate failing and no --yes → exit 1."""
     with patch(
         "vibe3.services.coverage_service.CoverageService"
     ) as mock_cov_service, patch(
@@ -63,18 +62,19 @@ def test_pr_ready_with_coverage_failing(mock_coverage_failing):
         mock_cov_instance.run_coverage_check.return_value = mock_coverage_failing
         mock_cov_service.return_value = mock_cov_instance
 
-        result = runner.invoke(app, ["ready", "123", "--yes"])
+        # Without --yes, coverage gate failure should cause exit 1
+        result = runner.invoke(app, ["ready", "123"])
 
         assert result.exit_code == 1
         assert "Coverage gate failed" in result.output
         assert "70.0%" in result.output
 
 
-def test_pr_ready_skip_coverage(mock_pr_response, mock_inspect_passing):
-    """pr ready --skip-coverage skips coverage gate."""
+def test_pr_ready_yes_bypass_coverage(mock_pr_response, mock_inspect_passing):
+    """pr ready --yes bypasses coverage gate."""
     with patch(
         "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
+    ), patch(
         "vibe3.commands.pr_lifecycle.PRService"
     ) as mock_pr_service, patch(
         "vibe3.commands.review_helpers.run_inspect_json",
@@ -84,29 +84,10 @@ def test_pr_ready_skip_coverage(mock_pr_response, mock_inspect_passing):
         mock_pr_instance.mark_ready.return_value = mock_pr_response
         mock_pr_service.return_value = mock_pr_instance
 
-        result = runner.invoke(app, ["ready", "123", "--yes", "--skip-coverage"])
+        result = runner.invoke(app, ["ready", "123", "--yes"])
 
         assert result.exit_code == 0
-        assert "Skipping coverage gate" in result.output
-        mock_cov_service.assert_not_called()
-
-
-def test_pr_ready_force_skips_all_gates(mock_pr_response):
-    """pr ready --force skips all quality gates."""
-    with patch(
-        "vibe3.services.coverage_service.CoverageService"
-    ) as mock_cov_service, patch(
-        "vibe3.commands.pr_lifecycle.PRService"
-    ) as mock_pr_service:
-        mock_pr_instance = MagicMock()
-        mock_pr_instance.mark_ready.return_value = mock_pr_response
-        mock_pr_service.return_value = mock_pr_instance
-
-        result = runner.invoke(app, ["ready", "123", "--yes", "--force"])
-
-        assert result.exit_code == 0
-        assert "跳过质量门禁" in result.output
-        mock_cov_service.assert_not_called()
+        assert "Skipping coverage gate (--yes)" in result.output
 
 
 def test_pr_ready_coverage_exception_handling():

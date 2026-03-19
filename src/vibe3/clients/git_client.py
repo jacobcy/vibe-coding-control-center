@@ -1,7 +1,8 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
+import re
 import subprocess
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
@@ -14,21 +15,36 @@ from vibe3.models.change_source import (
     PRSource,
 )
 
+if TYPE_CHECKING:
+    from vibe3.clients.github_client import GitHubClient
+
 
 class GitClientProtocol(Protocol):
     """Git client 协议定义."""
 
-    def get_current_branch(self) -> str: ...
+    def get_current_branch(self) -> str:
+        ...
 
-    def get_worktree_name(self) -> str: ...
+    def get_worktree_name(self) -> str:
+        ...
 
-    def get_changed_files(self, source: ChangeSource) -> list[str]: ...
+    def get_changed_files(self, source: ChangeSource) -> list[str]:
+        ...
 
-    def get_diff(self, source: ChangeSource) -> str: ...
+    def get_diff(self, source: ChangeSource) -> str:
+        ...
 
 
 class GitClient:
     """Git client，封装 git 命令操作."""
+
+    def __init__(self, github_client: "GitHubClient | None" = None) -> None:
+        """初始化 GitClient.
+
+        Args:
+            github_client: 可选的 GitHubClient 实例，用于处理 PR 相关操作
+        """
+        self._github_client = github_client
 
     def _run(self, args: list[str]) -> str:
         """执行 git 命令，统一错误处理.
@@ -101,7 +117,12 @@ class GitClient:
             files = self._get_branch_files(source.branch, source.base)
         elif source.type == ChangeSourceType.PR:
             assert isinstance(source, PRSource)
-            files = self._get_pr_files(source.pr_number)
+            if not self._github_client:
+                raise GitError(
+                    "get_changed_files",
+                    "PR source requires GitHubClient injection",
+                )
+            files = self._github_client.get_pr_files(source.pr_number)
         else:
             raise GitError("get_changed_files", f"Unknown source type: {source.type}")
 
@@ -133,8 +154,12 @@ class GitClient:
             diff = self._run(["diff", f"{source.base}...{source.branch}"])
         elif source.type == ChangeSourceType.PR:
             assert isinstance(source, PRSource)
-            # PR diff 通过 fetch FETCH_HEAD 获取
-            diff = self._get_pr_diff(source.pr_number)
+            if not self._github_client:
+                raise GitError(
+                    "get_diff",
+                    "PR source requires GitHubClient injection",
+                )
+            diff = self._github_client.get_pr_diff(source.pr_number)
         else:
             raise GitError("get_diff", f"Unknown source type: {source.type}")
 
@@ -163,32 +188,74 @@ class GitClient:
         output = self._run(["diff", "--name-only", f"{base}...{branch}"])
         return [f for f in output.splitlines() if f.strip()]
 
-    def _get_pr_files(self, pr_number: int) -> list[str]:
-        """获取 PR 改动文件（通过 gh CLI fetch）."""
+    def get_diff_hunk_ranges(
+        self, file_path: str, source: ChangeSource
+    ) -> list[tuple[int, int]]:
+        """Get changed line ranges from git diff for a specific file.
+
+        Simple heuristic: parse diff hunks to find changed line numbers.
+        Useful for finding which functions were changed.
+
+        Args:
+            file_path: Relative file path
+            source: Change source (commit/branch/pr)
+
+        Returns:
+            List of (start_line, end_line) tuples for changed hunks
+
+        Example:
+            >>> client = GitClient()
+            >>> source = CommitSource(sha="abc123")
+            >>> ranges = client.get_diff_hunk_ranges("src/foo.py", source)
+            >>> # [(10, 15), (42, 50)]
+        """
+        log = logger.bind(
+            domain="git",
+            action="get_diff_hunk_ranges",
+            file=file_path,
+            source_type=source.type,
+        )
+        log.debug("Getting diff hunk ranges")
+
         try:
-            import subprocess as sp
+            # Get diff for this specific file
+            if source.type == ChangeSourceType.COMMIT:
+                assert isinstance(source, CommitSource)
+                diff = self._run(
+                    ["diff", f"{source.sha}^", source.sha, "--", file_path]
+                )
+            elif source.type == ChangeSourceType.BRANCH:
+                assert isinstance(source, BranchSource)
+                diff = self._run(
+                    ["diff", f"{source.base}...{source.branch}", "--", file_path]
+                )
+            elif source.type == ChangeSourceType.PR:
+                assert isinstance(source, PRSource)
+                # For PR, we need to fetch the diff
+                diff = self._run(["diff", "FETCH_HEAD", "--", file_path])
+            else:
+                # Uncommitted changes
+                diff = self._run(["diff", "HEAD", "--", file_path])
 
-            result = sp.run(
-                ["gh", "pr", "diff", str(pr_number), "--name-only"],
-                capture_output=True,
-                text=True,
-                check=True,
+            if not diff:
+                return []
+
+            # Parse diff hunks: @@ -old_start,old_count +new_start,new_count @@
+            hunk_pattern = re.compile(
+                r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", re.MULTILINE
             )
-            return [f for f in result.stdout.splitlines() if f.strip()]
-        except subprocess.CalledProcessError as e:
-            raise GitError(f"get_pr_files pr#{pr_number}", e.stderr.strip()) from e
+            ranges: list[tuple[int, int]] = []
 
-    def _get_pr_diff(self, pr_number: int) -> str:
-        """获取 PR diff 内容（通过 gh CLI）."""
-        try:
-            import subprocess as sp
+            for match in hunk_pattern.finditer(diff):
+                start = int(match.group(1))
+                count = int(match.group(2)) if match.group(2) else 1
+                end = start + count - 1
+                ranges.append((start, end))
 
-            result = sp.run(
-                ["gh", "pr", "diff", str(pr_number)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            raise GitError(f"get_pr_diff pr#{pr_number}", e.stderr.strip()) from e
+            log.bind(hunk_count=len(ranges)).debug("Got diff hunk ranges")
+            return ranges
+
+        except GitError:
+            # If git command fails, return empty (graceful degradation)
+            log.warning("Failed to get diff hunks, returning empty")
+            return []

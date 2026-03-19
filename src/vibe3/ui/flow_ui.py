@@ -2,7 +2,6 @@
 
 from rich.table import Table
 from rich.text import Text
-
 from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.ui.console import console
 

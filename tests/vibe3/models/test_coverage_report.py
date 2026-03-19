@@ -1,6 +1,5 @@
 """Tests for CoverageReport model."""
 
-import pytest
 
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 

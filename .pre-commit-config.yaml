@@ -86,6 +86,16 @@ repos:
         pass_filenames: false
         files: ^tests/vibe3/.*\.py$
 
+  # ── Pre-push Checks (run on push, not commit) ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pre-push-checks
+        name: Pre-push checks (coverage + risk-based review)
+        entry: scripts/hooks/pre-push.sh
+        language: script
+        pass_filenames: false
+        stages: [push]
+
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)
   #

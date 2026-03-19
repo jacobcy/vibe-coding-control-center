@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check Python LOC ceiling (core code only)
-# Reads limit from config/settings.yaml
+# Delegates to metrics_service for consistent LOC counting.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
 #   - src/vibe3/
@@ -9,15 +9,14 @@
 
 set -e
 
-# Read limit from config
-LIMIT=$(PYTHONPATH=src uv run python -m vibe3.config.get \
-    code_limits.total_file_loc.v3_python \
-    -c config/settings.yaml \
-    --quiet 2>/dev/null || echo 9000)
+result=$(PYTHONPATH=src uv run python -c "
+from vibe3.services.metrics_service import collect_python_metrics
+m = collect_python_metrics()
+print(f'{m.total_loc} {m.limit_total}')
+" 2>/dev/null)
 
-# Count total lines (paths defined in config: code_limits.code_paths.v3_python)
-# Only src/vibe3/ (scripts/ NOT included)
-total=$(find src/vibe3 -name "*.py" 2>/dev/null | xargs cat 2>/dev/null | wc -l)
+total=$(echo "$result" | awk '{print $1}')
+LIMIT=$(echo "$result" | awk '{print $2}')
 
 if [ "$total" -gt "$LIMIT" ]; then
   echo "FAIL: Total Python LOC $total exceeds $LIMIT limit"

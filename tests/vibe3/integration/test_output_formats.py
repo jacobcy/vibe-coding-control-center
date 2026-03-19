@@ -1,9 +1,6 @@
 """Integration tests for trace output functionality."""
 
-import json
 
-import pytest
-import yaml
 from typer.testing import CliRunner
 
 from vibe3.cli import app

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check Shell LOC ceiling (core code only)
-# Reads limit from config/settings.yaml
+# Delegates to metrics_service for consistent LOC counting.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v2_shell):
 #   - lib/
@@ -11,17 +11,14 @@
 
 set -e
 
-# Read limit from config
-LIMIT=$(PYTHONPATH=src uv run python -m vibe3.config.get \
-    code_limits.total_file_loc.v2_shell \
-    -c config/settings.yaml \
-    --quiet 2>/dev/null || echo 7000)
+result=$(PYTHONPATH=src uv run python -c "
+from vibe3.services.metrics_service import collect_shell_metrics
+m = collect_shell_metrics()
+print(f'{m.total_loc} {m.limit_total}')
+" 2>/dev/null)
 
-# Count total lines (paths defined in config: code_limits.code_paths.v2_shell)
-# Only lib/, lib3/, bin/vibe (scripts/ NOT included)
-total=$( (find lib/ lib3/ -name "*.sh" 2>/dev/null; \
-          find bin/ -name "vibe" 2>/dev/null) | \
-        xargs cat 2>/dev/null | wc -l)
+total=$(echo "$result" | awk '{print $1}')
+LIMIT=$(echo "$result" | awk '{print $2}')
 
 if [ "$total" -gt "$LIMIT" ]; then
   echo "FAIL: Total Shell LOC $total exceeds $LIMIT limit"

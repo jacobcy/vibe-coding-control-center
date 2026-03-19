@@ -35,6 +35,7 @@ def _patch_review_deps(verdict: str = "PASS"):
             "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
         ),
         patch("vibe3.commands.review.GitClient"),
+        patch("vibe3.clients.github_client.GitHubClient"),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.call_codex", return_value="## Review\nLooks good."
@@ -55,7 +56,7 @@ def test_review_pr_missing_arg_shows_error():
 
 def test_review_pr_pass():
     patches = _patch_review_deps("PASS")
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
         result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
     assert "PASS" in result.output
@@ -63,7 +64,7 @@ def test_review_pr_pass():
 
 def test_review_pr_block_exits_1():
     patches = _patch_review_deps("BLOCK")
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
         result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 1
 

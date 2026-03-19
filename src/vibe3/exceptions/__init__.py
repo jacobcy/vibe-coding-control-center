@@ -210,3 +210,21 @@ class TaskNotFoundError(VibeError):
         """
         super().__init__(f"Task '{task_id}' not found", recoverable=False)
         self.task_id = task_id
+
+
+# ========== Batch Errors ==========
+
+
+class BatchError(SystemError):
+    """Batch operation partially failed."""
+
+    def __init__(self, message: str, errors: list[dict]) -> None:
+        """Initialize BatchError.
+
+        Args:
+            message: Summary error message
+            errors: List of error details, each with
+                at least 'file'/'task' and 'error' keys
+        """
+        super().__init__(f"{message} ({len(errors)} failures)")
+        self.errors = errors

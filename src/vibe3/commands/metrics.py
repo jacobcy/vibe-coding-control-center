@@ -24,14 +24,21 @@ def _render_layer(name: str, m: LayerMetrics) -> None:
     """渲染单层指标."""
     status = "✅" if m.total_ok and m.file_ok else "❌"
     rprint(f"\n[bold]{name}[/bold] {status}")
-    rprint(f"  总行数: {m.total_loc} / {m.limit_total}")
-    rprint(f"  最大文件: {m.max_file_loc} / {m.limit_file} 行")
-    rprint(f"  文件数: {m.file_count}")
+    rprint(f"  Total LOC : {m.total_loc} / {m.limit_total}")
+    rprint(f"  Max file  : {m.max_file_loc} / {m.limit_file_max}")
+    rprint(f"  Files     : {m.file_count}")
 
-    if m.violations:
-        rprint(f"  [red]超限文件 ({len(m.violations)}):[/red]")
-        for f in m.violations:
-            rprint(f"    {f.path}: {f.loc} 行")
+    # 显示错误文件（超过最大限制）
+    if m.errors:
+        rprint(f"  [red]❌ 超限文件 ({len(m.errors)}):[/red]")
+        for f in m.errors:
+            rprint(f"    {f.path}: {f.loc} 行 > {m.limit_file_max}")
+
+    # 显示警告文件（超过默认限制但未超过最大限制）
+    if m.warnings:
+        rprint(f"  [yellow]⚠️  大文件 ({len(m.warnings)}):[/yellow]")
+        for f in m.warnings:
+            rprint(f"    {f.path}: {f.loc} 行 > {m.limit_file_default}")
 
 
 @app.command()

@@ -1,5 +1,4 @@
 """Shared fixtures for coverage service tests."""
-import json
 from pathlib import Path
 
 import pytest

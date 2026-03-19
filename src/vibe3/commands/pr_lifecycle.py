@@ -20,13 +20,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
     def ready(
         pr_number: Annotated[int, typer.Argument(help="PR number")],
         yes: Annotated[
-            bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
-        ] = False,  # noqa: E501
-        force: Annotated[
-            bool, typer.Option("--force", help="跳过质量门禁检查")
-        ] = False,  # noqa: E501
-        skip_coverage: Annotated[
-            bool, typer.Option("--skip-coverage", help="跳过覆盖率检查")
+            bool, typer.Option("-y", "--yes", help="绕过业务逻辑检查并自动确认")
         ] = False,  # noqa: E501
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -44,8 +38,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         - 覆盖率检查（分层覆盖率统计）
         - 风险评分检查（来自 inspect pr）
 
-        使用 --skip-coverage 跳过覆盖率检查.
-        使用 --force 跳过所有检查（不推荐）.
+        使用 --yes 绕过业务逻辑检查（覆盖率不足等）并自动确认.
         """
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
@@ -60,32 +53,25 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr ready", pr_number=pr_number, force=force).info(
+            logger.bind(command="pr ready", pr_number=pr_number, yes=yes).info(
                 "Marking PR as ready for review"
             )
 
-            # 1. 质量门禁检查（除非 --force）
-            if not force:
-                from rich.console import Console
+            # 1. 质量门禁检查
+            from rich.console import Console
 
-                from vibe3.commands.pr_quality_gates import (
-                    run_coverage_gate,
-                    run_risk_gate,
-                )
+            from vibe3.commands.pr_quality_gates import (
+                run_coverage_gate,
+                run_risk_gate,
+            )
 
-                console = Console()
+            console = Console()
 
-                # 1.1 覆盖率检查
-                run_coverage_gate(console, skip_coverage)
+            # 1.1 覆盖率检查（业务错误，可用 --yes 绕过）
+            run_coverage_gate(console, yes)
 
-                # 1.2 风险评分检查
-                run_risk_gate(console, pr_number)
-
-            else:
-                from rich.console import Console
-
-                console = Console()
-                console.print("\n[yellow]⚠️  跳过质量门禁检查 (--force)[/]")
+            # 1.2 风险评分检查（系统错误，不可绕过）
+            run_risk_gate(console, pr_number)
 
             # 2. 确认操作（除非 --yes）
             if not yes:
@@ -118,11 +104,9 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
     def merge(
         pr_number: Annotated[int, typer.Argument(help="PR number")],
         yes: Annotated[
-            bool, typer.Option("-y", "--yes", help="自动确认（跳过交互）")
-        ] = False,  # noqa: E501
-        force: Annotated[
-            bool, typer.Option("--force", help="强制合并（跳过安全检查）")
-        ] = False,  # noqa: E501
+            bool,
+            typer.Option("-y", "--yes", help="自动确认并跳过安全检查"),
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
@@ -140,7 +124,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         - CI 检查已通过
         - 无未处理的 review comments（可选）
 
-        使用 --force 跳过所有检查（不推荐）.
+        使用 --yes 跳过所有检查（不推荐）.
         """
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
@@ -155,12 +139,12 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr merge", pr_number=pr_number, force=force).info(
+            logger.bind(command="pr merge", pr_number=pr_number, yes=yes).info(
                 "Merging PR"
             )
 
-            # 1. 安全检查（除非 --force）
-            if not force:
+            # 1. 安全检查（除非 --yes）
+            if not yes:
                 from rich.console import Console
 
                 console = Console()
@@ -186,10 +170,21 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                     console.print("[yellow]请先修复 CI 问题[/]")
                     raise typer.Exit(1)
 
-                # 1.3 检查 pending review comments（可选，优雅降级）
-                # TODO: Implement pending review comments check
-                # This functionality was removed as part of PR review refactoring
-                # Pass silently for now
+                # 1.3 检查 pending review comments
+                from vibe3.clients.github_client import GitHubClient
+
+                gh = GitHubClient()
+                reviews = gh.list_reviews(pr_number)
+                pending_reviews = [r for r in reviews if r.get("state") == "PENDING"]
+
+                if pending_reviews:
+                    pending_count = len(pending_reviews)
+                    console.print(
+                        f"\n[yellow]⚠️  有 {pending_count} 条待处理的 review comments[/]"
+                    )
+                    if not typer.confirm("是否仍然合并？"):
+                        logger.info("Aborted due to pending review comments")
+                        raise typer.Exit(1)
 
                 # 显示通过信息
                 console.print("\n[green]✓ 安全检查通过[/]")
@@ -198,7 +193,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                 from rich.console import Console
 
                 console = Console()
-                console.print("\n[yellow]⚠️  强制合并（跳过安全检查）[/]")
+                console.print("\n[yellow]⚠️  跳过安全检查 (--yes)[/]")
 
             # 2. 确认操作（除非 --yes）
             if not yes:
