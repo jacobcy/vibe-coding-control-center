@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
-# Check Python LOC ceiling (scripts/python ≤ 3000)
-# Used by pre-commit hooks
+# Check Python LOC ceiling (core code only)
+# Delegates to metrics_service for consistent LOC counting.
+#
+# Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
+#   - src/vibe3/
+#
+# Note: scripts/ NOT included in total LOC (checked separately for single-file limits only)
 
 set -e
 
-total=$(find scripts/python -name "*.py" | xargs cat | wc -l)
+result=$(PYTHONPATH=src uv run python -c "
+from vibe3.services.metrics_service import collect_python_metrics
+m = collect_python_metrics()
+print(f'{m.total_loc} {m.limit_total}')
+" 2>/dev/null)
 
-if [ "$total" -gt 3000 ]; then
-  echo "FAIL: Total Python LOC $total exceeds 3000 limit"
+total=$(echo "$result" | awk '{print $1}')
+LIMIT=$(echo "$result" | awk '{print $2}')
+
+if [ "$total" -gt "$LIMIT" ]; then
+  echo "FAIL: Total Python LOC $total exceeds $LIMIT limit"
   exit 1
 else
-  echo "✅ Total Python LOC: $total / 3000"
+  echo "✅ Total Python LOC: $total / $LIMIT"
 fi

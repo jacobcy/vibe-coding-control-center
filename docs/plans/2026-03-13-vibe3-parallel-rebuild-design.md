@@ -61,7 +61,7 @@ related_issues: []
 
 - `lib3/`：3.0 薄 shell wrapper / CLI glue
 - `tests3/`：3.0 tests
-- `scripts/python/`：3.0 结构化数据层与远端接口层
+- `src/`：3.0 结构化数据层与远端接口层
 
 ### 入口策略
 
@@ -78,9 +78,9 @@ bin/
 lib3/flow/
 lib3/task/
 lib3/pr/
-scripts/python/flow/
-scripts/python/task/
-scripts/python/pr/
+src/flow/
+src/task/
+src/pr/
 tests3/flow/
 tests3/task/
 tests3/pr/
@@ -110,7 +110,7 @@ lib/
 lib3/
 tests/
 tests3/
-scripts/python/
+src/
 ```
 
 语义约束：
@@ -119,7 +119,7 @@ scripts/python/
 - `tests/`：2.x tests，保留，不立即迁移或改名
 - `lib3/`：3.0 薄 shell wrapper / CLI glue
 - `tests3/`：3.0 tests
-- `scripts/python/`：3.0 结构化数据层与远端接口层
+- `src/`：3.0 结构化数据层与远端接口层
 
 补充说明：
 
@@ -1086,9 +1086,9 @@ bin/
 lib3/flow/
 lib3/task/
 lib3/pr/
-scripts/python/flow/
-scripts/python/task/
-scripts/python/pr/
+src/flow/
+src/task/
+src/pr/
 tests3/flow/
 tests3/task/
 tests3/pr/
@@ -1222,7 +1222,7 @@ PR: #201 (draft)
 以下核心架构决策已正式冻结：
 
 - **v3 主链与命令边界**：已冻结
-- **目录结构**：已冻结（lib3/, tests3/, scripts/python/ 分域结构）
+- **目录结构**：已冻结（lib3/, tests3/, src/ 分域结构）
 - **Python 框架与依赖策略**：已冻结（uv + stdlib 优先）
 
 待决项将在后续实施计划中通过分阶段交付物（docs/v3/）收敛：
@@ -1294,10 +1294,10 @@ skills 不重做，但要分阶段适配：
 
 **交付物**：
 - [ ] `bin/vibe3` CLI 入口脚本
-- [ ] `scripts/python/vibe3/cli.py` Typer 应用入口 (< 50 行)
-- [ ] `scripts/python/lib/store.py` Vibe3Store SQLite 实现
-- [ ] `scripts/python/vibe3/clients/git_client.py` Git 客户端封装
-- [ ] `scripts/python/vibe3/models/flow.py` Pydantic 数据模型
+- [ ] `src/vibe3/cli.py` Typer 应用入口 (< 50 行)
+- [ ] `src/vibe3/clients/sqlite_client.py` Vibe3Store SQLite 实现
+- [ ] `src/vibe3/clients/git_client.py` Git 客户端封装
+- [ ] `src/vibe3/models/flow.py` Pydantic 数据模型
 
 **验收标准**：
 - ✅ `vibe3 --help` 返回有效帮助信息
@@ -1316,9 +1316,9 @@ skills 不重做，但要分阶段适配：
 **目标**：实现完整的 flow 命令集
 
 **交付物**：
-- [ ] `scripts/python/vibe3/commands/flow.py` Flow 命令层 (< 100 行)
-- [ ] `scripts/python/vibe3/services/flow_service.py` Flow 业务逻辑 (< 300 行)
-- [ ] `scripts/python/vibe3/ui/flow_ui.py` UI 渲染层
+- [ ] `src/vibe3/commands/flow.py` Flow 命令层 (< 100 行)
+- [ ] `src/vibe3/services/flow_service.py` Flow 业务逻辑 (< 300 行)
+- [ ] `src/vibe3/ui/flow_ui.py` UI 渲染层
 - [ ] 命令实现：`new`, `bind`, `show`, `status`, `list`
 
 **验收标准**：
@@ -1342,9 +1342,9 @@ skills 不重做，但要分阶段适配：
 **目标**：实现完整的 task 命令集
 
 **交付物**：
-- [ ] `scripts/python/vibe3/commands/task.py` Task 命令层 (< 100 行)
-- [ ] `scripts/python/vibe3/services/task_service.py` Task 业务逻辑 (< 300 行)
-- [ ] `scripts/python/vibe3/ui/task_ui.py` UI 渲染层
+- [ ] `src/vibe3/commands/task.py` Task 命令层 (< 100 行)
+- [ ] `src/vibe3/services/task_service.py` Task 业务逻辑 (< 300 行)
+- [ ] `src/vibe3/ui/task_ui.py` UI 渲染层
 - [ ] 命令实现：`add`, `link`, `show`, `list`, `update`
 
 **验收标准**：
@@ -1367,9 +1367,9 @@ skills 不重做，但要分阶段适配：
 **目标**：实现 PR 命令集与发布流程
 
 **交付物**：
-- [ ] `scripts/python/vibe3/commands/pr.py` PR 命令层 (< 100 行)
-- [ ] `scripts/python/vibe3/services/pr_service.py` PR 业务逻辑 (< 300 行)
-- [ ] `scripts/python/vibe3/clients/github_client.py` GitHub API 客户端
+- [ ] `src/vibe3/commands/pr.py` PR 命令层 (< 100 行)
+- [ ] `src/vibe3/services/pr_service.py` PR 业务逻辑 (< 300 行)
+- [ ] `src/vibe3/clients/github_client.py` GitHub API 客户端
 - [ ] 命令实现：`draft`, `show`, `review`, `ready`, `merge`
 
 **验收标准**：
@@ -1666,7 +1666,7 @@ No flows found
 - **工具**: pytest + pytest-cov
 
 #### 4.4 依赖管理
-**允许的依赖** (见 [03-coding-standards.md](../v3/implementation/03-coding-standards.md)):
+**允许的依赖** (见 [03-coding-standards.md](../v3/infrastructure/03-coding-standards.md)):
 - typer: CLI 框架
 - rich: 终端输出
 - pydantic: 数据验证

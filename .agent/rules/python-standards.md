@@ -7,8 +7,8 @@ author: Claude Sonnet 4.6
 created: 2026-03-15
 last_updated: 2026-03-15
 related_docs:
-  - docs/v3/implementation/02-architecture.md
-  - docs/v3/implementation/03-coding-standards.md
+  - docs/v3/infrastructure/02-architecture.md
+  - docs/v3/infrastructure/03-coding-standards.md
   - docs/standards/glossary.md
   - SOUL.md
   - CLAUDE.md
@@ -29,6 +29,39 @@ related_docs:
 ### Python 版本
 - **最低版本**：Python 3.10+
 - **类型语法**：使用 Python 3.10+ 类型语法（`str | None` 而非 `Optional[str]`）
+
+### 依赖管理（强制）
+
+**本项目使用 uv 管理依赖和虚拟环境**：
+- **配置文件**：`pyproject.toml`（项目根目录）
+- **安装依赖**：`uv sync`
+- **添加依赖**：`uv add <package>`
+- **移除依赖**：`uv remove <package>`
+- **运行命令**：`uv run <command>`
+- **运行 Python**：`uv run python`（**禁止直接使用 `python` 或 `python3`**）
+
+**禁止**：
+- ❌ 使用 `python`、`python3`、`pip`、`pip3` 等命令
+- ❌ 手动创建虚拟环境（`python -m venv`）
+- ❌ 使用 `requirements.txt`（统一用 `pyproject.toml`）
+
+**正确示例**：
+```bash
+# ✅ 运行 Python 脚本
+uv run python src/vibe3/cli.py
+
+# ✅ 运行测试
+uv run pytest
+
+# ✅ 运行 mypy
+uv run mypy src/vibe3
+
+# ❌ 错误：直接使用 python
+python src/vibe3/cli.py
+
+# ❌ 错误：使用 pip
+pip install requests
+```
 
 ### 核心依赖（必须）
 
@@ -129,7 +162,7 @@ from vibe3.models.pr import PRRequest
 ### 目录结构（强制）
 
 ```
-scripts/python/vibe3/
+src/vibe3/
 ├── cli.py                    # Typer 入口
 ├── commands/                 # 命令调度层（薄层）
 │   ├── pr.py                # PR 命令
@@ -461,11 +494,11 @@ warn_return_any = true
 warn_unused_ignores = true
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py310"
 
 [tool.black]
-line-length = 100
+line-length = 88
 target-version = ["py310"]
 ```
 
@@ -473,7 +506,7 @@ target-version = ["py310"]
 
 ## 参考文档
 
-- **[docs/v3/implementation/](../../docs/v3/implementation/README.md)** - 实施指南
+- **[docs/v3/infrastructure/](../../docs/v3/infrastructure/README.md)** - 实施指南
 - **[SOUL.md](../../SOUL.md)** - 项目宪法
 - **[CLAUDE.md](../../CLAUDE.md)** - 项目上下文
 

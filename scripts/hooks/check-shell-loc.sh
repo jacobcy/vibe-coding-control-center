@@ -1,14 +1,28 @@
 #!/usr/bin/env bash
-# Check Shell LOC ceiling (lib/ + bin/ + lib3/ ≤ 7000)
-# Used by pre-commit hooks
+# Check Shell LOC ceiling (core code only)
+# Delegates to shell_metrics_collector for consistent LOC counting.
+#
+# Code paths (defined in config/settings.yaml:code_limits.code_paths.v2_shell):
+#   - lib/
+#   - lib3/
+#   - bin/vibe
+#
+# Note: scripts/ NOT included in total LOC (checked separately for single-file limits only)
 
 set -e
 
-total=$(find lib/ bin/ lib3/ -name "*.sh" -o -name "vibe" 2>/dev/null | xargs cat 2>/dev/null | wc -l)
+result=$(PYTHONPATH=src uv run python -c "
+from vibe3.services.shell_metrics_collector import collect_shell_metrics
+m = collect_shell_metrics()
+print(f'{m.total_loc} {m.limit_total}')
+" 2>/dev/null)
 
-if [ "$total" -gt 7000 ]; then
-  echo "FAIL: Total Shell LOC $total exceeds 7000 limit"
+total=$(echo "$result" | awk '{print $1}')
+LIMIT=$(echo "$result" | awk '{print $2}')
+
+if [ "$total" -gt "$LIMIT" ]; then
+  echo "FAIL: Total Shell LOC $total exceeds $LIMIT limit"
   exit 1
 else
-  echo "✅ Total Shell LOC: $total / 7000"
+  echo "✅ Total Shell LOC: $total / $LIMIT"
 fi

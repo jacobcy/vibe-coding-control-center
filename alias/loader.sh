@@ -38,7 +38,7 @@ export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
 # ── Source Aliases ────────────────────────────────────────
 _al_src_dir="$VIBE_ROOT/alias"
-for f in git.sh tmux.sh worktree.sh claude.sh opencode.sh openspec.sh vibe.sh; do
+for f in git.sh tmux.sh worktree.sh claude.sh opencode.sh openspec.sh vibe.sh vibe3.sh; do
   [[ -f "$_al_src_dir/$f" ]] && source "$_al_src_dir/$f"
 done
 

@@ -25,34 +25,34 @@ repos:
         pass_filenames: true
 
       - id: lint-sh
-        name: Custom Lint (scripts/lint.sh)
-        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && bash scripts/lint.sh' --
+        name: Custom Lint (scripts/hooks/lint.sh)
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && bash scripts/hooks/lint.sh' --
         language: system
         pass_filenames: false
 
   # ── Python Checks ───────────────────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
+    rev: v0.15.6
     hooks:
       - id: ruff
         name: Ruff (Python linter)
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
         args: ['--fix']
 
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 23.12.1
+    rev: 26.3.1
     hooks:
       - id: black
         name: Black (Python formatter)
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
 
   - repo: local
     hooks:
       - id: mypy
         name: MyPy (Python type checker)
-        entry: uv run mypy scripts/python
+        entry: uv run mypy src
         language: system
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
         pass_filenames: false
         types: [python]
 
@@ -67,17 +67,34 @@ repos:
         files: \.(sh|bash)$
 
       - id: check-python-loc
-        name: Check Python LOC ceiling (scripts/python ≤ 3000)
+        name: Check Python LOC ceiling (src ≤ config:code_limits.v3_python.total_loc)
         entry: scripts/hooks/check-python-loc.sh
         language: script
         pass_filenames: false
-        files: ^scripts/python/.*\.py$
+        files: ^src/.*\.py$
 
       - id: check-per-file-loc
-        name: Check per-file LOC ceiling (≤ 300 lines each)
+        name: "Check source file LOC (default: 200, max: 300)"
         entry: scripts/hooks/check-per-file-loc.sh
         language: script
         pass_filenames: false
+
+      - id: check-test-file-loc
+        name: "Check test file LOC (default: 200, max: 300)"
+        entry: scripts/hooks/check-test-file-loc.sh
+        language: script
+        pass_filenames: false
+        files: ^tests/vibe3/.*\.py$
+
+  # ── Pre-push Checks (run on push, not commit) ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pre-push-checks
+        name: Pre-push checks (coverage + risk-based review)
+        entry: scripts/hooks/pre-push.sh
+        language: script
+        pass_filenames: false
+        stages: [push]
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)
@@ -89,7 +106,7 @@ repos:
   #       entry: uv run pytest tests/vibe3 -v
   #       language: system
   #       pass_filenames: false
-  #       files: ^(scripts/python|tests/vibe3)/.*\.py$
+  #       files: ^(src|tests/vibe3)/.*\.py$
   #
   #     - id: bats
   #       name: Bats (Shell tests)

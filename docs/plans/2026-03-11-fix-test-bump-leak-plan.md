@@ -12,7 +12,7 @@ related_docs:
 
 # Goal
 
-让 `tests/flow/test_flow_pr_review.bats` 中与 `_flow_pr` 相关的用例在隔离目录内运行，避免 `scripts/bump.sh` 副作用泄漏到仓库根目录。
+让 `tests/flow/test_flow_pr_review.bats` 中与 `_flow_pr` 相关的用例在隔离目录内运行，避免 `scripts/hooks/bump.sh` 副作用泄漏到仓库根目录。
 
 # Non-Goals
 

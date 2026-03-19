@@ -329,7 +329,7 @@ Expected:
 Run:
 
 ```bash
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 rg -n "worktrees\\.json" lib tests docs/standards docs/plans
 rg -n "current_task|\\.tasks\\[|runtime_branch|runtime_worktree_name" lib tests
 ```

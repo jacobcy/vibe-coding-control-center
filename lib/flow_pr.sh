@@ -219,7 +219,7 @@ _flow_pr() {
   fi
 
   if [[ $skip_bump -eq 0 ]]; then
-    log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/bump.sh "$bump_type" "$version_msg" || return 1
+    log_step "Bumping version ($bump_type) and updating CHANGELOG..."; ./scripts/hooks/bump.sh "$bump_type" "$version_msg" || return 1
     managed_files+=("VERSION" "CHANGELOG.md")
     _flow_pr_stage_managed_files "${managed_files[@]}" || return 1
     _flow_pr_commit_managed_files "chore: bump version to $(cat VERSION)" "${managed_files[@]}" || return 1

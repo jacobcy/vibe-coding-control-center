@@ -1,0 +1,86 @@
+# Vibe Center 配置文件
+# 用于管理代码质量限制、审核范围、质量标准等
+
+# 代码量控制
+code_limits:
+  single_file_loc:
+    default: 200           # 单文件默认限制（所有类型）
+    max: 300              # 单文件最大限制（所有类型）
+
+  total_file_loc:
+    v2_shell: 7000         # Shell 核心代码总行数
+    v3_python: 12000        # Python 核心代码总行数
+
+  # 统计口径（路径定义）
+  code_paths:
+    v2_shell:              # Shell 核心代码路径
+      - "lib/"
+      - "lib3/"
+      - "bin/vibe"
+    v3_python:             # Python 核心代码路径
+      - "src/vibe3/"
+
+  scripts_paths:
+    v2_shell:              # Shell 工具脚本路径
+      - "scripts/"
+    v3_python:             # Python 工具脚本路径
+      - "scripts/"
+
+  test_paths:
+    v2_shell:              # Shell 测试路径
+      - "tests/vibe2/"
+    v3_python:             # Python 测试路径
+      - "tests/vibe3/"
+
+# 审核范围（适配 vibe-center 实际结构）
+review_scope:
+  critical_paths:            # 关键路径（重点审核）
+    - "bin/"                 # CLI 入口
+    - "lib/flow"             # Flow 核心逻辑
+    - "lib/git"              # Git 操作
+    - "lib/github"           # GitHub 集成
+    - "src/vibe3/services/"  # v3 服务层
+
+  public_api_paths:          # 公开 API（兼容性检查）
+    - "bin/vibe"             # 主入口
+    - "lib/flow.sh"          # Flow 公开接口
+    - "src/vibe3/commands/"  # v3 命令层
+
+# 质量标准
+quality:
+  test_coverage:
+    services: 80             # Services 层 ≥ 80%
+    clients: 70              # Clients 层 ≥ 70%
+    commands: 60             # Commands 层 ≥ 60%
+
+# PR 评分配置
+pr_scoring:
+  weights:
+    changed_lines:
+      small: 0               # <50 行
+      medium: 1              # 50-200 行
+      large: 2               # 200-500 行
+      xlarge: 3              # >500 行
+    changed_files:
+      small: 0               # 1-3 文件
+      medium: 1              # 4-10 文件
+      large: 2               # >10 文件
+    impacted_modules:
+      small: 0               # 1 模块
+      medium: 1              # 2-4 模块
+      large: 2               # ≥5 模块
+    critical_path_touch: 2
+    public_api_touch: 2
+    cross_module_symbol_change: 2
+    codex_major: 3
+    codex_critical: 5
+
+  thresholds:
+    medium: 3
+    high: 6
+    critical: 9
+
+  merge_gate:
+    block_on_score_at_or_above: 9
+    block_on_verdict:
+      - "BLOCK"

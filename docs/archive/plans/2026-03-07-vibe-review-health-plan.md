@@ -30,7 +30,7 @@ I'm using the writing-plans skill to create the implementation plan.
 
 ### Task 2: 校验代码规则与容量
 
-**Files:** `lib/flow*.sh`, `lib/task*.sh`, `lib/roadmap*.sh`, `scripts/metrics.sh`, `skills/vibe-review-code/SKILL.md`
+**Files:** `lib/flow*.sh`, `lib/task*.sh`, `lib/roadmap*.sh`, `scripts/tools/metrics.sh`, `skills/vibe-review-code/SKILL.md`
 
 **Step 1: 统计 `bin/ + lib/` 总行数**
 - Run:
@@ -49,7 +49,7 @@ PY
 - Expected: 报告中列出位置，若集中在新代码区需 mark 观察为 Minor 或 Major。
 
 **Step 3: 运行脚本 lint 并捕获安全问题**
-- Run: `bash scripts/lint.sh`
+- Run: `bash scripts/hooks/lint.sh`
 - Expected: 零错误，所有 shellcheck 提示已解决；如报错，记录相关文件/行。
 
 **Step 4: 评估 `skills/vibe-review-code/SKILL.md` 说明是否还可执行**
@@ -96,7 +96,7 @@ PY
 ## Suggested Test Commands Recap
 1. `bash scripts/serena_gate.sh --base main...HEAD` (expect JSON report)
 2. `bats tests/test_review_skills.bats tests/test_flow.bats tests/test_metrics.bats` (expect PASS)
-3. `bash scripts/lint.sh` (expect no warnings)
+3. `bash scripts/hooks/lint.sh` (expect no warnings)
 4. `bin/vibe check` (expect OK)
 
 ## Expected Change Summary (after execution)

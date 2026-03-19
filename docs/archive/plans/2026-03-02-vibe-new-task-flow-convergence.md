@@ -281,7 +281,7 @@ Run:
 bats tests/test_task.bats
 bats tests/test_flow.bats
 bats tests/test_vibe.bats
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 ```
 
 Expected:
@@ -310,7 +310,7 @@ Expected:
 bats tests/test_task.bats
 bats tests/test_flow.bats
 bats tests/test_vibe.bats
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 ```
 
 ## Expected Result

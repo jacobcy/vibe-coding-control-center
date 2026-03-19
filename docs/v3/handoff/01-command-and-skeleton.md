@@ -1,0 +1,86 @@
+---
+document_type: plan
+title: Phase 01 - CLI Skeleton & Contract
+status: completed
+author: Claude Sonnet 4.6
+created: 2026-03-15
+last_updated: 2026-03-15
+related_docs:
+  - docs/v3/handoff/v3-rewrite-plan.md
+  - docs/v3/infrastructure/02-architecture.md
+  - docs/v3/infrastructure/03-coding-standards.md
+---
+
+# Phase 01: CLI Skeleton & Contract
+
+**Goal**: Establish the `vibe3` entry point and the dispatching logic to domain managers.
+
+## 1. Context Anchor (Optional)
+If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3-rewrite-plan.md).
+
+## 2. Pre-requisites (Executor Entry)
+- [ ] Working Directory is the project root.
+- [ ] No `bin/vibe3` processes are running in the background.
+
+## 3. Directory Structure
+
+```text
+bin/vibe3 (Executable Shell)
+├── lib3/vibe.sh (Router Logic)
+└── src/vibe3/
+    ├── cli.py (Typer Entry, < 50 lines)
+    ├── commands/ (Command dispatch, < 100 lines each)
+    │   ├── flow.py
+    │   ├── task.py
+    │   └── pr.py
+    ├── models/ (Pydantic data models)
+    └── config/ (Configuration)
+```
+
+## 3. 通用架构约束（所有 Phase 必须遵守）
+
+**架构设计**: [02-architecture.md](../infrastructure/02-architecture.md)
+**编码标准**: [03-coding-standards.md](../infrastructure/03-coding-standards.md)
+**测试标准**: [04-test-standards.md](../infrastructure/04-test-standards.md)
+**数据库字段**: [handoff-store-standard.md](../../standards/v3/handoff-store-standard.md)
+
+**核心原则**：
+- 严格遵循 5 层架构（CLI → Commands → Services → Clients → Models）
+- 使用 typer, rich, pydantic, loguru
+- 所有命令支持核心参数集（--trace, -v, --json, -y）
+- GitHub 为唯一真源，SQLite 只做责任链索引
+
+**违反规范将导致验收失败，不予合并。**
+
+### Domain Dispatching
+Must support the following subcommands with `--help` output:
+- `vibe3 flow {new|bind|show|status}`
+- `vibe3 task {list|show|link}`
+- `vibe3 pr {draft|show|ready|merge}`
+
+### Global Flags
+- `--json`: Force JSON output to STDOUT.
+- `-y / --yes`: Skip all interactive prompts.
+
+## 3. Technical Implementation
+
+- **Shell Layer**: `bin/vibe3` should proxy arguments to `lib3/vibe.sh`.
+- **Python Bridge**: Use **typer** (not argparse) in `vibe3/cli.py` to handle nested subcommands.
+- **Error Codes**: Use standard Unix exit codes (0 for success, non-zero for errors).
+- **Output**: Use **rich** for formatted output, never use print().
+- **Architecture**: Follow strict layering (CLI → Commands → Services → Clients → Models).
+
+## 4. Acceptance Criteria (Command-Only)
+
+- [ ] `vibe3 flow --help` exit code is 0.
+- [ ] `vibe3 task --help` exit code is 0.
+- [ ] `vibe3 --json flow status` returns a valid JSON object (even if empty).
+- [ ] `mypy src/vibe3/ --strict` passes.
+- [ ] No usage of `argparse` (must use typer).
+- [ ] No usage of `print()` (must use rich or logger).
+
+## 5. Handoff for Executor 02
+
+- [ ] Ensure `src/vibe3/cli.py` contains basic typer setup for `flow`, `task`, and `pr` subcommands.
+- [ ] Ensure each command file (flow.py, task.py, pr.py) has skeleton command handlers.
+- [ ] Log the completion status in `.agent/context/task.md` (or equivalent).

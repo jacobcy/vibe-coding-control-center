@@ -6,9 +6,9 @@ author: Claude Sonnet 4.6
 created: 2026-03-16
 last_updated: 2026-03-16
 related_docs:
-  - docs/v3/plans/03-pr-domain.md
-  - docs/v3/implementation/02-architecture.md
-  - docs/v3/implementation/03-coding-standards.md
+  - docs/v3/handoff/03-pr-domain.md
+  - docs/v3/infrastructure/02-architecture.md
+  - docs/v3/infrastructure/03-coding-standards.md
   - docs/standards/v3/github-remote-call-standard.md
 ---
 
@@ -55,7 +55,7 @@ related_docs:
 - 简化 `calculate_version_bump()` 方法
 
 **新增文件**:
-- `scripts/python/vibe3/services/version_service.py` (88 行)
+- `src/vibe3/services/version_service.py` (88 行)
 
 **结果**: ✅ 282 行，符合 < 300 行限制
 
@@ -86,7 +86,7 @@ return pr
 ```
 
 **影响文件**:
-- `scripts/python/vibe3/clients/github_client.py` (4 处修复)
+- `src/vibe3/clients/github_client.py` (4 处修复)
 
 #### 2.2 Flow Service 类型安全
 
@@ -104,11 +104,11 @@ if task_id and task_issue_number is not None:
 ```
 
 **影响文件**:
-- `scripts/python/vibe3/services/flow_service.py` (1 处修复)
+- `src/vibe3/services/flow_service.py` (1 处修复)
 
 **验证结果**:
 ```bash
-$ uv run mypy --strict scripts/python/vibe3/
+$ uv run mypy --strict src/vibe3/
 Success: no issues found in 21 source files
 ```
 
@@ -187,7 +187,7 @@ $ uv run pytest tests/ -v
 ### 1. 架构优化
 
 **新增服务**:
-- `scripts/python/vibe3/services/version_service.py` - 版本计算服务
+- `src/vibe3/services/version_service.py` - 版本计算服务
 
 **职责分离**:
 - PR Service: PR 业务逻辑
@@ -299,17 +299,17 @@ if not pr:
 
 ### 新增文件
 
-1. `scripts/python/vibe3/services/version_service.py` - 版本计算服务
+1. `src/vibe3/services/version_service.py` - 版本计算服务
 2. `tests/vibe3/clients/test_github_client.py` - GitHub client 测试
 3. `tests/vibe3/services/test_version_service.py` - Version service 测试
 4. `tests/vibe3/services/test_pr_service.py` - PR service 测试
 
 ### 修改文件
 
-1. `scripts/python/vibe3/commands/pr.py` - 简化参数，减少行数
-2. `scripts/python/vibe3/services/pr_service.py` - 提取 version bump 逻辑
-3. `scripts/python/vibe3/clients/github_client.py` - 修复类型安全问题
-4. `scripts/python/vibe3/services/flow_service.py` - 修复类型安全问题
+1. `src/vibe3/commands/pr.py` - 简化参数，减少行数
+2. `src/vibe3/services/pr_service.py` - 提取 version bump 逻辑
+3. `src/vibe3/clients/github_client.py` - 修复类型安全问题
+4. `src/vibe3/services/flow_service.py` - 修复类型安全问题
 
 ---
 

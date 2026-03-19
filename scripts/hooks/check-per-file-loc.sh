@@ -1,34 +1,100 @@
 #!/usr/bin/env bash
-# Check per-file LOC ceiling (≤ 300 lines each)
-# Used by pre-commit hooks
+# Check per-file LOC ceiling for source files
+# Reads limits from config/settings.yaml
+#
+# Limits (unified for Shell and Python):
+#   default: 200 lines (most files should fit)
+#   max: 300 lines (special cases with justification)
+#
+# Code paths (defined in config/settings.yaml:code_limits.code_paths):
+#   Shell: lib/, lib3/, bin/vibe
+#   Python: src/vibe3/
+#
+# Scripts paths (defined in config/settings.yaml:code_limits.scripts_paths):
+#   Shell: scripts/ (*.sh files)
+#   Python: scripts/ (*.py files)
+#
+# Note: scripts/ are checked for single-file limits but NOT counted in total LOC
+#
+# Exit codes:
+#   0: All files within default limit
+#   1: Some files exceed max limit
 
 set -e
 
-failed=0
+get_limit() {
+  PYTHONPATH=src uv run python -m vibe3.config.get \
+    "$1" -c config/settings.yaml --quiet 2>/dev/null || echo "$2"
+}
 
-# Check Shell files
+# Get limits (unified for all file types)
+LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 200)
+LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
+
+warnings=0
+errors=0
+
+check_file() {
+  local f="$1"
+  local lines
+  lines=$(wc -l < "$f")
+
+  # Check max limit (error)
+  if [ "$lines" -gt "$LIMIT_MAX" ]; then
+    echo "❌ ERROR: $f has $lines lines (max: $LIMIT_MAX)"
+    errors=$((errors + 1))
+  # Check default limit (warning)
+  elif [ "$lines" -gt "$LIMIT_DEFAULT" ]; then
+    echo "⚠️  WARNING: $f has $lines lines (default: $LIMIT_DEFAULT, max: $LIMIT_MAX)"
+    warnings=$((warnings + 1))
+  fi
+}
+
+# Check Shell files (paths defined in config: code_limits.code_paths.v2_shell)
 for f in lib/*.sh lib3/*.sh bin/vibe; do
   [ -f "$f" ] || continue
-  lines=$(wc -l < "$f")
-  if [ "$lines" -gt 300 ]; then
-    echo "FAIL: $f has $lines lines (limit: 300)"
-    failed=$((failed + 1))
-  fi
+  check_file "$f"
 done
 
-# Check Python files
-for f in $(find scripts/python/vibe3 -name "*.py" 2>/dev/null); do
+# Check scripts/*.sh files
+for f in $(find scripts/ -name "*.sh" 2>/dev/null); do
   [ -f "$f" ] || continue
-  lines=$(wc -l < "$f")
-  if [ "$lines" -gt 300 ]; then
-    echo "FAIL: $f has $lines lines (limit: 300)"
-    failed=$((failed + 1))
-  fi
+  check_file "$f"
 done
 
-if [ "$failed" -gt 0 ]; then
-  echo "FAIL: $failed files exceed the 300-line limit"
+# Check Python files (paths defined in config: code_limits.code_paths.v3_python)
+for f in $(find src/vibe3 -name "*.py" -not -name "__init__.py" 2>/dev/null); do
+  [ -f "$f" ] || continue
+  check_file "$f"
+done
+
+# Check scripts/*.py files
+for f in $(find scripts/ -name "*.py" 2>/dev/null); do
+  [ -f "$f" ] || continue
+  check_file "$f"
+done
+
+# Report results
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Source file LOC check results:"
+echo "  - Default limit: $LIMIT_DEFAULT lines"
+echo "  - Max limit: $LIMIT_MAX lines"
+echo "  - Warnings: $warnings files (default → max)"
+echo "  - Errors: $errors files (exceed max)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "$errors" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Split large files into smaller, focused modules"
+  echo "   - Extract utilities to separate files"
+  echo "   - Use composition over inheritance"
+  echo "   - Follow Single Responsibility Principle"
   exit 1
+elif [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "💡 Tip: Consider refactoring files exceeding default limit"
+  echo "   (Warnings are allowed, but keep below max limit)"
 else
-  echo "✅ All files within 300-line limit"
+  echo "✅ All source files within default limit ($LIMIT_DEFAULT lines)"
 fi

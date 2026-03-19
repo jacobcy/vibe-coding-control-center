@@ -173,7 +173,7 @@ git commit -m "test: expand bats test suite to ≥20 cases covering all modules"
 
 **Files:**
 - Create: `.shellcheckrc`
-- Create: `scripts/lint.sh`
+- Create: `scripts/hooks/lint.sh`
 
 **Step 1: 创建 ShellCheck 配置**
 
@@ -192,13 +192,13 @@ disable=SC1091
 
 **Step 2: 创建双层 lint 脚本**
 
-`scripts/lint.sh` 执行两层检查：
+`scripts/hooks/lint.sh` 执行两层检查：
 1. **Layer 1: `zsh -n`** — Zsh 原生语法验证（严格，0 容忍）
 2. **Layer 2: `shellcheck -s bash`** — 代码质量 lint（error 级别 0 容忍，warning 允许但报告）
 
 ```bash
 #!/usr/bin/env bash
-# scripts/lint.sh — Dual-layer shell lint: zsh -n (syntax) + shellcheck (quality)
+# scripts/hooks/lint.sh — Dual-layer shell lint: zsh -n (syntax) + shellcheck (quality)
 set -e
 
 echo "=== Layer 1: Zsh Syntax Check (zsh -n) ==="
@@ -228,7 +228,7 @@ echo "✅ Lint complete. 0 errors."
 
 **Step 3: 运行 lint**
 
-Run: `bash scripts/lint.sh`
+Run: `bash scripts/hooks/lint.sh`
 Expected: 0 errors（warnings 作为信息输出但不阻塞）
 
 **Step 4: 修复 ShellCheck 发现的 error 级别问题**
@@ -247,7 +247,7 @@ Expected: 所有测试通过
 **Step 6: Commit**
 
 ```bash
-git add .shellcheckrc scripts/lint.sh
+git add .shellcheckrc scripts/hooks/lint.sh
 git commit -m "chore: integrate dual-layer lint (zsh -n + shellcheck)"
 ```
 
@@ -385,7 +385,7 @@ Job steps：
 1. checkout
 2. install bats-core (`brew install bats-core` or apt)
 3. install shellcheck
-4. run `bash scripts/lint.sh` (双层 lint)
+4. run `bash scripts/hooks/lint.sh` (双层 lint)
 5. run `bats tests/` (Unit tests)
 6. run LOC check: `find lib/ bin/ -name '*.sh' -o -name 'vibe' | xargs wc -l` 并验证 ≤ 1200
 7. run 单文件上限检查: 验证所有文件 ≤ 200 行
@@ -405,7 +405,7 @@ git commit -m "ci: add shellcheck + bats + loc-ceiling pipeline"
 ### Task 3.2: 度量仪表盘 (Metrics Dashboard)
 
 **Files:**
-- Create: `scripts/metrics.sh`
+- Create: `scripts/tools/metrics.sh`
 
 **Step 1: 编写度量脚本**
 
@@ -437,13 +437,13 @@ git commit -m "ci: add shellcheck + bats + loc-ceiling pipeline"
 
 **Step 2: 运行并验证**
 
-Run: `bash scripts/metrics.sh`
+Run: `bash scripts/tools/metrics.sh`
 Expected: Markdown 表格输出，所有指标在健康范围内
 
 **Step 3: Commit**
 
 ```bash
-git add scripts/metrics.sh
+git add scripts/tools/metrics.sh
 git commit -m "chore: add MSC health metrics dashboard"
 ```
 
@@ -461,7 +461,7 @@ git commit -m "chore: add MSC health metrics dashboard"
 
 **Step 2: 运行 metrics.sh 贴结果作为证据**
 
-Run: `bash scripts/metrics.sh`
+Run: `bash scripts/tools/metrics.sh`
 贴输出到文档中作为实际数据支撑。
 
 **Step 3: Commit**
@@ -479,17 +479,17 @@ git commit -m "docs: update MSC self-audit to reflect compliance status"
 
 | # | 条件 | 验证方式 |
 |---|---|---|
-| 1 | 所有文件 ≤ 200 行 | `scripts/metrics.sh` |
-| 2 | 总 LOC ≤ 1200 | `scripts/metrics.sh` |
+| 1 | 所有文件 ≤ 200 行 | `scripts/tools/metrics.sh` |
+| 2 | 总 LOC ≤ 1200 | `scripts/tools/metrics.sh` |
 | 3 | CLI Spec 存在且覆盖所有命令 | `cat openspec/specs/cli-commands.yaml` |
 | 4 | 测试用例 ≥ 20 个且全部通过 | `bats tests/` |
-| 5 | `zsh -n` 全部 PASS | `bash scripts/lint.sh` |
-| 6 | ShellCheck 0 error | `bash scripts/lint.sh` |
+| 5 | `zsh -n` 全部 PASS | `bash scripts/hooks/lint.sh` |
+| 6 | ShellCheck 0 error | `bash scripts/hooks/lint.sh` |
 | 7 | Serena 配置正确且有使用规范 | `.serena/project.yml` + `docs/standards/serena-usage.md` |
 | 8 | test-runner Skill 包含三层验证 + 3 轮熔断 | `cat skills/vibe-test-runner/SKILL.md` |
 | 9 | CI Pipeline 绿色 | GitHub Actions |
-| 10 | 度量脚本可用且全绿 | `bash scripts/metrics.sh` |
-| 11 | 死代码 = 0 | `scripts/metrics.sh` |
+| 10 | 度量脚本可用且全绿 | `bash scripts/tools/metrics.sh` |
+| 11 | 死代码 = 0 | `scripts/tools/metrics.sh` |
 | 12 | docs/model-spec-context.md 自检全绿 | 人工确认 |
 
 ## 变更汇总
@@ -505,8 +505,8 @@ git commit -m "docs: update MSC self-audit to reflect compliance status"
 | 新增 | `tests/test_keys.bats` | ~30 行 |
 | 新增 | `tests/test_utils.bats` | ~30 行 |
 | 新增 | `.shellcheckrc` | ~5 行 |
-| 新增 | `scripts/lint.sh` | ~25 行 |
-| 新增 | `scripts/metrics.sh` | ~60 行 |
+| 新增 | `scripts/hooks/lint.sh` | ~25 行 |
+| 新增 | `scripts/tools/metrics.sh` | ~60 行 |
 | 新增 | `skills/vibe-test-runner/SKILL.md` | ~70 行 |
 | 新增 | `docs/standards/serena-usage.md` | ~40 行 |
 | 新增 | `.github/workflows/ci.yml` | ~45 行 |

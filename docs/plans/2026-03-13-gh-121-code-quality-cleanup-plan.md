@@ -279,7 +279,7 @@ git commit -m "test: remove redundant non-gh-152 coverage"
 Run:
 
 ```bash
-bash scripts/lint.sh
+bash scripts/hooks/lint.sh
 bats tests/roadmap/test_roadmap_query.bats \
      tests/roadmap/test_roadmap_write_audit.bats \
      tests/roadmap/test_roadmap_status_render.bats \

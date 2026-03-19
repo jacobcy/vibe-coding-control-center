@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# post-commit hook - 轻量通知（commit-msg 已完成格式检查和 AST 分析）
+set -euo pipefail
+
+# 只输出 commit 信息
+echo "✓ Commit created: $(git rev-parse --short HEAD)"

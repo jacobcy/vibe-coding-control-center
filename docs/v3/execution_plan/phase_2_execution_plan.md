@@ -7,7 +7,7 @@
 **边界说明**:
 - 真正语义真源仍是 `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
 - 真正实施真源仍是 `docs/plans/2026-03-13-vibe3-parallel-rebuild-plan.md`
-- 第三轮顺序执行入口仍是 `docs/v3/plans/README.md`
+- 第三轮顺序执行入口仍是 `docs/v3/handoff/README.md`
 - 若本文件与上述真源冲突，以上述真源为准
 - 本文件只服务于 executor 拆解施工顺序，不应被当作标准、规范或 merge 审查依据
 

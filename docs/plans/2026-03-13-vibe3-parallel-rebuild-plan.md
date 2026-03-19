@@ -148,7 +148,7 @@ git commit -m "docs(vibe3): freeze chain and command boundaries"
 Run:
 
 ```bash
-rg -n "lib3|tests3|scripts/python|bin/vibe2|bin/vibe3" docs/plans/2026-03-13-vibe3-parallel-rebuild-*.md
+rg -n "lib3|tests3|src|bin/vibe2|bin/vibe3" docs/plans/2026-03-13-vibe3-parallel-rebuild-*.md
 ```
 
 Expected:
@@ -283,23 +283,23 @@ git commit -m "docs(vibe3): freeze pre-implementation decisions"
 
 ## Task 5: 实施文档已就绪，开始按阶段执行
 
-> **🔥 状态更新**：实施文档已完成！详见 **[docs/v3/implementation/](../v3/implementation/README.md)**
+> **🔥 状态更新**：实施文档已完成！详见 **[docs/v3/infrastructure/](../v3/infrastructure/README.md)**
 
 **Files:**
-- ✅ Created: `docs/v3/implementation/README.md` - 实施索引
-- ✅ Created: `docs/v3/implementation/00-skeleton-setup.md` - 骨架搭建指南
-- ✅ Created: `docs/v3/implementation/01-config-management.md` - 配置管理
-- ✅ Created: `docs/v3/implementation/06-error-handling.md` - 异常处理
-- ✅ Created: `docs/v3/implementation/05-logging.md` - 日志系统
+- ✅ Created: `docs/v3/infrastructure/README.md` - 实施索引
+- ✅ Created: `docs/v3/infrastructure/00-skeleton-setup.md` - 骨架搭建指南
+- ✅ Created: `docs/v3/infrastructure/01-config-management.md` - 配置管理
+- ✅ Created: `docs/v3/infrastructure/06-error-handling.md` - 异常处理
+- ✅ Created: `docs/v3/infrastructure/05-logging.md` - 日志系统
 - ✅ Created: `.agent/rules/python-standards.md` - Python 标准
-- ✅ Updated: `docs/v3/plans/v3-rewrite-plan.md` - 阶段划分
+- ✅ Updated: `docs/v3/handoff/v3-rewrite-plan.md` - 阶段划分
 
 **Step 1: 验证实施文档完整性**
 
 Run:
 
 ```bash
-ls -la docs/v3/implementation/
+ls -la docs/v3/infrastructure/
 ```
 
 Expected:
@@ -311,7 +311,7 @@ Expected:
 Run:
 
 ```bash
-grep -n "Phase [0-9]:" docs/v3/plans/v3-rewrite-plan.md
+grep -n "Phase [0-9]:" docs/v3/handoff/v3-rewrite-plan.md
 ```
 
 Expected:
@@ -323,7 +323,7 @@ Expected:
 **执行顺序**：
 1. **Phase 0**（准备）：阅读设计文档（1-2 小时）
 2. **Phase 1**（骨架）：搭建基础设施（2-3 小时）
-   - 参考：[docs/v3/implementation/00-skeleton-setup.md](../v3/implementation/00-skeleton-setup.md)
+   - 参考：[docs/v3/infrastructure/00-skeleton-setup.md](../v3/infrastructure/00-skeleton-setup.md)
 3. **Phase 2**（Client）：封装外部依赖（3-4 小时）
 4. **Phase 3**（Service）：实现业务逻辑（5-6 小时）
 5. **Phase 4**（Command）：提供命令接口（3-4 小时）
@@ -335,9 +335,9 @@ Expected:
 **Step 4: Commit**
 
 ```bash
-git add docs/v3/implementation/
+git add docs/v3/infrastructure/
 git add .agent/rules/python-standards.md
-git add docs/v3/plans/v3-rewrite-plan.md
+git add docs/v3/handoff/v3-rewrite-plan.md
 git commit -m "docs(v3): complete implementation documentation with phase-based execution plan
 
 - Add Python standards (.agent/rules/python-standards.md)
@@ -353,6 +353,6 @@ git commit -m "docs(v3): complete implementation documentation with phase-based 
 
 现在可以开始执行了！请查看：
 
-1. **[docs/v3/plans/v3-rewrite-plan.md](../v3/plans/v3-rewrite-plan.md)** - 了解各阶段目标
-2. **[docs/v3/implementation/README.md](../v3/implementation/README.md)** - 查看快速开始指南
+1. **[docs/v3/handoff/v3-rewrite-plan.md](../v3/handoff/v3-rewrite-plan.md)** - 了解各阶段目标
+2. **[docs/v3/infrastructure/README.md](../v3/infrastructure/README.md)** - 查看快速开始指南
 3. **[.agent/rules/python-standards.md](../../../.agent/rules/python-standards.md)** - 遵循 Python 标准

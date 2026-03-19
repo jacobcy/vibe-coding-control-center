@@ -1,0 +1,103 @@
+# GitHub PR 自动标签配置
+# 详见: docs/standards/github-labels-standard.md
+
+# 类型标签 (根据分支名)
+type/feature:
+  - head-branch: ['^feat/', '^feature/']
+
+type/fix:
+  - head-branch: ['^fix/', '^bugfix/']
+
+type/refactor:
+  - head-branch: ['^refactor/']
+
+type/docs:
+  - head-branch: ['^docs/', '^documentation/']
+
+type/test:
+  - head-branch: ['^test/', '^testing/']
+
+type/chore:
+  - head-branch: ['^chore/']
+
+type/task:
+  - head-branch: ['^task/']
+
+# 范围标签 (根据文件路径)
+scope/python:
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/**/*.py'
+
+scope/shell-script:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'lib/**/*.sh'
+      - 'scripts/**/*.sh'
+
+scope/documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+
+scope/infrastructure:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**'
+      - '.pre-commit-config.yaml'
+      - 'scripts/hooks/**'
+
+scope/skill:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'skills/**'
+      - '.agent/workflows/**'
+
+scope/supervisor:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.agent/rules/**'
+      - '.agent/context/**'
+
+# 组件标签 (根据文件路径)
+component/cli:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/cli.py'
+      - 'src/vibe3/commands/*.py'
+
+component/flow:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/flow.py'
+      - 'src/vibe3/services/flow_service.py'
+
+component/pr:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/pr*.py'
+      - 'src/vibe3/services/pr_service.py'
+      - 'src/vibe3/clients/github_pr_ops.py'
+
+component/task:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/vibe3/commands/task.py'
+      - 'src/vibe3/services/task_service.py'
+
+component/logger:
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/observability/**'
+
+component/client:
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/clients/**'
+
+component/config:
+  - changed-files:
+    - any-glob-to-any-file: 'src/vibe3/config/**'
+
+# 特殊标签
+breaking-change:
+  - head-branch: ['^breaking/', '^breaking-change/']
