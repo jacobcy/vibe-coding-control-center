@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
+from vibe3.clients.git_diff_utils import extract_file_diff
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,
@@ -45,6 +46,7 @@ class GitClient:
             github_client: 可选的 GitHubClient 实例，用于处理 PR 相关操作
         """
         self._github_client = github_client
+        self._pr_diff_cache: dict[int, str] = {}
 
     def _run(self, args: list[str]) -> str:
         """执行 git 命令，统一错误处理.
@@ -231,8 +233,14 @@ class GitClient:
                 )
             elif source.type == ChangeSourceType.PR:
                 assert isinstance(source, PRSource)
-                # For PR, we need to fetch the diff
-                diff = self._run(["diff", "FETCH_HEAD", "--", file_path])
+                # Use GitHub API to get the full PR diff, then extract this file
+                if not self._github_client:
+                    raise GitError(
+                        "get_diff_hunk_ranges",
+                        "PR source requires GitHubClient injection",
+                    )
+                full_diff = self._get_pr_diff_cached(source.pr_number)
+                diff = extract_file_diff(full_diff, file_path)
             else:
                 # Uncommitted changes
                 diff = self._run(["diff", "HEAD", "--", file_path])
@@ -259,3 +267,21 @@ class GitClient:
             # If git command fails, return empty (graceful degradation)
             log.warning("Failed to get diff hunks, returning empty")
             return []
+
+    def _get_pr_diff_cached(self, pr_number: int) -> str:
+        """Get PR diff with caching.
+
+        Args:
+            pr_number: PR number
+
+        Returns:
+            Full PR diff content
+        """
+        if pr_number not in self._pr_diff_cache:
+            if not self._github_client:
+                raise GitError(
+                    "get_pr_diff_cached",
+                    "PR source requires GitHubClient injection",
+                )
+            self._pr_diff_cache[pr_number] = self._github_client.get_pr_diff(pr_number)
+        return self._pr_diff_cache[pr_number]

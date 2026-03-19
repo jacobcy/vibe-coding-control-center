@@ -14,13 +14,6 @@ from vibe3.models.coverage import CoverageReport, LayerCoverage
 class CoverageService:
     """Service for running and analyzing test coverage by architectural layer."""
 
-    # Default coverage thresholds per layer
-    DEFAULT_THRESHOLDS = {
-        "services": 80,
-        "clients": 80,
-        "commands": 80,
-    }
-
     def __init__(
         self,
         thresholds: dict[str, int] | None = None,
@@ -29,11 +22,32 @@ class CoverageService:
         """Initialize coverage service.
 
         Args:
-            thresholds: Custom coverage thresholds per layer
+            thresholds: Custom coverage thresholds per layer.
+                        If None, reads from config/settings.yaml.
             project_root: Project root directory (defaults to cwd)
         """
-        self.thresholds = thresholds or self.DEFAULT_THRESHOLDS
+        if thresholds is not None:
+            self.thresholds = thresholds
+        else:
+            self.thresholds = self._load_thresholds_from_config()
         self.project_root = project_root or Path.cwd()
+
+    @staticmethod
+    def _load_thresholds_from_config() -> dict[str, int]:
+        """Load coverage thresholds from configuration.
+
+        Returns:
+            Dict of layer name -> threshold percentage
+        """
+        from vibe3.config.loader import get_config
+
+        config = get_config()
+        tc = config.quality.test_coverage
+        return {
+            "services": tc.services,
+            "clients": tc.clients,
+            "commands": tc.commands,
+        }
 
     def run_coverage_check(self) -> CoverageReport:
         """Run pytest with coverage and generate layer-based report.
@@ -96,6 +110,11 @@ class CoverageService:
         """
         cov_file = self.project_root / "coverage.json"
 
+        # Remove old coverage.json to prevent reusing stale data
+        if cov_file.exists():
+            cov_file.unlink()
+            logger.debug("Removed old coverage.json")
+
         cmd = [
             "uv",
             "run",
@@ -122,6 +141,15 @@ class CoverageService:
                 logger.debug(f"pytest stdout:\n{result.stdout}")
             if result.stderr:
                 logger.debug(f"pytest stderr:\n{result.stderr}")
+
+            # Check pytest return code
+            if result.returncode != 0:
+                error_msg = f"pytest failed with return code {result.returncode}"
+                if result.stdout:
+                    error_msg += f"\nstdout:\n{result.stdout}"
+                if result.stderr:
+                    error_msg += f"\nstderr:\n{result.stderr}"
+                raise RuntimeError(error_msg)
 
             # Parse coverage.json
             if not cov_file.exists():

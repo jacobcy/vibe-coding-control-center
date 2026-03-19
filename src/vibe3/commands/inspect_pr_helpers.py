@@ -81,13 +81,13 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
 
 def _get_pr_changed_files(pr_number: int) -> list[str]:
-    """Get list of changed files in a PR (only existing files).
+    """Get list of changed files in a PR (including deleted files).
 
     Args:
         pr_number: PR number
 
     Returns:
-        List of file paths (only files that currently exist)
+        List of all file paths changed in the PR
 
     Raises:
         GitError: Unable to get PR files
@@ -100,21 +100,18 @@ def _get_pr_changed_files(pr_number: int) -> list[str]:
     git = GitClient(github_client=GitHubClient())
     all_changed_files = git.get_changed_files(PRSource(pr_number=pr_number))
 
-    # Filter out files that no longer exist in the repository
-    existing_files = [f for f in all_changed_files if Path(f).exists()]
-    skipped_count = len(all_changed_files) - len(existing_files)
-
-    if skipped_count > 0:
+    # Log deleted files but keep them in the list for counting/scoring
+    deleted_files = [f for f in all_changed_files if not Path(f).exists()]
+    if deleted_files:
         logger.bind(
             domain="inspect",
             action="get_pr_changed_files",
             pr_number=pr_number,
-            total_files=len(all_changed_files),
-            existing_files=len(existing_files),
-            skipped_files=skipped_count,
-        ).warning(f"Skipping {skipped_count} files that no longer exist in repository")
+            deleted_count=len(deleted_files),
+            deleted_files=deleted_files,
+        ).info(f"{len(deleted_files)} deleted files included in PR analysis")
 
-    return existing_files
+    return all_changed_files
 
 
 def _filter_critical_files(files: list[str]) -> list[CriticalFileInfo]:
@@ -175,6 +172,10 @@ def _analyze_critical_files(
     for file_info in critical_files:
         file = file_info["path"]
         if not file.endswith(".py"):
+            continue
+
+        # Skip AST/symbol analysis for deleted files
+        if not Path(file).exists():
             continue
 
         # Extract changed functions

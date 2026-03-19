@@ -19,8 +19,8 @@ def test_hooks_no_args_shows_help():
 def test_hooks_help_flag():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "install-hooks" in result.output
-    assert "uninstall-hooks" in result.output
+    assert "enable" in result.output
+    assert "disable" in result.output
 
 
 def test_install_hooks_success(tmp_path):
@@ -37,12 +37,12 @@ def test_install_hooks_success(tmp_path):
         patch("vibe3.commands.hooks._ROOT", tmp_path),
         patch("os.access", return_value=True),
     ):
-        result = runner.invoke(app, ["install-hooks"])
+        result = runner.invoke(app, ["enable", "--all"])
 
     assert result.exit_code == 0
     # 更新断言以匹配新的输出
     output = result.output
-    assert "Installing all Git hooks" in output or "hooks installed" in output
+    assert "Enabling" in output or "enabled" in output.lower()
     assert (git_hooks / "post-commit").exists()
 
 
@@ -52,7 +52,7 @@ def test_install_hooks_source_missing(tmp_path):
     git_hooks.mkdir(parents=True)
 
     with patch("vibe3.commands.hooks._ROOT", tmp_path):
-        result = runner.invoke(app, ["install-hooks"])
+        result = runner.invoke(app, ["enable", "--all"])
 
     # 新行为：即使某些 hooks 文件缺失，也会尝试安装其他的，最终返回成功
     assert result.exit_code == 0
@@ -66,7 +66,7 @@ def test_uninstall_hooks_exists(tmp_path):
     target.write_text("#!/bin/bash")
 
     with patch("vibe3.commands.hooks._ROOT", tmp_path):
-        result = runner.invoke(app, ["uninstall-hooks"])
+        result = runner.invoke(app, ["disable", "--all"])
 
     assert result.exit_code == 0
     assert not target.exists()
@@ -77,6 +77,6 @@ def test_uninstall_hooks_not_exists(tmp_path):
     (tmp_path / ".git" / "hooks").mkdir(parents=True)
 
     with patch("vibe3.commands.hooks._ROOT", tmp_path):
-        result = runner.invoke(app, ["uninstall-hooks"])
+        result = runner.invoke(app, ["disable", "--all"])
 
     assert result.exit_code == 0

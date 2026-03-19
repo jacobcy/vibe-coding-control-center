@@ -17,14 +17,18 @@ def test_run_coverage_check_success(
     """Test run_coverage_check success."""
     coverage_service.project_root = mock_project_root
     coverage_file = mock_project_root / "coverage.json"
-    coverage_file.write_text(json.dumps(sample_coverage_data))
 
     mock_result = MagicMock()
     mock_result.stdout = "pytest output"
     mock_result.stderr = ""
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    def fake_subprocess_run(*args, **kwargs):
+        # Simulate pytest generating coverage.json
+        coverage_file.write_text(json.dumps(sample_coverage_data))
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
         report = coverage_service.run_coverage_check()
 
         assert isinstance(report, CoverageReport)
@@ -65,14 +69,17 @@ def test_run_coverage_check_with_failures(
 
     coverage_service.project_root = mock_project_root
     coverage_file = mock_project_root / "coverage.json"
-    coverage_file.write_text(json.dumps(low_coverage_data))
 
     mock_result = MagicMock()
     mock_result.stdout = "pytest output"
     mock_result.stderr = ""
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    def fake_subprocess_run(*args, **kwargs):
+        coverage_file.write_text(json.dumps(low_coverage_data))
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
         report = coverage_service.run_coverage_check()
 
         assert report.all_passing is False
@@ -93,14 +100,17 @@ def test_run_coverage_check_empty_project(
 
     coverage_service.project_root = mock_project_root
     coverage_file = mock_project_root / "coverage.json"
-    coverage_file.write_text(json.dumps(empty_data))
 
     mock_result = MagicMock()
     mock_result.stdout = "pytest output"
     mock_result.stderr = ""
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    def fake_subprocess_run(*args, **kwargs):
+        coverage_file.write_text(json.dumps(empty_data))
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
         report = coverage_service.run_coverage_check()
 
         assert report.total_covered == 0

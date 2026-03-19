@@ -12,8 +12,8 @@ def test_coverage_service_initialization(coverage_service: CoverageService) -> N
     """Test coverage service initialization."""
     assert coverage_service.thresholds == {
         "services": 80,
-        "clients": 80,
-        "commands": 80,
+        "clients": 70,
+        "commands": 60,
     }
     assert coverage_service.project_root == Path.cwd()
 
@@ -52,9 +52,11 @@ def test_run_pytest_cov_success(
     mock_result.stderr = ""
     mock_result.returncode = 0
 
-    with patch("subprocess.run", return_value=mock_result):
+    def fake_subprocess_run(*args, **kwargs):
         coverage_file.write_text(json.dumps(sample_coverage_data))
+        return mock_result
 
+    with patch("subprocess.run", side_effect=fake_subprocess_run):
         data = coverage_service._run_pytest_cov()
 
         assert data == sample_coverage_data
@@ -65,13 +67,13 @@ def test_run_pytest_cov_failure(
     coverage_service: CoverageService,
     mock_project_root: Path,
 ) -> None:
-    """Test _run_pytest_cov when coverage.json is not generated."""
+    """Test _run_pytest_cov when pytest fails."""
     coverage_service.project_root = mock_project_root
 
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout="", stderr="error", returncode=1)
 
-        with pytest.raises(RuntimeError, match="coverage.json not generated"):
+        with pytest.raises(RuntimeError, match="pytest failed"):
             coverage_service._run_pytest_cov()
 
 
@@ -83,11 +85,12 @@ def test_subprocess_command_construction(
     """Test that subprocess command is constructed correctly."""
     coverage_service.project_root = mock_project_root
     coverage_file = mock_project_root / "coverage.json"
-    coverage_file.write_text(json.dumps(sample_coverage_data))
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+    def fake_subprocess_run(*args, **kwargs):
+        coverage_file.write_text(json.dumps(sample_coverage_data))
+        return MagicMock(stdout="", stderr="", returncode=0)
 
+    with patch("subprocess.run", side_effect=fake_subprocess_run) as mock_run:
         coverage_service._run_pytest_cov()
 
         called_cmd = mock_run.call_args[0][0]

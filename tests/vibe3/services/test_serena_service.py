@@ -1,6 +1,6 @@
 """SerenaService 单元测试."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -56,7 +56,9 @@ class TestAnalyzeFiles:
 
     def test_summary_counts_files(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
-        result = service.analyze_files(["a.py", "b.py"])
+        with patch("vibe3.services.serena_file_analyzer.Path") as mock_path:
+            mock_path.return_value.exists.return_value = True
+            result = service.analyze_files(["a.py", "b.py"])
         assert result["summary"]["files"] == 2  # type: ignore[index]
 
     def test_empty_files_list(self, mock_client: MagicMock) -> None:

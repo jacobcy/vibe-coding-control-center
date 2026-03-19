@@ -8,8 +8,10 @@ from vibe3.services.coverage_service import CoverageService
 
 @pytest.fixture
 def coverage_service() -> CoverageService:
-    """Create coverage service fixture."""
-    return CoverageService()
+    """Create coverage service fixture with explicit thresholds."""
+    return CoverageService(
+        thresholds={"services": 80, "clients": 70, "commands": 60},
+    )
 
 
 @pytest.fixture

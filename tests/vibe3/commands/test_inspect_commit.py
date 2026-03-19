@@ -32,7 +32,7 @@ def test_inspect_commit_missing_arg_shows_error():
 def test_inspect_commit_with_sha():
     mock = _mock_change_analysis()
     with patch(
-        "vibe3.commands.inspect.build_change_analysis",
+        "vibe3.commands.inspect_change.build_change_analysis",
         return_value=mock,
     ):
         result = runner.invoke(app, ["commit", "abc123"])

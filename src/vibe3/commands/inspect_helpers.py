@@ -5,7 +5,8 @@ from typing import Union
 
 from loguru import logger
 
-# Re-export PR helpers for backward compatibility
+# Re-export from inspect_pr_helpers.
+# Implementation lives in inspect_pr_helpers; mock that module's namespace.
 from vibe3.commands.inspect_pr_helpers import (
     _analyze_critical_files,
     _calculate_risk_score,
