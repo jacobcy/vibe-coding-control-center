@@ -55,15 +55,25 @@ class ReviewAgentOptions:
     - Easy testing and debugging
 
     Attributes:
-        agent: The agent preset name (default: code-reviewer)
-        model: Optional model override (e.g., "gpt-5.4", "claude-3-opus")
+        agent: The agent preset name (mutually exclusive with backend)
+        model: Optional model override (used with backend)
+        backend: Backend name (mutually exclusive with agent)
         timeout_seconds: Maximum execution time (default: 600 seconds)
 
     """
 
-    agent: str = "code-reviewer"
+    agent: str | None = None
     model: str | None = None
+    backend: str | None = None
     timeout_seconds: int = 600
+
+    def __post_init__(self) -> None:
+        """Validate mutually exclusive options."""
+        if self.agent and self.backend:
+            raise ValueError(
+                "agent and backend are mutually exclusive. "
+                "Use either agent preset OR backend+model, not both."
+            )
 
 
 @dataclass(frozen=True)
@@ -95,12 +105,15 @@ class ReviewAgentResult:
         return self.exit_code == 0
 
 
-def run_review_agent(prompt: str, options: ReviewAgentOptions) -> ReviewAgentResult:
+def run_review_agent(
+    prompt: str, options: ReviewAgentOptions, dry_run: bool = False
+) -> ReviewAgentResult:
     """Run a review agent using codeagent-wrapper.
 
     Args:
         prompt: The prompt/instructions to send to the agent
         options: Configuration for the agent run
+        dry_run: If True, print command and prompt without executing
 
     Returns:
         ReviewAgentResult containing exit code and output
@@ -114,16 +127,30 @@ def run_review_agent(prompt: str, options: ReviewAgentOptions) -> ReviewAgentRes
     wrapper_path = DEFAULT_WRAPPER_PATH
 
     # Build command
-    command: list[str] = [
-        str(wrapper_path),
-        "--agent",
-        options.agent,
-    ]
+    command: list[str] = [str(wrapper_path)]
 
-    if options.model:
-        command.extend(["--model", options.model])
+    # Add agent preset OR backend+model
+    if options.agent:
+        command.extend(["--agent", options.agent])
+    elif options.backend:
+        command.extend(["--backend", options.backend])
+        if options.model:
+            command.extend(["--model", options.model])
+    else:
+        # Fallback to default agent if nothing specified
+        command.extend(["--agent", "code-reviewer"])
 
     command.extend(["-", "."])  # Read from stdin
+
+    # Dry-run mode: print command and prompt
+    if dry_run:
+        print("=== Command ===")
+        print(" ".join(command))
+        print("\n=== Prompt ===")
+        print(prompt)
+        print("\n=== End ===")
+        # Return a mock success result
+        return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
     try:
         result = run(

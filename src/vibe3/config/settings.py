@@ -10,6 +10,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from vibe3.config.review_config import AgentConfig
+
 
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
@@ -131,6 +133,10 @@ class ReviewConfig(BaseModel):
     policy_file: str = Field(
         default=".codex/review-policy.md",
         description="Path to review policy file",
+    )
+    agent_config: AgentConfig = Field(
+        default_factory=AgentConfig,
+        description="codeagent-wrapper configuration",
     )
     output_format: str = Field(
         default="",

@@ -52,8 +52,9 @@ class TestReviewAgentOptionsForPrePush:
     def test_default_options_suitable_for_pre_push(self) -> None:
         """Default options should be suitable for pre-push review."""
         options = ReviewAgentOptions()
-        assert options.agent == "code-reviewer"
-        assert options.model is None  # Use default model
+        assert options.agent is None
+        assert options.backend is None
+        assert options.model is None
         assert options.timeout_seconds == 600  # 10 minutes
 
     def test_can_override_model_for_pre_push(self) -> None:

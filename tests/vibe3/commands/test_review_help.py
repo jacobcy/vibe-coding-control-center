@@ -73,21 +73,19 @@ def test_review_analyze_commit_command_removed():
     )
 
 
-def test_review_base_help_mentions_agent_and_model_options():
-    """vibe review base --help should mention --agent and --model options."""
+def test_review_base_help_mentions_dry_run_option():
+    """vibe review base --help should mention --dry-run option."""
     result = runner.invoke(app, ["base", "--help"])
     assert result.exit_code == 0
     # Strip ANSI codes before checking
     output = _strip_ansi(result.output)
-    assert "--agent" in output
-    assert "--model" in output
+    assert "--dry-run" in output
 
 
-def test_review_pr_help_mentions_agent_and_model_options():
-    """vibe review pr --help should mention --agent and --model options."""
+def test_review_pr_help_mentions_dry_run_option():
+    """vibe review pr --help should mention --dry-run option."""
     result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
     # Strip ANSI codes before checking
     output = _strip_ansi(result.output)
-    assert "--agent" in output
-    assert "--model" in output
+    assert "--dry-run" in output

@@ -49,6 +49,16 @@ review_scope:
 # Review 配置
 review:
   policy_file: ".codex/review-policy.md"  # Review policy 文件路径
+
+  # codeagent-wrapper 调用配置（二选一）
+  agent_config:
+    # 方式1: 使用 agent preset（推荐）
+    agent: "code-reviewer"
+
+    # 方式2: 直接指定 backend 和 model（如果不用 preset）
+    # backend: "claude"
+    # model: "claude-3-opus"  # 可选
+
   output_format: |
     Each finding should follow this format:
     path/to/file.py:42 [MAJOR] concise issue description

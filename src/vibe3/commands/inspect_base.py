@@ -104,12 +104,28 @@ def register(app: typer.Typer) -> None:
             )
 
             # Get AST-level analysis: changed functions
+            # Skip test files - they don't need AST analysis
             changed_symbols_by_file: dict[str, list[str]] = {}
+            skipped_tests = 0
             if existing_files:
+                import sys
+
                 from vibe3.services.serena_service import SerenaService
 
                 svc = SerenaService(git_client=git)
                 for file in existing_files:
+                    # Skip test files to save tokens
+                    is_test = (
+                        "/tests/" in file
+                        or "/test/" in file
+                        or file.startswith("test_")
+                        or file.endswith("_test.py")
+                    )
+                    if is_test:
+                        skipped_tests += 1
+                        print(f"[DEBUG] Skipping test file: {file}", file=sys.stderr)
+                        continue
+
                     if file.endswith(".py"):
                         try:
                             changed_funcs = svc.get_changed_functions(
@@ -120,6 +136,12 @@ def register(app: typer.Typer) -> None:
                         except Exception:
                             # Skip files that can't be analyzed
                             pass
+
+            if skipped_tests > 0:
+                print(
+                    f"[INFO] Skipped {skipped_tests} test files for AST analysis",
+                    file=sys.stderr,
+                )
 
             # Calculate score
             has_critical = any(f["critical_path"] for f in core_files)

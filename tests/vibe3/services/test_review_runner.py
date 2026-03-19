@@ -20,22 +20,45 @@ class TestReviewAgentOptions:
     """Tests for ReviewAgentOptions dataclass - immutable configuration."""
 
     def test_default_options(self) -> None:
-        """Default options should be code-reviewer agent with default settings."""
+        """Default options should have None for agent/backend/model."""
         options = ReviewAgentOptions()
-        assert options.agent == "code-reviewer"
+        assert options.agent is None
         assert options.model is None
+        assert options.backend is None
         assert options.timeout_seconds == 600
 
-    def test_custom_options(self) -> None:
-        """Should support custom agent, model."""
+    def test_custom_options_with_agent(self) -> None:
+        """Should support custom agent preset."""
         options = ReviewAgentOptions(
             agent="code-reviewer",
-            model="gpt-5.4",
             timeout_seconds=300,
         )
         assert options.agent == "code-reviewer"
-        assert options.model == "gpt-5.4"
+        assert options.model is None
+        assert options.backend is None
         assert options.timeout_seconds == 300
+
+    def test_custom_options_with_backend(self) -> None:
+        """Should support backend + model specification."""
+        options = ReviewAgentOptions(
+            backend="claude",
+            model="claude-3-opus",
+            timeout_seconds=300,
+        )
+        assert options.agent is None
+        assert options.backend == "claude"
+        assert options.model == "claude-3-opus"
+        assert options.timeout_seconds == 300
+
+    def test_agent_and_backend_are_mutually_exclusive(self) -> None:
+        """Should raise error if both agent and backend are specified."""
+        with pytest.raises(
+            ValueError, match="agent and backend are mutually exclusive"
+        ):
+            ReviewAgentOptions(
+                agent="code-reviewer",
+                backend="claude",
+            )
 
     def test_options_are_frozen(self) -> None:
         """Options should be immutable (frozen dataclass)."""
@@ -60,7 +83,6 @@ class TestRunReviewAgent:
             )
             options = ReviewAgentOptions(
                 agent="code-reviewer",
-                model="gpt-5.4",
             )
             result = run_review_agent("prompt body", options)
 
@@ -72,7 +94,7 @@ class TestRunReviewAgent:
         command = call_args[0][0]
         assert "codeagent-wrapper" in command[0]
         assert "--agent" in command
-        assert "--model" in command
+        assert "code-reviewer" in command
 
     def test_run_review_without_model(self) -> None:
         """Runner should work without model override."""

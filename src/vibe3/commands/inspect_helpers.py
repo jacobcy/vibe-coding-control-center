@@ -119,13 +119,31 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             ]
 
         # Try to extract changed functions for each file (only existing files)
+        # Skip test files to save tokens - they don't need AST analysis
         changed_symbols_by_file: dict[str, list[str]] = {}
+        skipped_tests = 0
 
         for file in changed_files:
+            # Skip test files
+            is_test = (
+                "/tests/" in file
+                or "/test/" in file
+                or file.startswith("test_")
+                or file.endswith("_test.py")
+            )
+            if is_test:
+                skipped_tests += 1
+                continue
+
             if file.endswith(".py"):
                 changed_funcs = svc.get_changed_functions(file, source=source)
                 if changed_funcs:
                     changed_symbols_by_file[file] = changed_funcs
+
+        if skipped_tests > 0:
+            log.bind(skipped_test_files=skipped_tests).info(
+                "Skipped test files for AST analysis"
+            )
 
         log.bind(
             files_with_changes=len(changed_symbols_by_file),
