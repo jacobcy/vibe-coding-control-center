@@ -91,3 +91,11 @@ def test_review_base_with_agent_and_model():
     options = call_args[0][1]
     assert options.agent.value == "codex"
     assert options.model == "gpt-5.4"
+
+
+def test_review_base_does_not_have_publish_option():
+    """review base should NOT have --publish option."""
+    result = runner.invoke(app, ["base", "--help"])
+    assert result.exit_code == 0
+    # --publish should NOT appear in help
+    assert "--publish" not in result.output

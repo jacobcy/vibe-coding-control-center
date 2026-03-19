@@ -108,3 +108,38 @@ def test_review_pr_with_agent_and_model():
     options = call_args[0][1]
     assert options.agent.value == "codex"
     assert options.model == "gpt-5.4"
+
+
+def test_review_pr_does_not_have_publish_option():
+    """review pr should NOT have --publish option (local-only)."""
+    result = runner.invoke(app, ["pr", "--help"])
+    assert result.exit_code == 0
+    # --publish should NOT appear in help
+    assert "--publish" not in result.output
+
+
+def test_review_pr_is_local_only():
+    """review pr should not call GitHub publish methods."""
+    mock_gh = MagicMock()
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json", return_value=_mock_inspect_data()
+        ),
+        patch("vibe3.commands.review.GitClient"),
+        patch("vibe3.clients.github_client.GitHubClient", return_value=mock_gh),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch(
+            "vibe3.commands.review.run_review_agent",
+            return_value=_mock_agent_result(),
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+    ):
+        result = runner.invoke(app, ["pr", "42"])
+
+    assert result.exit_code == 0
+    # Should NOT call create_review or create_commit_status
+    mock_gh.create_review.assert_not_called()
+    mock_gh.create_commit_status.assert_not_called()

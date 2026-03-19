@@ -10,7 +10,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.models.change_source import BranchSource, PRSource
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.review_parser import convert_to_github_format, parse_codex_review
+from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import AgentType, ReviewAgentOptions, run_review_agent
 from vibe3.utils.trace import enable_trace
 
@@ -24,9 +24,6 @@ app = typer.Typer(
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
-_PUBLISH_OPT = Annotated[
-    bool, typer.Option("--publish", help="Post review comments to GitHub")
-]
 _AGENT_OPT = Annotated[
     str, typer.Option("--agent", help="Agent preset for codeagent-wrapper")
 ]
@@ -39,11 +36,13 @@ _MODEL_OPT = Annotated[
 def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
     trace: _TRACE_OPT = False,
-    publish: _PUBLISH_OPT = False,
     agent: _AGENT_OPT = "codex",
     model: _MODEL_OPT = None,
 ) -> None:
-    """Review a PR (calls inspect pr internally for context).
+    """Review a PR locally (generates review output, does not publish to GitHub).
+
+    This command is for local review only. To publish review to GitHub,
+    use `pr ready` command instead.
 
     Example: vibe review pr 42
     """
@@ -51,7 +50,7 @@ def pr(
         enable_trace()
 
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting PR review")
+    log.info("Starting local PR review")
 
     # 1. Get inspect analysis result
     inspect_data = run_inspect_json(["pr", str(pr_number)])
@@ -84,54 +83,6 @@ def pr(
         f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
     )
 
-    # 5. Publish to GitHub (with line-level comments + Merge Gate)
-    if publish:
-        from vibe3.clients.github_client import GitHubClient
-
-        gh = GitHubClient()
-
-        # 7.1 Line-level comments publishing
-        github_comments = convert_to_github_format(review) if review.comments else []
-        event = (
-            "REQUEST_CHANGES"
-            if review.verdict == "BLOCK"
-            else "APPROVE" if review.verdict == "PASS" else "COMMENT"
-        )
-        summary = (
-            f"**Automated Review** -- Risk score: "
-            f"{inspect_data.get('score', {}).get('score', '?')}\n\n"  # type: ignore
-            f"Verdict: **{review.verdict}**"
-        )
-
-        log.bind(event=event, comment_count=len(github_comments)).info(
-            "Publishing review to GitHub"
-        )
-        gh.create_review(
-            pr_number,
-            body=summary,
-            event=event,
-            comments=github_comments if github_comments else None,
-            dismiss_previous=True,  # Avoid duplicate reviews
-        )
-        log.success("Review published to GitHub")
-
-        # 7.2 Merge Gate
-        risk_level = str(inspect_data.get("score", {}).get("risk_level", "LOW"))  # type: ignore
-        sha = gh.get_pr_head_sha(pr_number)
-        log.bind(risk_level=risk_level).info("Setting commit status")
-        if risk_level == "CRITICAL":
-            gh.create_commit_status(
-                sha,
-                state="failure",
-                description="CRITICAL risk score - review required",
-            )
-        else:
-            gh.create_commit_status(
-                sha,
-                state="success",
-                description=f"{risk_level} risk score",
-            )
-
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
 
@@ -140,7 +91,6 @@ def pr(
 def base(
     branch: Annotated[str, typer.Argument(help="Branch to review against main")],
     trace: _TRACE_OPT = False,
-    publish: _PUBLISH_OPT = False,
     agent: _AGENT_OPT = "codex",
     model: _MODEL_OPT = None,
 ) -> None:
