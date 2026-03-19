@@ -63,14 +63,28 @@ def register(app: typer.Typer) -> None:
         source = BranchSource(branch=current_branch, base=base_branch)
         all_changed_files = git.get_changed_files(source)
 
-        changed_files = [f for f in all_changed_files if Path(f).exists()]
+        # Track all files for scoring, but note which ones are deleted
+        # Deleted files should still participate in risk assessment
+        existing_files = [f for f in all_changed_files if Path(f).exists()]
+        deleted_files = [f for f in all_changed_files if not Path(f).exists()]
+
+        if deleted_files:
+            log.bind(
+                total_files=len(all_changed_files),
+                existing_files=len(existing_files),
+                deleted_files=len(deleted_files),
+            ).warning(
+                f"Found {len(deleted_files)} deleted files "
+                "- including in risk assessment"
+            )
 
         config = get_config()
         critical_paths = config.review_scope.critical_paths
         public_api_paths = config.review_scope.public_api_paths
 
         core_files: list[dict[str, Any]] = []
-        for file in changed_files:
+        # Check all files (including deleted) for critical/public_api status
+        for file in all_changed_files:
             is_critical = any(p in str(file) for p in critical_paths)
             is_public_api = any(p in str(file) for p in public_api_paths)
             if is_critical or is_public_api:
@@ -79,6 +93,7 @@ def register(app: typer.Typer) -> None:
                         "path": file,
                         "critical_path": is_critical,
                         "public_api": is_public_api,
+                        "deleted": not Path(file).exists(),
                     }
                 )
 
@@ -95,12 +110,16 @@ def register(app: typer.Typer) -> None:
             # Get impacted modules for scoring
             impacted_modules = []
             if core_files:
-                core_paths = [f["path"] for f in core_files]
-                dag = dag_service.expand_impacted_modules(core_paths)
-                impacted_modules = dag.impacted_modules
+                # Only use existing files for DAG analysis
+                core_paths = [
+                    f["path"] for f in core_files if not f.get("deleted", False)
+                ]
+                if core_paths:
+                    dag = dag_service.expand_impacted_modules(core_paths)
+                    impacted_modules = dag.impacted_modules
 
             dims = PRDimensions(
-                changed_files=len(changed_files),
+                changed_files=len(all_changed_files),  # Include deleted files in count
                 changed_lines=0,  # Not calculated in base command
                 impacted_modules=len(impacted_modules),
                 critical_path_touch=has_critical,
@@ -112,7 +131,9 @@ def register(app: typer.Typer) -> None:
                 "current_branch": current_branch,
                 "base_branch": base_branch,
                 "core_files": core_files,
-                "total_changed": len(changed_files),
+                "total_changed": len(all_changed_files),  # Include deleted files
+                "existing_changed": len(existing_files),
+                "deleted_files": len(deleted_files),
                 "core_changed": len(core_files),
                 "score": score_report,  # Add score for pre-push hook
             }
@@ -125,9 +146,19 @@ def register(app: typer.Typer) -> None:
         # Human-readable output
         typer.echo(f"=== Branch Analysis: {current_branch} vs {base_branch} ===\n")
 
+        if deleted_files:
+            typer.echo(f"⚠️  Deleted files: {len(deleted_files)}")
+            for f in deleted_files[:5]:  # Show first 5
+                typer.echo(f"    - {f}")
+            if len(deleted_files) > 5:
+                typer.echo(f"    ... and {len(deleted_files) - 5} more")
+            typer.echo()
+
         if not core_files:
             typer.echo("✅ No core files changed")
-            typer.echo(f"\n  Total files changed: {len(changed_files)}")
+            typer.echo(f"\n  Total files changed: {len(all_changed_files)}")
+            typer.echo(f"  Existing files: {len(existing_files)}")
+            typer.echo(f"  Deleted files: {len(deleted_files)}")
             typer.echo("  Core files changed: 0")
             return
 
@@ -138,20 +169,30 @@ def register(app: typer.Typer) -> None:
                 tags.append("critical")
             if file_info["public_api"]:
                 tags.append("public-api")
+            if file_info.get("deleted"):
+                tags.append("deleted")
             tag_str = ", ".join(tags)
             typer.echo(f"  - {file_info['path']} ({tag_str})")
 
-        core_paths = [f["path"] for f in core_files]
-        dag = dag_service.expand_impacted_modules(core_paths)
+        # Only analyze existing files for DAG impact
+        existing_core_paths = [
+            f["path"] for f in core_files if not f.get("deleted", False)
+        ]
+        if existing_core_paths:
+            dag = dag_service.expand_impacted_modules(existing_core_paths)
 
-        typer.echo(f"\nImpact scope ({len(dag.impacted_modules)} modules):")
-        for module in dag.impacted_modules[:10]:
-            typer.echo(f"  - {module}")
-        if len(dag.impacted_modules) > 10:
-            typer.echo(f"  ... and {len(dag.impacted_modules) - 10} more")
+            typer.echo(f"\nImpact scope ({len(dag.impacted_modules)} modules):")
+            for module in dag.impacted_modules[:10]:
+                typer.echo(f"  - {module}")
+            if len(dag.impacted_modules) > 10:
+                typer.echo(f"  ... and {len(dag.impacted_modules) - 10} more")
+        else:
+            typer.echo("\nImpact scope: No existing core files to analyze")
 
         typer.echo("\nSummary:")
-        typer.echo(f"  Total files changed: {len(changed_files)}")
+        typer.echo(f"  Total files changed: {len(all_changed_files)}")
+        typer.echo(f"  Existing files: {len(existing_files)}")
+        typer.echo(f"  Deleted files: {len(deleted_files)}")
         typer.echo(f"  Core files changed: {len(core_files)}")
 
         critical_count = sum(1 for f in core_files if f["critical_path"])

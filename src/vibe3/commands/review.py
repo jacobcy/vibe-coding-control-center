@@ -131,10 +131,31 @@ def base(
     git = GitClient()
     diff = git.get_diff(BranchSource(branch=current_branch, base=base_branch))
 
+    # Build impact info from inspect base output
+    # inspect base returns: core_files, total_changed, core_changed,
+    # score, impacted_modules
+    # We construct impact info similar to inspect pr format
+    # for context builder
+    impact_info = {
+        "core_files": inspect_data.get("core_files", []),
+        "total_changed": inspect_data.get("total_changed", 0),
+        "core_changed": inspect_data.get("core_changed", 0),
+    }
+
+    # Build DAG info from impacted_modules
+    dag_info = None
+    impacted_modules = inspect_data.get("impacted_modules", [])
+    if impacted_modules:
+        assert isinstance(impacted_modules, list)
+        dag_info = {
+            "impacted_modules": impacted_modules,
+            "total_impacted": len(impacted_modules),
+        }
+
     context = build_review_context(
         diff=diff,
-        impact=json.dumps(inspect_data.get("impact"), indent=2),
-        dag=json.dumps(inspect_data.get("dag"), indent=2),
+        impact=json.dumps(impact_info, indent=2),
+        dag=json.dumps(dag_info, indent=2) if dag_info else None,
         score=json.dumps(inspect_data.get("score"), indent=2),
     )
 
