@@ -31,10 +31,21 @@ related_docs:
 
 ## 2. Pre-requisites (Executor Entry)
 
-- [ ] Phase 02 的 flow/task 责任链已经可写入 handoff store
-- [ ] Phase 03 的 `issue -> pr` 主链已经可运行
+**已完成**：
+- [x] Phase 02: `FlowState` model 已实现（`src/vibe3/models/flow.py`）
+- [x] Phase 02: `SQLiteClient` 已实现（`src/vibe3/clients/sqlite_client.py`）
+- [x] Phase 02: `FlowService` 已实现（`src/vibe3/services/flow_service.py`）
+- [x] Phase 03: PR commands 已实现（`src/vibe3/commands/pr_*.py`）
+
+**待确认**：
 - [ ] `pre-push` 本地 review report 已能落到 `.agent/reports/`
 - [ ] review report 中的 `SESSION_ID` 已可作为可提取线索使用
+
+**补充说明**：
+- `FlowState` model 包含 `planner_session_id`、`executor_session_id`、`reviewer_session_id` 字段
+- `flow_state` 表已存在，记录 flow 的**状态信息**
+- `handoff_items` 表（本次新增）将记录 flow 的**交接内容**（plan/report/audit 条目）
+- 两者关系：一个 flow 对应多条 handoff items（一对多）
 
 ## 3. 目录结构
 
@@ -56,7 +67,45 @@ related_docs:
 
 ## 4. 技术要求（分层实现）
 
-### 4.1 数据库扩展
+### 4.1 Models Layer
+
+**文件**: `src/vibe3/models/handoff.py`（新建）
+
+**新增 Model**: `HandoffItem`
+
+```python
+from datetime import datetime
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class HandoffItem(BaseModel):
+    """Handoff item model."""
+
+    branch: str
+    handoff_type: Literal["plan", "report", "audit"]
+    sequence_number: int
+    actor: str
+    content: str
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+class HandoffResponse(BaseModel):
+    """Response model for handoff operations."""
+
+    branch: str
+    handoff_type: str
+    items: list[HandoffItem]
+```
+
+**与 `FlowState` 的关系**：
+- `FlowState`：记录 flow 的**状态信息**（当前阶段、阻塞、下一步等）
+- `HandoffItem`：记录 flow 的**交接内容**（plan/report/audit 的具体条目）
+- 关系：一个 `FlowState` 对应多条 `HandoffItem`（一对多）
+- 示例：flow `task/vibe3-rebuild` 有 3 条 plan handoff items、2 条 report items
+
+### 4.2 数据库扩展
+
+**修改文件**: `src/vibe3/clients/sqlite_client.py`
 
 **新增表**: `handoff_items`
 
@@ -76,7 +125,14 @@ CREATE TABLE handoff_items (
 CREATE INDEX idx_handoff_branch_type ON handoff_items(branch, handoff_type);
 ```
 
-### 4.2 JSON 文件格式
+**修改 SQLiteClient**：
+在 `src/vibe3/clients/sqlite_client.py` 中添加方法：
+- `get_handoff_items(branch, handoff_type)` - 获取 handoff 条目列表
+- `add_handoff_item(branch, handoff_type, sequence_number, actor, content)` - 添加条目
+- `update_handoff_item(branch, handoff_type, sequence_number, content)` - 更新条目
+- `delete_handoff_item(branch, handoff_type, sequence_number)` - 删除条目
+
+### 4.3 JSON 文件格式
 
 **文件路径**: `.agent/handoff/{branch-safe-name}/plan.json`
 
@@ -101,7 +157,7 @@ CREATE INDEX idx_handoff_branch_type ON handoff_items(branch, handoff_type);
 }
 ```
 
-### 4.3 Service Layer
+### 4.4 Service Layer
 
 **文件**: `src/vibe3/services/handoff_service.py`
 
@@ -118,7 +174,7 @@ CREATE INDEX idx_handoff_branch_type ON handoff_items(branch, handoff_type);
 2. 以最新时间戳为准
 3. 记录同步事件到 `flow_events` 表
 
-### 4.4 Command Layer
+### 4.5 Command Layer
 
 **文件**: `src/vibe3/commands/handoff.py`
 
@@ -175,8 +231,6 @@ CREATE INDEX idx_handoff_branch_type ON handoff_items(branch, handoff_type);
 - [ ] 错误处理测试通过（JSON 格式错误、文件不存在等）
 
 **测试标准**: 见 [04-test-standards.md](../infrastructure/04-test-standards.md)
-
-## 10. Development Notes
 
 ## 6. Development Notes
 
