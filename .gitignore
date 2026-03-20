@@ -38,6 +38,7 @@ vibe-init-test*
 # Python
 # =============================================================================
 # Virtual environments
+.venv
 .venv/
 .tox/
 .nox/
