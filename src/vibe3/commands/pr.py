@@ -2,11 +2,20 @@
 
 This module provides the main PR command group with all subcommands
 organized in separate modules for maintainability.
+
+Public commands:
+- create --draft: Create draft PR (or ready PR in future)
+- ready: Mark PR as ready for review
+- show: Show PR details
+
+Removed from public CLI:
+- draft: Replaced by create --draft
+- merge: Now handled by flow done / integrate
 """
 
 import typer
 
-from vibe3.commands.pr_create import register_draft_command
+from vibe3.commands.pr_create import register_create_command
 from vibe3.commands.pr_lifecycle import register_lifecycle_commands
 from vibe3.commands.pr_query import register_query_commands
 
@@ -15,6 +24,6 @@ app = typer.Typer(
 )
 
 # Register all commands
-register_draft_command(app)
+register_create_command(app)
 register_query_commands(app)
 register_lifecycle_commands(app)

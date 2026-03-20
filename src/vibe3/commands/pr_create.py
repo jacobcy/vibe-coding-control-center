@@ -14,14 +14,17 @@ from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_created
 
 
-def register_draft_command(app: typer.Typer) -> None:
-    """Register pr draft command."""
+def register_create_command(app: typer.Typer) -> None:
+    """Register pr create command."""
 
     @app.command()
-    def draft(
+    def create(
         title: Annotated[str, typer.Option("-t", help="PR title")],
         body: Annotated[str, typer.Option("-b", help="PR description")] = "",
         base: Annotated[str, typer.Option(help="Base branch")] = "main",
+        draft: Annotated[
+            bool, typer.Option("--draft", help="Create as draft PR")
+        ] = True,
         task: Annotated[int | None, typer.Option(help="Task issue #")] = None,
         flow: Annotated[str | None, typer.Option(help="Flow slug")] = None,
         spec: Annotated[str | None, typer.Option(help="Spec reference")] = None,
@@ -32,12 +35,16 @@ def register_draft_command(app: typer.Typer) -> None:
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
         yaml_output: Annotated[
             bool, typer.Option("--yaml", help="YAML 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
     ) -> None:
-        """Create draft PR."""
+        """Create PR with optional draft mode.
+
+        By default, creates a draft PR. Use without --draft to create
+        a ready-for-review PR (not yet implemented).
+        """
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
             raise typer.Exit(1)
@@ -46,13 +53,13 @@ def register_draft_command(app: typer.Typer) -> None:
             setup_logging(verbose=2)
 
         ctx = (
-            trace_context(command="pr draft", domain="pr", title=title)
+            trace_context(command="pr create", domain="pr", title=title)
             if trace
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr draft", title=title, base=base).info(
-                "Creating draft PR"
+            logger.bind(command="pr create", title=title, base=base, draft=draft).info(
+                "Creating PR"
             )
 
             service = PRService()
@@ -65,9 +72,19 @@ def register_draft_command(app: typer.Typer) -> None:
                     planner=planner,
                     executor=executor,
                 )
-            pr = service.create_draft_pr(
-                title=title, body=body, base_branch=base, metadata=metadata
-            )
+
+            # For now, only draft creation is supported
+            if draft:
+                pr = service.create_draft_pr(
+                    title=title, body=body, base_branch=base, metadata=metadata
+                )
+            else:
+                # Non-draft creation not yet implemented
+                typer.echo(
+                    "Error: Non-draft PR creation not yet implemented. Use --draft.",
+                    err=True,
+                )
+                raise typer.Exit(1)
 
             if json_output:
                 typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))

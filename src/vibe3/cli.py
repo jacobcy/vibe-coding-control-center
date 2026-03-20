@@ -13,12 +13,14 @@ from loguru import logger
 from rich import box as _box
 
 from vibe3.commands import flow, hooks, inspect, pr, review, task
-from vibe3.commands.review_gate import review_gate
+
+# Note: review_gate is now an internal entry, not a public CLI command
+# Hooks should use: python -m vibe3.commands.review_gate
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
 
 
-# ── 去掉 help 面板边框，保留颜色 ──────────────────────────────────────────────
+# -- Remove help panel borders, keep colors --
 class _NoBorderPanel(_ru.Panel):
     def __init__(self, *args: object, **kwargs: object) -> None:
         kwargs["box"] = _box.SIMPLE
@@ -27,7 +29,8 @@ class _NoBorderPanel(_ru.Panel):
 
 
 _ru.Panel = _NoBorderPanel  # type: ignore[misc]
-# ─────────────────────────────────────────────────────────────────────────────
+# -- End panel styling --
+
 
 app = typer.Typer(
     name="vibe3",
@@ -44,7 +47,9 @@ app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(hooks.app, name="hooks")
-app.command(name="review-gate")(review_gate)
+# Note: review-gate is now an internal entry for hooks/CI
+# Use: python -m vibe3.commands.review_gate
+# Do NOT expose as public command: app.command(name="review-gate")(review_gate)
 
 
 @app.callback()
@@ -84,20 +89,20 @@ def help(
     """
     import click
 
-    # 获取底层的 Click 命令
+    # Get the underlying Click command
     click_app = typer.main.get_command(app)
 
     if command:
-        # 显示子命令的帮助（简化版本：显示主帮助）
+        # Show subcommand help (simplified: show main help)
         click.echo(click_app.get_help(click.Context(click_app)))
     else:
-        # 显示主帮助
+        # Show main help
         click.echo(click_app.get_help(click.Context(click_app)))
 
 
 def main() -> None:
     """CLI entry point with unified error handling."""
-    # 支持 -h 作为 --help 的简写（全局替换所有位置）
+    # Support -h as --help shorthand (globally replace all positions)
     sys.argv = ["--help" if a == "-h" else a for a in sys.argv]
 
     try:
@@ -107,21 +112,21 @@ def main() -> None:
         # User error: concise message
         logger.error(e.message)
         if e.recoverable:
-            logger.info("💡 Please check your input and try again")
+            logger.info("Please check your input and try again")
         sys.exit(1)
 
     except SystemError:
         # System error: show details
-        logger.exception("❌ System error occurred")
+        logger.exception("System error occurred")
         sys.exit(2)
 
     except KeyboardInterrupt:
-        logger.info("⏹️  Interrupted by user")
+        logger.info("Interrupted by user")
         sys.exit(130)
 
     except Exception as e:
         # Unexpected error: full traceback
-        logger.exception(f"❌ Unexpected error: {e}")
+        logger.exception(f"Unexpected error: {e}")
         sys.exit(99)
 
 
