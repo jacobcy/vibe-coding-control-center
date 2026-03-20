@@ -82,7 +82,7 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_D
 
 # 2. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
-for dir in bin lib config scripts alias; do
+for dir in bin lib lib3 config scripts alias; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
     mkdir -p "$INSTALL_DIR/$dir"
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.

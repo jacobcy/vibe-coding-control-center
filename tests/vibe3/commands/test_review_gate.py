@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from vibe3.commands.review_gate import review_gate
+from vibe3.commands.review_gate import run_review_gate
 
 
 class TestReviewGate:
@@ -29,7 +29,7 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             # Should not raise any exception
-            review_gate(check_block=False)
+            run_review_gate(check_block=False)
 
     def test_review_gate_passes_on_medium_risk(self) -> None:
         """Medium risk should pass without review."""
@@ -46,7 +46,7 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             # Should not raise any exception
-            review_gate(check_block=False)
+            run_review_gate(check_block=False)
 
     def test_review_gate_triggers_review_on_high_risk(self) -> None:
         """HIGH risk should trigger review."""
@@ -72,7 +72,7 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             # Should not raise any exception
-            review_gate(check_block=False)
+            run_review_gate(check_block=False)
 
     def test_review_gate_uses_level_field_from_inspect_score(self) -> None:
         """review-gate should read the canonical score.level field."""
@@ -97,7 +97,7 @@ class TestReviewGate:
             mock_review.return_value = MagicMock(stdout="VERDICT: PASS", exit_code=0)
             mock_get_config.return_value = mock_config
 
-            review_gate(check_block=False)
+            run_review_gate(check_block=False)
 
             mock_review.assert_called_once()
 
@@ -129,7 +129,7 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             with pytest.raises(typer.Exit) as exc_info:
-                review_gate(check_block=True)
+                run_review_gate(check_block=True)
 
             assert exc_info.value.exit_code == 1
 
@@ -148,7 +148,7 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             with pytest.raises(typer.Exit) as exc_info:
-                review_gate(check_block=False)
+                run_review_gate(check_block=False)
 
             assert exc_info.value.exit_code == 2
 
@@ -176,6 +176,6 @@ class TestReviewGate:
             mock_get_config.return_value = mock_config
 
             with pytest.raises(typer.Exit) as exc_info:
-                review_gate(check_block=True)
+                run_review_gate(check_block=True)
 
             assert exc_info.value.exit_code == 1

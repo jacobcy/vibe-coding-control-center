@@ -31,8 +31,9 @@ bash scripts/hooks/check-shell-loc.sh || {
 }
 
 # 4. Review gate (risk assessment + optional review)
+# Uses internal module entry, not public CLI command
 echo "  -> Review gate..."
-uv run python src/vibe3/cli.py review-gate --check-block
+uv run python -m vibe3.commands.review_gate --check-block
 
 echo ""
 echo "OK: All pre-push checks passed"

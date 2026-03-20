@@ -1,4 +1,21 @@
-"""Review gate command - Pre-push review gate for CI/hooks."""
+"""Review gate command - Pre-push review gate for CI/hooks.
+
+This is an INTERNAL entry point for hooks and CI pipelines.
+It is NOT exposed as a public CLI command.
+
+Usage:
+    # Internal entry (for hooks/CI):
+    python -m vibe3.commands.review_gate --check-block
+
+    # Direct import (for testing):
+    from vibe3.commands.review_gate import run_review_gate
+    run_review_gate(check_block=False)
+
+Exit codes:
+    0: Pass (low risk or review passed)
+    1: Block (high risk with BLOCK verdict)
+    2: Error (inspect/review execution failed)
+"""
 
 from typing import Annotated
 
@@ -12,30 +29,17 @@ from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
 
-_CHECK_BLOCK_OPT = Annotated[
-    bool,
-    typer.Option("--check-block", help="Return non-zero exit code on BLOCK verdict"),
-]
 
+def run_review_gate(check_block: bool = False) -> None:
+    """Run the review gate.
 
-def review_gate(
-    check_block: _CHECK_BLOCK_OPT = False,
-) -> None:
-    """Pre-push review gate: check risk and optionally run review.
+    This is the core function that can be called directly or via CLI.
 
-    This command is designed for use in pre-push hooks and CI pipelines.
+    Args:
+        check_block: If True, return non-zero exit code on BLOCK verdict.
 
-    Exit codes:
-    - 0: Pass (low risk or review passed)
-    - 1: Block (high risk with BLOCK verdict)
-    - 2: Error (inspect/review execution failed)
-
-    Examples:
-        # Check risk level only
-        vibe review-gate
-
-        # Run review on HIGH/CRITICAL risk and check verdict
-        vibe review-gate --check-block
+    Raises:
+        typer.Exit: With appropriate exit code based on result.
     """
     log = logger.bind(domain="review_gate", action="check")
     log.info("Running review gate")
@@ -137,3 +141,35 @@ def review_gate(
             f"\nWARNING: Review failed but HIGH risk allows push - {e}",
             err=True,
         )
+
+
+# -- CLI entry point for python -m vibe3.commands.review_gate --
+_CHECK_BLOCK_OPT = Annotated[
+    bool,
+    typer.Option("--check-block", help="Return non-zero exit code on BLOCK verdict"),
+]
+
+_app = typer.Typer(
+    name="review-gate",
+    help="Pre-push review gate: check risk and optionally run review (internal)",
+    add_completion=False,
+    no_args_is_help=False,
+)
+
+
+@_app.callback(invoke_without_command=True)
+def _cli_entry(
+    ctx: typer.Context,
+    check_block: _CHECK_BLOCK_OPT = False,
+) -> None:
+    """CLI entry point for python -m vibe3.commands.review_gate."""
+    run_review_gate(check_block=check_block)
+
+
+def run() -> None:
+    """Entry point for python -m vibe3.commands.review_gate."""
+    _app()
+
+
+if __name__ == "__main__":
+    run()
