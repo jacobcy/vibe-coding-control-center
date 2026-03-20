@@ -5,7 +5,7 @@ Tests the core runner functionality with extensible interface design.
 
 from dataclasses import FrozenInstanceError
 from subprocess import CompletedProcess
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

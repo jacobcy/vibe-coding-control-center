@@ -1,6 +1,5 @@
 """Shell metrics collector 单元测试."""
 
-from pathlib import Path
 
 from vibe3.services.shell_metrics_collector import collect_shell_metrics
 
@@ -56,11 +55,6 @@ class TestShellMetricsCollector:
         检查是否所有 config.code_limits.code_paths.v2_shell 中的路径
         都被正确处理了。
         """
-        from vibe3.config.loader import get_config
-
-        config = get_config()
-        expected_paths = config.code_limits.code_paths.v2_shell
-
         metrics = collect_shell_metrics()
 
         # 验证 lib/ 和 lib3/ 都有文件被收集

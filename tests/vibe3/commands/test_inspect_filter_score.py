@@ -1,6 +1,7 @@
 """Unit tests for filter and score helper functions.
 
-Tests focus on _filter_critical_files and _calculate_risk_score with mocked dependencies.
+Tests focus on _filter_critical_files and _calculate_risk_score with
+mocked dependencies.
 """
 
 from unittest.mock import MagicMock, patch
