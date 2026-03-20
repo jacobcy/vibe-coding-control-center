@@ -30,57 +30,9 @@ bash scripts/hooks/check-shell-loc.sh || {
     exit 1
 }
 
-# 4. Inspect-based risk assessment (fast, <10s)
-echo "  -> Risk assessment (inspect)..."
-INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json 2>/dev/null) || {
-    echo "ERROR: Inspect failed - cannot assess risk"
-    exit 1
-}
-
-RISK_LEVEL=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-print(data.get('score', {}).get('level', 'LOW'))
-")
-
-RISK_SCORE=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-print(data.get('score', {}).get('score', 0))
-")
-
-echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
-
-# 5. Trigger local review on HIGH/CRITICAL risk
-if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
-    echo ""
-    echo "  WARNING: High risk detected!"
-    echo "  Running local review before push..."
-    echo ""
-
-    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base --agent code-reviewer 2>&1) || {
-        REVIEW_EXIT=$?
-        echo "ERROR: Review failed with exit code $REVIEW_EXIT"
-        echo "$REVIEW_RESULT"
-        if [ "$RISK_LEVEL" = "CRITICAL" ]; then
-            echo ""
-            echo "CRITICAL risk requires passing review before push."
-            exit 1
-        fi
-        # HIGH risk: warn but allow push
-        echo ""
-        echo "WARNING: Review failed but HIGH risk allows push."
-    }
-
-    # Check verdict from review
-    VERDICT=$(echo "$REVIEW_RESULT" | grep -o "VERDICT: [A-Z]*" | head -1 | cut -d' ' -f2 || echo "PASS")
-    if [ "$VERDICT" = "BLOCK" ]; then
-        echo "ERROR: Review verdict is BLOCK - fix issues before push"
-        exit 1
-    fi
-fi
+# 4. Review gate (risk assessment + optional review)
+echo "  -> Review gate..."
+uv run python src/vibe3/cli.py review-gate check --check-block
 
 echo ""
 echo "OK: All pre-push checks passed"
