@@ -7,6 +7,7 @@ from loguru import logger
 
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
+from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
@@ -32,42 +33,23 @@ _MESSAGE_OPT = Annotated[
 ]
 
 
-@app.command()
-def pr(
-    pr_number: Annotated[int, typer.Argument(help="PR number")],
-    trace: _TRACE_OPT = False,
-    dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
+def _run_review(
+    request: ReviewRequest, config: VibeConfig, dry_run: bool, message: str | None
 ) -> None:
-    """Review a PR locally (generates review output, does not publish to GitHub).
+    """Execute review for a given request.
 
-    This command is for local review only. To publish review to GitHub,
-    use `pr ready` command instead.
+    This is the shared logic for both base and pr commands.
 
-    Examples:
-        vibe review pr 42
-        vibe review pr 42 --dry-run  # Print command and prompt only
-        vibe review pr 42 -m "Focus on security issues"  # Custom prompt
+    Args:
+        request: Review request with scope and symbols
+        config: Configuration instance
+        dry_run: If True, print command without executing
+        message: Optional custom task message
     """
-    if trace:
-        enable_trace()
+    log = logger.bind(domain="review", scope=request.scope.kind)
 
-    log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting local PR review")
-
-    # Load config
-    config = VibeConfig.get_defaults()
-
-    # Always build full context with AST analysis
-    inspect_data = run_inspect_json(["pr", str(pr_number)])
-    changed_symbols_raw = inspect_data.get("changed_symbols", {})
-    changed_symbols = (
-        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
-    )
-    prompt_file_content = build_review_context(
-        changed_symbols=changed_symbols,
-        config=config,
-    )
+    # Build review context
+    prompt_file_content = build_review_context(request, config)
 
     # Determine task: custom message, config default, or None
     task = None
@@ -101,6 +83,45 @@ def pr(
 
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
+
+
+@app.command()
+def pr(
+    pr_number: Annotated[int, typer.Argument(help="PR number")],
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    message: _MESSAGE_OPT = None,
+) -> None:
+    """Review a PR locally (generates review output, does not publish to GitHub).
+
+    This command is for local review only. To publish review to GitHub,
+    use `pr ready` command instead.
+
+    Examples:
+        vibe review pr 42
+        vibe review pr 42 --dry-run  # Print command and prompt only
+        vibe review pr 42 -m "Focus on security issues"  # Custom prompt
+    """
+    if trace:
+        enable_trace()
+
+    log = logger.bind(domain="review", action="pr", pr_number=pr_number)
+    log.info("Starting local PR review")
+
+    # Load config
+    config = VibeConfig.get_defaults()
+
+    # Create scope and get inspect data
+    scope = ReviewScope.for_pr(pr_number)
+    inspect_data = run_inspect_json(["pr", str(pr_number)])
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+
+    # Build request and execute review
+    request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
+    _run_review(request, config, dry_run, message)
 
 
 @app.command()
@@ -143,46 +164,14 @@ def base(
     # Load config
     config = VibeConfig.get_defaults()
 
-    # Always build full context with AST analysis
+    # Create scope and get inspect data
+    scope = ReviewScope.for_base(base_branch)
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
-    prompt_file_content = build_review_context(
-        changed_symbols=changed_symbols,
-        config=config,
-    )
 
-    # Determine task: custom message, config default, or None
-    task = None
-    if message:
-        task = message
-        log.bind(task_type="custom").info("Using custom task")
-    elif config.review.review_prompt:
-        task = config.review.review_prompt
-        log.bind(task_type="config").info("Using configured task")
-    else:
-        log.bind(task_type="none").info("No custom task, using prompt file only")
-
-    # Call agent via codeagent-wrapper
-    options = ReviewAgentOptions(
-        agent=config.review.agent_config.agent,
-        backend=config.review.agent_config.backend,
-        model=config.review.agent_config.model,
-    )
-    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
-
-    if dry_run:
-        return
-
-    raw = result.stdout
-    review = parse_codex_review(raw)
-
-    typer.echo(raw)
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
-    )
-
-    if review.verdict == "BLOCK":
-        raise typer.Exit(1)
+    # Build request and execute review
+    request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
+    _run_review(request, config, dry_run, message)

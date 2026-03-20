@@ -1,14 +1,26 @@
 """Context builder - Build context for codeagent-wrapper review.
 
-This module constructs a stable prompt format for the review agent.
+This module constructs a stable prompt format for the review agent through
+composable section builders. Each section builder is responsible for one
+aspect of the review context:
+
+- build_policy_section: Static review policy
+- build_tools_guide_section: Project-specific analysis tools
+- build_ast_analysis_section: Runtime symbol/DAG analysis
+- build_review_task_section: Task guidance
+- build_output_contract_section: Output format requirements
+
+The main build_review_context() function orchestrates these sections.
 """
 
+import json
 from pathlib import Path
 
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
+from vibe3.models.review import ReviewRequest
 
 
 class ContextBuilderError(VibeError):
@@ -18,104 +30,131 @@ class ContextBuilderError(VibeError):
         super().__init__(f"Context build failed: {details}", recoverable=False)
 
 
-def build_review_context(
-    policy_path: str | None = None,
-    changed_symbols: dict[str, list[str]] | None = None,
-    symbol_dag: dict[str, list[str]] | None = None,
-    config: VibeConfig | None = None,
-) -> str:
-    """Build review context with AST-level analysis.
+def build_policy_section(policy_path: str) -> str:
+    """Build policy section from file.
 
-    Reviewer runs git diff themselves to see file-level changes.
-    We provide AST-level insights they can't get from diff:
-    - Which functions were changed (symbol-level)
-    - Who calls these functions (DAG impact)
-    - Tools available for deeper analysis
+    Source: config/settings.yaml (review.policy_file)
 
     Args:
-        policy_path: path to review-policy.md (reads from config if None)
-        changed_symbols: file -> list of changed function names
-        symbol_dag: function -> list of caller locations
-        config: VibeConfig instance (loads from settings.yaml if None)
+        policy_path: Path to review policy markdown file
 
     Returns:
-        Complete context string
+        Policy markdown content
 
     Raises:
-        ContextBuilderError: build failed
+        ContextBuilderError: Cannot read policy file
     """
-    log = logger.bind(domain="context_builder", action="build_review_context")
-    log.info("Building review context")
-
-    # Load config if not provided
-    if config is None:
-        config = VibeConfig.get_defaults()
-
-    # Use policy_path from parameter or config
-    actual_policy_path = policy_path or config.review.policy_file
-
+    log = logger.bind(domain="context_builder", action="build_policy_section")
     try:
-        policy = Path(actual_policy_path).read_text(encoding="utf-8")
+        content = Path(policy_path).read_text(encoding="utf-8")
+        log.success("Policy section built")
+        return content
     except OSError as e:
         raise ContextBuilderError(f"Cannot read policy: {e}") from e
 
-    sections: list[str] = [policy]
 
-    # Add tools guide (project-specific analysis tools)
-    if config.review.tools_guide_file:
-        tools_guide_path = Path(config.review.tools_guide_file)
-        if tools_guide_path.exists():
-            try:
-                tools_guide = tools_guide_path.read_text(encoding="utf-8")
-                sections.append(f"## Available Tools\n\n{tools_guide}")
-            except OSError as e:
-                log.bind(error=str(e), path=str(tools_guide_path)).warning(
-                    "Could not read tools guide"
-                )
+def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
+    """Build tools guide section from file.
 
-    # Add AST-level analysis if available
-    if changed_symbols or symbol_dag:
-        ast_parts: list[str] = []
-        if changed_symbols:
-            import json
+    Source: config/settings.yaml (review.tools_guide_file)
 
-            symbols_json = json.dumps(changed_symbols, indent=2)
-            ast_parts.append(
-                f"### Changed Functions (AST Analysis)\n"
-                f"```json\n{symbols_json}\n```"
-            )
-        if symbol_dag:
-            import json
+    Args:
+        tools_guide_path: Path to tools guide file (optional)
 
-            dag_json = json.dumps(symbol_dag, indent=2)
-            ast_parts.append(
-                f"### Function Call Chain (DAG)\n" f"```json\n{dag_json}\n```"
-            )
+    Returns:
+        Tools guide section or None if not configured/available
+    """
+    if not tools_guide_path:
+        return None
 
-        ast_section = "## AST Analysis\n" + "\n\n".join(ast_parts)
-        sections.append(ast_section)
+    log = logger.bind(domain="context_builder", action="build_tools_guide_section")
+    path = Path(tools_guide_path)
+    if not path.exists():
+        return None
 
-    # Add review task guidance from config
-    review_task_text = config.review.review_task
-    if review_task_text:
-        review_task = f"## Review Task\n{review_task_text}"
-    else:
-        # Fallback if not configured
-        review_task = """## Review Task
+    try:
+        tools_guide = path.read_text(encoding="utf-8")
+        log.success("Tools guide section built")
+        return f"## Available Tools\n\n{tools_guide}"
+    except OSError as e:
+        log.bind(error=str(e), path=str(tools_guide_path)).warning(
+            "Could not read tools guide"
+        )
+        return None
+
+
+def build_ast_analysis_section(
+    changed_symbols: dict[str, list[str]] | None,
+    symbol_dag: dict[str, list[str]] | None,
+) -> str | None:
+    """Build AST analysis section from runtime data.
+
+    Source: Runtime (inspect command output)
+
+    Args:
+        changed_symbols: Map of file -> list of changed function names
+        symbol_dag: Map of function -> list of caller locations
+
+    Returns:
+        AST analysis section or None if no data provided
+    """
+    if not changed_symbols and not symbol_dag:
+        return None
+
+    ast_parts: list[str] = []
+
+    if changed_symbols:
+        symbols_json = json.dumps(changed_symbols, indent=2)
+        ast_parts.append(
+            f"### Changed Functions (AST Analysis)\n" f"```json\n{symbols_json}\n```"
+        )
+
+    if symbol_dag:
+        dag_json = json.dumps(symbol_dag, indent=2)
+        ast_parts.append(f"### Function Call Chain (DAG)\n" f"```json\n{dag_json}\n```")
+
+    return "## AST Analysis\n" + "\n\n".join(ast_parts)
+
+
+def build_review_task_section(task_text: str | None) -> str:
+    """Build review task section.
+
+    Source: config/settings.yaml (review.review_task) or default
+
+    Args:
+        task_text: Task text from config (optional)
+
+    Returns:
+        Review task section
+    """
+    if task_text:
+        return f"## Review Task\n{task_text}"
+
+    # Default task guidance
+    return """## Review Task
 - Run `git diff <base>...HEAD` to see file changes
 - Review only changed code, not the entire codebase
 - Use AST analysis to understand function-level impact
 - Prioritize: correctness, regression risk, API breaks
 - Focus on actionable, specific findings"""
-    sections.append(review_task)
 
-    # Add output format requirements from config
-    output_format_text = config.review.output_format
-    if output_format_text:
-        output_format_section = f"## Output format requirements\n{output_format_text}"
-    else:
-        # Fallback if not configured
-        output_format_section = """## Output format requirements
+
+def build_output_contract_section(output_format: str | None) -> str:
+    """Build output contract section.
+
+    Source: config/settings.yaml (review.output_format) or default
+
+    Args:
+        output_format: Output format text from config (optional)
+
+    Returns:
+        Output format section
+    """
+    if output_format:
+        return f"## Output format requirements\n{output_format}"
+
+    # Default output format
+    return """## Output format requirements
 
 Each finding should follow this format:
 path/to/file.py:42 [MAJOR] concise issue description
@@ -127,13 +166,76 @@ Where:
 - PASS: No significant issues found
 - MAJOR: Issues found that should be addressed before merge
 - BLOCK: Critical issues that must be fixed before merge"""
-    sections.append(output_format_section)
 
+
+def build_review_context(
+    request: ReviewRequest, config: VibeConfig | None = None
+) -> str:
+    """Build review context from request and configuration.
+
+    This is the orchestration function that:
+    1. Loads configuration if not provided
+    2. Calls section builders
+    3. Assembles final prompt
+
+    Args:
+        request: Review request containing scope, symbols, and task
+        config: VibeConfig instance (loads from settings.yaml if None)
+
+    Returns:
+        Complete review context string
+
+    Raises:
+        ContextBuilderError: Build failed
+
+    Examples:
+        >>> scope = ReviewScope.for_base("main")
+        >>> request = ReviewRequest(scope=scope)
+        >>> context = build_review_context(request)
+        >>> assert "Review Task" in context
+        >>> assert "VERDICT" in context
+    """
+    log = logger.bind(domain="context_builder", action="build_review_context")
+    log.info("Building review context")
+
+    # Load config if not provided
+    if config is None:
+        config = VibeConfig.get_defaults()
+
+    # Build sections
+    sections: list[str] = []
+
+    # 1. Policy section (required)
+    policy = build_policy_section(config.review.policy_file)
+    sections.append(policy)
+
+    # 2. Tools guide section (optional)
+    tools_guide = build_tools_guide_section(config.review.tools_guide_file)
+    if tools_guide:
+        sections.append(tools_guide)
+
+    # 3. AST analysis section (optional)
+    ast_analysis = build_ast_analysis_section(
+        request.changed_symbols, request.symbol_dag
+    )
+    if ast_analysis:
+        sections.append(ast_analysis)
+
+    # 4. Review task section
+    task = build_review_task_section(request.task_guidance or config.review.review_task)
+    sections.append(task)
+
+    # 5. Output contract section
+    output_contract = build_output_contract_section(config.review.output_format)
+    sections.append(output_contract)
+
+    # Assemble final context
     context = "\n\n---\n\n".join(sections)
     log.bind(context_len=len(context)).success("Review context built")
     return context
 
 
+# Keep for backward compatibility (if used elsewhere)
 def get_git_diff(base: str = "main", head: str = "HEAD") -> str:
     """Get git diff output.
 
