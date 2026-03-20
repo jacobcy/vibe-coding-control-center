@@ -215,5 +215,33 @@ git add docs/v3/handoff/04-handoff-and-cutover.md \
   docs/v3/handoff/README.md \
   docs/v3/handoff/v3-rewrite-plan.md \
   docs/plans/2026-03-21-phase04-handoff-cutover-rewrite-plan.md
-git commit -m "docs(handoff): rewrite phase 04 around truth model and cutover readiness"
-```
+---
+
+## 后续执行边界
+
+### 本次不做的事
+
+本次文档重写**不做**以下工作：
+
+- `bin/vibe` 默认入口切换：不在本次范围内，需要单独设计和实施
+- `pr show` 消费本地 report：需要在后续任务中实现
+- review prompt 质量优化：需要在后续任务中处理
+- skill 全量改写：本阶段先收敛文档，不要求一次改完全部 skill
+
+### 后续跟进任务
+
+完成本文档重写后，需要跟进以下任务：
+
+1. **skill 文案审计**
+   - 审计所有 skill 是否仍把 `.agent/context/task.md` 当主 handoff
+   - 修订仍把 handoff 冲突解释成 `task.md` 决定的 skill
+   - 补齐未明确 `issue -> pr` 主链的 skill
+
+2. **`pr show` 消费本地 report**
+   - 实现 `pr show` 对 `.agent/reports/pre-push-review-*.md` 的消费
+   - 集成 `SESSION_ID` 作为交接线索
+
+3. **cutover 入口策略单独设计**
+   - 设计 `bin/vibe` 默认入口切换策略
+   - 评估切换时机和风险
+   - 制定切换计划

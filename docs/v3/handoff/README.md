@@ -71,13 +71,13 @@ related_docs:
 
 ## Phase 04: Handoff & Logic Cutover
 
-**Objective**: Bridge SQLite state to Markdown handoff files.
+**Objective**: Converge v3 handoff truth, reduce `task.md` to a workflow index, and define cutover readiness.
 
 **Inputs**: `docs/v3/handoff/04-handoff-and-cutover.md`
 **Success Criteria**:
-- [ ] `vibe3 handoff sync` successfully writes to `handoff.md`.
-- [ ] `bin/vibe` (the existing v2 entry) correctly redirects to `vibe3` when configured.
-- [ ] Comparison tool confirms SQL record matches Markdown state.
+- [ ] Handoff command + handoff store are defined as the shared truth for v3 participants.
+- [ ] `.agent/context/task.md` is reduced to workflow task list / findings / follow-up issue / final conclusion.
+- [ ] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
 
 ---
 
@@ -100,7 +100,7 @@ related_docs:
 | 01: Skeleton | `01-command-and-skeleton.md` | Help flags |
 | 02: State | `02-flow-task-foundation.md` | SQL/JSON |
 | 03: PR | `03-pr-domain.md` | API Log |
-| 04: Sync | `04-handoff-and-cutover.md` | Handoff.md |
+| 04: Handoff Truth | `04-handoff-and-cutover.md` | Truth model / cutover readiness |
 | 05: Final | `05-polish-and-cleanup.md` | Timing/Lint |
 
 ---
