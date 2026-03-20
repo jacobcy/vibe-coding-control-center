@@ -60,10 +60,23 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     echo "  Running local review before push..."
     echo ""
 
-    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base 2>&1) || {
-        REVIEW_EXIT=$?
+    mkdir -p .agent/reports
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    REVIEW_REPORT_FILE=".agent/reports/pre-push-review-${TIMESTAMP}.md"
+
+    set +e
+    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base 2>&1)
+    REVIEW_EXIT=$?
+    set -e
+
+    printf '%s\n' "$REVIEW_RESULT" > "$REVIEW_REPORT_FILE"
+
+    echo "$REVIEW_RESULT"
+    echo ""
+    echo "  Review report saved: $REVIEW_REPORT_FILE"
+
+    if [ "$REVIEW_EXIT" -ne 0 ]; then
         echo "ERROR: Review failed with exit code $REVIEW_EXIT"
-        echo "$REVIEW_RESULT"
         if [ "$RISK_LEVEL" = "CRITICAL" ]; then
             echo ""
             echo "CRITICAL risk requires passing review before push."
@@ -71,7 +84,7 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
         fi
         echo ""
         echo "WARNING: Review failed but HIGH risk allows push."
-    }
+    fi
 
     VERDICT=$(echo "$REVIEW_RESULT" | grep -o "VERDICT: [A-Z]*" | head -1 | cut -d' ' -f2 || echo "PASS")
     if [ "$VERDICT" = "BLOCK" ]; then

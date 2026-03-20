@@ -42,6 +42,20 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "review base" in content
 
+    def test_pre_push_prints_review_output_when_review_runs(self) -> None:
+        """Verify pre-push.sh prints captured review output back to the user."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert 'echo "$REVIEW_RESULT"' in content
+
+    def test_pre_push_saves_review_output_to_agent_reports(self) -> None:
+        """Verify pre-push.sh persists local review output to .agent/reports/."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "mkdir -p .agent/reports" in content
+        assert ".agent/reports/pre-push-review-" in content
+        assert 'printf \'%s\\n\' "$REVIEW_RESULT" > "$REVIEW_REPORT_FILE"' in content
+
     def test_pre_push_does_not_call_review_gate(self) -> None:
         """Verify pre-push.sh does not call review-gate."""
         script_path = Path("scripts/hooks/pre-push.sh")
