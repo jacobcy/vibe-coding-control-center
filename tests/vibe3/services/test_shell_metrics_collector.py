@@ -1,6 +1,5 @@
 """Shell metrics collector 单元测试."""
 
-
 from vibe3.services.shell_metrics_collector import collect_shell_metrics
 
 

@@ -86,3 +86,15 @@ def test_review_base_does_not_have_publish_option():
     assert result.exit_code == 0
     # --publish should NOT appear in help
     assert "--publish" not in result.output
+
+
+def test_review_base_rejects_unknown_agent_param():
+    """review base should reject --agent (not a valid option).
+
+    This test ensures the hook-CLI contract is enforced: pre-push.sh
+    should not use --agent parameter.
+    """
+    result = runner.invoke(app, ["base", "--agent", "code-reviewer"])
+    # Typer should reject unknown option
+    assert result.exit_code != 0
+    assert "no such option" in result.output.lower() or "error" in result.output.lower()
