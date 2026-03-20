@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.2.3] - 2026-03-21
+
+### ✨ Changed
+- 重写 Phase 04 handoff 文档，基于当前 v3 现状定义 handoff 真源、task.md 降级角色、review report 线索与 cutover readiness
+
 ## [2.2.2] - 2026-03-20
 
 ### ✨ Changed
