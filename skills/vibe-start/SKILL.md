@@ -114,8 +114,8 @@ vibe task add --spec-standard <standard> --spec-ref <plan-path>
 
 **情况 C：都没有**
 
-- 根据 primary_issue_ref 编写 plan
-- 使用 `vibe task add --spec-standard --spec-ref` 创建 task
+- 根据 primary_issue_ref 编写 plan（保存到 `docs/plans/` 目录）
+- 使用 `vibe task add --spec-standard openspec --spec-ref <plan-path>` 创建 task
 - 使用 `vibe task update --bind-current` 绑定到当前 flow
 
 ### Step 3: 创建 PR draft
@@ -133,6 +133,10 @@ vibe flow pr --base <ref> --msg "<description>"
 - 如果已有 plan 文件，应包含在 PR 中
 - PR 创建后当前 flow 进入 `open + had_pr` 状态
 - 首次发布需要提供有效的 CHANGELOG message
+- **PR 创建后需要手动关联到 task**：
+  ```bash
+  vibe task update <task-id> --pr "gh-<pr-number>"
+  ```
 
 ### Step 4: 写入 handoff
 

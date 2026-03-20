@@ -5,8 +5,6 @@ Tests focus on _get_recent_commits and _get_pr_commit_count with mocked dependen
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from vibe3.commands.inspect_helpers import (
     _get_pr_commit_count,
     _get_recent_commits,

@@ -24,7 +24,10 @@ def _strip_ansi(text: str) -> str:
 
 
 def test_review_no_args_shows_help():
-    """vibe review (no subcommand) -> shows help (exit 0 or 2 per typer no_args_is_help)."""
+    """vibe review (no subcommand) -> shows help.
+
+    Exit 0 or 2 per typer no_args_is_help.
+    """
     result = runner.invoke(app, [])
     assert result.exit_code in (0, 2)
     assert "Usage" in result.output or "pr" in result.output

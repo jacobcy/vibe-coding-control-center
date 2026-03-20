@@ -141,14 +141,34 @@ _setup_direnv() {
         log_info "direnv hook already present in $RC_FILE"
     fi
 
-    # Create global venv if not exists
+    # Check and set UV_PROJECT_ENVIRONMENT
     local venv_path="$HOME/.venvs/vibe-center"
+
+    # Create global venv if not exists
     if [[ ! -d "$venv_path" ]]; then
         log_info "Creating global venv at $venv_path..."
         mkdir -p "$HOME/.venvs"
         uv venv "$venv_path"
     else
         log_info "Global venv already exists at $venv_path"
+    fi
+
+    # Check if UV_PROJECT_ENVIRONMENT is already set in environment
+    if [[ -n "$UV_PROJECT_ENVIRONMENT" ]]; then
+        log_info "UV_PROJECT_ENVIRONMENT is already set: $UV_PROJECT_ENVIRONMENT"
+        if [[ "$UV_PROJECT_ENVIRONMENT" != "$venv_path" && "$UV_PROJECT_ENVIRONMENT" != "\$HOME/.venvs/vibe-center" ]]; then
+            log_warn "UV_PROJECT_ENVIRONMENT points to a different location: $UV_PROJECT_ENVIRONMENT"
+            log_warn "Vibe Center expects: $venv_path"
+        fi
+    else
+        # Check if it's set in shell config
+        local uv_env_export="export UV_PROJECT_ENVIRONMENT=\"\$HOME/.venvs/vibe-center\""
+        if ! grep -qF 'UV_PROJECT_ENVIRONMENT' "$RC_FILE" 2>/dev/null; then
+            _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
+            log_info "Added UV_PROJECT_ENVIRONMENT to $RC_FILE"
+        else
+            log_info "UV_PROJECT_ENVIRONMENT already set in $RC_FILE"
+        fi
     fi
 
     # Create .envrc in source root if not exists

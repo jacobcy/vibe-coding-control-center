@@ -208,7 +208,7 @@ def run_review_agent(prompt: str, options: ReviewAgentOptions) -> str:
 
 把 `review_helpers.py` 改成只保留：
 - `run_inspect_json()`
-- `build_inspect_args()` 或类似薄函数
+- 如参数组装开始重复，再抽 `build_inspect_args()` 一类薄函数；否则保持最小实现
 
 删除 `call_codex()`，避免旧命名继续污染。
 

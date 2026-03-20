@@ -47,19 +47,33 @@ review_scope:
     - "src/vibe3/commands/"  # v3 命令层
 
 # Review 配置
+# Review Configuration
+# =====================
+# Data sources:
+# - Static: Read from config file at runtime
+# - Runtime: Injected by code (e.g., changed_symbols from inspect)
+#
+# Configuration boundaries:
+# - This file: Static policy/agent/output config
+# - Runtime code: AST analysis (changed_symbols, symbol_dag)
+# - Command line: Task guidance (--message option)
 review:
-  policy_file: ".codex/review-policy.md"  # Review policy 文件路径
-  tools_guide_file: ".agent/rules/cli-usage.md"  # 工具使用指南文件路径
+  # Static: Path to review policy markdown file
+  policy_file: ".codex/review-policy.md"
 
-  # codeagent-wrapper 调用配置（二选一）
+  # Static: Path to tools guide markdown file
+  tools_guide_file: ".agent/rules/cli-usage.md"
+
+  # Static: Agent configuration for codeagent-wrapper
   agent_config:
-    # 方式1: 使用 agent preset（推荐）
+    # Method 1: Use agent preset (recommended)
     agent: "code-reviewer"
 
-    # 方式2: 直接指定 backend 和 model（如果不用 preset）
+    # Method 2: Direct backend/model specification (alternative)
     # backend: "claude"
-    # model: "claude-3-opus"  # 可选
+    # model: "claude-3-opus"  # optional
 
+  # Static: Output format requirements (VERDICT contract)
   output_format: |
     Each finding should follow this format:
     path/to/file.py:42 [MAJOR] concise issue description
@@ -72,6 +86,8 @@ review:
     - MAJOR: Issues found that should be addressed before merge
     - BLOCK: Critical issues that must be fixed before merge
 
+  # Static: Default review task guidance
+  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
   review_task: |
     - Run `git diff <base>...HEAD` to see file changes
     - Review only changed code, not the entire codebase
@@ -79,9 +95,8 @@ review:
     - Prioritize: correctness, regression risk, API breaks
     - Focus on actionable, specific findings
 
-  # Custom review prompt (optional)
-  # If provided, will be added to the beginning of review context
-  # Can be overridden via command line: vibe3 review pr 42 --message "Focus on security"
+  # Static: Custom review prompt (optional prefix)
+  # Added to beginning of review context if provided
   review_prompt: "/code-review"
 
 # 质量标准

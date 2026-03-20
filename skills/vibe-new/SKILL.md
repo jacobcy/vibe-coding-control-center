@@ -13,7 +13,7 @@ description: Use when the user wants to create or intake the next delivery targe
 
 - 创建逻辑 flow（不创建物理 worktree）
 - 没指定 issue → 通过 `/vibe-issue` 创建 issue
-- 有 issue → `vibe roadmap sync` 同步 issue 到本地
+- 有 issue 且已有 `vibe-task` label 或在 GitHub Project 中 → `vibe roadmap sync` 同步到本地
 - 不创建 task，不进入执行
 
 ## 停止点
@@ -52,8 +52,8 @@ description: Use when the user wants to create or intake the next delivery targe
   │
   ├─ Step 3: 补齐上游规划对象
   │   ├─ 缺 issue → 调用 /vibe-issue
-  │   ├─ 缺 roadmap item → vibe roadmap add
-  │   └─ 缺 plan → 委托 writing-plans
+  │   ├─ 缺 roadmap item → vibe roadmap sync 或 vibe roadmap add
+  │   └─ 缺 plan → 等待 /vibe-start 编写 plan
   │
   ├─ Step 4: 处理 flow 现场
   │   ├─ 创建逻辑 flow：vibe flow new <slug> --branch origin/main
@@ -112,8 +112,11 @@ vibe roadmap list
 规则固定如下：
 
 - 缺少 `repo issue` 或 bug 边界不清时，先委托 `vibe-issue`
-- 缺少 roadmap item 时，先运行 `vibe roadmap add ...`
-- 缺少 plan 时，默认委托 `writing-plans`
+- 缺少 roadmap item 时：
+  - 如果 issue 已有 `vibe-task` label 或已在 GitHub Project 中：直接运行 `vibe roadmap sync`（会自动 intake）
+  - 如果 issue 没有 label 且不在 Project 中：先添加 label 或添加到 Project，然后 `vibe roadmap sync`
+  - 如果还没有 GitHub issue：运行 `vibe roadmap add <title>` 创建 draft item
+- 缺少 plan 时，等待 `/vibe-start` 编写 plan（vibe-new 不负责创建 plan）
 - 只有进入 `/vibe-start` 后，才允许从 issue 落 task 作为 execution bridge 并写入 `spec_standard/spec_ref`
 
 ### Step 4: 处理 flow 现场
