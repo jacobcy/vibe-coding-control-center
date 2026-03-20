@@ -56,6 +56,14 @@ class TestPrePushContract:
         assert ".agent/reports/pre-push-review-" in content
         assert 'printf \'%s\\n\' "$REVIEW_RESULT" > "$REVIEW_REPORT_FILE"' in content
 
+    def test_pre_push_prints_review_trigger_and_verdict_summary(self) -> None:
+        """Verify pre-push.sh prints explicit observability summary lines."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert 'echo "  Review triggered: yes"' in content
+        assert 'echo "  Review triggered: no"' in content
+        assert 'echo "  Review verdict: $VERDICT"' in content
+
     def test_pre_push_does_not_call_review_gate(self) -> None:
         """Verify pre-push.sh does not call review-gate."""
         script_path = Path("scripts/hooks/pre-push.sh")

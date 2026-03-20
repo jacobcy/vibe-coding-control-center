@@ -55,6 +55,7 @@ echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
 
 # 5. Trigger local review on HIGH/CRITICAL risk
 if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
+    echo "  Review triggered: yes"
     echo ""
     echo "  WARNING: High risk detected!"
     echo "  Running local review before push..."
@@ -87,10 +88,13 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     fi
 
     VERDICT=$(echo "$REVIEW_RESULT" | grep -o "VERDICT: [A-Z]*" | head -1 | cut -d' ' -f2 || echo "PASS")
+    echo "  Review verdict: $VERDICT"
     if [ "$VERDICT" = "BLOCK" ]; then
         echo "ERROR: Review verdict is BLOCK - fix issues before push"
         exit 1
     fi
+else
+    echo "  Review triggered: no"
 fi
 
 echo ""
