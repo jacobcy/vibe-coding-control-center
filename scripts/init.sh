@@ -58,38 +58,22 @@ _symlink_files() {
 
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 
-# ── 0. Setup shared .venv for worktrees ───────────────────────────────────────
-# All worktrees share the same .venv from the main worktree
-if command -v git &> /dev/null; then
-  git_common_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
-  main_worktree="$(dirname "$git_common_dir")"
-  current_worktree="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  shared_venv="$main_worktree/.venv"
-
-  # Check if we're in a worktree (not the main one)
-  if [[ -n "$current_worktree" && "$current_worktree" != "$main_worktree" ]]; then
-    # We're in a worktree, create symlink to main's .venv
-    if [[ ! -e "$current_worktree/.venv" ]]; then
-      echo "🔗 Creating symlink to shared .venv..."
-      ln -sfn "$shared_venv" "$current_worktree/.venv"
-      echo "  → Linked to $shared_venv"
-    elif [[ -L "$current_worktree/.venv" ]]; then
-      echo "✅ .venv symlink already exists"
-    else
-      echo -e "\033[1;33m⚠️  Warning: .venv exists but is not a symlink\033[0m"
-      echo "   Consider removing it and re-running init.sh"
-    fi
-  fi
-
-  # Ensure main worktree has .venv (only if uv is available)
-  if [[ ! -d "$shared_venv" ]] && command -v uv &> /dev/null; then
-    echo "📦 Creating shared .venv in main worktree..."
-    (
-      cd "$main_worktree" || exit 1
-      uv venv
-      uv sync --dev
-    ) || echo -e "\033[1;33m⚠️  Warning: Failed to create shared .venv\033[0m"
-  fi
+# ── 0. Check UV_PROJECT_ENVIRONMENT ───────────────────────────────────────
+# Verify that UV_PROJECT_ENVIRONMENT is set and points to global venv
+if [[ -z "$UV_PROJECT_ENVIRONMENT" ]]; then
+  echo -e "\033[1;33m⚠️  Warning: UV_PROJECT_ENVIRONMENT is not set\033[0m"
+  echo "   Vibe Center uses a shared virtual environment at: ~/.venvs/vibe-center"
+  echo ""
+  echo "   Please add the following to your shell config (~/.zshrc or ~/.bashrc):"
+  echo "   export UV_PROJECT_ENVIRONMENT=\"\$HOME/.venvs/vibe-center\""
+  echo ""
+  echo "   Or run: scripts/install.sh to set it up automatically"
+elif [[ ! -d "$UV_PROJECT_ENVIRONMENT" ]]; then
+  echo -e "\033[1;33m⚠️  Warning: UV_PROJECT_ENVIRONMENT directory does not exist: $UV_PROJECT_ENVIRONMENT\033[0m"
+  echo "   Please create it with: uv venv $UV_PROJECT_ENVIRONMENT"
+  echo "   Or run: scripts/install.sh to set it up automatically"
+else
+  echo "✅ UV_PROJECT_ENVIRONMENT is set: $UV_PROJECT_ENVIRONMENT"
 fi
 
 # ── 1. Install approved skills from ~/.vibe/skills.json ──────────────────────
@@ -108,7 +92,7 @@ if [ -f "$VIBE_SKILLS_CONFIG" ] && command -v jq &> /dev/null; then
 else
   # Fallback: install full superpowers if no config or jq not available
   echo "📦 Installing Superpowers (fallback)..."
-  npx skills add obra/superpowers -y --agent antigravity trae
+  npx skills add obra/superpowers -y --agent antigravity trae claude
 fi
 
 # ── 2. Initialize OpenSpec ────────────────────────────────────────────────────
@@ -125,7 +109,6 @@ echo "🔗 Creating symlinks for local skills..."
 
 # Link skills/vibe-* (project-owned skills)
 _symlink_files "skills/vibe-*/" ".agent/skills" "identity" "dir"
-_symlink_files "skills/vibe-*/" ".trae/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".claude/skills" "identity" "dir"
 _symlink_files "skills/vibe-*/" ".codex/skills" "identity" "dir"
 
