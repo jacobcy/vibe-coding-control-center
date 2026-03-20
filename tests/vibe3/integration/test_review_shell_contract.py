@@ -6,10 +6,17 @@ These tests ensure the hook-CLI contract is enforced:
 - Exit codes are correct
 """
 
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI color/style codes from subprocess help output."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 class TestPrePushContract:
@@ -76,7 +83,7 @@ class TestReviewGateContract:
             capture_output=True,
         )
         assert result.returncode == 0
-        output = result.stdout.decode()
+        output = _strip_ansi(result.stdout.decode())
         assert "review-gate" in output, "review-gate command should exist"
 
     def test_review_gate_has_check_block_option(self) -> None:
@@ -86,5 +93,5 @@ class TestReviewGateContract:
             capture_output=True,
         )
         assert result.returncode == 0
-        output = result.stdout.decode()
+        output = _strip_ansi(result.stdout.decode())
         assert "--check-block" in output, "review-gate should have --check-block option"

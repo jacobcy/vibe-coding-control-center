@@ -53,7 +53,7 @@ def review_gate(
 
     # Extract risk level
     score_data = inspect_data.get("score", {})
-    risk_level = score_data.get("risk_level", "LOW")
+    risk_level = score_data.get("level") or score_data.get("risk_level", "LOW")
     risk_score = score_data.get("score", 0)
 
     log.bind(risk_level=risk_level, risk_score=risk_score).info(

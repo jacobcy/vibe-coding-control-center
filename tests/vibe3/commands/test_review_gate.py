@@ -74,6 +74,33 @@ class TestReviewGate:
             # Should not raise any exception
             review_gate(check_block=False)
 
+    def test_review_gate_uses_level_field_from_inspect_score(self) -> None:
+        """review-gate should read the canonical score.level field."""
+        mock_config = MagicMock()
+        mock_config.review.agent_config.agent = "code-reviewer"
+        mock_config.review.agent_config.backend = None
+        mock_config.review.agent_config.model = None
+
+        with (
+            patch("vibe3.commands.review_gate.run_inspect_json") as mock_inspect,
+            patch("vibe3.commands.review_gate.run_review_agent") as mock_review,
+            patch("vibe3.commands.review_gate.build_review_context") as mock_build,
+            patch(
+                "vibe3.commands.review_gate.VibeConfig.get_defaults"
+            ) as mock_get_config,
+        ):
+            mock_inspect.return_value = {
+                "score": {"level": "HIGH", "score": 8},
+                "changed_symbols": None,
+            }
+            mock_build.return_value = "context"
+            mock_review.return_value = MagicMock(stdout="VERDICT: PASS", exit_code=0)
+            mock_get_config.return_value = mock_config
+
+            review_gate(check_block=False)
+
+            mock_review.assert_called_once()
+
     def test_review_gate_blocks_on_verdict_block(self) -> None:
         """BLOCK verdict should return exit code 1."""
         mock_config = MagicMock()
