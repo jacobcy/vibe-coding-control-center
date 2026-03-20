@@ -1,10 +1,10 @@
 ---
 document_type: plan
 title: Phase 02 - Flow & Task State (SQLite)
-status: draft
+status: active
 author: Claude Sonnet 4.6
 created: 2026-03-15
-last_updated: 2026-03-16
+last_updated: 2026-03-20
 related_docs:
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
@@ -12,11 +12,12 @@ related_docs:
   - docs/v3/infrastructure/02-architecture.md
   - docs/v3/infrastructure/03-coding-standards.md
   - docs/v3/infrastructure/04-test-standards.md
+  - docs/plans/2026-03-20-pr-command-surface-design.md
 ---
 
 # Phase 02: Flow & Task State (SQLite)
 
-**Goal**: Implement the state management layer for Flows and Tasks using SQLite.
+**Goal**: Implement the state management layer for Flows and Tasks using SQLite, while keeping `pr` as a separate delivery-carrier layer rather than collapsing PR lifecycle into flow/task.
 
 ## 1. 架构约束
 
@@ -85,6 +86,45 @@ If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3
 - `new` - 创建 flow，插入 `flow_state` 表
 - `bind` - 绑定 task，更新 `flow_state.current_task`
 - `status` - 查询 flow，读取 `flow_state` 表
+
+### 4.5 PR Command Surface (Finalized)
+
+The PR command surface has been simplified to focus only on delivery-carrier actions with clear project packaging value.
+
+**Public PR Commands (Final)**:
+- `pr create` - Create draft PR with project context (task, flow, spec metadata)
+- `pr ready` - Mark PR as ready with quality gates (coverage, risk score)
+- `pr show` - Show PR status with change analysis and risk summary
+
+**Removed from Public CLI**:
+- `pr draft` - Replaced by `pr create`
+- `pr merge` - Merge is now handled by `flow done` / `integrate`, not PR command
+- `pr version-bump` - No clear project packaging value
+- `review-gate` - Removed from this round's cleanup scope
+
+### 4.6 Responsibility Split (Final)
+
+This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
+
+**职责拆分**:
+
+- `task`：吸收 `repo issue`，做 execution record、分合、依赖、主闭环 issue 绑定
+- `flow`：把 task 带入 branch 现场，表达当前交付切片
+- `pr`：承载当前交付产物，只保留 `create` / `ready` / `show`
+- `review`：负责审查动作，不承担 PR 状态切换
+- `integrate` / `done`：承担合并与收口，不由 `pr` 直接承载
+
+**主链**:
+
+`repo issue -> task issue -> flow new/bind -> pr create -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
+
+**补充约束**:
+
+- `flow` 不负责 PR ready/merge
+- `task` 不负责 PR 创建
+- `pr` 不负责 issue intake
+- `pr` 不负责 merge (交给 integrate / done / closeout)
+- `pre-push` 直接调用 inspect + review，不额外扩张 review gate 命令
 
 ## 5. 成功标准（验收标准）
 

@@ -14,11 +14,11 @@ from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_created
 
 
-def register_draft_command(app: typer.Typer) -> None:
-    """Register pr draft command."""
+def register_create_command(app: typer.Typer) -> None:
+    """Register pr create command."""
 
     @app.command()
-    def draft(
+    def create(
         title: Annotated[str, typer.Option("-t", help="PR title")],
         body: Annotated[str, typer.Option("-b", help="PR description")] = "",
         base: Annotated[str, typer.Option(help="Base branch")] = "main",
@@ -32,10 +32,10 @@ def register_draft_command(app: typer.Typer) -> None:
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
         yaml_output: Annotated[
             bool, typer.Option("--yaml", help="YAML 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
     ) -> None:
         """Create draft PR."""
         if json_output and yaml_output:
@@ -46,14 +46,12 @@ def register_draft_command(app: typer.Typer) -> None:
             setup_logging(verbose=2)
 
         ctx = (
-            trace_context(command="pr draft", domain="pr", title=title)
+            trace_context(command="pr create", domain="pr", title=title)
             if trace
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr draft", title=title, base=base).info(
-                "Creating draft PR"
-            )
+            logger.bind(command="pr create", title=title, base=base).info("Creating PR")
 
             service = PRService()
             metadata = None
@@ -65,6 +63,7 @@ def register_draft_command(app: typer.Typer) -> None:
                     planner=planner,
                     executor=executor,
                 )
+
             pr = service.create_draft_pr(
                 title=title, body=body, base_branch=base, metadata=metadata
             )

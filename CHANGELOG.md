@@ -1,5 +1,10 @@
 # 更新日志
 
+## [2.2.2] - 2026-03-20
+
+### ✨ Changed
+- 收敛 vibe3 pr 公开命令面：只保留 create --draft、ready、show 三个入口；review-gate 改为内部入口，由 pre-push hook 调用
+
 ## [2.2.1] - 2026-03-19
 
 ### ✨ Changed

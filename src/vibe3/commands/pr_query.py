@@ -1,4 +1,11 @@
-"""PR query commands."""
+"""PR query commands.
+
+Public commands:
+- show: Show PR details with change analysis
+
+Removed from public CLI:
+- version-bump: No clear project packaging value
+"""
 
 from datetime import datetime
 from typing import Annotated
@@ -18,7 +25,7 @@ from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.pr_service import PRService
-from vibe3.ui.pr_ui import render_pr_details, render_version_bump
+from vibe3.ui.pr_ui import render_pr_details
 
 
 def register_query_commands(app: typer.Typer) -> None:
@@ -33,10 +40,10 @@ def register_query_commands(app: typer.Typer) -> None:
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
         yaml_output: Annotated[
             bool, typer.Option("--yaml", help="YAML 格式输出")
-        ] = False,  # noqa: E501
+        ] = False,
     ) -> None:
         """Show PR details with change analysis."""
         if json_output and yaml_output:
@@ -79,7 +86,7 @@ def register_query_commands(app: typer.Typer) -> None:
             # Get change analysis if pr_number is provided
             analysis = None
             if pr_number:
-                # Fail-fast: 如果分析失败，立即抛出
+                # Fail-fast: if analysis fails, immediately throw
                 analysis = run_inspect_json(["pr", str(pr_number)])
                 logger.debug("Successfully retrieved change analysis")
 
@@ -115,7 +122,7 @@ def register_query_commands(app: typer.Typer) -> None:
                 if analysis:
                     console = Console()
 
-                    console.print("\n[bold]### 📊 Change Analysis[/]")
+                    console.print("\n[bold]### Change Analysis[/]")
                     score = analysis.get("score", {})  # type: ignore[attr-defined]
                     console.print(f"- [cyan]Risk Level[/]: {score.get('level', 'N/A')}")  # type: ignore[attr-defined]
                     console.print(f"- [cyan]Risk Score[/]: {score.get('score', 'N/A')}")  # type: ignore[attr-defined]
@@ -132,58 +139,6 @@ def register_query_commands(app: typer.Typer) -> None:
 
                     # Show top changed files
                     if changed_files:
-                        console.print("\n[bold]### 🔍 Top Changed Files[/]")
+                        console.print("\n[bold]### Top Changed Files[/]")
                         for file in changed_files[:5]:
                             console.print(f"  - {file}")
-
-    @app.command()
-    def version_bump(
-        pr_number: Annotated[int, typer.Argument(help="PR number")],
-        group: Annotated[str | None, typer.Option("-g", help="Task group")] = None,
-        trace: Annotated[
-            bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-        ] = False,
-        json_output: Annotated[
-            bool, typer.Option("--json", help="JSON 格式输出")
-        ] = False,  # noqa: E501
-        yaml_output: Annotated[
-            bool, typer.Option("--yaml", help="YAML 格式输出")
-        ] = False,  # noqa: E501
-    ) -> None:
-        """Calculate version bump for PR."""
-        if json_output and yaml_output:
-            typer.echo("Error: Cannot use both --json and --yaml", err=True)
-            raise typer.Exit(1)
-
-        if trace:
-            setup_logging(verbose=2)
-
-        ctx = (
-            trace_context(command="pr version-bump", domain="pr", pr_number=pr_number)
-            if trace
-            else noop_context()
-        )
-        with ctx:
-            logger.bind(
-                command="pr version-bump", pr_number=pr_number, group=group
-            ).info("Calculating version bump")
-
-            service = PRService()
-            response = service.calculate_version_bump(pr_number, group)
-
-            if json_output:
-                import json
-
-                typer.echo(json.dumps(response.model_dump(), indent=2, default=str))
-            elif yaml_output:
-                import yaml
-
-                typer.echo(
-                    yaml.dump(
-                        response.model_dump(),
-                        default_flow_style=False,
-                        allow_unicode=True,
-                    )
-                )
-            else:
-                render_version_bump(response)

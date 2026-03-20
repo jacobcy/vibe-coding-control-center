@@ -25,8 +25,8 @@ jobs:
             echo "review_type=copilot" >> $GITHUB_OUTPUT
             echo "🛠️ Bug 修复，使用 Copilot 审查"
           elif echo "$LABELS" | grep -q 'type/refactor'; then
-            echo "review_type=local" >> $GITHUB_OUTPUT
-            echo "🔄 重构，运行本地 review"
+            echo "review_type=skip" >> $GITHUB_OUTPUT
+            echo "🔄 重构，已在本地完成测试和验证"
           elif echo "$LABELS" | grep -q 'type/docs\|type/test\|type/chore'; then
             echo "review_type=manual" >> $GITHUB_OUTPUT
             echo "📋 文档/测试/杂项变更，需要手动审查"
@@ -86,44 +86,6 @@ jobs:
               pull_number: context.issue.number,
               reviewers: ['copilot']
             });
-
-      - name: Remove ready-for-review label
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "status/ready-for-review"
-
-  # 本地 review (用于 refactor)
-  local-review:
-    needs: determine-strategy
-    if: needs.determine-strategy.outputs.review_type == 'local' && github.event.label.name == 'status/ready-for-review'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run vibe3 pr review
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
-        run: |
-          uv run python src/vibe3/cli.py pr review ${{ github.event.pull_request.number }} --publish
 
       - name: Remove ready-for-review label
         if: always()
