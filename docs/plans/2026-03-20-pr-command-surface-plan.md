@@ -4,9 +4,9 @@
 
 **Status:** COMPLETED (2026-03-20)
 
-**Goal:** 收敛 `vibe3 pr` 命令面，只保留 `create --draft`、`ready`、`show` 三个公开入口，并移除公开 `review-gate`。
+**Goal:** 收敛 `vibe3 pr` 命令面，只保留 `create`、`ready`、`show` 三个公开入口，并移除本轮引入的 `review-gate`。
 
-**Architecture:** 本次不重写 `task / flow / review` 主链，只做命令面治理与内部入口下沉。公开 CLI 只保留有项目包装价值的 `pr` 命令；hook/CI 的 gate 改走内部 Python 入口，避免污染用户命令体系。
+**Architecture:** 本次不重写 `task / flow / review` 主链，只做命令面治理与结构回收。公开 CLI 只保留有项目包装价值的 `pr` 命令；`pre-push` 直接使用现有 `inspect + review` 链路，不再单独保留 `review-gate`。
 
 **Tech Stack:** Typer CLI、Python services、pytest、Git hooks、GitHub client。
 
@@ -19,9 +19,9 @@
 | Task | Description | Status |
 |------|-------------|--------|
 | Task 1 | Freeze the target command contract | DONE |
-| Task 2 | Replace `pr draft` with `pr create --draft` | DONE |
+| Task 2 | Replace `pr draft` with `pr create` | DONE |
 | Task 3 | Remove `pr merge` from public CLI | DONE |
-| Task 4 | Move review gate behind an internal entry | DONE |
+| Task 4 | Remove review gate from this PR scope | DONE |
 | Task 5 | Tighten `pr show` as the only PR query surface | DONE |
 | Task 6 | Update design docs and handoff | DONE |
 | Task 7 | Final verification | DONE |
@@ -29,24 +29,21 @@
 ### Key Changes
 
 1. **PR Command Surface**:
-   - `pr create --draft` - Create draft PR (replaces `pr draft`)
+   - `pr create` - Create draft PR (replaces `pr draft`)
    - `pr ready` - Mark PR as ready with quality gates
    - `pr show` - Show PR details with change analysis
 
 2. **Removed from Public CLI**:
-   - `pr draft` - Now `pr create --draft`
+   - `pr draft` - Now `pr create`
    - `pr merge` - Merge handled by flow done / integrate
    - `pr version-bump` - No clear project packaging value
-   - `review-gate` - Internal entry only
-
-3. **Internal Entry Points**:
-   - `python -m vibe3.commands.review_gate --check-block` - Pre-push hook
+   - `review-gate` - Removed from this round
 
 ### Test Coverage
 
 - 32 tests pass for PR command surface
 - All type checks pass (`mypy src/vibe3`)
-- Shell contract tests updated for internal entry
+- Shell contract tests updated for direct inspect + review flow
 
 ---
 
@@ -92,7 +89,7 @@ git add src/vibe3/commands/pr.py src/vibe3/cli.py tests/vibe3/commands/test_pr_h
 git commit -m "refactor(pr): simplify public command surface"
 ```
 
-### Task 2: Replace `pr draft` with `pr create --draft`
+### Task 2: Replace `pr draft` with `pr create`
 
 **Files:**
 - Modify: `src/vibe3/commands/pr_create.py`
@@ -103,13 +100,12 @@ git commit -m "refactor(pr): simplify public command surface"
 
 覆盖：
 
-- `vibe3 pr create --draft` 创建 draft PR
-- `vibe3 pr create` 默认行为是否仍为 draft，必须显式定下来
+- `vibe3 pr create` 创建 draft PR
 - `vibe3 pr draft` 不再存在
 
 推荐默认：
 
-- `create` 要求显式 `--draft`
+- `create` 直接代表 draft PR 创建
 - 如果未来需要非 draft create，再单独扩展
 
 **Step 2: Run tests to verify they fail**
@@ -121,7 +117,6 @@ Expected: FAIL
 **Step 3: Implement minimal command reshaping**
 
 - 将 `draft()` 重命名/迁移为 `create()`
-- `--draft` 成为 create 的显式选项
 - 继续复用现有 `PRService.create_draft_pr()`，不要顺手扩张非 draft 创建逻辑
 
 **Step 4: Run focused tests**
@@ -134,7 +129,7 @@ Expected: PASS
 
 ```bash
 git add src/vibe3/commands/pr_create.py src/vibe3/services/pr_service.py tests/vibe3/commands/test_pr_create.py tests/vibe3/commands/test_pr_help.py
-git commit -m "refactor(pr): replace draft command with create --draft"
+git commit -m "refactor(pr): replace draft command with create"
 ```
 
 ### Task 3: Remove `pr merge` from public CLI
@@ -176,11 +171,10 @@ git add src/vibe3/commands/pr_lifecycle.py tests/vibe3/commands/test_pr_merge.py
 git commit -m "refactor(pr): remove merge from public command surface"
 ```
 
-### Task 4: Move review gate behind an internal entry
+### Task 4: Remove review gate from this PR scope
 
 **Files:**
 - Modify: `scripts/hooks/pre-push.sh`
-- Modify: `src/vibe3/commands/review_gate.py`
 - Modify: `tests/vibe3/integration/test_review_shell_contract.py`
 
 **Step 1: Write the failing tests**
@@ -188,8 +182,8 @@ git commit -m "refactor(pr): remove merge from public command surface"
 断言：
 
 - 顶层 help 不再显示 `review-gate`
-- `pre-push.sh` 仍能调用内部入口
-- shell contract 测试改为验证“未暴露公开命令，但 hook 入口稳定”
+- `pre-push.sh` 直接调用 inspect + review
+- shell contract 测试改为验证“无 review-gate，hook 链路仍稳定”
 
 **Step 2: Run tests to verify they fail**
 
@@ -197,27 +191,27 @@ Run: `uv run pytest tests/vibe3/integration/test_review_shell_contract.py -v`
 
 Expected: FAIL
 
-**Step 3: Implement minimal internalization**
+**Step 3: Implement minimal cleanup**
 
 推荐方式：
 
-- 保留 `review_gate()` 函数
-- 新增内部模块入口，例如 `python -m vibe3.commands.review_gate`
-- `pre-push.sh` 调内部入口，不调公开 CLI 命令
+- 删除 `review_gate.py`
+- `pre-push.sh` 回到 inspect + review 现有链路
+- 不再保留 review-gate 模块入口
 
 不要再引入新的顶层命令或 `hooks` 子命令。
 
 **Step 4: Run focused tests**
 
-Run: `uv run pytest tests/vibe3/integration/test_review_shell_contract.py tests/vibe3/commands/test_review_gate.py -v`
+Run: `uv run pytest tests/vibe3/integration/test_review_shell_contract.py -v`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-git add scripts/hooks/pre-push.sh src/vibe3/commands/review_gate.py tests/vibe3/integration/test_review_shell_contract.py tests/vibe3/commands/test_review_gate.py
-git commit -m "refactor(review): hide review gate from public cli"
+git add scripts/hooks/pre-push.sh tests/vibe3/integration/test_review_shell_contract.py
+git commit -m "refactor(review): remove review gate from cleanup scope"
 ```
 
 ### Task 5: Tighten `pr show` as the only PR query surface
@@ -314,7 +308,6 @@ uv run pytest \
   tests/vibe3/commands/test_pr_create.py \
   tests/vibe3/commands/test_pr_show.py \
   tests/vibe3/commands/test_pr_ready.py \
-  tests/vibe3/commands/test_review_gate.py \
   tests/vibe3/integration/test_review_shell_contract.py -v
 ```
 

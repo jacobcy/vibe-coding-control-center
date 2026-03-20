@@ -13,9 +13,6 @@ from loguru import logger
 from rich import box as _box
 
 from vibe3.commands import flow, hooks, inspect, pr, review, task
-
-# Note: review_gate is now an internal entry, not a public CLI command
-# Hooks should use: python -m vibe3.commands.review_gate
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
 
@@ -47,9 +44,6 @@ app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(hooks.app, name="hooks")
-# Note: review-gate is now an internal entry for hooks/CI
-# Use: python -m vibe3.commands.review_gate
-# Do NOT expose as public command: app.command(name="review-gate")(review_gate)
 
 
 @app.callback()

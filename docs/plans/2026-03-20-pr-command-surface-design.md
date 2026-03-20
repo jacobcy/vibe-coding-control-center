@@ -19,7 +19,7 @@
 
 本轮采用的主链表达：
 
-`repo issue -> task issue -> flow new/bind -> pr create --draft -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
+`repo issue -> task issue -> flow new/bind -> pr create -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
 
 其中：
 
@@ -67,13 +67,13 @@
 
 `pr` 只保留以下公开命令：
 
-- `pr create --draft`
+- `pr create`
 - `pr ready`
 - `pr show`
 
 设计理由：
 
-- `create --draft` 有项目包装价值：从当前 flow / task / branch 语境构造 draft PR。
+- `create` 有项目包装价值：从当前 flow / task / branch 语境构造 draft PR。
 - `ready` 有项目包装价值：从 draft 切换到 ready，并承载本项目质量门禁。
 - `show` 有项目包装价值：快速显示 PR 状态、CI、comments、risk summary。
 
@@ -88,7 +88,7 @@
 
 收敛后应改为：
 
-- `vibe3 pr create --draft`
+- `vibe3 pr create`
 
 ### Remove `pr merge`
 
@@ -97,7 +97,7 @@
 - merge 属于整合与收口动作，不属于 `pr` 命令域。
 - merge 的判断往往依赖 CI、review、stacked PR、closeout 语义，应该交给 integrate / done / skill。
 
-### Remove Public `review-gate`
+### Remove `review-gate` From This PR Scope
 
 原因：
 
@@ -107,8 +107,8 @@
 
 收敛原则：
 
-- 不暴露公开 `review-gate`
-- `pre-push.sh` 改走内部 Python 入口
+- 不暴露 `review-gate`
+- `pre-push.sh` 直接使用 `inspect` + `review` 现有链路
 
 ## `pr show` Scope
 
@@ -140,10 +140,10 @@
 
 下一轮 PR 聚焦 `pr` 命令面治理，只做：
 
-1. 收敛 `pr` 公开命令到 `create --draft / ready / show`
+1. 收敛 `pr` 公开命令到 `create / ready / show`
 2. 删除 `pr merge`
-3. 把 `pr draft` 重命名/迁移为 `pr create --draft`
-4. 移除公开 `review-gate`，改为内部入口
+3. 把 `pr draft` 重命名/迁移为 `pr create`
+4. 移除 `review-gate`，不在本轮保留内部入口
 5. 更新 handoff 与帮助文案
 
 不做：
@@ -158,6 +158,6 @@
 
 - 是否保留 `pr draft`
 - 是否保留 `pr merge`
-- 是否公开 `review-gate`
+- 是否保留 `review-gate`
 
 这些结论在本设计中已固定。

@@ -4,12 +4,12 @@ This module provides the main PR command group with all subcommands
 organized in separate modules for maintainability.
 
 Public commands:
-- create --draft: Create draft PR (or ready PR in future)
+- create: Create draft PR
 - ready: Mark PR as ready for review
 - show: Show PR details
 
 Removed from public CLI:
-- draft: Replaced by create --draft
+- draft: Replaced by create
 - merge: Now handled by flow done / integrate
 """
 

@@ -4,7 +4,8 @@ These tests define the expected command surface contract:
 - pr --help shows only: create, ready, show
 - pr draft is removed
 - pr merge is removed from public CLI
-- review-gate is not exposed publicly
+- review-gate is not part of the public CLI
+- pr create is a draft-only creation entry
 """
 
 import re
@@ -32,6 +33,16 @@ class TestPRCommandSurface:
         output = _strip_ansi(result.stdout.decode())
         assert "create" in output, "pr --help should show 'create' command"
 
+    def test_pr_create_help_does_not_show_draft_option(self) -> None:
+        """pr create is a draft-only command, not a mode switch."""
+        result = subprocess.run(
+            ["uv", "run", "python", "src/vibe3/cli.py", "pr", "create", "--help"],
+            capture_output=True,
+        )
+        assert result.returncode == 0
+        output = _strip_ansi(result.stdout.decode())
+        assert "--draft" not in output, "pr create should not expose --draft option"
+
     def test_pr_help_shows_ready_command(self) -> None:
         """pr --help shows 'ready' command."""
         result = subprocess.run(
@@ -55,7 +66,7 @@ class TestPRCommandSurface:
     def test_pr_help_does_not_show_draft_command(self) -> None:
         """pr --help does NOT show 'draft' as a separate command.
 
-        'draft' functionality is now under 'create --draft'.
+        Draft creation is now handled by `pr create`.
         """
         result = subprocess.run(
             ["uv", "run", "python", "src/vibe3/cli.py", "pr", "--help"],
@@ -116,10 +127,7 @@ class TestTopLevelHelpSurface:
     """Tests for top-level CLI help surface."""
 
     def test_top_level_help_does_not_show_review_gate(self) -> None:
-        """Top-level --help does NOT show 'review-gate' as a public command.
-
-        review-gate is an internal entry for hooks, not a user command.
-        """
+        """Top-level --help does NOT show 'review-gate'."""
         result = subprocess.run(
             ["uv", "run", "python", "src/vibe3/cli.py", "--help"],
             capture_output=True,
@@ -176,7 +184,7 @@ class TestPRMergeCommandRemoved:
 
 
 class TestReviewGateNotPublic:
-    """Tests verifying 'review-gate' is not a public command."""
+    """Tests verifying 'review-gate' does not exist in the CLI surface."""
 
     def test_review_gate_not_in_top_level_commands(self) -> None:
         """Calling 'review-gate' at top level should fail."""

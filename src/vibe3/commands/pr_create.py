@@ -22,9 +22,6 @@ def register_create_command(app: typer.Typer) -> None:
         title: Annotated[str, typer.Option("-t", help="PR title")],
         body: Annotated[str, typer.Option("-b", help="PR description")] = "",
         base: Annotated[str, typer.Option(help="Base branch")] = "main",
-        draft: Annotated[
-            bool, typer.Option("--draft", help="Create as draft PR")
-        ] = True,
         task: Annotated[int | None, typer.Option(help="Task issue #")] = None,
         flow: Annotated[str | None, typer.Option(help="Flow slug")] = None,
         spec: Annotated[str | None, typer.Option(help="Spec reference")] = None,
@@ -40,11 +37,7 @@ def register_create_command(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Create PR with optional draft mode.
-
-        By default, creates a draft PR. Use without --draft to create
-        a ready-for-review PR (not yet implemented).
-        """
+        """Create draft PR."""
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
             raise typer.Exit(1)
@@ -58,9 +51,7 @@ def register_create_command(app: typer.Typer) -> None:
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr create", title=title, base=base, draft=draft).info(
-                "Creating PR"
-            )
+            logger.bind(command="pr create", title=title, base=base).info("Creating PR")
 
             service = PRService()
             metadata = None
@@ -73,18 +64,9 @@ def register_create_command(app: typer.Typer) -> None:
                     executor=executor,
                 )
 
-            # For now, only draft creation is supported
-            if draft:
-                pr = service.create_draft_pr(
-                    title=title, body=body, base_branch=base, metadata=metadata
-                )
-            else:
-                # Non-draft creation not yet implemented
-                typer.echo(
-                    "Error: Non-draft PR creation not yet implemented. Use --draft.",
-                    err=True,
-                )
-                raise typer.Exit(1)
+            pr = service.create_draft_pr(
+                title=title, body=body, base_branch=base, metadata=metadata
+            )
 
             if json_output:
                 typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))

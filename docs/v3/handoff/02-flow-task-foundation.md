@@ -92,18 +92,15 @@ If you require more than technical scope, refer to the [Vibe 3.0 Master Plan](v3
 The PR command surface has been simplified to focus only on delivery-carrier actions with clear project packaging value.
 
 **Public PR Commands (Final)**:
-- `pr create --draft` - Create draft PR with project context (task, flow, spec metadata)
+- `pr create` - Create draft PR with project context (task, flow, spec metadata)
 - `pr ready` - Mark PR as ready with quality gates (coverage, risk score)
 - `pr show` - Show PR status with change analysis and risk summary
 
 **Removed from Public CLI**:
-- `pr draft` - Replaced by `pr create --draft`
+- `pr draft` - Replaced by `pr create`
 - `pr merge` - Merge is now handled by `flow done` / `integrate`, not PR command
 - `pr version-bump` - No clear project packaging value
-- `review-gate` - Now an internal entry for hooks/CI, accessible via `python -m vibe3.commands.review_gate`
-
-**Internal Entry Points**:
-- `python -m vibe3.commands.review_gate --check-block` - Pre-push hook entry
+- `review-gate` - Removed from this round's cleanup scope
 
 ### 4.6 Responsibility Split (Final)
 
@@ -113,13 +110,13 @@ This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
 
 - `task`：吸收 `repo issue`，做 execution record、分合、依赖、主闭环 issue 绑定
 - `flow`：把 task 带入 branch 现场，表达当前交付切片
-- `pr`：承载当前交付产物，只保留 `create --draft` / `ready` / `show`
+- `pr`：承载当前交付产物，只保留 `create` / `ready` / `show`
 - `review`：负责审查动作，不承担 PR 状态切换
 - `integrate` / `done`：承担合并与收口，不由 `pr` 直接承载
 
 **主链**:
 
-`repo issue -> task issue -> flow new/bind -> pr create --draft -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
+`repo issue -> task issue -> flow new/bind -> pr create -> pr ready -> review pr -> integrate -> flow done -> close repo issue`
 
 **补充约束**:
 
@@ -127,7 +124,7 @@ This handoff focuses on flow/task foundation, with PR lifecycle kept separate.
 - `task` 不负责 PR 创建
 - `pr` 不负责 issue intake
 - `pr` 不负责 merge (交给 integrate / done / closeout)
-- `review-gate` 不暴露为公开命令（只作为 hook/CI 内部入口）
+- `pre-push` 直接调用 inspect + review，不额外扩张 review gate 命令
 
 ## 5. 成功标准（验收标准）
 
