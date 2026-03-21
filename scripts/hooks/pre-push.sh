@@ -127,7 +127,12 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
         exit 1
     fi
 
-    VERDICT=$(grep -o "VERDICT: [A-Z]*" "$REVIEW_REPORT_FILE" | head -1 | cut -d' ' -f2 || echo "PASS")
+    VERDICT=$(python3 -c "
+import re
+content = open('$REVIEW_REPORT_FILE').read()
+match = re.search(r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}', content, re.IGNORECASE)
+print(match.group(1).upper() if match else 'PASS')
+")
     echo "  Review verdict: $VERDICT"
     if [ "$VERDICT" = "BLOCK" ]; then
         echo "ERROR: Review verdict is BLOCK - fix issues before push"
