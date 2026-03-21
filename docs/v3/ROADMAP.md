@@ -230,9 +230,9 @@ related_docs:
 
 ### Phase 04: Handoff & Logic Cutover
 
-- [ ] `vibe3 handoff sync` 写入 handoff.md
-- [ ] `bin/vibe` 正确重定向到 vibe3
-- [ ] SQL 记录匹配 Markdown 状态
+- [ ] handoff truth model 收敛完成
+- [ ] `.agent/context/task.md` 降级角色已明确
+- [ ] review report 与 `SESSION_ID` 被明确为证据指针
 
 ### Phase 05: Verification & Cleanup
 

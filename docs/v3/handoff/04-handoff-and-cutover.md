@@ -1,6 +1,6 @@
 ---
 document_type: plan
-title: Phase 04 - Handoff Command & Store
+title: Phase 04 - Handoff And Cutover
 status: draft
 author: GPT-5 Codex
 created: 2026-03-15
@@ -8,339 +8,261 @@ last_updated: 2026-03-21
 related_docs:
   - docs/v3/handoff/v3-rewrite-plan.md
   - docs/standards/v3/handoff-store-standard.md
+  - docs/standards/v2/handoff-governance-standard.md
   - docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
+  - docs/v3/infrastructure/01-data-standard.md
   - docs/v3/infrastructure/02-architecture.md
   - docs/v3/infrastructure/03-coding-standards.md
   - docs/v3/infrastructure/04-test-standards.md
 ---
 
-# Phase 04: Handoff Command & Store
+# Phase 04: Handoff And Cutover
 
-**Goal**: 实现 `vibe handoff` 命令与 JSON 文件编辑机制，建立基于 SQLite + JSON 文件的 handoff 体系，并降级 `.agent/context/task.md` 为 workflow 辅助索引。
+**Goal**: 收敛 v3 的 handoff 真相模型，明确多 agent 交接边界，降级 `.agent/context/task.md` 为 workflow 辅助索引，并定义 cutover readiness。
 
-## 1. 架构约束
+## 1. Truth Model
 
-见 [01-command-and-skeleton.md](01-command-and-skeleton.md) §通用架构约束
+本阶段固定以下口径：
+
+- `repo issue -> pr` 是唯一标准交付链
+- `git` 与 GitHub 现场负责业务事实
+- SQLite handoff store 只负责 flow 责任链与最小索引
+- `plan_ref / report_ref / audit_ref` 只存引用，不复制正文
+- `.agent/context/task.md` 是本地 workflow handoff，不是真源
+- review report 与 `SESSION_ID` 只作证据指针，不替代 issue / PR / git 事实
+
+补充说明：
+
+- handoff 在 v3 中的角色不是第二套内容数据库，而是跨 agent 的上下文索引层
+- 执行 agent 应能看到 planner / reviewer 留下的正式产物引用、当前 flow 的 findings 线索、下一步建议与阻塞信息
+- 如果 handoff 与 `issue / pr / git` 现场冲突，必须修正 handoff，而不是修正现场
+
+## 2. Why This Phase Exists
+
+Phase 02 已落地 `flow_state` 主表与最小事件表，能够承载：
+
+- `task_issue_number`
+- `pr_number`
+- `spec_ref / plan_ref / report_ref / audit_ref`
+- `planner / executor / reviewer` 责任链字段
+- `blocked_by / next_step / latest_actor`
+
+但当前仍缺少三件事情：
+
+1. 用统一口径说明 handoff store 到底存什么、不存什么
+2. 给 `.agent/context/task.md` 一个降级后的明确职责
+3. 给 review report 和 `SESSION_ID` 一个合法但受限的证据地位
+
+本阶段的重点是**收敛真相模型**，不是继续扩张本地存储层。
+
+## 3. Architecture Constraints
+
+见 [01-command-and-skeleton.md](01-command-and-skeleton.md) §通用架构约束。
 
 本阶段额外固定以下约束：
 
-- `handoff command + handoff store` 是 v3 多 agent 共同维护的交接真源
-- `issue -> pr` 是唯一标准交付链
-- `.agent/context/task.md` 不再承担 v3 正式 handoff 语义
-- 若 handoff 与 `issue / PR / git` 现场冲突，必须修正 handoff
-
-## 2. Pre-requisites (Executor Entry)
-
-**已完成**：
-- [x] Phase 02: `FlowState` model 已实现（`src/vibe3/models/flow.py`）
-- [x] Phase 02: `SQLiteClient` 已实现（`src/vibe3/clients/sqlite_client.py`）
-- [x] Phase 02: `FlowService` 已实现（`src/vibe3/services/flow_service.py`）
-- [x] Phase 03: PR commands 已实现（`src/vibe3/commands/pr_*.py`）
-
-**待确认**：
-- [ ] `pre-push` 本地 review report 已能落到 `.agent/reports/`
-- [ ] review report 中的 `SESSION_ID` 已可作为可提取线索使用
-
-**补充说明**：
-- `FlowState` model 包含 `planner_session_id`、`executor_session_id`、`reviewer_session_id` 字段
-- `flow_state` 表已存在，记录 flow 的**状态信息**
-- `handoff_items` 表（本次新增）将记录 flow 的**交接内容**（plan/report/audit 条目）
-- 两者关系：一个 flow 对应多条 handoff items（一对多）
-
-## 3. 目录结构
-
-```text
-.agent/handoff/
-├── task-feature-xyz/
-│   ├── plan.json
-│   ├── report.json
-│   └── audit.json
-└── task-another-feature/
-    ├── plan.json
-    ├── report.json
-    └── audit.json
-```
-
-**路径规则**：
-- `{branch-safe-name}`：将 branch 名称中的 `/` 替换为 `-`
-- 示例：`task/vibe3-parallel-rebuild` → `task-vibe3-parallel-rebuild`
-
-## 4. 技术要求（分层实现）
-
-### 4.1 Models Layer
-
-**文件**: `src/vibe3/models/handoff.py`（新建）
-
-**新增 Model**: `HandoffItem`
-
-```python
-from datetime import datetime
-from typing import Literal
-from pydantic import BaseModel, Field
-
-class HandoffItem(BaseModel):
-    """Handoff item model."""
-
-    branch: str
-    handoff_type: Literal["plan", "report", "audit"]
-    sequence_number: int
-    actor: str
-    content: str
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-class HandoffResponse(BaseModel):
-    """Response model for handoff operations."""
-
-    branch: str
-    handoff_type: str
-    items: list[HandoffItem]
-```
-
-**与 `FlowState` 的关系**：
-- `FlowState`：记录 flow 的**状态信息**（当前阶段、阻塞、下一步等）
-- `HandoffItem`：记录 flow 的**交接内容**（plan/report/audit 的具体条目）
-- 关系：一个 `FlowState` 对应多条 `HandoffItem`（一对多）
-- 示例：flow `task/vibe3-rebuild` 有 3 条 plan handoff items、2 条 report items
-
-### 4.2 数据库扩展
-
-**修改文件**: `src/vibe3/clients/sqlite_client.py`
-
-**新增表**: `handoff_items`
-
-```sql
-CREATE TABLE handoff_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  branch TEXT NOT NULL,
-  handoff_type TEXT NOT NULL,  -- 'plan', 'report', 'audit'
-  sequence_number INTEGER NOT NULL,
-  actor TEXT NOT NULL,
-  content TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(branch, handoff_type, sequence_number)
-);
-
-CREATE INDEX idx_handoff_branch_type ON handoff_items(branch, handoff_type);
-```
-
-**修改 SQLiteClient**：
-在 `src/vibe3/clients/sqlite_client.py` 中添加方法：
-- `get_handoff_items(branch, handoff_type)` - 获取 handoff 条目列表
-- `add_handoff_item(branch, handoff_type, sequence_number, actor, content)` - 添加条目
-- `update_handoff_item(branch, handoff_type, sequence_number, content)` - 更新条目
-- `delete_handoff_item(branch, handoff_type, sequence_number)` - 删除条目
-
-### 4.3 JSON 文件格式
-
-**文件路径**: `.agent/handoff/{branch-safe-name}/plan.json`
-
-**格式**:
-```json
-{
-  “flow_slug”: “vibe3-parallel-rebuild”,
-  “branch”: “task/vibe3-parallel-rebuild”,
-  “handoff_type”: “plan”,
-  “items”: [
-    {
-      “sequence_number”: 1,
-      “actor”: “claude/sonnet-4.5”,
-      “content”: “完成了数据模型的初步设计”
-    },
-    {
-      “sequence_number”: 2,
-      “actor”: “codex/gpt-5.4”,
-      “content”: “实现了 SQLite handoff store”
-    }
-  ]
-}
-```
-
-### 4.4 Service Layer
-
-**文件**: `src/vibe3/services/handoff_service.py`
-
-提供方法：
-- `get_handoff(branch, handoff_type)` - 从 SQLite 读取 handoff
-- `sync_from_json(branch, handoff_type, json_path)` - 从 JSON 同步到 SQLite
-- `sync_to_json(branch, handoff_type, json_path)` - 从 SQLite 同步到 JSON
-- `add_handoff_item(branch, handoff_type, content, actor)` - 添加新条目
-- `update_handoff_item(branch, handoff_type, sequence_number, content)` - 更新条目
-- `delete_handoff_item(branch, handoff_type, sequence_number)` - 删除条目
-
-**同步逻辑**：
-1. 比较 JSON 文件和 SQLite 的 `updated_at` 时间戳
-2. 以最新时间戳为准
-3. 记录同步事件到 `flow_events` 表
-
-### 4.5 Command Layer
-
-**文件**: `src/vibe3/commands/handoff.py`
-
-提供命令：
-- `vibe3 handoff edit plan` - 编辑 plan handoff（打开 JSON 文件）
-- `vibe3 handoff edit report` - 编辑 report handoff
-- `vibe3 handoff edit audit` - 编辑 audit handoff
-- `vibe3 handoff show plan` - 显示 plan handoff
-- `vibe3 handoff show report` - 显示 report handoff
-- `vibe3 handoff show audit` - 显示 audit handoff
-
-**edit 命令流程**：
-1. 检查 JSON 文件是否存在，不存在则创建
-2. 如果 SQLite 有数据但 JSON 不存在，先同步到 JSON
-3. 使用 `$EDITOR` 打开 JSON 文件
-4. 等待编辑器关闭
-5. 解析 JSON 文件并同步到 SQLite
-6. 记录 `handoff_edited` 事件到 `flow_events`
-
-**show 命令流程**：
-1. 从 SQLite 读取 handoff items
-2. 使用 rich 格式化输出
-3. 支持 `--json` 参数输出 JSON 格式
-
-## 5. 成功标准（验收标准）
-
-### 5.1 功能验收
-
-- [ ] `vibe3 handoff edit plan` 打开 JSON 文件编辑器
-- [ ] 编辑 JSON 文件后，SQLite 自动同步
-- [ ] `vibe3 handoff show plan` 显示 handoff 内容
-- [ ] `vibe3 handoff show plan --json` 输出 JSON 格式
-- [ ] 新增条目自动分配 `sequence_number`
-- [ ] 删除条目后 `sequence_number` 不回收
-- [ ] 所有变更记录到 `flow_events` 表
-
-### 5.2 数据库验收
-
-- [ ] `handoff_items` 表正确记录所有条目
-- [ ] 唯一约束 `(branch, handoff_type, sequence_number)` 生效
-- [ ] 删除条目后编号保留，不回收
-
-### 5.3 代码质量验收
-
-- [ ] `mypy --strict` 检查通过（无类型错误）
-- [ ] Service 层文件 < 300 行
-- [ ] Command 层文件 < 100 行
-- [ ] 不使用 `print()`，使用 `logger` 或 `rich`
-
-### 5.4 测试验收
-
-- [ ] `HandoffService` 单元测试通过（100% 成功率）
-- [ ] JSON ↔ SQLite 同步测试通过
-- [ ] 错误处理测试通过（JSON 格式错误、文件不存在等）
-
-**测试标准**: 见 [04-test-standards.md](../infrastructure/04-test-standards.md)
-
-## 6. Development Notes
-
-### 6.1 JSON 编辑流程
-
-**参考**: [2026-03-13-vibe3-parallel-rebuild-design.md](../../plans/2026-03-13-vibe3-parallel-rebuild-design.md) § "Handoff Command Design"
-
-**编辑规则**：
-
-1. **添加新记录**：
-   - 在 `items` 数组末尾添加新对象
-   - **不要填写 `sequence_number`**（系统自动分配）
-   - **不要填写 `actor`**（系统自动从当前注册身份读取）
-   - **不要填写 `created_at` 和 `updated_at`**（系统自动生成）
-   - 只需要填写 `content` 字段
-
-2. **修改记录**：
-   - 直接修改对应记录的 `content` 字段
-   - **不要修改 `sequence_number`、`actor`、`created_at`**
-   - 系统会自动更新 `updated_at`
-
-3. **删除记录**：
-   - 从 `items` 数组中移除对应的对象
-   - 删除后 `sequence_number` 不回收，保持历史可追溯性
-
-**同步规则**：
-- 系统会比较 JSON 文件和数据库的内容
-- 自动检测新增、修改、删除的记录
-- 自动分配 `sequence_number`（新增记录）
-- 自动更新 `updated_at`（修改记录）
-- 自动记录所有变更到 `flow_events` 表
-
-### 6.2 Service 层实现模式
-
-**参考**: Phase 02 中的 `flow_service.py` 实现
-
-**推荐结构**：
-```python
-# services/handoff_service.py
-from pathlib import Path
-from typing import Protocol
-import json
-
-class HandoffServiceProtocol(Protocol):
-    def get_handoff(self, branch: str, handoff_type: str) -> dict:
-        ...
-
-    def sync_from_json(self, branch: str, handoff_type: str, json_path: Path) -> None:
-        ...
-
-class HandoffService:
-    def __init__(self, store: Vibe3Store):
-        self.store = store
-
-    def get_handoff(self, branch: str, handoff_type: str) -> dict:
-        items = self.store.get_handoff_items(branch, handoff_type)
-        return {
-            "branch": branch,
-            "handoff_type": handoff_type,
-            "items": items
-        }
-```
-
-### 6.3 Command 层实现模式
-
-**参考**: Phase 02 中的 `flow.py` 实现
-
-**edit 命令**：
-```python
-# commands/handoff.py
-import typer
-import subprocess
-from pathlib import Path
-
-@app.command()
-def edit(handoff_type: str):
-    """Edit handoff JSON file"""
-    branch = get_current_branch()
-    json_path = get_handoff_json_path(branch, handoff_type)
-
-    # 如果 SQLite 有数据但 JSON 不存在，先同步
-    if not json_path.exists():
-        service.sync_to_json(branch, handoff_type, json_path)
-
-    # 打开编辑器
-    editor = os.getenv("EDITOR", "vim")
-    subprocess.run([editor, str(json_path)])
-
-    # 编辑完成后同步回 SQLite
-    service.sync_from_json(branch, handoff_type, json_path)
-```
-
-### 6.4 `task.md` 降级说明
-
-`.agent/context/task.md` 在 v3 阶段降级为 workflow 辅助索引：
-
-**允许记录**：
+- 不新增以正文为中心的 `handoff_items.content` 主存储
+- 不引入 `JSON <-> SQLite` 双向同步仲裁
+- 不把 `.agent/handoff/*.json` 设计成正式存储层
+- 不让本地 store 缓存 issue 正文、PR 正文、Project mirror 或 report 全文
+- 不把 `task.md` 升格为可覆盖 SQLite / GitHub / git 的事实层
+
+## 4. Current State And Gaps
+
+### 4.1 已有基础
+
+已有实现：
+
+- `src/vibe3/models/flow.py` 中的 `FlowState`
+- `src/vibe3/clients/sqlite_client.py` 中的 `flow_state` / `flow_issue_links` / `flow_events`
+- `src/vibe3/services/flow_service.py`
+- `src/vibe3/services/pr_service.py`
+
+这些能力已经说明 v3 当前的最小 handoff store 主体仍然是：
+
+- `flow_state` 作为每个 branch 一条责任链主记录
+- `flow_issue_links` 作为 flow 与 issue 的关联表
+- `flow_events` 作为最小审计事件表
+
+### 4.2 Cutover 前必须承认的实现分叉
+
+在继续实现 handoff command 之前，必须先承认并收敛以下不一致：
+
+- `flow_status` 当前实现使用 `active / idle / missing / stale`，而标准文档定义的是 `active / blocked / done / stale`
+- `issue_role` 当前实现使用 `task / related`，而标准文档定义的是 `task / repo`
+- `flow_events.event_type` 当前实现与标准列举尚未统一
+- `PRService` 当前会把 `flow_status=\"merged\"` 写回本地 store，这不符合现行标准枚举
+
+这些问题不要求在本阶段全部改完，但必须在本阶段文档中被明确识别为后续实现 blocker，避免继续在漂移语义上叠加新层。
+
+## 5. Data Responsibility
+
+### 5.1 本地 store 允许承载的内容
+
+SQLite handoff store 只允许承载：
+
+- flow 身份锚点：`branch`, `flow_slug`
+- 主闭环关联：`task_issue_number`, `pr_number`
+- 正式产物引用：`spec_ref`, `plan_ref`, `report_ref`, `audit_ref`
+- 责任链字段：`planner_actor`, `executor_actor`, `reviewer_actor`, `latest_actor`
+- 最小执行现场：`blocked_by`, `next_step`, `flow_status`, `updated_at`
+- 最小事件审计：`flow_events`
+
+### 5.2 本地 store 不允许承载的内容
+
+SQLite handoff store 不允许承载：
+
+- issue 正文
+- PR 正文
+- Project item JSON
+- report / plan / audit 全文
+- review comment 全量镜像
+- agent 对话全文
+- `.agent/context/task.md` 的自由文本副本
+
+### 5.3 Handoff 的推荐表达方式
+
+handoff 应优先表达为“责任链 + 指针”，而不是“责任链 + 内容副本”。
+
+推荐读取体验：
+
+1. 先看 `git` 与 GitHub 现场
+2. 再看 `flow_state` 中的责任链字段
+3. 再根据 `plan_ref / report_ref / audit_ref` 打开正式产物
+4. 必要时结合 `.agent/reports/` 中的本地 review 证据和 `SESSION_ID`
+
+## 6. Handoff Command Contract
+
+本阶段定义命令语义边界，不把命令面扩张为新的编辑器驱动存储系统。
+
+### 6.1 命令职责
+
+`vibe handoff plan`
+
+- 更新或确认 `plan_ref`
+- 更新 `planner_actor` / `latest_actor`
+- 必要时更新 `next_step` / `blocked_by`
+- 记录最小事件
+
+`vibe handoff report`
+
+- 更新或确认 `report_ref`
+- 更新 `reviewer_actor` / `latest_actor`
+- 必要时写入最小 verdict 线索和下一步提示
+- 记录最小事件
+
+`vibe handoff audit`
+
+- 更新或确认 `audit_ref`
+- 更新 `reviewer_actor` / `latest_actor`
+- 必要时写入最小收口信息
+- 记录最小事件
+
+### 6.2 命令不负责的事
+
+handoff command 不负责：
+
+- 打开 JSON 文件进行正文编辑
+- 在 SQLite 中维护多条 `content` item 正文
+- 维护 JSON 与 SQLite 的双向同步时间戳仲裁
+- 存储 planning 讨论全文或 review 全文
+
+## 7. `task.md` Reduced Role
+
+`.agent/context/task.md` 在 v3 中降级为 workflow 辅助索引。
+
+### 7.1 允许记录
+
 - 当前 workflow 的 task list
-- 每个 task 运行过程中的 findings
+- 当前轮执行中的 findings
 - follow-up issue 是否已发
 - 当前阶段的最终结论
+- 临时 blocker 与建议的下一步
+- 便于下一位 agent 快速进入现场的关键文件提示
 
-**不允许记录**：
-- 可替代 handoff store 的正式责任链
-- 与 `issue / PR / git` 冲突的阶段事实
+### 7.2 不允许记录
 
-## 7. Handoff for Executor 05
+- 可替代 SQLite handoff store 的正式责任链
+- 与 `issue / pr / git` 冲突的阶段事实
+- 可替代 `plan_ref / report_ref / audit_ref` 的正式产物正文
+- 任何“通常可视为最新事实副本”的镜像内容
 
-- [ ] 确保 `vibe3 handoff edit plan` 能正确打开 JSON 文件
-- [ ] 确保 JSON 编辑后能正确同步到 SQLite
-- [ ] 确保 `vibe3 handoff show plan` 能正确显示内容
-- [ ] 确保所有变更记录到 `flow_events` 表
-- [ ] 更新 `.agent/context/task.md` 说明其降级角色
+### 7.3 读取规则
+
+读取顺序必须遵循：
+
+1. 先核查 `git` 与 GitHub 现场
+2. 再读取 SQLite handoff store
+3. 最后把 `.agent/context/task.md` 当作补充线索
+
+## 8. Review Report And Session Evidence
+
+`.agent/reports/pre-push-review-*.md` 在 v3 中的角色是临时证据层。
+
+允许把以下信息作为 handoff 线索使用：
+
+- report 文件路径
+- report verdict
+- risk score
+- 关键 finding 摘要
+- `SESSION_ID`
+
+约束：
+
+- `SESSION_ID` 只作为会话线索，不是共享真源字段的替代品
+- report 只作证据入口，不复制全文到 SQLite
+- 若 report 与 issue / PR / git 现场不一致，以现场为准
+- 若 report 中有高价值结论，应通过正式文档引用、issue comment 或 PR comment 进入主链，而不是靠本地缓存长期保存
+
+## 9. Cutover Meaning
+
+本阶段所说的 cutover，不是：
+
+- `bin/vibe` 默认入口立即切到 `vibe3`
+- 引入 `vibe3_enabled` 开关
+- 建立一套 `handoff.md` 或 `plan.json` 的替代存储
+
+本阶段所说的 cutover，指的是：
+
+- v3 handoff 的真相模型已经稳定
+- `.agent/context/task.md` 的降级角色已经明确
+- review report / `SESSION_ID` 已被识别为合法证据指针
+- 后续执行 agent 可以在不发明新存储层的前提下继续补实现
+
+## 10. Success Criteria
+
+### 10.1 Concept Acceptance
+
+- [ ] `repo issue -> pr` 主链和本地 handoff store 的职责边界写清
+- [ ] SQLite 只存责任链与引用、不存正文的约束写清
+- [ ] `.agent/context/task.md` 的降级角色写清
+- [ ] review report 与 `SESSION_ID` 的证据角色写清
+- [ ] cutover readiness 的含义写清
+
+### 10.2 Implementation Readiness
+
+- [ ] 继续实现 handoff command 时，不再以 `JSON <-> SQLite` 双向同步为前提
+- [ ] 继续实现 handoff command 时，不再以 `handoff_items.content` 为主模型
+- [ ] 后续执行者能从本文件明确看到当前实现分叉与 blocker
+
+### 10.3 Non-Goals Confirmed
+
+- [ ] 本阶段不新增第二套正文型本地存储
+- [ ] 本阶段不要求切换默认 CLI 入口
+- [ ] 本阶段不要求 `pr show` 立刻消费本地 report
+
+## 11. Follow-up Work
+
+本阶段完成后，后续实现应拆成独立任务：
+
+1. 统一 `flow_status` / `issue_role` / `flow_events.event_type` 的标准与实现
+2. 设计 pointer-first 的 `handoff command` 写入协议
+3. 设计 `pr show` 如何消费 `.agent/reports/` 中的本地证据
+4. 单独设计 `bin/vibe` 到 `vibe3` 的 cutover 策略
+
+## 12. Handoff For Next Executor
+
+- [ ] 不要再实现 `JSON <-> SQLite` 双向同步
+- [ ] 不要新增以 `content` 为核心的 handoff 正文表
+- [ ] 先统一状态枚举和事件命名，再继续 handoff command
+- [ ] 若需要扩展 store，优先扩展“引用/证据指针”，不要扩展“正文缓存”
