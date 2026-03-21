@@ -71,13 +71,27 @@ related_docs:
 
 ## Phase 04: Handoff & Logic Cutover
 
-**Objective**: Converge v3 handoff truth, reduce `task.md` to a workflow index, and define cutover readiness.
+**Objective**: Converge v3 handoff truth, establish shared `current.md` as the structured handoff buffer, and define cutover readiness.
 
 **Inputs**: `docs/v3/handoff/04-handoff-and-cutover.md`
+**Implementation**: `docs/v3/handoff/04-implementation-plan.md`
+
 **Success Criteria**:
-- [ ] Handoff command + handoff store are defined as the shared truth for v3 participants.
-- [ ] `.agent/context/task.md` is reduced to workflow task list / findings / follow-up issue / final conclusion.
-- [ ] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
+- [x] SQLite handoff store is defined as the minimal shared index, not a content truth.
+- [x] `.git/vibe3/handoff/<branch-safe>/current.md` is defined as the shared structured handoff buffer.
+- [x] `.agent/context/task.md` is reduced to local draft / compatibility notes.
+- [x] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
+
+**Implementation Status** (2026-03-21):
+- ✅ `vibe handoff init` - Create shared handoff file
+- ✅ `vibe handoff show` - Display handoff content
+- ✅ `vibe handoff edit` - Open handoff in editor
+- ✅ `vibe handoff plan <ref>` - Record plan handoff with optional `--next-step` and `--blocked-by`
+- ✅ `vibe handoff report <ref>` - Record report handoff
+- ✅ `vibe handoff audit <ref>` - Record audit handoff
+- ✅ `vibe check` - Verify handoff store consistency
+- ✅ Unit tests: 92% coverage (28/28 tests passing)
+- ✅ Integration tests: All CLI commands functional
 
 ---
 

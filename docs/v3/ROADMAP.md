@@ -230,9 +230,9 @@ related_docs:
 
 ### Phase 04: Handoff & Logic Cutover
 
-- [ ] handoff truth model 收敛完成
-- [ ] `.agent/context/task.md` 降级角色已明确
-- [ ] review report 与 `SESSION_ID` 被明确为证据指针
+- [x] handoff truth model 收敛完成
+- [x] `.agent/context/task.md` 降级角色已明确
+- [x] review report 与 `SESSION_ID` 被明确为证据指针
 
 ### Phase 05: Verification & Cleanup
 

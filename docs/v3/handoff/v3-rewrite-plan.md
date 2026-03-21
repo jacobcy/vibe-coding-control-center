@@ -67,12 +67,13 @@
 
 ## Phase 4: Handoff & Logic Cutover
 
-**Objective**: Converge v3 handoff truth, reduce `task.md` to a workflow index, and define cutover readiness.
+**Objective**: Converge v3 handoff truth, establish shared `current.md` as the structured handoff buffer, and define cutover readiness.
 
 **Inputs**: `docs/v3/handoff/04-handoff-and-cutover.md`
 **Success Criteria**:
-- [ ] Handoff command + handoff store are defined as the shared truth for v3 participants.
-- [ ] `.agent/context/task.md` is reduced to workflow task list / findings / follow-up issue / final conclusion.
+- [ ] SQLite handoff store is defined as the minimal shared index, not a content truth.
+- [ ] `.git/vibe3/handoff/<branch-safe>/current.md` is defined as the shared structured handoff buffer.
+- [ ] `.agent/context/task.md` is reduced to local draft / compatibility notes.
 - [ ] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
 
 ---
