@@ -11,10 +11,11 @@ Design principles:
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 """
 
+import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE, STDOUT, CompletedProcess, Popen, TimeoutExpired
 from typing import Final
 
 
@@ -92,7 +93,9 @@ class ReviewAgentResult:
     stderr: str
 
     @classmethod
-    def from_completed_process(cls, cp: CompletedProcess[str]) -> "ReviewAgentResult":
+    def from_completed_process(
+        cls, cp: subprocess.CompletedProcess[str]
+    ) -> "ReviewAgentResult":
         """Create result from a CompletedProcess."""
         return cls(
             exit_code=cp.returncode,
@@ -174,42 +177,30 @@ def run_review_agent(
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
-            process = Popen(
+            result = subprocess.run(
                 command,
-                stdout=PIPE,
-                stderr=STDOUT,
+                capture_output=True,
                 text=True,
-                bufsize=1,
+                timeout=options.timeout_seconds,
             )
         except FileNotFoundError:
             raise FileNotFoundError(
                 f"codeagent-wrapper not found at {wrapper_path}. "
                 "Please ensure it is installed and accessible."
             ) from None
+        except subprocess.TimeoutExpired:
+            raise
 
-        stdout_parts: list[str] = []
-        try:
-            if process.stdout is None:
-                process.kill()
-                raise SystemError(
-                    "Process stdout is None. This indicates a subprocess "
-                    "configuration error."
-                )
-            for line in process.stdout:
-                print(line, end="", flush=True)
-                stdout_parts.append(line)
-            exit_code = process.wait(timeout=options.timeout_seconds)
-        except TimeoutExpired:
-            process.kill()
-            raise
-        except (OSError, IOError):
-            process.kill()
-            raise
+        # Print output for visibility
+        if result.stdout:
+            print(result.stdout, end="", flush=True)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="", flush=True)
 
         agent_result = ReviewAgentResult(
-            exit_code=exit_code,
-            stdout="".join(stdout_parts),
-            stderr="",
+            exit_code=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
         )
 
         if not agent_result.is_success():

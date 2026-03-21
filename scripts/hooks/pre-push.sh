@@ -30,8 +30,12 @@ if [ -z "$REVIEW_BASE" ]; then
     exit 1
 fi
 
-# Basic sanitization check (alphanumeric, dash, underscore, slash, dot)
-if ! echo "$REVIEW_BASE" | grep -qE '^[a-zA-Z0-9_./-]+$'; then
+# Basic sanitization check (allow alphanumeric, dash, underscore, slash, dot, tilde, at)
+# This supports:
+# - Branch names: main, feature/api-v2, origin/main
+# - Commit SHAs: abc123, a1b2c3d4e5f6...
+# - Relative refs: HEAD~5, HEAD@{upstream}
+if ! echo "$REVIEW_BASE" | grep -qE '^[a-zA-Z0-9_./~@{}-]+$'; then
     echo "ERROR: REVIEW_BASE contains invalid characters: $REVIEW_BASE"
     exit 1
 fi

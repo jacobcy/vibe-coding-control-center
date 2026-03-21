@@ -5,10 +5,8 @@ from typing import Annotated, Optional, cast
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
-from vibe3.exceptions import UserError
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
@@ -86,9 +84,7 @@ def _run_review(
     raw = result.stdout
     review = parse_codex_review(raw)
 
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
-    )
+    typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
@@ -162,19 +158,8 @@ def base(
 
     from vibe3.utils.git_helpers import get_current_branch
 
-    # Validate base branch exists
-    try:
-        GitClient()._run(["rev-parse", "--verify", base_branch])
-    except Exception:
-        raise UserError(
-            f"Base branch '{base_branch}' not found or invalid.\n\n"
-            "Please provide a valid branch name or commit SHA.\n\n"
-            "Examples:\n"
-            "  vibe review base              # Use default: origin/main\n"
-            "  vibe review base main         # Compare vs local main\n"
-            "  vibe review base develop      # Compare vs develop branch\n"
-            "  vibe review base HEAD~5       # Compare vs 5 commits ago"
-        )
+    # Note: base branch validation is handled by inspect_base command
+    # which is called by run_inspect_json below
 
     current_branch = get_current_branch()
 
