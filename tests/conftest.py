@@ -72,7 +72,7 @@ def issue_link_data():
     return {
         "branch": "test-branch",
         "issue_number": 101,
-        "issue_role": "related",
+        "issue_role": "repo",
         "created_at": "2026-03-16T00:00:00",
     }
 
