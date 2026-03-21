@@ -79,6 +79,13 @@ def register(app: typer.Typer) -> None:
         git = GitClient(github_client=GitHubClient())
         source = BranchSource(branch=current_branch, base=base_branch)
         all_changed_files = git.get_changed_files(source)
+        changed_lines = sum(
+            1
+            for line in git.get_diff(source).splitlines()
+            if (line.startswith("+") or line.startswith("-"))
+            and not line.startswith("+++")
+            and not line.startswith("---")
+        )
 
         # Track all files for scoring, but note which ones are deleted
         # Deleted files should still participate in risk assessment
@@ -179,7 +186,7 @@ def register(app: typer.Typer) -> None:
 
             dims = PRDimensions(
                 changed_files=len(all_changed_files),  # Include deleted files in count
-                changed_lines=0,  # Not calculated in base command
+                changed_lines=changed_lines,
                 impacted_modules=len(impacted_modules),
                 critical_path_touch=has_critical,
                 public_api_touch=has_public_api,

@@ -40,6 +40,10 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
     log = logger.bind(domain="inspect", action="pr_analysis", pr_number=pr_number)
     log.info("Analyzing PR")
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+
+    git = GitClient(github_client=GitHubClient())
 
     # 1. Get changed files
     all_changed_files = _get_pr_changed_files(pr_number)
@@ -58,10 +62,20 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
     # 4. Overall DAG analysis
     overall_dag = dag_service.expand_impacted_modules(all_changed_files)
+    changed_lines = sum(
+        1
+        for line in git.get_diff(PRSource(pr_number=pr_number)).splitlines()
+        if (line.startswith("+") or line.startswith("-"))
+        and not line.startswith("+++")
+        and not line.startswith("---")
+    )
 
     # 5. Risk scoring
     score = _calculate_risk_score(
-        all_changed_files, critical_files, overall_dag.impacted_modules
+        all_changed_files,
+        critical_files,
+        overall_dag.impacted_modules,
+        changed_lines=changed_lines,
     )
 
     # 6. Get commits info (only if verbose)
@@ -197,6 +211,7 @@ def _calculate_risk_score(
     all_files: list[str],
     critical_files: list[CriticalFileInfo],
     impacted_modules: list[str],
+    changed_lines: int = 0,
 ) -> dict:
     """Calculate risk score for the PR.
 
@@ -211,7 +226,7 @@ def _calculate_risk_score(
     dims = PRDimensions(
         changed_files=len(all_files),
         impacted_modules=len(impacted_modules),
-        changed_lines=0,  # TODO: Calculate from diff
+        changed_lines=changed_lines,
         critical_path_touch=any(f["critical_path"] for f in critical_files),
         public_api_touch=any(f["public_api"] for f in critical_files),
     )

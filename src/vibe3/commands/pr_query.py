@@ -126,6 +126,14 @@ def register_query_commands(app: typer.Typer) -> None:
                     score = analysis.get("score", {})  # type: ignore[attr-defined]
                     console.print(f"- [cyan]Risk Level[/]: {score.get('level', 'N/A')}")  # type: ignore[attr-defined]
                     console.print(f"- [cyan]Risk Score[/]: {score.get('score', 'N/A')}")  # type: ignore[attr-defined]
+                    reason = score.get("reason")  # type: ignore[attr-defined]
+                    if reason:
+                        console.print(f"- [cyan]Reason[/]: {reason}")
+                    trigger_factors = score.get("trigger_factors", [])  # type: ignore[attr-defined]
+                    if trigger_factors:
+                        console.print("- [cyan]Trigger Factors[/]:")
+                        for factor in trigger_factors:
+                            console.print(f"  - {factor}")
 
                     impact = analysis.get("impact", {})  # type: ignore[attr-defined]
                     changed_files = impact.get("changed_files", [])  # type: ignore[attr-defined]
@@ -136,6 +144,11 @@ def register_query_commands(app: typer.Typer) -> None:
                     console.print(
                         f"- [cyan]Impacted Modules[/]: {len(impacted_modules)}"
                     )
+                    recommendations = score.get("recommendations", [])  # type: ignore[attr-defined]
+                    if recommendations:
+                        console.print("- [cyan]Recommendations[/]:")
+                        for item in recommendations:
+                            console.print(f"  - {item}")
 
                     # Show top changed files
                     if changed_files:

@@ -107,23 +107,6 @@ class AgentConfig(BaseModel):
             )
 
 
-class HooksConfig(BaseModel):
-    """Git hooks configuration."""
-
-    post_commit: bool = True
-    pre_push: bool = False
-
-
-class AutoTriggerConfig(BaseModel):
-    """Auto trigger configuration for review."""
-
-    enabled: bool = True
-    min_complexity: int = Field(default=3, ge=1, le=10)
-    min_lines_changed: int = 50
-    min_files_changed: int = 3
-    hooks: HooksConfig = Field(default_factory=HooksConfig)
-
-
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
@@ -141,7 +124,6 @@ class ReviewConfig(BaseModel):
     review_prompt: str = Field(
         default="", description="Custom review prompt (optional)"
     )
-    auto_trigger: AutoTriggerConfig = Field(default_factory=AutoTriggerConfig)
 
 
 class TestCoverageConfig(BaseModel):

@@ -6,6 +6,25 @@ from rich.console import Console
 from typer import Exit
 
 
+def _render_score_explanation(console: Console, score: dict[str, object]) -> None:
+    """Render explainable risk details."""
+    reason = score.get("reason")
+    if isinstance(reason, str) and reason:
+        console.print(f"[yellow]原因[/]: {reason}")
+
+    trigger_factors = score.get("trigger_factors")
+    if isinstance(trigger_factors, list) and trigger_factors:
+        console.print("[yellow]扣分项[/]:")
+        for factor in trigger_factors:
+            console.print(f"  - {factor}")
+
+    recommendations = score.get("recommendations")
+    if isinstance(recommendations, list) and recommendations:
+        console.print("[yellow]建议[/]:")
+        for item in recommendations:
+            console.print(f"  - {item}")
+
+
 def run_coverage_gate(console: Console, yes: bool = False) -> None:
     """Run coverage quality gate.
 
@@ -85,7 +104,7 @@ def run_risk_gate(console: Console, pr_number: int) -> None:
             f"{score.get('score', 'N/A')} "
             f"({score.get('level', 'N/A')})"
         )
-        console.print(f"[yellow]原因[/]: {score.get('reason', '未知')}")
+        _render_score_explanation(console, score)
 
         console.print("\n[dim]请修复问题或使用 --yes 跳过（不推荐）[/]")
         raise Exit(1)
@@ -94,3 +113,4 @@ def run_risk_gate(console: Console, pr_number: int) -> None:
     console.print("\n[green]✓ 质量门禁通过[/]")
     console.print(f"[cyan]风险等级[/]: {score.get('level', 'N/A')}")
     console.print(f"[cyan]风险评分[/]: {score.get('score', 'N/A')}")
+    _render_score_explanation(console, score)

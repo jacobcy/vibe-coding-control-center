@@ -86,7 +86,6 @@ def _run_review(
     raw = result.stdout
     review = parse_codex_review(raw)
 
-    typer.echo(raw)
     typer.echo(
         f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
     )
