@@ -97,7 +97,7 @@ class PRService:
             head_branch, pr_number=pr.number, latest_actor=actor
         )
         self.store.add_event(
-            head_branch, "pr_created", actor, f"Draft PR #{pr.number} created: {pr.url}"
+            head_branch, "pr_draft", actor, f"Draft PR #{pr.number} created: {pr.url}"
         )
 
         logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
@@ -202,12 +202,12 @@ class PRService:
         branch = pr.head_branch
         self.store.update_flow_state(
             branch,
-            flow_status="merged",
+            flow_status="done",
             latest_actor=actor,
         )
         self.store.add_event(
             branch,
-            "pr_merged",
+            "pr_merge",
             actor,
             f"PR #{pr_number} merged",
         )

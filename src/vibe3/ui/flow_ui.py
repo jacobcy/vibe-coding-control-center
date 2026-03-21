@@ -10,7 +10,7 @@ _STATUS_COLOR: dict[str, str] = {
     "active": "green",
     "done": "dim",
     "blocked": "red",
-    "pending": "yellow",
+    "stale": "yellow",
 }
 
 

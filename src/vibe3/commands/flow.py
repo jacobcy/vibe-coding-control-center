@@ -169,7 +169,7 @@ def status(
 @app.command()
 def list(
     status_filter: Annotated[
-        Literal["active", "idle", "missing", "stale"] | None,
+        Literal["active", "blocked", "done", "stale"] | None,
         typer.Option("--status", help="Filter by status"),
     ] = None,
     trace: Annotated[

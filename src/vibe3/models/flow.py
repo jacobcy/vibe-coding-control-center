@@ -26,7 +26,7 @@ class FlowState(BaseModel):
     latest_actor: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
-    flow_status: Literal["active", "idle", "missing", "stale"] = "active"
+    flow_status: Literal["active", "blocked", "done", "stale"] = "active"
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -35,7 +35,7 @@ class IssueLink(BaseModel):
 
     branch: str
     issue_number: int
-    issue_role: Literal["task", "related"]
+    issue_role: Literal["task", "repo"]
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -63,9 +63,9 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: str
+    flow_status: Literal["active", "blocked", "done", "stale"]
     task_issue_number: int | None = None
     pr_number: int | None = None
     spec_ref: str | None = None
     next_step: str | None = None
-    issues: list[IssueLink] = []
+    issues: list[IssueLink] = Field(default_factory=list)

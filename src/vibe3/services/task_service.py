@@ -23,7 +23,7 @@ class TaskService:
         self,
         branch: str,
         issue_number: int,
-        role: Literal["task", "related"] = "related",
+        role: Literal["task", "repo"] = "repo",
         actor: str = "unknown",
     ) -> IssueLink:
         """Link an issue to a flow.
@@ -31,7 +31,7 @@ class TaskService:
         Args:
             branch: Git branch name
             issue_number: GitHub issue number
-            role: Issue role (task for primary, related for secondary)
+            role: Issue role (task for primary, repo for related issue)
             actor: Actor linking the issue
 
         Returns:
@@ -71,17 +71,17 @@ class TaskService:
             issue_role=role,
         )
 
-    def update_task_status(
+    def update_flow_status(
         self,
         branch: str,
-        status: Literal["active", "idle", "missing", "stale"],
+        status: Literal["active", "blocked", "done", "stale"],
         actor: str = "unknown",
     ) -> FlowState:
-        """Update task status (flow_status in flow_state).
+        """Update local flow scene status in flow_state.
 
         Args:
             branch: Git branch name
-            status: New status
+            status: New local flow scene status
             actor: Actor updating the status
 
         Returns:
@@ -89,11 +89,11 @@ class TaskService:
         """
         logger.bind(
             domain="task",
-            action="update_status",
+            action="update_flow_status",
             branch=branch,
             status=status,
             actor=actor,
-        ).info("Updating task status")
+        ).info("Updating local flow scene status")
 
         # Verify flow exists before updating
         flow_data = self.store.get_flow_state(branch)
@@ -121,6 +121,20 @@ class TaskService:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
         return FlowState(**flow_data)
+
+    def update_task_status(
+        self,
+        branch: str,
+        status: Literal["active", "blocked", "done", "stale"],
+        actor: str = "unknown",
+    ) -> FlowState:
+        """Compatibility wrapper for updating local flow scene status.
+
+        This remains for older callers, but it only updates the local
+        flow scene state stored in flow_state. It is not a GitHub Project
+        task truth write path.
+        """
+        return self.update_flow_status(branch=branch, status=status, actor=actor)
 
     def get_task(self, branch: str) -> FlowState | None:
         """Get task (flow) details.
