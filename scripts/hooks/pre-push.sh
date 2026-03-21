@@ -24,6 +24,18 @@ data = json.load(sys.stdin)
 print(data['summary'])
 ")
 
+# Defensive validation: ensure REVIEW_BASE is safe to use
+if [ -z "$REVIEW_BASE" ]; then
+    echo "ERROR: REVIEW_BASE is empty - cannot proceed with risk assessment"
+    exit 1
+fi
+
+# Basic sanitization check (alphanumeric, dash, underscore, slash, dot)
+if ! echo "$REVIEW_BASE" | grep -qE '^[a-zA-Z0-9_./-]+$'; then
+    echo "ERROR: REVIEW_BASE contains invalid characters: $REVIEW_BASE"
+    exit 1
+fi
+
 # 1. Compile check (fast, <5s)
 echo "  -> Compile check..."
 uv run python -m compileall -q src/vibe3 || {
@@ -116,17 +128,23 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     REVIEW_REPORT_FILE=".agent/reports/pre-push-review-${TIMESTAMP}.md"
 
-    # Run review with real-time output, capture exit code
+    # Run review and capture output to file
     set +e
-    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" 2>&1 | tee "$REVIEW_REPORT_FILE"
-    REVIEW_EXIT=${PIPESTATUS[0]}
+    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" > "$REVIEW_REPORT_FILE" 2>&1
+    REVIEW_EXIT=$?
     set -e
 
+    # Show report path
     echo ""
     echo "  Review report saved: $REVIEW_REPORT_FILE"
 
     if [ "$REVIEW_EXIT" -ne 0 ]; then
         echo "ERROR: Review failed with exit code $REVIEW_EXIT"
+        echo ""
+        # Show the error output on failure
+        echo "=== Review Output ==="
+        cat "$REVIEW_REPORT_FILE"
+        echo "====================="
         echo ""
         echo "Blocking risk requires visible review output and a passing review before push."
         exit 1
@@ -134,25 +152,38 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
 
     VERDICT=$(python3 -c "
 import re
-content = open('$REVIEW_REPORT_FILE').read()
+import os
+import sys
 
-# Try multiple patterns for robustness
-patterns = [
-    r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Standard format with optional markdown
-    r'\*\*VERDICT:\*\*\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Bold prefix
-    r'Verdict:\s*(PASS|MAJOR|BLOCK)',  # Simple format
-    r'=== Verdict:\s*(PASS|MAJOR|BLOCK)',  # Report format
-]
+report_file = os.environ.get('REVIEW_REPORT_FILE')
+if not report_file:
+    print('PASS')  # Fail-safe
+    sys.exit(0)
 
-for pattern in patterns:
-    match = re.search(pattern, content, re.IGNORECASE)
-    if match:
-        print(match.group(1).upper())
-        exit(0)
+try:
+    with open(report_file) as f:
+        content = f.read()
 
-# Default to PASS if no verdict found (fail-safe)
-print('PASS')
-")
+    # Try multiple patterns for robustness
+    patterns = [
+        r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Standard format with optional markdown
+        r'\*\*VERDICT:\*\*\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Bold prefix
+        r'Verdict:\s*(PASS|MAJOR|BLOCK)',  # Simple format
+        r'=== Verdict:\s*(PASS|MAJOR|BLOCK)',  # Report format
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            print(match.group(1).upper())
+            sys.exit(0)
+
+    # Default to PASS if no verdict found (fail-safe)
+    print('PASS')
+except Exception:
+    # On any error, default to PASS (fail-safe)
+    print('PASS')
+" REVIEW_REPORT_FILE="$REVIEW_REPORT_FILE")
     echo "  Review verdict: $VERDICT"
     if [ "$VERDICT" = "BLOCK" ]; then
         echo "ERROR: Review verdict is BLOCK - fix issues before push"

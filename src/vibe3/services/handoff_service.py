@@ -1,6 +1,5 @@
 """Handoff service implementation."""
 
-import hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +10,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.services.handoff_recorder import record_handoff
 from vibe3.services.handoff_template import get_handoff_template
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
 class HandoffService:
@@ -42,18 +42,7 @@ class HandoffService:
         git_dir = self.git_client.get_git_common_dir()
         branch = self.git_client.get_current_branch()
 
-        # Sanitize branch name with hash suffix to prevent collisions
-        # Example: feature/api-v2 and feature/api/v2 would otherwise collide
-        branch_hash = hashlib.sha256(branch.encode()).hexdigest()[:8]
-        # Replace path separators, remove leading/trailing special chars
-        branch_safe = branch.replace("/", "-").replace("\\", "-").strip("-_.")
-        # Fallback if branch name becomes empty after sanitization
-        if not branch_safe:
-            branch_safe = "default"
-        # Append hash suffix for uniqueness
-        branch_dir = f"{branch_safe}-{branch_hash}"
-
-        handoff_dir = Path(git_dir) / "vibe3" / "handoff" / branch_dir
+        handoff_dir = get_branch_handoff_dir(git_dir, branch)
 
         try:
             handoff_dir.mkdir(parents=True, exist_ok=True)
@@ -159,7 +148,7 @@ class HandoffService:
         handoff_path = self.ensure_current_handoff()
         content = handoff_path.read_text(encoding="utf-8")
         timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        update_block = f"### {timestamp} | {actor} | {kind}\n" f"{message}\n"
+        update_block = f"### {timestamp} | {actor} | {kind}\n{message}\n"
 
         updates_heading = "## Updates\n"
         if updates_heading in content:

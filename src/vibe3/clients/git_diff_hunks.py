@@ -109,6 +109,8 @@ def _get_file_diff(
                 "PR source requires GitHubClient injection",
             )
         full_diff = git_client._get_pr_diff_cached(source.pr_number)
+        # Late import to avoid circular dependency:
+        # git_diff_hunks -> git_client -> git_diff_utils -> git_diff_hunks
         from vibe3.clients.git_diff_utils import extract_file_diff
 
         return extract_file_diff(full_diff, file_path)

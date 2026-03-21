@@ -1,6 +1,5 @@
 """Check service implementation."""
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
 @dataclass
@@ -97,13 +97,7 @@ class CheckService:
 
         # Check 6: Shared current.md exists
         git_dir = self.git_client.get_git_common_dir()
-        # Use same hash-based logic as HandoffService to prevent collisions
-        branch_hash = hashlib.sha256(branch.encode()).hexdigest()[:8]
-        branch_safe = branch.replace("/", "-").replace("\\", "-").strip("-_.")
-        if not branch_safe:
-            branch_safe = "default"
-        branch_dir = f"{branch_safe}-{branch_hash}"
-        handoff_path = Path(git_dir) / "vibe3" / "handoff" / branch_dir / "current.md"
+        handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
         if not handoff_path.exists():
             issues.append(f"Shared handoff file not found: {handoff_path}")
 

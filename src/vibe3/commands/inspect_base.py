@@ -53,27 +53,33 @@ def register(app: typer.Typer) -> None:
 
         # Validate base branch exists
         git_client = GitClient()
-        try:
-            git_client._run(["rev-parse", "--verify", base_branch])
-        except GitError as e:
-            # Check if it's a "not found" error vs other git errors
-            error_msg = str(e).lower()
-            if "not found" in error_msg or "unknown revision" in error_msg:
-                raise UserError(
-                    f"Base branch '{base_branch}' not found or invalid.\n\n"
-                    "Please provide a valid branch name or commit SHA.\n\n"
-                    "Examples:\n"
-                    "  vibe inspect base              # Use default: origin/main\n"
-                    "  vibe inspect base main         # Compare vs local main\n"
-                    "  vibe inspect base develop      # Compare vs develop branch\n"
-                    "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
-                ) from None
-            else:
-                # Re-raise other git errors (permission issues, corrupted repo, etc.)
-                raise SystemError(
-                    f"Git operation failed while validating base branch "
-                    f"'{base_branch}': {e}"
-                ) from e
+
+        # Helper to check if a ref exists
+        def ref_exists(ref: str) -> bool:
+            try:
+                git_client._run(["rev-parse", "--verify", ref])
+                return True
+            except GitError:
+                return False
+
+        # Check various ref formats
+        base_exists = (
+            ref_exists(base_branch)  # As provided (could be SHA, HEAD~5, etc.)
+            or ref_exists(f"refs/heads/{base_branch}")  # Local branch
+            or ref_exists(f"refs/remotes/{base_branch}")  # Remote ref (origin/main)
+            or ref_exists(f"refs/remotes/origin/{base_branch}")  # Shorthand remote
+        )
+
+        if not base_exists:
+            raise UserError(
+                f"Base branch '{base_branch}' not found or invalid.\n\n"
+                "Please provide a valid branch name or commit SHA.\n\n"
+                "Examples:\n"
+                "  vibe inspect base              # Use default: origin/main\n"
+                "  vibe inspect base main         # Compare vs local main\n"
+                "  vibe inspect base develop      # Compare vs develop branch\n"
+                "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
+            ) from None
 
         current_branch = get_current_branch()
 
@@ -158,7 +164,6 @@ def register(app: typer.Typer) -> None:
                     )
                     if is_test:
                         skipped_tests += 1
-                        print(f"[DEBUG] Skipping test file: {file}", file=sys.stderr)
                         continue
 
                     if file.endswith(".py"):

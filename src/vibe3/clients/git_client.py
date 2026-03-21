@@ -1,12 +1,10 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
-import re
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.clients.git_diff_utils import extract_file_diff
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,

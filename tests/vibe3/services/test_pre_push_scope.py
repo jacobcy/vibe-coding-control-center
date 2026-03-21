@@ -1,5 +1,7 @@
 """Tests for pre-push review scope resolution."""
 
+from unittest.mock import MagicMock, patch
+
 from vibe3.services.pre_push_scope import resolve_pre_push_scope
 
 
@@ -53,4 +55,36 @@ class TestResolvePrePushScope:
 
         assert scope.base_ref == "2222222222222222222222222222222222222222"
         assert scope.head_ref == "1111111111111111111111111111111111111111"
+
+    @patch("vibe3.clients.git_client.GitClient")
+    def test_infers_incremental_push_from_git_state(self, mock_git_client: MagicMock) -> None:
+        """When stdin is empty, infer incremental push from git state."""
+        # Mock git client
+        mock_instance = MagicMock()
+        mock_instance.get_current_branch.return_value = "task/demo"
+        mock_instance._run.return_value = "abc123"  # Remote branch exists
+        mock_git_client.return_value = mock_instance
+
+        scope = resolve_pre_push_scope("")
+
+        assert scope.base_ref == "origin/task/demo"
+        assert scope.is_incremental is True
+        assert "inferred incremental push" in scope.summary
+
+    @patch("vibe3.clients.git_client.GitClient")
+    def test_infers_new_branch_push_from_git_state(
+        self, mock_git_client: MagicMock
+    ) -> None:
+        """When stdin is empty and remote branch doesn't exist, infer new branch push."""
+        # Mock git client
+        mock_instance = MagicMock()
+        mock_instance.get_current_branch.return_value = "task/demo"
+        mock_instance._run.side_effect = Exception("Remote branch not found")
+        mock_git_client.return_value = mock_instance
+
+        scope = resolve_pre_push_scope("")
+
+        assert scope.base_ref == "origin/main"
+        assert scope.is_incremental is False
+        assert "inferred new branch push" in scope.summary
 

@@ -49,8 +49,7 @@ def resolve_pre_push_scope(
                 base_ref=remote_sha,
                 is_incremental=True,
                 summary=(
-                    "this push only: "
-                    f"{remote_ref}@{remote_sha[:12]}..{local_sha[:12]}"
+                    f"this push only: {remote_ref}@{remote_sha[:12]}..{local_sha[:12]}"
                 ),
             )
 
@@ -66,14 +65,50 @@ def resolve_pre_push_scope(
             ),
         )
 
-    return PrePushReviewScope(
-        local_ref="HEAD",
-        remote_ref="HEAD",
-        head_ref="HEAD",
-        base_ref=default_base_ref,
-        is_incremental=False,
-        summary=f"fallback scope: HEAD against {default_base_ref}",
-    )
+    # Fallback: infer from git state when stdin is empty or invalid
+    # This handles cases where:
+    # - Hook is run manually (not via git push)
+    # - Git version doesn't provide stdin properly
+    # - Multiple refs pushed but none matched above
+    try:
+        from vibe3.clients.git_client import GitClient
+
+        git_client = GitClient()
+        current_branch = git_client.get_current_branch()
+        remote_branch = f"origin/{current_branch}"
+
+        # Check if remote branch exists
+        try:
+            git_client._run(["rev-parse", "--verify", remote_branch])
+            # Remote branch exists - incremental push
+            return PrePushReviewScope(
+                local_ref=f"refs/heads/{current_branch}",
+                remote_ref=f"refs/heads/{current_branch}",
+                head_ref="HEAD",
+                base_ref=remote_branch,
+                is_incremental=True,
+                summary=f"inferred incremental push: {remote_branch}..HEAD",
+            )
+        except Exception:
+            # Remote branch doesn't exist - new branch push
+            return PrePushReviewScope(
+                local_ref=f"refs/heads/{current_branch}",
+                remote_ref=f"refs/heads/{current_branch}",
+                head_ref="HEAD",
+                base_ref=default_base_ref,
+                is_incremental=False,
+                summary=f"inferred new branch push: against {default_base_ref}",
+            )
+    except Exception:
+        # Final fallback if git operations fail
+        return PrePushReviewScope(
+            local_ref="HEAD",
+            remote_ref="HEAD",
+            head_ref="HEAD",
+            base_ref=default_base_ref,
+            is_incremental=False,
+            summary=f"fallback scope: HEAD against {default_base_ref}",
+        )
 
 
 def main() -> None:
