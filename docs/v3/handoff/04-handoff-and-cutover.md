@@ -179,10 +179,10 @@ handoff 应优先表达为“责任链 + 指针”，而不是“责任链 + 内
 - 读取并展示共享目录下的 `current.md`
 - 作为 planner / executor / reviewer 的轻量交接入口
 
-`vibe handoff edit`
+`vibe handoff append`
 
-- 打开共享目录下的 `current.md`
-- 允许 agent 直接编辑结构化 Markdown
+- 向共享目录下的 `current.md` 追加一条轻量更新块
+- 适合记录临时 finding / blocker / next action
 - 不引入 item 级 CRUD，也不要求强 schema 校验
 
 ### 6.2 命令不负责的事

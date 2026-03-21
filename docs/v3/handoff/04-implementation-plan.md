@@ -76,12 +76,16 @@ def handoff_show() -> None:
     console.print(service.read_current_handoff())
 
 
-@app.command("edit")
-def handoff_edit() -> None:
-    """Open shared current.md for current branch."""
+@app.command("append")
+def handoff_append(
+    message: str = typer.Argument(..., help="Lightweight handoff update"),
+    actor: str = typer.Option("unknown", help="Actor identifier"),
+    kind: str = typer.Option("note", help="Update kind"),
+) -> None:
+    """Append a lightweight update block to shared current.md."""
     service = HandoffService()
-    path = service.ensure_current_handoff()
-    service.open_current_handoff(path)
+    path = service.append_current_handoff(message, actor, kind)
+    console.print(f"[green]✓[/green] Appended handoff update: {path}")
 
 
 @app.command("plan")
@@ -126,7 +130,7 @@ def handoff_audit(
 **验收标准**:
 - [ ] `vibe handoff init --help` 输出正确
 - [ ] `vibe handoff show --help` 输出正确
-- [ ] `vibe handoff edit --help` 输出正确
+- [ ] `vibe handoff append --help` 输出正确
 - [ ] `vibe handoff plan --help` 输出正确
 - [ ] `vibe handoff report --help` 输出正确
 - [ ] `vibe handoff audit --help` 输出正确
@@ -167,8 +171,8 @@ class HandoffService:
         """Read shared current.md content for current branch."""
         ...
 
-    def open_current_handoff(self, path: Path) -> None:
-        """Open shared current.md in editor or return path for caller."""
+    def append_current_handoff(self, message: str, actor: str, kind: str = "note") -> Path:
+        """Append a lightweight update block to shared current.md."""
         ...
 
     def record_plan(
@@ -596,8 +600,8 @@ Ensure shared handoff file exists for current branch.
 ### `vibe handoff show`
 Show shared handoff file for current branch.
 
-### `vibe handoff edit`
-Open shared handoff file for current branch.
+### `vibe handoff append <message>`
+Append a lightweight update block to shared handoff file for current branch.
 
 ### `vibe handoff report <report_ref>`
 Record report handoff.

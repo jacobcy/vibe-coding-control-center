@@ -85,7 +85,7 @@ related_docs:
 **Implementation Status** (2026-03-21):
 - ✅ `vibe handoff init` - Create shared handoff file
 - ✅ `vibe handoff show` - Display handoff content
-- ✅ `vibe handoff edit` - Open handoff in editor
+- ✅ `vibe handoff append` - Append lightweight update block to shared handoff
 - ✅ `vibe handoff plan <ref>` - Record plan handoff with optional `--next-step` and `--blocked-by`
 - ✅ `vibe handoff report <ref>` - Record report handoff
 - ✅ `vibe handoff audit <ref>` - Record audit handoff

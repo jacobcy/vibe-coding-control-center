@@ -96,12 +96,12 @@ Show shared handoff file for current branch.
 vibe3 handoff show
 ```
 
-### `vibe handoff edit`
+### `vibe handoff append <message>`
 
-Open shared handoff file for current branch in editor ($EDITOR).
+Append a lightweight update block to shared handoff file for current branch.
 
 ```bash
-vibe3 handoff edit
+vibe3 handoff append "Need to align event taxonomy" --actor "codex/gpt-5.4" --kind finding
 ```
 
 ### `vibe handoff plan <plan_ref>`
