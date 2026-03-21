@@ -81,7 +81,7 @@ class TestVerifyCurrentFlow:
             (handoff_dir / "current.md").write_text("# Handoff")
 
             with patch.object(
-                check_service.git_client, "get_git_dir", return_value=str(git_dir)
+                check_service.git_client, "get_git_common_dir", return_value=str(git_dir)
             ):
                 result = check_service.verify_current_flow()
 
@@ -177,7 +177,7 @@ class TestVerifyCurrentFlow:
             # Don't create handoff file
 
             with patch.object(
-                check_service.git_client, "get_git_dir", return_value=str(git_dir)
+                check_service.git_client, "get_git_common_dir", return_value=str(git_dir)
             ):
                 result = check_service.verify_current_flow()
 

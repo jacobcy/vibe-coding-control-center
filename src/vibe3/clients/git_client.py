@@ -103,6 +103,24 @@ class GitClient:
         )
         return git_dir
 
+    def get_git_common_dir(self) -> str:
+        """Get the shared .git directory path (for worktrees).
+
+        In linked worktrees, this returns the common git directory
+        instead of the worktree-local .git/worktrees/<name> path.
+
+        Returns:
+            Absolute path to the shared .git directory
+
+        Raises:
+            GitError: git command execution failed
+        """
+        git_common_dir = self._run(["rev-parse", "--git-common-dir"])
+        logger.bind(
+            domain="git", action="get_git_common_dir", git_common_dir=git_common_dir
+        ).debug("Got git common directory")
+        return git_common_dir
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表.
 

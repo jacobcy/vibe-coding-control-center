@@ -95,7 +95,7 @@ class CheckService:
                     issues.append(f"{ref_field} file not found: {ref_value}")
 
         # Check 6: Shared current.md exists
-        git_dir = self.git_client.get_git_dir()
+        git_dir = self.git_client.get_git_common_dir()
         branch_safe = branch.replace("/", "-").replace("\\", "-")
         handoff_path = Path(git_dir) / "vibe3" / "handoff" / branch_safe / "current.md"
         if not handoff_path.exists():
