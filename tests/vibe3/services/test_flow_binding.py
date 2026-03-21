@@ -28,7 +28,7 @@ class TestFlowBinding:
         mock_store.add_issue_link.assert_called_once_with("test-branch", 123, "task")
         mock_store.add_event.assert_called_once_with(
             "test-branch",
-            "task_bound",
+            "flow_bind",
             "test-actor",
             "Task 'TASK-123' bound",
         )

@@ -53,21 +53,34 @@ def test_create_draft_pr_success(
     )
 
     metadata = PRMetadata(task_issue=101, flow_slug="test-flow")
+    mock_store = MagicMock()
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client"):
-            pr_service.git_client.get_current_branch.return_value = "feature-branch"
+            with patch.object(pr_service, "store", mock_store):
+                pr_service.git_client.get_current_branch.return_value = "feature-branch"
 
-            pr = pr_service.create_draft_pr(
-                title="Test PR",
-                body="Test body",
-                base_branch="main",
-                metadata=metadata,
-            )
+                pr = pr_service.create_draft_pr(
+                    title="Test PR",
+                    body="Test body",
+                    base_branch="main",
+                    metadata=metadata,
+                )
 
-            assert pr.number == 123
-            assert pr.draft is True
-            mock_github_client.create_pr.assert_called_once()
+                assert pr.number == 123
+                assert pr.draft is True
+                mock_github_client.create_pr.assert_called_once()
+                mock_store.update_flow_state.assert_called_once_with(
+                    "feature-branch",
+                    pr_number=123,
+                    latest_actor="unknown",
+                )
+                mock_store.add_event.assert_called_once_with(
+                    "feature-branch",
+                    "pr_draft",
+                    "unknown",
+                    "Draft PR #123 created: https://github.com/org/repo/pull/123",
+                )
 
 
 def test_create_draft_pr_auth_failure(
@@ -145,8 +158,22 @@ def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) 
     mock_github_client.get_pr.return_value = mock_pr
     mock_github_client.merge_pr.return_value = mock_pr
 
-    with patch.object(pr_service, "github_client", mock_github_client):
-        pr = pr_service.merge_pr(123)
+    mock_store = MagicMock()
 
-        assert pr.state == PRState.MERGED
-        mock_github_client.merge_pr.assert_called_once_with(123)
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "store", mock_store):
+            pr = pr_service.merge_pr(123)
+
+            assert pr.state == PRState.MERGED
+            mock_github_client.merge_pr.assert_called_once_with(123)
+            mock_store.update_flow_state.assert_called_once_with(
+                "feature-branch",
+                flow_status="done",
+                latest_actor="unknown",
+            )
+            mock_store.add_event.assert_called_once_with(
+                "feature-branch",
+                "pr_merge",
+                "unknown",
+                "PR #123 merged",
+            )

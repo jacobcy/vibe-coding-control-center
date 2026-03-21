@@ -6,16 +6,16 @@ from vibe3.models.flow import FlowState
 from vibe3.services.task_service import TaskService
 
 
-class TestTaskStatus:
-    """Tests for task status management."""
+class TestFlowSceneStatus:
+    """Tests for local flow scene status management."""
 
-    def test_update_task_status_success(self, mock_store) -> None:
-        """Test updating task status."""
+    def test_update_flow_status_success(self, mock_store) -> None:
+        """Test updating local flow scene status."""
         # Configure mock to return updated state
         updated_state = {
             "branch": "test-branch",
             "flow_slug": "test-flow",
-            "flow_status": "idle",  # This is the updated status
+            "flow_status": "blocked",  # This is the updated status
             "task_issue_number": None,
             "next_step": None,
             "updated_at": "2026-03-16T00:00:00",
@@ -23,34 +23,41 @@ class TestTaskStatus:
         mock_store.get_flow_state.return_value = updated_state
 
         service = TaskService(store=mock_store)
-        result = service.update_task_status(
+        result = service.update_flow_status(
             branch="test-branch",
-            status="idle",
+            status="blocked",
             actor="test-actor",
         )
 
         assert isinstance(result, FlowState)
-        assert result.flow_status == "idle"
+        assert result.flow_status == "blocked"
 
         # Verify store calls
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
-            flow_status="idle",
+            flow_status="blocked",
             latest_actor="test-actor",
         )
-        mock_store.add_event.assert_called_once()
+        mock_store.add_event.assert_called_once_with(
+            "test-branch",
+            "status_updated",
+            "test-actor",
+            "Status changed to blocked",
+        )
 
-    def test_update_task_status_flow_not_found(self, mock_store) -> None:
-        """Test updating task status when flow not found."""
+    def test_update_flow_status_flow_not_found(self, mock_store) -> None:
+        """Test updating local flow scene status when flow not found."""
         mock_store.get_flow_state.return_value = None
 
         service = TaskService(store=mock_store)
         with pytest.raises(RuntimeError, match="Flow not found"):
-            service.update_task_status(
+            service.update_flow_status(
                 branch="nonexistent-branch",
-                status="idle",
+                status="blocked",
                 actor="test-actor",
             )
+        mock_store.update_flow_state.assert_not_called()
+        mock_store.add_event.assert_not_called()
 
 
 class TestTaskRetrieval:
