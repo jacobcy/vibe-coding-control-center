@@ -46,6 +46,60 @@ class RiskScore(BaseModel):
     block: bool
 
 
+def _format_trigger_factor(key: str, points: int) -> str:
+    """Format a score contribution for terminal-friendly output."""
+    return f"{key}(+{points})"
+
+
+def _build_reason(score: RiskScore, dimensions: PRDimensions) -> str:
+    """Build a short explanation for the current score."""
+    reasons: list[str] = []
+
+    if dimensions.critical_path_touch:
+        reasons.append("触达关键路径")
+    if dimensions.public_api_touch:
+        reasons.append("触达公开接口")
+    if dimensions.changed_files >= 4:
+        reasons.append("改动文件较多")
+    if dimensions.changed_lines >= 200:
+        reasons.append("改动行数较大")
+    if dimensions.impacted_modules >= 2:
+        reasons.append("影响模块范围较大")
+    if dimensions.codex_verdict == "BLOCK":
+        reasons.append("在线审查给出阻断结论")
+    elif dimensions.codex_verdict == "CRITICAL":
+        reasons.append("在线审查给出严重结论")
+    elif dimensions.codex_verdict == "MAJOR":
+        reasons.append("在线审查给出重要结论")
+
+    if not reasons:
+        reasons.append("变更范围较小")
+
+    suffix = "达到阻断阈值" if score.block else "未达到阻断阈值"
+    return f"{'，'.join(reasons)}，{suffix}"
+
+
+def _build_recommendations(score: RiskScore, dimensions: PRDimensions) -> list[str]:
+    """Build actionable recommendations from the scoring dimensions."""
+    recommendations: list[str] = []
+
+    if dimensions.changed_files >= 4 or dimensions.changed_lines >= 200:
+        recommendations.append("拆分 PR 以降低影响面")
+    if dimensions.critical_path_touch:
+        recommendations.append("补充关键路径回归测试")
+    if dimensions.public_api_touch:
+        recommendations.append("明确兼容性影响并补充调用侧验证")
+    if dimensions.impacted_modules >= 2:
+        recommendations.append("补充跨模块联动验证或说明影响范围")
+    if dimensions.codex_verdict in {"MAJOR", "CRITICAL", "BLOCK"}:
+        recommendations.append("先处理审查结论，再继续推进合并")
+
+    if not recommendations and score.level in {RiskLevel.LOW, RiskLevel.MEDIUM}:
+        recommendations.append("保持当前粒度，继续按常规测试和审查推进")
+
+    return recommendations
+
+
 def calculate_risk_score(dimensions: PRDimensions) -> RiskScore:
     """计算 PR 风险分数（从配置读取权重）.
 
@@ -159,12 +213,20 @@ def generate_score_report(dimensions: PRDimensions) -> dict[str, object]:
     log.info("Generating score report")
 
     score = calculate_risk_score(dimensions)
+    trigger_factors = [
+        _format_trigger_factor(key, points)
+        for key, points in score.breakdown.items()
+        if points > 0
+    ]
     report: dict[str, object] = {
         "score": score.score,
         "level": score.level,
         "block": score.block,
         "breakdown": score.breakdown,
         "dimensions": dimensions.model_dump(),
+        "reason": _build_reason(score, dimensions),
+        "trigger_factors": trigger_factors,
+        "recommendations": _build_recommendations(score, dimensions),
     }
     log.bind(score=score.score, level=score.level).success("Score report generated")
     return report

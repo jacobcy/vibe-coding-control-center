@@ -14,7 +14,7 @@ NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import CompletedProcess, run
+from subprocess import PIPE, STDOUT, CompletedProcess, Popen
 from typing import Final
 
 
@@ -174,12 +174,12 @@ def run_review_agent(
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
-            result = run(
+            process = Popen(
                 command,
-                capture_output=True,
+                stdout=PIPE,
+                stderr=STDOUT,
                 text=True,
-                timeout=options.timeout_seconds,
-                check=False,
+                bufsize=1,
             )
         except FileNotFoundError:
             raise FileNotFoundError(
@@ -187,11 +187,30 @@ def run_review_agent(
                 "Please ensure it is installed and accessible."
             ) from None
 
-        agent_result = ReviewAgentResult.from_completed_process(result)
+        stdout_parts: list[str] = []
+        try:
+            assert process.stdout is not None
+            for line in process.stdout:
+                print(line, end="", flush=True)
+                stdout_parts.append(line)
+            exit_code = process.wait(timeout=options.timeout_seconds)
+        except Exception:
+            process.kill()
+            raise
+
+        agent_result = ReviewAgentResult(
+            exit_code=exit_code,
+            stdout="".join(stdout_parts),
+            stderr="",
+        )
 
         if not agent_result.is_success():
             stderr_preview = (
-                agent_result.stderr[:500] if agent_result.stderr else "(no stderr)"
+                agent_result.stderr[:500]
+                if agent_result.stderr
+                else (
+                    agent_result.stdout[:500] if agent_result.stdout else "(no output)"
+                )
             )
             raise RuntimeError(
                 f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"
