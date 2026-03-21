@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
+from vibe3.services.handoff_template import get_handoff_template
 
 
 class HandoffService:
@@ -166,34 +167,14 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
-        logger.bind(
-            domain="handoff",
-            action="record_plan",
-            plan_ref=plan_ref,
-            actor=actor,
-        ).info("Recording plan handoff")
-
-        branch = self.git_client.get_current_branch()
-
-        # Update flow state only with refs and minimal scene hints
-        self.store.update_flow_state(
-            branch,
-            plan_ref=plan_ref,
-            planner_actor=actor,
-            latest_actor=actor,
+        self._record_handoff(
+            handoff_type="plan",
+            ref=plan_ref,
             next_step=next_step,
             blocked_by=blocked_by,
+            actor=actor,
+            actor_role="planner_actor",
         )
-
-        # Add event
-        self.store.add_event(
-            branch,
-            "handoff_plan",
-            actor,
-            f"Plan recorded: {plan_ref}",
-        )
-
-        logger.success("Plan handoff recorded")
 
     def record_report(
         self,
@@ -210,34 +191,14 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
-        logger.bind(
-            domain="handoff",
-            action="record_report",
-            report_ref=report_ref,
-            actor=actor,
-        ).info("Recording report handoff")
-
-        branch = self.git_client.get_current_branch()
-
-        # Update flow state
-        self.store.update_flow_state(
-            branch,
-            report_ref=report_ref,
-            reviewer_actor=actor,
-            latest_actor=actor,
+        self._record_handoff(
+            handoff_type="report",
+            ref=report_ref,
             next_step=next_step,
             blocked_by=blocked_by,
+            actor=actor,
+            actor_role="reviewer_actor",
         )
-
-        # Add event
-        self.store.add_event(
-            branch,
-            "handoff_report",
-            actor,
-            f"Report recorded: {report_ref}",
-        )
-
-        logger.success("Report handoff recorded")
 
     def record_audit(
         self,
@@ -254,34 +215,71 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
+        self._record_handoff(
+            handoff_type="audit",
+            ref=audit_ref,
+            next_step=next_step,
+            blocked_by=blocked_by,
+            actor=actor,
+            actor_role="reviewer_actor",
+        )
+
+    def _record_handoff(
+        self,
+        handoff_type: str,
+        ref: str,
+        next_step: str | None,
+        blocked_by: str | None,
+        actor: str,
+        actor_role: str,
+    ) -> None:
+        """Record handoff to store.
+
+        Args:
+            handoff_type: Type of handoff (plan/report/audit)
+            ref: Document reference
+            next_step: Next step suggestion
+            blocked_by: Blocker description
+            actor: Actor identifier
+            actor_role: Role field name for actor (planner_actor/reviewer_actor)
+        """
         logger.bind(
             domain="handoff",
-            action="record_audit",
-            audit_ref=audit_ref,
+            action=f"record_{handoff_type}",
+            ref=ref,
             actor=actor,
-        ).info("Recording audit handoff")
+        ).info(f"Recording {handoff_type} handoff")
 
         branch = self.git_client.get_current_branch()
 
+        # Build update kwargs
+        update_kwargs = {
+            actor_role: actor,
+            "latest_actor": actor,
+            "next_step": next_step,
+            "blocked_by": blocked_by,
+        }
+
+        # Set the appropriate ref field
+        if handoff_type == "plan":
+            update_kwargs["plan_ref"] = ref
+        elif handoff_type == "report":
+            update_kwargs["report_ref"] = ref
+        else:
+            update_kwargs["audit_ref"] = ref
+
         # Update flow state
-        self.store.update_flow_state(
-            branch,
-            audit_ref=audit_ref,
-            reviewer_actor=actor,
-            latest_actor=actor,
-            next_step=next_step,
-            blocked_by=blocked_by,
-        )
+        self.store.update_flow_state(branch, **update_kwargs)
 
         # Add event
         self.store.add_event(
             branch,
-            "handoff_audit",
+            f"handoff_{handoff_type}",
             actor,
-            f"Audit recorded: {audit_ref}",
+            f"{handoff_type.capitalize()} recorded: {ref}",
         )
 
-        logger.success("Audit handoff recorded")
+        logger.success(f"{handoff_type.capitalize()} handoff recorded")
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.
@@ -290,42 +288,4 @@ class HandoffService:
             Template string for new handoff files
         """
         branch = self.git_client.get_current_branch()
-        return f"""# Handoff: {branch}
-
-> This is a lightweight handoff file for agent-to-agent communication.
-> It is NOT a source of truth - all authoritative data is in the SQLite store.
-
-## Meta
-
-- Branch: {branch}
-- Updated at: TBD
-- Latest actor: unknown
-
-## Summary
-
-<!-- Brief summary of current state -->
-
-## Findings
-
-<!-- Open findings and observations -->
-
-## Blockers
-
-<!-- Current blockers -->
-
-## Next Actions
-
-<!-- Suggested next actions -->
-
-## Key Files
-
-<!-- Important files for the next agent -->
-
-## Evidence Refs
-
-<!-- Links to plans, reports, PRs, issues, or logs -->
-
-## Updates
-
-<!-- Append-only lightweight updates -->
-"""
+        return get_handoff_template(branch)
