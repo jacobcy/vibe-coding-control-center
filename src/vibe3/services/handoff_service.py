@@ -1,14 +1,13 @@
 """Handoff service implementation."""
 
-import os
-import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
-from vibe3.exceptions import SystemError, UserError
+from vibe3.exceptions import UserError
 
 
 class HandoffService:
@@ -34,7 +33,7 @@ class HandoffService:
         Returns:
             Path to .git/vibe3/handoff/<branch-safe>/
         """
-        git_dir = self.git_client.get_git_dir()
+        git_dir = self.git_client.get_git_common_dir()
         branch = self.git_client.get_current_branch()
 
         # Sanitize branch name for directory (replace / with -)
@@ -53,13 +52,18 @@ class HandoffService:
         """
         return self._get_handoff_dir() / "current.md"
 
-    def ensure_current_handoff(self) -> Path:
+    def ensure_current_handoff(self, force: bool = False) -> Path:
         """Ensure shared current.md exists for current branch.
 
         Creates the file with a minimal template if it doesn't exist.
+        Returns the existing file unchanged unless force=True.
+
+        Args:
+            force: Force overwrite if file exists
 
         Returns:
             Path to the current.md file
+
         """
         logger.bind(domain="handoff", action="ensure_current_handoff").info(
             "Ensuring handoff file exists"
@@ -67,13 +71,21 @@ class HandoffService:
 
         handoff_path = self._get_current_handoff_path()
 
-        if not handoff_path.exists():
-            # Create minimal template
-            template = self._get_handoff_template()
-            handoff_path.write_text(template)
-            logger.bind(path=str(handoff_path)).success("Created handoff file")
-        else:
-            logger.bind(path=str(handoff_path)).debug("Handoff file already exists")
+        if handoff_path.exists():
+            if not force:
+                logger.bind(path=str(handoff_path)).info(
+                    "Handoff file already exists, returning existing file"
+                )
+                return handoff_path
+            # Force overwrite
+            logger.bind(path=str(handoff_path)).info(
+                "Overwriting existing handoff file"
+            )
+
+        # Create minimal template
+        template = self._get_handoff_template()
+        handoff_path.write_text(template, encoding="utf-8")
+        logger.bind(path=str(handoff_path)).success("Created handoff file")
 
         return handoff_path
 
@@ -97,32 +109,47 @@ class HandoffService:
                 message=f"Handoff file not found: {handoff_path}",
             )
 
-        content = handoff_path.read_text()
+        content = handoff_path.read_text(encoding="utf-8")
         logger.success("Handoff file read successfully")
         return content
 
-    def open_current_handoff(self, path: Path) -> None:
-        """Open shared current.md in editor.
+    def append_current_handoff(
+        self,
+        message: str,
+        actor: str,
+        kind: str = "note",
+    ) -> Path:
+        """Append a lightweight update block to current.md.
 
         Args:
-            path: Path to the current.md file
+            message: Human-readable update message
+            actor: Actor identifier
+            kind: Lightweight update kind, such as finding/blocker/next/note
 
-        Raises:
-            SystemError: If editor cannot be opened
+        Returns:
+            Path to the current.md file
         """
         logger.bind(
-            domain="handoff", action="open_current_handoff", path=str(path)
-        ).info("Opening handoff file in editor")
+            domain="handoff",
+            action="append_current_handoff",
+            actor=actor,
+            kind=kind,
+        ).info("Appending handoff update")
 
-        editor = os.environ.get("EDITOR", "vim")
+        handoff_path = self.ensure_current_handoff()
+        content = handoff_path.read_text(encoding="utf-8")
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        update_block = f"### {timestamp} | {actor} | {kind}\n" f"{message}\n"
 
-        try:
-            subprocess.run([editor, str(path)], check=True)
-            logger.success("Editor opened successfully")
-        except subprocess.CalledProcessError as e:
-            raise SystemError(f"Failed to open editor: {editor}") from e
-        except Exception as e:
-            raise SystemError(f"Unexpected error opening editor: {e}") from e
+        updates_heading = "## Updates\n"
+        if updates_heading in content:
+            updated = content.rstrip() + "\n\n" + update_block
+        else:
+            updated = content.rstrip() + "\n\n" + updates_heading + "\n" + update_block
+
+        handoff_path.write_text(updated.rstrip() + "\n", encoding="utf-8")
+        logger.bind(path=str(handoff_path)).success("Appended handoff update")
+        return handoff_path
 
     def record_plan(
         self,
@@ -268,17 +295,37 @@ class HandoffService:
 > This is a lightweight handoff file for agent-to-agent communication.
 > It is NOT a source of truth - all authoritative data is in the SQLite store.
 
-## Status
+## Meta
 
-- Current actor: unknown
-- Next step: TBD
-- Blocked by: N/A
+- Branch: {branch}
+- Updated at: TBD
+- Latest actor: unknown
 
-## Context
+## Summary
 
-<!-- Add context here -->
+<!-- Brief summary of current state -->
 
-## Notes
+## Findings
 
-<!-- Add notes here -->
+<!-- Open findings and observations -->
+
+## Blockers
+
+<!-- Current blockers -->
+
+## Next Actions
+
+<!-- Suggested next actions -->
+
+## Key Files
+
+<!-- Important files for the next agent -->
+
+## Evidence Refs
+
+<!-- Links to plans, reports, PRs, issues, or logs -->
+
+## Updates
+
+<!-- Append-only lightweight updates -->
 """

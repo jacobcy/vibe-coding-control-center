@@ -11,10 +11,17 @@ app = typer.Typer(help="Handoff management commands")
 
 
 @app.command("init")
-def handoff_init() -> None:
+def handoff_init(
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Force overwrite if file exists",
+    ),
+) -> None:
     """Ensure shared current.md exists for current branch."""
     service = HandoffService()
-    path = service.ensure_current_handoff()
+    path = service.ensure_current_handoff(force=yes)
     console.print(f"[green]✓[/green] Handoff file ready: {path}")
 
 
@@ -22,15 +29,24 @@ def handoff_init() -> None:
 def handoff_show() -> None:
     """Show shared current.md for current branch."""
     service = HandoffService()
-    console.print(service.read_current_handoff())
+    content = service.read_current_handoff()
+    path = service._get_current_handoff_path()
+
+    console.print(content)
+    console.print()
+    console.print(f"[dim]File path: {path}[/]")
 
 
-@app.command("edit")
-def handoff_edit() -> None:
-    """Open shared current.md for current branch."""
+@app.command("append")
+def handoff_append(
+    message: str = typer.Argument(..., help="Lightweight handoff update"),
+    actor: str = typer.Option("unknown", help="Actor identifier"),
+    kind: str = typer.Option("note", help="Update kind, e.g. finding/blocker/next"),
+) -> None:
+    """Append a lightweight update block to shared current.md."""
     service = HandoffService()
-    path = service.ensure_current_handoff()
-    service.open_current_handoff(path)
+    path = service.append_current_handoff(message, actor, kind)
+    console.print(f"[green]✓[/green] Appended handoff update: {path}")
 
 
 @app.command("plan")

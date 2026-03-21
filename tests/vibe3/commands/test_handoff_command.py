@@ -24,20 +24,65 @@ class TestHandoffCommands:
         assert result.exit_code == 0
         assert "✓" in result.output
         assert "Handoff file ready" in result.output
-        mock_service.ensure_current_handoff.assert_called_once()
+        mock_service.ensure_current_handoff.assert_called_once_with(force=False)
+
+    @patch("vibe3.commands.handoff.HandoffService")
+    def test_handoff_init_with_force(self, mock_service_class):
+        """Test handoff init --yes command."""
+        mock_service = MagicMock()
+        mock_service.ensure_current_handoff.return_value = "/path/to/current.md"
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["handoff", "init", "--yes"])
+
+        assert result.exit_code == 0
+        assert "✓" in result.output
+        assert "Handoff file ready" in result.output
+        mock_service.ensure_current_handoff.assert_called_once_with(force=True)
 
     @patch("vibe3.commands.handoff.HandoffService")
     def test_handoff_show_command(self, mock_service_class):
         """Test handoff show command."""
         mock_service = MagicMock()
         mock_service.read_current_handoff.return_value = "# Handoff content"
+        mock_service._get_current_handoff_path.return_value = "/path/to/current.md"
         mock_service_class.return_value = mock_service
 
         result = runner.invoke(app, ["handoff", "show"])
 
         assert result.exit_code == 0
         assert "# Handoff content" in result.output
+        assert "File path:" in result.output
+        assert "/path/to/current.md" in result.output
         mock_service.read_current_handoff.assert_called_once()
+
+    @patch("vibe3.commands.handoff.HandoffService")
+    def test_handoff_append_command(self, mock_service_class):
+        """Test handoff append command."""
+        mock_service = MagicMock()
+        mock_service.append_current_handoff.return_value = "/path/to/current.md"
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "append",
+                "Need to align event taxonomy",
+                "--actor",
+                "codex/gpt-5.4",
+                "--kind",
+                "finding",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Appended handoff update" in result.output
+        mock_service.append_current_handoff.assert_called_once_with(
+            "Need to align event taxonomy",
+            "codex/gpt-5.4",
+            "finding",
+        )
 
     @patch("vibe3.commands.handoff.HandoffService")
     def test_handoff_plan_command(self, mock_service_class):
