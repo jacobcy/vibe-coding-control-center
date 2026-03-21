@@ -3,9 +3,21 @@ name: AI PR Review
 on:
   pull_request:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      review_type:
+        description: 'Review type to trigger'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - codex
+          - copilot
+          - skip
 
 jobs:
-  # 根据 PR 标签决定审查策略
+  # 根据 PR 标签或手动输入决定审查策略
   determine-strategy:
     runs-on: ubuntu-latest
     outputs:
@@ -14,16 +26,34 @@ jobs:
       - id: strategy
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          MANUAL_REVIEW_TYPE: ${{ github.event.inputs.review_type }}
         run: |
+          # Manual dispatch takes priority
+          if [ -n "$MANUAL_REVIEW_TYPE" ] && [ "$MANUAL_REVIEW_TYPE" != "auto" ]; then
+            echo "review_type=$MANUAL_REVIEW_TYPE" >> $GITHUB_OUTPUT
+            echo "🎯 Manual trigger: $MANUAL_REVIEW_TYPE review"
+            exit 0
+          fi
+
           echo "标签: $LABELS"
 
           # 根据标签决定审查策略
-          if echo "$LABELS" | grep -q 'type/feat'; then
-            echo "review_type=codex" >> $GITHUB_OUTPUT
-            echo "🤖 新功能，使用 Codex 审查"
+          if echo "$LABELS" | grep -q 'type/feature\|type/feat'; then
+            if echo "$LABELS" | grep -q 'scope/infrastructure\|component/cli\|component/flow\|component/pr\|component/task\|component/client\|component/config'; then
+              echo "review_type=codex" >> $GITHUB_OUTPUT
+              echo "🤖 高影响新功能，使用 Codex 审查"
+            else
+              echo "review_type=manual" >> $GITHUB_OUTPUT
+              echo "✋ 普通新功能，默认不自动触发在线审查"
+            fi
           elif echo "$LABELS" | grep -q 'type/fix'; then
-            echo "review_type=copilot" >> $GITHUB_OUTPUT
-            echo "🛠️ Bug 修复，使用 Copilot 审查"
+            if echo "$LABELS" | grep -q 'scope/infrastructure\|component/cli\|component/flow\|component/pr\|component/task\|component/client\|component/config'; then
+              echo "review_type=copilot" >> $GITHUB_OUTPUT
+              echo "🛠️ 高影响修复，使用 Copilot 审查"
+            else
+              echo "review_type=manual" >> $GITHUB_OUTPUT
+              echo "✋ 普通修复，默认不自动触发在线审查"
+            fi
           elif echo "$LABELS" | grep -q 'type/refactor'; then
             echo "review_type=skip" >> $GITHUB_OUTPUT
             echo "🔄 重构，已在本地完成测试和验证"
@@ -38,19 +68,58 @@ jobs:
   # Codex bot 审查 (用于 feat)
   codex-review:
     needs: determine-strategy
-    if: needs.determine-strategy.outputs.review_type == 'codex' && github.event.label.name == 'status/ready-for-review'
+    if: |
+      needs.determine-strategy.outputs.review_type == 'codex' && (
+        github.event.label.name == 'status/ready-for-review' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check if review already requested
+        id: check-review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name')
+          if echo "$LABELS" | grep -q "^status/ai-review-requested$"; then
+            echo "already_reviewed=true" >> $GITHUB_OUTPUT
+            echo "⚠️ AI review already requested, skipping"
+          else
+            echo "already_reviewed=false" >> $GITHUB_OUTPUT
+            echo "✅ No previous Codex review found, will request"
+          fi
+
       - name: Request Codex Review
-        # 在评论区 @codex 触发外部 bot
+        if: steps.check-review.outputs.already_reviewed == 'false'
         uses: actions/github-script@v7
         with:
           script: |
+            const requestedLabel = 'status/ai-review-requested';
+            const readyLabel = 'status/ready-for-review';
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: requestedLabel,
+              });
+            } catch (error) {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: requestedLabel,
+                color: '5319e7',
+                description: 'AI review already requested once',
+              });
+            }
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -58,20 +127,29 @@ jobs:
               body: '@codex review'
             });
 
-      - name: Remove ready-for-review label
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "status/ready-for-review"
+            const nextLabels = labels.filter(label => label !== readyLabel);
+            if (!nextLabels.includes(requestedLabel)) {
+              nextLabels.push(requestedLabel);
+            }
+            await github.rest.issues.setLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: nextLabels,
+            });
 
   # Copilot 代码审查 (用于 fix)
   copilot-review:
     needs: determine-strategy
-    if: needs.determine-strategy.outputs.review_type == 'copilot' && github.event.label.name == 'status/ready-for-review'
+    if: |
+      needs.determine-strategy.outputs.review_type == 'copilot' && (
+        github.event.label.name == 'status/ready-for-review' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +158,31 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const requestedLabel = 'status/ai-review-requested';
+            const readyLabel = 'status/ready-for-review';
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+
+            if (labels.includes(requestedLabel)) {
+              core.notice('AI review already requested once, skipping duplicate Copilot request.');
+              return;
+            }
+
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: requestedLabel,
+              });
+            } catch (error) {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: requestedLabel,
+                color: '5319e7',
+                description: 'AI review already requested once',
+              });
+            }
+
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -87,19 +190,28 @@ jobs:
               reviewers: ['copilot']
             });
 
-      - name: Remove ready-for-review label
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "status/ready-for-review"
+            const nextLabels = labels.filter(label => label !== readyLabel);
+            if (!nextLabels.includes(requestedLabel)) {
+              nextLabels.push(requestedLabel);
+            }
+            await github.rest.issues.setLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: nextLabels,
+            });
 
   # 手动审查提醒 (用于 docs/test/chore)
   manual-review:
     needs: determine-strategy
-    if: needs.determine-strategy.outputs.review_type == 'manual' && github.event.label.name == 'status/ready-for-review'
+    if: |
+      needs.determine-strategy.outputs.review_type == 'manual' && (
+        github.event.label.name == 'status/ready-for-review' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     permissions:
+      issues: write
       pull-requests: write
     steps:
       - name: Add manual review comment
@@ -119,10 +231,3 @@ jobs:
               repo: context.repo.repo,
               body: `📋 **此 PR 标记为 ${changeType} 变更**\n\n请手动决定是否需要测试：\n- 如果需要测试，请手动触发 CI 工作流\n- 如果不需要测试，请直接进行人工审查\n\n感谢您的贡献！ 🎉`
             });
-
-      - name: Remove ready-for-review label
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "status/ready-for-review"
