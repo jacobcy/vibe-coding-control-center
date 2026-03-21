@@ -5,8 +5,10 @@ from typing import Annotated, Optional, cast
 import typer
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
+from vibe3.exceptions import UserError
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import parse_codex_review
@@ -48,21 +50,29 @@ def _run_review(
     """
     log = logger.bind(domain="review", scope=request.scope.kind)
 
-    # Build review context
+    log.info("Building review context")
     prompt_file_content = build_review_context(request, config)
 
     # Determine task: custom message, config default, or None
     task = None
     if message:
         task = message
-        log.bind(task_type="custom").info("Using custom task")
+        log.info("Using custom task message")
+        typer.echo(f"→ Custom task: {message[:60]}{'...' if len(message) > 60 else ''}")
     elif config.review.review_prompt:
         task = config.review.review_prompt
-        log.bind(task_type="config").info("Using configured task")
+        log.info("Using configured task from vibe.toml")
     else:
-        log.bind(task_type="none").info("No custom task, using prompt file only")
+        log.info("Using prompt file only (no custom task)")
 
     # Call agent via codeagent-wrapper
+    log.info(
+        "Running review agent",
+        agent=config.review.agent_config.agent,
+        backend=config.review.agent_config.backend,
+        model=config.review.agent_config.model,
+    )
+    typer.echo("→ Running review...")
     options = ReviewAgentOptions(
         agent=config.review.agent_config.agent,
         backend=config.review.agent_config.backend,
@@ -106,12 +116,14 @@ def pr(
         enable_trace()
 
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting local PR review")
+    log.info("Starting PR review")
+    typer.echo(f"→ Review: PR #{pr_number}")
 
     # Load config
     config = VibeConfig.get_defaults()
 
     # Create scope and get inspect data
+    log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
     inspect_data = run_inspect_json(["pr", str(pr_number)])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
@@ -151,6 +163,20 @@ def base(
 
     from vibe3.utils.git_helpers import get_current_branch
 
+    # Validate base branch exists
+    try:
+        GitClient()._run(["rev-parse", "--verify", base_branch])
+    except Exception:
+        raise UserError(
+            f"Base branch '{base_branch}' not found or invalid.\n\n"
+            "Please provide a valid branch name or commit SHA.\n\n"
+            "Examples:\n"
+            "  vibe review base              # Use default: origin/main\n"
+            "  vibe review base main         # Compare vs local main\n"
+            "  vibe review base develop      # Compare vs develop branch\n"
+            "  vibe review base HEAD~5       # Compare vs 5 commits ago"
+        )
+
     current_branch = get_current_branch()
 
     log = logger.bind(
@@ -159,12 +185,14 @@ def base(
         current_branch=current_branch,
         base_branch=base_branch,
     )
-    log.info("Reviewing branch changes")
+    log.info("Starting branch review")
+    typer.echo(f"→ Review: {current_branch} vs {base_branch}")
 
     # Load config
     config = VibeConfig.get_defaults()
 
     # Create scope and get inspect data
+    log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})

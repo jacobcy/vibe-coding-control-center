@@ -65,14 +65,12 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     REVIEW_REPORT_FILE=".agent/reports/pre-push-review-${TIMESTAMP}.md"
 
+    # Run review with real-time output, capture exit code
     set +e
-    REVIEW_RESULT=$(uv run python src/vibe3/cli.py review base 2>&1)
-    REVIEW_EXIT=$?
+    uv run python src/vibe3/cli.py review base 2>&1 | tee "$REVIEW_REPORT_FILE"
+    REVIEW_EXIT=${PIPESTATUS[0]}
     set -e
 
-    printf '%s\n' "$REVIEW_RESULT" > "$REVIEW_REPORT_FILE"
-
-    echo "$REVIEW_RESULT"
     echo ""
     echo "  Review report saved: $REVIEW_REPORT_FILE"
 
@@ -87,7 +85,7 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
         echo "WARNING: Review failed but HIGH risk allows push."
     fi
 
-    VERDICT=$(echo "$REVIEW_RESULT" | grep -o "VERDICT: [A-Z]*" | head -1 | cut -d' ' -f2 || echo "PASS")
+    VERDICT=$(grep -o "VERDICT: [A-Z]*" "$REVIEW_REPORT_FILE" | head -1 | cut -d' ' -f2 || echo "PASS")
     echo "  Review verdict: $VERDICT"
     if [ "$VERDICT" = "BLOCK" ]; then
         echo "ERROR: Review verdict is BLOCK - fix issues before push"

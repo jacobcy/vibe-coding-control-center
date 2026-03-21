@@ -49,6 +49,23 @@ def register(app: typer.Typer) -> None:
         if trace:
             enable_trace()
 
+        from vibe3.exceptions import UserError
+
+        # Validate base branch exists
+        git_client = GitClient()
+        try:
+            git_client._run(["rev-parse", "--verify", base_branch])
+        except Exception:
+            raise UserError(
+                f"Base branch '{base_branch}' not found or invalid.\n\n"
+                "Please provide a valid branch name or commit SHA.\n\n"
+                "Examples:\n"
+                "  vibe inspect base              # Use default: origin/main\n"
+                "  vibe inspect base main         # Compare vs local main\n"
+                "  vibe inspect base develop      # Compare vs develop branch\n"
+                "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
+            )
+
         current_branch = get_current_branch()
 
         log = logger.bind(

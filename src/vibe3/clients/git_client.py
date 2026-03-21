@@ -88,6 +88,21 @@ class GitClient:
         )
         return name
 
+    def get_git_dir(self) -> str:
+        """Get the .git directory path.
+
+        Returns:
+            Absolute path to the .git directory
+
+        Raises:
+            GitError: git command execution failed
+        """
+        git_dir = self._run(["rev-parse", "--git-dir"])
+        logger.bind(domain="git", action="get_git_dir", git_dir=git_dir).debug(
+            "Got git directory"
+        )
+        return git_dir
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表.
 
