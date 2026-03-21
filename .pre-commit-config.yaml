@@ -95,6 +95,7 @@ repos:
         language: script
         pass_filenames: false
         stages: [pre-push]
+        verbose: true
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)

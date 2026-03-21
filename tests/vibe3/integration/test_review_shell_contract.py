@@ -34,13 +34,27 @@ class TestPrePushContract:
         """Verify pre-push.sh uses inspect base --json for risk assessment."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert "inspect base --json" in content
+        assert 'inspect base "$REVIEW_BASE" --json' in content
+
+    def test_pre_push_reads_ref_updates_from_stdin(self) -> None:
+        """Verify pre-push.sh derives review scope from this push, not full branch."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "PUSH_STDIN=$(cat)" in content
+        assert "review_scope" in content or "scope" in content
 
     def test_pre_push_calls_review_base_directly(self) -> None:
         """Verify pre-push.sh calls review base directly when needed."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
         assert "review base" in content
+
+    def test_pre_push_reviews_against_resolved_base_ref(self) -> None:
+        """Verify pre-push.sh uses resolved push base rather than default origin/main."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert 'inspect base "$REVIEW_BASE" --json' in content
+        assert 'review base "$REVIEW_BASE"' in content
 
     def test_pre_push_prints_review_output_when_review_runs(self) -> None:
         """Verify pre-push.sh prints review output in real-time using tee."""
@@ -81,6 +95,12 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "review_gate" not in content
         assert "review-gate" not in content
+
+    def test_pre_push_hook_is_verbose_in_pre_commit(self) -> None:
+        """Verify pre-commit always prints hook stdout for successful pre-push runs."""
+        content = Path(".pre-commit-config.yaml").read_text()
+        assert 'id: pre-push-checks' in content
+        assert "verbose: true" in content
 
 
 @pytest.mark.regression("issue-210")

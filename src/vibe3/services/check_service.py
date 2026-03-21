@@ -1,5 +1,6 @@
 """Check service implementation."""
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -96,8 +97,13 @@ class CheckService:
 
         # Check 6: Shared current.md exists
         git_dir = self.git_client.get_git_common_dir()
-        branch_safe = branch.replace("/", "-").replace("\\", "-")
-        handoff_path = Path(git_dir) / "vibe3" / "handoff" / branch_safe / "current.md"
+        # Use same hash-based logic as HandoffService to prevent collisions
+        branch_hash = hashlib.sha256(branch.encode()).hexdigest()[:8]
+        branch_safe = branch.replace("/", "-").replace("\\", "-").strip("-_.")
+        if not branch_safe:
+            branch_safe = "default"
+        branch_dir = f"{branch_safe}-{branch_hash}"
+        handoff_path = Path(git_dir) / "vibe3" / "handoff" / branch_dir / "current.md"
         if not handoff_path.exists():
             issues.append(f"Shared handoff file not found: {handoff_path}")
 
@@ -109,15 +115,27 @@ class CheckService:
     def auto_fix(self, issues: list[str]) -> FixResult:
         """Auto-fix identified issues.
 
+        NOTE: This method is not yet implemented.
+        Future work will provide automated fixes for common issues.
+
         Args:
             issues: List of issues to fix
 
         Returns:
             Fix result
+
+        Raises:
+            NotImplementedError: Always raised (feature not implemented)
         """
-        logger.bind(domain="check", action="auto_fix").info("Auto-fixing issues")
+        logger.bind(domain="check", action="auto_fix").warning(
+            "Auto-fix not implemented, manual intervention required"
+        )
 
         raise NotImplementedError(
             "Auto-fix functionality is not yet implemented. "
-            "Please fix issues manually or use specific fix commands."
+            "Manual fixes required:\n"
+            "  - Review the issues list above\n"
+            "  - Use specific fix commands if available (e.g., 'vibe flow sync')\n"
+            "  - Fix issues manually following the error messages\n"
+            "Future versions will provide automated fixes for common issues."
         )

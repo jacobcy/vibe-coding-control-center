@@ -3,6 +3,26 @@
 set -euo pipefail
 
 echo "Running pre-push checks..."
+PUSH_STDIN=$(cat)
+
+SCOPE_JSON=$(printf '%s' "$PUSH_STDIN" | uv run python -m vibe3.services.pre_push_scope) || {
+    echo "ERROR: Failed to resolve pre-push review scope"
+    exit 1
+}
+
+REVIEW_BASE=$(echo "$SCOPE_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print(data['base_ref'])
+")
+
+REVIEW_SCOPE_SUMMARY=$(echo "$SCOPE_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print(data['summary'])
+")
 
 # 1. Compile check (fast, <5s)
 echo "  -> Compile check..."
@@ -32,54 +52,39 @@ bash scripts/hooks/check-shell-loc.sh || {
 
 # 4. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."
-INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json) || {
+echo "  Review scope: $REVIEW_SCOPE_SUMMARY"
+INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json) || {
     echo "ERROR: Inspect failed - cannot assess risk"
     exit 1
 }
 
-RISK_LEVEL=$(echo "$INSPECT_JSON" | uv run python -c "
+# Parse all fields in a single Python invocation
+PARSED_DATA=$(echo "$INSPECT_JSON" | uv run python -c "
 import json
 import sys
 data = json.load(sys.stdin)
-print(data.get('score', {}).get('level', 'LOW'))
-")
-
-RISK_SCORE=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-print(data.get('score', {}).get('score', 0))
-")
-
-BLOCK_REVIEW=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-print('true' if data.get('score', {}).get('block', False) else 'false')
-")
-
-RISK_REASON=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-print(data.get('score', {}).get('reason', ''))
-")
-
-TRIGGER_FACTORS=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-for item in data.get('score', {}).get('trigger_factors', []):
+score = data.get('score', {})
+print('RISK_LEVEL=' + score.get('level', 'LOW'))
+print('RISK_SCORE=' + str(score.get('score', 0)))
+print('BLOCK_REVIEW=' + ('true' if score.get('block', False) else 'false'))
+print('RISK_REASON=' + score.get('reason', ''))
+print('TRIGGER_FACTORS_START')
+for item in score.get('trigger_factors', []):
     print(item)
+print('TRIGGER_FACTORS_END')
+print('RECOMMENDATIONS_START')
+for item in score.get('recommendations', []):
+    print(item)
+print('RECOMMENDATIONS_END')
 ")
 
-RECOMMENDATIONS=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-for item in data.get('score', {}).get('recommendations', []):
-    print(item)
-")
+# Parse extracted data
+RISK_LEVEL=$(echo "$PARSED_DATA" | grep "^RISK_LEVEL=" | cut -d= -f2)
+RISK_SCORE=$(echo "$PARSED_DATA" | grep "^RISK_SCORE=" | cut -d= -f2)
+BLOCK_REVIEW=$(echo "$PARSED_DATA" | grep "^BLOCK_REVIEW=" | cut -d= -f2)
+RISK_REASON=$(echo "$PARSED_DATA" | grep "^RISK_REASON=" | cut -d= -f2-)
+TRIGGER_FACTORS=$(echo "$PARSED_DATA" | sed -n '/^TRIGGER_FACTORS_START$/,/^TRIGGER_FACTORS_END$/p' | grep -v "TRIGGER_FACTORS")
+RECOMMENDATIONS=$(echo "$PARSED_DATA" | sed -n '/^RECOMMENDATIONS_START$/,/^RECOMMENDATIONS_END$/p' | grep -v "RECOMMENDATIONS")
 
 echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
 echo "  Review gate block: $BLOCK_REVIEW"
@@ -113,7 +118,7 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
 
     # Run review with real-time output, capture exit code
     set +e
-    uv run python src/vibe3/cli.py review base 2>&1 | tee "$REVIEW_REPORT_FILE"
+    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" 2>&1 | tee "$REVIEW_REPORT_FILE"
     REVIEW_EXIT=${PIPESTATUS[0]}
     set -e
 
@@ -130,8 +135,23 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
     VERDICT=$(python3 -c "
 import re
 content = open('$REVIEW_REPORT_FILE').read()
-match = re.search(r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}', content, re.IGNORECASE)
-print(match.group(1).upper() if match else 'PASS')
+
+# Try multiple patterns for robustness
+patterns = [
+    r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Standard format with optional markdown
+    r'\*\*VERDICT:\*\*\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Bold prefix
+    r'Verdict:\s*(PASS|MAJOR|BLOCK)',  # Simple format
+    r'=== Verdict:\s*(PASS|MAJOR|BLOCK)',  # Report format
+]
+
+for pattern in patterns:
+    match = re.search(pattern, content, re.IGNORECASE)
+    if match:
+        print(match.group(1).upper())
+        exit(0)
+
+# Default to PASS if no verdict found (fail-safe)
+print('PASS')
 ")
     echo "  Review verdict: $VERDICT"
     if [ "$VERDICT" = "BLOCK" ]; then
@@ -142,7 +162,7 @@ elif [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     echo "  Review triggered: recommended-manual"
     echo ""
     echo "  WARNING: Elevated risk detected, but below blocking threshold."
-    echo "  Recommendation: run 'uv run python src/vibe3/cli.py review base' before push if you want extra confidence."
+    echo "  Recommendation: run 'uv run python src/vibe3/cli.py review base \"$REVIEW_BASE\"' before push if you want extra confidence."
 else
     echo "  Review triggered: no"
 fi

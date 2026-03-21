@@ -76,7 +76,10 @@ class TestVerifyCurrentFlow:
         with tempfile.TemporaryDirectory() as tmpdir:
             git_dir = Path(tmpdir) / ".git"
             git_dir.mkdir()
-            handoff_dir = git_dir / "vibe3" / "handoff" / "feature-test-branch"
+            # Calculate hash suffix to match check_service logic
+            import hashlib
+            branch_hash = hashlib.sha256(b"feature/test-branch").hexdigest()[:8]
+            handoff_dir = git_dir / "vibe3" / "handoff" / f"feature-test-branch-{branch_hash}"
             handoff_dir.mkdir(parents=True)
             (handoff_dir / "current.md").write_text("# Handoff")
 

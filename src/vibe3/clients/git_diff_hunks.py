@@ -6,7 +6,13 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.exceptions import GitError
-from vibe3.models.change_source import BranchSource, ChangeSource, ChangeSourceType, CommitSource, PRSource
+from vibe3.models.change_source import (
+    BranchSource,
+    ChangeSource,
+    ChangeSourceType,
+    CommitSource,
+    PRSource,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -70,7 +76,9 @@ def get_diff_hunk_ranges(
         return []
 
 
-def _get_file_diff(git_client: "GitClient", file_path: str, source: ChangeSource) -> str:
+def _get_file_diff(
+    git_client: "GitClient", file_path: str, source: ChangeSource
+) -> str:
     """Get diff for a specific file from various change sources.
 
     Args:
@@ -86,9 +94,7 @@ def _get_file_diff(git_client: "GitClient", file_path: str, source: ChangeSource
     """
     if source.type == ChangeSourceType.COMMIT:
         assert isinstance(source, CommitSource)
-        return git_client._run(
-            ["diff", f"{source.sha}^", source.sha, "--", file_path]
-        )
+        return git_client._run(["diff", f"{source.sha}^", source.sha, "--", file_path])
     elif source.type == ChangeSourceType.BRANCH:
         assert isinstance(source, BranchSource)
         return git_client._run(
@@ -104,6 +110,7 @@ def _get_file_diff(git_client: "GitClient", file_path: str, source: ChangeSource
             )
         full_diff = git_client._get_pr_diff_cached(source.pr_number)
         from vibe3.clients.git_diff_utils import extract_file_diff
+
         return extract_file_diff(full_diff, file_path)
     else:
         # Uncommitted changes

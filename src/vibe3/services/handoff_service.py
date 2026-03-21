@@ -1,5 +1,6 @@
 """Handoff service implementation."""
 
+import hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -41,14 +42,18 @@ class HandoffService:
         git_dir = self.git_client.get_git_common_dir()
         branch = self.git_client.get_current_branch()
 
-        # Sanitize branch name for directory
-        # Replace path separators and remove leading/trailing special chars
+        # Sanitize branch name with hash suffix to prevent collisions
+        # Example: feature/api-v2 and feature/api/v2 would otherwise collide
+        branch_hash = hashlib.sha256(branch.encode()).hexdigest()[:8]
+        # Replace path separators, remove leading/trailing special chars
         branch_safe = branch.replace("/", "-").replace("\\", "-").strip("-_.")
         # Fallback if branch name becomes empty after sanitization
         if not branch_safe:
             branch_safe = "default"
+        # Append hash suffix for uniqueness
+        branch_dir = f"{branch_safe}-{branch_hash}"
 
-        handoff_dir = Path(git_dir) / "vibe3" / "handoff" / branch_safe
+        handoff_dir = Path(git_dir) / "vibe3" / "handoff" / branch_dir
 
         try:
             handoff_dir.mkdir(parents=True, exist_ok=True)

@@ -167,7 +167,11 @@ class TestGetHandoffDir:
 
         handoff_dir = handoff_service._get_handoff_dir()
 
+        # Branch name should be sanitized and include hash suffix for uniqueness
         assert "feature-complex-branch-name" in str(handoff_dir)
+        # Should have a hash suffix (8 hex chars)
+        import re
+        assert re.search(r"-[a-f0-9]{8}$", handoff_dir.name)
         assert handoff_dir.exists()
 
     def test_get_handoff_dir_handles_leading_trailing_dashes(
@@ -179,6 +183,7 @@ class TestGetHandoffDir:
 
         handoff_dir = handoff_service._get_handoff_dir()
 
+        # Dashes should be stripped, with hash suffix added
         assert "branch-with-dashes" in str(handoff_dir)
 
     def test_get_handoff_dir_fallback_for_empty_name(
@@ -190,4 +195,5 @@ class TestGetHandoffDir:
 
         handoff_dir = handoff_service._get_handoff_dir()
 
+        # Should use 'default' prefix with hash suffix
         assert "default" in str(handoff_dir)
