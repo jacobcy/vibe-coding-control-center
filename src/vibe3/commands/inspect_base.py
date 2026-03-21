@@ -49,22 +49,31 @@ def register(app: typer.Typer) -> None:
         if trace:
             enable_trace()
 
-        from vibe3.exceptions import UserError
+        from vibe3.exceptions import GitError, UserError
 
         # Validate base branch exists
         git_client = GitClient()
         try:
             git_client._run(["rev-parse", "--verify", base_branch])
-        except Exception:
-            raise UserError(
-                f"Base branch '{base_branch}' not found or invalid.\n\n"
-                "Please provide a valid branch name or commit SHA.\n\n"
-                "Examples:\n"
-                "  vibe inspect base              # Use default: origin/main\n"
-                "  vibe inspect base main         # Compare vs local main\n"
-                "  vibe inspect base develop      # Compare vs develop branch\n"
-                "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
-            )
+        except GitError as e:
+            # Check if it's a "not found" error vs other git errors
+            error_msg = str(e).lower()
+            if "not found" in error_msg or "unknown revision" in error_msg:
+                raise UserError(
+                    f"Base branch '{base_branch}' not found or invalid.\n\n"
+                    "Please provide a valid branch name or commit SHA.\n\n"
+                    "Examples:\n"
+                    "  vibe inspect base              # Use default: origin/main\n"
+                    "  vibe inspect base main         # Compare vs local main\n"
+                    "  vibe inspect base develop      # Compare vs develop branch\n"
+                    "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
+                ) from None
+            else:
+                # Re-raise other git errors (permission issues, corrupted repo, etc.)
+                raise SystemError(
+                    f"Git operation failed while validating base branch "
+                    f"'{base_branch}': {e}"
+                ) from e
 
         current_branch = get_current_branch()
 

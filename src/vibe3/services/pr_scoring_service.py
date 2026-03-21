@@ -56,21 +56,21 @@ def _build_reason(score: RiskScore, dimensions: PRDimensions) -> str:
     reasons: list[str] = []
 
     if dimensions.critical_path_touch:
-        reasons.append("触达关键路径")
+        reasons.append("touches critical path")
     if dimensions.public_api_touch:
-        reasons.append("触达公开接口")
+        reasons.append("touches public API")
     if dimensions.changed_files >= 4:
-        reasons.append("改动文件较多")
+        reasons.append("many files changed")
     if dimensions.changed_lines >= 200:
-        reasons.append("改动行数较大")
+        reasons.append("large lines changed")
     if dimensions.impacted_modules >= 2:
-        reasons.append("影响模块范围较大")
+        reasons.append("wide module impact")
     if dimensions.codex_verdict == "BLOCK":
-        reasons.append("在线审查给出阻断结论")
+        reasons.append("online review blocks")
     elif dimensions.codex_verdict == "CRITICAL":
-        reasons.append("在线审查给出严重结论")
+        reasons.append("online review critical")
     elif dimensions.codex_verdict == "MAJOR":
-        reasons.append("在线审查给出重要结论")
+        reasons.append("online review major")
 
     if not reasons:
         reasons.append("变更范围较小")

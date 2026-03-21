@@ -282,3 +282,78 @@ class TestAppendCurrentHandoff:
         assert content.index("Blocked on GitHub Project mapping") < content.index(
             "Next: define task sync contract"
         )
+
+
+class TestGetHandoffDir:
+    """Tests for _get_handoff_dir method - error handling and edge cases."""
+
+    def test_get_handoff_dir_handles_permission_error(
+        self, handoff_service, mock_git_client
+    ):
+        """Test that _get_handoff_dir raises SystemError on permission denied."""
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_dir = Path(tmpdir) / ".git"
+            git_dir.mkdir()
+            mock_git_client.get_git_common_dir.return_value = str(git_dir)
+            mock_git_client.get_current_branch.return_value = "feature/test"
+
+            # Mock mkdir to raise PermissionError
+            with patch.object(
+                Path, "mkdir", side_effect=PermissionError("Permission denied")
+            ):
+                with pytest.raises(SystemError) as exc_info:
+                    handoff_service._get_handoff_dir()
+
+            assert "Failed to create handoff directory" in str(exc_info.value)
+            assert "Permission denied" in str(exc_info.value)
+
+    def test_get_handoff_dir_sanitizes_branch_name(
+        self, handoff_service, mock_git_client
+    ):
+        """Test that _get_handoff_dir properly sanitizes branch names."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_dir = Path(tmpdir) / ".git"
+            git_dir.mkdir()
+            mock_git_client.get_git_common_dir.return_value = str(git_dir)
+
+            # Test branch with slashes and backslashes
+            mock_git_client.get_current_branch.return_value = "feature/branch\\name"
+            handoff_dir = handoff_service._get_handoff_dir()
+            assert "branch-name" in str(handoff_dir)
+
+            # Test branch starting with special chars
+            mock_git_client.get_current_branch.return_value = "-branch-name"
+            handoff_dir = handoff_service._get_handoff_dir()
+            # Should strip leading special chars
+            assert "branch-name" in str(handoff_dir)
+
+            # Test branch ending with special chars
+            mock_git_client.get_current_branch.return_value = "branch-name-"
+            handoff_dir = handoff_service._get_handoff_dir()
+            # Should strip trailing special chars
+            assert "branch-name" in str(handoff_dir)
+
+    def test_get_handoff_dir_handles_empty_branch_name(
+        self, handoff_service, mock_git_client
+    ):
+        """Test that _get_handoff_dir handles branch names that become empty after sanitization."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_dir = Path(tmpdir) / ".git"
+            git_dir.mkdir()
+            mock_git_client.get_git_common_dir.return_value = str(git_dir)
+
+            # Test branch that becomes empty after sanitization
+            mock_git_client.get_current_branch.return_value = "---"
+            handoff_dir = handoff_service._get_handoff_dir()
+            # Should use "default" fallback
+            assert "default" in str(handoff_dir)

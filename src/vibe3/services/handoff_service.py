@@ -33,15 +33,28 @@ class HandoffService:
 
         Returns:
             Path to .git/vibe3/handoff/<branch-safe>/
+
+        Raises:
+            SystemError: If directory creation fails due to filesystem issues
         """
         git_dir = self.git_client.get_git_common_dir()
         branch = self.git_client.get_current_branch()
 
-        # Sanitize branch name for directory (replace / with -)
-        branch_safe = branch.replace("/", "-").replace("\\", "-")
+        # Sanitize branch name for directory
+        # Replace path separators and remove leading/trailing special chars
+        branch_safe = branch.replace("/", "-").replace("\\", "-").strip("-_.")
+        # Fallback if branch name becomes empty after sanitization
+        if not branch_safe:
+            branch_safe = "default"
 
         handoff_dir = Path(git_dir) / "vibe3" / "handoff" / branch_safe
-        handoff_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            raise SystemError(
+                f"Failed to create handoff directory at {handoff_dir}: {e}"
+            ) from e
 
         return handoff_dir
 

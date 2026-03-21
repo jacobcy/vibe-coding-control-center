@@ -14,7 +14,7 @@ NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE, STDOUT, CompletedProcess, Popen
+from subprocess import PIPE, STDOUT, CompletedProcess, Popen, TimeoutExpired
 from typing import Final
 
 
@@ -189,12 +189,20 @@ def run_review_agent(
 
         stdout_parts: list[str] = []
         try:
-            assert process.stdout is not None
+            if process.stdout is None:
+                process.kill()
+                raise SystemError(
+                    "Process stdout is None. This indicates a subprocess "
+                    "configuration error."
+                )
             for line in process.stdout:
                 print(line, end="", flush=True)
                 stdout_parts.append(line)
             exit_code = process.wait(timeout=options.timeout_seconds)
-        except Exception:
+        except TimeoutExpired:
+            process.kill()
+            raise
+        except (OSError, IOError):
             process.kill()
             raise
 

@@ -189,8 +189,8 @@ class TestAutoFix:
     """Tests for auto_fix method."""
 
     def test_auto_fix_not_implemented(self, check_service):
-        """Test that auto_fix returns not implemented error."""
-        result = check_service.auto_fix(["Some issue"])
+        """Test that auto_fix raises NotImplementedError."""
+        with pytest.raises(NotImplementedError) as exc_info:
+            check_service.auto_fix(["Some issue"])
 
-        assert not result.success
-        assert "not implemented" in result.error.lower()
+        assert "not yet implemented" in str(exc_info.value).lower()

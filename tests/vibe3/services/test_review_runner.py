@@ -204,6 +204,32 @@ class TestRunReviewAgent:
         assert "line one" in result.stdout
         assert "VERDICT: PASS" in result.stdout
 
+    def test_run_review_handles_none_stdout(self) -> None:
+        """Runner should raise SystemError if process.stdout is None."""
+        process = MagicMock()
+        process.stdout = None
+
+        with patch("vibe3.services.review_runner.Popen", return_value=process):
+            with pytest.raises(SystemError) as exc_info:
+                run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+
+        assert "stdout is none" in str(exc_info.value).lower()
+        # Verify process was killed
+        process.kill.assert_called_once()
+
+    def test_run_review_handles_os_error(self) -> None:
+        """Runner should handle OSError and kill process."""
+        process = MagicMock()
+        process.stdout = io.StringIO("partial output\n")
+        process.wait.side_effect = OSError("I/O error")
+
+        with patch("vibe3.services.review_runner.Popen", return_value=process):
+            with pytest.raises(OSError, match="I/O error"):
+                run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+
+        # Verify process was killed
+        process.kill.assert_called_once()
+
 
 class TestReviewAgentResult:
     """Tests for ReviewAgentResult dataclass."""

@@ -117,5 +117,7 @@ class CheckService:
         """
         logger.bind(domain="check", action="auto_fix").info("Auto-fixing issues")
 
-        # TODO: Implement auto-fix logic
-        return FixResult(success=False, error="Auto-fix not implemented yet")
+        raise NotImplementedError(
+            "Auto-fix functionality is not yet implemented. "
+            "Please fix issues manually or use specific fix commands."
+        )
