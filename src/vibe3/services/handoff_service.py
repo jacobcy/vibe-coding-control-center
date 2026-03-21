@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
+from vibe3.services.handoff_recorder import record_handoff
 from vibe3.services.handoff_template import get_handoff_template
 
 
@@ -180,13 +181,8 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
-        self._record_handoff(
-            handoff_type="plan",
-            ref=plan_ref,
-            next_step=next_step,
-            blocked_by=blocked_by,
-            actor=actor,
-            actor_role="planner_actor",
+        record_handoff(
+            self.store, self.git_client, "plan", plan_ref, next_step, blocked_by, actor
         )
 
     def record_report(
@@ -204,13 +200,14 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
-        self._record_handoff(
-            handoff_type="report",
-            ref=report_ref,
-            next_step=next_step,
-            blocked_by=blocked_by,
-            actor=actor,
-            actor_role="reviewer_actor",
+        record_handoff(
+            self.store,
+            self.git_client,
+            "report",
+            report_ref,
+            next_step,
+            blocked_by,
+            actor,
         )
 
     def record_audit(
@@ -228,71 +225,15 @@ class HandoffService:
             blocked_by: Blocker description
             actor: Actor identifier
         """
-        self._record_handoff(
-            handoff_type="audit",
-            ref=audit_ref,
-            next_step=next_step,
-            blocked_by=blocked_by,
-            actor=actor,
-            actor_role="reviewer_actor",
-        )
-
-    def _record_handoff(
-        self,
-        handoff_type: str,
-        ref: str,
-        next_step: str | None,
-        blocked_by: str | None,
-        actor: str,
-        actor_role: str,
-    ) -> None:
-        """Record handoff to store.
-
-        Args:
-            handoff_type: Type of handoff (plan/report/audit)
-            ref: Document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            actor_role: Role field name for actor (planner_actor/reviewer_actor)
-        """
-        logger.bind(
-            domain="handoff",
-            action=f"record_{handoff_type}",
-            ref=ref,
-            actor=actor,
-        ).info(f"Recording {handoff_type} handoff")
-
-        branch = self.git_client.get_current_branch()
-
-        # Build update kwargs
-        update_kwargs = {
-            actor_role: actor,
-            "latest_actor": actor,
-            "next_step": next_step,
-            "blocked_by": blocked_by,
-        }
-
-        # Set the appropriate ref field
-        if handoff_type == "plan":
-            update_kwargs["plan_ref"] = ref
-        elif handoff_type == "report":
-            update_kwargs["report_ref"] = ref
-        else:
-            update_kwargs["audit_ref"] = ref
-
-        # Update flow state
-        self.store.update_flow_state(branch, **update_kwargs)
-
-        # Add event
-        self.store.add_event(
-            branch,
-            f"handoff_{handoff_type}",
+        record_handoff(
+            self.store,
+            self.git_client,
+            "audit",
+            audit_ref,
+            next_step,
+            blocked_by,
             actor,
-            f"{handoff_type.capitalize()} recorded: {ref}",
         )
-
-        logger.success(f"{handoff_type.capitalize()} handoff recorded")
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.
