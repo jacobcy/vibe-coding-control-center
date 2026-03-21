@@ -115,4 +115,6 @@ class TestGenerateScoreReport:
         assert report["block"] is True
         assert report["reason"] != "未知"
         assert len(report["trigger_factors"]) > 0
-        assert any("降低" in item or "拆分" in item for item in report["recommendations"])
+        assert any(
+            "降低" in item or "拆分" in item for item in report["recommendations"]
+        )

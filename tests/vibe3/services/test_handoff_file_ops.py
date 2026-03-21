@@ -96,9 +96,7 @@ class TestEnsureCurrentHandoff:
 class TestReadCurrentHandoff:
     """Tests for read_current_handoff method."""
 
-    def test_read_current_handoff(
-        self, handoff_service, temp_git_dir, mock_git_client
-    ):
+    def test_read_current_handoff(self, handoff_service, temp_git_dir, mock_git_client):
         """Test reading current handoff file."""
         mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
 
@@ -171,6 +169,7 @@ class TestGetHandoffDir:
         assert "feature-complex-branch-name" in str(handoff_dir)
         # Should have a hash suffix (8 hex chars)
         import re
+
         assert re.search(r"-[a-f0-9]{8}$", handoff_dir.name)
         assert handoff_dir.exists()
 

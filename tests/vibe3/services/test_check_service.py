@@ -78,13 +78,18 @@ class TestVerifyCurrentFlow:
             git_dir.mkdir()
             # Calculate hash suffix to match check_service logic
             import hashlib
+
             branch_hash = hashlib.sha256(b"feature/test-branch").hexdigest()[:8]
-            handoff_dir = git_dir / "vibe3" / "handoff" / f"feature-test-branch-{branch_hash}"
+            handoff_dir = (
+                git_dir / "vibe3" / "handoff" / f"feature-test-branch-{branch_hash}"
+            )
             handoff_dir.mkdir(parents=True)
             (handoff_dir / "current.md").write_text("# Handoff")
 
             with patch.object(
-                check_service.git_client, "get_git_common_dir", return_value=str(git_dir)
+                check_service.git_client,
+                "get_git_common_dir",
+                return_value=str(git_dir),
             ):
                 result = check_service.verify_current_flow()
 
@@ -180,7 +185,9 @@ class TestVerifyCurrentFlow:
             # Don't create handoff file
 
             with patch.object(
-                check_service.git_client, "get_git_common_dir", return_value=str(git_dir)
+                check_service.git_client,
+                "get_git_common_dir",
+                return_value=str(git_dir),
             ):
                 result = check_service.verify_current_flow()
 

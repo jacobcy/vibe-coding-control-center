@@ -196,7 +196,9 @@ class TestRunReviewAgent:
         process.returncode = 0
 
         with patch("vibe3.services.review_runner.Popen", return_value=process):
-            result = run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+            result = run_review_agent(
+                "prompt body", ReviewAgentOptions(agent="code-reviewer")
+            )
 
         captured = capsys.readouterr()
         assert "line one" in captured.out
@@ -211,7 +213,9 @@ class TestRunReviewAgent:
 
         with patch("vibe3.services.review_runner.Popen", return_value=process):
             with pytest.raises(SystemError) as exc_info:
-                run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+                run_review_agent(
+                    "prompt body", ReviewAgentOptions(agent="code-reviewer")
+                )
 
         assert "stdout is none" in str(exc_info.value).lower()
         # Verify process was killed
@@ -225,7 +229,9 @@ class TestRunReviewAgent:
 
         with patch("vibe3.services.review_runner.Popen", return_value=process):
             with pytest.raises(OSError, match="I/O error"):
-                run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+                run_review_agent(
+                    "prompt body", ReviewAgentOptions(agent="code-reviewer")
+                )
 
         # Verify process was killed
         process.kill.assert_called_once()

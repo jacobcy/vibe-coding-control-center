@@ -99,7 +99,7 @@ class TestPrePushContract:
     def test_pre_push_hook_is_verbose_in_pre_commit(self) -> None:
         """Verify pre-commit always prints hook stdout for successful pre-push runs."""
         content = Path(".pre-commit-config.yaml").read_text()
-        assert 'id: pre-push-checks' in content
+        assert "id: pre-push-checks" in content
         assert "verbose: true" in content
 
 

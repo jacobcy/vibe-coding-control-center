@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.services.pre_push_scope import resolve_pre_push_scope
 
-
 ZERO_SHA = "0" * 40
 
 
@@ -57,7 +56,9 @@ class TestResolvePrePushScope:
         assert scope.head_ref == "1111111111111111111111111111111111111111"
 
     @patch("vibe3.clients.git_client.GitClient")
-    def test_infers_incremental_push_from_git_state(self, mock_git_client: MagicMock) -> None:
+    def test_infers_incremental_push_from_git_state(
+        self, mock_git_client: MagicMock
+    ) -> None:
         """When stdin is empty, infer incremental push from git state."""
         # Mock git client
         mock_instance = MagicMock()
@@ -87,4 +88,3 @@ class TestResolvePrePushScope:
         assert scope.base_ref == "origin/main"
         assert scope.is_incremental is False
         assert "inferred new branch push" in scope.summary
-
