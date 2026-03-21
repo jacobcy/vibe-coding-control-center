@@ -32,7 +32,7 @@ bash scripts/hooks/check-shell-loc.sh || {
 
 # 4. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."
-INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json 2>/dev/null) || {
+INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base --json) || {
     echo "ERROR: Inspect failed - cannot assess risk"
     exit 1
 }
@@ -51,13 +51,59 @@ data = json.load(sys.stdin)
 print(data.get('score', {}).get('score', 0))
 ")
 
-echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
+BLOCK_REVIEW=$(echo "$INSPECT_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print('true' if data.get('score', {}).get('block', False) else 'false')
+")
 
-# 5. Trigger local review on HIGH/CRITICAL risk
-if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
+RISK_REASON=$(echo "$INSPECT_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print(data.get('score', {}).get('reason', ''))
+")
+
+TRIGGER_FACTORS=$(echo "$INSPECT_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+for item in data.get('score', {}).get('trigger_factors', []):
+    print(item)
+")
+
+RECOMMENDATIONS=$(echo "$INSPECT_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+for item in data.get('score', {}).get('recommendations', []):
+    print(item)
+")
+
+echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
+echo "  Review gate block: $BLOCK_REVIEW"
+if [ -n "$RISK_REASON" ]; then
+    echo "  Risk reason: $RISK_REASON"
+fi
+if [ -n "$TRIGGER_FACTORS" ]; then
+    echo "  Trigger factors:"
+    while IFS= read -r factor; do
+        [ -n "$factor" ] && echo "    - $factor"
+    done <<< "$TRIGGER_FACTORS"
+fi
+if [ -n "$RECOMMENDATIONS" ]; then
+    echo "  Recommendations:"
+    while IFS= read -r item; do
+        [ -n "$item" ] && echo "    - $item"
+    done <<< "$RECOMMENDATIONS"
+fi
+
+# 5. Trigger local review only when inspect score reaches block threshold
+if [ "$BLOCK_REVIEW" = "true" ]; then
     echo "  Review triggered: yes"
     echo ""
-    echo "  WARNING: High risk detected!"
+    echo "  WARNING: Blocking risk detected!"
     echo "  Running local review before push..."
     echo ""
 
@@ -76,13 +122,9 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
 
     if [ "$REVIEW_EXIT" -ne 0 ]; then
         echo "ERROR: Review failed with exit code $REVIEW_EXIT"
-        if [ "$RISK_LEVEL" = "CRITICAL" ]; then
-            echo ""
-            echo "CRITICAL risk requires passing review before push."
-            exit 1
-        fi
         echo ""
-        echo "WARNING: Review failed but HIGH risk allows push."
+        echo "Blocking risk requires visible review output and a passing review before push."
+        exit 1
     fi
 
     VERDICT=$(grep -o "VERDICT: [A-Z]*" "$REVIEW_REPORT_FILE" | head -1 | cut -d' ' -f2 || echo "PASS")
@@ -91,6 +133,11 @@ if [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
         echo "ERROR: Review verdict is BLOCK - fix issues before push"
         exit 1
     fi
+elif [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
+    echo "  Review triggered: recommended-manual"
+    echo ""
+    echo "  WARNING: Elevated risk detected, but below blocking threshold."
+    echo "  Recommendation: run 'uv run python src/vibe3/cli.py review base' before push if you want extra confidence."
 else
     echo "  Review triggered: no"
 fi
