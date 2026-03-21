@@ -213,9 +213,36 @@ class MergeGateConfig(BaseModel):
     )
 
 
+class SizeThreshold(BaseModel):
+    """Threshold values for size classification."""
+
+    small: int = Field(default=50, description="Upper bound for small size")
+    medium: int = Field(default=200, description="Upper bound for medium size")
+    large: int = Field(default=500, description="Upper bound for large size")
+
+
+class SizeThresholds(BaseModel):
+    """Size thresholds for each dimension."""
+
+    changed_lines: SizeThreshold = Field(
+        default_factory=SizeThreshold, description="Changed lines thresholds"
+    )
+    changed_files: SizeThreshold = Field(
+        default_factory=lambda: SizeThreshold(small=4, medium=10, large=20),
+        description="Changed files thresholds",
+    )
+    impacted_modules: SizeThreshold = Field(
+        default_factory=lambda: SizeThreshold(small=2, medium=5, large=10),
+        description="Impacted modules thresholds",
+    )
+
+
 class PRScoringConfig(BaseModel):
     """PR scoring configuration."""
 
+    size_thresholds: SizeThresholds = Field(
+        default_factory=SizeThresholds, description="Size thresholds"
+    )
     weights: PRScoringWeights = Field(default_factory=PRScoringWeights)
     thresholds: PRScoringThresholds = Field(default_factory=PRScoringThresholds)
     merge_gate: MergeGateConfig = Field(default_factory=MergeGateConfig)

@@ -108,25 +108,41 @@ quality:
 
 # PR 评分配置
 pr_scoring:
+  # Size thresholds (when to upgrade from small to medium to large)
+  size_thresholds:
+    changed_lines:
+      small: 50        # <50 lines = small (0 points)
+      medium: 200      # 50-200 lines = medium (1 point)
+      large: 500       # 200-500 lines = large (1 point), >500 = xlarge (2 points)
+    changed_files:
+      small: 4         # 1-3 files = small (0 points)
+      medium: 10       # 4-10 files = medium (1 point), >10 = large (1 point)
+    impacted_modules:
+      small: 2         # 1 module = small (0 points)
+      medium: 5        # 2-4 modules = medium (1 point), ≥5 = large (2 points)
+
+  # Points for each dimension
   weights:
     changed_lines:
-      small: 0               # <50 行
-      medium: 1              # 50-200 行
-      large: 1               # 200-500 行（从2降低，pre-push不应过度惩罚正常功能）
-      xlarge: 2              # >500 行
+      small: 0
+      medium: 1
+      large: 1         # Lowered from 2 (pre-push shouldn't over-penalize normal features)
+      xlarge: 2
     changed_files:
-      small: 0               # 1-3 文件
-      medium: 1              # 4-10 文件
-      large: 1               # >10 文件（从2降低，10+文件对功能开发是合理的）
+      small: 0
+      medium: 1
+      large: 1         # Lowered from 2 (10+ files is reasonable for feature work)
     impacted_modules:
-      small: 0               # 1 模块
-      medium: 1              # 2-4 模块
-      large: 2               # ≥5 模块
+      small: 0
+      medium: 1
+      large: 2
+
+    # Context dimensions (only used for PR review, not pre-push)
     critical_path_touch: 2
     public_api_touch: 2
-    cross_module_symbol_change: 2
-    codex_major: 3
-    codex_critical: 5
+    cross_module_symbol_change: 2    # Not used in pre-push
+    codex_major: 3                    # Not used in pre-push
+    codex_critical: 5                 # Not used in pre-push
 
   thresholds:
     medium: 3
@@ -134,6 +150,6 @@ pr_scoring:
     critical: 9
 
   merge_gate:
-    block_on_score_at_or_above: 12  # 从9提高到12，pre-push只阻断真正高风险的改动
+    block_on_score_at_or_above: 12  # Raised from 9 to reduce false positives
     block_on_verdict:
       - "BLOCK"

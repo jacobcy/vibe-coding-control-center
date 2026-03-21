@@ -119,34 +119,35 @@ def calculate_risk_score(dimensions: PRDimensions) -> RiskScore:
         config = get_config()
         w = config.pr_scoring.weights
         gate = config.pr_scoring.merge_gate
+        t = config.pr_scoring.size_thresholds
 
         breakdown: dict[str, int] = {}
 
         # 改动行数
         cl = dimensions.changed_lines
-        if cl > 500:
+        if cl > t.changed_lines.large:
             breakdown["changed_lines"] = w.changed_lines.xlarge
-        elif cl > 200:
+        elif cl > t.changed_lines.medium:
             breakdown["changed_lines"] = w.changed_lines.large
-        elif cl >= 50:
+        elif cl >= t.changed_lines.small:
             breakdown["changed_lines"] = w.changed_lines.medium
         else:
             breakdown["changed_lines"] = w.changed_lines.small
 
         # 改动文件数
         cf = dimensions.changed_files
-        if cf > 10:
+        if cf > t.changed_files.medium:  # >10
             breakdown["changed_files"] = w.changed_files.large
-        elif cf >= 4:
+        elif cf >= t.changed_files.small:  # >=4
             breakdown["changed_files"] = w.changed_files.medium
         else:
             breakdown["changed_files"] = w.changed_files.small
 
         # 影响模块数
         im = dimensions.impacted_modules
-        if im >= 5:
+        if im >= t.impacted_modules.medium:  # >=5
             breakdown["impacted_modules"] = w.impacted_modules.large
-        elif im >= 2:
+        elif im >= t.impacted_modules.small:  # >=2
             breakdown["impacted_modules"] = w.impacted_modules.medium
         else:
             breakdown["impacted_modules"] = w.impacted_modules.small

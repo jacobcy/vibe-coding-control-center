@@ -100,12 +100,15 @@ class TestGenerateScoreReport:
         assert "recommendations" in report
 
     def test_report_explains_blocking_risk(self) -> None:
+        # Use more extreme dimensions to trigger blocking
         dims = PRDimensions(
-            changed_lines=600,
-            changed_files=12,
-            impacted_modules=6,
+            changed_lines=1000,  # xlarge
+            changed_files=25,  # large
+            impacted_modules=10,  # large
             critical_path_touch=True,
             public_api_touch=True,
+            cross_module_symbol_change=True,  # Add this
+            codex_verdict="CRITICAL",  # Add this to trigger block
         )
         report = generate_score_report(dims)
 
