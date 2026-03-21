@@ -121,6 +121,20 @@ def build_json_output(
     Returns:
         JSON-serializable result dict
     """
+    # Filter: only count code files for risk scoring
+    # Exclude docs, configs, scripts, tests to avoid inflating risk scores
+    config = get_config()
+    code_paths = (
+        config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
+    )
+
+    def is_code_file(filepath: str) -> bool:
+        """Check if file is in code paths (not docs/configs/tests)."""
+        return any(filepath.startswith(path.rstrip("/")) for path in code_paths)
+
+    # Only count code files for changed_files dimension
+    code_changed_files = [f for f in all_changed_files if is_code_file(f)]
+
     # Get AST-level analysis: changed functions
     # Skip test files - they don't need AST analysis
     changed_symbols_by_file: dict[str, list[str]] = {}
@@ -162,7 +176,7 @@ def build_json_output(
             impacted_modules = dag.impacted_modules
 
     dims = PRDimensions(
-        changed_files=len(all_changed_files),  # Include deleted files in count
+        changed_files=len(code_changed_files),  # Only count code files
         changed_lines=changed_lines,
         impacted_modules=len(impacted_modules),
         critical_path_touch=has_critical,
@@ -175,6 +189,7 @@ def build_json_output(
         "base_branch": base_branch,
         "core_files": core_files,
         "total_changed": len(all_changed_files),  # Include deleted files
+        "code_changed": len(code_changed_files),  # Only code files
         "existing_changed": len(existing_files),
         "deleted_files": len(deleted_files),
         "core_changed": len(core_files),
