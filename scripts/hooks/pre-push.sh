@@ -92,6 +92,7 @@ print('RECOMMENDATIONS_START')
 for item in score.get('recommendations', []):
     print(item)
 print('RECOMMENDATIONS_END')
+print('BLOCK_THRESHOLD=' + str(score.get('block_threshold', 12)))
 ")
 
 # Parse extracted data
@@ -101,8 +102,9 @@ BLOCK_REVIEW=$(echo "$PARSED_DATA" | grep "^BLOCK_REVIEW=" | cut -d= -f2)
 RISK_REASON=$(echo "$PARSED_DATA" | grep "^RISK_REASON=" | cut -d= -f2-)
 TRIGGER_FACTORS=$(echo "$PARSED_DATA" | sed -n '/^TRIGGER_FACTORS_START$/,/^TRIGGER_FACTORS_END$/p' | grep -v "TRIGGER_FACTORS")
 RECOMMENDATIONS=$(echo "$PARSED_DATA" | sed -n '/^RECOMMENDATIONS_START$/,/^RECOMMENDATIONS_END$/p' | grep -v "RECOMMENDATIONS")
+BLOCK_THRESHOLD=$(echo "$PARSED_DATA" | grep "^BLOCK_THRESHOLD=" | cut -d= -f2)
 
-echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/10)"
+echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/$BLOCK_THRESHOLD)"
 echo "  Review gate block: $BLOCK_REVIEW"
 if [ -n "$RISK_REASON" ]; then
     echo "  Risk reason: $RISK_REASON"

@@ -219,10 +219,16 @@ def generate_score_report(dimensions: PRDimensions) -> dict[str, object]:
         for key, points in score.breakdown.items()
         if points > 0
     ]
+
+    # Get block threshold from config
+    config = get_config()
+    block_threshold = config.pr_scoring.merge_gate.block_on_score_at_or_above
+
     report: dict[str, object] = {
         "score": score.score,
         "level": score.level,
         "block": score.block,
+        "block_threshold": block_threshold,
         "breakdown": score.breakdown,
         "dimensions": dimensions.model_dump(),
         "reason": _build_reason(score, dimensions),
