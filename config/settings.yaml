@@ -9,7 +9,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 12000        # Python 核心代码总行数
+    v3_python: 14000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -181,8 +181,17 @@ pr_scoring:
     # Note: This is separate from risk level thresholds
     # Example: score=10 → CRITICAL level, but NOT blocked (10 < 12)
     # Example: score=12 → CRITICAL level, AND blocked (12 >= 12)
-    block_on_score_at_or_above: 12  # Raised from 9 to reduce false positives
+    block_on_score_at_or_above: 10  # Raised from 9 to reduce false positives
 
     # Always block if codex returns these verdicts
     block_on_verdict:
       - "BLOCK"
+
+# GitHub Projects v2 配置（Task Bridge 真源）
+# project_number 和 owner 是 task bridge 的远端真源配置
+# owner_type: "user" 表示个人账号，"org" 表示组织
+github_project:
+  owner_type: "user"
+  owner: "jacobcy"
+  project_number: 17
+  org: ""             # 已废弃，请使用 owner

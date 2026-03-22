@@ -10,49 +10,63 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from vibe3.config.settings_pr import (
+    FileChangeWeights,
+    LineChangeWeights,
+    MergeGateConfig,
+    ModuleChangeWeights,
+    PRScoringConfig,
+    PRScoringThresholds,
+    PRScoringWeights,
+    SizeThreshold,
+    SizeThresholds,
+)
+
+__all__ = [
+    "PRScoringConfig",
+    "MergeGateConfig",
+    "PRScoringWeights",
+    "PRScoringThresholds",
+    "LineChangeWeights",
+    "FileChangeWeights",
+    "ModuleChangeWeights",
+    "SizeThreshold",
+    "SizeThresholds",
+    "VibeConfig",
+]
+
 
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
 
-    default: int = Field(default=200, description="单文件默认限制")
-    max: int = Field(default=300, description="单文件最大限制")
+    default: int = Field(default=200)
+    max: int = Field(default=300)
 
 
 class TotalFileLocConfig(BaseModel):
     """总行数限制."""
 
-    v2_shell: int = Field(default=7000, description="Shell 核心代码总行数")
-    v3_python: int = Field(default=9000, description="Python 核心代码总行数")
+    v2_shell: int = Field(default=7000)
+    v3_python: int = Field(default=9000)
 
 
 class CodePathsConfig(BaseModel):
-    """代码路径配置."""
-
-    v2_shell: list[str] = Field(default_factory=list, description="Shell 核心代码路径")
-    v3_python: list[str] = Field(
-        default_factory=list, description="Python 核心代码路径"
-    )
+    v2_shell: list[str] = Field(default_factory=list)
+    v3_python: list[str] = Field(default_factory=list)
 
 
 class ScriptsPathsConfig(BaseModel):
-    """脚本路径配置."""
-
-    v2_shell: list[str] = Field(default_factory=list, description="Shell 脚本路径")
-    v3_python: list[str] = Field(default_factory=list, description="Python 脚本路径")
+    v2_shell: list[str] = Field(default_factory=list)
+    v3_python: list[str] = Field(default_factory=list)
 
 
 class TestPathsConfig(BaseModel):
-    """测试路径配置."""
-
-    v2_shell: list[str] = Field(default_factory=list, description="Shell 测试路径")
-    v3_python: list[str] = Field(default_factory=list, description="Python 测试路径")
+    v2_shell: list[str] = Field(default_factory=list)
+    v3_python: list[str] = Field(default_factory=list)
 
 
 class CodeLimitsConfig(BaseModel):
-    """代码量限制配置.
-
-    与 config/settings.yaml 结构完全对应。
-    """
+    """代码量限制配置."""
 
     single_file_loc: SingleFileLocConfig = Field(default_factory=SingleFileLocConfig)
     total_file_loc: TotalFileLocConfig = Field(default_factory=TotalFileLocConfig)
@@ -64,42 +78,26 @@ class CodeLimitsConfig(BaseModel):
 class TestFileLimitsConfig(BaseModel):
     """Per-layer test file line limits."""
 
-    services: int = Field(
-        default=500, description="Services layer max lines per test file"
-    )
-    clients: int = Field(
-        default=500, description="Clients layer max lines per test file"
-    )
-    commands: int = Field(
-        default=300, description="Commands layer max lines per test file"
-    )
+    services: int = Field(default=500)
+    clients: int = Field(default=500)
+    commands: int = Field(default=300)
 
 
 class ReviewScopeConfig(BaseModel):
     """Review scope configuration."""
 
-    critical_paths: list[str] = Field(
-        default_factory=list, description="Critical paths for detailed review"
-    )
-    public_api_paths: list[str] = Field(
-        default_factory=list, description="Public API paths for compatibility checking"
-    )
+    critical_paths: list[str] = Field(default_factory=list)
+    public_api_paths: list[str] = Field(default_factory=list)
 
 
 class AgentConfig(BaseModel):
-    """Agent configuration for codeagent-wrapper.
+    """Agent configuration for codeagent-wrapper."""
 
-    Two mutually exclusive modes:
-    1. Use preset: agent (e.g., "code-reviewer")
-    2. Direct specification: backend + model (optional)
-    """
-
-    agent: str | None = Field(default=None, description="Agent preset name")
-    backend: str | None = Field(default=None, description="Backend name")
-    model: str | None = Field(default=None, description="Model name (optional)")
+    agent: str | None = Field(default=None)
+    backend: str | None = Field(default=None)
+    model: str | None = Field(default=None)
 
     def validate_mutually_exclusive(self) -> None:
-        """Validate that agent and backend are not both specified."""
         if self.agent and self.backend:
             raise ValueError(
                 "agent and backend are mutually exclusive. "
@@ -110,151 +108,46 @@ class AgentConfig(BaseModel):
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
-    policy_file: str = Field(
-        default=".codex/review-policy.md", description="Path to review policy file"
-    )
-    tools_guide_file: str = Field(
-        default=".agent/rules/cli-usage.md", description="Path to tools guide file"
-    )
-    agent_config: AgentConfig = Field(
-        default_factory=AgentConfig, description="codeagent-wrapper configuration"
-    )
-    output_format: str = Field(default="", description="Output format requirements")
-    review_task: str = Field(default="", description="Review task guidance")
-    review_prompt: str = Field(
-        default="", description="Custom review prompt (optional)"
-    )
+    policy_file: str = Field(default=".codex/review-policy.md")
+    tools_guide_file: str = Field(default=".agent/rules/cli-usage.md")
+    agent_config: AgentConfig = Field(default_factory=AgentConfig)
+    output_format: str = Field(default="")
+    review_task: str = Field(default="")
+    review_prompt: str = Field(default="")
 
 
 class TestCoverageConfig(BaseModel):
     """Test coverage requirements."""
 
-    services: int = Field(
-        default=50, ge=0, le=100, description="Services layer coverage %"
-    )
-    clients: int = Field(
-        default=50, ge=0, le=100, description="Clients layer coverage %"
-    )
-    commands: int = Field(
-        default=50, ge=0, le=100, description="Commands layer coverage %"
-    )
+    services: int = Field(default=50, ge=0, le=100)
+    clients: int = Field(default=50, ge=0, le=100)
+    commands: int = Field(default=50, ge=0, le=100)
 
 
 class QualityConfig(BaseModel):
     """Quality standards configuration."""
 
-    test_coverage: TestCoverageConfig = Field(
-        default_factory=TestCoverageConfig, description="Test coverage requirements"
-    )
+    test_coverage: TestCoverageConfig = Field(default_factory=TestCoverageConfig)
 
 
-class LineChangeWeights(BaseModel):
-    """Weights for changed lines."""
+class GitHubProjectConfig(BaseModel):
+    """GitHub Projects v2 配置。
 
-    small: int = Field(default=0, description="<50 lines")
-    medium: int = Field(default=1, description="50-200 lines")
-    large: int = Field(default=2, description="200-500 lines")
-    xlarge: int = Field(default=3, description=">500 lines")
+    owner_type: "org" 或 "user"
+    owner: GitHub 组织名或用户名
+    project_number: GitHub Project number（URL 末尾的数字）
+    """
 
-
-class FileChangeWeights(BaseModel):
-    """Weights for changed files."""
-
-    small: int = Field(default=0, description="1-3 files")
-    medium: int = Field(default=1, description="4-10 files")
-    large: int = Field(default=2, description=">10 files")
-
-
-class ModuleChangeWeights(BaseModel):
-    """Weights for impacted modules."""
-
-    small: int = Field(default=0, description="1 module")
-    medium: int = Field(default=1, description="2-4 modules")
-    large: int = Field(default=2, description="≥5 modules")
-
-
-class PRScoringWeights(BaseModel):
-    """PR scoring weights configuration."""
-
-    changed_lines: LineChangeWeights = Field(default_factory=LineChangeWeights)
-    changed_files: FileChangeWeights = Field(default_factory=FileChangeWeights)
-    impacted_modules: ModuleChangeWeights = Field(default_factory=ModuleChangeWeights)
-    critical_path_touch: int = Field(
-        default=2, description="Weight for touching critical paths"
-    )
-    public_api_touch: int = Field(
-        default=2, description="Weight for touching public APIs"
-    )
-    cross_module_symbol_change: int = Field(
-        default=2, description="Weight for cross-module symbol changes"
-    )
-    codex_major: int = Field(default=3, description="Weight for Codex MAJOR verdict")
-    codex_critical: int = Field(
-        default=5, description="Weight for Codex CRITICAL verdict"
-    )
-
-
-class PRScoringThresholds(BaseModel):
-    """PR scoring risk thresholds."""
-
-    medium: int = Field(default=3, description="Medium risk threshold")
-    high: int = Field(default=6, description="High risk threshold")
-    critical: int = Field(default=9, description="Critical risk threshold")
-
-
-class MergeGateConfig(BaseModel):
-    """Merge gate configuration."""
-
-    block_on_score_at_or_above: int = Field(
-        default=9, description="Block PR if score >= this value"
-    )
-    block_on_verdict: list[str] = Field(
-        default_factory=lambda: ["BLOCK"], description="Block on these Codex verdicts"
-    )
-
-
-class SizeThreshold(BaseModel):
-    """Threshold values for size classification."""
-
-    small: int = Field(default=50, description="Upper bound for small size")
-    medium: int = Field(default=200, description="Upper bound for medium size")
-    large: int = Field(default=500, description="Upper bound for large size")
-
-
-class SizeThresholds(BaseModel):
-    """Size thresholds for each dimension."""
-
-    changed_lines: SizeThreshold = Field(
-        default_factory=SizeThreshold, description="Changed lines thresholds"
-    )
-    changed_files: SizeThreshold = Field(
-        default_factory=lambda: SizeThreshold(small=4, medium=10, large=20),
-        description="Changed files thresholds",
-    )
-    impacted_modules: SizeThreshold = Field(
-        default_factory=lambda: SizeThreshold(small=2, medium=5, large=10),
-        description="Impacted modules thresholds",
-    )
-
-
-class PRScoringConfig(BaseModel):
-    """PR scoring configuration."""
-
-    size_thresholds: SizeThresholds = Field(
-        default_factory=SizeThresholds, description="Size thresholds"
-    )
-    weights: PRScoringWeights = Field(default_factory=PRScoringWeights)
-    thresholds: PRScoringThresholds = Field(default_factory=PRScoringThresholds)
-    merge_gate: MergeGateConfig = Field(default_factory=MergeGateConfig)
+    owner_type: str = Field(default="org")
+    owner: str = Field(default="")
+    project_number: int = Field(default=0)
+    org: str = Field(default="", description="已废弃，请使用 owner")
 
 
 class VibeConfig(BaseModel):
     """Root configuration model for Vibe Center.
 
     配置真源：config/settings.yaml
-
-    Pydantic 模型中的默认值是最小安全默认值，仅用于降级场景。
-    正常情况下所有配置都应该从 YAML 文件读取。
     """
 
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
@@ -262,33 +155,20 @@ class VibeConfig(BaseModel):
     quality: QualityConfig = Field(default_factory=QualityConfig)
     pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
+    github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
-        """Load configuration from YAML file.
-
-        Args:
-            config_path: Path to configuration file
-
-        Returns:
-            VibeConfig instance
-        """
+        """Load configuration from YAML file."""
         import yaml  # type: ignore[import-untyped]
 
         with open(config_path) as f:
             data = yaml.safe_load(f)
-
         return cls(**data)
 
     @classmethod
     def get_defaults(cls) -> "VibeConfig":
-        """从默认配置文件 config/settings.yaml 读取配置.
-
-        这是获取配置的标准方式，确保 YAML 文件是唯一真源。
-
-        Returns:
-            从 config/settings.yaml 加载的配置，如果文件不存在则返回最小安全默认值
-        """
+        """从 config/settings.yaml 读取配置（标准方式）。"""
         default_path = Path("config/settings.yaml")
         if default_path.exists():
             return cls.from_yaml(default_path)

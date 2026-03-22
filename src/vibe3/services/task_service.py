@@ -1,23 +1,32 @@
 """Task service implementation."""
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.models.flow import FlowState, IssueLink
+from vibe3.services.task_bridge_mixin import TaskBridgeMixin
+
+if TYPE_CHECKING:
+    from vibe3.clients.github_project_client import GitHubProjectClient
 
 
-class TaskService:
-    """Service for managing task state."""
+class TaskService(TaskBridgeMixin):
+    """Service for managing task state.
 
-    def __init__(self, store: SQLiteClient | None = None) -> None:
-        """Initialize task service.
+    task 状态真源在 GitHub Project，本地 SQLite 只存 flow 执行现场状态。
+    bridge 操作（hydrate / update_remote_task_status / link_project_item）
+    由 TaskBridgeMixin 提供。
+    """
 
-        Args:
-            store: SQLiteClient instance for persistence
-        """
+    def __init__(
+        self,
+        store: SQLiteClient | None = None,
+        project_client: "GitHubProjectClient | None" = None,
+    ) -> None:
         self.store = store or SQLiteClient()
+        self._project_client: "GitHubProjectClient | None" = project_client
 
     def link_issue(
         self,
@@ -26,17 +35,7 @@ class TaskService:
         role: Literal["task", "repo"] = "repo",
         actor: str = "unknown",
     ) -> IssueLink:
-        """Link an issue to a flow.
-
-        Args:
-            branch: Git branch name
-            issue_number: GitHub issue number
-            role: Issue role (task for primary, repo for related issue)
-            actor: Actor linking the issue
-
-        Returns:
-            Created issue link
-        """
+        """Link an issue to a flow."""
         logger.bind(
             domain="task",
             action="link_issue",
@@ -46,10 +45,8 @@ class TaskService:
             actor=actor,
         ).info("Linking issue to flow")
 
-        # Add issue link
         self.store.add_issue_link(branch, issue_number, role)
 
-        # Update flow state if this is a task issue
         if role == "task":
             self.store.update_flow_state(
                 branch,
@@ -57,7 +54,6 @@ class TaskService:
                 latest_actor=actor,
             )
 
-        # Add event
         self.store.add_event(
             branch,
             "issue_linked",
@@ -77,15 +73,10 @@ class TaskService:
         status: Literal["active", "blocked", "done", "stale"],
         actor: str = "unknown",
     ) -> FlowState:
-        """Update local flow scene status in flow_state.
+        """Update local flow scene status.
 
-        Args:
-            branch: Git branch name
-            status: New local flow scene status
-            actor: Actor updating the status
-
-        Returns:
-            Updated flow state
+        NOTE: flow_status 是本地执行现场状态，不等于 GitHub Project task 状态真源。
+        如需更新远端状态，请使用 update_remote_task_status()（来自 TaskBridgeMixin）。
         """
         logger.bind(
             domain="task",
@@ -95,66 +86,23 @@ class TaskService:
             actor=actor,
         ).info("Updating local flow scene status")
 
-        # Verify flow exists before updating
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
-        # Update flow state
-        self.store.update_flow_state(
-            branch,
-            flow_status=status,
-            latest_actor=actor,
-        )
-
-        # Add event
+        self.store.update_flow_state(branch, flow_status=status, latest_actor=actor)
         self.store.add_event(
-            branch,
-            "status_updated",
-            actor,
-            f"Status changed to {status}",
+            branch, "status_updated", actor, f"Status changed to {status}"
         )
-
-        # Get updated flow
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
-
+        return FlowState(**flow_data)
         return FlowState(**flow_data)
 
-    def update_task_status(
-        self,
-        branch: str,
-        status: Literal["active", "blocked", "done", "stale"],
-        actor: str = "unknown",
-    ) -> FlowState:
-        """Compatibility wrapper for updating local flow scene status.
-
-        This remains for older callers, but it only updates the local
-        flow scene state stored in flow_state. It is not a GitHub Project
-        task truth write path.
-        """
-        return self.update_flow_status(branch=branch, status=status, actor=actor)
-
     def get_task(self, branch: str) -> FlowState | None:
-        """Get task (flow) details.
-
-        Args:
-            branch: Git branch name
-
-        Returns:
-            Flow state or None if not found
-        """
-        logger.bind(
-            domain="task",
-            action="get",
-            branch=branch,
-        ).debug("Getting task")
-
+        """Get task (flow) details."""
+        logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             return None
-
         return FlowState(**flow_data)
 
     def set_next_step(
@@ -163,16 +111,7 @@ class TaskService:
         next_step: str,
         actor: str = "unknown",
     ) -> FlowState:
-        """Set next step for a task.
-
-        Args:
-            branch: Git branch name
-            next_step: Next step description
-            actor: Actor setting the next step
-
-        Returns:
-            Updated flow state
-        """
+        """Set next step for a task."""
         logger.bind(
             domain="task",
             action="set_next_step",
@@ -181,24 +120,10 @@ class TaskService:
             actor=actor,
         ).info("Setting next step")
 
-        # Update flow state
-        self.store.update_flow_state(
-            branch,
-            next_step=next_step,
-            latest_actor=actor,
-        )
+        self.store.update_flow_state(branch, next_step=next_step, latest_actor=actor)
+        self.store.add_event(branch, "next_step_set", actor, f"Next step: {next_step}")
 
-        # Add event
-        self.store.add_event(
-            branch,
-            "next_step_set",
-            actor,
-            f"Next step: {next_step}",
-        )
-
-        # Get updated flow
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
-
         return FlowState(**flow_data)

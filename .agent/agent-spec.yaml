@@ -1,0 +1,173 @@
+version: "0.1"
+
+meta:
+  name: "Agent Control Spec"
+  purpose: "Constrain agent behavior to reduce repository entropy"
+  enforcement: "soft"   # soft | hard
+  source_of_truth: "git"
+
+principles:
+  - id: P1
+    name: "stateless_execution"
+    rule: "Agents must not rely on hidden or external memory"
+
+  - id: P2
+    name: "repo_as_truth"
+    rule: "All decisions must be derivable from repository state"
+
+  - id: P3
+    name: "minimal_diff"
+    rule: "Changes must be minimal, scoped, and reversible"
+
+# --- Task Definition ---
+
+task:
+  required_fields:
+    - scope
+    - intent
+    - constraints
+
+  scope:
+    type: "file_glob"
+    required: true
+
+  intent:
+    type: "string"
+    required: true
+    max_length: 200
+
+  constraints:
+    type: "list"
+    required: false
+
+  rules:
+    - id: T1
+      name: "no_out_of_scope_changes"
+      description: "Agent must not modify files outside defined scope"
+      severity: "error"
+
+    - id: T2
+      name: "no_implicit_refactor"
+      description: "Agent must not refactor unrelated code"
+      severity: "error"
+
+# --- Diff Rules ---
+
+diff:
+  max_files_changed: 20
+  max_lines_changed: 500
+
+  rules:
+    - id: D1
+      name: "no_large_overwrite"
+      description: "Avoid full-file overwrite unless explicitly allowed"
+      severity: "error"
+
+    - id: D2
+      name: "surgical_changes"
+      description: "Changes must be localized and minimal"
+      severity: "warn"
+
+    - id: D3
+      name: "explainable_diff"
+      description: "Diff must be explainable in <=5 bullet points"
+      severity: "warn"
+
+# --- Commit Rules ---
+
+commit:
+  format: "<type>(<scope>): <summary>"
+
+  allowed_types:
+    - feat
+    - fix
+    - refactor
+    - chore
+    - test
+    - docs
+
+  rules:
+    - id: C1
+      name: "single_responsibility"
+      description: "Each commit must represent one logical change"
+      severity: "error"
+
+    - id: C2
+      name: "no_generic_messages"
+      forbidden_patterns:
+        - "update"
+        - "fix stuff"
+        - "misc"
+      severity: "error"
+
+# --- PR Rules ---
+
+pr:
+  required_fields:
+    - intent
+    - scope
+    - impact
+    - agent
+
+  agent_identity:
+    required: true
+
+  rules:
+    - id: PR1
+      name: "must_declare_intent"
+      severity: "error"
+
+    - id: PR2
+      name: "must_declare_agent"
+      severity: "error"
+
+# --- Handoff Rules ---
+
+handoff:
+  required: true
+
+  required_fields:
+    - completed
+    - remaining
+    - risks
+
+  optional_fields:
+    - next_agent
+
+  rules:
+    - id: H1
+      name: "no_implicit_completion"
+      description: "Agent must not assume task completion"
+      severity: "error"
+
+# --- Audit Rules ---
+
+audit:
+  checks:
+    dead_code: true
+    duplicate_logic: true
+    file_size_limit: 800   # lines
+    dependency_change_requires_reason: true
+
+# --- Failure Handling ---
+
+failure:
+  on_uncertainty: "stop_and_report"   # stop_and_report | continue_with_warning
+
+  rules:
+    - id: F1
+      name: "no_guessing"
+      description: "Agent must not hallucinate requirements"
+      severity: "error"
+
+# --- Enforcement ---
+
+enforcement:
+  modes:
+    - name: "advisory"
+      description: "Report violations only"
+
+    - name: "strict"
+      description: "Block execution on error-level violations"
+
+  default_mode: "advisory"

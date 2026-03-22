@@ -80,6 +80,10 @@ class GitHubClientProtocol(Protocol):
         """List GitHub issues."""
         ...
 
-    def view_issue(self, issue_number: int) -> dict[str, Any] | None:
-        """View a GitHub issue."""
+    def view_issue(self, issue_number: int) -> "dict[str, Any] | None | str":
+        """View a GitHub issue. Returns 'network_error' string on network failure."""
+        ...
+
+    def list_prs_for_branch(self, branch: str) -> list[PRResponse]:
+        """List PRs for a specific branch."""
         ...

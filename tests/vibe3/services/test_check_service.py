@@ -198,9 +198,32 @@ class TestVerifyCurrentFlow:
 class TestAutoFix:
     """Tests for auto_fix method."""
 
-    def test_auto_fix_not_implemented(self, check_service):
-        """Test that auto_fix raises NotImplementedError."""
-        with pytest.raises(NotImplementedError) as exc_info:
-            check_service.auto_fix(["Some issue"])
+    def test_auto_fix_creates_handoff_file(self, check_service, mock_git_client):
+        """Test that auto_fix creates missing handoff file."""
+        import tempfile
 
-        assert "not yet implemented" in str(exc_info.value).lower()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_dir = Path(tmpdir) / ".git"
+            git_dir.mkdir()
+
+            with patch.object(
+                check_service.git_client,
+                "get_git_common_dir",
+                return_value=str(git_dir),
+            ):
+                result = check_service.auto_fix(
+                    [
+                        f"Shared handoff file not found: "
+                        f"{git_dir}/vibe3/handoff/x/current.md"
+                    ]
+                )
+
+        assert result.success
+
+    def test_auto_fix_unfixable_returns_hint(self, check_service):
+        """Test that unfixable issues return error with --init hint."""
+        result = check_service.auto_fix(["Task issue #123 not found on GitHub"])
+
+        assert not result.success
+        assert result.error is not None
+        assert "--init" in result.error

@@ -7,123 +7,56 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.sqlite_schema import init_schema
+
 
 class SQLiteClient:
     """SQLite client for managing flow state and events."""
 
-    def __init__(self, db_path: str | None = None) -> None:
-        """Initialize SQLite client.
+    # Whitelist of valid flow_state columns (security: prevent SQL injection)
+    VALID_FLOW_STATE_FIELDS = {
+        "branch",
+        "flow_slug",
+        "task_issue_number",
+        "pr_number",
+        "spec_ref",
+        "plan_ref",
+        "report_ref",
+        "audit_ref",
+        "planner_actor",
+        "planner_session_id",
+        "executor_actor",
+        "executor_session_id",
+        "reviewer_actor",
+        "reviewer_session_id",
+        "latest_actor",
+        "blocked_by",
+        "next_step",
+        "flow_status",
+        "updated_at",
+        "project_item_id",
+        "project_node_id",
+    }
 
-        Args:
-            db_path: Path to database file. If None, uses .git/vibe3/handoff.db
-        """
+    def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
-            # Use git rev-parse --git-dir to find the correct directory
             git_dir = os.popen("git rev-parse --git-dir").read().strip()
             vibe3_dir = os.path.join(git_dir, "vibe3")
-            if not os.path.exists(vibe3_dir):
-                os.makedirs(vibe3_dir, exist_ok=True)
+            os.makedirs(vibe3_dir, exist_ok=True)
             db_path = os.path.join(vibe3_dir, "handoff.db")
 
         self.db_path = db_path
         self._init_db()
-        logger.bind(
-            external="sqlite",
-            operation="init",
-            db_path=db_path,
-        ).debug("SQLite client initialized")
+        logger.bind(external="sqlite", operation="init", db_path=db_path).debug(
+            "SQLite client initialized"
+        )
 
     def _init_db(self) -> None:
-        """Initialize database schema."""
         with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-
-            # schema_meta
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS schema_meta (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-            """)
-
-            # flow_state
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS flow_state (
-                    branch TEXT PRIMARY KEY,
-                    flow_slug TEXT NOT NULL,
-                    task_issue_number INTEGER,
-                    pr_number INTEGER,
-                    spec_ref TEXT,
-                    plan_ref TEXT,
-                    report_ref TEXT,
-                    audit_ref TEXT,
-                    planner_actor TEXT,
-                    planner_session_id TEXT,
-                    executor_actor TEXT,
-                    executor_session_id TEXT,
-                    reviewer_actor TEXT,
-                    reviewer_session_id TEXT,
-                    latest_actor TEXT,
-                    blocked_by TEXT,
-                    next_step TEXT,
-                    flow_status TEXT NOT NULL DEFAULT 'active',
-                    updated_at TEXT NOT NULL
-                )
-            """)
-
-            # flow_issue_links
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS flow_issue_links (
-                    branch TEXT NOT NULL,
-                    issue_number INTEGER NOT NULL,
-                    issue_role TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY (branch, issue_number, issue_role)
-                )
-            """)
-
-            # Unique index for task issue
-            cursor.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_flow_single_task_issue
-                ON flow_issue_links(branch)
-                WHERE issue_role = 'task'
-            """)
-
-            # flow_events
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS flow_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    branch TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    actor TEXT NOT NULL,
-                    detail TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """)
-
-            # Set schema version if not set
-            cursor.execute(
-                "INSERT OR IGNORE INTO schema_meta (key, value) "
-                "VALUES ('schema_version', 'v3')"
-            )
-            cursor.execute(
-                "INSERT OR IGNORE INTO schema_meta (key, value) "
-                "VALUES ('store_type', 'handoff_store')"
-            )
-            conn.commit()
-            logger.bind(external="sqlite", operation="init_schema").debug(
-                "Database schema initialized"
-            )
+            init_schema(conn)
 
     def get_flow_state(self, branch: str) -> dict[str, Any] | None:
-        """Get flow state by branch.
-
-        Args:
-            branch: Git branch name
-
-        Returns:
-            Flow state dict or None if not found
-        """
+        """Get flow state by branch."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -134,37 +67,33 @@ class SQLiteClient:
                     external="sqlite", operation="get_flow_state", branch=branch
                 ).debug("Retrieved flow state")
                 return dict(row)
-            logger.bind(
-                external="sqlite", operation="get_flow_state", branch=branch
-            ).debug("No flow state found")
             return None
 
     def update_flow_state(self, branch: str, **kwargs: Any) -> None:
-        """Update flow state for branch.
-
-        Args:
-            branch: Git branch name
-            **kwargs: Fields to update
-        """
+        """Update flow state for branch."""
         if "updated_at" not in kwargs:
             kwargs["updated_at"] = datetime.datetime.now().isoformat()
 
+        # Validate field names against whitelist (prevent SQL injection)
+        invalid_fields = set(kwargs.keys()) - self.VALID_FLOW_STATE_FIELDS
+        if invalid_fields:
+            raise ValueError(f"Invalid flow_state fields: {invalid_fields}")
+
         fields = list(kwargs.keys())
         values = [kwargs[f] for f in fields]
-
         set_clause = ", ".join([f"{f} = ?" for f in fields])
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            # Ensure the row exists
             cursor.execute(
                 "INSERT OR IGNORE INTO flow_state (branch, flow_slug, updated_at) "
                 "VALUES (?, ?, ?)",
                 (branch, kwargs.get("flow_slug", "unknown"), kwargs["updated_at"]),
             )
-
-            query = f"UPDATE flow_state SET {set_clause} WHERE branch = ?"
-            cursor.execute(query, values + [branch])
+            cursor.execute(
+                f"UPDATE flow_state SET {set_clause} WHERE branch = ?",
+                values + [branch],
+            )
             conn.commit()
             logger.bind(
                 external="sqlite",
@@ -176,22 +105,14 @@ class SQLiteClient:
     def add_event(
         self, branch: str, event_type: str, actor: str, detail: str | None = None
     ) -> None:
-        """Add event to flow.
-
-        Args:
-            branch: Git branch name
-            event_type: Type of event
-            actor: Actor who performed the event
-            detail: Optional event detail
-        """
+        """Add event to flow."""
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
-                INSERT INTO flow_events (branch, event_type, actor, detail, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            """,
+                "INSERT INTO flow_events "
+                "(branch, event_type, actor, detail, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
                 (branch, event_type, actor, detail, now),
             )
             conn.commit()
@@ -203,22 +124,14 @@ class SQLiteClient:
             ).debug("Added event")
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
-        """Add issue link to flow.
-
-        Args:
-            branch: Git branch name
-            issue_number: GitHub issue number
-            role: Issue role (e.g., 'task', 'blocks')
-        """
+        """Add issue link to flow."""
         now = datetime.datetime.now().isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
-                INSERT OR REPLACE INTO flow_issue_links
-                    (branch, issue_number, issue_role, created_at)
-                VALUES (?, ?, ?, ?)
-            """,
+                "INSERT OR REPLACE INTO flow_issue_links "
+                "(branch, issue_number, issue_role, created_at) "
+                "VALUES (?, ?, ?, ?)",
                 (branch, issue_number, role, now),
             )
             conn.commit()
@@ -231,14 +144,7 @@ class SQLiteClient:
             ).debug("Added issue link")
 
     def get_issue_links(self, branch: str) -> list[dict[str, Any]]:
-        """Get issue links for branch.
-
-        Args:
-            branch: Git branch name
-
-        Returns:
-            List of issue link dicts
-        """
+        """Get issue links for branch."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -253,11 +159,7 @@ class SQLiteClient:
             return links
 
     def get_active_flows(self) -> list[dict[str, Any]]:
-        """Get all active flows.
-
-        Returns:
-            List of active flow state dicts
-        """
+        """Get all active flows."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -269,11 +171,7 @@ class SQLiteClient:
             return flows
 
     def get_all_flows(self) -> list[dict[str, Any]]:
-        """Get all flows.
-
-        Returns:
-            List of all flow state dicts
-        """
+        """Get all flows."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -283,3 +181,55 @@ class SQLiteClient:
                 external="sqlite", operation="get_all_flows", count=len(flows)
             ).debug("Retrieved all flows")
             return flows
+
+    def get_flows_by_issue(
+        self, issue_number: int, role: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all flows linked to a given issue number."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if role:
+                cursor.execute(
+                    "SELECT f.* FROM flow_state f "
+                    "JOIN flow_issue_links l ON f.branch = l.branch "
+                    "WHERE l.issue_number = ? AND l.issue_role = ?",
+                    (issue_number, role),
+                )
+            else:
+                cursor.execute(
+                    "SELECT f.* FROM flow_state f "
+                    "JOIN flow_issue_links l ON f.branch = l.branch "
+                    "WHERE l.issue_number = ?",
+                    (issue_number,),
+                )
+            flows = [dict(row) for row in cursor.fetchall()]
+            logger.bind(
+                external="sqlite",
+                operation="get_flows_by_issue",
+                issue_number=issue_number,
+                role=role,
+                count=len(flows),
+            ).debug("Retrieved flows by issue")
+            return flows
+
+    def update_bridge_fields(
+        self,
+        branch: str,
+        project_item_id: str | None,
+        project_node_id: str | None,
+    ) -> None:
+        """Update task bridge identity fields (project_item_id, project_node_id)."""
+        from vibe3.models.task_bridge import TaskBridgeModel
+
+        fields: dict[str, Any] = {}
+        if project_item_id is not None:
+            fields["project_item_id"] = project_item_id
+        if project_node_id is not None:
+            fields["project_node_id"] = project_node_id
+
+        TaskBridgeModel.assert_no_truth_write(fields)
+        self.update_flow_state(branch, **fields)
+        logger.bind(
+            external="sqlite", operation="update_bridge_fields", branch=branch
+        ).debug("Updated bridge fields")
