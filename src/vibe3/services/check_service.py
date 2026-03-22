@@ -104,6 +104,15 @@ class CheckService:
             if pr and pr.head_branch != branch:
                 issues.append(f"PR #{pr_number} does not match branch '{branch}'")
 
+        # Check for missing PR (branch has PR but database doesn't record it)
+        if not pr_number:
+            prs = self.github_client.list_prs_for_branch(branch)
+            if prs:
+                pr_num = prs[0].number
+                issues.append(
+                    f"Branch has open PR #{pr_num} but database missing pr_number"
+                )
+
         # ref files exist
         for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
             ref_value = flow_data.get(ref_field)
@@ -143,13 +152,15 @@ class CheckService:
 
         Handles:
         - Missing shared current.md (creates empty placeholder)
+        - Missing pr_number (queries GitHub and updates database)
 
-        Network-dependent fixes (missing task_issue_number) require --init.
+        Some fixes require network access to GitHub.
         """
         branch = self.git_client.get_current_branch()
         fixed: list[str] = []
 
         for issue in issues:
+            # Fix missing handoff file
             if "Shared handoff file not found" in issue:
                 git_dir = self.git_client.get_git_common_dir()
                 handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
@@ -160,9 +171,32 @@ class CheckService:
                     f"Created missing handoff file: {handoff_path}"
                 )
 
+            # Fix missing pr_number
+            elif "database missing pr_number" in issue:
+                prs = self.github_client.list_prs_for_branch(branch)
+                if prs:
+                    pr_number = prs[0].number
+                    self.store.update_flow_state(
+                        branch, pr_number=pr_number, latest_actor="check --fix"
+                    )
+                    self.store.add_event(
+                        branch,
+                        "pr_linked",
+                        "check --fix",
+                        f"PR #{pr_number} linked to flow",
+                    )
+                    fixed.append(issue)
+                    logger.bind(
+                        domain="check", action="fix", branch=branch, pr_number=pr_number
+                    ).info("Back-filled pr_number")
+                else:
+                    logger.bind(domain="check", branch=branch).warning(
+                        "PR not found on GitHub, cannot fix"
+                    )
+
         unfixed = [i for i in issues if i not in fixed]
         if unfixed:
-            hint = "  Run `vibe check --init` to fix issues requiring remote data."
+            hint = "  Some issues cannot be auto-fixed. Check manually."
             return FixResult(
                 success=False,
                 error="Could not auto-fix:\n"

@@ -73,6 +73,11 @@ def render_flow_status(
         _kv("url", pr_data.get("url", ""), 2)
     elif status.pr_number:
         _kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
+    else:
+        console.print(
+            "  [dim]pr:[/] [yellow]—[/]  "
+            "[dim][hint: run `vibe3 check --fix` to detect][/]"
+        )
 
     # plan / execute / review
     console.print("  [dim]plan:[/]")

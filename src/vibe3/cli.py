@@ -12,10 +12,9 @@ import typer.rich_utils as _ru
 from loguru import logger
 from rich import box as _box
 
-from vibe3.commands import flow, handoff, hooks, inspect, pr, review, task
+from vibe3.commands import check, flow, handoff, hooks, inspect, pr, review, task
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
-from vibe3.services.check_service import CheckService
 
 
 # -- Remove help panel borders, keep colors --
@@ -46,6 +45,7 @@ app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(hooks.app, name="hooks")
 app.add_typer(handoff.app, name="handoff")
+app.add_typer(check.app, name="check")
 
 
 @app.callback()
@@ -70,103 +70,6 @@ def main_callback(
 def version() -> None:
     """Show vibe3 version."""
     typer.echo("3.0.0-dev")
-
-
-@app.command()
-def check(
-    fix: bool = typer.Option(
-        False,
-        "--fix",
-        help="Auto-fix local issues for current branch (no network required)",
-    ),
-    all_flows: bool = typer.Option(
-        False,
-        "--all",
-        help="Check all flows in the store, not just current branch",
-    ),
-    init: bool = typer.Option(
-        False,
-        "--init",
-        help=(
-            "Scan merged PRs on GitHub and back-fill missing task_issue_number "
-            "for all flows. Requires network. Writes to local store. "
-            "Safe to re-run (skips flows that already have task_issue_number)."
-        ),
-    ),
-) -> None:
-    """Verify handoff store consistency.
-
-    [bold]Modes:[/bold]
-
-      [green]vibe check[/green]         Check current branch only
-
-      [green]vibe check --all[/green]   Check all flows (report only)
-
-      [green]vibe check --fix[/green]   Auto-fix current branch (local, no network)
-                         Fixable: missing handoff file
-                         Not fixable locally: missing task_issue_number
-                         → use --init for network-dependent fixes
-
-      [green]vibe check --init[/green]  Scan merged PRs + GitHub Project items,
-                         back-fill task_issue_number for all flows.
-                         Network call to GitHub. Writes to local store.
-                         Skips flows that already have task_issue_number.
-                         Network call to GitHub. Writes to local store.
-                         Skips flows that already have task_issue_number.
-    """
-    service = CheckService()
-
-    # --init: remote index back-fill
-    if init:
-        typer.echo("Scanning merged PRs to back-fill task_issue_number...")
-        result = service.init_remote_index()
-        typer.echo(
-            f"✓ Done  total={result.total_flows}  "
-            f"updated={result.updated}  skipped={result.skipped}"
-        )
-        if result.unresolvable:
-            typer.echo(
-                f"  Unresolvable ({len(result.unresolvable)} branches — "
-                "no linked issues found in PR body):"
-            )
-            for b in result.unresolvable:
-                typer.echo(f"    {b}")
-        return
-
-    # --all: check every flow
-    if all_flows:
-        results = service.verify_all_flows()
-        invalid = [r for r in results if not r.is_valid]
-        if not invalid:
-            typer.echo(f"✓ All {len(results)} flows passed")
-            return
-        typer.echo(f"✗ {len(invalid)}/{len(results)} flows have issues:", err=True)
-        for r in invalid:
-            typer.echo(f"\n  [{r.branch}]", err=True)
-            for issue in r.issues:
-                typer.echo(f"    - {issue}", err=True)
-        raise typer.Exit(code=1)
-
-    # default: check current branch
-    result_single = service.verify_current_flow()
-    if result_single.is_valid:
-        typer.echo("✓ All checks passed")
-        return
-
-    typer.echo("✗ Issues found:", err=True)
-    for issue in result_single.issues:
-        typer.echo(f"  - {issue}", err=True)
-
-    if fix:
-        typer.echo("\nAttempting auto-fix...")
-        fix_result = service.auto_fix(result_single.issues)
-        if fix_result.success:
-            typer.echo("✓ Issues fixed")
-        else:
-            typer.echo(f"✗ {fix_result.error}", err=True)
-            raise typer.Exit(code=1)
-    else:
-        raise typer.Exit(code=1)
 
 
 @app.command()
