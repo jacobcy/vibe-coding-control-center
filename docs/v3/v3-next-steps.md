@@ -19,6 +19,10 @@
 - review 风险链路已经改成 inspect-based：
   - `review.auto_trigger` 已从配置真相入口移除
   - `pre-push` / `pr ready` 现在都能输出原因、扣分项、建议
+- `vibe3 inspect structure` 已具备结构信息入口：
+  - 可以做单文件结构分析
+  - 可以输出 `src/vibe3` 的目录级结构摘要
+  - 但还不是 snapshot / diff 版本
 
 ### 1.2 还没打通的部分
 
@@ -117,6 +121,14 @@
 - 从单文件 AST 分析升级到项目级 structure snapshot
 - 给 review、handoff、未来 orchestrator 提供稳定结构上下文
 
+当前需要特别澄清的是：
+
+- **已经存在**：`vibe3 inspect structure`
+- **当前能力**：文件级分析 + `src/vibe3` 摘要
+- **尚未完成**：`build / show / diff` 驱动的 snapshot system
+
+所以 Step 3 不是从 0 到 1 发明 structure inspect，而是在现有 `vibe3 inspect structure` 基础上补齐 snapshot / diff。
+
 但它不该插到 `task -> GitHub Project` 打通之前。
 
 ### 4.1 原因
@@ -183,9 +195,9 @@
 
 第一版只做：
 
-- `file_analyzer` / `structure_service` 职责拆分
-- `build`
-- `show`
+- 保留 `vibe3 inspect structure` 作为 V3 入口
+- 在现有 file-level / summary 能力上补 `build`
+- 在现有 file-level / summary 能力上补 `show`
 
 第二版再做：
 
@@ -197,7 +209,8 @@
 
 **完成标志**
 
-- 结构快照可生成、可读取、可被 review/handoff 消费
+- `vibe3 inspect structure` 不再只是文件摘要，而是可生成、可读取结构快照
+- structure diff 可被 review/handoff 消费
 
 ### Step 4: 进入 Orchestrator 设计
 
@@ -235,7 +248,22 @@
 
 ---
 
-## 7. 结论
+## 7. 命令面边界
+
+为避免把 V2 / V3 搞混，当前命令面应明确区分：
+
+- `vibe` = V2 shell 入口
+- `vibe3` = V3 Python 入口
+
+在 structure / inspect 这条线上，应统一按 V3 入口表述为：
+
+- `vibe3 inspect structure`
+- `vibe3 inspect symbols`
+- `vibe3 review ...`
+
+---
+
+## 8. 结论
 
 这一轮结束时，v3 的真实状态应当这样描述：
 

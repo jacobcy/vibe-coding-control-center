@@ -52,6 +52,23 @@
 - ❌ 自动代码质量判断
 - ❌ LLM 分析（这一层不做）
 
+### 2.3 当前补齐原则（patch existing chain）
+
+这份方案的目标不是重写一套新的 review / inspect 逻辑，而是在现有链路上补齐能力。
+
+当前已经存在、且应直接复用的事实层包括：
+- `SerenaService.analyze_changes()`：提供 symbol-level change facts
+- `dag_service`：提供 impacted modules / dependency graph
+- `inspect` 命令层：提供 review 可消费的信息出口
+- 现有单文件结构分析：提供 file-level structure facts
+
+因此 Step 2 的正确切入点应是：
+1. 先修复现有 Serena gate / inspect / structure 之间的接线问题
+2. 再在现有 `inspect structure` 语义上补 `build / show / diff`
+3. 最后再补 duplication 等增强能力
+
+也就是说，Step 2 是在现有事实层之上补“持久化快照 + 历史对比”，不是替换现有 Serena / DAG / inspect 主链。
+
 ---
 
 ## 3. 命令归属讨论
@@ -61,7 +78,7 @@
 #### 选项A：扩展 `vibe3 inspect structure`
 
 **理由**：
-- 已经有 `vibe inspect structure <file>` 命令
+- 已经有 `vibe3 inspect structure <file>` 命令
 - Inspect 的职责是"提供结构化信息"
 - 符合现有的"信息提供层"定位
 
@@ -446,6 +463,7 @@ def compute_function_hash(node: ast.FunctionDef) -> str:
 **目标**：基本快照能力
 
 **任务**：
+- [ ] 修复现有 Serena / inspect / structure 接线断点（兼容旧入口，不改事实语义）
 - [ ] 定义 Snapshot 模型
 - [ ] 实现 `build_snapshot()` 基础版
 - [ ] 实现模块聚合（目录级统计）
@@ -455,6 +473,7 @@ def compute_function_hash(node: ast.FunctionDef) -> str:
 **产出**：
 - 生成 `.structure/snapshot.json`
 - 包含：全局统计 + 模块列表 + 依赖关系
+- 与现有 Serena / DAG / inspect 输出可拼接，不引入第二套结构真相
 
 ### 7.2 MVP 第二阶段
 
