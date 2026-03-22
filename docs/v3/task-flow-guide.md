@@ -168,18 +168,34 @@ vibe3 flow done --yes
 
 ### 阻塞 Flow
 
-**命令**：`vibe3 flow blocked --reason <reason> [--branch <ref>]`
+**命令**：`vibe3 flow blocked [--reason <reason>] [--by <issue>] [--branch <ref>]`
 
 **功能**：标记 flow 为 blocked 状态，保留分支。
+
+**参数**：
+- `--reason` - 阻塞原因描述（可选）
+- `--by` - 依赖的 issue number（可选，自动添加 dependency 关联）
+- `--branch` - 指定分支（默认：当前分支）
 
 **示例**：
 
 ```bash
-# 标记为 blocked
-vibe3 flow blocked --reason "等待依赖 #218 完成"
+# 1. 仅记录阻塞原因
+vibe3 flow blocked --reason "等待外部反馈"
 # → flow_status = blocked
-# → blocked_by = "等待依赖 #218 完成"
-# → 保留分支
+# → blocked_by = "等待外部反馈"
+
+# 2. 标记依赖 issue（自动生成描述）
+vibe3 flow blocked --by 218
+# → flow_status = blocked
+# → blocked_by = "等待依赖 issue #218"
+# → 自动添加 issue link: flow_issue_links(branch, 218, role='dependency')
+
+# 3. 同时指定依赖和原因
+vibe3 flow blocked --by 218 --reason "需要 #218 的 API 先完成"
+# → flow_status = blocked
+# → blocked_by = "需要 #218 的 API 先完成"
+# → 自动添加 issue link: flow_issue_links(branch, 218, role='dependency')
 
 # 解除阻塞（切换回 active）
 vibe3 task status active
@@ -188,9 +204,14 @@ vibe3 flow switch <other-flow>
 ```
 
 **使用场景**：
-- 等待依赖完成
-- 等待外部反馈
-- 等待资源分配
+- 等待依赖完成（使用 `--by` 自动建立关联）
+- 等待外部反馈（使用 `--reason` 记录原因）
+- 等待资源分配（使用 `--reason` 记录原因）
+
+**与 handoff 的关系**：
+- `handoff plan/report/audit --blocked-by` - 用于记录阻塞状态（可以是任何原因）
+- `flow blocked --by` - 用于建立依赖关系并自动设置阻塞状态
+- 两者互补，不冲突
 
 ### 废弃 Flow
 
