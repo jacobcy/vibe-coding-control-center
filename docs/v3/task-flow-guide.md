@@ -1,30 +1,78 @@
----
-title: Task & Flow 业务使用指南
-date: 2026-03-22
-status: active
-purpose: 说明 repo issue → task → flow 完整业务链路的实际操作方法
----
+# Task & Flow 操作指南
 
-# Task & Flow 业务使用指南
+**维护者**: Vibe Team
+**最后更新**: 2026-03-22
+
+> 本文档是用户操作手册，命令设计规范见 [vibe3-command-standard.md](../standards/vibe3-command-standard.md)
 
 ## 概念说明
 
-`vibe3` 的任务管理围绕三个对象：
+`vibe3` 的任务管理围绕三个核心概念：
 
 | 对象 | 真源 | 本地存储 | 说明 |
 |------|------|----------|------|
-| **repo issue** | GitHub Issues | 仅 issue_links 索引 | 需求/缺陷，代表"要做什么" |
-| **task issue** | GitHub Issues + Project | 仅 issue_links 索引 | 可执行单元，代表"具体做哪件事" |
-| **flow** | 本地 SQLite | flow_state 表 | 执行现场，代表"正在哪个 branch 上做" |
+| **GitHub Issue** | GitHub Issues API | flow_issue_links 索引 | 工作项，可以是需求、任务或缺陷 |
+| **Issue Role** | SQLite flow_issue_links | flow_issue_links 表 | Issue 在 Flow 中的角色（唯一真源）|
+| **Flow** | 本地 SQLite | flow_state 表 | 执行现场，代表"正在哪个 branch 上做" |
 
-关系：一个 repo issue 可以拆成多个 task issue，每个 task issue 对应一个 flow（branch）。
+### Flow 标识
+
+**`branch` 是指针（PRIMARY KEY）**，`flow_slug` 是显示名称。
+
+```sql
+-- SQLite flow_state 表
+CREATE TABLE flow_state (
+    branch TEXT PRIMARY KEY,        -- 这是指针，唯一标识
+    flow_slug TEXT NOT NULL,        -- 这是显示名称
+    task_issue_number INTEGER,
+    ...
+)
+```
+
+**生成规则**：
+- `branch = "task/my-feature"` → `flow_slug = "my-feature"`
+- 代码：`flow_slug = branch.split("/")[-1] if "/" in branch else branch`
+
+**查询方式**：
+- 所有命令都按 `branch` 查询，不支持按 `flow_slug` 查询
+
+### Issue Role 语义
+
+Issue Role 定义了 issue 在特定 flow 中的角色（相对于 flow 的关系语义）：
+
+| Role | 含义 | 示例 |
+|------|------|------|
+| `task` | Flow 的主要执行目标 | #220: 实现统一存储 |
+| `related` | 相关 issue（需求来源、参考） | #219: 实现报告系统 |
+| `dependency` | 依赖的其他 task | #218: 基础设施准备 |
+
+**重要**：
+- Issue Role 是**关系语义**，不是 issue 的类型属性
+- 同一个 issue 可以在不同的 flow 中有不同的 role
+- Issue Role 是**唯一真源**，GitHub label 只是同步副作用
+
+### 关系图
 
 ```
-repo issue #219
-  ├── task issue #221  →  flow: task/reports-unified-storage
-  ├── task issue #222  →  flow: task/pr-show-complete
-  └── task issue #223  →  flow: task/reports-cleanup
+related issue #219 (需求来源)
+  ├── task issue #220 (主要执行) → flow: task/reports-unified-storage
+  ├── task issue #221 (主要执行) → flow: task/pr-show-complete
+  └── dependency issue #218 (依赖) → flow: task/infra-setup
 ```
+
+**数据存储**：
+```sql
+-- SQLite flow_issue_links 表（唯一真源）
+flow_issue_links:
+  - branch: task/reports-unified-storage, issue_number: 220, issue_role: task
+  - branch: task/reports-unified-storage, issue_number: 219, issue_role: related
+  - branch: task/reports-unified-storage, issue_number: 218, issue_role: dependency
+```
+
+**GitHub Label 同步**：
+- role=task 或 dependency → 后续自动化可镜像 `vibe-task` 标签
+- role=related → 不镜像 `vibe-task`
+- Label 只用于 GitHub 视角过滤，不是真源
 
 ---
 
@@ -45,27 +93,30 @@ github_project:
 
 ## 标准工作流
 
-### 场景一：把 repo issue 提升为 task
+### 场景一：从需求 issue 创建 task
 
-适用于：一个 repo issue 直接对应一个可执行单元。
+适用于：一个需求 issue 直接对应一个可执行任务。
 
 ```bash
 # 1. 创建 task branch
 git checkout -b task/my-feature
 
-# 2. 创建 flow
-vibe3 flow new my-feature --actor jacobcy
+# 2. 创建 flow（name 可选，默认从 branch 生成）
+vibe3 flow new --issue 220 --actor jacobcy
+# 或自定义名称
+vibe3 flow new my-feature --issue 220 --actor jacobcy
 
-# 3. 关联 task issue（role=task）
-vibe3 task link 220 --role task
+# 3. 为当前 flow 记录补充 issue 关系
+vibe3 task link 219 --role related
+# → 在本地 flow_issue_links 中记录 role=related
 
-# 4. 关联来源 repo issue（role=repo）
-vibe3 task link 219 --role repo
+vibe3 task link 218 --role dependency
+# → 在本地 flow_issue_links 中记录 role=dependency
 
-# 5. 绑定 GitHub Project item（通过 issue 反查）
+# 4. 绑定 GitHub Project item（通过 issue 反查）
 vibe3 task bridge link-project --from-issue 220
 
-# 6. 验证
+# 5. 验证
 vibe3 task show task/my-feature
 ```
 
@@ -73,18 +124,19 @@ vibe3 task show task/my-feature
 ```
 Branch: task/my-feature
 Project Item [bound]: PVTI_xxx
-Task Issue: #220
-Repo Issue(s): #219
-[remote] Title:    打通 Task 真源桥接
+Task Issue: #220 (role: task)
+Related Issue(s): #219
+Dependencies: (none)
+[remote] Title:    实现统一存储
 [remote] Status:   Todo
 [remote] Assignees: jacobcy
 ```
 
 ---
 
-### 场景二：把 repo issue 拆成多个 task
+### 场景二：拆分需求 issue 为多个 task
 
-适用于：一个 repo issue 包含多个独立子需求，需要并行或分批执行。
+适用于：一个需求 issue 包含多个独立子任务，需要并行或分批执行。
 
 **Step 1：在 GitHub 上创建子 task issue**
 
@@ -117,16 +169,22 @@ gh project item-add 17 --owner jacobcy \
 ```bash
 # task #221
 git checkout -b task/reports-unified-storage
-vibe3 flow new reports-unified-storage --actor jacobcy
-vibe3 task link 221 --role task
-vibe3 task link 219 --role repo
+vibe3 flow new --issue 221 --actor jacobcy
+# flow_slug 自动生成: reports-unified-storage
+
+vibe3 task link 219 --role related
+# 为当前 flow 记录 role=related
+
 vibe3 task bridge link-project --from-issue 221
 
 # task #222
 git checkout -b task/pr-show-complete
-vibe3 flow new pr-show-complete --actor jacobcy
-vibe3 task link 222 --role task
-vibe3 task link 219 --role repo
+vibe3 flow new --issue 222 --actor jacobcy
+# flow_slug 自动生成: pr-show-complete
+
+vibe3 task link 219 --role related
+# 为当前 flow 记录 role=related
+
 vibe3 task bridge link-project --from-issue 222
 ```
 
@@ -148,20 +206,26 @@ vibe3 task list
   #223  reports-cleanup             active  [bound]  branch=task/reports-cleanup
 ```
 
-字段说明：`#task_issue  flow_slug  flow_status  [bound/unbound]  branch`
+### 搜索 issue
 
-### 从 repo issue 反查所有关联 task
+当前 `vibe3 task list` 只支持 `--issue` 反查 flow，不支持 `--search` / `--status`。
+
+如需搜索 GitHub issue，请使用：
 
 ```bash
-vibe3 task list --repo-issue 219
+gh search issues "report"
+```
+
+### 从 task issue 反查 flow
+
+```bash
+vibe3 task list --issue 221
 ```
 
 输出：
 ```
-Tasks linked to repo issue #219:
+Flows linked to issue #221 as task:
   #221  reports-unified-storage  active  [bound]  branch=task/reports-unified-storage
-  #222  pr-show-complete         active  [bound]  branch=task/pr-show-complete
-  #223  reports-cleanup          active  [bound]  branch=task/reports-cleanup
 ```
 
 ### 查看单个 task 详情（含远端字段）
@@ -175,7 +239,7 @@ vibe3 task show task/reports-unified-storage
 Branch: task/reports-unified-storage
 Project Item [bound]: PVTI_lAHOAAGiOs4BRZJ8zgoAgV0
 Task Issue: #221
-Repo Issue(s): #219
+Related Issue(s): #219
 [remote] Title:    feat(reports): coverage.json 和 review 结果统一存放
 [remote] Status:   In Progress
 [remote] Assignees: jacobcy
@@ -190,10 +254,12 @@ vibe3 flow show task/reports-unified-storage
 输出：
 ```
 reports-unified-storage  active
-  branch       task/reports-unified-storage
-  task         #221
-  task issues  #221
-  repo issues  #219
+  branch: task/reports-unified-storage
+  task_issue: #221  feat(reports): coverage.json 和 review 结果统一存放
+  related_issues:
+    - #219  实现报告系统
+  dependencies:
+    - #218  基础设施准备
 ```
 
 ### 查看所有 flow
@@ -202,6 +268,92 @@ reports-unified-storage  active
 vibe3 flow list
 vibe3 flow list --status active   # 按状态过滤
 ```
+
+---
+
+## 命令语义说明
+
+### flow show vs task show
+
+两个命令都显示 flow 信息，但视角不同：
+
+| 命令 | 视角 | 用户 | 数据源 | 核心关注点 |
+|------|------|------|--------|-----------|
+| `flow show` | 执行现场管理 | 开发者 | SQLite + GitHub Issues/PRs | 开发流程状态、文档引用、阻塞关系 |
+| `task show` | GitHub Project 管理 | 管理者 | SQLite + GitHub Project | Project 字段、绑定状态、数据一致性 |
+
+**flow show 独有功能**：
+- 显示 issue titles（从 GitHub Issues API）
+- 显示 PR 信息（从 GitHub PRs API）
+- 显示 plan/execute/review actors 和 refs
+- 支持 optional branch 参数（默认当前分支）
+
+**task show 独有功能**：
+- 显示 Project Item 绑定状态（bound/unbound）
+- 显示 Project 字段（Status, Priority, Assignees）
+- 检查 identity_drift（本地与远端一致性）
+- 显示 offline_mode 标识
+
+### 命令参数说明
+
+**参数语义**：
+- `flow new [name] --issue <issue>` — name 可选，默认从 branch 生成
+- `flow show [branch]` — 参数是 branch name（可选，默认当前分支）
+- `flow bind <issue> [--role <role>] [--branch <branch>]` — 绑定 issue 到 flow（可选 branch，默认当前）
+- `task show [branch]` — 参数是 branch name（可选，默认当前分支）
+- `task link <issue> [--role <role>]` — 为当前 flow 补充 related/dependency 关系
+
+**重要**：
+- Task 不是独立实体，是 flow 的属性（有 task_issue_number 的 flow）
+- `vibe3 task show` 中的参数是 `branch name`，默认当前分支
+- 没有独立的 "task name"，只有关联的 issue number
+
+### flow bind vs task link
+
+**两种不同的关系**：
+
+| 命令 | 关系 | 存储位置 | 操作 |
+|------|------|----------|------|
+| `flow bind` | Issue → Flow | SQLite 本地 | 记录到 flow_issue_links，必要时更新 task 指针 |
+| `task link` | 当前 flow 的补充 issue 关系 | SQLite 本地 | 记录 `related/dependency` |
+
+**示例**:
+```bash
+# flow bind: 指定 issue 是 flow 的 task
+vibe3 flow bind 220
+# SQLite: flow_issue_links(branch, 220, role='task')
+
+# task link: 为当前 flow 记录 related issue
+vibe3 task link 219 --role related
+# SQLite: flow_issue_links(branch, 219, role='related')
+```
+
+### 使用场景选择
+
+**场景 1：开发者查看当前工作**
+
+```bash
+# 在 feature 分支上
+vibe3 flow show
+# 显示：我需要做什么（task issue）
+#        依赖什么（dependencies）
+#        规划文档在哪（plan_ref）
+#        下一步做什么（next_step）
+```
+
+**推荐**：`flow show` ✅
+
+**场景 2：管理者查看项目状态**
+
+```bash
+vibe3 task show task/my-feature
+# 显示：Project 状态是什么（Status: In Progress）
+#        优先级（Priority: P1）
+#        谁负责（Assignees）
+#        绑定是否正常（bound/unbound）
+```
+
+**推荐**：`task show` ✅
 
 ---
 
@@ -268,7 +420,7 @@ vibe3 task bridge link-project --from-issue 221 --force
 Branch: task/reports-unified-storage
 Project Item [bound]: PVTI_xxx
 Task Issue: #221
-Repo Issue(s): #219
+Related Issue(s): #219
 [offline mode] 远端读取失败，仅显示本地 bridge 字段
 ```
 
@@ -285,17 +437,17 @@ Repo Issue(s): #219
 # 1. 确认 flow 已创建
 vibe3 flow list
 
-# 2. 确认 task issue 和 repo issue 都已关联
-vibe3 flow show <branch>
+# 2. 确认 task / related / dependency 关系都已写入
+vibe3 flow show [<branch>]
 
 # 3. 确认 GitHub Project item 已绑定，远端字段可读
-vibe3 task show <branch>
+vibe3 task show [<branch>]
 
 # 4. 更新远端状态
 vibe3 task status "In Progress"
 
 # 5. 再次确认状态已同步
-vibe3 task show <branch>
+vibe3 task show [<branch>]
 # 应显示 [remote] Status: In Progress
 ```
 
@@ -328,6 +480,13 @@ gh project item-add 17 --owner jacobcy \
 vibe3 task bridge link-project --from-issue <task_issue_number>
 ```
 
-**Q: flow show 的 `task` 字段和 `task issues` 字段有什么区别**
+**Q: flow show 和 task show 有什么区别**
 
-`task` 字段来自 `flow_state.task_issue_number`（主 task），`task issues` 来自 `flow_issue_links` 表中 role=task 的记录。正常情况下两者一致。
+- `flow show`：执行现场视角，显示开发流程状态（plan/execute/review）、issue titles、PR 信息、阻塞关系
+- `task show`：项目管理视角，显示 GitHub Project 字段（Status/Priority/Assignees）、绑定状态、数据一致性
+
+详见"命令语义说明"章节。
+
+**Q: 为什么 `vibe3 task show task/temp` 中的参数叫 task/temp**
+
+参数实际是 `branch name`，不是 task 标识。Task 不是独立实体，是 flow 的属性（有 task_issue_number 的 flow）。没有独立的 "task name"，只有关联的 issue number。

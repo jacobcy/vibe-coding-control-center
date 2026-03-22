@@ -69,28 +69,49 @@ class CheckRemoteIndexMixin:
     def _backfill_flows(
         self, branch_issue_map: dict[str, list[int]]
     ) -> tuple[int, int, list[str]]:
-        """将 branch_issue_map 回填到本地 store。
+        """从 branch_issue_map 创建/更新 flows。
+
+        对于 merged PRs：
+        - 如果 flow 不存在，创建并设置状态为 done
+        - 如果 flow 存在但没有 task_issue_number，回填
+        - 如果 flow 已有 task_issue_number，跳过
 
         Returns:
             (updated_count, skipped_count, unresolvable_branches)
         """
-        all_flows = self.store.get_all_flows()
         updated, skipped, unresolvable = 0, 0, []
+        existing_flows = {f["branch"]: f for f in self.store.get_all_flows()}
 
-        for flow in all_flows:
-            branch = flow["branch"]
-            if flow.get("task_issue_number"):
-                skipped += 1
-                continue
-            issues_for_branch = branch_issue_map.get(branch, [])
+        # Process all branches from merged PRs
+        for branch, issues_for_branch in branch_issue_map.items():
             if not issues_for_branch:
                 unresolvable.append(branch)
                 continue
 
             task_issue, extra_issues = issues_for_branch[0], issues_for_branch[1:]
-            self.store.update_flow_state(
-                branch, task_issue_number=task_issue, latest_actor="check --init"
-            )
+
+            # Check if flow exists
+            if branch in existing_flows:
+                flow = existing_flows[branch]
+                if flow.get("task_issue_number"):
+                    skipped += 1
+                    continue
+                # Update existing flow
+                self.store.update_flow_state(
+                    branch, task_issue_number=task_issue, latest_actor="check --init"
+                )
+            else:
+                # Create new flow for merged PR
+                flow_slug = branch.split("/")[-1] if "/" in branch else branch
+                self.store.update_flow_state(
+                    branch,
+                    flow_slug=flow_slug,
+                    task_issue_number=task_issue,
+                    flow_status="done",
+                    latest_actor="check --init",
+                )
+
+            # Add issue links
             self.store.add_issue_link(branch, task_issue, "task")
             self.store.add_event(
                 branch,
@@ -99,12 +120,12 @@ class CheckRemoteIndexMixin:
                 f"Issue #{task_issue} back-filled as task",
             )
             for extra in extra_issues:
-                self.store.add_issue_link(branch, extra, "repo")
+                self.store.add_issue_link(branch, extra, "related")
                 self.store.add_event(
                     branch,
                     "issue_linked",
                     "check --init",
-                    f"Issue #{extra} back-filled as repo",
+                    f"Issue #{extra} back-filled as related",
                 )
             logger.bind(domain="check", branch=branch, task_issue=task_issue).info(
                 "Back-filled task_issue_number"

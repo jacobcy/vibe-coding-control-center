@@ -53,22 +53,23 @@ related_docs:
 
 ## 3. Shared-State Terms
 
-### 3.1 `repo issue`
+### 3.1 GitHub Issue
 
-- 正式术语：`repo issue`
-- 别称：`issue`
-- 定义：本项目中 `repo issue` 特指 `GitHub repository issue`，表示外部问题、愿望、需求入口或讨论入口。
+- 正式术语：`GitHub issue` 或简称 `issue`
+- 别称：无（不再使用 “repo issue”）
+- 定义：GitHub repository issue，可以是需求、任务、缺陷、讨论等。所有 issue 都是 GitHub 上的实体对象。
 - 边界：
-  - `repo issue` 不是 execution record
-  - `repo issue` 不是 roadmap item
-  - `repo issue` 不是 flow
+  - GitHub issue 不是 execution record
+  - GitHub issue 不是 roadmap item
+  - GitHub issue 不是 flow
 - 落点：
   - 命令语义见 [command-standard.md](command-standard.md)
   - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
+  - 标准规范见 [issue-standard.md](issue-standard.md)
 - 使用规则：
-  - 讨论需求来源、外部问题、GitHub 追踪项时使用 `repo issue`
-  - 若只写 `issue`，默认按 `repo issue` 解释
-  - 不要把 `repo issue` 直接写成“正在执行的工作”
+  - 所有 issue 都是 GitHub repository issue
+  - 讨论需求、任务、缺陷时统一使用 “issue” 或 “GitHub issue”
+  - 不要区分 “repo issue” 和 “task issue”，它们都是 GitHub issue
 
 ### 3.2 `roadmap item`
 
@@ -103,24 +104,28 @@ related_docs:
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
   - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
   - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
-  - `repo issue` 可以映射到一个或多个 `task`
+  - GitHub issue 可以被关联为一个或多个 `task`（在不同 flow 中）
 
-### 3.3.1 `task issue`
+### 3.3.1 task issue
 
 - 正式术语：`task issue`
 - 别称：无
-- 定义：某个 `task` 在 execution 语义中承担主闭环职责的那个 `repo issue` 角色。
+- 定义：**vibe3 视角概念**，指被 vibe3 管理的 GitHub issue。判定标准：
+  - 在 SQLite `flow_issue_links` 中有记录，`issue_role = task` 或 `dependency`
+  - GitHub issue 有 `vibe-task` 标签（由 vibe3 自动管理）
 - 边界：
-  - `task issue` 不是新的 GitHub 对象类型
-  - `task issue` 不是与 `repo issue` 平行的新实体
-  - `task issue` 不等于任意一个 `issue_ref`
+  - task issue **不是**新的 GitHub 对象类型
+  - task issue **不是**与 GitHub issue 平行的新实体
+  - task issue 是 GitHub issue 在 vibe3 管理视角下的**角色**
 - 落点：
   - task 关联字段见 [registry-json-standard.md](registry-json-standard.md)
   - 命令语义见 [command-standard.md](command-standard.md)
+  - 标准规范见 [issue-standard.md](issue-standard.md)
 - 使用规则：
-  - 当一个 `task` 关联多个 `repo issue` 时，只有承担主闭环职责的那个 issue 才称为 `task issue`
-  - 若当前 task 尚未显式指定主闭环 issue，则不要把任意 `issue_ref` 默认写成 `task issue`
-  - `task issue` 只是 `repo issue` 的 execution role，不单独创造新的共享状态对象
+  - 不说 "创建 task issue"，而是 "将 issue 关联为 task"
+  - task issue 是相对于 flow 的**关系**，不是 issue 的类型属性
+  - 同一个 issue 可以在不同 flow 中有不同角色
+  - PR 合并时会自动关闭关联的 task issue（联动操作）
 
 ### 3.3.2 `roadmap sync`
 
@@ -473,9 +478,9 @@ related_docs:
 
 以下混用是高风险错误：
 
-  - `repo issue` != `task`
-- `roadmap item` != `task`
-- `flow` != `workflow`
+  - GitHub issue != `task`（一个是对象，一个是关系）
+  - `roadmap item` != `task`
+  - `flow` != `workflow`
 - `flow` != `worktree`
 - `flow` != `branch`
 - `Shell 能力层` != `共享状态真源`

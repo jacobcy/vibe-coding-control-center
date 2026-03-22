@@ -37,6 +37,24 @@ class TestFlowStatus:
 
         assert result is None
 
+    def test_get_flow_status_migrates_legacy_repo_role(self, mock_store) -> None:
+        """Legacy repo rows should still hydrate as related issues."""
+        mock_store.get_issue_links.return_value = [
+            {
+                "branch": "test-branch",
+                "issue_number": 101,
+                "issue_role": "repo",
+                "created_at": "2026-03-16T00:00:00",
+            }
+        ]
+
+        service = FlowService(store=mock_store)
+        result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert len(result.issues) == 1
+        assert result.issues[0].issue_role == "related"
+
 
 class TestFlowList:
     """Tests for listing flows."""

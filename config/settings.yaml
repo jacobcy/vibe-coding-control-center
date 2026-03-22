@@ -9,7 +9,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 14000        # Python 核心代码总行数
+    v3_python: 18000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:

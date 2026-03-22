@@ -23,16 +23,16 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
     console.print(f"{pad}[dim]{key}:[/] {value}")
 
 
-def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
+def render_flow_created(flow: FlowState, issue: str | None = None) -> None:
     console.print(f"[green]✓[/] Flow created: [cyan]{flow.flow_slug}[/]")
     _kv("branch", flow.branch, 1)
-    if task_id:
-        _kv("task", task_id, 1)
+    if issue:
+        _kv("issue", issue, 1)
 
 
-def render_flow_bound(flow: FlowState, task_id: str) -> None:
+def render_flow_bound(flow: FlowState, issue: str) -> None:
     console.print(f"[green]✓[/] Task bound: [cyan]{flow.flow_slug}[/]")
-    _kv("task", task_id, 1)
+    _kv("issue", issue, 1)
 
 
 def render_flow_status(
@@ -54,10 +54,18 @@ def render_flow_status(
         suffix = f"  [dim]{title}[/]" if title else ""
         console.print(f"  [dim]task_issue:[/] #{n}{suffix}")
     if status.issues:
-        repo_issues = [i for i in status.issues if i.issue_role == "repo"]
-        if repo_issues:
-            console.print("  [dim]repo_issues:[/]")
-            for i in repo_issues:
+        related_issues = [i for i in status.issues if i.issue_role == "related"]
+        if related_issues:
+            console.print("  [dim]related_issues:[/]")
+            for i in related_issues:
+                title = titles.get(i.issue_number, "")
+                suffix = f"  [dim]{title}[/]" if title else ""
+                console.print(f"    - #{i.issue_number}{suffix}")
+
+        dependency_issues = [i for i in status.issues if i.issue_role == "dependency"]
+        if dependency_issues:
+            console.print("  [dim]dependencies:[/]")
+            for i in dependency_issues:
                 title = titles.get(i.issue_number, "")
                 suffix = f"  [dim]{title}[/]" if title else ""
                 console.print(f"    - #{i.issue_number}{suffix}")
@@ -74,10 +82,8 @@ def render_flow_status(
     elif status.pr_number:
         _kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
     else:
-        console.print(
-            "  [dim]pr:[/] [yellow]—[/]  "
-            "[dim][hint: run `vibe3 check --fix` to detect][/]"
-        )
+        console.print("  [dim]pr:[/] [yellow]—[/]")
+        console.print("    [bright_black]hint: vibe3 check --fix[/]")
 
     # plan / execute / review
     console.print("  [dim]plan:[/]")
@@ -118,9 +124,14 @@ def render_flows_table(flows: list[FlowState]) -> None:
 
 
 def render_flows_status_dashboard(
-    flows: list[FlowState], titles: dict[int, str]
+    flows: list[FlowState],
+    titles: dict[int, str],
+    prs_data: dict[str, dict[str, object]] | None = None,
 ) -> None:
-    """flow status dashboard — YAML style with remote title."""
+    """flow status dashboard — YAML style with remote title and PR info."""
+    prs = prs_data or {}
+    flows_without_pr = 0
+
     for flow in flows:
         task_num = flow.task_issue_number
         task_str = f"#{task_num}" if task_num else "—"
@@ -129,7 +140,30 @@ def render_flows_status_dashboard(
         _kv("branch", flow.branch, 1)
         _kv("task_issue", task_str, 1)
         _kv("title", title, 1)
+
+        # PR info
+        pr_data = prs.get(flow.branch)
+        if pr_data:
+            draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
+            state = str(pr_data.get("state", "")).lower()
+            console.print(
+                f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
+                f"  [dim]{state}[/]  {pr_data.get('title', '')}"
+            )
+        elif flow.pr_number:
+            _kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
+        else:
+            console.print("  [dim]pr:[/] [yellow]—[/]")
+            flows_without_pr += 1
+
         console.print()
+
+    # Show hint if any flow is missing PR
+    if flows_without_pr > 0:
+        console.print(
+            f"[bright_black]Hint: {flows_without_pr} flow(s) without PR. "
+            f"Run [cyan]vibe3 check --fix --all[/] to detect and back-fill.[/]"
+        )
 
 
 def render_no_flow(branch: str) -> None:

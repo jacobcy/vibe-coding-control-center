@@ -29,26 +29,26 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def parse_issue_url(issue_url: str) -> int:
+def parse_issue_ref(issue_ref: str) -> int:
     """Parse issue number from GitHub URL or plain number."""
-    if issue_url.isdigit():
-        return int(issue_url)
-    match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_url)
+    if issue_ref.isdigit():
+        return int(issue_ref)
+    match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_ref)
     if match:
         return int(match.group(1))
-    raise ValueError(f"Invalid issue URL or number: {issue_url}")
+    raise ValueError(f"Invalid issue reference: {issue_ref}")
 
 
 @app.command()
 def list(
-    repo_issue: Annotated[
+    issue: Annotated[
         int | None,
-        typer.Option("--repo-issue", help="从 repo issue 反查所有关联 task"),
+        typer.Option("--issue", help="查询关联到指定 issue 的所有 flow"),
     ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """List all tasks (flows with task issue bound)."""
+    """List all flows with task issue bound, optionally filter by issue."""
     if trace:
         setup_logging(verbose=2)
 
@@ -56,15 +56,15 @@ def list(
 
     store = SQLiteClient()
 
-    if repo_issue is not None:
-        flows_data = store.get_flows_by_issue(repo_issue, role="repo")
+    if issue is not None:
+        flows_data = store.get_flows_by_issue(issue, role="task")
         if not flows_data:
-            typer.echo(f"No tasks linked to repo issue #{repo_issue}")
+            typer.echo(f"No flows linked to issue #{issue} as task")
             return
         if json_output:
             typer.echo(json.dumps(flows_data, indent=2, default=str))
             return
-        typer.echo(f"Tasks linked to repo issue #{repo_issue}:")
+        typer.echo(f"Flows linked to issue #{issue} as task:")
         for f in flows_data:
             task_num = f.get("task_issue_number")
             bound = "[bound]" if f.get("project_item_id") else "[unbound]"
@@ -92,7 +92,7 @@ def list(
 
 @app.command()
 def show(
-    branch: Annotated[str, typer.Argument(help="Branch name")],
+    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -100,23 +100,27 @@ def show(
     if trace:
         setup_logging(verbose=2)
 
+    # Get current branch if not specified
+    git = GitClient()
+    target_branch = branch if branch else git.get_current_branch()
+
     ctx = (
-        trace_context(command="task show", domain="task", branch=branch)
+        trace_context(command="task show", domain="task", branch=target_branch)
         if trace
         else _noop()
     )
     with ctx:
         service = TaskService()
-        view = service.hydrate(branch)
+        view = service.hydrate(target_branch)
 
         if isinstance(view, HydrateError):
             if view.type == "binding_invalid":
                 typer.echo(f"Error [{view.type}]: {view.message}", err=True)
                 raise typer.Exit(1)
 
-            task = service.get_task(branch)
+            task = service.get_task(target_branch)
             if not task:
-                typer.echo(f"Task not found: {branch}", err=True)
+                typer.echo(f"Task not found: {target_branch}", err=True)
                 raise typer.Exit(1)
             if json_output:
                 typer.echo(json.dumps(task.model_dump(), indent=2, default=str))
@@ -125,6 +129,35 @@ def show(
                 if task.task_issue_number:
                     typer.echo(f"Task Issue: #{task.task_issue_number}")
                 typer.echo(f"Status (local flow): {task.flow_status}")
+
+                # Show related issues and dependencies (also available in unbound state)
+                from vibe3.clients.sqlite_client import SQLiteClient
+
+                store = SQLiteClient()
+                related_issues = [
+                    lnk
+                    for lnk in store.get_issue_links(target_branch)
+                    if lnk["issue_role"] == "related"
+                ]
+                if related_issues:
+                    typer.echo(
+                        "Related Issue(s): "
+                        + "  ".join(f"#{lnk['issue_number']}" for lnk in related_issues)
+                    )
+
+                dependency_issues = [
+                    lnk
+                    for lnk in store.get_issue_links(target_branch)
+                    if lnk["issue_role"] == "dependency"
+                ]
+                if dependency_issues:
+                    typer.echo(
+                        "Dependencies: "
+                        + "  ".join(
+                            f"#{lnk['issue_number']}" for lnk in dependency_issues
+                        )
+                    )
+
                 typer.echo("[unbound] 运行 vibe task bridge link-project <id> 绑定")
             return
 
@@ -143,13 +176,29 @@ def show(
         from vibe3.clients.sqlite_client import SQLiteClient
 
         store = SQLiteClient()
-        repo_issues = [
-            lnk for lnk in store.get_issue_links(branch) if lnk["issue_role"] == "repo"
+
+        # Show related issues
+        related_issues = [
+            lnk
+            for lnk in store.get_issue_links(target_branch)
+            if lnk["issue_role"] == "related"
         ]
-        if repo_issues:
+        if related_issues:
             typer.echo(
-                "Repo Issue(s): "
-                + "  ".join(f"#{lnk['issue_number']}" for lnk in repo_issues)
+                "Related Issue(s): "
+                + "  ".join(f"#{lnk['issue_number']}" for lnk in related_issues)
+            )
+
+        # Show dependencies
+        dependency_issues = [
+            lnk
+            for lnk in store.get_issue_links(target_branch)
+            if lnk["issue_role"] == "dependency"
+        ]
+        if dependency_issues:
+            typer.echo(
+                "Dependencies: "
+                + "  ".join(f"#{lnk['issue_number']}" for lnk in dependency_issues)
             )
 
         if view.spec_ref:
@@ -177,8 +226,10 @@ def show(
 
 @app.command()
 def link(
-    issue_url: Annotated[str, typer.Argument(help="Issue URL or number")],
-    role: Annotated[Literal["task", "repo"], typer.Option(help="Issue role")] = "repo",
+    issue: Annotated[str, typer.Argument(help="Issue number (or URL)")],
+    role: Annotated[
+        Literal["related", "dependency"], typer.Option(help="Issue role")
+    ] = "related",
     actor: Annotated[str, typer.Option(help="Actor linking the issue")] = "unknown",
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
@@ -190,7 +241,7 @@ def link(
     ctx = trace_context(command="task link", domain="task") if trace else _noop()
     with ctx:
         try:
-            issue_number = parse_issue_url(issue_url)
+            issue_number = parse_issue_ref(issue)
             git = GitClient()
             branch = git.get_current_branch()
             service = TaskService()

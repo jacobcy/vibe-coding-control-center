@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.check_service import CheckService
+from vibe3.ui.console import console
 
 app = typer.Typer(
     help="Verify handoff store consistency",
@@ -36,9 +37,12 @@ def check(
         typer.Option(
             "--init",
             help=(
-                "Scan merged PRs on GitHub and back-fill missing task_issue_number "
-                "for all flows. Requires network. Writes to local store. "
-                "Safe to re-run (skips flows that already have task_issue_number)."
+                "Initialize flows from merged PRs on GitHub. "
+                "Scans PR body and GitHub Project items to extract linked issues, "
+                "creates flows for merged PRs (status=done), "
+                "and back-fills task_issue_number. "
+                "Requires network. Writes to local store. "
+                "Skips flows that already have task_issue_number."
             ),
         ),
     ] = False,
@@ -77,19 +81,19 @@ def check(
             logger.bind(command="check", mode="init").info(
                 "Scanning merged PRs to back-fill task_issue_number"
             )
-            typer.echo("Scanning merged PRs to back-fill task_issue_number...")
+            console.print("Scanning merged PRs to back-fill task_issue_number...")
             result = service.init_remote_index()
-            typer.echo(
-                f"✓ Done  total={result.total_flows}  "
+            console.print(
+                f"[green]✓[/] Done  total={result.total_flows}  "
                 f"updated={result.updated}  skipped={result.skipped}"
             )
             if result.unresolvable:
-                typer.echo(
-                    f"  Unresolvable ({len(result.unresolvable)} branches — "
+                console.print(
+                    f"  Unresolvable ([yellow]{len(result.unresolvable)}[/] branches — "
                     "no linked issues found in PR body):"
                 )
                 for b in result.unresolvable:
-                    typer.echo(f"    {b}")
+                    console.print(f"    {b}")
             return
 
         # --all: check every flow
@@ -98,40 +102,67 @@ def check(
             results = service.verify_all_flows()
             invalid = [r for r in results if not r.is_valid]
             if not invalid:
-                typer.echo(f"✓ All {len(results)} flows passed")
+                console.print(f"[green]✓[/] All {len(results)} flows passed")
                 return
-            typer.echo(f"✗ {len(invalid)}/{len(results)} flows have issues:", err=True)
+
+            console.print(f"[red]✗[/] {len(invalid)}/{len(results)} flows have issues:")
+
+            # If --fix is provided with --all, fix all issues
+            if fix:
+                console.print("\nAttempting auto-fix for all flows...\n")
+                fixed_count = 0
+                failed_count = 0
+                for r in invalid:
+                    console.print(r.branch)
+                    fix_result = service.auto_fix_for_branch(r.branch, r.issues)
+                    if fix_result.success:
+                        console.print(f"  [green]✓[/] Fixed {len(r.issues)} issue(s)")
+                        fixed_count += 1
+                    else:
+                        console.print(f"  [red]✗[/] {fix_result.error}")
+                        failed_count += 1
+                    console.print()
+
+                console.print(f"[green]✓[/] Fixed {fixed_count}/{len(invalid)} flows")
+                if failed_count > 0:
+                    console.print(f"[red]✗[/] Failed to fix {failed_count} flows")
+                    raise typer.Exit(code=1)
+                return
+
+            # Without --fix, just report issues
             for r in invalid:
-                typer.echo(f"\n  [{r.branch}]", err=True)
+                console.print(f"\n  {r.branch}")
                 for issue in r.issues:
-                    typer.echo(f"    - {issue}", err=True)
-                typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
+                    console.print(f"    - {issue}")
+                console.print(
+                    "    [dim]→ Run [cyan]vibe3 check --fix --all[/] "
+                    "to auto-fix all flows"
+                )
             raise typer.Exit(code=1)
 
         # default: check current branch
         logger.bind(command="check", mode="single").info("Checking current branch")
         result_single = service.verify_current_flow()
         if result_single.is_valid:
-            typer.echo("✓ All checks passed")
+            console.print("[green]✓[/] All checks passed")
             return
 
-        typer.echo(f"✗ Issues found for branch '{result_single.branch}':", err=True)
+        console.print(
+            f"[red]✗[/] Issues found for branch '[cyan]{result_single.branch}[/]':"
+        )
         for issue in result_single.issues:
-            typer.echo(f"  - {issue}", err=True)
+            console.print(f"  - {issue}")
 
         if fix:
-            typer.echo("\nAttempting auto-fix...")
+            console.print("\nAttempting auto-fix...")
             fix_result = service.auto_fix(result_single.issues)
             if fix_result.success:
-                typer.echo("✓ All issues fixed")
+                console.print("[green]✓[/] All issues fixed")
             else:
-                typer.echo(f"✗ {fix_result.error}", err=True)
+                console.print(f"[red]✗[/] {fix_result.error}")
                 raise typer.Exit(code=1)
         else:
-            typer.echo(
-                "\n  → Run [cyan]vibe3 check --fix[/] to auto-fix",
-                err=True,
-            )
+            console.print("\n  [dim]→ Run [cyan]vibe3 check --fix[/] to auto-fix[/]")
             raise typer.Exit(code=1)
 
     finally:

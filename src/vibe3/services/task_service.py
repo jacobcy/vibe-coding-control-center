@@ -32,7 +32,7 @@ class TaskService(TaskBridgeMixin):
         self,
         branch: str,
         issue_number: int,
-        role: Literal["task", "repo"] = "repo",
+        role: Literal["task", "related", "dependency"] = "related",
         actor: str = "unknown",
     ) -> IssueLink:
         """Link an issue to a flow."""
