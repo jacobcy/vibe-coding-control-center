@@ -87,7 +87,11 @@ class CheckService(CheckRemoteIndexMixin):
         task_issue = flow_data.get("task_issue_number")
         if task_issue:
             issue = self.github_client.view_issue(task_issue)
-            if not issue:
+            if issue == "network_error":
+                issues.append(
+                    f"Cannot verify task issue #{task_issue}: network/auth error"
+                )
+            elif not issue:
                 issues.append(f"Task issue #{task_issue} not found on GitHub")
 
         # only one task issue per branch
@@ -195,7 +199,10 @@ class CheckService(CheckRemoteIndexMixin):
 
         unfixed = [i for i in issues if i not in fixed]
         if unfixed:
-            hint = "  Some issues cannot be auto-fixed. Check manually."
+            hint = (
+                "  Some issues cannot be auto-fixed. "
+                "Try 'vibe3 check --init' or check manually."
+            )
             return FixResult(
                 success=False,
                 error="Could not auto-fix:\n"

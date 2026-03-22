@@ -77,6 +77,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     existing = {
         row[1] for row in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
     }
+    # Safe to use f-string: col values are hardcoded in the loop below
     for col in ("project_item_id", "project_node_id"):
         if col not in existing:
             cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} TEXT")

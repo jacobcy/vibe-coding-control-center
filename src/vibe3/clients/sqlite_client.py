@@ -13,6 +13,31 @@ from vibe3.clients.sqlite_schema import init_schema
 class SQLiteClient:
     """SQLite client for managing flow state and events."""
 
+    # Whitelist of valid flow_state columns (security: prevent SQL injection)
+    VALID_FLOW_STATE_FIELDS = {
+        "branch",
+        "flow_slug",
+        "task_issue_number",
+        "pr_number",
+        "spec_ref",
+        "plan_ref",
+        "report_ref",
+        "audit_ref",
+        "planner_actor",
+        "planner_session_id",
+        "executor_actor",
+        "executor_session_id",
+        "reviewer_actor",
+        "reviewer_session_id",
+        "latest_actor",
+        "blocked_by",
+        "next_step",
+        "flow_status",
+        "updated_at",
+        "project_item_id",
+        "project_node_id",
+    }
+
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
             git_dir = os.popen("git rev-parse --git-dir").read().strip()
@@ -48,6 +73,11 @@ class SQLiteClient:
         """Update flow state for branch."""
         if "updated_at" not in kwargs:
             kwargs["updated_at"] = datetime.datetime.now().isoformat()
+
+        # Validate field names against whitelist (prevent SQL injection)
+        invalid_fields = set(kwargs.keys()) - self.VALID_FLOW_STATE_FIELDS
+        if invalid_fields:
+            raise ValueError(f"Invalid flow_state fields: {invalid_fields}")
 
         fields = list(kwargs.keys())
         values = [kwargs[f] for f in fields]

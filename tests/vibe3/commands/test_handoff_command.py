@@ -199,7 +199,7 @@ class TestHandoffCommands:
 class TestCheckCommand:
     """Tests for check CLI command."""
 
-    @patch("vibe3.cli.CheckService")
+    @patch("vibe3.commands.check.CheckService")
     def test_check_command_valid(self, mock_service_class):
         """Test check command when all checks pass."""
         from vibe3.services.check_service import CheckResult
@@ -216,7 +216,7 @@ class TestCheckCommand:
         assert "✓" in result.output
         assert "All checks passed" in result.output
 
-    @patch("vibe3.cli.CheckService")
+    @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_issues(self, mock_service_class):
         """Test check command when issues found."""
         from vibe3.services.check_service import CheckResult
@@ -235,7 +235,7 @@ class TestCheckCommand:
         assert "Issues found" in result.output
         assert "Issue 1: Missing flow" in result.output
 
-    @patch("vibe3.cli.CheckService")
+    @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_fix(self, mock_service_class):
         """Test check command with --fix option."""
         from vibe3.services.check_service import CheckResult, FixResult
@@ -251,5 +251,5 @@ class TestCheckCommand:
         result = runner.invoke(app, ["check", "--fix"])
 
         assert "Attempting auto-fix" in result.output
-        assert "✓ Issues fixed" in result.output
+        assert "✓ All issues fixed" in result.output
         mock_service.auto_fix.assert_called_once()
