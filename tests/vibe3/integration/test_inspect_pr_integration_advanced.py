@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.commands.inspect_helpers import PRCriticalAnalysis, build_pr_analysis
+from vibe3.commands.inspect_helpers import build_pr_analysis
 
 
 def test_build_pr_analysis_no_critical_files(mock_all_dependencies):
