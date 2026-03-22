@@ -1,4 +1,4 @@
-"""GitClient 单元测试."""
+"""GitClient core functionality tests."""
 
 from unittest.mock import MagicMock, patch
 
@@ -18,22 +18,22 @@ SHA = "abc1234"
 
 
 class TestGitClientInit:
-    """GitClient 初始化测试."""
+    """GitClient initialization tests."""
 
     def test_init_without_github_client(self) -> None:
-        """测试不注入 GitHubClient."""
+        """Test initialization without GitHubClient."""
         client = GitClient()
         assert client._github_client is None
 
     def test_init_with_github_client(self) -> None:
-        """测试注入 GitHubClient."""
+        """Test initialization with GitHubClient."""
         mock_gh = MagicMock()
         client = GitClient(github_client=mock_gh)
         assert client._github_client is mock_gh
 
 
 class TestGetCurrentBranch:
-    """get_current_branch 测试."""
+    """get_current_branch tests."""
 
     def test_returns_branch_name(self) -> None:
         client = GitClient()
@@ -50,7 +50,7 @@ class TestGetCurrentBranch:
 
 
 class TestGetChangedFiles:
-    """get_changed_files 统一接口测试."""
+    """get_changed_files unified interface tests."""
 
     @pytest.fixture
     def client(self) -> GitClient:
@@ -77,7 +77,7 @@ class TestGetChangedFiles:
         assert files == ["z.py"]
 
     def test_pr_source_with_github_client(self, client: GitClient) -> None:
-        """测试 PR source 使用注入的 GitHubClient."""
+        """Test PR source with injected GitHubClient."""
         mock_gh = MagicMock()
         mock_gh.get_pr_files.return_value = ["pr_file.py"]
 
@@ -88,13 +88,13 @@ class TestGetChangedFiles:
         mock_gh.get_pr_files.assert_called_once_with(42)
 
     def test_pr_source_without_github_client_raises(self, client: GitClient) -> None:
-        """测试 PR source 但未注入 GitHubClient 时抛出错误."""
+        """Test PR source without GitHubClient raises error."""
         with pytest.raises(GitError, match="requires GitHubClient"):
             client.get_changed_files(PRSource(pr_number=99))
 
 
 class TestGetDiff:
-    """get_diff 统一接口测试."""
+    """get_diff unified interface tests."""
 
     @pytest.fixture
     def client(self) -> GitClient:
@@ -116,7 +116,7 @@ class TestGetDiff:
         assert diff == "branch diff"
 
     def test_pr_diff_with_github_client(self, client: GitClient) -> None:
-        """测试 PR diff 使用注入的 GitHubClient."""
+        """Test PR diff with injected GitHubClient."""
         mock_gh = MagicMock()
         mock_gh.get_pr_diff.return_value = "pr diff content"
 
@@ -127,6 +127,6 @@ class TestGetDiff:
         mock_gh.get_pr_diff.assert_called_once_with(42)
 
     def test_pr_diff_without_github_client_raises(self, client: GitClient) -> None:
-        """测试 PR diff 但未注入 GitHubClient 时抛出错误."""
+        """Test PR diff without GitHubClient raises error."""
         with pytest.raises(GitError, match="requires GitHubClient"):
             client.get_diff(PRSource(pr_number=99))

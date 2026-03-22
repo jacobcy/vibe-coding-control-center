@@ -14,7 +14,6 @@ class TestIssueLinking:
             branch="test-branch",
             issue_number=101,
             role="related",
-            actor="test-actor",
         )
 
         assert isinstance(result, IssueLink)
@@ -36,7 +35,6 @@ class TestIssueLinking:
             branch="test-branch",
             issue_number=103,
             role="dependency",
-            actor="test-actor",
         )
 
         assert isinstance(result, IssueLink)
@@ -56,7 +54,6 @@ class TestIssueLinking:
             branch="test-branch",
             issue_number=102,
             role="task",
-            actor="test-actor",
         )
 
         assert isinstance(result, IssueLink)
@@ -70,7 +67,6 @@ class TestIssueLinking:
         mock_store_for_task.update_flow_state.assert_called_once_with(
             "test-branch",
             task_issue_number=102,
-            latest_actor="test-actor",
         )
         mock_store_for_task.add_event.assert_called_once()
 
@@ -84,7 +80,6 @@ class TestIssueLinking:
             branch="test-branch",
             issue_number=101,
             role="related",
-            actor="test-actor",
         )
 
         # Attempt duplicate - should handle gracefully

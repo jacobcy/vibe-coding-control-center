@@ -230,7 +230,6 @@ def link(
     role: Annotated[
         Literal["related", "dependency"], typer.Option(help="Issue role")
     ] = "related",
-    actor: Annotated[str, typer.Option(help="Actor linking the issue")] = "unknown",
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -245,7 +244,7 @@ def link(
             git = GitClient()
             branch = git.get_current_branch()
             service = TaskService()
-            issue_link = service.link_issue(branch, issue_number, role, actor)
+            issue_link = service.link_issue(branch, issue_number, role)
 
             if json_output:
                 typer.echo(json.dumps(issue_link.model_dump(), indent=2, default=str))
@@ -260,7 +259,6 @@ def link(
 @app.command()
 def status(
     value: Annotated[str, typer.Argument(help="目标状态值，如 'In Progress'、'Done'")],
-    actor: Annotated[str, typer.Option(help="执行此操作的 actor")] = "unknown",
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Update remote GitHub Project task status (唯一合法写入路径)."""
@@ -272,7 +270,7 @@ def status(
         git = GitClient()
         branch = git.get_current_branch()
         service = TaskService()
-        result = service.update_remote_task_status(branch, value, actor)
+        result = service.update_remote_task_status(branch, value)
 
         if isinstance(result, ProjectItemError):
             typer.echo(f"Error [{result.type}]: {result.message}", err=True)

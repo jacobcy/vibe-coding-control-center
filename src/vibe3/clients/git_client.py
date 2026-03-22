@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
+from vibe3.clients.git_branch_mixin import GitBranchMixin
+from vibe3.clients.git_stash_mixin import GitStashMixin
+from vibe3.clients.git_utility_mixin import GitUtilityMixin
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,
@@ -30,7 +33,7 @@ class GitClientProtocol(Protocol):
     def get_diff(self, source: ChangeSource) -> str: ...
 
 
-class GitClient:
+class GitClient(GitBranchMixin, GitStashMixin, GitUtilityMixin):
     """Git client，封装 git 命令操作."""
 
     def __init__(self, github_client: "GitHubClient | None" = None) -> None:

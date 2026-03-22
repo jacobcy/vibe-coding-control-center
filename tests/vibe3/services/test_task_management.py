@@ -26,7 +26,6 @@ class TestFlowSceneStatus:
         result = service.update_flow_status(
             branch="test-branch",
             status="blocked",
-            actor="test-actor",
         )
 
         assert isinstance(result, FlowState)
@@ -36,12 +35,11 @@ class TestFlowSceneStatus:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             flow_status="blocked",
-            latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "status_updated",
-            "test-actor",
+            "system",
             "Status changed to blocked",
         )
 
@@ -54,7 +52,6 @@ class TestFlowSceneStatus:
             service.update_flow_status(
                 branch="nonexistent-branch",
                 status="blocked",
-                actor="test-actor",
             )
         mock_store.update_flow_state.assert_not_called()
         mock_store.add_event.assert_not_called()
@@ -113,7 +110,6 @@ class TestNextStep:
         result = service.set_next_step(
             branch="test-branch",
             next_step="Write tests",
-            actor="test-actor",
         )
 
         assert isinstance(result, FlowState)
@@ -123,7 +119,6 @@ class TestNextStep:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             next_step="Write tests",
-            latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once()
 
@@ -136,5 +131,4 @@ class TestNextStep:
             service.set_next_step(
                 branch="nonexistent-branch",
                 next_step="Write tests",
-                actor="test-actor",
             )

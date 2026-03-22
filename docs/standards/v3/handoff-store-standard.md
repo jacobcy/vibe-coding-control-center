@@ -9,7 +9,7 @@ authority:
   - vibe3-read-write-rules
 author: GPT-5 Codex
 created: 2026-03-14
-last_updated: 2026-03-21
+last_updated: 2026-03-23
 related_docs:
   - docs/prds/vibe-session-governance.md
   - docs/standards/v2/handoff-governance-standard.md
@@ -175,13 +175,15 @@ CREATE TABLE flow_issue_links (
 字段约束：
 
 - `issue_role` 只允许：
-  - `task`
-  - `repo`
+  - `task` - 主要任务 issue
+  - `related` - 相关 issue
+  - `dependency` - 依赖 issue
 
 补充约束：
 
 - 每个 branch 只能有一个 `issue_role='task'`
-- 每个 branch 可以有多个 `issue_role='repo'`
+- 每个 branch 可以有多个 `issue_role='related'`
+- 每个 branch 可以有多个 `issue_role='dependency'`
 
 推荐额外建立唯一索引：
 
@@ -210,15 +212,16 @@ CREATE TABLE flow_events (
 
 **Flow 生命周期事件**：
 - `flow_created` - flow 创建
-- `flow_bind` - task 绑定到 flow
-- `flow_freeze` - flow 冻结
-- `flow_done` - flow 完成
+- `flow_closed` - flow 关闭并删除分支
+- `flow_blocked` - flow 标记为 blocked
+- `flow_aborted` - flow 标记为 aborted
 
 **Issue 相关事件**：
 - `issue_linked` - issue 关联到 flow
 
 **状态变更事件**：
 - `status_updated` - flow 状态更新
+- `next_step_set` - 设置 next step
 
 **Handoff 事件**：
 - `handoff_plan` - plan handoff
@@ -323,16 +326,30 @@ CREATE TABLE flow_events (
 
 允许写入 SQLite 的命令只有：
 
-- `vibe handoff plan`
-- `vibe handoff report`
-- `vibe handoff audit`
-- `flow bind --issue`
-- `flow bind task`
-- `flow freeze`
-- `flow done`
-- `pr draft`
-- `pr merge`
-- `vibe check --fix`
+**Flow 生命周期**：
+- `flow new` - 创建新 flow 并创建分支
+- `flow switch` - 切换到已存在的 flow
+- `flow bind` - 绑定 issue 到 flow
+- `flow done` - 关闭 flow 并删除分支
+- `flow blocked` - 标记 flow 为 blocked
+- `flow aborted` - 标记 flow 为 aborted 并删除分支
+
+**Handoff 记录**：
+- `handoff plan` - 记录 plan handoff
+- `handoff report` - 记录 report handoff
+- `handoff audit` - 记录 audit handoff
+- `handoff append` - 追加轻量更新到 current.md
+
+**Task 操作**：
+- `task link` - 关联 issue 到 flow
+- `task status` - 更新 GitHub Project task 状态
+
+**PR 操作**：
+- `pr draft` - 创建 draft PR
+- `pr merge` - 合并 PR
+
+**检查与修复**：
+- `vibe check --fix` - 自动修复问题
 
 写入原则：
 
@@ -342,7 +359,7 @@ CREATE TABLE flow_events (
 - 所有写入必须更新 `updated_at`
 - 所有关键写入必须记录一条 `flow_events`
 
-## 8. `vibe check` Contract
+## 9. `vibe check` Contract
 
 `vibe check` 在 V3 至少要做这些检查：
 
@@ -372,7 +389,7 @@ CREATE TABLE flow_events (
 - 一个 branch 有多个 `task` role
 - `plan_ref` 缺失
 
-## 9. JSON Boundary
+## 10. JSON Boundary
 
 JSON 在 V3 只允许用于：
 
@@ -382,7 +399,7 @@ JSON 在 V3 只允许用于：
 
 JSON 不允许作为 V3 正式持久化主存储。
 
-## 10. Minimal Example
+## 11. Minimal Example
 
 ```sql
 INSERT INTO flow_state (

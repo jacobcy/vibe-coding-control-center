@@ -33,7 +33,6 @@ class TaskService(TaskBridgeMixin):
         branch: str,
         issue_number: int,
         role: Literal["task", "related", "dependency"] = "related",
-        actor: str = "unknown",
     ) -> IssueLink:
         """Link an issue to a flow."""
         logger.bind(
@@ -42,7 +41,6 @@ class TaskService(TaskBridgeMixin):
             branch=branch,
             issue_number=issue_number,
             role=role,
-            actor=actor,
         ).info("Linking issue to flow")
 
         self.store.add_issue_link(branch, issue_number, role)
@@ -51,13 +49,12 @@ class TaskService(TaskBridgeMixin):
             self.store.update_flow_state(
                 branch,
                 task_issue_number=issue_number,
-                latest_actor=actor,
             )
 
         self.store.add_event(
             branch,
             "issue_linked",
-            actor,
+            "system",
             f"Issue #{issue_number} linked as {role}",
         )
 
@@ -71,7 +68,6 @@ class TaskService(TaskBridgeMixin):
         self,
         branch: str,
         status: Literal["active", "blocked", "done", "stale"],
-        actor: str = "unknown",
     ) -> FlowState:
         """Update local flow scene status.
 
@@ -83,16 +79,15 @@ class TaskService(TaskBridgeMixin):
             action="update_flow_status",
             branch=branch,
             status=status,
-            actor=actor,
         ).info("Updating local flow scene status")
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
-        self.store.update_flow_state(branch, flow_status=status, latest_actor=actor)
+        self.store.update_flow_state(branch, flow_status=status)
         self.store.add_event(
-            branch, "status_updated", actor, f"Status changed to {status}"
+            branch, "status_updated", "system", f"Status changed to {status}"
         )
         return FlowState(**flow_data)
         return FlowState(**flow_data)
@@ -109,7 +104,6 @@ class TaskService(TaskBridgeMixin):
         self,
         branch: str,
         next_step: str,
-        actor: str = "unknown",
     ) -> FlowState:
         """Set next step for a task."""
         logger.bind(
@@ -117,11 +111,12 @@ class TaskService(TaskBridgeMixin):
             action="set_next_step",
             branch=branch,
             next_step=next_step,
-            actor=actor,
         ).info("Setting next step")
 
-        self.store.update_flow_state(branch, next_step=next_step, latest_actor=actor)
-        self.store.add_event(branch, "next_step_set", actor, f"Next step: {next_step}")
+        self.store.update_flow_state(branch, next_step=next_step)
+        self.store.add_event(
+            branch, "next_step_set", "system", f"Next step: {next_step}"
+        )
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
