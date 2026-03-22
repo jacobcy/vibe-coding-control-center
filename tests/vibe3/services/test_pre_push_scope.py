@@ -76,7 +76,8 @@ class TestResolvePrePushScope:
     def test_infers_new_branch_push_from_git_state(
         self, mock_git_client: MagicMock
     ) -> None:
-        """When stdin is empty and remote branch doesn't exist, infer new branch push."""
+        """When stdin is empty and remote branch doesn't exist,
+        infer new branch push."""
         # Mock git client
         mock_instance = MagicMock()
         mock_instance.get_current_branch.return_value = "task/demo"

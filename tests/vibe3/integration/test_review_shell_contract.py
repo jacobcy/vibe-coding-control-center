@@ -50,7 +50,8 @@ class TestPrePushContract:
         assert "review base" in content
 
     def test_pre_push_reviews_against_resolved_base_ref(self) -> None:
-        """Verify pre-push.sh uses resolved push base rather than default origin/main."""
+        """Verify pre-push.sh uses resolved push base rather than
+        default origin/main."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
         assert 'inspect base "$REVIEW_BASE" --json' in content
