@@ -92,6 +92,14 @@ class TaskBridgeMixin:
             logger.bind(domain="task", action="hydrate", branch=branch).warning(
                 f"Remote fetch failed: {result.type} - {result.message}"
             )
+            if result.type == "not_found":
+                return HydrateError(
+                    type="binding_invalid",
+                    message=(
+                        f"Branch '{branch}' 绑定的 GitHub Project item "
+                        f"'{project_item_id}' 已失效: {result.message}"
+                    ),
+                )
             view.offline_mode = True
             return view
 
@@ -156,6 +164,13 @@ class TaskBridgeMixin:
         self: Any, branch: str, project_item_id: str, force: bool = False
     ) -> TaskBridgeModel | LinkError:
         """将本地 task bridge 与远端 GitHub Project item 绑定。"""
+        flow_data = self.store.get_flow_state(branch)
+        if not flow_data:
+            return LinkError(
+                type="flow_not_found",
+                message=f"Branch '{branch}' 尚未创建 flow，请先运行 vibe flow new",
+            )
+
         client = self._get_project_client()
         if not client:
             return LinkError(
@@ -177,18 +192,16 @@ class TaskBridgeMixin:
                 ),
             )
 
-        flow_data = self.store.get_flow_state(branch)
-        if flow_data:
-            existing_id = flow_data.get("project_item_id")
-            if existing_id and existing_id != project_item_id and not force:
-                return LinkError(
-                    type="already_bound",
-                    message=(
-                        f"Branch '{branch}' 已绑定 "
-                        f"project_item_id='{existing_id}'，"
-                        "如需覆盖请传入 --force"
-                    ),
-                )
+        existing_id = flow_data.get("project_item_id")
+        if existing_id and existing_id != project_item_id and not force:
+            return LinkError(
+                type="already_bound",
+                message=(
+                    f"Branch '{branch}' 已绑定 "
+                    f"project_item_id='{existing_id}'，"
+                    "如需覆盖请传入 --force"
+                ),
+            )
 
         self.store.update_bridge_fields(
             branch,

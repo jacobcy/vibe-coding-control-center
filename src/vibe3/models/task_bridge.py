@@ -95,5 +95,5 @@ class HydratedTaskView(BaseModel):
 class HydrateError(BaseModel):
     """hydrate 操作失败时返回的错误对象。"""
 
-    type: str  # "no_remote_identity" | "network_error"
+    type: str  # "no_remote_identity" | "binding_invalid"
     message: str

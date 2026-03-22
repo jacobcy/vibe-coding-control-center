@@ -110,6 +110,10 @@ def show(
         view = service.hydrate(branch)
 
         if isinstance(view, HydrateError):
+            if view.type == "binding_invalid":
+                typer.echo(f"Error [{view.type}]: {view.message}", err=True)
+                raise typer.Exit(1)
+
             task = service.get_task(branch)
             if not task:
                 typer.echo(f"Task not found: {branch}", err=True)

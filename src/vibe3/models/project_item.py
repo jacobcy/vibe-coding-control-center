@@ -43,6 +43,7 @@ class LinkError(BaseModel):
     """link_project_item 操作失败时返回的错误对象。
 
     type 取值：
+    - "flow_not_found"：当前 branch 尚未创建 flow，不能独立绑定 bridge
     - "item_not_found"：提供的 project_item_id 在 GitHub Project 中不存在
     - "already_bound"：本地 bridge 已绑定不同的 project_item_id，需要 --force
     """
