@@ -27,6 +27,26 @@ related_docs:
 | `flow blocked` | 标记 blocked | ❌ 未实现 | 完全缺失 |
 | `flow aborted` | 标记废弃 + 删除分支 | ❌ 未实现 | 完全缺失 |
 
+### 设计原则：actor 参数
+
+**actor 字段的初衷**：记录 agent 阶段交接的责任人（上下文传递链）。
+
+**使用规则**：
+- ✅ **保留**：handoff 命令（plan/report/audit/append）- 用于 agent 间交接
+- ❌ **移除**：flow/task 命令 - 纯业务逻辑，不需要记录 actor
+
+**当前问题**：
+- `flow new/bind` 有 actor 参数 ❌ 应该移除
+- `task link/status` 有 actor 参数 ❌ 应该移除
+- `handoff plan/report/audit/append` 有 actor 参数 ✅ 保留
+
+**清理范围**：
+1. 移除 `flow new` 的 actor 参数
+2. 移除 `flow bind` 的 actor 参数
+3. 移除 `task link` 的 actor 参数
+4. 移除 `task status` 的 actor 参数
+5. Service 层签名更新：不接收 actor 参数，内部逻辑可保留 latest_actor 字段
+
 ### V2 核心语义
 
 ```
@@ -177,6 +197,11 @@ def abort_flow(
 
 **文件**: `src/vibe3/commands/flow.py`
 
+**设计原则**：
+- `actor` 参数仅在 handoff 命令中使用（plan/report/audit），用于记录阶段交接的责任人
+- flow 生命周期命令（new/switch/done/blocked/aborted）不需要 actor 参数
+- service 层的 `latest_actor` 字段保留，但不再从命令层传入，改为内部逻辑处理
+
 更新命令实现：
 
 ```python
@@ -186,7 +211,6 @@ def new(
     issue: Annotated[str | None, typer.Option("--issue")] = None,
     branch: Annotated[str, typer.Option("--branch", help="Start ref")] = "origin/main",
     save_unstash: Annotated[bool, typer.Option("--save-unstash")] = False,
-    actor: Annotated[str, typer.Option()] = "claude",
     trace: Annotated[bool, typer.Option()] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -196,7 +220,6 @@ def new(
 @app.command()
 def switch(
     target: Annotated[str, typer.Argument()],
-    actor: Annotated[str, typer.Option()] = "claude",
     trace: Annotated[bool, typer.Option()] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -206,8 +229,7 @@ def switch(
 @app.command()
 def done(
     branch: Annotated[str | None, typer.Option("--branch")] = None,
-    force: Annotated[bool, typer.Option("--force", help="Skip PR check")] = False,
-    actor: Annotated[str, typer.Option()] = "claude",
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip PR check")] = False,
     trace: Annotated[bool, typer.Option()] = False,
 ) -> None:
     """Close flow and delete branch."""
@@ -217,7 +239,6 @@ def done(
 def blocked(
     branch: Annotated[str | None, typer.Option("--branch")] = None,
     reason: Annotated[str, typer.Option("--reason")] = "",
-    actor: Annotated[str, typer.Option()] = "claude",
     trace: Annotated[bool, typer.Option()] = False,
 ) -> None:
     """Mark flow as blocked."""
@@ -226,14 +247,46 @@ def blocked(
 @app.command()
 def aborted(
     branch: Annotated[str | None, typer.Option("--branch")] = None,
-    actor: Annotated[str, typer.Option()] = "claude",
     trace: Annotated[bool, typer.Option()] = False,
 ) -> None:
     """Abort flow and delete branch."""
     # ... 调用 service.abort_flow()
 ```
 
+**注意**：需要清理现有命令中的 actor 参数：
+- `flow new` - 移除 actor 参数
+- `flow bind` - 移除 actor 参数
+- `task link` - 移除 actor 参数（待讨论）
+- `task status` - 移除 actor 参数（待讨论）
+
 ## 3. 实现顺序
+
+### Step 0: 清理 actor 参数 (Day 0)
+
+**目标**：移除 flow/task 命令中不必要的 actor 参数。
+
+**文件变更**：
+
+1. `src/vibe3/commands/flow.py`
+   - `flow new` - 移除 actor 参数
+   - `flow bind` - 移除 actor 参数
+
+2. `src/vibe3/commands/task.py`
+   - `task link` - 移除 actor 参数
+   - `task status` - 移除 actor 参数
+
+3. `src/vibe3/services/flow_service.py`
+   - `create_flow` - 移除 actor 参数
+   - Service 内部不更新 latest_actor（或使用固定值如 "system"）
+
+4. `src/vibe3/services/task_service.py`
+   - `link_issue` - 移除 actor 参数
+   - `update_flow_status` - 移除 actor 参数
+   - Service 内部不更新 latest_actor（或使用固定值如 "system"）
+
+**测试**：
+- 确保命令仍能正常执行
+- 验证 flow_state 表的 latest_actor 字段不再从命令层接收值
 
 ### Step 1: GitClient 基础方法 (Day 1)
 
@@ -251,6 +304,21 @@ def aborted(
 2. 实现 `switch_flow`
 3. 单元测试
 
+**方法签名**（无 actor 参数）：
+
+```python
+def create_flow_with_branch(
+    self,
+    slug: str,
+    start_ref: str = "origin/main",
+    save_unstash: bool = False,
+) -> FlowState:
+    """创建新 flow 并创建分支。"""
+
+def switch_flow(self, target: str) -> FlowState:
+    """切换到已有 flow。"""
+```
+
 ### Step 3: FlowService 关闭逻辑 (Day 4-5)
 
 1. 实现 `close_flow`
@@ -260,6 +328,23 @@ def aborted(
 2. 实现 `block_flow`
 3. 实现 `abort_flow`
 4. 单元测试
+
+**方法签名**（无 actor 参数）：
+
+```python
+def close_flow(
+    self,
+    branch: str,
+    check_pr: bool = True,
+) -> None:
+    """关闭 flow 并删除分支。"""
+
+def block_flow(self, branch: str, reason: str) -> None:
+    """标记 flow 为 blocked。"""
+
+def abort_flow(self, branch: str) -> None:
+    """废弃 flow 并删除分支。"""
+```
 
 ### Step 4: Command Layer (Day 6)
 
@@ -337,12 +422,20 @@ def test_flow_new_switch_done_lifecycle():
 - [ ] `vibe3 flow blocked --reason "等待依赖"` 标记 blocked
 - [ ] `vibe3 flow aborted` 标记废弃并删除分支
 
+### Actor 参数清理验收
+
+- [ ] `flow new` 无 actor 参数，命令正常执行
+- [ ] `flow bind` 无 actor 参数，命令正常执行
+- [ ] `task link` 无 actor 参数，命令正常执行
+- [ ] `task status` 无 actor 参数，命令正常执行
+- [ ] `handoff plan/report/audit/append` 保留 actor 参数，正常执行
+
 ### 错误处理验收
 
 - [ ] 分支已存在时 `flow new` 报错
 - [ ] dirty worktree 时 `flow new` 提示使用 `--save-unstash`
 - [ ] 切换到不存在的 flow 时 `flow switch` 报错
-- [ ] PR 未 merge 时 `flow done` 提示（除非 `--force`）
+- [ ] PR 未 merge 时 `flow done` 提示（除非 `--yes`）
 
 ### 代码质量验收
 
@@ -356,7 +449,7 @@ def test_flow_new_switch_done_lifecycle():
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
 | stash 冲突 | 用户改动丢失 | 提供详细的冲突解决指南 |
-| PR merged 检测失败 | 分支误删 | 增加 `--force` 选项作为安全网 |
+| PR merged 检测失败 | 分支误删 | 增加 `--yes` 选项作为安全网 |
 | 远程分支删除失败 | 残留分支 | 继续删除本地分支，记录错误日志 |
 
 ## 7. 后续工作
