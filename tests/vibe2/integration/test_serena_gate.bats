@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export REPO_ROOT="$BATS_TEST_DIRNAME/../.."
+  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
 }
 
 @test "serena project config uses languages list schema" {
