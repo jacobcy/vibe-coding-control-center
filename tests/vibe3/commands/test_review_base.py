@@ -52,12 +52,7 @@ def test_review_base_defaults_to_origin_main():
         patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
-        patch("vibe3.commands.review.GitClient") as mock_git_client_class,
     ):
-        # Mock GitClient to pass branch validation
-        mock_git_client = MagicMock()
-        mock_git_client._run.return_value = "abc123"  # Mock successful rev-parse
-        mock_git_client_class.return_value = mock_git_client
 
         result = runner.invoke(app, ["base"])
         assert result.exit_code == 0
@@ -81,12 +76,7 @@ def test_review_base_pass():
         patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
-        patch("vibe3.commands.review.GitClient") as mock_git_client_class,
     ):
-        # Mock GitClient to pass branch validation
-        mock_git_client = MagicMock()
-        mock_git_client._run.return_value = "abc123"  # Mock successful rev-parse
-        mock_git_client_class.return_value = mock_git_client
 
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0

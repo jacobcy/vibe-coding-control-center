@@ -134,13 +134,12 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     REVIEW_REPORT_FILE=".agent/reports/pre-push-review-${TIMESTAMP}.md"
 
-    # Run review and capture output to file
+    # Run review with real-time output using tee
     set +e
-    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" > "$REVIEW_REPORT_FILE" 2>&1
-    REVIEW_EXIT=$?
+    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" 2>&1 | tee "$REVIEW_REPORT_FILE"
+    REVIEW_EXIT=${PIPESTATUS[0]}
     set -e
 
-    # Show report path
     echo ""
     echo "  Review report saved: $REVIEW_REPORT_FILE"
 
