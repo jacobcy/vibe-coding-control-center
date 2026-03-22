@@ -1,7 +1,7 @@
 # Task & Flow 操作指南
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-22
+**最后更新**: 2026-03-23
 
 > 本文档是用户操作手册，命令设计规范见 [vibe3-command-standard.md](../standards/vibe3-command-standard.md)
 
@@ -91,6 +91,173 @@ github_project:
 
 ---
 
+## Flow 生命周期管理
+
+Flow 代表执行现场，围绕 Git branch 的生命周期进行管理。
+
+### Flow 状态流转
+
+```
+[new] → [active] → [done]      (正常完成)
+              ↓
+         [blocked]              (被阻塞)
+              ↓
+         [active] → [done]      (解除阻塞后继续)
+
+         [active] → [aborted]   (废弃)
+```
+
+### 创建 Flow
+
+**命令**：`vibe3 flow new [name] [--issue <issue>] [--branch <ref>] [--save-unstash]`
+
+**功能**：创建新分支并初始化 flow_state 记录。
+
+**参数**：
+- `name` - Flow 名称（可选，默认从 branch 生成）
+- `--issue` - 绑定 task issue（可选）
+- `--branch` - 起点分支（默认：origin/main）
+- `--save-unstash` - 将当前未提交改动带入新分支
+
+**示例**：
+
+```bash
+# 1. 基本用法：创建新 flow
+vibe3 flow new my-feature
+# → 创建分支 task/my-feature
+# → 初始化 flow_state 记录
+
+# 2. 绑定 issue
+vibe3 flow new --issue 220
+# → 创建分支 task/flow-status-transitions（从 issue 标题生成）
+# → 绑定 #220 为 task issue
+
+# 3. 从非 main 分支创建
+vibe3 flow new feature-b --branch origin/dev
+# → 从 origin/dev 创建分支
+
+# 4. 带入未提交改动
+# 假设当前在 feature-a 分支有未提交改动
+vibe3 flow new feature-b --save-unstash
+# → stash 当前改动
+# → 创建新分支 task/feature-b
+# → 恢复 stash 到新分支
+```
+
+**错误处理**：
+- 分支已存在 → 报错提示使用 `flow switch`
+- 工作目录不干净且未指定 `--save-unstash` → 报错提示使用该选项
+
+### 切换 Flow
+
+**命令**：`vibe3 flow switch <name>`
+
+**功能**：切换到已有的 flow 分支。
+
+**行为**：
+1. 自动 stash 当前分支的未提交改动
+2. 切换到目标分支
+3. 恢复 stash 到目标分支
+
+**示例**：
+
+```bash
+# 切换到已有 flow
+vibe3 flow switch my-feature
+# → stash 当前改动（如果有）
+# → 切换到 task/my-feature 分支
+# → 恢复 stash
+```
+
+**注意**：
+- 只能切换到未关闭的 flow
+- 已有 PR 的 flow 不能切换（需要通过 PR 继续）
+
+### 完成 Flow
+
+**命令**：`vibe3 flow done [--branch <ref>] [--yes]`
+
+**功能**：关闭 flow 并删除分支。
+
+**前置条件**：
+- PR 已 merge，或
+- 有 review evidence 且 merge 成功
+
+**参数**：
+- `--branch` - 指定分支（默认：当前分支）
+- `--yes` - 跳过 PR 检查（危险操作）
+
+**示例**：
+
+```bash
+# 1. 正常完成（PR 已 merge）
+vibe3 flow done
+# → 检查 PR 已 merge
+# → 删除本地分支
+# → 删除远程分支（如果存在）
+# → 标记 flow_status = done
+
+# 2. 指定分支
+vibe3 flow done --branch task/my-feature
+
+# 3. 强制完成（跳过 PR 检查）
+vibe3 flow done --yes
+# ⚠️ 危险：可能删除未合并的分支
+```
+
+**错误处理**：
+- PR 未 merge 且无 review evidence → 报错
+- 工作目录不干净 → 报错提示先提交或 stash
+
+### 阻塞 Flow
+
+**命令**：`vibe3 flow blocked --reason <reason> [--branch <ref>]`
+
+**功能**：标记 flow 为 blocked 状态，保留分支。
+
+**示例**：
+
+```bash
+# 标记为 blocked
+vibe3 flow blocked --reason "等待依赖 #218 完成"
+# → flow_status = blocked
+# → blocked_by = "等待依赖 #218 完成"
+# → 保留分支
+
+# 解除阻塞（切换回 active）
+vibe3 task status active
+# 或
+vibe3 flow switch <other-flow>
+```
+
+**使用场景**：
+- 等待依赖完成
+- 等待外部反馈
+- 等待资源分配
+
+### 废弃 Flow
+
+**命令**：`vibe3 flow aborted [--branch <ref>]`
+
+**功能**：废弃 flow 并删除分支。
+
+**示例**：
+
+```bash
+# 废弃当前 flow
+vibe3 flow aborted
+# → flow_status = aborted
+# → 删除本地分支
+# → 删除远程分支（如果存在）
+```
+
+**使用场景**：
+- 需求变更，不再需要此 flow
+- 方案被更好的实现替代
+- 探索性代码，不需要保留
+
+---
+
 ## 标准工作流
 
 ### 场景一：从需求 issue 创建 task
@@ -98,25 +265,27 @@ github_project:
 适用于：一个需求 issue 直接对应一个可执行任务。
 
 ```bash
-# 1. 创建 task branch
-git checkout -b task/my-feature
+# 1. 创建 flow 并绑定 issue
+vibe3 flow new --issue 220
+# → 创建分支 task/flow-status-transitions（从 issue 标题生成）
+# → 绑定 #220 为 task issue
+# → 初始化 flow_state 记录
 
-# 2. 创建 flow（name 可选，默认从 branch 生成）
-vibe3 flow new --issue 220 --actor jacobcy
-# 或自定义名称
-vibe3 flow new my-feature --issue 220 --actor jacobcy
+# 或指定自定义名称
+vibe3 flow new my-feature --issue 220
+# → 创建分支 task/my-feature
 
-# 3. 为当前 flow 记录补充 issue 关系
+# 2. 为当前 flow 记录补充 issue 关系
 vibe3 task link 219 --role related
 # → 在本地 flow_issue_links 中记录 role=related
 
 vibe3 task link 218 --role dependency
 # → 在本地 flow_issue_links 中记录 role=dependency
 
-# 4. 绑定 GitHub Project item（通过 issue 反查）
+# 3. 绑定 GitHub Project item（通过 issue 反查）
 vibe3 task bridge link-project --from-issue 220
 
-# 5. 验证
+# 4. 验证
 vibe3 task show task/my-feature
 ```
 
@@ -168,9 +337,9 @@ gh project item-add 17 --owner jacobcy \
 
 ```bash
 # task #221
-git checkout -b task/reports-unified-storage
-vibe3 flow new --issue 221 --actor jacobcy
-# flow_slug 自动生成: reports-unified-storage
+vibe3 flow new --issue 221
+# → 创建分支 task/reports-unified-storage
+# → flow_slug 自动生成: reports-unified-storage
 
 vibe3 task link 219 --role related
 # 为当前 flow 记录 role=related
@@ -178,9 +347,9 @@ vibe3 task link 219 --role related
 vibe3 task bridge link-project --from-issue 221
 
 # task #222
-git checkout -b task/pr-show-complete
-vibe3 flow new --issue 222 --actor jacobcy
-# flow_slug 自动生成: pr-show-complete
+vibe3 flow new --issue 222
+# → 创建分支 task/pr-show-complete
+# → flow_slug 自动生成: pr-show-complete
 
 vibe3 task link 219 --role related
 # 为当前 flow 记录 role=related
@@ -449,6 +618,53 @@ vibe3 task status "In Progress"
 # 5. 再次确认状态已同步
 vibe3 task show [<branch>]
 # 应显示 [remote] Status: In Progress
+```
+
+### Flow 生命周期示例
+
+```bash
+# 1. 创建新 flow
+vibe3 flow new feature-a --issue 220
+# → 分支：task/feature-a
+# → 绑定 issue #220
+
+# 2. 开发过程中切换到另一个 flow
+vibe3 flow new feature-b --issue 221
+# → 分支：task/feature-b
+# → 绑定 issue #221
+
+# 3. 切换回 feature-a
+vibe3 flow switch feature-a
+# → 自动 stash feature-b 的改动
+# → 切换到 task/feature-a
+# → 恢复 stash
+
+# 4. feature-a 被阻塞
+vibe3 flow blocked --reason "等待依赖 #218"
+# → flow_status = blocked
+# → 保留分支
+
+# 5. 解除阻塞继续开发
+vibe3 task status active
+# → flow_status = active
+
+# 6. 完成 feature-a
+# 6.1 创建 PR 并合并
+vibe3 pr create
+vibe3 pr ready
+# （等待 PR merge）
+
+# 6.2 关闭 flow
+vibe3 flow done
+# → 检查 PR 已 merge
+# → 删除分支
+# → flow_status = done
+
+# 7. 废弃某个 flow
+vibe3 flow switch feature-b
+vibe3 flow aborted
+# → flow_status = aborted
+# → 删除分支
 ```
 
 ---
