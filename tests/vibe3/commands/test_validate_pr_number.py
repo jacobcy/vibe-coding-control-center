@@ -74,3 +74,23 @@ def test_validate_pr_number_error_message_format():
         assert "Feature request: Add dark mode" in error_msg
         # Should suggest correct usage
         assert "vibe inspect pr" in error_msg
+
+
+def test_validate_pr_number_network_error():
+    """Network error is properly reported."""
+    with patch("vibe3.clients.github_client.GitHubClient") as mock_gh:
+        client = MagicMock()
+        client.get_pr.return_value = None  # Not a PR
+        client.view_issue.return_value = "network_error"  # Network failure
+        mock_gh.return_value = client
+
+        with pytest.raises(UserError) as exc_info:
+            validate_pr_number(42)
+
+        error_msg = str(exc_info.value)
+        # Should mention network error
+        assert "network or authentication error" in error_msg
+        # Should not claim it doesn't exist
+        assert "does not exist" not in error_msg
+        # Should suggest checking connection
+        assert "check your network connection" in error_msg

@@ -217,6 +217,11 @@ def validate_pr_number(pr_number: int) -> None:
 
     # Not a PR, check if it's an issue
     issue = gh.view_issue(pr_number)
+    if issue == "network_error":
+        raise UserError(
+            f"Cannot verify #{pr_number}: network or authentication error.\n"
+            f"  Please check your network connection and GitHub authentication."
+        )
     if isinstance(issue, dict):
         raise UserError(
             f"#{pr_number} is an issue, not a PR.\n"
