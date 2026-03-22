@@ -106,12 +106,12 @@ def build_ast_analysis_section(
     if changed_symbols:
         symbols_json = json.dumps(changed_symbols, indent=2)
         ast_parts.append(
-            f"### Changed Functions (AST Analysis)\n" f"```json\n{symbols_json}\n```"
+            f"### Changed Functions (AST Analysis)\n```json\n{symbols_json}\n```"
         )
 
     if symbol_dag:
         dag_json = json.dumps(symbol_dag, indent=2)
-        ast_parts.append(f"### Function Call Chain (DAG)\n" f"```json\n{dag_json}\n```")
+        ast_parts.append(f"### Function Call Chain (DAG)\n```json\n{dag_json}\n```")
 
     return "## AST Analysis\n" + "\n\n".join(ast_parts)
 

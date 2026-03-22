@@ -5,7 +5,7 @@ Tests the core runner functionality with extensible interface design.
 
 from dataclasses import FrozenInstanceError
 from subprocess import CompletedProcess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -77,10 +77,13 @@ class TestRunReviewAgent:
 
     def test_run_review_uses_codeagent_wrapper_with_agent_and_model(self) -> None:
         """Runner should call codeagent-wrapper with correct arguments."""
-        with patch("vibe3.services.review_runner.run") as mock_run:
-            mock_run.return_value = CompletedProcess(
-                args=[], returncode=0, stdout="VERDICT: PASS", stderr=""
-            )
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
             options = ReviewAgentOptions(
                 agent="code-reviewer",
             )
@@ -98,10 +101,13 @@ class TestRunReviewAgent:
 
     def test_run_review_without_model(self) -> None:
         """Runner should work without model override."""
-        with patch("vibe3.services.review_runner.run") as mock_run:
-            mock_run.return_value = CompletedProcess(
-                args=[], returncode=0, stdout="VERDICT: PASS", stderr=""
-            )
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
             options = ReviewAgentOptions(agent="code-reviewer")
             result = run_review_agent("prompt body", options)
 
@@ -114,10 +120,13 @@ class TestRunReviewAgent:
 
     def test_run_review_non_zero_exit_raises_error(self) -> None:
         """Runner should raise error on non-zero exit code."""
-        with patch("vibe3.services.review_runner.run") as mock_run:
-            mock_run.return_value = CompletedProcess(
-                args=[], returncode=1, stdout="", stderr="Error: something failed"
-            )
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = "Error: something failed\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
             options = ReviewAgentOptions(agent="code-reviewer")
 
             with pytest.raises(RuntimeError) as exc_info:
@@ -128,7 +137,7 @@ class TestRunReviewAgent:
 
     def test_run_review_wrapper_not_found(self) -> None:
         """Runner should give clear error when wrapper not found."""
-        with patch("vibe3.services.review_runner.run") as mock_run:
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
             options = ReviewAgentOptions(agent="code-reviewer")
 
@@ -141,7 +150,7 @@ class TestRunReviewAgent:
         """Runner should timeout after specified seconds."""
         import subprocess
 
-        with patch("vibe3.services.review_runner.run") as mock_run:
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(
                 cmd=["codeagent-wrapper"], timeout=300
             )
@@ -155,10 +164,13 @@ class TestRunReviewAgent:
 
     def test_run_review_uses_prompt_file(self) -> None:
         """Runner should pass prompt via temporary file."""
-        with patch("vibe3.services.review_runner.run") as mock_run:
-            mock_run.return_value = CompletedProcess(
-                args=[], returncode=0, stdout="Result", stderr=""
-            )
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Result\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
             options = ReviewAgentOptions(agent="code-reviewer")
             run_review_agent("my prompt file content", options, task="custom task")
 
@@ -174,6 +186,55 @@ class TestRunReviewAgent:
         )
         # The last argument should be the custom task
         assert command[-1] == "custom task"
+
+    def test_run_review_streams_output_while_capturing(self, capsys) -> None:
+        """Runner should stream wrapper output to console and capture it."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "line one\nVERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch(
+            "vibe3.services.review_runner.subprocess.run", return_value=mock_result
+        ):
+            result = run_review_agent(
+                "prompt body", ReviewAgentOptions(agent="code-reviewer")
+            )
+
+        captured = capsys.readouterr()
+        assert "line one" in captured.out
+        assert "VERDICT: PASS" in captured.out
+        assert "line one" in result.stdout
+        assert "VERDICT: PASS" in result.stdout
+
+    def test_run_review_handles_none_stdout(self) -> None:
+        """Runner should pass through None stdout."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = None
+        mock_result.stderr = ""
+
+        with patch(
+            "vibe3.services.review_runner.subprocess.run", return_value=mock_result
+        ):
+            result = run_review_agent(
+                "prompt body", ReviewAgentOptions(agent="code-reviewer")
+            )
+
+        # Should pass through None stdout
+        assert result.exit_code == 0
+        assert result.stdout is None
+
+    def test_run_review_handles_os_error(self) -> None:
+        """Runner should handle OSError gracefully."""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.side_effect = OSError("I/O error")
+
+            with pytest.raises(OSError, match="I/O error"):
+                run_review_agent(
+                    "prompt body", ReviewAgentOptions(agent="code-reviewer")
+                )
 
 
 class TestReviewAgentResult:

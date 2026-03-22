@@ -12,9 +12,10 @@ import typer.rich_utils as _ru
 from loguru import logger
 from rich import box as _box
 
-from vibe3.commands import flow, hooks, inspect, pr, review, task
+from vibe3.commands import flow, handoff, hooks, inspect, pr, review, task
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
+from vibe3.services.check_service import CheckService
 
 
 # -- Remove help panel borders, keep colors --
@@ -44,6 +45,7 @@ app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(hooks.app, name="hooks")
+app.add_typer(handoff.app, name="handoff")
 
 
 @app.callback()
@@ -68,6 +70,42 @@ def main_callback(
 def version() -> None:
     """Show vibe3 version."""
     typer.echo("3.0.0-dev")
+
+
+@app.command()
+def check(
+    fix: bool = typer.Option(False, "--fix", help="Auto-fix issues"),
+) -> None:
+    """Verify handoff store consistency.
+
+    Checks:
+    - Current branch exists in flow_state
+    - task_issue_number exists on GitHub
+    - Only one task issue per branch
+    - pr_number matches current branch
+    - plan_ref / report_ref / audit_ref files exist
+    - shared current.md exists for active flow
+    """
+    service = CheckService()
+    result = service.verify_current_flow(fix=fix)
+
+    if result.is_valid:
+        typer.echo("✓ All checks passed")
+    else:
+        typer.echo("✗ Issues found:", err=True)
+        for issue in result.issues:
+            typer.echo(f"  - {issue}", err=True)
+
+        if fix:
+            typer.echo("\nAttempting auto-fix...")
+            fix_result = service.auto_fix(result.issues)
+            if fix_result.success:
+                typer.echo("✓ Issues fixed")
+            else:
+                typer.echo(f"✗ Fix failed: {fix_result.error}", err=True)
+                raise typer.Exit(code=1)
+        else:
+            raise typer.Exit(code=1)
 
 
 @app.command()

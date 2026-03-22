@@ -36,7 +36,7 @@ repos:
     hooks:
       - id: ruff
         name: Ruff (Python linter)
-        files: ^src/.*\.py$
+        files: ^(src|tests)/.*\.py$
         args: ['--fix']
 
   - repo: https://github.com/psf/black-pre-commit-mirror
@@ -44,7 +44,7 @@ repos:
     hooks:
       - id: black
         name: Black (Python formatter)
-        files: ^src/.*\.py$
+        files: ^(src|tests)/.*\.py$
 
   - repo: local
     hooks:
@@ -95,6 +95,7 @@ repos:
         language: script
         pass_filenames: false
         stages: [pre-push]
+        verbose: true
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
   # Uncomment if you want to run tests on every commit (slower but safer)

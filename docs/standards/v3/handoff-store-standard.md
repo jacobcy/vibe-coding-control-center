@@ -9,7 +9,7 @@ authority:
   - vibe3-read-write-rules
 author: GPT-5 Codex
 created: 2026-03-14
-last_updated: 2026-03-14
+last_updated: 2026-03-21
 related_docs:
   - docs/prds/vibe-session-governance.md
   - docs/standards/v2/handoff-governance-standard.md
@@ -18,7 +18,7 @@ related_docs:
 
 # Vibe3 Handoff Store Standard
 
-本文档定义 Vibe 3.0 本地 handoff store 的正式结构。
+本文档定义 Vibe 3.0 handoff system 的正式本地结构。
 
 它只负责记录：
 
@@ -26,6 +26,7 @@ related_docs:
 - `plan / report / audit` ref
 - `planner / executor / reviewer` 署名
 - 最小阻塞与下一步信息
+- 共享 handoff 中间态文件的位置约定
 
 它不负责：
 
@@ -37,29 +38,36 @@ related_docs:
 
 ## 1. Storage Choice
 
-Vibe 3.0 本地 store 固定采用：
+Vibe 3.0 handoff system 固定采用两层：
 
-- **SQLite**
+- **SQLite**: 最小责任链与索引
+- **Shared Markdown Buffer**: 结构化 handoff 中间态
 
 原因：
 
-- 单文件，适合本地临时状态
-- 比 JSON 更适合约束字段和唯一键
+- SQLite 单文件，适合本地最小状态与唯一键约束
+- Markdown 更适合 agent 直接编辑 handoff 内容
+- 两层组合可以传递上下文，又不会自然膨胀成第二真源
 - 便于 `vibe check` 做一致性校验
-- 不会像多份 JSON 一样自然膨胀成第二套共享真源
 
 当前不采用：
 
-- 多文件 JSON
-- YAML
+- JSON / YAML 作为主 handoff 文件
+- item 级 CRUD + 双向同步系统
 - 进程级 `sessions.json`
 
 ## 2. File Location
 
-本地 store 文件位置固定为：
+SQLite store 文件位置固定为：
 
 ```text
 .git/vibe3/handoff.db
+```
+
+共享 handoff 中间态文件位置固定为：
+
+```text
+.git/vibe3/handoff/<branch-safe>/current.md
 ```
 
 补充约束：
@@ -68,6 +76,7 @@ Vibe 3.0 本地 store 固定采用：
 - 不放到仓库根目录
 - 不放到 `docs/`
 - 不放到 `.agent/context/`
+- 不把 `.agent/context/task.md` 当作共享 handoff 正文载体
 
 ## 3. Schema Version
 
@@ -199,17 +208,74 @@ CREATE TABLE flow_events (
 
 `event_type` 只允许：
 
-- `handoff_plan`
-- `handoff_report`
-- `handoff_audit`
-- `flow_bind`
-- `flow_freeze`
-- `flow_done`
-- `pr_draft`
-- `pr_merge`
-- `check_fix`
+**Flow 生命周期事件**：
+- `flow_created` - flow 创建
+- `flow_bind` - task 绑定到 flow
+- `flow_freeze` - flow 冻结
+- `flow_done` - flow 完成
 
-## 5. Field Naming Standard
+**Issue 相关事件**：
+- `issue_linked` - issue 关联到 flow
+
+**状态变更事件**：
+- `status_updated` - flow 状态更新
+
+**Handoff 事件**：
+- `handoff_plan` - plan handoff
+- `handoff_report` - report handoff
+- `handoff_audit` - audit handoff
+
+**PR 相关事件**：
+- `pr_draft` - draft PR 创建
+- `pr_ready` - PR 标记为 ready
+- `pr_merge` - PR 合并
+
+**检查与修复事件**：
+- `check_fix` - check 修复
+
+## 5. Shared Handoff Buffer
+
+共享 `current.md` 是 handoff 的结构化中间态，不是主链真源。
+
+### 5.1 Allowed Content
+
+允许记录：
+
+- findings
+- blockers
+- next actions
+- open questions
+- key files
+- evidence refs
+- `SESSION_ID`
+- 当前阶段的简短总结
+
+### 5.2 Forbidden Content
+
+不允许记录：
+
+- issue / PR / Project 正文镜像
+- `plan / report / audit` 全文
+- 可覆盖 SQLite 的正式责任链字段
+- 与 GitHub / git 冲突的事实副本
+
+### 5.3 Format
+
+`current.md` 固定采用 Markdown 文件，并使用固定 section 模板。
+
+第一版至少包含：
+
+- `Meta`
+- `Summary`
+- `Findings`
+- `Blockers`
+- `Next Actions`
+- `Key Files`
+- `Evidence Refs`
+
+允许轻量格式约定，但不要求 item 级严格 schema 校验。
+
+## 6. Field Naming Standard
 
 字段统一遵循：
 
@@ -236,14 +302,16 @@ CREATE TABLE flow_events (
 
 这些属于 V2 或镜像式心智，不属于 V3 handoff store。
 
-## 6. Read Rules
+## 7. Read Rules
 
 `flow show` / `flow status` / `vibe check` 固定按这个顺序重建：
 
 1. `git` 现场
 2. GitHub `issue / PR / Project`
 3. SQLite handoff store
-4. `plan / report / audit` 文档存在性
+4. 共享 `current.md`
+5. `.agent/context/task.md` 本地草稿（可选）
+6. `plan / report / audit` 文档存在性
 
 解释约束：
 
@@ -251,7 +319,7 @@ CREATE TABLE flow_events (
 - SQLite 只负责责任链补充
 - 若 SQLite 与远端冲突，以远端为准
 
-## 7. Write Rules
+## 8. Write Rules
 
 允许写入 SQLite 的命令只有：
 

@@ -12,13 +12,13 @@ from vibe3.services.review_runner import ReviewAgentOptions
 class TestInspectScoreTrigger:
     """Tests for inspect-score based review trigger."""
 
-    def test_should_trigger_review_on_high_risk(self) -> None:
-        """High risk score should trigger review."""
+    def test_should_not_trigger_review_on_high_risk_without_block(self) -> None:
+        """High risk alone should not auto-trigger review."""
         inspect_data = {"score": {"score": 8, "risk_level": "HIGH", "block": False}}
-        assert self._should_trigger_review(inspect_data) is True
+        assert self._should_trigger_review(inspect_data) is False
 
     def test_should_trigger_review_on_critical_risk(self) -> None:
-        """Critical risk score should trigger review."""
+        """Critical risk with block should trigger review."""
         inspect_data = {"score": {"score": 10, "risk_level": "CRITICAL", "block": True}}
         assert self._should_trigger_review(inspect_data) is True
 
@@ -40,8 +40,7 @@ class TestInspectScoreTrigger:
     def _should_trigger_review(self, inspect_data: dict) -> bool:
         """Determine if review should be triggered based on inspect score."""
         score_data = inspect_data.get("score", {})
-        risk_level = score_data.get("risk_level", "LOW")
-        return risk_level in ("HIGH", "CRITICAL")
+        return bool(score_data.get("block", False))
 
 
 class TestReviewAgentOptionsForPrePush:

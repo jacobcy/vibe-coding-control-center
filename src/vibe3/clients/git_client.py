@@ -1,12 +1,10 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
-import re
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.clients.git_diff_utils import extract_file_diff
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import (
     BranchSource,
@@ -87,6 +85,39 @@ class GitClient:
             "Got worktree name"
         )
         return name
+
+    def get_git_dir(self) -> str:
+        """Get the .git directory path.
+
+        Returns:
+            Absolute path to the .git directory
+
+        Raises:
+            GitError: git command execution failed
+        """
+        git_dir = self._run(["rev-parse", "--git-dir"])
+        logger.bind(domain="git", action="get_git_dir", git_dir=git_dir).debug(
+            "Got git directory"
+        )
+        return git_dir
+
+    def get_git_common_dir(self) -> str:
+        """Get the shared .git directory path (for worktrees).
+
+        In linked worktrees, this returns the common git directory
+        instead of the worktree-local .git/worktrees/<name> path.
+
+        Returns:
+            Absolute path to the shared .git directory
+
+        Raises:
+            GitError: git command execution failed
+        """
+        git_common_dir = self._run(["rev-parse", "--git-common-dir"])
+        logger.bind(
+            domain="git", action="get_git_common_dir", git_common_dir=git_common_dir
+        ).debug("Got git common directory")
+        return git_common_dir
 
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表.
@@ -185,84 +216,6 @@ class GitClient:
         """获取分支相对于 base 的改动文件."""
         output = self._run(["diff", "--name-only", f"{base}...{branch}"])
         return [f for f in output.splitlines() if f.strip()]
-
-    def get_diff_hunk_ranges(
-        self, file_path: str, source: ChangeSource
-    ) -> list[tuple[int, int]]:
-        """Get changed line ranges from git diff for a specific file.
-
-        Simple heuristic: parse diff hunks to find changed line numbers.
-        Useful for finding which functions were changed.
-
-        Args:
-            file_path: Relative file path
-            source: Change source (commit/branch/pr)
-
-        Returns:
-            List of (start_line, end_line) tuples for changed hunks
-
-        Example:
-            >>> client = GitClient()
-            >>> source = CommitSource(sha="abc123")
-            >>> ranges = client.get_diff_hunk_ranges("src/foo.py", source)
-            >>> # [(10, 15), (42, 50)]
-        """
-        log = logger.bind(
-            domain="git",
-            action="get_diff_hunk_ranges",
-            file=file_path,
-            source_type=source.type,
-        )
-        log.debug("Getting diff hunk ranges")
-
-        try:
-            # Get diff for this specific file
-            if source.type == ChangeSourceType.COMMIT:
-                assert isinstance(source, CommitSource)
-                diff = self._run(
-                    ["diff", f"{source.sha}^", source.sha, "--", file_path]
-                )
-            elif source.type == ChangeSourceType.BRANCH:
-                assert isinstance(source, BranchSource)
-                diff = self._run(
-                    ["diff", f"{source.base}...{source.branch}", "--", file_path]
-                )
-            elif source.type == ChangeSourceType.PR:
-                assert isinstance(source, PRSource)
-                # Use GitHub API to get the full PR diff, then extract this file
-                if not self._github_client:
-                    raise GitError(
-                        "get_diff_hunk_ranges",
-                        "PR source requires GitHubClient injection",
-                    )
-                full_diff = self._get_pr_diff_cached(source.pr_number)
-                diff = extract_file_diff(full_diff, file_path)
-            else:
-                # Uncommitted changes
-                diff = self._run(["diff", "HEAD", "--", file_path])
-
-            if not diff:
-                return []
-
-            # Parse diff hunks: @@ -old_start,old_count +new_start,new_count @@
-            hunk_pattern = re.compile(
-                r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", re.MULTILINE
-            )
-            ranges: list[tuple[int, int]] = []
-
-            for match in hunk_pattern.finditer(diff):
-                start = int(match.group(1))
-                count = int(match.group(2)) if match.group(2) else 1
-                end = start + count - 1
-                ranges.append((start, end))
-
-            log.bind(hunk_count=len(ranges)).debug("Got diff hunk ranges")
-            return ranges
-
-        except GitError:
-            # If git command fails, return empty (graceful degradation)
-            log.warning("Failed to get diff hunks, returning empty")
-            return []
 
     def _get_pr_diff_cached(self, pr_number: int) -> str:
         """Get PR diff with caching.

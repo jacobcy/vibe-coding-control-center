@@ -12,12 +12,10 @@ import json
 import re
 import subprocess
 import warnings
-from pathlib import Path
 from typing import TypedDict
 
 from loguru import logger
 
-from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import CommitAnalyzerError
 
 # Emit deprecation warning when module is used
@@ -75,23 +73,15 @@ def calculate_score(lines_changed: int, files_changed: int) -> int:
     return score
 
 
-def _load_config() -> VibeConfig:
-    """从 .vibe/config.yaml 加载配置，文件不存在时使用默认值。"""
-    config_path = Path(".vibe/config.yaml")
-    if config_path.exists():
-        return VibeConfig.from_yaml(config_path)
-    return VibeConfig()
-
-
 def analyze_commit(commit_sha: str) -> CommitAnalysisResult:
-    """分析单个 commit 的改动规模，计算复杂度分数，决定是否触发审核。
+    """分析单个 commit 的改动规模，返回遗留复杂度信息。
 
     Args:
         commit_sha: commit SHA
 
     Returns:
         CommitAnalysisResult: 包含 lines_changed, files_changed,
-            complexity_score, should_review
+            complexity_score, should_review(False)
 
     Raises:
         CommitAnalyzerError: git 命令失败时抛出
@@ -119,21 +109,14 @@ def analyze_commit(commit_sha: str) -> CommitAnalysisResult:
     stat_output = result.stdout
     lines_changed, files_changed = _parse_stat_output(stat_output)
 
-    config = _load_config()
-    auto_trigger = config.review.auto_trigger
-
     score = calculate_score(lines_changed, files_changed)
-
-    if not auto_trigger.enabled:
-        should_review = False
-    else:
-        should_review = score >= auto_trigger.min_complexity
 
     analysis: CommitAnalysisResult = {
         "lines_changed": lines_changed,
         "files_changed": files_changed,
         "complexity_score": score,
-        "should_review": should_review,
+        # Deprecated: review triggering now only follows inspect-based risk score.
+        "should_review": False,
     }
 
     log.bind(
@@ -141,7 +124,7 @@ def analyze_commit(commit_sha: str) -> CommitAnalysisResult:
         lines_changed=lines_changed,
         files_changed=files_changed,
         score=score,
-        should_review=should_review,
+        should_review=False,
     ).success("Commit analyzed")
 
     return analysis

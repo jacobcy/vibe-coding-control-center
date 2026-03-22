@@ -153,6 +153,13 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         ).info("Extracted changed symbols from diff")
 
         dag = dag_service.expand_impacted_modules(changed_files)
+        changed_lines = sum(
+            1
+            for line in git_client.get_diff(source).splitlines()
+            if (line.startswith("+") or line.startswith("-"))
+            and not line.startswith("+++")
+            and not line.startswith("---")
+        )
 
         # 3. 风险评分
         # Read critical and public API paths from config
@@ -163,7 +170,7 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         dims = PRDimensions(
             changed_files=len(changed_files),
             impacted_modules=len(dag.impacted_modules),
-            changed_lines=0,  # 需要从 diff 计算
+            changed_lines=changed_lines,
             critical_path_touch=any(
                 any(p in str(f) for p in critical_paths) for f in changed_files
             ),

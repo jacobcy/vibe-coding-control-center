@@ -53,6 +53,7 @@ def test_review_base_defaults_to_origin_main():
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
     ):
+
         result = runner.invoke(app, ["base"])
         assert result.exit_code == 0
 
@@ -76,6 +77,7 @@ def test_review_base_pass():
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
     ):
+
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
 

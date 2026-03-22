@@ -48,21 +48,29 @@ def _run_review(
     """
     log = logger.bind(domain="review", scope=request.scope.kind)
 
-    # Build review context
+    log.info("Building review context")
     prompt_file_content = build_review_context(request, config)
 
     # Determine task: custom message, config default, or None
     task = None
     if message:
         task = message
-        log.bind(task_type="custom").info("Using custom task")
+        log.info("Using custom task message")
+        typer.echo(f"→ Custom task: {message[:60]}{'...' if len(message) > 60 else ''}")
     elif config.review.review_prompt:
         task = config.review.review_prompt
-        log.bind(task_type="config").info("Using configured task")
+        log.info("Using configured task from vibe.toml")
     else:
-        log.bind(task_type="none").info("No custom task, using prompt file only")
+        log.info("Using prompt file only (no custom task)")
 
     # Call agent via codeagent-wrapper
+    log.info(
+        "Running review agent",
+        agent=config.review.agent_config.agent,
+        backend=config.review.agent_config.backend,
+        model=config.review.agent_config.model,
+    )
+    typer.echo("→ Running review...")
     options = ReviewAgentOptions(
         agent=config.review.agent_config.agent,
         backend=config.review.agent_config.backend,
@@ -76,10 +84,7 @@ def _run_review(
     raw = result.stdout
     review = parse_codex_review(raw)
 
-    typer.echo(raw)
-    typer.echo(
-        f"\n=== Verdict: {review.verdict} | Comments: {len(review.comments)} ==="
-    )
+    typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
@@ -106,12 +111,14 @@ def pr(
         enable_trace()
 
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
-    log.info("Starting local PR review")
+    log.info("Starting PR review")
+    typer.echo(f"→ Review: PR #{pr_number}")
 
     # Load config
     config = VibeConfig.get_defaults()
 
     # Create scope and get inspect data
+    log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
     inspect_data = run_inspect_json(["pr", str(pr_number)])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
@@ -151,6 +158,9 @@ def base(
 
     from vibe3.utils.git_helpers import get_current_branch
 
+    # Note: base branch validation is handled by inspect_base command
+    # which is called by run_inspect_json below
+
     current_branch = get_current_branch()
 
     log = logger.bind(
@@ -159,12 +169,14 @@ def base(
         current_branch=current_branch,
         base_branch=base_branch,
     )
-    log.info("Reviewing branch changes")
+    log.info("Starting branch review")
+    typer.echo(f"→ Review: {current_branch} vs {base_branch}")
 
     # Load config
     config = VibeConfig.get_defaults()
 
     # Create scope and get inspect data
+    log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})

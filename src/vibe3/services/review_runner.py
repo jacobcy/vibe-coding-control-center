@@ -11,10 +11,11 @@ Design principles:
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 """
 
+import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import CompletedProcess, run
 from typing import Final
 
 
@@ -92,7 +93,9 @@ class ReviewAgentResult:
     stderr: str
 
     @classmethod
-    def from_completed_process(cls, cp: CompletedProcess[str]) -> "ReviewAgentResult":
+    def from_completed_process(
+        cls, cp: subprocess.CompletedProcess[str]
+    ) -> "ReviewAgentResult":
         """Create result from a CompletedProcess."""
         return cls(
             exit_code=cp.returncode,
@@ -174,24 +177,39 @@ def run_review_agent(
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
-            result = run(
+            result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
                 timeout=options.timeout_seconds,
-                check=False,
             )
         except FileNotFoundError:
             raise FileNotFoundError(
                 f"codeagent-wrapper not found at {wrapper_path}. "
                 "Please ensure it is installed and accessible."
             ) from None
+        except subprocess.TimeoutExpired:
+            raise
 
-        agent_result = ReviewAgentResult.from_completed_process(result)
+        # Print output for visibility
+        if result.stdout:
+            print(result.stdout, end="", flush=True)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="", flush=True)
+
+        agent_result = ReviewAgentResult(
+            exit_code=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
 
         if not agent_result.is_success():
             stderr_preview = (
-                agent_result.stderr[:500] if agent_result.stderr else "(no stderr)"
+                agent_result.stderr[:500]
+                if agent_result.stderr
+                else (
+                    agent_result.stdout[:500] if agent_result.stdout else "(no output)"
+                )
             )
             raise RuntimeError(
                 f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"

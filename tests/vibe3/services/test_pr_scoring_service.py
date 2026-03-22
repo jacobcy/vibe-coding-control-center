@@ -95,3 +95,26 @@ class TestGenerateScoreReport:
         assert "block" in report
         assert "breakdown" in report
         assert "dimensions" in report
+        assert "reason" in report
+        assert "trigger_factors" in report
+        assert "recommendations" in report
+
+    def test_report_explains_blocking_risk(self) -> None:
+        # Use more extreme dimensions to trigger blocking
+        dims = PRDimensions(
+            changed_lines=1000,  # xlarge
+            changed_files=25,  # large
+            impacted_modules=10,  # large
+            critical_path_touch=True,
+            public_api_touch=True,
+            cross_module_symbol_change=True,  # Add this
+            codex_verdict="CRITICAL",  # Add this to trigger block
+        )
+        report = generate_score_report(dims)
+
+        assert report["block"] is True
+        assert report["reason"] != "未知"
+        assert len(report["trigger_factors"]) > 0
+        assert any(
+            "降低" in item or "拆分" in item for item in report["recommendations"]
+        )

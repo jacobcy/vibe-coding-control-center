@@ -123,9 +123,7 @@ def show(
 @app.command()
 def link(
     issue_url: Annotated[str, typer.Argument(help="Issue URL or number")],
-    role: Annotated[
-        Literal["task", "related"], typer.Option(help="Issue role")
-    ] = "related",
+    role: Annotated[Literal["task", "repo"], typer.Option(help="Issue role")] = "repo",
     actor: Annotated[str, typer.Option(help="Actor linking the issue")] = "unknown",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")

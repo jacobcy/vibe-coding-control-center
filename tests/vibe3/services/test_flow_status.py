@@ -23,8 +23,10 @@ class TestFlowStatus:
         assert result is not None
         assert result.branch == "test-branch"
         assert result.flow_slug == "test-flow"
+        assert result.flow_status == "active"
         assert len(result.issues) == 1
         assert result.issues[0].issue_number == 101
+        assert result.issues[0].issue_role == "task"
 
     def test_get_flow_status_not_found(self, mock_store) -> None:
         """Test getting flow status when not found."""
@@ -51,7 +53,7 @@ class TestFlowList:
             {
                 "branch": "branch-2",
                 "flow_slug": "flow-2",
-                "flow_status": "idle",
+                "flow_status": "blocked",
                 "updated_at": "2026-03-16T00:00:00",
             },
         ]
@@ -75,7 +77,7 @@ class TestFlowList:
             {
                 "branch": "branch-2",
                 "flow_slug": "flow-2",
-                "flow_status": "idle",
+                "flow_status": "blocked",
                 "updated_at": "2026-03-16T00:00:00",
             },
         ]

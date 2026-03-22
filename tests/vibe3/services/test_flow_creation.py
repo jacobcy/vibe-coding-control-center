@@ -47,3 +47,4 @@ class TestFlowCreation:
 
         assert result.flow_slug == "test-flow"
         mock_store.update_flow_state.assert_called()
+        mock_store.add_issue_link.assert_called_once_with("test-branch", 123, "task")

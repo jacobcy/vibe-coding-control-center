@@ -171,6 +171,7 @@ PR 创建后，Labeler 会根据标题前缀自动添加对应的标签：
 
 ## 参考资料
 
+- [配置标准](./configuration-standard.md) - 代码质量限制、审核范围、评分规则
 - [Codex GitHub 集成](https://developers.openai.com/codex/integrations/github)
 - [GitHub Copilot 代码审查](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/configure-automatic-review)
 - [GitHub 标签标准](./github-labels-standard.md)

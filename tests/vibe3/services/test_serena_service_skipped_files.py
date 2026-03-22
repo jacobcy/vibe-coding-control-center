@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -98,7 +98,6 @@ def test_get_changed_functions_missing_file(temp_dir):
     """Test get_changed_functions with missing file."""
     # Mock git client
     mock_git_client = MagicMock()
-    mock_git_client.get_diff_hunk_ranges.return_value = [(1, 10)]
 
     # Create service
     service = SerenaService(git_client=mock_git_client)
@@ -106,9 +105,12 @@ def test_get_changed_functions_missing_file(temp_dir):
     # Test with non-existing file
     from vibe3.models.change_source import CommitSource
 
-    result = service.get_changed_functions(
-        str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")
-    )
+    # Mock get_diff_hunk_ranges function
+    with patch("vibe3.services.serena_service.get_diff_hunk_ranges") as mock_get_ranges:
+        mock_get_ranges.return_value = [(1, 10)]
+        result = service.get_changed_functions(
+            str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")
+        )
 
     # Should return empty list for missing file
     assert result == []

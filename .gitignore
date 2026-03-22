@@ -125,3 +125,4 @@ docs/audits/
 .claude/
 !.claude/rules/  # Exception: share project-specific rules with team
 .aider*
+MagicMock/

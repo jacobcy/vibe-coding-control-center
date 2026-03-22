@@ -34,7 +34,14 @@ class TestPrePushContract:
         """Verify pre-push.sh uses inspect base --json for risk assessment."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert "inspect base --json" in content
+        assert 'inspect base "$REVIEW_BASE" --json' in content
+
+    def test_pre_push_reads_ref_updates_from_stdin(self) -> None:
+        """Verify pre-push.sh derives review scope from this push, not full branch."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "PUSH_STDIN=$(cat)" in content
+        assert "review_scope" in content or "scope" in content
 
     def test_pre_push_calls_review_base_directly(self) -> None:
         """Verify pre-push.sh calls review base directly when needed."""
@@ -42,11 +49,20 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "review base" in content
 
-    def test_pre_push_prints_review_output_when_review_runs(self) -> None:
-        """Verify pre-push.sh prints captured review output back to the user."""
+    def test_pre_push_reviews_against_resolved_base_ref(self) -> None:
+        """Verify pre-push.sh uses resolved push base rather than
+        default origin/main."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert 'echo "$REVIEW_RESULT"' in content
+        assert 'inspect base "$REVIEW_BASE" --json' in content
+        assert 'review base "$REVIEW_BASE"' in content
+
+    def test_pre_push_prints_review_output_when_review_runs(self) -> None:
+        """Verify pre-push.sh prints review output in real-time using tee."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        # New implementation uses tee for real-time output
+        assert 'tee "$REVIEW_REPORT_FILE"' in content
 
     def test_pre_push_saves_review_output_to_agent_reports(self) -> None:
         """Verify pre-push.sh persists local review output to .agent/reports/."""
@@ -54,7 +70,8 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "mkdir -p .agent/reports" in content
         assert ".agent/reports/pre-push-review-" in content
-        assert 'printf \'%s\\n\' "$REVIEW_RESULT" > "$REVIEW_REPORT_FILE"' in content
+        # New implementation uses tee to save output in real-time
+        assert 'tee "$REVIEW_REPORT_FILE"' in content
 
     def test_pre_push_prints_review_trigger_and_verdict_summary(self) -> None:
         """Verify pre-push.sh prints explicit observability summary lines."""
@@ -62,7 +79,16 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert 'echo "  Review triggered: yes"' in content
         assert 'echo "  Review triggered: no"' in content
+        assert 'echo "  Review triggered: recommended-manual"' in content
         assert 'echo "  Review verdict: $VERDICT"' in content
+
+    def test_pre_push_prints_risk_reason_and_recommendations(self) -> None:
+        """Verify pre-push.sh surfaces inspect explanations, not just score."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "Risk reason:" in content
+        assert "Trigger factors:" in content
+        assert "Recommendations:" in content
 
     def test_pre_push_does_not_call_review_gate(self) -> None:
         """Verify pre-push.sh does not call review-gate."""
@@ -70,6 +96,12 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "review_gate" not in content
         assert "review-gate" not in content
+
+    def test_pre_push_hook_is_verbose_in_pre_commit(self) -> None:
+        """Verify pre-commit always prints hook stdout for successful pre-push runs."""
+        content = Path(".pre-commit-config.yaml").read_text()
+        assert "id: pre-push-checks" in content
+        assert "verbose: true" in content
 
 
 @pytest.mark.regression("issue-210")

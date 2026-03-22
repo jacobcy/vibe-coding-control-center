@@ -142,7 +142,7 @@ class FlowService:
         # Add binding event
         self.store.add_event(
             branch,
-            "task_bound",
+            "flow_bind",
             actor,
             f"Task '{task_id}' bound",
         )
@@ -190,7 +190,7 @@ class FlowService:
 
     def list_flows(
         self,
-        status: Literal["active", "idle", "missing", "stale"] | None = None,
+        status: Literal["active", "blocked", "done", "stale"] | None = None,
     ) -> list[FlowState]:
         """List flows.
 

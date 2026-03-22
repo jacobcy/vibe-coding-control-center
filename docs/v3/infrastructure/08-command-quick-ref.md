@@ -74,6 +74,104 @@ vibe3 flow new my-feature -h
 
 ---
 
+## Handoff Commands
+
+### `vibe handoff init`
+
+Ensure shared handoff file exists for current branch.
+
+**Behavior**:
+- Creates `.git/vibe3/handoff/<branch-safe>/current.md` if missing
+- Scaffolds fixed Markdown template
+
+```bash
+vibe3 handoff init
+```
+
+### `vibe handoff show`
+
+Show shared handoff file for current branch.
+
+```bash
+vibe3 handoff show
+```
+
+### `vibe handoff append <message>`
+
+Append a lightweight update block to shared handoff file for current branch.
+
+```bash
+vibe3 handoff append "Need to align event taxonomy" --actor "codex/gpt-5.4" --kind finding
+```
+
+### `vibe handoff plan <plan_ref>`
+
+Record plan handoff.
+
+**Options**:
+- `--next-step <text>` - Next step suggestion
+- `--blocked-by <text>` - Blocker description
+- `--actor <actor>` - Actor identifier (default: unknown)
+
+```bash
+vibe3 handoff plan docs/plans/feature-x.md
+vibe3 handoff plan docs/plans/feature-x.md --next-step "Start implementation" --actor "claude/sonnet-4.6"
+```
+
+### `vibe handoff report <report_ref>`
+
+Record report handoff.
+
+**Options**:
+- `--next-step <text>` - Next step suggestion
+- `--blocked-by <text>` - Blocker description
+- `--actor <actor>` - Actor identifier (default: unknown)
+
+```bash
+vibe3 handoff report docs/reports/review-2026-03-21.md
+vibe3 handoff report docs/reports/review.md --next-step "Address feedback" --actor "claude/sonnet-4.6"
+```
+
+### `vibe handoff audit <audit_ref>`
+
+Record audit handoff.
+
+**Options**:
+- `--next-step <text>` - Next step suggestion
+- `--blocked-by <text>` - Blocker description
+- `--actor <actor>` - Actor identifier (default: unknown)
+
+```bash
+vibe3 handoff audit docs/audits/security-check.md
+vibe3 handoff audit docs/audits/security.md --actor "reviewer/sonnet-4.6"
+```
+
+---
+
+## Verification Commands
+
+### `vibe check`
+
+Verify handoff store consistency.
+
+**Options**:
+- `--fix` - Attempt auto-fix for detected issues
+
+**Checks**:
+- Current branch exists in flow_state
+- task_issue_number exists on GitHub
+- Only one task issue per branch
+- pr_number matches current branch
+- plan_ref / report_ref / audit_ref files exist
+- shared current.md exists for active flow
+
+```bash
+vibe3 check
+vibe3 check --fix
+```
+
+---
+
 ## 常用命令示例
 
 ```bash

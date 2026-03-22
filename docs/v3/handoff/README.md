@@ -71,13 +71,27 @@ related_docs:
 
 ## Phase 04: Handoff & Logic Cutover
 
-**Objective**: Bridge SQLite state to Markdown handoff files.
+**Objective**: Converge v3 handoff truth, establish shared `current.md` as the structured handoff buffer, and define cutover readiness.
 
 **Inputs**: `docs/v3/handoff/04-handoff-and-cutover.md`
+**Implementation**: `docs/v3/handoff/04-implementation-plan.md`
+
 **Success Criteria**:
-- [ ] `vibe3 handoff sync` successfully writes to `handoff.md`.
-- [ ] `bin/vibe` (the existing v2 entry) correctly redirects to `vibe3` when configured.
-- [ ] Comparison tool confirms SQL record matches Markdown state.
+- [x] SQLite handoff store is defined as the minimal shared index, not a content truth.
+- [x] `.git/vibe3/handoff/<branch-safe>/current.md` is defined as the shared structured handoff buffer.
+- [x] `.agent/context/task.md` is reduced to local draft / compatibility notes.
+- [x] Review reports and `SESSION_ID` are recognized as evidence pointers without replacing issue / PR facts.
+
+**Implementation Status** (2026-03-21):
+- ✅ `vibe handoff init` - Create shared handoff file
+- ✅ `vibe handoff show` - Display handoff content
+- ✅ `vibe handoff append` - Append lightweight update block to shared handoff
+- ✅ `vibe handoff plan <ref>` - Record plan handoff with optional `--next-step` and `--blocked-by`
+- ✅ `vibe handoff report <ref>` - Record report handoff
+- ✅ `vibe handoff audit <ref>` - Record audit handoff
+- ✅ `vibe check` - Verify handoff store consistency
+- ✅ Unit tests: 92% coverage (28/28 tests passing)
+- ✅ Integration tests: All CLI commands functional
 
 ---
 
@@ -100,7 +114,7 @@ related_docs:
 | 01: Skeleton | `01-command-and-skeleton.md` | Help flags |
 | 02: State | `02-flow-task-foundation.md` | SQL/JSON |
 | 03: PR | `03-pr-domain.md` | API Log |
-| 04: Sync | `04-handoff-and-cutover.md` | Handoff.md |
+| 04: Handoff Truth | `04-handoff-and-cutover.md` | Truth model / cutover readiness |
 | 05: Final | `05-polish-and-cleanup.md` | Timing/Lint |
 
 ---
