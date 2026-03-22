@@ -181,7 +181,7 @@ pr_scoring:
     # Note: This is separate from risk level thresholds
     # Example: score=10 → CRITICAL level, but NOT blocked (10 < 12)
     # Example: score=12 → CRITICAL level, AND blocked (12 >= 12)
-    block_on_score_at_or_above: 12  # Raised from 9 to reduce false positives
+    block_on_score_at_or_above: 10  # Raised from 9 to reduce false positives
 
     # Always block if codex returns these verdicts
     block_on_verdict:
