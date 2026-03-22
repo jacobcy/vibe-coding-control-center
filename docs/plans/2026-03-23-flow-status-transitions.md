@@ -150,7 +150,6 @@ def switch_flow(
 def close_flow(
     self,
     branch: str,
-    actor: str = "unknown",
     check_pr: bool = True,
 ) -> None:
     """
@@ -166,14 +165,18 @@ def close_flow(
 def block_flow(
     self,
     branch: str,
-    reason: str,
-    actor: str = "unknown",
+    reason: str | None = None,
+    blocked_by_issue: int | None = None,
 ) -> None:
     """
     标记 flow 为 blocked。
 
+    如果指定 blocked_by_issue:
+    1. 调用 TaskService.link_issue(branch, issue, role='dependency')
+    2. 自动生成 blocked_by 描述（如果未提供 reason）
+
     1. 更新 flow_status = blocked
-    2. 记录 blocked_by
+    2. 设置 blocked_by（如果有）
     3. 添加事件
     4. 保留分支
     """
@@ -181,7 +184,6 @@ def block_flow(
 def abort_flow(
     self,
     branch: str,
-    actor: str = "unknown",
 ) -> None:
     """
     废弃 flow 并删除分支。
@@ -201,6 +203,14 @@ def abort_flow(
 - `actor` 参数仅在 handoff 命令中使用（plan/report/audit），用于记录阶段交接的责任人
 - flow 生命周期命令（new/switch/done/blocked/aborted）不需要 actor 参数
 - service 层的 `latest_actor` 字段保留，但不再从命令层传入，改为内部逻辑处理
+
+**blocked_by 字段说明**：
+- `blocked_by` 字段保留，用于记录阻塞原因
+- `handoff plan/report/audit --blocked-by` - 通用的阻塞原因描述（自由文本）
+- `flow blocked --by <issue>` - 具体的依赖 issue，会自动建立 dependency 关联
+- 两者互补，不冲突：
+  - handoff 的 `--blocked-by` 用于记录阻塞状态（可以是任何原因）
+  - flow blocked 的 `--by` 用于建立依赖关系并自动设置阻塞状态
 
 更新命令实现：
 
@@ -238,10 +248,19 @@ def done(
 @app.command()
 def blocked(
     branch: Annotated[str | None, typer.Option("--branch")] = None,
-    reason: Annotated[str, typer.Option("--reason")] = "",
+    reason: Annotated[str | None, typer.Option("--reason")] = None,
+    by: Annotated[int | None, typer.Option("--by", help="Dependency issue number")] = None,
     trace: Annotated[bool, typer.Option()] = False,
 ) -> None:
-    """Mark flow as blocked."""
+    """Mark flow as blocked.
+
+    If --by is provided, automatically adds dependency issue link.
+
+    Examples:
+        vibe3 flow blocked --reason "等待外部反馈"
+        vibe3 flow blocked --by 218
+        vibe3 flow blocked --by 218 --reason "需要 #218 先完成"
+    """
     # ... 调用 service.block_flow()
 
 @app.command()
@@ -339,8 +358,24 @@ def close_flow(
 ) -> None:
     """关闭 flow 并删除分支。"""
 
-def block_flow(self, branch: str, reason: str) -> None:
-    """标记 flow 为 blocked。"""
+def block_flow(
+    self,
+    branch: str,
+    reason: str | None = None,
+    blocked_by_issue: int | None = None,
+) -> None:
+    """
+    标记 flow 为 blocked。
+
+    如果指定 blocked_by_issue:
+    1. 调用 TaskService.link_issue(branch, issue, role='dependency')
+    2. 自动生成 blocked_by 描述（如果未提供 reason）
+
+    1. 更新 flow_status = blocked
+    2. 设置 blocked_by（如果有）
+    3. 添加事件
+    4. 保留分支
+    """
 
 def abort_flow(self, branch: str) -> None:
     """废弃 flow 并删除分支。"""
@@ -420,6 +455,8 @@ def test_flow_new_switch_done_lifecycle():
 - [ ] `vibe3 flow switch feature-a` 切换到已有 flow
 - [ ] `vibe3 flow done` 删除分支并标记 flow_status = done
 - [ ] `vibe3 flow blocked --reason "等待依赖"` 标记 blocked
+- [ ] `vibe3 flow blocked --by 218` 标记 blocked 并自动添加 dependency issue link
+- [ ] `vibe3 flow blocked --by 218 --reason "需要 #218 先完成"` 同时设置依赖和原因
 - [ ] `vibe3 flow aborted` 标记废弃并删除分支
 
 ### Actor 参数清理验收
