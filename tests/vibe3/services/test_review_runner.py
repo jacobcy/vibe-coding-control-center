@@ -227,7 +227,6 @@ class TestRunReviewAgent:
 
     def test_run_review_handles_os_error(self) -> None:
         """Runner should handle OSError gracefully."""
-        import subprocess
 
         with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
             mock_run.side_effect = OSError("I/O error")
