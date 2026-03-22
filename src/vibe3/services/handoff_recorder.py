@@ -36,7 +36,12 @@ def record_handoff(
     branch = git_client.get_current_branch()
 
     # Determine actor role based on handoff type
-    actor_role = "planner_actor" if handoff_type == "plan" else "reviewer_actor"
+    if handoff_type == "plan":
+        actor_role = "planner_actor"
+    elif handoff_type == "report":
+        actor_role = "executor_actor"
+    else:  # audit
+        actor_role = "reviewer_actor"
 
     # Build update kwargs
     update_kwargs = {
