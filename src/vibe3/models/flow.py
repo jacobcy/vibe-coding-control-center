@@ -92,5 +92,13 @@ class FlowStatusResponse(BaseModel):
     task_issue_number: int | None = None
     pr_number: int | None = None
     spec_ref: str | None = None
+    plan_ref: str | None = None
+    report_ref: str | None = None
+    audit_ref: str | None = None
+    planner_actor: str | None = None
+    executor_actor: str | None = None
+    reviewer_actor: str | None = None
+    latest_actor: str | None = None
+    blocked_by: str | None = None
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)

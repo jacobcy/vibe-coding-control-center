@@ -21,11 +21,9 @@ class TestFlowCreation:
         assert result.branch == "test-branch"
         assert result.flow_status == "active"
 
-        # Verify store calls
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             flow_slug="test-flow",
-            task_issue_number=None,
             latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
@@ -35,16 +33,15 @@ class TestFlowCreation:
             "Flow 'test-flow' created",
         )
 
-    def test_create_flow_with_task(self, mock_store) -> None:
-        """Test creating a flow with initial task binding."""
+    def test_create_flow_no_task_id(self, mock_store) -> None:
+        """create_flow no longer accepts task_id; binding via TaskService."""
         service = FlowService(store=mock_store)
         result = service.create_flow(
             slug="test-flow",
             branch="test-branch",
             actor="test-actor",
-            task_id="TASK-123",
         )
 
         assert result.flow_slug == "test-flow"
-        mock_store.update_flow_state.assert_called()
-        mock_store.add_issue_link.assert_called_once_with("test-branch", 123, "task")
+        # No add_issue_link call — task binding is separate
+        mock_store.add_issue_link.assert_not_called()

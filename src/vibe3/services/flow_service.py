@@ -47,7 +47,6 @@ class FlowService:
         self,
         slug: str,
         branch: str,
-        task_id: str | None = None,
         actor: str = "unknown",
     ) -> FlowState:
         """Create a new flow.
@@ -55,7 +54,6 @@ class FlowService:
         Args:
             slug: Flow name/slug
             branch: Git branch name
-            task_id: Optional task ID to bind
             actor: Actor creating the flow
 
         Returns:
@@ -66,28 +64,15 @@ class FlowService:
             action="create",
             slug=slug,
             branch=branch,
-            task_id=task_id,
             actor=actor,
         ).info("Creating flow")
 
-        # Parse task_id if provided
-        task_issue_number = None
-        if task_id:
-            task_issue_number = parse_task_id(task_id)
-
-        # Update flow state
         self.store.update_flow_state(
             branch,
             flow_slug=slug,
-            task_issue_number=task_issue_number,
             latest_actor=actor,
         )
 
-        # Add issue link if task_id provided
-        if task_id and task_issue_number is not None:
-            self.store.add_issue_link(branch, task_issue_number, "task")
-
-        # Add creation event
         self.store.add_event(
             branch,
             "flow_created",
@@ -95,62 +80,9 @@ class FlowService:
             f"Flow '{slug}' created",
         )
 
-        # Get the created flow
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             raise RuntimeError(f"Failed to create flow for branch {branch}")
-
-        return FlowState(**flow_data)
-
-    def bind_flow(
-        self,
-        branch: str,
-        task_id: str,
-        actor: str = "unknown",
-    ) -> FlowState:
-        """Bind a task to a flow.
-
-        Args:
-            branch: Git branch name
-            task_id: Task ID to bind
-            actor: Actor binding the task
-
-        Returns:
-            Updated flow state
-        """
-        logger.bind(
-            domain="flow",
-            action="bind_task",
-            branch=branch,
-            task_id=task_id,
-            actor=actor,
-        ).info("Binding task to flow")
-
-        # Parse task_id
-        task_issue_number = parse_task_id(task_id)
-
-        # Update flow state with task_issue_number
-        self.store.update_flow_state(
-            branch,
-            task_issue_number=task_issue_number,
-            latest_actor=actor,
-        )
-
-        # Add issue link
-        self.store.add_issue_link(branch, task_issue_number, "task")
-
-        # Add binding event
-        self.store.add_event(
-            branch,
-            "flow_bind",
-            actor,
-            f"Task '{task_id}' bound",
-        )
-
-        # Get updated flow
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
 
         return FlowState(**flow_data)
 
@@ -184,6 +116,14 @@ class FlowService:
             task_issue_number=flow_data.get("task_issue_number"),
             pr_number=flow_data.get("pr_number"),
             spec_ref=flow_data.get("spec_ref"),
+            plan_ref=flow_data.get("plan_ref"),
+            report_ref=flow_data.get("report_ref"),
+            audit_ref=flow_data.get("audit_ref"),
+            planner_actor=flow_data.get("planner_actor"),
+            executor_actor=flow_data.get("executor_actor"),
+            reviewer_actor=flow_data.get("reviewer_actor"),
+            latest_actor=flow_data.get("latest_actor"),
+            blocked_by=flow_data.get("blocked_by"),
             next_step=flow_data.get("next_step"),
             issues=issues,
         )

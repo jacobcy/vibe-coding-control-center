@@ -217,7 +217,7 @@ def validate_pr_number(pr_number: int) -> None:
 
     # Not a PR, check if it's an issue
     issue = gh.view_issue(pr_number)
-    if issue is not None:
+    if isinstance(issue, dict):
         raise UserError(
             f"#{pr_number} is an issue, not a PR.\n"
             f"  Use 'vibe inspect pr <number>' only for pull requests.\n"
