@@ -4,6 +4,7 @@ import re
 
 from typer.testing import CliRunner
 
+from vibe3.cli import app as cli_app
 from vibe3.commands.plan import app as plan_app
 
 runner = CliRunner(env={"NO_COLOR": "1"})
@@ -16,6 +17,15 @@ def strip_ansi(text: str) -> str:
 
 def test_plan_help_shows_subcommands() -> None:
     result = runner.invoke(plan_app, ["--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    assert "task" in stdout
+    assert "spec" in stdout
+
+
+def test_main_cli_registers_plan_command() -> None:
+    result = runner.invoke(cli_app, ["plan", "--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0

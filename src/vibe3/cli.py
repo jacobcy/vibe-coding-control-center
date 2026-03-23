@@ -12,7 +12,7 @@ import typer.rich_utils as _ru
 from loguru import logger
 from rich import box as _box
 
-from vibe3.commands import check, flow, handoff, hooks, inspect, pr, review, task
+from vibe3.commands import check, flow, handoff, hooks, inspect, plan, pr, review, task
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
 
@@ -40,6 +40,7 @@ app = typer.Typer(
 # Register subcommands
 app.add_typer(flow.app, name="flow")
 app.add_typer(task.app, name="task")
+app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
