@@ -31,6 +31,7 @@ class StoreClientProtocol(Protocol):
         self,
         branch: str,
         event_type: str | None = None,
+        event_type_prefix: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:

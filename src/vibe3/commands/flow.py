@@ -63,6 +63,22 @@ def new(
         branch = git.get_current_branch()
         flow = service.create_flow(slug=name, branch=branch)
 
+        # Bind task if provided
+        if task:
+            store = SQLiteClient()
+            try:
+                issue_number = int("".join(filter(str.isdigit, task)))
+                store.add_issue_link(branch, issue_number, "task")
+                store.update_flow_state(branch, task_issue_number=issue_number)
+                store.add_event(
+                    branch, "task_bound", actor, detail=f"Task bound: {task}"
+                )
+                logger.bind(command="flow new", task=task).info("Task bound to flow")
+            except ValueError:
+                logger.bind(command="flow new", task=task).warning(
+                    "Invalid task ID format, skipping binding"
+                )
+
         # Bind spec_ref if provided
         if spec:
             store = SQLiteClient()

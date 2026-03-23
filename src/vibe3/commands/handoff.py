@@ -118,12 +118,10 @@ def show(
 
         state = FlowState(**state_data)
         limit = 0 if show_all else 5
-        events_data = store.get_events(branch, limit=limit or 50)
-        handoff_events = [
-            FlowEvent(**e)
-            for e in events_data
-            if e.get("event_type", "").startswith("handoff_")
-        ]
+        events_data = store.get_events(
+            branch, event_type_prefix="handoff_", limit=limit or 50
+        )
+        handoff_events = [FlowEvent(**e) for e in events_data]
 
         if json_output:
             output = {

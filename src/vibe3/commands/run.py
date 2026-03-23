@@ -95,6 +95,8 @@ def _record_run_event(
     run_content: str,
     config: VibeConfig,
     plan_file: str,
+    cli_agent: str | None = None,
+    cli_model: str | None = None,
 ) -> Path | None:
     """Record run execution to handoff."""
     git = GitClient()
@@ -109,13 +111,17 @@ def _record_run_event(
 
     run_file.write_text(run_content, encoding="utf-8")
 
-    run_config = getattr(config, "run", None)
-    agent = "executor"
-    model = None
-    if run_config and hasattr(run_config, "agent_config"):
-        ac = run_config.agent_config
-        agent = ac.agent if hasattr(ac, "agent") else "executor"
-        model = ac.model if hasattr(ac, "model") else None
+    # Determine actual actor from CLI overrides or config defaults
+    agent = cli_agent
+    model = cli_model
+    if agent is None:
+        run_config = getattr(config, "run", None)
+        if run_config and hasattr(run_config, "agent_config"):
+            ac = run_config.agent_config
+            agent = ac.agent if hasattr(ac, "agent") else "executor"
+            model = ac.model if hasattr(ac, "model") else None
+    if agent is None:
+        agent = "executor"
 
     actor = f"{agent}/{model}" if model else agent
 
@@ -175,7 +181,9 @@ def _run_execution(
         return
 
     run_content = result.stdout
-    run_file = _record_run_event(run_content, config, plan_file)
+    run_file = _record_run_event(
+        run_content, config, plan_file, cli_agent=options.agent, cli_model=options.model
+    )
     if run_file:
         typer.echo(f"-> Run output saved to: {run_file}")
 
