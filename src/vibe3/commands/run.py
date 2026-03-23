@@ -1,5 +1,6 @@
 """Run command - Execute implementation plans using codeagent-wrapper."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -7,10 +8,12 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
 from vibe3.services.run_context_builder import build_run_context
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -78,6 +81,62 @@ def _get_agent_options(
     )
 
 
+def _get_handoff_dir() -> Path:
+    """Get handoff directory for current branch."""
+    git = GitClient()
+    git_dir = git.get_git_common_dir()
+    branch = git.get_current_branch()
+    handoff_dir = get_branch_handoff_dir(git_dir, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    return handoff_dir
+
+
+def _record_run_event(
+    run_content: str,
+    config: VibeConfig,
+    plan_file: str,
+) -> Path | None:
+    """Record run execution to handoff."""
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+    except Exception:
+        return None
+
+    handoff_dir = _get_handoff_dir()
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    run_file = handoff_dir / f"run-{timestamp}.md"
+
+    run_file.write_text(run_content, encoding="utf-8")
+
+    run_config = getattr(config, "run", None)
+    agent = "executor"
+    model = None
+    if run_config and hasattr(run_config, "agent_config"):
+        ac = run_config.agent_config
+        agent = ac.agent if hasattr(ac, "agent") else "executor"
+        model = ac.model if hasattr(ac, "model") else None
+
+    actor = f"{agent}/{model}" if model else agent
+
+    store = SQLiteClient()
+    store.add_event(
+        branch,
+        "handoff_run",
+        actor,
+        detail=f"Run completed: {run_file.name}",
+        refs={
+            "ref": str(run_file),
+            "plan_ref": plan_file,
+            "agent": agent,
+            "model": model,
+        },
+    )
+    store.update_flow_state(branch, report_ref=str(run_file), executor_actor=actor)
+
+    return run_file
+
+
 def _run_execution(
     plan_file: str,
     config: VibeConfig,
@@ -110,10 +169,17 @@ def _run_execution(
         model=options.model,
     )
     typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
     if dry_run:
         return
+
+    run_content = result.stdout
+    run_file = _record_run_event(run_content, config, plan_file)
+    if run_file:
+        typer.echo(f"-> Run output saved to: {run_file}")
+
+    typer.echo("\n" + run_content)
 
 
 @app.command()
