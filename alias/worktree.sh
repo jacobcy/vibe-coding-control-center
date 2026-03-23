@@ -304,12 +304,7 @@ vup() {
 
   # Create session if needed (don't destroy existing)
   if ! tmux has-session -t "$session_name" 2>/dev/null; then
-    tmux new-session -d -s "$session_name" -c "$dir_path" -n "dash"
-  else
-    # Ensure session has a dash window
-    if ! tmux list-windows -t "$session_name" -F "#{window_name}" 2>/dev/null | grep -qx "dash"; then
-      tmux new-window -t "$session_name" -n "dash" -c "$dir_path"
-    fi
+    tmux new-session -d -s "$session_name" -c "$dir_path"
   fi
 
   case "$mode" in
