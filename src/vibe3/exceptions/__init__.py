@@ -228,3 +228,21 @@ class BatchError(SystemError):
         """
         super().__init__(f"{message} ({len(errors)} failures)")
         self.errors = errors
+
+
+# ========== Orchestration Errors ==========
+
+
+class InvalidTransitionError(UserError):
+    """Invalid state transition in orchestration state machine."""
+
+    def __init__(self, from_state: str | None, to_state: str) -> None:
+        """Initialize InvalidTransitionError.
+
+        Args:
+            from_state: Source state (or None if no prior state)
+            to_state: Target state
+        """
+        self.from_state = from_state
+        self.to_state = to_state
+        super().__init__(f"Invalid transition: {from_state or 'None'} -> {to_state}")
