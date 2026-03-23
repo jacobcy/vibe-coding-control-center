@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -65,6 +66,15 @@ def _get_changed_files(base_branch: str = "main") -> list[str]:
         return []
 
 
+def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
+    return (
+        not json_output
+        and not yaml_output
+        and sys.stdin.isatty()
+        and sys.stdout.isatty()
+    )
+
+
 def register_create_command(app: typer.Typer) -> None:
     """Register pr create command."""
 
@@ -109,6 +119,7 @@ def register_create_command(app: typer.Typer) -> None:
 
             pr_title = title
             pr_body = body
+            interactive = _is_interactive(json_output, yaml_output)
 
             if ai and not title:
                 console = Console()
@@ -116,9 +127,13 @@ def register_create_command(app: typer.Typer) -> None:
                 changed_files = _get_changed_files(base)
 
                 if not commits:
-                    console.print(
-                        "[yellow]No commits found, cannot generate AI suggestions[/]"
-                    )
+                    if interactive:
+                        console.print(
+                            (
+                                "[yellow]No commits found, cannot generate "
+                                "AI suggestions[/]"
+                            )
+                        )
                 else:
                     config = VibeConfig.get_defaults()
                     prompts_path = Path("config/prompts.yaml")
@@ -128,36 +143,46 @@ def register_create_command(app: typer.Typer) -> None:
                     if result:
                         suggested_title, suggested_body = result
                         if suggested_title:
-                            console.print(
-                                f"\n[bold]Suggested title:[/] {suggested_title}"
-                            )
-                            use_suggested = Prompt.ask(
-                                "Use this title?",
-                                choices=["y", "n"],
-                                default="y",
-                            )
-                            if use_suggested == "y":
-                                pr_title = suggested_title
+                            if interactive:
+                                console.print(
+                                    f"\n[bold]Suggested title:[/] {suggested_title}"
+                                )
+                                use_suggested = Prompt.ask(
+                                    "Use this title?",
+                                    choices=["y", "n"],
+                                    default="y",
+                                )
+                                if use_suggested == "y":
+                                    pr_title = suggested_title
+                                else:
+                                    pr_title = Prompt.ask("Enter PR title")
                             else:
-                                pr_title = Prompt.ask("Enter PR title")
+                                pr_title = suggested_title
                         if suggested_body:
-                            console.print(
-                                f"\n[bold]Suggested body:[/]\n{suggested_body}"
-                            )
-                            use_body = Prompt.ask(
-                                "Use this body?",
-                                choices=["y", "n"],
-                                default="y",
-                            )
-                            if use_body == "y":
+                            if interactive:
+                                console.print(
+                                    f"\n[bold]Suggested body:[/]\n{suggested_body}"
+                                )
+                                use_body = Prompt.ask(
+                                    "Use this body?",
+                                    choices=["y", "n"],
+                                    default="y",
+                                )
+                                if use_body == "y":
+                                    pr_body = suggested_body or ""
+                            else:
                                 pr_body = suggested_body or ""
-                    else:
+                    elif interactive:
                         console.print(
                             "[yellow]AI suggestion unavailable, using manual input[/]"
                         )
 
             if not pr_title:
-                pr_title = Prompt.ask("Enter PR title")
+                if interactive:
+                    pr_title = Prompt.ask("Enter PR title")
+                else:
+                    typer.echo("Error: PR title is required", err=True)
+                    raise typer.Exit(1)
 
             service = PRService()
             pr = service.create_draft_pr(title=pr_title, body=pr_body, base_branch=base)

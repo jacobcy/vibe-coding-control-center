@@ -29,10 +29,6 @@ class AIClient:
         self._api_key: str | None = None
         self._base_url: str | None = None
 
-        if not config.enabled:
-            logger.bind(module="ai_client").debug("AI assistance disabled in config")
-            return
-
         if not HAS_LITELLM:
             logger.bind(module="ai_client").warning(
                 "litellm package not installed, AI features disabled"

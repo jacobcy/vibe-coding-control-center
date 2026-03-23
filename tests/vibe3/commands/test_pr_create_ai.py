@@ -1,5 +1,6 @@
 """Integration tests for PR create command with AI support."""
 
+import json
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -8,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
+from vibe3.config.settings import AIConfig
 
 
 @pytest.fixture
@@ -94,3 +96,56 @@ pr:
                     mock_files.return_value = ["src/file.py"]
                     result = runner.invoke(app, ["pr", "create", "--ai"])
                     assert result.exit_code in [0, 1]
+
+    def test_pr_create_ai_json_uses_suggestions_without_prompt(
+        self, runner: CliRunner
+    ) -> None:
+        """Test pr create --ai --json uses AI result without prompting."""
+        with patch("vibe3.commands.pr_create._get_commits") as mock_commits:
+            mock_commits.return_value = ["feat: add feature"]
+            with patch("vibe3.commands.pr_create._get_changed_files") as mock_files:
+                mock_files.return_value = ["src/file.py"]
+                with patch(
+                    "vibe3.commands.pr_create.VibeConfig.get_defaults"
+                ) as mock_config:
+                    mock_config.return_value.ai = AIConfig()
+                    with patch(
+                        "vibe3.commands.pr_create.AIService.suggest_pr_content"
+                    ) as mock_suggest:
+                        mock_suggest.return_value = (
+                            "feat: ai title",
+                            "Summary\n\n- change",
+                        )
+                        with patch(
+                            "vibe3.commands.pr_create.Prompt.ask"
+                        ) as mock_prompt:
+                            with patch(
+                                "vibe3.commands.pr_create.PRService"
+                            ) as mock_service:
+                                mock_pr = MagicMock(
+                                    number=123,
+                                    title="feat: ai title",
+                                    body="Summary\n\n- change",
+                                    model_dump=lambda: {
+                                        "number": 123,
+                                        "title": "feat: ai title",
+                                        "body": "Summary\n\n- change",
+                                    },
+                                )
+                                (
+                                    mock_service.return_value.create_draft_pr.return_value
+                                ) = mock_pr
+                                result = runner.invoke(
+                                    app,
+                                    ["pr", "create", "--ai", "--json"],
+                                )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["title"] == "feat: ai title"
+        mock_prompt.assert_not_called()
+        mock_suggest.assert_called_once_with(["feat: add feature"], ["src/file.py"])
+        mock_service.return_value.create_draft_pr.assert_called_once_with(
+            title="feat: ai title",
+            body="Summary\n\n- change",
+            base_branch="main",
+        )

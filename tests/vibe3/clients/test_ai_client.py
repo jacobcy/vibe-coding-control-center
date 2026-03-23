@@ -16,7 +16,7 @@ class TestAIClient:
     def test_init_with_valid_config(self) -> None:
         """Test initialization with valid config."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             client = AIClient(config)
             assert client.config == config
             assert client._api_key == "test-key"
@@ -24,21 +24,14 @@ class TestAIClient:
     def test_init_with_missing_api_key(self) -> None:
         """Test initialization with missing API key returns None."""
         with patch.dict(os.environ, {}, clear=True):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             client = AIClient(config)
             assert client._api_key is None
-
-    def test_init_disabled_returns_none(self) -> None:
-        """Test initialization when disabled."""
-        config = AIConfig(enabled=False, model="deepseek-chat")
-        client = AIClient(config)
-        assert client._api_key is None
 
     def test_init_with_custom_base_url(self) -> None:
         """Test initialization with custom base URL."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
             config = AIConfig(
-                enabled=True,
                 base_url="http://localhost:11434/v1",
                 model="ollama/llama3",
             )
@@ -48,7 +41,7 @@ class TestAIClient:
     def test_generate_text_success(self) -> None:
         """Test successful text generation."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             with patch("litellm.completion") as mock_completion:
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock()]
@@ -61,17 +54,10 @@ class TestAIClient:
                 assert result == "generated text"
                 mock_completion.assert_called_once()
 
-    def test_generate_text_disabled_returns_none(self) -> None:
-        """Test generation when disabled returns None."""
-        config = AIConfig(enabled=False, model="deepseek-chat")
-        client = AIClient(config)
-        result = client.generate_text("system prompt", "user prompt")
-        assert result is None
-
     def test_generate_text_no_api_key_returns_none(self) -> None:
         """Test generation with no API key returns None."""
         with patch.dict(os.environ, {}, clear=True):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             client = AIClient(config)
             result = client.generate_text("system prompt", "user prompt")
             assert result is None
@@ -79,7 +65,7 @@ class TestAIClient:
     def test_generate_text_api_error_returns_none(self) -> None:
         """Test generation with API error returns None."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             with patch("litellm.completion") as mock_completion:
                 mock_completion.side_effect = Exception("API error")
 
@@ -91,7 +77,7 @@ class TestAIClient:
     def test_generate_text_empty_content_returns_none(self) -> None:
         """Test generation with empty content returns None."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             with patch("litellm.completion") as mock_completion:
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock()]
@@ -106,7 +92,7 @@ class TestAIClient:
     def test_generate_text_with_extra_params(self) -> None:
         """Test generation with extra parameters."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+            config = AIConfig(model="deepseek/deepseek-chat")
             with patch("litellm.completion") as mock_completion:
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock()]
@@ -127,7 +113,6 @@ class TestAIClient:
         """Test that client uses the environment variable name from config."""
         with patch.dict(os.environ, {"CUSTOM_API_KEY": "custom-key"}, clear=True):
             config = AIConfig(
-                enabled=True,
                 api_key_env="CUSTOM_API_KEY",
                 model="deepseek-chat",
             )
@@ -142,7 +127,7 @@ class TestAIClientWithoutLitellm:
         """Test initialization when litellm is not installed."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
             with patch("vibe3.clients.ai_client.HAS_LITELLM", False):
-                config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+                config = AIConfig(model="deepseek/deepseek-chat")
                 client = AIClient(config)
                 assert client._api_key is None
 
@@ -150,7 +135,7 @@ class TestAIClientWithoutLitellm:
         """Test generation when litellm is not installed."""
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}):
             with patch("vibe3.clients.ai_client.HAS_LITELLM", False):
-                config = AIConfig(enabled=True, model="deepseek/deepseek-chat")
+                config = AIConfig(model="deepseek/deepseek-chat")
                 client = AIClient(config)
                 result = client.generate_text("system prompt", "user prompt")
                 assert result is None

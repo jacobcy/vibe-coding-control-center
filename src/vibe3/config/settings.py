@@ -29,7 +29,6 @@ class AIConfig(BaseModel):
     用于 flow new --ai 和 pr create --ai 功能。
     """
 
-    enabled: bool = Field(default=False)
     api_key_env: str = Field(default="DEEPSEEK_API_KEY")
     base_url: str = Field(default="https://api.deepseek.com/v1")
     model: str = Field(default="deepseek/deepseek-chat")

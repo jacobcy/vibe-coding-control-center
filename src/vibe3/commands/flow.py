@@ -2,6 +2,7 @@
 """Flow command handlers."""
 
 import json
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, Iterator, Literal
@@ -45,6 +46,10 @@ def _default_flow_name(branch: str) -> str:
     return branch.split("/", 1)[1] if "/" in branch else branch
 
 
+def _is_interactive(json_output: bool) -> bool:
+    return not json_output and sys.stdin.isatty() and sys.stdout.isatty()
+
+
 @app.command()
 def new(
     name: Annotated[
@@ -78,16 +83,22 @@ def new(
         logger.bind(command="flow new", name=name, issue=issue).info("Creating flow")
         git = GitClient()
         console = Console()
+        interactive = _is_interactive(json_output)
         slug = name
+
+        if ai and issue is None:
+            typer.echo("Error: --ai requires --issue", err=True)
+            raise typer.Exit(1)
 
         if ai and issue is not None:
             issue_number = parse_issue_ref(issue)
             gh = GitHubClient()
             issue_data = gh.view_issue(issue_number)
             if issue_data is None:
-                console.print(
-                    f"[yellow]Warning: Could not fetch issue #{issue_number}[/]"
-                )
+                if interactive:
+                    console.print(
+                        f"[yellow]Warning: Could not fetch issue #{issue_number}[/]"
+                    )
             elif isinstance(issue_data, dict):
                 issue_title = issue_data.get("title", "")
                 issue_body = issue_data.get("body")
@@ -96,15 +107,18 @@ def new(
                 ai_service = AIService(config.ai, prompts_path=prompts_path)
                 suggestions = ai_service.suggest_flow_slug(issue_title, issue_body)
                 if suggestions:
-                    console.print("\n[bold]AI Suggestions:[/]")
-                    for i, suggestion in enumerate(suggestions, 1):
-                        console.print(f"  {i}. {suggestion}")
-                    choice = Prompt.ask("Choose (1-3) or enter name", default="1")
-                    if choice.isdigit() and 1 <= int(choice) <= len(suggestions):
-                        slug = suggestions[int(choice) - 1]
+                    if interactive:
+                        console.print("\n[bold]AI Suggestions:[/]")
+                        for i, suggestion in enumerate(suggestions, 1):
+                            console.print(f"  {i}. {suggestion}")
+                        choice = Prompt.ask("Choose (1-3) or enter name", default="1")
+                        if choice.isdigit() and 1 <= int(choice) <= len(suggestions):
+                            slug = suggestions[int(choice) - 1]
+                        else:
+                            slug = choice or None
                     else:
-                        slug = choice or None
-                else:
+                        slug = suggestions[0]
+                elif interactive:
                     console.print("[yellow]AI suggestion unavailable, using default[/]")
 
         if slug is None:

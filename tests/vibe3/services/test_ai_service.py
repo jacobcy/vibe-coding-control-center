@@ -11,22 +11,18 @@ from vibe3.services.ai_service import AIService
 class TestAIService:
     """Tests for AIService class."""
 
-    def test_init_disabled_returns_none(self, tmp_path: Path) -> None:
-        """Test initialization when AI is disabled."""
-        config = AIConfig(enabled=False)
-        service = AIService(config, prompts_path=tmp_path / "prompts.yaml")
-        assert service.ai_client is None
-
-    def test_init_enabled_creates_client(self, tmp_path: Path) -> None:
-        """Test initialization when AI is enabled."""
+    def test_init_with_api_key_creates_client(self, tmp_path: Path) -> None:
+        """Test initialization when API key exists."""
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             service = AIService(config, prompts_path=tmp_path / "prompts.yaml")
             assert service.ai_client is not None
 
-    def test_suggest_flow_slug_disabled_returns_none(self, tmp_path: Path) -> None:
-        """Test flow slug suggestion when disabled."""
-        config = AIConfig(enabled=False)
+    def test_suggest_flow_slug_without_api_key_returns_none(
+        self, tmp_path: Path
+    ) -> None:
+        """Test flow slug suggestion when AI client is unavailable."""
+        config = AIConfig(api_key_env="OPENAI_API_KEY")
         service = AIService(config, prompts_path=tmp_path / "prompts.yaml")
         result = service.suggest_flow_slug("Add feature", "Description")
         assert result is None
@@ -42,7 +38,7 @@ flow:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.return_value = "feature-name\nanother-name\nthird-name"
                 service = AIService(config, prompts_path=prompts_file)
@@ -62,7 +58,7 @@ flow:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.return_value = "slug-name"
                 service = AIService(config, prompts_path=prompts_file)
@@ -84,7 +80,7 @@ flow:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.return_value = ""
                 service = AIService(config, prompts_path=prompts_file)
@@ -103,7 +99,7 @@ flow:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.return_value = None
                 service = AIService(config, prompts_path=prompts_file)
@@ -111,9 +107,11 @@ flow:
 
                 assert result is None
 
-    def test_suggest_pr_content_disabled_returns_none(self, tmp_path: Path) -> None:
-        """Test PR content suggestion when disabled."""
-        config = AIConfig(enabled=False)
+    def test_suggest_pr_content_without_api_key_returns_none(
+        self, tmp_path: Path
+    ) -> None:
+        """Test PR content suggestion when AI client is unavailable."""
+        config = AIConfig(api_key_env="OPENAI_API_KEY")
         service = AIService(config, prompts_path=tmp_path / "prompts.yaml")
         result = service.suggest_pr_content(["commit 1", "commit 2"])
         assert result is None
@@ -132,7 +130,7 @@ pr:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.side_effect = ["feat: add feature", "Summary\n\nChanges:"]
                 service = AIService(config, prompts_path=prompts_file)
@@ -157,7 +155,7 @@ pr:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.side_effect = ["title", "body"]
                 service = AIService(config, prompts_path=prompts_file)
@@ -182,7 +180,7 @@ pr:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.return_value = None
                 service = AIService(config, prompts_path=prompts_file)
@@ -206,7 +204,7 @@ pr:
 """)
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             with patch.object(AIClient, "generate_text") as mock_generate:
                 mock_generate.side_effect = ["title", None]
                 service = AIService(config, prompts_path=prompts_file)
@@ -221,7 +219,7 @@ pr:
         """Test that missing prompts file uses default prompts."""
         prompts_file = tmp_path / "nonexistent.yaml"
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             service = AIService(config, prompts_path=prompts_file)
 
             assert service.ai_client is not None
@@ -234,7 +232,7 @@ pr:
         prompts_file.write_text("invalid: yaml: content:")
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            config = AIConfig(enabled=True)
+            config = AIConfig(api_key_env="OPENAI_API_KEY")
             service = AIService(config, prompts_path=prompts_file)
 
             assert "flow" in service.prompts
