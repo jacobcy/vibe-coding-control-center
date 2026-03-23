@@ -1,0 +1,67 @@
+# AI Prompts 配置
+# 用于 flow new --ai 和 pr create --ai 功能
+# 用户可自定义 Prompts 模板
+
+flow:
+  slug_suggestion:
+    system: |
+      You are an assistant that generates concise flow slugs.
+      A flow slug is a short kebab-case identifier for a development task.
+      Rules:
+      - Use English words only
+      - Use kebab-case (lowercase with hyphens)
+      - Maximum 4 words
+      - Be descriptive but concise
+      - No verbs like "add", "create", "implement" - focus on the feature/topic
+
+    user: |
+      Issue Title: {issue_title}
+
+      {issue_body}
+
+      Generate 3 flow slug suggestions (kebab-case).
+      Each suggestion should be on a separate line.
+      Do not include numbers, bullets, or explanations.
+
+pr:
+  title_suggestion:
+    system: |
+      You are an assistant that generates PR titles.
+      Rules:
+      - Use conventional commit format: type(scope): description
+      - Types: feat, fix, refactor, docs, test, chore
+      - Scope is optional but recommended
+      - Description should be imperative mood, lowercase, no period
+      - Maximum 72 characters total
+
+    user: |
+      Commits:
+      {commits}
+
+      {changed_files}
+
+      Generate a single PR title following conventional commit format.
+      Do not include explanations or extra text.
+
+  body_suggestion:
+    system: |
+      You are an assistant that generates PR descriptions.
+      Rules:
+      - Start with "Summary" section
+      - Include "Changes" section with bullet points
+      - Include "Testing" section if applicable
+      - Be concise but informative
+      - Use markdown formatting
+
+    user: |
+      Commits:
+      {commits}
+
+      {changed_files}
+
+      Generate a PR description with:
+      1. Summary (1-2 sentences)
+      2. Changes (bullet list of key changes)
+      3. Testing (how to verify)
+
+      Use markdown format. Do not include code blocks in the body.

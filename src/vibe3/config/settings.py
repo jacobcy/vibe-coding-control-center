@@ -22,7 +22,21 @@ from vibe3.config.settings_pr import (
     SizeThresholds,
 )
 
+
+class AIConfig(BaseModel):
+    """AI 辅助配置.
+
+    用于 flow new --ai 和 pr create --ai 功能。
+    """
+
+    api_key_env: str = Field(default="DEEPSEEK_API_KEY")
+    base_url: str = Field(default="https://api.deepseek.com/v1")
+    model: str = Field(default="deepseek/deepseek-chat")
+    timeout: int = Field(default=30, ge=1, le=300)
+
+
 __all__ = [
+    "AIConfig",
     "PRScoringConfig",
     "MergeGateConfig",
     "PRScoringWeights",
@@ -156,6 +170,7 @@ class VibeConfig(BaseModel):
     pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
+    ai: AIConfig = Field(default_factory=AIConfig)
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
