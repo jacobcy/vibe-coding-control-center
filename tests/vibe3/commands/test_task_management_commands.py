@@ -1,5 +1,6 @@
 """Tests for flow/task command parameter semantics."""
 
+import re
 from unittest.mock import Mock, patch
 
 from typer.testing import CliRunner
@@ -7,53 +8,64 @@ from typer.testing import CliRunner
 from vibe3.commands.flow import app as flow_app
 from vibe3.commands.task import app as task_app
 
-runner = CliRunner()
+runner = CliRunner(env={"NO_COLOR": "1"})
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 def test_flow_new_help_uses_optional_name_and_issue_flag() -> None:
     result = runner.invoke(flow_app, ["new", "--help"])
+    stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root new [OPTIONS] [NAME]" in result.stdout
-    assert "--issue" in result.stdout
-    assert "--task-issue" not in result.stdout
+    assert "Usage: root new [OPTIONS] [NAME]" in stdout
+    assert "--issue" in stdout
+    assert "--task-issue" not in stdout
 
 
 def test_flow_bind_help_uses_issue_and_role() -> None:
     result = runner.invoke(flow_app, ["bind", "--help"])
+    stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root bind [OPTIONS] ISSUE" in result.stdout
-    assert "--role" in result.stdout
-    assert "task|related|dependency" in result.stdout
-    assert "TASK_ID" not in result.stdout
+    assert "Usage: root bind [OPTIONS] ISSUE" in stdout
+    assert "--role" in stdout
+    assert "task|related|dependency" in stdout
+    assert "TASK_ID" not in stdout
 
 
 def test_flow_show_help_uses_branch_name() -> None:
     result = runner.invoke(flow_app, ["show", "--help"])
+    stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root show [OPTIONS] [BRANCH]" in result.stdout
-    assert "Branch name" in result.stdout
-    assert "FLOW_NAME" not in result.stdout
+    assert "Usage: root show [OPTIONS] [BRANCH]" in stdout
+    assert "Branch name" in stdout
+    assert "FLOW_NAME" not in stdout
 
 
 def test_task_link_help_uses_issue_and_new_roles() -> None:
     result = runner.invoke(task_app, ["link", "--help"])
+    stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root link [OPTIONS] ISSUE" in result.stdout
-    assert "related|dependency" in result.stdout
-    assert "task|repo" not in result.stdout
-    assert "ISSUE_URL" not in result.stdout
+    assert "Usage: root link [OPTIONS] ISSUE" in stdout
+    assert "related|dependency" in stdout
+    assert "task|repo" not in stdout
+    assert "ISSUE_URL" not in stdout
 
 
 def test_task_list_help_uses_issue_option() -> None:
     result = runner.invoke(task_app, ["list", "--help"])
+    stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "--issue" in result.stdout
-    assert "--repo-issue" not in result.stdout
+    assert "--issue" in stdout
+    assert "--repo-issue" not in stdout
 
 
 def test_flow_bind_supports_related_role() -> None:
