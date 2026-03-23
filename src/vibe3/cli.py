@@ -22,6 +22,7 @@ from vibe3.commands import (
     pr,
     review,
     run,
+    snapshot,
     task,
 )
 from vibe3.exceptions import SystemError, UserError
@@ -59,6 +60,7 @@ app.add_typer(review.app, name="review")
 app.add_typer(hooks.app, name="hooks")
 app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
+app.add_typer(snapshot.app, name="snapshot")
 
 
 @app.callback()

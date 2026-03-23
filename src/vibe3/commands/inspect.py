@@ -1,6 +1,7 @@
 """Inspect command - 信息提供层，输出结构化数据供 vibe review 消费."""
 
 import json
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -135,29 +136,30 @@ def metrics(
         )
 
 
-@app.command()
-def structure(
+@app.command(name="files")
+def files_(
     file: Annotated[str, typer.Argument(help="File to analyze")] = "",
     json_out: _JSON_OPT = False,
     trace: _TRACE_OPT = False,
 ) -> None:
-    """Show file structure analysis (functions, LOC, dependencies)."""
+    """Analyze file structure (functions, LOC, dependencies).
+
+    Examples:
+        vibe3 inspect files src/vibe3/services/flow_service.py
+        vibe3 inspect files                    # Analyze all Python files
+    """
     if trace:
         enable_trace()
 
     if file:
         result = structure_service.analyze_file(file)
 
-        # 添加依赖关系分析（仅 Python 文件）
         if file.endswith(".py"):
-            # 提取 imports
             result.imports = dag_service._extract_imports(file)
 
-            # 计算反向依赖（谁导入了我）
             module_graph = dag_service.build_module_graph()
             current_module = dag_service._file_to_module(file)
 
-            # 构建反向依赖映射
             imported_by: list[str] = []
             for module, node in module_graph.items():
                 if current_module in node.imports:
@@ -167,14 +169,13 @@ def structure(
         if json_out:
             typer.echo(json.dumps(result.model_dump(), indent=2))
         else:
-            typer.echo(f"=== Structure: {file} ===")
+            typer.echo(f"=== File: {file} ===")
             typer.echo(f"  Language  : {result.language}")
             typer.echo(f"  Total LOC : {result.total_loc}")
             typer.echo(f"  Functions : {result.function_count}")
             for fn in result.functions:
                 typer.echo(f"    L{fn.line:4d}  {fn.name}  ({fn.loc} lines)")
 
-            # 显示依赖关系
             if result.imports:
                 typer.echo(f"\n  Imports ({len(result.imports)}):")
                 for imp in result.imports:
@@ -185,21 +186,17 @@ def structure(
                 for imp_by in result.imported_by:
                     typer.echo(f"    - {imp_by}")
     else:
-        # 分析整个 src/vibe3 目录
-        from pathlib import Path
-
         results = []
         for p in sorted(Path("src/vibe3").glob("**/*.py")):
             if "__pycache__" in str(p):
                 continue
-            # Fail-fast: 不允许静默失败
             file_struct = structure_service.analyze_python_file(str(p))
             results.append(file_struct.model_dump())
 
         if json_out:
             typer.echo(json.dumps(results, indent=2))
         else:
-            typer.echo("=== Python Structure Summary ===")
+            typer.echo("=== Python Files Summary ===")
             for r in results:
                 typer.echo(
                     f"  {r['path']}: {r['total_loc']} LOC, "
