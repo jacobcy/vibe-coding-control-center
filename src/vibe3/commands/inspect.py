@@ -23,6 +23,19 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+AVAILABLE_COMMANDS = [
+    "flow",
+    "task",
+    "plan",
+    "run",
+    "pr",
+    "inspect",
+    "review",
+    "hooks",
+    "handoff",
+    "check",
+]
+
 _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
@@ -221,7 +234,7 @@ def commands(
         enable_trace()
 
     if not command:
-        typer.echo("Available commands: flow, task, pr, inspect, review")
+        typer.echo(f"Available commands: {', '.join(AVAILABLE_COMMANDS)}")
         return
 
     result = command_analyzer.analyze_command(command, subcommand or None)
