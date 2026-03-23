@@ -311,7 +311,7 @@ def link_issue(
 
 ### 2.4 输出文本修改（✅ 已完成）
 
-已在 [docs/updates/issue-concept-unification.md](../updates/issue-concept-unification.md) 中记录。
+输出文本已更新：`repo_issues` → `related_issues` + `dependencies`。详细变更见 git commit 记录。
 
 ---
 
@@ -656,4 +656,4 @@ sqlite3 .git/vibe3/handoff.db "UPDATE flow_issue_links SET issue_role = 'repo' W
 
 ---
 
-**参考文档**: [docs/plans/2026-03-22-vibe3-task-management-target.md](2026-03-22-vibe3-task-management-target.md)
+**文档状态**: 本文档已完整记录核心目标、实施步骤和决策记录。
