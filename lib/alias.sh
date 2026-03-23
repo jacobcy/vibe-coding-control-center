@@ -31,7 +31,7 @@ _vibe_alias_list() {
     local f_base f category tu=""
     [[ -n "$filter_target" ]] && tu=${filter_target:u}
 
-    for f_base in git.sh vibe.sh openspec.sh opencode.sh claude.sh worktree.sh tmux.sh; do
+    for f_base in git.sh vibe.sh openspec.sh agent.sh worktree.sh tmux.sh; do
         f="$src_dir/$f_base"
         [[ -f "$f" ]] || continue
         
