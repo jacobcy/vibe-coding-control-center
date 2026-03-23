@@ -64,10 +64,17 @@ def _get_agent_options(
         config_backend = ac.backend if hasattr(ac, "backend") else None
         config_model = ac.model if hasattr(ac, "model") else None
 
+    selected_backend = backend or config_backend
+    selected_model = model or config_model
+    selected_agent = None
+
+    if selected_backend is None:
+        selected_agent = agent or config_agent or "executor"
+
     return ReviewAgentOptions(
-        agent=agent or config_agent or "executor",
-        backend=backend or config_backend,
-        model=model or config_model,
+        agent=selected_agent,
+        backend=selected_backend,
+        model=selected_model,
     )
 
 
@@ -103,12 +110,10 @@ def _run_execution(
         model=options.model,
     )
     typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+    run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
     if dry_run:
         return
-
-    typer.echo("\n" + result.stdout)
 
 
 @app.command()
