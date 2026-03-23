@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.models.flow import FlowEvent, FlowState
+from vibe3.models.flow import FlowEvent
 from vibe3.services.flow_service import FlowService
 
 
@@ -75,7 +75,7 @@ class TestRefs:
 
 class TestFlowTimeline:
     def test_timeline_with_state_and_events(self, service, db):
-        service.create_flow("test-flow", "br", actor="claude")
+        service.create_flow("test-flow", "br")
         db.add_event("br", "pr_created", "claude", detail="Draft PR #1")
         timeline = service.get_flow_timeline("br")
         assert timeline["state"] is not None

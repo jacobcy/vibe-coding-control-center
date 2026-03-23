@@ -13,7 +13,6 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
-    render_flow_bound,
     render_flow_created,
     render_flow_status,
     render_flow_status_table,
@@ -60,7 +59,7 @@ def new(
         git = GitClient()
         service = FlowService()
         branch = git.get_current_branch()
-        flow = service.create_flow(slug=name, branch=branch, task_id=task, actor=actor)
+        flow = service.create_flow(slug=name, branch=branch)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -91,15 +90,10 @@ def bind(
             "Binding task to flow"
         )
 
-        git = GitClient()
-        service = FlowService()
-        branch = git.get_current_branch()
-        flow = service.bind_flow(branch=branch, task_id=task_id, actor=actor)
-
-        if json_output:
-            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-        else:
-            render_flow_bound(flow, task_id)
+        # TODO: Implement bind_flow in FlowService
+        raise NotImplementedError(
+            "bind_flow not yet implemented. Use task bind command instead."
+        )
 
 
 @app.command()
@@ -183,7 +177,7 @@ def status(
 @app.command()
 def list(
     status_filter: Annotated[
-        Literal["active", "idle", "missing", "stale"] | None,
+        Literal["active", "blocked", "done", "stale"] | None,
         typer.Option("--status", help="Filter by status"),
     ] = None,
     trace: Annotated[

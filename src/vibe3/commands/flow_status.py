@@ -18,7 +18,7 @@ from vibe3.ui.flow_ui import (
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
-    from vibe3.models.flow import FlowState, FlowStatusResponse
+    from vibe3.models.flow import FlowStatusResponse
 
 
 def _fetch_issue_titles(
