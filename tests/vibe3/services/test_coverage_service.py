@@ -46,7 +46,6 @@ def test_run_pytest_cov_success(
 ) -> None:
     """Test _run_pytest_cov success."""
     coverage_service.project_root = mock_project_root
-    coverage_file = mock_project_root / "coverage.json"
 
     mock_result = MagicMock()
     mock_result.stdout = "pytest output"
@@ -54,14 +53,20 @@ def test_run_pytest_cov_success(
     mock_result.returncode = 0
 
     def fake_subprocess_run(*args, **kwargs):
-        coverage_file.write_text(json.dumps(sample_coverage_data))
+        cov_file = (
+            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+        )
+        cov_file.parent.mkdir(parents=True, exist_ok=True)
+        cov_file.write_text(json.dumps(sample_coverage_data))
         return mock_result
 
-    with patch("subprocess.run", side_effect=fake_subprocess_run):
-        data = coverage_service._run_pytest_cov()
+    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        mock_git.return_value.get_current_branch.return_value = "test-branch"
+        with patch("subprocess.run", side_effect=fake_subprocess_run):
+            data = coverage_service._run_pytest_cov()
 
-        assert data == sample_coverage_data
-        assert "files" in data
+            assert data == sample_coverage_data
+            assert "files" in data
 
 
 def test_run_pytest_cov_failure(
@@ -71,11 +76,13 @@ def test_run_pytest_cov_failure(
     """Test _run_pytest_cov when pytest fails."""
     coverage_service.project_root = mock_project_root
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="", stderr="error", returncode=1)
+    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        mock_git.return_value.get_current_branch.return_value = "test-branch"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="", stderr="error", returncode=1)
 
-        with pytest.raises(RuntimeError, match="pytest failed"):
-            coverage_service._run_pytest_cov()
+            with pytest.raises(RuntimeError, match="pytest failed"):
+                coverage_service._run_pytest_cov()
 
 
 def test_subprocess_command_construction(
@@ -85,28 +92,31 @@ def test_subprocess_command_construction(
 ) -> None:
     """Test that subprocess command is constructed correctly."""
     coverage_service.project_root = mock_project_root
-    coverage_file = mock_project_root / "coverage.json"
 
     def fake_subprocess_run(*args, **kwargs):
-        coverage_file.write_text(json.dumps(sample_coverage_data))
+        cov_file = (
+            mock_project_root / ".agent" / "reports" / "test-branch" / "coverage.json"
+        )
+        cov_file.parent.mkdir(parents=True, exist_ok=True)
+        cov_file.write_text(json.dumps(sample_coverage_data))
         return MagicMock(stdout="", stderr="", returncode=0)
 
-    with patch("subprocess.run", side_effect=fake_subprocess_run) as mock_run:
-        coverage_service._run_pytest_cov()
+    with patch("vibe3.clients.git_client.GitClient") as mock_git:
+        mock_git.return_value.get_current_branch.return_value = "test-branch"
+        with patch("subprocess.run", side_effect=fake_subprocess_run) as mock_run:
+            coverage_service._run_pytest_cov()
 
-        called_cmd = mock_run.call_args[0][0]
-        assert called_cmd[0] == "uv"
-        assert called_cmd[1] == "run"
-        assert called_cmd[2] == "pytest"
-        assert "--cov=src/vibe3" in called_cmd
-        # Check that coverage report path contains the expected prefix
-        # (full path varies based on flow state)
-        cov_report_args = [
-            arg for arg in called_cmd if arg.startswith("--cov-report=json:")
-        ]
-        assert len(cov_report_args) == 1
-        assert "coverage.json" in cov_report_args[0]
-        assert "-q" in called_cmd
+            called_cmd = mock_run.call_args[0][0]
+            assert called_cmd[0] == "uv"
+            assert called_cmd[1] == "run"
+            assert called_cmd[2] == "pytest"
+            assert "--cov=src/vibe3" in called_cmd
+            cov_report_args = [
+                arg for arg in called_cmd if arg.startswith("--cov-report=json:")
+            ]
+            assert len(cov_report_args) == 1
+            assert "coverage.json" in cov_report_args[0]
+            assert "-q" in called_cmd
 
 
 def test_analyze_layer(
