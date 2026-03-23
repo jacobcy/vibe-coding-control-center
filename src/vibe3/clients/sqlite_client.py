@@ -85,10 +85,12 @@ class SQLiteClient:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Use branch as slug if not provided (for display fallback)
+            flow_slug = kwargs.get("flow_slug", branch.replace("/", "-"))
             cursor.execute(
                 "INSERT OR IGNORE INTO flow_state (branch, flow_slug, updated_at) "
                 "VALUES (?, ?, ?)",
-                (branch, kwargs.get("flow_slug", "unknown"), kwargs["updated_at"]),
+                (branch, flow_slug, kwargs["updated_at"]),
             )
             cursor.execute(
                 f"UPDATE flow_state SET {set_clause} WHERE branch = ?",

@@ -130,23 +130,11 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
     echo "  Running local review before push..."
     echo ""
 
-    # Get flow slug for report directory
+    # Always use branch for report directory (branch is always available)
+    # flow_slug is for display only and may be unreliable
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    FLOW_SLUG=$(python3 -c "
-import sys
-sys.path.insert(0, 'src')
-from vibe3.clients.sqlite_client import SQLiteClient
-store = SQLiteClient()
-flow = store.get_flow_state('$CURRENT_BRANCH')
-print(flow.get('flow_slug', '') if flow else '')
-" 2>/dev/null || echo "")
-
-    # Create reports directory
-    if [ -n "$FLOW_SLUG" ]; then
-        REPORTS_DIR=".agent/reports/$FLOW_SLUG"
-    else
-        REPORTS_DIR=".agent/reports"
-    fi
+    BRANCH_SAFE=$(echo "$CURRENT_BRANCH" | tr '/' '-')
+    REPORTS_DIR=".agent/reports/$BRANCH_SAFE"
     mkdir -p "$REPORTS_DIR"
 
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
