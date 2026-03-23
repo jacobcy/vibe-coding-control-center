@@ -77,10 +77,36 @@ def register_query_commands(app: typer.Typer) -> None:
                 )
 
             service = PRService()
+
+            # If no pr_number or branch provided, try to get from flow
+            if not pr_number and not branch:
+                from vibe3.clients.git_client import GitClient
+
+                current_branch = GitClient().get_current_branch()
+                flow_data = service.store.get_flow_state(current_branch)
+                if flow_data and flow_data.get("pr_number"):
+                    pr_number = flow_data["pr_number"]
+                    logger.bind(branch=current_branch, pr_number=pr_number).debug(
+                        "Found PR number in flow state"
+                    )
+
             pr = service.get_pr(pr_number, branch)
 
             if not pr:
-                logger.error("PR not found")
+                # Get current branch for better error message
+                if not pr_number and not branch:
+                    from vibe3.clients.git_client import GitClient
+
+                    current_branch = GitClient().get_current_branch()
+                    typer.echo(
+                        f"No PR found for current branch '{current_branch}'\n\n"
+                        "To create a PR, run:\n"
+                        f'  vibe3 pr create -t "Your PR title"',
+                        err=True,
+                    )
+                else:
+                    target = f"PR #{pr_number}" if pr_number else f"branch '{branch}'"
+                    typer.echo(f"{target} not found", err=True)
                 raise typer.Exit(1)
 
             # Get change analysis if pr_number is provided
