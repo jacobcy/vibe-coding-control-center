@@ -17,7 +17,10 @@ def test_inspect_commands_no_args_lists_available():
     """commands 不传参数时列出可用命令，不报错。"""
     result = runner.invoke(app, ["commands"])
     assert result.exit_code == 0
-    assert "review" in result.output or "flow" in result.output
+    assert "flow" in result.output
+    assert "review" in result.output
+    assert "plan" in result.output
+    assert "run" in result.output
 
 
 def test_inspect_commands_with_command():

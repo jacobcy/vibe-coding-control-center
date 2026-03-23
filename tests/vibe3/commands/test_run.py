@@ -83,3 +83,36 @@ def test_run_execute_with_agent_override() -> None:
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
     assert "-> Executing plan with executor-pro" in result.stdout
+
+
+def test_run_execute_with_backend_override() -> None:
+    mock_context = "# Test Plan\n\n## Task\nTest execution"
+    mock_result = MagicMock()
+    mock_result.stdout = "Mocked execution output"
+
+    with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
+        with patch(
+            "vibe3.commands.run.run_review_agent", return_value=mock_result
+        ) as mock_run:
+            result = runner.invoke(
+                cli_app,
+                [
+                    "run",
+                    "execute",
+                    "--file",
+                    "plan.md",
+                    "--backend",
+                    "claude",
+                    "--model",
+                    "claude-3-opus",
+                    "--dry-run",
+                ],
+            )
+
+    assert result.exit_code == 0
+    assert "-> Execute: plan.md" in result.stdout
+    assert "-> Executing plan with claude" in result.stdout
+    options = mock_run.call_args.args[1]
+    assert options.agent is None
+    assert options.backend == "claude"
+    assert options.model == "claude-3-opus"
