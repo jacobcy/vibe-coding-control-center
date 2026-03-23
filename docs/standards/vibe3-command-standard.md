@@ -78,6 +78,8 @@ SQLite (本地缓存)                 GitHub (真源)
 | `task link` | 为当前 flow 记录 related/dependency issue | Issue 关联 | 开发者 |
 | `task show` | 显示 GitHub Project 管理信息 | 项目管理 | 管理者 |
 | `task list` | 列出所有 task | Task 查询 | 所有用户 |
+| `task status` | 更新 GitHub Project task 状态 | 状态更新 | 管理者 |
+| `task bridge link-project` | 绑定 flow 到 Project item | 绑定管理 | 管理者 |
 
 ### 2.2 flow show vs task show
 
@@ -302,7 +304,7 @@ vibe3 flow done --yes
 ### 4.4 flow blocked
 
 ```bash
-vibe3 flow blocked [--reason <text>] [--by <issue>] [--branch <ref>]
+vibe3 flow blocked [--reason <reason>] [--by <issue>] [--branch <ref>]
 ```
 
 **参数**:
@@ -364,6 +366,10 @@ vibe3 flow show [branch]
 - `branch`: Branch name（可选，默认当前分支）
   - 类型: `str | None`
   - 帮助: "Branch name"
+
+**前置条件**:
+- 指定分支（或当前分支）必须已在 `flow_state` 中有记录
+- 如果分支不在 flow_state 中，会报错 `Flow not found: <branch>`
 
 **行为**:
 - 显示 flow 的完整信息
@@ -492,6 +498,66 @@ vibe3 task list
 
 # 反查关联 task
 vibe3 task list --issue 221
+```
+
+### 5.4 task status
+
+```bash
+vibe3 task status <status>
+```
+
+**参数**:
+- `status`: GitHub Project Status 选项值（必需）
+  - 类型: `str`
+  - 帮助: "Project status value (e.g. Todo, In Progress, Done)"
+
+**行为**:
+- 更新 GitHub Project 中对应 item 的 Status 字段
+- 状态值必须与 Project 中配置的选项名称匹配（大小写不敏感）
+- 通过当前分支 flow_state 中的 project_item_id 定位目标 item
+
+**示例**:
+```bash
+# 更新状态为 In Progress
+vibe3 task status "In Progress"
+
+# 更新状态为 Done
+vibe3 task status "Done"
+```
+
+### 5.5 task bridge link-project
+
+```bash
+vibe3 task bridge link-project [item_id] [--from-issue <issue>] [--force]
+```
+
+**参数**:
+- `item_id`: GitHub Project Item ID（可选，二选一）
+  - 类型: `str | None`
+  - 帮助: "Project item ID (e.g. PVTI_xxx)"
+- `--from-issue`: 通过 issue number 反查 item（可选，二选一）
+  - 类型: `str | None`
+  - 帮助: "Issue number (or URL) to find project item"
+- `--force`: 强制覆盖已有绑定（可选）
+  - 类型: `bool`
+  - 帮助: "Force overwrite existing binding"
+
+**行为**:
+- 将当前 flow 绑定到 GitHub Project item
+- 更新 flow_state.project_item_id 和 project_node_id
+- `--from-issue` 会先在 Project 中查找该 issue 对应的 item
+- `item_id` 直接使用提供的 item ID
+
+**示例**:
+```bash
+# 通过 issue number 反查绑定（推荐）
+vibe3 task bridge link-project --from-issue 221
+
+# 直接提供 item ID
+vibe3 task bridge link-project PVTI_lAHOAAGiOs4BRZJ8zgoAgV0
+
+# 强制覆盖已有绑定
+vibe3 task bridge link-project --from-issue 221 --force
 ```
 
 ---
