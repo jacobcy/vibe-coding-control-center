@@ -30,10 +30,9 @@ class AIConfig(BaseModel):
     """
 
     enabled: bool = Field(default=False)
-    provider: str = Field(default="openai")
-    api_key_env: str = Field(default="OPENAI_API_KEY")
-    base_url: str | None = Field(default=None)
-    model: str = Field(default="gpt-4o-mini")
+    api_key_env: str = Field(default="DEEPSEEK_API_KEY")
+    base_url: str = Field(default="https://api.deepseek.com/v1")
+    model: str = Field(default="deepseek/deepseek-chat")
     timeout: int = Field(default=30, ge=1, le=300)
 
 

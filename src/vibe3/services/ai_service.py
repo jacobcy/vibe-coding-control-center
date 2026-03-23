@@ -67,7 +67,7 @@ class AIService:
 
         if config.enabled:
             self.ai_client = AIClient(config)
-            if self.ai_client._client is None:
+            if self.ai_client._api_key is None:
                 self.ai_client = None
                 logger.bind(module="ai_service").debug(
                     "AI client not available, service will return None"

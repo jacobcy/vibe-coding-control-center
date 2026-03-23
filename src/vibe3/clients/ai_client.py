@@ -1,5 +1,6 @@
-"""AI client for OpenAI-compatible API calls."""
+"""AI client using litellm for multi-provider support."""
 
+import importlib.util
 import os
 from typing import Any
 
@@ -7,11 +8,14 @@ from loguru import logger
 
 from vibe3.config.settings import AIConfig
 
+# Check if litellm is available without importing
+HAS_LITELLM = importlib.util.find_spec("litellm") is not None
+
 
 class AIClient:
-    """Client for AI text generation.
+    """Client for AI text generation using litellm.
 
-    Supports OpenAI-compatible APIs (OpenAI, Ollama, vLLM, etc.).
+    Supports 100+ models: DeepSeek, OpenAI, Anthropic, Ollama, etc.
     Designed for graceful degradation - never throws, returns None on failure.
     """
 
@@ -22,10 +26,17 @@ class AIClient:
             config: AI configuration
         """
         self.config = config
-        self._client: Any = None
+        self._api_key: str | None = None
+        self._base_url: str | None = None
 
         if not config.enabled:
             logger.bind(module="ai_client").debug("AI assistance disabled in config")
+            return
+
+        if not HAS_LITELLM:
+            logger.bind(module="ai_client").warning(
+                "litellm package not installed, AI features disabled"
+            )
             return
 
         api_key = os.environ.get(config.api_key_env)
@@ -35,29 +46,11 @@ class AIClient:
             )
             return
 
-        try:
-            from openai import OpenAI
-
-            kwargs: dict[str, Any] = {
-                "api_key": api_key,
-                "timeout": config.timeout,
-            }
-            if config.base_url:
-                kwargs["base_url"] = config.base_url
-
-            self._client = OpenAI(**kwargs)
-            logger.bind(module="ai_client").debug(
-                f"AI client initialized: provider={config.provider}, "
-                f"model={config.model}"
-            )
-        except ImportError:
-            logger.bind(module="ai_client").warning(
-                "openai package not installed, AI features disabled"
-            )
-        except Exception as e:
-            logger.bind(module="ai_client").warning(
-                f"Failed to initialize AI client: {e}"
-            )
+        self._api_key = api_key
+        self._base_url = config.base_url
+        logger.bind(module="ai_client").debug(
+            f"AI client initialized: model={config.model}"
+        )
 
     def generate_text(
         self,
@@ -75,16 +68,24 @@ class AIClient:
         Returns:
             Generated text or None on failure
         """
-        if self._client is None:
+        if self._api_key is None:
             return None
 
         try:
-            response = self._client.chat.completions.create(
+            import litellm
+
+            # Set API key and base URL for litellm
+            litellm.api_key = self._api_key
+            if self._base_url:
+                litellm.api_base = self._base_url
+
+            response = litellm.completion(
                 model=self.config.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                timeout=self.config.timeout,
                 **kwargs,
             )
 
@@ -95,11 +96,6 @@ class AIClient:
 
             return str(content)
 
-        except TimeoutError:
-            logger.bind(module="ai_client").warning(
-                f"AI API call timed out after {self.config.timeout}s"
-            )
-            return None
         except Exception as e:
             logger.bind(module="ai_client").warning(f"AI API call failed: {e}")
             return None
