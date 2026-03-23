@@ -86,7 +86,8 @@ class TestRecordReport:
         mock_store.update_flow_state.assert_called_once_with(
             "feature/test-branch",
             report_ref="docs/reports/review-42.md",
-            reviewer_actor="codex/gpt-5.4",
+            # Fixed: was reviewer_actor, now executor_actor
+            executor_actor="codex/gpt-5.4",
             latest_actor="codex/gpt-5.4",
             next_step="Address review comments",
             blocked_by=None,
