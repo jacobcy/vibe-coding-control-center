@@ -9,6 +9,7 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -36,6 +37,7 @@ def _noop() -> Iterator[None]:
 def new(
     name: Annotated[str, typer.Argument(help="Flow name")],
     task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
     actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "claude",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -60,6 +62,13 @@ def new(
         service = FlowService()
         branch = git.get_current_branch()
         flow = service.create_flow(slug=name, branch=branch)
+
+        # Bind spec_ref if provided
+        if spec:
+            store = SQLiteClient()
+            store.update_flow_state(branch, spec_ref=spec, latest_actor=actor)
+            store.add_event(branch, "spec_bound", actor, detail=f"Spec bound: {spec}")
+            logger.bind(command="flow new", spec=spec).info("Spec bound to flow")
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
