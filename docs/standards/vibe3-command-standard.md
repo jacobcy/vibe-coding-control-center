@@ -1,7 +1,7 @@
 # Vibe3 命令设计标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-22
+**最后更新**: 2026-03-23
 **状态**: Active
 
 ---
@@ -202,12 +202,12 @@ def parse_issue_ref(issue_ref: str) -> int:
 
 ---
 
-## 四、命令参数规范
+## 四、Flow 命令参数规范
 
 ### 4.1 flow new
 
 ```bash
-vibe3 flow new [name] [--issue <issue>]
+vibe3 flow new [name] [--issue <issue>] [--branch <ref>] [--save-unstash]
 ```
 
 **参数**:
@@ -218,25 +218,143 @@ vibe3 flow new [name] [--issue <issue>]
 - `--issue`: Issue number，绑定为 task issue（可选）
   - 类型: `str`
   - 帮助: "Issue number (or URL) to bind as task"
+- `--branch`: 起点分支（可选，默认：origin/main）
+  - 类型: `str`
+  - 帮助: "Start ref for branch creation"
+- `--save-unstash`: 将当前未提交改动带入新分支（可选）
+  - 类型: `bool`
+  - 帮助: "Stash and carry uncommitted changes to new branch"
 
 **行为**:
-- 创建 flow（绑定当前 branch）
-- 如果不提供 `name`，从当前 branch 自动生成 `flow_slug`
-- 如果提供 `--issue`，调用 `TaskService().link_issue(branch, issue, role="task")`
-- 后续标签自动化可根据该 role 镜像 `vibe-task`
+- 创建新分支 `<branch>/<name>`
+- 初始化 flow_state 记录
+- 如果提供 `--issue`，绑定 task issue
+- 如果指定 `--save-unstash`，stash 当前改动并恢复到新分支
 
 **示例**:
 ```bash
-# 当前 branch: task/my-feature
+# 创建 flow 并绑定 issue
 vibe3 flow new --issue 220
-# flow_slug = "my-feature"（自动生成）
-# issue #220 绑定为 task issue
+# → 创建分支 task/flow-status-transitions（从 issue 标题生成）
+# → 绑定 #220 为 task issue
 
-vibe3 flow new custom-name --issue 220
-# flow_slug = "custom-name"
+# 从非 main 分支创建
+vibe3 flow new feature-b --branch origin/dev
+
+# 带入未提交改动
+vibe3 flow new feature-b --save-unstash
 ```
 
-### 4.2 flow show
+### 4.2 flow switch
+
+```bash
+vibe3 flow switch <name>
+```
+
+**参数**:
+- `name`: Flow 名称或分支名（必需）
+  - 类型: `str`
+  - 帮助: "Flow name or branch to switch to"
+
+**行为**:
+- Stash 当前分支的未提交改动
+- 切换到目标分支
+- 恢复 stash 到目标分支
+
+**示例**:
+```bash
+vibe3 flow switch my-feature
+# → stash 当前改动
+# → 切换到 task/my-feature
+# → 恢复 stash
+```
+
+### 4.3 flow done
+
+```bash
+vibe3 flow done [--branch <ref>] [--yes]
+```
+
+**参数**:
+- `--branch`: 指定分支（可选，默认当前分支）
+  - 类型: `str | None`
+  - 帮助: "Branch to close"
+- `--yes`: 跳过 PR 检查（可选）
+  - 类型: `bool`
+  - 帮助: "Skip PR merged check"
+
+**行为**:
+- 检查 PR 是否已 merge
+- 如果未 merge 且无 `--yes`，提示错误
+- 删除本地分支
+- 删除远程分支（如果存在）
+- 标记 flow_status = done
+
+**示例**:
+```bash
+# 正常完成（PR 已 merge）
+vibe3 flow done
+
+# 强制完成
+vibe3 flow done --yes
+```
+
+### 4.4 flow blocked
+
+```bash
+vibe3 flow blocked [--reason <text>] [--by <issue>] [--branch <ref>]
+```
+
+**参数**:
+- `--reason`: 阻塞原因描述（可选）
+  - 类型: `str | None`
+  - 帮助: "Block reason description"
+- `--by`: 依赖的 issue number（可选）
+  - 类型: `int | None`
+  - 帮助: "Dependency issue number"
+- `--branch`: 指定分支（可选，默认当前分支）
+  - 类型: `str | None`
+  - 帮助: "Branch to block"
+
+**行为**:
+- 如果指定 `--by`，自动添加 dependency issue link
+- 更新 flow_status = blocked
+- 设置 blocked_by 字段
+
+**示例**:
+```bash
+# 仅记录阻塞原因
+vibe3 flow blocked --reason "等待外部反馈"
+
+# 标记依赖 issue（自动生成描述）
+vibe3 flow blocked --by 218
+
+# 同时指定依赖和原因
+vibe3 flow blocked --by 218 --reason "需要 #218 先完成"
+```
+
+### 4.5 flow aborted
+
+```bash
+vibe3 flow aborted [--branch <ref>]
+```
+
+**参数**:
+- `--branch`: 指定分支（可选，默认当前分支）
+  - 类型: `str | None`
+  - 帮助: "Branch to abort"
+
+**行为**:
+- 标记 flow_status = aborted
+- 删除本地分支
+- 删除远程分支（如果存在）
+
+**示例**:
+```bash
+vibe3 flow aborted
+```
+
+### 4.6 flow show
 
 ```bash
 vibe3 flow show [branch]
@@ -251,7 +369,7 @@ vibe3 flow show [branch]
 - 显示 flow 的完整信息
 - 包括所有 issues（task, related, dependency）
 
-### 4.3 flow bind
+### 4.7 flow bind
 
 ```bash
 vibe3 flow bind <issue> [--role <role>] [--branch <branch>]
@@ -294,7 +412,9 @@ vibe3 flow bind 218 --role dependency
 vibe3 flow bind 220 --branch task/my-feature
 ```
 
-### 4.4 task link
+## 五、Task 命令参数规范
+
+### 5.1 task link
 
 ```bash
 vibe3 task link <issue> [--role <role>]
@@ -334,7 +454,7 @@ vibe3 task link 218 --role dependency
 
 **注意**: 后续 GitHub 标签自动化必须消费同一套 role，不得额外定义第二套参数或状态机
 
-### 4.5 task show
+### 5.2 task show
 
 ```bash
 vibe3 task show <branch>
@@ -349,7 +469,7 @@ vibe3 task show <branch>
 - 显示 GitHub Project 管理信息
 - 包括 Project 字段、绑定状态
 
-### 4.6 task list
+### 5.3 task list
 
 ```bash
 vibe3 task list [--issue <issue>]
@@ -376,21 +496,275 @@ vibe3 task list --issue 221
 
 ---
 
-## 五、设计原则
+## 六、PR 命令参数规范
 
-### 5.1 架构原则
+### 6.1 pr create
+
+```bash
+vibe3 pr create -t <title> [-b <body>] [--base <branch>]
+```
+
+**参数**:
+- `-t, --title`: PR 标题（必需）
+  - 类型: `str`
+  - 帮助: "PR title"
+- `-b, --body`: PR 描述（可选，默认 ""）
+  - 类型: `str`
+  - 帮助: "PR description"
+- `--base`: 目标分支（可选，默认 "main"）
+  - 类型: `str`
+  - 帮助: "Base branch"
+
+**Metadata 自动读取**:
+- 不需要用户手动指定 task、flow、spec、planner、executor
+- 系统自动从当前 flow_state 读取：
+  - `task_issue_number` → Task issue
+  - `flow_slug` → Flow
+  - `spec_ref` → Spec reference
+  - `planner_actor` → Planner agent
+  - `executor_actor` → Executor agent
+
+**行为**:
+- 从当前分支创建 draft PR
+- 自动在 PR body 中添加 Vibe3 Metadata 章节
+- 更新 flow_state.pr_number
+- 添加 pr_draft 事件
+
+**示例**:
+```bash
+# 最简单的用法 - metadata 自动读取
+vibe3 pr create -t "feat: 添加用户认证功能"
+
+# 指定详细描述
+vibe3 pr create -t "feat: 用户认证" -b "实现了登录和注册功能"
+
+# 指定目标分支
+vibe3 pr create -t "feat: 用户认证" --base develop
+```
+
+**设计原则**:
+- **单一事实来源**: Flow 是 metadata 的唯一真源
+- **避免重复**: 用户不需要重复输入已在 flow 中设置的信息
+- **简化操作**: 只关心 PR 内容本身
+
+### 6.2 pr show
+
+```bash
+vibe3 pr show [PR_NUMBER] [-b <branch>]
+```
+
+**参数**:
+- `PR_NUMBER`: PR 号码（可选）
+  - 类型: `int | None`
+  - 帮助: "PR number"
+- `-b, --branch`: 分支名（可选）
+  - 类型: `str | None`
+  - 帮助: "Branch name"
+
+**智能查找**:
+1. 如果未提供 pr_number 和 branch：
+   - 先从当前 flow_state 查找 pr_number
+   - 如果找到，自动使用该 PR
+   - 如果未找到，使用当前分支名查询
+2. 如果提供 pr_number：直接查询该 PR
+3. 如果提供 branch：查询该分支的 PR
+
+**行为**:
+- 显示 PR 基本信息（标题、状态、链接等）
+- 如果提供了 pr_number，自动执行 change analysis：
+  - Risk Level 和 Score
+  - Changed Files
+  - Impacted Modules
+  - Recommendations
+
+**错误处理**:
+- 当前分支无 PR：友好提示如何创建 PR
+- PR 不存在：显示 "PR #xxx not found" 或 "branch 'xxx' not found"
+
+**示例**:
+```bash
+# 查看当前 flow 的 PR
+vibe3 pr show
+
+# 查看指定 PR
+vibe3 pr show 123
+
+# 查看指定分支的 PR
+vibe3 pr show -b task/my-feature
+```
+
+### 6.3 pr ready
+
+```bash
+vibe3 pr ready PR_NUMBER [-y]
+```
+
+**参数**:
+- `PR_NUMBER`: PR 号码（必需）
+  - 类型: `int`
+  - 帮助: "PR number"
+- `-y, --yes`: 绕过质量门禁检查（可选）
+  - 类型: `bool`
+  - 帮助: "Bypass quality gates and auto-confirm"
+
+**质量门禁检查**:
+1. **覆盖率检查**（分层覆盖率统计）
+   - 检查测试覆盖率是否达标
+   - 显示覆盖率详情
+2. **风险评分检查**（来自 inspect pr）
+   - 评估代码变更风险
+   - 显示风险等级和原因
+
+**行为**:
+- 将 draft PR 标记为 ready for review
+- 执行质量门禁检查（除非使用 --yes）
+- 更新 flow_state 添加 pr_ready 事件
+
+**示例**:
+```bash
+# 标记 PR 为 ready（通过质量门禁）
+vibe3 pr ready 123
+
+# 强制标记为 ready（绕过检查）
+vibe3 pr ready 123 --yes
+```
+
+**使用场景**:
+- 开发完成后，将 draft PR 转为 ready for review
+- 质量门禁确保代码符合标准
+- 使用 `--yes` 仅在紧急情况下跳过检查
+
+---
+
+## 七、Handoff 命令参数规范
+
+### 6.1 handoff plan
+
+```bash
+vibe3 handoff plan <plan_ref> [--next-step <text>] [--blocked-by <text>] [--actor <actor>]
+```
+
+**参数**:
+- `plan_ref`: Plan 文档引用（必需）
+  - 类型: `str`
+  - 帮助: "Plan document reference"
+- `--next-step`: 下一步建议（可选）
+  - 类型: `str | None`
+  - 帮助: "Next step suggestion"
+- `--blocked-by`: 阻塞原因（可选）
+  - 类型: `str | None`
+  - 帮助: "Blocker description"
+- `--actor`: Actor 标识（可选，默认 "unknown"）
+  - 类型: `str`
+  - 帮助: "Actor identifier"
+
+**行为**:
+- 更新 flow_state.plan_ref
+- 更新 flow_state.planner_actor
+- 更新 flow_state.next_step
+- 更新 flow_state.blocked_by
+- 添加 handoff_plan 事件
+
+**Actor 映射**: `planner_actor`
+
+### 6.2 handoff report
+
+```bash
+vibe3 handoff report <report_ref> [--next-step <text>] [--blocked-by <text>] [--actor <actor>]
+```
+
+**参数**:
+- `report_ref`: Report 文档引用（必需）
+  - 类型: `str`
+  - 帮助: "Report document reference"
+- `--next-step`: 下一步建议（可选）
+  - 类型: `str | None`
+  - 帮助: "Next step suggestion"
+- `--blocked-by`: 阻塞原因（可选）
+  - 类型: `str | None`
+  - 帮助: "Blocker description"
+- `--actor`: Actor 标识（可选，默认 "unknown"）
+  - 类型: `str`
+  - 帮助: "Actor identifier"
+
+**行为**:
+- 更新 flow_state.report_ref
+- 更新 flow_state.executor_actor
+- 更新 flow_state.next_step
+- 更新 flow_state.blocked_by
+- 添加 handoff_report 事件
+
+**Actor 映射**: `executor_actor`
+
+### 6.3 handoff audit
+
+```bash
+vibe3 handoff audit <audit_ref> [--next-step <text>] [--blocked-by <text>] [--actor <actor>]
+```
+
+**参数**:
+- `audit_ref`: Audit 文档引用（必需）
+  - 类型: `str`
+  - 帮助: "Audit document reference"
+- `--next-step`: 下一步建议（可选）
+  - 类型: `str | None`
+  - 帮助: "Next step suggestion"
+- `--blocked-by`: 阻塞原因（可选）
+  - 类型: `str | None`
+  - 帮助: "Blocker description"
+- `--actor`: Actor 标识（可选，默认 "unknown"）
+  - 类型: `str`
+  - 帮助: "Actor identifier"
+
+**行为**:
+- 更新 flow_state.audit_ref
+- 更新 flow_state.reviewer_actor
+- 更新 flow_state.next_step
+- 更新 flow_state.blocked_by
+- 添加 handoff_audit 事件
+
+**Actor 映射**: `reviewer_actor`
+
+### 6.4 handoff append
+
+```bash
+vibe3 handoff append <message> [--kind <kind>] [--actor <actor>]
+```
+
+**参数**:
+- `message`: Handoff 更新消息（必需）
+  - 类型: `str`
+  - 帮助: "Lightweight handoff update"
+- `--kind`: 更新类型（可选，默认 "note"）
+  - 类型: `str`
+  - 帮助: "Update kind, e.g. finding/blocker/next"
+- `--actor`: Actor 标识（可选，默认 "unknown"）
+  - 类型: `str`
+  - 帮助: "Actor identifier"
+
+**行为**:
+- 更新 flow_state.latest_actor
+- 追加消息到当前 handoff 文档
+
+**Actor 映射**: `latest_actor`
+
+---
+
+## 八、设计原则
+
+### 8.1 架构原则
 
 1. **单一真源**: GitHub 是真源，SQLite 是缓存
 2. **不包装 gh**: 不简单包装 `git/gh` 已有的命令
 3. **不做第二真源**: 避免与 GitHub 状态冲突
 
-### 5.2 命名原则
+### 8.2 命名原则
 
 1. **统一命名**: 相同概念使用相同术语
 2. **语义清晰**: 参数名反映实际含义
 3. **用户友好**: 支持便捷输入方式（如 URL 复制）
 
-### 5.3 职责分离
+### 8.3 职责分离
 
 1. **flow 命令**: Flow 生命周期管理
 2. **task 命令**: Issue 关联和 Project 管理
@@ -398,8 +772,8 @@ vibe3 task list --issue 221
 
 ---
 
-## 六、参考文档
+## 九、参考文档
 
 - [glossary.md](glossary.md) - 术语定义
 - [issue-standard.md](issue-standard.md) - Issue 标准
-- [../v3/task-flow-guide.md](../v3/task-flow-guide.md) - 操作手册
+- [../standards/vibe3-user-guide.md](../standards/vibe3-user-guide.md) - 操作手册

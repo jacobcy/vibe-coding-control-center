@@ -260,6 +260,6 @@ vibe3 flow blocked --by 218
 
 ## 相关文档
 
-- [Task & Flow 操作指南](../v3/task-flow-guide.md)
+- [Task & Flow 操作指南](../standards/vibe3-user-guide.md)
 - [Flow 状态转换计划](../plans/2026-03-23-flow-status-transitions.md)
 - [数据模型标准](../standards/v3/handoff-store-standard.md)

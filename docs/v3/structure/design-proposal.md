@@ -1,623 +1,360 @@
-# Structure Snapshot 系统设计方案
+# Structure / Snapshot / Diff 设计方案
 
-> **版本**: v0.1 初稿
-> **日期**: 2026-03-21
-> **状态**: 讨论中
-
----
-
-## 1. 背景与问题
-
-### 1.1 现状
-
-我们有一个**单文件分析器**（`structure_service.py`），但缺少**项目级结构快照系统**。
-
-**现有能力**：
-- ✅ Python/Shell 文件 AST 分析
-- ✅ 函数信息提取（name、line、LOC）
-- ✅ 文件级依赖追踪（imports/imported_by）
-- ✅ 项目级度量统计（`metrics_service.py`）
-- ✅ 模块依赖图（`dag_service.py`）
-
-**关键缺失**：
-- ❌ 无持久化快照（snapshot）
-- ❌ 无历史对比能力（diff）
-- ❌ 无重复代码检测（duplication）
-- ❌ 无模块级聚合（module-level metrics）
-
-### 1.2 问题影响
-
-- **无法追溯结构演变**：不知道代码结构随时间如何变化
-- **无法发现重复实现**：跨模块的重复代码无法自动检测
-- **Agent 缺少上下文**：无法为 AI 提供稳定的结构信息
-- **Code Review 缺乏数据**：无法量化变更影响范围
+**版本**: v0.2
+**日期**: 2026-03-22
+**状态**: Draft
+**定位**: 为多 agent 编排提供结构级质量控制层，不替代现有 inspect/review 主链
 
 ---
 
-## 2. 设计目标
+## 1. 这份设计要解决什么
 
-参考 [OpenAI 建议稿](../../prds/structure-snapshow.md)，但结合现有代码实际：
+我们已经明确：
 
-### 2.1 核心目标
+- GitHub labels 负责状态机
+- handoff 负责交接
+- GitHub Project 负责 UI
 
-1. **持久化快照**：生成稳定的 `.structure/snapshot.json`
-2. **模块聚合**：从文件级扩展到目录级（module）
-3. **变更对比**：`structure diff A B` 对比两个快照
-4. **重复检测**：Function Hash + Duplication Map
+但还缺一个稳定的**质量治理层**，用于回答：
 
-### 2.2 非目标（明确边界）
+- 这轮改动有没有把结构做坏
+- agent 有没有越界扩散改动
+- 是否出现重复实现、边界膨胀、错层依赖
 
-- ❌ Call Graph（调用图）
-- ❌ 数据流分析
-- ❌ 自动代码质量判断
-- ❌ LLM 分析（这一层不做）
-
-### 2.3 当前补齐原则（patch existing chain）
-
-这份方案的目标不是重写一套新的 review / inspect 逻辑，而是在现有链路上补齐能力。
-
-当前已经存在、且应直接复用的事实层包括：
-- `SerenaService.analyze_changes()`：提供 symbol-level change facts
-- `dag_service`：提供 impacted modules / dependency graph
-- `inspect` 命令层：提供 review 可消费的信息出口
-- 现有单文件结构分析：提供 file-level structure facts
-
-因此 Step 2 的正确切入点应是：
-1. 先修复现有 Serena gate / inspect / structure 之间的接线问题
-2. 再在现有 `inspect structure` 语义上补 `build / show / diff`
-3. 最后再补 duplication 等增强能力
-
-也就是说，Step 2 是在现有事实层之上补“持久化快照 + 历史对比”，不是替换现有 Serena / DAG / inspect 主链。
+`structure / snapshot / diff` 就是这一层。
 
 ---
 
-## 3. 命令归属讨论
+## 2. 当前基线
 
-### 3.1 两个选项
+### 2.1 已存在能力
 
-#### 选项A：扩展 `vibe3 inspect structure`
-
-**理由**：
-- 已经有 `vibe3 inspect structure <file>` 命令
-- Inspect 的职责是"提供结构化信息"
-- 符合现有的"信息提供层"定位
-
-**问题**：
-- 当前只支持单文件，扩展到项目级可能职责不清
-- `inspect` 命令已经有 `metrics`、`symbols`、`commands` 等
-
-**命令示例**：
-```bash
-vibe3 inspect structure              # 项目级快照（默认）
-vibe3 inspect structure <file>       # 单文件分析（保留现有）
-vibe3 inspect structure --build      # 生成快照
-vibe3 inspect structure --show       # 查看快照
-vibe3 inspect structure --diff A B   # 对比快照
-```
-
-#### 选项B：新建顶级命令 `vibe3 structure`
-
-**理由**：
-- Structure 是独立的能力域
-- 有自己的生命周期（build/show/diff）
-- 未来可能扩展更多子命令
-
-**问题**：
-- 命令数量增加
-- 可能与 `inspect` 职责重叠
-
-**命令示例**：
-```bash
-vibe3 structure build                # 生成快照
-vibe3 structure show                 # 查看快照
-vibe3 structure diff A B             # 对比快照
-```
-
-### 3.2 推荐方案
-
-**推荐选项A：扩展 `vibe3 inspect structure`**
-
-**理由**：
-1. **职责清晰**：Inspect = 信息提供层，Structure = 结构信息
-2. **最小变更**：已有命令，无需新建顶级命令
-3. **语义一致**：`inspect structure` 和 `inspect metrics` 属于同一层
-4. **向后兼容**：保留 `inspect structure <file>` 的单文件分析能力
-
-**实现方式**：
-```python
-# src/vibe3/commands/inspect.py
-
-@app.command()
-def structure(
-    file: Annotated[str, typer.Argument(help="File to analyze")] = "",
-    build: Annotated[bool, typer.Option("--build", help="Build snapshot")] = False,
-    show: Annotated[bool, typer.Option("--show", help="Show snapshot")] = False,
-    diff: Annotated[bool, typer.Option("--diff", help="Diff snapshots")] = False,
-    baseline: Annotated[str, typer.Option("--baseline", help="Baseline branch")] = "",
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Show file structure or project snapshot.
-
-    Examples:
-        vibe3 inspect structure <file>          # Single file analysis
-        vibe3 inspect structure --build         # Build project snapshot
-        vibe3 inspect structure --show          # Show snapshot summary
-        vibe3 inspect structure --diff main feature  # Diff branches
-    """
-    if trace:
-        enable_trace()
-
-    if file:
-        # 现有逻辑：单文件分析
-        result = structure_service.analyze_file(file)
-        # ...
-    elif build:
-        # 新增：生成快照
-        snapshot = structure_service.build_snapshot()
-        # ...
-    elif show:
-        # 新增：查看快照
-        snapshot = structure_service.load_snapshot()
-        # ...
-    elif diff:
-        # 新增：对比快照
-        diff_result = structure_service.diff_snapshots(baseline, "HEAD")
-        # ...
-    else:
-        # 默认：项目级结构摘要
-        results = []
-        for p in Path("src/vibe3").glob("**/*.py"):
-            # ...
-```
-
----
-
-## 4. 现有代码重构
-
-### 4.1 职责重新划分
-
-**问题**：现有 `structure_service.py` 名不副实，它只是"单文件分析器"，但名字叫"structure"太大了。
-
-**解决方案**：拆分职责
-
-```
-file_analyzer.py (新)
-  └─ 负责：单文件 AST 分析
-     - analyze_python_file()
-     - analyze_shell_file()
-     - analyze_file()
-
-structure_service.py (重新定义)
-  └─ 负责：项目级结构快照
-     - build_snapshot()     # 生成快照
-     - load_snapshot()      # 加载快照
-     - save_snapshot()      # 保存快照
-     - diff_snapshots()     # 对比快照
-     - aggregate_modules()  # 模块聚合（复用 file_analyzer）
-```
-
-### 4.2 重构步骤
-
-**Step 1: 重命名现有文件**
+仓库当前真实已有的入口是：
 
 ```bash
-# 现有文件降级
-mv src/vibe3/services/structure_service.py \
-   src/vibe3/services/file_analyzer.py
+vibe3 inspect structure <file>
+vibe3 inspect structure
 ```
 
-**Step 2: 更新类名**
+当前能力是：
 
-```python
-# src/vibe3/services/file_analyzer.py
+- 单文件结构分析
+- `src/vibe3` 目录的结构摘要
+- Python 文件 import / imported_by 补充展示
 
-class FileAnalysisError(VibeError):  # 原 StructureError
-    """文件分析失败."""
-    pass
+### 2.2 当前缺口
 
-class FileAnalysisResult(BaseModel):  # 原 FileStructure
-    """文件分析结果."""
-    path: str
-    language: str
-    total_loc: int
-    functions: list[FunctionInfo]
-    function_count: int
-    imports: list[str] = []
-    imported_by: list[str] = []
-```
+还没有：
 
-**Step 3: 新建真正的 structure_service.py**
+- 可持久化的 snapshot
+- 结构级 diff
+- 稳定的 machine-readable 结构基线
+- 与 handoff / review / 状态迁移联动的质量闸
 
-```python
-# src/vibe3/services/structure_service.py
+### 2.3 关键边界
 
-from vibe3.services.file_analyzer import analyze_file
-from vibe3.services.dag_service import build_module_graph
-from vibe3.models.snapshot import Snapshot, ModuleInfo
+这套系统不负责：
 
-class StructureService:
-    """项目级结构快照服务."""
+- 业务状态机
+- handoff 文本正文
+- 自动判定“代码一定正确”
+- 替代现有 PR risk gate
 
-    def build_snapshot(self, root: Path) -> Snapshot:
-        """构建项目快照."""
-        # 1. 扫描所有文件（复用 file_analyzer）
-        files = self._scan_files(root)
-        file_results = [analyze_file(f) for f in files]
-
-        # 2. 按模块聚合
-        modules = self._aggregate_modules(file_results)
-
-        # 3. 提取依赖关系（复用 dag_service）
-        dependencies = build_module_graph()
-
-        # 4. 计算函数 hash
-        # ...
-
-        return Snapshot(...)
-```
-
-**Step 4: 更新 CLI 调用**
-
-```python
-# src/vibe3/commands/inspect.py
-
-# 单文件分析
-from vibe3.services.file_analyzer import analyze_file
-
-@app.command()
-def structure(
-    file: str = "",
-    build: bool = False,
-    # ...
-):
-    if file:
-        # 单文件：调用 file_analyzer
-        result = analyze_file(file)
-    elif build:
-        # 项目级：调用 structure_service
-        from vibe3.services.structure_service import StructureService
-        service = StructureService()
-        snapshot = service.build_snapshot()
-```
+它只负责给 review、handoff、orchestrator 提供**结构级事实**。
 
 ---
 
-## 5. 数据模型设计
+## 3. 目标定义
 
-### 5.1 现有模型（迁移到 file_analyzer.py）
+### 3.1 三层能力
 
-```python
-# src/vibe3/services/file_analyzer.py
+### A. structure
 
-class FunctionInfo(BaseModel):
-    name: str
-    line: int
-    loc: int
+按当前代码树提取结构事实：
 
-class FileAnalysisResult(BaseModel):  # 原 FileStructure
-    path: str
-    language: str
-    total_loc: int
-    functions: list[FunctionInfo]
-    function_count: int
-    imports: list[str] = []
-    imported_by: list[str] = []
-```
+- 文件
+- 函数/符号
+- 目录/模块聚合
+- 依赖关系摘要
 
-### 5.2 新增模型（structure_service.py）
+### B. snapshot
 
-```python
-# src/vibe3/models/snapshot.py
+把某一时刻的结构事实落成稳定基线，供后续比较与交接复用。
 
-class ModuleMetrics(BaseModel):
-    """模块级度量（目录聚合）."""
-    files: int
-    loc: int
-    functions: int
+### C. diff
 
-
-class ModuleInfo(BaseModel):
-    """模块信息（一个目录）."""
-    name: str  # 相对路径，如 "services/user"
-    path: str  # 文件系统路径
-    metrics: ModuleMetrics
-    dependencies: list[str]  # 依赖的其他模块
-    function_hashes: list[str]  # 模块内所有函数的 hash
-
-
-class Snapshot(BaseModel):
-    """项目级结构快照."""
-    version: str = "1.0"
-    timestamp: str  # ISO 8601
-    branch: str
-    commit: str
-
-    # 全局统计
-    global_metrics: ModuleMetrics
-
-    # 模块列表
-    modules: list[ModuleInfo]
-
-    # 重复代码检测
-    duplications: list[DuplicationInfo]
-
-
-class DuplicationInfo(BaseModel):
-    """重复代码信息."""
-    hash: str  # Function hash
-    count: int  # 出现次数
-    modules: list[str]  # 在哪些模块中出现
-
-
-class SnapshotDiff(BaseModel):
-    """快照差异."""
-    # 全局变化
-    loc_change: int
-    files_change: int
-    modules_change: int
-
-    # 模块级变化
-    module_changes: dict[str, ModuleChange]
-
-    # 重复代码变化
-    duplication_changes: dict[str, DuplicationChange]
-
-    # 依赖关系变化
-    dependency_changes: list[DependencyChange]
-
-
-class ModuleChange(BaseModel):
-    """模块变化."""
-    loc_change: int
-    functions_change: int
-    dependencies_added: list[str]
-    dependencies_removed: list[str]
-
-
-class DuplicationChange(BaseModel):
-    """重复代码变化."""
-    before: int
-    after: int
-
-
-class DependencyChange(BaseModel):
-    """依赖关系变化."""
-    module: str
-    added: list[str]
-    removed: list[str]
-```
+对比两个 snapshot 或一个 snapshot 与当前工作树，输出结构变化。
 
 ---
 
-## 6. 服务层设计
+## 4. 与多 Agent 编排的关系
 
-### 6.1 文件分析服务（file_analyzer.py）
+### 4.1 这不是孤立工具
 
-```python
-# src/vibe3/services/file_analyzer.py
+目标态里，这套能力必须接到编排链路里：
 
-def analyze_file(file_path: str) -> FileAnalysisResult
-def analyze_python_file(file_path: str) -> FileAnalysisResult
-def analyze_shell_file(file_path: str) -> FileAnalysisResult
+```text
+issue
+  -> state/*
+  -> flow execution
+  -> handoff/review
+  -> structure snapshot / diff
+  -> merge / recycle
 ```
 
-### 6.2 结构快照服务（structure_service.py）
+### 4.2 典型使用点
 
-```python
-# src/vibe3/services/structure_service.py
+#### 进入 handoff 前
 
-class StructureService:
-    """结构快照服务（项目级）."""
+- 生成当前结构快照
+- 把 snapshot id 或路径写入 handoff
 
-    def build_snapshot(self, root: Path = Path("src/vibe3")) -> Snapshot:
-        """构建项目快照."""
-        # 1. 扫描所有文件
-        # 2. 按模块聚合
-        # 3. 提取依赖关系（复用 dag_service）
-        # 4. 计算函数 hash
-        # 5. 构建重复代码映射
-        # 6. 生成 snapshot.json
+#### 进入 review 前
 
-    def load_snapshot(self, path: Path = Path(".structure/snapshot.json")) -> Snapshot:
-        """加载快照."""
-        # 从文件加载 JSON
+- 对比 baseline snapshot 和当前 snapshot
+- 让 reviewer 看到“结构有没有失控”
 
-    def save_snapshot(self, snapshot: Snapshot, path: Path) -> None:
-        """保存快照."""
-        # 写入 JSON（保证稳定 key 顺序）
+#### 进入垃圾代码回收流程时
 
-    def diff_snapshots(self, baseline: str, current: str) -> SnapshotDiff:
-        """对比两个快照."""
-        # 1. 加载 baseline snapshot
-        # 2. 加载 current snapshot
-        # 3. 对比差异
-```
-
-### 6.3 Function Hash 实现（简化版）
-
-```python
-# src/vibe3/services/function_hash.py
-
-import ast
-import hashlib
-
-def compute_function_hash(node: ast.FunctionDef) -> str:
-    """计算函数 hash（简化版：不 normalize）."""
-    # MVP 阶段：直接 hash AST
-    source = ast.unparse(node)
-    return hashlib.sha256(source.encode()).hexdigest()[:8]
-
-    # 完整版需要：
-    # 1. Normalize AST（去变量名、常量值）
-    # 2. 保留结构
-    # 3. 计算 hash
-```
+- 用 diff 判断是否出现边界漂移、重复实现、异常膨胀
 
 ---
 
-## 7. 实施路径
+## 5. 命令面设计
 
-### 7.1 MVP 第一阶段（最小可交付）
+### 5.1 当前真实入口
 
-**目标**：基本快照能力
+当前真实入口是 `vibe3 inspect structure`，不是顶级 `vibe3 structure`。
 
-**任务**：
-- [ ] 修复现有 Serena / inspect / structure 接线断点（兼容旧入口，不改事实语义）
-- [ ] 定义 Snapshot 模型
-- [ ] 实现 `build_snapshot()` 基础版
-- [ ] 实现模块聚合（目录级统计）
-- [ ] 复用 `dag_service` 提取依赖关系
-- [ ] 实现 `vibe3 inspect structure --build`
+因此目标态继续沿用：
 
-**产出**：
-- 生成 `.structure/snapshot.json`
-- 包含：全局统计 + 模块列表 + 依赖关系
-- 与现有 Serena / DAG / inspect 输出可拼接，不引入第二套结构真相
+```bash
+vibe3 inspect structure <file>
+vibe3 inspect structure --build
+vibe3 inspect structure --show
+vibe3 inspect structure --diff
+```
 
-### 7.2 MVP 第二阶段
+以上 `--build / --show / --diff` 目前仍是目标接口，不是当前已实现能力。
 
-**目标**：可视化与对比
+### 5.2 推荐子能力
 
-**任务**：
-- [ ] 实现 `vibe3 inspect structure --show`
-- [ ] 实现 `vibe3 inspect structure --diff A B`
-- [ ] 实现文本化输出（表格 + ASCII）
-- [ ] 实现 JSON 输出（给 agent）
+#### 单文件分析
 
-**产出**：
-- `structure show` 输出结构摘要
-- `structure diff` 输出变更摘要
+```bash
+vibe3 inspect structure src/vibe3/services/task_service.py
+```
 
-### 7.3 完整版
+#### 生成快照
 
-**目标**：重复检测
+```bash
+vibe3 inspect structure --build
+```
 
-**任务**：
-- [ ] 实现函数 hash（简化版）
-- [ ] 构建重复代码映射
-- [ ] 在 snapshot 中包含 duplication 信息
-- [ ] 在 diff 中输出重复代码变化
+#### 查看快照
 
-**产出**：
-- 自动检测重复代码
-- 跨模块重复警告
+```bash
+vibe3 inspect structure --show
+vibe3 inspect structure --show --snapshot <id>
+```
 
----
+#### 对比快照
 
-## 8. 现有代码复用
+```bash
+vibe3 inspect structure --diff --baseline <snapshot-id>
+vibe3 inspect structure --diff --baseline main
+```
 
-### 8.1 直接复用
+### 5.3 不推荐方向
 
-| 能力 | 服务 | 说明 |
-|------|------|------|
-| 文件分析 | `file_analyzer.analyze_file()` | 已有（重构后）|
-| 依赖图 | `dag_service.build_module_graph()` | 已有 |
-| 项目度量 | `metrics_service.collect_metrics()` | 已有 |
+暂时不推荐：
 
-### 8.2 扩展点
-
-| 能力 | 现有 | 需要新增 |
-|------|------|---------|
-| 模块定义 | 无 | `ModuleInfo` 模型 |
-| 模块聚合 | 无 | 按目录聚合文件级数据 |
-| 快照持久化 | 无 | `SnapshotService` |
-| 变更对比 | 无 | `diff_snapshots()` |
-| 函数 hash | 无 | `compute_function_hash()` |
+- 新建平行顶级命令 `vibe3 structure`
+- 把 snapshot 单独做成另一个无关命令族
+- 绕开 inspect 再造一套输出协议
 
 ---
 
-## 9. 与 Agent 集成
+## 6. 数据与存储设计
 
-### 9.1 输入给 Agent
+### 6.1 存储位置
+
+snapshot 是派生数据，不应进入 Git。
+
+推荐存储在：
+
+```text
+.git/vibe3/structure/
+  snapshots/
+    <snapshot-id>.json
+  latest.json
+```
+
+理由：
+
+- 与 `.git/vibe3` 现有本地运行态一致
+- 避免提交快照造成冲突
+- 明确它不是仓库正文的一部分
+
+### 6.2 Snapshot 最小模型
 
 ```json
 {
-  "snapshot": ".structure/snapshot.json",
-  "diff": ".structure/diff.json"  // 可选
+  "snapshot_id": "2026-03-22T10-30-00Z_HEAD_abcd1234",
+  "branch": "task/example",
+  "commit": "abcd1234",
+  "created_at": "2026-03-22T10:30:00Z",
+  "root": "src/vibe3",
+  "files": [],
+  "modules": [],
+  "metrics": {},
+  "dependencies": []
 }
 ```
 
-### 9.2 Agent 职责
+最小要求：
 
-- 是否需要重构
-- 是否重复实现
-- 是否结构异常
-- 是否依赖过重
+- 可稳定序列化
+- 字段顺序稳定
+- 便于 handoff / review 引用
 
-### 9.3 示例场景
+### 6.3 Diff 最小模型
 
-**场景1：Code Review**
-```bash
-# 生成当前分支快照
-vibe3 inspect structure --build
-
-# 对比 main 分支
-vibe3 inspect structure --diff main HEAD
-
-# Agent 消费 diff.json
-vibe3 review base --use-structure-diff
-```
-
-**场景2：重复代码检测**
-```bash
-# 构建快照（包含 duplication）
-vibe3 inspect structure --build
-
-# 查看重复代码
-vibe3 inspect structure --show | grep Duplication
-
-# Agent 分析
-vibe3 review structure --focus-duplication
+```json
+{
+  "baseline": "snapshot-a",
+  "current": "snapshot-b",
+  "summary": {
+    "files_changed": 3,
+    "modules_changed": 2
+  },
+  "module_changes": [],
+  "dependency_changes": [],
+  "warnings": []
+}
 ```
 
 ---
 
-## 10. 开放问题
+## 7. 质量信号设计
 
-### 10.1 模块定义
+### 7.1 第一版必须支持的信号
 
-**问题**：什么算一个"模块"？
+1. 文件数量变化
+2. 模块 LOC 变化
+3. 函数数量变化
+4. 依赖新增/移除
+5. 目录级结构膨胀提示
 
-**选项**：
-- A. 所有有代码的目录
-- B. 忽略 `__tests__`、`test`、`tests` 目录
-- C. 只统计 `src/vibe3` 下的目录
+### 7.2 第二版再补
 
-**建议**：选项 B（与 OpenAI 建议稿一致）
+1. duplication detection
+2. 可疑目录越界
+3. 更细粒度的 symbol 漂移
 
-### 10.2 快照存储位置
+### 7.3 明确不做
 
-**问题**：`.structure/snapshot.json` 是否提交到 git？
-
-**选项**：
-- A. 提交（作为项目元数据）
-- B. 不提交（临时文件，`.gitignore`）
-- C. 用户选择
-
-**建议**：选项 B（不提交），理由：
-- 快照是派生数据，可以从代码重新生成
-- 避免合并冲突
-- CI/CD 中按需生成
-
-### 10.3 Function Hash 复杂度
-
-**问题**：MVP 阶段要不要 normalize AST？
-
-**选项**：
-- A. 直接 hash AST（简化版）
-- B. Normalize 后 hash（完整版）
-
-**建议**：选项 A（简化版），理由：
-- 快速上线
-- 后续迭代优化
-- 即使不 normalize 也有价值（检测完全相同的代码）
+1. 完整调用图
+2. 数据流分析
+3. 自动代码评分
+4. 用 LLM 替代结构事实提取
 
 ---
 
-## 11. 参考文档
+## 8. 与现有能力的衔接
 
-- [OpenAI 建议稿](../../prds/structure-snapshow.md)
-- [现有 structure_service.py](../../../src/vibe3/services/structure_service.py)
-- [现有 dag_service.py](../../../src/vibe3/services/dag_service.py)
-- [现有 metrics_service.py](../../../src/vibe3/services/metrics_service.py)
+### 8.1 直接复用
+
+- `vibe3 inspect structure` 的单文件/目录结构分析入口
+- `dag_service` 的依赖关系能力
+- `metrics_service` 的度量统计能力
+- `review` 链路的 explainability 输出
+
+### 8.2 需要新增
+
+- snapshot build/load/show
+- diff build/show
+- 稳定的 JSON schema
+- 与 handoff / review 的挂接点
+
+---
+
+## 9. 与 handoff / review 的协议
+
+### 9.1 handoff
+
+handoff 不保存完整 snapshot 内容，只保存：
+
+- `snapshot_id`
+- 生成时间
+- 是否存在高风险结构变化
+- 需要接手者关注的模块
+
+### 9.2 review
+
+review 消费的不是“原始大 JSON”，而是 diff 摘要：
+
+- 哪些模块变大了
+- 新增了哪些依赖
+- 是否出现重复实现趋势
+
+### 9.3 状态机联动
+
+推荐联动点：
+
+- 进入 `state/handoff` 前：应有 snapshot
+- 进入 `state/review` 前：应有 diff
+- 进入垃圾代码回收流程前：应有 diff + warning
+
+---
+
+## 10. 实施顺序
+
+### 第一阶段：snapshot 最小版
+
+1. 保持 `vibe3 inspect structure` 入口不变
+2. 增加 `--build`
+3. 增加稳定存储位置
+4. 输出最小 snapshot JSON
+
+### 第二阶段：show / diff
+
+1. 增加 `--show`
+2. 增加 `--diff`
+3. 输出文本摘要和 JSON 摘要
+
+### 第三阶段：编排联动
+
+1. handoff 引用 snapshot
+2. review 引用 diff
+3. 状态迁移前增加最小检查
+
+### 第四阶段：重复与回收
+
+1. duplication detection
+2. 垃圾代码回收信号
+3. orchestrator 消费结构风险
+
+---
+
+## 11. 验收标准
+
+达到以下状态时，说明这套设计成立：
+
+1. `vibe3 inspect structure --build` 能生成稳定 snapshot
+2. `vibe3 inspect structure --diff` 能输出结构变化摘要
+3. handoff 能引用 snapshot，而不是复制正文
+4. review 能消费 diff，而不是只看纯 git diff
+5. snapshot/diff 能作为垃圾代码回收的事实输入
+
+---
+
+## 12. 结论
+
+`structure / snapshot / diff` 在目标态里不是“另一个分析工具”，而是：
+
+- 多 agent 编排的质量治理层
+- handoff 与 review 的结构事实来源
+- 垃圾代码回收的核心输入之一
+
+所以它的正确定位不是替代当前 inspect/review，而是在现有链路上补齐“可持久化、可比较、可审计”的能力。

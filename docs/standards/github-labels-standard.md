@@ -1,325 +1,291 @@
-# GitHub Issue 和 PR 标签规范
-
-> **文档定位**：定义 Vibe Center 项目的 GitHub Issue 和 PR 标签体系
-> **适用范围**：所有 GitHub Issue 和 Pull Request
-> **维护者**：Vibe Team
-
----
-
-## 标签体系设计原则
-
-1. **语义清晰**：标签名称和颜色应一目了然
-2. **分类明确**：不同类型的标签使用不同前缀
-3. **自动应用**：尽可能通过工具自动应用标签
-4. **最小集合**：避免标签过多导致混乱
-
----
-
-## 标签分类
-
-### 1. 类型标签 (Type Labels)
-
-**用途**：标识 Issue 或 PR 的主要类型
-
-| 标签名称 | 颜色 | 描述 | 示例场景 |
-|---------|------|------|---------|
-| `type/feature` | `#a2eeef` | 新功能开发 | 添加新的 CLI 命令 |
-| `type/fix` | `#d73a4a` | Bug 修复 | 修复命令行参数解析错误 |
-| `type/refactor` | `#fbca04` | 代码重构 | 重构 Logger 层统一规范 |
-| `type/docs` | `#0075ca` | 文档更新 | 更新 README、添加 API 文档 |
-| `type/test` | `#0e8a16` | 测试相关 | 添加单元测试、修复测试 |
-| `type/chore` | `#fef2c0` | 杂项改动 | 更新依赖、修改构建脚本 |
-| `type/task` | `#8fc5e3` | 任务驱动的工作 | 综合性任务，包含多种类型改动 |
-
-**自动应用规则**：
-- **优先级**：标题前缀 > 分支名前缀
-- PR 标题包含 `feat:` → 自动添加 `type/feature`
-- PR 标题包含 `fix:` → 自动添加 `type/fix`
-- PR 标题包含 `refactor:` → 自动添加 `type/refactor`
-- PR 标题包含 `docs:` → 自动添加 `type/docs`
-- PR 标题包含 `test:` → 自动添加 `type/test`
-- PR 标题包含 `chore:` → 自动添加 `type/chore`
-- 分支名以 `task/` 开头且标题无类型前缀 → 自动添加 `type/task`（综合性任务，可能需要审查后手动调整具体类型）
-
-**示例**：
-- 标题 `feat: add new CLI command` → `type/feature` ✅
-- 分支 `task/codex-auto-review` + 标题 `feat: ...` → `type/feature` ✅（标题优先）
-- 分支 `task/codex-auto-review` + 标题 `update README` → `type/task` ✅（无类型前缀）
-
----
-
-### 2. 优先级标签 (Priority Labels)
-
-**用途**：标识工作优先级
-
-| 标签名称 | 颜色 | 描述 | 使用场景 |
-|---------|------|------|---------|
-| `priority/high` | `#b60205` | 高优先级 | 阻塞发布、严重 Bug |
-| `priority/medium` | `#fbca04` | 中等优先级 | 常规功能开发 |
-| `priority/low` | `#c5def5` | 低优先级 | 优化、改进项 |
-
-**应用规则**：
-- 由 Issue 创建者或 Reviewer 手动添加
-- 默认为 `priority/medium`
-
----
-
-### 3. 范围标签 (Scope Labels)
-
-**用途**：标识改动影响的技术范围
-
-| 标签名称 | 颜色 | 描述 | 涵盖范围 |
-|---------|------|------|---------|
-| `scope/shell` | `#1d76db` | Shell 层改动 | bin/vibe、lib/*.sh |
-| `scope/skill` | `#5319e7` | Skill 层改动 | skills/**、.agent/workflows/** |
-| `scope/supervisor` | `#d93f0b` | Supervisor 层改动 | .agent/rules/**、.agent/context/** |
-| `scope/infrastructure` | `#0e8a16` | 基础设施改动 | CI/CD、hooks、scripts |
-| `scope/documentation` | `#0075ca` | 文档改动 | docs/**、README、CLAUDE.md |
-| `scope/python` | `#fbca04` | Python 代码改动 | src/vibe3/**/*.py |
-| `scope/shell-script` | `#c5def5` | Shell 脚本改动 | lib/**/*.sh、scripts/**/*.sh |
-
-**自动应用规则**：
-- 文件路径匹配 `src/vibe3/**/*.py` → 自动添加 `scope/python`
-- 文件路径匹配 `lib/**/*.sh` → 自动添加 `scope/shell-script`
-- 文件路径匹配 `docs/**` → 自动添加 `scope/documentation`
-
----
-
-### 4. 状态标签 (Status Labels)
-
-**用途**：标识 Issue 或 PR 的当前状态
-
-| 标签名称 | 颜色 | 描述 | 使用场景 |
-|---------|------|------|---------|
-| `status/blocked` | `#b60205` | 被阻塞 | 依赖未完成、等待外部输入 |
-| `status/in-progress` | `#fbca04` | 进行中 | 正在开发中 |
-| `status/ready-for-review` | `#0e8a16` | 待审核 | PR 已创建，等待 Review |
-| `status/wip` | `#c5def5` | 工作进行中 | Work In Progress |
-
-**应用规则**：
-- Issue 被分配时 → 自动添加 `status/in-progress`
-- PR 创建后 → 开发者手动添加 `status/ready-for-review`（触发 AI review）
-- AI review 完成后 → 自动移除 `status/ready-for-review`（避免重复触发）
-- 发现阻塞时 → 手动添加 `status/blocked`
-
-**AI Review 触发机制**：
-1. 开发者完成开发，手动添加 `status/ready-for-review` 标签
-2. GitHub Action 自动触发 AI review
-3. Review 完成后自动移除标签
-4. 如需重新 review，再次添加标签即可
-
----
-
-### 5. 组件标签 (Component Labels)
-
-**用途**：标识改动的具体组件或模块
-
-| 标签名称 | 颜色 | 描述 | 涵盖模块 |
-|---------|------|------|---------|
-| `component/cli` | `#1d76db` | CLI 入口 | src/vibe3/cli.py |
-| `component/flow` | `#5319e7` | Flow 管理 | src/vibe3/commands/flow.py、services/flow_service.py |
-| `component/pr` | `#d93f0b` | PR 管理 | src/vibe3/commands/pr.py、services/pr_service.py |
-| `component/task` | `#0e8a16` | Task 管理 | src/vibe3/commands/task.py、services/task_service.py |
-| `component/logger` | `#fbca04` | Logger 模块 | src/vibe3/observability/** |
-| `component/client` | `#c5def5` | Client 封装 | src/vibe3/clients/** |
-| `component/config` | `#fef2c0` | 配置管理 | src/vibe3/config/** |
-
-**自动应用规则**：
-- 根据文件路径自动匹配并添加对应组件标签
-
----
-
-### 6. 特殊标签 (Special Labels)
-
-**用途**：特殊分类或标记
-
-| 标签名称 | 颜色 | 描述 | 使用场景 |
-|---------|------|------|---------|
-| `vibe-task` | `#0E8A16` | Vibe 任务追踪 | 由 `/vibe-new` 创建的 Issue |
-| `good first issue` | `#7057ff` | 适合新手 | 适合首次贡献者 |
-| `help wanted` | `#008672` | 需要帮助 | 需要社区贡献 |
-| `breaking-change` | `#b60205` | 破坏性变更 | 不兼容旧版本的改动 |
-
----
-
-## 标签使用流程
-
-### Issue 创建流程
-
-1. **创建 Issue 时**：
-   - 添加至少一个 **类型标签** (`type/*`)
-   - 添加一个 **优先级标签** (`priority/*`)
-   - 根据需要添加 **范围标签** (`scope/*`)
-   - 根据需要添加 **组件标签** (`component/*`)
-
-2. **Issue 被分配时**：
-   - 添加 `status/in-progress`
-
-3. **Issue 被阻塞时**：
-   - 添加 `status/blocked`，并在评论中说明阻塞原因
-
-### PR 创建流程
-
-1. **创建 PR 时**（在 vibe-commit skill 中自动完成）：
-   - 根据 PR 标题自动添加 **类型标签**
-   - 根据文件改动自动添加 **范围标签** 和 **组件标签**
-   - 添加 `status/ready-for-review`
-
-2. **PR Review 中**：
-   - 如需要修改，添加 `status/wip`
-   - 修改完成后，添加 `status/ready-for-review`
-
-3. **PR Merge 后**：
-   - 移除所有状态标签
-   - 保留类型、范围、组件标签用于分类
-
----
-
-## 标签命名约定
-
-### 前缀约定
-
-- `type/` - 类型标签
-- `priority/` - 优先级标签
-- `scope/` - 范围标签
-- `status/` - 状态标签
-- `component/` - 组件标签
-
-### 颜色约定
-
-- **红色系** (`#d73a4a`, `#b60205`) - 高优先级、严重问题、破坏性变更
-- **黄色系** (`#fbca04`, `#fef2c0`) - 中等优先级、进行中
-- **绿色系** (`#0e8a16`, `#008672`) - 低优先级、已完成、正面状态
-- **蓝色系** (`#0075ca`, `#1d76db`, `#c5def5`) - 功能、文档、Shell 层
-- **紫色系** (`#5319e7`, `#7057ff`) - Skill 层、新手友好
-- **橙色系** (`#d93f0b`) - Supervisor 层、紧急组件
-
----
-
-## 标签自动化
-
-### GitHub Actions 自动打标签
-
-创建 `.github/workflows/label.yml`：
-
-```yaml
-name: Auto Label
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  label:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/labeler@v4
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-```
-
-### 配置文件 `.github/labeler.yml`
-
-```yaml
-# 类型标签
-type/feature:
-  - head_branch: ['^feat/', '^feature/']
-
-type/fix:
-  - head_branch: ['^fix/', '^bugfix/']
-
-type/refactor:
-  - head_branch: ['^refactor/']
-
-type/docs:
-  - head_branch: ['^docs/', '^documentation/']
-
-type/test:
-  - head_branch: ['^test/', '^testing/']
-
-# 范围标签
-scope/python:
-  - 'src/vibe3/**/*.py'
-
-scope/shell-script:
-  - 'lib/**/*.sh'
-  - 'scripts/**/*.sh'
-
-scope/documentation:
-  - 'docs/**'
-  - '**/*.md'
-  - 'LICENSE'
-
-scope/infrastructure:
-  - '.github/**'
-  - '.pre-commit-config.yaml'
-  - 'scripts/hooks/**'
-
-# 组件标签
-component/cli:
-  - 'src/vibe3/cli.py'
-  - 'src/vibe3/commands/*.py'
-
-component/flow:
-  - 'src/vibe3/commands/flow.py'
-  - 'src/vibe3/services/flow_service.py'
-
-component/pr:
-  - 'src/vibe3/commands/pr.py'
-  - 'src/vibe3/services/pr_service.py'
-
-component/logger:
-  - 'src/vibe3/observability/**'
-
-component/client:
-  - 'src/vibe3/clients/**'
-```
-
----
-
-## 最佳实践
-
-### ✅ 推荐
-
-1. **每个 Issue/PR 至少有一个类型标签**
-2. **优先级标签帮助排定工作顺序**
-3. **范围标签帮助快速定位改动影响**
-4. **状态标签帮助跟踪工作进度**
-5. **使用前缀分类，保持标签体系清晰**
-
-### ❌ 避免
-
-1. **不要创建过多标签** - 保持精简
-2. **不要滥用高优先级标签** - 仅用于真正紧急的事项
-3. **不要忽略标签** - 标签是项目管理的重要工具
-4. **不要创建重复标签** - 如已有 `bug`，不要再创建 `type/bug`
-
----
-
-## 标签维护
-
-### 定期审查
-
-- **每月**：审查是否有不再使用的标签
-- **每季度**：评估标签体系是否需要调整
-- **按需**：新增组件或模块时，考虑添加对应标签
-
-### 标签废弃流程
-
-1. 在标签描述中标记为 `[DEPRECATED]`
-2. 通知团队成员不再使用该标签
-3. 迁移现有 Issue/PR 到新标签
-4. 确认无遗漏后删除标签
-
----
-
-## 参考资料
-
-- [GitHub Labels Best Practices](https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels)
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- `docs/standards/v2/git-workflow-standard.md`
-- `skills/vibe-commit/SKILL.md`
-
----
+# GitHub 标签标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-17
+**最后更新**: 2026-03-22
+**状态**: Active
+
+---
+
+## 1. 目标
+
+这份标准定义 GitHub labels 在 V3 中承担的职责。
+
+目标不是“给 issue 多打几个标签”，而是建立三层清晰语义：
+
+1. 分类标签：说明这是什么工作
+2. 关系镜像标签：说明这个 issue 是否是执行项
+3. 编排状态标签：说明当前处于 flow 循环的哪一阶段
+
+---
+
+## 2. 真源边界
+
+### 2.1 真源分层
+
+- GitHub issue：任务身份真源
+- SQLite `flow_issue_links.issue_role`：issue 与 flow 的关系真源
+- GitHub `state/*` labels：编排状态真源
+- GitHub `vibe-task`：关系镜像标签，不是真源
+- GitHub Project：UI，不是真源
+
+### 2.2 基本原则
+
+1. 标签可以镜像真源，但不能反向改义。
+2. `task/related/dependency` 是关系，不是状态。
+3. `state/*` 是状态，不是类型。
+4. 不允许再引入 `repo` 旧语义。
+
+---
+
+## 3. 标签分层
+
+### 3.1 分类标签
+
+分类标签用于描述工作属性，不参与状态机裁定。
+
+### 类型标签
+
+| 标签名称 | 描述 |
+|---------|------|
+| `type/feature` | 新功能 |
+| `type/fix` | Bug 修复 |
+| `type/refactor` | 重构 |
+| `type/docs` | 文档 |
+| `type/test` | 测试 |
+| `type/chore` | 杂项 |
+| `type/task` | 综合型任务 |
+
+### 优先级标签
+
+| 标签名称 | 描述 |
+|---------|------|
+| `priority/high` | 高优先级 |
+| `priority/medium` | 中优先级 |
+| `priority/low` | 低优先级 |
+
+### 范围标签
+
+| 标签名称 | 描述 |
+|---------|------|
+| `scope/python` | Python 改动 |
+| `scope/shell` | Shell 改动 |
+| `scope/documentation` | 文档改动 |
+| `scope/infrastructure` | 基础设施 |
+| `scope/skill` | Skill 改动 |
+| `scope/supervisor` | agent/workflow/rules 改动 |
+
+### 组件标签
+
+| 标签名称 | 描述 |
+|---------|------|
+| `component/cli` | CLI 入口 |
+| `component/flow` | Flow 相关 |
+| `component/task` | Task 相关 |
+| `component/pr` | PR 相关 |
+| `component/client` | Client 层 |
+| `component/config` | 配置层 |
+
+### 3.2 关系镜像标签
+
+### `vibe-task`
+
+`vibe-task` 是执行项镜像标签。
+
+它的职责只有一个：让 GitHub / Project 视角能快速筛出“被纳入 flow 管理的执行 issue”。
+
+映射规则：
+
+| `issue_role` | `vibe-task` |
+|--------------|-------------|
+| `task` | 应添加 |
+| `dependency` | 应添加 |
+| `related` | 不添加 |
+
+重要约束：
+
+- `vibe-task` 不能作为 task 真源
+- `vibe-task` 不能反推出 `issue_role`
+- 标签自动化失败时，不能改写本地 role
+
+### 3.3 编排状态标签
+
+编排状态标签是多 agent 协作的远端状态机真源。
+
+### 状态集合
+
+| 标签名称 | 含义 |
+|---------|------|
+| `state/ready` | 可认领 |
+| `state/claimed` | 已认领，待进入执行 |
+| `state/in-progress` | 执行中 |
+| `state/blocked` | 阻塞中 |
+| `state/handoff` | 待交接 |
+| `state/review` | 待 review |
+| `state/merge-ready` | 已满足合并条件 |
+| `state/done` | 已完成 |
+
+### 状态机约束
+
+1. 一个 issue 任一时刻只能有一个 `state/*` 标签。
+2. 状态变更优先发生在 issue 上，而不是 Project 字段上。
+3. Project 只能镜像 `state/*`，不能定义第二套状态。
+4. handoff 负责解释状态，label 负责表示状态。
+
+---
+
+## 4. 状态迁移规则
+
+### 4.1 推荐主链
+
+```text
+state/ready
+  -> state/claimed
+  -> state/in-progress
+  -> state/handoff
+  -> state/review
+  -> state/merge-ready
+  -> state/done
+```
+
+### 4.2 允许的旁路
+
+- `state/in-progress -> state/blocked`
+- `state/blocked -> state/in-progress`
+- `state/review -> state/in-progress`
+- `state/handoff -> state/in-progress`
+
+### 4.3 不允许的跳转
+
+以下跳转默认视为异常，需要人工确认：
+
+- `state/ready -> state/done`
+- `state/claimed -> state/done`
+- `state/blocked -> state/done`
+- 同时存在多个 `state/*`
+
+---
+
+## 5. Agent 协作规则
+
+### 5.1 认领
+
+agent 认领 issue 时：
+
+1. 确认当前是 `state/ready`
+2. 更新为 `state/claimed`
+3. 写入或更新 assignee / handoff 最小上下文
+
+### 5.2 执行
+
+进入实际修改后：
+
+1. 从 `state/claimed` 进入 `state/in-progress`
+2. 持续更新 handoff
+3. 保持 `state/*` 单值
+
+### 5.3 阻塞
+
+当 agent 无法继续推进时：
+
+1. 切换到 `state/blocked`
+2. handoff 中必须写明阻塞原因和下一步
+
+### 5.4 交接
+
+当任务需要换手时：
+
+1. 切换到 `state/handoff`
+2. handoff 必须完整
+3. 接手方读取 handoff 后再进入 `state/in-progress`
+
+### 5.5 Review 与完成
+
+1. 待 review 时使用 `state/review`
+2. 达到可合并条件时使用 `state/merge-ready`
+3. 真正完成后进入 `state/done`
+
+---
+
+## 6. 与 issue-role 的关系
+
+### 6.1 关系与状态是两层语义
+
+| 层 | 真源 | 例子 |
+|----|------|------|
+| 关系层 | SQLite `issue_role` | `task / related / dependency` |
+| 状态层 | GitHub `state/*` labels | `ready / blocked / review` |
+
+### 6.2 不能混写
+
+错误示例：
+
+- 把 `dependency` 当成一种状态
+- 把 `review` 当成一种 issue 类型
+- 用 `vibe-task` 表达 “现在正在执行”
+
+正确示例：
+
+- `issue_role = dependency` + `state/blocked`
+- `issue_role = task` + `state/in-progress`
+
+---
+
+## 7. 历史标签处理
+
+### 7.1 旧 `status/*` 标签
+
+旧文档中的以下标签不再作为编排真源：
+
+- `status/blocked`
+- `status/in-progress`
+- `status/ready-for-review`
+- `status/wip`
+
+处理原则：
+
+1. 不再把 `status/*` 作为流程状态标准
+2. 后续自动化应迁移到 `state/*`
+3. 如仓库已有旧标签，可保留一段过渡期，但不能继续写入新逻辑
+
+### 7.2 `repo` 旧语义
+
+- 历史 `repo -> related` 迁移必须先完成
+- 不允许新增任何依赖 `repo` 的标签或规则
+
+---
+
+## 8. 自动化要求
+
+1. 自动化只消费统一后的 `task/related/dependency` 和 `state/*`。
+2. `issue_role -> vibe-task` 是单向镜像。
+3. `state/* -> Project Flow Lane` 是单向镜像。
+4. 自动化失败不得修改本地 role。
+5. 自动化补偿必须幂等。
+
+---
+
+## 9. 最小落地版本
+
+第一阶段必须落地的标签只有两组：
+
+1. `vibe-task`
+2. `state/*`
+
+其余 `type/*`、`priority/*`、`scope/*`、`component/*` 保持现有分类能力即可。
+
+---
+
+## 10. 术语规范
+
+### 正确说法
+
+- “给 issue 加 `state/in-progress`，表示正在执行”
+- “给 issue 镜像 `vibe-task`，表示它是执行项”
+- “`issue_role` 决定关系，`state/*` 决定阶段”
+
+### 错误说法
+
+- “`vibe-task` 就是 task 真源”
+- “Project 列位就等于状态真源”
+- “`dependency` 就是 blocked”
+- “`status/wip` 继续作为标准流程标签”

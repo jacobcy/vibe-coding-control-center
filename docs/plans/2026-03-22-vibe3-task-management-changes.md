@@ -14,7 +14,7 @@
 - ✅ 更新核心文档（glossary, issue-standard, github-labels-standard）
 - ✅ 更新命令参数（`--task-issue` / `--repo-issue` / `TASK_ID` / `ISSUE_URL` → `issue`）
 - ✅ 更新输出文本（`repo_issues` → `related_issues` + `dependencies`）
-- ✅ 更新用户指南（task-flow-guide.md）
+- ✅ 更新用户指南（vibe3-user-guide.md）
 - ✅ 明确命令语义（flow show vs task show）
 - ✅ 兼容旧数据语义（`repo` → `related`）
 
@@ -414,7 +414,7 @@ service.link_issue('test-branch', 218, role='dependency')  # 应该通过
 
 ### Step 4: 更新文档
 
-**文件**: `docs/standards/task-flow-guide.md`
+**文件**: `docs/standards/vibe3-user-guide.md`
 
 **修改内容**:
 ```bash
@@ -460,7 +460,7 @@ grep -r "parse_issue_url" src/vibe3/
 | 文件 | 修改点 |
 |------|--------|
 | `docs/standards/vibe3-command-standard.md` | ✅ 已更新（task link role 定义） |
-| `docs/standards/task-flow-guide.md` | 命令示例 + role 语义说明 |
+| `docs/standards/vibe3-user-guide.md` | 命令示例 + role 语义说明 |
 
 ### 4.3 用户影响
 
@@ -559,7 +559,7 @@ git checkout HEAD -- src/vibe3/commands/flow.py
 git checkout HEAD -- src/vibe3/services/task_service.py
 
 # 回滚文档
-git checkout HEAD -- docs/standards/task-flow-guide.md
+git checkout HEAD -- docs/standards/vibe3-user-guide.md
 
 # 回滚数据库（如果已迁移）
 sqlite3 .git/vibe3/handoff.db "UPDATE flow_issue_links SET issue_role = 'repo' WHERE issue_role = 'related';"

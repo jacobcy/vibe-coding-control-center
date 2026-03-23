@@ -257,8 +257,8 @@ vibe3 flow new my-feature --issue 220
 vibe3 task link 219 --role related
 # → 在本地 flow_issue_links 中记录 role=related
 
-# 3. 关联来源 repo issue（role=repo）
-vibe3 task link 219 --role repo
+# 3. 关联来源 related issue
+vibe3 task link 219 --role related
 
 # 4. 绑定 GitHub Project item（通过 issue 反查）
 vibe3 task bridge link-project --from-issue 220
@@ -272,7 +272,7 @@ vibe3 task show task/my-feature
 Branch: task/my-feature
 Project Item [bound]: PVTI_xxx
 Task Issue: #220
-Repo Issue(s): #219
+Related Issue(s): #219
 [remote] Title:    打通 Task 真源桥接
 [remote] Status:   Todo
 [remote] Assignees: jacobcy
@@ -354,15 +354,15 @@ vibe3 task list
 
 字段说明：`#task_issue  flow_slug  flow_status  [bound/unbound]  branch`
 
-### 从 repo issue 反查所有关联 task
+### 从 related issue 反查所有关联 task
 
 ```bash
-vibe3 task list --repo-issue 219
+vibe3 task list --issue 219
 ```
 
 输出：
 ```
-Tasks linked to repo issue #219:
+Tasks linked to related issue #219:
   #221  reports-unified-storage  active  [bound]  branch=task/reports-unified-storage
   #222  pr-show-complete         active  [bound]  branch=task/pr-show-complete
   #223  reports-cleanup          active  [bound]  branch=task/reports-cleanup
