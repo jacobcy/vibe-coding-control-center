@@ -120,7 +120,7 @@ class TaskBridgeMixin:
         return view
 
     def update_remote_task_status(
-        self: Any, branch: str, status: str, actor: str = "unknown"
+        self: Any, branch: str, status: str
     ) -> bool | ProjectItemError:
         """通过 GitHub API 更新远端 Project item 的 task 状态（唯一合法写入路径）。"""
         flow_data = self.store.get_flow_state(branch)
@@ -155,7 +155,7 @@ class TaskBridgeMixin:
             self.store.add_event(
                 branch,
                 "remote_status_updated",
-                actor,
+                "system",
                 f"Remote task status updated to '{status}'",
             )
         return cast("bool | ProjectItemError", result)

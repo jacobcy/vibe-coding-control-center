@@ -49,7 +49,7 @@ class IssueLink(BaseModel):
 
     branch: str
     issue_number: int
-    issue_role: Literal["task", "repo"]
+    issue_role: Literal["task", "related", "dependency"]
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     @field_validator("issue_role", mode="before")
@@ -57,10 +57,10 @@ class IssueLink(BaseModel):
     def migrate_issue_role(cls, v: str) -> str:
         """Migrate legacy issue role values.
 
-        - related -> repo (repository-scoped role)
+        - repo -> related (legacy classification -> relation semantics)
         """
-        if v == "related":
-            return "repo"
+        if v == "repo":
+            return "related"
         return v
 
 

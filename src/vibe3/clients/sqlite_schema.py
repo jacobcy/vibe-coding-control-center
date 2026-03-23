@@ -89,6 +89,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
 
+    # Normalize legacy issue_role values from the old classification view.
+    cursor.execute(
+        "UPDATE flow_issue_links SET issue_role = 'related' WHERE issue_role = 'repo'"
+    )
+
     cursor.execute(
         "INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', 'v3')"
     )

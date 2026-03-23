@@ -6,11 +6,13 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.git_client import GitClient
 from vibe3.models.flow import (
     FlowState,
     FlowStatusResponse,
     IssueLink,
 )
+from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 
 
 def parse_task_id(task_id: str) -> int:
@@ -32,7 +34,7 @@ def parse_task_id(task_id: str) -> int:
     return int(match.group())
 
 
-class FlowService:
+class FlowService(FlowLifecycleMixin):
     """Service for managing flow state."""
 
     def __init__(self, store: SQLiteClient | None = None) -> None:
@@ -47,14 +49,12 @@ class FlowService:
         self,
         slug: str,
         branch: str,
-        actor: str = "unknown",
     ) -> FlowState:
         """Create a new flow.
 
         Args:
             slug: Flow name/slug
             branch: Git branch name
-            actor: Actor creating the flow
 
         Returns:
             Created flow state
@@ -64,19 +64,17 @@ class FlowService:
             action="create",
             slug=slug,
             branch=branch,
-            actor=actor,
         ).info("Creating flow")
 
         self.store.update_flow_state(
             branch,
             flow_slug=slug,
-            latest_actor=actor,
         )
 
         self.store.add_event(
             branch,
             "flow_created",
-            actor,
+            "system",
             f"Flow '{slug}' created",
         )
 
@@ -85,6 +83,116 @@ class FlowService:
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
         return FlowState(**flow_data)
+
+    def create_flow_with_branch(
+        self,
+        slug: str,
+        start_ref: str = "origin/main",
+        save_unstash: bool = False,
+    ) -> FlowState:
+        """Create a new flow and create branch.
+
+        Args:
+            slug: Flow name/slug
+            start_ref: Starting reference for new branch
+            save_unstash: Whether to stash and restore current changes
+
+        Returns:
+            Created flow state
+
+        Raises:
+            RuntimeError: If branch already exists or worktree is dirty
+        """
+        git = GitClient()
+        branch = f"task/{slug}"
+
+        logger.bind(
+            domain="flow",
+            action="create_with_branch",
+            slug=slug,
+            branch=branch,
+            start_ref=start_ref,
+        ).info("Creating flow with branch")
+
+        # Check if branch already exists
+        if git.branch_exists(branch):
+            raise RuntimeError(f"Branch '{branch}' already exists")
+
+        # Check if worktree is dirty
+        if git.has_uncommitted_changes() and not save_unstash:
+            raise RuntimeError(
+                "Worktree has uncommitted changes. "
+                "Use --save-unstash to stash them automatically."
+            )
+
+        # Stash changes if requested
+        stash_ref = None
+        if save_unstash and git.has_uncommitted_changes():
+            stash_ref = git.stash_push(message=f"vibe flow new {slug}")
+
+        # Create and switch to new branch
+        git.create_branch(branch, start_ref)
+
+        # Create flow state
+        flow = self.create_flow(slug, branch)
+
+        # Restore stash if we stashed
+        if stash_ref:
+            git.stash_apply(stash_ref)
+
+        return flow
+
+    def switch_flow(
+        self,
+        target: str,
+    ) -> FlowState:
+        """Switch to existing flow.
+
+        Args:
+            target: Flow slug or branch name to switch to
+
+        Returns:
+            Flow state of the target flow
+
+        Raises:
+            RuntimeError: If flow not found
+        """
+        git = GitClient()
+
+        logger.bind(
+            domain="flow",
+            action="switch",
+            target=target,
+        ).info("Switching to flow")
+
+        # Find the flow - try by slug first, then by branch
+        flows = self.list_flows()
+        target_flow = None
+        for flow in flows:
+            if flow.flow_slug == target or flow.branch == target:
+                target_flow = flow
+                break
+
+        if not target_flow:
+            raise RuntimeError(f"Flow '{target}' not found")
+
+        # Check if branch exists
+        if not git.branch_exists(target_flow.branch):
+            raise RuntimeError(f"Branch '{target_flow.branch}' does not exist")
+
+        # Stash current changes
+        stash_ref = None
+        if git.has_uncommitted_changes():
+            stash_ref = git.stash_push(message=f"vibe flow switch {target}")
+
+        # Switch to target branch
+        git.switch_branch(target_flow.branch)
+
+        # Restore stash if we stashed
+        if stash_ref:
+            git.stash_apply(stash_ref)
+
+        return target_flow
 
     def get_flow_status(self, branch: str) -> FlowStatusResponse | None:
         """Get flow status.
