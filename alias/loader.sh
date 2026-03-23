@@ -35,12 +35,12 @@ export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
 # ── Clear cached functions (ensures fresh load) ─────────────
 unset -f wt wtls wtnew wtrm vup vnew 2>/dev/null || true
-unset -f cc{y,p,s,wt} oo{,a,d,p} vc vsign vmain vt vtup vtdown vtswitch vtls vtkill 2>/dev/null || true
+unset -f cc{,wt} cx oc gm oo{,a,d,p} vc vsign vmain vt vtup vtdown vtswitch vtls vtkill 2>/dev/null || true
 
 # ── Source Aliases ────────────────────────────────────────
 _al_src_dir="$VIBE_ROOT/alias"
 _al_loaded=0
-for f in git.sh tmux.sh worktree.sh claude.sh opencode.sh openspec.sh vibe.sh vibe3.sh; do
+for f in git.sh tmux.sh worktree.sh agent.sh openspec.sh vibe.sh vibe3.sh; do
   if [[ -f "$_al_src_dir/$f" ]]; then
     source "$_al_src_dir/$f"
     ((_al_loaded++))

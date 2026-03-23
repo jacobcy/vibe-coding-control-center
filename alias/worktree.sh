@@ -297,9 +297,10 @@ vup() {
 
   local agent_cmd
   case "$agent" in
-    opencode) vibe_require opencode; agent_cmd="opencode" ;;
-    codex)    vibe_require codex;    agent_cmd="codex --yes" ;;
-    *)        vibe_require claude;   agent_cmd="claude --dangerously-skip-permissions --continue" ;;
+    opencode) vibe_require opencode; agent_cmd="opencode -c" ;;
+    codex)    vibe_require codex;    agent_cmd="codex resume --last --full-auto" ;;
+    gemini)   vibe_require gemini;   agent_cmd="gemini -r latest --yolo" ;;
+    *)        vibe_require claude;   agent_cmd="claude -c --dangerously-skip-permissions" ;;
   esac
 
   # Create session if needed (don't destroy existing)
