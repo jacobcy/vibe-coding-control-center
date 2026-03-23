@@ -49,7 +49,7 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
         return
 
     for event in events:
-        time_str = event.created_at[:16].replace("T", " ")
+        time_str = event.created_at[:19].replace("T", " ")
         actor_short = event.actor.split("/")[-1] if "/" in event.actor else event.actor
         console.print(
             f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{actor_short}[/]"
