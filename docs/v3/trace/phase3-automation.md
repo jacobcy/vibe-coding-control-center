@@ -289,14 +289,14 @@ jobs:
 
       - name: Run review
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
         run: |
           vibe review pr ${{ github.event.pull_request.number }}
 
       - name: Post review comments
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           python3 -m vibe3.commands.review post-comments \
             --pr ${{ github.event.pull_request.number }} \
@@ -306,7 +306,7 @@ jobs:
 
 **实现任务**:
 - [ ] 创建 `.github/workflows/ai-pr-review.yml`
-- [ ] 配置环境变量（GITHUB_TOKEN、CODEX_API_KEY）
+- [ ] 配置环境变量（GH_TOKEN、CODEX_API_KEY）
 - [ ] 实现审核步骤
 - [ ] 实现 review comments 发布
 

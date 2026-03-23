@@ -9,7 +9,6 @@ code_limits:
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 18000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -195,3 +194,12 @@ github_project:
   owner: "jacobcy"
   project_number: 17
   org: ""             # 已废弃，请使用 owner
+
+# AI 辅助配置
+# 用于 flow new --ai 和 pr create --ai 功能
+# API Key 通过环境变量配置: DEEPSEEK_API_KEY
+ai:
+  api_key_env: "DEEPSEEK_API_KEY"  # 环境变量名
+  base_url: "https://api.deepseek.com/v1"  # DeepSeek API endpoint
+  model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
+  timeout: 30                 # 超时秒数

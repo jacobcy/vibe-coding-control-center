@@ -29,7 +29,7 @@ class ProjectItemError(BaseModel):
 
     type 取值：
     - "network_error"：网络失败或 API 超时
-    - "auth_error"：认证失败（GITHUB_TOKEN 未设置或无效）
+    - "auth_error"：认证失败（GH_TOKEN 未设置或无效）
     - "not_found"：item 不存在
     - "parse_error"：JSON 解析失败
     """

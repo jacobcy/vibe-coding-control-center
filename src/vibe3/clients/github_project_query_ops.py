@@ -20,8 +20,7 @@ class ProjectQueryMixin:
             return ProjectItemError(
                 type="auth_error",
                 message=(
-                    "未找到 GitHub 认证令牌，"
-                    "请设置 GITHUB_TOKEN 或运行 gh auth login"
+                    "未找到 GitHub 认证令牌，" "请设置 GH_TOKEN 或运行 gh auth login"
                 ),
             )
 
@@ -133,8 +132,7 @@ class ProjectQueryMixin:
             return ProjectItemError(
                 type="auth_error",
                 message=(
-                    "未找到 GitHub 认证令牌，"
-                    "请设置 GITHUB_TOKEN 或运行 gh auth login"
+                    "未找到 GitHub 认证令牌，" "请设置 GH_TOKEN 或运行 gh auth login"
                 ),
             )
 
