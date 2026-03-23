@@ -35,7 +35,7 @@ export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
 # ── Clear cached functions (ensures fresh load) ─────────────
 unset -f wt wtls wtnew wtrm vup vnew 2>/dev/null || true
-unset -f cc{,wt} cx oc gm oo{,a,d,p} vc vsign vmain vt vtup vtdown vtswitch vtls vtkill 2>/dev/null || true
+unset -f cc{,i} cx{,i} oc{,i} gm{,i} oo{,a,d,p} vc vsign vmain vt vtup vtdown vtswitch vtls vtkill 2>/dev/null || true
 
 # ── Source Aliases ────────────────────────────────────────
 _al_src_dir="$VIBE_ROOT/alias"
