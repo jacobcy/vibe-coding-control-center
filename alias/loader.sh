@@ -36,6 +36,10 @@ else
 fi
 export VIBE_SESSION="${VIBE_SESSION:-vibe}"
 
+# ── Clear cached functions (ensures fresh load) ─────────────
+unset -f wt wtls wtnew wtrm vup vnew 2>/dev/null || true
+unset -f cc{y,p,s,wt} oo{,a,d,p} vc vsign vmain vt vtup vtdown vtswitch vtls vtkill 2>/dev/null || true
+
 # ── Source Aliases ────────────────────────────────────────
 _al_src_dir="$VIBE_ROOT/alias"
 for f in git.sh tmux.sh worktree.sh claude.sh opencode.sh openspec.sh vibe.sh vibe3.sh; do
