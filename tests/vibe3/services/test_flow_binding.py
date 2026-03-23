@@ -14,7 +14,6 @@ class TestFlowBinding:
             branch="test-branch",
             issue_number=123,
             role="task",
-            actor="test-actor",
         )
 
         assert isinstance(result, IssueLink)
@@ -25,12 +24,11 @@ class TestFlowBinding:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             task_issue_number=123,
-            latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "issue_linked",
-            "test-actor",
+            "system",
             "Issue #123 linked as task",
         )
 
@@ -41,7 +39,6 @@ class TestFlowBinding:
             branch="test-branch",
             issue_number=456,
             role="task",
-            actor="test-actor",
         )
 
         assert isinstance(result, IssueLink)

@@ -13,7 +13,6 @@ class TestFlowCreation:
         result = service.create_flow(
             slug="test-flow",
             branch="test-branch",
-            actor="test-actor",
         )
 
         assert isinstance(result, FlowState)
@@ -24,12 +23,11 @@ class TestFlowCreation:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             flow_slug="test-flow",
-            latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "flow_created",
-            "test-actor",
+            "system",
             "Flow 'test-flow' created",
         )
 
@@ -39,7 +37,6 @@ class TestFlowCreation:
         result = service.create_flow(
             slug="test-flow",
             branch="test-branch",
-            actor="test-actor",
         )
 
         assert result.flow_slug == "test-flow"
