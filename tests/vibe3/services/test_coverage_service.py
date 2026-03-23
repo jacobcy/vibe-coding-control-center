@@ -99,7 +99,13 @@ def test_subprocess_command_construction(
         assert called_cmd[1] == "run"
         assert called_cmd[2] == "pytest"
         assert "--cov=src/vibe3" in called_cmd
-        assert "--cov-report=json:coverage.json" in called_cmd
+        # Check that coverage report path contains the expected prefix
+        # (full path varies based on flow state)
+        cov_report_args = [
+            arg for arg in called_cmd if arg.startswith("--cov-report=json:")
+        ]
+        assert len(cov_report_args) == 1
+        assert "coverage.json" in cov_report_args[0]
         assert "-q" in called_cmd
 
 

@@ -54,10 +54,17 @@ def render_flow_status(
         suffix = f"  [dim]{title}[/]" if title else ""
         console.print(f"  [dim]task_issue:[/] #{n}{suffix}")
     if status.issues:
-        repo_issues = [i for i in status.issues if i.issue_role == "repo"]
-        if repo_issues:
-            console.print("  [dim]repo_issues:[/]")
-            for i in repo_issues:
+        related_issues = [i for i in status.issues if i.issue_role == "related"]
+        dependency_issues = [i for i in status.issues if i.issue_role == "dependency"]
+        if related_issues:
+            console.print("  [dim]related_issues:[/]")
+            for i in related_issues:
+                title = titles.get(i.issue_number, "")
+                suffix = f"  [dim]{title}[/]" if title else ""
+                console.print(f"    - #{i.issue_number}{suffix}")
+        if dependency_issues:
+            console.print("  [dim]dependencies:[/]")
+            for i in dependency_issues:
                 title = titles.get(i.issue_number, "")
                 suffix = f"  [dim]{title}[/]" if title else ""
                 console.print(f"    - #{i.issue_number}{suffix}")

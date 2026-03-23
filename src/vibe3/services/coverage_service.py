@@ -103,25 +103,43 @@ class CoverageService:
     def _run_pytest_cov(self) -> dict[str, Any]:
         """Run pytest with --cov --cov-json and parse output.
 
+        Output is saved to .agent/reports/<flow_slug>/coverage.json
+
         Returns:
             Parsed coverage data from coverage.json
 
         Raises:
             RuntimeError: If pytest or coverage run fails
         """
-        cov_file = self.project_root / "coverage.json"
+        from vibe3.clients.git_client import GitClient
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        # Get current flow slug for report directory
+        git = GitClient()
+        store = SQLiteClient()
+        current_branch = git.get_current_branch()
+        flow_data = store.get_flow_state(current_branch)
+
+        if flow_data and flow_data.get("flow_slug"):
+            flow_slug = flow_data["flow_slug"]
+            reports_dir = self.project_root / ".agent" / "reports" / flow_slug
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            cov_file = reports_dir / "coverage.json"
+        else:
+            # Fallback to project root if no flow
+            cov_file = self.project_root / "coverage.json"
 
         # Remove old coverage.json to prevent reusing stale data
         if cov_file.exists():
             cov_file.unlink()
-            logger.debug("Removed old coverage.json")
+            logger.debug(f"Removed old {cov_file}")
 
         cmd = [
             "uv",
             "run",
             "pytest",
             "--cov=src/vibe3",
-            "--cov-report=json:coverage.json",
+            f"--cov-report=json:{cov_file}",
             "--cov-report=term-missing:skip-covered",
             "-q",  # Quiet mode
         ]
@@ -154,11 +172,12 @@ class CoverageService:
 
             # Parse coverage.json
             if not cov_file.exists():
-                raise RuntimeError("coverage.json not generated")
+                raise RuntimeError(f"coverage.json not generated at {cov_file}")
 
             with open(cov_file) as f:
                 data: dict[str, Any] = json.load(f)
 
+            logger.info(f"Coverage report saved to {cov_file}")
             return data
 
         except Exception as e:

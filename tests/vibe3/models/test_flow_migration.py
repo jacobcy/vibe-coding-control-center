@@ -38,22 +38,29 @@ class TestFlowStatusMigration:
 
 
 class TestIssueRoleMigration:
-    """Tests for issue_role field migration (related->repo)."""
+    """Tests for issue_role field migration (repo->related)."""
 
-    def test_migrate_related_to_repo(self):
-        """Test that 'related' role is migrated to 'repo'."""
-        link = IssueLink(branch="test-branch", issue_number=123, issue_role="related")
-        assert link.issue_role == "repo"
+    def test_migrate_repo_to_related(self):
+        """Test that legacy 'repo' role is migrated to 'related'."""
+        link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
+        assert link.issue_role == "related"
 
     def test_task_role_unchanged(self):
         """Test that 'task' role is not modified."""
         link = IssueLink(branch="test-branch", issue_number=123, issue_role="task")
         assert link.issue_role == "task"
 
-    def test_repo_role_unchanged(self):
-        """Test that 'repo' role is not modified."""
-        link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
-        assert link.issue_role == "repo"
+    def test_related_role_unchanged(self):
+        """Test that 'related' role is not modified."""
+        link = IssueLink(branch="test-branch", issue_number=123, issue_role="related")
+        assert link.issue_role == "related"
+
+    def test_dependency_role_unchanged(self):
+        """Test that 'dependency' role is not modified."""
+        link = IssueLink(
+            branch="test-branch", issue_number=123, issue_role="dependency"
+        )
+        assert link.issue_role == "dependency"
 
 
 class TestModelSerialization:
@@ -67,9 +74,9 @@ class TestModelSerialization:
 
     def test_issue_link_dict_serialization(self):
         """Test that IssueLink serializes with migrated values."""
-        link = IssueLink(branch="test-branch", issue_number=123, issue_role="related")
+        link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
         data = link.model_dump()
-        assert data["issue_role"] == "repo"
+        assert data["issue_role"] == "related"
 
     def test_flow_state_json_serialization(self):
         """Test that FlowState JSON serialization uses migrated values."""
@@ -79,6 +86,6 @@ class TestModelSerialization:
 
     def test_issue_link_json_serialization(self):
         """Test that IssueLink JSON serialization uses migrated values."""
-        link = IssueLink(branch="test-branch", issue_number=123, issue_role="related")
+        link = IssueLink(branch="test-branch", issue_number=123, issue_role="repo")
         json_str = link.model_dump_json()
-        assert '"issue_role":"repo"' in json_str
+        assert '"issue_role":"related"' in json_str

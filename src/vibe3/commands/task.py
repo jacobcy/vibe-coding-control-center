@@ -10,6 +10,7 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.task_bridge import bridge_app
 from vibe3.models.project_item import ProjectItemError
 from vibe3.models.task_bridge import HydrateError
@@ -29,21 +30,24 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def parse_issue_url(issue_url: str) -> int:
-    """Parse issue number from GitHub URL or plain number."""
-    if issue_url.isdigit():
-        return int(issue_url)
-    match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_url)
+def parse_issue_ref(issue_ref: str) -> int:
+    """Parse issue number from reference (number or GitHub URL)."""
+    if issue_ref.isdigit():
+        return int(issue_ref)
+    match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_ref)
     if match:
         return int(match.group(1))
-    raise ValueError(f"Invalid issue URL or number: {issue_url}")
+    raise ValueError(f"Invalid issue reference: {issue_ref}")
 
 
 @app.command()
 def list(
-    repo_issue: Annotated[
-        int | None,
-        typer.Option("--repo-issue", help="从 repo issue 反查所有关联 task"),
+    issue: Annotated[
+        str | None,
+        typer.Option(
+            "--issue",
+            help="Issue number (or URL) — 查找该 issue 作为 related 角色关联的 flow",
+        ),
     ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
@@ -52,19 +56,18 @@ def list(
     if trace:
         setup_logging(verbose=2)
 
-    from vibe3.clients.sqlite_client import SQLiteClient
-
     store = SQLiteClient()
 
-    if repo_issue is not None:
-        flows_data = store.get_flows_by_issue(repo_issue, role="repo")
+    if issue is not None:
+        issue_number = parse_issue_ref(issue)
+        flows_data = store.get_flows_by_issue(issue_number, role="related")
         if not flows_data:
-            typer.echo(f"No tasks linked to repo issue #{repo_issue}")
+            typer.echo(f"No tasks linked to related issue #{issue_number}")
             return
         if json_output:
             typer.echo(json.dumps(flows_data, indent=2, default=str))
             return
-        typer.echo(f"Tasks linked to repo issue #{repo_issue}:")
+        typer.echo(f"Tasks linked to related issue #{issue_number}:")
         for f in flows_data:
             task_num = f.get("task_issue_number")
             bound = "[bound]" if f.get("project_item_id") else "[unbound]"
@@ -140,16 +143,26 @@ def show(
         if view.task_issue_number:
             typer.echo(f"Task Issue: #{view.task_issue_number.value}")
 
-        from vibe3.clients.sqlite_client import SQLiteClient
-
         store = SQLiteClient()
-        repo_issues = [
-            lnk for lnk in store.get_issue_links(branch) if lnk["issue_role"] == "repo"
+        related_issues = [
+            lnk
+            for lnk in store.get_issue_links(branch)
+            if lnk["issue_role"] == "related"
         ]
-        if repo_issues:
+        dependency_issues = [
+            lnk
+            for lnk in store.get_issue_links(branch)
+            if lnk["issue_role"] == "dependency"
+        ]
+        if related_issues:
             typer.echo(
-                "Repo Issue(s): "
-                + "  ".join(f"#{lnk['issue_number']}" for lnk in repo_issues)
+                "Related Issue(s): "
+                + "  ".join(f"#{lnk['issue_number']}" for lnk in related_issues)
+            )
+        if dependency_issues:
+            typer.echo(
+                "Dependencies: "
+                + "  ".join(f"#{lnk['issue_number']}" for lnk in dependency_issues)
             )
 
         if view.spec_ref:
@@ -177,9 +190,10 @@ def show(
 
 @app.command()
 def link(
-    issue_url: Annotated[str, typer.Argument(help="Issue URL or number")],
-    role: Annotated[Literal["task", "repo"], typer.Option(help="Issue role")] = "repo",
-    actor: Annotated[str, typer.Option(help="Actor linking the issue")] = "unknown",
+    issue: Annotated[str, typer.Argument(help="Issue number (or URL)")],
+    role: Annotated[
+        Literal["related", "dependency"], typer.Option(help="Issue role")
+    ] = "related",
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -190,11 +204,11 @@ def link(
     ctx = trace_context(command="task link", domain="task") if trace else _noop()
     with ctx:
         try:
-            issue_number = parse_issue_url(issue_url)
+            issue_number = parse_issue_ref(issue)
             git = GitClient()
             branch = git.get_current_branch()
             service = TaskService()
-            issue_link = service.link_issue(branch, issue_number, role, actor)
+            issue_link = service.link_issue(branch, issue_number, role)
 
             if json_output:
                 typer.echo(json.dumps(issue_link.model_dump(), indent=2, default=str))
@@ -209,7 +223,6 @@ def link(
 @app.command()
 def status(
     value: Annotated[str, typer.Argument(help="目标状态值，如 'In Progress'、'Done'")],
-    actor: Annotated[str, typer.Option(help="执行此操作的 actor")] = "unknown",
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Update remote GitHub Project task status (唯一合法写入路径)."""
@@ -221,7 +234,7 @@ def status(
         git = GitClient()
         branch = git.get_current_branch()
         service = TaskService()
-        result = service.update_remote_task_status(branch, value, actor)
+        result = service.update_remote_task_status(branch, value)
 
         if isinstance(result, ProjectItemError):
             typer.echo(f"Error [{result.type}]: {result.message}", err=True)

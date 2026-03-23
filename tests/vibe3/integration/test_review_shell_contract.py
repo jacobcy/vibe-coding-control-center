@@ -68,8 +68,11 @@ class TestPrePushContract:
         """Verify pre-push.sh persists local review output to .agent/reports/."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert "mkdir -p .agent/reports" in content
-        assert ".agent/reports/pre-push-review-" in content
+        # Check for dynamic reports directory creation (supports flow-specific paths)
+        assert "mkdir -p" in content
+        assert "REPORTS_DIR" in content
+        assert ".agent/reports" in content
+        assert "pre-push-review-" in content
         # New implementation uses tee to save output in real-time
         assert 'tee "$REVIEW_REPORT_FILE"' in content
 

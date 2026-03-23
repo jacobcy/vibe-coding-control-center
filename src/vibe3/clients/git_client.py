@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.exceptions import GitError
+from vibe3.exceptions import GitError, SystemError
 from vibe3.models.change_source import (
     BranchSource,
     ChangeSource,
@@ -139,13 +139,22 @@ class GitClient:
         if source.type == ChangeSourceType.UNCOMMITTED:
             files = self._get_uncommitted_files()
         elif source.type == ChangeSourceType.COMMIT:
-            assert isinstance(source, CommitSource)
+            if not isinstance(source, CommitSource):
+                raise SystemError(
+                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
+                )
             files = self._get_commit_files(source.sha)
         elif source.type == ChangeSourceType.BRANCH:
-            assert isinstance(source, BranchSource)
+            if not isinstance(source, BranchSource):
+                raise SystemError(
+                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
+                )
             files = self._get_branch_files(source.branch, source.base)
         elif source.type == ChangeSourceType.PR:
-            assert isinstance(source, PRSource)
+            if not isinstance(source, PRSource):
+                raise SystemError(
+                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
+                )
             if not self._github_client:
                 raise GitError(
                     "get_changed_files",
@@ -176,13 +185,22 @@ class GitClient:
         if source.type == ChangeSourceType.UNCOMMITTED:
             diff = self._run(["diff", "HEAD"])
         elif source.type == ChangeSourceType.COMMIT:
-            assert isinstance(source, CommitSource)
+            if not isinstance(source, CommitSource):
+                raise SystemError(
+                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
+                )
             diff = self._run(["show", source.sha, "--stat"])
         elif source.type == ChangeSourceType.BRANCH:
-            assert isinstance(source, BranchSource)
+            if not isinstance(source, BranchSource):
+                raise SystemError(
+                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
+                )
             diff = self._run(["diff", f"{source.base}...{source.branch}"])
         elif source.type == ChangeSourceType.PR:
-            assert isinstance(source, PRSource)
+            if not isinstance(source, PRSource):
+                raise SystemError(
+                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
+                )
             if not self._github_client:
                 raise GitError(
                     "get_diff",
@@ -234,3 +252,117 @@ class GitClient:
                 )
             self._pr_diff_cache[pr_number] = self._github_client.get_pr_diff(pr_number)
         return self._pr_diff_cache[pr_number]
+
+    # ── 分支管理方法 ──────────────────────────────────────────
+
+    def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
+        """Create a new branch from start_ref.
+
+        Args:
+            branch_name: Name of the new branch
+            start_ref: Starting reference (default: origin/main)
+        """
+        self._run(["checkout", "-b", branch_name, start_ref])
+        logger.bind(
+            domain="git",
+            action="create_branch",
+            branch=branch_name,
+            start_ref=start_ref,
+        ).info("Created branch")
+
+    def switch_branch(self, branch_name: str) -> None:
+        """Switch to existing branch.
+
+        Args:
+            branch_name: Branch to switch to
+        """
+        self._run(["checkout", branch_name])
+        logger.bind(domain="git", action="switch_branch", branch=branch_name).info(
+            "Switched branch"
+        )
+
+    def delete_branch(self, branch_name: str, force: bool = False) -> None:
+        """Delete local branch.
+
+        Args:
+            branch_name: Branch to delete
+            force: Force delete even if not merged
+        """
+        flag = "-D" if force else "-d"
+        self._run(["branch", flag, branch_name])
+        logger.bind(
+            domain="git", action="delete_branch", branch=branch_name, force=force
+        ).info("Deleted local branch")
+
+    def delete_remote_branch(self, branch_name: str) -> None:
+        """Delete remote branch.
+
+        Args:
+            branch_name: Remote branch to delete
+        """
+        self._run(["push", "origin", "--delete", branch_name])
+        logger.bind(
+            domain="git", action="delete_remote_branch", branch=branch_name
+        ).info("Deleted remote branch")
+
+    def stash_push(self, message: str | None = None) -> str:
+        """Stash current changes, return stash ref.
+
+        Args:
+            message: Optional stash message
+
+        Returns:
+            Stash reference (e.g., stash@{0})
+        """
+        args = ["stash", "push"]
+        if message:
+            args.extend(["-m", message])
+        self._run(args)
+        stash_ref = "stash@{0}"
+        logger.bind(
+            domain="git", action="stash_push", stash_ref=stash_ref, message=message
+        ).info("Stashed changes")
+        return stash_ref
+
+    def stash_apply(self, stash_ref: str) -> None:
+        """Apply and drop stash.
+
+        Args:
+            stash_ref: Stash reference to apply
+        """
+        self._run(["stash", "pop", stash_ref])
+        logger.bind(domain="git", action="stash_apply", stash_ref=stash_ref).info(
+            "Applied stash"
+        )
+
+    def has_uncommitted_changes(self) -> bool:
+        """Check if working directory is dirty.
+
+        Returns:
+            True if there are uncommitted changes
+        """
+        try:
+            status = self._run(["status", "--porcelain"])
+            return bool(status)
+        except GitError:
+            return False
+
+    def branch_exists(self, branch_name: str) -> bool:
+        """Check if branch exists (local or remote).
+
+        Args:
+            branch_name: Branch name to check
+
+        Returns:
+            True if branch exists
+        """
+        try:
+            # Check local branches
+            local = self._run(["branch", "--list", branch_name])
+            if local:
+                return True
+            # Check remote branches
+            remote = self._run(["branch", "-r", "--list", f"origin/{branch_name}"])
+            return bool(remote)
+        except GitError:
+            return False

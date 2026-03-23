@@ -8,10 +8,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
 from vibe3.models.pr import (
     CreatePRRequest,
-    PRMetadata,
     PRResponse,
     VersionBumpResponse,
 )
+from vibe3.services.pr_utils import build_pr_body, get_metadata_from_flow
 from vibe3.services.version_service import VersionService
 
 
@@ -43,16 +43,17 @@ class PRService:
         title: str,
         body: str,
         base_branch: str = "main",
-        metadata: PRMetadata | None = None,
         actor: str = "unknown",
     ) -> PRResponse:
         """Create a draft PR.
+
+        Metadata (task, flow, spec, planner, executor) is automatically
+        read from the current flow state.
 
         Args:
             title: PR title
             body: PR body/description
             base_branch: Base branch name
-            metadata: PR metadata (task, flow, spec, etc.)
             actor: Actor creating the PR
 
         Returns:
@@ -66,7 +67,6 @@ class PRService:
             action="create_draft",
             title=title,
             base_branch=base_branch,
-            metadata=metadata,
             actor=actor,
         ).info("Creating draft PR")
 
@@ -76,9 +76,14 @@ class PRService:
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Get current branch and build PR body
+        # Get current branch
         head_branch = self.git_client.get_current_branch()
-        enhanced_body = self._build_pr_body(body, metadata)
+
+        # Read metadata from flow state
+        metadata = get_metadata_from_flow(self.store, head_branch)
+
+        # Build PR body with metadata
+        enhanced_body = build_pr_body(body, metadata)
 
         # Create PR
         request = CreatePRRequest(
@@ -246,31 +251,3 @@ class PRService:
 
         # Use version service for calculation (reads from VERSION file)
         return self.version_service.calculate_bump(group)
-
-    def _build_pr_body(self, body: str, metadata: PRMetadata | None = None) -> str:
-        """Build PR body with metadata.
-
-        Args:
-            body: Original PR body
-            metadata: PR metadata
-
-        Returns:
-            Enhanced PR body with metadata section
-        """
-        if not metadata:
-            return body
-
-        metadata_section = "\n\n---\n\n## Vibe3 Metadata\n\n"
-
-        if metadata.task_issue:
-            metadata_section += f"**Task Issue:** #{metadata.task_issue}\n"
-        if metadata.flow_slug:
-            metadata_section += f"**Flow:** {metadata.flow_slug}\n"
-        if metadata.spec_ref:
-            metadata_section += f"**Spec Ref:** {metadata.spec_ref}\n"
-        if metadata.planner:
-            metadata_section += f"**Planner:** {metadata.planner}\n"
-        if metadata.executor:
-            metadata_section += f"**Executor:** {metadata.executor}\n"
-
-        return body + metadata_section

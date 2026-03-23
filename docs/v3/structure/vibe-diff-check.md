@@ -1,87 +1,248 @@
-# Plan: vibe3 diff --check
+# vibe3 inspect diff Check 设计
 
-## 背景
+**日期**: 2026-03-22
+**状态**: Draft
+**定位**: 定义面向 agent 改动的本地 diff 质量闸，作为 snapshot/diff 质量层的执行入口之一
 
-OpenAI 提供了：
-- `.agent/agent-spec.yaml` — 机器可读的 agent 行为规则（diff 限制、commit 格式、scope 约束）
+---
 
-核心价值是：把 SOUL.md 里"最小正确改动"的原则变成一个可执行的 CLI 卡口。
+## 1. 问题定义
 
-## 问题
+当多 agent 编排跑起来以后，风险不只是“任务有没有推进”，还包括：
 
-`vibe diff --check` 命令不存在。
+- 是否越 scope 乱改
+- 是否一次改了太多无关文件
+- 是否引入结构级膨胀
+- 是否把垃圾代码更快地产生出来
 
-## 目标
+因此需要一个本地 diff 检查入口，在 handoff、review、commit 之前给出最小质量判断。
 
-实现 `vibe3 diff --check`：读取当前 git diff，对照 `agent-spec.yaml` 规则，输出违规报告。
+---
 
-## 使用场景
+## 2. 目标
 
-```
-agent 改完代码 → vibe3 diff --check → pre-commit → commit
-```
+定义 `vibe3 inspect diff --check` 的目标态能力：
 
-不是"改之前跑"，而是"改完之后、commit 之前跑"，作为 pre-commit 的前置补充。
-专注检查 agent 行为规范层面，不检查代码质量。
+- 读取当前 git diff
+- 结合 task 边界、structure snapshot、structure diff
+- 输出可读的违规报告
+- 为 handoff / review / 垃圾代码回收提供统一入口
 
-## 输出格式
+这不是替代 review，也不是替代 PR risk gate。
 
-```
-[ERROR][T1] src/unrelated.py is outside task scope
-[WARN ][D2] 12 files changed — consider splitting
-[OK   ][C2] Commit message format valid
-```
+当前仓库还没有 `vibe3 inspect diff` 命令；这份文档定义的是目标接口和落地路径。
 
-exit code: 有 ERROR 返回 1，仅 WARN 返回 0。
+---
 
-## 规则映射
+## 3. 它在整体系统中的位置
 
-来自 `agent-spec.yaml`，按优先级：
-
-| 规则 ID | 检查内容 | 严重级别 | 实现方式 |
-|---------|---------|---------|---------|
-| T1 | 改动文件是否在 task scope 内 | ERROR | 读 `.agent/context/task.md` 的 scope 字段 |
-| D1 | 是否整个文件覆盖重写 | ERROR | diff 行数 vs 文件总行数比例 |
-| D2 | 改动是否局部最小化 | WARN | 改动文件数 > max_files_changed |
-| C1 | commit 是否单一职责 | ERROR | 改动文件跨多个模块 |
-| C2 | commit message 格式 | ERROR | 正则匹配 forbidden_patterns |
-
-T1 依赖 task scope，初期可以跳过（scope 未定义时降级为 WARN）。
-
-## 实现结构
-
-```
-src/vibe3/
-  commands/diff.py          # CLI 入口，vibe3 diff --check
-  services/diff_service.py  # 规则引擎，读 yaml + 跑检查
+```text
+agent 修改代码
+  -> git diff
+  -> vibe3 inspect diff --check
+  -> handoff / review / commit / PR
 ```
 
-复用现有：
-- `GitClient.get_changed_files()` — 获取改动文件列表
-- `GitClient.get_diff()` — 获取 diff 内容
-- `agent-spec.yaml` — 规则数据源
+它属于：
 
-## 不做的事
+- 本地执行阶段的质量闸
+- 编排系统中的“产出检查”层
 
-- 不实现"改之前模拟 diff"（过于复杂，实际价值低）
-- 不替换现有 pre-commit（互补，不替代）
-- 不实现 `--fix` 自动修复（规则违规需要人工判断）
+它不属于：
 
-## 与现有 risk gate 的关系
+- GitHub 状态机
+- handoff 正文
+- Project UI
 
-项目已有 `run_risk_gate`（`pr_quality_gates.py`），在 `vibe3 pr ready` 时触发：
-- 调用 `inspect pr` 分析符号变更影响范围
-- 风险评分超标则阻断 PR
+---
 
-两者不重叠：
+## 4. 输入
 
-| | vibe diff --check | risk gate |
-|---|---|---|
-| 时机 | commit 之前，本地 | PR ready，需要 PR 号 |
-| 检查内容 | agent 行为规范（scope、diff 大小） | 代码风险（符号影响范围） |
-| 依赖 | 纯本地 git diff | GitHub PR + inspect 分析 |
+`vibe3 inspect diff --check` 的目标输入应包括：
 
-## 优先级
+1. 当前 git diff
+2. 当前 flow / issue 最小上下文
+3. task scope 或任务边界
+4. 可选的 structure snapshot
+5. 可选的 structure diff
 
-低。risk gate 已覆盖 PR 层面的风险拦截，pre-commit 覆盖代码质量。
-当 agent 越 scope 乱改的问题变得频繁时再实现。
+---
+
+## 5. 输出
+
+### 5.1 文本输出
+
+```text
+[ERROR][SCOPE] src/unrelated.py is outside declared task scope
+[WARN ][SIZE ] 12 files changed, consider splitting
+[WARN ][ARCH ] dependency added: services/task -> clients/github
+[OK   ][MIN  ] changes stay within expected modules
+```
+
+### 5.2 退出码
+
+- 有 `ERROR`：退出码 1
+- 只有 `WARN`：退出码 0
+- 全部 `OK`：退出码 0
+
+### 5.3 JSON 输出
+
+供 handoff、review、未来 orchestrator 消费：
+
+```json
+{
+  "ok": false,
+  "errors": [],
+  "warnings": [],
+  "summary": {}
+}
+```
+
+---
+
+## 6. 检查维度
+
+### 6.1 第一阶段必须有
+
+### A. Scope 边界检查
+
+检查是否越出当前任务边界。
+
+可用输入：
+
+- task 文档中的 scope
+- handoff 中声明的关注模块
+- 当前 flow 已绑定 issue 的上下文
+
+### B. 改动规模检查
+
+检查：
+
+- 改动文件数量
+- 单文件改动量
+- 是否接近“整文件重写”
+
+### C. 结构漂移检查
+
+如果存在 structure diff，则检查：
+
+- 新增依赖
+- 模块 LOC 异常膨胀
+- 函数数量异常增加
+
+### 6.2 第二阶段再补
+
+### D. 重复实现趋势
+
+结合 duplication 信息判断：
+
+- 是否新增重复实现
+- 是否把已有重复继续扩散
+
+### E. 垃圾代码回收建议
+
+在不阻断执行的前提下给出：
+
+- 建议拆分
+- 建议回收
+- 建议后续 cleanup
+
+---
+
+## 7. 与现有能力的关系
+
+### 7.1 不替代 PR Risk Gate
+
+仓库已有 `pr ready` 时触发的 risk gate，用于 PR 级风险判断。  
+`vibe3 inspect diff --check` 解决的是更早阶段的问题：
+
+- 还没到 PR
+- 还没进入最终 review
+- 但已经需要一个本地质量卡口
+
+### 7.2 不替代 pre-commit
+
+pre-commit 更偏语法、格式、基础质量。  
+`vibe3 inspect diff --check` 更偏：
+
+- agent 行为边界
+- 任务范围边界
+- 结构级扩散风险
+
+### 7.3 依赖 structure/snapshot/diff
+
+如果没有结构基线，它仍可运行，但能力会降级为：
+
+- scope 检查
+- 文件规模检查
+
+有 snapshot/diff 时，才能升级到结构级治理。
+
+---
+
+## 8. 推荐规则分级
+
+| 规则组 | 严重级别 | 说明 |
+|--------|---------|------|
+| `SCOPE` | ERROR | 越界改动 |
+| `SIZE` | WARN | 改动过大或应拆分 |
+| `ARCH` | WARN/ERROR | 结构漂移，视阈值决定 |
+| `DUP` | WARN | 重复实现趋势 |
+| `RECYCLE` | WARN | 建议进入垃圾代码回收 |
+
+---
+
+## 9. 与状态机的联动
+
+### 9.1 推荐联动点
+
+- 从 `state/in-progress` 进入 `state/handoff` 前运行一次
+- 从 `state/in-progress` 进入 `state/review` 前运行一次
+- 进入垃圾代码回收时运行一次
+
+### 9.2 联动原则
+
+- `diff check` 不直接改 label
+- 它只提供事实和建议
+- 是否阻断状态迁移，由上层规则决定
+
+---
+
+## 10. 最小实施路径
+
+### 第一阶段
+
+1. 提供 `vibe3 inspect diff --check`
+2. 只做 scope + size 检查
+3. 输出文本和 JSON
+
+### 第二阶段
+
+1. 接 structure diff
+2. 加入架构漂移提示
+3. 与 handoff/review 对接
+
+### 第三阶段
+
+1. 加 duplication 趋势
+2. 接垃圾代码回收流程
+3. 给 orchestrator 提供质量信号
+
+---
+
+## 11. 验收标准
+
+1. agent 在本地就能发现明显越界改动
+2. handoff / review 前能拿到一致的 diff 摘要
+3. 结构漂移能在 PR 前暴露，而不是到 merge 后才发现
+4. 垃圾代码回收有明确触发依据，而不是凭感觉
+
+---
+
+## 12. 结论
+
+`vibe3 inspect diff --check` 的正确定位不是“另一个 lint”，而是：
+
+- 多 agent 编排里的本地质量闸
+- 连接 git diff 与 structure diff 的桥
+- 垃圾代码回收的早期触发器
