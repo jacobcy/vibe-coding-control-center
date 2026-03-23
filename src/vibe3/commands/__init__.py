@@ -1,5 +1,29 @@
 """Commands package."""
 
-from . import flow, hooks, inspect, pr, review, task
+from . import (
+    check,
+    flow,
+    handoff,
+    hooks,
+    inspect,
+    plan,
+    pr,
+    review,
+    run,
+    snapshot,
+    task,
+)
 
-__all__ = ["flow", "task", "pr", "hooks", "inspect", "review"]
+__all__ = [
+    "check",
+    "flow",
+    "handoff",
+    "hooks",
+    "inspect",
+    "plan",
+    "pr",
+    "review",
+    "run",
+    "snapshot",
+    "task",
+]

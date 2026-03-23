@@ -73,6 +73,18 @@ class GitClient:
         )
         return branch
 
+    def get_current_commit(self) -> str:
+        """Get current HEAD commit SHA.
+
+        Returns:
+            Full commit SHA of current HEAD
+        """
+        commit = self._run(["rev-parse", "HEAD"])
+        logger.bind(domain="git", action="get_current_commit", commit=commit[:7]).debug(
+            "Got current commit"
+        )
+        return commit
+
     def get_worktree_name(self) -> str:
         """获取当前 worktree 名称（路径最后一段）.
 

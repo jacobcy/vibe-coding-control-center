@@ -21,6 +21,7 @@ def test_inspect_commands_no_args_lists_available():
     assert "review" in result.output
     assert "plan" in result.output
     assert "run" in result.output
+    assert "snapshot" in result.output
 
 
 def test_inspect_commands_with_command():

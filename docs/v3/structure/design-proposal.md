@@ -122,56 +122,65 @@ issue
 
 ## 5. 命令面设计
 
-### 5.1 当前真实入口
+### 5.1 命名决策
 
-当前真实入口是 `vibe3 inspect structure`，不是顶级 `vibe3 structure`。
+**职责分离**：
+- `vibe3 inspect files` - 即时分析文件结构（文件级，不持久化）
+- `vibe3 snapshot` - 代码库快照管理（模块级，持久化，可对比）
 
-因此目标态继续沿用：
+### 5.2 文件分析命令
 
-```bash
-vibe3 inspect structure <file>
-vibe3 inspect structure --build
-vibe3 inspect structure --show
-vibe3 inspect structure --diff
-```
-
-以上 `--build / --show / --diff` 目前仍是目标接口，不是当前已实现能力。
-
-### 5.2 推荐子能力
-
-#### 单文件分析
+即时分析，每次运行重新计算：
 
 ```bash
-vibe3 inspect structure src/vibe3/services/task_service.py
+# 单文件分析
+vibe3 inspect files src/vibe3/services/task_service.py
+
+# 目录摘要（实时计算，不持久化）
+vibe3 inspect files
 ```
 
-#### 生成快照
+输出：文件级结构、函数列表、LOC、依赖关系。
+
+### 5.3 快照管理命令
+
+代码库级结构快照，持久化存储，支持历史对比：
 
 ```bash
-vibe3 inspect structure --build
+# 创建快照
+vibe3 snapshot build
+
+# 列出所有快照
+vibe3 snapshot list
+
+# 查看快照
+vibe3 snapshot show              # 最新快照
+vibe3 snapshot show <id>         # 指定快照
+
+# 对比快照
+vibe3 snapshot diff --baseline <id>    # 与指定快照对比
+vibe3 snapshot diff --baseline main    # 与当前 main 对比
 ```
 
-#### 查看快照
+### 5.4 存储位置
 
-```bash
-vibe3 inspect structure --show
-vibe3 inspect structure --show --snapshot <id>
+```
+.git/vibe3/structure/
+  snapshots/
+    <snapshot-id>.json
+  latest.json
 ```
 
-#### 对比快照
+注意：worktree 环境下使用 `git rev-parse --git-common-dir` 获取共享 git 目录。
 
-```bash
-vibe3 inspect structure --diff --baseline <snapshot-id>
-vibe3 inspect structure --diff --baseline main
-```
+### 5.5 与现有命令的关系
 
-### 5.3 不推荐方向
-
-暂时不推荐：
-
-- 新建平行顶级命令 `vibe3 structure`
-- 把 snapshot 单独做成另一个无关命令族
-- 绕开 inspect 再造一套输出协议
+| 命令 | 分析对象 | 粒度 | 持久化 | 用途 |
+|------|----------|------|--------|------|
+| `inspect files` | 文件/目录 | 文件级 | 否 | 人类快速查看 |
+| `inspect symbols` | 符号 | 符号级 | 否 | 引用分析 |
+| `inspect metrics` | 代码库 | 指标级 | 否 | 度量统计 |
+| `snapshot build/show/diff` | 代码库 | 模块级 | 是 | Agent 编排、质量治理 |
 
 ---
 
