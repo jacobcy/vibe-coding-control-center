@@ -1,5 +1,7 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Optional, cast
 
 import typer
@@ -13,6 +15,7 @@ from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -35,19 +38,39 @@ _MESSAGE_OPT = Annotated[
 ]
 
 
-def _record_review_event(review: ParsedReview, actor: str) -> None:
+def _record_review_event(
+    review: ParsedReview,
+    actor: str,
+    review_content: str | None = None,
+) -> Path | None:
+    """Record review to handoff."""
     store = SQLiteClient()
+    git = GitClient()
     try:
-        branch = GitClient().get_current_branch()
+        branch = git.get_current_branch()
     except Exception:
-        return
+        return None
+
+    git_dir = git.get_git_common_dir()
+    handoff_dir = get_branch_handoff_dir(git_dir, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    review_file = handoff_dir / f"review-{timestamp}.md"
+
+    if review_content:
+        review_file.write_text(review_content, encoding="utf-8")
+
     store.add_event(
         branch,
         "handoff_review",
         actor,
         detail=f"Verdict: {review.verdict}, {len(review.comments)} comments",
+        refs={"ref": str(review_file), "verdict": review.verdict},
     )
-    store.update_flow_state(branch, reviewer_actor=actor)
+    store.update_flow_state(branch, reviewer_actor=actor, audit_ref=str(review_file))
+
+    return review_file
 
 
 def _run_review(
@@ -91,10 +114,13 @@ def _run_review(
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
-    _record_review_event(
+    review_file = _record_review_event(
         review,
         actor=f"{config.review.agent_config.agent}/{config.review.agent_config.model}",
+        review_content=raw,
     )
+    if review_file:
+        typer.echo(f"→ Review saved to: {review_file}")
 
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
