@@ -380,6 +380,99 @@ vibe3 task bridge link-project --from-issue 222
 
 ---
 
+## Issue 绑定操作
+
+`flow bind` 和 `task link` 都用于建立 issue 和 flow 的关联，但语义不同。参数规范详见 [vibe3-command-standard.md](../standards/vibe3-command-standard.md)。
+
+### 场景一：为已有 flow 绑定 task issue
+
+适用于：flow 已创建，需要绑定或更换 task issue。
+
+```bash
+# 1. 在已有 flow 上绑定 task issue（默认 role=task）
+vibe3 flow bind 220
+# → SQLite: flow_issue_links(branch, 220, role='task')
+# → 更新 flow_state.task_issue_number = 220
+
+# 2. 更换 task issue
+vibe3 flow bind 225
+# → 原有 task 关系被更新
+# → task_issue_number 更新为 225
+```
+
+### 场景二：补充 related/dependency 关系
+
+适用于：flow 已有 task issue，需要补充相关或依赖 issue。
+
+```bash
+# 1. 用 flow bind 指定 role
+vibe3 flow bind 219 --role related
+# → SQLite: flow_issue_links(branch, 219, role='related')
+
+# 2. 用 task link 补充（更简洁，只能补充 related/dependency）
+vibe3 task link 219 --role related
+# → SQLite: flow_issue_links(branch, 219, role='related')
+
+vibe3 task link 218 --role dependency
+# → SQLite: flow_issue_links(branch, 218, role='dependency')
+```
+
+**选择建议**：
+- 绑定或更换 task issue → 用 `flow bind`
+- 补充 related/dependency → 用 `task link`（更简洁）
+- 需要指定非当前 flow → 用 `flow bind --branch`
+
+---
+
+## Handoff 操作
+
+Handoff 用于在 AI Agent 协作时传递执行上下文。参数规范详见 [vibe3-command-standard.md](../standards/vibe3-command-standard.md)。
+
+### 场景一：记录规划文档引用
+
+```bash
+# 规划完成后，记录 plan 文档位置
+vibe3 handoff plan docs/specs/auth-plan.md --actor claude-opus
+# → flow_state.plan_ref = "docs/specs/auth-plan.md"
+# → flow_state.planner_actor = "claude-opus"
+```
+
+### 场景二：记录执行报告引用
+
+```bash
+# 执行完成后，记录 report 文档位置
+vibe3 handoff report docs/tasks/auth-impl/report.md --next-step "等待 review" --actor claude-sonnet
+# → flow_state.report_ref = "..."
+# → flow_state.executor_actor = "claude-sonnet"
+# → flow_state.next_step = "等待 review"
+```
+
+### 场景三：记录审查结果
+
+```bash
+# Review 完成后，记录 audit 文档位置
+vibe3 handoff audit docs/tasks/auth-impl/audit.md --actor claude-opus
+# → flow_state.audit_ref = "..."
+# → flow_state.reviewer_actor = "claude-opus"
+```
+
+### 场景四：轻量级更新
+
+```bash
+# 开发过程中记录发现
+vibe3 handoff append "发现 auth 模块需要重构" --kind finding
+
+# 记录阻塞原因
+vibe3 handoff append "等待 #218 的 API 先完成" --kind blocker
+
+# 与 flow blocked 的关系：
+# - handoff append --kind blocker: 仅记录消息，不改变 flow 状态
+# - flow blocked --by: 自动建立依赖关系并设置 blocked 状态
+# 两者可配合使用
+```
+
+---
+
 ## 查询命令
 
 ### 查看所有 task
@@ -406,7 +499,7 @@ vibe3 task list
 gh search issues "report"
 ```
 
-### 从 task issue 反查 flow
+### 从 related issue 反查 flow
 
 ```bash
 vibe3 task list --issue 221
@@ -414,9 +507,11 @@ vibe3 task list --issue 221
 
 输出：
 ```
-Flows linked to issue #221 as task:
+Tasks linked to related issue #221:
   #221  reports-unified-storage  active  [bound]  branch=task/reports-unified-storage
 ```
+
+> **注意**：`--issue` 参数按 `related` 角色查询，不是按 `task` 角色。
 
 ### 查看单个 task 详情（含远端字段）
 
@@ -436,6 +531,8 @@ Related Issue(s): #219
 ```
 
 ### 查看 flow 详情（含 issue 角色区分）
+
+**前置条件**：当前分支（或指定分支）必须已在 `flow_state` 中。如果当前分支不在 flow_state 中，会报错 `Flow not found: <branch>`。
 
 ```bash
 vibe3 flow show task/reports-unified-storage
@@ -629,33 +726,22 @@ vibe3 pr ready 123 --yes
 - `flow new [name] --issue <issue>` — name 可选，默认从 branch 生成
 - `flow show [branch]` — 参数是 branch name（可选，默认当前分支）
 - `flow bind <issue> [--role <role>] [--branch <branch>]` — 绑定 issue 到 flow（可选 branch，默认当前）
-- `task show [branch]` — 参数是 branch name（可选，默认当前分支）
+- `task show <branch>` — 参数是 branch name（必需）
 - `task link <issue> [--role <role>]` — 为当前 flow 补充 related/dependency 关系
 
 **重要**：
 - Task 不是独立实体，是 flow 的属性（有 task_issue_number 的 flow）
-- `vibe3 task show` 中的参数是 `branch name`，默认当前分支
+- `vibe3 task show` 中的参数是 `branch name`，必须提供
 - 没有独立的 "task name"，只有关联的 issue number
 
 ### flow bind vs task link
 
-**两种不同的关系**：
+两者都用于建立 issue 和 flow 的关联，但语义不同。详见 [Issue 绑定操作](#issue-绑定操作) 章节。
 
-| 命令 | 关系 | 存储位置 | 操作 |
-|------|------|----------|------|
-| `flow bind` | Issue → Flow | SQLite 本地 | 记录到 flow_issue_links，必要时更新 task 指针 |
-| `task link` | 当前 flow 的补充 issue 关系 | SQLite 本地 | 记录 `related/dependency` |
-
-**示例**:
-```bash
-# flow bind: 指定 issue 是 flow 的 task
-vibe3 flow bind 220
-# SQLite: flow_issue_links(branch, 220, role='task')
-
-# task link: 为当前 flow 记录 related issue
-vibe3 task link 219 --role related
-# SQLite: flow_issue_links(branch, 219, role='related')
-```
+| 命令 | 用途 | 支持的 role |
+|------|------|------------|
+| `flow bind` | 绑定或更换 task issue，或指定特定 flow | task, related, dependency |
+| `task link` | 为当前 flow 补充 related/dependency | related, dependency |
 
 ### 使用场景选择
 
@@ -770,13 +856,13 @@ vibe3 flow list
 vibe3 flow show [<branch>]
 
 # 3. 确认 GitHub Project item 已绑定，远端字段可读
-vibe3 task show [<branch>]
+vibe3 task show <branch>
 
 # 4. 更新远端状态
 vibe3 task status "In Progress"
 
 # 5. 再次确认状态已同步
-vibe3 task show [<branch>]
+vibe3 task show <branch>
 # 应显示 [remote] Status: In Progress
 ```
 
