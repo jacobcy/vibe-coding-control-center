@@ -1,5 +1,6 @@
 """Plan command - Create implementation plans using codeagent-wrapper."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -7,11 +8,13 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -71,6 +74,56 @@ def _get_agent_options(
     )
 
 
+def _get_handoff_dir() -> Path:
+    """Get handoff directory for current branch."""
+    git = GitClient()
+    git_dir = git.get_git_common_dir()
+    branch = git.get_current_branch()
+    handoff_dir = get_branch_handoff_dir(git_dir, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    return handoff_dir
+
+
+def _record_plan_event(
+    plan_content: str,
+    config: VibeConfig,
+) -> Path | None:
+    """Record plan execution to handoff."""
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+    except Exception:
+        return None
+
+    handoff_dir = _get_handoff_dir()
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    plan_file = handoff_dir / f"plan-{timestamp}.md"
+
+    plan_file.write_text(plan_content, encoding="utf-8")
+
+    plan_config = getattr(config, "plan", None)
+    agent = "planner"
+    model = None
+    if plan_config and hasattr(plan_config, "agent_config"):
+        ac = plan_config.agent_config
+        agent = ac.agent if hasattr(ac, "agent") else "planner"
+        model = ac.model if hasattr(ac, "model") else None
+
+    actor = f"{agent}/{model}" if model else agent
+
+    store = SQLiteClient()
+    store.add_event(
+        branch,
+        "handoff_plan",
+        actor,
+        detail=f"Plan generated: {plan_file.name}",
+        refs={"ref": str(plan_file), "agent": agent, "model": model},
+    )
+    store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
+
+    return plan_file
+
+
 def _run_plan(
     request: PlanRequest,
     config: VibeConfig,
@@ -109,7 +162,12 @@ def _run_plan(
     if dry_run:
         return
 
-    typer.echo("\n" + result.stdout)
+    plan_content = result.stdout
+    plan_file = _record_plan_event(plan_content, config)
+    if plan_file:
+        typer.echo(f"-> Plan saved to: {plan_file}")
+
+    typer.echo("\n" + plan_content)
 
 
 @app.command()
@@ -205,15 +263,27 @@ def spec(
     config = VibeConfig.get_defaults()
 
     description = ""
+    spec_path = None
     if file:
         if not file.exists():
             typer.echo(f"Error: File not found: {file}", err=True)
             raise typer.Exit(1)
         description = file.read_text(encoding="utf-8")
+        spec_path = str(file.resolve())
         typer.echo(f"-> Plan from file: {file}")
     elif msg:
         description = msg
         typer.echo(f"-> Plan: {msg[:60]}{'...' if len(msg) > 60 else ''}")
+
+    if spec_path and not dry_run:
+        git = GitClient()
+        store = SQLiteClient()
+        try:
+            branch = git.get_current_branch()
+            store.update_flow_state(branch, spec_ref=spec_path)
+            store.add_event(branch, "spec_bound", "user", detail=f"Spec bound: {file}")
+        except Exception:
+            pass
 
     log = logger.bind(domain="plan", action="spec")
     log.info("Starting plan from spec")
