@@ -39,8 +39,6 @@ class FlowLifecycleMixin:
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
-        self.store.update_flow_state(branch, flow_status="done")
-
         if git.branch_exists(branch):
             git.delete_branch(branch, force=True)
 
@@ -52,6 +50,8 @@ class FlowLifecycleMixin:
                 action="close",
                 branch=branch,
             ).warning("Failed to delete remote branch, continuing")
+
+        self.store.update_flow_state(branch, flow_status="done")
 
         self.store.add_event(
             branch,
@@ -85,18 +85,19 @@ class FlowLifecycleMixin:
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
-        blocked_by = reason or ""
         if blocked_by_issue:
             from vibe3.services.task_service import TaskService
 
             TaskService().link_issue(branch, blocked_by_issue, role="dependency")
-            if not blocked_by:
-                blocked_by = f"Blocked by issue #{blocked_by_issue}"
+
+        blocked_by = reason or (
+            f"Blocked by issue #{blocked_by_issue}" if blocked_by_issue else None
+        )
 
         self.store.update_flow_state(
             branch,
             flow_status="blocked",
-            blocked_by=blocked_by if blocked_by else None,
+            blocked_by=blocked_by,
         )
 
         self.store.add_event(
@@ -127,8 +128,6 @@ class FlowLifecycleMixin:
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
-        self.store.update_flow_state(branch, flow_status="aborted")
-
         if git.branch_exists(branch):
             git.delete_branch(branch, force=True)
 
@@ -140,6 +139,8 @@ class FlowLifecycleMixin:
                 action="abort",
                 branch=branch,
             ).warning("Failed to delete remote branch, continuing")
+
+        self.store.update_flow_state(branch, flow_status="aborted")
 
         self.store.add_event(
             branch,

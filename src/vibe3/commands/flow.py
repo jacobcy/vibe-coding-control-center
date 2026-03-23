@@ -9,6 +9,20 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.commands.flow_lifecycle import (
+    aborted as _aborted,
+)
+from vibe3.commands.flow_lifecycle import (
+    blocked as _blocked,
+)
+from vibe3.commands.flow_lifecycle import (
+    done as _done,
+)
+from vibe3.commands.flow_lifecycle import (
+    switch as _switch,
+)
+from vibe3.commands.flow_status import show as _show
+from vibe3.commands.flow_status import status as _status
 from vibe3.commands.task import parse_issue_ref
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -144,22 +158,6 @@ def list(
             )
         else:
             render_flows_table(flows)
-
-
-from vibe3.commands.flow_lifecycle import (
-    aborted as _aborted,
-)
-from vibe3.commands.flow_lifecycle import (
-    blocked as _blocked,
-)
-from vibe3.commands.flow_lifecycle import (
-    done as _done,
-)
-from vibe3.commands.flow_lifecycle import (
-    switch as _switch,
-)
-from vibe3.commands.flow_status import show as _show
-from vibe3.commands.flow_status import status as _status
 
 
 @app.command()
