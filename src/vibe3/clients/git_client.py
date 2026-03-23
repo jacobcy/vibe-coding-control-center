@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
-from vibe3.exceptions import GitError
+from vibe3.exceptions import GitError, SystemError
 from vibe3.models.change_source import (
     BranchSource,
     ChangeSource,
@@ -139,13 +139,22 @@ class GitClient:
         if source.type == ChangeSourceType.UNCOMMITTED:
             files = self._get_uncommitted_files()
         elif source.type == ChangeSourceType.COMMIT:
-            assert isinstance(source, CommitSource)
+            if not isinstance(source, CommitSource):
+                raise SystemError(
+                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
+                )
             files = self._get_commit_files(source.sha)
         elif source.type == ChangeSourceType.BRANCH:
-            assert isinstance(source, BranchSource)
+            if not isinstance(source, BranchSource):
+                raise SystemError(
+                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
+                )
             files = self._get_branch_files(source.branch, source.base)
         elif source.type == ChangeSourceType.PR:
-            assert isinstance(source, PRSource)
+            if not isinstance(source, PRSource):
+                raise SystemError(
+                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
+                )
             if not self._github_client:
                 raise GitError(
                     "get_changed_files",
@@ -176,13 +185,22 @@ class GitClient:
         if source.type == ChangeSourceType.UNCOMMITTED:
             diff = self._run(["diff", "HEAD"])
         elif source.type == ChangeSourceType.COMMIT:
-            assert isinstance(source, CommitSource)
+            if not isinstance(source, CommitSource):
+                raise SystemError(
+                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
+                )
             diff = self._run(["show", source.sha, "--stat"])
         elif source.type == ChangeSourceType.BRANCH:
-            assert isinstance(source, BranchSource)
+            if not isinstance(source, BranchSource):
+                raise SystemError(
+                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
+                )
             diff = self._run(["diff", f"{source.base}...{source.branch}"])
         elif source.type == ChangeSourceType.PR:
-            assert isinstance(source, PRSource)
+            if not isinstance(source, PRSource):
+                raise SystemError(
+                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
+                )
             if not self._github_client:
                 raise GitError(
                     "get_diff",
