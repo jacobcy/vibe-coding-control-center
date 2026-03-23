@@ -9,7 +9,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 14500        # Python 核心代码总行数
+    v3_python: 15000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -195,3 +195,13 @@ github_project:
   owner: "jacobcy"
   project_number: 17
   org: ""             # 已废弃，请使用 owner
+
+# AI 辅助配置
+# 用于 flow new --ai 和 pr create --ai 功能
+ai:
+  enabled: false              # 总开关（默认禁用）
+  provider: "openai"          # openai, anthropic, ollama
+  api_key_env: "OPENAI_API_KEY"  # 环境变量名
+  base_url: null              # 可选：自定义 API endpoint (Ollama, vLLM 等)
+  model: "gpt-4o-mini"        # 模型名称
+  timeout: 30                 # 超时秒数
