@@ -61,6 +61,7 @@ _CREATE_FLOW_EVENTS = """
         event_type TEXT NOT NULL,
         actor TEXT NOT NULL,
         detail TEXT,
+        refs TEXT,
         created_at TEXT NOT NULL
     )
 """
@@ -88,6 +89,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
+
+    # Migration: add refs column to flow_events if missing
+    event_columns = {
+        row[1] for row in cursor.execute("PRAGMA table_info(flow_events)").fetchall()
+    }
+    if "refs" not in event_columns:
+        cursor.execute("ALTER TABLE flow_events ADD COLUMN refs TEXT")
 
     # Normalize legacy issue_role values from the old classification view.
     cursor.execute(
