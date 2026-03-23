@@ -35,6 +35,7 @@ AVAILABLE_COMMANDS = [
     "hooks",
     "handoff",
     "check",
+    "snapshot",
 ]
 
 _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
