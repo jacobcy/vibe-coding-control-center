@@ -1,4 +1,4 @@
-"""Handoff command - Agent chain and handoff events."""
+"""Handoff command - Agent handoff chain and events."""
 
 import json
 from contextlib import contextmanager
@@ -12,6 +12,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.handoff_service import HandoffService
 from vibe3.ui.console import console
 
 app = typer.Typer(
@@ -67,12 +68,33 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
 
 
 @app.command()
+def init(
+    force: Annotated[bool, typer.Option("--yes", "-y", help="Force overwrite")] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Initialize handoff file for current branch."""
+    if trace:
+        setup_logging(verbose=2)
+
+    ctx = trace_context(command="handoff init", domain="handoff") if trace else _noop()
+    with ctx:
+        logger.bind(command="handoff init", force=force).info("Initializing handoff")
+
+        service = HandoffService()
+        handoff_path = service.ensure_current_handoff(force=force)
+
+        console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
+
+
+@app.command()
 def show(
     flow_name: Annotated[str | None, typer.Argument(help="Flow to show")] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show agent handoff chain and events."""
@@ -117,3 +139,134 @@ def show(
         console.print("[bold]═══ Recent Handoff Events ═══[/]")
         console.print()
         _render_handoff_events(handoff_events)
+
+
+@app.command()
+def append(
+    message: Annotated[str, typer.Argument(help="Message to append")],
+    actor: Annotated[
+        str, typer.Option("--actor", "-a", help="Actor identifier")
+    ] = "claude",
+    kind: Annotated[
+        str,
+        typer.Option("--kind", "-k", help="Update kind (finding/blocker/next/note)"),
+    ] = "note",
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Append lightweight update to handoff file."""
+    if trace:
+        setup_logging(verbose=2)
+
+    ctx = (
+        trace_context(command="handoff append", domain="handoff") if trace else _noop()
+    )
+    with ctx:
+        logger.bind(command="handoff append", actor=actor, kind=kind).info(
+            "Appending handoff update"
+        )
+
+        service = HandoffService()
+        handoff_path = service.append_current_handoff(message, actor, kind)
+
+        console.print("[green]✓[/] Appended handoff update")
+        console.print(f"  [dim]File: {handoff_path}[/]")
+
+
+@app.command()
+def plan(
+    plan_ref: Annotated[str, typer.Argument(help="Plan document reference")],
+    next_step: Annotated[
+        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
+    ] = None,
+    blocked_by: Annotated[
+        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    ] = None,
+    actor: Annotated[
+        str, typer.Option("--actor", "-a", help="Actor identifier")
+    ] = "claude",
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Record plan handoff."""
+    if trace:
+        setup_logging(verbose=2)
+
+    ctx = trace_context(command="handoff plan", domain="handoff") if trace else _noop()
+    with ctx:
+        logger.bind(command="handoff plan", plan_ref=plan_ref, actor=actor).info(
+            "Recording plan handoff"
+        )
+
+        service = HandoffService()
+        service.record_plan(plan_ref, next_step, blocked_by, actor)
+
+        console.print(f"[green]✓[/] Plan handoff recorded: {plan_ref}")
+
+
+@app.command()
+def report(
+    report_ref: Annotated[str, typer.Argument(help="Report document reference")],
+    next_step: Annotated[
+        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
+    ] = None,
+    blocked_by: Annotated[
+        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    ] = None,
+    actor: Annotated[
+        str, typer.Option("--actor", "-a", help="Actor identifier")
+    ] = "claude",
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Record report handoff."""
+    if trace:
+        setup_logging(verbose=2)
+
+    ctx = (
+        trace_context(command="handoff report", domain="handoff") if trace else _noop()
+    )
+    with ctx:
+        logger.bind(command="handoff report", report_ref=report_ref, actor=actor).info(
+            "Recording report handoff"
+        )
+
+        service = HandoffService()
+        service.record_report(report_ref, next_step, blocked_by, actor)
+
+        console.print(f"[green]✓[/] Report handoff recorded: {report_ref}")
+
+
+@app.command()
+def audit(
+    audit_ref: Annotated[str, typer.Argument(help="Audit document reference")],
+    next_step: Annotated[
+        str | None, typer.Option("--next-step", "-n", help="Next step suggestion")
+    ] = None,
+    blocked_by: Annotated[
+        str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
+    ] = None,
+    actor: Annotated[
+        str, typer.Option("--actor", "-a", help="Actor identifier")
+    ] = "claude",
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Record audit handoff."""
+    if trace:
+        setup_logging(verbose=2)
+
+    ctx = trace_context(command="handoff audit", domain="handoff") if trace else _noop()
+    with ctx:
+        logger.bind(command="handoff audit", audit_ref=audit_ref, actor=actor).info(
+            "Recording audit handoff"
+        )
+
+        service = HandoffService()
+        service.record_audit(audit_ref, next_step, blocked_by, actor)
+
+        console.print(f"[green]✓[/] Audit handoff recorded: {audit_ref}")
