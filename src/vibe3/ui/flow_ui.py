@@ -2,7 +2,7 @@
 
 from rich.text import Text
 
-from vibe3.models.flow import FlowState, FlowStatusResponse
+from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse
 from vibe3.ui.console import console
 
 _STATUS_COLOR: dict[str, str] = {
@@ -153,3 +153,73 @@ def render_no_flows() -> None:
 
 def render_error(message: str) -> None:
     console.print(f"[red]✗[/] {message}")
+
+
+_EVENT_COLOR: dict[str, str] = {
+    "flow_created": "cyan",
+    "task_bound": "cyan",
+    "issue_linked": "cyan",
+    "status_updated": "dim",
+    "next_step_set": "dim",
+    "pr_created": "yellow",
+    "pr_ready": "yellow",
+    "pr_merged": "green",
+    "handoff_plan": "blue",
+    "handoff_run": "blue",
+    "handoff_review": "magenta",
+}
+
+
+def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
+    console.print(
+        f"\n[bold cyan]{state.flow_slug}[/]  {_status_text(state.flow_status)}"
+    )
+    console.print(f"  [dim]branch[/]      {state.branch}")
+    if state.task_issue_number:
+        console.print(f"  [dim]task[/]        #{state.task_issue_number}")
+    if state.pr_number:
+        console.print(f"  [dim]pr[/]          #{state.pr_number}")
+    if state.spec_ref:
+        console.print(f"  [dim]spec[/]        {state.spec_ref}")
+    if state.next_step:
+        console.print(f"  [dim]next[/]        {state.next_step}")
+    console.print()
+
+    if not events:
+        console.print("[dim]  no events[/]")
+        return
+
+    console.print("[bold]═══ Timeline ═══[/]")
+    console.print()
+
+    for event in reversed(events):
+        color = _EVENT_COLOR.get(event.event_type, "white")
+        time_str = event.created_at[:16].replace("T", " ")
+        actor_short = event.actor.split("/")[-1] if "/" in event.actor else event.actor
+        console.print(
+            f"[dim]{time_str}[/]  [{color}]{event.event_type}[/]  [dim]{actor_short}[/]"
+        )
+        if event.detail:
+            console.print(f"  {event.detail}")
+        if event.refs:
+            files = event.refs.get("files") if isinstance(event.refs, dict) else None
+            if files and isinstance(files, list):
+                for f in files:
+                    console.print(f"  [dim]📎 {f}[/]")
+            ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
+            if ref:
+                console.print(f"  [dim]📎 {ref}[/]")
+        console.print()
+
+    refs_shown = False
+    for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
+        val = getattr(state, label, None)
+        if val:
+            if not refs_shown:
+                console.print("[bold]═══ Refs ═══[/]")
+                refs_shown = True
+            actor_field = label.replace("_ref", "_actor")
+            actor = getattr(state, actor_field, None) or ""
+            actor_str = f"  [dim]{actor}[/]" if actor else ""
+            console.print(f"  [dim]{label}[/]  {val}{actor_str}")
+    console.print()
