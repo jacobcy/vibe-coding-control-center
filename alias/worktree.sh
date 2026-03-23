@@ -87,12 +87,6 @@ wtnew() {
   local repo_root
   repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
 
-  # Must be on main/master
-  local cur_br; cur_br="$($git_cmd -C "$repo_root" branch --show-current 2>/dev/null)"
-  if [[ "$cur_br" != "main" && "$cur_br" != "master" ]]; then
-    echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
-  fi
-
   local dir="wt-${branch//\//-}"
   local path="${repo_root}/.worktrees/$dir"
 
