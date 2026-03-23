@@ -108,6 +108,44 @@ class ReviewAgentResult:
         return self.exit_code == 0
 
 
+def get_effective_backend(options: ReviewAgentOptions) -> str:
+    """Get the effective backend name from options.
+
+    When using agent preset, the preset name serves as the backend identifier.
+    When using backend directly, returns the backend name.
+
+    Args:
+        options: ReviewAgentOptions with agent or backend set
+
+    Returns:
+        Backend name (either preset name or direct backend)
+    """
+    if options.backend:
+        return options.backend
+    if options.agent:
+        return options.agent
+    return "unknown"
+
+
+def format_agent_actor(options: ReviewAgentOptions) -> str:
+    """Format the actor string for handoff records.
+
+    Actor format: '<backend>/<model>' or '<backend>'
+    - backend: either agent preset name or direct backend name
+    - model: optional model name
+
+    Args:
+        options: ReviewAgentOptions with agent/backend/model
+
+    Returns:
+        Actor string like 'claude/sonnet' or 'planner' or 'unknown'
+    """
+    backend = get_effective_backend(options)
+    if options.model:
+        return f"{backend}/{options.model}"
+    return backend
+
+
 def run_review_agent(
     prompt_file_content: str,
     options: ReviewAgentOptions,

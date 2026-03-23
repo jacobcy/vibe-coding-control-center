@@ -14,7 +14,11 @@ from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
-from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.services.review_runner import (
+    ReviewAgentOptions,
+    format_agent_actor,
+    run_review_agent,
+)
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
@@ -116,7 +120,7 @@ def _run_review(
 
     review_file = _record_review_event(
         review,
-        actor=f"{config.review.agent_config.agent}/{config.review.agent_config.model}",
+        actor=format_agent_actor(options),
         review_content=raw,
     )
     if review_file:

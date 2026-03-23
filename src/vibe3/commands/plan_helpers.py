@@ -9,7 +9,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.services.review_runner import ReviewAgentOptions
+from vibe3.services.review_runner import ReviewAgentOptions, format_agent_actor
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
@@ -61,17 +61,13 @@ def get_handoff_dir() -> Path:
 
 def record_plan_event(
     plan_content: str,
-    config: VibeConfig,
-    cli_backend: str | None = None,
-    cli_model: str | None = None,
+    options: ReviewAgentOptions,
 ) -> Path | None:
     """Record plan execution to handoff.
 
     Args:
         plan_content: The plan content to save
-        config: VibeConfig for defaults
-        cli_backend: Backend name from CLI (e.g., "claude", "opencode")
-        cli_model: Model name from CLI (e.g., "claude-sonnet-4-6")
+        options: ReviewAgentOptions with agent/backend/model
     """
     git = GitClient()
     try:
@@ -85,20 +81,7 @@ def record_plan_event(
 
     plan_file.write_text(plan_content, encoding="utf-8")
 
-    # Resolve backend/model from CLI or config defaults
-    backend = cli_backend
-    model = cli_model
-    if backend is None:
-        plan_config = getattr(config, "plan", None)
-        if plan_config and hasattr(plan_config, "agent_config"):
-            ac = plan_config.agent_config
-            # agent_config stores the preset's backend/model
-            backend = ac.backend if hasattr(ac, "backend") else None
-            model = ac.model if hasattr(ac, "model") else None
-    if backend is None:
-        backend = "claude"  # Default backend
-
-    actor = f"{backend}/{model}" if model else backend
+    actor = format_agent_actor(options)
 
     store = SQLiteClient()
     store.add_event(
@@ -106,7 +89,11 @@ def record_plan_event(
         "handoff_plan",
         actor,
         detail=f"Plan generated: {plan_file.name}",
-        refs={"ref": str(plan_file), "backend": backend, "model": model},
+        refs={
+            "ref": str(plan_file),
+            "backend": options.backend or options.agent,
+            "model": options.model,
+        },
     )
     store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
 
@@ -159,9 +146,7 @@ def run_plan(
         return
 
     plan_content = result.stdout
-    plan_file = record_plan_event(
-        plan_content, config, cli_backend=options.backend, cli_model=options.model
-    )
+    plan_file = record_plan_event(plan_content, options)
     if plan_file:
         import typer
 
