@@ -62,10 +62,17 @@ def get_handoff_dir() -> Path:
 def record_plan_event(
     plan_content: str,
     config: VibeConfig,
-    cli_agent: str | None = None,
+    cli_backend: str | None = None,
     cli_model: str | None = None,
 ) -> Path | None:
-    """Record plan execution to handoff."""
+    """Record plan execution to handoff.
+
+    Args:
+        plan_content: The plan content to save
+        config: VibeConfig for defaults
+        cli_backend: Backend name from CLI (e.g., "claude", "opencode")
+        cli_model: Model name from CLI (e.g., "claude-sonnet-4-6")
+    """
     git = GitClient()
     try:
         branch = git.get_current_branch()
@@ -78,19 +85,20 @@ def record_plan_event(
 
     plan_file.write_text(plan_content, encoding="utf-8")
 
-    # Determine actual actor from CLI overrides or config defaults
-    agent = cli_agent
+    # Resolve backend/model from CLI or config defaults
+    backend = cli_backend
     model = cli_model
-    if agent is None:
+    if backend is None:
         plan_config = getattr(config, "plan", None)
         if plan_config and hasattr(plan_config, "agent_config"):
             ac = plan_config.agent_config
-            agent = ac.agent if hasattr(ac, "agent") else "planner"
+            # agent_config stores the preset's backend/model
+            backend = ac.backend if hasattr(ac, "backend") else None
             model = ac.model if hasattr(ac, "model") else None
-    if agent is None:
-        agent = "planner"
+    if backend is None:
+        backend = "claude"  # Default backend
 
-    actor = f"{agent}/{model}" if model else agent
+    actor = f"{backend}/{model}" if model else backend
 
     store = SQLiteClient()
     store.add_event(
@@ -98,7 +106,7 @@ def record_plan_event(
         "handoff_plan",
         actor,
         detail=f"Plan generated: {plan_file.name}",
-        refs={"ref": str(plan_file), "agent": agent, "model": model},
+        refs={"ref": str(plan_file), "backend": backend, "model": model},
     )
     store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
 
@@ -152,7 +160,7 @@ def run_plan(
 
     plan_content = result.stdout
     plan_file = record_plan_event(
-        plan_content, config, cli_agent=options.agent, cli_model=options.model
+        plan_content, config, cli_backend=options.backend, cli_model=options.model
     )
     if plan_file:
         import typer

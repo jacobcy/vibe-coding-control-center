@@ -95,10 +95,18 @@ def _record_run_event(
     run_content: str,
     config: VibeConfig,
     plan_file: str,
-    cli_agent: str | None = None,
+    cli_backend: str | None = None,
     cli_model: str | None = None,
 ) -> Path | None:
-    """Record run execution to handoff."""
+    """Record run execution to handoff.
+
+    Args:
+        run_content: The run content to save
+        config: VibeConfig for defaults
+        plan_file: Path to the plan file being executed
+        cli_backend: Backend name from CLI (e.g., "claude", "opencode")
+        cli_model: Model name from CLI (e.g., "claude-sonnet-4-6")
+    """
     git = GitClient()
     try:
         branch = git.get_current_branch()
@@ -111,19 +119,20 @@ def _record_run_event(
 
     run_file.write_text(run_content, encoding="utf-8")
 
-    # Determine actual actor from CLI overrides or config defaults
-    agent = cli_agent
+    # Resolve backend/model from CLI or config defaults
+    backend = cli_backend
     model = cli_model
-    if agent is None:
+    if backend is None:
         run_config = getattr(config, "run", None)
         if run_config and hasattr(run_config, "agent_config"):
             ac = run_config.agent_config
-            agent = ac.agent if hasattr(ac, "agent") else "executor"
+            # agent_config stores the preset's backend/model
+            backend = ac.backend if hasattr(ac, "backend") else None
             model = ac.model if hasattr(ac, "model") else None
-    if agent is None:
-        agent = "executor"
+    if backend is None:
+        backend = "claude"  # Default backend
 
-    actor = f"{agent}/{model}" if model else agent
+    actor = f"{backend}/{model}" if model else backend
 
     store = SQLiteClient()
     store.add_event(
@@ -134,7 +143,7 @@ def _record_run_event(
         refs={
             "ref": str(run_file),
             "plan_ref": plan_file,
-            "agent": agent,
+            "backend": backend,
             "model": model,
         },
     )
@@ -182,7 +191,11 @@ def _run_execution(
 
     run_content = result.stdout
     run_file = _record_run_event(
-        run_content, config, plan_file, cli_agent=options.agent, cli_model=options.model
+        run_content,
+        config,
+        plan_file,
+        cli_backend=options.backend,
+        cli_model=options.model,
     )
     if run_file:
         typer.echo(f"-> Run output saved to: {run_file}")
