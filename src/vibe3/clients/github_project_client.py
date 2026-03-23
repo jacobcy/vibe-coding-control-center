@@ -47,7 +47,7 @@ class GitHubProjectClient(GitHubClientBase, ProjectQueryMixin, ProjectMutationMi
 
     def _get_token(self) -> str | None:
         """获取 GitHub 认证令牌。"""
-        token = os.environ.get("GITHUB_TOKEN")
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
         if token:
             return token
         try:
@@ -99,8 +99,7 @@ class GitHubProjectClient(GitHubClientBase, ProjectQueryMixin, ProjectMutationMi
             return ProjectItemError(
                 type="auth_error",
                 message=(
-                    "未找到 GitHub 认证令牌，"
-                    "请设置 GITHUB_TOKEN 或运行 gh auth login"
+                    "未找到 GitHub 认证令牌，请设置 GH_TOKEN 或运行 gh auth login"
                 ),
             )
 

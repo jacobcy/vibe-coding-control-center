@@ -87,7 +87,7 @@ github_project:
   project_number: 17   # GitHub Project number
 ```
 
-认证：设置 `GITHUB_TOKEN` 环境变量，或已登录 `gh auth login`。
+认证：设置 `GH_TOKEN` 环境变量，或已登录 `gh auth login`。
 
 ---
 

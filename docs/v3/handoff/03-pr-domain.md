@@ -78,7 +78,7 @@ class GitHubClientProtocol(Protocol):
 
 class GitHubClient:
     def __init__(self, token: str | None = None):
-        self.token = token or os.getenv("GITHUB_TOKEN")
+        self.token = token or os.getenv("GH_TOKEN")
 
     def create_pr(self, title: str, body: str, draft: bool) -> dict:
         # 使用 gh CLI 或 PyGithub

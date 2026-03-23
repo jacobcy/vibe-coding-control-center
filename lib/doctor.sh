@@ -70,9 +70,9 @@ vibe_doctor() {
     [[ -n "$ANTHROPIC_AUTH_TOKEN" ]] && \
         echo "  ${GREEN}✓${NC} ANTHROPIC_AUTH_TOKEN  configured" || \
         echo "  ${YELLOW}!${NC} ANTHROPIC_AUTH_TOKEN  not set"
-    [[ -n "$GITHUB_PERSONAL_ACCESS_TOKEN" ]] && \
-        echo "  ${GREEN}✓${NC} GITHUB_TOKEN          configured" || \
-        echo "  ${YELLOW}!${NC} GITHUB_TOKEN          not set"
+    [[ -n "$GH_TOKEN" ]] && \
+        echo "  ${GREEN}✓${NC} GH_TOKEN              configured" || \
+        echo "  ${YELLOW}!${NC} GH_TOKEN              not set"
     [[ -n "$BRAVE_API_KEY" ]] && \
         echo "  ${GREEN}✓${NC} BRAVE_API_KEY         configured" || \
         echo "  ${YELLOW}!${NC} BRAVE_API_KEY         not set"
