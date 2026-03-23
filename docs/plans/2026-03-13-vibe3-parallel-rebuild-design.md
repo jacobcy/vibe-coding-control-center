@@ -1772,7 +1772,7 @@ Flow: test-flow
 - **路径遍历防护**: 验证所有文件路径
 
 #### 7.2 身份认证
-- **GitHub Token**: 从环境变量 `GITHUB_TOKEN` 读取
+- **GitHub Token**: 从环境变量 `GH_TOKEN` 读取
 - **不存储敏感信息**: 数据库不存储 token、密码等敏感信息
 
 #### 7.3 权限控制

@@ -11,7 +11,7 @@ paths:
 
 ```bash
 # .envrc 文件（项目根目录）
-export GITHUB_TOKEN="ghp_xxx"
+export GH_TOKEN="ghp_xxx"
 export OPENAI_API_KEY="sk-xxx"
 ```
 
