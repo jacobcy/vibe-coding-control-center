@@ -81,8 +81,8 @@ wt() {
 # @featured
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local branch="$1" base="${2:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=main]"
+  local branch="$1" base="${2:-origin/main}"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=origin/main]"
 
   local repo_root
   repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
@@ -241,19 +241,23 @@ wtrm() {
 # @desc Initialize a modular Tmux workspace for a worktree
 #   vup              → current worktree
 #   vup <name>       → smart match worktree from wtls
+#   vup --agent codex → specify agent (claude|codex|opencode)
 # @featured
 vup() {
   vibe_require tmux git || return 1
   local mode="dash" target="" agent="${VIBE_DEFAULT_TOOL:-claude}"
 
-  # Parse modular subcommands
-  case "${1:-}" in
-    logs|tests|edit|all) mode="$1"; shift ;;
-    -a|--all) mode="all"; shift ;;
-    *) ;;
-  esac
-
-  target="${1:-}"
+  # Parse flags and subcommands
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -a|--all)   mode="all"; shift ;;
+      --agent)    agent="$2"; shift 2 ;;
+      --agent=*)  agent="${1#--agent=}"; shift ;;
+      logs|tests|edit|all) mode="$1"; shift ;;
+      -*)         vibe_die "Unknown flag: $1" ;;
+      *)          target="$1"; shift ;;
+    esac
+  done
 
   # Resolve target to directory path using _wt_find
   local dir_path
@@ -355,12 +359,32 @@ vup() {
 }
 
 # @desc One-shot command to create worktree and setup workspace
+#   vnew <branch>              → create from origin/main with default agent
+#   vnew <branch> --agent codex → specify agent (claude|codex|opencode)
 # @featured
 vnew() {
-  local branch="$1" base="${2:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [base]"
+  local branch="" base="origin/main" agent=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --agent)    agent="$2"; shift 2 ;;
+      --agent=*)  agent="${1#--agent=}"; shift ;;
+      -*)         vibe_die "Unknown flag: $1" ;;
+      *)
+        if [[ -z "$branch" ]]; then branch="$1"
+        elif [[ "$base" == "origin/main" ]]; then base="$1"
+        fi
+        shift ;;
+    esac
+  done
+
+  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [base] [--agent claude|codex|opencode]"
   wtnew "$branch" "$base" || return 1
-  vup "$branch" || return 1
+  if [[ -n "$agent" ]]; then
+    vup --agent "$agent" "$branch" || return 1
+  else
+    vup "$branch" || return 1
+  fi
   
   if [[ -n "$TMUX" ]]; then
     echo "✅ Ready. Your dash window is active."
