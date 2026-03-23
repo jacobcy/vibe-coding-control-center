@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.models.pr import PRMetadata, PRResponse, PRState
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
 
@@ -52,8 +52,16 @@ def test_create_draft_pr_success(
         draft=True,
     )
 
-    metadata = PRMetadata(task_issue=101, flow_slug="test-flow")
     mock_store = MagicMock()
+    # Mock flow state with metadata
+    mock_store.get_flow_state.return_value = {
+        "branch": "feature-branch",
+        "flow_slug": "test-flow",
+        "task_issue_number": 101,
+        "spec_ref": None,
+        "planner_actor": None,
+        "executor_actor": None,
+    }
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client"):
@@ -64,12 +72,13 @@ def test_create_draft_pr_success(
                     title="Test PR",
                     body="Test body",
                     base_branch="main",
-                    metadata=metadata,
                 )
 
                 assert pr.number == 123
                 assert pr.draft is True
                 mock_github_client.create_pr.assert_called_once()
+                # Verify metadata was read from flow
+                mock_store.get_flow_state.assert_called_once_with("feature-branch")
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
                     pr_number=123,
