@@ -93,19 +93,20 @@ repo/
 |------|------|------|
 | `wtls` | 列出所有 worktree | `wtls` |
 | `wt <wt-dir>` | 跳转到某个 worktree（tmux 内自动重命名窗口） | `wt wt-login-fix` |
-| `wtnew <branch> [base]` | 创建新 worktree | `wtnew login-fix` |
+| `wtnew <branch> [base]` | 创建新 worktree（默认从 origin/main） | `wtnew login-fix` |
 | `wtrm <wt-dir\|all>` | 删除 worktree 并清理 git 引用 | `wtrm wt-login-fix` |
 
 ### `wtnew` 详解
 
 ```bash
-wtnew login-fix               # 从 main 创建
-wtnew feature-branch develop  # 从 develop 创建
+wtnew login-fix                       # 从 origin/main 创建（推荐）
+wtnew feature-branch main             # 从本地 main 创建
+wtnew feature-branch develop          # 从 develop 创建
 ```
 
 结果：
 - 创建 `wt-login-fix/` 目录
-- 分支名：`login-fix`（从 main 分支）
+- 分支名：`login-fix`（默认从 origin/main 分支，确保代码最新）
 
 ### `wtrm` 详解
 
@@ -166,7 +167,7 @@ wtrm all             # 删除所有 wt-* worktree
 
 ## 七、一键「全套工作台」（核心功能）
 
-### `vup [wt-dir] [agent] [editor]`
+### `vup [wt-dir] [--agent <name>]`
 
 为一个 worktree 自动创建完整 tmux 工作区。
 
@@ -181,8 +182,12 @@ wtrm all             # 删除所有 wt-* worktree
 | `<wt>-git` | lazygit（最终审查点） |
 
 ```bash
-vup wt-login-fix claude
+vup wt-login-fix                  # 默认 agent（claude 或 VIBE_DEFAULT_TOOL）
+vup wt-login-fix --agent codex    # 指定使用 codex
+vup --agent opencode              # 当前 worktree，使用 opencode
 ```
+
+Agent 选项：`claude`（默认）、`codex`、`opencode`
 
 你需要做的事：
 - 什么都不用管
@@ -193,20 +198,24 @@ vup wt-login-fix claude
 
 ## 八、一键从零开始（最推荐）
 
-### `vnew <branch> [base]`
+### `vnew <branch> [base] [--agent <name>]`
 
 这是你最常用的命令。
 
 它会一次性完成：
-1. 创建新分支
+1. 创建新分支（默认从 origin/main）
 2. 创建 worktree（`wt-<branch>`）
 3. 启动 tmux 全套窗口
 4. 打开 lazygit
 
 ```bash
-vnew login-fix
-vnew login-fix develop
+vnew login-fix                    # 从 origin/main，默认 agent
+vnew login-fix main               # 从本地 main
+vnew login-fix --agent codex      # 指定使用 codex
+vnew login-fix develop --agent opencode  # 从 develop，使用 opencode
 ```
+
+Agent 选项：`claude`（默认）、`codex`、`opencode`
 
 你接下来只需要：
 - 去 `wt-login-fix-git` 窗口
@@ -233,7 +242,7 @@ vnew login-fix develop
 
 ```bash
 vt
-vnew test-1 claude
+vnew test-1 --agent claude
 ```
 
 等 agent 完成 → lazygit 审查 → commit。
@@ -244,7 +253,7 @@ vnew test-1 claude
 
 ```bash
 wtnew test-2
-vup wt-test-2 opencode
+vup wt-test-2 --agent opencode
 ```
 
 ---

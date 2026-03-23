@@ -81,17 +81,11 @@ wt() {
 # @featured
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local branch="$1" base="${2:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=main]"
+  local branch="$1" base="${2:-origin/main}"
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=origin/main]"
 
   local repo_root
   repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
-
-  # Must be on main/master
-  local cur_br; cur_br="$($git_cmd -C "$repo_root" branch --show-current 2>/dev/null)"
-  if [[ "$cur_br" != "main" && "$cur_br" != "master" ]]; then
-    echo "⚠️  On '$cur_br', not main. Switch first: cd $repo_root && git checkout main"; return 1
-  fi
 
   local dir="wt-${branch//\//-}"
   local path="${repo_root}/.worktrees/$dir"
@@ -241,19 +235,23 @@ wtrm() {
 # @desc Initialize a modular Tmux workspace for a worktree
 #   vup              → current worktree
 #   vup <name>       → smart match worktree from wtls
+#   vup --agent codex → specify agent (claude|codex|opencode)
 # @featured
 vup() {
   vibe_require tmux git || return 1
   local mode="dash" target="" agent="${VIBE_DEFAULT_TOOL:-claude}"
 
-  # Parse modular subcommands
-  case "${1:-}" in
-    logs|tests|edit|all) mode="$1"; shift ;;
-    -a|--all) mode="all"; shift ;;
-    *) ;;
-  esac
-
-  target="${1:-}"
+  # Parse flags and subcommands
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -a|--all)   mode="all"; shift ;;
+      --agent)    agent="$2"; shift 2 ;;
+      --agent=*)  agent="${1#--agent=}"; shift ;;
+      logs|tests|edit|all) mode="$1"; shift ;;
+      -*)         vibe_die "Unknown flag: $1" ;;
+      *)          target="$1"; shift ;;
+    esac
+  done
 
   # Resolve target to directory path using _wt_find
   local dir_path
@@ -299,19 +297,15 @@ vup() {
 
   local agent_cmd
   case "$agent" in
-    opencode) vibe_require opencode; agent_cmd="opencode" ;;
-    codex)    vibe_require codex;    agent_cmd="codex --yes" ;;
-    *)        vibe_require claude;   agent_cmd="claude --dangerously-skip-permissions --continue" ;;
+    opencode) vibe_require opencode; agent_cmd="opencode -c" ;;
+    codex)    vibe_require codex;    agent_cmd="codex resume --last --full-auto" ;;
+    gemini)   vibe_require gemini;   agent_cmd="gemini -r latest --yolo" ;;
+    *)        vibe_require claude;   agent_cmd="claude -c --dangerously-skip-permissions" ;;
   esac
 
   # Create session if needed (don't destroy existing)
   if ! tmux has-session -t "$session_name" 2>/dev/null; then
-    tmux new-session -d -s "$session_name" -c "$dir_path" -n "dash"
-  else
-    # Ensure session has a dash window
-    if ! tmux list-windows -t "$session_name" -F "#{window_name}" 2>/dev/null | grep -qx "dash"; then
-      tmux new-window -t "$session_name" -n "dash" -c "$dir_path"
-    fi
+    tmux new-session -d -s "$session_name" -c "$dir_path"
   fi
 
   case "$mode" in
@@ -355,12 +349,32 @@ vup() {
 }
 
 # @desc One-shot command to create worktree and setup workspace
+#   vnew <branch>              → create from origin/main with default agent
+#   vnew <branch> --agent codex → specify agent (claude|codex|opencode)
 # @featured
 vnew() {
-  local branch="$1" base="${2:-main}"
-  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [base]"
+  local branch="" base="origin/main" agent=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --agent)    agent="$2"; shift 2 ;;
+      --agent=*)  agent="${1#--agent=}"; shift ;;
+      -*)         vibe_die "Unknown flag: $1" ;;
+      *)
+        if [[ -z "$branch" ]]; then branch="$1"
+        elif [[ "$base" == "origin/main" ]]; then base="$1"
+        fi
+        shift ;;
+    esac
+  done
+
+  [[ -z "$branch" ]] && vibe_die "usage: vnew <branch> [base] [--agent claude|codex|opencode]"
   wtnew "$branch" "$base" || return 1
-  vup "$branch" || return 1
+  if [[ -n "$agent" ]]; then
+    vup --agent "$agent" "$branch" || return 1
+  else
+    vup "$branch" || return 1
+  fi
   
   if [[ -n "$TMUX" ]]; then
     echo "✅ Ready. Your dash window is active."
