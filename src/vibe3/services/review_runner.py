@@ -149,11 +149,13 @@ def run_review_agent(
     import tempfile
 
     wrapper_path = DEFAULT_WRAPPER_PATH
+    prompt_dir = Path.home() / ".codeagent" / "agents"
+    prompt_dir.mkdir(parents=True, exist_ok=True)
 
     # Always write prompt file content, even in resume mode
     # This ensures the correct AST information is available
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, dir=Path.home() / ".codeagent" / "agents"
+        mode="w", suffix=".md", delete=False, dir=prompt_dir
     ) as prompt_file:
         prompt_file.write(prompt_file_content)
         prompt_file_path = prompt_file.name

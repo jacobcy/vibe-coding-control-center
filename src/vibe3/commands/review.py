@@ -157,11 +157,12 @@ def _run_review(
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
+    effective_session_id = result.session_id or session_id
     review_file = _record_review_event(
         review,
         actor=format_agent_actor(options),
         review_content=raw,
-        session_id=result.session_id,
+        session_id=effective_session_id,
     )
     if review_file:
         typer.echo(f"→ Review saved to: {review_file}")
@@ -296,5 +297,4 @@ def base(
     request = ReviewRequest(
         scope=scope, changed_symbols=changed_symbols, structure_diff=structure_diff
     )
-
     _run_review(request, config, dry_run, message, issue_number=issue_number)

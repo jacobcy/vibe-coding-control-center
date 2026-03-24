@@ -221,8 +221,9 @@ def _run_execution(
         return
 
     run_content = result.stdout
+    effective_session_id = result.session_id or session_id
     run_file = _record_run_event(
-        run_content, options, plan_file, session_id=result.session_id
+        run_content, options, plan_file, session_id=effective_session_id
     )
     if run_file:
         typer.echo(f"-> Run output saved to: {run_file}")

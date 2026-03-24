@@ -4,6 +4,7 @@ Tests the core runner functionality with extensible interface design.
 """
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
 
@@ -179,12 +180,10 @@ class TestRunReviewAgent:
         call_args = mock_run.call_args[0]
         command = call_args[0]
         assert "--prompt-file" in command
-        # The prompt file path should be a temp file
+        # The prompt file path should be created under ~/.codeagent/agents
         prompt_file_idx = command.index("--prompt-file") + 1
-        assert (
-            command[prompt_file_idx].startswith("/tmp")
-            or "/var/folders" in command[prompt_file_idx]
-        )
+        expected_dir = Path.home() / ".codeagent" / "agents"
+        assert Path(command[prompt_file_idx]).parent == expected_dir
         # The last argument should be the custom task
         assert command[-1] == "custom task"
 
@@ -221,8 +220,6 @@ class TestRunReviewAgent:
             result = run_review_agent(
                 "prompt body", ReviewAgentOptions(agent="code-reviewer")
             )
-
-        # Should pass through None stdout
         assert result.exit_code == 0
         assert result.stdout is None
 
@@ -236,6 +233,44 @@ class TestRunReviewAgent:
                 run_review_agent(
                     "prompt body", ReviewAgentOptions(agent="code-reviewer")
                 )
+
+    @patch("vibe3.services.review_runner.subprocess.run")
+    @patch("vibe3.services.review_runner.Path.mkdir")
+    def test_run_review_creates_codeagent_agents_dir(
+        self, mock_mkdir, mock_run
+    ) -> None:
+        """Runner should ensure the codeagent agents directory exists."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
+        result = run_review_agent(
+            "prompt body", ReviewAgentOptions(agent="code-reviewer")
+        )
+
+        assert result.exit_code == 0
+        mock_mkdir.assert_any_call(parents=True, exist_ok=True)
+
+    @patch("vibe3.services.review_runner.subprocess.run")
+    @patch("vibe3.services.review_runner.Path.mkdir")
+    def test_run_review_uses_codeagent_agents_dir_for_prompt_file(
+        self, mock_mkdir, mock_run
+    ) -> None:
+        """Runner should place prompt files under ~/.codeagent/agents."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
+        run_review_agent("prompt body", ReviewAgentOptions(agent="code-reviewer"))
+
+        command = mock_run.call_args[0][0]
+        prompt_file_idx = command.index("--prompt-file") + 1
+        expected_dir = Path.home() / ".codeagent" / "agents"
+        assert Path(command[prompt_file_idx]).parent == expected_dir
 
 
 class TestReviewAgentResult:

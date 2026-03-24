@@ -189,7 +189,10 @@ def run_plan(
         return
 
     plan_content = result.stdout
-    plan_file = record_plan_event(plan_content, options, session_id=result.session_id)
+    effective_session_id = result.session_id or session_id
+    plan_file = record_plan_event(
+        plan_content, options, session_id=effective_session_id
+    )
     if plan_file:
         import typer
 
