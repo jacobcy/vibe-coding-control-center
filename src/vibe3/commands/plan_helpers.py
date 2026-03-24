@@ -103,17 +103,20 @@ def record_plan_event(
     actor = format_agent_actor(options)
     backend, model = resolve_actor_backend_model(options)
 
+    refs: dict[str, str] = {
+        "ref": str(plan_file),
+        "backend": backend,
+    }
+    if model:
+        refs["model"] = model
+
     store = SQLiteClient()
     store.add_event(
         branch,
         "handoff_plan",
         actor,
         detail=f"Plan generated: {plan_file.name}",
-        refs={
-            "ref": str(plan_file),
-            "backend": backend,
-            "model": model,
-        },
+        refs=refs,
     )
     store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
 

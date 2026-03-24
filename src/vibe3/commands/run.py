@@ -140,18 +140,21 @@ def _record_run_event(
     actor = format_agent_actor(options)
     backend, model = resolve_actor_backend_model(options)
 
+    refs: dict[str, str] = {
+        "ref": str(run_file),
+        "plan_ref": plan_file,
+        "backend": backend,
+    }
+    if model:
+        refs["model"] = model
+
     store = SQLiteClient()
     store.add_event(
         branch,
         "handoff_run",
         actor,
         detail=f"Run completed: {run_file.name}",
-        refs={
-            "ref": str(run_file),
-            "plan_ref": plan_file,
-            "backend": backend,
-            "model": model,
-        },
+        refs=refs,
     )
     store.update_flow_state(branch, report_ref=str(run_file), executor_actor=actor)
 

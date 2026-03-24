@@ -117,9 +117,10 @@ def show(
             raise typer.Exit(1)
 
         state = FlowState(**state_data)
-        limit = 0 if show_all else 5
+        # When --all, pass None to get all events; otherwise limit to 5
+        limit = None if show_all else 5
         events_data = store.get_events(
-            branch, event_type_prefix="handoff_", limit=limit or 50
+            branch, event_type_prefix="handoff_", limit=limit
         )
         handoff_events = [FlowEvent(**e) for e in events_data]
 

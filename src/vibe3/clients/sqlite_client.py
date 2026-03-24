@@ -135,7 +135,7 @@ class SQLiteClient:
         branch: str,
         event_type: str | None = None,
         event_type_prefix: str | None = None,
-        limit: int = 50,
+        limit: int | None = None,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
@@ -149,8 +149,10 @@ class SQLiteClient:
             if event_type_prefix:
                 query += " AND event_type LIKE ?"
                 params.append(f"{event_type_prefix}%")
-            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-            params.extend([limit, offset])
+            query += " ORDER BY created_at DESC"
+            if limit is not None:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
             cursor.execute(query, params)
             rows = [dict(row) for row in cursor.fetchall()]
             for row in rows:

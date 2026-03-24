@@ -13,6 +13,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
     render_flow_status,
@@ -115,10 +116,26 @@ def bind(
             "Binding task to flow"
         )
 
-        # TODO: Implement bind_flow in FlowService
-        raise NotImplementedError(
-            "bind_flow not yet implemented. Use task bind command instead."
-        )
+        git = GitClient()
+        store = SQLiteClient()
+        branch = git.get_current_branch()
+
+        try:
+            issue_number = int("".join(filter(str.isdigit, task_id)))
+            store.add_issue_link(branch, issue_number, "task")
+            store.update_flow_state(branch, task_issue_number=issue_number)
+            store.add_event(
+                branch, "task_bound", actor, detail=f"Task bound: {task_id}"
+            )
+            logger.bind(command="flow bind", task_id=task_id).info("Task bound to flow")
+
+            if json_output:
+                typer.echo(json.dumps({"status": "bound", "task_id": task_id}))
+            else:
+                console.print(f"[green]✓[/] Task {task_id} bound to flow {branch}")
+        except ValueError:
+            logger.error(f"Invalid task ID format: {task_id}")
+            raise typer.BadParameter(f"Invalid task ID format: {task_id}")
 
 
 @app.command()

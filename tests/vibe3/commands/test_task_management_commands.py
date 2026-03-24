@@ -65,14 +65,22 @@ def test_task_list_help_uses_issue_option() -> None:
 
 
 def test_flow_bind_supports_related_role() -> None:
-    """Test flow bind raises NotImplementedError (not yet implemented)."""
-    with (patch("vibe3.commands.flow.GitClient") as git_cls,):
+    """Test flow bind successfully binds a task to the current flow."""
+    with (
+        patch("vibe3.commands.flow.GitClient") as git_cls,
+        patch("vibe3.commands.flow.SQLiteClient") as store_cls,
+    ):
         git_cls.return_value.get_current_branch.return_value = "task/demo"
+        store_cls.return_value.add_issue_link.return_value = None
+        store_cls.return_value.update_flow_state.return_value = None
+        store_cls.return_value.add_event.return_value = None
 
         result = runner.invoke(flow_app, ["bind", "219"])
 
-    assert result.exit_code == 1
-    assert "not yet implemented" in str(result.exception).lower()
+    assert result.exit_code == 0
+    store_cls.return_value.add_issue_link.assert_called_once_with(
+        "task/demo", 219, "task"
+    )
 
 
 def test_task_link_defaults_to_related_role() -> None:

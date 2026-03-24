@@ -32,7 +32,7 @@ class StoreClientProtocol(Protocol):
         branch: str,
         event_type: str | None = None,
         event_type_prefix: str | None = None,
-        limit: int = 50,
+        limit: int | None = None,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         """Get events for branch."""
