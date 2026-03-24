@@ -12,6 +12,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.task_bridge import bridge_app
+from vibe3.exceptions import GitError
 from vibe3.models.project_item import ProjectItemError
 from vibe3.models.task_bridge import HydrateError
 from vibe3.observability.logger import setup_logging
@@ -95,31 +96,40 @@ def list(
 
 @app.command()
 def show(
-    branch: Annotated[str, typer.Argument(help="Branch name")],
+    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show task details, including remote GitHub Project fields."""
+    try:
+        target_branch = branch or GitClient().get_current_branch()
+    except GitError as e:
+        typer.echo(
+            f"Error: unable to resolve current branch ({e})",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     if trace:
         setup_logging(verbose=2)
 
     ctx = (
-        trace_context(command="task show", domain="task", branch=branch)
+        trace_context(command="task show", domain="task", branch=target_branch)
         if trace
         else _noop()
     )
     with ctx:
         service = TaskService()
-        view = service.hydrate(branch)
+        view = service.hydrate(target_branch)
 
         if isinstance(view, HydrateError):
             if view.type == "binding_invalid":
                 typer.echo(f"Error [{view.type}]: {view.message}", err=True)
                 raise typer.Exit(1)
 
-            task = service.get_task(branch)
+            task = service.get_task(target_branch)
             if not task:
-                typer.echo(f"Task not found: {branch}", err=True)
+                typer.echo(f"Task not found: {target_branch}", err=True)
                 raise typer.Exit(1)
             if json_output:
                 typer.echo(json.dumps(task.model_dump(), indent=2, default=str))
@@ -128,7 +138,10 @@ def show(
                 if task.task_issue_number:
                     typer.echo(f"Task Issue: #{task.task_issue_number}")
                 typer.echo(f"Status (local flow): {task.flow_status}")
-                typer.echo("[unbound] 运行 vibe task bridge link-project <id> 绑定")
+                typer.echo(
+                    "[unbound] 运行 vibe3 task bridge 自动绑定，"
+                    "或 vibe3 task bridge <issue_number> 指定"
+                )
             return
 
         if json_output:
@@ -146,12 +159,12 @@ def show(
         store = SQLiteClient()
         related_issues = [
             lnk
-            for lnk in store.get_issue_links(branch)
+            for lnk in store.get_issue_links(target_branch)
             if lnk["issue_role"] == "related"
         ]
         dependency_issues = [
             lnk
-            for lnk in store.get_issue_links(branch)
+            for lnk in store.get_issue_links(target_branch)
             if lnk["issue_role"] == "dependency"
         ]
         if related_issues:

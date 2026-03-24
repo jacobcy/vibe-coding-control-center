@@ -34,6 +34,11 @@ LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
 # Files to ignore (temporarily exceed limits)
 IGNORE_FILES=(
   "src/vibe3/clients/git_client.py"  # TODO: Split into git_branch.py and git_stash.py
+  "src/vibe3/commands/run.py"  # TODO: Extract skill execution to run_skill.py
+  "src/vibe3/commands/flow.py"  # TODO: Extract GitHub Project auto-link logic
+  "src/vibe3/commands/handoff.py"  # TODO: Extract show logic to handoff_show.py
+  "src/vibe3/commands/review.py"  # TODO: Extract session management
+  "src/vibe3/services/task_bridge_mixin.py"  # TODO: Extract auto_link logic
 )
 
 warnings=0

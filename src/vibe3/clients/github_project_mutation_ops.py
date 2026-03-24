@@ -5,11 +5,143 @@ from typing import Any
 
 from loguru import logger
 
-from vibe3.models.project_item import ProjectItemError
+from vibe3.models.project_item import ProjectItemData, ProjectItemError
 
 
 class ProjectMutationMixin:
     """Mixin for GitHub Project write/mutation operations."""
+
+    def _get_repo_name(self: Any) -> str | None:
+        """动态获取当前 git repo 名称。"""
+        try:
+            result = subprocess.run(
+                ["gh", "repo", "view", "--json", "name", "--jq", ".name"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def add_issue_to_project(
+        self: Any, issue_number: int
+    ) -> ProjectItemData | ProjectItemError:
+        """将 issue 添加到 GitHub Project，返回新建的 ProjectItemData。
+
+        自动获取 project node_id 及 issue content node_id，
+        通过 addProjectV2ItemById mutation 完成操作。
+        """
+        if not self._get_token():
+            return ProjectItemError(
+                type="auth_error",
+                message="未找到 GitHub 认证令牌，请设置 GH_TOKEN 或运行 gh auth login",
+            )
+
+        # Step 1: 获取 project node_id
+        owner_fragment, meta_vars = self._owner_fragment()
+        project_id_query = f"""
+        query GetProjectId($owner: String!, $projectNumber: Int!) {{
+          {owner_fragment} {{
+            projectV2(number: $projectNumber) {{
+              id
+            }}
+          }}
+        }}
+        """
+        try:
+            meta = self._run_graphql(project_id_query, meta_vars)
+        except Exception as e:
+            return ProjectItemError(type="network_error", message=str(e))
+
+        project_id = None
+        for key in ("user", "organization"):
+            if key in meta.get("data", {}):
+                project_id = meta["data"][key].get("projectV2", {}).get("id")
+                break
+
+        if not project_id:
+            return ProjectItemError(
+                type="not_found", message="无法获取 GitHub Project node ID"
+            )
+
+        # Step 2: 获取 issue content node_id
+        repo_name = self._get_repo_name()
+        if not repo_name:
+            return ProjectItemError(
+                type="network_error", message="无法自动获取 repo 名称"
+            )
+
+        issue_id_query = """
+        query GetIssueId($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) {
+              id
+            }
+          }
+        }
+        """
+        try:
+            issue_data = self._run_graphql(
+                issue_id_query,
+                {"owner": self.owner, "repo": repo_name, "number": issue_number},
+            )
+        except Exception as e:
+            return ProjectItemError(type="network_error", message=str(e))
+
+        content_id = (
+            issue_data.get("data", {}).get("repository", {}).get("issue", {}).get("id")
+        )
+        if not content_id:
+            return ProjectItemError(
+                type="not_found",
+                message=(
+                    f"Issue #{issue_number} 在仓库 "
+                    f"{self.owner}/{repo_name} 中未找到"
+                ),
+            )
+
+        # Step 3: 通过 addProjectV2ItemById 将 issue 加入 project
+        add_mutation = """
+        mutation AddIssueToProject($projectId: ID!, $contentId: ID!) {
+          addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+            item {
+              id
+            }
+          }
+        }
+        """
+        try:
+            result = self._run_graphql(
+                add_mutation,
+                {"projectId": project_id, "contentId": content_id},
+            )
+        except subprocess.CalledProcessError as e:
+            return ProjectItemError(type="network_error", message=e.stderr or str(e))
+        except Exception as e:
+            return ProjectItemError(type="network_error", message=str(e))
+
+        item_id = (
+            result.get("data", {})
+            .get("addProjectV2ItemById", {})
+            .get("item", {})
+            .get("id")
+        )
+        if not item_id:
+            return ProjectItemError(
+                type="parse_error",
+                message="addProjectV2ItemById 成功但未返回 item ID",
+            )
+
+        logger.bind(
+            domain="github_project",
+            operation="add_issue_to_project",
+            issue_number=issue_number,
+            item_id=item_id,
+        ).info("Added issue to project")
+        return ProjectItemData(item_id=item_id, node_id=item_id, partial=True)
 
     def update_item_status(
         self: Any, node_id: str, status_value: str

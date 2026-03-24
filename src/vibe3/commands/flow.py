@@ -10,9 +10,12 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models.project_item import LinkError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.handoff_service import HandoffService
+from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
@@ -53,7 +56,7 @@ def new(
             "--start-ref", help="Start ref for new branch (default: origin/main)"
         ),
     ] = "origin/main",
-    actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "claude",
+    actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "system",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
@@ -121,6 +124,14 @@ def new(
                     branch, "task_bound", actor, detail=f"Task bound: {task}"
                 )
                 logger.bind(command="flow new", task=task).info("Task bound to flow")
+                # 自动将 issue 加入 GitHub Project（链式反应，非致命）
+                link_result = TaskService().auto_link_issue_to_project(
+                    branch, issue_number
+                )
+                if isinstance(link_result, LinkError):
+                    logger.bind(command="flow new", task=task).warning(
+                        f"Auto project link skipped: {link_result.message}"
+                    )
             except ValueError:
                 logger.bind(command="flow new", task=task).warning(
                     "Invalid task ID format, skipping binding"
@@ -133,6 +144,9 @@ def new(
             store.add_event(branch, "spec_bound", actor, detail=f"Spec bound: {spec}")
             logger.bind(command="flow new", spec=spec).info("Spec bound to flow")
 
+        # Auto-initialize handoff current.md on flow creation
+        HandoffService().ensure_current_handoff()
+
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
@@ -142,7 +156,7 @@ def new(
 @app.command()
 def bind(
     task_id: Annotated[str, typer.Argument(help="Task ID to bind")],
-    actor: Annotated[str, typer.Option(help="Actor binding the task")] = "claude",
+    actor: Annotated[str, typer.Option(help="Actor binding the task")] = "system",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
@@ -174,6 +188,12 @@ def bind(
                 branch, "task_bound", actor, detail=f"Task bound: {task_id}"
             )
             logger.bind(command="flow bind", task_id=task_id).info("Task bound to flow")
+            # 自动将 issue 加入 GitHub Project（链式反应，非致命）
+            link_result = TaskService().auto_link_issue_to_project(branch, issue_number)
+            if isinstance(link_result, LinkError):
+                logger.bind(command="flow bind", task_id=task_id).warning(
+                    f"Auto project link skipped: {link_result.message}"
+                )
 
             if json_output:
                 typer.echo(json.dumps({"status": "bound", "task_id": task_id}))

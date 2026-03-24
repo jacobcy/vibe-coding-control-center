@@ -47,6 +47,7 @@ def test_review_help_only_shows_supported_commands():
     assert "commit" not in result.output.lower()
     assert "uncommitted" not in result.output.lower()
     assert "analyze-commit" not in result.output.lower()
+    assert "--message" not in result.output
 
 
 def test_review_commit_command_removed():
@@ -83,6 +84,7 @@ def test_review_base_help_mentions_dry_run_option():
     # Strip ANSI codes before checking
     output = _strip_ansi(result.output)
     assert "--dry-run" in output
+    assert "--message" not in output
 
 
 def test_review_pr_help_mentions_dry_run_option():
@@ -92,3 +94,4 @@ def test_review_pr_help_mentions_dry_run_option():
     # Strip ANSI codes before checking
     output = _strip_ansi(result.output)
     assert "--dry-run" in output
+    assert "--message" not in output

@@ -25,7 +25,8 @@ from vibe3.utils.trace import enable_trace
 app = typer.Typer(
     name="run",
     help="Execute implementation plans using codeagent-wrapper",
-    no_args_is_help=True,
+    no_args_is_help=False,
+    invoke_without_command=True,
     rich_markup_mode="rich",
 )
 
@@ -35,10 +36,6 @@ _TRACE_OPT = Annotated[
 _DRY_RUN_OPT = Annotated[
     bool,
     typer.Option("--dry-run", help="Print command and prompt without executing"),
-]
-_MESSAGE_OPT = Annotated[
-    Optional[str],
-    typer.Option("--message", "-m", help="Additional task guidance"),
 ]
 _AGENT_OPT = Annotated[
     Optional[str],
@@ -175,7 +172,7 @@ def _run_execution(
     plan_file: str,
     config: VibeConfig,
     dry_run: bool,
-    message: str | None,
+    instructions: str | None,
     agent: str | None,
     backend: str | None,
     model: str | None,
@@ -194,10 +191,12 @@ def _run_execution(
     log.info("Building run context")
     prompt_file_content = build_run_context(plan_file, config)
 
-    task = message
-    if message:
+    task = instructions
+    if instructions:
         log.info("Using custom task message")
-        typer.echo(f"-> Guidance: {message[:60]}{'...' if len(message) > 60 else ''}")
+        typer.echo(
+            f"-> Guidance: {instructions[:60]}{'...' if len(instructions) > 60 else ''}"
+        )
 
     run_config = getattr(config, "run", None)
     if not task and run_config and hasattr(run_config, "run_prompt"):
@@ -226,51 +225,155 @@ def _run_execution(
         run_content, options, plan_file, session_id=effective_session_id
     )
     if run_file:
-        typer.echo(f"-> Run output saved to: {run_file}")
-
-    typer.echo("\n" + run_content)
+        typer.echo(f"-> Run saved: {run_file}")
 
 
-@app.command()
-def execute(
+def _find_skill_file(skill_name: str) -> Path | None:
+    """Find SKILL.md for a named skill under skills/ directory.
+
+    Searches from the git root upward to locate skills/<name>/SKILL.md.
+    """
+    try:
+        git = GitClient()
+        repo_root = Path(git.get_git_common_dir()).parent
+    except Exception:
+        repo_root = Path.cwd()
+
+    candidate = repo_root / "skills" / skill_name / "SKILL.md"
+    if candidate.exists():
+        return candidate
+
+    # Also check worktree root
+    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
+    if cwd_candidate.exists():
+        return cwd_candidate
+
+    return None
+
+
+def _run_skill(
+    skill_name: str,
+    instructions: str | None,
+    config: VibeConfig,
+    dry_run: bool,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> None:
+    skill_file = _find_skill_file(skill_name)
+    if not skill_file:
+        typer.echo(
+            f"Error: Skill '{skill_name}' not found (skills/{skill_name}/SKILL.md)",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"-> Skill: {skill_file}")
+    skill_content = skill_file.read_text(encoding="utf-8")
+
+    task = instructions or f"Execute skill: {skill_name}"
+    options = _get_agent_options(config, agent, backend, model)
+
+    typer.echo(f"-> Running skill with {options.agent or options.backend}...")
+    result = run_review_agent(skill_content, options, task=task, dry_run=dry_run)
+
+    if dry_run:
+        return
+
+    # Record as handoff_run event
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+        handoff_dir = _get_handoff_dir()
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        run_file = handoff_dir / f"skill-{skill_name}-{timestamp}.md"
+        run_file.write_text(result.stdout, encoding="utf-8")
+
+        actor = format_agent_actor(options)
+        backend_val, model_val = resolve_actor_backend_model(options)
+        refs: dict[str, str] = {
+            "ref": str(run_file),
+            "skill": skill_name,
+            "backend": backend_val,
+        }
+        if model_val:
+            refs["model"] = model_val
+
+        store = SQLiteClient()
+        store.add_event(
+            branch, "handoff_run", actor, detail=f"Skill run: {skill_name}", refs=refs
+        )
+        typer.echo(f"-> Run saved: {run_file}")
+    except Exception as e:
+        logger.bind(domain="run").warning(f"Failed to record skill run event: {e}")
+
+
+def run_command(
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Instructions to pass to codeagent"),
+    ] = None,
+    plan: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+        ),
+    ] = None,
     file: Annotated[
         Optional[Path],
-        typer.Option("--file", "-f", help="Path to plan file"),
+        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
+    ] = None,
+    skill: Annotated[
+        Optional[str],
+        typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
+    """Execute implementation plan or skill using codeagent-wrapper.
+
+    Default: runs current flow's plan_ref.
+    Use --plan to specify a plan file, or --skill to run a project skill.
+    """
     if trace:
         enable_trace()
 
     config = VibeConfig.get_defaults()
-    git = GitClient()
-    branch = git.get_current_branch()
-    flow = FlowService().get_flow_status(branch)
 
-    if file is None:
+    # --skill mode
+    if skill:
+        _run_skill(skill, instructions, config, dry_run, agent, backend, model)
+        return
+
+    # --plan / --file / flow plan_ref mode
+    resolved_file = plan or file
+    if resolved_file is None:
+        git = GitClient()
+        branch = git.get_current_branch()
+        flow = FlowService().get_flow_status(branch)
         if not flow or not flow.plan_ref:
             typer.echo(
-                "Error: No file provided and current flow has no plan "
-                "reference.\nUse 'vibe3 run execute --file plan.md' "
-                "or set a plan on the current flow.",
+                "Error: Current flow has no plan_ref.\n"
+                "Use 'vibe3 run --plan <file>' or 'vibe3 run --skill <name>'.",
                 err=True,
             )
             raise typer.Exit(1)
-        file = Path(flow.plan_ref)
-        typer.echo(f"-> Using flow plan: {file}")
+        resolved_file = Path(flow.plan_ref)
+        typer.echo(f"-> Using flow plan: {resolved_file}")
 
-    plan_file = str(file)
-    log = logger.bind(domain="run", action="execute", plan_file=plan_file)
+    plan_file = str(resolved_file)
+    log = logger.bind(domain="run", action="run", plan_file=plan_file)
     log.info("Starting plan execution")
     typer.echo(f"-> Execute: {plan_file}")
 
-    _run_execution(plan_file, config, dry_run, message, agent, backend, model)
+    _run_execution(plan_file, config, dry_run, instructions, agent, backend, model)
 
+    git = GitClient()
+    branch = git.get_current_branch()
+    flow = FlowService().get_flow_status(branch)
     if not dry_run and flow and flow.task_issue_number:
         result = transition_to_in_progress(flow.task_issue_number)
         if not result.success and result.error and result.error != "no_issue_bound":
@@ -278,3 +381,46 @@ def execute(
                 f"Warning: Failed to transition issue state: {result.error}",
                 err=True,
             )
+
+
+@app.callback(invoke_without_command=True)
+def default(
+    ctx: typer.Context,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Instructions to pass to codeagent"),
+    ] = None,
+    plan: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+        ),
+    ] = None,
+    file: Annotated[
+        Optional[Path],
+        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
+    ] = None,
+    skill: Annotated[
+        Optional[str],
+        typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+
+    run_command(
+        instructions,
+        plan,
+        file,
+        skill,
+        trace,
+        dry_run,
+        agent,
+        backend,
+        model,
+    )

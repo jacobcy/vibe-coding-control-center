@@ -14,6 +14,7 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.handoff_service import HandoffService
 from vibe3.ui.console import console
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 app = typer.Typer(
     help="Agent handoff chain and events",
@@ -52,9 +53,8 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
 
     for event in events:
         time_str = event.created_at[:19].replace("T", " ")
-        actor_short = event.actor.split("/")[-1] if "/" in event.actor else event.actor
         console.print(
-            f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{actor_short}[/]"
+            f"[dim]{time_str}[/]  [magenta]{event.event_type}[/]  [dim]{event.actor}[/]"
         )
         if event.detail:
             console.print(f"  {event.detail}")
@@ -134,7 +134,7 @@ def show(
             typer.echo(json.dumps(output, indent=2, default=str))
             return
 
-        console.print(f"\n[bold cyan]Handoff[/]: {state.flow_slug}")
+        console.print(f"\n[bold cyan]flow[/]: {state.flow_slug}")
         console.print()
         _render_agent_chain(state)
 
@@ -157,6 +157,22 @@ def show(
         console.print("[bold]═══ Recent Handoff Events ═══[/]")
         console.print()
         _render_handoff_events(handoff_events)
+
+        # Show current.md path and content
+        git_dir = git.get_git_common_dir()
+        handoff_dir = get_branch_handoff_dir(git_dir, branch)
+        current_md = handoff_dir / "current.md"
+        console.print("[bold]═══ Current Handoff ═══[/]")
+        console.print(f"  [dim]path[/]  {current_md}")
+        console.print()
+        if current_md.exists():
+            content = current_md.read_text(encoding="utf-8")
+            console.print(content)
+        else:
+            console.print(
+                "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"
+            )
+        console.print()
 
 
 @app.command()

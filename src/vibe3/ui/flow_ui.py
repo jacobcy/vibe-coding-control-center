@@ -195,7 +195,7 @@ def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
     for event in reversed(events):
         color = _EVENT_COLOR.get(event.event_type, "white")
         time_str = event.created_at[:16].replace("T", " ")
-        actor_short = event.actor.split("/")[-1] if "/" in event.actor else event.actor
+        actor_short = event.actor
         console.print(
             f"[dim]{time_str}[/]  [{color}]{event.event_type}[/]  [dim]{actor_short}[/]"
         )

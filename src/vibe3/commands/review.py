@@ -37,10 +37,6 @@ _TRACE_OPT = Annotated[
 _DRY_RUN_OPT = Annotated[
     bool, typer.Option("--dry-run", help="Print command and prompt without executing")
 ]
-_MESSAGE_OPT = Annotated[
-    Optional[str],
-    typer.Option("--message", "-m", help="Custom prompt (skips context building)"),
-]
 
 
 def _record_review_event(
@@ -92,7 +88,7 @@ def _run_review(
     request: ReviewRequest,
     config: VibeConfig,
     dry_run: bool,
-    message: str | None,
+    instructions: str | None,
     issue_number: int | None = None,
     pr_number: int | None = None,
 ) -> None:
@@ -114,18 +110,20 @@ def _run_review(
 
     task = None
     if pr_number:
-        if message:
-            task = f"审查 PR #{pr_number}: {message}"
+        if instructions:
+            task = f"审查 PR #{pr_number}: {instructions}"
         elif config.review.review_prompt:
             task = f"审查 PR #{pr_number}: {config.review.review_prompt}"
         else:
             task = f"审查 PR #{pr_number} 的变更"
         log.info("Using PR-specific task")
         typer.echo(f"→ Task: {task}")
-    elif message:
-        task = message
+    elif instructions:
+        task = instructions
         log.info("Using custom task message")
-        typer.echo(f"→ Custom task: {message[:60]}{'...' if len(message) > 60 else ''}")
+        truncated = instructions[:60]
+        suffix = "..." if len(instructions) > 60 else ""
+        typer.echo(f"→ Custom task: {truncated}{suffix}")
     elif config.review.review_prompt:
         task = config.review.review_prompt
         log.info("Using configured task from vibe.toml")
@@ -186,9 +184,12 @@ def _run_review(
 @app.command()
 def pr(
     pr_number: Annotated[int, typer.Argument(help="PR number")],
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Custom prompt (skips context building)"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
 
@@ -199,7 +200,7 @@ def pr(
 
     Use this to review PRs before merging or providing feedback.
 
-    Example: vibe3 review pr 42
+    Example: vibe3 review pr 42 "Focus on security regressions"
     """
     if trace:
         enable_trace()
@@ -230,7 +231,7 @@ def pr(
         request,
         config,
         dry_run,
-        message,
+        instructions,
         issue_number=issue_number,
         pr_number=pr_number,
     )
@@ -242,9 +243,12 @@ def base(
         str,
         typer.Argument(help="Base branch to compare against (default: origin/main)"),
     ] = "origin/main",
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Custom prompt (skips context building)"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -256,7 +260,7 @@ def base(
 
     Use this to review local changes before pushing or creating a PR.
 
-    Example: vibe3 review base origin/main
+    Example: vibe3 review base origin/main "Focus on behavior changes"
     """
     if trace:
         enable_trace()
@@ -297,4 +301,4 @@ def base(
     request = ReviewRequest(
         scope=scope, changed_symbols=changed_symbols, structure_diff=structure_diff
     )
-    _run_review(request, config, dry_run, message, issue_number=issue_number)
+    _run_review(request, config, dry_run, instructions, issue_number=issue_number)
