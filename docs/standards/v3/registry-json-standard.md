@@ -23,9 +23,9 @@ related_docs:
 
 This document serves as a migration guide and reference for understanding the legacy `registry.json` structure and how it maps to the new v3 database schema.
 
-本文档定义 `registry.json` 的最终文件结构（v2遗留）。它是执行态共享真源，只表达 task execution record 注册信息，不表达规划层或现场层以外的内容。
+本文档记录 v2 遗留 `registry.json` 的结构与迁移映射，供理解历史数据和迁移逻辑使用。v3 当前执行态真源以 [data-model-standard.md](data-model-standard.md) 定义的 SQLite 表与 GitHub 外部对象为准。
 
-本文档涉及的 `task`、`repo issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档涉及的 `task`、`repo issue`、`roadmap item`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](../glossary.md) 为准。
 
 ## 1. V3 Architecture Change
 
