@@ -151,7 +151,7 @@ class SerenaClient:
         try:
             agent = self._get_agent()
             tool = agent.get_tool_by_name("get_symbols_overview")
-            result = agent.execute_task(lambda: tool.apply(relative_path=relative_file))
+            result = agent.execute_task(lambda: tool.apply(relative_path=relative_file))  # type: ignore[union-attr]
             return json.loads(result)  # type: ignore[no-any-return]
         except Exception as e:
             logger.bind(
@@ -181,7 +181,7 @@ class SerenaClient:
             agent = self._get_agent()
             tool = agent.get_tool_by_name("find_referencing_symbols")
             result = agent.execute_task(
-                lambda: tool.apply(name_path=name_path, relative_path=relative_file)
+                lambda: tool.apply(name_path=name_path, relative_path=relative_file)  # type: ignore[union-attr]
             )
             return json.loads(result)  # type: ignore[no-any-return]
         except Exception as e:

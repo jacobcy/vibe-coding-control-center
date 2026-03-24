@@ -9,9 +9,9 @@ related_docs:
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-design.md
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-plan.md
   - docs/standards/glossary.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/registry-json-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/registry-json-standard.md
 related_issues:
   - gh-157
   - gh-158
@@ -84,9 +84,9 @@ related_issues:
 
 **Files:**
 - Modify: `docs/standards/glossary.md`
-- Modify: `docs/standards/v2/data-model-standard.md`
-- Modify: `docs/standards/v2/command-standard.md`
-- Modify: `docs/standards/v2/registry-json-standard.md`
+- Modify: `docs/standards/v3/data-model-standard.md`
+- Modify: `docs/standards/v3/command-standard.md`
+- Modify: `docs/standards/v3/registry-json-standard.md`
 
 **Step 1: 对齐 `worktree / branch / flow`**
 

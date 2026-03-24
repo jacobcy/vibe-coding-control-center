@@ -16,8 +16,8 @@
 
 **Files:**
 - Modify: `docs/v3/handoff/04-handoff-and-cutover.md`
-- Read: `docs/standards/v2/handoff-governance-standard.md`
-- Read: `docs/standards/v2/git-workflow-standard.md`
+- Read: `docs/standards/v3/handoff-governance-standard.md`
+- Read: `docs/standards/v3/git-workflow-standard.md`
 - Read: `docs/standards/v3/handoff-store-standard.md`
 - Read: `.agent/context/task.md`
 - Read: `.agent/reports/pre-push-review-*.md`

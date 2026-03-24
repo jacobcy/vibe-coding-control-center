@@ -6,7 +6,7 @@ author: Codex GPT-5
 created: 2026-03-11
 related_docs:
   - .agent/README.md
-  - docs/standards/v2/skill-standard.md
+  - docs/standards/v3/skill-standard.md
   - .agent/workflows/vibe-new.md
   - .agent/workflows/vibe-start.md
   - .agent/workflows/vibe-commit.md

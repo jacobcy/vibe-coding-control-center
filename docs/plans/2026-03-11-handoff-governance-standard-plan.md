@@ -9,7 +9,7 @@ last_updated: 2026-03-11
 related_docs:
   - AGENTS.md
   - CLAUDE.md
-  - docs/standards/v2/git-workflow-standard.md
+  - docs/standards/v3/git-workflow-standard.md
   - skills/vibe-save/SKILL.md
   - skills/vibe-continue/SKILL.md
   - skills/vibe-commit/SKILL.md
@@ -44,7 +44,7 @@ related_docs:
 
 ## Files To Modify
 
-- Create: `docs/standards/v2/handoff-governance-standard.md`
+- Create: `docs/standards/v3/handoff-governance-standard.md`
 - Modify: `AGENTS.md`
 - Modify: `CLAUDE.md`
 - Modify: `skills/vibe-save/SKILL.md`
@@ -56,7 +56,7 @@ related_docs:
 ## Task 1: 新增 handoff 标准文件
 
 **Files:**
-- Create: `docs/standards/v2/handoff-governance-standard.md`
+- Create: `docs/standards/v3/handoff-governance-standard.md`
 
 **Step tasks:**
 
@@ -92,7 +92,7 @@ related_docs:
 2. 在 `CLAUDE.md` 中加入简要硬规则或上下文管理规则：
    - handoff 只作补充
    - 不允许基于旧 handoff 直接做判断
-3. 两处都只做高层规则，不复制标准全文，改为引用 `docs/standards/v2/handoff-governance-standard.md`
+3. 两处都只做高层规则，不复制标准全文，改为引用 `docs/standards/v3/handoff-governance-standard.md`
 
 **Expected Result:**
 - 不依赖是否进入某个具体 skill，agent 一进入项目就能看到 handoff 边界。
@@ -109,7 +109,7 @@ related_docs:
 **Step tasks:**
 
 1. 把 skill 中重复的 handoff 定义改成短引用：
-   - 指向 `docs/standards/v2/handoff-governance-standard.md`
+   - 指向 `docs/standards/v3/handoff-governance-standard.md`
 2. 在读取 handoff 的 skill 中统一加入一句硬规则：
    - 若 handoff 与当前真源或现场不一致，必须修正后再退出
 3. 在会改变阶段事实的 skill 中保留“退出前更新 handoff”的要求，但不再重复长篇定义
@@ -138,7 +138,7 @@ related_docs:
 
 ```bash
 rg -n "handoff|task\\.md|真源|修正义务" \
-  docs/standards/v2/handoff-governance-standard.md \
+  docs/standards/v3/handoff-governance-standard.md \
   AGENTS.md \
   CLAUDE.md \
   skills/vibe-save/SKILL.md \

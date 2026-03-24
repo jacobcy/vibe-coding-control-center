@@ -6,10 +6,10 @@ author: GPT-5 Codex
 created: 2026-03-12
 last_updated: 2026-03-12
 related_docs:
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/git-workflow-standard.md
-  - docs/standards/v2/worktree-lifecycle-standard.md
-  - docs/standards/v2/command-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/git-workflow-standard.md
+  - docs/standards/v3/worktree-lifecycle-standard.md
+  - docs/standards/v3/command-standard.md
 related_issues:
   - gh-103
   - gh-144
@@ -73,8 +73,8 @@ related_issues:
 - `lib/flow.sh`
 - `lib/flow_history.sh`
 - `lib/flow_help.sh`
-- `docs/standards/v2/worktree-lifecycle-standard.md`
-- `docs/standards/v2/git-workflow-standard.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
+- `docs/standards/v3/git-workflow-standard.md`
 - `tests/flow/test_flow_bind_done.bats`
 - `tests/flow/test_flow_lifecycle.bats`
 
@@ -146,8 +146,8 @@ bats tests/flow/test_flow_lifecycle.bats
 
 **Files**
 - Modify: `lib/flow_help.sh`
-- Modify: `docs/standards/v2/worktree-lifecycle-standard.md`
-- Modify: `docs/standards/v2/git-workflow-standard.md`
+- Modify: `docs/standards/v3/worktree-lifecycle-standard.md`
+- Modify: `docs/standards/v3/git-workflow-standard.md`
 
 **Steps**
 1. 删除或改写任何把 closeout 后目录理解成 detached 中转态的表述。
@@ -157,7 +157,7 @@ bats tests/flow/test_flow_lifecycle.bats
 **Run command**
 
 ```bash
-rg -n "detach|detached|worktree" lib/flow_help.sh docs/standards/v2/worktree-lifecycle-standard.md docs/standards/v2/git-workflow-standard.md
+rg -n "detach|detached|worktree" lib/flow_help.sh docs/standards/v3/worktree-lifecycle-standard.md docs/standards/v3/git-workflow-standard.md
 ```
 
 **Expected Result**

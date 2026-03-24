@@ -7,9 +7,9 @@ created: 2026-03-11
 related_docs:
   - docs/plans/2026-03-11-workflow-skill-boundary-audit.md
   - .agent/README.md
-  - docs/standards/v2/skill-standard.md
-  - docs/standards/v2/skill-trigger-standard.md
-  - docs/standards/v2/shell-capability-design.md
+  - docs/standards/v3/skill-standard.md
+  - docs/standards/v3/skill-trigger-standard.md
+  - docs/standards/v3/python-capability-design.md
   - .agent/workflows/vibe-new.md
   - .agent/workflows/vibe-start.md
   - .agent/workflows/vibe-commit.md

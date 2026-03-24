@@ -5,8 +5,8 @@ status: proposed
 author: Codex GPT-5
 created: 2026-03-11
 related_docs:
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/shell-skill-boundary-audit.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/python-skill-boundary-audit.md
   - skills/vibe-task/SKILL.md
 ---
 
@@ -33,8 +33,8 @@ related_docs:
 
 # Files To Modify
 
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/shell-skill-boundary-audit.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/python-skill-boundary-audit.md`
 - `skills/vibe-task/SKILL.md`
 
 # Test Command

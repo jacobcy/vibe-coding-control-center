@@ -11,8 +11,8 @@ related_docs:
   - docs/standards/v3/github-remote-call-standard.md
   - docs/plans/2026-03-13-shell-thinning-python-core-plan.md
   - docs/plans/2026-03-13-gh-157-worktrees-json-retirement-implementation-plan.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/data-model-standard.md
 related_issues: []
 ---
 
@@ -37,8 +37,8 @@ related_issues: []
 **Files:**
 - Create: `docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md`
 - Create: `docs/plans/2026-03-13-vibe3-parallel-rebuild-plan.md`
-- Inspect: `docs/standards/v2/command-standard.md`
-- Inspect: `docs/standards/v2/shell-capability-design.md`
+- Inspect: `docs/standards/v3/command-standard.md`
+- Inspect: `docs/standards/v3/python-capability-design.md`
 
 **Step 1: Write the design gap audit**
 
@@ -74,7 +74,7 @@ related_issues: []
 Run:
 
 ```bash
-rg -n "roadmap|task|flow|check|--json" docs/standards/v2/command-standard.md docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
+rg -n "roadmap|task|flow|check|--json" docs/standards/v3/command-standard.md docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
 ```
 
 Expected:

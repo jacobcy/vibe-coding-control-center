@@ -8,9 +8,9 @@ last_updated: 2026-03-13
 related_docs:
   - docs/plans/2026-03-13-gh-157-semantic-cleanup-prerequisite-plan.md
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-plan.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/registry-json-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/registry-json-standard.md
 related_issues:
   - gh-157
   - gh-152

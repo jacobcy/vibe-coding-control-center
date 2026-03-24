@@ -8,9 +8,9 @@ description: Use when the user wants to review documentation changes, audit entr
 标准真源：
 
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v2/skill-standard.md`、`docs/standards/v2/command-standard.md`、`docs/standards/v2/shell-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v2/skill-trigger-standard.md` 为准。
-- 交付 flow / PR / worktree 语义若被提及，以 `docs/standards/v2/git-workflow-standard.md`、`docs/standards/v2/worktree-lifecycle-standard.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
+- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
+- 交付 flow / PR / worktree 语义若被提及，以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
 - 文档角色与质量要求以 `docs/README.md`、`docs/standards/doc-quality-standards.md` 为准。
 
 **核心职责**: 文档概念审查（检查错误概念和过时信息）

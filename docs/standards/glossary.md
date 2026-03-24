@@ -15,10 +15,10 @@ related_docs:
   - CLAUDE.md
   - docs/README.md
   - docs/standards/action-verbs.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/shell-capability-design.md
-  - docs/standards/v2/skill-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/python-capability-design.md
+  - docs/standards/v3/skill-standard.md
 ---
 
 # 项目术语表
@@ -276,7 +276,7 @@ related_docs:
   - `编排` 不是调度
   - `编排` 不直接等于执行
 - 落点：
-  - skill 职责边界见 [shell-capability-design.md](shell-capability-design.md)
+  - skill 职责边界见 [python-capability-design.md](python-capability-design.md)
 - 使用规则：
   - 讨论先建 task 还是先开 flow、何时 bind/review/pr 时使用 `编排`
 
@@ -306,7 +306,7 @@ related_docs:
   - `Skill 层` 不应直接写 JSON 真源
 - 落点：
   - 规则见 [skill-standard.md](skill-standard.md)
-  - 设计边界见 [shell-capability-design.md](shell-capability-design.md)
+  - 设计边界见 [python-capability-design.md](python-capability-design.md)
 - 使用规则：
   - 文档中优先使用 `Skill 层`
   - `胶水层` 作为历史叫法保留
@@ -321,7 +321,7 @@ related_docs:
   - `Shell 能力层` 不是调度器
   - `Shell 能力层` 不是编排器
 - 落点：
-  - 定义见 [shell-capability-design.md](shell-capability-design.md)
+  - 定义见 [python-capability-design.md](python-capability-design.md)
 - 使用规则：
   - 讨论命令设计、原子能力、shell 边界时使用 `Shell 能力层`
 
