@@ -14,6 +14,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.review_runner import (
     ReviewAgentOptions,
     format_agent_actor,
+    resolve_actor_backend_model,
     run_review_agent,
 )
 from vibe3.services.run_context_builder import build_run_context
@@ -120,6 +121,7 @@ def _record_run_event(
     run_file.write_text(run_content, encoding="utf-8")
 
     actor = format_agent_actor(options)
+    backend, model = resolve_actor_backend_model(options)
 
     store = SQLiteClient()
     store.add_event(
@@ -130,8 +132,8 @@ def _record_run_event(
         refs={
             "ref": str(run_file),
             "plan_ref": plan_file,
-            "backend": options.backend or options.agent,
-            "model": options.model,
+            "backend": backend,
+            "model": model,
         },
     )
     store.update_flow_state(branch, report_ref=str(run_file), executor_actor=actor)

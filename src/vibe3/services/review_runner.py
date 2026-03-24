@@ -109,22 +109,45 @@ class ReviewAgentResult:
 
 
 def get_effective_backend(options: ReviewAgentOptions) -> str:
-    """Get the effective backend name from options.
+    """Get the effective backend name for database recording.
 
-    When using agent preset, the preset name serves as the backend identifier.
+    When using agent preset, returns the preset name as identifier.
     When using backend directly, returns the backend name.
 
+    Note: For codeagent-wrapper invocation, use options.agent if set,
+    otherwise use options.backend.
+
     Args:
-        options: ReviewAgentOptions with agent or backend set
+        options: ReviewAgentOptions with agent/backend/model
 
     Returns:
-        Backend name (either preset name or direct backend)
+        Backend name or preset name (for database recording)
     """
-    if options.backend:
-        return options.backend
     if options.agent:
         return options.agent
+    if options.backend:
+        return options.backend
     return "unknown"
+
+
+def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str | None]:
+    """Resolve the actual backend and model for database recording.
+
+    Priority:
+    1. If backend is provided (CLI override): use backend/model
+    2. If only agent is provided: use agent as backend identifier
+
+    Args:
+        options: ReviewAgentOptions with agent/backend/model
+
+    Returns:
+        Tuple of (backend, model) for database recording
+    """
+    if options.backend:
+        return options.backend, options.model
+    if options.agent:
+        return options.agent, options.model
+    return "unknown", None
 
 
 def format_agent_actor(options: ReviewAgentOptions) -> str:
@@ -140,9 +163,9 @@ def format_agent_actor(options: ReviewAgentOptions) -> str:
     Returns:
         Actor string like 'claude/sonnet' or 'planner' or 'unknown'
     """
-    backend = get_effective_backend(options)
-    if options.model:
-        return f"{backend}/{options.model}"
+    backend, model = resolve_actor_backend_model(options)
+    if model:
+        return f"{backend}/{model}"
     return backend
 
 

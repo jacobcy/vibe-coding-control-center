@@ -121,6 +121,34 @@ review:
   # Added to beginning of review context if provided
   review_prompt: "/code-review"
 
+# Plan command configuration
+plan:
+  # Agent configuration for plan generation
+  agent_config:
+    # Method 1: Use agent preset (recommended)
+    agent: "planner"
+
+    # Method 2: Direct backend/model specification (alternative)
+    # backend: "claude"
+    # model: "claude-sonnet-4-6"
+
+  # Custom plan prompt (optional prefix)
+  plan_prompt: "/plan"
+
+# Run command configuration
+run:
+  # Agent configuration for plan execution
+  agent_config:
+    # Method 1: Use agent preset (recommended)
+    agent: "executor"
+
+    # Method 2: Direct backend/model specification (alternative)
+    # backend: "claude"
+    # model: "claude-sonnet-4-6"
+
+  # Custom run prompt (optional prefix)
+  run_prompt: "/run"
+
 # 质量标准
 quality:
   test_coverage:

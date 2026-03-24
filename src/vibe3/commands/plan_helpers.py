@@ -9,7 +9,11 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.services.review_runner import ReviewAgentOptions, format_agent_actor
+from vibe3.services.review_runner import (
+    ReviewAgentOptions,
+    format_agent_actor,
+    resolve_actor_backend_model,
+)
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
@@ -82,6 +86,7 @@ def record_plan_event(
     plan_file.write_text(plan_content, encoding="utf-8")
 
     actor = format_agent_actor(options)
+    backend, model = resolve_actor_backend_model(options)
 
     store = SQLiteClient()
     store.add_event(
@@ -91,8 +96,8 @@ def record_plan_event(
         detail=f"Plan generated: {plan_file.name}",
         refs={
             "ref": str(plan_file),
-            "backend": options.backend or options.agent,
-            "model": options.model,
+            "backend": backend,
+            "model": model,
         },
     )
     store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
