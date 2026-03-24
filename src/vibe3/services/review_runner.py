@@ -56,10 +56,15 @@ class ReviewAgentOptions:
     - Easy testing and debugging
 
     Attributes:
-        agent: The agent preset name (mutually exclusive with backend)
-        model: Optional model override (used with backend)
-        backend: Backend name (mutually exclusive with agent)
+        agent: The agent preset name (passed to codeagent-wrapper)
+        model: Optional model override
+        backend: Backend name (for database recording or direct use)
         timeout_seconds: Maximum execution time (default: 600 seconds)
+
+    Usage:
+        - Use agent preset: Set agent, leave backend=None
+        - Use backend directly: Set backend, leave agent=None
+        - Config can have both: agent for codeagent-wrapper, backend for DB recording
 
     """
 
@@ -67,14 +72,6 @@ class ReviewAgentOptions:
     model: str | None = None
     backend: str | None = None
     timeout_seconds: int = 600
-
-    def __post_init__(self) -> None:
-        """Validate mutually exclusive options."""
-        if self.agent and self.backend:
-            raise ValueError(
-                "agent and backend are mutually exclusive. "
-                "Use either agent preset OR backend+model, not both."
-            )
 
 
 @dataclass(frozen=True)
@@ -106,6 +103,67 @@ class ReviewAgentResult:
     def is_success(self) -> bool:
         """Check if the agent run was successful."""
         return self.exit_code == 0
+
+
+def get_effective_backend(options: ReviewAgentOptions) -> str:
+    """Get the effective backend name for database recording.
+
+    When using agent preset, returns the preset name as identifier.
+    When using backend directly, returns the backend name.
+
+    Note: For codeagent-wrapper invocation, use options.agent if set,
+    otherwise use options.backend.
+
+    Args:
+        options: ReviewAgentOptions with agent/backend/model
+
+    Returns:
+        Backend name or preset name (for database recording)
+    """
+    if options.agent:
+        return options.agent
+    if options.backend:
+        return options.backend
+    return "unknown"
+
+
+def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str | None]:
+    """Resolve the actual backend and model for database recording.
+
+    Priority:
+    1. If backend is provided (CLI override): use backend/model
+    2. If only agent is provided: use agent as backend identifier
+
+    Args:
+        options: ReviewAgentOptions with agent/backend/model
+
+    Returns:
+        Tuple of (backend, model) for database recording
+    """
+    if options.backend:
+        return options.backend, options.model
+    if options.agent:
+        return options.agent, options.model
+    return "unknown", None
+
+
+def format_agent_actor(options: ReviewAgentOptions) -> str:
+    """Format the actor string for handoff records.
+
+    Actor format: '<backend>/<model>' or '<backend>'
+    - backend: either agent preset name or direct backend name
+    - model: optional model name
+
+    Args:
+        options: ReviewAgentOptions with agent/backend/model
+
+    Returns:
+        Actor string like 'claude/sonnet' or 'planner' or 'unknown'
+    """
+    backend, model = resolve_actor_backend_model(options)
+    if model:
+        return f"{backend}/{model}"
+    return backend
 
 
 def run_review_agent(

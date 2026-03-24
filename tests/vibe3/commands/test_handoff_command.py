@@ -40,21 +40,35 @@ class TestHandoffCommands:
         assert "Handoff file ready" in result.output
         mock_service.ensure_current_handoff.assert_called_once_with(force=True)
 
-    @patch("vibe3.commands.handoff.HandoffService")
-    def test_handoff_show_command(self, mock_service_class):
-        """Test handoff show command."""
-        mock_service = MagicMock()
-        mock_service.read_current_handoff.return_value = "# Handoff content"
-        mock_service._get_current_handoff_path.return_value = "/path/to/current.md"
-        mock_service_class.return_value = mock_service
+    @patch("vibe3.commands.handoff.SQLiteClient")
+    @patch("vibe3.commands.handoff.GitClient")
+    def test_handoff_show_command(self, mock_git_class, mock_store_class):
+        """Test handoff show command shows agent chain and events."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "feature/test"
+        mock_git_class.return_value = mock_git
+
+        mock_store = MagicMock()
+        mock_store.get_flow_state.return_value = {
+            "branch": "feature/test",
+            "flow_slug": "feature-test",
+            "flow_status": "active",
+            "spec_ref": None,
+            "plan_ref": None,
+            "report_ref": None,
+            "audit_ref": None,
+        }
+        mock_store.get_events.return_value = []
+        mock_store_class.return_value = mock_store
 
         result = runner.invoke(app, ["handoff", "show"])
 
         assert result.exit_code == 0
-        assert "# Handoff content" in result.output
-        assert "File path:" in result.output
-        assert "/path/to/current.md" in result.output
-        mock_service.read_current_handoff.assert_called_once()
+        assert "Handoff" in result.output
+        assert "Agent Chain" in result.output
+        assert "spec_ref" in result.output
+        mock_store.get_flow_state.assert_called_once()
+        mock_store.get_events.assert_called_once()
 
     @patch("vibe3.commands.handoff.HandoffService")
     def test_handoff_append_command(self, mock_service_class):

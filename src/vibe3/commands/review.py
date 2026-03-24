@@ -1,16 +1,25 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Optional, cast
 
 import typer
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.review_parser import parse_codex_review
-from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.services.review_parser import ParsedReview, parse_codex_review
+from vibe3.services.review_runner import (
+    ReviewAgentOptions,
+    format_agent_actor,
+    run_review_agent,
+)
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -33,25 +42,49 @@ _MESSAGE_OPT = Annotated[
 ]
 
 
+def _record_review_event(
+    review: ParsedReview,
+    actor: str,
+    review_content: str | None = None,
+) -> Path | None:
+    """Record review to handoff."""
+    store = SQLiteClient()
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+    except Exception:
+        return None
+
+    git_dir = git.get_git_common_dir()
+    handoff_dir = get_branch_handoff_dir(git_dir, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    review_file = handoff_dir / f"review-{timestamp}.md"
+
+    if review_content:
+        review_file.write_text(review_content, encoding="utf-8")
+
+    store.add_event(
+        branch,
+        "handoff_review",
+        actor,
+        detail=f"Verdict: {review.verdict}, {len(review.comments)} comments",
+        refs={"ref": str(review_file), "verdict": review.verdict},
+    )
+    store.update_flow_state(branch, reviewer_actor=actor, audit_ref=str(review_file))
+
+    return review_file
+
+
 def _run_review(
     request: ReviewRequest, config: VibeConfig, dry_run: bool, message: str | None
 ) -> None:
-    """Execute review for a given request.
-
-    This is the shared logic for both base and pr commands.
-
-    Args:
-        request: Review request with scope and symbols
-        config: Configuration instance
-        dry_run: If True, print command without executing
-        message: Optional custom task message
-    """
     log = logger.bind(domain="review", scope=request.scope.kind)
 
     log.info("Building review context")
     prompt_file_content = build_review_context(request, config)
 
-    # Determine task: custom message, config default, or None
     task = None
     if message:
         task = message
@@ -63,7 +96,6 @@ def _run_review(
     else:
         log.info("Using prompt file only (no custom task)")
 
-    # Call agent via codeagent-wrapper
     log.info(
         "Running review agent",
         agent=config.review.agent_config.agent,
@@ -86,6 +118,14 @@ def _run_review(
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
+    review_file = _record_review_event(
+        review,
+        actor=format_agent_actor(options),
+        review_content=raw,
+    )
+    if review_file:
+        typer.echo(f"→ Review saved to: {review_file}")
+
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
 
@@ -97,16 +137,7 @@ def pr(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review a PR locally (generates review output, does not publish to GitHub).
-
-    This command is for local review only. To publish review to GitHub,
-    use `pr ready` command instead.
-
-    Examples:
-        vibe review pr 42
-        vibe review pr 42 --dry-run  # Print command and prompt only
-        vibe review pr 42 -m "Focus on security issues"  # Custom prompt
-    """
+    """Review a PR locally (generates review output, does not publish to GitHub)."""
     if trace:
         enable_trace()
 
@@ -114,10 +145,8 @@ def pr(
     log.info("Starting PR review")
     typer.echo(f"→ Review: PR #{pr_number}")
 
-    # Load config
     config = VibeConfig.get_defaults()
 
-    # Create scope and get inspect data
     log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
     inspect_data = run_inspect_json(["pr", str(pr_number)])
@@ -126,7 +155,6 @@ def pr(
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
 
-    # Build request and execute review
     request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
     _run_review(request, config, dry_run, message)
 
@@ -141,25 +169,11 @@ def base(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review current branch changes relative to base branch.
-
-    By default, compares current branch against origin/main (recommended for projects
-    that don't develop on main branch locally).
-
-    Examples:
-        vibe review base                 # Compare current branch vs origin/main
-        vibe review base origin/develop  # Compare current branch vs origin/develop
-        vibe review base main            # Compare current branch vs local main
-        vibe review base --dry-run       # Print command and prompt only
-        vibe review base -m "Focus on security"  # Custom task
-    """
+    """Review current branch changes relative to base branch."""
     if trace:
         enable_trace()
 
     from vibe3.utils.git_helpers import get_current_branch
-
-    # Note: base branch validation is handled by inspect_base command
-    # which is called by run_inspect_json below
 
     current_branch = get_current_branch()
 
@@ -172,10 +186,8 @@ def base(
     log.info("Starting branch review")
     typer.echo(f"→ Review: {current_branch} vs {base_branch}")
 
-    # Load config
     config = VibeConfig.get_defaults()
 
-    # Create scope and get inspect data
     log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
     inspect_data = run_inspect_json(["base", base_branch])
@@ -184,6 +196,5 @@ def base(
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
 
-    # Build request and execute review
     request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
     _run_review(request, config, dry_run, message)

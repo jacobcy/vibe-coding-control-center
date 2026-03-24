@@ -105,29 +105,54 @@ class ReviewScopeConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    """Agent configuration for codeagent-wrapper."""
+    """Agent configuration for codeagent-wrapper.
+
+    When using a preset (agent specified), backend/model can still be provided
+    for database recording purposes. If backend is None, agent is passed to
+    codeagent-wrapper as preset name. If backend is provided, it overrides
+    the preset's backend/model.
+
+    Actor resolution:
+    - If backend is provided: use backend/model directly
+    - If only agent is provided: use agent as identifier (preset name)
+    """
 
     agent: str | None = Field(default=None)
     backend: str | None = Field(default=None)
     model: str | None = Field(default=None)
 
-    def validate_mutually_exclusive(self) -> None:
-        if self.agent and self.backend:
-            raise ValueError(
-                "agent and backend are mutually exclusive. "
-                "Use either agent preset OR backend+model, not both."
-            )
-
 
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
-    policy_file: str = Field(default=".codex/review-policy.md")
-    tools_guide_file: str = Field(default=".agent/rules/cli-usage.md")
+    policy_file: str = Field(default=".agent/rules/review-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
     review_prompt: str = Field(default="")
+
+
+class PlanConfig(BaseModel):
+    """Plan command configuration."""
+
+    policy_file: str = Field(default=".agent/rules/plan-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
+    agent_config: AgentConfig = Field(default_factory=AgentConfig)
+    output_format: str = Field(default="")
+    plan_task: str = Field(default="")
+    plan_prompt: str = Field(default="")
+
+
+class RunConfig(BaseModel):
+    """Run command configuration."""
+
+    policy_file: str = Field(default=".agent/rules/run-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
+    agent_config: AgentConfig = Field(default_factory=AgentConfig)
+    output_format: str = Field(default="")
+    run_task: str = Field(default="")
+    run_prompt: str = Field(default="")
 
 
 class TestCoverageConfig(BaseModel):
@@ -168,6 +193,8 @@ class VibeConfig(BaseModel):
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)
     pr_scoring: PRScoringConfig = Field(default_factory=PRScoringConfig)
+    plan: PlanConfig = Field(default_factory=PlanConfig)
+    run: RunConfig = Field(default_factory=RunConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
     ai: AIConfig = Field(default_factory=AIConfig)

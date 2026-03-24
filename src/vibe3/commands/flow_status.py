@@ -12,6 +12,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
     render_error,
     render_flow_status,
+    render_flow_timeline,
     render_flows_status_dashboard,
 )
 
@@ -56,6 +57,7 @@ def _fetch_issue_titles(
 
 def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    snapshot: Annotated[bool, typer.Option("--snapshot", help="静态快照模式")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -65,20 +67,37 @@ def show(
     git = GitClient()
     service = FlowService()
     target_branch = branch if branch else git.get_current_branch()
-    flow_status = service.get_flow_status(target_branch)
-    if not flow_status:
+
+    if snapshot:
+        flow_status = service.get_flow_status(target_branch)
+        if not flow_status:
+            logger.error(f"Flow not found: {target_branch}")
+            raise typer.Exit(1)
+        if json_output:
+            typer.echo(json.dumps(flow_status.model_dump(), indent=2, default=str))
+        else:
+            from vibe3.clients.github_client import GitHubClient
+
+            gh = GitHubClient()
+            issue_titles, pr_data, net_err = _fetch_issue_titles(gh, flow_status)
+            if net_err:
+                render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
+            render_flow_status(flow_status, issue_titles, pr_data)
+        return
+
+    timeline = service.get_flow_timeline(target_branch)
+    if not timeline["state"]:
         logger.error(f"Flow not found: {target_branch}")
         raise typer.Exit(1)
-    if json_output:
-        typer.echo(json.dumps(flow_status.model_dump(), indent=2, default=str))
-    else:
-        from vibe3.clients.github_client import GitHubClient
 
-        gh = GitHubClient()
-        issue_titles, pr_data, net_err = _fetch_issue_titles(gh, flow_status)
-        if net_err:
-            render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
-        render_flow_status(flow_status, issue_titles, pr_data)
+    if json_output:
+        output = {
+            "state": timeline["state"].model_dump(),
+            "events": [e.model_dump() for e in timeline["events"]],
+        }
+        typer.echo(json.dumps(output, indent=2, default=str))
+    else:
+        render_flow_timeline(timeline["state"], timeline["events"])
 
 
 def status(

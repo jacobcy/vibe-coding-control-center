@@ -57,7 +57,8 @@ def test_run_execute_dry_run_shows_command() -> None:
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
-    assert "-> Executing plan with executor" in result.stdout
+    # When config has backend/model, shows backend name
+    assert "-> Executing plan with" in result.stdout
 
 
 def test_run_execute_with_agent_override() -> None:
@@ -82,6 +83,7 @@ def test_run_execute_with_agent_override() -> None:
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
+    # CLI --agent override shows agent name
     assert "-> Executing plan with executor-pro" in result.stdout
 
 

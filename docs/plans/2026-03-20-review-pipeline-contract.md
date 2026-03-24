@@ -147,7 +147,7 @@ review.py
 2. **提取 build_tools_guide_section**
    - 输入: `tools_guide_path` 或从 config 读取
    - 输出: tools guide 字符串
-   - 职责: 读取 `.agent/rules/cli-usage.md`
+   - 职责: 读取 `.agent/rules/common.md`
 
 3. **提取 build_ast_analysis_section**
    - 输入: `changed_symbols`, `symbol_dag`

@@ -55,7 +55,8 @@ def test_plan_task_dry_run_shows_command() -> None:
 
     assert result.exit_code == 0
     assert "codeagent-wrapper" in result.stdout
-    assert "--agent planner" in result.stdout
+    # When config has backend/model, it uses --backend --model instead of --agent
+    assert "--backend" in result.stdout or "--agent" in result.stdout
 
 
 def test_plan_task_with_agent_override() -> None:
@@ -64,6 +65,7 @@ def test_plan_task_with_agent_override() -> None:
     )
 
     assert result.exit_code == 0
+    # CLI --agent override takes precedence
     assert "--agent planner-pro" in result.stdout
 
 

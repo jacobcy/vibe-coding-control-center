@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.models.flow import (
+    FlowEvent,
     FlowState,
     FlowStatusResponse,
     IssueLink,
@@ -262,3 +263,11 @@ class FlowService(FlowLifecycleMixin):
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 
         return [FlowState(**flow) for flow in flows_data]
+
+    def get_flow_timeline(self, branch: str) -> dict:
+        state_data = self.store.get_flow_state(branch)
+        if not state_data:
+            return {"state": None, "events": []}
+        events_data = self.store.get_events(branch, limit=100)
+        events = [FlowEvent(**e) for e in events_data]
+        return {"state": FlowState(**state_data), "events": events}

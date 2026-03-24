@@ -4,6 +4,7 @@ Tests CLI surface: argument validation, help output, exit codes.
 All external services (codeagent-wrapper, GitHub, Git) are mocked.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -33,6 +34,11 @@ def _mock_inspect_data():
     }
 
 
+def _mock_record_review_event(review, actor, review_content=None):
+    """Mock _record_review_event to avoid writing to real handoff directory."""
+    return Path("/tmp/mock-review.md")
+
+
 def test_review_pr_missing_arg_shows_error():
     """vibe review pr (missing PR number) -> friendly error, not crash."""
     result = runner.invoke(app, ["pr"])
@@ -55,6 +61,10 @@ def test_review_pr_pass():
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
+        patch(
+            "vibe3.commands.review._record_review_event",
+            side_effect=_mock_record_review_event,
+        ),
     ):
         result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
@@ -75,6 +85,10 @@ def test_review_pr_block_exits_1():
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("BLOCK"),
+        ),
+        patch(
+            "vibe3.commands.review._record_review_event",
+            side_effect=_mock_record_review_event,
         ),
     ):
         result = runner.invoke(app, ["pr", "42"])
@@ -110,6 +124,10 @@ def test_review_pr_is_local_only():
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
+        ),
+        patch(
+            "vibe3.commands.review._record_review_event",
+            side_effect=_mock_record_review_event,
         ),
     ):
         result = runner.invoke(app, ["pr", "42"])

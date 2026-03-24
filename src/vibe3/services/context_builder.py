@@ -56,7 +56,7 @@ def build_policy_section(policy_path: str) -> str:
 def build_tools_guide_section(tools_guide_path: str | None) -> str | None:
     """Build tools guide section from file.
 
-    Source: config/settings.yaml (review.tools_guide_file)
+    Source: config/settings.yaml (review.common_rules)
 
     Args:
         tools_guide_path: Path to tools guide file (optional)
@@ -210,7 +210,7 @@ def build_review_context(
     sections.append(policy)
 
     # 2. Tools guide section (optional)
-    tools_guide = build_tools_guide_section(config.review.tools_guide_file)
+    tools_guide = build_tools_guide_section(config.review.common_rules)
     if tools_guide:
         sections.append(tools_guide)
 

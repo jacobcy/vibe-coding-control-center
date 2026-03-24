@@ -126,9 +126,7 @@ def build_plan_context(
         if policy:
             sections.append(policy)
 
-    tools_guide = build_tools_guide_section(
-        getattr(config.review, "tools_guide_file", None)
-    )
+    tools_guide = build_tools_guide_section(getattr(plan_config, "common_rules", None))
     if tools_guide:
         sections.append(tools_guide)
 

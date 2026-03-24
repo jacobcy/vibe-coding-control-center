@@ -112,22 +112,15 @@ class CoverageService:
             RuntimeError: If pytest or coverage run fails
         """
         from vibe3.clients.git_client import GitClient
-        from vibe3.clients.sqlite_client import SQLiteClient
 
-        # Get current flow slug for report directory
+        # Always use branch for paths (branch is always available)
         git = GitClient()
-        store = SQLiteClient()
         current_branch = git.get_current_branch()
-        flow_data = store.get_flow_state(current_branch)
-
-        if flow_data and flow_data.get("flow_slug"):
-            flow_slug = flow_data["flow_slug"]
-            reports_dir = self.project_root / ".agent" / "reports" / flow_slug
-            reports_dir.mkdir(parents=True, exist_ok=True)
-            cov_file = reports_dir / "coverage.json"
-        else:
-            # Fallback to project root if no flow
-            cov_file = self.project_root / "coverage.json"
+        reports_dir = (
+            self.project_root / ".agent" / "reports" / current_branch.replace("/", "-")
+        )
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        cov_file = reports_dir / "coverage.json"
 
         # Remove old coverage.json to prevent reusing stale data
         if cov_file.exists():

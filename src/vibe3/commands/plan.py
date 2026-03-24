@@ -4,14 +4,15 @@ from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
 from vibe3.services.plan_context_builder import build_plan_context
-from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.services.review_runner import run_review_agent
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -44,72 +45,6 @@ _MODEL_OPT = Annotated[
     Optional[str],
     typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
 ]
-
-
-def _get_agent_options(
-    config: VibeConfig,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
-) -> ReviewAgentOptions:
-    """Build agent options with CLI override support."""
-    plan_config = getattr(config, "plan", None)
-    config_agent = None
-    config_backend = None
-    config_model = None
-
-    if plan_config and hasattr(plan_config, "agent_config"):
-        ac = plan_config.agent_config
-        config_agent = ac.agent if hasattr(ac, "agent") else None
-        config_backend = ac.backend if hasattr(ac, "backend") else None
-        config_model = ac.model if hasattr(ac, "model") else None
-
-    return ReviewAgentOptions(
-        agent=agent or config_agent or "planner",
-        backend=backend or config_backend,
-        model=model or config_model,
-    )
-
-
-def _run_plan(
-    request: PlanRequest,
-    config: VibeConfig,
-    dry_run: bool,
-    message: str | None,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
-) -> None:
-    """Execute plan generation."""
-    log = logger.bind(domain="plan", scope=request.scope.kind)
-
-    log.info("Building plan context")
-    prompt_file_content = build_plan_context(request, config)
-
-    task = message
-    if message:
-        log.info("Using custom task message")
-        typer.echo(f"-> Guidance: {message[:60]}{'...' if len(message) > 60 else ''}")
-
-    plan_config = getattr(config, "plan", None)
-    if not task and plan_config and hasattr(plan_config, "plan_prompt"):
-        task = plan_config.plan_prompt
-
-    options = _get_agent_options(config, agent, backend, model)
-
-    log.info(
-        "Running plan agent",
-        agent=options.agent,
-        backend=options.backend,
-        model=options.model,
-    )
-    typer.echo(f"-> Generating plan with {options.agent or options.backend}...")
-    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
-
-    if dry_run:
-        return
-
-    typer.echo("\n" + result.stdout)
 
 
 @app.command()
@@ -155,13 +90,23 @@ def task(
         issue = flow.task_issue_number
         typer.echo(f"-> Using flow task: Issue #{issue}")
 
-    log = logger.bind(domain="plan", action="task", issue=issue)
-    log.info("Starting plan for issue")
-    typer.echo(f"-> Plan: Issue #{issue}")
+    import typer as typer_module
+
+    typer_module.echo(f"-> Plan: Issue #{issue}")
 
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)
-    _run_plan(request, config, dry_run, message, agent, backend, model)
+    run_plan(
+        request,
+        config,
+        dry_run,
+        message,
+        agent,
+        backend,
+        model,
+        build_plan_context,
+        run_review_agent,
+    )
 
 
 @app.command()
@@ -205,19 +150,38 @@ def spec(
     config = VibeConfig.get_defaults()
 
     description = ""
+    spec_path = None
     if file:
         if not file.exists():
             typer.echo(f"Error: File not found: {file}", err=True)
             raise typer.Exit(1)
         description = file.read_text(encoding="utf-8")
+        spec_path = str(file.resolve())
         typer.echo(f"-> Plan from file: {file}")
     elif msg:
         description = msg
         typer.echo(f"-> Plan: {msg[:60]}{'...' if len(msg) > 60 else ''}")
 
-    log = logger.bind(domain="plan", action="spec")
-    log.info("Starting plan from spec")
+    if spec_path and not dry_run:
+        git = GitClient()
+        store = SQLiteClient()
+        try:
+            branch = git.get_current_branch()
+            store.update_flow_state(branch, spec_ref=spec_path)
+            store.add_event(branch, "spec_bound", "user", detail=f"Spec bound: {file}")
+        except Exception:
+            pass
 
     scope = PlanScope.for_spec(description)
     request = PlanRequest(scope=scope)
-    _run_plan(request, config, dry_run, message, agent, backend, model)
+    run_plan(
+        request,
+        config,
+        dry_run,
+        message,
+        agent,
+        backend,
+        model,
+        build_plan_context,
+        run_review_agent,
+    )

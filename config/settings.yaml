@@ -1,6 +1,30 @@
 # Vibe Center 配置文件
 # 用于管理代码质量限制、审核范围、质量标准等
 
+# GitHub Projects v2 配置（Task Bridge 真源）
+# project_number 和 owner 是 task bridge 的远端真源配置
+# owner_type: "user" 表示个人账号，"org" 表示组织
+github_project:
+  owner_type: "user"
+  owner: "jacobcy"
+  project_number: 17
+  org: ""             # 已废弃，请使用 owner
+
+# AI 辅助配置
+# 用于 flow new --ai 和 pr create --ai 功能
+# API Key 通过环境变量配置: DEEPSEEK_API_KEY
+ai:
+  api_key_env: "DEEPSEEK_API_KEY"  # 环境变量名
+  base_url: "https://api.deepseek.com/v1"  # DeepSeek API endpoint
+  model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
+  timeout: 30                 # 超时秒数
+
+# 文本量控制
+doc_limits:
+  single_file_loc:
+    default: 500           # 单文件默认限制（所有类型）
+    max: 800              # 单文件最大限制（所有类型）
+
 # 代码量控制
 code_limits:
   single_file_loc:
@@ -68,59 +92,6 @@ review_scope:
     # V3 (Python) - 命令层（公开 API）
     - "src/vibe3/commands/"  # v3 命令层
 
-# Review 配置
-# Review Configuration
-# =====================
-# Data sources:
-# - Static: Read from config file at runtime
-# - Runtime: Injected by code (e.g., changed_symbols from inspect)
-#
-# Configuration boundaries:
-# - This file: Static policy/agent/output config
-# - Runtime code: AST analysis (changed_symbols, symbol_dag)
-# - Command line: Task guidance (--message option)
-review:
-  # Static: Path to review policy markdown file
-  policy_file: ".codex/review-policy.md"
-
-  # Static: Path to tools guide markdown file
-  tools_guide_file: ".agent/rules/cli-usage.md"
-
-  # Static: Agent configuration for codeagent-wrapper
-  agent_config:
-    # Method 1: Use agent preset (recommended)
-    agent: "code-reviewer"
-
-    # Method 2: Direct backend/model specification (alternative)
-    # backend: "claude"
-    # model: "claude-3-opus"  # optional
-
-  # Static: Output format requirements (VERDICT contract)
-  output_format: |
-    Each finding should follow this format:
-    path/to/file.py:42 [MAJOR] concise issue description
-
-    The final line must be:
-    VERDICT: PASS | MAJOR | BLOCK
-
-    Where:
-    - PASS: No significant issues found
-    - MAJOR: Issues found that should be addressed before merge
-    - BLOCK: Critical issues that must be fixed before merge
-
-  # Static: Default review task guidance
-  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
-  review_task: |
-    - Run `git diff <base>...HEAD` to see file changes
-    - Review only changed code, not the entire codebase
-    - Use AST analysis to understand function-level impact
-    - Prioritize: correctness, regression risk, API breaks
-    - Focus on actionable, specific findings
-
-  # Static: Custom review prompt (optional prefix)
-  # Added to beginning of review context if provided
-  review_prompt: "/code-review"
-
 # 质量标准
 quality:
   test_coverage:
@@ -187,20 +158,158 @@ pr_scoring:
     block_on_verdict:
       - "BLOCK"
 
-# GitHub Projects v2 配置（Task Bridge 真源）
-# project_number 和 owner 是 task bridge 的远端真源配置
-# owner_type: "user" 表示个人账号，"org" 表示组织
-github_project:
-  owner_type: "user"
-  owner: "jacobcy"
-  project_number: 17
-  org: ""             # 已废弃，请使用 owner
+# Review 配置
+# Review Configuration
+# =====================
+# Data sources:
+# - Static: Read from config file at runtime
+# - Runtime: Injected by code (e.g., changed_symbols from inspect)
+#
+# Configuration boundaries:
+# - This file: Static policy/agent/output config
+# - Runtime code: AST analysis (changed_symbols, symbol_dag)
+# - Command line: Task guidance (--message option)
+review:
+  # Static: Path to review policy markdown file
+  policy_file: ".agent/rules/review-policy.md"
 
-# AI 辅助配置
-# 用于 flow new --ai 和 pr create --ai 功能
-# API Key 通过环境变量配置: DEEPSEEK_API_KEY
-ai:
-  api_key_env: "DEEPSEEK_API_KEY"  # 环境变量名
-  base_url: "https://api.deepseek.com/v1"  # DeepSeek API endpoint
-  model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
-  timeout: 30                 # 超时秒数
+  # Static: Path to tools guide markdown file
+  common_rules: ".agent/rules/common.md"
+
+  # Static: Agent configuration for codeagent-wrapper
+  agent_config:
+    # Agent preset name (passed to codeagent-wrapper)
+    agent: "code-reviewer"
+
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "claude"  # e.g., "claude", "opencode", "gemini"
+    model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+
+  # Static: Output format requirements (VERDICT contract)
+  output_format: |
+    Each finding should follow this format:
+    path/to/file.py:42 [MAJOR] concise issue description
+
+    The final line must be:
+    VERDICT: PASS | MAJOR | BLOCK
+
+    Where:
+    - PASS: No significant issues found
+    - MAJOR: Issues found that should be addressed before merge
+    - BLOCK: Critical issues that must be fixed before merge
+
+  # Static: Default review task guidance
+  # Can be overridden via CLI: vibe review pr 42 --message "Focus on security"
+  review_task: |
+    Review only changed code, focus on correctness, regression, and security.
+    Use AST analysis to understand impact scope.
+    Prioritize actionable findings with clear severity.
+    Follow the repository review contract.
+
+  # Static: Custom review prompt (optional prefix)
+  # Added to beginning of review context if provided
+  review_prompt: "/code-review"
+
+# Plan command configuration
+# Plan Configuration
+# =====================
+# Similar structure to review for consistency
+plan:
+  # Static: Path to plan policy markdown file
+  policy_file: ".agent/rules/plan-policy.md"
+
+  # Static: Path to tools guide markdown file
+  common_rules: ".agent/rules/common.md"
+
+  # Static: Agent configuration for codeagent-wrapper
+  agent_config:
+    # Agent preset name (passed to codeagent-wrapper)
+    agent: "code-architect"
+
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "codex"  # e.g., "claude", "opencode", "gemini"
+    model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+
+  # Static: Output format requirements
+  output_format: |
+    The plan should follow this structure:
+
+    ## Summary
+    Brief description of the implementation approach.
+
+    ## Changes
+    - file/path/one.py: Description of changes
+    - file/path/two.py: Description of changes
+
+    ## Implementation Steps
+    1. Step one with details
+    2. Step two with details
+
+    ## Risks & Considerations
+    - Risk 1 and mitigation
+    - Risk 2 and mitigation
+
+  # Static: Default plan task guidance
+  # Can be overridden via CLI: vibe plan task 42 --message "Focus on performance"
+  plan_task: |
+    Analyze requirements and identify affected files using inspect tools.
+    Design minimal changes with clear implementation steps.
+    Document risks and breaking changes upfront.
+    Follow the repository planning contract.
+
+  # Static: Custom plan prompt (optional prefix)
+  plan_prompt: "/writing-plan"
+
+# Run command configuration
+# Run Configuration
+# =====================
+# Similar structure to review for consistency
+run:
+  # Static: Path to run policy markdown file
+  policy_file: ".agent/rules/run-policy.md"
+
+  # Static: Path to tools guide markdown file
+  common_rules: ".agent/rules/common.md"
+
+  # Static: Agent configuration for codeagent-wrapper
+  agent_config:
+    # Agent preset name (passed to codeagent-wrapper)
+    agent: "develop"
+
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "opencode"  # e.g., "claude", "opencode", "gemini"
+    model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+
+  # Static: Output format requirements
+  output_format: |
+    The execution report should follow this structure:
+
+    ## Summary
+    Brief description of what was implemented.
+
+    ## Changes Made
+    - file/path/one.py: What was changed and why
+    - file/path/two.py: What was changed and why
+
+    ## Tests
+    - test_one.py: What is being tested
+    - test_two.py: What is being tested
+
+    ## Verification
+    - [ ] All tests pass
+    - [ ] No type errors
+    - [ ] No lint errors
+
+  # Static: Default run task guidance
+  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
+  run_task: |
+    Follow plan steps strictly, verify each step before proceeding.
+    Write clean code with tests, run verification after changes.
+    Document any deviations with reasons.
+    Follow the repository execution contract.
+
+  # Static: Custom run prompt (optional prefix)
+  run_prompt: "/executing-plan"

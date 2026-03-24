@@ -1,6 +1,7 @@
 """SQLite client for flow state management."""
 
 import datetime
+import json
 import os
 import sqlite3
 from typing import Any
@@ -44,7 +45,6 @@ class SQLiteClient:
             vibe3_dir = os.path.join(git_dir, "vibe3")
             os.makedirs(vibe3_dir, exist_ok=True)
             db_path = os.path.join(vibe3_dir, "handoff.db")
-
         self.db_path = db_path
         self._init_db()
         logger.bind(external="sqlite", operation="init", db_path=db_path).debug(
@@ -85,10 +85,12 @@ class SQLiteClient:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Use branch as slug if not provided (for display fallback)
+            flow_slug = kwargs.get("flow_slug", branch.replace("/", "-"))
             cursor.execute(
                 "INSERT OR IGNORE INTO flow_state (branch, flow_slug, updated_at) "
                 "VALUES (?, ?, ?)",
-                (branch, kwargs.get("flow_slug", "unknown"), kwargs["updated_at"]),
+                (branch, flow_slug, kwargs["updated_at"]),
             )
             cursor.execute(
                 f"UPDATE flow_state SET {set_clause} WHERE branch = ?",
@@ -103,17 +105,22 @@ class SQLiteClient:
             ).debug("Updated flow state")
 
     def add_event(
-        self, branch: str, event_type: str, actor: str, detail: str | None = None
+        self,
+        branch: str,
+        event_type: str,
+        actor: str,
+        detail: str | None = None,
+        refs: dict[str, Any] | None = None,
     ) -> None:
-        """Add event to flow."""
         now = datetime.datetime.now().isoformat()
+        refs_json = json.dumps(refs) if refs else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO flow_events "
-                "(branch, event_type, actor, detail, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (branch, event_type, actor, detail, now),
+                "(branch, event_type, actor, detail, refs, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (branch, event_type, actor, detail, refs_json, now),
             )
             conn.commit()
             logger.bind(
@@ -122,6 +129,41 @@ class SQLiteClient:
                 branch=branch,
                 event_type=event_type,
             ).debug("Added event")
+
+    def get_events(
+        self,
+        branch: str,
+        event_type: str | None = None,
+        event_type_prefix: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            query = "SELECT * FROM flow_events WHERE branch = ?"
+            params: list[Any] = [branch]
+            if event_type:
+                query += " AND event_type = ?"
+                params.append(event_type)
+            if event_type_prefix:
+                query += " AND event_type LIKE ?"
+                params.append(f"{event_type_prefix}%")
+            query += " ORDER BY created_at DESC"
+            if limit is not None:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
+            cursor.execute(query, params)
+            rows = [dict(row) for row in cursor.fetchall()]
+            for row in rows:
+                if row.get("refs"):
+                    try:
+                        row["refs"] = json.loads(row["refs"])
+                    except json.JSONDecodeError:
+                        row["refs"] = None
+                else:
+                    row["refs"] = None
+            return rows
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
         """Add issue link to flow."""

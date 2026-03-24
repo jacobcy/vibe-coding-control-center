@@ -1,5 +1,6 @@
 """Run command - Execute implementation plans using codeagent-wrapper."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -7,10 +8,17 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_service import FlowService
-from vibe3.services.review_runner import ReviewAgentOptions, run_review_agent
+from vibe3.services.review_runner import (
+    ReviewAgentOptions,
+    format_agent_actor,
+    resolve_actor_backend_model,
+    run_review_agent,
+)
 from vibe3.services.run_context_builder import build_run_context
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -53,6 +61,13 @@ def _get_agent_options(
     backend: str | None,
     model: str | None,
 ) -> ReviewAgentOptions:
+    """Build agent options with CLI override support.
+
+    Priority:
+    1. CLI --agent: use agent preset (ignore config backend/model)
+    2. CLI --backend/--model: use backend/model directly
+    3. Config: use config backend/model if set, else agent preset
+    """
     run_config = getattr(config, "run", None)
     config_agent = None
     config_backend = None
@@ -64,18 +79,86 @@ def _get_agent_options(
         config_backend = ac.backend if hasattr(ac, "backend") else None
         config_model = ac.model if hasattr(ac, "model") else None
 
-    selected_backend = backend or config_backend
-    selected_model = model or config_model
-    selected_agent = None
+    # CLI --agent takes precedence over everything
+    if agent:
+        return ReviewAgentOptions(agent=agent, backend=None, model=None)
 
-    if selected_backend is None:
-        selected_agent = agent or config_agent or "executor"
+    # CLI --backend takes precedence over config
+    if backend:
+        return ReviewAgentOptions(
+            agent=None, backend=backend, model=model or config_model
+        )
 
+    # Use config values
+    if config_backend:
+        return ReviewAgentOptions(
+            agent=None, backend=config_backend, model=config_model
+        )
+
+    # Fallback to agent preset
     return ReviewAgentOptions(
-        agent=selected_agent,
-        backend=selected_backend,
-        model=selected_model,
+        agent=config_agent or "executor",
+        backend=None,
+        model=None,
     )
+
+
+def _get_handoff_dir() -> Path:
+    """Get handoff directory for current branch."""
+    git = GitClient()
+    git_dir = git.get_git_common_dir()
+    branch = git.get_current_branch()
+    handoff_dir = get_branch_handoff_dir(git_dir, branch)
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    return handoff_dir
+
+
+def _record_run_event(
+    run_content: str,
+    options: ReviewAgentOptions,
+    plan_file: str,
+) -> Path | None:
+    """Record run execution to handoff.
+
+    Args:
+        run_content: The run content to save
+        options: ReviewAgentOptions with agent/backend/model
+        plan_file: Path to the plan file being executed
+    """
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+    except Exception:
+        return None
+
+    handoff_dir = _get_handoff_dir()
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    run_file = handoff_dir / f"run-{timestamp}.md"
+
+    run_file.write_text(run_content, encoding="utf-8")
+
+    actor = format_agent_actor(options)
+    backend, model = resolve_actor_backend_model(options)
+
+    refs: dict[str, str] = {
+        "ref": str(run_file),
+        "plan_ref": plan_file,
+        "backend": backend,
+    }
+    if model:
+        refs["model"] = model
+
+    store = SQLiteClient()
+    store.add_event(
+        branch,
+        "handoff_run",
+        actor,
+        detail=f"Run completed: {run_file.name}",
+        refs=refs,
+    )
+    store.update_flow_state(branch, report_ref=str(run_file), executor_actor=actor)
+
+    return run_file
 
 
 def _run_execution(
@@ -110,10 +193,17 @@ def _run_execution(
         model=options.model,
     )
     typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
 
     if dry_run:
         return
+
+    run_content = result.stdout
+    run_file = _record_run_event(run_content, options, plan_file)
+    if run_file:
+        typer.echo(f"-> Run output saved to: {run_file}")
+
+    typer.echo("\n" + run_content)
 
 
 @app.command()

@@ -65,13 +65,12 @@ class IssueLink(BaseModel):
 
 
 class FlowEvent(BaseModel):
-    """Flow event model."""
-
     id: int | None = None
     branch: str
     event_type: str
     actor: str
     detail: str | None = None
+    refs: dict[str, str | list[str]] | None = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

@@ -17,9 +17,25 @@ class StoreClientProtocol(Protocol):
         ...
 
     def add_event(
-        self, branch: str, event_type: str, actor: str, detail: str | None = None
+        self,
+        branch: str,
+        event_type: str,
+        actor: str,
+        detail: str | None = None,
+        refs: dict[str, Any] | None = None,
     ) -> None:
         """Add event to flow."""
+        ...
+
+    def get_events(
+        self,
+        branch: str,
+        event_type: str | None = None,
+        event_type_prefix: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get events for branch."""
         ...
 
     def add_issue_link(self, branch: str, issue_number: int, role: str) -> None:
