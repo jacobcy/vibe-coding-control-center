@@ -48,7 +48,12 @@ class TestDispatcherBuildCommand:
             args=["task"],
         )
 
-        cmd = dispatcher._build_command(trigger)
+        with patch.object(
+            dispatcher.orchestrator,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-123"},
+        ):
+            cmd = dispatcher._build_command(trigger)
 
         assert cmd is not None
         assert "vibe3" in cmd
@@ -178,8 +183,13 @@ class TestDispatcherDryRun:
         dispatcher = Dispatcher(config, dry_run=True)
         trigger = make_trigger()
 
-        with patch("subprocess.run") as mock_run:
-            result = dispatcher.dispatch(trigger)
+        with patch.object(
+            dispatcher.orchestrator,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-42"},
+        ):
+            with patch("subprocess.run") as mock_run:
+                result = dispatcher.dispatch(trigger)
 
         assert result is True
         mock_run.assert_not_called()
