@@ -11,6 +11,7 @@ from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
+from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.services.review_runner import run_review_agent
 from vibe3.utils.trace import enable_trace
@@ -107,6 +108,14 @@ def task(
         build_plan_context,
         run_review_agent,
     )
+
+    if not dry_run:
+        result = transition_to_claimed(issue)
+        if not result.success and result.error and result.error != "no_issue_bound":
+            typer.echo(
+                f"Warning: Failed to transition issue state: {result.error}",
+                err=True,
+            )
 
 
 @app.command()

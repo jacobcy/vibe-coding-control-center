@@ -8,11 +8,14 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
+from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_runner import (
     ReviewAgentOptions,
@@ -78,7 +81,11 @@ def _record_review_event(
 
 
 def _run_review(
-    request: ReviewRequest, config: VibeConfig, dry_run: bool, message: str | None
+    request: ReviewRequest,
+    config: VibeConfig,
+    dry_run: bool,
+    message: str | None,
+    issue_number: int | None = None,
 ) -> None:
     log = logger.bind(domain="review", scope=request.scope.kind)
 
@@ -126,6 +133,18 @@ def _run_review(
     if review_file:
         typer.echo(f"→ Review saved to: {review_file}")
 
+    if issue_number is not None:
+        label_result = transition_to_review(issue_number)
+        if (
+            not label_result.success
+            and label_result.error
+            and label_result.error != "no_issue_bound"
+        ):
+            typer.echo(
+                f"Warning: Failed to transition issue state: {label_result.error}",
+                err=True,
+            )
+
     if review.verdict == "BLOCK":
         raise typer.Exit(1)
 
@@ -147,6 +166,11 @@ def pr(
 
     config = VibeConfig.get_defaults()
 
+    gh = GitHubClient()
+    pr_data = gh.get_pr(pr_number)
+    linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
+    issue_number = linked_issues[0] if linked_issues else None
+
     log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
     inspect_data = run_inspect_json(["pr", str(pr_number)])
@@ -156,7 +180,7 @@ def pr(
     )
 
     request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
-    _run_review(request, config, dry_run, message)
+    _run_review(request, config, dry_run, message, issue_number=issue_number)
 
 
 @app.command()
@@ -173,6 +197,7 @@ def base(
     if trace:
         enable_trace()
 
+    from vibe3.services.flow_service import FlowService
     from vibe3.utils.git_helpers import get_current_branch
 
     current_branch = get_current_branch()
@@ -188,6 +213,9 @@ def base(
 
     config = VibeConfig.get_defaults()
 
+    flow = FlowService().get_flow_status(current_branch)
+    issue_number = flow.task_issue_number if flow else None
+
     log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
     inspect_data = run_inspect_json(["base", base_branch])
@@ -197,4 +225,4 @@ def base(
     )
 
     request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
-    _run_review(request, config, dry_run, message)
+    _run_review(request, config, dry_run, message, issue_number=issue_number)

@@ -85,7 +85,7 @@ class AIClient:
                 **kwargs,
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content  # type: ignore[union-attr]
             if content is None:
                 logger.bind(module="ai_client").warning("AI returned empty content")
                 return None

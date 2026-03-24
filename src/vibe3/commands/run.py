@@ -11,6 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_service import FlowService
+from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.review_runner import (
     ReviewAgentOptions,
     format_agent_actor,
@@ -223,11 +224,11 @@ def execute(
         enable_trace()
 
     config = VibeConfig.get_defaults()
+    git = GitClient()
+    branch = git.get_current_branch()
+    flow = FlowService().get_flow_status(branch)
 
     if file is None:
-        git = GitClient()
-        branch = git.get_current_branch()
-        flow = FlowService().get_flow_status(branch)
         if not flow or not flow.plan_ref:
             typer.echo(
                 "Error: No file provided and current flow has no plan "
@@ -245,3 +246,11 @@ def execute(
     typer.echo(f"-> Execute: {plan_file}")
 
     _run_execution(plan_file, config, dry_run, message, agent, backend, model)
+
+    if not dry_run and flow and flow.task_issue_number:
+        result = transition_to_in_progress(flow.task_issue_number)
+        if not result.success and result.error and result.error != "no_issue_bound":
+            typer.echo(
+                f"Warning: Failed to transition issue state: {result.error}",
+                err=True,
+            )
