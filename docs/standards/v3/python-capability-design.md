@@ -48,13 +48,12 @@ Python CLI 不是：
 
 ### 2.1 Data Layer
 
-共享状态真源只包括：
+共享状态真源以 v3 数据模型标准定义为准，核心包括：
 
-- `roadmap.json`
-- `registry.json`
-- `worktrees.json`
+- SQLite 本地共享状态表（如 `flow_state`、`flow_issue_links`）
+- GitHub 外部真源对象（Issues、Projects、Pull Requests）
 
-Data Layer 只保存共享事实，不暴露给 skill 直接手工读写。
+Data Layer 只保存共享事实，不暴露给 skill 直接手工读写；具体 schema 与字段边界见 [data-model-standard.md](data-model-standard.md)。
 
 ### 2.2 Python CLI Layer
 
@@ -109,11 +108,11 @@ Skill Layer 负责：
 
 当 Python CLI 设计涉及 `roadmap`、`task`、`flow` 的业务语义时，必须引用以下真源，而不是在设计文档中重复定义：
 
-- [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md)
-- [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md)
-- [data-model-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/data-model-standard.md)
-- [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/registry-json-standard.md)
-- [roadmap-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/roadmap-json-standard.md)
+- [glossary.md](../glossary.md)
+- [command-standard.md](command-standard.md)
+- [data-model-standard.md](data-model-standard.md)
+- [registry-json-standard.md](registry-json-standard.md)
+- [roadmap-json-standard.md](roadmap-json-standard.md)
 
 设计层只回答：
 

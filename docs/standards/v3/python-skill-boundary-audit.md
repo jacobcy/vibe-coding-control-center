@@ -21,7 +21,7 @@ related_docs:
 
 ## 1. Audit Questions
 
-本审计使用 [python-capability-design.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/python-capability-design.md) 中的审查原则，并将 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md) 作为命令语义真源。
+本审计使用 [python-capability-design.md](python-capability-design.md) 中的审查原则，并将 [command-standard.md](command-standard.md) 作为命令语义真源。
 
 审计时统一使用以下问题：
 
@@ -35,7 +35,7 @@ related_docs:
 
 ### 2.1 Medium: `flow new` 的边界不应按“是否同时碰多个对象”来判断
 
-当前 [flow.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/flow.sh#L19) 到 [flow.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/flow.sh#L37) 中，`vibe3 flow new` 会：
+当前 [flow.sh](../../../lib/flow.sh#L19) 到 [flow.sh](../../../lib/flow.sh#L37) 中，`vibe3 flow new` 会：
 
 - 生成 task id
 - 注册 task
@@ -60,9 +60,9 @@ related_docs:
 
 ### 2.2 Blocking: `task` 缺少 `repo issue` / roadmap item 关联原子能力
 
-当前 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L50) 到 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L71) 中，`vibe3 task add` 只能创建最小 task 记录。
+当前 [task_actions.sh](../../../lib/task_actions.sh#L50) 到 [task_actions.sh](../../../lib/task_actions.sh#L71) 中，`vibe3 task add` 只能创建最小 task 记录。
 
-当前 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L8) 到 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L18) 中，`vibe3 task update` 也不支持：
+当前 [task_actions.sh](../../../lib/task_actions.sh#L8) 到 [task_actions.sh](../../../lib/task_actions.sh#L18) 中，`vibe3 task update` 也不支持：
 
 - `--issue-ref`
 - `--roadmap-item`
@@ -80,7 +80,7 @@ related_docs:
 
 ### 2.3 Blocking: `roadmap current` 不能被解释为分支当前态
 
-依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md)，`roadmap.current` 属于规划窗口状态，而分支当前焦点属于 `flow` / task runtime。
+依据 [command-standard.md](command-standard.md)，`roadmap.current` 属于规划窗口状态，而分支当前焦点属于 `flow` / task runtime。
 
 如果 CLI 或 skill 将 `roadmap.current` 误解释为分支当前态，就会导致：
 
@@ -94,11 +94,11 @@ related_docs:
 
 期望：
 
-- 按 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md) 执行，不在 CLI 或 skill 中重写这套语义
+- 按 [command-standard.md](command-standard.md) 执行，不在 CLI 或 skill 中重写这套语义
 
 ### 2.4 Blocking: `repo issue`、`roadmap item`、`task`、`flow` 的业务概念必须明确区分
 
-依据 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md)，`repo issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
+依据 [command-standard.md](command-standard.md)，`repo issue`、`roadmap item`、`task`、`flow` 的职责与关系已在命令标准中定义。
 
 如果 CLI 或 skill 混用这些概念，就会产生两类问题：
 
@@ -111,7 +111,7 @@ related_docs:
 
 期望：
 
-- 业务概念统一引用 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md)
+- 业务概念统一引用 [command-standard.md](command-standard.md)
 - 文件字段与关系统一引用数据模型标准
 
 ### 2.5 High: `registry.json` 标准与当前 task 写入字段不一致
@@ -124,9 +124,9 @@ related_docs:
 - `issue_refs`
 - `related_task_ids`
 
-见 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/registry-json-standard.md#L66) 到 [registry-json-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/registry-json-standard.md#L109)。
+见 [registry-json-standard.md](registry-json-standard.md) 对遗留字段与迁移边界的定义。
 
-但当前 [task_actions.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_actions.sh#L68) 和 [task_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/task_write.sh#L65) 只写最小字段，尚未对齐标准。
+但当前 [task_actions.sh](../../../lib/task_actions.sh#L68) 和 [task_write.sh](../../../lib/task_write.sh#L65) 只写最小字段，尚未对齐标准。
 
 判定：
 
@@ -134,7 +134,7 @@ related_docs:
 
 ### 2.6 High: `roadmap classify` 越权执行“分类 + 新增实体”
 
-当前 [roadmap_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/roadmap_write.sh#L73) 到 [roadmap_write.sh](/Users/jacobcy/src/vibe-center/wt-claude-refactor/lib/roadmap_write.sh#L97) 中，`vibe3 roadmap classify` 在找不到 roadmap item 时会自动新增 item。
+当前 [roadmap_write.sh](../../../lib/roadmap_write.sh#L73) 到 [roadmap_write.sh](../../../lib/roadmap_write.sh#L97) 中，`vibe3 roadmap classify` 在找不到 roadmap item 时会自动新增 item。
 
 这使得 `classify` 同时承担：
 
@@ -153,7 +153,7 @@ related_docs:
 
 ### 2.7 Medium: `vibe-new` workflow 文案基本正确，但依赖的 CLI 合同尚未落地
 
-[vibe-new.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/workflows/vibe-new.md#L15) 到 [vibe-new.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/.agent/workflows/vibe-new.md#L22) 明确写了：
+[vibe-new.md](../../../.agent/workflows/vibe-new.md#L15) 到 [vibe-new.md](../../../.agent/workflows/vibe-new.md#L22) 明确写了：
 
 - 必须通过 CLI 命令写共享真源
 - 不得直接手工编辑 JSON
@@ -169,13 +169,13 @@ related_docs:
 
 ### 2.8 Medium: `vibe-roadmap` skill 文案方向正确，但有一处能力描述超前
 
-[vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L8) 到 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L28) 已明确：
+[vibe-roadmap/SKILL.md](../../../skills/vibe-roadmap/SKILL.md#L8) 到 [vibe-roadmap/SKILL.md](../../../skills/vibe-roadmap/SKILL.md#L28) 已明确：
 
 - CLI 负责读写
 - skill 负责调度决策
 - 不得直接改底层数据
 
-但 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L79) 到 [vibe-roadmap/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-roadmap/SKILL.md#L86) 仍写有“从当前版本 backlog 中分配最高优先级任务”。
+但 [vibe-roadmap/SKILL.md](../../../skills/vibe-roadmap/SKILL.md#L79) 到 [vibe-roadmap/SKILL.md](../../../skills/vibe-roadmap/SKILL.md#L86) 仍写有“从当前版本 backlog 中分配最高优先级任务”。
 
 这句话的问题是：
 
@@ -189,12 +189,12 @@ related_docs:
 
 ### 2.9 Medium: `vibe-task` 与 `vibe-save` skill 文案整体正确
 
-[vibe-task/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-task/SKILL.md#L825) 到 [vibe-task/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-task/SKILL.md#L839) 已明确：
+[vibe-task/SKILL.md](../../../skills/vibe-task/SKILL.md#L825) 到 [vibe-task/SKILL.md](../../../skills/vibe-task/SKILL.md#L839) 已明确：
 
 - CLI 提供原子操作
 - Skill 负责语义分析和决策
 
-[vibe-save/SKILL.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/skills/vibe-save/SKILL.md#L140) 也明确禁止直接编辑底层真源。
+[vibe-save/SKILL.md](../../../skills/vibe-save/SKILL.md#L140) 也明确禁止直接编辑底层真源。
 
 判定：
 

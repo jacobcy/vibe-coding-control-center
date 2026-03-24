@@ -23,7 +23,7 @@ related_docs:
 
 > **重要变更**: v3 使用 **GitHub Projects 作为真源**，`roadmap.json` 仅作为本地缓存和桥接，不再作为规划态真源。
 
-本文档涉及的 `roadmap item`、`task`、`repo issue`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-v3/docs/standards/glossary.md) 为准。
+本文档涉及的 `roadmap item`、`task`、`repo issue`、`worktree`、`branch`、`pr` 等正式术语以 [glossary.md](../glossary.md) 为准。
 
 ## 1. File Responsibility
 
