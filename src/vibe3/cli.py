@@ -27,6 +27,7 @@ from vibe3.commands import (
 )
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
+from vibe3.orchestra import serve
 
 
 # -- Remove help panel borders, keep colors --
@@ -61,6 +62,7 @@ app.add_typer(handoff.app, name="handoff")
 app.add_typer(hooks.app, name="hooks")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
+app.add_typer(serve.app, name="serve")
 
 
 @app.callback()

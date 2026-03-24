@@ -183,11 +183,28 @@ class GitHubProjectConfig(BaseModel):
     org: str = Field(default="", description="已废弃，请使用 owner")
 
 
-class VibeConfig(BaseModel):
-    """Root configuration model for Vibe Center.
+class MasterAgentSettings(BaseModel):
+    """Master agent settings for issue triage."""
 
-    配置真源：config/settings.yaml
-    """
+    enabled: bool = True
+    agent: str = "master-controller"
+    backend: str | None = None
+    model: str | None = None
+    timeout_seconds: int = 300
+
+
+class OrchestraSettings(BaseModel):
+    """Orchestra daemon settings."""
+
+    enabled: bool = True
+    polling_interval: int = 60
+    repo: str | None = None
+    max_concurrent_flows: int = 3
+    master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
+
+
+class VibeConfig(BaseModel):
+    """Root configuration model."""
 
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
@@ -198,6 +215,7 @@ class VibeConfig(BaseModel):
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
+    orchestra: OrchestraSettings = Field(default_factory=OrchestraSettings)
 
     @classmethod
     def from_yaml(cls, config_path: Path) -> "VibeConfig":
