@@ -166,6 +166,7 @@ class HandoffService:
         next_step: str | None,
         blocked_by: str | None,
         actor: str,
+        session_id: str | None = None,
     ) -> None:
         """Record plan handoff.
 
@@ -174,9 +175,17 @@ class HandoffService:
             next_step: Next step suggestion
             blocked_by: Blocker description
             actor: Actor identifier
+            session_id: Optional session ID from codeagent-wrapper
         """
         record_handoff(
-            self.store, self.git_client, "plan", plan_ref, next_step, blocked_by, actor
+            self.store,
+            self.git_client,
+            "plan",
+            plan_ref,
+            next_step,
+            blocked_by,
+            actor,
+            session_id=session_id,
         )
 
     def record_report(
@@ -185,6 +194,7 @@ class HandoffService:
         next_step: str | None,
         blocked_by: str | None,
         actor: str,
+        session_id: str | None = None,
     ) -> None:
         """Record report handoff.
 
@@ -193,6 +203,7 @@ class HandoffService:
             next_step: Next step suggestion
             blocked_by: Blocker description
             actor: Actor identifier
+            session_id: Optional session ID from codeagent-wrapper
         """
         record_handoff(
             self.store,
@@ -202,6 +213,7 @@ class HandoffService:
             next_step,
             blocked_by,
             actor,
+            session_id=session_id,
         )
 
     def record_audit(
@@ -210,6 +222,7 @@ class HandoffService:
         next_step: str | None,
         blocked_by: str | None,
         actor: str,
+        session_id: str | None = None,
     ) -> None:
         """Record audit handoff.
 
@@ -218,6 +231,7 @@ class HandoffService:
             next_step: Next step suggestion
             blocked_by: Blocker description
             actor: Actor identifier
+            session_id: Optional session ID from codeagent-wrapper
         """
         record_handoff(
             self.store,
@@ -227,6 +241,7 @@ class HandoffService:
             next_step,
             blocked_by,
             actor,
+            session_id=session_id,
         )
 
     def _get_handoff_template(self) -> str:
