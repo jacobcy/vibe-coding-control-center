@@ -11,7 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.commands.review_helpers import run_inspect_json
+from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
@@ -173,6 +173,8 @@ def pr(
 
     log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
+
+    # PR review uses inspect (GitHub API) to fetch PR diff
     inspect_data = run_inspect_json(["pr", str(pr_number)])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
@@ -218,11 +220,22 @@ def base(
 
     log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
-    inspect_data = run_inspect_json(["base", base_branch])
-    changed_symbols_raw = inspect_data.get("changed_symbols", {})
-    changed_symbols = (
-        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
-    )
 
-    request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
+    # Build snapshot diff for review context
+    structure_diff = build_snapshot_diff()
+
+    # Fallback to inspect if snapshot diff failed
+    if structure_diff is None:
+        log.info("Using inspect data for review context")
+        inspect_data = run_inspect_json(["base", base_branch])
+        changed_symbols_raw = inspect_data.get("changed_symbols", {})
+        changed_symbols = (
+            cast(dict[str, list[str]], changed_symbols_raw)
+            if changed_symbols_raw
+            else None
+        )
+        request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
+    else:
+        request = ReviewRequest(scope=scope, structure_diff=structure_diff)
+
     _run_review(request, config, dry_run, message, issue_number=issue_number)
