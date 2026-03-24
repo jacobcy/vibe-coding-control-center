@@ -222,20 +222,20 @@ def base(
     scope = ReviewScope.for_base(base_branch)
 
     # Build snapshot diff for review context
-    structure_diff = build_snapshot_diff()
+    structure_diff = build_snapshot_diff(base_branch)
 
-    # Fallback to inspect if snapshot diff failed
-    if structure_diff is None:
-        log.info("Using inspect data for review context")
-        inspect_data = run_inspect_json(["base", base_branch])
-        changed_symbols_raw = inspect_data.get("changed_symbols", {})
-        changed_symbols = (
-            cast(dict[str, list[str]], changed_symbols_raw)
-            if changed_symbols_raw
-            else None
-        )
-        request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
-    else:
-        request = ReviewRequest(scope=scope, structure_diff=structure_diff)
+    # Get changed symbols from inspect (always needed for function-level impact)
+    inspect_data = run_inspect_json(["base", base_branch])
+    changed_symbols_raw = inspect_data.get("changed_symbols", {})
+    changed_symbols = (
+        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    )
+
+    # Build request with both snapshot diff and changed symbols
+    request = ReviewRequest(
+        scope=scope,
+        changed_symbols=changed_symbols,
+        structure_diff=structure_diff,
+    )
 
     _run_review(request, config, dry_run, message, issue_number=issue_number)

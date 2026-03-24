@@ -253,3 +253,43 @@ def list_snapshots() -> list[str]:
 
     snapshots.sort(key=lambda x: x["created_at"], reverse=True)
     return [s["id"] for s in snapshots]
+
+
+def find_snapshot_by_branch(branch: str) -> StructureSnapshot | None:
+    """Find the most recent snapshot for a specific branch.
+
+    Args:
+        branch: Branch name to search for (e.g., "main", "origin/main")
+
+    Returns:
+        Most recent StructureSnapshot for the branch, or None if not found
+    """
+    snapshot_dir = _get_snapshot_dir()
+    if not snapshot_dir.exists():
+        return None
+
+    # Normalize branch name for comparison
+    normalized_branch = branch.replace("origin/", "")
+
+    snapshots = []
+    for fp in snapshot_dir.glob("*.json"):
+        try:
+            data = json.loads(fp.read_text(encoding="utf-8"))
+            snapshot_branch = data.get("branch", "")
+            if snapshot_branch == normalized_branch or snapshot_branch == branch:
+                snapshots.append(
+                    {
+                        "id": data.get("snapshot_id", fp.stem),
+                        "created_at": data.get("created_at", ""),
+                        "branch": snapshot_branch,
+                    }
+                )
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+    if not snapshots:
+        return None
+
+    # Sort by created_at descending and return the most recent
+    snapshots.sort(key=lambda x: x["created_at"], reverse=True)
+    return load_snapshot(snapshots[0]["id"])
