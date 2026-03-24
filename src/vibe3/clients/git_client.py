@@ -317,6 +317,25 @@ class GitClient:
             domain="git", action="delete_remote_branch", branch=branch_name
         ).info("Deleted remote branch")
 
+    def get_merge_base(self, branch1: str, branch2: str) -> str:
+        """Get merge-base commit between two branches.
+
+        Args:
+            branch1: First branch name
+            branch2: Second branch name
+
+        Returns:
+            Commit SHA of merge-base
+
+        Raises:
+            GitError: If merge-base cannot be determined
+        """
+        try:
+            result = self._run(["merge-base", branch1, branch2])
+            return result.strip()
+        except Exception as e:
+            raise GitError("merge-base", str(e))
+
     def stash_push(self, message: str | None = None) -> str:
         """Stash current changes, return stash ref.
 
