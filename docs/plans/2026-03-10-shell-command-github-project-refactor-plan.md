@@ -8,9 +8,9 @@ created: 2026-03-10
 last_updated: 2026-03-10
 related_docs:
   - docs/references/github_project.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/skill-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/skill-standard.md
 ---
 
 # Shell Command GitHub Project Refactor Plan

@@ -24,10 +24,10 @@ PR 创建后 → 自动进入 `/vibe-integrate`
 
 ## 必读文档
 
-- `docs/standards/v2/git-workflow-standard.md`
-- `docs/standards/v2/worktree-lifecycle-standard.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/handoff-governance-standard.md`
+- `docs/standards/v3/git-workflow-standard.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/handoff-governance-standard.md`
 - `docs/standards/github-labels-standard.md`
 - `.agent/context/task.md`
 
@@ -414,7 +414,7 @@ gh pr edit <pr-number> --add-label "type/feature,scope/python,status/ready-for-r
 - suggestion: <改进建议（可选）>
 ```
 
-`.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v2/handoff-governance-standard.md` 为准。
+`.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v3/handoff-governance-standard.md` 为准。
 
 ## Restrictions
 

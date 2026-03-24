@@ -14,7 +14,7 @@ related_docs:
   - CLAUDE.md
   - docs/README.md
   - docs/standards/glossary.md
-  - docs/standards/v2/command-standard.md
+  - docs/standards/v3/command-standard.md
 ---
 
 # 高频动作词标准
@@ -28,7 +28,7 @@ related_docs:
 ## 1. Use Rule
 
 - 这些动作词只提供默认解释与执行提醒
-- 若具体命令语义与本表冲突，以 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v2/command-standard.md) 为准
+- 若具体命令语义与本表冲突，以 [command-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/v3/command-standard.md) 为准
 - 若出现新的高频动作词歧义，应优先补本文档，而不是在入口文档中临时解释
 
 ## 2. Action Verbs

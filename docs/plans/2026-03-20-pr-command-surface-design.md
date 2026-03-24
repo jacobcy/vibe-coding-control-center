@@ -15,7 +15,7 @@
 术语与主链以以下真源为准：
 
 - [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-v3/docs/standards/glossary.md)
-- [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-v3/docs/standards/v2/git-workflow-standard.md)
+- [git-workflow-standard.md](/Users/jacobcy/src/vibe-center/wt-claude-v3/docs/standards/v3/git-workflow-standard.md)
 
 本轮采用的主链表达：
 

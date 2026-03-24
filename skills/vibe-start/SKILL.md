@@ -28,8 +28,8 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 ## 必读文档
 
-- `docs/standards/v2/git-workflow-standard.md` (flow 生命周期)
-- `docs/standards/v2/handoff-governance-standard.md` (handoff 规则与问题记录)
+- `docs/standards/v3/git-workflow-standard.md` (flow 生命周期)
+- `docs/standards/v3/handoff-governance-standard.md` (handoff 规则与问题记录)
 - `.agent/context/task.md` (当前上下文)
 
 相关文档：

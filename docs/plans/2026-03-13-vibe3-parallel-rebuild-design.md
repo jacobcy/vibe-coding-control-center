@@ -9,8 +9,8 @@ related_docs:
   - docs/standards/v3/handoff-store-standard.md
   - docs/standards/v3/github-remote-call-standard.md
   - docs/standards/glossary.md
-  - docs/standards/v2/command-standard.md
-  - docs/standards/v2/data-model-standard.md
+  - docs/standards/v3/command-standard.md
+  - docs/standards/v3/data-model-standard.md
   - docs/plans/2026-03-13-gh-157-remote-first-roadmap-governance-design.md
   - docs/plans/2026-03-13-shell-thinning-python-core-design.md
 related_issues: []

@@ -6,9 +6,9 @@ author: GPT-5 Codex
 created: 2026-03-11
 last_updated: 2026-03-11
 related_docs:
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/git-workflow-standard.md
-  - docs/standards/v2/worktree-lifecycle-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/git-workflow-standard.md
+  - docs/standards/v3/worktree-lifecycle-standard.md
   - .agent/context/task.md
 ---
 
@@ -45,7 +45,7 @@ related_docs:
 - `lib/flow_list.sh` - flow 列表与开放/关闭历史拼接
 - `lib/task_actions.sh` - task runtime 绑定字段，确认不会和 flow runtime 语义冲突
 - `lib/check_groups.sh` - runtime / link 检查口径
-- `docs/standards/v2/data-model-standard.md` - 当前共享状态职责边界
+- `docs/standards/v3/data-model-standard.md` - 当前共享状态职责边界
 - `tests/flow/test_flow_lifecycle.bats` - flow new/switch runtime 行为
 - `tests/flow/test_flow_help_runtime.bats` - flow status/show/list 行为
 - `tests/flow/test_flow_bind_done.bats` - flow done/history 收口行为
@@ -70,8 +70,8 @@ related_docs:
 ### Task 1: 圈定 runtime 读写边界
 
 **Files**
-- Modify: `docs/standards/v2/data-model-standard.md`
-- Modify: `docs/standards/v2/worktree-lifecycle-standard.md`
+- Modify: `docs/standards/v3/data-model-standard.md`
+- Modify: `docs/standards/v3/worktree-lifecycle-standard.md`
 
 **Steps**
 1. 识别文档中仍把 `worktree` 写成 runtime 主语的段落

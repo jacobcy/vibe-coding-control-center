@@ -8,7 +8,7 @@ last_updated: 2026-03-21
 related_docs:
   - docs/v3/handoff/04-handoff-and-cutover.md
   - docs/standards/v3/handoff-store-standard.md
-  - docs/standards/v2/handoff-governance-standard.md
+  - docs/standards/v3/handoff-governance-standard.md
 ---
 
 # Phase 04: Handoff And Cutover 实施计划
