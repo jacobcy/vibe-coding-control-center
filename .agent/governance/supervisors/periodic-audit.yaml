@@ -1,0 +1,132 @@
+version: "0.1"
+
+meta:
+  name: "Periodic Supervisor Audit"
+  purpose: "Run narrow, periodic repository audits and surface governance drift"
+  owner: ".agent/governance/supervisors/periodic-audit.yaml"
+  execution_model:
+    local: "manual or CLI-triggered"
+    remote: "scheduled GitHub Actions or equivalent scheduler"
+
+principles:
+  - id: SP1
+    name: "post_execution_audit"
+    rule: "Supervisor checks inspect repository state after execution rather than constraining live commands."
+  - id: SP2
+    name: "one_check_one_concern"
+    rule: "Each supervisor check audits one concern only."
+  - id: SP3
+    name: "report_first"
+    rule: "The default output is a report, not silent auto-fix."
+  - id: SP4
+    name: "same_check_local_and_remote"
+    rule: "The same check definition should be runnable locally and on GitHub."
+
+severity_levels:
+  - info
+  - warning
+  - error
+
+default_actions:
+  - report
+  - open_issue
+  - request_confirmation
+
+report_record:
+  required_fields:
+    - check_id
+    - status
+    - severity
+    - evidence
+    - message
+    - recommended_action
+
+checks:
+  - id: github_pr_doc_backing
+    enabled: true
+    scope: remote
+    schedule: "daily"
+    target: github.pr.latest_open
+    goal: "Ensure active PRs have supporting plan/spec/documentation."
+    data_sources:
+      - github.pull_requests
+      - repository.docs
+    predicates:
+      - "pr must reference plan/spec/doc artifact"
+    on_violation:
+      severity: warning
+      action: report
+      message: "Open PR lacks clear plan/spec/document backing."
+
+  - id: local_branch_cleanup
+    enabled: true
+    scope: local
+    schedule: "manual_or_cron"
+    target: git.local_branches
+    goal: "Identify stale, merged, or dirty local branches/worktrees."
+    data_sources:
+      - git.branch
+      - git.status
+      - vibe flow state
+    predicates:
+      - "merged branches should be candidates for cleanup"
+      - "unexpected dirty worktrees should be surfaced"
+    on_violation:
+      severity: warning
+      action: report
+      message: "Local branches or worktrees require cleanup review."
+
+  - id: remote_branch_cleanup
+    enabled: true
+    scope: remote
+    schedule: "daily"
+    target: github.remote_branches
+    goal: "Identify stale remote branches after merge or abandonment."
+    data_sources:
+      - github.branches
+      - github.pull_requests
+    predicates:
+      - "merged PR branches should be candidates for deletion"
+    on_violation:
+      severity: info
+      action: report
+      message: "Remote branch appears stale or cleanup-eligible."
+
+  - id: glossary_semantic_conflict
+    enabled: true
+    scope: repository
+    schedule: "daily"
+    target: docs_and_rules
+    goal: "Detect semantic drift against glossary and governance terms."
+    data_sources:
+      - docs/standards/glossary.md
+      - .agent/rules
+      - .agent/governance
+    predicates:
+      - "governance terms should not conflict with glossary/source terms"
+      - "new rules should not redefine an existing authority document"
+    on_violation:
+      severity: warning
+      action: report
+      message: "Terminology or semantic drift detected in governance/rules/docs."
+
+  - id: handoff_truth_drift
+    enabled: true
+    scope: repository
+    schedule: "manual_or_daily"
+    target: handoff_vs_truth
+    goal: "Detect drift between handoff narratives and actual repository facts."
+    data_sources:
+      - .agent/context/task.md
+      - git
+      - vibe shell outputs
+    predicates:
+      - "handoff must not contradict git or shared state facts"
+    on_violation:
+      severity: error
+      action: report
+      message: "Handoff drift detected against current truth sources."
+
+notes:
+  - "Supervisor checks are expected to stay narrow and composable."
+  - "Auto-remediation can be added later, but reporting is the default."
