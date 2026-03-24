@@ -34,7 +34,7 @@ def _mock_inspect_data():
     }
 
 
-def _mock_record_review_event(review, actor, review_content=None):
+def _mock_record_review_event(review, actor, review_content=None, session_id=None):
     """Mock _record_review_event to avoid writing to real handoff directory."""
     return Path("/tmp/mock-review.md")
 
