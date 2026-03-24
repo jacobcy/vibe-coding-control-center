@@ -1,4 +1,4 @@
-"""vibe3 serve command."""
+"""vibe3 serve command - foreground server for GitHub label orchestration."""
 
 import os
 import signal
@@ -13,7 +13,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.poller import Poller
 
 app = typer.Typer(
-    help="Orchestra daemon for GitHub label-driven orchestration",
+    help="Orchestra server for GitHub label-driven orchestration (runs in foreground)",
     no_args_is_help=True,
 )
 
@@ -27,9 +27,9 @@ def _is_orchestra_process(pid: int) -> bool:
     Returns:
         True if the process is orchestra, False otherwise
     """
-    try:
-        import subprocess
+    import subprocess
 
+    try:
         result = subprocess.run(
             ["ps", "-p", str(pid), "-o", "command="],
             capture_output=True,
@@ -87,10 +87,19 @@ def start(
         int, typer.Option("-v", "--verbose", count=True, help="Increase verbosity")
     ] = 0,
 ) -> None:
-    """Start Orchestra daemon to monitor GitHub labels.
+    """Start Orchestra server (runs in foreground).
 
-    The daemon monitors GitHub issues for state label changes and
+    This server monitors GitHub issues for state label changes and
     triggers corresponding commands (plan/run/review).
+
+    NOTE: This runs in the foreground. For background execution,
+    use nohup, tmux, or a process manager:
+
+        # Using nohup
+        nohup vibe3 serve start --interval 60 > orchestra.log 2>&1 &
+
+        # Using tmux
+        tmux new -d -s orchestra 'vibe3 serve start'
 
     Examples:
         vibe3 serve start
@@ -110,7 +119,7 @@ def start(
 
     pid, is_valid = _validate_pid_file(config.pid_file)
     if is_valid:
-        typer.echo(f"Orchestra daemon already running (PID: {pid})")
+        typer.echo(f"Orchestra server already running (PID: {pid})")
         raise typer.Exit(1)
     elif pid is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
@@ -118,11 +127,17 @@ def start(
 
     log = logger.bind(domain="orchestra", action="serve")
     log.info(
-        "Starting Orchestra daemon",
+        "Starting Orchestra server",
         interval=config.polling_interval,
         repo=config.repo,
         dry_run=config.dry_run,
     )
+
+    typer.echo(
+        f"Starting Orchestra server (interval: {config.polling_interval}s, "
+        f"max_concurrent: {config.max_concurrent_flows})"
+    )
+    typer.echo("Press Ctrl+C to stop")
 
     poller = Poller(config)
     poller.start()
@@ -130,33 +145,36 @@ def start(
 
 @app.command()
 def status() -> None:
-    """Show Orchestra daemon status."""
+    """Show Orchestra server status."""
     config = OrchestraConfig.from_settings()
     pid, is_valid = _validate_pid_file(config.pid_file)
 
     if pid is None:
-        typer.echo("Orchestra daemon is not running (no PID file)")
+        typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
         typer.echo(
-            f"Orchestra daemon is not running (stale PID file, process {pid} "
+            f"Orchestra server is not running (stale PID file, process {pid} "
             "is not orchestra)"
         )
         raise typer.Exit(0)
 
-    typer.echo(f"Orchestra daemon running (PID: {pid})")
+    typer.echo(f"Orchestra server running (PID: {pid})")
 
 
 @app.command()
 def stop() -> None:
-    """Stop Orchestra daemon."""
+    """Stop Orchestra server.
+
+    Sends SIGTERM to the server process. Use 'vibe3 serve status' to verify.
+    """
     config = OrchestraConfig.from_settings()
     pid_file = config.pid_file
     pid, is_valid = _validate_pid_file(pid_file)
 
     if pid is None:
-        typer.echo("Orchestra daemon is not running (no PID file)")
+        typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
@@ -167,7 +185,7 @@ def stop() -> None:
     try:
         os.kill(pid, signal.SIGTERM)
         pid_file.unlink()
-        typer.echo(f"Stopped Orchestra daemon (PID: {pid})")
+        typer.echo(f"Stopped Orchestra server (PID: {pid})")
     except ProcessLookupError:
         typer.echo(f"Process {pid} not found, cleaning up PID file")
         pid_file.unlink()
