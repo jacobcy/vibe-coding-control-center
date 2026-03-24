@@ -95,8 +95,6 @@ def task(
 
     typer_module.echo(f"-> Plan: Issue #{issue}")
 
-    transition_to_claimed(issue)
-
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)
     run_plan(
@@ -110,6 +108,14 @@ def task(
         build_plan_context,
         run_review_agent,
     )
+
+    if not dry_run:
+        result = transition_to_claimed(issue)
+        if not result.success and result.error and result.error != "no_issue_bound":
+            typer.echo(
+                f"Warning: Failed to transition issue state: {result.error}",
+                err=True,
+            )
 
 
 @app.command()

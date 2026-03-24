@@ -245,7 +245,12 @@ def execute(
     log.info("Starting plan execution")
     typer.echo(f"-> Execute: {plan_file}")
 
-    if flow and flow.task_issue_number:
-        transition_to_in_progress(flow.task_issue_number)
-
     _run_execution(plan_file, config, dry_run, message, agent, backend, model)
+
+    if not dry_run and flow and flow.task_issue_number:
+        result = transition_to_in_progress(flow.task_issue_number)
+        if not result.success and result.error and result.error != "no_issue_bound":
+            typer.echo(
+                f"Warning: Failed to transition issue state: {result.error}",
+                err=True,
+            )
