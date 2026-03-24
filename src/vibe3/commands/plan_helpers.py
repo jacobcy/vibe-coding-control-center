@@ -9,8 +9,8 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.models.review_runner import ReviewAgentOptions
 from vibe3.services.review_runner import (
-    ReviewAgentOptions,
     format_agent_actor,
     resolve_actor_backend_model,
 )
@@ -81,12 +81,14 @@ def get_handoff_dir() -> Path:
 def record_plan_event(
     plan_content: str,
     options: ReviewAgentOptions,
+    session_id: str | None = None,
 ) -> Path | None:
     """Record plan execution to handoff.
 
     Args:
         plan_content: The plan content to save
         options: ReviewAgentOptions with agent/backend/model
+        session_id: Optional session ID from codeagent-wrapper
     """
     git = GitClient()
     try:
@@ -109,6 +111,8 @@ def record_plan_event(
     }
     if model:
         refs["model"] = model
+    if session_id:
+        refs["session_id"] = session_id
 
     store = SQLiteClient()
     store.add_event(
@@ -118,7 +122,12 @@ def record_plan_event(
         detail=f"Plan generated: {plan_file.name}",
         refs=refs,
     )
-    store.update_flow_state(branch, plan_ref=str(plan_file), planner_actor=actor)
+    store.update_flow_state(
+        branch,
+        plan_ref=str(plan_file),
+        planner_actor=actor,
+        planner_session_id=session_id,
+    )
 
     return plan_file
 
@@ -136,11 +145,21 @@ def run_plan(
 ) -> None:
     """Execute plan generation."""
     from vibe3.models.plan import PlanRequest
+    from vibe3.services.flow_service import FlowService
 
     if not isinstance(request, PlanRequest):
         raise TypeError(f"Expected PlanRequest, got {type(request)}")
 
     log = logger.bind(domain="plan", scope=request.scope.kind)
+
+    # Load existing session_id if available
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+        flow_status = FlowService().get_flow_status(branch)
+        session_id = flow_status.planner_session_id if flow_status else None
+    except Exception:
+        session_id = None
 
     log.info("Building plan context")
     prompt_file_content = build_plan_context_func(request, config)
@@ -160,16 +179,17 @@ def run_plan(
         agent=options.agent,
         backend=options.backend,
         model=options.model,
+        session_id=session_id,
     )
     result = run_review_agent_func(
-        prompt_file_content, options, task=task, dry_run=dry_run
+        prompt_file_content, options, task=task, dry_run=dry_run, session_id=session_id
     )
 
     if dry_run:
         return
 
     plan_content = result.stdout
-    plan_file = record_plan_event(plan_content, options)
+    plan_file = record_plan_event(plan_content, options, session_id=result.session_id)
     if plan_file:
         import typer
 

@@ -14,11 +14,11 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
+from vibe3.models.review_runner import ReviewAgentOptions
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_runner import (
-    ReviewAgentOptions,
     format_agent_actor,
     run_review_agent,
 )
@@ -49,6 +49,7 @@ def _record_review_event(
     review: ParsedReview,
     actor: str,
     review_content: str | None = None,
+    session_id: str | None = None,
 ) -> Path | None:
     """Record review to handoff."""
     store = SQLiteClient()
@@ -68,14 +69,23 @@ def _record_review_event(
     if review_content:
         review_file.write_text(review_content, encoding="utf-8")
 
+    refs: dict[str, str] = {"ref": str(review_file), "verdict": review.verdict}
+    if session_id:
+        refs["session_id"] = session_id
+
     store.add_event(
         branch,
         "handoff_review",
         actor,
         detail=f"Verdict: {review.verdict}, {len(review.comments)} comments",
-        refs={"ref": str(review_file), "verdict": review.verdict},
+        refs=refs,
     )
-    store.update_flow_state(branch, reviewer_actor=actor, audit_ref=str(review_file))
+    store.update_flow_state(
+        branch,
+        reviewer_actor=actor,
+        audit_ref=str(review_file),
+        reviewer_session_id=session_id,
+    )
 
     return review_file
 
@@ -87,7 +97,18 @@ def _run_review(
     message: str | None,
     issue_number: int | None = None,
 ) -> None:
+    from vibe3.services.flow_service import FlowService
+
     log = logger.bind(domain="review", scope=request.scope.kind)
+
+    # Load existing session_id if available
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+        flow_status = FlowService().get_flow_status(branch)
+        session_id = flow_status.reviewer_session_id if flow_status else None
+    except Exception:
+        session_id = None
 
     log.info("Building review context")
     prompt_file_content = build_review_context(request, config)
@@ -108,6 +129,7 @@ def _run_review(
         agent=config.review.agent_config.agent,
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
+        session_id=session_id,
     )
     typer.echo("→ Running review...")
     options = ReviewAgentOptions(
@@ -115,7 +137,9 @@ def _run_review(
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
     )
-    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+    result = run_review_agent(
+        prompt_file_content, options, task=task, dry_run=dry_run, session_id=session_id
+    )
 
     if dry_run:
         return
@@ -129,6 +153,7 @@ def _run_review(
         review,
         actor=format_agent_actor(options),
         review_content=raw,
+        session_id=result.session_id,
     )
     if review_file:
         typer.echo(f"→ Review saved to: {review_file}")

@@ -10,10 +10,10 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.models.review_runner import ReviewAgentOptions
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.review_runner import (
-    ReviewAgentOptions,
     format_agent_actor,
     resolve_actor_backend_model,
     run_review_agent,
@@ -118,6 +118,7 @@ def _record_run_event(
     run_content: str,
     options: ReviewAgentOptions,
     plan_file: str,
+    session_id: str | None = None,
 ) -> Path | None:
     """Record run execution to handoff.
 
@@ -125,6 +126,7 @@ def _record_run_event(
         run_content: The run content to save
         options: ReviewAgentOptions with agent/backend/model
         plan_file: Path to the plan file being executed
+        session_id: Optional session ID from codeagent-wrapper
     """
     git = GitClient()
     try:
@@ -148,6 +150,8 @@ def _record_run_event(
     }
     if model:
         refs["model"] = model
+    if session_id:
+        refs["session_id"] = session_id
 
     store = SQLiteClient()
     store.add_event(
@@ -157,7 +161,12 @@ def _record_run_event(
         detail=f"Run completed: {run_file.name}",
         refs=refs,
     )
-    store.update_flow_state(branch, report_ref=str(run_file), executor_actor=actor)
+    store.update_flow_state(
+        branch,
+        report_ref=str(run_file),
+        executor_actor=actor,
+        executor_session_id=session_id,
+    )
 
     return run_file
 
@@ -172,6 +181,15 @@ def _run_execution(
     model: str | None,
 ) -> None:
     log = logger.bind(domain="run", plan_file=plan_file)
+
+    # Load existing session_id if available
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+        flow_status = FlowService().get_flow_status(branch)
+        session_id = flow_status.executor_session_id if flow_status else None
+    except Exception:
+        session_id = None
 
     log.info("Building run context")
     prompt_file_content = build_run_context(plan_file, config)
@@ -192,15 +210,20 @@ def _run_execution(
         agent=options.agent,
         backend=options.backend,
         model=options.model,
+        session_id=session_id,
     )
     typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    result = run_review_agent(prompt_file_content, options, task=task, dry_run=dry_run)
+    result = run_review_agent(
+        prompt_file_content, options, task=task, dry_run=dry_run, session_id=session_id
+    )
 
     if dry_run:
         return
 
     run_content = result.stdout
-    run_file = _record_run_event(run_content, options, plan_file)
+    run_file = _record_run_event(
+        run_content, options, plan_file, session_id=result.session_id
+    )
     if run_file:
         typer.echo(f"-> Run output saved to: {run_file}")
 
