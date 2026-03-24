@@ -39,13 +39,31 @@ def new(
     name: Annotated[str, typer.Argument(help="Flow name")],
     task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    create_branch: Annotated[
+        bool,
+        typer.Option(
+            "--create-branch",
+            "-c",
+            help="Create new branch (task/<name>) instead of binding current branch",
+        ),
+    ] = False,
+    start_ref: Annotated[
+        str,
+        typer.Option(
+            "--start-ref", help="Start ref for new branch (default: origin/main)"
+        ),
+    ] = "origin/main",
     actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "claude",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Create a new flow."""
+    """Create a new flow.
+
+    Use -c to create new branch (task/<name>), otherwise binds to current branch.
+    If current branch already has a flow, an error will be raised.
+    """
     if trace:
         setup_logging(verbose=2)
 
@@ -61,8 +79,36 @@ def new(
 
         git = GitClient()
         service = FlowService()
+
+        if create_branch:
+            branch_name = f"task/{name}"
+            if git.branch_exists(branch_name):
+                console.print(f"[red]Error: Branch '{branch_name}' already exists.[/]")
+                console.print(
+                    f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
+                )
+                raise typer.Exit(1)
+            try:
+                flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
+            except RuntimeError as e:
+                console.print(f"[red]Error: {e}[/]")
+                raise typer.Exit(1)
+        else:
+            branch = git.get_current_branch()
+            existing_flow = service.get_flow_status(branch)
+            if existing_flow:
+                console.print(
+                    f"[red]Error: Branch '{branch}' already has "
+                    f"flow: {existing_flow.flow_slug}[/]"
+                )
+                console.print(
+                    "[yellow]Hint: Use -c to create new branch, "
+                    "or switch to different branch[/]"
+                )
+                raise typer.Exit(1)
+            flow = service.create_flow(slug=name, branch=branch)
+
         branch = git.get_current_branch()
-        flow = service.create_flow(slug=name, branch=branch)
 
         # Bind task if provided
         if task:
