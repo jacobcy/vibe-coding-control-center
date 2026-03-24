@@ -27,7 +27,9 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review using inspect context and codeagent-wrapper",
+    help="Code review with two modes:\n\n"
+    "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
+    "  base [branch] - Review local changes vs base branch (compares snapshots)",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -156,7 +158,17 @@ def pr(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review a PR locally (generates review output, does not publish to GitHub)."""
+    """Review an existing PR by number (fetches diff from GitHub API).
+
+    This command reviews a PR that already exists on GitHub. It analyzes:
+    - Changed symbols (functions in diff hunks)
+    - Impacted modules (DAG upstream dependencies)
+    - Risk score and block status
+
+    Use this to review PRs before merging or providing feedback.
+
+    Example: vibe3 review pr 42
+    """
     if trace:
         enable_trace()
 
@@ -195,7 +207,18 @@ def base(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review current branch changes relative to base branch."""
+    """Review local branch changes against a base branch (compares codebase snapshots).
+
+    This command compares your current local branch state against a base branch.
+    It analyzes:
+    - Structure diff (file/module/dependency changes)
+    - Changed symbols (function-level impact)
+    - Impacted modules (DAG upstream dependencies)
+
+    Use this to review local changes before pushing or creating a PR.
+
+    Example: vibe3 review base origin/main
+    """
     if trace:
         enable_trace()
 
