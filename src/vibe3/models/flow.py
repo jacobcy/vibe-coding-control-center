@@ -95,8 +95,11 @@ class FlowStatusResponse(BaseModel):
     report_ref: str | None = None
     audit_ref: str | None = None
     planner_actor: str | None = None
+    planner_session_id: str | None = None
     executor_actor: str | None = None
+    executor_session_id: str | None = None
     reviewer_actor: str | None = None
+    reviewer_session_id: str | None = None
     latest_actor: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
