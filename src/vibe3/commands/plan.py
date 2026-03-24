@@ -30,10 +30,6 @@ _DRY_RUN_OPT = Annotated[
     bool,
     typer.Option("--dry-run", help="Print command and prompt without executing"),
 ]
-_MESSAGE_OPT = Annotated[
-    Optional[str],
-    typer.Option("--message", "-m", help="Additional task guidance"),
-]
 _AGENT_OPT = Annotated[
     Optional[str],
     typer.Option("--agent", help="Override agent preset (e.g., planner, planner-pro)"),
@@ -54,9 +50,12 @@ def task(
         int | None,
         typer.Argument(help="Issue number (default: current flow's task issue)"),
     ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -69,7 +68,7 @@ def task(
         vibe3 plan task              # Use current flow's task issue
         vibe3 plan task 42           # Plan for issue #42
         vibe3 plan task 42 --dry-run
-        vibe3 plan task 42 -m "Focus on security"
+        vibe3 plan task 42 "Focus on security"
         vibe3 plan task 42 --agent planner-pro
     """
     if trace:
@@ -101,7 +100,7 @@ def task(
         request,
         config,
         dry_run,
-        message,
+        instructions,
         agent,
         backend,
         model,
@@ -128,9 +127,12 @@ def spec(
         Optional[str],
         typer.Option("--msg", help="Spec description"),
     ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -142,7 +144,7 @@ def spec(
     Examples:
         vibe3 plan spec --file spec.md
         vibe3 plan spec --msg "Add dark mode support"
-        vibe3 plan spec -f spec.md -m "Prioritize performance"
+        vibe3 plan spec -f spec.md "Prioritize performance"
         vibe3 plan spec --msg "Refactor auth" --agent planner-pro
     """
     if trace:
@@ -187,7 +189,7 @@ def spec(
         request,
         config,
         dry_run,
-        message,
+        instructions,
         agent,
         backend,
         model,

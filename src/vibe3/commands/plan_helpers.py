@@ -196,8 +196,4 @@ def run_plan(
     if plan_file:
         import typer
 
-        typer.echo(f"-> Plan saved to: {plan_file}")
-
-    import typer
-
-    typer.echo("\n" + plan_content)
+        typer.echo(f"-> Plan saved: {plan_file}")
