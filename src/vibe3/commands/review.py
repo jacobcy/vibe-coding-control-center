@@ -245,7 +245,7 @@ def base(
     scope = ReviewScope.for_base(base_branch)
 
     # Build snapshot diff for review context
-    structure_diff = build_snapshot_diff(base_branch)
+    structure_diff = build_snapshot_diff(base_branch, current_branch)
 
     # Get changed symbols from inspect (always needed for function-level impact)
     inspect_data = run_inspect_json(["base", base_branch])

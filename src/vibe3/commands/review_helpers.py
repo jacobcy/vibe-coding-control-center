@@ -8,10 +8,10 @@ from loguru import logger
 
 from vibe3.models.snapshot import StructureDiff
 from vibe3.services.snapshot_diff import compute_diff
+from vibe3.services.snapshot_lookup import find_snapshot_by_branch
 from vibe3.services.snapshot_service import (
     SnapshotError,
     build_snapshot,
-    find_snapshot_by_branch,
 )
 
 
@@ -38,11 +38,14 @@ def run_inspect_json(args: list[str]) -> dict[str, object]:
     return json.loads(result.stdout)  # type: ignore
 
 
-def build_snapshot_diff(base_branch: str = "main") -> StructureDiff | None:
+def build_snapshot_diff(
+    base_branch: str = "main", current_branch: str | None = None
+) -> StructureDiff | None:
     """Build snapshot diff for review context.
 
     Args:
         base_branch: Base branch to use for finding baseline snapshot (default: "main")
+        current_branch: Current branch name (optional, for merge-base selection)
 
     Returns:
         StructureDiff if successful, None if failed or no baseline snapshot
@@ -55,7 +58,7 @@ def build_snapshot_diff(base_branch: str = "main") -> StructureDiff | None:
         current = build_snapshot()
 
         log.info(f"Loading baseline snapshot for branch: {base_branch}")
-        baseline = find_snapshot_by_branch(base_branch)
+        baseline = find_snapshot_by_branch(base_branch, current_branch)
 
         if baseline is None:
             log.warning(f"No baseline snapshot found for branch: {base_branch}")
