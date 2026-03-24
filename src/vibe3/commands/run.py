@@ -61,6 +61,13 @@ def _get_agent_options(
     backend: str | None,
     model: str | None,
 ) -> ReviewAgentOptions:
+    """Build agent options with CLI override support.
+
+    Priority:
+    1. CLI --agent: use agent preset (ignore config backend/model)
+    2. CLI --backend/--model: use backend/model directly
+    3. Config: use config backend/model if set, else agent preset
+    """
     run_config = getattr(config, "run", None)
     config_agent = None
     config_backend = None
@@ -72,17 +79,27 @@ def _get_agent_options(
         config_backend = ac.backend if hasattr(ac, "backend") else None
         config_model = ac.model if hasattr(ac, "model") else None
 
-    selected_backend = backend or config_backend
-    selected_model = model or config_model
-    selected_agent = None
+    # CLI --agent takes precedence over everything
+    if agent:
+        return ReviewAgentOptions(agent=agent, backend=None, model=None)
 
-    if selected_backend is None:
-        selected_agent = agent or config_agent or "executor"
+    # CLI --backend takes precedence over config
+    if backend:
+        return ReviewAgentOptions(
+            agent=None, backend=backend, model=model or config_model
+        )
 
+    # Use config values
+    if config_backend:
+        return ReviewAgentOptions(
+            agent=None, backend=config_backend, model=config_model
+        )
+
+    # Fallback to agent preset
     return ReviewAgentOptions(
-        agent=selected_agent,
-        backend=selected_backend,
-        model=selected_model,
+        agent=config_agent or "executor",
+        backend=None,
+        model=None,
     )
 
 

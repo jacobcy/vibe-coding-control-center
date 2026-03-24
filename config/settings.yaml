@@ -88,12 +88,13 @@ review:
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
-    # Method 1: Use agent preset (recommended)
+    # Agent preset name (passed to codeagent-wrapper)
     agent: "code-reviewer"
 
-    # Method 2: Direct backend/model specification (alternative)
-    # backend: "claude"
-    # model: "claude-3-opus"  # optional
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "claude"  # e.g., "claude", "opencode", "gemini"
+    model: "claude-sonnet-4-6"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
   # Static: Output format requirements (VERDICT contract)
   output_format: |
@@ -122,31 +123,108 @@ review:
   review_prompt: "/code-review"
 
 # Plan command configuration
+# Plan Configuration
+# =====================
+# Similar structure to review for consistency
 plan:
-  # Agent configuration for plan generation
+  # Static: Path to plan policy markdown file
+  policy_file: ".codex/plan-policy.md"
+
+  # Static: Path to tools guide markdown file
+  tools_guide_file: ".agent/rules/cli-usage.md"
+
+  # Static: Agent configuration for codeagent-wrapper
   agent_config:
-    # Method 1: Use agent preset (recommended)
+    # Agent preset name (passed to codeagent-wrapper)
     agent: "planner"
 
-    # Method 2: Direct backend/model specification (alternative)
-    # backend: "claude"
-    # model: "claude-sonnet-4-6"
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "claude"  # e.g., "claude", "opencode", "gemini"
+    model: "claude-sonnet-4-6"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
-  # Custom plan prompt (optional prefix)
+  # Static: Output format requirements
+  output_format: |
+    The plan should follow this structure:
+
+    ## Summary
+    Brief description of the implementation approach.
+
+    ## Changes
+    - file/path/one.py: Description of changes
+    - file/path/two.py: Description of changes
+
+    ## Implementation Steps
+    1. Step one with details
+    2. Step two with details
+
+    ## Risks & Considerations
+    - Risk 1 and mitigation
+    - Risk 2 and mitigation
+
+  # Static: Default plan task guidance
+  # Can be overridden via CLI: vibe plan task 42 --message "Focus on performance"
+  plan_task: |
+    - Analyze the issue/requirement thoroughly
+    - Identify affected files and modules
+    - Design minimal, focused changes
+    - Consider backward compatibility
+    - Document any breaking changes
+
+  # Static: Custom plan prompt (optional prefix)
   plan_prompt: "/plan"
 
 # Run command configuration
+# Run Configuration
+# =====================
+# Similar structure to review for consistency
 run:
-  # Agent configuration for plan execution
+  # Static: Path to run policy markdown file
+  policy_file: ".codex/run-policy.md"
+
+  # Static: Path to tools guide markdown file
+  tools_guide_file: ".agent/rules/cli-usage.md"
+
+  # Static: Agent configuration for codeagent-wrapper
   agent_config:
-    # Method 1: Use agent preset (recommended)
+    # Agent preset name (passed to codeagent-wrapper)
     agent: "executor"
 
-    # Method 2: Direct backend/model specification (alternative)
-    # backend: "claude"
-    # model: "claude-sonnet-4-6"
+    # Actual backend/model for database recording
+    # TODO: Fill in actual values before merge
+    backend: "claude"  # e.g., "claude", "opencode", "gemini"
+    model: "claude-sonnet-4-6"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
-  # Custom run prompt (optional prefix)
+  # Static: Output format requirements
+  output_format: |
+    The execution report should follow this structure:
+
+    ## Summary
+    Brief description of what was implemented.
+
+    ## Changes Made
+    - file/path/one.py: What was changed and why
+    - file/path/two.py: What was changed and why
+
+    ## Tests
+    - test_one.py: What is being tested
+    - test_two.py: What is being tested
+
+    ## Verification
+    - [ ] All tests pass
+    - [ ] No type errors
+    - [ ] No lint errors
+
+  # Static: Default run task guidance
+  # Can be overridden via CLI: vibe run execute --message "Skip slow tests"
+  run_task: |
+    - Follow the plan step by step
+    - Write clean, maintainable code
+    - Add tests for new functionality
+    - Run verification after each major change
+    - Document any deviations from the plan
+
+  # Static: Custom run prompt (optional prefix)
   run_prompt: "/run"
 
 # 质量标准

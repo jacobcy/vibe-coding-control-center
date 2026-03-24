@@ -56,10 +56,15 @@ class ReviewAgentOptions:
     - Easy testing and debugging
 
     Attributes:
-        agent: The agent preset name (mutually exclusive with backend)
-        model: Optional model override (used with backend)
-        backend: Backend name (mutually exclusive with agent)
+        agent: The agent preset name (passed to codeagent-wrapper)
+        model: Optional model override
+        backend: Backend name (for database recording or direct use)
         timeout_seconds: Maximum execution time (default: 600 seconds)
+
+    Usage:
+        - Use agent preset: Set agent, leave backend=None
+        - Use backend directly: Set backend, leave agent=None
+        - Config can have both: agent for codeagent-wrapper, backend for DB recording
 
     """
 
@@ -67,14 +72,6 @@ class ReviewAgentOptions:
     model: str | None = None
     backend: str | None = None
     timeout_seconds: int = 600
-
-    def __post_init__(self) -> None:
-        """Validate mutually exclusive options."""
-        if self.agent and self.backend:
-            raise ValueError(
-                "agent and backend are mutually exclusive. "
-                "Use either agent preset OR backend+model, not both."
-            )
 
 
 @dataclass(frozen=True)

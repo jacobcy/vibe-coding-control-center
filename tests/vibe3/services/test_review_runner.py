@@ -50,15 +50,16 @@ class TestReviewAgentOptions:
         assert options.model == "claude-3-opus"
         assert options.timeout_seconds == 300
 
-    def test_agent_and_backend_are_mutually_exclusive(self) -> None:
-        """Should raise error if both agent and backend are specified."""
-        with pytest.raises(
-            ValueError, match="agent and backend are mutually exclusive"
-        ):
-            ReviewAgentOptions(
-                agent="code-reviewer",
-                backend="claude",
-            )
+    def test_agent_and_backend_can_coexist(self) -> None:
+        """Agent and backend can both be specified (for different purposes)."""
+        options = ReviewAgentOptions(
+            agent="code-reviewer",
+            backend="claude",
+            model="claude-sonnet-4-6",
+        )
+        assert options.agent == "code-reviewer"
+        assert options.backend == "claude"
+        assert options.model == "claude-sonnet-4-6"
 
     def test_options_are_frozen(self) -> None:
         """Options should be immutable (frozen dataclass)."""
