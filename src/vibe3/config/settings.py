@@ -183,6 +183,16 @@ class GitHubProjectConfig(BaseModel):
     org: str = Field(default="", description="已废弃，请使用 owner")
 
 
+class MasterAgentSettings(BaseModel):
+    """Master agent settings for issue triage."""
+
+    enabled: bool = True
+    agent: str = "master-controller"
+    backend: str | None = None
+    model: str | None = None
+    timeout_seconds: int = 300
+
+
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
@@ -190,6 +200,7 @@ class OrchestraSettings(BaseModel):
     polling_interval: int = 60
     repo: str | None = None
     max_concurrent_flows: int = 3
+    master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
 
 
 class VibeConfig(BaseModel):

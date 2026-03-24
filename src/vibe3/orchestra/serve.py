@@ -42,11 +42,14 @@ def start(
     """
     setup_logging(verbose=verbose)
 
-    config = OrchestraConfig(
-        polling_interval=interval,
-        repo=repo,
-        dry_run=dry_run,
-    )
+    config = OrchestraConfig.from_settings()
+
+    if interval != 60:
+        config.polling_interval = interval
+    if repo is not None:
+        config.repo = repo
+    if dry_run:
+        config.dry_run = dry_run
 
     log = logger.bind(domain="orchestra", action="serve")
     log.info(
