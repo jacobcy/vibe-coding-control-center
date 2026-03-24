@@ -18,10 +18,7 @@ from vibe3.models.review_runner import ReviewAgentOptions
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
-from vibe3.services.review_runner import (
-    format_agent_actor,
-    run_review_agent,
-)
+from vibe3.services.review_runner import format_agent_actor, run_review_agent
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
@@ -38,8 +35,7 @@ _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
 _DRY_RUN_OPT = Annotated[
-    bool,
-    typer.Option("--dry-run", help="Print command and prompt without executing"),
+    bool, typer.Option("--dry-run", help="Print command and prompt without executing")
 ]
 _MESSAGE_OPT = Annotated[
     Optional[str],
@@ -98,6 +94,7 @@ def _run_review(
     dry_run: bool,
     message: str | None,
     issue_number: int | None = None,
+    pr_number: int | None = None,
 ) -> None:
     from vibe3.services.flow_service import FlowService
 
@@ -116,7 +113,16 @@ def _run_review(
     prompt_file_content = build_review_context(request, config)
 
     task = None
-    if message:
+    if pr_number:
+        if message:
+            task = f"审查 PR #{pr_number}: {message}"
+        elif config.review.review_prompt:
+            task = f"审查 PR #{pr_number}: {config.review.review_prompt}"
+        else:
+            task = f"审查 PR #{pr_number} 的变更"
+        log.info("Using PR-specific task")
+        typer.echo(f"→ Task: {task}")
+    elif message:
         task = message
         log.info("Using custom task message")
         typer.echo(f"→ Custom task: {message[:60]}{'...' if len(message) > 60 else ''}")
@@ -219,7 +225,14 @@ def pr(
     )
 
     request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
-    _run_review(request, config, dry_run, message, issue_number=issue_number)
+    _run_review(
+        request,
+        config,
+        dry_run,
+        message,
+        issue_number=issue_number,
+        pr_number=pr_number,
+    )
 
 
 @app.command()
@@ -281,9 +294,7 @@ def base(
 
     # Build request with both snapshot diff and changed symbols
     request = ReviewRequest(
-        scope=scope,
-        changed_symbols=changed_symbols,
-        structure_diff=structure_diff,
+        scope=scope, changed_symbols=changed_symbols, structure_diff=structure_diff
     )
 
     _run_review(request, config, dry_run, message, issue_number=issue_number)

@@ -149,22 +149,34 @@ def run_review_agent(
     import tempfile
 
     wrapper_path = DEFAULT_WRAPPER_PATH
-    prompt_file_path = None
 
-    if not session_id:
-        # Write prompt file content to temporary file (only if not resuming)
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as prompt_file:
-            prompt_file.write(prompt_file_content)
-            prompt_file_path = prompt_file.name
+    # Always write prompt file content, even in resume mode
+    # This ensures the correct AST information is available
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, dir=Path.home() / ".codeagent" / "agents"
+    ) as prompt_file:
+        prompt_file.write(prompt_file_content)
+        prompt_file_path = prompt_file.name
 
     try:
         # Build command: wrapper --agent <agent> --prompt-file <file> [task]
         command: list[str] = [str(wrapper_path)]
 
+        # Add agent preset or backend+model (for both new and resume sessions)
+        if options.agent:
+            command.extend(["--agent", options.agent])
+        elif options.backend:
+            command.extend(["--backend", options.backend])
+            if options.model:
+                command.extend(["--model", options.model])
+        else:
+            command.extend(["--agent", "code-reviewer"])
+
+        # Add prompt file (always needed for correct AST context)
+        command.extend(["--prompt-file", cast(str, prompt_file_path)])
+
         if session_id:
-            # Resume mode: wrapper resume <session_id> [task]
+            # Resume mode with session_id
             command.append("resume")
             command.append(cast(str, session_id))
             if task:
@@ -172,22 +184,7 @@ def run_review_agent(
             else:
                 command.append("continue")
         else:
-            # New session mode
-            # Add agent preset or backend+model
-            if options.agent:
-                command.extend(["--agent", options.agent])
-            elif options.backend:
-                command.extend(["--backend", options.backend])
-                if options.model:
-                    command.extend(["--model", options.model])
-            else:
-                # Fallback to default agent if nothing specified
-                command.extend(["--agent", "code-reviewer"])
-
-            # Add prompt file
-            command.extend(["--prompt-file", cast(str, prompt_file_path)])
-
-            # Add task if provided
+            # New session mode: wrapper --agent <agent> --prompt-file <file> [task]
             if task:
                 command.append(task)
 
