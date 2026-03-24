@@ -46,9 +46,7 @@ def build_run_context(
 
     from vibe3.services.context_builder import build_tools_guide_section
 
-    tools_guide = build_tools_guide_section(
-        getattr(config.review, "tools_guide_file", None)
-    )
+    tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
     if tools_guide:
         sections.append(tools_guide)
 

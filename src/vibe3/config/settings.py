@@ -125,8 +125,8 @@ class AgentConfig(BaseModel):
 class ReviewConfig(BaseModel):
     """Review configuration."""
 
-    policy_file: str = Field(default=".codex/review-policy.md")
-    tools_guide_file: str = Field(default=".agent/rules/cli-usage.md")
+    policy_file: str = Field(default=".agent/rules/review-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     review_task: str = Field(default="")
@@ -136,8 +136,8 @@ class ReviewConfig(BaseModel):
 class PlanConfig(BaseModel):
     """Plan command configuration."""
 
-    policy_file: str = Field(default=".codex/plan-policy.md")
-    tools_guide_file: str = Field(default=".agent/rules/cli-usage.md")
+    policy_file: str = Field(default=".agent/rules/plan-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     plan_task: str = Field(default="")
@@ -147,8 +147,8 @@ class PlanConfig(BaseModel):
 class RunConfig(BaseModel):
     """Run command configuration."""
 
-    policy_file: str = Field(default=".codex/run-policy.md")
-    tools_guide_file: str = Field(default=".agent/rules/cli-usage.md")
+    policy_file: str = Field(default=".agent/rules/run-policy.md")
+    common_rules: str = Field(default=".agent/rules/common.md")
     agent_config: AgentConfig = Field(default_factory=AgentConfig)
     output_format: str = Field(default="")
     run_task: str = Field(default="")

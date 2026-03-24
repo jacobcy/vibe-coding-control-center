@@ -26,8 +26,8 @@
 
 ### 使用指南
 
-**cli-usage.md**
-- V2/V3 常用命令
+**common.md**
+- 常用命令
 - 代码分析工具（inspect 系列）
 - 代码搜索工具（auggie MCP vs Grep）
 - 格式化输出选项

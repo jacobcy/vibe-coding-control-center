@@ -192,3 +192,19 @@ class TestBuildReviewContext:
 
             with pytest.raises(Exception):  # ContextBuilderError
                 build_review_context(request)
+
+    def test_build_review_context_hides_internal_prompt_wiring(self) -> None:
+        """Context should not leak internal file/config wiring to the agent."""
+        scope = ReviewScope.for_base("main")
+        request = ReviewRequest(scope=scope)
+
+        context = build_review_context(request)
+
+        forbidden_tokens = (
+            "common.md",
+            "config/settings.yaml",
+            ".agent/rules",
+            "Follow policy at",
+        )
+        for token in forbidden_tokens:
+            assert token not in context

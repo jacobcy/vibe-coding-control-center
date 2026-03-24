@@ -513,7 +513,7 @@ git commit -m "refactor(review): keep pr review local-only"
 **Files:**
 - Modify: `docs/references/codeagent-wrapper-guide.md`
 - Modify: `CLAUDE.md`
-- Modify: `.agent/rules/cli-usage.md`
+- Modify: `.agent/rules/common.md`
 - Test: `tests/vibe3/commands/test_review_help.py`
 
 **Step 1: Write the failing docs/help expectation**
@@ -547,7 +547,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add docs/references/codeagent-wrapper-guide.md CLAUDE.md .agent/rules/cli-usage.md tests/vibe3/commands/test_review_help.py
+git add docs/references/codeagent-wrapper-guide.md CLAUDE.md .agent/rules/common.md tests/vibe3/commands/test_review_help.py
 git commit -m "docs(review): document codeagent review flow"
 ```
 
