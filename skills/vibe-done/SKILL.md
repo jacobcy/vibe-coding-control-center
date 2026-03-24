@@ -25,10 +25,10 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 ## 必读文档
 
-- `docs/standards/v2/git-workflow-standard.md`
-- `docs/standards/v2/worktree-lifecycle-standard.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/handoff-governance-standard.md`
+- `docs/standards/v3/git-workflow-standard.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/handoff-governance-standard.md`
 - `.agent/context/task.md`
 
 ## 完整流程

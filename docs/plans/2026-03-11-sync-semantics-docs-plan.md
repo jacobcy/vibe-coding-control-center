@@ -5,7 +5,7 @@ status: proposed
 author: Codex GPT-5
 created: 2026-03-11
 related_docs:
-  - docs/standards/v2/command-standard.md
+  - docs/standards/v3/command-standard.md
   - docs/standards/glossary.md
   - skills/vibe-task/SKILL.md
   - skills/vibe-roadmap/SKILL.md
@@ -37,7 +37,7 @@ related_docs:
 
 # Files To Modify
 
-- `docs/standards/v2/command-standard.md`
+- `docs/standards/v3/command-standard.md`
 - `docs/standards/glossary.md`
 - `skills/vibe-task/SKILL.md`
 - `skills/vibe-roadmap/SKILL.md`

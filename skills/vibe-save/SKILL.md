@@ -21,17 +21,17 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 以下语义以标准为准，不在本 skill 中重写：
 
-- `docs/standards/v2/skill-standard.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/shell-capability-design.md`
-- `docs/standards/v2/git-workflow-standard.md`
-- `docs/standards/v2/handoff-governance-standard.md`
+- `docs/standards/v3/skill-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/python-capability-design.md`
+- `docs/standards/v3/git-workflow-standard.md`
+- `docs/standards/v3/handoff-governance-standard.md`
 - `docs/standards/glossary.md`
 
 特别约束：
 
-- `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v2/handoff-governance-standard.md` 为准。
-- Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成“自动判断”或“自动修复”。见 `docs/standards/v2/shell-capability-design.md`。
+- `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v3/handoff-governance-standard.md` 为准。
+- Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成“自动判断”或“自动修复”。见 `docs/standards/v3/python-capability-design.md`。
 
 ## Command Boundary
 

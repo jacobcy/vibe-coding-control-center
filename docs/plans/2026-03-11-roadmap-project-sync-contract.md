@@ -5,9 +5,9 @@ status: proposed
 author: Codex GPT-5
 created: 2026-03-11
 related_docs:
-  - docs/standards/v2/roadmap-json-standard.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/command-standard.md
+  - docs/standards/v3/roadmap-json-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/command-standard.md
   - docs/references/github_project.md
   - lib/roadmap.sh
   - lib/roadmap_write.sh
@@ -128,9 +128,9 @@ related_docs:
 
 # Files To Modify
 
-- `docs/standards/v2/roadmap-json-standard.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/data-model-standard.md`
+- `docs/standards/v3/roadmap-json-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/data-model-standard.md`
 - `lib/roadmap.sh`
 - `lib/roadmap_write.sh`
 - `lib/roadmap_help.sh`

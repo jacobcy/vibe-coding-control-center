@@ -21,10 +21,10 @@ Read [review-checklist.md](./references/review-checklist.md) before substantial 
 
 ## Hard Boundary
 
-- `skills/` 是 Vibe 自有 skill 定义的唯一源码；`.agent/skills/` 只是运行时链接层。见 `docs/standards/v2/skill-standard.md`。
-- 共享状态相关写入只能通过真实 `bin/vibe` 命令完成；不要在 skill 中直接改 `.git/vibe/*.json`。见 `docs/standards/v2/command-standard.md` 和 `docs/standards/v2/shell-capability-design.md`。
+- `skills/` 是 Vibe 自有 skill 定义的唯一源码；`.agent/skills/` 只是运行时链接层。见 `docs/standards/v3/skill-standard.md`。
+- 共享状态相关写入只能通过真实 `bin/vibe` 命令完成；不要在 skill 中直接改 `.git/vibe/*.json`。见 `docs/standards/v3/command-standard.md` 和 `docs/standards/v3/python-capability-design.md`。
 - 术语定义与边界语义只引用真源，不在本 skill 中复述。术语见 `docs/standards/glossary.md`，动作词默认语义见 `docs/standards/action-verbs.md`。
-- 触发时机、合理介入范围与相邻 skill 冲突裁决以 `docs/standards/v2/skill-trigger-standard.md` 为准。
+- 触发时机、合理介入范围与相邻 skill 冲突裁决以 `docs/standards/v3/skill-trigger-standard.md` 为准。
 - 如果需要的 Shell 能力不存在，结论应为 `Capability Gap`，而不是在 skill 文案中发明 workaround。
 
 ## Truth Sources
@@ -33,11 +33,11 @@ When the skill touches the corresponding semantic area, cite these files directl
 
 - `docs/standards/glossary.md`
 - `docs/standards/action-verbs.md`
-- `docs/standards/v2/skill-standard.md`
-- `docs/standards/v2/command-standard.md`
-- `docs/standards/v2/shell-capability-design.md`
-- `docs/standards/v2/git-workflow-standard.md`
-- `docs/standards/v2/worktree-lifecycle-standard.md`
+- `docs/standards/v3/skill-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/python-capability-design.md`
+- `docs/standards/v3/git-workflow-standard.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
 
 If the target skill only manages local installation or runtime linking, only cite the subset that actually governs that behavior.
 

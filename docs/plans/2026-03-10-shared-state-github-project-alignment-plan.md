@@ -8,9 +8,9 @@ created: 2026-03-10
 last_updated: 2026-03-10
 related_docs:
   - docs/references/github_project.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/roadmap-json-standard.md
-  - docs/standards/v2/registry-json-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/roadmap-json-standard.md
+  - docs/standards/v3/registry-json-standard.md
 ---
 
 # Shared State GitHub Project Alignment Plan

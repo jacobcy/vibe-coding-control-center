@@ -17,7 +17,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 标准真源：
 
 - 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v2/skill-standard.md` 为准。
+- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md` 为准。
 
 相关标准文档目录：`docs/standards/`
 
@@ -101,4 +101,4 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - suggestion: <改进建议（可选）>
 ```
 
-详细规则见 `docs/standards/v2/handoff-governance-standard.md` 第 6 节。
+详细规则见 `docs/standards/v3/handoff-governance-standard.md` 第 6 节。

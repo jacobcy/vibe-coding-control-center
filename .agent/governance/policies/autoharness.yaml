@@ -1,0 +1,128 @@
+version: "0.1"
+
+meta:
+  name: "AutoHarness Policy"
+  purpose: "Define stable boundaries, trace contract, and learning signals for unattended agent governance"
+  owner: ".agent/governance/policies/autoharness.yaml"
+  source_of_truth:
+    - "repository"
+    - "git"
+    - "vibe shell outputs"
+
+principles:
+  - id: AP1
+    name: "learning_over_static_rules"
+    rule: "The harness should improve from traces, findings, and replay evidence rather than rely on a permanently fixed blocker list."
+  - id: AP2
+    name: "thin_runtime"
+    rule: "The runtime harness should stay thin and focus on decision plus telemetry."
+  - id: AP3
+    name: "wrapper_boundary_first"
+    rule: "The preferred attachment point is codeagent-wrapper or its immediate caller."
+  - id: AP4
+    name: "flow_linked_learning"
+    rule: "Harness evidence should flow into flow events, handoff findings, and retrospective review."
+
+subjects:
+  human:
+    default_enforcement: advisory
+    note: "Humans retain override authority."
+  agent:
+    default_enforcement: trace_first
+    note: "Autonomous agents enter a learnable governance loop."
+
+modes:
+  interactive:
+    description: "Human-in-the-loop collaboration mode."
+    enforcement_limit:
+      - advisory
+      - confirm
+  autonomous:
+    description: "Unattended execution mode."
+    enforcement_limit:
+      - trace
+      - rewrite
+      - block
+
+actions:
+  families:
+    - git
+    - shell
+    - file_write
+    - shared_state_write
+    - network
+
+enforcement:
+  supported:
+    - trace
+    - advisory
+    - confirm
+    - rewrite
+    - block
+
+trace_record:
+  required_fields:
+    - rule_id
+    - subject
+    - mode
+    - phase
+    - action
+    - evidence
+    - decision
+    - message
+    - trace_ref
+
+finding_promotion:
+  notable_cases:
+    - blocked_task_progress
+    - rewrite_then_failed
+    - repeated_same_action_pattern
+    - confirmed_false_positive
+    - confirmed_false_negative
+    - semantic_conflict_detected
+    - contract_drift_detected
+    - suspected_bug_detected
+  required_fields:
+    - category
+    - summary
+    - impact
+    - evidence_ref
+    - suggested_improvement
+
+finding_categories:
+  - behavior_violation
+  - false_positive
+  - false_negative
+  - semantic_conflict
+  - contract_drift
+  - suspected_bug
+  - improvement_opportunity
+
+replay_metrics:
+  required:
+    - false_positive_rate
+    - false_negative_rate
+    - task_continuation_rate
+    - flow_completion_rate
+    - repo_defect_signal_precision
+
+stable_invariants:
+  - id: stay_in_current_worktree
+    subject: agent
+    mode: autonomous
+    action_family: shell.worktree
+    message: "Autonomous agents should stay inside the current worktree unless explicitly approved."
+  - id: shared_state_via_legal_channels
+    subject: agent
+    mode: autonomous
+    action_family: shared_state_write
+    message: "Shared state should be updated through legal shell entry points."
+  - id: decision_must_be_traced
+    subject: agent
+    mode: autonomous
+    action_family: any
+    message: "Notable harness decisions must be recorded into flow-linked evidence."
+
+notes:
+  - "This file defines stable governance intent, trace requirements, and replay metrics."
+  - "The learned harness itself should evolve from evidence, not be fully encoded here."

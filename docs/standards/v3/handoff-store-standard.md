@@ -12,7 +12,7 @@ created: 2026-03-14
 last_updated: 2026-03-23
 related_docs:
   - docs/prds/vibe-session-governance.md
-  - docs/standards/v2/handoff-governance-standard.md
+  - docs/standards/v3/handoff-governance-standard.md
   - docs/plans/2026-03-14-vibe3-data-model-design.md
 ---
 

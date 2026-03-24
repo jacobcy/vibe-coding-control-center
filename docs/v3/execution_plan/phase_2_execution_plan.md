@@ -402,5 +402,5 @@ Phase 2 被认为成功完成，当且仅当:
 
 - [docs/v3/README.md](README.md) - Vibe3 主文档
 - [docs/v3/phase_1_review_and_apply.md](phase_1_review_and_apply.md) - Phase 1 审核指南
-- [docs/standards/v2/command-standard.md](../../standards/v2/command-standard.md) - 命令标准
+- [docs/standards/v3/command-standard.md](../../standards/v2/command-standard.md) - 命令标准
 - [docs/standards/glossary.md](../../standards/glossary.md) - 术语定义

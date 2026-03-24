@@ -8,7 +8,7 @@ last_updated: 2026-03-21
 related_docs:
   - docs/v3/handoff/v3-rewrite-plan.md
   - docs/standards/v3/handoff-store-standard.md
-  - docs/standards/v2/handoff-governance-standard.md
+  - docs/standards/v3/handoff-governance-standard.md
   - docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md
   - docs/v3/infrastructure/01-data-standard.md
   - docs/v3/infrastructure/02-architecture.md

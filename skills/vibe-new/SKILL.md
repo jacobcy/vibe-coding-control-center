@@ -26,14 +26,14 @@ description: Use when the user wants to create or intake the next delivery targe
 
 ## 必读文档
 
-- `docs/standards/v2/git-workflow-standard.md` (flow 生命周期)
+- `docs/standards/v3/git-workflow-standard.md` (flow 生命周期)
 - `.agent/context/task.md` (当前上下文)
 
 相关文档：
 
 - 术语：`docs/standards/glossary.md`
 - 动作语义：`docs/standards/action-verbs.md`
-- Skill 标准：`docs/standards/v2/skill-standard.md`
+- Skill 标准：`docs/standards/v3/skill-standard.md`
 
 ## 完整流程
 

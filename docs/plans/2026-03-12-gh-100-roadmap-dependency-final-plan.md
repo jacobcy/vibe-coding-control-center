@@ -8,8 +8,8 @@ last_updated: 2026-03-12
 related_docs:
   - docs/references/roadmap-dependency.md
   - docs/standards/glossary.md
-  - docs/standards/v2/data-model-standard.md
-  - docs/standards/v2/roadmap-json-standard.md
+  - docs/standards/v3/data-model-standard.md
+  - docs/standards/v3/roadmap-json-standard.md
 ---
 
 # GH-100 Roadmap Dependency Implementation Plan (Final)
@@ -37,8 +37,8 @@ related_docs:
 ### Task 1.1: 固定依赖字段与标准引用
 
 **Files:**
-- Modify: `docs/standards/v2/roadmap-json-standard.md`
-- Modify: `docs/standards/v2/data-model-standard.md`
+- Modify: `docs/standards/v3/roadmap-json-standard.md`
+- Modify: `docs/standards/v3/data-model-standard.md`
 - Reference: `docs/references/roadmap-dependency.md`
 
 **Step 1: 写文档断言清单**
@@ -111,7 +111,7 @@ Expected: 新增依赖查询断言通过
 **Step 5: Commit**
 
 ```bash
-git add docs/standards/v2/roadmap-json-standard.md docs/standards/v2/data-model-standard.md lib/roadmap_query.sh lib/roadmap_write.sh tests/contracts/test_shared_state_contracts.bats tests/roadmap/test_roadmap_status_render.bats
+git add docs/standards/v3/roadmap-json-standard.md docs/standards/v3/data-model-standard.md lib/roadmap_query.sh lib/roadmap_write.sh tests/contracts/test_shared_state_contracts.bats tests/roadmap/test_roadmap_status_render.bats
 git commit -m "feat: add roadmap dependency query layer
 
 - Add depends_on_item_ids field to roadmap item
