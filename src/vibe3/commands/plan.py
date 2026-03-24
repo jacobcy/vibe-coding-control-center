@@ -11,6 +11,7 @@ from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
+from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.services.review_runner import run_review_agent
 from vibe3.utils.trace import enable_trace
@@ -93,6 +94,8 @@ def task(
     import typer as typer_module
 
     typer_module.echo(f"-> Plan: Issue #{issue}")
+
+    transition_to_claimed(issue)
 
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)

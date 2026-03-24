@@ -13,6 +13,7 @@ from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
+from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_runner import (
     ReviewAgentOptions,
@@ -81,6 +82,17 @@ def _run_review(
     request: ReviewRequest, config: VibeConfig, dry_run: bool, message: str | None
 ) -> None:
     log = logger.bind(domain="review", scope=request.scope.kind)
+
+    git = GitClient()
+    try:
+        branch = git.get_current_branch()
+        from vibe3.services.flow_service import FlowService
+
+        flow = FlowService().get_flow_status(branch)
+        if flow and flow.task_issue_number:
+            transition_to_review(flow.task_issue_number)
+    except Exception:
+        pass
 
     log.info("Building review context")
     prompt_file_content = build_review_context(request, config)
