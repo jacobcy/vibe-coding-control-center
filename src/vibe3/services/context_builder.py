@@ -21,6 +21,7 @@ from loguru import logger
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
 from vibe3.models.review import ReviewRequest
+from vibe3.services.snapshot_diff_section import build_snapshot_diff_section
 
 
 class ContextBuilderError(VibeError):
@@ -214,7 +215,12 @@ def build_review_context(
     if tools_guide:
         sections.append(tools_guide)
 
-    # 3. AST analysis section (optional)
+    # 3. Snapshot diff section (optional)
+    snapshot_diff = build_snapshot_diff_section(request.structure_diff)
+    if snapshot_diff:
+        sections.append(snapshot_diff)
+
+    # 4. AST analysis section (optional - always include when available)
     ast_analysis = build_ast_analysis_section(
         request.changed_symbols, request.symbol_dag
     )

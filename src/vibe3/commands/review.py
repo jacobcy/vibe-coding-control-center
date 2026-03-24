@@ -11,7 +11,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.commands.review_helpers import run_inspect_json
+from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.services.context_builder import build_review_context
@@ -27,7 +27,9 @@ from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
     name="review",
-    help="Code review using inspect context and codeagent-wrapper",
+    help="Code review with two modes:\n\n"
+    "  pr <number>  - Review existing PR from GitHub (analyzes PR diff)\n"
+    "  base [branch] - Review local changes vs base branch (compares snapshots)",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -156,7 +158,17 @@ def pr(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review a PR locally (generates review output, does not publish to GitHub)."""
+    """Review an existing PR by number (fetches diff from GitHub API).
+
+    This command reviews a PR that already exists on GitHub. It analyzes:
+    - Changed symbols (functions in diff hunks)
+    - Impacted modules (DAG upstream dependencies)
+    - Risk score and block status
+
+    Use this to review PRs before merging or providing feedback.
+
+    Example: vibe3 review pr 42
+    """
     if trace:
         enable_trace()
 
@@ -173,6 +185,8 @@ def pr(
 
     log.info("Analyzing PR changes")
     scope = ReviewScope.for_pr(pr_number)
+
+    # PR review uses inspect (GitHub API) to fetch PR diff
     inspect_data = run_inspect_json(["pr", str(pr_number)])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
@@ -193,7 +207,18 @@ def base(
     dry_run: _DRY_RUN_OPT = False,
     message: _MESSAGE_OPT = None,
 ) -> None:
-    """Review current branch changes relative to base branch."""
+    """Review local branch changes against a base branch (compares codebase snapshots).
+
+    This command compares your current local branch state against a base branch.
+    It analyzes:
+    - Structure diff (file/module/dependency changes)
+    - Changed symbols (function-level impact)
+    - Impacted modules (DAG upstream dependencies)
+
+    Use this to review local changes before pushing or creating a PR.
+
+    Example: vibe3 review base origin/main
+    """
     if trace:
         enable_trace()
 
@@ -218,11 +243,22 @@ def base(
 
     log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
+
+    # Build snapshot diff for review context
+    structure_diff = build_snapshot_diff(base_branch, current_branch)
+
+    # Get changed symbols from inspect (always needed for function-level impact)
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
 
-    request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
+    # Build request with both snapshot diff and changed symbols
+    request = ReviewRequest(
+        scope=scope,
+        changed_symbols=changed_symbols,
+        structure_diff=structure_diff,
+    )
+
     _run_review(request, config, dry_run, message, issue_number=issue_number)
