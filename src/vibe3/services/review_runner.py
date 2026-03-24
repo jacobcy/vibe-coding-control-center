@@ -11,12 +11,14 @@ Design principles:
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 """
 
+import re
 import subprocess
 import sys
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
+
+from vibe3.models.review_runner import ReviewAgentOptions, ReviewAgentResult
 
 
 class AgentType(str, Enum):
@@ -46,63 +48,16 @@ DEFAULT_WRAPPER_PATH: Final[Path] = (
 )
 
 
-@dataclass(frozen=True)
-class ReviewAgentOptions:
-    """Immutable configuration for running a review agent.
+def extract_session_id(stdout: str) -> str | None:
+    """Extract session ID from codeagent-wrapper output.
 
-    This configuration is frozen (immutable) to ensure:
-    - Thread safety
-    - Predictable behavior
-    - Easy testing and debugging
-
-    Attributes:
-        agent: The agent preset name (passed to codeagent-wrapper)
-        model: Optional model override
-        backend: Backend name (for database recording or direct use)
-        timeout_seconds: Maximum execution time (default: 600 seconds)
-
-    Usage:
-        - Use agent preset: Set agent, leave backend=None
-        - Use backend directly: Set backend, leave agent=None
-        - Config can have both: agent for codeagent-wrapper, backend for DB recording
-
+    Pattern:
+        SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8
     """
-
-    agent: str | None = None
-    model: str | None = None
-    backend: str | None = None
-    timeout_seconds: int = 600
-
-
-@dataclass(frozen=True)
-class ReviewAgentResult:
-    """Result from running a review agent.
-
-    Attributes:
-        exit_code: The exit code from codeagent-wrapper (0 = success)
-        stdout: Standard output from the agent
-        stderr: Standard error from the agent
-
-    """
-
-    exit_code: int
-    stdout: str
-    stderr: str
-
-    @classmethod
-    def from_completed_process(
-        cls, cp: subprocess.CompletedProcess[str]
-    ) -> "ReviewAgentResult":
-        """Create result from a CompletedProcess."""
-        return cls(
-            exit_code=cp.returncode,
-            stdout=cp.stdout or "",
-            stderr=cp.stderr or "",
-        )
-
-    def is_success(self) -> bool:
-        """Check if the agent run was successful."""
-        return self.exit_code == 0
+    if not stdout:
+        return None
+    match = re.search(r"SESSION_ID:\s*([a-f0-9-]{36})", stdout)
+    return match.group(1) if match else None
 
 
 def get_effective_backend(options: ReviewAgentOptions) -> str:
@@ -171,17 +126,19 @@ def run_review_agent(
     options: ReviewAgentOptions,
     task: str | None = None,
     dry_run: bool = False,
+    session_id: str | None = None,
 ) -> ReviewAgentResult:
     """Run a review agent using codeagent-wrapper.
 
     Args:
-        prompt_file_content: Content to write to prompt file (review context)
+        prompt_file_content: Prompt file content (ignored if session_id provided)
         options: Configuration for the agent run
         task: Optional task/instruction (custom message or default)
         dry_run: If True, print command and prompt without executing
+        session_id: Optional session ID to resume an existing session
 
     Returns:
-        ReviewAgentResult containing exit code and output
+        ReviewAgentResult containing exit code, output, and session_id
 
     Raises:
         FileNotFoundError: If codeagent-wrapper is not found
@@ -192,10 +149,13 @@ def run_review_agent(
     import tempfile
 
     wrapper_path = DEFAULT_WRAPPER_PATH
+    prompt_dir = Path.home() / ".codeagent" / "agents"
+    prompt_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write prompt file content to temporary file
+    # Always write prompt file content, even in resume mode
+    # This ensures the correct AST information is available
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False
+        mode="w", suffix=".md", delete=False, dir=prompt_dir
     ) as prompt_file:
         prompt_file.write(prompt_file_content)
         prompt_file_path = prompt_file.name
@@ -204,7 +164,7 @@ def run_review_agent(
         # Build command: wrapper --agent <agent> --prompt-file <file> [task]
         command: list[str] = [str(wrapper_path)]
 
-        # Add agent preset or backend+model
+        # Add agent preset or backend+model (for both new and resume sessions)
         if options.agent:
             command.extend(["--agent", options.agent])
         elif options.backend:
@@ -212,22 +172,31 @@ def run_review_agent(
             if options.model:
                 command.extend(["--model", options.model])
         else:
-            # Fallback to default agent if nothing specified
             command.extend(["--agent", "code-reviewer"])
 
-        # Add prompt file
-        command.extend(["--prompt-file", prompt_file_path])
+        # Add prompt file (always needed for correct AST context)
+        command.extend(["--prompt-file", cast(str, prompt_file_path)])
 
-        # Add task if provided
-        if task:
-            command.append(task)
+        if session_id:
+            # Resume mode with session_id
+            command.append("resume")
+            command.append(cast(str, session_id))
+            if task:
+                command.append(task)
+            else:
+                command.append("continue")
+        else:
+            # New session mode: wrapper --agent <agent> --prompt-file <file> [task]
+            if task:
+                command.append(task)
 
         # Dry-run mode: print command and prompt
         if dry_run:
             print("=== Command ===")
             print(" ".join(command))
-            print(f"\n=== Prompt File: {prompt_file_path} ===")
-            print(prompt_file_content)
+            if prompt_file_path:
+                print(f"\n=== Prompt File: {prompt_file_path} ===")
+                print(prompt_file_content)
             if task:
                 print(f"\n=== Task ===\n{task}")
             print("\n=== End ===")
@@ -259,6 +228,7 @@ def run_review_agent(
             exit_code=result.returncode,
             stdout=result.stdout,
             stderr=result.stderr,
+            session_id=extract_session_id(result.stdout),
         )
 
         if not agent_result.is_success():
@@ -277,4 +247,5 @@ def run_review_agent(
         return agent_result
     finally:
         # Clean up temporary file
-        Path(prompt_file_path).unlink(missing_ok=True)
+        if prompt_file_path:
+            Path(prompt_file_path).unlink(missing_ok=True)

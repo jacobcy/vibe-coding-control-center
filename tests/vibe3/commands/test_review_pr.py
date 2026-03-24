@@ -34,7 +34,7 @@ def _mock_inspect_data():
     }
 
 
-def _mock_record_review_event(review, actor, review_content=None):
+def _mock_record_review_event(review, actor, review_content=None, session_id=None):
     """Mock _record_review_event to avoid writing to real handoff directory."""
     return Path("/tmp/mock-review.md")
 
@@ -51,7 +51,7 @@ def test_review_pr_pass():
         patch(
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
-        ),
+        ) as mock_inspect,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.run_review_agent",
@@ -69,6 +69,7 @@ def test_review_pr_pass():
         result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
     assert "PASS" in result.output
+    mock_inspect.assert_called_once_with(["pr", "42"])
 
 
 def test_review_pr_block_exits_1():
@@ -144,3 +145,43 @@ def test_review_pr_rejects_unknown_agent_param():
     # Typer should reject unknown option
     assert result.exit_code != 0
     assert "no such option" in result.output.lower() or "error" in result.output.lower()
+
+
+def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
+    flow_status = MagicMock()
+    flow_status.reviewer_session_id = "existing-session-id"
+
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch("vibe3.commands.review.GitClient") as mock_git_class,
+        patch(
+            "vibe3.services.flow_service.FlowService.get_flow_status",
+            return_value=flow_status,
+        ),
+        patch(
+            "vibe3.commands.review.run_review_agent",
+            return_value=ReviewAgentResult(
+                exit_code=0,
+                stdout="## Review\nLooks good.",
+                stderr="",
+                session_id=None,
+            ),
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+        patch("vibe3.commands.review._record_review_event") as mock_record,
+    ):
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/session-resume-check"
+        mock_git_class.return_value = mock_git
+
+        result = runner.invoke(app, ["pr", "42"])
+
+    assert result.exit_code == 0
+    assert mock_record.call_args.kwargs["session_id"] == "existing-session-id"

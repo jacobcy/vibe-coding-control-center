@@ -29,17 +29,19 @@ def _noop() -> Iterator[None]:
 
 def _render_agent_chain(state: FlowState) -> None:
     console.print("[bold]═══ Agent Chain ═══[/]")
-    for label, actor_label in [
-        ("spec_ref", "planner_actor"),
-        ("plan_ref", "planner_actor"),
-        ("report_ref", "executor_actor"),
-        ("audit_ref", "reviewer_actor"),
+    for label, actor_label, session_label in [
+        ("spec_ref", "planner_actor", "planner_session_id"),
+        ("plan_ref", "planner_actor", "planner_session_id"),
+        ("report_ref", "executor_actor", "executor_session_id"),
+        ("audit_ref", "reviewer_actor", "reviewer_session_id"),
     ]:
         val = getattr(state, label, None)
         actor = getattr(state, actor_label, None) or ""
+        session_id = getattr(state, session_label, None)
         actor_str = f"  [dim]{actor}[/]" if actor else ""
+        session_str = f" [blue]({session_id[:8]})[/]" if session_id else ""
         status = val if val else "[dim](pending)[/]"
-        console.print(f"  [dim]{label}[/]  {status}{actor_str}")
+        console.print(f"  [dim]{label}[/]  {status}{actor_str}{session_str}")
     console.print()
 
 
@@ -135,6 +137,23 @@ def show(
         console.print(f"\n[bold cyan]Handoff[/]: {state.flow_slug}")
         console.print()
         _render_agent_chain(state)
+
+        # Show resume hints if session IDs exist
+        hints_shown = False
+        for role, session_id in [
+            ("planner", state.planner_session_id),
+            ("executor", state.executor_session_id),
+            ("reviewer", state.reviewer_session_id),
+        ]:
+            if session_id:
+                if not hints_shown:
+                    console.print("[bold]💡 Resume Hints[/]")
+                    hints_shown = True
+                console.print(f'  [dim]codeagent-wrapper resume {session_id} "..."[/]')
+
+        if hints_shown:
+            console.print()
+
         console.print("[bold]═══ Recent Handoff Events ═══[/]")
         console.print()
         _render_handoff_events(handoff_events)
