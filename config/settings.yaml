@@ -313,3 +313,36 @@ run:
 
   # Static: Custom run prompt (optional prefix)
   run_prompt: "/executing-plan"
+
+# Orchestra Configuration
+# =======================
+# Background daemon for GitHub label-driven orchestration
+orchestra:
+  # Enable orchestra daemon
+  enabled: true
+
+  # Polling interval in seconds (minimum 30s due to GitHub API limits)
+  polling_interval: 60
+
+  # GitHub repository (optional, defaults to current repo)
+  # repo: "owner/repo"
+
+  # Maximum concurrent flows
+  max_concurrent_flows: 3
+
+  # Master agent for issue triage
+  master_agent:
+    # Enable master agent for new issue triage
+    enabled: true
+
+    # Agent preset name (passed to codeagent-wrapper)
+    agent: "master-controller"
+
+    # Backend for direct execution
+    # backend: "claude"
+
+    # Model for direct execution
+    # model: "claude-sonnet-4-5"
+
+    # Timeout in seconds
+    timeout_seconds: 300
