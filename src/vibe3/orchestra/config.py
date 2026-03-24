@@ -22,7 +22,7 @@ STATE_TRIGGERS: list[StateTrigger] = [
         from_state=IssueState.READY,
         to_state=IssueState.CLAIMED,
         command="plan",
-        args=["execute"],
+        args=["task"],
     ),
     StateTrigger(
         from_state=IssueState.CLAIMED,
@@ -76,25 +76,24 @@ class OrchestraConfig(BaseModel):
         config = VibeConfig.get_defaults()
         orchestra_config = getattr(config, "orchestra", None)
 
-        if orchestra_config:
-            master_cfg = getattr(orchestra_config, "master_agent", None)
-            master_agent = MasterAgentConfig()
-            if master_cfg:
-                master_agent = MasterAgentConfig(
-                    enabled=getattr(master_cfg, "enabled", True),
-                    agent=getattr(master_cfg, "agent", "master-controller"),
-                    backend=getattr(master_cfg, "backend", None),
-                    model=getattr(master_cfg, "model", None),
-                    timeout_seconds=getattr(master_cfg, "timeout_seconds", 300),
-                )
+        if not orchestra_config:
+            return cls()
 
-            return cls(
-                enabled=getattr(orchestra_config, "enabled", True),
-                polling_interval=getattr(orchestra_config, "polling_interval", 60),
-                repo=getattr(orchestra_config, "repo", None),
-                max_concurrent_flows=getattr(
-                    orchestra_config, "max_concurrent_flows", 3
-                ),
-                master_agent=master_agent,
+        master_cfg = getattr(orchestra_config, "master_agent", None)
+        master_agent = MasterAgentConfig()
+        if master_cfg:
+            master_agent = MasterAgentConfig(
+                enabled=getattr(master_cfg, "enabled", True),
+                agent=getattr(master_cfg, "agent", "master-controller"),
+                backend=getattr(master_cfg, "backend", None),
+                model=getattr(master_cfg, "model", None),
+                timeout_seconds=getattr(master_cfg, "timeout_seconds", 300),
             )
-        return cls()
+
+        return cls(
+            enabled=getattr(orchestra_config, "enabled", True),
+            polling_interval=getattr(orchestra_config, "polling_interval", 60),
+            repo=getattr(orchestra_config, "repo", None),
+            max_concurrent_flows=getattr(orchestra_config, "max_concurrent_flows", 3),
+            master_agent=master_agent,
+        )

@@ -66,14 +66,7 @@ class Dispatcher:
         cmd = ["uv", "run", "python", "-m", "vibe3", trigger.command]
         cmd.extend(trigger.args)
 
-        if trigger.command == "plan" and "execute" in trigger.args:
-            cmd.extend(["--issue", str(trigger.issue.number)])
-            cmd.extend(["--branch", f"task/{trigger.issue.slug}"])
-
-        elif trigger.command == "run" and "execute" in trigger.args:
-            pass
-
-        elif trigger.command == "review" and "pr" in trigger.args:
-            pass
+        if trigger.command == "plan" and "task" in trigger.args:
+            cmd.append(str(trigger.issue.number))
 
         return cmd

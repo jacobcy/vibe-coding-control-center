@@ -23,6 +23,7 @@ class Poller:
         self.dispatcher = Dispatcher(dry_run=config.dry_run)
         self._state_cache: dict[int, IssueState | None] = {}
         self._seen_issues: set[int] = set()
+        self._active_flows: set[int] = set()
         self._running = False
 
     def start(self) -> None:
@@ -65,12 +66,24 @@ class Poller:
                     self._seen_issues.add(issue.number)
 
                 elif issue.state and previous_state != issue.state:
+                    if len(self._active_flows) >= self.config.max_concurrent_flows:
+                        limit = self.config.max_concurrent_flows
+                        log.warning(
+                            f"Max concurrent flows ({limit}) reached, "
+                            f"skipping #{issue.number}"
+                        )
+                        continue
+
                     trigger = self.router.route(issue, previous_state)
                     if trigger:
                         prev = previous_state.value if previous_state else "none"
                         curr = issue.state.value if issue.state else "none"
                         log.info(f"State change: #{issue.number} {prev} -> {curr}")
-                        self.dispatcher.dispatch(trigger)
+                        self._active_flows.add(issue.number)
+                        try:
+                            self.dispatcher.dispatch(trigger)
+                        finally:
+                            self._active_flows.discard(issue.number)
 
                 self._state_cache[issue.number] = issue.state
 
