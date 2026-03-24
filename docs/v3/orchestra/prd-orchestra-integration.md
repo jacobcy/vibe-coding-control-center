@@ -62,35 +62,35 @@ ready → claimed → in-progress → review → merge-ready → done
 ### 1.1 核心组件
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     vibe3 serve                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │   Poller    │───▶│   Router    │───▶│  Dispatcher │     │
-│  │ (每 60s)    │    │ (状态判断)   │    │ (执行命令)   │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
-│         │                  │                  │             │
-│         ▼                  ▼                  ▼             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │ GitHub API  │    │ LabelService│    │   Commands  │     │
-│  │ (gh issue)  │    │ (状态机)     │    │ plan/run/   │     │
-│  │             │    │             │    │ review      │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │   handoff.db    │
-                    │  (执行记录)      │
-                    └─────────────────┘
++-------------------------------------------------------------+
+|                     vibe3 serve                             |
+|  +-----------+    +-----------+    +-----------+            |
+|  |  Poller   |--->|  Router   |--->| Dispatcher|            |
+|  | (每 60s)  |    | (状态判断) |    | (执行命令) |            |
+|  +-----------+    +-----------+    +-----------+            |
+|        |                |                |                  |
+|        v                v                v                  |
+|  +-----------+    +-----------+    +-----------+            |
+|  | GitHub API|    |LabelService|    | Commands  |            |
+|  | (gh issue)|    | (状态机)    |    |plan/run/  |            |
+|  |           |    |            |    | review    |            |
+|  +-----------+    +-----------+    +-----------+            |
++-------------------------------------------------------------+
+                              |
+                              v
+                    +-----------------+
+                    |   handoff.db    |
+                    |  (执行记录)      |
+                    +-----------------+
 ```
 
 ### 1.2 状态触发映射
 
 | GitHub Label | 状态变化 | 触发命令 | 说明 |
 |--------------|----------|----------|------|
-| `state/ready` → `state/claimed` | READY → CLAIMED | `vibe3 plan` | 开始规划 |
-| `state/claimed` → `state/in-progress` | CLAIMED → IN_PROGRESS | `vibe3 run` | 开始执行 |
-| `state/in-progress` → `state/review` | IN_PROGRESS → REVIEW | `vibe3 review` | 开始审核 |
+| `state/ready` → `state/claimed` | READY → CLAIMED | `vibe3 plan task <issue>` | 开始规划 |
+| `state/claimed` → `state/in-progress` | CLAIMED → IN_PROGRESS | `vibe3 run execute` | 开始执行 |
+| `state/in-progress` → `state/review` | IN_PROGRESS → REVIEW | `vibe3 review pr <pr_number>` | 开始审核 |
 | `state/review` → `state/merge-ready` | REVIEW → MERGE_READY | - | 等待合并 |
 | `state/merge-ready` → `state/done` | MERGE_READY → DONE | - | 完成 |
 | 任意 → `state/blocked` | → BLOCKED | - | 阻塞中 |
@@ -116,7 +116,7 @@ src/vibe3/orchestra/
 # src/vibe3/orchestra/serve.py
 
 @app.command()
-def serve(
+def start(
     interval: int = 60,
     repo: str | None = None,
     dry_run: bool = False,
@@ -128,7 +128,14 @@ def serve(
         repo: GitHub repo (default: current repo)
         dry_run: Only log actions, don't execute
     """
-    config = OrchestraConfig(interval=interval, repo=repo, dry_run=dry_run)
+    config = OrchestraConfig.from_settings()
+    if interval != 60:
+        config.polling_interval = interval
+    if repo is not None:
+        config.repo = repo
+    if dry_run:
+        config.dry_run = dry_run
+    
     poller = Poller(config)
     poller.start()
 ```
@@ -141,73 +148,45 @@ def serve(
 class Poller:
     def __init__(self, config: OrchestraConfig):
         self.config = config
-        self.label_service = LabelService()
         self.router = Router()
         self.dispatcher = Dispatcher(config)
     
-    def start(self) -> None:
-        """Start polling loop."""
-        while True:
-            self.tick()
-            time.sleep(self.config.interval)
+    async def start(self) -> None:
+        """Start async polling loop."""
+        while self._running:
+            await self._tick_async()
+            await asyncio.sleep(self.config.polling_interval)
     
-    def tick(self) -> None:
+    async def _tick_async(self) -> None:
         """Single polling iteration."""
-        issues = self.fetch_issues_with_state_changes()
+        issues = self._fetch_issues()
         for issue in issues:
-            transitions = self.router.route(issue)
-            for transition in transitions:
-                self.dispatcher.dispatch(transition)
+            await self._process_issue_async(issue)
 ```
 
-### 2.3 Router 实现
-
-```python
-# src/vibe3/orchestra/router.py
-
-class Router:
-    STATE_COMMANDS = {
-        (IssueState.READY, IssueState.CLAIMED): "plan",
-        (IssueState.CLAIMED, IssueState.IN_PROGRESS): "run",
-        (IssueState.IN_PROGRESS, IssueState.REVIEW): "review",
-    }
-    
-    def route(self, issue: Issue) -> list[Transition]:
-        """Determine transitions for an issue."""
-        current_state = self.label_service.get_state(issue.number)
-        target_state = self.determine_target_state(issue)
-        
-        if current_state != target_state:
-            return [Transition(issue, current_state, target_state)]
-        return []
-```
-
-### 2.4 Dispatcher 实现
+### 2.3 Dispatcher 实现
 
 ```python
 # src/vibe3/orchestra/dispatcher.py
 
 class Dispatcher:
-    def dispatch(self, transition: Transition) -> None:
-        """Execute command for transition."""
-        command = Router.STATE_COMMANDS.get(
-            (transition.from_state, transition.to_state)
-        )
+    def _build_command(self, trigger: Trigger) -> list[str] | None:
+        """Build command list from trigger with flow orchestration."""
+        cmd = ["uv", "run", "python", "-m", "vibe3", trigger.command]
+        cmd.extend(trigger.args)
         
-        if command == "plan":
-            self.run_plan(transition.issue)
-        elif command == "run":
-            self.run_execute(transition.issue)
-        elif command == "review":
-            self.run_review(transition.issue)
-    
-    def run_plan(self, issue: Issue) -> None:
-        """Execute vibe3 plan for issue."""
-        subprocess.run([
-            "uv", "run", "python", "-m", "vibe3", "plan", "execute",
-            "--issue", str(issue.number),
-            "--branch", f"task/{issue.slug}",
-        ])
+        if trigger.command == "plan":
+            # vibe3 plan task <issue_number>
+            cmd.append(str(trigger.issue.number))
+        elif trigger.command == "review":
+            # vibe3 review pr <pr_number>
+            pr_number = self._get_pr_for_issue(trigger.issue.number)
+            if pr_number:
+                cmd.append(str(pr_number))
+            else:
+                return None  # Cannot review without PR
+        
+        return cmd
 ```
 
 ## 3. 使用场景
@@ -216,28 +195,28 @@ class Dispatcher:
 
 ```bash
 # 1. 启动 serve 服务
-vibe3 serve --interval 60
+vibe3 serve start --interval 60
 
 # 2. 人类创建 issue 并添加标签
 gh issue create --title "feat: add new feature" --body "..."
 gh issue edit 42 --add-label "state/ready"
 
-# 3. serve 自动检测到 ready 状态，触发 plan
-#    → vibe3 plan execute --issue 42
+# 3. serve 自动检测到 ready → claimed 状态变化，触发:
+#    → vibe3 plan task 42
 #    → 创建 plan-{timestamp}.md
 
-# 4. 人类查看 plan 后，添加 claimed 标签
-gh issue edit 42 --add-label "state/claimed"
+# 4. 人类查看 plan 后，添加 in-progress 标签
+gh issue edit 42 --add-label "state/in-progress"
 
 # 5. serve 自动检测到 claimed → in-progress
-#    → vibe3 run execute --file plan-{timestamp}.md
+#    → vibe3 run execute
 #    → 开始执行代码
 
 # 6. 执行完成后，添加 review 标签
 gh issue edit 42 --add-label "state/review"
 
 # 7. serve 自动触发 review
-#    → vibe3 review pr
+#    → vibe3 review pr 123
 
 # 8. review 通过后，人类 merge PR
 #    → GitHub Actions 自动设置 done
@@ -249,7 +228,7 @@ gh issue edit 42 --add-label "state/review"
 # serve 服务与手动命令可以共存
 
 # 手动执行（不依赖 serve）
-vibe3 plan execute --issue 42
+vibe3 plan task 42
 vibe3 run execute --file plan.md
 vibe3 review pr 123
 
@@ -266,24 +245,12 @@ orchestra:
   enabled: true
   polling_interval: 60
   repo: "jacobcy/vibe-coding-control-center"
-  
-  state_triggers:
-    ready_to_claimed: plan
-    claimed_to_in_progress: run
-    in_progress_to_review: review
-  
   max_concurrent_flows: 3
   
-  agent_config:
-    plan:
-      backend: claude
-      model: claude-sonnet-4-5
-    run:
-      backend: claude
-      model: claude-sonnet-4-5
-    review:
-      backend: claude
-      model: claude-sonnet-4-5
+  master_agent:
+    enabled: true
+    agent: "master-controller"
+    timeout_seconds: 300
 ```
 
 ## 5. 实现计划
@@ -333,10 +300,10 @@ orchestra:
 
 ## 7. 验收标准
 
-- [ ] `vibe3 serve` 命令可以启动后台服务
-- [ ] 检测到 `state/ready` 标签变化时触发 `vibe3 plan`
-- [ ] 检测到 `state/claimed` 标签变化时触发 `vibe3 run`
-- [ ] 检测到 `state/review` 标签变化时触发 `vibe3 review`
+- [ ] `vibe3 serve start` 命令可以启动后台服务
+- [ ] 检测到 `state/ready` → `state/claimed` 标签变化时触发 `vibe3 plan task <issue>`
+- [ ] 检测到 `state/claimed` → `state/in-progress` 标签变化时触发 `vibe3 run execute`
+- [ ] 检测到 `state/in-progress` → `state/review` 标签变化时触发 `vibe3 review pr <pr_number>`
 - [ ] 所有执行记录写入 handoff.db
 - [ ] `vibe3 flow status` 显示当前状态
 - [ ] 单元测试覆盖率 >= 80%

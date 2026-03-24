@@ -102,14 +102,14 @@ src/vibe3/orchestra/
 
 ```bash
 # 启动 serve 服务
-vibe3 serve --interval 60
+vibe3 serve start --interval 60
 
 # 创建 issue 并添加标签
 gh issue create --title "feat: new feature" --body "..."
 gh issue edit 42 --add-label "state/ready"
 
 # serve 自动检测并触发:
-#   ready → plan
-#   claimed → run
-#   review → review
+#   ready → claimed: vibe3 plan task <issue>
+#   claimed → in-progress: vibe3 run execute
+#   in-progress → review: vibe3 review pr <pr_number>
 ```
