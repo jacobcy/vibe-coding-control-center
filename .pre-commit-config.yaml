@@ -109,23 +109,31 @@ repos:
         stages: [pre-push]
         verbose: true
 
-  # ── Optional: Test Checks (run only when tests are modified) ───────────────
-  # Tests MUST PASS in pre-commit to ensure code quality
-  - repo: local
-    hooks:
-      - id: pytest
-        name: Pytest (Python tests)
-        entry: uv run pytest tests/vibe3 -v
-        language: system
-        pass_filenames: false
-        files: ^(src|tests/vibe3)/.*\.py$
-
-      - id: bats
-        name: Bats (Shell tests)
-        entry: bats tests/
-        language: system
-        pass_filenames: false
-        files: ^tests/.*\.(bats|sh)$
+  # ── Test Checks ───────────────────────────────────────────────────────────
+  # Tests run in pre-push, not pre-commit (faster local iteration)
+  #
+  # Rationale:
+  #   - Pre-commit: fast feedback (<10s), only lint/format/type
+  #   - Pre-push: full test suite (~1-2min), protects remote
+  #   - CI: comprehensive testing + coverage
+  #
+  # Uncomment below if you want tests in pre-commit (slower commits):
+  #
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: Pytest (Python tests)
+  #       entry: uv run pytest tests/vibe3 -v
+  #       language: system
+  #       pass_filenames: false
+  #       files: ^(src|tests/vibe3)/.*\.py$
+  #
+  #     - id: bats
+  #       name: Bats (Shell tests)
+  #       entry: bats tests/
+  #       language: system
+  #       pass_filenames: false
+  #       files: ^tests/.*\.(bats|sh)$
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # Use system default Python (avoid pre-commit trying to install python3.10)
