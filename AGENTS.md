@@ -30,7 +30,7 @@ This project has **two parallel implementations**:
 - **V3 (Python)**: `src/vibe3/` (see [.agent/rules/python-standards.md](.agent/rules/python-standards.md))
 - **Skills**: `skills/`
 - **Workflows, rules, context**: `.agent/`
-- **Shared state truth**: `.git/vibe/`
+- **Shared state truth**: `.git/vibe/`（位于主仓库 git common dir）
 
 ## 🚀 Quick Start
 

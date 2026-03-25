@@ -30,8 +30,11 @@ class HandoffService:
         self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
 
-    def _get_handoff_dir(self) -> Path:
+    def _get_handoff_dir(self, ensure: bool = True) -> Path:
         """Get handoff directory for current branch.
+
+        Args:
+            ensure: If True, create directory if it doesn't exist (idempotent)
 
         Returns:
             Path to .git/vibe3/handoff/<branch-safe>/
@@ -44,28 +47,42 @@ class HandoffService:
 
         handoff_dir = get_branch_handoff_dir(git_dir, branch)
 
-        try:
-            handoff_dir.mkdir(parents=True, exist_ok=True)
-        except (PermissionError, OSError) as e:
-            raise SystemError(
-                f"Failed to create handoff directory at {handoff_dir}: {e}"
-            ) from e
+        if ensure:
+            try:
+                handoff_dir.mkdir(parents=True, exist_ok=True)
+            except (PermissionError, OSError) as e:
+                raise SystemError(
+                    f"Failed to create handoff directory at {handoff_dir}: {e}"
+                ) from e
 
         return handoff_dir
 
-    def _get_current_handoff_path(self) -> Path:
-        """Get path to shared current.md file.
+    def ensure_handoff_dir(self) -> Path:
+        """Ensure handoff directory exists for current branch (idempotent).
+
+        This is the unified entry point for all handoff directory creation.
+        Safe to call multiple times - will only create if doesn't exist.
 
         Returns:
-            Path to .git/vibe3/handoff/<branch-safe>/current.md
+            Path to the handoff directory
+
+        Example:
+            >>> service = HandoffService()
+            >>> handoff_dir = service.ensure_handoff_dir()
+            >>> # Directory now exists, can write files to it
         """
-        return self._get_handoff_dir() / "current.md"
+        logger.bind(domain="handoff", action="ensure_handoff_dir").info(
+            "Ensuring handoff directory exists"
+        )
+        return self._get_handoff_dir(ensure=True)
 
     def ensure_current_handoff(self, force: bool = False) -> Path:
         """Ensure shared current.md exists for current branch.
 
         Creates the file with a minimal template if it doesn't exist.
         Returns the existing file unchanged unless force=True.
+
+        This method is idempotent - safe to call multiple times.
 
         Args:
             force: Force overwrite if file exists
@@ -74,11 +91,13 @@ class HandoffService:
             Path to the current.md file
 
         """
-        logger.bind(domain="handoff", action="ensure_current_handoff").info(
-            "Ensuring handoff file exists"
-        )
+        logger.bind(
+            domain="handoff", action="ensure_current_handoff", force=force
+        ).info("Ensuring handoff file exists")
 
-        handoff_path = self._get_current_handoff_path()
+        # Ensure directory exists (idempotent)
+        handoff_dir = self.ensure_handoff_dir()
+        handoff_path = handoff_dir / "current.md"
 
         if handoff_path.exists():
             if not force:
@@ -111,7 +130,9 @@ class HandoffService:
             "Reading handoff file"
         )
 
-        handoff_path = self._get_current_handoff_path()
+        # Get directory path without creating it
+        handoff_dir = self._get_handoff_dir(ensure=False)
+        handoff_path = handoff_dir / "current.md"
 
         if not handoff_path.exists():
             raise UserError(

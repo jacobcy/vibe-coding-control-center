@@ -60,28 +60,6 @@ def extract_session_id(stdout: str) -> str | None:
     return match.group(1) if match else None
 
 
-def get_effective_backend(options: ReviewAgentOptions) -> str:
-    """Get the effective backend name for database recording.
-
-    When using agent preset, returns the preset name as identifier.
-    When using backend directly, returns the backend name.
-
-    Note: For codeagent-wrapper invocation, use options.agent if set,
-    otherwise use options.backend.
-
-    Args:
-        options: ReviewAgentOptions with agent/backend/model
-
-    Returns:
-        Backend name or preset name (for database recording)
-    """
-    if options.agent:
-        return options.agent
-    if options.backend:
-        return options.backend
-    return "unknown"
-
-
 def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str | None]:
     """Resolve the actual backend and model for database recording.
 

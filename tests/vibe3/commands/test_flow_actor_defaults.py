@@ -10,6 +10,7 @@ from vibe3.models.flow import FlowState
 runner = CliRunner()
 
 
+@patch("vibe3.commands.flow.HandoffService")
 @patch("vibe3.commands.flow.render_flow_created")
 @patch("vibe3.commands.flow.SQLiteClient")
 @patch("vibe3.commands.flow.FlowService")
@@ -19,6 +20,7 @@ def test_flow_new_task_bound_uses_system_actor_by_default(
     flow_service_cls,
     sqlite_cls,
     _render_flow_created,
+    _handoff_service_cls,
 ) -> None:
     """flow new without --actor should write task_bound actor as system."""
     git = git_cls.return_value

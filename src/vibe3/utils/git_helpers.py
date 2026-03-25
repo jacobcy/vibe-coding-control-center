@@ -4,6 +4,8 @@ import hashlib
 import subprocess
 from pathlib import Path
 
+from loguru import logger
+
 from vibe3.exceptions import GitError
 
 
@@ -24,6 +26,10 @@ def get_branch_handoff_dir(git_dir: str, branch: str) -> Path:
         >>> get_branch_handoff_dir(".git", "feature/api-v2")
         Path(".git/vibe3/handoff/feature-api-v2-a1b2c3d4")
     """
+    # Validate branch name
+    if not branch or not branch.strip():
+        raise ValueError(f"Invalid branch name: {branch!r}")
+
     # Sanitize branch name with hash suffix to prevent collisions
     # Example: feature/api-v2 and feature/api/v2 would otherwise collide
     branch_hash = hashlib.sha256(branch.encode()).hexdigest()[:8]
@@ -35,7 +41,17 @@ def get_branch_handoff_dir(git_dir: str, branch: str) -> Path:
     # Append hash suffix for uniqueness
     branch_dir = f"{branch_safe}-{branch_hash}"
 
-    return Path(git_dir) / "vibe3" / "handoff" / branch_dir
+    result = Path(git_dir) / "vibe3" / "handoff" / branch_dir
+
+    # Log directory computation for debugging
+    logger.bind(
+        branch=branch,
+        branch_hash=branch_hash,
+        git_dir=git_dir,
+        handoff_dir=str(result),
+    ).debug("Computed handoff directory")
+
+    return result
 
 
 def get_commit_message(sha: str) -> str:

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
+from vibe3.models.agent_execution import AgentExecutionOutcome
 from vibe3.services.review_runner import ReviewAgentResult
 
 runner = CliRunner()
@@ -24,6 +25,13 @@ def _mock_review(verdict: str = "PASS"):
 
 def _mock_agent_result(stdout: str = "## Review\nLooks good."):
     return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
+
+
+def _mock_execution_outcome(session_id: str | None = None) -> AgentExecutionOutcome:
+    return AgentExecutionOutcome(
+        result=_mock_agent_result(),
+        effective_session_id=session_id,
+    )
 
 
 def _mock_inspect_data():
@@ -54,8 +62,8 @@ def test_review_pr_pass():
         ) as mock_inspect,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_review_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.execute_agent",
+            return_value=_mock_execution_outcome(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -80,8 +88,8 @@ def test_review_pr_block_exits_1():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_review_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.execute_agent",
+            return_value=_mock_execution_outcome(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -119,8 +127,8 @@ def test_review_pr_is_local_only():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_review_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.execute_agent",
+            return_value=_mock_execution_outcome(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -148,28 +156,19 @@ def test_review_pr_rejects_unknown_agent_param():
 
 
 def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
-    flow_status = MagicMock()
-    flow_status.reviewer_session_id = "existing-session-id"
-
     with (
         patch(
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
-        patch("vibe3.commands.review.GitClient") as mock_git_class,
         patch(
-            "vibe3.services.flow_service.FlowService.get_flow_status",
-            return_value=flow_status,
+            "vibe3.commands.review.load_session_id",
+            return_value="existing-session-id",
         ),
         patch(
-            "vibe3.commands.review.run_review_agent",
-            return_value=ReviewAgentResult(
-                exit_code=0,
-                stdout="## Review\nLooks good.",
-                stderr="",
-                session_id=None,
-            ),
+            "vibe3.commands.review.execute_agent",
+            return_value=_mock_execution_outcome("existing-session-id"),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -177,10 +176,6 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
         ),
         patch("vibe3.commands.review._record_review_event") as mock_record,
     ):
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "task/session-resume-check"
-        mock_git_class.return_value = mock_git
-
         result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0

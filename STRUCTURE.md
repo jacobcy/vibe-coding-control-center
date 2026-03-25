@@ -7,18 +7,27 @@ audience: both
 review_frequency: on-change
 author: Claude Sonnet 4.5
 created: 2024-01-15
-last_updated: 2025-01-24
+last_updated: 2026-03-25
 related_docs:
   - SOUL.md
   - CLAUDE.md
   - docs/README.md
 ---
 
-# Vibe Center 2.0 项目结构
+# Vibe Center 项目结构
 
-本文档定义 Vibe Center 2.0 的完整项目结构，说明每个文件和目录的用途。
+本文档定义 Vibe Center 的完整项目结构，说明每个文件和目录的用途。
 
 > **单一事实来源**：本文件是项目结构的权威定义。
+
+## 项目组成
+
+Vibe Center 包含**两个并行实现**：
+
+- **V3 (Python)** - 主要实现，Python 3.10+，路径 `src/vibe3/`
+- **V2 (Shell)** - Shell 实现，Zsh，入口 `bin/vibe`
+
+本文档以 **V3 为主视角**进行说明。
 
 ## 📁 根目录结构
 
@@ -32,15 +41,29 @@ vibe-center/
 ├── README.md                    # 项目介绍（面向用户）
 │
 ├── bin/                         # CLI 入口
-│   └── vibe                     # 主命令入口
+│   ├── vibe                     # V2 Shell 入口
+│   └── vibe3                    # V3 Python 入口
 │
-├── lib/                         # Shell 核心逻辑
+├── src/vibe3/                   # V3 Python 实现（主要）
+│   ├── cli.py                   # CLI 主入口
+│   ├── commands/                # 命令实现
+│   ├── services/                # 业务逻辑
+│   ├── clients/                 # 外部客户端
+│   ├── models/                  # 数据模型
+│   ├── utils/                   # 工具函数
+│   └── observability/           # 可观测性
+│
+├── lib/                         # V2 Shell 核心逻辑
 │   ├── *.sh                     # 各功能模块
 │   └── ...
 │
-├── config/                      # 配置文件
+├── config/                      # V2 配置文件
 │   ├── keys/                    # API 密钥配置
 │   └── aliases/                 # 命令别名
+│
+├── tests/                       # 测试
+│   ├── vibe3/                   # V3 测试
+│   └── vibe2/                   # V2 测试
 │
 ├── skills/                      # 技能定义（canonical source）
 │   └── */                       # 各技能目录
@@ -52,6 +75,7 @@ vibe-center/
 │   │   └── memory.md            # [TRACKED] 跨项目长期记忆与架构共识
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
+│   │   ├── python-standards.md  # Python 标准（V3 权威）
 │   │   └── patterns.md          # 设计模式
 │   ├── templates/               # 文档模板（AI 工具）
 │   │   ├── prd.md               # PRD 模板
@@ -122,14 +146,50 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **职责**：命令行接口的分发入口
 
+**内容**：
+- `vibe` - V2 Shell 入口
+- `vibe3` - V3 Python 入口
+
 **规则**：
-- 只包含 `vibe` 主命令
+- 只包含命令入口脚本
 - 负责参数解析和命令分发
 - 不包含业务逻辑
 
-### `lib/` - Shell 核心逻辑
+### `src/vibe3/` - V3 Python 实现（主要）
 
-**职责**：所有 Shell 脚本的业务逻辑
+**职责**：Vibe 的主要实现，Python 3.10+
+
+**规则**：
+- 使用 `uv` 进行依赖管理
+- 禁止使用 `python`/`pip`，必须用 `uv run`
+- 详细标准见 [.agent/rules/python-standards.md](.agent/rules/python-standards.md)
+
+**主要模块**：
+- `cli.py` - CLI 主入口
+- `commands/` - 命令实现（flow, handoff, plan, review, run 等）
+- `services/` - 业务逻辑层
+- `clients/` - 外部客户端（git, sqlite, linear 等）
+- `models/` - 数据模型（FlowState, FlowEvent 等）
+- `utils/` - 工具函数
+- `observability/` - 可观测性（logger, trace）
+
+**常用命令**：
+```bash
+uv run python src/vibe3/cli.py <command>  # 运行 CLI
+uv run pytest                              # 运行测试
+uv run mypy src/vibe3                      # 类型检查
+```
+
+**代码分析**：
+```bash
+vibe3 inspect symbols <file|file:symbol>  # 符号引用分析
+vibe3 inspect structure <file>             # 文件结构 + 依赖关系
+vibe3 inspect commit <sha>                 # 改动影响范围
+```
+
+### `lib/` - V2 Shell 核心逻辑
+
+**职责**：V2 Shell 实现的业务逻辑
 
 **规则**：
 - 单文件 ≤ 300 行
@@ -143,13 +203,25 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `keys.sh` - API 密钥管理
 - `utils.sh` - 通用工具函数
 
-### `config/` - 配置文件
+### `config/` - V2 配置文件
 
-**职责**：存放配置文件
+**职责**：V2 Shell 实现的配置文件
 
 **子目录**：
 - `keys/` - API 密钥配置
 - `aliases/` - 命令别名
+
+### `tests/` - 测试
+
+**职责**：所有测试代码
+
+**子目录**：
+- `vibe3/` - V3 Python 测试
+- `vibe2/` - V2 Shell 测试
+
+**规则**：
+- V3 测试使用 pytest
+- 测试覆盖率目标 80%+
 
 ### `skills/` - 技能定义
 
@@ -204,19 +276,44 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 
 **职责**：技能的运行时环境（symlinks 到 `skills/`）
 
-### `.git/vibe/`、`~/.vibe/` 与历史 `<worktree>/.vibe/` - 数据存储
+### `.git/vibe3/`、`.git/vibe/`、`~/.vibe/` - 数据存储
 
 **职责**：Vibe 系统的数据存储位置
 
 #### 数据存储位置规则
 
-| 路径 | 职责 | 共享范围 | 示例内容 |
-|------|------|---------|---------|
-| **`.git/vibe/`** | **当前运行时共享真源**（主仓库） | 所有 worktrees 共享 | `registry.json`, `worktrees.json`, `tasks/*/` |
-| **`~/.vibe/`** | **用户级全局配置** | 当前用户跨仓库共享 | loader、keys、skills 偏好 |
-| **`<worktree>/.vibe/`** | **历史本地缓存方案（已淘汰）** | 仅历史文档背景 | 不再作为当前运行时真源 |
+| 路径 | 职责 | 共享范围 | 版本 | 示例内容 |
+|------|------|---------|------|---------|
+| **`.git/vibe3/`** | **V3 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V3 | `flow.db`, `handoff/*/` |
+| **`.git/vibe/`** | **V2 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V2 | `registry.json`, `worktrees.json`, `tasks/*/` |
+| **`~/.vibe/`** | **用户级全局配置** | 当前用户跨仓库共享 | V2/V3 | loader、keys、skills 偏好 |
+| **`<worktree>/.vibe/`** | **历史本地缓存方案（已淘汰）** | 仅历史文档背景 | V2 | 不再作为当前运行时真源 |
 
-#### 重要文件
+#### V3 数据存储（`.git/vibe3/`）
+
+**`.git/vibe3/flow.db`** - SQLite 数据库（跨项目共享）
+- 存储所有 flow 状态和事件
+- 包含 `flow_state` 和 `flow_events` 表
+- 所有 worktree 共享访问
+- 通过 `git rev-parse --git-common-dir` 定位
+
+**`.git/vibe3/handoff/{branch-safe}/`** - Handoff 数据（跨项目共享）
+- `current.md` - 当前 handoff 文件
+- `plan-*.md` - Plan 文档
+- `report-*.md` - Report 文档
+- `audit-*.md` - Audit 文档
+
+**访问方式**：
+```bash
+# V3 CLI
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py handoff show
+
+# 数据库路径
+$(git rev-parse --git-common-dir)/vibe3/flow.db
+```
+
+#### V2 数据存储（`.git/vibe/`）
 
 **`.git/vibe/registry.json`** - 任务注册表（跨项目共享）
 - 记录所有任务的状态与当前 runtime 映射关系
@@ -231,17 +328,9 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - 每个任务的 `task.json` 详细配置
 - 所有 worktree 共享访问
 
-**`~/.vibe/`** - 全局用户配置
-- 保存跨仓库生效的 loader、keys 与偏好设置
-- 不承载当前仓库的 task/worktree 运行时绑定
-
-**`<worktree>/.vibe/`** - 已淘汰的本地缓存层
-- 当前 shell/runtime 不再读写 `.vibe/current-task.json`、`.vibe/focus.md`、`.vibe/session.json`
-- 如在历史文档中出现，仅表示旧设计，不代表现行真源
-
 **访问方式**：
 ```bash
-# Shell 中获取 registry 路径
+# V2 Shell
 $(git rev-parse --git-common-dir)/vibe/registry.json
 
 # 查看用户级全局配置目录
@@ -374,6 +463,7 @@ ls ~/.vibe/
 2. 阅读 `DEVELOPER.md` - 了解开发流程
 3. 阅读 `STRUCTURE.md`（本文件）- 了解项目结构
 4. 阅读 `SOUL.md` - 了解核心原则
+5. 查看 `src/vibe3/` - 了解 V3 Python 实现（主要）
 
 ### 我是 AI Agent
 1. 阅读 `AGENTS.md` - 入口指南
@@ -385,11 +475,30 @@ ls ~/.vibe/
 1. 阅读 `docs/README.md` - 文档结构
 2. 阅读 `docs/standards/DOC_ORGANIZATION.md` - 详细指南
 3. 使用 `.agent/templates/` 中的模板
+4. 运行 `uv run python src/vibe3/cli.py flow start <feature>` - 启动新 flow
 
 ### 我要理解工作流
 1. 阅读 `docs/prds/vibe-workflow-paradigm.md` - Vibe Guard 范式
 2. 阅读 `docs/standards/cognition-spec-dominion.md` - 宪法大纲
 3. 查看 `docs/tasks/` 中的示例任务
+4. 运行 `uv run python src/vibe3/cli.py flow --help` - 查看命令帮助
+
+### 我要使用 V3 命令
+```bash
+# Flow 管理
+uv run python src/vibe3/cli.py flow start <feature>
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py flow status
+
+# Handoff 管理
+uv run python src/vibe3/cli.py handoff init
+uv run python src/vibe3/cli.py handoff show
+uv run python src/vibe3/cli.py handoff append "message"
+
+# 测试
+uv run pytest
+uv run pytest tests/vibe3/ -k flow
+```
 
 ## 🔍 文件审查清单
 
@@ -401,6 +510,9 @@ ls ~/.vibe/
 - [ ] `docs/README.md` 与实际文档结构一致
 - [ ] `.agent/templates/` 包含所有必需模板
 - [ ] 所有入口文件相互引用正确
+- [ ] `src/vibe3/` 遵循 Python 编码标准
+- [ ] `tests/vibe3/` 测试覆盖率 ≥ 80%
+- [ ] `.git/vibe3/flow.db` 结构与代码一致
 
 ## 📝 维护责任
 
