@@ -5,7 +5,6 @@ This module provides an extensible interface for running different agent types
 
 Design principles:
 - Immutable configuration (frozen dataclass)
-- Enum-based agent types for type safety and future extension
 - Clear separation between configuration and execution
 
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
@@ -14,32 +13,11 @@ NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 import re
 import subprocess
 import sys
-from enum import Enum
 from pathlib import Path
 from typing import Final, cast
 
+from vibe3.clients.git_client import GitClient
 from vibe3.models.review_runner import ReviewAgentOptions, ReviewAgentResult
-
-
-class AgentType(str, Enum):
-    """Supported agent types for codeagent-wrapper.
-
-    Extensible for future agent types (planner, executor, etc.)
-    """
-
-    CODEX = "codex"
-    PLANNER = "planner"
-    EXECUTOR = "executor"
-
-
-class AgentBackend(str, Enum):
-    """Supported backends for codeagent-wrapper.
-
-    Extensible for future backends (claude, etc.)
-    """
-
-    CODEX = "codex"
-    CLAUDE = "claude"
 
 
 # Default wrapper path
@@ -182,11 +160,16 @@ def run_review_agent(
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
+            # Get project root directory (git root)
+            git_client = GitClient()
+            project_root = git_client.get_git_common_dir().replace("/.git", "")
+
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
                 timeout=options.timeout_seconds,
+                cwd=project_root,  # Execute in project root
             )
         except FileNotFoundError:
             raise FileNotFoundError(
