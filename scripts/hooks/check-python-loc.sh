@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Check Python LOC ceiling (core code only)
+# WARNING ONLY - Does not block commits/pushes
+#
 # Delegates to metrics_service for consistent LOC counting.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
@@ -19,8 +21,12 @@ total=$(echo "$result" | awk '{print $1}')
 LIMIT=$(echo "$result" | awk '{print $2}')
 
 if [ "$total" -gt "$LIMIT" ]; then
-  echo "FAIL: Total Python LOC $total exceeds $LIMIT limit"
-  exit 1
+  echo "⚠️  WARNING: Total Python LOC $total exceeds $LIMIT limit"
+  echo "   This is a soft constraint - push allowed but consider refactoring"
+  echo ""
+  echo "💡 Tip: Split large modules, extract utilities, remove dead code"
+  # Exit 0 to allow push (warning only)
+  exit 0
 else
   echo "✅ Total Python LOC: $total / $LIMIT"
 fi

@@ -311,7 +311,9 @@ def run_command(
     try:
         flow_service.ensure_flow_for_branch(branch)
     except MainBranchProtectedError as e:
-        typer.echo(f"Error: {e}", err=True)
+        typer.echo(f"Error: {e}\n", err=True)
+        typer.echo("Tip: Create a feature branch first:", err=True)
+        typer.echo("  vibe3 flow new <branch-name> -c", err=True)
         raise typer.Exit(1)
 
     # --skill mode

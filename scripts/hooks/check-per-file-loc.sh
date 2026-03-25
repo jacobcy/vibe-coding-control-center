@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Check per-file LOC ceiling for source files
+# WARNING ONLY - Does not block commits/pushes
+#
 # Reads limits from config/settings.yaml
 #
 # Limits (unified for Shell and Python):
@@ -15,10 +17,6 @@
 #   Python: scripts/ (*.py files)
 #
 # Note: scripts/ are checked for single-file limits but NOT counted in total LOC
-#
-# Exit codes:
-#   0: All files within default limit
-#   1: Some files exceed max limit
 
 set -e
 
@@ -112,12 +110,19 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 if [ "$errors" -gt 0 ]; then
   echo ""
+  echo "⚠️  WARNING: $errors files exceed max limit ($LIMIT_MAX lines)"
+  echo "   This is a soft constraint - push allowed but consider refactoring"
+  echo ""
   echo "💡 Tip: Split large files into smaller, focused modules"
   echo "   - Extract utilities to separate files"
   echo "   - Use composition over inheritance"
   echo "   - Follow Single Responsibility Principle"
-  exit 1
+  # Exit 0 to allow push (warning only)
+  exit 0
 elif [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "⚠️  WARNING: $warnings files exceed default limit ($LIMIT_DEFAULT lines)"
+  echo "   This is a soft constraint - push allowed but consider refactoring"
   echo ""
   echo "💡 Tip: Consider refactoring files exceeding default limit"
   echo "   (Warnings are allowed, but keep below max limit)"

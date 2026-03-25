@@ -226,9 +226,11 @@ def pr(
 @app.command()
 def base(
     base_branch: Annotated[
-        str,
-        typer.Argument(help="Base branch to compare against (default: origin/main)"),
-    ] = "origin/main",
+        str | None,
+        typer.Argument(
+            help="Base branch to compare against (auto-detected if not specified)"
+        ),
+    ] = None,
     instructions: Annotated[
         Optional[str],
         typer.Argument(help="Custom prompt (skips context building)"),
@@ -244,6 +246,10 @@ def base(
     - Changed symbols (function-level impact)
     - Impacted modules (DAG upstream dependencies)
 
+    If base_branch is not specified, it will auto-detect the closest parent branch
+    (e.g., for refactor/B forked from feature/A, it will compare against feature/A
+    instead of main).
+
     Use this to review local changes before pushing or creating a PR.
 
     Example: vibe3 review base origin/main "Focus on behavior changes"
@@ -252,16 +258,31 @@ def base(
         enable_trace()
 
     from vibe3.services.flow_service import FlowService
+    from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.git_helpers import get_current_branch
 
     current_branch = get_current_branch()
+
+    # Auto-detect parent branch if not specified
+    if base_branch is None:
+        base_branch = find_parent_branch(current_branch)
+        if base_branch is None:
+            typer.echo(
+                "Error: Could not auto-detect parent branch. "
+                "Please specify base branch explicitly.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(f"→ Auto-detected parent branch: {base_branch}")
 
     # Auto-ensure flow for non-main branches
     flow_service = FlowService()
     try:
         flow_service.ensure_flow_for_branch(current_branch)
     except MainBranchProtectedError as e:
-        typer.echo(f"Error: {e}", err=True)
+        typer.echo(f"Error: {e}\n", err=True)
+        typer.echo("Tip: Create a feature branch first:", err=True)
+        typer.echo("  vibe3 flow new <branch-name> -c", err=True)
         raise typer.Exit(1)
 
     log = logger.bind(

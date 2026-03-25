@@ -56,7 +56,15 @@ def test_review_base_defaults_to_origin_main():
         patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
+        patch(
+            "vibe3.utils.branch_utils.find_parent_branch",
+            return_value="origin/main",
+        ),
+        patch("vibe3.services.flow_service.FlowService") as mock_flow_service,
     ):
+        # Mock FlowService methods
+        mock_flow_service.return_value.ensure_flow_for_branch.return_value = None
+        mock_flow_service.return_value.get_flow_status.return_value = None
 
         result = runner.invoke(app, ["base"])
         assert result.exit_code == 0
@@ -80,7 +88,11 @@ def test_review_base_pass():
         patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
+        patch("vibe3.services.flow_service.FlowService") as mock_flow_service,
     ):
+        # Mock FlowService methods
+        mock_flow_service.return_value.ensure_flow_for_branch.return_value = None
+        mock_flow_service.return_value.get_flow_status.return_value = None
 
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
