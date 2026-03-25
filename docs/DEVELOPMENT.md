@@ -91,6 +91,57 @@ uv add --dev package-name
 uv lock --upgrade
 ```
 
+## Flow Management
+
+Vibe3 uses a **branch-centric flow model** where flows are automatically managed
+based on git branches. This eliminates the need for explicit flow creation and
+deletion.
+
+### Key Concepts
+
+- **Branch as Primary Key**: Each flow is uniquely identified by its branch name
+- **Automatic Lifecycle**: Flows are created automatically when needed and marked
+  as done when PRs are merged
+- **Main Branch Protection**: Flows cannot be created on protected branches
+  (main, master, develop by default)
+
+### Usage
+
+You no longer need to run `vibe3 flow new` explicitly. Instead:
+
+```bash
+# On a feature branch, just run your commands
+vibe3 plan task  # Flow is automatically created if needed
+vibe3 run execute
+vibe3 review base
+
+# Check flow status
+vibe3 flow status
+
+# View flow details (now shows branch as primary identifier)
+vibe3 flow show
+```
+
+### Protected Branches
+
+Configure protected branches in `config/settings.yaml`:
+
+```yaml
+flow:
+  protected_branches:
+    - "main"
+    - "master"
+    - "develop"
+    - "production"  # Add custom protected branches
+```
+
+### Implementation Details
+
+- **Auto-Ensure**: Commands like `plan`, `run`, and `review` automatically call
+  `ensure_flow_for_branch()` which creates a flow if one doesn't exist
+- **PR Detection**: `vibe3 check` detects merged/closed PRs and marks flows as done
+- **Display**: UI now shows branch as the primary identifier with flow status
+
 ## 故障排除
 
 ### 问题：ModuleNotFoundError

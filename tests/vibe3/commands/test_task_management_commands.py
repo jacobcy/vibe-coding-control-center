@@ -41,7 +41,7 @@ def test_flow_show_help_uses_branch_name() -> None:
 
     assert result.exit_code == 0
     assert "Usage: root show [OPTIONS] [FLOW_NAME]" in stdout
-    assert "Flow to show" in stdout
+    assert "Branch name" in stdout
 
 
 def test_task_link_help_uses_issue_and_new_roles() -> None:

@@ -28,7 +28,7 @@ def create_handoff_artifact(
 
     # Use unified entry point for directory creation (idempotent)
     handoff_service = HandoffService()
-    handoff_dir = handoff_service.ensure_handoff_dir()  # type: ignore[attr-defined]
+    handoff_dir = handoff_service._get_handoff_dir()
 
     timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
+from vibe3.models.agent_execution import AgentExecutionOutcome
 from vibe3.services.review_runner import ReviewAgentResult
 
 runner = CliRunner()
@@ -22,7 +23,10 @@ def _mock_review(verdict: str = "PASS"):
 
 
 def _mock_agent_result(stdout: str = "## Review\nLooks good."):
-    return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
+    return AgentExecutionOutcome(
+        result=ReviewAgentResult(exit_code=0, stdout=stdout, stderr=""),
+        effective_session_id=None,
+    )
 
 
 def _mock_inspect_data():
@@ -42,7 +46,7 @@ def test_review_base_defaults_to_origin_main():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_review_agent",
+            "vibe3.commands.review.execute_agent",
             return_value=_mock_agent_result(),
         ),
         patch(
@@ -66,7 +70,7 @@ def test_review_base_pass():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_review_agent",
+            "vibe3.commands.review.execute_agent",
             return_value=_mock_agent_result(),
         ),
         patch(

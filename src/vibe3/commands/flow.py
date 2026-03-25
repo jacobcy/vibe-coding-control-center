@@ -2,8 +2,8 @@
 """Flow command handlers."""
 
 import json
-from contextlib import contextmanager
-from typing import Annotated, Iterator, Literal
+from contextlib import nullcontext
+from typing import Annotated, Literal
 
 import typer
 from loguru import logger
@@ -26,15 +26,51 @@ from vibe3.ui.flow_ui import (
 )
 
 app = typer.Typer(
-    help="Manage logic flows (branch-centric)",
+    help=(
+        "Manage logic flows (branch-centric: flows are automatically created "
+        "and managed based on git branches)"
+    ),
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
 
-@contextmanager
-def _noop() -> Iterator[None]:
-    yield
+def _trace_scope(trace: bool, command: str, **kwargs: str):  # type: ignore[no-untyped-def]
+    if trace:
+        setup_logging(verbose=2)
+        return trace_context(command=command, domain="flow", **kwargs)
+    return nullcontext()
+
+
+def _parse_issue_number(task_ref: str) -> int:
+    digits = "".join(filter(str.isdigit, task_ref))
+    if not digits:
+        raise ValueError(f"Invalid task ID format: {task_ref}")
+    return int(digits)
+
+
+def _bind_task_to_flow(
+    branch: str,
+    task_ref: str,
+    actor: str,
+    command: str,
+) -> int:
+    issue_number = _parse_issue_number(task_ref)
+    store = SQLiteClient()
+
+    store.add_issue_link(branch, issue_number, "task")
+    store.update_flow_state(branch, task_issue_number=issue_number)
+    store.add_event(branch, "task_bound", actor, detail=f"Task bound: {task_ref}")
+    logger.bind(command=command, task=task_ref).info("Task bound to flow")
+
+    # 自动将 issue 加入 GitHub Project（链式反应，非致命）
+    link_result = TaskService().auto_link_issue_to_project(branch, issue_number)
+    if isinstance(link_result, LinkError):
+        logger.bind(command=command, task=task_ref).warning(
+            f"Auto project link skipped: {link_result.message}"
+        )
+
+    return issue_number
 
 
 @app.command()
@@ -67,15 +103,7 @@ def new(
     Use -c to create new branch (task/<name>), otherwise binds to current branch.
     If current branch already has a flow, an error will be raised.
     """
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = (
-        trace_context(command="flow new", domain="flow", name=name)
-        if trace
-        else _noop()
-    )
-    with ctx:
+    with _trace_scope(trace, "flow new", name=name):
         logger.bind(command="flow new", name=name, task=task, actor=actor).info(
             "Creating new flow"
         )
@@ -115,23 +143,8 @@ def new(
 
         # Bind task if provided
         if task:
-            store = SQLiteClient()
             try:
-                issue_number = int("".join(filter(str.isdigit, task)))
-                store.add_issue_link(branch, issue_number, "task")
-                store.update_flow_state(branch, task_issue_number=issue_number)
-                store.add_event(
-                    branch, "task_bound", actor, detail=f"Task bound: {task}"
-                )
-                logger.bind(command="flow new", task=task).info("Task bound to flow")
-                # 自动将 issue 加入 GitHub Project（链式反应，非致命）
-                link_result = TaskService().auto_link_issue_to_project(
-                    branch, issue_number
-                )
-                if isinstance(link_result, LinkError):
-                    logger.bind(command="flow new", task=task).warning(
-                        f"Auto project link skipped: {link_result.message}"
-                    )
+                _bind_task_to_flow(branch, task, actor, command="flow new")
             except ValueError:
                 logger.bind(command="flow new", task=task).warning(
                     "Invalid task ID format, skipping binding"
@@ -163,37 +176,16 @@ def bind(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Bind a task to current flow."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = (
-        trace_context(command="flow bind", domain="flow", task_id=task_id)
-        if trace
-        else _noop()
-    )
-    with ctx:
+    with _trace_scope(trace, "flow bind", task_id=task_id):
         logger.bind(command="flow bind", task_id=task_id, actor=actor).info(
             "Binding task to flow"
         )
 
         git = GitClient()
-        store = SQLiteClient()
         branch = git.get_current_branch()
 
         try:
-            issue_number = int("".join(filter(str.isdigit, task_id)))
-            store.add_issue_link(branch, issue_number, "task")
-            store.update_flow_state(branch, task_issue_number=issue_number)
-            store.add_event(
-                branch, "task_bound", actor, detail=f"Task bound: {task_id}"
-            )
-            logger.bind(command="flow bind", task_id=task_id).info("Task bound to flow")
-            # 自动将 issue 加入 GitHub Project（链式反应，非致命）
-            link_result = TaskService().auto_link_issue_to_project(branch, issue_number)
-            if isinstance(link_result, LinkError):
-                logger.bind(command="flow bind", task_id=task_id).warning(
-                    f"Auto project link skipped: {link_result.message}"
-                )
+            _bind_task_to_flow(branch, task_id, actor, command="flow bind")
 
             if json_output:
                 typer.echo(json.dumps({"status": "bound", "task_id": task_id}))
@@ -206,19 +198,17 @@ def bind(
 
 @app.command()
 def show(
-    flow_name: Annotated[str | None, typer.Argument(help="Flow to show")] = None,
+    flow_name: Annotated[
+        str | None, typer.Argument(help="Branch name (defaults to current branch)")
+    ] = None,
     snapshot: Annotated[bool, typer.Option("--snapshot", help="静态快照模式")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Show flow details."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="flow show", domain="flow") if trace else _noop()
-    with ctx:
+    """Show flow details for a branch."""
+    with _trace_scope(trace, "flow show"):
         logger.bind(command="flow show", flow_name=flow_name).info(
             "Showing flow details"
         )
@@ -258,11 +248,7 @@ def status(
     ] = False,  # noqa: E501
 ) -> None:
     """Show flow status."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="flow status", domain="flow") if trace else _noop()
-    with ctx:
+    with _trace_scope(trace, "flow status"):
         logger.bind(command="flow status", json_output=json_output).info(
             "Getting flow status"
         )
@@ -294,11 +280,7 @@ def list(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """List all flows."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="flow list", domain="flow") if trace else _noop()
-    with ctx:
+    with _trace_scope(trace, "flow list"):
         logger.bind(command="flow list", status_filter=status_filter).info(
             "Listing flows"
         )

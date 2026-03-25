@@ -1,20 +1,22 @@
 """Helper functions for plan command."""
 
-from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Literal
 
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.models.agent_execution import AgentExecutionRequest
 from vibe3.models.review_runner import ReviewAgentOptions
+from vibe3.services.agent_execution_service import execute_agent, load_session_id
+from vibe3.services.handoff_event_service import (
+    create_handoff_artifact,
+    persist_handoff_event,
+)
 from vibe3.services.review_runner import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
-from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 if TYPE_CHECKING:
     from vibe3.models.plan import PlanRequest
@@ -25,6 +27,8 @@ def get_agent_options(
     agent: str | None,
     backend: str | None,
     model: str | None,
+    section: Literal["plan", "run"] = "plan",
+    default_agent: str = "planner",
 ) -> ReviewAgentOptions:
     """Build agent options with CLI override support.
 
@@ -33,13 +37,16 @@ def get_agent_options(
     2. CLI --backend/--model: use backend/model directly
     3. Config: use config backend/model if set, else agent preset
     """
-    plan_config = getattr(config, "plan", None)
+    if section not in {"plan", "run"}:
+        raise ValueError(f"Unsupported section: {section}")
+
+    target_config = getattr(config, section, None)
     config_agent = None
     config_backend = None
     config_model = None
 
-    if plan_config and hasattr(plan_config, "agent_config"):
-        ac = plan_config.agent_config
+    if target_config and hasattr(target_config, "agent_config"):
+        ac = target_config.agent_config
         config_agent = ac.agent if hasattr(ac, "agent") else None
         config_backend = ac.backend if hasattr(ac, "backend") else None
         config_model = ac.model if hasattr(ac, "model") else None
@@ -62,20 +69,22 @@ def get_agent_options(
 
     # Fallback to agent preset
     return ReviewAgentOptions(
-        agent=config_agent or "planner",
+        agent=config_agent or default_agent,
         backend=None,
         model=None,
     )
 
 
 def get_handoff_dir() -> Path:
-    """Get handoff directory for current branch."""
-    git = GitClient()
-    git_dir = git.get_git_common_dir()
-    branch = git.get_current_branch()
-    handoff_dir = get_branch_handoff_dir(git_dir, branch)
-    handoff_dir.mkdir(parents=True, exist_ok=True)
-    return handoff_dir
+    """Get handoff directory for current branch.
+
+    Uses HandoffService._get_handoff_dir() as unified entry point
+    for directory creation (idempotent).
+    """
+    from vibe3.services.handoff_service import HandoffService
+
+    service = HandoffService()
+    return service._get_handoff_dir()
 
 
 def record_plan_event(
@@ -90,17 +99,10 @@ def record_plan_event(
         options: ReviewAgentOptions with agent/backend/model
         session_id: Optional session ID from codeagent-wrapper
     """
-    git = GitClient()
-    try:
-        branch = git.get_current_branch()
-    except Exception:
+    artifact = create_handoff_artifact("plan", plan_content)
+    if artifact is None:
         return None
-
-    handoff_dir_ = get_handoff_dir()
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    plan_file = handoff_dir_ / f"plan-{timestamp}.md"
-
-    plan_file.write_text(plan_content, encoding="utf-8")
+    branch, plan_file = artifact
 
     actor = format_agent_actor(options)
     backend, model = resolve_actor_backend_model(options)
@@ -114,19 +116,17 @@ def record_plan_event(
     if session_id:
         refs["session_id"] = session_id
 
-    store = SQLiteClient()
-    store.add_event(
-        branch,
-        "handoff_plan",
-        actor,
+    persist_handoff_event(
+        branch=branch,
+        event_type="handoff_plan",
+        actor=actor,
         detail=f"Plan generated: {plan_file.name}",
         refs=refs,
-    )
-    store.update_flow_state(
-        branch,
-        plan_ref=str(plan_file),
-        planner_actor=actor,
-        planner_session_id=session_id,
+        flow_state_updates={
+            "plan_ref": str(plan_file),
+            "planner_actor": actor,
+            "planner_session_id": session_id,
+        },
     )
 
     return plan_file
@@ -141,25 +141,16 @@ def run_plan(
     backend: str | None,
     model: str | None,
     build_plan_context_func: Callable,
-    run_review_agent_func: Callable,
 ) -> None:
     """Execute plan generation."""
     from vibe3.models.plan import PlanRequest
-    from vibe3.services.flow_service import FlowService
 
     if not isinstance(request, PlanRequest):
         raise TypeError(f"Expected PlanRequest, got {type(request)}")
 
     log = logger.bind(domain="plan", scope=request.scope.kind)
 
-    # Load existing session_id if available
-    git = GitClient()
-    try:
-        branch = git.get_current_branch()
-        flow_status = FlowService().get_flow_status(branch)
-        session_id = flow_status.planner_session_id if flow_status else None
-    except Exception:
-        session_id = None
+    session_id = load_session_id("planner")
 
     log.info("Building plan context")
     prompt_file_content = build_plan_context_func(request, config)
@@ -181,17 +172,24 @@ def run_plan(
         model=options.model,
         session_id=session_id,
     )
-    result = run_review_agent_func(
-        prompt_file_content, options, task=task, dry_run=dry_run, session_id=session_id
+    outcome = execute_agent(
+        AgentExecutionRequest(
+            prompt_file_content=prompt_file_content,
+            options=options,
+            task=task,
+            dry_run=dry_run,
+            session_id=session_id,
+        )
     )
 
     if dry_run:
         return
 
-    plan_content = result.stdout
-    effective_session_id = result.session_id or session_id
+    plan_content = outcome.result.stdout
     plan_file = record_plan_event(
-        plan_content, options, session_id=effective_session_id
+        plan_content,
+        options,
+        session_id=outcome.effective_session_id,
     )
     if plan_file:
         import typer

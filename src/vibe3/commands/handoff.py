@@ -1,8 +1,8 @@
 """Handoff command - Agent handoff chain and events."""
 
 import json
-from contextlib import contextmanager
-from typing import Annotated, Iterator
+from contextlib import nullcontext
+from typing import Annotated
 
 import typer
 from loguru import logger
@@ -23,9 +23,37 @@ app = typer.Typer(
 )
 
 
-@contextmanager
-def _noop() -> Iterator[None]:
-    yield
+def _trace_scope(trace: bool, command: str):  # type: ignore[no-untyped-def]
+    if trace:
+        setup_logging(verbose=2)
+        return trace_context(command=command, domain="handoff")
+    return nullcontext()
+
+
+def _record_handoff_reference(
+    *,
+    command: str,
+    ref_label: str,
+    ref_value: str,
+    next_step: str | None,
+    blocked_by: str | None,
+    actor: str,
+    trace: bool,
+    method_name: str,
+) -> None:
+    with _trace_scope(trace, command):
+        specific_ref_key = f"{ref_label.lower()}_ref"
+        logger.bind(
+            command=command,
+            actor=actor,
+            ref=ref_value,
+            **{specific_ref_key: ref_value},
+        ).info(f"Recording {ref_label} handoff")
+
+        service = HandoffService()
+        method = getattr(service, method_name)
+        method(ref_value, next_step, blocked_by, actor)
+        console.print(f"[green]✓[/] {ref_label} handoff recorded: {ref_value}")
 
 
 def _render_agent_chain(state: FlowState) -> None:
@@ -69,6 +97,90 @@ def _render_handoff_events(events: list[FlowEvent]) -> None:
         console.print()
 
 
+def _parse_updates_section(content: str) -> list[dict[str, str]]:
+    """Parse Updates section from current.md content.
+
+    Args:
+        content: Full content of current.md
+
+    Returns:
+        List of update entries with timestamp, actor, kind, message
+    """
+    updates = []
+    in_updates = False
+
+    for line in content.split("\n"):
+        if line.strip() == "## Updates":
+            in_updates = True
+            continue
+
+        if in_updates and line.startswith("## "):
+            # Reached next section, stop parsing
+            break
+
+        if in_updates and line.startswith("### "):
+            # Parse update header: ### timestamp | actor | kind
+            try:
+                header = line[4:].strip()
+                parts = header.split(" | ")
+                if len(parts) >= 3:
+                    timestamp = parts[0].strip()
+                    actor = parts[1].strip()
+                    kind = parts[2].strip()
+                    updates.append(
+                        {
+                            "timestamp": timestamp,
+                            "actor": actor,
+                            "kind": kind,
+                            "message": "",
+                        }
+                    )
+            except Exception:
+                pass
+        elif in_updates and updates and line.strip():
+            # Append message to last update
+            if updates[-1]["message"]:
+                updates[-1]["message"] += "\n" + line
+            else:
+                updates[-1]["message"] = line
+
+    return updates
+
+
+def _render_updates_log(updates: list[dict[str, str]]) -> None:
+    """Render updates in log format.
+
+    Args:
+        updates: List of update entries
+    """
+    if not updates:
+        console.print("[dim]  no updates yet[/]")
+        return
+
+    # Display in reverse chronological order (newest first)
+    for update in reversed(updates):
+        timestamp = update["timestamp"]
+        actor = update["actor"]
+        kind = update["kind"]
+        message = update["message"]
+
+        # Kind-based color coding
+        kind_colors = {
+            "finding": "yellow",
+            "blocker": "red",
+            "next": "blue",
+            "note": "dim",
+        }
+        kind_color = kind_colors.get(kind, "dim")
+
+        time_str = timestamp[:19].replace("T", " ")
+        console.print(f"[dim]{time_str}[/]  [{kind_color}]{kind}[/]  [dim]{actor}[/]")
+        if message:
+            for msg_line in message.split("\n"):
+                console.print(f"  {msg_line}")
+        console.print()
+
+
 @app.command()
 def init(
     force: Annotated[bool, typer.Option("--yes", "-y", help="Force overwrite")] = False,
@@ -77,11 +189,7 @@ def init(
     ] = False,
 ) -> None:
     """Initialize handoff file for current branch."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="handoff init", domain="handoff") if trace else _noop()
-    with ctx:
+    with _trace_scope(trace, "handoff init"):
         logger.bind(command="handoff init", force=force).info("Initializing handoff")
 
         service = HandoffService()
@@ -100,11 +208,7 @@ def show(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show agent handoff chain and events."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="handoff show", domain="handoff") if trace else _noop()
-    with ctx:
+    with _trace_scope(trace, "handoff show"):
         logger.bind(command="handoff show", flow_name=flow_name).info(
             "Showing handoff details"
         )
@@ -158,16 +262,24 @@ def show(
         console.print()
         _render_handoff_events(handoff_events)
 
-        # Show current.md path and content
+        # Show current.md updates in log format
         git_dir = git.get_git_common_dir()
         handoff_dir = get_branch_handoff_dir(git_dir, branch)
         current_md = handoff_dir / "current.md"
-        console.print("[bold]═══ Current Handoff ═══[/]")
+
+        console.print("[bold]═══ Update Log (current.md) ═══[/]")
         console.print(f"  [dim]path[/]  {current_md}")
         console.print()
+
         if current_md.exists():
             content = current_md.read_text(encoding="utf-8")
-            console.print(content)
+            updates = _parse_updates_section(content)
+            _render_updates_log(updates)
+
+            # Show full content hint
+            console.print("[dim]---[/]")
+            console.print(f"[dim]Full file: {current_md}[/]")
+            console.print("[dim]Use 'cat' or edit the file to see all sections[/]")
         else:
             console.print(
                 "[dim]  (current.md not found — run `vibe3 handoff init` to create)[/]"
@@ -179,8 +291,13 @@ def show(
 def append(
     message: Annotated[str, typer.Argument(help="Message to append")],
     actor: Annotated[
-        str, typer.Option("--actor", "-a", help="Actor identifier")
-    ] = "claude",
+        str,
+        typer.Option(
+            "--actor",
+            "-a",
+            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+        ),
+    ] = "unknown",
     kind: Annotated[
         str,
         typer.Option("--kind", "-k", help="Update kind (finding/blocker/next/note)"),
@@ -190,13 +307,7 @@ def append(
     ] = False,
 ) -> None:
     """Append lightweight update to handoff file."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = (
-        trace_context(command="handoff append", domain="handoff") if trace else _noop()
-    )
-    with ctx:
+    with _trace_scope(trace, "handoff append"):
         logger.bind(command="handoff append", actor=actor, kind=kind).info(
             "Appending handoff update"
         )
@@ -218,26 +329,28 @@ def plan(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str, typer.Option("--actor", "-a", help="Actor identifier")
-    ] = "claude",
+        str,
+        typer.Option(
+            "--actor",
+            "-a",
+            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+        ),
+    ] = "unknown",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
     """Record plan handoff."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="handoff plan", domain="handoff") if trace else _noop()
-    with ctx:
-        logger.bind(command="handoff plan", plan_ref=plan_ref, actor=actor).info(
-            "Recording plan handoff"
-        )
-
-        service = HandoffService()
-        service.record_plan(plan_ref, next_step, blocked_by, actor)
-
-        console.print(f"[green]✓[/] Plan handoff recorded: {plan_ref}")
+    _record_handoff_reference(
+        command="handoff plan",
+        ref_label="Plan",
+        ref_value=plan_ref,
+        next_step=next_step,
+        blocked_by=blocked_by,
+        actor=actor,
+        trace=trace,
+        method_name="record_plan",
+    )
 
 
 @app.command()
@@ -250,28 +363,28 @@ def report(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str, typer.Option("--actor", "-a", help="Actor identifier")
-    ] = "claude",
+        str,
+        typer.Option(
+            "--actor",
+            "-a",
+            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+        ),
+    ] = "unknown",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
     """Record report handoff."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = (
-        trace_context(command="handoff report", domain="handoff") if trace else _noop()
+    _record_handoff_reference(
+        command="handoff report",
+        ref_label="Report",
+        ref_value=report_ref,
+        next_step=next_step,
+        blocked_by=blocked_by,
+        actor=actor,
+        trace=trace,
+        method_name="record_report",
     )
-    with ctx:
-        logger.bind(command="handoff report", report_ref=report_ref, actor=actor).info(
-            "Recording report handoff"
-        )
-
-        service = HandoffService()
-        service.record_report(report_ref, next_step, blocked_by, actor)
-
-        console.print(f"[green]✓[/] Report handoff recorded: {report_ref}")
 
 
 @app.command()
@@ -284,23 +397,25 @@ def audit(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str, typer.Option("--actor", "-a", help="Actor identifier")
-    ] = "claude",
+        str,
+        typer.Option(
+            "--actor",
+            "-a",
+            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+        ),
+    ] = "unknown",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
 ) -> None:
     """Record audit handoff."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="handoff audit", domain="handoff") if trace else _noop()
-    with ctx:
-        logger.bind(command="handoff audit", audit_ref=audit_ref, actor=actor).info(
-            "Recording audit handoff"
-        )
-
-        service = HandoffService()
-        service.record_audit(audit_ref, next_step, blocked_by, actor)
-
-        console.print(f"[green]✓[/] Audit handoff recorded: {audit_ref}")
+    _record_handoff_reference(
+        command="handoff audit",
+        ref_label="Audit",
+        ref_value=audit_ref,
+        next_step=next_step,
+        blocked_by=blocked_by,
+        actor=actor,
+        trace=trace,
+        method_name="record_audit",
+    )
