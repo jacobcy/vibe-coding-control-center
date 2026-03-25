@@ -28,7 +28,6 @@ def get_agent_options(
     backend: str | None,
     model: str | None,
     section: Literal["plan", "run"] = "plan",
-    default_agent: str = "planner",
 ) -> ReviewAgentOptions:
     """Build agent options with CLI override support.
 
@@ -61,30 +60,23 @@ def get_agent_options(
             agent=None, backend=backend, model=model or config_model
         )
 
-    # Use config values
+    # Use config agent preset if available (preferred over backend/model)
+    if config_agent:
+        return ReviewAgentOptions(agent=config_agent, backend=None, model=None)
+
+    # Fallback to config backend/model
     if config_backend:
         return ReviewAgentOptions(
             agent=None, backend=config_backend, model=config_model
         )
 
-    # Fallback to agent preset
-    return ReviewAgentOptions(
-        agent=config_agent or default_agent,
-        backend=None,
-        model=None,
+    # No configuration found - raise error
+    raise ValueError(
+        f"No agent configuration found for '{section}' command. "
+        f"Please either:\n"
+        f"  1. Configure agent_config in config/settings.yaml under '{section}:' section, or\n"
+        f"  2. Use --agent, --backend, or --model CLI options"
     )
-
-
-def get_handoff_dir() -> Path:
-    """Get handoff directory for current branch.
-
-    Uses HandoffService._get_handoff_dir() as unified entry point
-    for directory creation (idempotent).
-    """
-    from vibe3.services.handoff_service import HandoffService
-
-    service = HandoffService()
-    return service._get_handoff_dir()
 
 
 def record_plan_event(

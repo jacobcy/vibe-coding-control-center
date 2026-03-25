@@ -60,7 +60,7 @@ _MODEL_OPT = Annotated[
 def _record_run_event(
     run_content: str,
     options: ReviewAgentOptions,
-    plan_file: str,
+    plan_file: str | None,
     session_id: str | None = None,
 ) -> Path | None:
     """Record run execution to handoff.
@@ -68,7 +68,7 @@ def _record_run_event(
     Args:
         run_content: The run content to save
         options: ReviewAgentOptions with agent/backend/model
-        plan_file: Path to the plan file being executed
+        plan_file: Path to the plan file being executed (None for lightweight mode)
         session_id: Optional session ID from codeagent-wrapper
     """
     artifact = create_handoff_artifact("run", run_content)
@@ -79,21 +79,49 @@ def _record_run_event(
     actor = format_agent_actor(options)
     backend, model = resolve_actor_backend_model(options)
 
+    # Parse modified files from run content
+    import re
+    modified_files = []
+    # Look for "Modified Files" section
+    match = re.search(
+        r"### Modified Files\s*([\s\S]*?)(?:\n###|\Z)", run_content, re.IGNORECASE
+    )
+    if match:
+        files_section = match.group(1)
+        # Extract file paths from lines starting with "- "
+        file_matches = re.findall(r"^-\s*([^:\]]+)(?::|\])?", files_section, re.MULTILINE)
+        modified_files = [f.strip() for f in file_matches if f.strip()]
+
+    # Build detail
+    detail_parts = [f"Run completed: {run_file.name}"]
+    if modified_files:
+        detail_parts.append(f"Modified {len(modified_files)} files:")
+        for f in modified_files[:3]:  # Show first 3 files
+            detail_parts.append(f"  - {f}")
+        if len(modified_files) > 3:
+            detail_parts.append(f"  ... and {len(modified_files) - 3} more")
+
+    detail = "\n".join(detail_parts)
+
     refs: dict[str, str] = {
         "ref": str(run_file),
-        "plan_ref": plan_file,
         "backend": backend,
     }
     if model:
         refs["model"] = model
+    if plan_file:
+        refs["plan_ref"] = plan_file
     if session_id:
         refs["session_id"] = session_id
+    if modified_files:
+        refs["modified_files"] = ",".join(modified_files)
+        refs["modified_count"] = str(len(modified_files))
 
     persist_handoff_event(
         branch=branch,
         event_type="handoff_run",
         actor=actor,
-        detail=f"Run completed: {run_file.name}",
+        detail=detail,
         refs=refs,
         flow_state_updates={
             "report_ref": str(run_file),
@@ -106,7 +134,7 @@ def _record_run_event(
 
 
 def _run_execution(
-    plan_file: str,
+    plan_file: str | None,
     config: VibeConfig,
     dry_run: bool,
     instructions: str | None,
@@ -114,7 +142,7 @@ def _run_execution(
     backend: str | None,
     model: str | None,
 ) -> None:
-    log = logger.bind(domain="run", plan_file=plan_file)
+    log = logger.bind(domain="run", plan_file=plan_file or "(lightweight)")
 
     session_id = load_session_id("executor")
 
@@ -138,7 +166,6 @@ def _run_execution(
         backend,
         model,
         section="run",
-        default_agent="executor",
     )
 
     log.info(
@@ -223,7 +250,6 @@ def _run_skill(
         backend,
         model,
         section="run",
-        default_agent="executor",
     )
 
     typer.echo(f"-> Running skill with {options.agent or options.backend}...")
@@ -321,24 +347,40 @@ def run_command(
         _run_skill(skill, instructions, config, dry_run, agent, backend, model)
         return
 
-    # --plan / --file / flow plan_ref mode
+    # Determine execution mode
     resolved_file = plan or file
-    if resolved_file is None:
+
+    if resolved_file:
+        # Explicit plan file provided
+        plan_file = str(resolved_file)
+        log = logger.bind(domain="run", action="run", plan_file=plan_file)
+        log.info("Starting plan execution")
+        typer.echo(f"-> Execute: {plan_file}")
+    elif instructions:
+        # Lightweight mode: only instructions
+        plan_file = None
+        log = logger.bind(domain="run", action="run", plan_file="(lightweight)")
+        log.info("Starting lightweight execution")
+        typer.echo("-> Lightweight mode: running with instructions only")
+        typer.echo(f"-> Task: {instructions[:60]}{'...' if len(instructions) > 60 else ''}")
+    else:
+        # Try to use flow's plan_ref
         flow = flow_service.get_flow_status(branch)
-        if not flow or not flow.plan_ref:
+        if flow and flow.plan_ref:
+            plan_file = str(flow.plan_ref)
+            log = logger.bind(domain="run", action="run", plan_file=plan_file)
+            log.info("Starting plan execution from flow")
+            typer.echo(f"-> Using flow plan: {plan_file}")
+        else:
             typer.echo(
-                "Error: Current flow has no plan_ref.\n"
-                "Use 'vibe3 run --plan <file>' or 'vibe3 run --skill <name>'.",
+                "Error: No plan specified.\n"
+                "Use one of:\n"
+                "  vibe3 run <instructions>        # Lightweight mode\n"
+                "  vibe3 run --plan <file>         # With plan file\n"
+                "  vibe3 run --skill <name>        # With skill",
                 err=True,
             )
             raise typer.Exit(1)
-        resolved_file = Path(flow.plan_ref)
-        typer.echo(f"-> Using flow plan: {resolved_file}")
-
-    plan_file = str(resolved_file)
-    log = logger.bind(domain="run", action="run", plan_file=plan_file)
-    log.info("Starting plan execution")
-    typer.echo(f"-> Execute: {plan_file}")
 
     _run_execution(plan_file, config, dry_run, instructions, agent, backend, model)
 

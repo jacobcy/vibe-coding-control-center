@@ -19,7 +19,6 @@ from typing import Final, cast
 from vibe3.clients.git_client import GitClient
 from vibe3.models.review_runner import ReviewAgentOptions, ReviewAgentResult
 
-
 # Default wrapper path
 DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
@@ -160,17 +159,63 @@ def run_review_agent(
             return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
-            # Get project root directory (git root)
-            git_client = GitClient()
-            project_root = git_client.get_git_common_dir().replace("/.git", "")
+            # Get current working directory (worktree or main repo)
+            # Use os.getcwd() to respect the current worktree context
+            import os
+            project_root = os.getcwd()
 
-            result = subprocess.run(
+            # Real-time output using Popen
+            stdout_lines = []
+            stderr_lines = []
+
+            process = subprocess.Popen(
                 command,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=options.timeout_seconds,
-                cwd=project_root,  # Execute in project root
+                cwd=project_root,  # Execute in current worktree
             )
+
+            # Read output in real-time
+            import select
+
+            while process.poll() is None:
+                # Check for available output
+                reads, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
+
+                for fd in reads:
+                    line = fd.readline()
+                    if line:
+                        if fd == process.stdout:
+                            print(line, end="", flush=True)
+                            stdout_lines.append(line)
+                        else:
+                            print(line, file=sys.stderr, end="", flush=True)
+                            stderr_lines.append(line)
+
+            # Read remaining output after process exits
+            for line in process.stdout.readlines():
+                if line:
+                    print(line, end="", flush=True)
+                    stdout_lines.append(line)
+
+            for line in process.stderr.readlines():
+                if line:
+                    print(line, file=sys.stderr, end="", flush=True)
+                    stderr_lines.append(line)
+
+            # Create result object
+            stdout = "".join(stdout_lines)
+            stderr = "".join(stderr_lines)
+
+            class FakeResult:
+                def __init__(self, returncode, stdout, stderr):
+                    self.returncode = returncode
+                    self.stdout = stdout
+                    self.stderr = stderr
+
+            result = FakeResult(process.returncode, stdout, stderr)
+
         except FileNotFoundError:
             raise FileNotFoundError(
                 f"codeagent-wrapper not found at {wrapper_path}. "
