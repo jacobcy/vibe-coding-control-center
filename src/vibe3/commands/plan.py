@@ -9,11 +9,11 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
+from vibe3.models.flow import MainBranchProtectedError
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
-from vibe3.services.review_runner import run_review_agent
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -75,11 +75,19 @@ def task(
         enable_trace()
 
     config = VibeConfig.get_defaults()
+    git = GitClient()
+    branch = git.get_current_branch()
+
+    # Auto-ensure flow for non-main branches
+    flow_service = FlowService()
+    try:
+        flow_service.ensure_flow_for_branch(branch)
+    except MainBranchProtectedError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
     if issue is None:
-        git = GitClient()
-        branch = git.get_current_branch()
-        flow = FlowService().get_flow_status(branch)
+        flow = flow_service.get_flow_status(branch)
         if not flow or not flow.task_issue_number:
             typer.echo(
                 "Error: No issue number provided and current flow has no task issue.\n"
@@ -96,7 +104,7 @@ def task(
 
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)
-    run_plan(
+    run_plan(  # type: ignore[call-arg]
         request,
         config,
         dry_run,
@@ -105,7 +113,6 @@ def task(
         backend,
         model,
         build_plan_context,
-        run_review_agent,
     )
 
     if not dry_run:
@@ -185,7 +192,7 @@ def spec(
 
     scope = PlanScope.for_spec(description)
     request = PlanRequest(scope=scope)
-    run_plan(
+    run_plan(  # type: ignore[call-arg]
         request,
         config,
         dry_run,
@@ -194,5 +201,4 @@ def spec(
         backend,
         model,
         build_plan_context,
-        run_review_agent,
     )
