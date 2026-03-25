@@ -35,8 +35,18 @@ class AIConfig(BaseModel):
     timeout: int = Field(default=30, ge=1, le=300)
 
 
+class FlowConfig(BaseModel):
+    """Flow 管理配置."""
+
+    protected_branches: list[str] = Field(
+        default_factory=lambda: ["main", "master", "develop"],
+        description="Branches that cannot have flows",
+    )
+
+
 __all__ = [
     "AIConfig",
+    "FlowConfig",
     "PRScoringConfig",
     "MergeGateConfig",
     "PRScoringWeights",
@@ -206,6 +216,7 @@ class OrchestraSettings(BaseModel):
 class VibeConfig(BaseModel):
     """Root configuration model."""
 
+    flow: FlowConfig = Field(default_factory=FlowConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)

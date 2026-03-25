@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.pr import PRState
 from vibe3.services.check_remote_index_mixin import CheckRemoteIndexMixin
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -106,6 +107,28 @@ class CheckService(CheckRemoteIndexMixin):
             pr = self.github_client.get_pr(pr_number)
             if pr and pr.head_branch != branch:
                 issues.append(f"PR #{pr_number} does not match branch '{branch}'")
+
+            # Check if PR is closed or merged - auto-complete flow
+            if pr and (pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at):
+                logger.bind(
+                    domain="check",
+                    action="auto_complete_flow",
+                    branch=branch,
+                    pr_number=pr_number,
+                    pr_state=pr.state.value,
+                ).info("PR closed/merged, marking flow as done")
+
+                # Mark flow as done
+                self.store.update_flow_state(branch, flow_status="done")
+                self.store.add_event(
+                    branch,
+                    "flow_auto_completed",
+                    "system",
+                    f"Flow auto-completed: PR #{pr_number} is {pr.state.value}",
+                )
+                issues.append(
+                    f"ℹ️ Flow marked as done: PR #{pr_number} is {pr.state.value}"
+                )
 
         # Check for missing PR (branch has PR but database doesn't record it)
         if not pr_number:

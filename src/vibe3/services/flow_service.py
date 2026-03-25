@@ -1,50 +1,37 @@
 """Flow service implementation."""
 
-import re
 from typing import Literal
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
+from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import (
     FlowEvent,
     FlowState,
     FlowStatusResponse,
     IssueLink,
+    MainBranchProtectedError,
 )
+from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 
 
-def parse_task_id(task_id: str) -> int:
-    """Extract numeric part from task ID.
-
-    Args:
-        task_id: Task ID string (e.g., "TASK-123", "123", "task-456")
-
-    Returns:
-        Numeric part of task ID
-
-    Raises:
-        ValueError: If no numeric part found
-    """
-    # Extract digits from the task ID
-    match = re.search(r"\d+", task_id)
-    if not match:
-        raise ValueError(f"Invalid task ID format: {task_id}")
-    return int(match.group())
-
-
-class FlowService(FlowLifecycleMixin):
+class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
     """Service for managing flow state."""
 
-    def __init__(self, store: SQLiteClient | None = None) -> None:
+    def __init__(
+        self, store: SQLiteClient | None = None, config: VibeConfig | None = None
+    ) -> None:
         """Initialize flow service.
 
         Args:
             store: SQLiteClient instance for persistence
+            config: VibeConfig instance for configuration
         """
         self.store = store or SQLiteClient()
+        self.config = config or VibeConfig.get_defaults()
 
     def create_flow(
         self,
@@ -59,7 +46,17 @@ class FlowService(FlowLifecycleMixin):
 
         Returns:
             Created flow state
+
+        Raises:
+            MainBranchProtectedError: If branch is main/master
         """
+        # Guard against main branch
+        if self._is_main_branch(branch):
+            raise MainBranchProtectedError(
+                f"Cannot create flow on protected branch '{branch}'. "
+                "Switch to a feature branch first."
+            )
+
         logger.bind(
             domain="flow",
             action="create",

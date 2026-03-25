@@ -6,6 +6,16 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class MainBranchProtectedError(Exception):
+    """Cannot create flow on protected main branches.
+
+    Main branches (main, master, develop, etc.) are protected and cannot
+    have flows. Flows are only for feature branches.
+    """
+
+    pass
+
+
 class FlowState(BaseModel):
     """Flow state model."""
 

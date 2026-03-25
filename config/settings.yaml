@@ -1,6 +1,16 @@
 # Vibe Center 配置文件
 # 用于管理代码质量限制、审核范围、质量标准等
 
+# Flow 配置
+# 控制流程管理行为
+flow:
+  # 受保护的主分支列表
+  # 这些分支禁止创建 flow，强制在特性分支上工作
+  protected_branches:
+    - "main"
+    - "master"
+    - "develop"
+
 # GitHub Projects v2 配置（Task Bridge 真源）
 # project_number 和 owner 是 task bridge 的远端真源配置
 # owner_type: "user" 表示个人账号，"org" 表示组织
