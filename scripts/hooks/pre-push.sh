@@ -54,17 +54,12 @@ uv run mypy src || {
     exit 1
 }
 
-# 3. LOC checks (fast, <2s)
-echo "  -> LOC checks..."
-bash scripts/hooks/check-python-loc.sh || {
-    echo "ERROR: Python LOC check failed"
-    exit 1
-}
-
-bash scripts/hooks/check-shell-loc.sh || {
-    echo "ERROR: Shell LOC check failed"
-    exit 1
-}
+# 3. LOC checks (fast, <2s) - WARNING ONLY in pre-push
+echo "  -> LOC checks (warning only)..."
+bash scripts/hooks/check-python-loc.sh
+# Note: Script now exits 0 with warning (doesn't block push)
+bash scripts/hooks/check-shell-loc.sh
+# Note: Script now exits 0 with warning (doesn't block push)
 
 # 4. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."

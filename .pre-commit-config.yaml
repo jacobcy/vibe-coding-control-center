@@ -110,23 +110,22 @@ repos:
         verbose: true
 
   # ── Optional: Test Checks (run only when tests are modified) ───────────────
-  # Uncomment if you want to run tests on every commit (slower but safer)
-  #
-  # - repo: local
-  #   hooks:
-  #     - id: pytest
-  #       name: Pytest (Python tests)
-  #       entry: uv run pytest tests/vibe3 -v
-  #       language: system
-  #       pass_filenames: false
-  #       files: ^(src|tests/vibe3)/.*\.py$
-  #
-  #     - id: bats
-  #       name: Bats (Shell tests)
-  #       entry: bats tests/
-  #       language: system
-  #       pass_filenames: false
-  #       files: ^tests/.*\.(bats|sh)$
+  # Tests MUST PASS in pre-commit to ensure code quality
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Pytest (Python tests)
+        entry: uv run pytest tests/vibe3 -v
+        language: system
+        pass_filenames: false
+        files: ^(src|tests/vibe3)/.*\.py$
+
+      - id: bats
+        name: Bats (Shell tests)
+        entry: bats tests/
+        language: system
+        pass_filenames: false
+        files: ^tests/.*\.(bats|sh)$
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 # Use system default Python (avoid pre-commit trying to install python3.10)

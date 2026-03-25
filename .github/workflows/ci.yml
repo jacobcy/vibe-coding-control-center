@@ -52,14 +52,23 @@ jobs:
         run: uv run pytest tests/vibe3 -v
 
       # LOC checks — delegate to hook scripts which read limits from config/settings.yaml
+      # In CI, we ENFORCE limits (local hooks only warn)
       - name: Check Shell LOC ceiling
         run: bash scripts/hooks/check-shell-loc.sh
+        env:
+          ENFORCE_LOC_LIMITS: true
 
       - name: Check Python LOC ceiling
         run: bash scripts/hooks/check-python-loc.sh
+        env:
+          ENFORCE_LOC_LIMITS: true
 
       - name: Check per-file LOC ceiling (production code)
         run: bash scripts/hooks/check-per-file-loc.sh
+        env:
+          ENFORCE_LOC_LIMITS: true
 
       - name: Check per-file LOC ceiling (test code, layer-aware)
         run: bash scripts/hooks/check-test-file-loc.sh
+        env:
+          ENFORCE_LOC_LIMITS: true

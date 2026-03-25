@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Check Python LOC ceiling (core code only)
-# WARNING ONLY - Does not block commits/pushes
+#
+# Behavior:
+#   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
+#   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
 #
 # Delegates to metrics_service for consistent LOC counting.
 #
@@ -22,11 +25,20 @@ LIMIT=$(echo "$result" | awk '{print $2}')
 
 if [ "$total" -gt "$LIMIT" ]; then
   echo "⚠️  WARNING: Total Python LOC $total exceeds $LIMIT limit"
-  echo "   This is a soft constraint - push allowed but consider refactoring"
+  echo "   This is a soft constraint in local development"
   echo ""
   echo "💡 Tip: Split large modules, extract utilities, remove dead code"
-  # Exit 0 to allow push (warning only)
-  exit 0
+
+  # In CI (ENFORCE_LOC_LIMITS=true), block on violations
+  if [ "${ENFORCE_LOC_LIMITS:-false}" = "true" ]; then
+    echo ""
+    echo "❌ CI ENFORCEMENT: LOC limit exceeded - blocking pipeline"
+    exit 1
+  else
+    echo ""
+    echo "   Push allowed (local development)"
+    exit 0
+  fi
 else
   echo "✅ Total Python LOC: $total / $LIMIT"
 fi

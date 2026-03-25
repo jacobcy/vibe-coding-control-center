@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Check per-file LOC ceiling for source files
-# WARNING ONLY - Does not block commits/pushes
+#
+# Behavior:
+#   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
+#   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
 #
 # Reads limits from config/settings.yaml
 #
@@ -111,18 +114,27 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 if [ "$errors" -gt 0 ]; then
   echo ""
   echo "⚠️  WARNING: $errors files exceed max limit ($LIMIT_MAX lines)"
-  echo "   This is a soft constraint - push allowed but consider refactoring"
+  echo "   This is a soft constraint in local development"
   echo ""
   echo "💡 Tip: Split large files into smaller, focused modules"
   echo "   - Extract utilities to separate files"
   echo "   - Use composition over inheritance"
   echo "   - Follow Single Responsibility Principle"
-  # Exit 0 to allow push (warning only)
-  exit 0
+
+  # In CI (ENFORCE_LOC_LIMITS=true), block on violations
+  if [ "${ENFORCE_LOC_LIMITS:-false}" = "true" ]; then
+    echo ""
+    echo "❌ CI ENFORCEMENT: Files exceed max LOC limit - blocking pipeline"
+    exit 1
+  else
+    echo ""
+    echo "   Push allowed (local development)"
+    exit 0
+  fi
 elif [ "$warnings" -gt 0 ]; then
   echo ""
   echo "⚠️  WARNING: $warnings files exceed default limit ($LIMIT_DEFAULT lines)"
-  echo "   This is a soft constraint - push allowed but consider refactoring"
+  echo "   This is a soft constraint in local development"
   echo ""
   echo "💡 Tip: Consider refactoring files exceeding default limit"
   echo "   (Warnings are allowed, but keep below max limit)"
