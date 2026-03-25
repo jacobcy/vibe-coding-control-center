@@ -41,8 +41,6 @@ class GitClientProtocol(Protocol):
 
     def get_current_branch(self) -> str: ...
 
-    def get_worktree_name(self) -> str: ...
-
     def get_changed_files(self, source: ChangeSource) -> list[str]: ...
 
     def get_diff(self, source: ChangeSource) -> str: ...
@@ -102,34 +100,6 @@ class GitClient:
             "Got current commit"
         )
         return commit
-
-    def get_worktree_name(self) -> str:
-        """获取当前 worktree 名称（路径最后一段）.
-
-        Returns:
-            Worktree 名称
-        """
-        root = self._run(["rev-parse", "--show-toplevel"])
-        name = root.split("/")[-1]
-        logger.bind(domain="git", action="get_worktree_name", name=name).debug(
-            "Got worktree name"
-        )
-        return name
-
-    def get_git_dir(self) -> str:
-        """Get the .git directory path.
-
-        Returns:
-            Absolute path to the .git directory
-
-        Raises:
-            GitError: git command execution failed
-        """
-        git_dir = self._run(["rev-parse", "--git-dir"])
-        logger.bind(domain="git", action="get_git_dir", git_dir=git_dir).debug(
-            "Got git directory"
-        )
-        return git_dir
 
     def get_git_common_dir(self) -> str:
         """Get the shared .git directory path (for worktrees).

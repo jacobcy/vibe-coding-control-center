@@ -39,12 +39,6 @@ class UserError(VibeError):
         super().__init__(message, recoverable=True)
 
 
-class ValidationError(UserError):
-    """Parameter validation failed."""
-
-    pass
-
-
 class ConfigError(UserError):
     """Configuration file or setting error."""
 

@@ -200,18 +200,6 @@ class SQLiteClient:
             ).debug("Retrieved issue links")
             return links
 
-    def get_active_flows(self) -> list[dict[str, Any]]:
-        """Get all active flows."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state WHERE flow_status = 'active'")
-            flows = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite", operation="get_active_flows", count=len(flows)
-            ).debug("Retrieved active flows")
-            return flows
-
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows."""
         with sqlite3.connect(self.db_path) as conn:

@@ -350,24 +350,3 @@ class TaskBridgeMixin:
             blocked_by=flow_data.get("blocked_by"),
             latest_actor=flow_data.get("latest_actor"),
         )
-
-    def get_task_bridge_for_flow(self: Any, branch: str) -> HydratedTaskView:
-        """获取 flow 消费用的 HydratedTaskView，远端失败时降级为 offline mode。"""
-        result = self.hydrate(branch)
-        if isinstance(result, HydrateError):
-            flow_data = self.store.get_flow_state(branch) or {}
-            view = HydratedTaskView(branch=branch, offline_mode=True)
-            if flow_data.get("project_item_id"):
-                view.project_item_id = FieldSource(
-                    value=flow_data["project_item_id"], source="local"
-                )
-            if flow_data.get("task_issue_number"):
-                view.task_issue_number = FieldSource(
-                    value=flow_data["task_issue_number"], source="local"
-                )
-            if flow_data.get("next_step"):
-                view.next_step = FieldSource(
-                    value=flow_data["next_step"], source="local"
-                )
-            return view
-        return cast("HydratedTaskView", result)
