@@ -18,33 +18,30 @@
 - **基线**: Python LOC 19696/20000, 113 tests passing
 - **说明**: 以当前重构分支为基准，跳过创建新分支步骤
 
-### ✅ Phase 1: 命令层瘦身（run/handoff）
-- **状态**: 已完成
-- **提交**: 8ef10ae (refactor: extract handoff orchestration into usecase service)
-- **成果**:
-  - 创建 `RunUseCase` 服务层 (tests: 4 passing)
-  - 创建 `HandoffUseCase` 服务层 (tests: 8 passing)
-  - 基线测试全绿 (21 tests passing)
-  - 类型检查通过
+### ⏸️ Phase 1: 命令层瘦身（run/handoff）
+- **状态**: 暂停
+- **原因**: usecase 服务已创建但未集成，导致 LOC 超限
+- **待完成**:
+  - 集成 RunUseCase 到 run.py
+  - 集成 HandoffUseCase 到 handoff.py
+  - 删除命令层重复代码
 
 ### ✅ Phase 2: 流程统一（flow/review/plan）
 - **状态**: 已完成 (Task 2.1)
-- **提交**: 待提交（LOC 超限）
+- **提交**: b2dcdc9 (refactor: introduce execution pipeline and delegate branch ops)
 - **成果**:
   - 创建 `ExecutionPipeline` 统一执行管线 (tests: 6 passing)
   - 定义 `ExecutionRequest` 和 `ExecutionResult` 标准类型
   - 协调 agent 执行、artifact 持久化、event 记录
 
-### 🔄 Phase 3: 大文件拆分与职责下沉
-- **状态**: 进行中
-- **当前进度**:
+### ✅ Phase 3: 大文件拆分与职责下沉（部分）
+- **状态**: 部分完成
+- **提交**: b2dcdc9
+- **成果**:
   - ✅ 创建 `git_branch_ops.py` (113 lines)
-  - 🔄 重构 `git_client.py`（待删除重复代码）
-  - ⏳ 重构 `task_bridge_mixin.py`
-  - ⏳ 重构 `handoff.py`
-  - ⏳ 重构 `run.py`
-- **当前指标**: Python LOC 20264/20000 (超出 264 行)
-- **阻塞**: 需删除重复代码降低 LOC
+  - ✅ 重构 `git_client.py`（委托给 git_branch_ops）
+  - ⏸️ Task 3.2 暂停：拆分 `task_bridge_mixin.py` 会导致 LOC 超限
+- **当前指标**: Python LOC 19967/20000 ✅
 
 ### ⏳ Phase 4: 破坏性兼容清理
 - **状态**: 未开始
