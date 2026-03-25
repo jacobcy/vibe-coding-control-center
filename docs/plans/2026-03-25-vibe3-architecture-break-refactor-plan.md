@@ -4,9 +4,67 @@
 
 **Goal:** 在可控的破坏性改动下，完成 Vibe3 命令层-服务层-持久层的职责重构，降低耦合与重复，恢复可持续扩展空间。
 
-**Architecture:** 采用“薄命令层 + 用例服务层 + 仓储/网关层 + UI 渲染层”的分层重构。先抽离高重复执行链路（run/review/plan/handoff），再拆大文件与兼容层，最后做破坏性兼容清理。每阶段都必须通过同一组回归门禁和指标门禁。
+**Architecture:** 采用”薄命令层 + 用例服务层 + 仓储/网关层 + UI 渲染层”的分层重构。先抽离高重复执行链路（run/review/plan/handoff），再拆大文件与兼容层，最后做破坏性兼容清理。每阶段都必须通过同一组回归门禁和指标门禁。
 
 **Tech Stack:** Python 3.10+, Typer, pytest, ruff, mypy, loguru, SQLiteClient, uv
+
+---
+
+## 执行进度（2026-03-25 更新）
+
+### ✅ Phase 0: 分支与基线冻结
+- **状态**: 已完成
+- **提交**: e6bf8b7 (refactor: begin architecture break - service layer cleanup)
+- **基线**: Python LOC 19696/20000, 113 tests passing
+- **说明**: 以当前重构分支为基准，跳过创建新分支步骤
+
+### ✅ Phase 1: 命令层瘦身（run/handoff）
+- **状态**: 已完成
+- **提交**: 8ef10ae (refactor: extract handoff orchestration into usecase service)
+- **成果**:
+  - 创建 `RunUseCase` 服务层 (tests: 4 passing)
+  - 创建 `HandoffUseCase` 服务层 (tests: 8 passing)
+  - 基线测试全绿 (21 tests passing)
+  - 类型检查通过
+
+### ✅ Phase 2: 流程统一（flow/review/plan）
+- **状态**: 已完成 (Task 2.1)
+- **提交**: 待提交（LOC 超限）
+- **成果**:
+  - 创建 `ExecutionPipeline` 统一执行管线 (tests: 6 passing)
+  - 定义 `ExecutionRequest` 和 `ExecutionResult` 标准类型
+  - 协调 agent 执行、artifact 持久化、event 记录
+
+### 🔄 Phase 3: 大文件拆分与职责下沉
+- **状态**: 进行中
+- **当前进度**:
+  - ✅ 创建 `git_branch_ops.py` (113 lines)
+  - 🔄 重构 `git_client.py`（待删除重复代码）
+  - ⏳ 重构 `task_bridge_mixin.py`
+  - ⏳ 重构 `handoff.py`
+  - ⏳ 重构 `run.py`
+- **当前指标**: Python LOC 20264/20000 (超出 264 行)
+- **阻塞**: 需删除重复代码降低 LOC
+
+### ⏳ Phase 4: 破坏性兼容清理
+- **状态**: 未开始
+
+### ⏳ Final Gate: 全量验证
+- **状态**: 未开始
+
+---
+
+## 当前阻塞问题
+
+**Python LOC 超限**:
+- 当前: 20264/20000
+- 超出: 264 行
+- 原因: 添加了新服务层代码和 git_branch_ops，未删除重复部分
+
+**解决方案**:
+1. 完成 git_client.py 重构，删除重复的分支操作代码（~70 行）
+2. 继续拆分其他大文件，消除重复逻辑
+3. 利用 usecase 层简化命令层代码
 
 ---
 

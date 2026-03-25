@@ -5,6 +5,24 @@ from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
 
+from vibe3.clients.git_branch_ops import (
+    branch_exists as _branch_exists,
+)
+from vibe3.clients.git_branch_ops import (
+    create_branch as _create_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    delete_branch as _delete_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    delete_remote_branch as _delete_remote_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    get_merge_base as _get_merge_base,
+)
+from vibe3.clients.git_branch_ops import (
+    switch_branch as _switch_branch,
+)
 from vibe3.exceptions import GitError, SystemError
 from vibe3.models.change_source import (
     BranchSource,
@@ -265,7 +283,7 @@ class GitClient:
             self._pr_diff_cache[pr_number] = self._github_client.get_pr_diff(pr_number)
         return self._pr_diff_cache[pr_number]
 
-    # ── 分支管理方法 ──────────────────────────────────────────
+    # ── 分支管理方法（委托给 git_branch_ops）──────────────────
 
     def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
         """Create a new branch from start_ref.
@@ -274,13 +292,7 @@ class GitClient:
             branch_name: Name of the new branch
             start_ref: Starting reference (default: origin/main)
         """
-        self._run(["checkout", "-b", branch_name, start_ref])
-        logger.bind(
-            domain="git",
-            action="create_branch",
-            branch=branch_name,
-            start_ref=start_ref,
-        ).info("Created branch")
+        _create_branch(branch_name, start_ref)
 
     def switch_branch(self, branch_name: str) -> None:
         """Switch to existing branch.
@@ -288,10 +300,7 @@ class GitClient:
         Args:
             branch_name: Branch to switch to
         """
-        self._run(["checkout", branch_name])
-        logger.bind(domain="git", action="switch_branch", branch=branch_name).info(
-            "Switched branch"
-        )
+        _switch_branch(branch_name)
 
     def delete_branch(self, branch_name: str, force: bool = False) -> None:
         """Delete local branch.
@@ -300,11 +309,7 @@ class GitClient:
             branch_name: Branch to delete
             force: Force delete even if not merged
         """
-        flag = "-D" if force else "-d"
-        self._run(["branch", flag, branch_name])
-        logger.bind(
-            domain="git", action="delete_branch", branch=branch_name, force=force
-        ).info("Deleted local branch")
+        _delete_branch(branch_name, force=force)
 
     def delete_remote_branch(self, branch_name: str) -> None:
         """Delete remote branch.
@@ -312,10 +317,7 @@ class GitClient:
         Args:
             branch_name: Remote branch to delete
         """
-        self._run(["push", "origin", "--delete", branch_name])
-        logger.bind(
-            domain="git", action="delete_remote_branch", branch=branch_name
-        ).info("Deleted remote branch")
+        _delete_remote_branch(branch_name)
 
     def get_merge_base(self, branch1: str, branch2: str) -> str:
         """Get merge-base commit between two branches.
@@ -326,15 +328,21 @@ class GitClient:
 
         Returns:
             Commit SHA of merge-base
-
-        Raises:
-            GitError: If merge-base cannot be determined
         """
-        try:
-            result = self._run(["merge-base", branch1, branch2])
-            return result.strip()
-        except Exception as e:
-            raise GitError("merge-base", str(e))
+        return _get_merge_base(branch1, branch2)
+
+    def branch_exists(self, branch_name: str) -> bool:
+        """Check if branch exists (local or remote).
+
+        Args:
+            branch_name: Branch name to check
+
+        Returns:
+            True if branch exists
+        """
+        return _branch_exists(branch_name)
+
+    # ── Stash 操作 ────────────────────────────────────────────
 
     def stash_push(self, message: str | None = None) -> str:
         """Stash current changes, return stash ref.
@@ -375,25 +383,5 @@ class GitClient:
         try:
             status = self._run(["status", "--porcelain"])
             return bool(status)
-        except GitError:
-            return False
-
-    def branch_exists(self, branch_name: str) -> bool:
-        """Check if branch exists (local or remote).
-
-        Args:
-            branch_name: Branch name to check
-
-        Returns:
-            True if branch exists
-        """
-        try:
-            # Check local branches
-            local = self._run(["branch", "--list", branch_name])
-            if local:
-                return True
-            # Check remote branches
-            remote = self._run(["branch", "-r", "--list", f"origin/{branch_name}"])
-            return bool(remote)
         except GitError:
             return False
