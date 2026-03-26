@@ -6,11 +6,7 @@ from loguru import logger
 
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.handoff_recorder_unified import (
-    HandoffRecord,
-    record_handoff_unified,
-)
+from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 
 if TYPE_CHECKING:
     from vibe3.models.plan import PlanRequest
@@ -87,11 +83,7 @@ def run_plan(
 
     log = logger.bind(domain="plan", scope=request.scope.kind)
 
-    session_id = load_session_id("planner")
-
-    log.info("Building plan context")
-    prompt_file_content = build_plan_context_func(request, config)
-
+    # Resolve task message
     task = message
     if message:
         log.info("Using custom task message")
@@ -100,37 +92,14 @@ def run_plan(
     if not task and plan_config and hasattr(plan_config, "plan_prompt"):
         task = plan_config.plan_prompt
 
-    options = get_agent_options(config, agent, backend, model)
-
-    log.info(
-        "Running plan agent",
-        agent=options.agent,
-        backend=options.backend,
-        model=options.model,
-        session_id=session_id,
-    )
-    result = execute_agent(
-        options,
-        prompt_file_content,
+    # Build execution request
+    exec_request = ExecutionRequest(
+        role="planner",
+        context_builder=lambda: build_plan_context_func(request, config),
+        options_builder=lambda: get_agent_options(config, agent, backend, model),
         task=task,
         dry_run=dry_run,
-        session_id=session_id,
+        handoff_kind="plan",
     )
 
-    if dry_run:
-        return
-
-    effective_session_id = result.session_id or session_id
-    plan_content = result.stdout
-    plan_file = record_handoff_unified(
-        HandoffRecord(
-            kind="plan",
-            content=plan_content,
-            options=options,
-            session_id=effective_session_id,
-        )
-    )
-    if plan_file:
-        import typer
-
-        typer.echo(f"-> Plan saved: {plan_file}")
+    run_execution_pipeline(exec_request)
