@@ -1,6 +1,6 @@
 """Tests for task show command behavior."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -29,11 +29,12 @@ def test_task_show_remote_binding_invalid_exits() -> None:
 def test_task_show_defaults_to_current_branch_when_missing_argument() -> None:
     """task show without BRANCH should fallback to current git branch."""
     with (
-        patch("vibe3.commands.task.GitClient") as git_cls,
+        patch("vibe3.commands.task.FlowService") as flow_service_cls,
         patch("vibe3.commands.task.TaskService") as service_cls,
     ):
-        git = git_cls.return_value
-        git.get_current_branch.return_value = "task/set-default-flow"
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/set-default-flow"
+        flow_service_cls.return_value = flow_service
 
         service = service_cls.return_value
         service.hydrate.return_value = HydrateError(

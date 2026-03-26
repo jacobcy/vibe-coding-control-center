@@ -4,19 +4,19 @@
 import json
 import re
 from contextlib import contextmanager
-from typing import Annotated, Iterator, Literal
+from typing import Annotated, Iterator, List, Literal
 
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.task_bridge import bridge_app
 from vibe3.exceptions import GitError
+from vibe3.models.flow import FlowState
 from vibe3.models.project_item import ProjectItemError
 from vibe3.models.task_bridge import HydrateError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 from vibe3.ui.task_ui import render_issue_linked
 
@@ -57,11 +57,11 @@ def list(
     if trace:
         setup_logging(verbose=2)
 
-    store = SQLiteClient()
+    flow_service = FlowService()
 
     if issue is not None:
         issue_number = parse_issue_ref(issue)
-        flows_data = store.get_flows_by_issue(issue_number, role="related")
+        flows_data = flow_service.store.get_flows_by_issue(issue_number, role="related")
         if not flows_data:
             typer.echo(f"No tasks linked to related issue #{issue_number}")
             return
@@ -78,19 +78,22 @@ def list(
             )
         return
 
-    all_flows = store.get_all_flows()
-    tasks = [f for f in all_flows if f.get("task_issue_number")]
+    all_flows_result: List[FlowState] = flow_service.list_flows()
+    store = flow_service.store
+    tasks = [f for f in all_flows_result if f.task_issue_number]
     if not tasks:
         typer.echo("No tasks found")
         return
     if json_output:
-        typer.echo(json.dumps(tasks, indent=2, default=str))
+        typer.echo(json.dumps([t.model_dump() for t in tasks], indent=2, default=str))
         return
-    for f in tasks:
-        bound = "[bound]" if f.get("project_item_id") else "[unbound]"
+    for task_flow in tasks:
+        links = store.get_issue_links(task_flow.branch)
+        has_project_item = any(lnk.get("project_item_id") for lnk in links)
+        bound = "[bound]" if has_project_item else "[unbound]"
         typer.echo(
-            f"  #{f['task_issue_number']}  {f['flow_slug']}  "
-            f"{f['flow_status']}  {bound}  branch={f['branch']}"
+            f"  #{task_flow.task_issue_number}  {task_flow.flow_slug}  "
+            f"{task_flow.flow_status}  {bound}  branch={task_flow.branch}"
         )
 
 
@@ -101,8 +104,9 @@ def show(
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show task details, including remote GitHub Project fields."""
+    flow_service = FlowService()
     try:
-        target_branch = branch or GitClient().get_current_branch()
+        target_branch = branch or flow_service.get_current_branch()
     except GitError as e:
         typer.echo(
             f"Error: unable to resolve current branch ({e})",
@@ -156,7 +160,7 @@ def show(
         if view.task_issue_number:
             typer.echo(f"Task Issue: #{view.task_issue_number.value}")
 
-        store = SQLiteClient()
+        store = flow_service.store
         related_issues = [
             lnk
             for lnk in store.get_issue_links(target_branch)
@@ -218,8 +222,8 @@ def link(
     with ctx:
         try:
             issue_number = parse_issue_ref(issue)
-            git = GitClient()
-            branch = git.get_current_branch()
+            flow_service = FlowService()
+            branch = flow_service.get_current_branch()
             service = TaskService()
             issue_link = service.link_issue(branch, issue_number, role)
 
@@ -244,8 +248,8 @@ def status(
 
     ctx = trace_context(command="task status", domain="task") if trace else _noop()
     with ctx:
-        git = GitClient()
-        branch = git.get_current_branch()
+        flow_service = FlowService()
+        branch = flow_service.get_current_branch()
         service = TaskService()
         result = service.update_remote_task_status(branch, value)
 
