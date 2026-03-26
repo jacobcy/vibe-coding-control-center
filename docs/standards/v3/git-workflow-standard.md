@@ -79,25 +79,57 @@ related_docs:
 标准 flow 生命周期只分三类：
 
 - `open + no_pr`
-  - flow 已打开
-  - 当前 branch 尚未形成 PR 事实
-  - 允许继续开发
-  - 允许通过 `vibe3 flow switch` 重新进入
+   - flow 已打开
+   - 当前 branch 尚未形成 PR 事实
+   - 允许继续开发
+   - 允许通过 `vibe3 flow switch` 重新进入
 - `open + had_pr`
-  - flow 尚未关闭
-  - 当前 branch 已经形成 PR 事实
-  - 不再允许当作普通开发 flow 重新进入
-  - 应交由 `vibe3 integrate` 或同类 skill 处理 review、CI、merge 与收口 handoff
+   - flow 尚未关闭
+   - 当前 branch 已经形成 PR 事实
+   - 不再允许当作普通开发 flow 重新进入
+   - 应交由 `vibe3 integrate` 或同类 skill 处理 review、CI、merge 与收口 handoff
 - `closed`
-  - flow 已完成并进入历史
-  - 不允许再次 `new` 同名 flow
-  - 不允许复用同名 branch 语义重新发 PR
+   - flow 已完成并进入历史
+   - 不允许再次 `new` 同名 flow
+   - 不允许复用同名 branch 语义重新发 PR
 
 命令语义对应：
 
 - `show`：查看单个 flow 的当前或历史详情
 - `status`：只看未关闭 flow 大盘
 - `list`：看所有 flow，包括已关闭历史
+
+## 3.1 Single-Target Governance (强约束)
+
+**核心规则：一个 worktree 同时只允许一个当前交付目标。**
+
+### Flow Create 准入规则
+
+| 当前 Flow 状态 | `flow create` 行为 | 说明 |
+|---------------|-------------------|------|
+| `active` | **拒绝** | 提示使用 `vibe3 wtnew` 创建新 worktree |
+| `blocked` | **允许** | 从当前 branch 切出新 branch（下游修复流） |
+| `done/aborted/stale` | **允许** | 从 `origin/main` 开始新目标 |
+| 无 flow | **允许** | 从 `origin/main` 开始新目标 |
+
+### 新 Feature 推荐路径
+
+1. **独立新 feature**: 使用 `vibe3 wtnew <name>` 创建新 worktree
+2. **下游修复流**: 先 `vibe3 flow blocked`，再 `vibe3 flow create <name>`
+3. **同 worktree 串行**: 先 `vibe3 flow done`，再 `vibe3 flow create <name>`
+
+### Flow Done 落盘规则
+
+关闭当前 flow 时：
+
+1. **优先回活跃下游 flow**: 若有单个活跃下游 flow，切换到该分支继续工作
+2. **否则回安全分支**: 切换到 `main` 并拉取最新
+
+### 禁止事项
+
+- 禁止在 `active` flow 的 worktree 中继续 `flow create`
+- 禁止单 worktree 内并行维护多个活跃目标
+- 禁止通过 `--base current` 在活跃 flow 中开新独立目标
 
 ## 4. Happy Path
 

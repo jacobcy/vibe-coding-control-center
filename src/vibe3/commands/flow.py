@@ -23,7 +23,11 @@ from vibe3.ui.flow_ui import (
 app = typer.Typer(
     help=(
         "Manage logic flows (branch-centric: flows are automatically created "
-        "and managed based on git branches)"
+        "and managed based on git branches)\n\n"
+        "Single-Target Governance:\n"
+        "- One worktree, one active target at a time\n"
+        "- Use 'flow create' only when current flow is blocked or done\n"
+        "- Use 'wtnew' for new independent features"
     ),
     no_args_is_help=True,
     rich_markup_mode="rich",
@@ -167,6 +171,11 @@ def create(
     - current: Create from current branch
     - <branch-name>: Create from specified branch
 
+    Single-target governance:
+    - If current flow is ACTIVE: reject and suggest 'vibe3 wtnew'
+    - If current flow is BLOCKED: allow from current branch (downstream)
+    - If current flow is DONE/ABORTED/STALE: allow from origin/main
+
     Examples:
         vibe3 flow create my-feature
         vibe3 flow create my-feature --base main
@@ -179,18 +188,29 @@ def create(
         )
 
         service = FlowService()
+        current_branch = service.get_current_branch()
 
-        # Determine base branch
+        decision = service.can_create_from_current_worktree(current_branch)
+
+        if not decision.allowed:
+            console.print(f"[red]Error: {decision.reason}[/]")
+            if decision.guidance:
+                console.print(f"[yellow]{decision.guidance}[/]")
+            raise typer.Exit(1)
+
+        if decision.requires_new_worktree:
+            console.print(f"[yellow]Hint: {decision.guidance}[/]")
+            raise typer.Exit(1)
+
         if base == "main":
-            start_ref = "origin/main"
+            start_ref = decision.start_ref or "origin/main"
         elif base == "current":
-            start_ref = service.get_current_branch()
+            start_ref = current_branch
         else:
             start_ref = base
 
         branch_name = f"task/{name}"
 
-        # Create branch and register flow
         try:
             flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
         except RuntimeError as e:
@@ -203,7 +223,6 @@ def create(
                 console.print(f"[red]Error: {e}[/]")
             raise typer.Exit(1)
 
-        # Bind task if provided
         if task:
             try:
                 service.bind_task(branch_name, task, "system")
@@ -212,11 +231,9 @@ def create(
                     "Invalid task ID format, skipping binding"
                 )
 
-        # Bind spec_ref if provided
         if spec:
             service.bind_spec(branch_name, spec, "system")
 
-        # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
 
         if json_output:
