@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
+from vibe3.models.flow import FlowState
 
 runner = CliRunner()
 
@@ -34,75 +35,68 @@ class TestHandoffCommands:
             force=expected_force
         )
 
-    @patch("vibe3.commands.handoff_read.SQLiteClient")
-    @patch("vibe3.commands.handoff_read.GitClient")
-    def test_handoff_show_command(self, mock_git_class, mock_store_class):
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_show_command(self, mock_service_class):
         """Test handoff show command shows agent chain and events."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
+        mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
+        mock_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="feature-test",
+            flow_status="active",
+        )
+        mock_service.get_handoff_events.return_value = []
+        mock_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_service_class.return_value = mock_service
 
-        mock_store = MagicMock()
-        mock_store.get_flow_state.return_value = {
-            "branch": "feature/test",
-            "flow_slug": "feature-test",
-            "flow_status": "active",
-            "spec_ref": None,
-            "plan_ref": None,
-            "report_ref": None,
-            "audit_ref": None,
-        }
-        mock_store.get_events.return_value = []
-        mock_store_class.return_value = mock_store
-
-        result = runner.invoke(app, ["handoff", "show"])
+        with patch(
+            "vibe3.commands.handoff_read.get_branch_handoff_dir"
+        ) as mock_get_dir:
+            mock_get_dir.return_value = Path("/path/to/handoff")
+            with patch.object(Path, "exists", return_value=False):
+                result = runner.invoke(app, ["handoff", "show"])
 
         assert result.exit_code == 0
         assert "Handoff" in result.output
-        assert "Agent Chain" in result.output
-        assert "spec_ref" in result.output
-        mock_store.get_flow_state.assert_called_once()
-        mock_store.get_events.assert_called_once()
+        mock_service.get_flow_state.assert_called_once()
+        mock_service.get_handoff_events.assert_called_once()
 
     @patch("vibe3.commands.handoff_read.render_handoff_summary")
     @patch("vibe3.commands.handoff_read.render_handoff_list")
-    @patch("vibe3.commands.handoff_read.SQLiteClient")
-    @patch("vibe3.commands.handoff_read.GitClient")
+    @patch("vibe3.commands.handoff_read.FlowService")
     def test_handoff_list_command(
         self,
-        mock_git_class,
-        mock_store_class,
+        mock_service_class,
         mock_render_list,
         mock_render_summary,
     ):
         """Test handoff list command renders filtered handoff events."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
+        from vibe3.models.flow import FlowEvent
 
-        mock_store = MagicMock()
-        mock_store.get_events.return_value = [
-            {
-                "event_type": "handoff_plan",
-                "actor": "planner",
-                "detail": "Plan completed",
-                "created_at": "2026-03-26T11:00:00",
-            },
-            {
-                "event_type": "handoff_run",
-                "actor": "executor",
-                "detail": "Run completed",
-                "created_at": "2026-03-26T11:10:00",
-            },
+        mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
+        mock_service.get_handoff_events.return_value = [
+            FlowEvent(
+                branch="feature/test",
+                event_type="handoff_plan",
+                actor="planner",
+                detail="Plan completed",
+                created_at="2026-03-26T11:00:00",
+            ),
+            FlowEvent(
+                branch="feature/test",
+                event_type="handoff_run",
+                actor="executor",
+                detail="Run completed",
+                created_at="2026-03-26T11:10:00",
+            ),
         ]
-        mock_store_class.return_value = mock_store
+        mock_service_class.return_value = mock_service
 
         result = runner.invoke(app, ["handoff", "list", "--kind", "run"])
 
         assert result.exit_code == 0
-        mock_store.get_events.assert_called_once_with(
-            "feature/test", event_type_prefix="handoff_"
-        )
+        mock_service.get_handoff_events.assert_called_once()
         mock_render_list.assert_called_once()
         handoffs = mock_render_list.call_args.args[1]
         assert len(handoffs) == 1

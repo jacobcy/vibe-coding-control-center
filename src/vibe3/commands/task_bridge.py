@@ -6,11 +6,10 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.project_item import LinkError
 from vibe3.observability.logger import setup_logging
+from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 
 bridge_app = typer.Typer(
@@ -58,14 +57,12 @@ def bridge(
         _hint_missing_config()
         raise typer.Exit(1)
 
-    git = GitClient()
-    branch = git.get_current_branch()
+    flow_service = FlowService()
+    branch = flow_service.get_current_branch()
     service = TaskService()
 
     if issue_number is None:
-        # 从当前 flow 取 task issue
-        store = SQLiteClient()
-        flow_data = store.get_flow_state(branch)
+        flow_data = flow_service.store.get_flow_state(branch)
         issue_number = flow_data.get("task_issue_number") if flow_data else None
         if not issue_number:
             typer.echo(
