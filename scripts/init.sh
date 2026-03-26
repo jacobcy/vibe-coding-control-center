@@ -122,11 +122,12 @@ echo "✅ Environment setup complete!"
 echo "🪝 Installing git hooks..."
 if command -v pre-commit &> /dev/null; then
   pre-commit install
-  echo "✅ Pre-commit hooks installed"
+  pre-commit install --hook-type pre-push
+  echo "✅ Pre-commit and pre-push hooks installed"
 else
   echo -e "\033[1;33m⚠️  Warning: 'pre-commit' not found. Skipping git hooks installation.\033[0m"
   echo "   Install via: uv pip install pre-commit"
-  echo "   Then run: pre-commit install"
+  echo "   Then run: pre-commit install && pre-commit install --hook-type pre-push"
 fi
 
 # ── 4. Migrate matching pending task into docs/tasks/ ────────────────────────

@@ -111,6 +111,13 @@ wtnew() {
   fi
 
   cd "$path" || return
+
+  # Run init script to setup environment (git hooks, skills, etc.)
+  if [[ -f "$repo_root/scripts/init.sh" ]]; then
+    echo "🔧 Running initialization script..."
+    bash "$repo_root/scripts/init.sh" || echo "⚠️  Init script failed (non-fatal)"
+  fi
+
   echo "💡 Next: Run ${CYAN}vup${NC} to initialize your cockpit."
 }
 

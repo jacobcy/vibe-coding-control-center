@@ -10,6 +10,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.models.project_item import LinkError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -73,91 +74,207 @@ def _bind_task_to_flow(
     return issue_number
 
 
-@app.command()
-def new(
+@app.command(name="add")
+def add(
     name: Annotated[str, typer.Argument(help="Flow name")],
     task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
-    create_branch: Annotated[
+    force: Annotated[
         bool,
-        typer.Option(
-            "--create-branch",
-            "-c",
-            help="Create new branch (task/<name>) instead of binding current branch",
-        ),
+        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
     ] = False,
-    start_ref: Annotated[
-        str,
-        typer.Option(
-            "--start-ref", help="Start ref for new branch (default: origin/main)"
-        ),
-    ] = "origin/main",
-    actor: Annotated[str, typer.Option(help="Actor creating the flow")] = "system",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Create a new flow.
+    """Add flow to current branch.
 
-    Use -c to create new branch (task/<name>), otherwise binds to current branch.
-    If current branch already has a flow, an error will be raised.
+    This command registers a flow on the current branch.
+    Use 'flow create' to create a new branch with flow.
+
+    If current branch already has a flow:
+    - Active/blocked flow: Error (use --yes to force)
+    - Done/aborted/stale flow: Warning, then proceed
+
+    Examples:
+        vibe3 flow add my-feature
+        vibe3 flow add my-feature --yes  # Force add on branch with active flow
     """
-    with _trace_scope(trace, "flow new", name=name):
-        logger.bind(command="flow new", name=name, task=task, actor=actor).info(
-            "Creating new flow"
-        )
+    with _trace_scope(trace, "flow add", name=name):
+        logger.bind(command="flow add", name=name, task=task).info("Adding flow")
 
         git = GitClient()
         service = FlowService()
-
-        if create_branch:
-            branch_name = f"task/{name}"
-            if git.branch_exists(branch_name):
-                console.print(f"[red]Error: Branch '{branch_name}' already exists.[/]")
-                console.print(
-                    f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
-                )
-                raise typer.Exit(1)
-            try:
-                flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
-            except RuntimeError as e:
-                console.print(f"[red]Error: {e}[/]")
-                raise typer.Exit(1)
-        else:
-            branch = git.get_current_branch()
-            existing_flow = service.get_flow_status(branch)
-            if existing_flow:
-                console.print(
-                    f"[red]Error: Branch '{branch}' already has "
-                    f"flow: {existing_flow.flow_slug}[/]"
-                )
-                console.print(
-                    "[yellow]Hint: Use -c to create new branch, "
-                    "or switch to different branch[/]"
-                )
-                raise typer.Exit(1)
-            flow = service.create_flow(slug=name, branch=branch)
-
         branch = git.get_current_branch()
+
+        # Check if flow already exists
+        existing_flow = service.get_flow_status(branch)
+        if existing_flow:
+            status = existing_flow.flow_status
+
+            # Active/blocked flow: block add
+            if status in ["active", "blocked"]:
+                if not force:
+                    console.print(
+                        f"[red]Error: Branch '{branch}' has active flow: "
+                        f"{existing_flow.flow_slug}[/]"
+                    )
+                    console.print(
+                        "[yellow]Use --yes to force add, "
+                        "or switch to another branch first[/]"
+                    )
+                    raise typer.Exit(1)
+
+            # Done/aborted/stale flow: allow add with warning
+            if status in ["done", "aborted", "stale"] and not force:
+                console.print(
+                    f"[yellow]Warning: Branch '{branch}' has completed flow: "
+                    f"{existing_flow.flow_slug}[/]"
+                )
+                console.print("[yellow]Adding new flow to this branch[/]")
+
+        # Register flow
+        flow = service.create_flow(slug=name, branch=branch)
 
         # Bind task if provided
         if task:
             try:
-                _bind_task_to_flow(branch, task, actor, command="flow new")
+                _bind_task_to_flow(branch, task, "system", command="flow add")
             except ValueError:
-                logger.bind(command="flow new", task=task).warning(
+                logger.bind(command="flow add", task=task).warning(
                     "Invalid task ID format, skipping binding"
                 )
 
         # Bind spec_ref if provided
         if spec:
             store = SQLiteClient()
-            store.update_flow_state(branch, spec_ref=spec, latest_actor=actor)
-            store.add_event(branch, "spec_bound", actor, detail=f"Spec bound: {spec}")
-            logger.bind(command="flow new", spec=spec).info("Spec bound to flow")
+            store.update_flow_state(branch, spec_ref=spec, latest_actor="system")
+            store.add_event(
+                branch, "spec_bound", "system", detail=f"Spec bound: {spec}"
+            )
+            logger.bind(command="flow add", spec=spec).info("Spec bound to flow")
 
-        # Auto-initialize handoff current.md on flow creation
+        # Auto-initialize handoff current.md
+        HandoffService().ensure_current_handoff()
+
+        if json_output:
+            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
+        else:
+            render_flow_created(flow, task)
+
+
+# Backward compatibility alias for 'flow new'
+@app.command(name="new", deprecated=True, hidden=True)
+def new(
+    name: Annotated[str, typer.Argument(help="Flow name")],
+    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
+    ] = False,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+) -> None:
+    """Deprecated: Use 'flow add' instead.
+
+    This command is kept for backward compatibility.
+    It will be removed in a future version.
+    """
+    console.print(
+        "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
+    )
+    add(name, task, spec, force, trace, json_output)
+
+
+@app.command(name="create")
+def create(
+    name: Annotated[str, typer.Argument(help="Flow name")],
+    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    base: Annotated[
+        str,
+        typer.Option(
+            "--base",
+            "-b",
+            help="Base branch (default: main, also supports 'current' or branch name)",
+        ),
+    ] = "main",
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+) -> None:
+    """Create new branch with flow.
+
+    This command creates a new branch and registers a flow on it.
+
+    Base branch options:
+    - main (default): Create from origin/main
+    - current: Create from current branch
+    - <branch-name>: Create from specified branch
+
+    Examples:
+        vibe3 flow create my-feature
+        vibe3 flow create my-feature --base main
+        vibe3 flow create my-feature --base current
+        vibe3 flow create my-feature --base feature/A
+    """
+    with _trace_scope(trace, "flow create", name=name, base=base):
+        logger.bind(command="flow create", name=name, base=base, task=task).info(
+            "Creating flow with new branch"
+        )
+
+        git = GitClient()
+        service = FlowService()
+
+        # Determine base branch
+        if base == "main":
+            start_ref = "origin/main"
+        elif base == "current":
+            start_ref = git.get_current_branch()
+        else:
+            # User-specified branch name
+            start_ref = base
+
+        # Check if branch already exists
+        branch_name = f"task/{name}"
+        if git.branch_exists(branch_name):
+            console.print(f"[red]Error: Branch '{branch_name}' already exists.[/]")
+            console.print(
+                f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
+            )
+            raise typer.Exit(1)
+
+        # Create branch and register flow
+        try:
+            flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
+        except RuntimeError as e:
+            console.print(f"[red]Error: {e}[/]")
+            raise typer.Exit(1)
+
+        # Bind task if provided
+        if task:
+            try:
+                _bind_task_to_flow(branch_name, task, "system", command="flow create")
+            except ValueError:
+                logger.bind(command="flow create", task=task).warning(
+                    "Invalid task ID format, skipping binding"
+                )
+
+        # Bind spec_ref if provided
+        if spec:
+            store = SQLiteClient()
+            store.update_flow_state(branch_name, spec_ref=spec, latest_actor="system")
+            store.add_event(
+                branch_name, "spec_bound", "system", detail=f"Spec bound: {spec}"
+            )
+            logger.bind(command="flow create", spec=spec).info("Spec bound to flow")
+
+        # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
 
         if json_output:
@@ -298,3 +415,10 @@ def list(
             )
         else:
             render_flows_table(flows)
+
+
+# Register lifecycle commands from flow_lifecycle.py
+app.command(name="switch")(switch)
+app.command(name="done")(done)
+app.command(name="blocked")(blocked)
+app.command(name="aborted")(aborted)

@@ -36,7 +36,7 @@ class FlowState(BaseModel):
     latest_actor: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale"] = "active"
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     @field_validator("flow_status", mode="before")
@@ -89,7 +89,7 @@ class FlowStatusResponse(BaseModel):
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale"]
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
     task_issue_number: int | None = None
     pr_number: int | None = None
     spec_ref: str | None = None

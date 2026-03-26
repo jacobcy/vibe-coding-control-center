@@ -286,5 +286,3 @@ class TestHandoffCommands:
             "API key needed",
             "claude/sonnet-4.6",
         )
-
-

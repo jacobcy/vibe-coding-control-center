@@ -133,15 +133,16 @@ Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 
 
 **基本用法**：
 ```bash
-# 使用现有 plan 执行
-vibe3 run --plan
+# 方式 1：使用 plan 文件
+vibe3 run --plan docs/plans/my-plan.md
 
-# 使用自定义 instructions 执行
-vibe3 run --instructions "Fix the bug in auth.py"
-
-# 使用指定 agent 执行
-vibe3 run --agent planner-pro --plan
+# 方式 2：直接传入指令（位置参数）
+vibe3 run "Fix the bug in auth.py"
 ```
+
+**重要**：
+- **不要指定 `--agent`**，使用默认 agent 即可
+- **两种方式二选一**：plan 文件或指令字符串
 
 **标准流程**：
 ```
