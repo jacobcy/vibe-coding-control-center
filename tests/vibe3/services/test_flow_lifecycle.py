@@ -215,7 +215,6 @@ class TestFlowLifecycle:
         assert "delete_local:task/current-flow:True" in actions
         assert not any(action == "run:pull" for action in actions)
 
-
 class TestFlowCreateDecision:
     """Tests for flow create access control."""
 
