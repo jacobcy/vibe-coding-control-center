@@ -13,13 +13,20 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
+from vibe3.services.codeagent_execution_service import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.utils.trace import enable_trace
+
+_ASYNC_OPT = Annotated[
+    bool, typer.Option("--async", help="Run asynchronously in background")
+]
 
 app = typer.Typer(
     name="plan",
@@ -41,6 +48,7 @@ def task(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -55,6 +63,7 @@ def task(
         vibe3 plan task 42 --dry-run
         vibe3 plan task 42 "Focus on security"
         vibe3 plan task 42 --agent planner-pro
+        vibe3 plan task 42 --async   # Run in background
     """
     if trace:
         enable_trace()
@@ -74,28 +83,56 @@ def task(
         issue = flow.task_issue_number
         typer.echo(f"-> Using flow task: Issue #{issue}")
 
-    import typer as typer_module
+    typer.echo(f"-> Plan: Issue #{issue}")
 
-    typer_module.echo(f"-> Plan: Issue #{issue}")
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = ["python", "-m", "vibe3", "plan", "task", str(issue)]
+        if instructions:
+            cmd.append(instructions)
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+        cmd.append("--no-async")
+
+        async_svc.start_async_execution("planner", cmd, branch)
+        typer.echo("[green]✓[/] Plan started in background")
+        typer.echo("Use 'vibe3 flow show' to check status")
+        return
 
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)
-    run_plan(  # type: ignore[call-arg]
-        request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+
+    exec_svc = CodeagentExecutionService(config)
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(request, config),
+        task=instructions,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
     )
 
-    if not dry_run:
-        result = transition_to_claimed(issue)
-        if not result.success and result.error and result.error != "no_issue_bound":
+    result = exec_svc.execute_sync(command)
+
+    if not dry_run and result.success:
+        label_result = transition_to_claimed(issue)
+        if (
+            not label_result.success
+            and label_result.error
+            and label_result.error != "no_issue_bound"
+        ):
             typer.echo(
-                f"Warning: Failed to transition issue state: {result.error}",
+                f"Warning: Failed to transition issue state: {label_result.error}",
                 err=True,
             )
 
@@ -116,6 +153,7 @@ def spec(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -129,6 +167,7 @@ def spec(
         vibe3 plan spec --msg "Add dark mode support"
         vibe3 plan spec -f spec.md "Prioritize performance"
         vibe3 plan spec --msg "Refactor auth" --agent planner-pro
+        vibe3 plan spec --file spec.md --async
     """
     if trace:
         enable_trace()
@@ -156,23 +195,54 @@ def spec(
         description = msg
         typer.echo(f"-> Plan: {msg[:60]}{'...' if len(msg) > 60 else ''}")
 
+    flow_service = FlowService()
+    branch = flow_service.get_current_branch()
+
     if spec_path and not dry_run:
         try:
-            service = FlowService()
-            branch = service.get_current_branch()
-            service.bind_spec(branch, spec_path, "user")
+            flow_service.bind_spec(branch, spec_path, "user")
         except Exception:
             pass
 
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = ["python", "-m", "vibe3", "plan", "spec"]
+        if file:
+            cmd.extend(["--file", str(file)])
+        elif msg:
+            cmd.extend(["--msg", msg])
+        if instructions:
+            cmd.append(instructions)
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+        cmd.append("--no-async")
+
+        async_svc.start_async_execution("planner", cmd, branch)
+        typer.echo("[green]✓[/] Plan started in background")
+        typer.echo("Use 'vibe3 flow show' to check status")
+        return
+
     scope = PlanScope.for_spec(description)
     request = PlanRequest(scope=scope)
-    run_plan(  # type: ignore[call-arg]
-        request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+
+    exec_svc = CodeagentExecutionService(config)
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(request, config),
+        task=instructions,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
     )
+
+    exec_svc.execute_sync(command)

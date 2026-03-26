@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
-from vibe3.models.review_runner import AgentResult
 
 runner = CliRunner()
 
@@ -21,8 +20,15 @@ def _mock_review(verdict: str = "PASS"):
     return m
 
 
-def _mock_agent_result(stdout: str = "## Review\nLooks good."):
-    return AgentResult(exit_code=0, stdout=stdout, stderr="")
+def _mock_result(stdout: str = "## Review\nLooks good."):
+    return MagicMock(
+        success=True,
+        exit_code=0,
+        stdout=stdout,
+        stderr="",
+        handoff_file=None,
+        session_id=None,
+    )
 
 
 def _mock_inspect_data():
@@ -42,12 +48,8 @@ def test_review_base_defaults_to_origin_main():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(),
-                handoff_file=None,
-                session_id=None,
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -77,12 +79,8 @@ def test_review_base_pass():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(),
-                handoff_file=None,
-                session_id=None,
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -104,7 +102,6 @@ def test_review_base_does_not_have_publish_option():
     """review base should NOT have --publish option."""
     result = runner.invoke(app, ["base", "--help"])
     assert result.exit_code == 0
-    # --publish should NOT appear in help
     assert "--publish" not in result.output
 
 
@@ -115,6 +112,5 @@ def test_review_base_rejects_unknown_agent_param():
     should not use --agent parameter.
     """
     result = runner.invoke(app, ["base", "--agent", "code-reviewer"])
-    # Typer should reject unknown option
     assert result.exit_code != 0
     assert "no such option" in result.output.lower() or "error" in result.output.lower()

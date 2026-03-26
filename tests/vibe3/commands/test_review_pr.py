@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
-from vibe3.models.review_runner import AgentResult
 
 runner = CliRunner()
 
@@ -22,10 +21,15 @@ def _mock_review(verdict: str = "PASS"):
     return m
 
 
-def _mock_agent_result(
-    stdout: str = "## Review\nLooks good.", session_id: str | None = None
-):
-    return AgentResult(exit_code=0, stdout=stdout, stderr="", session_id=session_id)
+def _mock_result(stdout: str = "## Review\nLooks good."):
+    return MagicMock(
+        success=True,
+        exit_code=0,
+        stdout=stdout,
+        stderr="",
+        handoff_file=None,
+        session_id=None,
+    )
 
 
 def _mock_inspect_data():
@@ -34,11 +38,6 @@ def _mock_inspect_data():
             "src/review.py": ["build_review_context", "run_inspect_json"]
         }
     }
-
-
-def _mock_record_review_event(record):
-    """Mock unified recorder to avoid writing to real handoff directory."""
-    return Path("/tmp/mock-review.md")
 
 
 def test_review_pr_missing_arg_shows_error():
@@ -56,12 +55,8 @@ def test_review_pr_pass():
         ) as mock_inspect,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(),
-                handoff_file=None,
-                session_id=None,
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -82,12 +77,8 @@ def test_review_pr_block_exits_1():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(),
-                handoff_file=None,
-                session_id=None,
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -108,7 +99,6 @@ def test_review_pr_does_not_have_publish_option():
     """review pr should NOT have --publish option (local-only)."""
     result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
-    # --publish should NOT appear in help
     assert "--publish" not in result.output
 
 
@@ -121,12 +111,8 @@ def test_review_pr_is_local_only():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(),
-                handoff_file=None,
-                session_id=None,
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -144,7 +130,6 @@ def test_review_pr_rejects_unknown_agent_param():
     This test ensures the hook-CLI contract is enforced.
     """
     result = runner.invoke(app, ["pr", "42", "--agent", "code-reviewer"])
-    # Typer should reject unknown option
     assert result.exit_code != 0
     assert "no such option" in result.output.lower() or "error" in result.output.lower()
 
@@ -157,12 +142,8 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=_mock_agent_result(session_id=None),
-                handoff_file=None,
-                session_id="existing-session-id",
-            ),
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",

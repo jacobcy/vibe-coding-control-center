@@ -15,9 +15,11 @@ from vibe3.commands.command_options import (
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
-from vibe3.models.review_runner import AgentOptions
+from vibe3.services.codeagent_execution_service import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.utils.trace import enable_trace
@@ -43,10 +45,11 @@ def _run_review(
     instructions: str | None,
     issue_number: int | None = None,
     pr_number: int | None = None,
+    branch: str | None = None,
+    async_mode: bool = False,
 ) -> None:
     log = logger.bind(domain="review", scope=request.scope.kind)
 
-    # Resolve task message
     task = None
     if pr_number:
         if instructions:
@@ -69,37 +72,32 @@ def _run_review(
     else:
         log.info("Using prompt file only (no custom task)")
 
-    # Build agent options
-    options = AgentOptions(
-        agent=config.review.agent_config.agent,
-        backend=config.review.agent_config.backend,
-        model=config.review.agent_config.model,
-    )
-
-    # Build execution request
-    exec_request = ExecutionRequest(
+    exec_svc = CodeagentExecutionService(config)
+    command = create_codeagent_command(
         role="reviewer",
         context_builder=lambda: build_review_context(request, config),
-        options_builder=lambda: options,
         task=task,
         dry_run=dry_run,
         handoff_kind="review",
         handoff_metadata={},
+        config=config,
+        branch=branch,
     )
 
-    # Run pipeline
-    result = run_execution_pipeline(exec_request)
+    if async_mode and not dry_run and branch:
+        exec_svc.execute_async(command, branch)
+        return
+
+    result = exec_svc.execute_sync(command)
 
     if dry_run:
         return
 
-    # Review-specific post-processing
-    raw = result.agent_result.stdout
+    raw = result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
-    # Update handoff metadata with review results
     if result.handoff_file:
         typer.echo(f"→ Review saved to: {result.handoff_file}")
 
@@ -228,20 +226,6 @@ def base(
 
     flow_service, _ = ensure_flow_for_current_branch()
 
-    if async_mode and not dry_run:
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
-        async_svc = AsyncExecutionService()
-        command = ["python", "-m", "vibe3", "review", "base", base_branch or ""]
-        if instructions:
-            command.append(instructions)
-        command.append("--no-async")
-
-        async_svc.start_async_execution("reviewer", command, current_branch)
-        typer.echo("[green]✓[/] Review started in background")
-        typer.echo("Use 'vibe3 flow show' to check status")
-        return
-
     log = logger.bind(
         domain="review",
         action="base",
@@ -259,18 +243,23 @@ def base(
     log.info("Analyzing changed files")
     scope = ReviewScope.for_base(base_branch)
 
-    # Build snapshot diff for review context
     structure_diff = build_snapshot_diff(base_branch, current_branch)
 
-    # Get changed symbols from inspect (always needed for function-level impact)
     inspect_data = run_inspect_json(["base", base_branch])
     changed_symbols_raw = inspect_data.get("changed_symbols", {})
     changed_symbols = (
         cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
     )
 
-    # Build request with both snapshot diff and changed symbols
     request = ReviewRequest(
         scope=scope, changed_symbols=changed_symbols, structure_diff=structure_diff
     )
-    _run_review(request, config, dry_run, instructions, issue_number=issue_number)
+    _run_review(
+        request,
+        config,
+        dry_run,
+        instructions,
+        issue_number=issue_number,
+        branch=current_branch,
+        async_mode=async_mode,
+    )
