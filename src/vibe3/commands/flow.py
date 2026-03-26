@@ -132,7 +132,9 @@ def create(
     task: Annotated[
         str | None, typer.Option(help="Issue reference to bind as task")
     ] = None,
-    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    spec: Annotated[
+        str | None, typer.Option("--spec", help="Spec file path or issue reference")
+    ] = None,
     base: Annotated[
         str,
         typer.Option(
@@ -239,9 +241,9 @@ def create(
 
 @app.command()
 def bind(
-    task_id: Annotated[
+    issue: Annotated[
         str,
-        typer.Argument(help="Task ID to bind as task/related/dependency"),
+        typer.Argument(help="Issue reference to bind as task/related/dependency"),
     ],
     role: Annotated[
         Literal["task", "related", "dependency"],
@@ -253,8 +255,8 @@ def bind(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Bind an issue to current flow as task, related, or dependency."""
-    with trace_scope(trace, "flow bind", task_id=task_id, role=role):
-        logger.bind(command="flow bind", task_id=task_id, role=role).info(
+    with trace_scope(trace, "flow bind", issue=issue, role=role):
+        logger.bind(command="flow bind", issue=issue, role=role).info(
             "Binding issue to flow"
         )
 
@@ -263,7 +265,7 @@ def bind(
         service = TaskService()
 
         try:
-            issue_number = _parse_task_id(task_id)
+            issue_number = _parse_task_id(issue)
             link = service.link_issue(branch, issue_number, role)
 
             if json_output:
@@ -275,8 +277,8 @@ def bind(
                 )
                 console.print(message)
         except ValueError:
-            logger.error(f"Invalid task ID format: {task_id}")
-            raise typer.BadParameter(f"Invalid task ID format: {task_id}")
+            logger.error(f"Invalid issue format: {issue}")
+            raise typer.BadParameter(f"Invalid issue format: {issue}")
 
 
 @app.command()
@@ -323,6 +325,11 @@ def show(
             typer.echo(json.dumps(output, indent=2, default=str))
         else:
             render_flow_timeline(timeline["state"], timeline["events"])
+            if timeline["state"].task_issue_number is None:
+                console.print(
+                    "[yellow]提示：当前 flow 还没有 task，建议先执行 "
+                    "vibe3 flow bind <issue> --role task[/]"
+                )
 
 
 @app.command()

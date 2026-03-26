@@ -44,7 +44,7 @@ class PRService:
         title: str,
         body: str,
         base_branch: str = "main",
-        actor: str = "unknown",
+        actor: str = "server",
     ) -> PRResponse:
         """Create a draft PR.
 

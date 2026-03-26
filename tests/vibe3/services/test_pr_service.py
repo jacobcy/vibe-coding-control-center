@@ -90,12 +90,12 @@ def test_create_draft_pr_success(
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
                     pr_number=123,
-                    latest_actor="unknown",
+                    latest_actor="server",
                 )
                 mock_store.add_event.assert_called_once_with(
                     "feature-branch",
                     "pr_draft",
-                    "unknown",
+                    "server",
                     "Draft PR #123 created: https://github.com/org/repo/pull/123",
                 )
 

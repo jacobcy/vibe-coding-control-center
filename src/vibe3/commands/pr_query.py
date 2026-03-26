@@ -24,6 +24,7 @@ from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
 
@@ -81,8 +82,6 @@ def register_query_commands(app: typer.Typer) -> None:
             # If no pr_number or branch provided, try to get from flow
             current_branch: str | None = None
             if not pr_number and not branch:
-                from vibe3.services.flow_service import FlowService
-
                 flow_service = FlowService()
                 current_branch = flow_service.get_current_branch()
                 flow_data = service.store.get_flow_state(current_branch)
@@ -98,13 +97,18 @@ def register_query_commands(app: typer.Typer) -> None:
                 # Get current branch for better error message
                 if not pr_number and not branch:
                     if current_branch is None:
-                        from vibe3.services.flow_service import FlowService
-
                         current_branch = FlowService().get_current_branch()
+                    flow_status = FlowService().get_flow_status(current_branch)
+                    bind_hint = ""
+                    if not flow_status or flow_status.task_issue_number is None:
+                        bind_hint = (
+                            "\n提示：当前 flow 还没有 task，建议先执行\n"
+                            "  vibe3 flow bind <issue> --role task"
+                        )
                     typer.echo(
                         f"No PR found for current branch '{current_branch}'\n\n"
                         "To create a PR, run:\n"
-                        f'  vibe3 pr create -t "Your PR title"',
+                        f'  vibe3 pr create -t "Your PR title"{bind_hint}',
                         err=True,
                     )
                 else:
