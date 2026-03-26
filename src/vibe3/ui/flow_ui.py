@@ -195,6 +195,9 @@ _EVENT_COLOR: dict[str, str] = {
     "pr_created": "yellow",
     "pr_ready": "yellow",
     "pr_merged": "green",
+    "run_started": "yellow",
+    "run_completed": "green",
+    "run_aborted": "red",
     "handoff_plan": "blue",
     "handoff_run": "blue",
     "handoff_review": "magenta",
@@ -208,6 +211,11 @@ def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
     _kv("flow_slug", state.flow_slug, 1)
     if state.task_issue_number:
         console.print(f"  [dim]task[/]        #{state.task_issue_number}")
+    else:
+        console.print(
+            "  [yellow]task[/]        [dim]not bound[/]  "
+            "[dim]→ vibe3 flow bind <task-id>[/]"
+        )
     if state.pr_number:
         console.print(f"  [dim]pr[/]          #{state.pr_number}")
     if state.spec_ref:

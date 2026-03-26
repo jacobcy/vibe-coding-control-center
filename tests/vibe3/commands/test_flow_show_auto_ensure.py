@@ -11,11 +11,10 @@ runner = CliRunner()
 
 
 @patch("vibe3.commands.flow.render_flow_timeline")
-@patch("vibe3.commands.flow.FlowService")
-def test_flow_show_auto_ensures_current_branch(flow_service_cls, _render_timeline) -> None:
+@patch("vibe3.commands.flow.ensure_flow_for_current_branch")
+def test_flow_show_auto_ensures_current_branch(mock_ensure, _render_timeline) -> None:
     """flow show should auto-ensure flow for current branch before showing timeline."""
     flow_service = MagicMock()
-    flow_service.get_current_branch.return_value = "task/auto-ensure-show"
     flow_service.get_flow_timeline.return_value = {
         "state": FlowState(
             branch="task/auto-ensure-show",
@@ -24,9 +23,9 @@ def test_flow_show_auto_ensures_current_branch(flow_service_cls, _render_timelin
         ),
         "events": [],
     }
-    flow_service_cls.return_value = flow_service
+    mock_ensure.return_value = (flow_service, "task/auto-ensure-show")
 
     result = runner.invoke(app, ["flow", "show"])
 
     assert result.exit_code == 0
-    flow_service.ensure_flow_for_branch.assert_called_once_with("task/auto-ensure-show")
+    mock_ensure.assert_called_once()

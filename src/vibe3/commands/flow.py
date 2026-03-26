@@ -47,8 +47,13 @@ def _parse_task_id(task_id: str) -> int:
 @app.command(name="add")
 def add(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
-    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    task: Annotated[
+        str | None,
+        typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
+    ] = None,
+    spec: Annotated[
+        str | None, typer.Option("--spec", help="Spec file path or issue reference")
+    ] = None,
     force: Annotated[
         bool,
         typer.Option("--yes", "-y", help="Force add on branch with existing flow"),

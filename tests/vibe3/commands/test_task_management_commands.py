@@ -102,3 +102,118 @@ def test_task_link_defaults_to_related_role() -> None:
     task_service_cls.return_value.link_issue.assert_called_once_with(
         "task/demo", 219, "related"
     )
+
+
+# ==============================================================================
+# Task 1 Tests: Issue-based task semantics for flow CLI
+# ==============================================================================
+
+
+def test_flow_create_task_option_help_shows_issue_reference() -> None:
+    """--task option should describe issue reference, not arbitrary task ID."""
+    result = runner.invoke(flow_app, ["create", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    # --task help should mention "issue" in description
+    assert "--task" in stdout
+    # Should describe it as issue reference, not arbitrary task ID
+    assert "issue" in stdout.lower() or "Issue" in stdout
+
+
+def test_flow_create_spec_option_help() -> None:
+    """--spec option should be the primary spec reference option."""
+    result = runner.invoke(flow_app, ["create", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    assert "--spec" in stdout
+
+
+def test_flow_blocked_help_shows_task_option() -> None:
+    """flow blocked should show --task option for dependency issue."""
+    result = runner.invoke(flow_app, ["blocked", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    # Should have --task option visible
+    assert "--task" in stdout
+    # Should describe it as issue reference for blocking dependency
+    assert "issue" in stdout.lower() or "Issue" in stdout
+
+
+def test_flow_blocked_help_still_shows_by_for_backward_compat() -> None:
+    """flow blocked --by should remain for backward compatibility."""
+    result = runner.invoke(flow_app, ["blocked", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    # --by should still be available for backward compat
+    assert "--by" in stdout
+
+
+def test_flow_bind_positional_arg_is_issue() -> None:
+    """flow bind positional argument should be ISSUE (not TASK_ID)."""
+    result = runner.invoke(flow_app, ["bind", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    # Argument should be named ISSUE
+    assert "ISSUE" in stdout or "issue" in stdout.lower()
+
+
+def test_flow_bind_role_option_has_all_roles() -> None:
+    """flow bind --role should support task, related, dependency."""
+    result = runner.invoke(flow_app, ["bind", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    assert "--role" in stdout
+    assert "task" in stdout
+    assert "related" in stdout
+    assert "dependency" in stdout
+
+
+def test_flow_bind_with_task_role() -> None:
+    """flow bind 220 --role task should bind as task."""
+    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
+            result = runner.invoke(flow_app, ["bind", "220", "--role", "task"])
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_called_once_with("task/demo", 220, "task")
+
+
+def test_flow_bind_with_related_role() -> None:
+    """flow bind 219 --role related should bind as related."""
+    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
+            result = runner.invoke(flow_app, ["bind", "219", "--role", "related"])
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_called_once_with("task/demo", 219, "related")
+
+
+def test_flow_bind_with_dependency_role() -> None:
+    """flow bind 218 --role dependency should bind as dependency."""
+    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
+            result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_called_once_with("task/demo", 218, "dependency")
