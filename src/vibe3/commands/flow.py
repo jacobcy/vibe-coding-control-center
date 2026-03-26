@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 import typer
 from loguru import logger
 
+from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
@@ -321,8 +322,11 @@ def show(
             "Showing flow details"
         )
 
-        service = FlowService()
-        branch = flow_name if flow_name else service.get_current_branch()
+        if flow_name:
+            service = FlowService()
+            branch = flow_name
+        else:
+            service, branch = ensure_flow_for_current_branch()
 
         if snapshot:
             flow_status = service.get_flow_status(branch)
