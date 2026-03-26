@@ -1,19 +1,6 @@
-"""Unified codeagent execution service.
+"""Unified codeagent execution service for plan/review/run commands."""
 
-This service provides a unified interface for executing codeagent commands
-(plan/review/run) with support for both synchronous and asynchronous execution.
-
-Design principles:
-- Single source of truth for codeagent execution
-- Support sync/async modes uniformly
-- Reusable across plan/review/run commands
-- Easy to extend for new commands
-"""
-
-import os
-import subprocess
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -23,20 +10,13 @@ from typer import echo
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
-from vibe3.services.handoff_recorder_unified import (
-    HandoffRecord,
-    record_handoff_unified,
-)
 
 ExecutionRole = Literal["planner", "executor", "reviewer"]
 
 
 @dataclass
 class CodeagentCommand:
-    """Configuration for a codeagent command execution.
-
-    This is the unified input for all codeagent-based commands.
-    """
+    """Configuration for a codeagent command execution."""
 
     role: ExecutionRole
     context_builder: Callable[[], str]
@@ -61,26 +41,13 @@ class CodeagentResult:
     stderr: str = ""
     handoff_file: Path | None = None
     session_id: str | None = None
-    pid: int | None = None  # For async execution
+    pid: int | None = None
 
 
 class CodeagentExecutionService:
-    """Unified service for codeagent execution.
-
-    This service handles:
-    1. Agent options resolution (config + CLI overrides)
-    2. Synchronous execution
-    3. Asynchronous execution with status tracking
-    4. Handoff recording
-    5. Flow state updates for async execution
-    """
+    """Unified service for codeagent execution."""
 
     def __init__(self, config: VibeConfig | None = None) -> None:
-        """Initialize service.
-
-        Args:
-            config: VibeConfig instance (defaults to VibeConfig.get_defaults())
-        """
         self.config = config or VibeConfig.get_defaults()
 
     def resolve_agent_options(
@@ -92,22 +59,7 @@ class CodeagentExecutionService:
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
-        Priority:
-        1. CLI --agent: use agent preset (ignore config backend/model)
-        2. CLI --backend/--model: use backend/model directly
-        3. Config: use config backend/model if set, else agent preset
-
-        Args:
-            section: Config section (plan/run/review)
-            agent: CLI --agent override
-            backend: CLI --backend override
-            model: CLI --model override
-
-        Returns:
-            Resolved AgentOptions
-
-        Raises:
-            ValueError: If no configuration found
+        Priority: CLI --agent > CLI --backend/--model > Config agent > Config backend
         """
         target_config = getattr(self.config, section, None)
         config_agent = None
@@ -140,14 +92,7 @@ class CodeagentExecutionService:
         )
 
     def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
-        """Execute codeagent synchronously.
-
-        Args:
-            command: Execution configuration
-
-        Returns:
-            CodeagentResult with execution output
-        """
+        """Execute codeagent synchronously."""
         log = logger.bind(
             domain="codeagent",
             role=command.role,
@@ -195,15 +140,7 @@ class CodeagentExecutionService:
         command: CodeagentCommand,
         branch: str,
     ) -> CodeagentResult:
-        """Execute codeagent asynchronously in background.
-
-        Args:
-            command: Execution configuration
-            branch: Current branch for status tracking
-
-        Returns:
-            CodeagentResult with background process PID
-        """
+        """Execute codeagent asynchronously in background."""
         from vibe3.services.async_execution_service import AsyncExecutionService
 
         log = logger.bind(
@@ -218,9 +155,8 @@ class CodeagentExecutionService:
         pid = async_svc.start_async_execution(command.role, cli_command, branch)
 
         log.info("Started async execution", pid=pid)
-        echo(
-            f"[green]✓[/] {command.role.capitalize()} started in background (PID: {pid})"
-        )
+        role_name = command.role.capitalize()
+        echo(f"[green]✓[/] {role_name} started in background (PID: {pid})")
         echo("Use 'vibe3 flow show' to check status")
 
         return CodeagentResult(
@@ -233,28 +169,13 @@ class CodeagentExecutionService:
         command: CodeagentCommand,
         async_mode: bool = False,
     ) -> CodeagentResult:
-        """Execute codeagent with automatic mode selection.
-
-        Args:
-            command: Execution configuration
-            async_mode: Whether to run asynchronously
-
-        Returns:
-            CodeagentResult
-        """
+        """Execute codeagent with automatic mode selection."""
         if async_mode and not command.dry_run and command.branch:
             return self.execute_async(command, command.branch)
         return self.execute_sync(command)
 
     def _build_cli_command(self, command: CodeagentCommand) -> list[str]:
-        """Build CLI command for async execution.
-
-        Args:
-            command: Execution configuration
-
-        Returns:
-            CLI command as list of strings
-        """
+        """Build CLI command for async execution."""
         cmd = ["python", "-m", "vibe3"]
 
         if command.role == "planner":
