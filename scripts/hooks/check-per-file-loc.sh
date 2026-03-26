@@ -5,7 +5,7 @@
 #   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
 #   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
 #
-# Reads limits from config/settings.yaml
+# Reads limits from config/settings.yaml without uv
 #
 # Limits (unified for Shell and Python):
 #   default: 200 lines (most files should fit)
@@ -24,8 +24,43 @@
 set -e
 
 get_limit() {
-  PYTHONPATH=src uv run python -m vibe3.config.get \
-    "$1" -c config/settings.yaml --quiet 2>/dev/null || echo "$2"
+  python3 - "$1" "${2:-}" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+
+def parse_config(path: str) -> dict[str, str]:
+  values: dict[str, str] = {}
+  stack: list[tuple[int, str]] = []
+
+  for raw_line in Path(path).read_text().splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+      continue
+
+    indent = len(raw_line) - len(raw_line.lstrip(" "))
+    while stack and stack[-1][0] >= indent:
+      stack.pop()
+
+    match = re.match(r"([A-Za-z0-9_]+):(?:\s*(.*))?$", stripped)
+    if not match:
+      continue
+
+    key, value = match.groups()
+    if not value:
+      stack.append((indent, key))
+      continue
+
+    path_key = ".".join([item[1] for item in stack] + [key])
+    values[path_key] = value.split("#", 1)[0].strip().strip('"').strip("'")
+
+  return values
+
+
+config = parse_config("config/settings.yaml")
+print(config.get(sys.argv[1], sys.argv[2]))
+PY
 }
 
 # Get limits (unified for all file types)

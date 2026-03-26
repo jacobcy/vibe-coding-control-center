@@ -22,6 +22,10 @@ from vibe3.services.flow_query_mixin import FlowQueryMixin
 class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
     """Service for managing flow state."""
 
+    store: SQLiteClient
+    git_client: GitClient
+    config: VibeConfig
+
     def __init__(
         self,
         store: SQLiteClient | None = None,

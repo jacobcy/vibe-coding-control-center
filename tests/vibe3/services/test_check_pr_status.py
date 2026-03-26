@@ -18,7 +18,7 @@ class TestPRStatusDetection:
         os.environ.get("CI") == "true",
         reason="CI environment lacks gh authentication for this test",
     )
-    def test_check_handles_no_pr_gracefully(self, tmp_path):
+    def test_check_marks_flow_done_when_merged(self, tmp_path):
         """Should mark flow as done when PR is merged."""
         # ARRANGE: Flow with merged PR
         store = SQLiteClient(db_path=tmp_path / "test.db")
