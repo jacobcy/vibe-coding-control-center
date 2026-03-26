@@ -35,6 +35,33 @@ uv run python src/vibe3/cli.py pr show --yaml     # YAML 格式输出
 uv run python src/vibe3/cli.py inspect commands pr show --tree  # ASCII 调用树
 ```
 
+## Flow Management
+
+Vibe3 automatically manages flows based on git branches. There's no need to
+manually create or delete flows:
+
+- **Automatic Creation**: Running `vibe3 plan`, `run`, or `review` on a feature
+  branch automatically creates a flow if one doesn't exist.
+- **Main Branch Protection**: Flows cannot be created on main/master branches.
+- **Automatic Completion**: When a PR is merged or closed, `vibe3 check` marks
+  the flow as done.
+
+### Protected Branches
+
+By default, the following branches are protected:
+- `main`
+- `master`
+- `develop`
+
+Configure via `config/settings.yaml`:
+```yaml
+flow:
+  protected_branches:
+    - "main"
+    - "master"
+    - "production"
+```
+
 ## 架构分层 (三层解耦)
 Vibe Center 3.0 推行了极其稳定的抽象分层模型：
 

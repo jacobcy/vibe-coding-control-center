@@ -19,8 +19,9 @@ class PRState(str, Enum):
 class PRMetadata(BaseModel):
     """PR metadata for vibe3 integration."""
 
+    branch: Optional[str] = Field(None, description="Branch name (primary identifier)")
     task_issue: Optional[int] = Field(None, description="Task issue number")
-    flow_slug: Optional[str] = Field(None, description="Flow slug")
+    flow_slug: Optional[str] = Field(None, description="Flow slug (display name)")
     spec_ref: Optional[str] = Field(None, description="Spec reference path")
     planner: Optional[str] = Field(None, description="Planner agent")
     executor: Optional[str] = Field(None, description="Executor agent")
@@ -73,15 +74,6 @@ class VersionBumpType(str, Enum):
     MINOR = "minor"
     MAJOR = "major"
     NONE = "none"
-
-
-class VersionBumpRequest(BaseModel):
-    """Request model for version bump calculation."""
-
-    pr_number: int = Field(..., description="PR number")
-    group: Optional[str] = Field(
-        None, description="Task group (feature/bug/docs/chore)"
-    )
 
 
 class VersionBumpResponse(BaseModel):

@@ -57,6 +57,17 @@ repos:
         types: [python]
 
   # ── LOC Checks (prevent code bloat) ─────────────────────────────────────────
+  # MOVED TO PRE-PUSH: These checks are now warnings only and run before push
+  # to allow incremental refactoring without blocking commits.
+  #
+  # See pre-push hooks below for LOC checks.
+  #
+  # Rationale:
+  #   - Code size is an architectural concern, not a commit blocker
+  #   - Allows draft PRs and incremental improvements
+  #   - Warnings remind developers to refactor without blocking workflow
+
+  # ── Pre-push Checks (run on push, not commit) ────────────────────────────────
   - repo: local
     hooks:
       - id: check-shell-loc
@@ -65,6 +76,7 @@ repos:
         language: script
         pass_filenames: false
         files: \.(sh|bash)$
+        stages: [pre-push]
 
       - id: check-python-loc
         name: Check Python LOC ceiling (src ≤ config:code_limits.v3_python.total_loc)
@@ -72,12 +84,14 @@ repos:
         language: script
         pass_filenames: false
         files: ^src/.*\.py$
+        stages: [pre-push]
 
       - id: check-per-file-loc
         name: "Check source file LOC (default: 200, max: 300)"
         entry: scripts/hooks/check-per-file-loc.sh
         language: script
         pass_filenames: false
+        stages: [pre-push]
 
       - id: check-test-file-loc
         name: "Check test file LOC (default: 200, max: 300)"
@@ -85,10 +99,8 @@ repos:
         language: script
         pass_filenames: false
         files: ^tests/vibe3/.*\.py$
+        stages: [pre-push]
 
-  # ── Pre-push Checks (run on push, not commit) ────────────────────────────────
-  - repo: local
-    hooks:
       - id: pre-push-checks
         name: Pre-push checks (coverage + risk-based review)
         entry: scripts/hooks/pre-push.sh
@@ -97,8 +109,15 @@ repos:
         stages: [pre-push]
         verbose: true
 
-  # ── Optional: Test Checks (run only when tests are modified) ───────────────
-  # Uncomment if you want to run tests on every commit (slower but safer)
+  # ── Test Checks ───────────────────────────────────────────────────────────
+  # Tests run in pre-push, not pre-commit (faster local iteration)
+  #
+  # Rationale:
+  #   - Pre-commit: fast feedback (<10s), only lint/format/type
+  #   - Pre-push: full test suite (~1-2min), protects remote
+  #   - CI: comprehensive testing + coverage
+  #
+  # Uncomment below if you want tests in pre-commit (slower commits):
   #
   # - repo: local
   #   hooks:

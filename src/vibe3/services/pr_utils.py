@@ -22,6 +22,7 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         return None
 
     metadata = PRMetadata(
+        branch=branch,
         task_issue=flow_data.get("task_issue_number"),
         flow_slug=flow_data.get("flow_slug"),
         spec_ref=flow_data.get("spec_ref"),
@@ -53,6 +54,8 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
 
     metadata_section = "\n\n---\n\n## Vibe3 Metadata\n\n"
 
+    if metadata.branch:
+        metadata_section += f"**Branch:** {metadata.branch}\n"
     if metadata.task_issue:
         metadata_section += f"**Task Issue:** #{metadata.task_issue}\n"
     if metadata.flow_slug:

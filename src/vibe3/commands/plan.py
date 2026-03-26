@@ -7,13 +7,19 @@ import typer
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.command_options import (
+    _AGENT_OPT,
+    _BACKEND_OPT,
+    _DRY_RUN_OPT,
+    _MODEL_OPT,
+    _TRACE_OPT,
+    ensure_flow_for_current_branch,
+)
 from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
-from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
-from vibe3.services.review_runner import run_review_agent
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -23,30 +29,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-_TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-]
-_DRY_RUN_OPT = Annotated[
-    bool,
-    typer.Option("--dry-run", help="Print command and prompt without executing"),
-]
-_MESSAGE_OPT = Annotated[
-    Optional[str],
-    typer.Option("--message", "-m", help="Additional task guidance"),
-]
-_AGENT_OPT = Annotated[
-    Optional[str],
-    typer.Option("--agent", help="Override agent preset (e.g., planner, planner-pro)"),
-]
-_BACKEND_OPT = Annotated[
-    Optional[str],
-    typer.Option("--backend", help="Override backend (claude, codex)"),
-]
-_MODEL_OPT = Annotated[
-    Optional[str],
-    typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
-]
-
 
 @app.command()
 def task(
@@ -54,9 +36,12 @@ def task(
         int | None,
         typer.Argument(help="Issue number (default: current flow's task issue)"),
     ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -69,18 +54,17 @@ def task(
         vibe3 plan task              # Use current flow's task issue
         vibe3 plan task 42           # Plan for issue #42
         vibe3 plan task 42 --dry-run
-        vibe3 plan task 42 -m "Focus on security"
+        vibe3 plan task 42 "Focus on security"
         vibe3 plan task 42 --agent planner-pro
     """
     if trace:
         enable_trace()
 
     config = VibeConfig.get_defaults()
+    flow_service, branch = ensure_flow_for_current_branch()
 
     if issue is None:
-        git = GitClient()
-        branch = git.get_current_branch()
-        flow = FlowService().get_flow_status(branch)
+        flow = flow_service.get_flow_status(branch)
         if not flow or not flow.task_issue_number:
             typer.echo(
                 "Error: No issue number provided and current flow has no task issue.\n"
@@ -97,16 +81,15 @@ def task(
 
     scope = PlanScope.for_task(issue)
     request = PlanRequest(scope=scope)
-    run_plan(
+    run_plan(  # type: ignore[call-arg]
         request,
         config,
         dry_run,
-        message,
+        instructions,
         agent,
         backend,
         model,
         build_plan_context,
-        run_review_agent,
     )
 
     if not dry_run:
@@ -128,9 +111,12 @@ def spec(
         Optional[str],
         typer.Option("--msg", help="Spec description"),
     ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    message: _MESSAGE_OPT = None,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -142,7 +128,7 @@ def spec(
     Examples:
         vibe3 plan spec --file spec.md
         vibe3 plan spec --msg "Add dark mode support"
-        vibe3 plan spec -f spec.md -m "Prioritize performance"
+        vibe3 plan spec -f spec.md "Prioritize performance"
         vibe3 plan spec --msg "Refactor auth" --agent planner-pro
     """
     if trace:
@@ -183,14 +169,13 @@ def spec(
 
     scope = PlanScope.for_spec(description)
     request = PlanRequest(scope=scope)
-    run_plan(
+    run_plan(  # type: ignore[call-arg]
         request,
         config,
         dry_run,
-        message,
+        instructions,
         agent,
         backend,
         model,
         build_plan_context,
-        run_review_agent,
     )

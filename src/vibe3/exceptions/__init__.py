@@ -39,12 +39,6 @@ class UserError(VibeError):
         super().__init__(message, recoverable=True)
 
 
-class ValidationError(UserError):
-    """Parameter validation failed."""
-
-    pass
-
-
 class ConfigError(UserError):
     """Configuration file or setting error."""
 
@@ -68,6 +62,12 @@ class SystemError(VibeError):
             message: Error message describing the system failure
         """
         super().__init__(message, recoverable=False)
+
+
+class AgentExecutionError(SystemError):
+    """Agent execution failed (wrapper/API/backend error)."""
+
+    pass
 
 
 class GitError(SystemError):

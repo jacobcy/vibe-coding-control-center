@@ -1,31 +1,34 @@
-"""Task bridge sub-commands — link current branch to GitHub Project item."""
+"""Task bridge commands — link current branch to GitHub Project item."""
 
+import json
 from typing import Annotated
 
 import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
-from vibe3.models.project_item import LinkError, ProjectItemError
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.config.settings import VibeConfig
+from vibe3.models.project_item import LinkError
 from vibe3.observability.logger import setup_logging
 from vibe3.services.task_service import TaskService
 
 bridge_app = typer.Typer(
     help="Task bridge commands for linking to GitHub Project",
-    no_args_is_help=True,
+    no_args_is_help=False,
     rich_markup_mode="rich",
+    invoke_without_command=True,
 )
 
 
-@bridge_app.command("link-project")
-def bridge_link_project(
-    project_item_id: Annotated[
-        str | None,
-        typer.Argument(help="GitHub Project item ID"),
-    ] = None,
-    from_issue: Annotated[
+@bridge_app.callback()
+def bridge(
+    ctx: typer.Context,
+    issue_number: Annotated[
         int | None,
-        typer.Option("--from-issue", help="通过 issue number 反查并绑定 Project item"),
+        typer.Argument(
+            help="Issue number to link (default: current flow's bound task)"
+        ),
     ] = None,
     force: Annotated[
         bool,
@@ -36,60 +39,76 @@ def bridge_link_project(
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Link current branch to a GitHub Project item.
+    """Link current branch's task issue to GitHub Project.
 
-    Usage:
-      vibe task bridge link-project <project_item_id>
-      vibe task bridge link-project --from-issue <issue_number>
+    Examples:
+      vibe3 task bridge         # 自动使用当前 flow 绑定的 task issue
+      vibe3 task bridge 100     # 指定 issue #100
+      vibe3 task bridge 100 --force
     """
-    import json
+    if ctx.invoked_subcommand is not None:
+        return
 
     if trace:
         setup_logging(verbose=2)
 
-    if not project_item_id and not from_issue:
-        typer.echo(
-            "Error: 请提供 project_item_id 或 --from-issue <issue_number>", err=True
-        )
+    cfg = VibeConfig.get_defaults()
+    gh_cfg = cfg.github_project
+    if not (gh_cfg.owner or gh_cfg.org) or not gh_cfg.project_number:
+        _hint_missing_config()
         raise typer.Exit(1)
 
     git = GitClient()
     branch = git.get_current_branch()
     service = TaskService()
 
-    if from_issue is not None:
-        client = service._get_project_client()
-        if not client:
+    if issue_number is None:
+        # 从当前 flow 取 task issue
+        store = SQLiteClient()
+        flow_data = store.get_flow_state(branch)
+        issue_number = flow_data.get("task_issue_number") if flow_data else None
+        if not issue_number:
             typer.echo(
-                "Error: GitHubProjectClient 未初始化，"
-                "请检查 config/settings.yaml 中的 github_project 配置",
+                "Error: 当前 branch 尚未绑定 task issue，"
+                "请先运行 vibe3 flow bind <issue_number> "
+                "或直接指定: vibe3 task bridge <issue_number>",
                 err=True,
             )
             raise typer.Exit(1)
 
-        found = client.find_item_by_issue(from_issue)
-        if isinstance(found, ProjectItemError):
-            typer.echo(f"Error [{found.type}]: {found.message}", err=True)
-            raise typer.Exit(1)
-        project_item_id = found.item_id
-
-    assert project_item_id is not None
-
-    result = service.link_project_item(branch, project_item_id, force=force)
+    result = service.auto_link_issue_to_project(branch, issue_number)
 
     if isinstance(result, LinkError):
-        typer.echo(f"Error [{result.type}]: {result.message}", err=True)
-        raise typer.Exit(1)
+        if result.type == "already_bound" and not force:
+            typer.echo(f"Error [{result.type}]: {result.message}", err=True)
+            typer.echo("Hint: 使用 --force 强制覆盖", err=True)
+            raise typer.Exit(1)
+        elif result.type != "already_bound":
+            typer.echo(f"Error [{result.type}]: {result.message}", err=True)
+            raise typer.Exit(1)
 
     if json_output:
         typer.echo(json.dumps(result.model_dump(), indent=2, default=str))
     else:
         typer.echo(
-            f"✓ Branch '{branch}' linked to GitHub Project item '{project_item_id}'"
+            f"✓ Issue #{issue_number} linked to GitHub Project (branch: {branch})"
         )
-        if result.project_node_id:
-            typer.echo(f"  node_id: {result.project_node_id}")
+        if hasattr(result, "project_item_id") and result.project_item_id:
+            typer.echo(f"  project_item_id: {result.project_item_id}")
 
     logger.bind(domain="task", action="bridge_link_project", branch=branch).info(
-        "Bridge link-project done"
+        "Bridge link done"
+    )
+
+
+def _hint_missing_config() -> None:
+    """提示用户在 settings.yaml 配置 github_project。"""
+    typer.echo(
+        "Error: GitHub Project 未配置。\n"
+        "请在 config/settings.yaml 中设置：\n\n"
+        "  github_project:\n"
+        '    owner_type: "user"   # 或 "org"\n'
+        '    owner: "<your-github-username-or-org>"\n'
+        "    project_number: <project-number>",
+        err=True,
     )

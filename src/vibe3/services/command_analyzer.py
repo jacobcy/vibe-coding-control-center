@@ -32,15 +32,6 @@ class CallEdge(BaseModel):
     line: int
 
 
-class CommandCallChain(BaseModel):
-    """命令调用链路分析结果."""
-
-    command: str
-    file_path: str
-    calls: list[CallEdge]
-    call_depth: int
-
-
 def _extract_calls(file_path: str, func_name: str) -> list[CallEdge]:
     """从函数中提取所有调用关系（AST 静态分析）.
 

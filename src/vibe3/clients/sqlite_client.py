@@ -41,7 +41,8 @@ class SQLiteClient:
 
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
-            git_dir = os.popen("git rev-parse --git-dir").read().strip()
+            # Use git common dir to ensure shared state across worktrees
+            git_dir = os.popen("git rev-parse --git-common-dir").read().strip()
             vibe3_dir = os.path.join(git_dir, "vibe3")
             os.makedirs(vibe3_dir, exist_ok=True)
             db_path = os.path.join(vibe3_dir, "handoff.db")
@@ -200,18 +201,6 @@ class SQLiteClient:
             ).debug("Retrieved issue links")
             return links
 
-    def get_active_flows(self) -> list[dict[str, Any]]:
-        """Get all active flows."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM flow_state WHERE flow_status = 'active'")
-            flows = [dict(row) for row in cursor.fetchall()]
-            logger.bind(
-                external="sqlite", operation="get_active_flows", count=len(flows)
-            ).debug("Retrieved active flows")
-            return flows
-
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows."""
         with sqlite3.connect(self.db_path) as conn:
@@ -275,3 +264,44 @@ class SQLiteClient:
         logger.bind(
             external="sqlite", operation="update_bridge_fields", branch=branch
         ).debug("Updated bridge fields")
+
+    def get_flow_dependents(self, branch: str) -> list[str]:
+        """Get branches that depend on the given branch.
+
+        Args:
+            branch: Branch name to check dependents for
+
+        Returns:
+            List of branch names that depend on this branch (only active flows)
+
+        Example:
+            >>> store = SQLiteClient()
+            >>> dependents = store.get_flow_dependents("feature/A")
+            >>> # ["feature/B"] or ["feature/B", "feature/C"]
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT DISTINCT fil.branch
+                FROM flow_issue_links fil
+                JOIN flow_state fs ON fil.branch = fs.branch
+                WHERE fil.issue_number = (
+                    SELECT task_issue_number
+                    FROM flow_state
+                    WHERE branch = ?
+                )
+                AND fil.issue_role = 'dependency'
+                AND fs.flow_status = 'active'
+                ORDER BY fil.branch
+                """,
+                (branch,),
+            )
+            dependents = [row[0] for row in cursor.fetchall()]
+            logger.bind(
+                external="sqlite",
+                operation="get_flow_dependents",
+                branch=branch,
+                dependents_count=len(dependents),
+            ).debug("Retrieved flow dependents")
+            return dependents

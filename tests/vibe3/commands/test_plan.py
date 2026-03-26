@@ -48,6 +48,7 @@ def test_plan_spec_help_shows_options() -> None:
     assert result.exit_code == 0
     assert "--file" in stdout or "-f" in stdout
     assert "--msg" in stdout
+    assert "--message" not in stdout
 
 
 def test_plan_task_dry_run_shows_command() -> None:
@@ -67,6 +68,13 @@ def test_plan_task_with_agent_override() -> None:
     assert result.exit_code == 0
     # CLI --agent override takes precedence
     assert "--agent planner-pro" in result.stdout
+
+
+def test_plan_task_with_instructions() -> None:
+    result = runner.invoke(plan_app, ["task", "42", "Focus on security", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Focus on security" in result.stdout
 
 
 def test_plan_spec_msg_dry_run() -> None:

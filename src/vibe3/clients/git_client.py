@@ -3,16 +3,50 @@
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
-from loguru import logger
-
-from vibe3.exceptions import GitError, SystemError
-from vibe3.models.change_source import (
-    BranchSource,
-    ChangeSource,
-    ChangeSourceType,
-    CommitSource,
-    PRSource,
+from vibe3.clients.git_branch_ops import (
+    branch_exists as _branch_exists,
 )
+from vibe3.clients.git_branch_ops import (
+    create_branch as _create_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    delete_branch as _delete_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    delete_remote_branch as _delete_remote_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    get_merge_base as _get_merge_base,
+)
+from vibe3.clients.git_branch_ops import (
+    switch_branch as _switch_branch,
+)
+from vibe3.clients.git_status_ops import (
+    get_changed_files as _get_changed_files,
+)
+from vibe3.clients.git_status_ops import (
+    get_diff as _get_diff,
+)
+from vibe3.clients.git_status_ops import (
+    has_uncommitted_changes as _has_uncommitted_changes,
+)
+from vibe3.clients.git_status_ops import (
+    stash_apply as _stash_apply,
+)
+from vibe3.clients.git_status_ops import (
+    stash_push as _stash_push,
+)
+from vibe3.clients.git_worktree_ops import (
+    get_current_branch as _get_current_branch,
+)
+from vibe3.clients.git_worktree_ops import (
+    get_current_commit as _get_current_commit,
+)
+from vibe3.clients.git_worktree_ops import (
+    get_git_common_dir as _get_git_common_dir,
+)
+from vibe3.exceptions import GitError
+from vibe3.models.change_source import ChangeSource
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -22,8 +56,6 @@ class GitClientProtocol(Protocol):
     """Git client 协议定义."""
 
     def get_current_branch(self) -> str: ...
-
-    def get_worktree_name(self) -> str: ...
 
     def get_changed_files(self, source: ChangeSource) -> list[str]: ...
 
@@ -62,338 +94,59 @@ class GitClient:
             raise GitError(" ".join(args), e.stderr.strip()) from e
 
     def get_current_branch(self) -> str:
-        """获取当前分支名.
-
-        Returns:
-            当前分支名
-        """
-        branch = self._run(["rev-parse", "--abbrev-ref", "HEAD"])
-        logger.bind(domain="git", action="get_current_branch", branch=branch).debug(
-            "Got current branch"
-        )
-        return branch
+        """获取当前分支名."""
+        return _get_current_branch(self._run)
 
     def get_current_commit(self) -> str:
-        """Get current HEAD commit SHA.
-
-        Returns:
-            Full commit SHA of current HEAD
-        """
-        commit = self._run(["rev-parse", "HEAD"])
-        logger.bind(domain="git", action="get_current_commit", commit=commit[:7]).debug(
-            "Got current commit"
-        )
-        return commit
-
-    def get_worktree_name(self) -> str:
-        """获取当前 worktree 名称（路径最后一段）.
-
-        Returns:
-            Worktree 名称
-        """
-        root = self._run(["rev-parse", "--show-toplevel"])
-        name = root.split("/")[-1]
-        logger.bind(domain="git", action="get_worktree_name", name=name).debug(
-            "Got worktree name"
-        )
-        return name
-
-    def get_git_dir(self) -> str:
-        """Get the .git directory path.
-
-        Returns:
-            Absolute path to the .git directory
-
-        Raises:
-            GitError: git command execution failed
-        """
-        git_dir = self._run(["rev-parse", "--git-dir"])
-        logger.bind(domain="git", action="get_git_dir", git_dir=git_dir).debug(
-            "Got git directory"
-        )
-        return git_dir
+        """Get current HEAD commit SHA."""
+        return _get_current_commit(self._run)
 
     def get_git_common_dir(self) -> str:
-        """Get the shared .git directory path (for worktrees).
-
-        In linked worktrees, this returns the common git directory
-        instead of the worktree-local .git/worktrees/<name> path.
-
-        Returns:
-            Absolute path to the shared .git directory
-
-        Raises:
-            GitError: git command execution failed
-        """
-        git_common_dir = self._run(["rev-parse", "--git-common-dir"])
-        logger.bind(
-            domain="git", action="get_git_common_dir", git_common_dir=git_common_dir
-        ).debug("Got git common directory")
-        return git_common_dir
+        """Get the shared .git directory path (for worktrees)."""
+        return _get_git_common_dir(self._run)
 
     def get_changed_files(self, source: ChangeSource) -> list[str]:
-        """统一接口：获取改动文件列表.
-
-        Args:
-            source: 改动源（PR/Commit/Branch/Uncommitted）
-
-        Returns:
-            改动文件路径列表
-
-        Raises:
-            GitError: git 命令执行失败
-        """
-        log = logger.bind(
-            domain="git", action="get_changed_files", source_type=source.type
-        )
-        log.info("Getting changed files")
-
-        if source.type == ChangeSourceType.UNCOMMITTED:
-            files = self._get_uncommitted_files()
-        elif source.type == ChangeSourceType.COMMIT:
-            if not isinstance(source, CommitSource):
-                raise SystemError(
-                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
-                )
-            files = self._get_commit_files(source.sha)
-        elif source.type == ChangeSourceType.BRANCH:
-            if not isinstance(source, BranchSource):
-                raise SystemError(
-                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
-                )
-            files = self._get_branch_files(source.branch, source.base)
-        elif source.type == ChangeSourceType.PR:
-            if not isinstance(source, PRSource):
-                raise SystemError(
-                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
-                )
-            if not self._github_client:
-                raise GitError(
-                    "get_changed_files",
-                    "PR source requires GitHubClient injection",
-                )
-            files = self._github_client.get_pr_files(source.pr_number)
-        else:
-            raise GitError("get_changed_files", f"Unknown source type: {source.type}")
-
-        log.bind(file_count=len(files)).success("Got changed files")
-        return files
+        """统一接口：获取改动文件列表."""
+        return _get_changed_files(self._run, source, self._github_client)
 
     def get_diff(self, source: ChangeSource) -> str:
-        """统一接口：获取 diff 内容.
-
-        Args:
-            source: 改动源（PR/Commit/Branch/Uncommitted）
-
-        Returns:
-            diff 文本
-
-        Raises:
-            GitError: git 命令执行失败
-        """
-        log = logger.bind(domain="git", action="get_diff", source_type=source.type)
-        log.info("Getting diff")
-
-        if source.type == ChangeSourceType.UNCOMMITTED:
-            diff = self._run(["diff", "HEAD"])
-        elif source.type == ChangeSourceType.COMMIT:
-            if not isinstance(source, CommitSource):
-                raise SystemError(
-                    f"Type mismatch: expected CommitSource, got {type(source).__name__}"
-                )
-            diff = self._run(["show", source.sha, "--stat"])
-        elif source.type == ChangeSourceType.BRANCH:
-            if not isinstance(source, BranchSource):
-                raise SystemError(
-                    f"Type mismatch: expected BranchSource, got {type(source).__name__}"
-                )
-            diff = self._run(["diff", f"{source.base}...{source.branch}"])
-        elif source.type == ChangeSourceType.PR:
-            if not isinstance(source, PRSource):
-                raise SystemError(
-                    f"Type mismatch: expected PRSource, got {type(source).__name__}"
-                )
-            if not self._github_client:
-                raise GitError(
-                    "get_diff",
-                    "PR source requires GitHubClient injection",
-                )
-            diff = self._github_client.get_pr_diff(source.pr_number)
-        else:
-            raise GitError("get_diff", f"Unknown source type: {source.type}")
-
-        log.bind(diff_len=len(diff)).success("Got diff")
-        return diff
-
-    # ── 私有方法 ──────────────────────────────────────────────
-
-    def _get_uncommitted_files(self) -> list[str]:
-        """获取未提交改动文件（暂存 + 工作区）."""
-        staged = self._run(["diff", "--name-only", "--cached"])
-        unstaged = self._run(["diff", "--name-only"])
-        all_files = set()
-        for line in (staged + "\n" + unstaged).splitlines():
-            if line.strip():
-                all_files.add(line.strip())
-        return sorted(all_files)
-
-    def _get_commit_files(self, sha: str) -> list[str]:
-        """获取指定 commit 的改动文件."""
-        output = self._run(["diff-tree", "--no-commit-id", "-r", "--name-only", sha])
-        return [f for f in output.splitlines() if f.strip()]
-
-    def _get_branch_files(self, branch: str, base: str) -> list[str]:
-        """获取分支相对于 base 的改动文件."""
-        output = self._run(["diff", "--name-only", f"{base}...{branch}"])
-        return [f for f in output.splitlines() if f.strip()]
-
-    def _get_pr_diff_cached(self, pr_number: int) -> str:
-        """Get PR diff with caching.
-
-        Args:
-            pr_number: PR number
-
-        Returns:
-            Full PR diff content
-        """
-        if pr_number not in self._pr_diff_cache:
-            if not self._github_client:
-                raise GitError(
-                    "get_pr_diff_cached",
-                    "PR source requires GitHubClient injection",
-                )
-            self._pr_diff_cache[pr_number] = self._github_client.get_pr_diff(pr_number)
-        return self._pr_diff_cache[pr_number]
-
-    # ── 分支管理方法 ──────────────────────────────────────────
-
-    def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
-        """Create a new branch from start_ref.
-
-        Args:
-            branch_name: Name of the new branch
-            start_ref: Starting reference (default: origin/main)
-        """
-        self._run(["checkout", "-b", branch_name, start_ref])
-        logger.bind(
-            domain="git",
-            action="create_branch",
-            branch=branch_name,
-            start_ref=start_ref,
-        ).info("Created branch")
-
-    def switch_branch(self, branch_name: str) -> None:
-        """Switch to existing branch.
-
-        Args:
-            branch_name: Branch to switch to
-        """
-        self._run(["checkout", branch_name])
-        logger.bind(domain="git", action="switch_branch", branch=branch_name).info(
-            "Switched branch"
-        )
-
-    def delete_branch(self, branch_name: str, force: bool = False) -> None:
-        """Delete local branch.
-
-        Args:
-            branch_name: Branch to delete
-            force: Force delete even if not merged
-        """
-        flag = "-D" if force else "-d"
-        self._run(["branch", flag, branch_name])
-        logger.bind(
-            domain="git", action="delete_branch", branch=branch_name, force=force
-        ).info("Deleted local branch")
-
-    def delete_remote_branch(self, branch_name: str) -> None:
-        """Delete remote branch.
-
-        Args:
-            branch_name: Remote branch to delete
-        """
-        self._run(["push", "origin", "--delete", branch_name])
-        logger.bind(
-            domain="git", action="delete_remote_branch", branch=branch_name
-        ).info("Deleted remote branch")
-
-    def get_merge_base(self, branch1: str, branch2: str) -> str:
-        """Get merge-base commit between two branches.
-
-        Args:
-            branch1: First branch name
-            branch2: Second branch name
-
-        Returns:
-            Commit SHA of merge-base
-
-        Raises:
-            GitError: If merge-base cannot be determined
-        """
-        try:
-            result = self._run(["merge-base", branch1, branch2])
-            return result.strip()
-        except Exception as e:
-            raise GitError("merge-base", str(e))
+        """统一接口：获取 diff 内容."""
+        return _get_diff(self._run, source, self._github_client, self._pr_diff_cache)
 
     def stash_push(self, message: str | None = None) -> str:
-        """Stash current changes, return stash ref.
-
-        Args:
-            message: Optional stash message
-
-        Returns:
-            Stash reference (e.g., stash@{0})
-        """
-        args = ["stash", "push"]
-        if message:
-            args.extend(["-m", message])
-        self._run(args)
-        stash_ref = "stash@{0}"
-        logger.bind(
-            domain="git", action="stash_push", stash_ref=stash_ref, message=message
-        ).info("Stashed changes")
-        return stash_ref
+        """Stash current changes, return stash ref."""
+        return _stash_push(self._run, message)
 
     def stash_apply(self, stash_ref: str) -> None:
-        """Apply and drop stash.
-
-        Args:
-            stash_ref: Stash reference to apply
-        """
-        self._run(["stash", "pop", stash_ref])
-        logger.bind(domain="git", action="stash_apply", stash_ref=stash_ref).info(
-            "Applied stash"
-        )
+        """Apply and drop stash."""
+        return _stash_apply(self._run, stash_ref)
 
     def has_uncommitted_changes(self) -> bool:
-        """Check if working directory is dirty.
+        """Check if working directory is dirty."""
+        return _has_uncommitted_changes(self._run)
 
-        Returns:
-            True if there are uncommitted changes
-        """
-        try:
-            status = self._run(["status", "--porcelain"])
-            return bool(status)
-        except GitError:
-            return False
+    # ── 分支管理方法（委托给 git_branch_ops）──────────────────
+
+    def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
+        """Create a new branch from start_ref."""
+        _create_branch(branch_name, start_ref)
+
+    def switch_branch(self, branch_name: str) -> None:
+        """Switch to existing branch."""
+        _switch_branch(branch_name)
+
+    def delete_branch(self, branch_name: str, force: bool = False) -> None:
+        """Delete local branch."""
+        _delete_branch(branch_name, force=force)
+
+    def delete_remote_branch(self, branch_name: str) -> None:
+        """Delete remote branch."""
+        _delete_remote_branch(branch_name)
+
+    def get_merge_base(self, branch1: str, branch2: str) -> str:
+        """Get merge-base commit between two branches."""
+        return _get_merge_base(branch1, branch2)
 
     def branch_exists(self, branch_name: str) -> bool:
-        """Check if branch exists (local or remote).
-
-        Args:
-            branch_name: Branch name to check
-
-        Returns:
-            True if branch exists
-        """
-        try:
-            # Check local branches
-            local = self._run(["branch", "--list", branch_name])
-            if local:
-                return True
-            # Check remote branches
-            remote = self._run(["branch", "-r", "--list", f"origin/{branch_name}"])
-            return bool(remote)
-        except GitError:
-            return False
+        """Check if branch exists (local or remote)."""
+        return _branch_exists(branch_name)

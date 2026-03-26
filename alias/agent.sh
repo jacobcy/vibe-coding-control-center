@@ -9,11 +9,11 @@ alias cc='claude -c --dangerously-skip-permissions'
 
 # @desc Codex: 新建会话 + 全自动
 # @featured
-alias cxi='codex --full-auto'
+alias cxi='codex --dangerously-bypass-approvals-and-sandbox'
 
 # @desc Codex: 恢复会话 + 全自动
 # @featured
-alias cx='codex resume --last --full-auto'
+alias cx='codex resume --last --dangerously-bypass-approvals-and-sandbox'
 
 # @desc OpenCode: 新建会话
 # @featured

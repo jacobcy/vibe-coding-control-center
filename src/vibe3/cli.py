@@ -5,6 +5,7 @@ Thin wrapper that sets up Typer app and registers subcommands.
 """
 
 import sys
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
@@ -54,7 +55,6 @@ app = typer.Typer(
 app.add_typer(flow.app, name="flow")
 app.add_typer(task.app, name="task")
 app.add_typer(plan.app, name="plan")
-app.add_typer(run.app, name="run")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
@@ -81,6 +81,63 @@ def main_callback(
 ) -> None:
     """Vibe 3.0 - Development orchestration tool."""
     setup_logging(verbose=verbose)
+
+
+@app.command(name="run")
+def run_command(
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Instructions to pass to codeagent"),
+    ] = None,
+    plan: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
+        ),
+    ] = None,
+    file: Annotated[
+        Optional[Path],
+        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
+    ] = None,
+    skill: Annotated[
+        Optional[str],
+        typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print command and prompt without executing"),
+    ] = False,
+    agent: Annotated[
+        Optional[str],
+        typer.Option(
+            "--agent", help="Override agent preset (e.g., executor, executor-pro)"
+        ),
+    ] = None,
+    backend: Annotated[
+        Optional[str],
+        typer.Option("--backend", help="Override backend (claude, codex)"),
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
+    ] = None,
+) -> None:
+    """Execute implementation plan or skill using codeagent-wrapper."""
+    # Handle deprecated --file option
+    resolved_plan = plan or file
+    run.run_command(
+        instructions,
+        resolved_plan,
+        skill,
+        trace,
+        dry_run,
+        agent,
+        backend,
+        model,
+    )
 
 
 @app.command()
@@ -128,9 +185,9 @@ def main() -> None:
             logger.info("Please check your input and try again")
         sys.exit(1)
 
-    except SystemError:
-        # System error: show details
-        logger.exception("System error occurred")
+    except SystemError as e:
+        # System error: concise fail-fast message without traceback noise
+        logger.error(e.message)
         sys.exit(2)
 
     except KeyboardInterrupt:

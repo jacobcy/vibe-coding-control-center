@@ -9,7 +9,7 @@ from loguru import logger
 
 from vibe3.services.review_runner import (
     DEFAULT_WRAPPER_PATH,
-    ReviewAgentOptions,
+    AgentOptions,
 )
 
 
@@ -82,7 +82,7 @@ Analyze this GitHub issue and decide: close, triage (add state/ready), or commen
 def run_master_agent(
     issue: dict,
     repo: str,
-    options: ReviewAgentOptions,
+    options: AgentOptions,
     dry_run: bool = False,
 ) -> TriageDecision:
     """Run master agent to triage an issue.

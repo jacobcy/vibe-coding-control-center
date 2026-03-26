@@ -54,19 +54,21 @@ uv run mypy src || {
     exit 1
 }
 
-# 3. LOC checks (fast, <2s)
-echo "  -> LOC checks..."
-bash scripts/hooks/check-python-loc.sh || {
-    echo "ERROR: Python LOC check failed"
+# 4. Test suite (full test run, ~1-2min)
+echo "  -> Running test suite..."
+uv run pytest tests/vibe3 -v --tb=short || {
+    echo "ERROR: Tests failed"
     exit 1
 }
 
-bash scripts/hooks/check-shell-loc.sh || {
-    echo "ERROR: Shell LOC check failed"
-    exit 1
-}
+# 5. LOC checks (fast, <2s) - WARNING ONLY in pre-push
+echo "  -> LOC checks (warning only)..."
+bash scripts/hooks/check-python-loc.sh
+# Note: Script now exits 0 with warning (doesn't block push)
+bash scripts/hooks/check-shell-loc.sh
+# Note: Script now exits 0 with warning (doesn't block push)
 
-# 4. Inspect-based risk assessment (fast, <10s)
+# 6. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."
 echo "  Review scope: $REVIEW_SCOPE_SUMMARY"
 INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json) || {
@@ -122,7 +124,7 @@ if [ -n "$RECOMMENDATIONS" ]; then
     done <<< "$RECOMMENDATIONS"
 fi
 
-# 5. Trigger local review only when inspect score reaches block threshold
+# 7. Trigger local review only when inspect score reaches block threshold
 if [ "$BLOCK_REVIEW" = "true" ]; then
     echo "  Review triggered: yes"
     echo ""

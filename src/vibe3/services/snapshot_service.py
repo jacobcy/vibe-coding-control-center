@@ -51,20 +51,6 @@ def _ensure_snapshot_dir() -> None:
     _get_snapshot_dir().mkdir(parents=True, exist_ok=True)
 
 
-def _sanitize_branch(branch: str) -> str:
-    return branch.replace("/", "-").replace("\\", "-")
-
-
-def _file_to_module(file_path: str, root: str = "src/vibe3") -> str:
-    p = Path(file_path)
-    parts = p.with_suffix("").parts
-    try:
-        idx = list(parts).index(Path(root).parts[0])
-        return ".".join(parts[idx + 1 :])
-    except (ValueError, IndexError):
-        return str(p.with_suffix("")).replace("/", ".")
-
-
 def _get_module_from_path(file_path: str) -> str:
     p = Path(file_path)
     if "src/vibe3" in str(p):

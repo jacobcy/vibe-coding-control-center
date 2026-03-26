@@ -6,7 +6,7 @@ Tests the inspect-score trigger mechanism for local review.
 import json
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.review_runner import ReviewAgentOptions
+from vibe3.services.review_runner import AgentOptions
 
 
 class TestInspectScoreTrigger:
@@ -43,12 +43,12 @@ class TestInspectScoreTrigger:
         return bool(score_data.get("block", False))
 
 
-class TestReviewAgentOptionsForPrePush:
-    """Tests for ReviewAgentOptions in pre-push context."""
+class TestAgentOptionsForPrePush:
+    """Tests for AgentOptions in pre-push context."""
 
     def test_default_options_suitable_for_pre_push(self) -> None:
         """Default options should be suitable for pre-push review."""
-        options = ReviewAgentOptions()
+        options = AgentOptions()
         assert options.agent is None
         assert options.backend is None
         assert options.model is None
@@ -56,7 +56,7 @@ class TestReviewAgentOptionsForPrePush:
 
     def test_can_override_model_for_pre_push(self) -> None:
         """Can override model for pre-push review."""
-        options = ReviewAgentOptions(model="gpt-5.4")
+        options = AgentOptions(model="gpt-5.4")
         assert options.model == "gpt-5.4"
 
 

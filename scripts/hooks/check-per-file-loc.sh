@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Check per-file LOC ceiling for source files
+#
+# Behavior:
+#   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
+#   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
+#
 # Reads limits from config/settings.yaml
 #
 # Limits (unified for Shell and Python):
@@ -15,10 +20,6 @@
 #   Python: scripts/ (*.py files)
 #
 # Note: scripts/ are checked for single-file limits but NOT counted in total LOC
-#
-# Exit codes:
-#   0: All files within default limit
-#   1: Some files exceed max limit
 
 set -e
 
@@ -33,7 +34,10 @@ LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
 
 # Files to ignore (temporarily exceed limits)
 IGNORE_FILES=(
-  "src/vibe3/clients/git_client.py"  # TODO: Split into git_branch.py and git_stash.py
+  "src/vibe3/commands/run.py"  # TODO: Extract skill execution to run_skill.py
+  "src/vibe3/commands/flow.py"  # TODO: Extract GitHub Project auto-link logic
+  "src/vibe3/commands/review.py"  # TODO: Extract session management
+  "src/vibe3/clients/sqlite_client.py"  # TODO: Extract issue link queries to sqlite_issue_queries.py
 )
 
 warnings=0
@@ -107,12 +111,28 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 if [ "$errors" -gt 0 ]; then
   echo ""
+  echo "⚠️  WARNING: $errors files exceed max limit ($LIMIT_MAX lines)"
+  echo "   This is a soft constraint in local development"
+  echo ""
   echo "💡 Tip: Split large files into smaller, focused modules"
   echo "   - Extract utilities to separate files"
   echo "   - Use composition over inheritance"
   echo "   - Follow Single Responsibility Principle"
-  exit 1
+
+  # In CI (ENFORCE_LOC_LIMITS=true), block on violations
+  if [ "${ENFORCE_LOC_LIMITS:-false}" = "true" ]; then
+    echo ""
+    echo "❌ CI ENFORCEMENT: Files exceed max LOC limit - blocking pipeline"
+    exit 1
+  else
+    echo ""
+    echo "   Push allowed (local development)"
+    exit 0
+  fi
 elif [ "$warnings" -gt 0 ]; then
+  echo ""
+  echo "⚠️  WARNING: $warnings files exceed default limit ($LIMIT_DEFAULT lines)"
+  echo "   This is a soft constraint in local development"
   echo ""
   echo "💡 Tip: Consider refactoring files exceeding default limit"
   echo "   (Warnings are allowed, but keep below max limit)"

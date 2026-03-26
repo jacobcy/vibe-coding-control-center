@@ -1,4 +1,4 @@
-"""Models for review runner service."""
+"""Models for agent execution (used by plan/run/review commands)."""
 
 import subprocess
 from dataclasses import dataclass
@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class ReviewAgentOptions:
-    """Immutable configuration for running a review agent.
+class AgentOptions:
+    """Immutable configuration for running an agent.
 
     This configuration is frozen (immutable) to ensure:
     - Thread safety
@@ -36,8 +36,12 @@ class ReviewAgentOptions:
     timeout_seconds: int = 600
 
 
+# Backward compatibility alias
+ReviewAgentOptions = AgentOptions
+
+
 @dataclass(frozen=True)
-class ReviewAgentResult:
+class AgentResult:
     """Result from running a review agent.
 
     Attributes:
@@ -56,7 +60,7 @@ class ReviewAgentResult:
     @classmethod
     def from_completed_process(
         cls, cp: subprocess.CompletedProcess[str]
-    ) -> "ReviewAgentResult":
+    ) -> "AgentResult":
         """Create result from a CompletedProcess."""
         from vibe3.services.review_runner import extract_session_id
 
@@ -71,3 +75,7 @@ class ReviewAgentResult:
     def is_success(self) -> bool:
         """Check if the agent run was successful."""
         return self.exit_code == 0
+
+
+# Backward compatibility aliases
+ReviewAgentResult = AgentResult

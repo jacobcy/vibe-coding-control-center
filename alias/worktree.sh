@@ -84,8 +84,17 @@ wtnew() {
   local branch="$1" base="${2:-origin/main}"
   [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=origin/main]"
 
+  # Find main repo root: use git-common-dir to handle worktrees correctly
+  local git_common_dir
+  git_common_dir="$($git_cmd rev-parse --git-common-dir 2>/dev/null)" || vibe_die "Not in a git repo"
+  
+  # git-common-dir is relative to current directory; convert to absolute and find parent
   local repo_root
-  repo_root="$($git_cmd rev-parse --show-toplevel 2>/dev/null)" || vibe_die "Not in a git repo"
+  if [[ "$git_common_dir" == /* ]]; then
+    repo_root="$(dirname "$git_common_dir")"
+  else
+    repo_root="$(cd "$(dirname "$git_common_dir")" 2>/dev/null && pwd)" || vibe_die "Failed to resolve git directory"
+  fi
 
   local dir="wt-${branch//\//-}"
   local path="${repo_root}/.worktrees/$dir"
@@ -102,6 +111,13 @@ wtnew() {
   fi
 
   cd "$path" || return
+
+  # Run init script to setup environment (git hooks, skills, etc.)
+  if [[ -f "$repo_root/scripts/init.sh" ]]; then
+    echo "🔧 Running initialization script..."
+    bash "$repo_root/scripts/init.sh" || echo "⚠️  Init script failed (non-fatal)"
+  fi
+
   echo "💡 Next: Run ${CYAN}vup${NC} to initialize your cockpit."
 }
 
@@ -298,7 +314,7 @@ vup() {
   local agent_cmd
   case "$agent" in
     opencode) vibe_require opencode; agent_cmd="opencode -c" ;;
-    codex)    vibe_require codex;    agent_cmd="codex resume --last --full-auto" ;;
+    codex)    vibe_require codex;    agent_cmd="codex resume --last --dangerously-bypass-approvals-and-sandbox" ;;
     gemini)   vibe_require gemini;   agent_cmd="gemini -r latest --yolo" ;;
     *)        vibe_require claude;   agent_cmd="claude -c --dangerously-skip-permissions" ;;
   esac

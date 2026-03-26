@@ -35,8 +35,18 @@ class AIConfig(BaseModel):
     timeout: int = Field(default=30, ge=1, le=300)
 
 
+class FlowConfig(BaseModel):
+    """Flow 管理配置."""
+
+    protected_branches: list[str] = Field(
+        default_factory=lambda: ["main", "master", "develop"],
+        description="Branches that cannot have flows",
+    )
+
+
 __all__ = [
     "AIConfig",
+    "FlowConfig",
     "PRScoringConfig",
     "MergeGateConfig",
     "PRScoringWeights",
@@ -87,14 +97,6 @@ class CodeLimitsConfig(BaseModel):
     code_paths: CodePathsConfig = Field(default_factory=CodePathsConfig)
     scripts_paths: ScriptsPathsConfig = Field(default_factory=ScriptsPathsConfig)
     test_paths: TestPathsConfig = Field(default_factory=TestPathsConfig)
-
-
-class TestFileLimitsConfig(BaseModel):
-    """Per-layer test file line limits."""
-
-    services: int = Field(default=500)
-    clients: int = Field(default=500)
-    commands: int = Field(default=300)
 
 
 class ReviewScopeConfig(BaseModel):
@@ -206,6 +208,7 @@ class OrchestraSettings(BaseModel):
 class VibeConfig(BaseModel):
     """Root configuration model."""
 
+    flow: FlowConfig = Field(default_factory=FlowConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)
     quality: QualityConfig = Field(default_factory=QualityConfig)

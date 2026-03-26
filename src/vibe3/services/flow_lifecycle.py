@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.sqlite_client import SQLiteClient
 
 
 class FlowLifecycleMixin:
@@ -59,6 +60,54 @@ class FlowLifecycleMixin:
             "system",
             f"Flow closed, branch '{branch}' deleted",
         )
+
+        # Dependency reverse lookup: switch to dependent branch or main
+        try:
+            store = SQLiteClient()
+            dependents = store.get_flow_dependents(branch)
+
+            if len(dependents) == 1:
+                # Single dependent: auto-switch
+                dependent_branch = dependents[0]
+                git.switch_branch(dependent_branch)
+                logger.bind(
+                    domain="flow",
+                    action="close",
+                    branch=branch,
+                    dependent=dependent_branch,
+                ).info("Switched to dependent branch")
+
+            elif len(dependents) > 1:
+                # Multiple dependents: warn and switch to main
+                logger.warning(
+                    f"Multiple flows depend on '{branch}': {', '.join(dependents)}\n"
+                    f"Use 'vibe3 flow switch <branch>' to switch to the desired branch"
+                )
+                git.switch_branch("main")
+                try:
+                    git._run(["pull"])
+                    logger.info("Switched to main and pulled latest changes")
+                except Exception as e:
+                    logger.warning(f"Failed to pull: {e}")
+
+            else:
+                # No dependents: switch to main
+                git.switch_branch("main")
+                try:
+                    git._run(["pull"])
+                    logger.info("Switched to main and pulled latest changes")
+                except Exception as e:
+                    logger.warning(f"Failed to pull: {e}")
+
+        except Exception as e:
+            # Dependency reverse lookup failure should not block main flow
+            logger.warning(f"Failed to check dependents: {e}")
+            # Still switch to main
+            git.switch_branch("main")
+            try:
+                git._run(["pull"])
+            except Exception:
+                pass
 
     def block_flow(
         self: Any,

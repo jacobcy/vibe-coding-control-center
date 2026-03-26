@@ -5,7 +5,6 @@ This module provides an extensible interface for running different agent types
 
 Design principles:
 - Immutable configuration (frozen dataclass)
-- Enum-based agent types for type safety and future extension
 - Clear separation between configuration and execution
 
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
@@ -14,33 +13,11 @@ NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 import re
 import subprocess
 import sys
-from enum import Enum
 from pathlib import Path
 from typing import Final, cast
 
-from vibe3.models.review_runner import ReviewAgentOptions, ReviewAgentResult
-
-
-class AgentType(str, Enum):
-    """Supported agent types for codeagent-wrapper.
-
-    Extensible for future agent types (planner, executor, etc.)
-    """
-
-    CODEX = "codex"
-    PLANNER = "planner"
-    EXECUTOR = "executor"
-
-
-class AgentBackend(str, Enum):
-    """Supported backends for codeagent-wrapper.
-
-    Extensible for future backends (claude, etc.)
-    """
-
-    CODEX = "codex"
-    CLAUDE = "claude"
-
+from vibe3.exceptions import AgentExecutionError
+from vibe3.models.review_runner import AgentOptions, AgentResult
 
 # Default wrapper path
 DEFAULT_WRAPPER_PATH: Final[Path] = (
@@ -60,29 +37,7 @@ def extract_session_id(stdout: str) -> str | None:
     return match.group(1) if match else None
 
 
-def get_effective_backend(options: ReviewAgentOptions) -> str:
-    """Get the effective backend name for database recording.
-
-    When using agent preset, returns the preset name as identifier.
-    When using backend directly, returns the backend name.
-
-    Note: For codeagent-wrapper invocation, use options.agent if set,
-    otherwise use options.backend.
-
-    Args:
-        options: ReviewAgentOptions with agent/backend/model
-
-    Returns:
-        Backend name or preset name (for database recording)
-    """
-    if options.agent:
-        return options.agent
-    if options.backend:
-        return options.backend
-    return "unknown"
-
-
-def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str | None]:
+def resolve_actor_backend_model(options: AgentOptions) -> tuple[str, str | None]:
     """Resolve the actual backend and model for database recording.
 
     Priority:
@@ -90,7 +45,7 @@ def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str |
     2. If only agent is provided: use agent as backend identifier
 
     Args:
-        options: ReviewAgentOptions with agent/backend/model
+        options: AgentOptions with agent/backend/model
 
     Returns:
         Tuple of (backend, model) for database recording
@@ -102,7 +57,7 @@ def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str |
     return "unknown", None
 
 
-def format_agent_actor(options: ReviewAgentOptions) -> str:
+def format_agent_actor(options: AgentOptions) -> str:
     """Format the actor string for handoff records.
 
     Actor format: '<backend>/<model>' or '<backend>'
@@ -110,7 +65,7 @@ def format_agent_actor(options: ReviewAgentOptions) -> str:
     - model: optional model name
 
     Args:
-        options: ReviewAgentOptions with agent/backend/model
+        options: AgentOptions with agent/backend/model
 
     Returns:
         Actor string like 'claude/sonnet' or 'planner' or 'unknown'
@@ -123,11 +78,11 @@ def format_agent_actor(options: ReviewAgentOptions) -> str:
 
 def run_review_agent(
     prompt_file_content: str,
-    options: ReviewAgentOptions,
+    options: AgentOptions,
     task: str | None = None,
     dry_run: bool = False,
     session_id: str | None = None,
-) -> ReviewAgentResult:
+) -> AgentResult:
     """Run a review agent using codeagent-wrapper.
 
     Args:
@@ -138,12 +93,10 @@ def run_review_agent(
         session_id: Optional session ID to resume an existing session
 
     Returns:
-        ReviewAgentResult containing exit code, output, and session_id
+        AgentResult containing exit code, output, and session_id
 
     Raises:
-        FileNotFoundError: If codeagent-wrapper is not found
-        RuntimeError: If the agent returns a non-zero exit code
-        TimeoutExpired: If the agent exceeds the timeout
+        AgentExecutionError: If wrapper is missing, times out, or returns non-zero exit
 
     """
     import tempfile
@@ -201,22 +154,35 @@ def run_review_agent(
                 print(f"\n=== Task ===\n{task}")
             print("\n=== End ===")
             # Return a mock success result
-            return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
+            return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
+            # Get current working directory (worktree or main repo)
+            # Use os.getcwd() to respect the current worktree context
+            import os
+
+            project_root = os.getcwd()
+
+            # Run wrapper and capture output for parsing and persistence.
             result = subprocess.run(
                 command,
+                cwd=project_root,
                 capture_output=True,
                 text=True,
                 timeout=options.timeout_seconds,
+                check=False,
             )
+
         except FileNotFoundError:
-            raise FileNotFoundError(
+            raise AgentExecutionError(
                 f"codeagent-wrapper not found at {wrapper_path}. "
                 "Please ensure it is installed and accessible."
             ) from None
         except subprocess.TimeoutExpired:
-            raise
+            raise AgentExecutionError(
+                f"codeagent-wrapper timed out after {options.timeout_seconds}s. "
+                "Consider increasing the timeout or splitting the review scope."
+            ) from None
 
         # Print output for visibility
         if result.stdout:
@@ -224,7 +190,7 @@ def run_review_agent(
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="", flush=True)
 
-        agent_result = ReviewAgentResult(
+        agent_result = AgentResult(
             exit_code=result.returncode,
             stdout=result.stdout,
             stderr=result.stderr,
@@ -239,7 +205,7 @@ def run_review_agent(
                     agent_result.stdout[:500] if agent_result.stdout else "(no output)"
                 )
             )
-            raise RuntimeError(
+            raise AgentExecutionError(
                 f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"
                 f"{stderr_preview}"
             )

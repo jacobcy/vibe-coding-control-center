@@ -40,12 +40,12 @@ def render_flow_status(
     issue_titles: dict[int, str] | None = None,
     pr_data: dict[str, object] | None = None,
 ) -> None:
-    """flow show — full detail, YAML style."""
+    """flow show — full detail, YAML style (branch-centric)."""
     titles = issue_titles or {}
-    console.print(
-        f"[cyan bold]{status.flow_slug}[/]  {_status_text(status.flow_status)}"
-    )
-    _kv("branch", status.branch, 1)
+    # Branch as primary key with flow status
+    status_text = _status_text(status.flow_status).plain
+    console.print(f"[cyan bold]{status.branch}[/]  [dim](Flow: {status_text})[/]")
+    _kv("flow_slug", status.flow_slug, 1)
 
     # issues with titles
     if status.task_issue_number:
@@ -115,11 +115,13 @@ def render_flow_status_table(status: FlowStatusResponse) -> None:
 
 
 def render_flows_table(flows: list[FlowState]) -> None:
-    """flow list — YAML style, one block per flow."""
+    """flow list — YAML style, one block per flow (branch-centric)."""
     for flow in flows:
         task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-        console.print(f"[cyan]{flow.flow_slug}[/]  {_status_text(flow.flow_status)}")
-        _kv("branch", flow.branch, 1)
+        # Branch as primary key with flow status
+        status_text = _status_text(flow.flow_status).plain
+        console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
+        _kv("flow_slug", flow.flow_slug, 1)
         _kv("task_issue", task_str, 1)
         console.print()
 
@@ -127,13 +129,15 @@ def render_flows_table(flows: list[FlowState]) -> None:
 def render_flows_status_dashboard(
     flows: list[FlowState], titles: dict[int, str]
 ) -> None:
-    """flow status dashboard — YAML style with remote title."""
+    """flow status dashboard — YAML style with remote title (branch-centric)."""
     for flow in flows:
         task_num = flow.task_issue_number
         task_str = f"#{task_num}" if task_num else "—"
         title = titles.get(task_num, "—") if task_num else "—"
-        console.print(f"[cyan]{flow.flow_slug}[/]  {_status_text(flow.flow_status)}")
-        _kv("branch", flow.branch, 1)
+        # Branch as primary key with flow status
+        status_text = _status_text(flow.flow_status).plain
+        console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
+        _kv("flow_slug", flow.flow_slug, 1)
         _kv("task_issue", task_str, 1)
         _kv("title", title, 1)
         console.print()
@@ -171,10 +175,10 @@ _EVENT_COLOR: dict[str, str] = {
 
 
 def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
-    console.print(
-        f"\n[bold cyan]{state.flow_slug}[/]  {_status_text(state.flow_status)}"
-    )
-    console.print(f"  [dim]branch[/]      {state.branch}")
+    # Branch as primary key with flow status
+    status_text = _status_text(state.flow_status).plain
+    console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
+    _kv("flow_slug", state.flow_slug, 1)
     if state.task_issue_number:
         console.print(f"  [dim]task[/]        #{state.task_issue_number}")
     if state.pr_number:
@@ -195,7 +199,7 @@ def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
     for event in reversed(events):
         color = _EVENT_COLOR.get(event.event_type, "white")
         time_str = event.created_at[:16].replace("T", " ")
-        actor_short = event.actor.split("/")[-1] if "/" in event.actor else event.actor
+        actor_short = event.actor
         console.print(
             f"[dim]{time_str}[/]  [{color}]{event.event_type}[/]  [dim]{actor_short}[/]"
         )

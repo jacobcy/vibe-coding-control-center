@@ -239,37 +239,3 @@ def build_review_context(
     context = "\n\n---\n\n".join(sections)
     log.bind(context_len=len(context)).success("Review context built")
     return context
-
-
-# Keep for backward compatibility (if used elsewhere)
-def get_git_diff(base: str = "main", head: str = "HEAD") -> str:
-    """Get git diff output.
-
-    Args:
-        base: base branch or commit
-        head: target branch or commit
-
-    Returns:
-        diff text
-
-    Raises:
-        ContextBuilderError: git command failed
-    """
-    import subprocess
-
-    log = logger.bind(
-        domain="context_builder", action="get_git_diff", base=base, head=head
-    )
-    log.info("Getting git diff")
-
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--unified=3", f"{base}...{head}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        log.bind(diff_len=len(result.stdout)).success("Got git diff")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        raise ContextBuilderError(f"git diff failed: {e.stderr}") from e

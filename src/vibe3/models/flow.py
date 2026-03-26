@@ -6,6 +6,16 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class MainBranchProtectedError(Exception):
+    """Cannot create flow on protected main branches.
+
+    Main branches (main, master, develop, etc.) are protected and cannot
+    have flows. Flows are only for feature branches.
+    """
+
+    pass
+
+
 class FlowState(BaseModel):
     """Flow state model."""
 
@@ -26,7 +36,7 @@ class FlowState(BaseModel):
     latest_actor: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
-    flow_status: Literal["active", "blocked", "done", "stale"] = "active"
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     @field_validator("flow_status", mode="before")
@@ -74,20 +84,12 @@ class FlowEvent(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
-class CreateFlowRequest(BaseModel):
-    """Request model for creating a flow."""
-
-    slug: str
-    branch: str
-    task_id: str | None = None
-
-
 class FlowStatusResponse(BaseModel):
     """Response model for flow status."""
 
     branch: str
     flow_slug: str
-    flow_status: Literal["active", "blocked", "done", "stale"]
+    flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
     task_issue_number: int | None = None
     pr_number: int | None = None
     spec_ref: str | None = None
