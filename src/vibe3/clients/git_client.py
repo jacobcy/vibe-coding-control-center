@@ -47,6 +47,15 @@ from vibe3.utils.git_worktree import (
 from vibe3.utils.git_worktree import (
     get_git_common_dir as _get_git_common_dir,
 )
+from vibe3.utils.git_worktree import (
+    get_safe_main_branch_name as _get_safe_main_branch_name,
+)
+from vibe3.utils.git_worktree import (
+    get_worktree_root as _get_worktree_root,
+)
+from vibe3.utils.git_worktree import (
+    is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -105,6 +114,18 @@ class GitClient:
         """Get the shared .git directory path (for worktrees)."""
         return _get_git_common_dir(self._run)
 
+    def get_worktree_root(self) -> str:
+        """Get the top-level path of the current worktree."""
+        return _get_worktree_root(self._run)
+
+    def get_safe_main_branch_name(self) -> str:
+        """Get the worktree-specific safe branch name."""
+        return _get_safe_main_branch_name(self._run)
+
+    def is_branch_occupied_by_worktree(self, branch_name: str) -> bool:
+        """Check whether any worktree already has this branch checked out."""
+        return _is_branch_occupied_by_worktree(self._run, branch_name)
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
         return _get_changed_files(self._run, source, self._github_client)
@@ -125,7 +146,7 @@ class GitClient:
         """Check if working directory is dirty."""
         return _has_uncommitted_changes(self._run)
 
-    # ── 分支管理方法（委托给 git_branch_ops）──────────────────
+    # 分支管理方法（委托给 git_branch）
 
     def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
         """Create a new branch from start_ref."""
@@ -150,3 +171,22 @@ class GitClient:
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""
         return _branch_exists(branch_name)
+
+    def push_branch(
+        self,
+        branch_name: str,
+        remote: str = "origin",
+        set_upstream: bool = True,
+    ) -> None:
+        """Push branch to remote.
+
+        Args:
+            branch_name: Branch to push
+            remote: Remote name, default origin
+            set_upstream: Whether to set upstream tracking
+        """
+        args = ["push"]
+        if set_upstream:
+            args.append("-u")
+        args.extend([remote, branch_name])
+        self._run(args)

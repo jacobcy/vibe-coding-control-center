@@ -7,12 +7,15 @@ in background processes, with status tracking in flow state.
 import os
 import subprocess
 import threading
-from datetime import datetime
 from typing import Literal
 
 from loguru import logger
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.services.execution_lifecycle import (
+    ExecutionLifecycleEvent,
+    persist_execution_lifecycle_event,
+)
 
 ExecutionRole = Literal["planner", "executor", "reviewer"]
 ExecutionStatus = Literal["pending", "running", "done", "crashed"]
@@ -45,8 +48,6 @@ class AsyncExecutionService:
         Returns:
             Process ID of the background process
         """
-        now = datetime.now().isoformat()
-
         process = subprocess.Popen(
             command,
             start_new_session=True,
@@ -55,21 +56,14 @@ class AsyncExecutionService:
             cwd=os.getcwd(),
         )
 
-        self.store.update_flow_state(
+        persist_execution_lifecycle_event(
+            self.store,
             branch,
-            **{
-                f"{role}_status": "running",
-                "execution_pid": process.pid,
-                "execution_started_at": now,
-                "execution_completed_at": None,
-            },
-        )
-
-        self.store.add_event(
-            branch,
-            f"{role}_started",
+            role,
+            "started",
             "system",
             detail=f"Started async {role}",
+            extra_state_updates={"execution_pid": process.pid},
         )
 
         self._start_completion_watcher(process, role, branch)
@@ -164,21 +158,14 @@ class AsyncExecutionService:
         except (OSError, ProcessLookupError):
             pass
 
-        now = datetime.now().isoformat()
-        self.store.update_flow_state(
+        persist_execution_lifecycle_event(
+            self.store,
             branch,
-            **{
-                f"{role}_status": "crashed",
-                "execution_completed_at": now,
-                "execution_pid": None,
-            },
-        )
-
-        self.store.add_event(
-            branch,
-            f"{role}_cancelled",
+            role,
+            "aborted",
             "system",
             detail=f"{role} was manually cancelled",
+            refs={"reason": "cancelled"},
         )
 
         logger.bind(
@@ -203,23 +190,16 @@ class AsyncExecutionService:
             branch: Branch name
             success: Whether execution succeeded
         """
-        now = datetime.now().isoformat()
+        lifecycle: ExecutionLifecycleEvent = "completed" if success else "aborted"
         status: ExecutionStatus = "done" if success else "crashed"
-
-        self.store.update_flow_state(
+        persist_execution_lifecycle_event(
+            self.store,
             branch,
-            **{
-                f"{role}_status": status,
-                "execution_completed_at": now,
-                "execution_pid": None,
-            },
-        )
-
-        self.store.add_event(
-            branch,
-            f"{role}_completed",
+            role,
+            lifecycle,
             "system",
             detail=f"{role} finished with status: {status}",
+            refs={"status": status},
         )
 
         logger.bind(

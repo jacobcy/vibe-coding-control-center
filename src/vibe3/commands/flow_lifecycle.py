@@ -47,6 +47,16 @@ def done(
             "Closing flow"
         )
 
+        flow_status = service.get_flow_status(target_branch)
+        if flow_status and flow_status.task_issue_number is None and not yes:
+            typer.echo(
+                "Error: 当前 flow 未绑定 task issue\n"
+                "先执行 `vibe3 flow bind <issue> --role task`\n"
+                "若确认强制关闭，使用 `vibe3 flow done --yes`",
+                err=True,
+            )
+            raise typer.Exit(1)
+
         service.close_flow(target_branch, check_pr=not yes)
 
         typer.echo(f"Flow closed, branch '{target_branch}' deleted")
@@ -57,6 +67,9 @@ def blocked(
     reason: Annotated[
         str | None, typer.Option("--reason", help="Blocking reason")
     ] = None,
+    task: Annotated[
+        int | None, typer.Option("--task", help="Dependency issue number")
+    ] = None,
     by: Annotated[
         int | None, typer.Option("--by", help="Dependency issue number")
     ] = None,
@@ -66,12 +79,12 @@ def blocked(
 ) -> None:
     """Mark flow as blocked.
 
-    If --by is provided, automatically adds dependency issue link.
+    If --task/--by is provided, automatically adds dependency issue link.
 
     Examples:
         vibe3 flow blocked --reason "等待外部反馈"
-        vibe3 flow blocked --by 218
-        vibe3 flow blocked --by 218 --reason "需要 #218 先完成"
+        vibe3 flow blocked --task 218
+        vibe3 flow blocked --task 218 --reason "需要 #218 先完成"
     """
     with trace_scope(trace, "flow blocked", domain="flow"):
         service = FlowService()
@@ -81,16 +94,20 @@ def blocked(
             command="flow blocked",
             branch=target_branch,
             reason=reason,
+            task=task,
             by=by,
         ).info("Blocking flow")
 
-        service.block_flow(target_branch, reason=reason, blocked_by_issue=by)
+        blocked_by_issue = task if task is not None else by
+        service.block_flow(
+            target_branch, reason=reason, blocked_by_issue=blocked_by_issue
+        )
 
         msg = f"Flow blocked on branch '{target_branch}'"
         if reason:
             msg += f": {reason}"
-        if by:
-            msg += f" (blocked by #{by})"
+        if blocked_by_issue:
+            msg += f" (blocked by #{blocked_by_issue})"
         typer.echo(msg)
 
 

@@ -41,7 +41,10 @@ class TestAsyncExecutionService:
 
         assert pid == 12345
         mock_store.update_flow_state.assert_called()
-        mock_store.add_event.assert_called_once()
+        assert mock_store.add_event.call_args.args[1] == "review_started"
+        assert (
+            mock_store.add_event.call_args.kwargs["detail"] == "Started async reviewer"
+        )
 
     def test_check_execution_status_running(self, service):
         """Check status returns running for active process."""
@@ -68,9 +71,8 @@ class TestAsyncExecutionService:
         )
 
         mock_store.update_flow_state.assert_called()
-        args = mock_store.update_flow_state.call_args[1]
-        assert args["reviewer_status"] == "done"
-        assert args["execution_pid"] is None
+        assert mock_store.add_event.call_args.args[1] == "review_completed"
+        assert mock_store.add_event.call_args.kwargs["refs"]["status"] == "done"
 
     def test_complete_execution_crashed(self, service, mock_store):
         """Complete execution with failure should set crashed status."""
@@ -81,9 +83,8 @@ class TestAsyncExecutionService:
         )
 
         mock_store.update_flow_state.assert_called()
-        args = mock_store.update_flow_state.call_args[1]
-        assert args["reviewer_status"] == "crashed"
-        assert args["execution_pid"] is None
+        assert mock_store.add_event.call_args.args[1] == "review_aborted"
+        assert mock_store.add_event.call_args.kwargs["refs"]["status"] == "crashed"
 
     def test_start_async_execution_persists_state(self, tmp_path):
         """Starting execution should persist running state in SQLite store."""
@@ -116,6 +117,8 @@ class TestAsyncExecutionService:
         assert state["reviewer_status"] == "running"
         assert state["execution_pid"] == 4321
         assert state["execution_started_at"] is not None
+        events = store.get_events("feature/test")
+        assert events[0]["event_type"] == "review_started"
 
     def test_wait_for_process_marks_completion(self, tmp_path):
         """Watcher should mark completion state on exit."""
@@ -132,6 +135,24 @@ class TestAsyncExecutionService:
         assert state["planner_status"] == "done"
         assert state["execution_pid"] is None
         assert state["execution_completed_at"] is not None
+        events = store.get_events("feature/x")
+        assert events[0]["event_type"] == "plan_completed"
+
+    def test_wait_for_process_marks_aborted_on_failure(self, tmp_path):
+        """Watcher should record aborted state on non-zero exit."""
+        db_path = tmp_path / "handoff.db"
+        store = SQLiteClient(db_path=str(db_path))
+        service = AsyncExecutionService(store=store)
+
+        process = MagicMock()
+        process.wait.return_value = 1
+
+        service._wait_for_process(process, "executor", "feature/x")
+
+        state = store.get_flow_state("feature/x")
+        assert state["executor_status"] == "crashed"
+        events = store.get_events("feature/x")
+        assert events[0]["event_type"] == "run_aborted"
 
     def test_cancel_execution_updates_state(self, tmp_path):
         """Cancel should handle dict rows and clear pid."""
@@ -153,4 +174,6 @@ class TestAsyncExecutionService:
         assert state["reviewer_status"] == "crashed"
         assert state["execution_pid"] is None
         assert state["execution_completed_at"] is not None
+        events = store.get_events("feature/x")
+        assert events[0]["event_type"] == "review_aborted"
         killpg.assert_called_once()

@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 
 import typer
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -16,10 +17,12 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.plan import PlanRequest, PlanScope
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
+from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -28,6 +31,50 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+def _build_issue_context(
+    issue_number: int,
+    heading: str,
+    github: GitHubClient,
+) -> str | None:
+    issue = github.view_issue(issue_number)
+    if not isinstance(issue, dict):
+        return None
+
+    parts = [f"## {heading}", f"Issue: #{issue_number}"]
+    title = issue.get("title")
+    body = issue.get("body")
+    if title:
+        parts.append(f"Title: {title}")
+    if body:
+        parts.append("")
+        parts.append(body)
+    return "\n".join(parts)
+
+
+def _build_flow_plan_guidance(
+    flow: FlowStatusResponse | None,
+    issue_number: int,
+) -> str | None:
+    github = GitHubClient()
+    sections: list[str] = []
+
+    task_context = _build_issue_context(issue_number, "Task Issue Context", github)
+    if task_context:
+        sections.append(task_context)
+
+    spec_ref = getattr(flow, "spec_ref", None)
+    if spec_ref:
+        spec_service = SpecRefService()
+        spec_info = spec_service.parse_spec_ref(spec_ref)
+        spec_content = spec_service.get_spec_content_for_prompt(spec_info)
+        if spec_info.display and spec_info.display != spec_ref:
+            sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
+        if spec_content:
+            sections.append(f"## Spec Context\n{spec_content}")
+
+    return "\n\n".join(sections) if sections else None
 
 
 @app.command()
@@ -109,8 +156,11 @@ def task(
 
     typer_module.echo(f"-> Plan: Issue #{issue}")
 
+    flow = flow_service.get_flow_status(branch)
+    guidance = _build_flow_plan_guidance(flow, issue) if flow else None
+
     scope = PlanScope.for_task(issue)
-    request = PlanRequest(scope=scope)
+    request = PlanRequest(scope=scope, task_guidance=guidance)
     run_plan(  # type: ignore[call-arg]
         request,
         config,

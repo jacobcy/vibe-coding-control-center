@@ -1,5 +1,7 @@
 """Tests for Task issue linking functionality."""
 
+from unittest.mock import patch
+
 from vibe3.models.flow import IssueLink
 from vibe3.services.task_service import TaskService
 
@@ -30,12 +32,13 @@ class TestIssueLinking:
 
     def test_link_issue_dependency_role(self, mock_store_for_task) -> None:
         """Test linking an issue with 'dependency' role."""
-        service = TaskService(store=mock_store_for_task)
-        result = service.link_issue(
-            branch="test-branch",
-            issue_number=103,
-            role="dependency",
-        )
+        with patch.object(TaskService, "auto_link_issue_to_project"):
+            service = TaskService(store=mock_store_for_task)
+            result = service.link_issue(
+                branch="test-branch",
+                issue_number=103,
+                role="dependency",
+            )
 
         assert isinstance(result, IssueLink)
         assert result.issue_number == 103
@@ -49,12 +52,13 @@ class TestIssueLinking:
 
     def test_link_issue_task_role(self, mock_store_for_task) -> None:
         """Test linking an issue with 'task' role."""
-        service = TaskService(store=mock_store_for_task)
-        result = service.link_issue(
-            branch="test-branch",
-            issue_number=102,
-            role="task",
-        )
+        with patch.object(TaskService, "auto_link_issue_to_project"):
+            service = TaskService(store=mock_store_for_task)
+            result = service.link_issue(
+                branch="test-branch",
+                issue_number=102,
+                role="task",
+            )
 
         assert isinstance(result, IssueLink)
         assert result.issue_number == 102

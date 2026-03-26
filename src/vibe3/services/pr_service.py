@@ -6,6 +6,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.protocols import GitHubClientProtocol
+from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import (
     CreatePRRequest,
     PRResponse,
@@ -43,7 +44,7 @@ class PRService:
         title: str,
         body: str,
         base_branch: str = "main",
-        actor: str = "unknown",
+        actor: str = "server",
     ) -> PRResponse:
         """Create a draft PR.
 
@@ -78,6 +79,27 @@ class PRService:
 
         # Get current branch
         head_branch = self.git_client.get_current_branch()
+
+        # Prevent duplicate PR creation for the same head branch.
+        existing_prs = self.github_client.list_prs_for_branch(head_branch)
+        if existing_prs:
+            existing = existing_prs[0]
+            raise UserError(
+                f"PR already exists for branch '{head_branch}': "
+                f"#{existing.number} {existing.url}\n"
+                f"Use `vibe3 pr show --number {existing.number}` to continue."
+            )
+
+        # Ensure head branch exists on remote before gh pr create.
+        try:
+            self.git_client.push_branch(head_branch, set_upstream=True)
+        except GitError as exc:
+            raise UserError(
+                f"Failed to push branch '{head_branch}' before PR creation: {exc}\n"
+                f"Tips:\n"
+                f"  1. Resolve local/remote divergence if any\n"
+                f"  2. Ensure you have push permission to origin"
+            ) from exc
 
         # Read metadata from flow state
         metadata = get_metadata_from_flow(self.store, head_branch)

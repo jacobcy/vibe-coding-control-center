@@ -47,13 +47,15 @@ def build_plan_task_section(
 ) -> str:
     """Build plan task section."""
     if task_text:
+        if request.task_guidance:
+            return f"## Planning Task\n{task_text}\n\n{request.task_guidance}"
         return f"## Planning Task\n{task_text}"
 
     scope_info = ""
     if request.scope.kind == "task" and request.scope.issue_number:
         scope_info = f"\n- Issue: #{request.scope.issue_number}"
     elif request.scope.kind == "spec" and request.scope.description:
-        return f"""## Specification
+        section = f"""## Specification
 
 {request.scope.description}
 
@@ -63,13 +65,19 @@ def build_plan_task_section(
 - Estimate effort for each step
 - Flag potential risks or blockers
 - Maximum {request.max_steps} steps"""
+        if request.task_guidance:
+            section += f"\n\n{request.task_guidance}"
+        return section
 
-    return f"""## Planning Task
+    section = f"""## Planning Task
 - Create a step-by-step implementation plan
 - Identify dependencies between steps
 - Estimate effort for each step
 - Flag potential risks or blockers
 - Maximum {request.max_steps} steps{scope_info}"""
+    if request.task_guidance:
+        section += f"\n\n{request.task_guidance}"
+    return section
 
 
 def build_plan_output_contract_section(output_format: str | None) -> str:

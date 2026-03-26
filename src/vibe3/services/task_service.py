@@ -6,6 +6,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.models.flow import FlowState, IssueLink
+from vibe3.models.project_item import LinkError
 from vibe3.services.task_bridge_mixin import TaskBridgeMixin
 
 if TYPE_CHECKING:
@@ -57,6 +58,17 @@ class TaskService(TaskBridgeMixin):
             "system",
             f"Issue #{issue_number} linked as {role}",
         )
+
+        if role in {"task", "dependency"}:
+            link_result = self.auto_link_issue_to_project(branch, issue_number)
+            if isinstance(link_result, LinkError):
+                logger.bind(
+                    domain="task",
+                    action="link_issue",
+                    branch=branch,
+                    issue_number=issue_number,
+                    role=role,
+                ).warning(f"Auto project link skipped: {link_result.message}")
 
         return IssueLink(
             branch=branch,

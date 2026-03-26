@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 import typer
 from loguru import logger
 
+from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
@@ -46,12 +47,13 @@ def _parse_task_id(task_id: str) -> int:
 @app.command(name="add")
 def add(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
-    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
-    force: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
-    ] = False,
+    task: Annotated[
+        str | None,
+        typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
+    ] = None,
+    spec: Annotated[
+        str | None, typer.Option("--spec", help="Spec file path or issue reference")
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -60,15 +62,10 @@ def add(
     """Add flow to current branch.
 
     This command registers a flow on the current branch.
-    Use 'flow create' to create a new branch with flow.
-
-    If current branch already has a flow:
-    - Active/blocked flow: Error (use --yes to force)
-    - Done/aborted/stale flow: Warning, then proceed
+    The branch must not already have any flow record.
 
     Examples:
         vibe3 flow add my-feature
-        vibe3 flow add my-feature --yes  # Force add on branch with active flow
     """
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task).info("Adding flow")
@@ -76,36 +73,16 @@ def add(
         service = FlowService()
         branch = service.get_current_branch()
 
-        # Check if flow already exists
         existing_flow = service.get_flow_status(branch)
         if existing_flow:
-            status = existing_flow.flow_status
+            console.print(
+                f"[red]Error: Branch '{branch}' already has flow: "
+                f"{existing_flow.flow_slug}[/]"
+            )
+            raise typer.Exit(1)
 
-            # Active/blocked flow: block add
-            if status in ["active", "blocked"]:
-                if not force:
-                    console.print(
-                        f"[red]Error: Branch '{branch}' has active flow: "
-                        f"{existing_flow.flow_slug}[/]"
-                    )
-                    console.print(
-                        "[yellow]Use --yes to force add, "
-                        "or switch to another branch first[/]"
-                    )
-                    raise typer.Exit(1)
-
-            # Done/aborted/stale flow: allow add with warning
-            if status in ["done", "aborted", "stale"] and not force:
-                console.print(
-                    f"[yellow]Warning: Branch '{branch}' has completed flow: "
-                    f"{existing_flow.flow_slug}[/]"
-                )
-                console.print("[yellow]Adding new flow to this branch[/]")
-
-        # Register flow
         flow = service.create_flow(slug=name, branch=branch)
 
-        # Bind task if provided
         if task:
             try:
                 service.bind_task(branch, task, "system")
@@ -114,11 +91,9 @@ def add(
                     "Invalid task ID format, skipping binding"
                 )
 
-        # Bind spec_ref if provided
         if spec:
             service.bind_spec(branch, spec, "system")
 
-        # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
 
         if json_output:
@@ -131,12 +106,10 @@ def add(
 @app.command(name="new", deprecated=True, hidden=True)
 def new(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    task: Annotated[
+        str | None, typer.Option(help="Issue reference to bind as task")
+    ] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
-    force: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
-    ] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -150,14 +123,18 @@ def new(
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
-    add(name, task, spec, force, trace, json_output)
+    add(name, task, spec, trace, json_output)
 
 
 @app.command(name="create")
 def create(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
-    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
+    task: Annotated[
+        str | None, typer.Option(help="Issue reference to bind as task")
+    ] = None,
+    spec: Annotated[
+        str | None, typer.Option("--spec", help="Spec file path or issue reference")
+    ] = None,
     base: Annotated[
         str,
         typer.Option(
@@ -264,9 +241,9 @@ def create(
 
 @app.command()
 def bind(
-    task_id: Annotated[
+    issue: Annotated[
         str,
-        typer.Argument(help="Task ID to bind as task/related/dependency"),
+        typer.Argument(help="Issue reference to bind as task/related/dependency"),
     ],
     role: Annotated[
         Literal["task", "related", "dependency"],
@@ -278,8 +255,8 @@ def bind(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Bind an issue to current flow as task, related, or dependency."""
-    with trace_scope(trace, "flow bind", task_id=task_id, role=role):
-        logger.bind(command="flow bind", task_id=task_id, role=role).info(
+    with trace_scope(trace, "flow bind", issue=issue, role=role):
+        logger.bind(command="flow bind", issue=issue, role=role).info(
             "Binding issue to flow"
         )
 
@@ -288,7 +265,7 @@ def bind(
         service = TaskService()
 
         try:
-            issue_number = _parse_task_id(task_id)
+            issue_number = _parse_task_id(issue)
             link = service.link_issue(branch, issue_number, role)
 
             if json_output:
@@ -300,8 +277,8 @@ def bind(
                 )
                 console.print(message)
         except ValueError:
-            logger.error(f"Invalid task ID format: {task_id}")
-            raise typer.BadParameter(f"Invalid task ID format: {task_id}")
+            logger.error(f"Invalid issue format: {issue}")
+            raise typer.BadParameter(f"Invalid issue format: {issue}")
 
 
 @app.command()
@@ -321,8 +298,11 @@ def show(
             "Showing flow details"
         )
 
-        service = FlowService()
-        branch = flow_name if flow_name else service.get_current_branch()
+        if flow_name:
+            service = FlowService()
+            branch = flow_name
+        else:
+            service, branch = ensure_flow_for_current_branch()
 
         if snapshot:
             flow_status = service.get_flow_status(branch)
@@ -345,6 +325,11 @@ def show(
             typer.echo(json.dumps(output, indent=2, default=str))
         else:
             render_flow_timeline(timeline["state"], timeline["events"])
+            if timeline["state"].task_issue_number is None:
+                console.print(
+                    "[yellow]提示：当前 flow 还没有 task，建议先执行 "
+                    "vibe3 flow bind <issue> --role task[/]"
+                )
 
 
 @app.command()
