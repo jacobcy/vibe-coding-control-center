@@ -204,10 +204,12 @@ def create(
 
         if base == "current" and not decision.allow_base_current:
             console.print(
-                "[red]Error: '--base current' is only allowed when current flow is blocked.[/]"
+                "[red]Error: '--base current' is only allowed "
+                "when current flow is blocked.[/]"
             )
             console.print(
-                "[yellow]For independent new features, use 'vibe3 wtnew <name>' first.[/]"
+                "[yellow]For independent new features, "
+                "use 'vibe3 wtnew <name>' first.[/]"
             )
             raise typer.Exit(1)
 
