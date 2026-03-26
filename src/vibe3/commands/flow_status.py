@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.observability.logger import setup_logging
+from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
     render_error,
@@ -62,11 +61,9 @@ def show(
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show flow details."""
-    if trace:
-        setup_logging(verbose=2)
-    git = GitClient()
-    service = FlowService()
-    target_branch = branch if branch else git.get_current_branch()
+    with trace_scope(trace, "flow show", domain="flow"):
+        service = FlowService()
+        target_branch = branch if branch else service.get_current_branch()
 
     if snapshot:
         flow_status = service.get_flow_status(target_branch)
@@ -105,10 +102,9 @@ def status(
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Show dashboard of all active flows."""
-    if trace:
-        setup_logging(verbose=2)
-    service = FlowService()
-    flows = service.list_flows(status="active")
+    with trace_scope(trace, "flow status", domain="flow"):
+        service = FlowService()
+        flows = service.list_flows(status="active")
     if json_output:
         typer.echo(json.dumps([f.model_dump() for f in flows], indent=2, default=str))
         return

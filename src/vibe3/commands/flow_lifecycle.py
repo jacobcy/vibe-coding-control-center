@@ -5,8 +5,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.observability.logger import setup_logging
+from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
 
 
@@ -18,20 +17,18 @@ def switch(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Switch to existing flow."""
-    if trace:
-        setup_logging(verbose=2)
+    with trace_scope(trace, "flow switch", domain="flow", target=target):
+        logger.bind(command="flow switch", target=target).info("Switching to flow")
 
-    logger.bind(command="flow switch", target=target).info("Switching to flow")
+        service = FlowService()
+        flow = service.switch_flow(target)
 
-    service = FlowService()
-    flow = service.switch_flow(target)
+        if json_output:
+            import json
 
-    if json_output:
-        import json
-
-        typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-    else:
-        typer.echo(f"Switched to flow '{flow.flow_slug}' on branch '{flow.branch}'")
+            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
+        else:
+            typer.echo(f"Switched to flow '{flow.flow_slug}' on branch '{flow.branch}'")
 
 
 def done(
@@ -42,18 +39,17 @@ def done(
     ] = False,
 ) -> None:
     """Close flow and delete branch."""
-    if trace:
-        setup_logging(verbose=2)
+    with trace_scope(trace, "flow done", domain="flow"):
+        service = FlowService()
+        target_branch = branch or service.get_current_branch()
 
-    git = GitClient()
-    target_branch = branch or git.get_current_branch()
+        logger.bind(command="flow done", branch=target_branch, yes=yes).info(
+            "Closing flow"
+        )
 
-    logger.bind(command="flow done", branch=target_branch, yes=yes).info("Closing flow")
+        service.close_flow(target_branch, check_pr=not yes)
 
-    service = FlowService()
-    service.close_flow(target_branch, check_pr=not yes)
-
-    typer.echo(f"Flow closed, branch '{target_branch}' deleted")
+        typer.echo(f"Flow closed, branch '{target_branch}' deleted")
 
 
 def blocked(
@@ -77,28 +73,25 @@ def blocked(
         vibe3 flow blocked --by 218
         vibe3 flow blocked --by 218 --reason "需要 #218 先完成"
     """
-    if trace:
-        setup_logging(verbose=2)
+    with trace_scope(trace, "flow blocked", domain="flow"):
+        service = FlowService()
+        target_branch = branch or service.get_current_branch()
 
-    git = GitClient()
-    target_branch = branch or git.get_current_branch()
+        logger.bind(
+            command="flow blocked",
+            branch=target_branch,
+            reason=reason,
+            by=by,
+        ).info("Blocking flow")
 
-    logger.bind(
-        command="flow blocked",
-        branch=target_branch,
-        reason=reason,
-        by=by,
-    ).info("Blocking flow")
+        service.block_flow(target_branch, reason=reason, blocked_by_issue=by)
 
-    service = FlowService()
-    service.block_flow(target_branch, reason=reason, blocked_by_issue=by)
-
-    msg = f"Flow blocked on branch '{target_branch}'"
-    if reason:
-        msg += f": {reason}"
-    if by:
-        msg += f" (blocked by #{by})"
-    typer.echo(msg)
+        msg = f"Flow blocked on branch '{target_branch}'"
+        if reason:
+            msg += f": {reason}"
+        if by:
+            msg += f" (blocked by #{by})"
+        typer.echo(msg)
 
 
 def aborted(
@@ -108,15 +101,12 @@ def aborted(
     ] = False,
 ) -> None:
     """Abort flow and delete branch."""
-    if trace:
-        setup_logging(verbose=2)
+    with trace_scope(trace, "flow aborted", domain="flow"):
+        service = FlowService()
+        target_branch = branch or service.get_current_branch()
 
-    git = GitClient()
-    target_branch = branch or git.get_current_branch()
+        logger.bind(command="flow aborted", branch=target_branch).info("Aborting flow")
 
-    logger.bind(command="flow aborted", branch=target_branch).info("Aborting flow")
+        service.abort_flow(target_branch)
 
-    service = FlowService()
-    service.abort_flow(target_branch)
-
-    typer.echo(f"Flow aborted, branch '{target_branch}' deleted")
+        typer.echo(f"Flow aborted, branch '{target_branch}' deleted")

@@ -2,21 +2,15 @@
 """Flow command handlers."""
 
 import json
-from contextlib import nullcontext
 from typing import Annotated, Literal
 
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
-from vibe3.models.project_item import LinkError
-from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
@@ -34,44 +28,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-
-def _trace_scope(trace: bool, command: str, **kwargs: str):  # type: ignore[no-untyped-def]
-    if trace:
-        setup_logging(verbose=2)
-        return trace_context(command=command, domain="flow", **kwargs)
-    return nullcontext()
-
-
-def _parse_issue_number(task_ref: str) -> int:
-    digits = "".join(filter(str.isdigit, task_ref))
-    if not digits:
-        raise ValueError(f"Invalid task ID format: {task_ref}")
-    return int(digits)
-
-
-def _bind_task_to_flow(
-    branch: str,
-    task_ref: str,
-    actor: str,
-    command: str,
-) -> int:
-    issue_number = _parse_issue_number(task_ref)
-    store = SQLiteClient()
-
-    store.add_issue_link(branch, issue_number, "task")
-    store.update_flow_state(branch, task_issue_number=issue_number)
-    store.add_event(branch, "task_bound", actor, detail=f"Task bound: {task_ref}")
-    logger.bind(command=command, task=task_ref).info("Task bound to flow")
-
-    # 自动将 issue 加入 GitHub Project（链式反应，非致命）
-    link_result = TaskService().auto_link_issue_to_project(branch, issue_number)
-    if isinstance(link_result, LinkError):
-        logger.bind(command=command, task=task_ref).warning(
-            f"Auto project link skipped: {link_result.message}"
-        )
-
-    return issue_number
 
 
 @app.command(name="add")
@@ -101,12 +57,11 @@ def add(
         vibe3 flow add my-feature
         vibe3 flow add my-feature --yes  # Force add on branch with active flow
     """
-    with _trace_scope(trace, "flow add", name=name):
+    with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task).info("Adding flow")
 
-        git = GitClient()
         service = FlowService()
-        branch = git.get_current_branch()
+        branch = service.get_current_branch()
 
         # Check if flow already exists
         existing_flow = service.get_flow_status(branch)
@@ -140,7 +95,7 @@ def add(
         # Bind task if provided
         if task:
             try:
-                _bind_task_to_flow(branch, task, "system", command="flow add")
+                service.bind_task(branch, task, "system")
             except ValueError:
                 logger.bind(command="flow add", task=task).warning(
                     "Invalid task ID format, skipping binding"
@@ -148,12 +103,7 @@ def add(
 
         # Bind spec_ref if provided
         if spec:
-            store = SQLiteClient()
-            store.update_flow_state(branch, spec_ref=spec, latest_actor="system")
-            store.add_event(
-                branch, "spec_bound", "system", detail=f"Spec bound: {spec}"
-            )
-            logger.bind(command="flow add", spec=spec).info("Spec bound to flow")
+            service.bind_spec(branch, spec, "system")
 
         # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
@@ -223,43 +173,40 @@ def create(
         vibe3 flow create my-feature --base current
         vibe3 flow create my-feature --base feature/A
     """
-    with _trace_scope(trace, "flow create", name=name, base=base):
+    with trace_scope(trace, "flow create", name=name, base=base):
         logger.bind(command="flow create", name=name, base=base, task=task).info(
             "Creating flow with new branch"
         )
 
-        git = GitClient()
         service = FlowService()
 
         # Determine base branch
         if base == "main":
             start_ref = "origin/main"
         elif base == "current":
-            start_ref = git.get_current_branch()
+            start_ref = service.get_current_branch()
         else:
-            # User-specified branch name
             start_ref = base
 
-        # Check if branch already exists
         branch_name = f"task/{name}"
-        if git.branch_exists(branch_name):
-            console.print(f"[red]Error: Branch '{branch_name}' already exists.[/]")
-            console.print(
-                f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
-            )
-            raise typer.Exit(1)
 
         # Create branch and register flow
         try:
             flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
         except RuntimeError as e:
-            console.print(f"[red]Error: {e}[/]")
+            if "already exists" in str(e):
+                console.print(f"[red]Error: {e}[/]")
+                console.print(
+                    f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
+                )
+            else:
+                console.print(f"[red]Error: {e}[/]")
             raise typer.Exit(1)
 
         # Bind task if provided
         if task:
             try:
-                _bind_task_to_flow(branch_name, task, "system", command="flow create")
+                service.bind_task(branch_name, task, "system")
             except ValueError:
                 logger.bind(command="flow create", task=task).warning(
                     "Invalid task ID format, skipping binding"
@@ -267,12 +214,7 @@ def create(
 
         # Bind spec_ref if provided
         if spec:
-            store = SQLiteClient()
-            store.update_flow_state(branch_name, spec_ref=spec, latest_actor="system")
-            store.add_event(
-                branch_name, "spec_bound", "system", detail=f"Spec bound: {spec}"
-            )
-            logger.bind(command="flow create", spec=spec).info("Spec bound to flow")
+            service.bind_spec(branch_name, spec, "system")
 
         # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
@@ -293,16 +235,16 @@ def bind(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Bind a task to current flow."""
-    with _trace_scope(trace, "flow bind", task_id=task_id):
+    with trace_scope(trace, "flow bind", task_id=task_id):
         logger.bind(command="flow bind", task_id=task_id, actor=actor).info(
             "Binding task to flow"
         )
 
-        git = GitClient()
-        branch = git.get_current_branch()
+        service = FlowService()
+        branch = service.get_current_branch()
 
         try:
-            _bind_task_to_flow(branch, task_id, actor, command="flow bind")
+            service.bind_task(branch, task_id, actor)
 
             if json_output:
                 typer.echo(json.dumps({"status": "bound", "task_id": task_id}))
@@ -325,14 +267,13 @@ def show(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show flow details for a branch."""
-    with _trace_scope(trace, "flow show"):
+    with trace_scope(trace, "flow show"):
         logger.bind(command="flow show", flow_name=flow_name).info(
             "Showing flow details"
         )
 
-        git = GitClient()
         service = FlowService()
-        branch = flow_name if flow_name else git.get_current_branch()
+        branch = flow_name if flow_name else service.get_current_branch()
 
         if snapshot:
             flow_status = service.get_flow_status(branch)
@@ -365,14 +306,13 @@ def status(
     ] = False,  # noqa: E501
 ) -> None:
     """Show flow status."""
-    with _trace_scope(trace, "flow status"):
+    with trace_scope(trace, "flow status"):
         logger.bind(command="flow status", json_output=json_output).info(
             "Getting flow status"
         )
 
-        git = GitClient()
         service = FlowService()
-        branch = git.get_current_branch()
+        branch = service.get_current_branch()
         flow_status = service.get_flow_status(branch)
 
         if json_output:
@@ -397,7 +337,7 @@ def list(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """List all flows."""
-    with _trace_scope(trace, "flow list"):
+    with trace_scope(trace, "flow list"):
         logger.bind(command="flow list", status_filter=status_filter).info(
             "Listing flows"
         )
