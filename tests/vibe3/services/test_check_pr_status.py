@@ -169,6 +169,10 @@ class TestPRStatusDetection:
         git_client.get_current_branch.return_value = "task/my-feature"
         git_client.get_git_common_dir.return_value = tmp_path
 
+        # Mock GitHub client to return empty PR list
+        github_client = MagicMock(spec=GitHubClient)
+        github_client.list_prs_for_branch.return_value = []
+
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -177,6 +181,14 @@ class TestPRStatusDetection:
         (handoff_dir / "current.md").touch()
 
         # ACT: Run check
+        service = CheckService(
+            store=store, git_client=git_client, github_client=github_client
+        )
+        service.verify_current_flow()
+
+        # ASSERT: Flow should remain active
+        flow = store.get_flow_state("task/my-feature")
+        assert flow["flow_status"] == "active"
         service = CheckService(store=store, git_client=git_client)
         service.verify_current_flow()
 

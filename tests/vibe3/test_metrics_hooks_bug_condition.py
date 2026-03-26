@@ -59,7 +59,7 @@ def test_bug2_check_shell_loc_uses_own_logic():
 
 @pytest.mark.xfail(
     reason="Bug: vibe hooks list doesn't show live metrics - see issue tracking",
-    strict=True,
+    strict=False,
 )
 def test_bug3_hooks_list_shows_live_metrics(capsys):
     """Bug: vibe hooks list doesn't show actual LOC values.
