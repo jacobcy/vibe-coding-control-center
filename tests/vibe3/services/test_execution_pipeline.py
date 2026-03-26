@@ -39,7 +39,7 @@ def test_run_execution_pipeline_marks_started_before_execute_agent(
             create=True,
         ),
         patch(
-            "vibe3.services.execution_pipeline.GitClient",
+            "vibe3.clients.git_client.GitClient",
             return_value=MagicMock(
                 get_current_branch=MagicMock(return_value="task/demo")
             ),
@@ -87,7 +87,7 @@ def test_run_execution_pipeline_marks_completed_with_report_ref(
             create=True,
         ),
         patch(
-            "vibe3.services.execution_pipeline.GitClient",
+            "vibe3.clients.git_client.GitClient",
             return_value=MagicMock(
                 get_current_branch=MagicMock(return_value="task/demo")
             ),
@@ -127,7 +127,7 @@ def test_run_execution_pipeline_marks_aborted_when_execution_fails(
             create=True,
         ),
         patch(
-            "vibe3.services.execution_pipeline.GitClient",
+            "vibe3.clients.git_client.GitClient",
             return_value=MagicMock(
                 get_current_branch=MagicMock(return_value="task/demo")
             ),

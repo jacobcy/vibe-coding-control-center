@@ -6,31 +6,31 @@ session handling, execution, and handoff recording.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 from loguru import logger
 from typer import echo
 
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
+from vibe3.services.execution_lifecycle import (
+    ExecutionRole,
+    persist_execution_lifecycle_event,
+)
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
     record_handoff_unified,
 )
 from vibe3.services.review_runner import format_agent_actor
 
-SessionRole = Literal["planner", "executor", "reviewer"]
-
 
 @dataclass
 class ExecutionRequest:
     """Request payload for execution pipeline."""
 
-    role: SessionRole
+    role: ExecutionRole
     context_builder: Callable[[], str]
     options_builder: Callable[[], AgentOptions]
     task: str | None = None
@@ -46,62 +46,6 @@ class ExecutionResult:
     agent_result: AgentResult
     handoff_file: Path | None
     session_id: str | None
-
-
-def _run_lifecycle_enabled(request: ExecutionRequest) -> bool:
-    return request.role == "executor" and request.handoff_kind == "run"
-
-
-def _get_current_branch() -> str | None:
-    try:
-        return GitClient().get_current_branch()
-    except Exception as exc:  # pragma: no cover - defensive path
-        logger.bind(domain="execution_pipeline").warning(
-            f"Failed to resolve branch for run lifecycle event: {exc}"
-        )
-        return None
-
-
-def _persist_run_lifecycle_event(
-    branch: str | None,
-    actor: str,
-    event_type: Literal["run_started", "run_completed", "run_aborted"],
-    detail: str,
-    session_id: str | None = None,
-    refs: dict[str, str] | None = None,
-) -> None:
-    if branch is None:
-        return
-
-    now = datetime.now().isoformat()
-    flow_state_updates: dict[str, object] = {
-        "executor_actor": actor,
-    }
-    if session_id:
-        flow_state_updates["executor_session_id"] = session_id
-
-    if event_type == "run_started":
-        flow_state_updates.update(
-            executor_status="running",
-            execution_started_at=now,
-            execution_completed_at=None,
-        )
-    elif event_type == "run_completed":
-        flow_state_updates.update(
-            executor_status="done",
-            execution_completed_at=now,
-            execution_pid=None,
-        )
-    else:
-        flow_state_updates.update(
-            executor_status="crashed",
-            execution_completed_at=now,
-            execution_pid=None,
-        )
-
-    store = SQLiteClient()
-    store.update_flow_state(branch, **flow_state_updates)
-    store.add_event(branch, event_type, actor, detail=detail, refs=refs)
 
 
 def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
@@ -132,17 +76,30 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
     # Build agent options early so the start event can record the actual actor.
     options = request.options_builder()
     actor = format_agent_actor(options)
-    branch = (
-        _get_current_branch()
-        if not request.dry_run and _run_lifecycle_enabled(request)
-        else None
-    )
+    branch = None
+    store = None
+    if (
+        not request.dry_run
+        and request.role == "executor"
+        and request.handoff_kind == "run"
+    ):
+        from vibe3.clients.git_client import GitClient
 
-    if branch:
-        _persist_run_lifecycle_event(
+        try:
+            branch = GitClient().get_current_branch()
+            store = SQLiteClient()
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.bind(domain="execution_pipeline").warning(
+                f"Failed to resolve branch for run lifecycle event: {exc}"
+            )
+
+    if branch and store:
+        persist_execution_lifecycle_event(
+            store,
             branch,
+            request.role,
+            "started",
             actor,
-            "run_started",
             "Run started (status: in_progress)",
             session_id=session_id,
         )
@@ -191,14 +148,16 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
         if handoff_file:
             echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
 
-        if branch:
+        if branch and store:
             refs = {"status": "completed"}
             if handoff_file:
                 refs["ref"] = str(handoff_file)
-            _persist_run_lifecycle_event(
+            persist_execution_lifecycle_event(
+                store,
                 branch,
+                request.role,
+                "completed",
                 actor,
-                "run_completed",
                 "Run completed (status: completed)",
                 session_id=effective_session_id,
                 refs=refs,
@@ -210,11 +169,13 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
             session_id=effective_session_id,
         )
     except BaseException as exc:
-        if branch:
-            _persist_run_lifecycle_event(
+        if branch and store:
+            persist_execution_lifecycle_event(
+                store,
                 branch,
+                request.role,
+                "aborted",
                 actor,
-                "run_aborted",
                 f"Run aborted (status: aborted, reason: {exc})",
                 session_id=session_id,
                 refs={"reason": str(exc), "status": "aborted"},
