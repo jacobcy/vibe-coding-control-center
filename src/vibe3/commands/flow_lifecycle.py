@@ -57,6 +57,9 @@ def blocked(
     reason: Annotated[
         str | None, typer.Option("--reason", help="Blocking reason")
     ] = None,
+    task: Annotated[
+        int | None, typer.Option("--task", help="Dependency issue number")
+    ] = None,
     by: Annotated[
         int | None, typer.Option("--by", help="Dependency issue number")
     ] = None,
@@ -81,16 +84,20 @@ def blocked(
             command="flow blocked",
             branch=target_branch,
             reason=reason,
+            task=task,
             by=by,
         ).info("Blocking flow")
 
-        service.block_flow(target_branch, reason=reason, blocked_by_issue=by)
+        blocked_by_issue = task if task is not None else by
+        service.block_flow(
+            target_branch, reason=reason, blocked_by_issue=blocked_by_issue
+        )
 
         msg = f"Flow blocked on branch '{target_branch}'"
         if reason:
             msg += f": {reason}"
-        if by:
-            msg += f" (blocked by #{by})"
+        if blocked_by_issue:
+            msg += f" (blocked by #{blocked_by_issue})"
         typer.echo(msg)
 
 

@@ -137,7 +137,9 @@ def add(
 @app.command(name="new", deprecated=True, hidden=True)
 def new(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    task: Annotated[
+        str | None, typer.Option(help="Issue reference to bind as task")
+    ] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
     force: Annotated[
         bool,
@@ -162,7 +164,9 @@ def new(
 @app.command(name="create")
 def create(
     name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[str | None, typer.Option(help="Task ID to bind")] = None,
+    task: Annotated[
+        str | None, typer.Option(help="Issue reference to bind as task")
+    ] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
     base: Annotated[
         str,

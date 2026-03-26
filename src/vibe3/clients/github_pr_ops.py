@@ -96,19 +96,25 @@ class PRMixin:
             )
             target = result.stdout.strip()
 
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                target,
-                "--json",
-                "number,title,body,state,headRefName,baseRefName,"
-                "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    target,
+                    "--json",
+                    "number,title,body,state,headRefName,baseRefName,"
+                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(external="github", target=target).warning(
+                "GitHub CLI (gh) not found, skipping PR lookup"
+            )
+            return None
 
         if result.returncode != 0:
             logger.bind(external="github", target=target).warning("PR not found")
