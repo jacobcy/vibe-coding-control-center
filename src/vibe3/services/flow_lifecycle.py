@@ -6,12 +6,122 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models.flow import CloseTargetDecision, CreateDecision
 
 
 class FlowLifecycleMixin:
     """Mixin providing flow lifecycle operations."""
 
     store: Any
+    git_client: Any
+
+    def can_create_from_current_worktree(
+        self: Any,
+        current_branch: str,
+    ) -> CreateDecision:
+        """Determine if a new flow can be created in the current worktree.
+
+        Rules:
+        - active: reject - current flow is in progress
+        - blocked: allow from current branch - user wants to create downstream flow
+        - done/aborted/stale/no-flow: require fresh worktree check
+
+        Args:
+            current_branch: Current git branch name
+
+        Returns:
+            CreateDecision with allowed status and guidance
+        """
+        flow_data = self.store.get_flow_state(current_branch)
+
+        if not flow_data:
+            return CreateDecision(
+                allowed=True,
+                reason="No active flow in current worktree",
+                start_ref="origin/main",
+                requires_new_worktree=False,
+            )
+
+        status = flow_data.get("flow_status", "active")
+
+        if status == "active":
+            return CreateDecision(
+                allowed=False,
+                reason=(
+                    "Current flow is active - cannot create new flow in same worktree"
+                ),
+                requires_new_worktree=True,
+                guidance=(
+                    "Use 'vibe3 wtnew <name>' to create a new worktree for new features"
+                ),
+            )
+
+        if status == "blocked":
+            return CreateDecision(
+                allowed=True,
+                reason=(
+                    "Current flow is blocked - "
+                    "can create downstream flow from current branch"
+                ),
+                start_ref=current_branch,
+                requires_new_worktree=False,
+            )
+
+        if status in ("done", "aborted", "stale"):
+            return CreateDecision(
+                allowed=True,
+                reason=f"Current flow is {status} - safe to start new target",
+                start_ref="origin/main",
+                requires_new_worktree=False,
+            )
+
+        return CreateDecision(
+            allowed=True,
+            reason="Unknown status - allowing with caution",
+            start_ref="origin/main",
+            requires_new_worktree=False,
+        )
+
+    def resolve_close_target(
+        self: Any,
+        branch: str,
+    ) -> CloseTargetDecision:
+        """Resolve target branch for flow close with explicit rules.
+
+        Rules (no dependency guessing):
+        1. If a single active dependent flow exists: return to that branch
+        2. Otherwise: return to safe branch (main) with pull
+
+        Args:
+            branch: Branch being closed
+
+        Returns:
+            CloseTargetDecision with target branch and behavior
+        """
+        try:
+            dependents = self.store.get_flow_dependents(branch)
+        except Exception as e:
+            logger.warning(f"Failed to query flow dependents: {e}")
+            dependents = []
+
+        if len(dependents) == 1:
+            return CloseTargetDecision(
+                target_branch=dependents[0],
+                should_pull=False,
+                reason="Single active dependent flow exists",
+            )
+
+        if len(dependents) > 1:
+            logger.warning(
+                f"Multiple active flows depend on '{branch}': {', '.join(dependents)}\n"
+                f"Use 'vibe3 flow switch <branch>' to switch to specific branch"
+            )
+
+        return CloseTargetDecision(
+            target_branch="main",
+            should_pull=True,
+            reason="No single active dependent - returning to safe branch",
+        )
 
     def _resolve_close_target_branch(
         self: Any,
@@ -19,19 +129,29 @@ class FlowLifecycleMixin:
     ) -> tuple[str, bool]:
         """Resolve which branch to switch to after closing a flow.
 
+        Rules (explicit, no guessing):
+        1. If a single dependent flow exists (active), return to that branch
+        2. Otherwise, return to main (safe branch) with pull
+
         Returns:
             Tuple of target branch and whether latest changes should be pulled.
         """
         store = SQLiteClient()
-        dependents = store.get_flow_dependents(branch)
+        try:
+            dependents = store.get_flow_dependents(branch)
+        except Exception as e:
+            logger.warning(f"Failed to query flow dependents: {e}")
+            dependents = []
 
         if len(dependents) == 1:
+            logger.info(f"Single dependent flow found: {dependents[0]}")
             return dependents[0], False
 
         if len(dependents) > 1:
             logger.warning(
                 f"Multiple flows depend on '{branch}': {', '.join(dependents)}\n"
-                f"Use 'vibe3 flow switch <branch>' to switch to the desired branch"
+                f"Returning to 'main'. "
+                f"Use 'vibe3 flow switch <branch>' to switch to a specific branch"
             )
 
         return "main", True
@@ -123,7 +243,9 @@ class FlowLifecycleMixin:
             if should_pull and switched_to_target:
                 try:
                     git._run(["pull"])
-                    logger.info(f"Switched to {target_branch} and pulled latest changes")
+                    logger.info(
+                        f"Switched to {target_branch} and pulled latest changes"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to pull: {e}")
 

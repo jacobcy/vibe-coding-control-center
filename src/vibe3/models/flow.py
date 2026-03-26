@@ -106,3 +106,21 @@ class FlowStatusResponse(BaseModel):
     blocked_by: str | None = None
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
+
+
+class CreateDecision(BaseModel):
+    """Decision model for flow create operation."""
+
+    allowed: bool
+    reason: str
+    start_ref: str | None = None
+    requires_new_worktree: bool = False
+    guidance: str | None = None
+
+
+class CloseTargetDecision(BaseModel):
+    """Decision model for flow close target branch."""
+
+    target_branch: str
+    should_pull: bool
+    reason: str

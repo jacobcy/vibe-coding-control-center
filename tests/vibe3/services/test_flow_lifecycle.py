@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from vibe3.models.flow import CreateDecision
 from vibe3.services.flow_service import FlowService
 
 
@@ -130,7 +131,9 @@ class TestFlowLifecycle:
 
         service = FlowService(store=mock_store)
 
-        with pytest.raises(RuntimeError, match="Cannot switch away from closing branch"):
+        with pytest.raises(
+            RuntimeError, match="Cannot switch away from closing branch"
+        ):
             service.close_flow("task/current-flow")
 
         mock_git.delete_branch.assert_not_called()
@@ -220,3 +223,139 @@ class TestFlowLifecycle:
             "task/current-flow",
             flow_status="done",
         )
+
+
+class TestFlowCreateDecision:
+    """Tests for flow create access control."""
+
+    def test_active_flow_rejects_create_in_same_worktree(
+        self, mock_store: Mock
+    ) -> None:
+        """Active flow should reject creating new flow in same worktree."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/current-flow",
+            "flow_slug": "current_flow",
+            "flow_status": "active",
+            "updated_at": "2026-03-26T00:00:00",
+        }
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("task/current-flow")
+
+        assert decision.allowed is False
+        assert decision.requires_new_worktree is True
+        assert "wtnew" in (decision.guidance or "").lower()
+
+    def test_blocked_flow_allows_create_from_current_branch(
+        self, mock_store: Mock
+    ) -> None:
+        """Blocked flow should allow creating downstream flow from current branch."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/blocked-flow",
+            "flow_slug": "blocked_flow",
+            "flow_status": "blocked",
+            "blocked_by": "issue #42",
+            "updated_at": "2026-03-26T00:00:00",
+        }
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("task/blocked-flow")
+
+        assert decision.allowed is True
+        assert decision.start_ref == "task/blocked-flow"
+        assert decision.requires_new_worktree is False
+
+    def test_done_flow_can_start_new_target_from_safe_base(
+        self, mock_store: Mock
+    ) -> None:
+        """Done flow should allow starting new target from safe base."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/done-flow",
+            "flow_slug": "done_flow",
+            "flow_status": "done",
+            "updated_at": "2026-03-26T00:00:00",
+        }
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("task/done-flow")
+
+        assert decision.allowed is True
+        assert decision.start_ref == "origin/main"
+        assert decision.requires_new_worktree is False
+
+    def test_no_flow_allows_create_from_main(self, mock_store: Mock) -> None:
+        """No existing flow should allow creating new flow from main."""
+        mock_store.get_flow_state.return_value = None
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("main")
+
+        assert decision.allowed is True
+        assert decision.start_ref == "origin/main"
+        assert decision.requires_new_worktree is False
+
+    def test_aborted_flow_allows_new_target(self, mock_store: Mock) -> None:
+        """Aborted flow should allow starting new target."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/aborted-flow",
+            "flow_slug": "aborted_flow",
+            "flow_status": "aborted",
+            "updated_at": "2026-03-26T00:00:00",
+        }
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("task/aborted-flow")
+
+        assert decision.allowed is True
+        assert decision.start_ref == "origin/main"
+
+
+class TestFlowCloseTargetDecision:
+    """Tests for flow close target resolution."""
+
+    def test_done_returns_to_single_dependent_flow(self, mock_store: Mock) -> None:
+        """Single active dependent flow should be the close target."""
+        mock_store.get_flow_dependents.return_value = ["task/downstream-flow"]
+
+        service = FlowService(store=mock_store)
+        decision = service.resolve_close_target("task/current-flow")
+
+        assert decision.target_branch == "task/downstream-flow"
+        assert decision.should_pull is False
+        assert "dependent" in decision.reason.lower()
+
+    def test_done_falls_back_to_main_when_no_dependents(self, mock_store: Mock) -> None:
+        """No dependents should fall back to main."""
+        mock_store.get_flow_dependents.return_value = []
+
+        service = FlowService(store=mock_store)
+        decision = service.resolve_close_target("task/current-flow")
+
+        assert decision.target_branch == "main"
+        assert decision.should_pull is True
+        assert "safe branch" in decision.reason.lower()
+
+    def test_done_warns_on_multiple_dependents_and_falls_back(
+        self, mock_store: Mock
+    ) -> None:
+        """Multiple dependents should warn and fall back to main."""
+        mock_store.get_flow_dependents.return_value = [
+            "task/flow-a",
+            "task/flow-b",
+        ]
+
+        service = FlowService(store=mock_store)
+        decision = service.resolve_close_target("task/current-flow")
+
+        assert decision.target_branch == "main"
+        assert decision.should_pull is True
+
+    def test_done_handles_dependent_query_failure(self, mock_store: Mock) -> None:
+        """Dependent query failure should fall back to main safely."""
+        mock_store.get_flow_dependents.side_effect = RuntimeError("db error")
+
+        service = FlowService(store=mock_store)
+        decision = service.resolve_close_target("task/current-flow")
+
+        assert decision.target_branch == "main"
+        assert decision.should_pull is True
