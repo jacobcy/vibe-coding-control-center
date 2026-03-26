@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
@@ -65,5 +64,5 @@ class TestCheckCommand:
         result = runner.invoke(app, ["check", "--fix"])
 
         assert result.exit_code == 0
-        assert "Auto-fixed" in result.output
+        assert "All issues fixed" in result.output
         mock_service.auto_fix.assert_called_once()

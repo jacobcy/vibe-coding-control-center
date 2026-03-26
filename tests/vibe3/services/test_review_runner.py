@@ -5,7 +5,6 @@ Tests the core runner functionality with extensible interface design.
 
 from dataclasses import FrozenInstanceError
 from pathlib import Path
-from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +12,6 @@ import pytest
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
-    AgentResult,
 )
 from vibe3.services.review_runner import (
     run_review_agent,
@@ -292,5 +290,3 @@ class TestRunReviewAgent:
         prompt_file_idx = command.index("--prompt-file") + 1
         expected_dir = Path.home() / ".codeagent" / "agents"
         assert Path(command[prompt_file_idx]).parent == expected_dir
-
-
