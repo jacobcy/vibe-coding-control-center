@@ -11,6 +11,7 @@ from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
@@ -32,6 +33,14 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+def _parse_task_id(task_id: str) -> int:
+    """Parse a task identifier into an issue number."""
+    digits = "".join(filter(str.isdigit, task_id))
+    if not digits:
+        raise ValueError(f"Invalid task ID format: {task_id}")
+    return int(digits)
 
 
 @app.command(name="add")
@@ -255,29 +264,41 @@ def create(
 
 @app.command()
 def bind(
-    task_id: Annotated[str, typer.Argument(help="Task ID to bind")],
-    actor: Annotated[str, typer.Option(help="Actor binding the task")] = "system",
+    task_id: Annotated[
+        str,
+        typer.Argument(help="Task ID to bind as task/related/dependency"),
+    ],
+    role: Annotated[
+        Literal["task", "related", "dependency"],
+        typer.Option("--role", help="Issue role (task, related, or dependency)"),
+    ] = "task",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Bind a task to current flow."""
-    with trace_scope(trace, "flow bind", task_id=task_id):
-        logger.bind(command="flow bind", task_id=task_id, actor=actor).info(
-            "Binding task to flow"
+    """Bind an issue to current flow as task, related, or dependency."""
+    with trace_scope(trace, "flow bind", task_id=task_id, role=role):
+        logger.bind(command="flow bind", task_id=task_id, role=role).info(
+            "Binding issue to flow"
         )
 
-        service = FlowService()
-        branch = service.get_current_branch()
+        flow_service = FlowService()
+        branch = flow_service.get_current_branch()
+        service = TaskService()
 
         try:
-            service.bind_task(branch, task_id, actor)
+            issue_number = _parse_task_id(task_id)
+            link = service.link_issue(branch, issue_number, role)
 
             if json_output:
-                typer.echo(json.dumps({"status": "bound", "task_id": task_id}))
+                typer.echo(json.dumps(link.model_dump(), indent=2, default=str))
             else:
-                console.print(f"[green]✓[/] Task {task_id} bound to flow {branch}")
+                message = (
+                    f"[green]✓[/] Issue #{issue_number} linked as {role} "
+                    f"to flow {branch}"
+                )
+                console.print(message)
         except ValueError:
             logger.error(f"Invalid task ID format: {task_id}")
             raise typer.BadParameter(f"Invalid task ID format: {task_id}")

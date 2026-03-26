@@ -143,8 +143,8 @@ def show(
                     typer.echo(f"Task Issue: #{task.task_issue_number}")
                 typer.echo(f"Status (local flow): {task.flow_status}")
                 typer.echo(
-                    "[unbound] 运行 vibe3 task bridge 自动绑定，"
-                    "或 vibe3 task bridge <issue_number> 指定"
+                    "未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task，"
+                    "再使用 vibe3 task bridge 同步到 GitHub Project。"
                 )
             return
 
