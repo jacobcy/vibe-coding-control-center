@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from loguru import logger
 
+from vibe3.clients.github_pr_error_helpers import raise_gh_pr_error
 from vibe3.exceptions import PRNotFoundError
 from vibe3.models.pr import CreatePRRequest, PRResponse, PRState, UpdatePRRequest
 
@@ -14,7 +15,12 @@ class PRMixin:
     """Mixin for PR-related operations."""
 
     def create_pr(self: Any, request: CreatePRRequest) -> PRResponse:
-        """Create a pull request."""
+        """Create a pull request.
+
+        Raises:
+            UserError: User/actionable PR creation failures.
+            GitHubError: Non-recoverable gh/GitHub failures.
+        """
         logger.bind(
             external="github",
             operation="create_pr",
@@ -41,12 +47,22 @@ class PRMixin:
         if request.draft:
             cmd.append("--draft")
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(
+                e,
+                "create",
+                user_tips=(
+                    f"  1. Ensure branch '{request.head_branch}' is pushed\n"
+                    f"  2. Check whether an open PR already exists for this branch"
+                ),
+            )
 
         # Parse PR URL from output
         pr_url = result.stdout.strip()
@@ -80,19 +96,25 @@ class PRMixin:
             )
             target = result.stdout.strip()
 
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                target,
-                "--json",
-                "number,title,body,state,headRefName,baseRefName,"
-                "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    target,
+                    "--json",
+                    "number,title,body,state,headRefName,baseRefName,"
+                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(external="github", target=target).warning(
+                "GitHub CLI (gh) not found, skipping PR lookup"
+            )
+            return None
 
         if result.returncode != 0:
             logger.bind(external="github", target=target).warning("PR not found")
@@ -142,24 +164,53 @@ class PRMixin:
         if request.base_branch:
             cmd.extend(["--base", request.base_branch])
 
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(
+                e,
+                "edit",
+                user_tips=(
+                    f"  1. Confirm PR #{request.number} exists\n"
+                    f"  2. Verify current branch/repo has permission to edit it"
+                ),
+            )
 
         # Handle draft status separately
         if request.draft is not None:
             if request.draft:
-                subprocess.run(
-                    ["gh", "pr", "ready", str(request.number), "--undo"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
+                try:
+                    subprocess.run(
+                        ["gh", "pr", "ready", str(request.number), "--undo"],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    raise_gh_pr_error(
+                        e,
+                        "ready --undo",
+                        user_tips=(
+                            f"  1. Confirm PR #{request.number} " f"is currently ready"
+                        ),
+                    )
             else:
-                subprocess.run(
-                    ["gh", "pr", "ready", str(request.number)],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
+                try:
+                    subprocess.run(
+                        ["gh", "pr", "ready", str(request.number)],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    raise_gh_pr_error(
+                        e,
+                        "ready",
+                        user_tips=(
+                            f"  1. Confirm PR #{request.number} is a draft\n"
+                            f"  2. Ensure required checks/permissions are satisfied"
+                        ),
+                    )
 
         pr = self.get_pr(request.number)
         if pr is None:
@@ -174,12 +225,22 @@ class PRMixin:
             pr_number=pr_number,
         ).debug("Calling GitHub API: mark_ready_for_review")
 
-        subprocess.run(
-            ["gh", "pr", "ready", str(pr_number)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", str(pr_number)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(
+                e,
+                "ready",
+                user_tips=(
+                    f"  1. Confirm PR #{pr_number} is a draft\n"
+                    f"  2. Ensure required checks/permissions are satisfied"
+                ),
+            )
 
         pr = self.get_pr(pr_number)
         if pr is None:
@@ -194,12 +255,22 @@ class PRMixin:
             pr_number=pr_number,
         ).debug("Calling GitHub API: merge_pull_request")
 
-        subprocess.run(
-            ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        try:
+            subprocess.run(
+                ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(
+                e,
+                "merge",
+                user_tips=(
+                    f"  1. Confirm PR #{pr_number} is ready and mergeable\n"
+                    f"  2. Check required CI/review rules are satisfied"
+                ),
+            )
 
         pr = self.get_pr(pr_number)
         if pr is None:

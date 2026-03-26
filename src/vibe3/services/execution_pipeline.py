@@ -7,26 +7,30 @@ session handling, execution, and handoff recording.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 from loguru import logger
 from typer import echo
 
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
+from vibe3.services.execution_lifecycle import (
+    ExecutionRole,
+    persist_execution_lifecycle_event,
+)
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
     record_handoff_unified,
 )
-
-SessionRole = Literal["planner", "executor", "reviewer"]
+from vibe3.services.review_runner import format_agent_actor
 
 
 @dataclass
 class ExecutionRequest:
     """Request payload for execution pipeline."""
 
-    role: SessionRole
+    role: ExecutionRole
     context_builder: Callable[[], str]
     options_builder: Callable[[], AgentOptions]
     task: str | None = None
@@ -69,53 +73,111 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
     session_id = load_session_id(request.role)
     log.debug("Loaded session", session_id=session_id)
 
+    # Build agent options early so the start event can record the actual actor.
+    options = request.options_builder()
+    actor = format_agent_actor(options)
+    branch = None
+    store = None
+    if (
+        not request.dry_run
+        and request.role == "executor"
+        and request.handoff_kind == "run"
+    ):
+        from vibe3.clients.git_client import GitClient
+
+        try:
+            branch = GitClient().get_current_branch()
+            store = SQLiteClient()
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.bind(domain="execution_pipeline").warning(
+                f"Failed to resolve branch for run lifecycle event: {exc}"
+            )
+
+    if branch and store:
+        persist_execution_lifecycle_event(
+            store,
+            branch,
+            request.role,
+            "started",
+            actor,
+            "Run started (status: in_progress)",
+            session_id=session_id,
+        )
+
     # Build execution context
     log.info("Building execution context")
-    prompt_content = request.context_builder()
+    try:
+        prompt_content = request.context_builder()
 
-    # Build agent options
-    options = request.options_builder()
-    log.info(
-        "Running agent",
-        agent=options.agent,
-        backend=options.backend,
-        model=options.model,
-        session_id=session_id,
-    )
-    echo(f"-> Executing with {options.agent or options.backend}...")
+        log.info(
+            "Running agent",
+            agent=options.agent,
+            backend=options.backend,
+            model=options.model,
+            session_id=session_id,
+        )
+        echo(f"-> Executing with {options.agent or options.backend}...")
 
-    # Execute agent
-    result = execute_agent(
-        options,
-        prompt_content,
-        task=request.task,
-        dry_run=request.dry_run,
-        session_id=session_id,
-    )
+        # Execute agent
+        result = execute_agent(
+            options,
+            prompt_content,
+            task=request.task,
+            dry_run=request.dry_run,
+            session_id=session_id,
+        )
 
-    if request.dry_run:
+        if request.dry_run:
+            return ExecutionResult(
+                agent_result=result,
+                handoff_file=None,
+                session_id=result.session_id or session_id,
+            )
+
+        # Record handoff
+        effective_session_id = result.session_id or session_id
+        handoff_file = record_handoff_unified(
+            HandoffRecord(
+                kind=request.handoff_kind,  # type: ignore[arg-type]
+                content=result.stdout,
+                options=options,
+                session_id=effective_session_id,
+                metadata=request.handoff_metadata,
+            )
+        )
+        if handoff_file:
+            echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
+
+        if branch and store:
+            refs = {"status": "completed"}
+            if handoff_file:
+                refs["ref"] = str(handoff_file)
+            persist_execution_lifecycle_event(
+                store,
+                branch,
+                request.role,
+                "completed",
+                actor,
+                "Run completed (status: completed)",
+                session_id=effective_session_id,
+                refs=refs,
+            )
+
         return ExecutionResult(
             agent_result=result,
-            handoff_file=None,
-            session_id=result.session_id or session_id,
-        )
-
-    # Record handoff
-    effective_session_id = result.session_id or session_id
-    handoff_file = record_handoff_unified(
-        HandoffRecord(
-            kind=request.handoff_kind,  # type: ignore[arg-type]
-            content=result.stdout,
-            options=options,
+            handoff_file=handoff_file,
             session_id=effective_session_id,
-            metadata=request.handoff_metadata,
         )
-    )
-    if handoff_file:
-        echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
-
-    return ExecutionResult(
-        agent_result=result,
-        handoff_file=handoff_file,
-        session_id=effective_session_id,
-    )
+    except BaseException as exc:
+        if branch and store:
+            persist_execution_lifecycle_event(
+                store,
+                branch,
+                request.role,
+                "aborted",
+                actor,
+                f"Run aborted (status: aborted, reason: {exc})",
+                session_id=session_id,
+                refs={"reason": str(exc), "status": "aborted"},
+            )
+        raise
