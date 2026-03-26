@@ -31,8 +31,9 @@ def test_flow_bind_help_uses_issue_and_role() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root bind [OPTIONS] TASK_ID" in stdout
-    assert "Task ID to bind as task/related/dependency" in stdout
+    # Argument should be named ISSUE (not TASK_ID)
+    assert "Usage: root bind [OPTIONS] ISSUE" in stdout
+    assert "Issue reference to bind" in stdout
     assert "--role" in stdout
     assert "Issue role" in stdout
     assert "actor" not in stdout

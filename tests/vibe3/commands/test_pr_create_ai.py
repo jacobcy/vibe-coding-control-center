@@ -34,6 +34,12 @@ class TestPRCreateCommandAI:
                 mock_commits.return_value = ["feat: add feature"]
                 result = runner.invoke(app, ["pr", "create", "-t", "Test PR"])
                 assert result.exit_code in [0, 1]
+                mock_service.return_value.create_draft_pr.assert_called_once_with(
+                    title="Test PR",
+                    body="",
+                    base_branch="main",
+                    actor="server",
+                )
 
     def test_pr_create_ai_disabled(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create with --ai when AI is disabled."""
@@ -148,4 +154,5 @@ pr:
             title="feat: ai title",
             body="Summary\n\n- change",
             base_branch="main",
+            actor="ai_assistant",
         )

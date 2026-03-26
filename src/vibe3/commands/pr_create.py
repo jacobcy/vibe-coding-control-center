@@ -16,6 +16,7 @@ from vibe3.config.settings import VibeConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.ai_service import AIService
+from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_created
 
@@ -120,6 +121,18 @@ def register_create_command(app: typer.Typer) -> None:
             pr_title = title
             pr_body = body
             interactive = _is_interactive(json_output, yaml_output)
+            flow_service = FlowService()
+            branch = flow_service.get_current_branch()
+            flow_status = flow_service.get_flow_status(branch)
+            if (
+                not json_output
+                and not yaml_output
+                and (not flow_status or flow_status.task_issue_number is None)
+            ):
+                typer.echo(
+                    "提示：当前 flow 还没有 task，建议先执行 "
+                    "vibe3 flow bind <issue> --role task"
+                )
 
             if ai and not title:
                 console = Console()
@@ -185,7 +198,13 @@ def register_create_command(app: typer.Typer) -> None:
                     raise typer.Exit(1)
 
             service = PRService()
-            pr = service.create_draft_pr(title=pr_title, body=pr_body, base_branch=base)
+            actor = "ai_assistant" if ai else "server"
+            pr = service.create_draft_pr(
+                title=pr_title,
+                body=pr_body,
+                base_branch=base,
+                actor=actor,
+            )
 
             if json_output:
                 typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))

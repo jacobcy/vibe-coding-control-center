@@ -1,6 +1,7 @@
 """Tests for plan command."""
 
 import re
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -94,3 +95,40 @@ def test_plan_spec_file_not_found() -> None:
     result = runner.invoke(plan_app, ["spec", "--file", "nonexistent.md"])
 
     assert result.exit_code != 0
+
+
+@patch("vibe3.services.spec_ref_service.SpecRefService._fetch_issue_data")
+@patch("vibe3.commands.plan.run_plan")
+@patch("vibe3.commands.plan.FlowService")
+@patch("vibe3.commands.plan.ensure_flow_for_current_branch")
+def test_plan_task_includes_issue_and_spec_context(
+    mock_ensure, mock_flow_service_cls, mock_run_plan, mock_fetch_issue
+) -> None:
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(
+        task_issue_number=42,
+        spec_ref="#55:Spec title",
+    )
+    mock_ensure.return_value = (flow_service, "task/demo")
+
+    issue_client = MagicMock()
+    issue_client.view_issue.side_effect = [
+        {"number": 42, "title": "Task title", "body": "Task body"},
+        {"number": 55, "title": "Spec title", "body": "Spec body"},
+    ]
+    mock_fetch_issue.return_value = {
+        "number": 55,
+        "title": "Spec title",
+        "body": "Spec body",
+    }
+
+    with patch("vibe3.commands.plan.GitHubClient", return_value=issue_client):
+        result = runner.invoke(plan_app, ["task"])
+
+    assert result.exit_code == 0
+    request = mock_run_plan.call_args.args[0]
+    assert request.task_guidance is not None
+    assert "Task title" in request.task_guidance
+    assert "Task body" in request.task_guidance
+    assert "Spec title" in request.task_guidance
+    assert "Spec body" in request.task_guidance

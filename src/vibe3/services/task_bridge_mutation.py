@@ -144,10 +144,17 @@ def auto_link_issue_to_project(
     """issue 绑定为 task/dependency 时，自动将其加入 GitHub Project 并记录。
 
     执行顺序：
-    1. 检查 issue 是否已在项目里（find_item_by_issue）
-    2. 若不存在，调用 add_issue_to_project 添加
-    3. 将 project_item_id / project_node_id 写入本地 SQLite
+    1. 确保 issue 有 vibe-task label
+    2. 检查 issue 是否已在项目里（find_item_by_issue）
+    3. 若不存在，调用 add_issue_to_project 添加
+    4. 将 project_item_id / project_node_id 写入本地 SQLite
     """
+    from vibe3.services.task_label_service import TaskLabelService
+
+    # 确保 vibe-task label
+    label_svc = TaskLabelService()
+    label_svc.ensure_vibe_task_label(issue_number)
+
     client = self._get_project_client()
     if not client:
         return LinkError(
