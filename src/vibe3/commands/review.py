@@ -1,6 +1,5 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-from pathlib import Path
 from typing import Annotated, Optional, cast
 
 import typer
@@ -8,18 +7,18 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.commands.command_options import (
+    _DRY_RUN_OPT,
+    _TRACE_OPT,
+    ensure_flow_for_current_branch,
+)
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
-from vibe3.models.agent_execution import AgentExecutionRequest
-from vibe3.models.flow import MainBranchProtectedError
 from vibe3.models.review import ReviewRequest, ReviewScope
-from vibe3.models.review_runner import ReviewAgentOptions
+from vibe3.models.review_runner import AgentOptions
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.handoff_event_service import (
-    create_handoff_artifact,
-    persist_handoff_event,
-)
+from vibe3.services.handoff_recorder_unified import HandoffRecord, record_handoff_unified
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_runner import format_agent_actor
@@ -33,47 +32,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-_TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-]
-_DRY_RUN_OPT = Annotated[
-    bool, typer.Option("--dry-run", help="Print command and prompt without executing")
-]
-
-
-def _record_review_event(
-    review: ParsedReview,
-    actor: str,
-    review_content: str | None = None,
-    session_id: str | None = None,
-) -> Path | None:
-    """Record review to handoff."""
-    artifact = create_handoff_artifact("review", review_content)
-    if artifact is None:
-        return None
-    branch, review_file = artifact
-
-    refs: dict[str, str] = {"ref": str(review_file), "verdict": review.verdict}
-    if session_id:
-        refs["session_id"] = session_id
-
-    persist_handoff_event(
-        branch=branch,
-        event_type="handoff_review",
-        actor=actor,
-        detail=f"Verdict: {review.verdict}, {len(review.comments)} comments",
-        refs=refs,
-        flow_state_updates={
-            "reviewer_actor": actor,
-            "audit_ref": str(review_file),
-            "reviewer_session_id": session_id,
-        },
-    )
-
-    return review_file
-
-
 def _run_review(
     request: ReviewRequest,
     config: VibeConfig,
@@ -119,34 +77,39 @@ def _run_review(
         session_id=session_id,
     )
     typer.echo("→ Running review...")
-    options = ReviewAgentOptions(
+    options = AgentOptions(
         agent=config.review.agent_config.agent,
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
     )
-    outcome = execute_agent(
-        AgentExecutionRequest(
-            prompt_file_content=prompt_file_content,
-            options=options,
-            task=task,
-            dry_run=dry_run,
-            session_id=session_id,
-        )
+    result = execute_agent(
+        options,
+        prompt_file_content,
+        task=task,
+        dry_run=dry_run,
+        session_id=session_id,
     )
 
     if dry_run:
         return
 
-    raw = outcome.result.stdout
+    effective_session_id = result.session_id or session_id
+    raw = result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
-    review_file = _record_review_event(
-        review,
-        actor=format_agent_actor(options),
-        review_content=raw,
-        session_id=outcome.effective_session_id,
+    review_file = record_handoff_unified(
+        HandoffRecord(
+            kind="review",
+            content=raw,
+            options=options,
+            session_id=effective_session_id,
+            metadata={
+                "verdict": review.verdict,
+                "comment_count": str(len(review.comments)),
+            },
+        )
     )
     if review_file:
         typer.echo(f"→ Review saved to: {review_file}")
@@ -257,7 +220,6 @@ def base(
     if trace:
         enable_trace()
 
-    from vibe3.services.flow_service import FlowService
     from vibe3.utils.branch_utils import find_parent_branch
     from vibe3.utils.git_helpers import get_current_branch
 
@@ -276,14 +238,7 @@ def base(
         typer.echo(f"→ Auto-detected parent branch: {base_branch}")
 
     # Auto-ensure flow for non-main branches
-    flow_service = FlowService()
-    try:
-        flow_service.ensure_flow_for_branch(current_branch)
-    except MainBranchProtectedError as e:
-        typer.echo(f"Error: {e}\n", err=True)
-        typer.echo("Tip: Create a feature branch first:", err=True)
-        typer.echo("  vibe3 flow new <branch-name> -c", err=True)
-        raise typer.Exit(1)
+    flow_service, _ = ensure_flow_for_current_branch()
 
     log = logger.bind(
         domain="review",

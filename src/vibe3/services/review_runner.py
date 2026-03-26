@@ -16,8 +16,7 @@ import sys
 from pathlib import Path
 from typing import Final, cast
 
-from vibe3.clients.git_client import GitClient
-from vibe3.models.review_runner import ReviewAgentOptions, ReviewAgentResult
+from vibe3.models.review_runner import AgentOptions, AgentResult
 
 # Default wrapper path
 DEFAULT_WRAPPER_PATH: Final[Path] = (
@@ -37,7 +36,7 @@ def extract_session_id(stdout: str) -> str | None:
     return match.group(1) if match else None
 
 
-def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str | None]:
+def resolve_actor_backend_model(options: AgentOptions) -> tuple[str, str | None]:
     """Resolve the actual backend and model for database recording.
 
     Priority:
@@ -45,7 +44,7 @@ def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str |
     2. If only agent is provided: use agent as backend identifier
 
     Args:
-        options: ReviewAgentOptions with agent/backend/model
+        options: AgentOptions with agent/backend/model
 
     Returns:
         Tuple of (backend, model) for database recording
@@ -57,7 +56,7 @@ def resolve_actor_backend_model(options: ReviewAgentOptions) -> tuple[str, str |
     return "unknown", None
 
 
-def format_agent_actor(options: ReviewAgentOptions) -> str:
+def format_agent_actor(options: AgentOptions) -> str:
     """Format the actor string for handoff records.
 
     Actor format: '<backend>/<model>' or '<backend>'
@@ -65,7 +64,7 @@ def format_agent_actor(options: ReviewAgentOptions) -> str:
     - model: optional model name
 
     Args:
-        options: ReviewAgentOptions with agent/backend/model
+        options: AgentOptions with agent/backend/model
 
     Returns:
         Actor string like 'claude/sonnet' or 'planner' or 'unknown'
@@ -78,11 +77,11 @@ def format_agent_actor(options: ReviewAgentOptions) -> str:
 
 def run_review_agent(
     prompt_file_content: str,
-    options: ReviewAgentOptions,
+    options: AgentOptions,
     task: str | None = None,
     dry_run: bool = False,
     session_id: str | None = None,
-) -> ReviewAgentResult:
+) -> AgentResult:
     """Run a review agent using codeagent-wrapper.
 
     Args:
@@ -93,7 +92,7 @@ def run_review_agent(
         session_id: Optional session ID to resume an existing session
 
     Returns:
-        ReviewAgentResult containing exit code, output, and session_id
+        AgentResult containing exit code, output, and session_id
 
     Raises:
         FileNotFoundError: If codeagent-wrapper is not found
@@ -156,65 +155,24 @@ def run_review_agent(
                 print(f"\n=== Task ===\n{task}")
             print("\n=== End ===")
             # Return a mock success result
-            return ReviewAgentResult(exit_code=0, stdout="[dry-run]", stderr="")
+            return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
             # Get current working directory (worktree or main repo)
             # Use os.getcwd() to respect the current worktree context
             import os
+
             project_root = os.getcwd()
 
-            # Real-time output using Popen
-            stdout_lines = []
-            stderr_lines = []
-
-            process = subprocess.Popen(
+            # Run wrapper and capture output for parsing and persistence.
+            result = subprocess.run(
                 command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                cwd=project_root,
+                capture_output=True,
                 text=True,
-                cwd=project_root,  # Execute in current worktree
+                timeout=options.timeout_seconds,
+                check=False,
             )
-
-            # Read output in real-time
-            import select
-
-            while process.poll() is None:
-                # Check for available output
-                reads, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
-
-                for fd in reads:
-                    line = fd.readline()
-                    if line:
-                        if fd == process.stdout:
-                            print(line, end="", flush=True)
-                            stdout_lines.append(line)
-                        else:
-                            print(line, file=sys.stderr, end="", flush=True)
-                            stderr_lines.append(line)
-
-            # Read remaining output after process exits
-            for line in process.stdout.readlines():
-                if line:
-                    print(line, end="", flush=True)
-                    stdout_lines.append(line)
-
-            for line in process.stderr.readlines():
-                if line:
-                    print(line, file=sys.stderr, end="", flush=True)
-                    stderr_lines.append(line)
-
-            # Create result object
-            stdout = "".join(stdout_lines)
-            stderr = "".join(stderr_lines)
-
-            class FakeResult:
-                def __init__(self, returncode, stdout, stderr):
-                    self.returncode = returncode
-                    self.stdout = stdout
-                    self.stderr = stderr
-
-            result = FakeResult(process.returncode, stdout, stderr)
 
         except FileNotFoundError:
             raise FileNotFoundError(
@@ -230,7 +188,7 @@ def run_review_agent(
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="", flush=True)
 
-        agent_result = ReviewAgentResult(
+        agent_result = AgentResult(
             exit_code=result.returncode,
             stdout=result.stdout,
             stderr=result.stderr,

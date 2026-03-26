@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.models.review_runner import ReviewAgentOptions
+from vibe3.models.review_runner import AgentOptions
 from vibe3.services.review_runner import run_review_agent
 
 
@@ -19,7 +19,7 @@ def test_run_review_agent_resume_mode(mock_tempfile, mock_run):
     mock_cp.stderr = ""
     mock_run.return_value = mock_cp
 
-    options = ReviewAgentOptions(agent="planner")
+    options = AgentOptions(agent="planner")
     session_id = "262f0fea-eacb-4223-b842-b5b5097f94e8"
 
     result = run_review_agent(
@@ -58,7 +58,7 @@ def test_run_review_agent_new_session(mock_tempfile, mock_run):
     mock_cp.stderr = ""
     mock_run.return_value = mock_cp
 
-    options = ReviewAgentOptions(agent="planner")
+    options = AgentOptions(agent="planner")
 
     result = run_review_agent(
         prompt_file_content="context", options=options, task="start work"

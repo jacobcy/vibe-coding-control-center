@@ -9,8 +9,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
-from vibe3.models.agent_execution import AgentExecutionOutcome
-from vibe3.services.review_runner import ReviewAgentResult
+from vibe3.models.review_runner import AgentResult
 
 runner = CliRunner()
 
@@ -23,10 +22,7 @@ def _mock_review(verdict: str = "PASS"):
 
 
 def _mock_agent_result(stdout: str = "## Review\nLooks good."):
-    return AgentExecutionOutcome(
-        result=ReviewAgentResult(exit_code=0, stdout=stdout, stderr=""),
-        effective_session_id=None,
-    )
+    return AgentResult(exit_code=0, stdout=stdout, stderr="")
 
 
 def _mock_inspect_data():
@@ -60,12 +56,11 @@ def test_review_base_defaults_to_origin_main():
             "vibe3.utils.branch_utils.find_parent_branch",
             return_value="origin/main",
         ),
-        patch("vibe3.services.flow_service.FlowService") as mock_flow_service,
+        patch(
+            "vibe3.commands.review.ensure_flow_for_current_branch",
+            return_value=(MagicMock(), "feature/test"),
+        ),
     ):
-        # Mock FlowService methods
-        mock_flow_service.return_value.ensure_flow_for_branch.return_value = None
-        mock_flow_service.return_value.get_flow_status.return_value = None
-
         result = runner.invoke(app, ["base"])
         assert result.exit_code == 0
 
@@ -88,12 +83,11 @@ def test_review_base_pass():
         patch(
             "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
         ),
-        patch("vibe3.services.flow_service.FlowService") as mock_flow_service,
+        patch(
+            "vibe3.commands.review.ensure_flow_for_current_branch",
+            return_value=(MagicMock(), "feature/test"),
+        ),
     ):
-        # Mock FlowService methods
-        mock_flow_service.return_value.ensure_flow_for_branch.return_value = None
-        mock_flow_service.return_value.get_flow_status.return_value = None
-
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
 

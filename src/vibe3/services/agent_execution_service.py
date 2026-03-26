@@ -6,7 +6,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import SystemError, UserError
-from vibe3.models.agent_execution import AgentExecutionOutcome, AgentExecutionRequest
+from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.services.flow_service import FlowService
 from vibe3.services.review_runner import run_review_agent
 
@@ -38,16 +38,22 @@ def load_session_id(role: SessionRole) -> str | None:
         return None
 
 
-def execute_agent(request: AgentExecutionRequest) -> AgentExecutionOutcome:
-    """Execute codeagent-wrapper and resolve effective session id."""
-    result = run_review_agent(
-        request.prompt_file_content,
-        request.options,
-        task=request.task,
-        dry_run=request.dry_run,
-        session_id=request.session_id,
-    )
-    effective_session_id = result.session_id or request.session_id
-    return AgentExecutionOutcome(
-        result=result, effective_session_id=effective_session_id
+def execute_agent(
+    options: AgentOptions,
+    prompt_file_content: str,
+    task: str | None = None,
+    dry_run: bool = False,
+    session_id: str | None = None,
+) -> AgentResult:
+    """Execute codeagent-wrapper using direct parameters.
+
+    The caller is responsible for resolving the effective session id via
+    ``result.session_id or session_id`` when continuation semantics matter.
+    """
+    return run_review_agent(
+        prompt_file_content,
+        options,
+        task=task,
+        dry_run=dry_run,
+        session_id=session_id,
     )

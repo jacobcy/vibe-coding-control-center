@@ -2,6 +2,7 @@
 
 import json
 from contextlib import nullcontext
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -14,6 +15,11 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.handoff_service import HandoffService
 from vibe3.ui.console import console
+from vibe3.ui.handoff_ui import (
+    render_handoff_detail,
+    render_handoff_list,
+    render_handoff_summary,
+)
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 app = typer.Typer(
@@ -106,7 +112,7 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     Returns:
         List of update entries with timestamp, actor, kind, message
     """
-    updates = []
+    updates: list[dict[str, str]] = []
     in_updates = False
 
     for line in content.split("\n"):
@@ -198,9 +204,75 @@ def init(
         console.print(f"[green]✓[/] Handoff file ready: {handoff_path}")
 
 
+@app.command("list")
+def list_handoffs(
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Flow/branch to inspect"),
+    ] = None,
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", "-k", help="Filter by kind: plan/run/review"),
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """List handoff events for current or specified branch."""
+    with _trace_scope(trace, "handoff list"):
+        git = GitClient()
+        store = SQLiteClient()
+
+        target_branch = branch if branch else git.get_current_branch()
+        events_data = store.get_events(target_branch, event_type_prefix="handoff_")
+
+        allowed_kinds = {"plan", "run", "review"}
+        filter_kind = kind.lower() if kind else None
+        if filter_kind and filter_kind not in allowed_kinds:
+            typer.echo("Error: --kind must be one of: plan, run, review", err=True)
+            raise typer.Exit(1)
+
+        handoffs: list[dict[str, str]] = []
+        stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0}
+
+        for event in events_data:
+            event_type = event.get("event_type", "")
+            event_kind = event_type.replace("handoff_", "", 1)
+            if event_kind not in allowed_kinds:
+                continue
+            if filter_kind and event_kind != filter_kind:
+                continue
+
+            stats["total"] += 1
+            if event_kind == "plan":
+                stats["plans"] += 1
+            elif event_kind == "run":
+                stats["runs"] += 1
+            elif event_kind == "review":
+                stats["reviews"] += 1
+
+            handoffs.append(
+                {
+                    "timestamp": str(event.get("created_at", ""))[:19].replace(
+                        "T", " "
+                    ),
+                    "kind": event_kind,
+                    "actor": str(event.get("actor", "")),
+                    "detail": str(event.get("detail", "")),
+                }
+            )
+
+        render_handoff_list(target_branch, handoffs)
+        render_handoff_summary(target_branch, stats)
+
+
 @app.command()
 def show(
     flow_name: Annotated[str | None, typer.Argument(help="Flow to show")] = None,
+    artifact: Annotated[
+        Path | None,
+        typer.Option("--artifact", help="Display a handoff artifact file"),
+    ] = None,
     show_all: Annotated[bool, typer.Option("--all", help="显示全部历史")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -209,6 +281,20 @@ def show(
 ) -> None:
     """Show agent handoff chain and events."""
     with _trace_scope(trace, "handoff show"):
+        if artifact is not None:
+            if not artifact.exists():
+                typer.echo(f"Error: artifact not found: {artifact}", err=True)
+                raise typer.Exit(1)
+            if not artifact.is_file():
+                typer.echo(f"Error: artifact is not a file: {artifact}", err=True)
+                raise typer.Exit(1)
+            try:
+                render_handoff_detail(artifact)
+            except (OSError, UnicodeDecodeError) as exc:
+                typer.echo(f"Error: failed to read artifact: {exc}", err=True)
+                raise typer.Exit(1)
+            return
+
         logger.bind(command="handoff show", flow_name=flow_name).info(
             "Showing handoff details"
         )

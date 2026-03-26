@@ -1,7 +1,9 @@
 """Integration tests for Handoff commands."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
@@ -12,33 +14,25 @@ runner = CliRunner()
 class TestHandoffCommands:
     """Tests for handoff CLI commands."""
 
+    @pytest.mark.parametrize("force,expected_force", [(False, False), (True, True)])
     @patch("vibe3.commands.handoff.HandoffService")
-    def test_handoff_init_command(self, mock_service_class):
+    def test_handoff_init_command(self, mock_service_class, force, expected_force):
         """Test handoff init command."""
         mock_service = MagicMock()
         mock_service.ensure_current_handoff.return_value = "/path/to/current.md"
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(app, ["handoff", "init"])
+        args = ["handoff", "init"]
+        if force:
+            args.append("--yes")
+        result = runner.invoke(app, args)
 
         assert result.exit_code == 0
         assert "✓" in result.output
         assert "Handoff file ready" in result.output
-        mock_service.ensure_current_handoff.assert_called_once_with(force=False)
-
-    @patch("vibe3.commands.handoff.HandoffService")
-    def test_handoff_init_with_force(self, mock_service_class):
-        """Test handoff init --yes command."""
-        mock_service = MagicMock()
-        mock_service.ensure_current_handoff.return_value = "/path/to/current.md"
-        mock_service_class.return_value = mock_service
-
-        result = runner.invoke(app, ["handoff", "init", "--yes"])
-
-        assert result.exit_code == 0
-        assert "✓" in result.output
-        assert "Handoff file ready" in result.output
-        mock_service.ensure_current_handoff.assert_called_once_with(force=True)
+        mock_service.ensure_current_handoff.assert_called_once_with(
+            force=expected_force
+        )
 
     @patch("vibe3.commands.handoff.SQLiteClient")
     @patch("vibe3.commands.handoff.GitClient")
@@ -69,6 +63,88 @@ class TestHandoffCommands:
         assert "spec_ref" in result.output
         mock_store.get_flow_state.assert_called_once()
         mock_store.get_events.assert_called_once()
+
+    @patch("vibe3.commands.handoff.render_handoff_summary")
+    @patch("vibe3.commands.handoff.render_handoff_list")
+    @patch("vibe3.commands.handoff.SQLiteClient")
+    @patch("vibe3.commands.handoff.GitClient")
+    def test_handoff_list_command(
+        self,
+        mock_git_class,
+        mock_store_class,
+        mock_render_list,
+        mock_render_summary,
+    ):
+        """Test handoff list command renders filtered handoff events."""
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "feature/test"
+        mock_git_class.return_value = mock_git
+
+        mock_store = MagicMock()
+        mock_store.get_events.return_value = [
+            {
+                "event_type": "handoff_plan",
+                "actor": "planner",
+                "detail": "Plan completed",
+                "created_at": "2026-03-26T11:00:00",
+            },
+            {
+                "event_type": "handoff_run",
+                "actor": "executor",
+                "detail": "Run completed",
+                "created_at": "2026-03-26T11:10:00",
+            },
+        ]
+        mock_store_class.return_value = mock_store
+
+        result = runner.invoke(app, ["handoff", "list", "--kind", "run"])
+
+        assert result.exit_code == 0
+        mock_store.get_events.assert_called_once_with(
+            "feature/test", event_type_prefix="handoff_"
+        )
+        mock_render_list.assert_called_once()
+        handoffs = mock_render_list.call_args.args[1]
+        assert len(handoffs) == 1
+        assert handoffs[0]["kind"] == "run"
+        mock_render_summary.assert_called_once()
+
+    def test_handoff_list_rejects_invalid_kind(self):
+        """Test handoff list validates kind option."""
+        result = runner.invoke(app, ["handoff", "list", "--kind", "invalid"])
+
+        assert result.exit_code != 0
+        assert "must be one of" in result.output
+
+    @patch("vibe3.commands.handoff.render_handoff_detail")
+    def test_handoff_show_artifact(self, mock_render_detail):
+        """Test handoff show --artifact renders single artifact."""
+        with runner.isolated_filesystem():
+            artifact = Path("artifact.md")
+            artifact.write_text("# artifact", encoding="utf-8")
+
+            result = runner.invoke(app, ["handoff", "show", "--artifact", str(artifact)])
+
+        assert result.exit_code == 0
+        mock_render_detail.assert_called_once()
+
+    def test_handoff_show_artifact_not_found(self):
+        """Test handoff show --artifact reports missing files."""
+        result = runner.invoke(app, ["handoff", "show", "--artifact", "missing.md"])
+
+        assert result.exit_code != 0
+        assert "artifact not found" in result.output.lower()
+
+    def test_handoff_show_artifact_rejects_directory(self):
+        """Test handoff show --artifact rejects non-file paths."""
+        with runner.isolated_filesystem():
+            Path("artifact_dir").mkdir()
+            result = runner.invoke(
+                app, ["handoff", "show", "--artifact", "artifact_dir"]
+            )
+
+        assert result.exit_code != 0
+        assert "not a file" in result.output.lower()
 
     @patch("vibe3.commands.handoff.HandoffService")
     def test_handoff_append_command(self, mock_service_class):

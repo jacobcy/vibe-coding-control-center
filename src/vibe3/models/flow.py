@@ -84,14 +84,6 @@ class FlowEvent(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
-class CreateFlowRequest(BaseModel):
-    """Request model for creating a flow."""
-
-    slug: str
-    branch: str
-    task_id: str | None = None
-
-
 class FlowStatusResponse(BaseModel):
     """Response model for flow status."""
 

@@ -7,22 +7,20 @@ import typer
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.commands.command_options import (
+    _AGENT_OPT,
+    _BACKEND_OPT,
+    _DRY_RUN_OPT,
+    _MODEL_OPT,
+    _TRACE_OPT,
+    ensure_flow_for_current_branch,
+)
 from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
-from vibe3.models.agent_execution import AgentExecutionRequest
-from vibe3.models.flow import MainBranchProtectedError
-from vibe3.models.review_runner import ReviewAgentOptions
+from vibe3.models.review_runner import AgentOptions
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.flow_service import FlowService
-from vibe3.services.handoff_event_service import (
-    create_handoff_artifact,
-    persist_handoff_event,
-)
+from vibe3.services.handoff_recorder_unified import HandoffRecord, record_handoff_unified
 from vibe3.services.label_integration import transition_to_in_progress
-from vibe3.services.review_runner import (
-    format_agent_actor,
-    resolve_actor_backend_model,
-)
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.utils.trace import enable_trace
 
@@ -33,106 +31,6 @@ app = typer.Typer(
     invoke_without_command=True,
     rich_markup_mode="rich",
 )
-
-_TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-]
-_DRY_RUN_OPT = Annotated[
-    bool,
-    typer.Option("--dry-run", help="Print command and prompt without executing"),
-]
-_AGENT_OPT = Annotated[
-    Optional[str],
-    typer.Option(
-        "--agent", help="Override agent preset (e.g., executor, executor-pro)"
-    ),
-]
-_BACKEND_OPT = Annotated[
-    Optional[str],
-    typer.Option("--backend", help="Override backend (claude, codex)"),
-]
-_MODEL_OPT = Annotated[
-    Optional[str],
-    typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
-]
-
-
-def _record_run_event(
-    run_content: str,
-    options: ReviewAgentOptions,
-    plan_file: str | None,
-    session_id: str | None = None,
-) -> Path | None:
-    """Record run execution to handoff.
-
-    Args:
-        run_content: The run content to save
-        options: ReviewAgentOptions with agent/backend/model
-        plan_file: Path to the plan file being executed (None for lightweight mode)
-        session_id: Optional session ID from codeagent-wrapper
-    """
-    artifact = create_handoff_artifact("run", run_content)
-    if artifact is None:
-        return None
-    branch, run_file = artifact
-
-    actor = format_agent_actor(options)
-    backend, model = resolve_actor_backend_model(options)
-
-    # Parse modified files from run content
-    import re
-    modified_files = []
-    # Look for "Modified Files" section
-    match = re.search(
-        r"### Modified Files\s*([\s\S]*?)(?:\n###|\Z)", run_content, re.IGNORECASE
-    )
-    if match:
-        files_section = match.group(1)
-        # Extract file paths from lines starting with "- "
-        file_matches = re.findall(r"^-\s*([^:\]]+)(?::|\])?", files_section, re.MULTILINE)
-        modified_files = [f.strip() for f in file_matches if f.strip()]
-
-    # Build detail
-    detail_parts = [f"Run completed: {run_file.name}"]
-    if modified_files:
-        detail_parts.append(f"Modified {len(modified_files)} files:")
-        for f in modified_files[:3]:  # Show first 3 files
-            detail_parts.append(f"  - {f}")
-        if len(modified_files) > 3:
-            detail_parts.append(f"  ... and {len(modified_files) - 3} more")
-
-    detail = "\n".join(detail_parts)
-
-    refs: dict[str, str] = {
-        "ref": str(run_file),
-        "backend": backend,
-    }
-    if model:
-        refs["model"] = model
-    if plan_file:
-        refs["plan_ref"] = plan_file
-    if session_id:
-        refs["session_id"] = session_id
-    if modified_files:
-        refs["modified_files"] = ",".join(modified_files)
-        refs["modified_count"] = str(len(modified_files))
-
-    persist_handoff_event(
-        branch=branch,
-        event_type="handoff_run",
-        actor=actor,
-        detail=detail,
-        refs=refs,
-        flow_state_updates={
-            "report_ref": str(run_file),
-            "executor_actor": actor,
-            "executor_session_id": session_id,
-        },
-    )
-
-    return run_file
-
-
 def _run_execution(
     plan_file: str | None,
     config: VibeConfig,
@@ -176,25 +74,27 @@ def _run_execution(
         session_id=session_id,
     )
     typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    outcome = execute_agent(
-        AgentExecutionRequest(
-            prompt_file_content=prompt_file_content,
-            options=options,
-            task=task,
-            dry_run=dry_run,
-            session_id=session_id,
-        )
+    result = execute_agent(
+        options,
+        prompt_file_content,
+        task=task,
+        dry_run=dry_run,
+        session_id=session_id,
     )
 
     if dry_run:
         return
 
-    run_content = outcome.result.stdout
-    run_file = _record_run_event(
-        run_content,
-        options,
-        plan_file,
-        session_id=outcome.effective_session_id,
+    effective_session_id = result.session_id or session_id
+    run_content = result.stdout
+    run_file = record_handoff_unified(
+        HandoffRecord(
+            kind="run",
+            content=run_content,
+            options=options,
+            session_id=effective_session_id,
+            metadata={"plan_ref": plan_file} if plan_file else None,
+        )
     )
     if run_file:
         typer.echo(f"-> Run saved: {run_file}")
@@ -253,46 +153,31 @@ def _run_skill(
     )
 
     typer.echo(f"-> Running skill with {options.agent or options.backend}...")
-    outcome = execute_agent(
-        AgentExecutionRequest(
-            prompt_file_content=skill_content,
-            options=options,
-            task=task,
-            dry_run=dry_run,
-            session_id=None,
-        )
+    session_id = load_session_id("executor")
+
+    result = execute_agent(
+        options,
+        skill_content,
+        task=task,
+        dry_run=dry_run,
+        session_id=session_id,
     )
 
     if dry_run:
         return
 
-    # Record as handoff_run event
-    artifact = create_handoff_artifact(f"skill-{skill_name}", outcome.result.stdout)
-    if artifact is None:
-        return
-    branch, run_file = artifact
-
-    actor = format_agent_actor(options)
-    backend_val, model_val = resolve_actor_backend_model(options)
-    refs: dict[str, str] = {
-        "ref": str(run_file),
-        "skill": skill_name,
-        "backend": backend_val,
-    }
-    if model_val:
-        refs["model"] = model_val
-
-    try:
-        persist_handoff_event(
-            branch=branch,
-            event_type="handoff_run",
-            actor=actor,
-            detail=f"Skill run: {skill_name}",
-            refs=refs,
+    effective_session_id = result.session_id or session_id
+    run_file = record_handoff_unified(
+        HandoffRecord(
+            kind="run",
+            content=result.stdout,
+            options=options,
+            session_id=effective_session_id,
+            metadata={"skill": skill_name},
         )
+    )
+    if run_file:
         typer.echo(f"-> Run saved: {run_file}")
-    except Exception as e:
-        logger.bind(domain="run").warning(f"Failed to record skill run event: {e}")
 
 
 def run_command(
@@ -329,18 +214,7 @@ def run_command(
         enable_trace()
 
     config = VibeConfig.get_defaults()
-    git = GitClient()
-    branch = git.get_current_branch()
-
-    # Auto-ensure flow for non-main branches
-    flow_service = FlowService()
-    try:
-        flow_service.ensure_flow_for_branch(branch)
-    except MainBranchProtectedError as e:
-        typer.echo(f"Error: {e}\n", err=True)
-        typer.echo("Tip: Create a feature branch first:", err=True)
-        typer.echo("  vibe3 flow new <branch-name> -c", err=True)
-        raise typer.Exit(1)
+    flow_service, branch = ensure_flow_for_current_branch()
 
     # --skill mode
     if skill:
@@ -362,7 +236,9 @@ def run_command(
         log = logger.bind(domain="run", action="run", plan_file="(lightweight)")
         log.info("Starting lightweight execution")
         typer.echo("-> Lightweight mode: running with instructions only")
-        typer.echo(f"-> Task: {instructions[:60]}{'...' if len(instructions) > 60 else ''}")
+        typer.echo(
+            f"-> Task: {instructions[:60]}{'...' if len(instructions) > 60 else ''}"
+        )
     else:
         # Try to use flow's plan_ref
         flow = flow_service.get_flow_status(branch)

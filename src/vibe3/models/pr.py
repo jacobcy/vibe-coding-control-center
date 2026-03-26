@@ -76,15 +76,6 @@ class VersionBumpType(str, Enum):
     NONE = "none"
 
 
-class VersionBumpRequest(BaseModel):
-    """Request model for version bump calculation."""
-
-    pr_number: int = Field(..., description="PR number")
-    group: Optional[str] = Field(
-        None, description="Task group (feature/bug/docs/chore)"
-    )
-
-
 class VersionBumpResponse(BaseModel):
     """Response model for version bump."""
 
