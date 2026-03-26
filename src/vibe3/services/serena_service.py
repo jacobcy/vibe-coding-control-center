@@ -6,11 +6,11 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.git_diff_hunks import get_diff_hunk_ranges
 from vibe3.clients.serena_client import SerenaClient
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import ChangeSource
 from vibe3.services.serena_file_analyzer import analyze_files
+from vibe3.utils.git_hunks import get_diff_hunk_ranges
 
 
 class SerenaService:

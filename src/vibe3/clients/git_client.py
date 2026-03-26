@@ -3,50 +3,50 @@
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
-from vibe3.clients.git_branch_ops import (
-    branch_exists as _branch_exists,
-)
-from vibe3.clients.git_branch_ops import (
-    create_branch as _create_branch,
-)
-from vibe3.clients.git_branch_ops import (
-    delete_branch as _delete_branch,
-)
-from vibe3.clients.git_branch_ops import (
-    delete_remote_branch as _delete_remote_branch,
-)
-from vibe3.clients.git_branch_ops import (
-    get_merge_base as _get_merge_base,
-)
-from vibe3.clients.git_branch_ops import (
-    switch_branch as _switch_branch,
-)
-from vibe3.clients.git_status_ops import (
-    get_changed_files as _get_changed_files,
-)
-from vibe3.clients.git_status_ops import (
-    get_diff as _get_diff,
-)
-from vibe3.clients.git_status_ops import (
-    has_uncommitted_changes as _has_uncommitted_changes,
-)
-from vibe3.clients.git_status_ops import (
-    stash_apply as _stash_apply,
-)
-from vibe3.clients.git_status_ops import (
-    stash_push as _stash_push,
-)
-from vibe3.clients.git_worktree_ops import (
-    get_current_branch as _get_current_branch,
-)
-from vibe3.clients.git_worktree_ops import (
-    get_current_commit as _get_current_commit,
-)
-from vibe3.clients.git_worktree_ops import (
-    get_git_common_dir as _get_git_common_dir,
-)
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import ChangeSource
+from vibe3.utils.git_branch import (
+    branch_exists as _branch_exists,
+)
+from vibe3.utils.git_branch import (
+    create_branch as _create_branch,
+)
+from vibe3.utils.git_branch import (
+    delete_branch as _delete_branch,
+)
+from vibe3.utils.git_branch import (
+    delete_remote_branch as _delete_remote_branch,
+)
+from vibe3.utils.git_branch import (
+    get_merge_base as _get_merge_base,
+)
+from vibe3.utils.git_branch import (
+    switch_branch as _switch_branch,
+)
+from vibe3.utils.git_status import (
+    get_changed_files as _get_changed_files,
+)
+from vibe3.utils.git_status import (
+    get_diff as _get_diff,
+)
+from vibe3.utils.git_status import (
+    has_uncommitted_changes as _has_uncommitted_changes,
+)
+from vibe3.utils.git_status import (
+    stash_apply as _stash_apply,
+)
+from vibe3.utils.git_status import (
+    stash_push as _stash_push,
+)
+from vibe3.utils.git_worktree import (
+    get_current_branch as _get_current_branch,
+)
+from vibe3.utils.git_worktree import (
+    get_current_commit as _get_current_commit,
+)
+from vibe3.utils.git_worktree import (
+    get_git_common_dir as _get_git_common_dir,
+)
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient

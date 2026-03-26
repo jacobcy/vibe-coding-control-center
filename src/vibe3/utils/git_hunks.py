@@ -115,8 +115,8 @@ def _get_file_diff(
             )
         full_diff = git_client._pr_diff_cache[source.pr_number]
         # Late import to avoid circular dependency:
-        # git_diff_hunks -> git_client -> git_diff_utils -> git_diff_hunks
-        from vibe3.clients.git_diff_utils import extract_file_diff
+        # git_hunks -> git_client -> git_diff -> git_hunks
+        from vibe3.utils.git_diff import extract_file_diff
 
         return extract_file_diff(full_diff, file_path)
     else:
