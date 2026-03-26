@@ -176,7 +176,7 @@ class CodeagentExecutionService:
 
     def _build_cli_command(self, command: CodeagentCommand) -> list[str]:
         """Build CLI command for async execution."""
-        cmd = ["python", "-m", "vibe3"]
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
 
         if command.role == "planner":
             cmd.extend(["plan", "task"])
@@ -184,6 +184,8 @@ class CodeagentExecutionService:
             cmd.append("run")
         elif command.role == "reviewer":
             cmd.extend(["review", "base"])
+
+        cmd.append("--no-async")
 
         if command.agent:
             cmd.extend(["--agent", command.agent])
@@ -194,7 +196,6 @@ class CodeagentExecutionService:
         if command.task:
             cmd.append(command.task)
 
-        cmd.append("--no-async")
         return cmd
 
 

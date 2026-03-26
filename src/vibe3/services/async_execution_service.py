@@ -6,6 +6,7 @@ in background processes, with status tracking in flow state.
 
 import os
 import subprocess
+import threading
 from datetime import datetime
 from typing import Literal
 
@@ -46,11 +47,21 @@ class AsyncExecutionService:
         """
         now = datetime.now().isoformat()
 
+        process = subprocess.Popen(
+            command,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=os.getcwd(),
+        )
+
         self.store.update_flow_state(
             branch,
             **{
                 f"{role}_status": "running",
+                "execution_pid": process.pid,
                 "execution_started_at": now,
+                "execution_completed_at": None,
             },
         )
 
@@ -61,15 +72,7 @@ class AsyncExecutionService:
             detail=f"Started async {role}",
         )
 
-        process = subprocess.Popen(
-            command,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=os.getcwd(),
-        )
-
-        self.store.update_flow_state(branch, execution_pid=process.pid)
+        self._start_completion_watcher(process, role, branch)
 
         logger.bind(
             domain="async_execution",
@@ -79,6 +82,41 @@ class AsyncExecutionService:
         ).info(f"Started async {role}")
 
         return process.pid
+
+    def _start_completion_watcher(
+        self,
+        process: subprocess.Popen,
+        role: ExecutionRole,
+        branch: str,
+    ) -> None:
+        """Spawn background watcher to mark completion."""
+        watcher = threading.Thread(
+            target=self._wait_for_process,
+            args=(process, role, branch),
+            daemon=True,
+        )
+        watcher.start()
+
+    def _wait_for_process(
+        self,
+        process: subprocess.Popen,
+        role: ExecutionRole,
+        branch: str,
+    ) -> None:
+        """Wait for process exit and mark completion."""
+        try:
+            exit_code = process.wait()
+            success = exit_code == 0
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.bind(
+                domain="async_execution",
+                role=role,
+                branch=branch,
+            ).exception(f"Async {role} wait failed: {exc}")
+            self.complete_execution(role, branch, success=False)
+            return
+
+        self.complete_execution(role, branch, success=success)
 
     def check_execution_status(self, pid: int) -> ExecutionStatus:
         """Check if a background process is still running.
@@ -117,7 +155,7 @@ class AsyncExecutionService:
         if not pid:
             return False
 
-        current_status = getattr(flow_data, f"{role}_status", None)
+        current_status = flow_data.get(f"{role}_status")
         if current_status != "running":
             return False
 

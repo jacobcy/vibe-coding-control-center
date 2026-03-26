@@ -1,14 +1,12 @@
 """Tests for async execution service."""
 
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.async_execution_service import (
     AsyncExecutionService,
-    ExecutionRole,
-    ExecutionStatus,
 )
 
 
@@ -27,7 +25,10 @@ class TestAsyncExecutionService:
 
     def test_start_async_execution_updates_status(self, service, mock_store):
         """Starting execution should update flow state."""
-        with patch("subprocess.Popen") as mock_popen:
+        with (
+            patch("subprocess.Popen") as mock_popen,
+            patch.object(service, "_start_completion_watcher"),
+        ):
             mock_process = MagicMock()
             mock_process.pid = 12345
             mock_popen.return_value = mock_process
@@ -82,3 +83,74 @@ class TestAsyncExecutionService:
         mock_store.update_flow_state.assert_called()
         args = mock_store.update_flow_state.call_args[1]
         assert args["reviewer_status"] == "crashed"
+        assert args["execution_pid"] is None
+
+    def test_start_async_execution_persists_state(self, tmp_path):
+        """Starting execution should persist running state in SQLite store."""
+        db_path = tmp_path / "handoff.db"
+        store = SQLiteClient(db_path=str(db_path))
+        service = AsyncExecutionService(store=store)
+
+        process = MagicMock()
+        process.pid = 4321
+
+        with patch("subprocess.Popen", return_value=process):
+            with patch.object(service, "_start_completion_watcher") as watcher:
+                pid = service.start_async_execution(
+                    role="reviewer",
+                    command=[
+                        "uv",
+                        "run",
+                        "python",
+                        "src/vibe3/cli.py",
+                        "review",
+                        "base",
+                        "--no-async",
+                    ],
+                    branch="feature/test",
+                )
+
+        assert pid == 4321
+        watcher.assert_called_once()
+        state = store.get_flow_state("feature/test")
+        assert state["reviewer_status"] == "running"
+        assert state["execution_pid"] == 4321
+        assert state["execution_started_at"] is not None
+
+    def test_wait_for_process_marks_completion(self, tmp_path):
+        """Watcher should mark completion state on exit."""
+        db_path = tmp_path / "handoff.db"
+        store = SQLiteClient(db_path=str(db_path))
+        service = AsyncExecutionService(store=store)
+
+        process = MagicMock()
+        process.wait.return_value = 0
+
+        service._wait_for_process(process, "planner", "feature/x")
+
+        state = store.get_flow_state("feature/x")
+        assert state["planner_status"] == "done"
+        assert state["execution_pid"] is None
+        assert state["execution_completed_at"] is not None
+
+    def test_cancel_execution_updates_state(self, tmp_path):
+        """Cancel should handle dict rows and clear pid."""
+        db_path = tmp_path / "handoff.db"
+        store = SQLiteClient(db_path=str(db_path))
+        service = AsyncExecutionService(store=store)
+        store.update_flow_state(
+            "feature/x",
+            flow_slug="feature-x",
+            reviewer_status="running",
+            execution_pid=9999,
+        )
+
+        with patch("os.getpgid", return_value=9999), patch("os.killpg") as killpg:
+            cancelled = service.cancel_execution("reviewer", "feature/x")
+
+        assert cancelled is True
+        state = store.get_flow_state("feature/x")
+        assert state["reviewer_status"] == "crashed"
+        assert state["execution_pid"] is None
+        assert state["execution_completed_at"] is not None
+        killpg.assert_called_once()
