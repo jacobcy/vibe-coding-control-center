@@ -233,6 +233,12 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             blocked_by=flow_data.get("blocked_by"),
             next_step=flow_data.get("next_step"),
             issues=issues,
+            planner_status=flow_data.get("planner_status"),
+            executor_status=flow_data.get("executor_status"),
+            reviewer_status=flow_data.get("reviewer_status"),
+            execution_pid=flow_data.get("execution_pid"),
+            execution_started_at=flow_data.get("execution_started_at"),
+            execution_completed_at=flow_data.get("execution_completed_at"),
         )
 
     def list_flows(

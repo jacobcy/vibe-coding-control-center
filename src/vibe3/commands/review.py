@@ -22,6 +22,10 @@ from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.utils.trace import enable_trace
 
+_ASYNC_OPT = Annotated[
+    bool, typer.Option("--async", help="Run asynchronously in background")
+]
+
 app = typer.Typer(
     name="review",
     help="Code review with two modes:\n\n"
@@ -185,6 +189,7 @@ def base(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -210,7 +215,6 @@ def base(
 
     current_branch = get_current_branch()
 
-    # Auto-detect parent branch if not specified
     if base_branch is None:
         base_branch = find_parent_branch(current_branch)
         if base_branch is None:
@@ -222,8 +226,21 @@ def base(
             raise typer.Exit(1)
         typer.echo(f"→ Auto-detected parent branch: {base_branch}")
 
-    # Auto-ensure flow for non-main branches
     flow_service, _ = ensure_flow_for_current_branch()
+
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        command = ["python", "-m", "vibe3", "review", "base", base_branch or ""]
+        if instructions:
+            command.append(instructions)
+        command.append("--no-async")
+
+        async_svc.start_async_execution("reviewer", command, current_branch)
+        typer.echo("[green]✓[/] Review started in background")
+        typer.echo("Use 'vibe3 flow show' to check status")
+        return
 
     log = logger.bind(
         domain="review",
