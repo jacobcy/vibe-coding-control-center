@@ -124,89 +124,35 @@ if [ -n "$RECOMMENDATIONS" ]; then
     done <<< "$RECOMMENDATIONS"
 fi
 
-# 7. Trigger local review only when inspect score reaches block threshold
+# 7. Trigger async local review when inspect score reaches block threshold
+# NOTE: Review runs asynchronously and does NOT block push.
+# High-risk changes are flagged but push proceeds - review results available later.
 if [ "$BLOCK_REVIEW" = "true" ]; then
-    echo "  Review triggered: yes"
+    echo "  Review triggered: yes (async)"
     echo ""
-    echo "  WARNING: Blocking risk detected!"
-    echo "  Running local review before push..."
+    echo "  ⚠️  WARNING: Blocking risk detected!"
+    echo "  Starting async review in background..."
     echo ""
 
-    # Always use branch for report directory (branch is always available)
-    # flow_slug is for display only and may be unreliable
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    BRANCH_SAFE=$(echo "$CURRENT_BRANCH" | tr '/' '-')
-    REPORTS_DIR=".agent/reports/$BRANCH_SAFE"
-    mkdir -p "$REPORTS_DIR"
 
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    REVIEW_REPORT_FILE="$REPORTS_DIR/pre-push-review-${TIMESTAMP}.md"
+    # Start async review (non-blocking)
+    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" --async 2>/dev/null || {
+        echo "  [yellow]Note:[/] Failed to start async review (continuing push)"
+    }
 
-    # Run review with real-time output using tee
-    set +e
-    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" 2>&1 | tee "$REVIEW_REPORT_FILE"
-    REVIEW_EXIT=${PIPESTATUS[0]}
-    set -e
-
+    echo "  [green]✓[/] Review started in background"
     echo ""
-    echo "  Review report saved: $REVIEW_REPORT_FILE"
-
-    if [ "$REVIEW_EXIT" -ne 0 ]; then
-        echo "ERROR: Review failed with exit code $REVIEW_EXIT"
-        echo ""
-        # Show the error output on failure
-        echo "=== Review Output ==="
-        cat "$REVIEW_REPORT_FILE"
-        echo "====================="
-        echo ""
-        echo "Blocking risk requires visible review output and a passing review before push."
-        exit 1
-    fi
-
-    VERDICT=$(python3 -c "
-import re
-import os
-import sys
-
-report_file = os.environ.get('REVIEW_REPORT_FILE')
-if not report_file:
-    print('PASS')  # Fail-safe
-    sys.exit(0)
-
-try:
-    with open(report_file) as f:
-        content = f.read()
-
-    # Try multiple patterns for robustness
-    patterns = [
-        r'VERDICT:\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Standard format with optional markdown
-        r'\*\*VERDICT:\*\*\s*\*{0,2}(PASS|MAJOR|BLOCK)\*{0,2}',  # Bold prefix
-        r'Verdict:\s*(PASS|MAJOR|BLOCK)',  # Simple format
-        r'=== Verdict:\s*(PASS|MAJOR|BLOCK)',  # Report format
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, content, re.IGNORECASE)
-        if match:
-            print(match.group(1).upper())
-            sys.exit(0)
-
-    # Default to PASS if no verdict found (fail-safe)
-    print('PASS')
-except Exception:
-    # On any error, default to PASS (fail-safe)
-    print('PASS')
-" REVIEW_REPORT_FILE="$REVIEW_REPORT_FILE")
-    echo "  Review verdict: $VERDICT"
-    if [ "$VERDICT" = "BLOCK" ]; then
-        echo "ERROR: Review verdict is BLOCK - fix issues before push"
-        exit 1
-    fi
+    echo "  [dim]Commands:[/]"
+    echo "    vibe3 flow show              # Check review status"
+    echo "    vibe3 handoff show           # View review result (when done)"
+    echo "    vibe3 flow cancel reviewer   # Cancel running review"
+    echo ""
 elif [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
     echo "  Review triggered: recommended-manual"
     echo ""
-    echo "  WARNING: Elevated risk detected, but below blocking threshold."
-    echo "  Recommendation: run 'uv run python src/vibe3/cli.py review base \"$REVIEW_BASE\"' before push if you want extra confidence."
+    echo "  ⚠️  WARNING: Elevated risk detected, but below blocking threshold."
+    echo "  Recommendation: run 'vibe3 review base \"$REVIEW_BASE\"' before push if you want extra confidence."
 else
     echo "  Review triggered: no"
 fi

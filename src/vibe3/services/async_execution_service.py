@@ -95,6 +95,63 @@ class AsyncExecutionService:
         except OSError:
             return "done"
 
+    def cancel_execution(
+        self,
+        role: ExecutionRole,
+        branch: str,
+    ) -> bool:
+        """Cancel a running background execution.
+
+        Args:
+            role: Execution role (planner/executor/reviewer)
+            branch: Branch name
+
+        Returns:
+            True if process was killed, False if not running
+        """
+        flow_data = self.store.get_flow_state(branch)
+        if not flow_data:
+            return False
+
+        pid = flow_data.get("execution_pid")
+        if not pid:
+            return False
+
+        current_status = getattr(flow_data, f"{role}_status", None)
+        if current_status != "running":
+            return False
+
+        try:
+            os.killpg(os.getpgid(pid), 15)
+        except (OSError, ProcessLookupError):
+            pass
+
+        now = datetime.now().isoformat()
+        self.store.update_flow_state(
+            branch,
+            **{
+                f"{role}_status": "crashed",
+                "execution_completed_at": now,
+                "execution_pid": None,
+            },
+        )
+
+        self.store.add_event(
+            branch,
+            f"{role}_cancelled",
+            "system",
+            detail=f"{role} was manually cancelled",
+        )
+
+        logger.bind(
+            domain="async_execution",
+            role=role,
+            branch=branch,
+            pid=pid,
+        ).info(f"{role} cancelled")
+
+        return True
+
     def complete_execution(
         self,
         role: ExecutionRole,

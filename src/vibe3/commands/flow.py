@@ -362,3 +362,48 @@ app.command(name="switch")(switch)
 app.command(name="done")(done)
 app.command(name="blocked")(blocked)
 app.command(name="aborted")(aborted)
+
+
+@app.command()
+def cancel(
+    role: Annotated[
+        str,
+        typer.Argument(help="Role to cancel (planner/executor/reviewer)"),
+    ],
+    flow_name: Annotated[
+        str | None, typer.Argument(help="Branch name (defaults to current branch)")
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Cancel a running async execution.
+
+    Examples:
+        vibe3 flow cancel reviewer
+        vibe3 flow cancel planner task/my-feature
+    """
+    with trace_scope(trace, "flow cancel", role=role):
+        from typing import cast
+
+        from vibe3.services.async_execution_service import (
+            AsyncExecutionService,
+            ExecutionRole,
+        )
+
+        valid_roles = ("planner", "executor", "reviewer")
+        if role not in valid_roles:
+            console.print(f"[red]Error: Invalid role '{role}'[/]")
+            console.print(f"[yellow]Valid roles: {', '.join(valid_roles)}[/]")
+            raise typer.Exit(1)
+
+        service = FlowService()
+        branch = flow_name if flow_name else service.get_current_branch()
+
+        async_svc = AsyncExecutionService()
+        cancelled = async_svc.cancel_execution(cast(ExecutionRole, role), branch)
+
+        if cancelled:
+            console.print(f"[green]✓[/] Cancelled {role} on {branch}")
+        else:
+            console.print(f"[yellow]No running {role} found on {branch}[/]")
