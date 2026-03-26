@@ -119,6 +119,17 @@ class FlowLifecycleMixin:
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
+        pr_number = flow_data.get("pr_number")
+        if check_pr and pr_number is not None:
+            pr = GitHubClient().get_pr(pr_number)
+            pr_state = str(getattr(pr, "state", "")).upper() if pr else ""
+            pr_merged_at = getattr(pr, "merged_at", None) if pr else None
+            pr_is_merged = pr_state in {"PRSTATE.MERGED", "MERGED"} or bool(
+                pr_merged_at
+            )
+            if not pr or not pr_is_merged:
+                raise RuntimeError(f"PR #{pr_number} is not merged")
+
         try:
             close_target = self.resolve_close_target(branch)
             target_branch = close_target.target_branch

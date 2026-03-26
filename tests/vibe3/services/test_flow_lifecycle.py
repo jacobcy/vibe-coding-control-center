@@ -73,6 +73,40 @@ class TestFlowLifecycle:
         mock_github_class.return_value.close_issue.assert_not_called()
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    def test_close_flow_rejects_unmerged_pr_when_check_enabled(
+        self,
+        mock_github_class: MagicMock,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        """Flow with an open PR must not be closed while PR check is enabled."""
+        self._build_flow_store(mock_store, task_issue_number=220)
+        mock_store.get_flow_state.return_value["pr_number"] = 123
+
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/current-flow"
+        mock_git.branch_exists.return_value = True
+        mock_git.is_branch_occupied_by_worktree.return_value = False
+        mock_git_class.return_value = mock_git
+
+        mock_store.get_flow_dependents.return_value = []
+        mock_github_class.return_value.get_pr.return_value = MagicMock(
+            number=123,
+            state="OPEN",
+            merged_at=None,
+        )
+
+        service = FlowService(store=mock_store)
+
+        with pytest.raises(RuntimeError, match="PR #123 is not merged"):
+            service.close_flow("task/current-flow", check_pr=True)
+
+        mock_git.delete_branch.assert_not_called()
+        mock_git.delete_remote_branch.assert_not_called()
+        mock_store.update_flow_state.assert_not_called()
+
+    @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_switches_off_current_branch_before_delete(
         self,
         mock_git_class: MagicMock,
@@ -214,6 +248,7 @@ class TestFlowLifecycle:
 
         assert "delete_local:task/current-flow:True" in actions
         assert not any(action == "run:pull" for action in actions)
+
 
 class TestFlowCreateDecision:
     """Tests for flow create access control."""
