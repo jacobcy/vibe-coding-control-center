@@ -6,6 +6,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
+from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
 
 
@@ -271,35 +272,4 @@ class FlowLifecycleMixin:
         Args:
             branch: Branch name
         """
-        git = GitClient()
-
-        logger.bind(
-            domain="flow",
-            action="abort",
-            branch=branch,
-        ).info("Aborting flow")
-
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
-
-        if git.branch_exists(branch):
-            git.delete_branch(branch, force=True)
-
-        try:
-            git.delete_remote_branch(branch)
-        except Exception:
-            logger.bind(
-                domain="flow",
-                action="abort",
-                branch=branch,
-            ).warning("Failed to delete remote branch, continuing")
-
-        self.store.update_flow_state(branch, flow_status="aborted")
-
-        self.store.add_event(
-            branch,
-            "flow_aborted",
-            "system",
-            f"Flow aborted, branch '{branch}' deleted",
-        )
+        abort_flow_impl(self.store, branch)

@@ -6,42 +6,13 @@ from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.exceptions import GitHubError, PRNotFoundError, UserError
+from vibe3.clients.github_pr_error_helpers import raise_gh_pr_error
+from vibe3.exceptions import PRNotFoundError
 from vibe3.models.pr import CreatePRRequest, PRResponse, PRState, UpdatePRRequest
 
 
 class PRMixin:
     """Mixin for PR-related operations."""
-
-    def _raise_gh_pr_error(
-        self,
-        error: subprocess.CalledProcessError,
-        operation: str,
-        user_tips: str | None = None,
-    ) -> None:
-        """Normalize gh pr command failure into unified error types."""
-        error_msg = (error.stderr or error.stdout or f"Failed to {operation}").strip()
-        lower_msg = error_msg.lower()
-
-        recoverable_patterns = (
-            "already exists",
-            "no commits between",
-            "must push the current branch",
-            "head sha can't be blank",
-            "already ready for review",
-            "is in draft mode",
-            "is not mergeable",
-            "checks are failing",
-            "no pull requests found",
-        )
-        if any(pattern in lower_msg for pattern in recoverable_patterns):
-            tips = f"\nTips:\n{user_tips}" if user_tips else ""
-            raise UserError(f"PR {operation} failed: {error_msg}{tips}") from error
-
-        raise GitHubError(
-            status_code=error.returncode,
-            message=f"gh pr {operation} failed: {error_msg}",
-        ) from error
 
     def create_pr(self: Any, request: CreatePRRequest) -> PRResponse:
         """Create a pull request.
@@ -84,7 +55,7 @@ class PRMixin:
                 check=True,
             )
         except subprocess.CalledProcessError as e:
-            self._raise_gh_pr_error(
+            raise_gh_pr_error(
                 e,
                 "create",
                 user_tips=(
@@ -190,7 +161,7 @@ class PRMixin:
         try:
             subprocess.run(cmd, capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as e:
-            self._raise_gh_pr_error(
+            raise_gh_pr_error(
                 e,
                 "edit",
                 user_tips=(
@@ -210,7 +181,7 @@ class PRMixin:
                         check=True,
                     )
                 except subprocess.CalledProcessError as e:
-                    self._raise_gh_pr_error(
+                    raise_gh_pr_error(
                         e,
                         "ready --undo",
                         user_tips=(
@@ -227,7 +198,7 @@ class PRMixin:
                         check=True,
                     )
                 except subprocess.CalledProcessError as e:
-                    self._raise_gh_pr_error(
+                    raise_gh_pr_error(
                         e,
                         "ready",
                         user_tips=(
@@ -257,7 +228,7 @@ class PRMixin:
                 check=True,
             )
         except subprocess.CalledProcessError as e:
-            self._raise_gh_pr_error(
+            raise_gh_pr_error(
                 e,
                 "ready",
                 user_tips=(
@@ -287,7 +258,7 @@ class PRMixin:
                 check=True,
             )
         except subprocess.CalledProcessError as e:
-            self._raise_gh_pr_error(
+            raise_gh_pr_error(
                 e,
                 "merge",
                 user_tips=(
