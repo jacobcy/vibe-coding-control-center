@@ -6,8 +6,9 @@
 Validates: Requirements 1.1, 1.2, 1.3, 1.4
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Bug 1: pre-push 漏检 - FIXED in refactor/split-large-files

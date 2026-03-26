@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
     AgentResult,
@@ -133,19 +134,37 @@ class TestRunReviewAgent:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
 
-            with pytest.raises(RuntimeError) as exc_info:
+            with pytest.raises(AgentExecutionError) as exc_info:
                 run_review_agent("prompt body", options)
 
         assert "codeagent-wrapper failed" in str(exc_info.value)
         assert "something failed" in str(exc_info.value)
 
+    def test_run_review_non_zero_exit_prefers_stderr_in_message(self) -> None:
+        """Runner should surface stderr details when available."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = "stdout ignored\n"
+        mock_result.stderr = "wrapper stderr details\n"
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            options = AgentOptions(agent="code-reviewer")
+
+            with pytest.raises(AgentExecutionError) as exc_info:
+                run_review_agent("prompt body", options)
+
+        assert "wrapper stderr details" in str(exc_info.value)
+
     def test_run_review_wrapper_not_found(self) -> None:
         """Runner should give clear error when wrapper not found."""
+        from vibe3.exceptions import AgentExecutionError
+
         with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
             options = AgentOptions(agent="code-reviewer")
 
-            with pytest.raises(FileNotFoundError) as exc_info:
+            with pytest.raises(AgentExecutionError) as exc_info:
                 run_review_agent("prompt body", options)
 
         assert "codeagent-wrapper not found" in str(exc_info.value)
@@ -153,6 +172,8 @@ class TestRunReviewAgent:
     def test_run_review_timeout(self) -> None:
         """Runner should timeout after specified seconds."""
         import subprocess
+
+        from vibe3.exceptions import AgentExecutionError
 
         with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(
@@ -163,8 +184,10 @@ class TestRunReviewAgent:
                 timeout_seconds=300,
             )
 
-            with pytest.raises(subprocess.TimeoutExpired):
+            with pytest.raises(AgentExecutionError) as exc_info:
                 run_review_agent("prompt body", options)
+
+        assert "timed out" in str(exc_info.value)
 
     def test_run_review_uses_prompt_file(self) -> None:
         """Runner should pass prompt via temporary file."""
