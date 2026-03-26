@@ -64,6 +64,12 @@ class SystemError(VibeError):
         super().__init__(message, recoverable=False)
 
 
+class AgentExecutionError(SystemError):
+    """Agent execution failed (wrapper/API/backend error)."""
+
+    pass
+
+
 class GitError(SystemError):
     """Git operation failed."""
 

@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import Final, cast
 
+from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
 # Default wrapper path
@@ -95,9 +96,7 @@ def run_review_agent(
         AgentResult containing exit code, output, and session_id
 
     Raises:
-        FileNotFoundError: If codeagent-wrapper is not found
-        RuntimeError: If the agent returns a non-zero exit code
-        TimeoutExpired: If the agent exceeds the timeout
+        AgentExecutionError: If wrapper is missing, times out, or returns non-zero exit
 
     """
     import tempfile
@@ -175,12 +174,15 @@ def run_review_agent(
             )
 
         except FileNotFoundError:
-            raise FileNotFoundError(
+            raise AgentExecutionError(
                 f"codeagent-wrapper not found at {wrapper_path}. "
                 "Please ensure it is installed and accessible."
             ) from None
         except subprocess.TimeoutExpired:
-            raise
+            raise AgentExecutionError(
+                f"codeagent-wrapper timed out after {options.timeout_seconds}s. "
+                "Consider increasing the timeout or splitting the review scope."
+            ) from None
 
         # Print output for visibility
         if result.stdout:
@@ -203,7 +205,7 @@ def run_review_agent(
                     agent_result.stdout[:500] if agent_result.stdout else "(no output)"
                 )
             )
-            raise RuntimeError(
+            raise AgentExecutionError(
                 f"codeagent-wrapper failed with exit code {agent_result.exit_code}:\n"
                 f"{stderr_preview}"
             )

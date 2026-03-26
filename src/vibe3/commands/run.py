@@ -17,11 +17,7 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.handoff_recorder_unified import (
-    HandoffRecord,
-    record_handoff_unified,
-)
+from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.utils.trace import enable_trace
@@ -46,11 +42,7 @@ def _run_execution(
 ) -> None:
     log = logger.bind(domain="run", plan_file=plan_file or "(lightweight)")
 
-    session_id = load_session_id("executor")
-
-    log.info("Building run context")
-    prompt_file_content = build_run_context(plan_file, config)
-
+    # Resolve task message
     task = instructions
     if instructions:
         log.info("Using custom task message")
@@ -62,46 +54,24 @@ def _run_execution(
     if not task and run_config and hasattr(run_config, "run_prompt"):
         task = run_config.run_prompt
 
-    options = get_agent_options(  # type: ignore[call-arg]
-        config,
-        agent,
-        backend,
-        model,
-        section="run",
-    )
-
-    log.info(
-        "Running execution agent",
-        agent=options.agent,
-        backend=options.backend,
-        model=options.model,
-        session_id=session_id,
-    )
-    typer.echo(f"-> Executing plan with {options.agent or options.backend}...")
-    result = execute_agent(
-        options,
-        prompt_file_content,
+    # Build execution request
+    request = ExecutionRequest(
+        role="executor",
+        context_builder=lambda: build_run_context(plan_file, config),
+        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
+            config,
+            agent,
+            backend,
+            model,
+            section="run",
+        ),
         task=task,
         dry_run=dry_run,
-        session_id=session_id,
+        handoff_kind="run",
+        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
     )
 
-    if dry_run:
-        return
-
-    effective_session_id = result.session_id or session_id
-    run_content = result.stdout
-    run_file = record_handoff_unified(
-        HandoffRecord(
-            kind="run",
-            content=run_content,
-            options=options,
-            session_id=effective_session_id,
-            metadata={"plan_ref": plan_file} if plan_file else None,
-        )
-    )
-    if run_file:
-        typer.echo(f"-> Run saved: {run_file}")
+    run_execution_pipeline(request)
 
 
 def _find_skill_file(skill_name: str) -> Path | None:
@@ -148,40 +118,25 @@ def _run_skill(
     skill_content = skill_file.read_text(encoding="utf-8")
 
     task = instructions or f"Execute skill: {skill_name}"
-    options = get_agent_options(  # type: ignore[call-arg]
-        config,
-        agent,
-        backend,
-        model,
-        section="run",
-    )
 
-    typer.echo(f"-> Running skill with {options.agent or options.backend}...")
-    session_id = load_session_id("executor")
-
-    result = execute_agent(
-        options,
-        skill_content,
+    # Build execution request
+    request = ExecutionRequest(
+        role="executor",
+        context_builder=lambda: skill_content,
+        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
+            config,
+            agent,
+            backend,
+            model,
+            section="run",
+        ),
         task=task,
         dry_run=dry_run,
-        session_id=session_id,
+        handoff_kind="run",
+        handoff_metadata={"skill": skill_name},
     )
 
-    if dry_run:
-        return
-
-    effective_session_id = result.session_id or session_id
-    run_file = record_handoff_unified(
-        HandoffRecord(
-            kind="run",
-            content=result.stdout,
-            options=options,
-            session_id=effective_session_id,
-            metadata={"skill": skill_name},
-        )
-    )
-    if run_file:
-        typer.echo(f"-> Run saved: {run_file}")
+    run_execution_pipeline(request)
 
 
 def run_command(
@@ -194,10 +149,6 @@ def run_command(
         typer.Option(
             "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
         ),
-    ] = None,
-    file: Annotated[
-        Optional[Path],
-        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
     ] = None,
     skill: Annotated[
         Optional[str],
@@ -226,7 +177,7 @@ def run_command(
         return
 
     # Determine execution mode
-    resolved_file = plan or file
+    resolved_file = plan
 
     if resolved_file:
         # Explicit plan file provided
@@ -287,10 +238,6 @@ def default(
             "--plan", "-p", help="Path to plan file (overrides flow plan_ref)"
         ),
     ] = None,
-    file: Annotated[
-        Optional[Path],
-        typer.Option("--file", "-f", help="Alias for --plan (deprecated)"),
-    ] = None,
     skill: Annotated[
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
@@ -307,7 +254,6 @@ def default(
     run_command(
         instructions,
         plan,
-        file,
         skill,
         trace,
         dry_run,

@@ -16,12 +16,8 @@ from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.handoff_recorder_unified import (
-    HandoffRecord,
-    record_handoff_unified,
-)
+from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.utils.trace import enable_trace
@@ -46,11 +42,7 @@ def _run_review(
 ) -> None:
     log = logger.bind(domain="review", scope=request.scope.kind)
 
-    session_id = load_session_id("reviewer")
-
-    log.info("Building review context")
-    prompt_file_content = build_review_context(request, config)
-
+    # Resolve task message
     task = None
     if pr_number:
         if instructions:
@@ -73,50 +65,39 @@ def _run_review(
     else:
         log.info("Using prompt file only (no custom task)")
 
-    log.info(
-        "Running review agent",
-        agent=config.review.agent_config.agent,
-        backend=config.review.agent_config.backend,
-        model=config.review.agent_config.model,
-        session_id=session_id,
-    )
-    typer.echo("→ Running review...")
+    # Build agent options
     options = AgentOptions(
         agent=config.review.agent_config.agent,
         backend=config.review.agent_config.backend,
         model=config.review.agent_config.model,
     )
-    result = execute_agent(
-        options,
-        prompt_file_content,
+
+    # Build execution request
+    exec_request = ExecutionRequest(
+        role="reviewer",
+        context_builder=lambda: build_review_context(request, config),
+        options_builder=lambda: options,
         task=task,
         dry_run=dry_run,
-        session_id=session_id,
+        handoff_kind="review",
+        handoff_metadata={},
     )
+
+    # Run pipeline
+    result = run_execution_pipeline(exec_request)
 
     if dry_run:
         return
 
-    effective_session_id = result.session_id or session_id
-    raw = result.stdout
+    # Review-specific post-processing
+    raw = result.agent_result.stdout
     review = parse_codex_review(raw)
 
     typer.echo(f"\n=== Verdict: {review.verdict} ===")
 
-    review_file = record_handoff_unified(
-        HandoffRecord(
-            kind="review",
-            content=raw,
-            options=options,
-            session_id=effective_session_id,
-            metadata={
-                "verdict": review.verdict,
-                "comment_count": str(len(review.comments)),
-            },
-        )
-    )
-    if review_file:
-        typer.echo(f"→ Review saved to: {review_file}")
+    # Update handoff metadata with review results
+    if result.handoff_file:
+        typer.echo(f"→ Review saved to: {result.handoff_file}")
 
     if issue_number is not None:
         label_result = transition_to_review(issue_number)
