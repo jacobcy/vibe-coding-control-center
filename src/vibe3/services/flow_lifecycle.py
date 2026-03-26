@@ -85,10 +85,7 @@ class FlowLifecycleMixin:
             requires_new_worktree=False,
         )
 
-    def resolve_close_target(
-        self: Any,
-        branch: str,
-    ) -> CloseTargetDecision:
+    def resolve_close_target(self: Any, branch: str) -> CloseTargetDecision:
         """Resolve target branch for flow close with explicit rules."""
         return resolve_close_target(self.store, branch)
 
@@ -289,10 +286,7 @@ class FlowLifecycleMixin:
             f"Flow blocked{': ' + reason if reason else ''}",
         )
 
-    def abort_flow(
-        self: Any,
-        branch: str,
-    ) -> None:
+    def abort_flow(self: Any, branch: str) -> None:
         """Abort flow and delete branch.
 
         Args:

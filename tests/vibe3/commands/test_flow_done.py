@@ -48,3 +48,17 @@ def test_flow_done_allows_force_without_task_issue() -> None:
 
     assert result.exit_code == 0
     flow_service.close_flow.assert_called_once_with("task/demo", check_pr=False)
+
+
+def test_flow_done_reports_missing_flow_cleanly() -> None:
+    """Missing flow on current branch should return a user-facing error."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/flow-done-close-task-issue"
+    flow_service.get_flow_status.return_value = None
+
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+        result = runner.invoke(app, ["flow", "done"])
+
+    assert result.exit_code == 1
+    assert "当前分支还没有 flow" in result.output
+    flow_service.close_flow.assert_not_called()
