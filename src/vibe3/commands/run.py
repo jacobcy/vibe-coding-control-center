@@ -8,6 +8,7 @@ from loguru import logger
 
 from vibe3.commands.command_options import (
     _AGENT_OPT,
+    _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
@@ -156,6 +157,7 @@ def run_command(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -164,12 +166,36 @@ def run_command(
 
     Default: runs current flow's plan_ref.
     Use --plan to specify a plan file, or --skill to run a project skill.
+    Use --async to run in background.
     """
     if trace:
         enable_trace()
 
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
+
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "run", "--no-async"]
+        if instructions:
+            cmd.append(instructions)
+        if plan:
+            cmd.extend(["--plan", str(plan)])
+        if skill:
+            cmd.extend(["--skill", skill])
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+
+        async_svc.start_async_execution("executor", cmd, branch)
+        typer.echo("✓ Execution started in background")
+        typer.echo("  vibe3 flow show    # Check status")
+        return
 
     # --skill mode
     if skill:
@@ -244,6 +270,7 @@ def default(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -257,6 +284,7 @@ def default(
         skill,
         trace,
         dry_run,
+        async_mode,
         agent,
         backend,
         model,

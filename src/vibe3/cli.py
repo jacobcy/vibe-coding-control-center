@@ -110,6 +110,9 @@ def run_command(
         bool,
         typer.Option("--dry-run", help="Print command and prompt without executing"),
     ] = False,
+    async_mode: Annotated[
+        bool, typer.Option("--async", help="Run asynchronously in background")
+    ] = False,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -126,7 +129,6 @@ def run_command(
     ] = None,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
-    # Handle deprecated --file option
     resolved_plan = plan or file
     run.run_command(
         instructions,
@@ -134,6 +136,7 @@ def run_command(
         skill,
         trace,
         dry_run,
+        async_mode,
         agent,
         backend,
         model,

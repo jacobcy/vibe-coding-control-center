@@ -406,6 +406,40 @@ def list(
             render_flows_table(flows)
 
 
+@app.command()
+def cancel(
+    role: Annotated[
+        Literal["planner", "executor", "reviewer"],
+        typer.Argument(help="Role to cancel"),
+    ],
+    flow_name: Annotated[
+        str | None, typer.Argument(help="Branch name (defaults to current branch)")
+    ] = None,
+    trace: Annotated[
+        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+    ] = False,
+) -> None:
+    """Cancel a running async execution.
+
+    Examples:
+        vibe3 flow cancel reviewer
+        vibe3 flow cancel planner task/my-feature
+    """
+    with trace_scope(trace, "flow cancel", role=role):
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        service = FlowService()
+        branch = flow_name if flow_name else service.get_current_branch()
+
+        async_svc = AsyncExecutionService()
+        cancelled = async_svc.cancel_execution(role, branch)
+
+        if cancelled:
+            console.print(f"[green]✓[/] Cancelled {role} on {branch}")
+        else:
+            console.print(f"[yellow]No running {role} found on {branch}[/]")
+
+
 # Register lifecycle commands from flow_lifecycle.py
 app.command(name="switch")(switch)
 app.command(name="done")(done)

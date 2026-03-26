@@ -34,7 +34,13 @@ _CREATE_FLOW_STATE = """
         flow_status TEXT NOT NULL DEFAULT 'active',
         updated_at TEXT NOT NULL,
         project_item_id TEXT,
-        project_node_id TEXT
+        project_node_id TEXT,
+        planner_status TEXT,
+        executor_status TEXT,
+        reviewer_status TEXT,
+        execution_pid INTEGER,
+        execution_started_at TEXT,
+        execution_completed_at TEXT
     )
 """
 
@@ -82,6 +88,22 @@ def init_schema(conn: sqlite3.Connection) -> None:
     for col in ("project_item_id", "project_node_id"):
         if col not in existing:
             cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} TEXT")
+            logger.bind(external="sqlite", operation="migration").info(
+                f"Added {col} column to flow_state"
+            )
+
+    # Migration: add async execution tracking columns if missing
+    async_columns = {
+        "planner_status": "TEXT",
+        "executor_status": "TEXT",
+        "reviewer_status": "TEXT",
+        "execution_pid": "INTEGER",
+        "execution_started_at": "TEXT",
+        "execution_completed_at": "TEXT",
+    }
+    for col, col_type in async_columns.items():
+        if col not in existing:
+            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} {col_type}")
             logger.bind(external="sqlite", operation="migration").info(
                 f"Added {col} column to flow_state"
             )

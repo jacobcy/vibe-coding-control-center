@@ -7,6 +7,7 @@ import typer
 
 from vibe3.commands.command_options import (
     _AGENT_OPT,
+    _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
@@ -41,6 +42,7 @@ def task(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -55,6 +57,7 @@ def task(
         vibe3 plan task 42 --dry-run
         vibe3 plan task 42 "Focus on security"
         vibe3 plan task 42 --agent planner-pro
+        vibe3 plan task 42 --async   # Run in background
     """
     if trace:
         enable_trace()
@@ -73,6 +76,34 @@ def task(
             raise typer.Exit(1)
         issue = flow.task_issue_number
         typer.echo(f"-> Using flow task: Issue #{issue}")
+
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = [
+            "uv",
+            "run",
+            "python",
+            "src/vibe3/cli.py",
+            "plan",
+            "task",
+            str(issue),
+            "--no-async",
+        ]
+        if instructions:
+            cmd.append(instructions)
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+
+        async_svc.start_async_execution("planner", cmd, branch)
+        typer.echo("✓ Plan started in background")
+        typer.echo("  vibe3 flow show    # Check status")
+        return
 
     import typer as typer_module
 
@@ -116,6 +147,7 @@ def spec(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -129,6 +161,7 @@ def spec(
         vibe3 plan spec --msg "Add dark mode support"
         vibe3 plan spec -f spec.md "Prioritize performance"
         vibe3 plan spec --msg "Refactor auth" --agent planner-pro
+        vibe3 plan spec --file spec.md --async  # Run in background
     """
     if trace:
         enable_trace()
@@ -142,6 +175,30 @@ def spec(
         raise typer.Exit(1)
 
     config = VibeConfig.get_defaults()
+    flow_service, branch = ensure_flow_for_current_branch()
+
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "plan", "spec", "--no-async"]
+        if file:
+            cmd.extend(["--file", str(file)])
+        if msg:
+            cmd.extend(["--msg", msg])
+        if instructions:
+            cmd.append(instructions)
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+
+        async_svc.start_async_execution("planner", cmd, branch)
+        typer.echo("✓ Plan started in background")
+        typer.echo("  vibe3 flow show    # Check status")
+        return
 
     description = ""
     spec_path = None

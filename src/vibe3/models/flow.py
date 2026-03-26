@@ -16,6 +16,9 @@ class MainBranchProtectedError(Exception):
     pass
 
 
+ExecutionStatus = Literal["pending", "running", "done", "crashed"]
+
+
 class FlowState(BaseModel):
     """Flow state model."""
 
@@ -38,6 +41,12 @@ class FlowState(BaseModel):
     next_step: str | None = None
     flow_status: Literal["active", "blocked", "done", "stale", "aborted"] = "active"
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    planner_status: ExecutionStatus | None = None
+    executor_status: ExecutionStatus | None = None
+    reviewer_status: ExecutionStatus | None = None
+    execution_pid: int | None = None
+    execution_started_at: str | None = None
+    execution_completed_at: str | None = None
 
     @field_validator("flow_status", mode="before")
     @classmethod
@@ -106,6 +115,12 @@ class FlowStatusResponse(BaseModel):
     blocked_by: str | None = None
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
+    planner_status: ExecutionStatus | None = None
+    executor_status: ExecutionStatus | None = None
+    reviewer_status: ExecutionStatus | None = None
+    execution_pid: int | None = None
+    execution_started_at: str | None = None
+    execution_completed_at: str | None = None
 
 
 class CreateDecision(BaseModel):

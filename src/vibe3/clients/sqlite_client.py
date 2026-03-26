@@ -37,6 +37,12 @@ class SQLiteClient:
         "updated_at",
         "project_item_id",
         "project_node_id",
+        "planner_status",
+        "executor_status",
+        "reviewer_status",
+        "execution_pid",
+        "execution_started_at",
+        "execution_completed_at",
     }
 
     def __init__(self, db_path: str | None = None) -> None:

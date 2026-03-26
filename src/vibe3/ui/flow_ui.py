@@ -106,6 +106,33 @@ def render_flow_status(
         _kv("blocked_by", status.blocked_by, 1)
     if status.next_step:
         _kv("next_step", status.next_step, 1)
+
+    # execution status
+    execution_statuses = [
+        ("planner", status.planner_status),
+        ("executor", status.executor_status),
+        ("reviewer", status.reviewer_status),
+    ]
+    has_execution = any(s for _, s in execution_statuses)
+    if has_execution:
+        console.print("  [dim]execution:[/]")
+        for role, st in execution_statuses:
+            if st:
+                icon = {
+                    "running": "⏳",
+                    "done": "✓",
+                    "crashed": "✗",
+                    "pending": "○",
+                }.get(st, "?")
+                color = {"running": "yellow", "done": "green", "crashed": "red"}.get(
+                    st, "dim"
+                )
+                console.print(f"    [{color}]{icon} {role}: {st}[/]")
+        if status.execution_started_at:
+            _kv("started", status.execution_started_at[:19], 2)
+        if status.execution_pid:
+            _kv("pid", status.execution_pid, 2)
+
     console.print()
 
 
