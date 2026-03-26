@@ -13,6 +13,29 @@ class FlowLifecycleMixin:
 
     store: Any
 
+    def _resolve_close_target_branch(
+        self: Any,
+        branch: str,
+    ) -> tuple[str, bool]:
+        """Resolve which branch to switch to after closing a flow.
+
+        Returns:
+            Tuple of target branch and whether latest changes should be pulled.
+        """
+        store = SQLiteClient()
+        dependents = store.get_flow_dependents(branch)
+
+        if len(dependents) == 1:
+            return dependents[0], False
+
+        if len(dependents) > 1:
+            logger.warning(
+                f"Multiple flows depend on '{branch}': {', '.join(dependents)}\n"
+                f"Use 'vibe3 flow switch <branch>' to switch to the desired branch"
+            )
+
+        return "main", True
+
     def close_flow(
         self: Any,
         branch: str,
@@ -40,6 +63,30 @@ class FlowLifecycleMixin:
         if not flow_data:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
+        try:
+            target_branch, should_pull = self._resolve_close_target_branch(branch)
+        except Exception as e:
+            logger.warning(f"Failed to check dependents: {e}")
+            target_branch, should_pull = "main", True
+
+        switched_before_delete = False
+        if git.get_current_branch() == branch:
+            try:
+                git.switch_branch(target_branch)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Cannot switch away from closing branch '{branch}' "
+                    f"to '{target_branch}': {e}"
+                ) from e
+
+            switched_before_delete = True
+            logger.bind(
+                domain="flow",
+                action="close",
+                branch=branch,
+                target=target_branch,
+            ).info("Switched away from closing branch")
+
         if git.branch_exists(branch):
             git.delete_branch(branch, force=True)
 
@@ -61,53 +108,27 @@ class FlowLifecycleMixin:
             f"Flow closed, branch '{branch}' deleted",
         )
 
-        # Dependency reverse lookup: switch to dependent branch or main
+        switched_to_target = switched_before_delete
         try:
-            store = SQLiteClient()
-            dependents = store.get_flow_dependents(branch)
-
-            if len(dependents) == 1:
-                # Single dependent: auto-switch
-                dependent_branch = dependents[0]
-                git.switch_branch(dependent_branch)
+            if not switched_before_delete:
+                git.switch_branch(target_branch)
+                switched_to_target = True
                 logger.bind(
                     domain="flow",
                     action="close",
                     branch=branch,
-                    dependent=dependent_branch,
-                ).info("Switched to dependent branch")
+                    target=target_branch,
+                ).info("Switched after flow close")
 
-            elif len(dependents) > 1:
-                # Multiple dependents: warn and switch to main
-                logger.warning(
-                    f"Multiple flows depend on '{branch}': {', '.join(dependents)}\n"
-                    f"Use 'vibe3 flow switch <branch>' to switch to the desired branch"
-                )
-                git.switch_branch("main")
+            if should_pull and switched_to_target:
                 try:
                     git._run(["pull"])
-                    logger.info("Switched to main and pulled latest changes")
-                except Exception as e:
-                    logger.warning(f"Failed to pull: {e}")
-
-            else:
-                # No dependents: switch to main
-                git.switch_branch("main")
-                try:
-                    git._run(["pull"])
-                    logger.info("Switched to main and pulled latest changes")
+                    logger.info(f"Switched to {target_branch} and pulled latest changes")
                 except Exception as e:
                     logger.warning(f"Failed to pull: {e}")
 
         except Exception as e:
-            # Dependency reverse lookup failure should not block main flow
-            logger.warning(f"Failed to check dependents: {e}")
-            # Still switch to main
-            git.switch_branch("main")
-            try:
-                git._run(["pull"])
-            except Exception:
-                pass
+            logger.warning(f"Failed to switch after close: {e}")
 
     def block_flow(
         self: Any,
