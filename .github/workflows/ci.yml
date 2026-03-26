@@ -30,34 +30,6 @@ jobs:
         env:
           ENFORCE_LOC_LIMITS: true
 
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install Python dependencies
-        run: uv sync --dev
-
-      # Shell checks
-      - name: Run dual-layer lint
-        run: bash scripts/hooks/lint.sh
-
-      - name: Run bats tests
-        run: bats tests/vibe2/
-
-      # Python checks for v3
-      - name: Run Python lint (ruff)
-        run: uv run ruff check src
-
-      - name: Run Python format check (black)
-        run: uv run black --check src tests/vibe3
-
-      - name: Run Python type check (mypy)
-        run: uv run mypy src
-
-      - name: Run Python tests (pytest)
-        run: uv run pytest tests/vibe3 -v
-
-      # LOC checks — delegate to hook scripts which read limits from config/settings.yaml
-      # In CI, we ENFORCE limits (local hooks only warn)
       - name: Check Shell LOC ceiling
         run: bash scripts/hooks/check-shell-loc.sh
         env:
@@ -72,3 +44,29 @@ jobs:
         run: bash scripts/hooks/check-test-file-loc.sh
         env:
           ENFORCE_LOC_LIMITS: true
+
+      # Shell checks
+      - name: Run dual-layer lint
+        run: bash scripts/hooks/lint.sh
+
+      - name: Run bats tests
+        run: bats tests/vibe2/
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python dependencies
+        run: uv sync --dev
+
+      # Python checks for v3
+      - name: Run Python lint (ruff)
+        run: uv run ruff check src
+
+      - name: Run Python format check (black)
+        run: uv run black --check src tests/vibe3
+
+      - name: Run Python type check (mypy)
+        run: uv run mypy src
+
+      - name: Run Python tests (pytest)
+        run: uv run pytest tests/vibe3 -v

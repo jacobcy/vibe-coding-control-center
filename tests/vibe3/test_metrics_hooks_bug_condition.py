@@ -41,15 +41,14 @@ def test_bug2_check_python_loc_uses_own_logic():
 
 
 def test_bug2_check_shell_loc_uses_own_logic():
-    """Verify check-shell-loc.sh uses metrics service.
+    """Verify check-shell-loc.sh uses standalone logic.
 
     This test should PASS after refactor/split-large-files changes.
     """
     content = Path("scripts/hooks/check-shell-loc.sh").read_text()
-    # 修复后使用 shell_metrics_collector（metrics 服务的子模块）
     assert (
-        "shell_metrics_collector" in content or "metrics_service" in content
-    ), "check-shell-loc.sh should use metrics service"
+        "python3" in content and "uv run" not in content
+    ), "check-shell-loc.sh should use standalone python3 logic"
 
 
 # ---------------------------------------------------------------------------

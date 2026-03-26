@@ -66,7 +66,7 @@ def test_layer_metrics_total_ok_property(loc):
 
 
 def test_check_per_file_loc_script_unchanged():
-    """check-per-file-loc.sh 内容不变（本次修复不涉及该脚本）.
+    """check-per-file-loc.sh still enforces per-file limits without uv.
 
     **Validates: Requirements 3.3**
     """
@@ -76,6 +76,7 @@ def test_check_per_file_loc_script_unchanged():
     assert "LIMIT_MAX" in content
     assert "warnings" in content
     assert "errors" in content
+    assert "uv run" not in content
 
 
 # ---------------------------------------------------------------------------
