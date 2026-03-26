@@ -52,7 +52,9 @@ def test_record_handoff_unified_for_run_tracks_modified_files(
 ) -> None:
     artifact = Path("/tmp/run-2026-03-26T10:00:00.md")
     mock_create.return_value = ("feature/test", artifact)
-    content = """### Modified Files\n- src/foo.py: changed\n- tests/test_foo.py: added\n"""
+    content = (
+        """### Modified Files\n- src/foo.py: changed\n- tests/test_foo.py: added\n"""
+    )
 
     result = record_handoff_unified(
         HandoffRecord(
@@ -77,7 +79,9 @@ def test_record_handoff_unified_for_run_tracks_modified_files(
 
 @patch("vibe3.services.handoff_recorder_unified.persist_handoff_event")
 @patch("vibe3.services.handoff_recorder_unified.create_handoff_artifact")
-def test_record_handoff_unified_for_review_uses_audit_ref(mock_create, mock_persist) -> None:
+def test_record_handoff_unified_for_review_uses_audit_ref(
+    mock_create, mock_persist
+) -> None:
     artifact = Path("/tmp/review-2026-03-26T10:00:00.md")
     mock_create.return_value = ("feature/test", artifact)
 

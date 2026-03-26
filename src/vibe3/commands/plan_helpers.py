@@ -1,6 +1,5 @@
 """Helper functions for plan command."""
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal
 
 from loguru import logger
@@ -8,7 +7,10 @@ from loguru import logger
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.handoff_recorder_unified import HandoffRecord, record_handoff_unified
+from vibe3.services.handoff_recorder_unified import (
+    HandoffRecord,
+    record_handoff_unified,
+)
 
 if TYPE_CHECKING:
     from vibe3.models.plan import PlanRequest
@@ -65,6 +67,8 @@ def get_agent_options(
         f"  1. Configure agent_config in settings.yaml under '{section}:' section, or\n"
         f"  2. Use --agent, --backend, or --model CLI options"
     )
+
+
 def run_plan(
     request: "PlanRequest",
     config: VibeConfig,

@@ -17,9 +17,11 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
-from vibe3.models.review_runner import AgentOptions
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.handoff_recorder_unified import HandoffRecord, record_handoff_unified
+from vibe3.services.handoff_recorder_unified import (
+    HandoffRecord,
+    record_handoff_unified,
+)
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.utils.trace import enable_trace
@@ -31,6 +33,8 @@ app = typer.Typer(
     invoke_without_command=True,
     rich_markup_mode="rich",
 )
+
+
 def _run_execution(
     plan_file: str | None,
     config: VibeConfig,

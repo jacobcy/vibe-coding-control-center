@@ -84,7 +84,9 @@ def parse_review_verdict(content: str) -> str | None:
     return match.group(1).upper() if match else None
 
 
-def _build_detail(record: HandoffRecord, artifact_file: Path) -> tuple[str, dict[str, str]]:
+def _build_detail(
+    record: HandoffRecord, artifact_file: Path
+) -> tuple[str, dict[str, str]]:
     refs: dict[str, str] = {}
     detail_parts = [f"{record.kind.capitalize()} completed: {artifact_file.name}"]
 

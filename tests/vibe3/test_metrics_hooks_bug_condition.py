@@ -74,6 +74,6 @@ def test_bug3_hooks_list_shows_live_metrics(capsys):
     captured = capsys.readouterr()
 
     # This should pass when bug is fixed
-    assert str(report.shell.total_loc) in captured.out, (
-        f"hooks list should show shell LOC ({report.shell.total_loc})"
-    )
+    assert (
+        str(report.shell.total_loc) in captured.out
+    ), f"hooks list should show shell LOC ({report.shell.total_loc})"

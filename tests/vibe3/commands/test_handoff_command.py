@@ -123,7 +123,9 @@ class TestHandoffCommands:
             artifact = Path("artifact.md")
             artifact.write_text("# artifact", encoding="utf-8")
 
-            result = runner.invoke(app, ["handoff", "show", "--artifact", str(artifact)])
+            result = runner.invoke(
+                app, ["handoff", "show", "--artifact", str(artifact)]
+            )
 
         assert result.exit_code == 0
         mock_render_detail.assert_called_once()

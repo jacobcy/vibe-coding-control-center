@@ -18,10 +18,12 @@ from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.agent_execution_service import execute_agent, load_session_id
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.handoff_recorder_unified import HandoffRecord, record_handoff_unified
+from vibe3.services.handoff_recorder_unified import (
+    HandoffRecord,
+    record_handoff_unified,
+)
 from vibe3.services.label_integration import transition_to_review
-from vibe3.services.review_parser import ParsedReview, parse_codex_review
-from vibe3.services.review_runner import format_agent_actor
+from vibe3.services.review_parser import parse_codex_review
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -32,6 +34,8 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
 def _run_review(
     request: ReviewRequest,
     config: VibeConfig,

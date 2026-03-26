@@ -56,7 +56,13 @@ def build_run_context(
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
-    sections.append("## Execution Task\n\n- Execute the implementation plan\n- Make the necessary code changes\n- Ensure changes compile and pass tests\n- Output a report of changes made")
+    sections.append(
+        "## Execution Task\n\n"
+        "- Execute the implementation plan\n"
+        "- Make the necessary code changes\n"
+        "- Ensure changes compile and pass tests\n"
+        "- Output a report of changes made"
+    )
 
     # Use output_format from config or default
     if run_config and hasattr(run_config, "output_format"):
@@ -65,7 +71,8 @@ def build_run_context(
         # Default format for backward compatibility
         output_format = """## Output format requirements
 
-You MUST output a structured report in this EXACT format at the END of your response, no matter what. Do not include this section in your response until the very end.
+You MUST output a structured report in this EXACT format at the END of your response,
+no matter what. Do not include this section in your response until the very end.
 
 ## Changes Made
 ### Modified Files
