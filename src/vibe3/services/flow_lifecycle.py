@@ -125,10 +125,25 @@ class FlowLifecycleMixin:
             logger.warning(f"Failed to resolve close target: {e}")
             target_branch, should_pull = "main", True
 
+        if target_branch == "main" and git.is_branch_occupied_by_worktree(
+            target_branch
+        ):
+            target_branch = git.get_safe_main_branch_name()
+            should_pull = False
+            logger.bind(
+                domain="flow",
+                action="close",
+                branch=branch,
+                target=target_branch,
+            ).info("Main branch is occupied; switching to safe branch")
+
         switched_before_delete = False
         if git.get_current_branch() == branch:
             try:
-                git.switch_branch(target_branch)
+                if git.branch_exists(target_branch):
+                    git.switch_branch(target_branch)
+                else:
+                    git.create_branch(target_branch, start_ref="origin/main")
             except Exception as e:
                 raise RuntimeError(
                     f"Cannot switch away from closing branch '{branch}' "
@@ -143,7 +158,16 @@ class FlowLifecycleMixin:
                 target=target_branch,
             ).info("Switched away from closing branch")
 
-        if git.branch_exists(branch):
+        if git.is_branch_occupied_by_worktree(branch):
+            logger.bind(
+                domain="flow",
+                action="close",
+                branch=branch,
+            ).warning(
+                f"Branch '{branch}' is checked out in another worktree. "
+                "Skipping local branch deletion."
+            )
+        elif git.branch_exists(branch):
             git.delete_branch(branch, force=True)
 
         try:
@@ -167,7 +191,10 @@ class FlowLifecycleMixin:
         switched_to_target = switched_before_delete
         try:
             if not switched_before_delete:
-                git.switch_branch(target_branch)
+                if git.branch_exists(target_branch):
+                    git.switch_branch(target_branch)
+                else:
+                    git.create_branch(target_branch, start_ref="origin/main")
                 switched_to_target = True
                 logger.bind(
                     domain="flow",

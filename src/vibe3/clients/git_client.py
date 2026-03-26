@@ -45,6 +45,15 @@ from vibe3.clients.git_worktree_ops import (
 from vibe3.clients.git_worktree_ops import (
     get_git_common_dir as _get_git_common_dir,
 )
+from vibe3.clients.git_worktree_ops import (
+    get_safe_main_branch_name as _get_safe_main_branch_name,
+)
+from vibe3.clients.git_worktree_ops import (
+    get_worktree_root as _get_worktree_root,
+)
+from vibe3.clients.git_worktree_ops import (
+    is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
+)
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import ChangeSource
 
@@ -104,6 +113,18 @@ class GitClient:
     def get_git_common_dir(self) -> str:
         """Get the shared .git directory path (for worktrees)."""
         return _get_git_common_dir(self._run)
+
+    def get_worktree_root(self) -> str:
+        """Get the top-level path of the current worktree."""
+        return _get_worktree_root(self._run)
+
+    def get_safe_main_branch_name(self) -> str:
+        """Get the worktree-specific safe branch name."""
+        return _get_safe_main_branch_name(self._run)
+
+    def is_branch_occupied_by_worktree(self, branch_name: str) -> bool:
+        """Check whether any worktree already has this branch checked out."""
+        return _is_branch_occupied_by_worktree(self._run, branch_name)
 
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
