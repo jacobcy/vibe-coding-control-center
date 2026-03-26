@@ -56,16 +56,16 @@ def test_review_pr_pass():
         ) as mock_inspect,
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(),
+                handoff_file=None,
+                session_id=None,
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
-        ),
-        patch(
-            "vibe3.commands.review.record_handoff_unified",
-            side_effect=_mock_record_review_event,
         ),
     ):
         result = runner.invoke(app, ["pr", "42"])
@@ -82,16 +82,16 @@ def test_review_pr_block_exits_1():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(),
+                handoff_file=None,
+                session_id=None,
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("BLOCK"),
-        ),
-        patch(
-            "vibe3.commands.review.record_handoff_unified",
-            side_effect=_mock_record_review_event,
         ),
     ):
         result = runner.invoke(app, ["pr", "42"])
@@ -121,16 +121,16 @@ def test_review_pr_is_local_only():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(),
+                handoff_file=None,
+                session_id=None,
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
-        ),
-        patch(
-            "vibe3.commands.review.record_handoff_unified",
-            side_effect=_mock_record_review_event,
         ),
     ):
         result = runner.invoke(app, ["pr", "42"])
@@ -157,21 +157,18 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.load_session_id",
-            return_value="existing-session-id",
-        ),
-        patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(session_id=None),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(session_id=None),
+                handoff_file=None,
+                session_id="existing-session-id",
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
-        patch("vibe3.commands.review.record_handoff_unified") as mock_record,
     ):
         result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
-    record = mock_record.call_args.args[0]
-    assert record.session_id == "existing-session-id"

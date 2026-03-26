@@ -42,8 +42,12 @@ def test_review_base_defaults_to_origin_main():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(),
+                handoff_file=None,
+                session_id=None,
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
@@ -73,8 +77,12 @@ def test_review_base_pass():
         ),
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
-            "vibe3.commands.review.execute_agent",
-            return_value=_mock_agent_result(),
+            "vibe3.commands.review.run_execution_pipeline",
+            return_value=MagicMock(
+                agent_result=_mock_agent_result(),
+                handoff_file=None,
+                session_id=None,
+            ),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
