@@ -30,14 +30,14 @@ def test_bug1_prepush_missing_shell_loc_check():
 
 
 def test_bug2_check_python_loc_uses_own_logic():
-    """Verify check-python-loc.sh uses metrics_service.
+    """Verify check-python-loc.sh uses standalone logic.
 
     This test should PASS after refactor/split-large-files changes.
     """
     content = Path("scripts/hooks/check-python-loc.sh").read_text()
     assert (
-        "metrics_service" in content
-    ), "check-python-loc.sh should use metrics_service"
+        "python3" in content and "uv run" not in content
+    ), "check-python-loc.sh should use standalone python3 logic"
 
 
 def test_bug2_check_shell_loc_uses_own_logic():
