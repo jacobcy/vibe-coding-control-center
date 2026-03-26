@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from vibe3.models.flow import CreateDecision
 from vibe3.services.flow_service import FlowService
 
 
@@ -107,7 +106,7 @@ class TestFlowLifecycle:
         mock_git_class: MagicMock,
         mock_store: Mock,
     ) -> None:
-        """Current branch close should fail clearly when switch target is unavailable."""
+        """Branch close should fail when target missing."""
         self._build_flow_store(mock_store)
 
         mock_git = MagicMock()

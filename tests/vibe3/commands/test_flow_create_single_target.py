@@ -23,9 +23,9 @@ class TestFlowCreateSingleTarget:
         mock_service.get_current_branch.return_value = "task/active-flow"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=False,
-            reason="Current flow is active - cannot create new flow in same worktree",
+            reason="Current flow is active - cannot create new flow",
             requires_new_worktree=True,
-            guidance="Use 'vibe3 wtnew <name>' to create a new worktree for new features",
+            guidance="Use 'vibe3 wtnew <name>' to create a new worktree",
         )
         mock_service_class.return_value = mock_service
 
@@ -47,7 +47,7 @@ class TestFlowCreateSingleTarget:
         mock_service.get_current_branch.return_value = "task/blocked-flow"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
-            reason="Current flow is blocked - can create downstream flow from current branch",
+            reason="Current flow is blocked - spawn downstream",
             start_ref="task/blocked-flow",
             allow_base_current=True,
             requires_new_worktree=False,
@@ -77,7 +77,7 @@ class TestFlowCreateSingleTarget:
         mock_service.get_current_branch.return_value = "task/blocked-flow"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
-            reason="Current flow is blocked - can create downstream flow from current branch",
+            reason="Current flow is blocked - spawn downstream",
             start_ref="task/blocked-flow",
             allow_base_current=True,
             requires_new_worktree=False,
@@ -176,7 +176,9 @@ class TestFlowCreateSingleTarget:
         )
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(app, ["flow", "create", "new-feature", "--base", "current"])
+        result = runner.invoke(
+            app, ["flow", "create", "new-feature", "--base", "current"]
+        )
 
         assert result.exit_code == 1
         assert "only allowed when current flow is blocked" in result.output
