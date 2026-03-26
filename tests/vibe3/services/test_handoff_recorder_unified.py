@@ -13,7 +13,9 @@ from vibe3.services.handoff_recorder_unified import (
 
 
 def test_parse_modified_files_extracts_paths() -> None:
-    content = """# Run\n\n### Modified Files\n- src/foo.py: changed\n- tests/test_foo.py: added\n\n### Notes\nDone\n"""
+    content = """# Run\n\n### Modified Files
+- src/foo.py: changed
+- tests/test_foo.py: added\n\n### Notes\nDone\n"""
 
     assert parse_modified_files(content) == ["src/foo.py", "tests/test_foo.py"]
 
