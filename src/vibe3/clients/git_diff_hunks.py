@@ -108,7 +108,12 @@ def _get_file_diff(
                 "get_diff_hunk_ranges",
                 "PR source requires GitHubClient injection",
             )
-        full_diff = git_client._get_pr_diff_cached(source.pr_number)
+        # Get diff from cache or fetch it
+        if source.pr_number not in git_client._pr_diff_cache:
+            git_client._pr_diff_cache[source.pr_number] = (
+                git_client._github_client.get_pr_diff(source.pr_number)
+            )
+        full_diff = git_client._pr_diff_cache[source.pr_number]
         # Late import to avoid circular dependency:
         # git_diff_hunks -> git_client -> git_diff_utils -> git_diff_hunks
         from vibe3.clients.git_diff_utils import extract_file_diff
