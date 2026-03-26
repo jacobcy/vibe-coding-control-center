@@ -46,10 +46,6 @@ class StoreClientProtocol(Protocol):
         """Get issue links for branch."""
         ...
 
-    def get_active_flows(self) -> list[dict[str, Any]]:
-        """Get all active flows."""
-        ...
-
     def get_all_flows(self) -> list[dict[str, Any]]:
         """Get all flows."""
         ...

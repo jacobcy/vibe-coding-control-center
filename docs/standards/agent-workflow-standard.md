@@ -1,252 +1,418 @@
----
-document_type: standard
-title: Agent Workflow Standard
-status: active
-scope: agent-workflow-governance
-authority:
-  - agent-workflow-definition
-  - agent-workflow-boundary
-  - workflow-skill-relationship
-author: Codex GPT-5
-created: 2026-03-11
-last_updated: 2026-03-11
-related_docs:
-  - AGENTS.md
-  - CLAUDE.md
-  - .agent/README.md
-  - docs/standards/glossary.md
-  - docs/standards/action-verbs.md
-  - docs/standards/v3/skill-standard.md
-  - docs/standards/v3/skill-trigger-standard.md
-  - docs/standards/v3/command-standard.md
-  - docs/standards/v3/python-capability-design.md
+# Agent 工作流规范
+
+> **文档定位**：定义如何使用 AI Agent（通过 `vibe3 run`）执行开发任务
+> **适用范围**：所有需要 AI 辅助的开发工作
+> **权威性**：本标准为 agent 工作流的权威依据
+
 ---
 
-# Agent Workflow Standard
+## 概述
 
-本文档只定义 `.agent/workflows/*.md` 的治理边界。
+Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 执行开发任务。Agent 工作流适用于：
 
-本文所说的 `agent workflow`：
+- 代码实现（根据 plan 执行）
+- Bug 修复
+- 代码重构
+- 测试编写
+- 文档生成
 
-- 是面向执行代理的流程文件
-- 是 slash / command 风格入口的语义文档
-- 是 workflow 层的编排入口
+---
 
-本文**不**定义以下对象：
+## 一、前置条件
 
-- GitHub Actions workflow
-- GitHub Project workflow
-- 项目交付流程的全部业务真源
-- shell 命令能力本身
+### 1.1 环境要求
 
-若出现这些概念冲突，以 `docs/standards/glossary.md` 为准。
+- ✅ `codeagent-wrapper` 已安装（位于 `~/.claude/bin/codeagent-wrapper`）
+- ✅ 已配置 API keys（Claude API 或其他）
+- ✅ 已配置 `config/settings.yaml` 中的 `run.agent_config`
 
-## 1. 定义
+### 1.2 配置文件
 
-### 1.1 `agent workflow`
+**settings.yaml 配置示例**：
+```yaml
+run:
+  policy_file: ".agent/rules/run-policy.md"
+  common_rules: ".agent/rules/common.md"
+  agent_config:
+    agent: "develop"  # 默认 agent preset
+    timeout_seconds: 600  # 默认超时（秒）
+```
 
-- 正式术语：`agent workflow`
-- 定义：位于 `.agent/workflows/` 的入口型流程文件，用于告诉执行代理：
-  - 这个入口在处理什么对象
-  - 应该委托哪个 skill / shell
-  - 何时停止
-  - 何时切到下一个入口
+**Agent Presets**：
+- `develop`: 通用开发 agent（推荐）
+- `code-reviewer`: 代码审查 agent
+- `planner`: 规划 agent
+- 其他自定义 presets（见 `~/.codeagent/models.json`）
 
-边界：
+---
 
-- `agent workflow` 不是 shell 命令
-- `agent workflow` 不是 skill
-- `agent workflow` 不是 GitHub workflow
-- `agent workflow` 不是 roadmap / project / release 的业务对象
+## 二、工作流程
 
-### 1.2 `workflow entry`
+### 2.1 标准流程
 
-- 定义：用户触发的入口名，例如 `/vibe-new`
-- 作用：把自然语言或 slash 请求路由到对应的 workflow 文档
+```
+Plan → Run → Review → Commit
+```
 
-### 1.3 `alias workflow`
+**Step 1: 创建 Plan**
 
-- 定义：不拥有独立业务逻辑，只是把一个历史入口或兼容入口转发到另一条 workflow / skill 路径的薄入口
-- 例子：
-  - 历史入口保留
-  - 兼容别名
-  - 更窄场景下的快捷入口
+```bash
+# 从 issue 创建 plan
+vibe3 plan task <issue_number>
 
-`alias workflow` 可以没有同名 skill。
+# 从 spec 文件创建 plan
+vibe3 plan spec --file spec.md
 
-### 1.4 `standalone orchestration workflow`
+# 从 spec message 创建 plan
+vibe3 plan spec --msg "Add dark mode support"
+```
 
-- 定义：只做编排、路由、提示和停点判断的 workflow，本身不要求有同名 skill
-- 使用场景：
-  - 它只是一个 alias
-  - 它只是把用户引导到已有 skill / shell 组合
-  - 它本身没有独立业务逻辑真源
+**Step 2: 执行 Plan（使用 Agent）**
 
-### 1.5 `skill-backed workflow`
+```bash
+# 使用现有 plan 执行
+vibe3 run --plan
 
-- 定义：主要职责是把用户入口委托给某个现有 skill 的 workflow
-- 典型结构：
-  - 说明入口对象
-  - 委托同名或非同名 skill
-  - 说明停点与下一步
+# 使用自定义 instructions 执行
+vibe3 run --instructions "Focus on test coverage"
 
-`skill-backed workflow` 可以委托同名 skill，也可以委托不同名 skill；重点是职责清晰，不是名字必须一一对应。
+# 使用指定 agent 执行
+vibe3 run --agent planner-pro --plan
+```
 
-## 2. 核心边界
+**Step 3: 审查结果**
 
-### 2.1 workflow 只负责什么
+```bash
+# 查看 handoff 记录
+vibe3 handoff show
 
-`agent workflow` 只允许承载以下内容：
+# 查看 agent 做了哪些修改
+git status
+git diff
 
-1. 入口语义
-2. 对象边界的最小提示
-3. 流程阶段顺序
-4. 委托关系
-5. 停止点
-6. 下一步入口建议
+# 运行测试验证
+uv run pytest tests/vibe3
+```
 
-例如：
+**Step 4: 提交或调整**
 
-- 可以提示“先去收集 review evidence，再进入 `vibe flow done`”
-- 可以说明某个入口是 `skill-backed workflow`
-- 但不能在 workflow 内重写 review evidence 的判定规则
+```bash
+# 如果结果满意，提交
+git add -A
+git commit -m "feat: implement dark mode"
 
-### 2.2 workflow 不负责什么
+# 如果需要调整，继续开发或重新运行
+vibe3 run --plan  # 恢复 session 继续工作
+```
 
-`agent workflow` 不应承载：
+---
 
-1. 长篇业务判断树
-2. 具体 shell 修复策略
-3. 复杂 blocker 分类
-4. 详细 fallback 逻辑
-5. 共享状态写入细节
-6. 对标准文件的第二套重定义
+### 2.2 Agent Session 管理
 
-一句话：
+**Session 持久化**：
+- Agent 执行会创建 session（存储在 `~/.codeagent/sessions/`）
+- Session ID 自动记录到 flow 的 `executor_session_id` 字段
+- 可以通过 `vibe3 run --plan` 恢复之前的 session
 
-- workflow 只负责编排，不承载复杂业务逻辑
-- 例如是否已有 review evidence、何时允许 `vibe flow done`，应由 skill / shell 真源判定
+**查看 Session**：
+```bash
+# Handoff 显示 session 信息
+vibe3 handoff show
 
-这些内容应分别下沉到：
+# 查看当前 flow 状态
+vibe3 flow status
+```
 
-- `skills/*/SKILL.md`
-- `bin/vibe` / `lib/*`
-- `docs/standards/*.md`
+**清理 Session**：
+```bash
+# Agent 会自动管理 session 生命周期
+# 也可以手动清理旧日志
+codeagent-wrapper cleanup
+```
 
-### 2.3 workflow 与 skill 的关系
+---
 
-必须明确以下几点：
+## 三、使用场景
 
-1. 不是每个 workflow 都必须有同名 skill。
-2. 只要 workflow 本身仍然是薄入口，它可以：
-   - 委托同名 skill
-   - 委托不同名 skill
-   - 委托 shell 命令组合
-   - 充当 alias workflow
-3. 只有当 workflow 本身承载了独立业务逻辑时，才需要：
-   - 下沉到 skill
-   - 或拆成更薄的 workflow
+### 3.1 新功能开发
 
-一句话：
+**推荐流程**：
+```bash
+# 1. 创建 flow
+vibe3 flow new feature/api-v2
 
-- `是否必须有同名 skill` 不是治理标准
-- `workflow 是否越界承载业务逻辑` 才是治理标准
+# 2. 绑定 task issue
+vibe3 issue bind <issue_number>
 
-## 3. 命名与命名空间
+# 3. 创建 plan
+vibe3 plan task
 
-### 3.1 workflow 命名
+# 4. 执行 plan（agent 实现）
+vibe3 run --plan
 
-推荐规则：
+# 5. 验证结果
+uv run pytest tests/vibe3
+vibe3 inspect base origin/main  # 查看改动影响
 
-- workflow frontmatter `name` 使用 `vibe:*`
-- skill `name` 使用 `vibe-*`
+# 6. 创建 PR
+vibe3 pr create
+```
 
-这条规则的目标是快速区分层级，而不是强制一一映射。
+---
 
-### 3.2 允许的偏差
+### 3.2 Bug 修复
 
-以下情况允许短期存在：
+**推荐流程**：
+```bash
+# 1. 创建 flow
+vibe3 flow new fix/login-bug
 
-- 历史 workflow 还未迁移到 `vibe:*`
-- alias workflow 保留历史名字
-- slash 入口名与 workflow frontmatter 名不完全一致，但文案必须说明关系
+# 2. 绑定 bug issue
+vibe3 issue bind <bug_issue_number>
 
-### 3.3 不允许的歧义
+# 3. 使用 instructions 直接描述问题
+vibe3 run --instructions "Fix the login timeout bug in auth.py"
 
-以下情况属于高风险歧义：
+# 4. 验证修复
+uv run pytest tests/vibe3/services/test_auth.py
 
-1. 把 workflow 写成 GitHub workflow
-2. 把 workflow 写成 roadmap / feature / release 对象
-3. 把 workflow 写成 shell 命令真源
-4. 把 `flow`、`workflow`、`worktree` 混成同一概念
-5. 在 workflow 中重新定义 `repo issue`、`roadmap item`、`task`、`flow`、`pr`
+# 5. 提交修复
+git commit -am "fix: resolve login timeout issue"
+```
 
-## 4. 分类规则
+---
 
-每个 `.agent/workflows/*.md` 至少应能被归入以下三类之一：
+### 3.3 代码重构
 
-### A. Skill-backed workflow
+**推荐流程**：
+```bash
+# 1. 创建 flow
+vibe3 flow new refactor/split-large-file
 
-判定信号：
+# 2. 创建 plan（重构需要详细规划）
+vibe3 plan spec --file refactor_plan.md
 
-- 主要目标是把用户入口委托给 skill
-- 结果解释依赖 skill 输出
-- workflow 本身不承载复杂判断
+# 3. 执行 plan
+vibe3 run --plan
 
-### B. Alias workflow
+# 4. 验证重构不影响功能
+uv run pytest tests/vibe3
+uv run mypy src/vibe3
 
-判定信号：
+# 5. 提交重构
+git commit -am "refactor: split large file into smaller modules"
+```
 
-- 只是兼容入口或快捷入口
-- 实质上把用户导向已有 workflow / skill / shell 路径
-- 不拥有独立真源逻辑
+---
 
-### C. Standalone orchestration workflow
+## 四、最佳实践
 
-判定信号：
+### 4.1 Prompt 编写
 
-- 本身只做流程编排
-- 可以串联多个 workflow / skill / shell
-- 但不应承载复杂业务判断
+**好的 Prompt**：
+```markdown
+# Task: Implement User Authentication
 
-若一个 workflow 无法归入以上任一类，通常说明它语义失控，需要重构。
+## Context
+- Current codebase uses session-based auth
+- Need to migrate to JWT-based auth
+- Must maintain backward compatibility
 
-## 5. 验收标准
+## Requirements
+1. Add JWT token generation
+2. Add JWT validation middleware
+3. Update existing endpoints to use JWT
+4. Add tests for new functionality
 
-检查一个 `agent workflow` 是否合格时，按以下顺序判断：
+## Constraints
+- Do NOT change the public API
+- Maintain existing test coverage
+- Follow existing code patterns
+```
 
-1. 它是否清楚说明自己是 agent workflow，而不是 GitHub / project workflow？
-2. 它是否能被归类为：
-   - skill-backed workflow
-   - alias workflow
-   - standalone orchestration workflow
-3. 它是否只保留入口、委托、停点和下一步？
-4. 它是否避免重写标准文件中的对象定义？
-5. 它是否避免把 shell 能力写成文案假能力？
-6. 若它没有同名 skill，这是否能用 alias / orchestration 角色解释？
+**避免的写法**：
+```markdown
+Fix the auth thing
+```
 
-只要 1-6 都成立，就视为合格。
+**Prompt 要素**：
+- ✅ 明确的任务目标
+- ✅ 足够的上下文
+- ✅ 具体的要求
+- ✅ 清晰的约束条件
+- ❌ 模糊的描述
+- ❌ 缺少上下文
 
-## 6. 审计输出格式
+---
 
-用本标准审查 `.agent/workflows/` 时，结论至少分成四类：
+### 4.2 Agent 选择
 
-- `Compliant`
-  - 已符合 agent workflow 标准
-- `Needs Rename`
-  - 主要问题是命名空间或入口名不清
-- `Needs Thinning`
-  - 主要问题是 workflow 过厚，承载了业务逻辑
-- `Needs Reclassification`
-  - 主要问题是文件身份不清，需明确它到底是 skill-backed、alias 还是 standalone orchestration
+**默认 Agent**：
+- `develop`: 通用开发任务（推荐）
 
-## 7. 变更检查清单
+**专用 Agents**：
+- `planner`: 架构设计、技术方案
+- `code-reviewer`: 代码审查、质量检查
+- `test-writer`: 测试用例编写
 
-修改或新增 `.agent/workflows/*.md` 时，逐项确认：
+**高级配置**：
+```bash
+# 使用 planner-pro（更强的规划能力）
+vibe3 run --agent planner-pro --plan
 
-1. 是否明确这是 agent workflow，而不是 GitHub / project workflow？
-2. 是否说明它属于哪一类 workflow？
-3. 是否只保留最小必要对象边界，而没有重写标准定义？
-4. 是否把复杂逻辑留在 skill / shell / standard 中？
-5. 如果没有同名 skill，是否已能清楚归类为 alias 或 standalone orchestration？
-6. 是否避免把 `flow`、`workflow`、`worktree` 混写？
+# 使用特定 backend 和 model
+vibe3 run --backend claude --model claude-sonnet-4-6 --plan
+```
+
+---
+
+### 4.3 Timeout 管理
+
+**默认超时**：600 秒（10 分钟）
+
+**调整超时**：
+```bash
+# 短任务（bug fix）
+vibe3 run --instructions "Fix typo" --timeout 300
+
+# 长任务（大型重构）
+vibe3 run --plan --timeout 1800  # 30 分钟
+```
+
+**超时处理**：
+- Agent 会在超时前保存进度
+- Session 仍然可用，可以恢复继续
+- 检查 handoff 记录了解已完成的工作
+
+---
+
+### 4.4 错误处理
+
+**常见错误**：
+
+1. **codeagent-wrapper not found**
+   ```bash
+   # 检查安装
+   which codeagent-wrapper
+   # 应该输出: /Users/<user>/.claude/bin/codeagent-wrapper
+   ```
+
+2. **API Key 未配置**
+   ```bash
+   # 检查环境变量
+   echo $ANTHROPIC_API_KEY
+
+   # 或配置在 ~/.codeagent/config.yaml
+   ```
+
+3. **Permission denied**
+   ```bash
+   # 使用 --skip-permissions（谨慎使用）
+   vibe3 run --plan --skip-permissions
+   ```
+
+4. **Timeout**
+   ```bash
+   # 增加超时时间
+   vibe3 run --plan --timeout 1800
+   ```
+
+---
+
+## 五、质量控制
+
+### 5.1 执行前检查
+
+- ✅ Plan 是否清晰完整
+- ✅ 是否有足够的上下文
+- ✅ 是否指定了正确的 agent
+- ✅ 是否设置了合理的 timeout
+
+### 5.2 执行后验证
+
+- ✅ 查看 handoff 记录，了解 agent 完成了什么
+- ✅ 检查代码修改，确认符合预期
+- ✅ 运行测试，确保功能正确
+- ✅ 运行类型检查和 lint
+
+### 5.3 审查要点
+
+**代码质量**：
+- 是否符合代码规范
+- 是否有足够的测试
+- 是否有清晰的注释
+- 是否处理了错误情况
+
+**安全性**：
+- 是否有潜在的安全漏洞
+- 是否正确处理了用户输入
+- 是否有敏感信息泄露
+
+**性能**：
+- 是否有性能问题
+- 是否有内存泄漏
+- 是否有并发问题
+
+---
+
+## 六、限制与注意事项
+
+### 6.1 当前限制
+
+- Agent 在正确的项目目录执行（通过 `cwd` 参数）
+- Session 自动持久化到 flow
+- Agent 只操作当前 worktree（不会跨 worktree）
+
+### 6.2 安全考虑
+
+**禁止操作**：
+- ❌ 不要让 agent 操作生产环境配置
+- ❌ 不要让 agent 提交到 main 分支
+- ❌ 不要让 agent 推送 force
+
+**推荐做法**：
+- ✅ 在 feature branch 上使用 agent
+- ✅ 审查 agent 的所有修改
+- ✅ 运行完整测试套件验证
+
+---
+
+## 七、故障排查
+
+### 7.1 Agent 无响应
+
+**检查步骤**：
+1. 检查 API key 是否正确
+2. 检查网络连接
+3. 检查 agent logs（`~/.codeagent/logs/`）
+4. 尝试减少任务复杂度
+
+### 7.2 Agent 超时
+
+**解决方案**：
+1. 增加 timeout 参数
+2. 拆分任务为更小的子任务
+3. 使用 session 恢复继续执行
+
+### 7.3 代码质量不佳
+
+**改进方法**：
+1. 提供更详细的 prompt
+2. 使用更强大的 agent（如 `planner-pro`）
+3. 提供更多上下文信息
+4. 使用 `--instructions` 添加具体要求
+
+---
+
+## 八、参考文档
+
+- [SOUL.md](../../SOUL.md) - 项目宪法
+- [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
+- [error-handling.md](./error-handling.md) - 错误处理规范
+- [.agent/rules/run-policy.md](../.agent/rules/run-policy.md) - Run 命令策略
+
+---
+
+**文档版本**：v1.0
+**最后更新**：2026-03-25
+**维护者**：Vibe Center Team

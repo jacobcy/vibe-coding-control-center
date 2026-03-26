@@ -1,173 +1,121 @@
-"""Unified execution pipeline for agent workflows.
+"""Shared execution pipeline usecase for plan/run/review workflows.
 
-This module provides a unified interface for executing agents with
-automatic artifact persistence and event recording.
+Encapsulates the common orchestration logic for agent execution flows,
+removing duplication across command layers and enforcing consistent
+session handling, execution, and handoff recording.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable, Literal
 
 from loguru import logger
+from typer import echo
 
-from vibe3.clients.git_client import GitClient
-from vibe3.models.agent_execution import AgentExecutionRequest
-from vibe3.models.review_runner import ReviewAgentOptions
-from vibe3.services.agent_execution_service import execute_agent
-from vibe3.services.handoff_event_service import (
-    create_handoff_artifact,
-    persist_handoff_event,
+from vibe3.models.review_runner import AgentOptions, AgentResult
+from vibe3.services.agent_execution_service import execute_agent, load_session_id
+from vibe3.services.handoff_recorder_unified import (
+    HandoffRecord,
+    record_handoff_unified,
 )
-from vibe3.services.handoff_service import HandoffService
+
+SessionRole = Literal["planner", "executor", "reviewer"]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ExecutionRequest:
-    """Unified execution request.
+    """Request payload for execution pipeline."""
 
-    Attributes:
-        prompt_content: Prompt content to execute
-        options: Agent options (agent/backend/model)
-        artifact_prefix: Prefix for artifact file (e.g., "plan", "run")
-        event_type: Event type for recording (e.g., "handoff_plan")
-        actor: Actor name (e.g., "planner", "executor")
-        task: Optional task override
-        dry_run: Whether this is a dry run
-        session_id: Optional session ID for continuation
-        refs: Optional additional references for event
-        flow_state_updates: Optional flow state updates
-    """
-
-    prompt_content: str
-    options: ReviewAgentOptions
-    artifact_prefix: str
-    event_type: str
-    actor: str
+    role: SessionRole
+    context_builder: Callable[[], str]
+    options_builder: Callable[[], AgentOptions]
     task: str | None = None
     dry_run: bool = False
-    session_id: str | None = None
-    refs: dict[str, str] | None = None
-    flow_state_updates: dict[str, object] | None = None
+    handoff_kind: str = "run"
+    handoff_metadata: dict[str, Any] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class ExecutionResult:
-    """Unified execution result.
+    """Result of execution pipeline."""
 
-    Attributes:
-        success: Whether execution succeeded
-        session_id: Session ID for continuation
-        artifact_path: Path to created artifact (if any)
-        stdout: Execution output
-        stderr: Execution errors
-    """
-
-    success: bool
+    agent_result: AgentResult
+    handoff_file: Path | None
     session_id: str | None
-    artifact_path: Path | None
-    stdout: str
-    stderr: str
 
 
-class ExecutionPipeline:
-    """Unified execution pipeline.
+def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
+    """Run the full agent execution pipeline.
 
-    This class provides a single entry point for:
-    1. Agent execution
-    2. Artifact persistence
-    3. Event recording
+    Handles:
+    1. Session ID loading
+    2. Context building
+    3. Agent execution
+    4. Handoff recording (if not dry_run)
 
-    It coordinates between agent execution service, handoff service,
-    and git client to provide a unified workflow.
+    Args:
+        request: Execution configuration
+
+    Returns:
+        ExecutionResult with agent output, handoff path, and effective session ID
     """
+    log = logger.bind(
+        domain="execution_pipeline",
+        role=request.role,
+        handoff_kind=request.handoff_kind,
+    )
 
-    def __init__(
-        self,
-        git_client: GitClient | None = None,
-        handoff_service: HandoffService | None = None,
-    ):
-        """Initialize pipeline with dependencies.
+    # Load existing session
+    session_id = load_session_id(request.role)
+    log.debug("Loaded session", session_id=session_id)
 
-        Args:
-            git_client: Git client for branch context
-            handoff_service: Handoff service for directory management
-        """
-        self.git_client = git_client or GitClient()
-        self.handoff_service = handoff_service or HandoffService()
+    # Build execution context
+    log.info("Building execution context")
+    prompt_content = request.context_builder()
 
-    def execute(self, request: ExecutionRequest) -> ExecutionResult:
-        """Execute unified pipeline.
+    # Build agent options
+    options = request.options_builder()
+    log.info(
+        "Running agent",
+        agent=options.agent,
+        backend=options.backend,
+        model=options.model,
+        session_id=session_id,
+    )
+    echo(f"-> Executing with {options.agent or options.backend}...")
 
-        This is the main entry point that coordinates:
-        1. Agent execution
-        2. Artifact persistence
-        3. Event recording
+    # Execute agent
+    result = execute_agent(
+        options,
+        prompt_content,
+        task=request.task,
+        dry_run=request.dry_run,
+        session_id=session_id,
+    )
 
-        Args:
-            request: Execution request
-
-        Returns:
-            Execution result with artifact and session info
-        """
-        log = logger.bind(
-            domain="execution_pipeline",
-            actor=request.actor,
-            event_type=request.event_type,
-        )
-
-        log.info("Starting execution pipeline")
-
-        # Step 1: Execute agent
-        agent_request = AgentExecutionRequest(
-            prompt_file_content=request.prompt_content,
-            options=request.options,
-            task=request.task,
-            dry_run=request.dry_run,
-            session_id=request.session_id,
-        )
-
-        outcome = execute_agent(agent_request)
-
-        success = outcome.result.exit_code == 0
-        log.info(
-            "Agent execution completed",
-            success=success,
-            session_id=outcome.effective_session_id,
-        )
-
-        # Step 2: Persist artifact (if not dry run)
-        artifact_path = None
-        if not request.dry_run and outcome.result.stdout:
-            artifact_result = create_handoff_artifact(
-                request.artifact_prefix, outcome.result.stdout
-            )
-            if artifact_result:
-                _, artifact_path = artifact_result
-                log.info("Artifact persisted", path=str(artifact_path))
-
-        # Step 3: Record event (always, even on failure)
-        if not request.dry_run:
-            refs = request.refs or {}
-            if artifact_path:
-                refs["ref"] = str(artifact_path)
-            if outcome.effective_session_id:
-                refs["session_id"] = outcome.effective_session_id
-
-            branch = self.git_client.get_current_branch()
-            persist_handoff_event(
-                branch=branch,
-                event_type=request.event_type,
-                actor=request.actor,
-                detail=f"{request.artifact_prefix.capitalize()} completed",
-                refs=refs,
-                flow_state_updates=request.flow_state_updates,
-            )
-
-            log.info("Event recorded", branch=branch)
-
+    if request.dry_run:
         return ExecutionResult(
-            success=success,
-            session_id=outcome.effective_session_id,
-            artifact_path=artifact_path,
-            stdout=outcome.result.stdout,
-            stderr=outcome.result.stderr,
+            agent_result=result,
+            handoff_file=None,
+            session_id=result.session_id or session_id,
         )
+
+    # Record handoff
+    effective_session_id = result.session_id or session_id
+    handoff_file = record_handoff_unified(
+        HandoffRecord(
+            kind=request.handoff_kind,  # type: ignore[arg-type]
+            content=result.stdout,
+            options=options,
+            session_id=effective_session_id,
+            metadata=request.handoff_metadata,
+        )
+    )
+    if handoff_file:
+        echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
+
+    return ExecutionResult(
+        agent_result=result,
+        handoff_file=handoff_file,
+        session_id=effective_session_id,
+    )

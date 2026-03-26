@@ -227,27 +227,3 @@ class GitHubProjectClient(GitHubClientBase, ProjectQueryMixin, ProjectMutationMi
             assignees=assignees,
             partial=not bool(title),
         )
-
-    def format_project_item(
-        self,
-        item: ProjectItemData,
-        bound_item_id: str | None = None,
-    ) -> str:
-        """格式化 ProjectItemData 为人类可读文本。"""
-        lines = []
-        bind_status = "[bound]" if bound_item_id else "[unbound]"
-        lines.append(f"Project Item {bind_status}: {item.item_id}")
-        if item.title:
-            lines.append(f"  [remote] title:    {item.title}")
-        if item.status:
-            lines.append(f"  [remote] status:   {item.status}")
-        if item.priority:
-            lines.append(f"  [remote] priority: {item.priority}")
-        if item.assignees:
-            lines.append(f"  [remote] assignees: {', '.join(item.assignees)}")
-        if item.body:
-            preview = item.body[:120].replace("\n", " ")
-            lines.append(f"  [remote] body:     {preview}...")
-        if item.partial:
-            lines.append("  [partial] 部分字段缺失，数据不完整")
-        return "\n".join(lines)

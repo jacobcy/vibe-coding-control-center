@@ -7,11 +7,17 @@ import typer
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.command_options import (
+    _AGENT_OPT,
+    _BACKEND_OPT,
+    _DRY_RUN_OPT,
+    _MODEL_OPT,
+    _TRACE_OPT,
+    ensure_flow_for_current_branch,
+)
 from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
-from vibe3.models.flow import MainBranchProtectedError
 from vibe3.models.plan import PlanRequest, PlanScope
-from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.utils.trace import enable_trace
@@ -22,26 +28,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-_TRACE_OPT = Annotated[
-    bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
-]
-_DRY_RUN_OPT = Annotated[
-    bool,
-    typer.Option("--dry-run", help="Print command and prompt without executing"),
-]
-_AGENT_OPT = Annotated[
-    Optional[str],
-    typer.Option("--agent", help="Override agent preset (e.g., planner, planner-pro)"),
-]
-_BACKEND_OPT = Annotated[
-    Optional[str],
-    typer.Option("--backend", help="Override backend (claude, codex)"),
-]
-_MODEL_OPT = Annotated[
-    Optional[str],
-    typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
-]
 
 
 @app.command()
@@ -75,16 +61,7 @@ def task(
         enable_trace()
 
     config = VibeConfig.get_defaults()
-    git = GitClient()
-    branch = git.get_current_branch()
-
-    # Auto-ensure flow for non-main branches
-    flow_service = FlowService()
-    try:
-        flow_service.ensure_flow_for_branch(branch)
-    except MainBranchProtectedError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
+    flow_service, branch = ensure_flow_for_current_branch()
 
     if issue is None:
         flow = flow_service.get_flow_status(branch)

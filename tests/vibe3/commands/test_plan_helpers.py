@@ -43,7 +43,6 @@ def test_get_agent_options_uses_run_section_with_backend_model() -> None:
         backend=None,
         model=None,
         section="run",
-        default_agent="executor",
     )
 
     assert options.agent is None
@@ -51,8 +50,8 @@ def test_get_agent_options_uses_run_section_with_backend_model() -> None:
     assert options.model == "gpt-5.3"
 
 
-def test_get_agent_options_run_section_falls_back_to_executor() -> None:
-    config = _make_config()
+def test_get_agent_options_run_section_uses_agent_preset() -> None:
+    config = _make_config(run_agent="executor")
 
     options = get_agent_options(
         config,
@@ -60,7 +59,6 @@ def test_get_agent_options_run_section_falls_back_to_executor() -> None:
         backend=None,
         model=None,
         section="run",
-        default_agent="executor",
     )
 
     assert options.agent == "executor"
@@ -77,7 +75,6 @@ def test_get_agent_options_cli_agent_override_has_highest_priority() -> None:
         backend="codex",
         model="gpt-5.3",
         section="plan",
-        default_agent="planner",
     )
 
     assert options.agent == "planner-pro"
@@ -95,5 +92,17 @@ def test_get_agent_options_rejects_invalid_section() -> None:
             backend=None,
             model=None,
             section="invalid",  # type: ignore[arg-type]
-            default_agent="planner",
+        )
+
+
+def test_get_agent_options_raises_when_no_config() -> None:
+    config = _make_config()
+
+    with pytest.raises(ValueError, match="No agent configuration found"):
+        get_agent_options(
+            config,
+            agent=None,
+            backend=None,
+            model=None,
+            section="run",
         )

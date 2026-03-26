@@ -99,14 +99,6 @@ class CodeLimitsConfig(BaseModel):
     test_paths: TestPathsConfig = Field(default_factory=TestPathsConfig)
 
 
-class TestFileLimitsConfig(BaseModel):
-    """Per-layer test file line limits."""
-
-    services: int = Field(default=500)
-    clients: int = Field(default=500)
-    commands: int = Field(default=300)
-
-
 class ReviewScopeConfig(BaseModel):
     """Review scope configuration."""
 

@@ -10,8 +10,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.review import app
-from vibe3.models.agent_execution import AgentExecutionOutcome
-from vibe3.services.review_runner import ReviewAgentResult
+from vibe3.models.review_runner import AgentResult
 
 runner = CliRunner()
 
@@ -23,15 +22,10 @@ def _mock_review(verdict: str = "PASS"):
     return m
 
 
-def _mock_agent_result(stdout: str = "## Review\nLooks good."):
-    return ReviewAgentResult(exit_code=0, stdout=stdout, stderr="")
-
-
-def _mock_execution_outcome(session_id: str | None = None) -> AgentExecutionOutcome:
-    return AgentExecutionOutcome(
-        result=_mock_agent_result(),
-        effective_session_id=session_id,
-    )
+def _mock_agent_result(
+    stdout: str = "## Review\nLooks good.", session_id: str | None = None
+):
+    return AgentResult(exit_code=0, stdout=stdout, stderr="", session_id=session_id)
 
 
 def _mock_inspect_data():
@@ -42,8 +36,8 @@ def _mock_inspect_data():
     }
 
 
-def _mock_record_review_event(review, actor, review_content=None, session_id=None):
-    """Mock _record_review_event to avoid writing to real handoff directory."""
+def _mock_record_review_event(record):
+    """Mock unified recorder to avoid writing to real handoff directory."""
     return Path("/tmp/mock-review.md")
 
 
@@ -63,14 +57,14 @@ def test_review_pr_pass():
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.execute_agent",
-            return_value=_mock_execution_outcome(),
+            return_value=_mock_agent_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.commands.review._record_review_event",
+            "vibe3.commands.review.record_handoff_unified",
             side_effect=_mock_record_review_event,
         ),
     ):
@@ -89,14 +83,14 @@ def test_review_pr_block_exits_1():
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.execute_agent",
-            return_value=_mock_execution_outcome(),
+            return_value=_mock_agent_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("BLOCK"),
         ),
         patch(
-            "vibe3.commands.review._record_review_event",
+            "vibe3.commands.review.record_handoff_unified",
             side_effect=_mock_record_review_event,
         ),
     ):
@@ -128,14 +122,14 @@ def test_review_pr_is_local_only():
         patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.execute_agent",
-            return_value=_mock_execution_outcome(),
+            return_value=_mock_agent_result(),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.commands.review._record_review_event",
+            "vibe3.commands.review.record_handoff_unified",
             side_effect=_mock_record_review_event,
         ),
     ):
@@ -168,15 +162,16 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
         ),
         patch(
             "vibe3.commands.review.execute_agent",
-            return_value=_mock_execution_outcome("existing-session-id"),
+            return_value=_mock_agent_result(session_id=None),
         ),
         patch(
             "vibe3.commands.review.parse_codex_review",
             return_value=_mock_review("PASS"),
         ),
-        patch("vibe3.commands.review._record_review_event") as mock_record,
+        patch("vibe3.commands.review.record_handoff_unified") as mock_record,
     ):
         result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
-    assert mock_record.call_args.kwargs["session_id"] == "existing-session-id"
+    record = mock_record.call_args.args[0]
+    assert record.session_id == "existing-session-id"

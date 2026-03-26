@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services.review_runner import ReviewAgentOptions
+from vibe3.services.review_runner import AgentOptions
 
 
 class StateTrigger(BaseModel):
@@ -48,8 +48,8 @@ class MasterAgentConfig(BaseModel):
     model: str | None = None
     timeout_seconds: int = 300
 
-    def to_agent_options(self) -> ReviewAgentOptions:
-        return ReviewAgentOptions(
+    def to_agent_options(self) -> AgentOptions:
+        return AgentOptions(
             agent=self.agent,
             backend=self.backend,
             model=self.model,

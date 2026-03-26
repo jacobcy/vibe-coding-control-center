@@ -126,10 +126,11 @@ def run_command(
     ] = None,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
+    # Handle deprecated --file option
+    resolved_plan = plan or file
     run.run_command(
         instructions,
-        plan,
-        file,
+        resolved_plan,
         skill,
         trace,
         dry_run,
@@ -184,9 +185,9 @@ def main() -> None:
             logger.info("Please check your input and try again")
         sys.exit(1)
 
-    except SystemError:
-        # System error: show details
-        logger.exception("System error occurred")
+    except SystemError as e:
+        # System error: concise fail-fast message without traceback noise
+        logger.error(e.message)
         sys.exit(2)
 
     except KeyboardInterrupt:

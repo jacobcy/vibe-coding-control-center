@@ -48,7 +48,6 @@ def mock_store(flow_state_data):
     """Mock Vibe3Store with pre-configured responses."""
     store = Mock()
     store.get_flow_state.return_value = flow_state_data
-    store.get_active_flows.return_value = []
     return store
 
 

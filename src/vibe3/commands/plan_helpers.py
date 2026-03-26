@@ -1,22 +1,12 @@
 """Helper functions for plan command."""
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal
 
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
-from vibe3.models.agent_execution import AgentExecutionRequest
-from vibe3.models.review_runner import ReviewAgentOptions
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
-from vibe3.services.handoff_event_service import (
-    create_handoff_artifact,
-    persist_handoff_event,
-)
-from vibe3.services.review_runner import (
-    format_agent_actor,
-    resolve_actor_backend_model,
-)
+from vibe3.models.review_runner import AgentOptions
+from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 
 if TYPE_CHECKING:
     from vibe3.models.plan import PlanRequest
@@ -28,8 +18,7 @@ def get_agent_options(
     backend: str | None,
     model: str | None,
     section: Literal["plan", "run"] = "plan",
-    default_agent: str = "planner",
-) -> ReviewAgentOptions:
+) -> AgentOptions:
     """Build agent options with CLI override support.
 
     Priority:
@@ -53,83 +42,27 @@ def get_agent_options(
 
     # CLI --agent takes precedence over everything
     if agent:
-        return ReviewAgentOptions(agent=agent, backend=None, model=None)
+        return AgentOptions(agent=agent, backend=None, model=None)
 
     # CLI --backend takes precedence over config
     if backend:
-        return ReviewAgentOptions(
-            agent=None, backend=backend, model=model or config_model
-        )
+        return AgentOptions(agent=None, backend=backend, model=model or config_model)
 
-    # Use config values
+    # Use config agent preset if available (preferred over backend/model)
+    if config_agent:
+        return AgentOptions(agent=config_agent, backend=None, model=None)
+
+    # Fallback to config backend/model
     if config_backend:
-        return ReviewAgentOptions(
-            agent=None, backend=config_backend, model=config_model
-        )
+        return AgentOptions(agent=None, backend=config_backend, model=config_model)
 
-    # Fallback to agent preset
-    return ReviewAgentOptions(
-        agent=config_agent or default_agent,
-        backend=None,
-        model=None,
+    # No configuration found - raise error
+    raise ValueError(
+        f"No agent configuration found for '{section}' command. "
+        f"Please either:\n"
+        f"  1. Configure agent_config in settings.yaml under '{section}:' section, or\n"
+        f"  2. Use --agent, --backend, or --model CLI options"
     )
-
-
-def get_handoff_dir() -> Path:
-    """Get handoff directory for current branch.
-
-    Uses HandoffService._get_handoff_dir() as unified entry point
-    for directory creation (idempotent).
-    """
-    from vibe3.services.handoff_service import HandoffService
-
-    service = HandoffService()
-    return service._get_handoff_dir()
-
-
-def record_plan_event(
-    plan_content: str,
-    options: ReviewAgentOptions,
-    session_id: str | None = None,
-) -> Path | None:
-    """Record plan execution to handoff.
-
-    Args:
-        plan_content: The plan content to save
-        options: ReviewAgentOptions with agent/backend/model
-        session_id: Optional session ID from codeagent-wrapper
-    """
-    artifact = create_handoff_artifact("plan", plan_content)
-    if artifact is None:
-        return None
-    branch, plan_file = artifact
-
-    actor = format_agent_actor(options)
-    backend, model = resolve_actor_backend_model(options)
-
-    refs: dict[str, str] = {
-        "ref": str(plan_file),
-        "backend": backend,
-    }
-    if model:
-        refs["model"] = model
-    if session_id:
-        refs["session_id"] = session_id
-
-    persist_handoff_event(
-        branch=branch,
-        event_type="handoff_plan",
-        actor=actor,
-        detail=f"Plan generated: {plan_file.name}",
-        refs=refs,
-        flow_state_updates={
-            "plan_ref": str(plan_file),
-            "planner_actor": actor,
-            "planner_session_id": session_id,
-        },
-    )
-
-    return plan_file
 
 
 def run_plan(
@@ -150,11 +83,7 @@ def run_plan(
 
     log = logger.bind(domain="plan", scope=request.scope.kind)
 
-    session_id = load_session_id("planner")
-
-    log.info("Building plan context")
-    prompt_file_content = build_plan_context_func(request, config)
-
+    # Resolve task message
     task = message
     if message:
         log.info("Using custom task message")
@@ -163,35 +92,14 @@ def run_plan(
     if not task and plan_config and hasattr(plan_config, "plan_prompt"):
         task = plan_config.plan_prompt
 
-    options = get_agent_options(config, agent, backend, model)
-
-    log.info(
-        "Running plan agent",
-        agent=options.agent,
-        backend=options.backend,
-        model=options.model,
-        session_id=session_id,
-    )
-    outcome = execute_agent(
-        AgentExecutionRequest(
-            prompt_file_content=prompt_file_content,
-            options=options,
-            task=task,
-            dry_run=dry_run,
-            session_id=session_id,
-        )
+    # Build execution request
+    exec_request = ExecutionRequest(
+        role="planner",
+        context_builder=lambda: build_plan_context_func(request, config),
+        options_builder=lambda: get_agent_options(config, agent, backend, model),
+        task=task,
+        dry_run=dry_run,
+        handoff_kind="plan",
     )
 
-    if dry_run:
-        return
-
-    plan_content = outcome.result.stdout
-    plan_file = record_plan_event(
-        plan_content,
-        options,
-        session_id=outcome.effective_session_id,
-    )
-    if plan_file:
-        import typer
-
-        typer.echo(f"-> Plan saved: {plan_file}")
+    run_execution_pipeline(exec_request)
