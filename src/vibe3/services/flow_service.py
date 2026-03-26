@@ -16,9 +16,10 @@ from vibe3.models.flow import (
 )
 from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
+from vibe3.services.flow_query_mixin import FlowQueryMixin
 
 
-class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
+class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
     """Service for managing flow state."""
 
     def __init__(
@@ -63,7 +64,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         Raises:
             MainBranchProtectedError: If branch is main/master
         """
-        # Guard against main branch
         if self._is_main_branch(branch):
             raise MainBranchProtectedError(
                 f"Cannot create flow on protected branch '{branch}'. "
@@ -124,29 +124,23 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
             start_ref=start_ref,
         ).info("Creating flow with branch")
 
-        # Check if branch already exists
         if self.git_client.branch_exists(branch):
             raise RuntimeError(f"Branch '{branch}' already exists")
 
-        # Check if worktree is dirty
         if self.git_client.has_uncommitted_changes() and not save_unstash:
             raise RuntimeError(
                 "Worktree has uncommitted changes. "
                 "Use --save-unstash to stash them automatically."
             )
 
-        # Stash changes if requested
         stash_ref = None
         if save_unstash and self.git_client.has_uncommitted_changes():
             stash_ref = self.git_client.stash_push(message=f"vibe flow new {slug}")
 
-        # Create and switch to new branch
         self.git_client.create_branch(branch, start_ref)
 
-        # Create flow state
         flow = self.create_flow(slug, branch)
 
-        # Restore stash if we stashed
         if stash_ref:
             self.git_client.stash_apply(stash_ref)
 
@@ -173,7 +167,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
             target=target,
         ).info("Switching to flow")
 
-        # Find the flow - try by slug first, then by branch
         flows = self.list_flows()
         target_flow = None
         for flow in flows:
@@ -184,19 +177,15 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         if not target_flow:
             raise RuntimeError(f"Flow '{target}' not found")
 
-        # Check if branch exists
         if not self.git_client.branch_exists(target_flow.branch):
             raise RuntimeError(f"Branch '{target_flow.branch}' does not exist")
 
-        # Stash current changes
         stash_ref = None
         if self.git_client.has_uncommitted_changes():
             stash_ref = self.git_client.stash_push(message=f"vibe flow switch {target}")
 
-        # Switch to target branch
         self.git_client.switch_branch(target_flow.branch)
 
-        # Restore stash if we stashed
         if stash_ref:
             self.git_client.stash_apply(stash_ref)
 
@@ -221,7 +210,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         if not flow_data:
             return None
 
-        # Get issue links
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
@@ -265,10 +253,8 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
             status=status,
         ).debug("Listing flows")
 
-        # Get all flows, not just active ones
         flows_data = self.store.get_all_flows()
 
-        # Apply status filter if provided
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 
@@ -281,105 +267,3 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         events_data = self.store.get_events(branch, limit=100)
         events = [FlowEvent(**e) for e in events_data]
         return {"state": FlowState(**state_data), "events": events}
-
-    def bind_task(
-        self,
-        branch: str,
-        task_ref: str,
-        actor: str = "system",
-    ) -> int:
-        """Bind a task to a flow.
-
-        Args:
-            branch: Branch name
-            task_ref: Task reference (e.g., "123" or "#123" or "gh-123")
-            actor: Actor performing the bind
-
-        Returns:
-            Issue number
-
-        Raises:
-            ValueError: If task_ref is invalid
-        """
-        from vibe3.models.project_item import LinkError
-        from vibe3.services.task_service import TaskService
-
-        digits = "".join(filter(str.isdigit, task_ref))
-        if not digits:
-            raise ValueError(f"Invalid task ID format: {task_ref}")
-        issue_number = int(digits)
-
-        self.store.add_issue_link(branch, issue_number, "task")
-        self.store.update_flow_state(branch, task_issue_number=issue_number)
-        self.store.add_event(
-            branch, "task_bound", actor, detail=f"Task bound: {task_ref}"
-        )
-
-        logger.bind(branch=branch, task=task_ref).info("Task bound to flow")
-
-        link_result = TaskService().auto_link_issue_to_project(branch, issue_number)
-        if isinstance(link_result, LinkError):
-            logger.bind(task=task_ref).warning(
-                f"Auto project link skipped: {link_result.message}"
-            )
-
-        return issue_number
-
-    def bind_spec(
-        self,
-        branch: str,
-        spec_ref: str,
-        actor: str = "system",
-    ) -> None:
-        """Bind a spec to a flow.
-
-        Args:
-            branch: Branch name
-            spec_ref: Spec file reference
-            actor: Actor performing the bind
-        """
-        self.store.update_flow_state(branch, spec_ref=spec_ref, latest_actor=actor)
-        self.store.add_event(
-            branch, "spec_bound", actor, detail=f"Spec bound: {spec_ref}"
-        )
-        logger.bind(branch=branch, spec=spec_ref).info("Spec bound to flow")
-
-    def get_handoff_events(
-        self, branch: str, event_type_prefix: str = "handoff_", limit: int | None = None
-    ) -> list[FlowEvent]:
-        """Get handoff events for branch.
-
-        Args:
-            branch: Branch name
-            event_type_prefix: Event type filter prefix
-            limit: Maximum number of events
-
-        Returns:
-            List of FlowEvent objects
-        """
-        events_data = self.store.get_events(
-            branch, event_type_prefix=event_type_prefix, limit=limit
-        )
-        return [FlowEvent(**e) for e in events_data]
-
-    def get_flow_state(self, branch: str) -> FlowState | None:
-        """Get flow state for branch.
-
-        Args:
-            branch: Branch name
-
-        Returns:
-            FlowState or None if not found
-        """
-        state_data = self.store.get_flow_state(branch)
-        if not state_data:
-            return None
-        return FlowState(**state_data)
-
-    def get_git_common_dir(self) -> str:
-        """Get git common directory path.
-
-        Returns:
-            Path to git common directory
-        """
-        return self.git_client.get_git_common_dir()
