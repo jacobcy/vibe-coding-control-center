@@ -38,6 +38,27 @@ def parse_linked_issues(body: str) -> list[int]:
 class IssuesMixin:
     """Mixin for issues-related operations."""
 
+    def close_issue(self: Any, issue_number: int) -> bool:
+        """Close a GitHub issue."""
+        logger.bind(
+            external="github",
+            operation="close_issue",
+            issue_number=issue_number,
+        ).info("Calling GitHub API: close_issue")
+        result = subprocess.run(
+            ["gh", "issue", "close", str(issue_number)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            logger.bind(
+                external="github",
+                issue_number=issue_number,
+                error=result.stderr,
+            ).error("Failed to close issue")
+            return False
+        return True
+
     def list_merged_prs(self: Any, limit: int = 100) -> list[dict[str, Any]]:
         """List merged PRs with branch name and body.
 

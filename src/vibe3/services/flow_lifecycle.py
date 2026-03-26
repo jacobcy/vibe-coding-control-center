@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
@@ -180,6 +181,13 @@ class FlowLifecycleMixin:
                 branch=branch,
             ).warning("Failed to delete remote branch, continuing")
 
+        task_issue_number = flow_data.get("task_issue_number")
+        if task_issue_number is not None:
+            if not GitHubClient().close_issue(task_issue_number):
+                raise RuntimeError(
+                    f"Failed to close bound task issue #{task_issue_number}"
+                )
+
         self.store.update_flow_state(branch, flow_status="done")
 
         self.store.add_event(
@@ -188,6 +196,13 @@ class FlowLifecycleMixin:
             "system",
             f"Flow closed, branch '{branch}' deleted",
         )
+        if task_issue_number is not None:
+            self.store.add_event(
+                branch,
+                "task_issue_closed",
+                "system",
+                f"Task issue #{task_issue_number} closed",
+            )
 
         switched_to_target = switched_before_delete
         try:

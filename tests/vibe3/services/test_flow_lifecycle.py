@@ -11,13 +11,66 @@ class TestFlowLifecycle:
     """Tests for flow close behavior."""
 
     @staticmethod
-    def _build_flow_store(mock_store: Mock) -> None:
+    def _build_flow_store(
+        mock_store: Mock, task_issue_number: int | None = None
+    ) -> None:
         mock_store.get_flow_state.return_value = {
             "branch": "task/current-flow",
             "flow_slug": "current_flow",
             "flow_status": "active",
+            "task_issue_number": task_issue_number,
             "updated_at": "2026-03-26T00:00:00",
         }
+
+    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    def test_close_flow_closes_bound_task_issue(
+        self,
+        mock_github_class: MagicMock,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        """Closing a flow should also close its bound task issue."""
+        self._build_flow_store(mock_store, task_issue_number=220)
+
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/current-flow"
+        mock_git.branch_exists.return_value = True
+        mock_git.is_branch_occupied_by_worktree.return_value = False
+        mock_git_class.return_value = mock_git
+
+        mock_store.get_flow_dependents.return_value = []
+
+        service = FlowService(store=mock_store)
+
+        service.close_flow("task/current-flow")
+
+        mock_github_class.return_value.close_issue.assert_called_once_with(220)
+
+    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    def test_close_flow_skips_issue_close_when_no_task_issue(
+        self,
+        mock_github_class: MagicMock,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        """Taskless flow close should not attempt to close any issue."""
+        self._build_flow_store(mock_store)
+
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/current-flow"
+        mock_git.branch_exists.return_value = True
+        mock_git.is_branch_occupied_by_worktree.return_value = False
+        mock_git_class.return_value = mock_git
+
+        mock_store.get_flow_dependents.return_value = []
+
+        service = FlowService(store=mock_store)
+
+        service.close_flow("task/current-flow")
+
+        mock_github_class.return_value.close_issue.assert_not_called()
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_switches_off_current_branch_before_delete(

@@ -211,6 +211,22 @@ def test_mark_ready_maps_recoverable_error_to_user_error(
     assert "PR ready failed" in str(exc_info.value)
 
 
+def test_close_issue_success(
+    github_client: GitHubClient,
+) -> None:
+    with patch("vibe3.clients.github_issues_ops.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+
+        result = github_client.close_issue(220)
+
+    assert result is True
+    mock_run.assert_called_once_with(
+        ["gh", "issue", "close", "220"],
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_merge_pr_maps_non_recoverable_error_to_github_error(
     github_client: GitHubClient,
 ) -> None:
