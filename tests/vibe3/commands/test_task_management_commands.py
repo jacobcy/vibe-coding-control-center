@@ -32,7 +32,10 @@ def test_flow_bind_help_uses_issue_and_role() -> None:
 
     assert result.exit_code == 0
     assert "Usage: root bind [OPTIONS] TASK_ID" in stdout
-    assert "TASK_ID" in stdout
+    assert "Task ID to bind as task/related/dependency" in stdout
+    assert "--role" in stdout
+    assert "Issue role" in stdout
+    assert "actor" not in stdout
 
 
 def test_flow_show_help_uses_branch_name() -> None:
@@ -66,15 +69,17 @@ def test_task_list_help_uses_issue_option() -> None:
 
 def test_flow_bind_supports_related_role() -> None:
     """Test flow bind successfully binds a task to the current flow."""
-    with patch("vibe3.commands.flow.FlowService") as flow_service_cls:
+    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+
         flow_service = MagicMock()
         flow_service.get_current_branch.return_value = "task/demo"
-        flow_service_cls.return_value = flow_service
-
-        result = runner.invoke(flow_app, ["bind", "219"])
+        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
+            result = runner.invoke(flow_app, ["bind", "219"])
 
     assert result.exit_code == 0
-    flow_service.bind_task.assert_called_once_with("task/demo", "219", "system")
+    task_service.link_issue.assert_called_once_with("task/demo", 219, "task")
 
 
 def test_task_link_defaults_to_related_role() -> None:

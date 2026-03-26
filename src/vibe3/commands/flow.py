@@ -11,6 +11,7 @@ from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
@@ -23,11 +24,23 @@ from vibe3.ui.flow_ui import (
 app = typer.Typer(
     help=(
         "Manage logic flows (branch-centric: flows are automatically created "
-        "and managed based on git branches)"
+        "and managed based on git branches)\n\n"
+        "Single-Target Governance:\n"
+        "- One worktree, one active target at a time\n"
+        "- Use 'flow create' only when current flow is blocked or done\n"
+        "- Use 'wtnew' for new independent features"
     ),
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+def _parse_task_id(task_id: str) -> int:
+    """Parse a task identifier into an issue number."""
+    digits = "".join(filter(str.isdigit, task_id))
+    if not digits:
+        raise ValueError(f"Invalid task ID format: {task_id}")
+    return int(digits)
 
 
 @app.command(name="add")
@@ -167,6 +180,11 @@ def create(
     - current: Create from current branch
     - <branch-name>: Create from specified branch
 
+    Single-target governance:
+    - If current flow is ACTIVE: reject and suggest 'vibe3 wtnew'
+    - If current flow is BLOCKED: allow from current branch (downstream)
+    - If current flow is DONE/ABORTED/STALE: allow from origin/main
+
     Examples:
         vibe3 flow create my-feature
         vibe3 flow create my-feature --base main
@@ -179,18 +197,40 @@ def create(
         )
 
         service = FlowService()
+        current_branch = service.get_current_branch()
 
-        # Determine base branch
+        decision = service.can_create_from_current_worktree(current_branch)
+
+        if not decision.allowed:
+            console.print(f"[red]Error: {decision.reason}[/]")
+            if decision.guidance:
+                console.print(f"[yellow]{decision.guidance}[/]")
+            raise typer.Exit(1)
+
+        if decision.requires_new_worktree:
+            console.print(f"[yellow]Hint: {decision.guidance}[/]")
+            raise typer.Exit(1)
+
+        if base == "current" and not decision.allow_base_current:
+            console.print(
+                "[red]Error: '--base current' is only allowed "
+                "when current flow is blocked.[/]"
+            )
+            console.print(
+                "[yellow]For independent new features, "
+                "use 'vibe3 wtnew <name>' first.[/]"
+            )
+            raise typer.Exit(1)
+
         if base == "main":
-            start_ref = "origin/main"
+            start_ref = decision.start_ref or "origin/main"
         elif base == "current":
-            start_ref = service.get_current_branch()
+            start_ref = current_branch
         else:
             start_ref = base
 
         branch_name = f"task/{name}"
 
-        # Create branch and register flow
         try:
             flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
         except RuntimeError as e:
@@ -203,7 +243,6 @@ def create(
                 console.print(f"[red]Error: {e}[/]")
             raise typer.Exit(1)
 
-        # Bind task if provided
         if task:
             try:
                 service.bind_task(branch_name, task, "system")
@@ -212,11 +251,9 @@ def create(
                     "Invalid task ID format, skipping binding"
                 )
 
-        # Bind spec_ref if provided
         if spec:
             service.bind_spec(branch_name, spec, "system")
 
-        # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
 
         if json_output:
@@ -227,29 +264,41 @@ def create(
 
 @app.command()
 def bind(
-    task_id: Annotated[str, typer.Argument(help="Task ID to bind")],
-    actor: Annotated[str, typer.Option(help="Actor binding the task")] = "system",
+    task_id: Annotated[
+        str,
+        typer.Argument(help="Task ID to bind as task/related/dependency"),
+    ],
+    role: Annotated[
+        Literal["task", "related", "dependency"],
+        typer.Option("--role", help="Issue role (task, related, or dependency)"),
+    ] = "task",
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,  # noqa: E501
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
-    """Bind a task to current flow."""
-    with trace_scope(trace, "flow bind", task_id=task_id):
-        logger.bind(command="flow bind", task_id=task_id, actor=actor).info(
-            "Binding task to flow"
+    """Bind an issue to current flow as task, related, or dependency."""
+    with trace_scope(trace, "flow bind", task_id=task_id, role=role):
+        logger.bind(command="flow bind", task_id=task_id, role=role).info(
+            "Binding issue to flow"
         )
 
-        service = FlowService()
-        branch = service.get_current_branch()
+        flow_service = FlowService()
+        branch = flow_service.get_current_branch()
+        service = TaskService()
 
         try:
-            service.bind_task(branch, task_id, actor)
+            issue_number = _parse_task_id(task_id)
+            link = service.link_issue(branch, issue_number, role)
 
             if json_output:
-                typer.echo(json.dumps({"status": "bound", "task_id": task_id}))
+                typer.echo(json.dumps(link.model_dump(), indent=2, default=str))
             else:
-                console.print(f"[green]✓[/] Task {task_id} bound to flow {branch}")
+                message = (
+                    f"[green]✓[/] Issue #{issue_number} linked as {role} "
+                    f"to flow {branch}"
+                )
+                console.print(message)
         except ValueError:
             logger.error(f"Invalid task ID format: {task_id}")
             raise typer.BadParameter(f"Invalid task ID format: {task_id}")
@@ -357,18 +406,11 @@ def list(
             render_flows_table(flows)
 
 
-# Register lifecycle commands from flow_lifecycle.py
-app.command(name="switch")(switch)
-app.command(name="done")(done)
-app.command(name="blocked")(blocked)
-app.command(name="aborted")(aborted)
-
-
 @app.command()
 def cancel(
     role: Annotated[
-        str,
-        typer.Argument(help="Role to cancel (planner/executor/reviewer)"),
+        Literal["planner", "executor", "reviewer"],
+        typer.Argument(help="Role to cancel"),
     ],
     flow_name: Annotated[
         str | None, typer.Argument(help="Branch name (defaults to current branch)")
@@ -384,26 +426,22 @@ def cancel(
         vibe3 flow cancel planner task/my-feature
     """
     with trace_scope(trace, "flow cancel", role=role):
-        from typing import cast
-
-        from vibe3.services.async_execution_service import (
-            AsyncExecutionService,
-            ExecutionRole,
-        )
-
-        valid_roles = ("planner", "executor", "reviewer")
-        if role not in valid_roles:
-            console.print(f"[red]Error: Invalid role '{role}'[/]")
-            console.print(f"[yellow]Valid roles: {', '.join(valid_roles)}[/]")
-            raise typer.Exit(1)
+        from vibe3.services.async_execution_service import AsyncExecutionService
 
         service = FlowService()
         branch = flow_name if flow_name else service.get_current_branch()
 
         async_svc = AsyncExecutionService()
-        cancelled = async_svc.cancel_execution(cast(ExecutionRole, role), branch)
+        cancelled = async_svc.cancel_execution(role, branch)
 
         if cancelled:
             console.print(f"[green]✓[/] Cancelled {role} on {branch}")
         else:
             console.print(f"[yellow]No running {role} found on {branch}[/]")
+
+
+# Register lifecycle commands from flow_lifecycle.py
+app.command(name="switch")(switch)
+app.command(name="done")(done)
+app.command(name="blocked")(blocked)
+app.command(name="aborted")(aborted)

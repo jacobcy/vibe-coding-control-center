@@ -58,32 +58,26 @@ class TestPrePushContract:
         assert 'review base "$REVIEW_BASE"' in content
 
     def test_pre_push_prints_review_output_when_review_runs(self) -> None:
-        """Verify pre-push.sh prints review output in real-time using tee."""
+        """Verify pre-push.sh starts async review with --async flag."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        # New implementation uses tee for real-time output
-        assert 'tee "$REVIEW_REPORT_FILE"' in content
+        assert "review base" in content
+        assert "--async" in content
 
     def test_pre_push_saves_review_output_to_agent_reports(self) -> None:
-        """Verify pre-push.sh persists local review output to .agent/reports/."""
+        """Verify pre-push.sh does NOT create reports directory in async mode."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        # Check for dynamic reports directory creation (supports flow-specific paths)
-        assert "mkdir -p" in content
-        assert "REPORTS_DIR" in content
-        assert ".agent/reports" in content
-        assert "pre-push-review-" in content
-        # New implementation uses tee to save output in real-time
-        assert 'tee "$REVIEW_REPORT_FILE"' in content
+        assert "vibe3 flow show" in content
+        assert "vibe3 handoff show" in content
 
     def test_pre_push_prints_review_trigger_and_verdict_summary(self) -> None:
-        """Verify pre-push.sh prints explicit observability summary lines."""
+        """Verify pre-push.sh prints async review trigger message."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert 'echo "  Review triggered: yes"' in content
-        assert 'echo "  Review triggered: no"' in content
-        assert 'echo "  Review triggered: recommended-manual"' in content
-        assert 'echo "  Review verdict: $VERDICT"' in content
+        assert "Review triggered: yes (async)" in content
+        assert "Review triggered: no" in content
+        assert "Review triggered: recommended-manual" in content
 
     def test_pre_push_prints_risk_reason_and_recommendations(self) -> None:
         """Verify pre-push.sh surfaces inspect explanations, not just score."""

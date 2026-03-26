@@ -5,7 +5,7 @@
 #   - Local hooks (pre-commit/pre-push): WARNING ONLY (exit 0)
 #   - CI: Set env var ENFORCE_LOC_LIMITS=true to BLOCK on violations
 #
-# Delegates to metrics_service for consistent LOC counting.
+# Uses only the Python standard library so it can run before uv sync.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
 #   - src/vibe3/
@@ -14,11 +14,51 @@
 
 set -e
 
-result=$(PYTHONPATH=src uv run python -c "
-from vibe3.services.metrics_service import collect_python_metrics
-m = collect_python_metrics()
-print(f'{m.total_loc} {m.limit_total}')
-" 2>/dev/null)
+result=$(python3 - <<'PY'
+from pathlib import Path
+import re
+
+
+def parse_config(path: str) -> dict[str, str]:
+  values: dict[str, str] = {}
+  stack: list[tuple[int, str]] = []
+
+  for raw_line in Path(path).read_text().splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+      continue
+
+    indent = len(raw_line) - len(raw_line.lstrip(" "))
+    while stack and stack[-1][0] >= indent:
+      stack.pop()
+
+    match = re.match(r"([A-Za-z0-9_]+):(?:\s*(.*))?$", stripped)
+    if not match:
+      continue
+
+    key, value = match.groups()
+    if not value:
+      stack.append((indent, key))
+      continue
+
+    path_key = ".".join([item[1] for item in stack] + [key])
+    values[path_key] = value.split("#", 1)[0].strip().strip('"').strip("'")
+
+  return values
+
+
+config = parse_config("config/settings.yaml")
+limit_total = int(config["code_limits.total_file_loc.v3_python"])
+
+total_loc = 0
+for path in Path("src/vibe3").rglob("*.py"):
+  if "__pycache__" in path.parts or path.name == "__init__.py":
+    continue
+  total_loc += sum(1 for _ in path.open())
+
+print(f"{total_loc} {limit_total}")
+PY
+)
 
 total=$(echo "$result" | awk '{print $1}')
 LIMIT=$(echo "$result" | awk '{print $2}')

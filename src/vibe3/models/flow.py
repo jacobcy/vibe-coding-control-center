@@ -121,3 +121,22 @@ class FlowStatusResponse(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+
+
+class CreateDecision(BaseModel):
+    """Decision model for flow create operation."""
+
+    allowed: bool
+    reason: str
+    start_ref: str | None = None
+    allow_base_current: bool = False
+    requires_new_worktree: bool = False
+    guidance: str | None = None
+
+
+class CloseTargetDecision(BaseModel):
+    """Decision model for flow close target branch."""
+
+    target_branch: str
+    should_pull: bool
+    reason: str

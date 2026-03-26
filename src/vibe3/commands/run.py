@@ -8,25 +8,20 @@ from loguru import logger
 
 from vibe3.commands.command_options import (
     _AGENT_OPT,
+    _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
+from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
-from vibe3.services.codeagent_execution_service import (
-    CodeagentExecutionService,
-    create_codeagent_command,
-)
+from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.utils.trace import enable_trace
-
-_ASYNC_OPT = Annotated[
-    bool, typer.Option("--async", help="Run asynchronously in background")
-]
 
 app = typer.Typer(
     name="run",
@@ -45,11 +40,10 @@ def _run_execution(
     agent: str | None,
     backend: str | None,
     model: str | None,
-    branch: str | None = None,
-    async_mode: bool = False,
 ) -> None:
     log = logger.bind(domain="run", plan_file=plan_file or "(lightweight)")
 
+    # Resolve task message
     task = instructions
     if instructions:
         log.info("Using custom task message")
@@ -61,25 +55,24 @@ def _run_execution(
     if not task and run_config and hasattr(run_config, "run_prompt"):
         task = run_config.run_prompt
 
-    exec_svc = CodeagentExecutionService(config)
-    command = create_codeagent_command(
+    # Build execution request
+    request = ExecutionRequest(
         role="executor",
         context_builder=lambda: build_run_context(plan_file, config),
+        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
+            config,
+            agent,
+            backend,
+            model,
+            section="run",
+        ),
         task=task,
         dry_run=dry_run,
         handoff_kind="run",
         handoff_metadata={"plan_ref": plan_file} if plan_file else None,
-        agent=agent,
-        backend=backend,
-        model=model,
-        config=config,
-        branch=branch,
     )
 
-    if async_mode and not dry_run and branch:
-        exec_svc.execute_async(command, branch)
-    else:
-        exec_svc.execute_sync(command)
+    run_execution_pipeline(request)
 
 
 def _find_skill_file(skill_name: str) -> Path | None:
@@ -113,8 +106,6 @@ def _run_skill(
     agent: str | None,
     backend: str | None,
     model: str | None,
-    branch: str | None = None,
-    async_mode: bool = False,
 ) -> None:
     skill_file = _find_skill_file(skill_name)
     if not skill_file:
@@ -129,25 +120,24 @@ def _run_skill(
 
     task = instructions or f"Execute skill: {skill_name}"
 
-    exec_svc = CodeagentExecutionService(config)
-    command = create_codeagent_command(
+    # Build execution request
+    request = ExecutionRequest(
         role="executor",
         context_builder=lambda: skill_content,
+        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
+            config,
+            agent,
+            backend,
+            model,
+            section="run",
+        ),
         task=task,
         dry_run=dry_run,
         handoff_kind="run",
         handoff_metadata={"skill": skill_name},
-        agent=agent,
-        backend=backend,
-        model=model,
-        config=config,
-        branch=branch,
     )
 
-    if async_mode and not dry_run and branch:
-        exec_svc.execute_async(command, branch)
-    else:
-        exec_svc.execute_sync(command)
+    run_execution_pipeline(request)
 
 
 def run_command(
@@ -184,28 +174,45 @@ def run_command(
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
 
-    if skill:
-        _run_skill(
-            skill,
-            instructions,
-            config,
-            dry_run,
-            agent,
-            backend,
-            model,
-            branch,
-            async_mode,
-        )
+    if async_mode and not dry_run:
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        async_svc = AsyncExecutionService()
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "run", "--no-async"]
+        if instructions:
+            cmd.append(instructions)
+        if plan:
+            cmd.extend(["--plan", str(plan)])
+        if skill:
+            cmd.extend(["--skill", skill])
+        if agent:
+            cmd.extend(["--agent", agent])
+        if backend:
+            cmd.extend(["--backend", backend])
+        if model:
+            cmd.extend(["--model", model])
+
+        async_svc.start_async_execution("executor", cmd, branch)
+        typer.echo("✓ Execution started in background")
+        typer.echo("  vibe3 flow show    # Check status")
         return
 
+    # --skill mode
+    if skill:
+        _run_skill(skill, instructions, config, dry_run, agent, backend, model)
+        return
+
+    # Determine execution mode
     resolved_file = plan
 
     if resolved_file:
+        # Explicit plan file provided
         plan_file = str(resolved_file)
         log = logger.bind(domain="run", action="run", plan_file=plan_file)
         log.info("Starting plan execution")
         typer.echo(f"-> Execute: {plan_file}")
     elif instructions:
+        # Lightweight mode: only instructions
         plan_file = None
         log = logger.bind(domain="run", action="run", plan_file="(lightweight)")
         log.info("Starting lightweight execution")
@@ -214,6 +221,7 @@ def run_command(
             f"-> Task: {instructions[:60]}{'...' if len(instructions) > 60 else ''}"
         )
     else:
+        # Try to use flow's plan_ref
         flow = flow_service.get_flow_status(branch)
         if flow and flow.plan_ref:
             plan_file = str(flow.plan_ref)
@@ -231,17 +239,7 @@ def run_command(
             )
             raise typer.Exit(1)
 
-    _run_execution(
-        plan_file,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        branch,
-        async_mode,
-    )
+    _run_execution(plan_file, config, dry_run, instructions, agent, backend, model)
 
     flow = flow_service.get_flow_status(branch)
     if not dry_run and flow and flow.task_issue_number:

@@ -46,3 +46,35 @@ def test_task_show_defaults_to_current_branch_when_missing_argument() -> None:
 
     assert result.exit_code == 1
     service.hydrate.assert_called_once_with("task/set-default-flow")
+
+
+def test_task_show_prompts_flow_bind_when_task_is_unbound() -> None:
+    """Unbound tasks should point users to flow bind, not task bridge."""
+    with (
+        patch("vibe3.commands.task.FlowService") as flow_service_cls,
+        patch("vibe3.commands.task.TaskService") as service_cls,
+    ):
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/set-default-flow"
+        flow_service_cls.return_value = flow_service
+
+        service = service_cls.return_value
+        service.hydrate.return_value = HydrateError(
+            type="no_remote_identity",
+            message="Branch 'task/set-default-flow' 未绑定 GitHub Project item",
+        )
+        service.get_task.return_value = type(
+            "Task",
+            (),
+            {
+                "branch": "task/set-default-flow",
+                "task_issue_number": 248,
+                "flow_status": "active",
+            },
+        )()
+
+        result = runner.invoke(app, ["show"])
+
+    assert result.exit_code == 0
+    assert "vibe3 flow bind <issue_number>" in result.output
+    assert "vibe3 task bridge" in result.output
