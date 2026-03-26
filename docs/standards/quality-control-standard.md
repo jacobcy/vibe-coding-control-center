@@ -215,7 +215,7 @@ Required approving reviews: 0  # 允许self-merge，但需CI通过
 2. **单文件LOC**：Default ≤ 200 | Max ≤ 300
 
 **阻断性**：
-- Pre-commit: ⚠️ Warning only（允许开发超标）
+- Pre-commit: - 不检查（保持commit快速）
 - Pre-push: ⚠️ Warning only（允许draft PR）
 - CI: ✅ 阻断（最终合并前强制）
 
@@ -330,8 +330,8 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 | Lint | ✅ | - | ✅ | `.pre-commit-config.yaml` |
 | Format | ✅ | - | ✅ | `.pre-commit-config.yaml` |
 | Type | ✅ | ✅ | ✅ | `.pre-commit-config.yaml` |
-| Test | ✅ | - | ✅ | `.pre-commit-config.yaml` |
-| LOC | ⚠️ | ⚠️ | ✅ | `config/settings.yaml` |
+| Test | - | ✅ | ✅ | `.pre-commit-config.yaml` |
+| LOC | - | ⚠️ | ✅ | `config/settings.yaml` |
 | Review | - | ✅ | - | `scripts/hooks/pre-push.sh` |
 | Coverage | - | - | ✅ | `config/settings.yaml` |
 
