@@ -191,8 +191,7 @@ class PRMixin:
                         e,
                         "ready --undo",
                         user_tips=(
-                            f"  1. Confirm PR #{request.number} "
-                            f"is currently ready"
+                            f"  1. Confirm PR #{request.number} " f"is currently ready"
                         ),
                     )
             else:

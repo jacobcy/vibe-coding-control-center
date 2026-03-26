@@ -38,9 +38,7 @@ class TestFlowAddStatusCheck:
 
     @pytest.mark.parametrize("flow_status", ["active", "done", "aborted", "stale"])
     @patch("vibe3.commands.flow.FlowService")
-    def test_existing_flow_blocks_creation(
-        self, mock_service_class, flow_status: str
-    ):
+    def test_existing_flow_blocks_creation(self, mock_service_class, flow_status: str):
         """Any existing flow record should block creation."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "feature/test"

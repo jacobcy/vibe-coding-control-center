@@ -103,8 +103,8 @@ def test_create_pr_maps_recoverable_error_to_user_error(
             returncode=1,
             cmd=["gh", "pr", "create"],
             stderr=(
-                "a pull request for branch \"feature-branch\" into branch "
-                "\"main\" already exists"
+                'a pull request for branch "feature-branch" into branch '
+                '"main" already exists'
             ),
         )
 
