@@ -1,12 +1,14 @@
 """Tests for GitHub client."""
 
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.pr import CreatePRRequest, PRState
+from vibe3.exceptions import GitHubError, UserError
+from vibe3.models.pr import CreatePRRequest, PRState, UpdatePRRequest
 
 
 @pytest.fixture
@@ -85,6 +87,59 @@ def test_create_pr_success(
         mock_subprocess.assert_called()
 
 
+def test_create_pr_maps_recoverable_error_to_user_error(
+    github_client: GitHubClient,
+) -> None:
+    request = CreatePRRequest(
+        title="Test PR",
+        body="Test body",
+        head_branch="feature-branch",
+        base_branch="main",
+        draft=True,
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "create"],
+            stderr=(
+                "a pull request for branch \"feature-branch\" into branch "
+                "\"main\" already exists"
+            ),
+        )
+
+        with pytest.raises(UserError) as exc_info:
+            github_client.create_pr(request)
+
+    assert "PR create failed" in str(exc_info.value)
+    assert "already exists" in str(exc_info.value)
+
+
+def test_create_pr_maps_non_recoverable_error_to_github_error(
+    github_client: GitHubClient,
+) -> None:
+    request = CreatePRRequest(
+        title="Test PR",
+        body="Test body",
+        head_branch="feature-branch",
+        base_branch="main",
+        draft=True,
+    )
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "create"],
+            stderr="GraphQL: Internal server error",
+        )
+
+        with pytest.raises(GitHubError) as exc_info:
+            github_client.create_pr(request)
+
+    assert exc_info.value.status_code == 1
+    assert "gh pr create failed" in exc_info.value.message
+
+
 def test_get_pr_by_number(
     github_client: GitHubClient, mock_subprocess: MagicMock
 ) -> None:
@@ -138,6 +193,55 @@ def test_mark_ready_success(
 
         assert pr.number == 123
         mock_subprocess.assert_called()
+
+
+def test_mark_ready_maps_recoverable_error_to_user_error(
+    github_client: GitHubClient,
+) -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "ready", "123"],
+            stderr="pull request is already ready for review",
+        )
+
+        with pytest.raises(UserError) as exc_info:
+            github_client.mark_ready(123)
+
+    assert "PR ready failed" in str(exc_info.value)
+
+
+def test_merge_pr_maps_non_recoverable_error_to_github_error(
+    github_client: GitHubClient,
+) -> None:
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "merge", "123"],
+            stderr="GraphQL: Internal server error",
+        )
+
+        with pytest.raises(GitHubError) as exc_info:
+            github_client.merge_pr(123)
+
+    assert exc_info.value.status_code == 1
+    assert "gh pr merge failed" in exc_info.value.message
+
+
+def test_update_pr_maps_error_to_user_error(github_client: GitHubClient) -> None:
+    request = UpdatePRRequest(number=123, title="new title")
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "pr", "edit", "123"],
+            stderr="no pull requests found for branch",
+        )
+
+        with pytest.raises(UserError) as exc_info:
+            github_client.update_pr(request)
+
+    assert "PR edit failed" in str(exc_info.value)
 
 
 def test_merge_pr_success(
