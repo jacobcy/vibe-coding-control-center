@@ -79,6 +79,7 @@ def register_query_commands(app: typer.Typer) -> None:
             service = PRService()
 
             # If no pr_number or branch provided, try to get from flow
+            current_branch: str | None = None
             if not pr_number and not branch:
                 from vibe3.services.flow_service import FlowService
 
@@ -96,10 +97,10 @@ def register_query_commands(app: typer.Typer) -> None:
             if not pr:
                 # Get current branch for better error message
                 if not pr_number and not branch:
-                    from vibe3.services.flow_service import FlowService
+                    if current_branch is None:
+                        from vibe3.services.flow_service import FlowService
 
-                    flow_service = FlowService()
-                    current_branch = flow_service.get_current_branch()
+                        current_branch = FlowService().get_current_branch()
                     typer.echo(
                         f"No PR found for current branch '{current_branch}'\n\n"
                         "To create a PR, run:\n"
