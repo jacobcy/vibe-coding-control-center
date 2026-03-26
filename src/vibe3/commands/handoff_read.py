@@ -7,10 +7,9 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.commands.handoff_write import _trace_scope
+from vibe3.commands.common import trace_scope
 from vibe3.models.flow import FlowEvent, FlowState
+from vibe3.services.flow_service import FlowService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
@@ -130,12 +129,11 @@ def list_handoffs(
     ] = False,
 ) -> None:
     """List handoff events for current or specified branch."""
-    with _trace_scope(trace, "handoff list"):
-        git = GitClient()
-        store = SQLiteClient()
+    with trace_scope(trace, "handoff list", domain="handoff"):
+        service = FlowService()
 
-        target_branch = branch if branch else git.get_current_branch()
-        events_data = store.get_events(target_branch, event_type_prefix="handoff_")
+        target_branch = branch if branch else service.get_current_branch()
+        events = service.get_handoff_events(target_branch)
 
         allowed_kinds = {"plan", "run", "review"}
         filter_kind = kind.lower() if kind else None
@@ -146,9 +144,8 @@ def list_handoffs(
         handoffs: list[dict[str, str]] = []
         stats = {"total": 0, "plans": 0, "runs": 0, "reviews": 0}
 
-        for event in events_data:
-            event_type = event.get("event_type", "")
-            event_kind = event_type.replace("handoff_", "", 1)
+        for event in events:
+            event_kind = event.event_type.replace("handoff_", "", 1)
             if event_kind not in allowed_kinds:
                 continue
             if filter_kind and event_kind != filter_kind:
@@ -164,12 +161,10 @@ def list_handoffs(
 
             handoffs.append(
                 {
-                    "timestamp": str(event.get("created_at", ""))[:19].replace(
-                        "T", " "
-                    ),
+                    "timestamp": event.created_at[:19].replace("T", " "),
                     "kind": event_kind,
-                    "actor": str(event.get("actor", "")),
-                    "detail": str(event.get("detail", "")),
+                    "actor": event.actor,
+                    "detail": event.detail or "",
                 }
             )
 
@@ -190,7 +185,7 @@ def show(
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Show agent handoff chain and events."""
-    with _trace_scope(trace, "handoff show"):
+    with trace_scope(trace, "handoff show", domain="handoff"):
         if artifact is not None:
             if not artifact.exists():
                 typer.echo(f"Error: artifact not found: {artifact}", err=True)
@@ -209,22 +204,16 @@ def show(
             "Showing handoff details"
         )
 
-        git = GitClient()
-        store = SQLiteClient()
-        branch = flow_name if flow_name else git.get_current_branch()
+        service = FlowService()
+        branch = flow_name if flow_name else service.get_current_branch()
 
-        state_data = store.get_flow_state(branch)
-        if not state_data:
+        state = service.get_flow_state(branch)
+        if not state:
             logger.error(f"Flow not found: {branch}")
             raise typer.Exit(1)
 
-        state = FlowState(**state_data)
-        # When --all, pass None to get all events; otherwise limit to 5
         limit = None if show_all else 5
-        events_data = store.get_events(
-            branch, event_type_prefix="handoff_", limit=limit
-        )
-        handoff_events = [FlowEvent(**e) for e in events_data]
+        handoff_events = service.get_handoff_events(branch, limit=limit)
 
         if json_output:
             output = {
@@ -259,7 +248,7 @@ def show(
         _render_handoff_events(handoff_events)
 
         # Show current.md updates in log format
-        git_dir = git.get_git_common_dir()
+        git_dir = service.get_git_common_dir()
         handoff_dir = get_branch_handoff_dir(git_dir, branch)
         current_md = handoff_dir / "current.md"
 

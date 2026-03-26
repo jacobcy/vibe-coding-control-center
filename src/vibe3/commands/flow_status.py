@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
-from vibe3.observability.logger import setup_logging
+from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
 from vibe3.ui.flow_ui import (
     render_error,
@@ -62,42 +61,41 @@ def show(
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show flow details."""
-    if trace:
-        setup_logging(verbose=2)
-    git = GitClient()
-    service = FlowService()
-    target_branch = branch if branch else git.get_current_branch()
+    with trace_scope(trace, "flow show", domain="flow"):
+        service = FlowService()
+        target_branch = branch if branch else service.get_current_branch()
 
-    if snapshot:
-        flow_status = service.get_flow_status(target_branch)
-        if not flow_status:
+        if snapshot:
+            flow_status = service.get_flow_status(target_branch)
+            if not flow_status:
+                logger.error(f"Flow not found: {target_branch}")
+                raise typer.Exit(1)
+            if json_output:
+                typer.echo(json.dumps(flow_status.model_dump(), indent=2, default=str))
+            else:
+                # TODO: move GitHubClient calls to a service method in a follow-up PR
+                from vibe3.clients.github_client import GitHubClient
+
+                gh = GitHubClient()
+                issue_titles, pr_data, net_err = _fetch_issue_titles(gh, flow_status)
+                if net_err:
+                    render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
+                render_flow_status(flow_status, issue_titles, pr_data)
+            return
+
+        timeline = service.get_flow_timeline(target_branch)
+        if not timeline["state"]:
             logger.error(f"Flow not found: {target_branch}")
             raise typer.Exit(1)
+
         if json_output:
-            typer.echo(json.dumps(flow_status.model_dump(), indent=2, default=str))
+            output = {
+                "state": timeline["state"].model_dump(),
+                "events": [e.model_dump() for e in timeline["events"]],
+            }
+            typer.echo(json.dumps(output, indent=2, default=str))
         else:
-            from vibe3.clients.github_client import GitHubClient
-
-            gh = GitHubClient()
-            issue_titles, pr_data, net_err = _fetch_issue_titles(gh, flow_status)
-            if net_err:
-                render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
-            render_flow_status(flow_status, issue_titles, pr_data)
-        return
-
-    timeline = service.get_flow_timeline(target_branch)
-    if not timeline["state"]:
-        logger.error(f"Flow not found: {target_branch}")
-        raise typer.Exit(1)
-
-    if json_output:
-        output = {
-            "state": timeline["state"].model_dump(),
-            "events": [e.model_dump() for e in timeline["events"]],
-        }
-        typer.echo(json.dumps(output, indent=2, default=str))
-    else:
-        render_flow_timeline(timeline["state"], timeline["events"])
+            render_flow_timeline(timeline["state"], timeline["events"])
 
 
 def status(
@@ -105,29 +103,31 @@ def status(
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
     """Show dashboard of all active flows."""
-    if trace:
-        setup_logging(verbose=2)
-    service = FlowService()
-    flows = service.list_flows(status="active")
-    if json_output:
-        typer.echo(json.dumps([f.model_dump() for f in flows], indent=2, default=str))
-        return
-    if not flows:
-        typer.echo("No active flows")
-        raise typer.Exit(0)
-    from vibe3.clients.github_client import GitHubClient
+    with trace_scope(trace, "flow status", domain="flow"):
+        service = FlowService()
+        flows = service.list_flows(status="active")
+        if json_output:
+            typer.echo(
+                json.dumps([f.model_dump() for f in flows], indent=2, default=str)
+            )
+            return
+        if not flows:
+            typer.echo("No active flows")
+            raise typer.Exit(0)
+        # TODO: move GitHubClient calls to a service method in a follow-up PR
+        from vibe3.clients.github_client import GitHubClient
 
-    gh = GitHubClient()
-    titles: dict[int, str] = {}
-    net_err = False
-    for flow in flows:
-        if flow.task_issue_number and flow.task_issue_number not in titles:
-            r = gh.view_issue(flow.task_issue_number)
-            if r == "network_error":
-                net_err = True
-                break
-            if isinstance(r, dict):
-                titles[flow.task_issue_number] = r.get("title", "")
-    if net_err:
-        render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")
-    render_flows_status_dashboard(flows, titles)
+        gh = GitHubClient()
+        titles: dict[int, str] = {}
+        net_err = False
+        for flow in flows:
+            if flow.task_issue_number and flow.task_issue_number not in titles:
+                r = gh.view_issue(flow.task_issue_number)
+                if r == "network_error":
+                    net_err = True
+                    break
+                if isinstance(r, dict):
+                    titles[flow.task_issue_number] = r.get("title", "")
+        if net_err:
+            render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")
+        render_flows_status_dashboard(flows, titles)

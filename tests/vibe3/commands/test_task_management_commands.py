@@ -1,7 +1,7 @@
 """Tests for flow/task command parameter semantics."""
 
 import re
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from typer.testing import CliRunner
 
@@ -66,32 +66,29 @@ def test_task_list_help_uses_issue_option() -> None:
 
 def test_flow_bind_supports_related_role() -> None:
     """Test flow bind successfully binds a task to the current flow."""
-    with (
-        patch("vibe3.commands.flow.GitClient") as git_cls,
-        patch("vibe3.commands.flow.SQLiteClient") as store_cls,
-    ):
-        git_cls.return_value.get_current_branch.return_value = "task/demo"
-        store_cls.return_value.add_issue_link.return_value = None
-        store_cls.return_value.update_flow_state.return_value = None
-        store_cls.return_value.add_event.return_value = None
+    with patch("vibe3.commands.flow.FlowService") as flow_service_cls:
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        flow_service_cls.return_value = flow_service
 
         result = runner.invoke(flow_app, ["bind", "219"])
 
     assert result.exit_code == 0
-    store_cls.return_value.add_issue_link.assert_called_once_with(
-        "task/demo", 219, "task"
-    )
+    flow_service.bind_task.assert_called_once_with("task/demo", "219", "system")
 
 
 def test_task_link_defaults_to_related_role() -> None:
     issue_link = Mock()
 
     with (
-        patch("vibe3.commands.task.GitClient") as git_cls,
+        patch("vibe3.commands.task.FlowService") as flow_service_cls,
         patch("vibe3.commands.task.TaskService") as task_service_cls,
         patch("vibe3.commands.task.render_issue_linked"),
     ):
-        git_cls.return_value.get_current_branch.return_value = "task/demo"
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        flow_service_cls.return_value = flow_service
+
         task_service_cls.return_value.link_issue.return_value = issue_link
 
         result = runner.invoke(task_app, ["link", "219"])

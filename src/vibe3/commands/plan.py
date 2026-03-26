@@ -5,8 +5,6 @@ from typing import Annotated, Optional
 
 import typer
 
-from vibe3.clients.git_client import GitClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _BACKEND_OPT,
@@ -18,6 +16,7 @@ from vibe3.commands.command_options import (
 from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
+from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.utils.trace import enable_trace
@@ -158,12 +157,10 @@ def spec(
         typer.echo(f"-> Plan: {msg[:60]}{'...' if len(msg) > 60 else ''}")
 
     if spec_path and not dry_run:
-        git = GitClient()
-        store = SQLiteClient()
         try:
-            branch = git.get_current_branch()
-            store.update_flow_state(branch, spec_ref=spec_path)
-            store.add_event(branch, "spec_bound", "user", detail=f"Spec bound: {file}")
+            service = FlowService()
+            branch = service.get_current_branch()
+            service.bind_spec(branch, spec_path, "user")
         except Exception:
             pass
 

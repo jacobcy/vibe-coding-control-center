@@ -5,19 +5,9 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.observability.logger import setup_logging
-from vibe3.observability.trace import trace_context
+from vibe3.commands.common import trace_scope
 from vibe3.services.handoff_service import HandoffService
 from vibe3.ui.console import console
-
-
-def _trace_scope(trace: bool, command: str):  # type: ignore[no-untyped-def]
-    if trace:
-        setup_logging(verbose=2)
-        return trace_context(command=command, domain="handoff")
-    from contextlib import nullcontext
-
-    return nullcontext()
 
 
 def _record_handoff_reference(
@@ -31,7 +21,7 @@ def _record_handoff_reference(
     trace: bool,
     method_name: str,
 ) -> None:
-    with _trace_scope(trace, command):
+    with trace_scope(trace, command, domain="handoff"):
         specific_ref_key = f"{ref_label.lower()}_ref"
         logger.bind(
             command=command,
@@ -53,7 +43,7 @@ def init(
     ] = False,
 ) -> None:
     """Initialize handoff file for current branch."""
-    with _trace_scope(trace, "handoff init"):
+    with trace_scope(trace, "handoff init", domain="handoff"):
         logger.bind(command="handoff init", force=force).info("Initializing handoff")
 
         service = HandoffService()
@@ -81,7 +71,7 @@ def append(
     ] = False,
 ) -> None:
     """Append lightweight update to handoff file."""
-    with _trace_scope(trace, "handoff append"):
+    with trace_scope(trace, "handoff append", domain="handoff"):
         logger.bind(command="handoff append", actor=actor, kind=kind).info(
             "Appending handoff update"
         )

@@ -6,7 +6,6 @@ from typing import Annotated, Optional
 import typer
 from loguru import logger
 
-from vibe3.clients.git_client import GitClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _BACKEND_OPT,
@@ -18,6 +17,7 @@ from vibe3.commands.command_options import (
 from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
 from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.utils.trace import enable_trace
@@ -80,8 +80,8 @@ def _find_skill_file(skill_name: str) -> Path | None:
     Searches from the git root upward to locate skills/<name>/SKILL.md.
     """
     try:
-        git = GitClient()
-        repo_root = Path(git.get_git_common_dir()).parent
+        service = FlowService()
+        repo_root = Path(service.get_git_common_dir()).parent
     except Exception:
         repo_root = Path.cwd()
 

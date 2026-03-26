@@ -31,13 +31,11 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
     Raises:
         typer.Exit: If on main branch or flow creation fails
     """
-    from vibe3.clients.git_client import GitClient
     from vibe3.models.flow import MainBranchProtectedError
     from vibe3.services.flow_service import FlowService
 
-    git = GitClient()
-    branch = git.get_current_branch()
     flow_service = FlowService()
+    branch = flow_service.get_current_branch()
 
     try:
         flow_service.ensure_flow_for_branch(branch)

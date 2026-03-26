@@ -16,22 +16,36 @@ from vibe3.models.flow import (
 )
 from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
+from vibe3.services.flow_query_mixin import FlowQueryMixin
 
 
-class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
+class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
     """Service for managing flow state."""
 
     def __init__(
-        self, store: SQLiteClient | None = None, config: VibeConfig | None = None
+        self,
+        store: SQLiteClient | None = None,
+        git_client: GitClient | None = None,
+        config: VibeConfig | None = None,
     ) -> None:
         """Initialize flow service.
 
         Args:
             store: SQLiteClient instance for persistence
+            git_client: GitClient instance for git operations
             config: VibeConfig instance for configuration
         """
         self.store = store or SQLiteClient()
+        self.git_client = git_client or GitClient()
         self.config = config or VibeConfig.get_defaults()
+
+    def get_current_branch(self) -> str:
+        """Get current git branch.
+
+        Returns:
+            Current branch name
+        """
+        return self.git_client.get_current_branch()
 
     def create_flow(
         self,
@@ -50,7 +64,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         Raises:
             MainBranchProtectedError: If branch is main/master
         """
-        # Guard against main branch
         if self._is_main_branch(branch):
             raise MainBranchProtectedError(
                 f"Cannot create flow on protected branch '{branch}'. "
@@ -101,7 +114,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         Raises:
             RuntimeError: If branch already exists or worktree is dirty
         """
-        git = GitClient()
         branch = f"task/{slug}"
 
         logger.bind(
@@ -112,31 +124,25 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
             start_ref=start_ref,
         ).info("Creating flow with branch")
 
-        # Check if branch already exists
-        if git.branch_exists(branch):
+        if self.git_client.branch_exists(branch):
             raise RuntimeError(f"Branch '{branch}' already exists")
 
-        # Check if worktree is dirty
-        if git.has_uncommitted_changes() and not save_unstash:
+        if self.git_client.has_uncommitted_changes() and not save_unstash:
             raise RuntimeError(
                 "Worktree has uncommitted changes. "
                 "Use --save-unstash to stash them automatically."
             )
 
-        # Stash changes if requested
         stash_ref = None
-        if save_unstash and git.has_uncommitted_changes():
-            stash_ref = git.stash_push(message=f"vibe flow new {slug}")
+        if save_unstash and self.git_client.has_uncommitted_changes():
+            stash_ref = self.git_client.stash_push(message=f"vibe flow new {slug}")
 
-        # Create and switch to new branch
-        git.create_branch(branch, start_ref)
+        self.git_client.create_branch(branch, start_ref)
 
-        # Create flow state
         flow = self.create_flow(slug, branch)
 
-        # Restore stash if we stashed
         if stash_ref:
-            git.stash_apply(stash_ref)
+            self.git_client.stash_apply(stash_ref)
 
         return flow
 
@@ -155,15 +161,12 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         Raises:
             RuntimeError: If flow not found
         """
-        git = GitClient()
-
         logger.bind(
             domain="flow",
             action="switch",
             target=target,
         ).info("Switching to flow")
 
-        # Find the flow - try by slug first, then by branch
         flows = self.list_flows()
         target_flow = None
         for flow in flows:
@@ -174,21 +177,17 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         if not target_flow:
             raise RuntimeError(f"Flow '{target}' not found")
 
-        # Check if branch exists
-        if not git.branch_exists(target_flow.branch):
+        if not self.git_client.branch_exists(target_flow.branch):
             raise RuntimeError(f"Branch '{target_flow.branch}' does not exist")
 
-        # Stash current changes
         stash_ref = None
-        if git.has_uncommitted_changes():
-            stash_ref = git.stash_push(message=f"vibe flow switch {target}")
+        if self.git_client.has_uncommitted_changes():
+            stash_ref = self.git_client.stash_push(message=f"vibe flow switch {target}")
 
-        # Switch to target branch
-        git.switch_branch(target_flow.branch)
+        self.git_client.switch_branch(target_flow.branch)
 
-        # Restore stash if we stashed
         if stash_ref:
-            git.stash_apply(stash_ref)
+            self.git_client.stash_apply(stash_ref)
 
         return target_flow
 
@@ -211,7 +210,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
         if not flow_data:
             return None
 
-        # Get issue links
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
@@ -255,10 +253,8 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin):
             status=status,
         ).debug("Listing flows")
 
-        # Get all flows, not just active ones
         flows_data = self.store.get_all_flows()
 
-        # Apply status filter if provided
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 

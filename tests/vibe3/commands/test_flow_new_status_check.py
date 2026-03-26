@@ -14,14 +14,10 @@ class TestFlowAddStatusCheck:
     """Tests for flow add status checking."""
 
     @patch("vibe3.commands.flow.FlowService")
-    @patch("vibe3.commands.flow.GitClient")
-    def test_active_flow_blocks_creation(self, mock_git_class, mock_service_class):
+    def test_active_flow_blocks_creation(self, mock_service_class):
         """Active flow should block creation."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
-
         mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
         mock_flow = MagicMock(spec=FlowStatusResponse)
         mock_flow.flow_status = "active"
         mock_flow.flow_slug = "test-flow"
@@ -35,14 +31,10 @@ class TestFlowAddStatusCheck:
         mock_service.create_flow.assert_not_called()
 
     @patch("vibe3.commands.flow.FlowService")
-    @patch("vibe3.commands.flow.GitClient")
-    def test_active_flow_force_create(self, mock_git_class, mock_service_class):
+    def test_active_flow_force_create(self, mock_service_class):
         """Active flow with --yes should force create."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
-
         mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
         mock_flow = MagicMock(spec=FlowStatusResponse)
         mock_flow.flow_status = "active"
         mock_flow.flow_slug = "test-flow"
@@ -58,14 +50,10 @@ class TestFlowAddStatusCheck:
         mock_service.create_flow.assert_called_once()
 
     @patch("vibe3.commands.flow.FlowService")
-    @patch("vibe3.commands.flow.GitClient")
-    def test_done_flow_allows_creation(self, mock_git_class, mock_service_class):
+    def test_done_flow_allows_creation(self, mock_service_class):
         """Done flow should allow creation with warning."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
-
         mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
         mock_flow = MagicMock(spec=FlowStatusResponse)
         mock_flow.flow_status = "done"
         mock_flow.flow_slug = "test-flow"
@@ -82,14 +70,10 @@ class TestFlowAddStatusCheck:
         mock_service.create_flow.assert_called_once()
 
     @patch("vibe3.commands.flow.FlowService")
-    @patch("vibe3.commands.flow.GitClient")
-    def test_aborted_flow_allows_creation(self, mock_git_class, mock_service_class):
+    def test_aborted_flow_allows_creation(self, mock_service_class):
         """Aborted flow should allow creation with warning."""
-        mock_git = MagicMock()
-        mock_git.get_current_branch.return_value = "feature/test"
-        mock_git_class.return_value = mock_git
-
         mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "feature/test"
         mock_flow = MagicMock(spec=FlowStatusResponse)
         mock_flow.flow_status = "aborted"
         mock_flow.flow_slug = "test-flow"
