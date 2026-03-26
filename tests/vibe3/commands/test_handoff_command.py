@@ -15,7 +15,7 @@ class TestHandoffCommands:
     """Tests for handoff CLI commands."""
 
     @pytest.mark.parametrize("force,expected_force", [(False, False), (True, True)])
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_init_command(self, mock_service_class, force, expected_force):
         """Test handoff init command."""
         mock_service = MagicMock()
@@ -34,8 +34,8 @@ class TestHandoffCommands:
             force=expected_force
         )
 
-    @patch("vibe3.commands.handoff.SQLiteClient")
-    @patch("vibe3.commands.handoff.GitClient")
+    @patch("vibe3.commands.handoff_read.SQLiteClient")
+    @patch("vibe3.commands.handoff_read.GitClient")
     def test_handoff_show_command(self, mock_git_class, mock_store_class):
         """Test handoff show command shows agent chain and events."""
         mock_git = MagicMock()
@@ -64,10 +64,10 @@ class TestHandoffCommands:
         mock_store.get_flow_state.assert_called_once()
         mock_store.get_events.assert_called_once()
 
-    @patch("vibe3.commands.handoff.render_handoff_summary")
-    @patch("vibe3.commands.handoff.render_handoff_list")
-    @patch("vibe3.commands.handoff.SQLiteClient")
-    @patch("vibe3.commands.handoff.GitClient")
+    @patch("vibe3.commands.handoff_read.render_handoff_summary")
+    @patch("vibe3.commands.handoff_read.render_handoff_list")
+    @patch("vibe3.commands.handoff_read.SQLiteClient")
+    @patch("vibe3.commands.handoff_read.GitClient")
     def test_handoff_list_command(
         self,
         mock_git_class,
@@ -116,7 +116,7 @@ class TestHandoffCommands:
         assert result.exit_code != 0
         assert "must be one of" in result.output
 
-    @patch("vibe3.commands.handoff.render_handoff_detail")
+    @patch("vibe3.commands.handoff_read.render_handoff_detail")
     def test_handoff_show_artifact(self, mock_render_detail):
         """Test handoff show --artifact renders single artifact."""
         with runner.isolated_filesystem():
@@ -148,7 +148,7 @@ class TestHandoffCommands:
         assert result.exit_code != 0
         assert "not a file" in result.output.lower()
 
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_append_command(self, mock_service_class):
         """Test handoff append command."""
         mock_service = MagicMock()
@@ -176,7 +176,7 @@ class TestHandoffCommands:
             "finding",
         )
 
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_plan_command(self, mock_service_class):
         """Test handoff plan command."""
         mock_service = MagicMock()
@@ -200,7 +200,7 @@ class TestHandoffCommands:
             "docs/plans/test-plan.md", None, None, "claude/sonnet-4.6"
         )
 
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_report_command(self, mock_service_class):
         """Test handoff report command."""
         mock_service = MagicMock()
@@ -229,7 +229,7 @@ class TestHandoffCommands:
             "claude/sonnet-4.6",
         )
 
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_audit_command(self, mock_service_class):
         """Test handoff audit command."""
         mock_service = MagicMock()
@@ -258,7 +258,7 @@ class TestHandoffCommands:
             "claude/sonnet-4.6",
         )
 
-    @patch("vibe3.commands.handoff.HandoffService")
+    @patch("vibe3.commands.handoff_write.HandoffService")
     def test_handoff_with_options(self, mock_service_class):
         """Test handoff commands with optional parameters."""
         mock_service = MagicMock()
