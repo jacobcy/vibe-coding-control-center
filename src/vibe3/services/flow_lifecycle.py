@@ -64,6 +64,7 @@ class FlowLifecycleMixin:
                     "can create downstream flow from current branch"
                 ),
                 start_ref=current_branch,
+                allow_base_current=True,
                 requires_new_worktree=False,
             )
 
@@ -98,8 +99,12 @@ class FlowLifecycleMixin:
         Returns:
             CloseTargetDecision with target branch and behavior
         """
+        dependency_store = self.store
+        if not hasattr(dependency_store, "get_flow_dependents"):
+            dependency_store = SQLiteClient()
+
         try:
-            dependents = self.store.get_flow_dependents(branch)
+            dependents = dependency_store.get_flow_dependents(branch)
         except Exception as e:
             logger.warning(f"Failed to query flow dependents: {e}")
             dependents = []
@@ -122,39 +127,6 @@ class FlowLifecycleMixin:
             should_pull=True,
             reason="No single active dependent - returning to safe branch",
         )
-
-    def _resolve_close_target_branch(
-        self: Any,
-        branch: str,
-    ) -> tuple[str, bool]:
-        """Resolve which branch to switch to after closing a flow.
-
-        Rules (explicit, no guessing):
-        1. If a single dependent flow exists (active), return to that branch
-        2. Otherwise, return to main (safe branch) with pull
-
-        Returns:
-            Tuple of target branch and whether latest changes should be pulled.
-        """
-        store = SQLiteClient()
-        try:
-            dependents = store.get_flow_dependents(branch)
-        except Exception as e:
-            logger.warning(f"Failed to query flow dependents: {e}")
-            dependents = []
-
-        if len(dependents) == 1:
-            logger.info(f"Single dependent flow found: {dependents[0]}")
-            return dependents[0], False
-
-        if len(dependents) > 1:
-            logger.warning(
-                f"Multiple flows depend on '{branch}': {', '.join(dependents)}\n"
-                f"Returning to 'main'. "
-                f"Use 'vibe3 flow switch <branch>' to switch to a specific branch"
-            )
-
-        return "main", True
 
     def close_flow(
         self: Any,
@@ -184,9 +156,11 @@ class FlowLifecycleMixin:
             raise RuntimeError(f"Flow not found for branch {branch}")
 
         try:
-            target_branch, should_pull = self._resolve_close_target_branch(branch)
+            close_target = self.resolve_close_target(branch)
+            target_branch = close_target.target_branch
+            should_pull = close_target.should_pull
         except Exception as e:
-            logger.warning(f"Failed to check dependents: {e}")
+            logger.warning(f"Failed to resolve close target: {e}")
             target_branch, should_pull = "main", True
 
         switched_before_delete = False

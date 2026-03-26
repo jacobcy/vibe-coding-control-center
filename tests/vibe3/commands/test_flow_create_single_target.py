@@ -49,6 +49,7 @@ class TestFlowCreateSingleTarget:
             allowed=True,
             reason="Current flow is blocked - can create downstream flow from current branch",
             start_ref="task/blocked-flow",
+            allow_base_current=True,
             requires_new_worktree=False,
         )
         mock_service.create_flow_with_branch.return_value = FlowState(
@@ -68,6 +69,38 @@ class TestFlowCreateSingleTarget:
 
     @patch("vibe3.commands.flow.HandoffService")
     @patch("vibe3.commands.flow.FlowService")
+    def test_flow_create_allows_base_current_when_flow_is_blocked(
+        self, mock_service_class, mock_handoff_class
+    ):
+        """Blocked flow should explicitly allow --base current."""
+        mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "task/blocked-flow"
+        mock_service.can_create_from_current_worktree.return_value = CreateDecision(
+            allowed=True,
+            reason="Current flow is blocked - can create downstream flow from current branch",
+            start_ref="task/blocked-flow",
+            allow_base_current=True,
+            requires_new_worktree=False,
+        )
+        mock_service.create_flow_with_branch.return_value = FlowState(
+            branch="task/new-feature",
+            flow_slug="new-feature",
+            flow_status="active",
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(
+            app, ["flow", "create", "new-feature", "--base", "current"]
+        )
+
+        assert result.exit_code == 0
+        mock_service.create_flow_with_branch.assert_called_once_with(
+            slug="new-feature",
+            start_ref="task/blocked-flow",
+        )
+
+    @patch("vibe3.commands.flow.HandoffService")
+    @patch("vibe3.commands.flow.FlowService")
     def test_flow_create_guides_wtnew_for_new_feature(
         self, mock_service_class, mock_handoff_class
     ):
@@ -78,6 +111,7 @@ class TestFlowCreateSingleTarget:
             allowed=True,
             reason="No active flow in current worktree",
             start_ref="origin/main",
+            allow_base_current=False,
             requires_new_worktree=False,
         )
         mock_service.create_flow_with_branch.return_value = FlowState(
@@ -107,6 +141,7 @@ class TestFlowCreateSingleTarget:
             allowed=True,
             reason="Current flow is done - safe to start new target",
             start_ref="origin/main",
+            allow_base_current=False,
             requires_new_worktree=False,
         )
         mock_service.create_flow_with_branch.return_value = FlowState(
@@ -123,3 +158,26 @@ class TestFlowCreateSingleTarget:
             slug="new-feature",
             start_ref="origin/main",
         )
+
+    @patch("vibe3.commands.flow.HandoffService")
+    @patch("vibe3.commands.flow.FlowService")
+    def test_flow_create_rejects_base_current_when_flow_not_blocked(
+        self, mock_service_class, mock_handoff_class
+    ):
+        """--base current should be rejected unless current flow is blocked."""
+        mock_service = MagicMock()
+        mock_service.get_current_branch.return_value = "task/done-flow"
+        mock_service.can_create_from_current_worktree.return_value = CreateDecision(
+            allowed=True,
+            reason="Current flow is done - safe to start new target",
+            start_ref="origin/main",
+            allow_base_current=False,
+            requires_new_worktree=False,
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["flow", "create", "new-feature", "--base", "current"])
+
+        assert result.exit_code == 1
+        assert "only allowed when current flow is blocked" in result.output
+        mock_service.create_flow_with_branch.assert_not_called()

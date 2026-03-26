@@ -114,6 +114,7 @@ class CreateDecision(BaseModel):
     allowed: bool
     reason: str
     start_ref: str | None = None
+    allow_base_current: bool = False
     requires_new_worktree: bool = False
     guidance: str | None = None
 

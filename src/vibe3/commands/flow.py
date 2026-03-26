@@ -202,6 +202,15 @@ def create(
             console.print(f"[yellow]Hint: {decision.guidance}[/]")
             raise typer.Exit(1)
 
+        if base == "current" and not decision.allow_base_current:
+            console.print(
+                "[red]Error: '--base current' is only allowed when current flow is blocked.[/]"
+            )
+            console.print(
+                "[yellow]For independent new features, use 'vibe3 wtnew <name>' first.[/]"
+            )
+            raise typer.Exit(1)
+
         if base == "main":
             start_ref = decision.start_ref or "origin/main"
         elif base == "current":

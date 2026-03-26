@@ -20,12 +20,10 @@ class TestFlowLifecycle:
             "updated_at": "2026-03-26T00:00:00",
         }
 
-    @patch("vibe3.services.flow_lifecycle.SQLiteClient")
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_switches_off_current_branch_before_delete(
         self,
         mock_git_class: MagicMock,
-        mock_sqlite_class: MagicMock,
         mock_store: Mock,
     ) -> None:
         """Closing the current worktree branch should switch away before delete."""
@@ -47,9 +45,7 @@ class TestFlowLifecycle:
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
 
-        mock_dependency_store = MagicMock()
-        mock_dependency_store.get_flow_dependents.return_value = []
-        mock_sqlite_class.return_value = mock_dependency_store
+        mock_store.get_flow_dependents.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -69,12 +65,10 @@ class TestFlowLifecycle:
             "Flow closed, branch 'task/current-flow' deleted",
         )
 
-    @patch("vibe3.services.flow_lifecycle.SQLiteClient")
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_switches_to_single_dependent_without_pull(
         self,
         mock_git_class: MagicMock,
-        mock_sqlite_class: MagicMock,
         mock_store: Mock,
     ) -> None:
         """Single dependent branch should be the switch target without pulling."""
@@ -96,9 +90,7 @@ class TestFlowLifecycle:
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
 
-        mock_dependency_store = MagicMock()
-        mock_dependency_store.get_flow_dependents.return_value = ["task/dependent"]
-        mock_sqlite_class.return_value = mock_dependency_store
+        mock_store.get_flow_dependents.return_value = ["task/dependent"]
 
         service = FlowService(store=mock_store)
 
@@ -109,12 +101,10 @@ class TestFlowLifecycle:
         )
         assert not any(action == "run:pull" for action in actions)
 
-    @patch("vibe3.services.flow_lifecycle.SQLiteClient")
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_raises_if_current_branch_cannot_switch_away(
         self,
         mock_git_class: MagicMock,
-        mock_sqlite_class: MagicMock,
         mock_store: Mock,
     ) -> None:
         """Current branch close should fail clearly when switch target is unavailable."""
@@ -125,9 +115,7 @@ class TestFlowLifecycle:
         mock_git.switch_branch.side_effect = RuntimeError("checkout failed")
         mock_git_class.return_value = mock_git
 
-        mock_dependency_store = MagicMock()
-        mock_dependency_store.get_flow_dependents.return_value = []
-        mock_sqlite_class.return_value = mock_dependency_store
+        mock_store.get_flow_dependents.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -139,12 +127,10 @@ class TestFlowLifecycle:
         mock_git.delete_branch.assert_not_called()
         mock_store.update_flow_state.assert_not_called()
 
-    @patch("vibe3.services.flow_lifecycle.SQLiteClient")
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_does_not_pull_if_post_close_switch_fails(
         self,
         mock_git_class: MagicMock,
-        mock_sqlite_class: MagicMock,
         mock_store: Mock,
     ) -> None:
         """Post-close switch failure should not pull on an unrelated current branch."""
@@ -164,9 +150,7 @@ class TestFlowLifecycle:
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
 
-        mock_dependency_store = MagicMock()
-        mock_dependency_store.get_flow_dependents.return_value = []
-        mock_sqlite_class.return_value = mock_dependency_store
+        mock_store.get_flow_dependents.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -175,12 +159,10 @@ class TestFlowLifecycle:
         assert "delete_local:task/current-flow:True" in actions
         assert not any(action == "run:pull" for action in actions)
 
-    @patch("vibe3.services.flow_lifecycle.SQLiteClient")
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_falls_back_to_main_when_dependency_lookup_fails(
         self,
         mock_git_class: MagicMock,
-        mock_sqlite_class: MagicMock,
         mock_store: Mock,
     ) -> None:
         """Dependency lookup failure should still close flow via main fallback."""
@@ -202,11 +184,7 @@ class TestFlowLifecycle:
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
 
-        mock_dependency_store = MagicMock()
-        mock_dependency_store.get_flow_dependents.side_effect = RuntimeError(
-            "db unavailable"
-        )
-        mock_sqlite_class.return_value = mock_dependency_store
+        mock_store.get_flow_dependents.side_effect = RuntimeError("db unavailable")
 
         service = FlowService(store=mock_store)
 
@@ -216,9 +194,7 @@ class TestFlowLifecycle:
             "delete_local:task/current-flow:True"
         )
         assert "run:pull" in actions
-        mock_dependency_store.get_flow_dependents.assert_called_once_with(
-            "task/current-flow"
-        )
+        mock_store.get_flow_dependents.assert_called_once_with("task/current-flow")
         mock_store.update_flow_state.assert_called_once_with(
             "task/current-flow",
             flow_status="done",
