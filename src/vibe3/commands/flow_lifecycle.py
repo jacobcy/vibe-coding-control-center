@@ -71,8 +71,7 @@ def blocked(
         int | None, typer.Option("--task", help="Dependency issue number")
     ] = None,
     by: Annotated[
-        int | None,
-        typer.Option("--by", help="Dependency issue number (alias for --task)"),
+        int | None, typer.Option("--by", help="Dependency issue number")
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -91,29 +90,24 @@ def blocked(
         service = FlowService()
         target_branch = branch or service.get_current_branch()
 
-        if task is not None and by is not None:
-            typer.echo("Error: Cannot use both --task and --by", err=True)
-            raise typer.Exit(1)
-
-        # Prefer --task, fallback to --by for backward compatibility
-        dependency_issue = task or by
-
         logger.bind(
             command="flow blocked",
             branch=target_branch,
             reason=reason,
-            task=dependency_issue,
+            task=task,
+            by=by,
         ).info("Blocking flow")
 
+        blocked_by_issue = task if task is not None else by
         service.block_flow(
-            target_branch, reason=reason, blocked_by_issue=dependency_issue
+            target_branch, reason=reason, blocked_by_issue=blocked_by_issue
         )
 
         msg = f"Flow blocked on branch '{target_branch}'"
         if reason:
             msg += f": {reason}"
-        if dependency_issue:
-            msg += f" (blocked by #{dependency_issue})"
+        if blocked_by_issue:
+            msg += f" (blocked by #{blocked_by_issue})"
         typer.echo(msg)
 
 
