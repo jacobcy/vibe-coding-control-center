@@ -54,10 +54,6 @@ def add(
     spec: Annotated[
         str | None, typer.Option("--spec", help="Spec file path or issue reference")
     ] = None,
-    force: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
-    ] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -66,15 +62,10 @@ def add(
     """Add flow to current branch.
 
     This command registers a flow on the current branch.
-    Use 'flow create' to create a new branch with flow.
-
-    If current branch already has a flow:
-    - Active/blocked flow: Error (use --yes to force)
-    - Done/aborted/stale flow: Warning, then proceed
+    The branch must not already have any flow record.
 
     Examples:
         vibe3 flow add my-feature
-        vibe3 flow add my-feature --yes  # Force add on branch with active flow
     """
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task).info("Adding flow")
@@ -82,36 +73,16 @@ def add(
         service = FlowService()
         branch = service.get_current_branch()
 
-        # Check if flow already exists
         existing_flow = service.get_flow_status(branch)
         if existing_flow:
-            status = existing_flow.flow_status
+            console.print(
+                f"[red]Error: Branch '{branch}' already has flow: "
+                f"{existing_flow.flow_slug}[/]"
+            )
+            raise typer.Exit(1)
 
-            # Active/blocked flow: block add
-            if status in ["active", "blocked"]:
-                if not force:
-                    console.print(
-                        f"[red]Error: Branch '{branch}' has active flow: "
-                        f"{existing_flow.flow_slug}[/]"
-                    )
-                    console.print(
-                        "[yellow]Use --yes to force add, "
-                        "or switch to another branch first[/]"
-                    )
-                    raise typer.Exit(1)
-
-            # Done/aborted/stale flow: allow add with warning
-            if status in ["done", "aborted", "stale"] and not force:
-                console.print(
-                    f"[yellow]Warning: Branch '{branch}' has completed flow: "
-                    f"{existing_flow.flow_slug}[/]"
-                )
-                console.print("[yellow]Adding new flow to this branch[/]")
-
-        # Register flow
         flow = service.create_flow(slug=name, branch=branch)
 
-        # Bind task if provided
         if task:
             try:
                 service.bind_task(branch, task, "system")
@@ -120,11 +91,9 @@ def add(
                     "Invalid task ID format, skipping binding"
                 )
 
-        # Bind spec_ref if provided
         if spec:
             service.bind_spec(branch, spec, "system")
 
-        # Auto-initialize handoff current.md
         HandoffService().ensure_current_handoff()
 
         if json_output:
@@ -141,10 +110,6 @@ def new(
         str | None, typer.Option(help="Issue reference to bind as task")
     ] = None,
     spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
-    force: Annotated[
-        bool,
-        typer.Option("--yes", "-y", help="Force add on branch with existing flow"),
-    ] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -158,7 +123,7 @@ def new(
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
-    add(name, task, spec, force, trace, json_output)
+    add(name, task, spec, trace, json_output)
 
 
 @app.command(name="create")
