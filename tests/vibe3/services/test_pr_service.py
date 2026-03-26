@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
@@ -41,6 +42,7 @@ def test_create_draft_pr_success(
     """Test create draft PR success."""
     mock_github_client.check_auth.return_value = True
     mock_github_client.get_current_branch.return_value = "feature-branch"
+    mock_github_client.list_prs_for_branch.return_value = []
     mock_github_client.create_pr.return_value = PRResponse(
         number=123,
         title="Test PR",
@@ -77,6 +79,12 @@ def test_create_draft_pr_success(
                 assert pr.number == 123
                 assert pr.draft is True
                 mock_github_client.create_pr.assert_called_once()
+                mock_github_client.list_prs_for_branch.assert_called_once_with(
+                    "feature-branch"
+                )
+                pr_service.git_client.push_branch.assert_called_once_with(
+                    "feature-branch", set_upstream=True
+                )
                 # Verify metadata was read from flow
                 mock_store.get_flow_state.assert_called_once_with("feature-branch")
                 mock_store.update_flow_state.assert_called_once_with(
@@ -101,6 +109,33 @@ def test_create_draft_pr_auth_failure(
     with patch.object(pr_service, "github_client", mock_github_client):
         with pytest.raises(RuntimeError, match="Not authenticated"):
             pr_service.create_draft_pr(title="Test", body="Body")
+
+
+def test_create_draft_pr_duplicate_branch_pr(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
+    mock_github_client.check_auth.return_value = True
+    mock_github_client.list_prs_for_branch.return_value = [
+        PRResponse(
+            number=321,
+            title="Existing PR",
+            body="",
+            state=PRState.OPEN,
+            head_branch="feature-branch",
+            base_branch="main",
+            url="https://github.com/org/repo/pull/321",
+            draft=True,
+        )
+    ]
+
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "git_client") as mock_git_client:
+            mock_git_client.get_current_branch.return_value = "feature-branch"
+
+            with pytest.raises(UserError, match="PR already exists"):
+                pr_service.create_draft_pr(title="Test", body="Body")
+
+            mock_git_client.push_branch.assert_not_called()
 
 
 def test_get_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:

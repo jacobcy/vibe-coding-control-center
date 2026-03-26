@@ -171,3 +171,22 @@ class GitClient:
     def branch_exists(self, branch_name: str) -> bool:
         """Check if branch exists (local or remote)."""
         return _branch_exists(branch_name)
+
+    def push_branch(
+        self,
+        branch_name: str,
+        remote: str = "origin",
+        set_upstream: bool = True,
+    ) -> None:
+        """Push branch to remote.
+
+        Args:
+            branch_name: Branch to push
+            remote: Remote name, default origin
+            set_upstream: Whether to set upstream tracking
+        """
+        args = ["push"]
+        if set_upstream:
+            args.append("-u")
+        args.extend([remote, branch_name])
+        self._run(args)
