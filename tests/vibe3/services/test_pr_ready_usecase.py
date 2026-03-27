@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.models.pr import PRResponse, PRState
-from vibe3.services.pr_ready_usecase import PrReadyUsecase
+from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 
 
 def _pr_response() -> PRResponse:
@@ -43,7 +43,7 @@ def test_mark_ready_skips_service_when_not_confirmed() -> None:
         confirmer=confirmer,
     )
 
-    with pytest.raises(RuntimeError, match="aborted by user"):
+    with pytest.raises(PrReadyAbortedError, match="aborted by user"):
         usecase.mark_ready(pr_number=123, yes=False)
 
     gate_runner.assert_called_once_with(123, False)

@@ -6,6 +6,10 @@ from vibe3.models.pr import PRResponse
 from vibe3.services.pr_service import PRService
 
 
+class PrReadyAbortedError(RuntimeError):
+    """Raised when user cancels PR ready confirmation."""
+
+
 class PrReadyUsecase:
     """Coordinate PR ready sequencing while keeping UI in command layer."""
 
@@ -27,5 +31,5 @@ class PrReadyUsecase:
         """Run gates, enforce confirmation, then mark PR ready."""
         self.gate_runner(pr_number, yes)
         if not yes and self.confirmer is not None and not self.confirmer(pr_number):
-            raise RuntimeError("aborted by user")
+            raise PrReadyAbortedError("aborted by user")
         return self.pr_service.mark_ready(pr_number)

@@ -13,7 +13,7 @@ from loguru import logger
 from vibe3.commands.pr_helpers import noop_context
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
-from vibe3.services.pr_ready_usecase import PrReadyUsecase
+from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_ready
 
@@ -87,11 +87,9 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
 
             try:
                 pr = _build_pr_ready_usecase().mark_ready(pr_number=pr_number, yes=yes)
-            except RuntimeError as error:
-                if str(error) == "aborted by user":
-                    logger.info("Aborted by user")
-                    raise typer.Exit(0) from None
-                raise
+            except PrReadyAbortedError:
+                logger.info("Aborted by user")
+                raise typer.Exit(0) from None
 
             if json_output:
                 typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
