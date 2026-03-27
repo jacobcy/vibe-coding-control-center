@@ -24,21 +24,34 @@ class TestTransitionIssueState:
     def test_returns_true_on_success(self, mock_service_class: MagicMock):
         """Test that function returns success=True on successful transition."""
         mock_service = MagicMock()
+        mock_service.confirm_issue_state.return_value = "advanced"
         mock_service_class.return_value = mock_service
 
         result = transition_issue_state(123, IssueState.CLAIMED, "agent:plan")
 
-        mock_service.transition.assert_called_once_with(
+        mock_service.confirm_issue_state.assert_called_once_with(
             123, IssueState.CLAIMED, "agent:plan"
         )
         assert result.success is True
         assert result.issue_number == 123
 
     @patch("vibe3.services.label_integration.LabelService")
-    def test_returns_false_on_exception(self, mock_service_class: MagicMock):
-        """Test that function returns success=False on exception."""
+    def test_returns_false_on_blocked(self, mock_service_class: MagicMock):
+        """Test that function returns success=False on blocked transition."""
         mock_service = MagicMock()
-        mock_service.transition.side_effect = Exception("API error")
+        mock_service.confirm_issue_state.return_value = "blocked"
+        mock_service_class.return_value = mock_service
+
+        result = transition_issue_state(123, IssueState.CLAIMED, "agent:plan")
+
+        assert result.success is False
+        assert result.error == "state_transition_blocked"
+
+    @patch("vibe3.services.label_integration.LabelService")
+    def test_returns_false_on_exception(self, mock_service_class: MagicMock):
+        """Test that function returns success=False on unexpected exception."""
+        mock_service = MagicMock()
+        mock_service.confirm_issue_state.side_effect = Exception("API error")
         mock_service_class.return_value = mock_service
 
         result = transition_issue_state(123, IssueState.CLAIMED, "agent:plan")

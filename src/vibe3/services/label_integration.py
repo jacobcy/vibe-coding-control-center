@@ -2,7 +2,6 @@
 
 from loguru import logger
 
-from vibe3.exceptions import InvalidTransitionError
 from vibe3.models.orchestration import IssueState
 from vibe3.services.label_service import LabelService
 
@@ -42,7 +41,13 @@ def transition_issue_state(
 
     try:
         service = LabelService()
-        service.transition(issue_number, to_state, actor)
+        result = service.confirm_issue_state(issue_number, to_state, actor)
+        if result == "blocked":
+            return LabelTransitionResult(
+                success=False,
+                issue_number=issue_number,
+                error="state_transition_blocked",
+            )
         logger.bind(
             domain="label",
             issue_number=issue_number,
@@ -50,16 +55,6 @@ def transition_issue_state(
             actor=actor,
         ).info("Issue state transitioned")
         return LabelTransitionResult(success=True, issue_number=issue_number)
-    except InvalidTransitionError as e:
-        logger.bind(
-            domain="label",
-            issue_number=issue_number,
-            to_state=to_state.value,
-            error=str(e),
-        ).warning(f"Invalid state transition: {e}")
-        return LabelTransitionResult(
-            success=False, issue_number=issue_number, error=str(e)
-        )
     except Exception as e:
         logger.bind(
             domain="label",
