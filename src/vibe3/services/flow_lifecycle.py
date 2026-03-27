@@ -8,10 +8,10 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
-from vibe3.models.pr import PRState
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
+from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
 
 
 class FlowLifecycleMixin:
@@ -138,33 +138,7 @@ class FlowLifecycleMixin:
                 f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
             )
         if check_pr:
-            pr_number = flow_data.get("pr_number")
-            try:
-                gh = GitHubClient()
-                pr = gh.get_pr(pr_number) if pr_number else None
-                if pr is None:
-                    pr = gh.get_pr(branch=branch)
-            except Exception as error:
-                raise UserError(
-                    "无法检查当前 flow 的 PR merge 状态。\n"
-                    "请先确认 PR 已 merged；\n"
-                    "若要放弃当前 flow，请执行 `vibe3 flow aborted`。\n"
-                    f"原始错误: {error}"
-                ) from error
-
-            if not pr:
-                raise UserError(
-                    "当前 flow 未找到可关闭的 PR。\n"
-                    "请先执行 `vibe3 pr create` 并完成 merge；"
-                    "若要放弃当前 flow，请执行 `vibe3 flow aborted`。"
-                )
-
-            merged = pr.state == PRState.MERGED or pr.merged_at is not None
-            if not merged:
-                raise UserError(
-                    f"PR #{pr.number} 尚未 merged，不能关闭 flow。\n"
-                    "请先完成 merge；若要放弃当前 flow，请执行 `vibe3 flow aborted`。"
-                )
+            ensure_flow_pr_merged(GitHubClient(), flow_data, branch)
 
         try:
             close_target = self.resolve_close_target(branch)
