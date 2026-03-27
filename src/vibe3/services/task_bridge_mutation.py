@@ -6,6 +6,7 @@ from loguru import logger
 
 from vibe3.models.project_item import LinkError, ProjectItemError
 from vibe3.models.task_bridge import TaskBridgeModel
+from vibe3.services.label_service import LabelService
 
 
 def auto_link_issue_to_project(
@@ -19,11 +20,8 @@ def auto_link_issue_to_project(
     3. 若不存在，调用 add_issue_to_project 添加
     4. 将 project_item_id / project_node_id 写入本地 SQLite
     """
-    from vibe3.services.task_label_service import TaskLabelService
-
-    # 确保 vibe-task label
-    label_svc = TaskLabelService()
-    label_svc.ensure_vibe_task_label(issue_number)
+    # 确保 vibe-task label（幂等）
+    LabelService().confirm_vibe_task(issue_number, should_exist=True)
 
     client = self._get_project_client()
     if not client:

@@ -6,9 +6,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from loguru import logger
 
+from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.master import TriageDecision, run_master_agent
 from vibe3.orchestra.models import IssueInfo
+from vibe3.services.label_service import LabelService
 
 
 class MasterAgentHandler:
@@ -59,17 +61,12 @@ class MasterAgentHandler:
             subprocess.run(cmd, capture_output=True)
 
         elif decision.action == "triage":
-            cmd = [
-                "gh",
-                "issue",
-                "edit",
-                str(issue_number),
-                "--add-label",
-                "state/ready",
-            ]
-            if self.config.repo:
-                cmd.extend(["--repo", self.config.repo])
-            subprocess.run(cmd, capture_output=True)
+            LabelService(repo=self.config.repo).confirm_issue_state(
+                issue_number,
+                IssueState.READY,
+                actor="orchestra:triage",
+                force=True,
+            )
 
         elif decision.action == "comment" and decision.comment_body:
             cmd = [

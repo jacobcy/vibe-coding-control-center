@@ -36,20 +36,33 @@ def test_run_direct_help_shows_file_option() -> None:
 
 
 def test_run_file_not_found() -> None:
-    result = runner.invoke(cli_app, ["run", "--file", "nonexistent.md"])
+    with patch(
+        "vibe3.commands.run.ensure_flow_for_current_branch",
+        return_value=(MagicMock(), "task/test-branch"),
+    ):
+        with patch(
+            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            return_value=MagicMock(success=True),
+        ) as mock_execute:
+            result = runner.invoke(cli_app, ["run", "--file", "nonexistent.md"])
 
     assert result.exit_code != 0
+    assert "Plan file not found: nonexistent.md" in strip_ansi(result.output)
+    mock_execute.assert_not_called()
 
 
 def test_run_dry_run_shows_command() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
-        with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
-            return_value=MagicMock(success=True),
-        ) as mock_execute:
-            result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--dry-run"])
+        with patch("vibe3.commands.run._ensure_plan_file_exists"):
+            with patch(
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
+                result = runner.invoke(
+                    cli_app, ["run", "--file", "plan.md", "--dry-run"]
+                )
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
@@ -62,14 +75,22 @@ def test_run_with_agent_override() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
-        with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
-            return_value=MagicMock(success=True),
-        ) as mock_execute:
-            result = runner.invoke(
-                cli_app,
-                ["run", "--file", "plan.md", "--agent", "executor-pro", "--dry-run"],
-            )
+        with patch("vibe3.commands.run._ensure_plan_file_exists"):
+            with patch(
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
+                result = runner.invoke(
+                    cli_app,
+                    [
+                        "run",
+                        "--file",
+                        "plan.md",
+                        "--agent",
+                        "executor-pro",
+                        "--dry-run",
+                    ],
+                )
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
@@ -81,23 +102,24 @@ def test_run_with_backend_override() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
-        with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
-            return_value=MagicMock(success=True),
-        ) as mock_execute:
-            result = runner.invoke(
-                cli_app,
-                [
-                    "run",
-                    "--file",
-                    "plan.md",
-                    "--backend",
-                    "claude",
-                    "--model",
-                    "claude-3-opus",
-                    "--dry-run",
-                ],
-            )
+        with patch("vibe3.commands.run._ensure_plan_file_exists"):
+            with patch(
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
+                result = runner.invoke(
+                    cli_app,
+                    [
+                        "run",
+                        "--file",
+                        "plan.md",
+                        "--backend",
+                        "claude",
+                        "--model",
+                        "claude-3-opus",
+                        "--dry-run",
+                    ],
+                )
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
@@ -111,14 +133,15 @@ def test_run_uses_shared_agent_options_with_run_context() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
-        with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
-            return_value=MagicMock(success=True),
-        ) as mock_execute:
-            result = runner.invoke(
-                cli_app,
-                ["run", "--file", "plan.md", "--dry-run"],
-            )
+        with patch("vibe3.commands.run._ensure_plan_file_exists"):
+            with patch(
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
+                result = runner.invoke(
+                    cli_app,
+                    ["run", "--file", "plan.md", "--dry-run"],
+                )
 
     assert result.exit_code == 0
     command = mock_execute.call_args.args[0]

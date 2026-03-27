@@ -1,7 +1,7 @@
 """Label service for GitHub state/* label operations."""
 
-import subprocess
 from datetime import datetime
+from typing import Literal
 
 from loguru import logger
 
@@ -12,6 +12,9 @@ from vibe3.models.orchestration import (
     IssueState,
     StateTransition,
 )
+from vibe3.services.state_sync_ports import GhIssueLabelPort, IssueLabelPort
+
+VIBE_TASK_LABEL = "vibe-task"
 
 
 class LabelService:
@@ -20,6 +23,13 @@ class LabelService:
     This is the core state machine, providing Python API for other services.
     No CLI commands exposed.
     """
+
+    def __init__(
+        self,
+        issue_port: IssueLabelPort | None = None,
+        repo: str | None = None,
+    ) -> None:
+        self.issue_port = issue_port or GhIssueLabelPort(repo=repo)
 
     def get_state(self, issue_number: int) -> IssueState | None:
         """Get current orchestration state of an issue.
@@ -37,32 +47,14 @@ class LabelService:
             issue_number=issue_number,
         ).debug("Getting issue state")
 
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "view",
-                str(issue_number),
-                "--json",
-                "labels",
-            ],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            logger.bind(external="github", error=result.stderr).warning(
-                f"Failed to get issue #{issue_number}"
+        labels = self.issue_port.get_issue_labels(issue_number)
+        if labels is None:
+            logger.bind(external="github", issue_number=issue_number).warning(
+                "Failed to get issue labels"
             )
             return None
 
-        import json
-
-        data = json.loads(result.stdout)
-        labels = data.get("labels", [])
-
-        for label in labels:
-            name = label.get("name", "")
+        for name in labels:
             state = IssueState.from_label(name)
             if state:
                 return state
@@ -120,6 +112,23 @@ class LabelService:
             forced=force,
         )
 
+    def confirm_issue_state(
+        self,
+        issue_number: int,
+        to_state: IssueState,
+        actor: str,
+        force: bool = False,
+    ) -> Literal["confirmed", "advanced", "blocked"]:
+        """Confirm target issue state with minimum action."""
+        current_state = self.get_state(issue_number)
+        if current_state == to_state:
+            return "confirmed"
+        try:
+            self.transition(issue_number, to_state, actor=actor, force=force)
+        except (InvalidTransitionError, RuntimeError):
+            return "blocked"
+        return "advanced"
+
     def set_state(self, issue_number: int, state: IssueState) -> None:
         """Directly set state (internal method, atomically replace state/* labels).
 
@@ -139,47 +148,52 @@ class LabelService:
 
     def _get_all_state_labels(self, issue_number: int) -> list[str]:
         """Get all state/* labels of an issue."""
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "view",
-                str(issue_number),
-                "--json",
-                "labels",
-            ],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
+        labels = self.issue_port.get_issue_labels(issue_number)
+        if labels is None:
             return []
+        return [name for name in labels if name.startswith("state/")]
 
-        import json
+    def has_label(self, issue_number: int, label: str) -> bool:
+        """Check whether an issue currently has the given label."""
+        labels = self.issue_port.get_issue_labels(issue_number)
+        return labels is not None and label in labels
 
-        data = json.loads(result.stdout)
-        labels = data.get("labels", [])
+    def confirm_vibe_task(
+        self,
+        issue_number: int,
+        should_exist: bool = True,
+    ) -> Literal["confirmed", "advanced", "blocked"]:
+        """Confirm vibe-task mirror label with minimum action."""
+        labels = self.issue_port.get_issue_labels(issue_number)
+        if labels is None:
+            return "blocked"
 
-        return [
-            label.get("name", "")
-            for label in labels
-            if label.get("name", "").startswith("state/")
-        ]
+        has_vibe_task = VIBE_TASK_LABEL in labels
+        if should_exist and has_vibe_task:
+            return "confirmed"
+        if (not should_exist) and (not has_vibe_task):
+            return "confirmed"
+
+        if should_exist:
+            ok = self.issue_port.add_issue_label(issue_number, VIBE_TASK_LABEL)
+        else:
+            ok = self.issue_port.remove_issue_label(issue_number, VIBE_TASK_LABEL)
+        if not ok:
+            return "blocked"
+        return "advanced"
 
     def _add_label(self, issue_number: int, label: str) -> None:
         """[Internal] Add label to issue."""
-        subprocess.run(
-            ["gh", "issue", "edit", str(issue_number), "--add-label", label],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        ok = self.issue_port.add_issue_label(issue_number, label)
+        if not ok:
+            raise RuntimeError(
+                f"Failed to add label '{label}' on issue #{issue_number}"
+            )
 
     def _remove_label(self, issue_number: int, label: str) -> None:
         """[Internal] Remove label from issue."""
-        subprocess.run(
-            ["gh", "issue", "edit", str(issue_number), "--remove-label", label],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        ok = self.issue_port.remove_issue_label(issue_number, label)
+        if not ok:
+            raise RuntimeError(
+                f"Failed to remove label '{label}' on issue #{issue_number}"
+            )

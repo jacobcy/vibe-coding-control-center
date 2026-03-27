@@ -21,9 +21,30 @@ def runner() -> CliRunner:
 class TestPRCreateCommandAI:
     """Tests for PR create command with --ai flag."""
 
+    def test_pr_create_confirms_existing_pr(self, runner: CliRunner) -> None:
+        """Existing PR should be confirmed without requiring title."""
+        with patch("vibe3.commands.pr_create.PRService") as mock_service:
+            existing_pr = MagicMock(
+                number=456,
+                title="Existing PR",
+                body="",
+                model_dump=lambda: {"number": 456, "title": "Existing PR"},
+            )
+            mock_service.return_value.get_pr.return_value = existing_pr
+
+            result = runner.invoke(app, ["pr", "create", "--json"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["number"] == 456
+        mock_service.return_value.sync_pr_state_from_remote.assert_called_once_with(
+            existing_pr, actor="server"
+        )
+        mock_service.return_value.create_draft_pr.assert_not_called()
+
     def test_pr_create_without_ai(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create without --ai flag works normally."""
         with patch("vibe3.commands.pr_create.PRService") as mock_service:
+            mock_service.return_value.get_pr.return_value = None
             mock_service.return_value.create_draft_pr.return_value = MagicMock(
                 number=123,
                 title="Test PR",
@@ -43,6 +64,7 @@ class TestPRCreateCommandAI:
         """Test PR create with --ai when AI is disabled."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("vibe3.commands.pr_create.PRService") as mock_service:
+                mock_service.return_value.get_pr.return_value = None
                 mock_service.return_value.create_draft_pr.return_value = MagicMock(
                     number=123,
                     title="Test PR",
@@ -60,6 +82,7 @@ class TestPRCreateCommandAI:
         """Test PR create with --ai but no commits."""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
             with patch("vibe3.commands.pr_create.PRService") as mock_service:
+                mock_service.return_value.get_pr.return_value = None
                 mock_service.return_value.create_draft_pr.return_value = MagicMock(
                     number=123,
                     title="Test PR",
@@ -93,6 +116,7 @@ pr:
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
             with patch("vibe3.commands.pr_create.PRService") as mock_service:
+                mock_service.return_value.get_pr.return_value = None
                 mock_service.return_value.create_draft_pr.return_value = MagicMock(
                     number=123,
                     title="AI suggested title",
@@ -141,6 +165,7 @@ pr:
                             with patch(
                                 "vibe3.commands.pr_create.PRService"
                             ) as mock_service:
+                                mock_service.return_value.get_pr.return_value = None
                                 mock_pr = MagicMock(
                                     number=123,
                                     title="feat: ai title",
@@ -201,6 +226,7 @@ pr:
                         with patch(
                             "vibe3.commands.pr_create.PRService"
                         ) as mock_service:
+                            mock_service.return_value.get_pr.return_value = None
                             mock_pr = MagicMock(
                                 number=123,
                                 title="feat: ai title",

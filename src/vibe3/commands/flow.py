@@ -2,7 +2,7 @@
 """Flow command handlers."""
 
 import json
-from typing import Annotated, Literal
+from typing import Annotated, List, Literal
 
 import typer
 from loguru import logger
@@ -32,6 +32,10 @@ BranchArg = Annotated[
     str | None, typer.Argument(help="Branch name (defaults to current branch)")
 ]
 TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
+TaskTailArg = Annotated[
+    List[str] | None,
+    typer.Argument(hidden=True),
+]
 AddTaskOption = Annotated[
     str | None,
     typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
@@ -74,24 +78,43 @@ def _print_flow_error(error: FlowUsecaseError) -> None:
         console.print(f"[yellow]{error.guidance}[/]")
 
 
+def _merge_issue_refs(
+    primary: str | None,
+    tail: List[str] | None,
+    *,
+    primary_hint: str,
+) -> str | List[str] | None:
+    """Support both repeated option and trailing-args styles for issue refs."""
+    tail = tail or []
+    if not tail:
+        return primary
+    if primary is None:
+        raise typer.BadParameter(
+            f"Additional issue refs require '{primary_hint}' prefix."
+        )
+    return [primary, *tail]
+
+
 @app.command(name="add")
 def add(
     name: FlowNameArg,
     task: AddTaskOption = None,
+    task_tail: TaskTailArg = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
     """Add flow."""
+    task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
     with trace_scope(trace, "flow add", name=name):
-        logger.bind(command="flow add", name=name, task=task).info("Adding flow")
+        logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
         try:
-            flow = _build_flow_usecase().add_flow(name=name, task=task, spec=spec)
+            flow = _build_flow_usecase().add_flow(name=name, task=task_refs, spec=spec)
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
         except ValueError:
-            logger.bind(command="flow add", task=task).warning(
+            logger.bind(command="flow add", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
             flow = _build_flow_usecase().add_flow(name=name, spec=spec)
@@ -99,7 +122,14 @@ def add(
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
-            render_flow_created(flow, task)
+            render_flow_created(
+                flow,
+                (
+                    " ".join(task_refs)
+                    if task_refs is not None and not isinstance(task_refs, str)
+                    else task_refs
+                ),
+            )
 
 
 @app.command(name="new", deprecated=True, hidden=True)
@@ -114,13 +144,14 @@ def new(
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
-    add(name, task, spec, trace, json_output)
+    add(name, task, None, spec, trace, json_output)
 
 
 @app.command(name="create")
 def create(
     name: FlowNameArg,
     task: TaskOption = None,
+    task_tail: TaskTailArg = None,
     spec: SpecOption = None,
     base: Annotated[
         str | None,
@@ -134,22 +165,23 @@ def create(
     json_output: JsonOption = False,
 ) -> None:
     """Create a new branch with flow state."""
+    task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
     with trace_scope(trace, "flow create", name=name, base=base):
-        logger.bind(command="flow create", name=name, base=base, task=task).info(
+        logger.bind(command="flow create", name=name, base=base, task=task_refs).info(
             "Creating flow with new branch"
         )
         try:
             flow = _build_flow_usecase().create_flow(
                 name=name,
                 base=base,
-                task=task,
+                task=task_refs,
                 spec=spec,
             )
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
         except ValueError:
-            logger.bind(command="flow create", task=task).warning(
+            logger.bind(command="flow create", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
             flow = _build_flow_usecase().create_flow(name=name, base=base, spec=spec)
@@ -157,34 +189,54 @@ def create(
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
-            render_flow_created(flow, task)
+            render_flow_created(
+                flow,
+                (
+                    " ".join(task_refs)
+                    if task_refs is not None and not isinstance(task_refs, str)
+                    else task_refs
+                ),
+            )
 
 
 @app.command()
 def bind(
     issue: IssueArg,
+    issue_tail: TaskTailArg = None,
     role: BindRoleOption = "task",
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
     """Bind an issue to current flow."""
-    with trace_scope(trace, "flow bind", issue=issue, role=role):
-        logger.bind(command="flow bind", issue=issue, role=role).info(
+    issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
+    if issue_refs is None:  # pragma: no cover - defensive
+        raise typer.BadParameter("Missing issue reference")
+    refs: List[str] = [issue_refs] if isinstance(issue_refs, str) else issue_refs
+    with trace_scope(trace, "flow bind", issue=issue_refs, role=role):
+        logger.bind(command="flow bind", issue=issue_refs, role=role).info(
             "Binding issue to flow"
         )
         try:
-            link = _build_flow_usecase().bind_issue(issue, role)
+            links = [_build_flow_usecase().bind_issue(ref, role) for ref in refs]
             if json_output:
-                typer.echo(json.dumps(link.model_dump(), indent=2, default=str))
+                if len(links) == 1:
+                    typer.echo(json.dumps(links[0].model_dump(), indent=2, default=str))
+                else:
+                    typer.echo(
+                        json.dumps(
+                            [link.model_dump() for link in links], indent=2, default=str
+                        )
+                    )
             else:
-                message = (
-                    f"[green]✓[/] Issue #{link.issue_number} linked as {role} "
-                    f"to flow {link.branch}"
-                )
-                console.print(message)
+                for link in links:
+                    message = (
+                        f"[green]✓[/] Issue #{link.issue_number} linked as {role} "
+                        f"to flow {link.branch}"
+                    )
+                    console.print(message)
         except ValueError:
-            logger.error(f"Invalid issue format: {issue}")
-            raise typer.BadParameter(f"Invalid issue format: {issue}")
+            logger.error(f"Invalid issue format: {issue_refs}")
+            raise typer.BadParameter(f"Invalid issue format: {issue_refs}")
 
 
 @app.command()

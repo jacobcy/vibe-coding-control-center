@@ -224,6 +224,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             flow_status=flow_data["flow_status"],
             task_issue_number=flow_data.get("task_issue_number"),
             pr_number=flow_data.get("pr_number"),
+            pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
             spec_ref=flow_data.get("spec_ref"),
             plan_ref=flow_data.get("plan_ref"),
             report_ref=flow_data.get("report_ref"),

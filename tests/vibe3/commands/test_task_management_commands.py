@@ -198,3 +198,33 @@ def test_flow_bind_with_dependency_role() -> None:
 
     assert result.exit_code == 0
     task_service.link_issue.assert_called_once_with("task/demo", 218, "dependency")
+
+
+def test_flow_bind_with_multiple_related_roles() -> None:
+    """flow bind 219 220 --role related should bind both issues."""
+    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
+        task_service = MagicMock()
+        task_service_cls.return_value = task_service
+        task_service.link_issue.side_effect = [
+            MagicMock(issue_number=219, issue_role="related", branch="task/demo"),
+            MagicMock(issue_number=220, issue_role="related", branch="task/demo"),
+        ]
+
+        flow_service = MagicMock()
+        flow_service.get_current_branch.return_value = "task/demo"
+        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
+            result = runner.invoke(
+                flow_app, ["bind", "219", "220", "--role", "related"]
+            )
+
+    assert result.exit_code == 0
+    assert task_service.link_issue.call_args_list[0].args == (
+        "task/demo",
+        219,
+        "related",
+    )
+    assert task_service.link_issue.call_args_list[1].args == (
+        "task/demo",
+        220,
+        "related",
+    )

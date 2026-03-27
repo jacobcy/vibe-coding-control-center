@@ -16,11 +16,12 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
+from vibe3.models.orchestration import IssueState
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
-from vibe3.services.label_integration import transition_to_in_progress
+from vibe3.services.label_service import LabelService
 from vibe3.services.run_context_builder import build_run_context
 from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
@@ -66,6 +67,15 @@ def _execute_run_command(
         branch=branch,
     )
     CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
+def _ensure_plan_file_exists(plan_file: str | None) -> None:
+    """Fail fast when plan file is missing to avoid noisy run lifecycle writes."""
+    if not plan_file:
+        return
+    if Path(plan_file).exists():
+        return
+    raise FileNotFoundError(f"Plan file not found: {plan_file}")
 
 
 def run_command(
@@ -147,6 +157,12 @@ def run_command(
         log.info("Starting plan execution from flow")
         typer.echo(f"-> Using flow plan: {plan_file}")
 
+    try:
+        _ensure_plan_file_exists(plan_file)
+    except FileNotFoundError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
+
     _execute_run_command(
         config=config,
         branch=branch,
@@ -162,10 +178,14 @@ def run_command(
 
     issue_number = usecase.transition_issue(branch)
     if not dry_run and issue_number:
-        result = transition_to_in_progress(int(issue_number))
-        if not result.success and result.error and result.error != "no_issue_bound":
+        result = LabelService().confirm_issue_state(
+            int(issue_number),
+            IssueState.IN_PROGRESS,
+            actor="agent:run",
+        )
+        if result == "blocked":
             typer.echo(
-                f"Warning: Failed to transition issue state: {result.error}",
+                "Warning: Failed to transition issue state: state_transition_blocked",
                 err=True,
             )
 

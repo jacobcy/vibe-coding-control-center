@@ -19,22 +19,32 @@ jobs:
           # Parse issue numbers from PR body using GitHub closing keywords
           PR_BODY="${{ github.event.pull_request.body }}"
           ISSUE_NUMBERS=$(echo "$PR_BODY" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+' | grep -oE '[0-9]+' | sort -u)
-          
-          for ISSUE_NUM in $ISSUE_NUMBERS; do
-            echo "Processing issue #$ISSUE_NUM"
-            
-            # Get current labels
-            CURRENT_LABELS=$(gh issue view "$ISSUE_NUM" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            
-            # Remove existing state/* labels
-            for LABEL in $CURRENT_LABELS; do
-              if [[ "$LABEL" == state/* ]]; then
-                echo "Removing label: $LABEL"
-                gh issue edit "$ISSUE_NUM" --remove-label "$LABEL" || true
-              fi
-            done
-            
-            # Add state/done label
-            echo "Adding label: state/done"
-            gh issue edit "$ISSUE_NUM" --add-label "state/done" || true
-          done
+
+          if [[ -z "$ISSUE_NUMBERS" ]]; then
+            echo "No linked issues detected."
+            exit 0
+          fi
+
+          export ISSUE_NUMBERS
+          python - <<'PY'
+          import os
+          import sys
+
+          sys.path.insert(0, "src")
+
+          from vibe3.models.orchestration import IssueState
+          from vibe3.services.label_service import LabelService
+
+          raw = os.environ.get("ISSUE_NUMBERS", "").strip()
+          issues = [int(x) for x in raw.split() if x.isdigit()]
+
+          service = LabelService()
+          for issue_number in issues:
+              result = service.confirm_issue_state(
+                  issue_number,
+                  IssueState.DONE,
+                  actor="github-action:issue-state-sync",
+                  force=True,
+              )
+              print(f"issue #{issue_number}: {result}")
+          PY
