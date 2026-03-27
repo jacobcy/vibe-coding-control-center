@@ -69,6 +69,15 @@ def _execute_run_command(
     CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
 
+def _ensure_plan_file_exists(plan_file: str | None) -> None:
+    """Fail fast when plan file is missing to avoid noisy run lifecycle writes."""
+    if not plan_file:
+        return
+    if Path(plan_file).exists():
+        return
+    raise FileNotFoundError(f"Plan file not found: {plan_file}")
+
+
 def run_command(
     instructions: Annotated[
         Optional[str],
@@ -147,6 +156,12 @@ def run_command(
         log = logger.bind(domain="run", action="run", plan_file=plan_file)
         log.info("Starting plan execution from flow")
         typer.echo(f"-> Using flow plan: {plan_file}")
+
+    try:
+        _ensure_plan_file_exists(plan_file)
+    except FileNotFoundError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
     _execute_run_command(
         config=config,
