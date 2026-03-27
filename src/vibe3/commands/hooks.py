@@ -36,12 +36,17 @@ def _get_hooks_dir() -> Path:
     """获取真实的 Git hooks 目录，兼容 worktree 场景."""
     try:
         cwd = _ROOT
+        clean_env = dict(os.environ)
+        clean_env.pop("GIT_DIR", None)
+        clean_env.pop("GIT_WORK_TREE", None)
+        clean_env.pop("GIT_INDEX_FILE", None)
         result = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
             capture_output=True,
             text=True,
             check=True,
             cwd=cwd,
+            env=clean_env,
         )
         git_common_dir = Path(result.stdout.strip())
         if not git_common_dir.is_absolute():
