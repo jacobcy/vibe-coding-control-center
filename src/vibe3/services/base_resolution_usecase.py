@@ -7,6 +7,9 @@ from vibe3.clients.git_client import GitClient, GitClientProtocol
 from vibe3.models.change_source import BranchSource
 from vibe3.utils.branch_utils import find_parent_branch
 
+MAIN_BRANCH_NAME = "main"
+MAIN_BRANCH_REF = "origin/main"
+
 
 @dataclass(frozen=True)
 class ResolvedBase:
@@ -41,7 +44,7 @@ class BaseResolutionUsecase:
     @staticmethod
     def resolve_pr_create_base(requested_base: str | None) -> str:
         """Resolve base branch for PR creation while preserving current default."""
-        return requested_base or "main"
+        return requested_base or MAIN_BRANCH_NAME
 
     def resolve_inspect_base(
         self,
@@ -105,7 +108,7 @@ class BaseResolutionUsecase:
         if token == "current":
             return ResolvedBase(base_branch=current_branch, auto_detected=False)
         if token == "main":
-            return ResolvedBase(base_branch="origin/main", auto_detected=False)
+            return ResolvedBase(base_branch=MAIN_BRANCH_REF, auto_detected=False)
         return ResolvedBase(base_branch=token, auto_detected=False)
 
     def collect_branch_material(

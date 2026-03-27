@@ -25,7 +25,7 @@ def register(app: typer.Typer) -> None:
         base_branch: Annotated[
             str | None,
             typer.Argument(
-                help="Base branch to compare against (default: origin/main)"
+                help="Base policy/branch: parent|current|main|<branch> (default: parent)"
             ),
         ] = None,
         json_out: Annotated[
@@ -41,9 +41,9 @@ def register(app: typer.Typer) -> None:
         Shows impact scope, not detailed diffs.
 
         Examples:
-            vibe inspect base                # Compare current branch vs origin/main
+            vibe inspect base                # Compare current branch vs parent branch
             vibe inspect base origin/develop # Compare current branch vs origin/develop
-            vibe inspect base main           # Compare current branch vs local main
+            vibe inspect base main           # Compare current branch vs origin/main
         """
         from vibe3.clients.git_client import GitClient
         from vibe3.clients.github_client import GitHubClient

@@ -14,6 +14,7 @@ from vibe3.models.flow import (
     IssueLink,
     MainBranchProtectedError,
 )
+from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 from vibe3.services.flow_query_mixin import FlowQueryMixin
@@ -102,7 +103,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
     def create_flow_with_branch(
         self,
         slug: str,
-        start_ref: str = "origin/main",
+        start_ref: str = MAIN_BRANCH_REF,
         save_unstash: bool = False,
     ) -> FlowState:
         """Create a new flow and create branch.

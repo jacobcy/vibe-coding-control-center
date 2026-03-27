@@ -7,6 +7,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
+from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
 
@@ -40,7 +41,7 @@ class FlowLifecycleMixin:
             return CreateDecision(
                 allowed=True,
                 reason="No active flow in current worktree",
-                start_ref="origin/main",
+                start_ref=MAIN_BRANCH_REF,
                 requires_new_worktree=False,
             )
 
@@ -74,14 +75,14 @@ class FlowLifecycleMixin:
             return CreateDecision(
                 allowed=True,
                 reason=f"Current flow is {status} - safe to start new target",
-                start_ref="origin/main",
+                start_ref=MAIN_BRANCH_REF,
                 requires_new_worktree=False,
             )
 
         return CreateDecision(
             allowed=True,
             reason="Unknown status - allowing with caution",
-            start_ref="origin/main",
+            start_ref=MAIN_BRANCH_REF,
             requires_new_worktree=False,
         )
 
@@ -148,7 +149,7 @@ class FlowLifecycleMixin:
                 if git.branch_exists(target_branch):
                     git.switch_branch(target_branch)
                 else:
-                    git.create_branch(target_branch, start_ref="origin/main")
+                    git.create_branch(target_branch, start_ref=MAIN_BRANCH_REF)
             except Exception as e:
                 raise RuntimeError(
                     f"Cannot switch away from closing branch '{branch}' "
@@ -199,7 +200,7 @@ class FlowLifecycleMixin:
                 if git.branch_exists(target_branch):
                     git.switch_branch(target_branch)
                 else:
-                    git.create_branch(target_branch, start_ref="origin/main")
+                    git.create_branch(target_branch, start_ref=MAIN_BRANCH_REF)
                 switched_to_target = True
                 logger.bind(
                     domain="flow",
