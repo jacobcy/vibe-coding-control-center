@@ -42,6 +42,14 @@ class TestPrePushContract:
         content = script_path.read_text()
         assert "PUSH_STDIN=$(cat)" in content
         assert "review_scope" in content or "scope" in content
+        assert 'git diff --name-only "$REVIEW_BASE..HEAD"' in content
+
+    def test_pre_push_uses_incremental_selector_with_full_override(self) -> None:
+        """Verify pre-push.sh defaults to incremental tests with explicit full mode."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "VIBE_PREPUSH_FULL" in content
+        assert "vibe3.services.pre_push_test_selector" in content
 
     def test_pre_push_calls_review_base_directly(self) -> None:
         """Verify pre-push.sh calls review base directly when needed."""
@@ -83,9 +91,14 @@ class TestPrePushContract:
         """Verify pre-push.sh surfaces inspect explanations, not just score."""
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
-        assert "Risk reason:" in content
-        assert "Trigger factors:" in content
-        assert "Recommendations:" in content
+        assert "pre_push_inspect_summary --render" in content
+        assert "pre_push_inspect_summary --field review_trigger" in content
+
+    def test_pre_push_does_not_keep_unused_current_branch_variable(self) -> None:
+        """Verify hook does not keep dead local variables."""
+        script_path = Path("scripts/hooks/pre-push.sh")
+        content = script_path.read_text()
+        assert "CURRENT_BRANCH=" not in content
 
     def test_pre_push_does_not_call_review_gate(self) -> None:
         """Verify pre-push.sh does not call review-gate."""

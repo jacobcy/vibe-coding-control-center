@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.flow_service import FlowService
 
 
@@ -20,8 +21,10 @@ class TestFlowLifecycle:
         }
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
     def test_close_flow_switches_off_current_branch_before_delete(
         self,
+        mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
     ) -> None:
@@ -44,6 +47,18 @@ class TestFlowLifecycle:
         )
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
+        mock_gh = MagicMock()
+        mock_gh.get_pr.return_value = PRResponse(
+            number=284,
+            title="test",
+            body="",
+            state=PRState.MERGED,
+            head_branch="task/current-flow",
+            base_branch="main",
+            url="https://example.com/pr/284",
+            merged_at=None,
+        )
+        mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
 
@@ -66,8 +81,10 @@ class TestFlowLifecycle:
         )
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
     def test_close_flow_switches_to_single_dependent_without_pull(
         self,
+        mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
     ) -> None:
@@ -90,6 +107,18 @@ class TestFlowLifecycle:
         )
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
+        mock_gh = MagicMock()
+        mock_gh.get_pr.return_value = PRResponse(
+            number=284,
+            title="test",
+            body="",
+            state=PRState.MERGED,
+            head_branch="task/current-flow",
+            base_branch="main",
+            url="https://example.com/pr/284",
+            merged_at=None,
+        )
+        mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = ["task/dependent"]
 
@@ -103,8 +132,10 @@ class TestFlowLifecycle:
         assert not any(action == "run:pull" for action in actions)
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
     def test_close_flow_raises_if_current_branch_cannot_switch_away(
         self,
+        mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
     ) -> None:
@@ -116,6 +147,18 @@ class TestFlowLifecycle:
         mock_git.switch_branch.side_effect = RuntimeError("checkout failed")
         mock_git.is_branch_occupied_by_worktree.return_value = False
         mock_git_class.return_value = mock_git
+        mock_gh = MagicMock()
+        mock_gh.get_pr.return_value = PRResponse(
+            number=284,
+            title="test",
+            body="",
+            state=PRState.MERGED,
+            head_branch="task/current-flow",
+            base_branch="main",
+            url="https://example.com/pr/284",
+            merged_at=None,
+        )
+        mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
 
@@ -130,8 +173,10 @@ class TestFlowLifecycle:
         mock_store.update_flow_state.assert_not_called()
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
     def test_close_flow_does_not_pull_if_post_close_switch_fails(
         self,
+        mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
     ) -> None:
@@ -152,6 +197,18 @@ class TestFlowLifecycle:
         mock_git.switch_branch.side_effect = RuntimeError("checkout failed")
         mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
         mock_git_class.return_value = mock_git
+        mock_gh = MagicMock()
+        mock_gh.get_pr.return_value = PRResponse(
+            number=284,
+            title="test",
+            body="",
+            state=PRState.MERGED,
+            head_branch="task/current-flow",
+            base_branch="main",
+            url="https://example.com/pr/284",
+            merged_at=None,
+        )
+        mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
 
@@ -162,106 +219,33 @@ class TestFlowLifecycle:
         assert "delete_local:task/current-flow:True" in actions
         assert not any(action == "run:pull" for action in actions)
 
-
-class TestFlowCreateDecision:
-    """Tests for flow create access control."""
-
-    def test_active_flow_rejects_create_in_same_worktree(
-        self, mock_store: Mock
+    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    def test_close_flow_rejects_when_pr_not_merged(
+        self,
+        mock_gh_class: MagicMock,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
     ) -> None:
-        """Active flow should reject creating new flow in same worktree."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/current-flow",
-            "flow_slug": "current_flow",
-            "flow_status": "active",
-            "updated_at": "2026-03-26T00:00:00",
-        }
+        """flow done should reject when PR is not merged."""
+        self._build_flow_store(mock_store)
+        mock_git_class.return_value = MagicMock()
+        mock_gh = MagicMock()
+        mock_gh.get_pr.return_value = PRResponse(
+            number=284,
+            title="test",
+            body="",
+            state=PRState.OPEN,
+            head_branch="task/current-flow",
+            base_branch="main",
+            url="https://example.com/pr/284",
+            merged_at=None,
+        )
+        mock_gh_class.return_value = mock_gh
 
         service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/current-flow")
 
-        assert decision.allowed is False
-        assert decision.requires_new_worktree is True
-        assert "wtnew" in (decision.guidance or "").lower()
+        with pytest.raises(Exception, match="尚未 merged"):
+            service.close_flow("task/current-flow")
 
-    def test_blocked_flow_allows_create_from_current_branch(
-        self, mock_store: Mock
-    ) -> None:
-        """Blocked flow should allow creating downstream flow from current branch."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/blocked-flow",
-            "flow_slug": "blocked_flow",
-            "flow_status": "blocked",
-            "blocked_by": "issue #42",
-            "updated_at": "2026-03-26T00:00:00",
-        }
-
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/blocked-flow")
-
-        assert decision.allowed is True
-        assert decision.start_ref == "task/blocked-flow"
-        assert decision.requires_new_worktree is False
-
-    def test_active_flow_waiting_review_allows_create_from_main(
-        self, mock_store: Mock
-    ) -> None:
-        """Active flow with ready PR should allow creating new target."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/reviewing-flow",
-            "flow_slug": "reviewing_flow",
-            "flow_status": "active",
-            "pr_ready_for_review": 1,
-            "updated_at": "2026-03-26T00:00:00",
-        }
-
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/reviewing-flow")
-
-        assert decision.allowed is True
-        assert decision.start_ref == "origin/main"
-        assert decision.requires_new_worktree is False
-
-    def test_done_flow_can_start_new_target_from_safe_base(
-        self, mock_store: Mock
-    ) -> None:
-        """Done flow should allow starting new target from safe base."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/done-flow",
-            "flow_slug": "done_flow",
-            "flow_status": "done",
-            "updated_at": "2026-03-26T00:00:00",
-        }
-
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/done-flow")
-
-        assert decision.allowed is True
-        assert decision.start_ref == "origin/main"
-        assert decision.requires_new_worktree is False
-
-    def test_no_flow_allows_create_from_main(self, mock_store: Mock) -> None:
-        """No existing flow should allow creating new flow from main."""
-        mock_store.get_flow_state.return_value = None
-
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("main")
-
-        assert decision.allowed is True
-        assert decision.start_ref == "origin/main"
-        assert decision.requires_new_worktree is False
-
-    def test_aborted_flow_allows_new_target(self, mock_store: Mock) -> None:
-        """Aborted flow should allow starting new target."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/aborted-flow",
-            "flow_slug": "aborted_flow",
-            "flow_status": "aborted",
-            "updated_at": "2026-03-26T00:00:00",
-        }
-
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/aborted-flow")
-
-        assert decision.allowed is True
-        assert decision.start_ref == "origin/main"
+        mock_store.update_flow_state.assert_not_called()

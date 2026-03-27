@@ -5,11 +5,13 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
+from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
 
 
 class FlowLifecycleMixin:
@@ -135,6 +137,8 @@ class FlowLifecycleMixin:
                 f"当前分支 '{branch}' 没有 flow\n"
                 f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
             )
+        if check_pr:
+            ensure_flow_pr_merged(GitHubClient(), flow_data, branch)
 
         try:
             close_target = self.resolve_close_target(branch)

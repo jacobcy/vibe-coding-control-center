@@ -54,21 +54,68 @@ uv run mypy src || {
     exit 1
 }
 
-# 4. Test suite (full test run, ~1-2min)
-echo "  -> Running test suite..."
-uv run pytest tests/vibe3 -v --tb=short || {
+# 3. Resolve test scope (incremental by default)
+TEST_MODE="full"
+TEST_REASON="forced full suite"
+TEST_TARGETS=("tests/vibe3")
+if [ "${VIBE_PREPUSH_FULL:-0}" != "1" ]; then
+    CHANGED_FILES=$(git diff --name-only "$REVIEW_BASE..HEAD" 2>/dev/null) || {
+        echo "  -> Could not compute changed files, fallback to full suite"
+        CHANGED_FILES=""
+    }
+
+    TEST_PLAN_JSON=$(printf '%s\n' "$CHANGED_FILES" | uv run python -m vibe3.services.pre_push_test_selector) || {
+        echo "  -> Failed to resolve incremental test targets, fallback to full suite"
+        TEST_PLAN_JSON=""
+    }
+
+    if [ -n "$TEST_PLAN_JSON" ]; then
+        TEST_MODE=$(echo "$TEST_PLAN_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print(data.get('mode', 'full'))
+")
+        TEST_REASON=$(echo "$TEST_PLAN_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+print(data.get('reason', 'resolved by selector'))
+")
+        mapfile -t TEST_TARGETS < <(
+            echo "$TEST_PLAN_JSON" | uv run python -c "
+import json
+import sys
+data = json.load(sys.stdin)
+for item in data.get('tests', []):
+    print(item)
+"
+        )
+    fi
+else
+    TEST_REASON="VIBE_PREPUSH_FULL=1"
+fi
+
+if [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
+    TEST_MODE="full"
+    TEST_REASON="empty target set, fallback to full suite"
+    TEST_TARGETS=("tests/vibe3")
+fi
+
+echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
+uv run pytest "${TEST_TARGETS[@]}" -v --tb=short || {
     echo "ERROR: Tests failed"
     exit 1
 }
 
-# 5. LOC checks (fast, <2s) - WARNING ONLY in pre-push
+# 4. LOC checks (fast, <2s) - WARNING ONLY in pre-push
 echo "  -> LOC checks (warning only)..."
 bash scripts/hooks/check-python-loc.sh
 # Note: Script now exits 0 with warning (doesn't block push)
 bash scripts/hooks/check-shell-loc.sh
 # Note: Script now exits 0 with warning (doesn't block push)
 
-# 6. Inspect-based risk assessment (fast, <10s)
+# 5. Inspect-based risk assessment (fast, <10s)
 echo "  -> Risk assessment (inspect)..."
 echo "  Review scope: $REVIEW_SCOPE_SUMMARY"
 INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json) || {
@@ -76,65 +123,20 @@ INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json
     exit 1
 }
 
-# Parse all fields in a single Python invocation
-PARSED_DATA=$(echo "$INSPECT_JSON" | uv run python -c "
-import json
-import sys
-data = json.load(sys.stdin)
-score = data.get('score', {})
-print('RISK_LEVEL=' + score.get('level', 'LOW'))
-print('RISK_SCORE=' + str(score.get('score', 0)))
-print('BLOCK_REVIEW=' + ('true' if score.get('block', False) else 'false'))
-print('RISK_REASON=' + score.get('reason', ''))
-print('TRIGGER_FACTORS_START')
-for item in score.get('trigger_factors', []):
-    print(item)
-print('TRIGGER_FACTORS_END')
-print('RECOMMENDATIONS_START')
-for item in score.get('recommendations', []):
-    print(item)
-print('RECOMMENDATIONS_END')
-print('BLOCK_THRESHOLD=' + str(score.get('block_threshold', 12)))
-")
+echo "$INSPECT_JSON" | uv run python -m vibe3.services.pre_push_inspect_summary --render
+REVIEW_TRIGGER=$(
+    echo "$INSPECT_JSON" | uv run python -m vibe3.services.pre_push_inspect_summary --field review_trigger
+)
 
-# Parse extracted data
-RISK_LEVEL=$(echo "$PARSED_DATA" | grep "^RISK_LEVEL=" | cut -d= -f2)
-RISK_SCORE=$(echo "$PARSED_DATA" | grep "^RISK_SCORE=" | cut -d= -f2)
-BLOCK_REVIEW=$(echo "$PARSED_DATA" | grep "^BLOCK_REVIEW=" | cut -d= -f2)
-RISK_REASON=$(echo "$PARSED_DATA" | grep "^RISK_REASON=" | cut -d= -f2-)
-TRIGGER_FACTORS=$(echo "$PARSED_DATA" | sed -n '/^TRIGGER_FACTORS_START$/,/^TRIGGER_FACTORS_END$/p' | grep -v "TRIGGER_FACTORS" || true)
-RECOMMENDATIONS=$(echo "$PARSED_DATA" | sed -n '/^RECOMMENDATIONS_START$/,/^RECOMMENDATIONS_END$/p' | grep -v "RECOMMENDATIONS" || true)
-BLOCK_THRESHOLD=$(echo "$PARSED_DATA" | grep "^BLOCK_THRESHOLD=" | cut -d= -f2)
-
-echo "  Risk level: $RISK_LEVEL (score: $RISK_SCORE/$BLOCK_THRESHOLD)"
-echo "  Review gate block: $BLOCK_REVIEW"
-if [ -n "$RISK_REASON" ]; then
-    echo "  Risk reason: $RISK_REASON"
-fi
-if [ -n "$TRIGGER_FACTORS" ]; then
-    echo "  Trigger factors:"
-    while IFS= read -r factor; do
-        [ -n "$factor" ] && echo "    - $factor"
-    done <<< "$TRIGGER_FACTORS"
-fi
-if [ -n "$RECOMMENDATIONS" ]; then
-    echo "  Recommendations:"
-    while IFS= read -r item; do
-        [ -n "$item" ] && echo "    - $item"
-    done <<< "$RECOMMENDATIONS"
-fi
-
-# 7. Trigger async local review when inspect score reaches block threshold
+# 6. Trigger async local review when inspect score reaches block threshold
 # NOTE: Review runs asynchronously and does NOT block push.
 # High-risk changes are flagged but push proceeds - review results available later.
-if [ "$BLOCK_REVIEW" = "true" ]; then
+if [ "$REVIEW_TRIGGER" = "yes-async" ]; then
     echo "  Review triggered: yes (async)"
     echo ""
     echo "  ⚠️  WARNING: Blocking risk detected!"
     echo "  Starting async review in background..."
     echo ""
-
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
     # Start async review (non-blocking)
     uv run python src/vibe3/cli.py review base "$REVIEW_BASE" --async 2>/dev/null || {
@@ -146,9 +148,8 @@ if [ "$BLOCK_REVIEW" = "true" ]; then
     echo "  [dim]Commands:[/]"
     echo "    vibe3 flow show              # Check review status"
     echo "    vibe3 handoff show           # View review result (when done)"
-    echo "    vibe3 flow cancel reviewer   # Cancel running review"
     echo ""
-elif [ "$RISK_LEVEL" = "HIGH" ] || [ "$RISK_LEVEL" = "CRITICAL" ]; then
+elif [ "$REVIEW_TRIGGER" = "recommended-manual" ]; then
     echo "  Review triggered: recommended-manual"
     echo ""
     echo "  ⚠️  WARNING: Elevated risk detected, but below blocking threshold."
