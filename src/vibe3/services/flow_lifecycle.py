@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
@@ -116,7 +117,10 @@ class FlowLifecycleMixin:
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
+            raise UserError(
+                f"当前分支 '{branch}' 没有 flow\n"
+                f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
+            )
 
         try:
             close_target = self.resolve_close_target(branch)
@@ -239,7 +243,10 @@ class FlowLifecycleMixin:
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
+            raise UserError(
+                f"当前分支 '{branch}' 没有 flow\n"
+                f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
+            )
 
         if blocked_by_issue:
             from vibe3.services.task_service import TaskService

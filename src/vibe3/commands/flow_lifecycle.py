@@ -48,7 +48,15 @@ def done(
         )
 
         flow_status = service.get_flow_status(target_branch)
-        if flow_status and flow_status.task_issue_number is None and not yes:
+        if not flow_status:
+            typer.echo(
+                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
+                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        if flow_status.task_issue_number is None and not yes:
             typer.echo(
                 "Error: 当前 flow 未绑定 task issue\n"
                 "先执行 `vibe3 flow bind <issue> --role task`\n"
