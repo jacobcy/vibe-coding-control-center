@@ -21,7 +21,7 @@ github_project:
   org: ""             # 已废弃，请使用 owner
 
 # AI 辅助配置
-# 用于 flow new --ai 和 pr create --ai 功能
+# 用于 AI 文案辅助能力（如 pr create --ai）
 # API Key 通过环境变量配置: DEEPSEEK_API_KEY
 ai:
   api_key_env: "DEEPSEEK_API_KEY"  # 环境变量名
