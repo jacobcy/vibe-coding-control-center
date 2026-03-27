@@ -141,11 +141,9 @@ def run_review_agent(
             else:
                 command.append("continue")
         else:
-            # New session mode:
-            # wrapper --agent <agent> --prompt-file <file> [task] [workdir]
+            # New session mode: wrapper --agent <agent> --prompt-file <file> [task]
             if task:
                 command.append(task)
-            command.append(project_root)
 
         # Dry-run mode: print command and prompt
         if dry_run:

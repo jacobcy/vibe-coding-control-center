@@ -1,6 +1,7 @@
 """PR creation commands."""
 
 import json
+import os
 import sys
 from typing import Annotated
 
@@ -38,6 +39,13 @@ def _emit_pr_result(pr: PRResponse, json_output: bool, yaml_output: bool) -> Non
         )
     else:
         render_pr_created(pr)
+
+
+def _resolve_branch_for_ai_context(current_branch: str) -> str:
+    """Normalize detached HEAD in CI to PR head branch when available."""
+    if current_branch != "HEAD":
+        return current_branch
+    return os.getenv("GITHUB_HEAD_REF", current_branch)
 
 
 def register_create_command(app: typer.Typer) -> None:
@@ -88,7 +96,7 @@ def register_create_command(app: typer.Typer) -> None:
             interactive = _is_interactive(json_output, yaml_output)
 
             usecase = PRCreateUsecase(base_resolver=base_resolver)
-            branch = FlowService().get_current_branch()
+            branch = _resolve_branch_for_ai_context(FlowService().get_current_branch())
 
             if not json_output and not yaml_output:
                 usecase.check_flow_task(branch)
