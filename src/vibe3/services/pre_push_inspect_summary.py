@@ -29,8 +29,19 @@ class PrePushInspectSummary:
 
 def _coerce_int(value: object, default: int) -> int:
     """Convert value to int with safe fallback."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
     try:
-        return int(value)  # type: ignore[arg-type]
+        return int(str(value))
     except (TypeError, ValueError):
         return default
 
