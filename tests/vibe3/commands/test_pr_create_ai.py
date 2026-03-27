@@ -30,7 +30,7 @@ class TestPRCreateCommandAI:
                 body="Test body",
                 model_dump=lambda: {"number": 123, "title": "Test PR"},
             )
-            result = runner.invoke(app, ["pr", "create", "-t", "Test PR"])
+            result = runner.invoke(app, ["pr", "create", "-t", "Test PR", "--yes"])
             assert result.exit_code in [0, 1]
             mock_service.return_value.create_draft_pr.assert_called_once_with(
                 title="Test PR",
@@ -53,7 +53,7 @@ class TestPRCreateCommandAI:
                     "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
                 ) as mock_config:
                     mock_config.return_value.ai.enabled = False
-                    result = runner.invoke(app, ["pr", "create", "--ai"])
+                    result = runner.invoke(app, ["pr", "create", "--ai", "--yes"])
                     assert result.exit_code in [0, 1]
 
     def test_pr_create_ai_no_commits(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ class TestPRCreateCommandAI:
                         commits=[],
                         changed_files=[],
                     )
-                    result = runner.invoke(app, ["pr", "create", "--ai"])
+                    result = runner.invoke(app, ["pr", "create", "--ai", "--yes"])
                     assert result.exit_code in [0, 1]
 
     def test_pr_create_ai_with_suggestions(
@@ -106,7 +106,7 @@ pr:
                         commits=["feat: add feature"],
                         changed_files=["src/file.py"],
                     )
-                    result = runner.invoke(app, ["pr", "create", "--ai"])
+                    result = runner.invoke(app, ["pr", "create", "--ai", "--yes"])
                     assert result.exit_code in [0, 1]
 
     def test_pr_create_ai_json_uses_suggestions_without_prompt(
@@ -156,7 +156,7 @@ pr:
                                 ) = mock_pr
                                 result = runner.invoke(
                                     app,
-                                    ["pr", "create", "--ai", "--json"],
+                                    ["pr", "create", "--ai", "--json", "--yes"],
                                 )
 
         assert result.exit_code == 0
@@ -217,7 +217,7 @@ pr:
 
                             result = runner.invoke(
                                 app,
-                                ["pr", "create", "--ai", "--json"],
+                                ["pr", "create", "--ai", "--json", "--yes"],
                             )
 
         assert result.exit_code == 0

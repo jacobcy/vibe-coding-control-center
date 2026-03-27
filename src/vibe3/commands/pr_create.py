@@ -63,6 +63,9 @@ def register_create_command(app: typer.Typer) -> None:
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
         ] = False,
+        yes: Annotated[
+            bool, typer.Option("-y", "--yes", help="跳过 task 绑定检查并继续")
+        ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
         ] = False,
@@ -98,8 +101,11 @@ def register_create_command(app: typer.Typer) -> None:
             usecase = PRCreateUsecase(base_resolver=base_resolver)
             branch = _resolve_branch_for_ai_context(FlowService().get_current_branch())
 
-            if not json_output and not yaml_output:
-                usecase.check_flow_task(branch)
+            try:
+                usecase.check_flow_task(branch, yes=yes)
+            except RuntimeError as error:
+                typer.echo(str(error), err=True)
+                raise typer.Exit(1) from error
 
             ai_title, ai_body = ("", "")
             if ai and not title:

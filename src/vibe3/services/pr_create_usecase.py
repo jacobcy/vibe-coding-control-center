@@ -12,6 +12,7 @@ from vibe3.config.settings import VibeConfig
 from vibe3.services.ai_service import AIService
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
+from vibe3.services.task_binding_guard import ensure_task_issue_bound
 
 
 @dataclass(frozen=True)
@@ -42,15 +43,16 @@ class PRCreateUsecase:
         self._flow_service = flow_service or FlowService()
         self._base_resolver = base_resolver or BaseResolutionUsecase()
 
-    def check_flow_task(self, branch: str) -> None:
-        """Warn if current flow has no task bound."""
+    def check_flow_task(self, branch: str, *, yes: bool = False) -> None:
+        """Require current flow to have task bound unless bypassed by --yes."""
         flow_status = self._flow_service.get_flow_status(branch)
-        if flow_status is None or flow_status.task_issue_number is None:
-            logger.info("Flow has no task bound, suggesting bind")
-            print(
-                "提示：当前 flow 还没有 task，建议先执行 "
-                "vibe3 flow bind <issue> --role task"
-            )
+        ensure_task_issue_bound(
+            flow_status,
+            yes=yes,
+            force_command="vibe3 pr create --yes",
+        )
+        if yes and (flow_status is None or flow_status.task_issue_number is None):
+            logger.warning("Bypassing missing task binding via --yes")
 
     def suggest_content(
         self,

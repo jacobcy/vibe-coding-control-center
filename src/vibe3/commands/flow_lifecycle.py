@@ -7,6 +7,7 @@ from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
+from vibe3.services.task_binding_guard import ensure_task_issue_bound
 
 
 def switch(
@@ -56,14 +57,15 @@ def done(
             )
             raise typer.Exit(1)
 
-        if flow_status.task_issue_number is None and not yes:
-            typer.echo(
-                "Error: 当前 flow 未绑定 task issue\n"
-                "先执行 `vibe3 flow bind <issue> --role task`\n"
-                "若确认强制关闭，使用 `vibe3 flow done --yes`",
-                err=True,
+        try:
+            ensure_task_issue_bound(
+                flow_status,
+                yes=yes,
+                force_command="vibe3 flow done --yes",
             )
-            raise typer.Exit(1)
+        except RuntimeError as error:
+            typer.echo(str(error), err=True)
+            raise typer.Exit(1) from error
 
         service.close_flow(target_branch, check_pr=not yes)
 
