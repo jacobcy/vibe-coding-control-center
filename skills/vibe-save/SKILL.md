@@ -180,11 +180,3 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 1. `task.md` 是默认 handoff 载体，避免 save 默认散落出过多文件。
 2. 共享真源只同步最小必要事实，不把 save 扩展成 workflow 编排器。
 3. `memory.md` 只记录稳定共识，不承担每次会话的临时状态保存。
-
-## 命令映射说明
-
-| 旧命令 (vibe2) | 新命令 (vibe3) |
-|---------------|---------------|
-| `vibe task update` | `uv run python src/vibe3/cli.py task status` |
-| `vibe flow status` | `uv run python src/vibe3/cli.py flow status` |
-| N/A | `uv run python src/vibe3/cli.py handoff append` |

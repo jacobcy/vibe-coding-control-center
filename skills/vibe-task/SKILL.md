@@ -344,13 +344,3 @@ uv run python src/vibe3/cli.py check --all
 1. Shell 层提供数据和原子操作
 2. Skill 层负责语义分析和决策
 3. 用户负责最终确认
-
-## 命令映射说明
-
-| 旧命令 (vibe2) | 新命令 (vibe3) |
-|---------------|---------------|
-| `vibe task list` | `uv run python src/vibe3/cli.py task list` |
-| `vibe task show` | `uv run python src/vibe3/cli.py task show` |
-| `vibe task audit` | `uv run python src/vibe3/cli.py check --all` |
-| `vibe task update` | `uv run python src/vibe3/cli.py task status` |
-| `vibe roadmap audit` | `uv run python src/vibe3/cli.py check --all` |
