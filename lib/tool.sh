@@ -24,7 +24,7 @@ _tool_require_confirmation() {
     local prompt="$1" assume_yes="${2:-false}"
     local allow_interactive="${VIBE_ALLOW_INTERACTIVE:-}"
     if [[ "$assume_yes" != true && -z "$allow_interactive" ]]; then
-        vibe_die "Interactive confirmation disabled for '$prompt'. Rerun with 'vibe tool --yes' or set VIBE_ALLOW_INTERACTIVE=1."
+        vibe_die "Interactive confirmation disabled for '$prompt'. Rerun with 'vibe tools --yes' or set VIBE_ALLOW_INTERACTIVE=1."
     fi
     local prev_assume="${VIBE_ASSUME_YES:-}" prev_defined=0
     [[ -n "${VIBE_ASSUME_YES+x}" ]] && prev_defined=1
@@ -123,7 +123,7 @@ _tool_status() {
         fi
     done
     echo ""
-    echo "💡 Install: ${CYAN}vibe tool <tool>${NC} or ${CYAN}vibe tool all${NC}"
+    echo "Install: ${CYAN}vibe tools <tool>${NC} or ${CYAN}vibe tools all${NC}"
 }
 
 # ── Install Core Dependencies ───────────────────────────
@@ -190,7 +190,7 @@ vibe_tool() {
             _tool_status
             ;;
         help|-h|--help)
-            echo "Usage: ${CYAN}vibe tool <command>${NC}"
+            echo "Usage: ${CYAN}vibe tools <command>${NC}"
             echo ""
             echo "Commands:"
             echo "  ${GREEN}status${NC}    Show installation status of AI tools"
@@ -205,7 +205,7 @@ vibe_tool() {
             ;;
         *)
             log_error "Unknown tool: $target"
-            echo "Run 'vibe tool --help' for usage."
+            echo "Run 'vibe tools --help' for usage."
             return 1
             ;;
     esac
