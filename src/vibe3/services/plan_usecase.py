@@ -109,59 +109,6 @@ class PlanUsecase:
         """Bind resolved spec path to current flow."""
         self.flow_service.bind_spec(branch, spec_path, "user")
 
-    @staticmethod
-    def build_async_task_command(
-        issue_number: int,
-        instructions: str | None,
-        agent: str | None,
-        backend: str | None,
-        model: str | None,
-    ) -> list[str]:
-        """Build async command invocation for `plan task`."""
-        cmd = [
-            "uv",
-            "run",
-            "python",
-            "src/vibe3/cli.py",
-            "plan",
-            "task",
-            str(issue_number),
-        ]
-        if instructions:
-            cmd.append(instructions)
-        if agent:
-            cmd.extend(["--agent", agent])
-        if backend:
-            cmd.extend(["--backend", backend])
-        if model:
-            cmd.extend(["--model", model])
-        return cmd
-
-    @staticmethod
-    def build_async_spec_command(
-        file: Path | None,
-        msg: str | None,
-        instructions: str | None,
-        agent: str | None,
-        backend: str | None,
-        model: str | None,
-    ) -> list[str]:
-        """Build async command invocation for `plan spec`."""
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "plan", "spec"]
-        if file:
-            cmd.extend(["--file", str(file)])
-        if msg:
-            cmd.extend(["--msg", msg])
-        if instructions:
-            cmd.append(instructions)
-        if agent:
-            cmd.extend(["--agent", agent])
-        if backend:
-            cmd.extend(["--backend", backend])
-        if model:
-            cmd.extend(["--model", model])
-        return cmd
-
     def _build_issue_context(self, issue_number: int, heading: str) -> str | None:
         issue = self.github_client.view_issue(issue_number)
         if not isinstance(issue, dict):

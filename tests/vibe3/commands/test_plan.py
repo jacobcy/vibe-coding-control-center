@@ -98,11 +98,11 @@ def test_plan_spec_file_not_found() -> None:
 
 
 @patch("vibe3.services.spec_ref_service.SpecRefService._fetch_issue_data")
-@patch("vibe3.commands.plan.run_plan")
+@patch("vibe3.commands.plan.CodeagentExecutionService.execute_sync")
 @patch("vibe3.commands.plan.FlowService")
 @patch("vibe3.commands.plan.ensure_flow_for_current_branch")
 def test_plan_task_includes_issue_and_spec_context(
-    mock_ensure, mock_flow_service_cls, mock_run_plan, mock_fetch_issue
+    mock_ensure, mock_flow_service_cls, mock_execute, mock_fetch_issue
 ) -> None:
     flow_service = MagicMock()
     flow_service.get_flow_status.return_value = MagicMock(
@@ -123,12 +123,13 @@ def test_plan_task_includes_issue_and_spec_context(
     }
 
     with patch("vibe3.commands.plan.GitHubClient", return_value=issue_client):
+        mock_execute.return_value = MagicMock(success=True)
         result = runner.invoke(plan_app, ["task"])
 
     assert result.exit_code == 0
-    request = mock_run_plan.call_args.args[0]
-    assert request.task_guidance is not None
-    assert "Task title" in request.task_guidance
-    assert "Task body" in request.task_guidance
-    assert "Spec title" in request.task_guidance
-    assert "Spec body" in request.task_guidance
+    command = mock_execute.call_args.args[0]
+    context = command.context_builder()
+    assert "Task title" in context
+    assert "Task body" in context
+    assert "Spec title" in context
+    assert "Spec body" in context

@@ -1,9 +1,10 @@
 """Unified codeagent execution service for plan/review/run commands."""
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Sequence
 
 from loguru import logger
 from typer import echo
@@ -30,6 +31,7 @@ class CodeagentCommand:
     model: str | None = None
     config: VibeConfig | None = None
     branch: str | None = None
+    cli_args: list[str] | None = None
 
 
 @dataclass
@@ -181,15 +183,43 @@ class CodeagentExecutionService:
         return self.execute_sync(command)
 
     def _build_cli_command(self, command: CodeagentCommand) -> list[str]:
-        """Build CLI command for async execution."""
+        """Build CLI command for async execution.
+
+        Priority:
+        1. Explicit CLI args from command builder
+        2. Current process argv (strip --async)
+        3. Fallback role-based defaults for non-CLI callers
+        """
+        if command.cli_args:
+            return self.build_self_invocation(command.cli_args)
+
+        current_argv = list(sys.argv[1:]) if len(sys.argv) > 1 else []
+        if current_argv:
+            return self.build_self_invocation(current_argv)
+
+        return self._build_fallback_cli_command(command)
+
+    @staticmethod
+    def build_self_invocation(args: Sequence[str]) -> list[str]:
+        """Build `uv run python src/vibe3/cli.py ...` invocation and strip --async."""
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+        for arg in args:
+            if arg == "--async":
+                continue
+            cmd.append(arg)
+        return cmd
+
+    @staticmethod
+    def _build_fallback_cli_command(command: CodeagentCommand) -> list[str]:
+        """Fallback async CLI command for non-CLI/internal call sites."""
         cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
 
-        if command.role == "planner":
-            cmd.extend(["plan", "task"])
-        elif command.role == "executor":
-            cmd.append("run")
-        elif command.role == "reviewer":
-            cmd.extend(["review", "base"])
+        role_default_args: dict[ExecutionRole, list[str]] = {
+            "planner": ["plan", "task"],
+            "executor": ["run"],
+            "reviewer": ["review", "base"],
+        }
+        cmd.extend(role_default_args[command.role])
 
         if command.agent:
             cmd.extend(["--agent", command.agent])
@@ -199,7 +229,6 @@ class CodeagentExecutionService:
             cmd.extend(["--model", command.model])
         if command.task:
             cmd.append(command.task)
-
         return cmd
 
 
@@ -215,6 +244,7 @@ def create_codeagent_command(
     model: str | None = None,
     config: VibeConfig | None = None,
     branch: str | None = None,
+    cli_args: list[str] | None = None,
 ) -> CodeagentCommand:
     """Factory function to create CodeagentCommand.
 
@@ -230,6 +260,7 @@ def create_codeagent_command(
         model: Model override
         config: VibeConfig instance
         branch: Current branch (for async execution)
+        cli_args: Optional explicit CLI args used for async self-invocation
 
     Returns:
         CodeagentCommand instance
@@ -252,4 +283,5 @@ def create_codeagent_command(
         model=model,
         config=config,
         branch=branch,
+        cli_args=cli_args,
     )

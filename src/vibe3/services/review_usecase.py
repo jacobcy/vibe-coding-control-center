@@ -131,7 +131,7 @@ class ReviewUsecase:
             branch=branch,
         )
         if async_mode and not dry_run and branch:
-            exec_svc.execute_async(command, branch)
+            exec_svc.execute(command, async_mode=True)
             return ReviewRunResult(
                 verdict="ASYNC",
                 handoff_file=None,

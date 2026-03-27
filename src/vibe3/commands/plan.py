@@ -15,8 +15,11 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
+from vibe3.services.codeagent_execution_service import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
@@ -86,35 +89,22 @@ def task(
     if task_input.used_flow_issue:
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
-    if async_mode and not dry_run:
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
-        async_svc = AsyncExecutionService()
-        cmd = usecase.build_async_task_command(
-            task_input.issue_number,
-            instructions,
-            agent,
-            backend,
-            model,
-        )
-        async_svc.start_async_execution("planner", cmd, branch)
-        typer.echo("✓ Plan started in background")
-        typer.echo("  vibe3 flow show    # Check status")
-        return
-
-    import typer as typer_module
-
-    typer_module.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    run_plan(  # type: ignore[call-arg]
-        task_input.request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+    typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
+    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
+    task = instructions or plan_prompt
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(task_input.request, config),
+        task=task,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
     )
+    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
     if not dry_run:
         result = transition_to_claimed(task_input.issue_number)
@@ -181,23 +171,6 @@ def spec(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    if async_mode and not dry_run:
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
-        async_svc = AsyncExecutionService()
-        cmd = usecase.build_async_spec_command(
-            file,
-            msg,
-            instructions,
-            agent,
-            backend,
-            model,
-        )
-        async_svc.start_async_execution("planner", cmd, branch)
-        typer.echo("✓ Plan started in background")
-        typer.echo("  vibe3 flow show    # Check status")
-        return
-
     if file:
         typer.echo(f"-> Plan from file: {file}")
     elif msg:
@@ -209,13 +182,18 @@ def spec(
         except Exception:
             pass
 
-    run_plan(  # type: ignore[call-arg]
-        spec_input.request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
+    task = instructions or plan_prompt
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(spec_input.request, config),
+        task=task,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
     )
+    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
