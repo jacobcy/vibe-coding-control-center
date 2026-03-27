@@ -92,3 +92,41 @@ def test_fetch_failure_does_not_block(
                 # Should NOT raise despite fetch failure
                 pr = pr_service.create_draft_pr(title="T", body="B")
                 assert pr.number == 1
+
+
+def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:
+    """Test merge PR success."""
+    mock_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.MERGED,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+
+    mock_github_client.check_auth.return_value = True
+    mock_github_client.get_pr.return_value = mock_pr
+    mock_github_client.merge_pr.return_value = mock_pr
+
+    mock_store = MagicMock()
+
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "store", mock_store):
+            pr = pr_service.merge_pr(123)
+
+            assert pr.state == PRState.MERGED
+            mock_github_client.merge_pr.assert_called_once_with(123)
+            mock_store.update_flow_state.assert_called_once_with(
+                "feature-branch",
+                flow_status="done",
+                latest_actor="unknown",
+            )
+            mock_store.add_event.assert_called_once_with(
+                "feature-branch",
+                "pr_merge",
+                "unknown",
+                "PR #123 merged",
+            )
