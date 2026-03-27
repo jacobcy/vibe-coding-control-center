@@ -35,8 +35,17 @@ def mock_store() -> MagicMock:
         yield mock
 
 
+@pytest.fixture
+def no_conflict_git() -> MagicMock:
+    """Mock git client with no merge conflicts (fetch + dry-run clean)."""
+    git = MagicMock()
+    git.fetch.return_value = None
+    git.check_merge_conflicts.return_value = False
+    return git
+
+
 def test_create_draft_pr_success(
-    pr_service: PRService, mock_github_client: MagicMock
+    pr_service: PRService, mock_github_client: MagicMock, no_conflict_git: MagicMock
 ) -> None:
     """Test create draft PR success."""
     mock_github_client.check_auth.return_value = True
@@ -54,7 +63,6 @@ def test_create_draft_pr_success(
     )
 
     mock_store = MagicMock()
-    # Mock flow state with metadata
     mock_store.get_flow_state.return_value = {
         "branch": "feature-branch",
         "flow_slug": "test-flow",
@@ -65,9 +73,9 @@ def test_create_draft_pr_success(
     }
 
     with patch.object(pr_service, "github_client", mock_github_client):
-        with patch.object(pr_service, "git_client"):
+        with patch.object(pr_service, "git_client", no_conflict_git):
             with patch.object(pr_service, "store", mock_store):
-                pr_service.git_client.get_current_branch.return_value = "feature-branch"
+                no_conflict_git.get_current_branch.return_value = "feature-branch"
 
                 pr = pr_service.create_draft_pr(
                     title="Test PR",
@@ -78,13 +86,10 @@ def test_create_draft_pr_success(
                 assert pr.number == 123
                 assert pr.draft is True
                 mock_github_client.create_pr.assert_called_once()
-                mock_github_client.list_prs_for_branch.assert_called_once_with(
-                    "feature-branch"
-                )
-                pr_service.git_client.push_branch.assert_called_once_with(
+                no_conflict_git.fetch.assert_called_once_with("origin", "main")
+                no_conflict_git.push_branch.assert_called_once_with(
                     "feature-branch", set_upstream=True
                 )
-                # Verify metadata was read from flow
                 mock_store.get_flow_state.assert_called_once_with("feature-branch")
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
@@ -112,7 +117,7 @@ def test_create_draft_pr_auth_failure(
 
 
 def test_create_draft_pr_duplicate_branch_pr(
-    pr_service: PRService, mock_github_client: MagicMock
+    pr_service: PRService, mock_github_client: MagicMock, no_conflict_git: MagicMock
 ) -> None:
     mock_github_client.check_auth.return_value = True
     mock_github_client.list_prs_for_branch.return_value = [
@@ -142,15 +147,15 @@ def test_create_draft_pr_duplicate_branch_pr(
 
     mock_store = MagicMock()
     with patch.object(pr_service, "github_client", mock_github_client):
-        with patch.object(pr_service, "git_client") as mock_git_client:
+        with patch.object(pr_service, "git_client", no_conflict_git):
             with patch.object(pr_service, "store", mock_store):
-                mock_git_client.get_current_branch.return_value = "feature-branch"
+                no_conflict_git.get_current_branch.return_value = "feature-branch"
 
                 pr = pr_service.create_draft_pr(title="Test", body="Body")
 
                 assert pr.number == 321
                 assert pr.body == "Existing body"
-                mock_git_client.push_branch.assert_not_called()
+                no_conflict_git.push_branch.assert_not_called()
                 mock_github_client.get_pr.assert_called_once_with(321)
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
@@ -182,7 +187,7 @@ def test_get_pr_success(pr_service: PRService, mock_github_client: MagicMock) ->
 
 
 def test_mark_ready_success(
-    pr_service: PRService, mock_github_client: MagicMock
+    pr_service: PRService, mock_github_client: MagicMock, no_conflict_git: MagicMock
 ) -> None:
     """Test mark PR as ready success."""
     mock_pr = PRResponse(
@@ -204,27 +209,29 @@ def test_mark_ready_success(
     mock_store = MagicMock()
 
     with patch.object(pr_service, "github_client", mock_github_client):
-        with patch.object(pr_service, "store", mock_store):
-            pr = pr_service.mark_ready(123)
+        with patch.object(pr_service, "git_client", no_conflict_git):
+            with patch.object(pr_service, "store", mock_store):
+                pr = pr_service.mark_ready(123)
 
-        assert pr.number == 123
-        mock_github_client.mark_ready.assert_called_once_with(123)
-        mock_store.update_flow_state.assert_called_once_with(
-            "feature-branch",
-            pr_number=123,
-            pr_ready_for_review=True,
-            latest_actor="unknown",
-        )
-        mock_store.add_event.assert_called_once_with(
-            "feature-branch",
-            "pr_ready",
-            "unknown",
-            "PR #123 marked as ready for review",
-        )
+                assert pr.number == 123
+                mock_github_client.mark_ready.assert_called_once_with(123)
+                no_conflict_git.fetch.assert_called_once_with("origin", "main")
+                mock_store.update_flow_state.assert_called_once_with(
+                    "feature-branch",
+                    pr_number=123,
+                    pr_ready_for_review=True,
+                    latest_actor="unknown",
+                )
+                mock_store.add_event.assert_called_once_with(
+                    "feature-branch",
+                    "pr_ready",
+                    "unknown",
+                    "PR #123 marked as ready for review",
+                )
 
 
 def test_mark_ready_already_ready_syncs_state(
-    pr_service: PRService, mock_github_client: MagicMock
+    pr_service: PRService, mock_github_client: MagicMock, no_conflict_git: MagicMock
 ) -> None:
     """mark_ready should confirm and sync when PR is already ready."""
     ready_pr = PRResponse(
@@ -243,8 +250,9 @@ def test_mark_ready_already_ready_syncs_state(
     mock_store = MagicMock()
 
     with patch.object(pr_service, "github_client", mock_github_client):
-        with patch.object(pr_service, "store", mock_store):
-            pr = pr_service.mark_ready(123)
+        with patch.object(pr_service, "git_client", no_conflict_git):
+            with patch.object(pr_service, "store", mock_store):
+                pr = pr_service.mark_ready(123)
 
     assert pr.number == 123
     mock_github_client.mark_ready.assert_not_called()

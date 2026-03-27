@@ -77,6 +77,9 @@ class PRService:
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
+        # Check for merge conflicts with origin/main
+        self._check_upstream_conflicts("create")
+
         # Get current branch
         head_branch = self.git_client.get_current_branch()
 
@@ -169,6 +172,9 @@ class PRService:
             raise RuntimeError(
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
+
+        # Check for merge conflicts with origin/main
+        self._check_upstream_conflicts("ready")
 
         # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)
@@ -284,3 +290,33 @@ class PRService:
             pr_ready_for_review=not pr.draft,
             latest_actor=actor,
         )
+
+    def _check_upstream_conflicts(self, action: str) -> None:
+        """Fetch origin/main and dry-run merge to detect conflicts.
+
+        On conflict: raise UserError to halt the calling command.
+        On network/fetch failure: log warning and continue (non-blocking).
+
+        Args:
+            action: Context label for log/error messages (e.g. "create", "ready")
+
+        Raises:
+            UserError: When merge conflicts are detected
+        """
+        target = "origin/main"
+        try:
+            self.git_client.fetch("origin", "main")
+        except GitError:
+            logger.bind(domain="pr", action=action).warning(
+                f"Failed to fetch {target}, skipping conflict check"
+            )
+            return
+
+        if self.git_client.check_merge_conflicts(target):
+            raise UserError(
+                f"Merge conflict detected between current branch and {target}\n"
+                f"Resolve before {action}:\n"
+                f"  1. git rebase {target}\n"
+                f"  2. Resolve any conflicts\n"
+                f"  3. Re-run vibe3 pr {action}"
+            )
