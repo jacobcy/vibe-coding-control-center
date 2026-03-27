@@ -12,7 +12,6 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.config.settings import VibeConfig
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
