@@ -39,7 +39,7 @@ def hydrate_task(
             type="no_remote_identity",
             message=(
                 f"Branch '{branch}' 未绑定 GitHub Project item，"
-                "请先运行 vibe task bridge link-project <id>"
+                "请先运行 vibe3 flow bind <issue_number> 绑定 task/dependency"
             ),
         )
 

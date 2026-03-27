@@ -203,6 +203,25 @@ class TestFlowCreateDecision:
         assert decision.start_ref == "task/blocked-flow"
         assert decision.requires_new_worktree is False
 
+    def test_active_flow_waiting_review_allows_create_from_main(
+        self, mock_store: Mock
+    ) -> None:
+        """Active flow with ready PR should allow creating new target."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/reviewing-flow",
+            "flow_slug": "reviewing_flow",
+            "flow_status": "active",
+            "pr_ready_for_review": 1,
+            "updated_at": "2026-03-26T00:00:00",
+        }
+
+        service = FlowService(store=mock_store)
+        decision = service.can_create_from_current_worktree("task/reviewing-flow")
+
+        assert decision.allowed is True
+        assert decision.start_ref == "origin/main"
+        assert decision.requires_new_worktree is False
+
     def test_done_flow_can_start_new_target_from_safe_base(
         self, mock_store: Mock
     ) -> None:

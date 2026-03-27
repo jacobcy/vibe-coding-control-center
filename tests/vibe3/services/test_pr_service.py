@@ -90,6 +90,7 @@ def test_create_draft_pr_success(
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
                     pr_number=123,
+                    pr_ready_for_review=False,
                     latest_actor="server",
                 )
                 mock_store.add_event.assert_called_once_with(
@@ -177,12 +178,25 @@ def test_mark_ready_success(
     mock_github_client.check_auth.return_value = True
     mock_github_client.get_pr.return_value = mock_pr
     mock_github_client.mark_ready.return_value = mock_pr
+    mock_store = MagicMock()
 
     with patch.object(pr_service, "github_client", mock_github_client):
-        pr = pr_service.mark_ready(123)
+        with patch.object(pr_service, "store", mock_store):
+            pr = pr_service.mark_ready(123)
 
         assert pr.number == 123
         mock_github_client.mark_ready.assert_called_once_with(123)
+        mock_store.update_flow_state.assert_called_once_with(
+            "feature-branch",
+            pr_ready_for_review=True,
+            latest_actor="unknown",
+        )
+        mock_store.add_event.assert_called_once_with(
+            "feature-branch",
+            "pr_ready",
+            "unknown",
+            "PR #123 marked as ready for review",
+        )
 
 
 def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:

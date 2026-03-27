@@ -13,6 +13,7 @@ from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
 from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.task_binding_guard import build_bind_task_hint
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
@@ -231,8 +232,8 @@ def show(
             render_flow_timeline(timeline["state"], timeline["events"])
             if timeline["state"].task_issue_number is None:
                 console.print(
-                    "[yellow]提示：当前 flow 还没有 task，建议先执行 "
-                    "vibe3 flow bind <issue> --role task[/]"
+                    "[yellow]提示：当前 flow 还没有 task，建议 "
+                    f"{build_bind_task_hint()}[/]"
                 )
 
 

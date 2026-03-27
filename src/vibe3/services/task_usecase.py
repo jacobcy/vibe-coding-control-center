@@ -2,11 +2,9 @@
 
 import re
 from dataclasses import dataclass
-from typing import Literal
 
 from vibe3.exceptions import GitError
-from vibe3.models.flow import FlowState, IssueLink
-from vibe3.models.project_item import ProjectItemError
+from vibe3.models.flow import FlowState
 from vibe3.models.task_bridge import HydratedTaskView, HydrateError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -120,19 +118,3 @@ class TaskUsecase:
             related_issue_numbers=related_issue_numbers,
             dependency_issue_numbers=dependency_issue_numbers,
         )
-
-    def link_issue(
-        self,
-        issue_ref: str,
-        role: Literal["related", "dependency"] = "related",
-    ) -> IssueLink:
-        """Link issue to current flow."""
-        issue_number = self.parse_issue_ref(issue_ref)
-        branch = self.resolve_branch()
-        return self.task_service.link_issue(branch, issue_number, role)
-
-    def update_remote_status(self, value: str) -> tuple[str, bool | ProjectItemError]:
-        """Update current task status in GitHub Project."""
-        branch = self.resolve_branch()
-        result = self.task_service.update_remote_task_status(branch, value)
-        return branch, result

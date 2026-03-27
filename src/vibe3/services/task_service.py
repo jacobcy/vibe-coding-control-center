@@ -17,8 +17,7 @@ class TaskService(TaskBridgeMixin):
     """Service for managing task state.
 
     task 状态真源在 GitHub Project，本地 SQLite 只存 flow 执行现场状态。
-    bridge 操作（hydrate / update_remote_task_status / link_project_item）
-    由 TaskBridgeMixin 提供。
+    bridge 操作（hydrate / auto_link_issue_to_project）由 TaskBridgeMixin 提供。
     """
 
     def __init__(
@@ -84,7 +83,6 @@ class TaskService(TaskBridgeMixin):
         """Update local flow scene status.
 
         NOTE: flow_status 是本地执行现场状态，不等于 GitHub Project task 状态真源。
-        如需更新远端状态，请使用 update_remote_task_status()（来自 TaskBridgeMixin）。
         """
         logger.bind(
             domain="task",
