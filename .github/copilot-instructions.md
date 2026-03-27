@@ -1,73 +1,37 @@
-Your task is to "onboard" this repository to Copilot coding agent by adding a .github/copilot-instructions.md file in the repository that contains information describing how a coding agent seeing it for the first time can work most efficiently.
+# Copilot Onboarding — Vibe Center 2.0
 
-You will do this task only one time per repository and doing a good job can SIGNIFICANTLY improve the quality of the agent's work, so take your time, think carefully, and search thoroughly before writing the instructions.
+## 快速认知
+- 仓库是 AI 协作编排工具，存在 **V2 Shell**（`bin/`, `lib/`, `tests/vibe2/`）与 **V3 Python**（`src/vibe3/`, `tests/vibe3/`）双实现。配置与规则集中在 `.agent/`（规则）、`skills/`（技能）、`.git/vibe/`（共享状态真源，勿直接改）。
+- AI 工作入口与硬规则：先读 `AGENTS.md` → `CLAUDE.md` → `.agent/rules/*`。文档职责见 `SOUL.md`/`STRUCTURE.md`，术语以 `docs/standards/glossary.md` 为准。
+- CI（`.github/workflows/ci.yml`）在 PR 上运行：Shell LOC 上限检查、Python LOC 上限、Shell 双层 lint、bats `tests/vibe2/`、`uv run ruff check src`、`uv run black --check src tests/vibe3`、`uv run mypy src`、`uv run pytest tests/vibe3 -v`。
 
-<Goals>
-- Reduce the likelihood of a coding agent pull request getting rejected by the user due to
-generating code that fails the continuous integration build, fails a validation pipeline, or
-having misbehavior.
-- Minimize bash command and build failures.
-- Allow the agent to complete its task more quickly by minimizing the need for exploration using grep, find, str_replace_editor, and code search tools.
-</Goals>
+## 环境与依赖（必备）
+- 系统依赖：`zsh`、`bats`、`shellcheck`。在全新 runner 上 `zsh`/`bats` 缺失会导致 `scripts/hooks/lint.sh` 或 bats 直接报 127，需先执行 `sudo apt-get install -y zsh bats shellcheck`。
+- Python 工具链：**必须用 uv**。若官方安装脚本（`curl https://astral.sh/uv/install.sh | sh`）因 DNS 失败（遇到 “Could not resolve host: astral.sh”），可用 `pip install uv` 作为替代。同步依赖：`uv sync --dev`（使用 Python 3.12，创建 `.venv`）。
+- 运行 CLI：Shell 用 `bin/vibe ...`；Python 用 `uv run python src/vibe3/cli.py ...`。禁止直接用 `python`/`pip` 触达 V3。
 
-<Limitations>
-- Instructions must be no longer than 2 pages.
-- Instructions must not be task specific.
-</Limitations>
+## 推荐构建 / 验证顺序
+1) **Shell 双层 lint**：`bash scripts/hooks/lint.sh`（需 zsh、shellcheck）。当前仅有若干 shellcheck warning，0 error。
+2) **Shell 测试（bats）**：`bats --recursive tests/vibe2`。在未安装全局 `vibe` / 未准备模拟资产时会大量失败（127），尤其安装类用例把 `VIBE_ROOT` 解析到 `tests/` 下缺少 `bin/`/`scripts/`。若需运行，请确保：
+   - PATH 中可找到 `bin/vibe`（可 `export PATH="$PWD/bin:$PATH"` 或先 `scripts/install.sh` 完成全局安装）；
+   - 相关脚本依赖的工具（如 `npx`、`openspec`）已可执行或被 stub。
+3) **Python 质量栈**（在 `uv sync --dev` 后）：
+   - `uv run ruff check src`
+   - `uv run black --check src tests/vibe3`
+   - `uv run mypy src`
+   - `uv run pytest tests/vibe3 -q`（~52s，当前通过；有 PytestReturnNotNone 与 fork Deprecation 警告但不阻塞）
 
-<WhatToAdd>
+## 目录速览
+- `bin/vibe`：Shell CLI 入口；`lib/`：核心逻辑；`config/`：别名与密钥模板；`scripts/`：lint/metrics/install 等工具。
+- `src/vibe3/`：Python V3 代码；`tests/vibe3/`：pytest 套件；`tests/vibe2/`：bats 套件。
+- `.agent/`：规则、workflow、记忆；`skills/`：项目自有技能；`.github/workflows/`：CI；`docs/`：规范与计划。
 
-Add the following high level details about the codebase to reduce the amount of searching the agent has to do to understand the codebase each time:
-<HighLevelDetails>
+## 常见陷阱与绕过
+- 缺少 `zsh` / `bats` 会让 lint、bats 直接失败；先安装系统包再跑脚本。
+- uv 安装脚本若因网络受阻，改用 `pip install uv`；随后再 `uv sync --dev`。
+- bats 集成测试默认将 `VIBE_ROOT` 设为 `tests/`，若未准备对应资源会出现 `Command not found` 或找不到 `bin/`/`scripts/` 的错误；在需要验证时先把仓库 `bin/` 加入 PATH 或跑 `scripts/install.sh` 以提供这些资产。
+- Python 侧所有命令都走 `uv run ...`；不要用裸 `python`/`pip`，否则不符合项目标准与 CI 行为。
 
-- A summary of what the repository does.
-- High level repository information, such as the size of the repo, the type of the project, the languages, frameworks, or target runtimes in use.
-  </HighLevelDetails>
-
-Add information about how to build and validate changes so the agent does not need to search and find it each time.
-<BuildInstructions>
-
-- For each of bootstrap, build, test, run, lint, and any other scripted step, document the sequence of steps to take to run it successfully as well as the versions of any runtime or build tools used.
-- Each command should be validated by running it to ensure that it works correctly as well as any preconditions and postconditions.
-- Try cleaning the repo and environment and running commands in different orders and document errors and misbehavior observed as well as any steps used to mitigate the problem.
-- Run the tests and document the order of steps required to run the tests.
-- Make a change to the codebase. Document any unexpected build issues as well as the workarounds.
-- Document environment setup steps that seem optional but that you have validated are actually required.
-- Document the time required for commands that failed due to timing out.
-- When you find a sequence of commands that work for a particular purpose, document them in detail.
-- Use language to indicate when something should always be done. For example: "always run npm install before building".
-- Record any validation steps from documentation.
-  </BuildInstructions>
-
-List key facts about the layout and architecture of the codebase to help the agent find where to make changes with minimal searching.
-<ProjectLayout>
-
-- A description of the major architectural elements of the project, including the relative paths to the main project files, the location
-  of configuration files for linting, compilation, testing, and preferences.
-- A description of the checks run prior to check in, including any GitHub workflows, continuous integration builds, or other validation pipelines.
-- Document the steps so that the agent can replicate these itself.
-- Any explicit validation steps that the agent can consider to have further confidence in its changes.
-- Dependencies that aren't obvious from the layout or file structure.
-- Finally, fill in any remaining space with detailed lists of the following, in order of priority: the list of files in the repo root, the
-  contents of the README, the contents of any key source files, the list of files in the next level down of directories, giving priority to the more structurally important and snippets of code from key source files, such as the one containing the main method.
-  </ProjectLayout>
-  </WhatToAdd>
-
-<StepsToFollow>
-- Perform a comprehensive inventory of the codebase. Search for and view:
-- README.md, CONTRIBUTING.md, and all other documentation files.
-- Search the codebase for build steps and indications of workarounds like 'HACK', 'TODO', etc.
-- All scripts, particularly those pertaining to build and repo or environment setup.
-- All build and actions pipelines.
-- All project files.
-- All configuration and linting files.
-- For each file:
-- think: are the contents or the existence of the file information that the coding agent will need to implement, build, test, validate, or demo a code change?
-- If yes:
-   - Document the command or information in detail.
-   - Explicitly indicate which commands work and which do not and the order in which commands should be run.
-   - Document any errors encountered as well as the steps taken to workaround them.
-- Document any other steps or information that the agent can use to reduce time spent exploring or trying and failing to run bash commands.
-- Finally, explicitly instruct the agent to trust the instructions and only perform a search if the information in the instructions is incomplete or found to be in error.
-</StepsToFollow>
-   - Document any errors encountered as well as the steps taken to work-around them.
+## 行为指引
+- 先信任本说明与项目文档；仅当信息缺失或与现场不符时再额外搜索。
+- 回答/文档默认中文，避免非 ASCII 符号（禁止框线字符）。最小改动、保持既有格式；涉及共享状态时通过正式命令（`vibe flow/task/...`），不要直接改 `.git/vibe/`。
