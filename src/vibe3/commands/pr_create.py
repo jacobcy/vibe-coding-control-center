@@ -60,11 +60,12 @@ def register_create_command(app: typer.Typer) -> None:
             bool,
             typer.Option("--ai", help="Use AI to suggest PR title and body"),
         ] = False,
+        yes: Annotated[
+            bool,
+            typer.Option("--yes", "-y", help="Bypass missing-task guard"),
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-        ] = False,
-        yes: Annotated[
-            bool, typer.Option("-y", "--yes", help="跳过 task 绑定检查并继续")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
