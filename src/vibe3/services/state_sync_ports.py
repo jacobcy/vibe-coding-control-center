@@ -49,10 +49,26 @@ class PrStatePort(Protocol):
 class GhIssueLabelPort:
     """Default issue label port backed by `gh issue`."""
 
+    def __init__(self, repo: str | None = None) -> None:
+        self.repo = repo
+        if self.repo is None:
+            from vibe3.config.settings import VibeConfig
+
+            config = VibeConfig.get_defaults()
+            self.repo = getattr(getattr(config, "orchestra", None), "repo", None)
+
+    def _build_cmd(self, base: list[str]) -> list[str]:
+        cmd = list(base)
+        if self.repo:
+            cmd.extend(["--repo", self.repo])
+        return cmd
+
     def get_issue_labels(self, issue_number: int) -> list[str] | None:
         try:
             result = subprocess.run(
-                ["gh", "issue", "view", str(issue_number), "--json", "labels"],
+                self._build_cmd(
+                    ["gh", "issue", "view", str(issue_number), "--json", "labels"]
+                ),
                 capture_output=True,
                 text=True,
             )
@@ -77,7 +93,9 @@ class GhIssueLabelPort:
     def add_issue_label(self, issue_number: int, label: str) -> bool:
         try:
             result = subprocess.run(
-                ["gh", "issue", "edit", str(issue_number), "--add-label", label],
+                self._build_cmd(
+                    ["gh", "issue", "edit", str(issue_number), "--add-label", label]
+                ),
                 capture_output=True,
                 text=True,
             )
@@ -91,7 +109,9 @@ class GhIssueLabelPort:
     def remove_issue_label(self, issue_number: int, label: str) -> bool:
         try:
             result = subprocess.run(
-                ["gh", "issue", "edit", str(issue_number), "--remove-label", label],
+                self._build_cmd(
+                    ["gh", "issue", "edit", str(issue_number), "--remove-label", label]
+                ),
                 capture_output=True,
                 text=True,
             )

@@ -24,8 +24,12 @@ class LabelService:
     No CLI commands exposed.
     """
 
-    def __init__(self, issue_port: IssueLabelPort | None = None) -> None:
-        self.issue_port = issue_port or GhIssueLabelPort()
+    def __init__(
+        self,
+        issue_port: IssueLabelPort | None = None,
+        repo: str | None = None,
+    ) -> None:
+        self.issue_port = issue_port or GhIssueLabelPort(repo=repo)
 
     def get_state(self, issue_number: int) -> IssueState | None:
         """Get current orchestration state of an issue.

@@ -61,7 +61,7 @@ class MasterAgentHandler:
             subprocess.run(cmd, capture_output=True)
 
         elif decision.action == "triage":
-            LabelService().confirm_issue_state(
+            LabelService(repo=self.config.repo).confirm_issue_state(
                 issue_number,
                 IssueState.READY,
                 actor="orchestra:triage",
