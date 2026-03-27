@@ -8,12 +8,15 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
-from vibe3.models.orchestration import IssueState
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
+from vibe3.services.flow_create_decision import decide_create_from_current_worktree
+from vibe3.services.flow_label_sync import (
+    sync_flow_blocked_task_label,
+    sync_flow_done_task_labels,
+)
 from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
-from vibe3.services.label_service import LabelService
 
 
 class FlowLifecycleMixin:
@@ -26,82 +29,8 @@ class FlowLifecycleMixin:
         self: Any,
         current_branch: str,
     ) -> CreateDecision:
-        """Determine if a new flow can be created in the current worktree.
-
-        Rules:
-        - active: reject - current flow is in progress
-        - active + pr_ready_for_review: allow - current flow is waiting review
-        - blocked: allow from current branch - user wants to create downstream flow
-        - done/aborted/stale/no-flow: require fresh worktree check
-
-        Args:
-            current_branch: Current git branch name
-
-        Returns:
-            CreateDecision with allowed status and guidance
-        """
-        flow_data = self.store.get_flow_state(current_branch)
-
-        if not flow_data:
-            return CreateDecision(
-                allowed=True,
-                reason="No active flow in current worktree",
-                start_ref=MAIN_BRANCH_REF,
-                requires_new_worktree=False,
-            )
-
-        status = flow_data.get("flow_status", "active")
-        is_waiting_review = bool(flow_data.get("pr_ready_for_review"))
-
-        if status == "active" and is_waiting_review:
-            return CreateDecision(
-                allowed=True,
-                reason=(
-                    "Current flow PR is ready and waiting review - "
-                    "safe to start a new target"
-                ),
-                start_ref=MAIN_BRANCH_REF,
-                requires_new_worktree=False,
-            )
-
-        if status == "active":
-            return CreateDecision(
-                allowed=False,
-                reason=(
-                    "Current flow is active - cannot create new flow in same worktree"
-                ),
-                requires_new_worktree=True,
-                guidance=(
-                    "Use 'vibe3 wtnew <name>' to create a new worktree for new features"
-                ),
-            )
-
-        if status == "blocked":
-            return CreateDecision(
-                allowed=True,
-                reason=(
-                    "Current flow is blocked - "
-                    "can create downstream flow from current branch"
-                ),
-                start_ref=current_branch,
-                allow_base_current=True,
-                requires_new_worktree=False,
-            )
-
-        if status in ("done", "aborted", "stale"):
-            return CreateDecision(
-                allowed=True,
-                reason=f"Current flow is {status} - safe to start new target",
-                start_ref=MAIN_BRANCH_REF,
-                requires_new_worktree=False,
-            )
-
-        return CreateDecision(
-            allowed=True,
-            reason="Unknown status - allowing with caution",
-            start_ref=MAIN_BRANCH_REF,
-            requires_new_worktree=False,
-        )
+        """Determine if a new flow can be created in the current worktree."""
+        return decide_create_from_current_worktree(self.store, current_branch)
 
     def resolve_close_target(
         self: Any,
@@ -115,15 +44,7 @@ class FlowLifecycleMixin:
         branch: str,
         check_pr: bool = True,
     ) -> None:
-        """Close flow and delete branch.
-
-        Args:
-            branch: Branch name
-            check_pr: Whether to check PR merge status
-
-        Raises:
-            RuntimeError: If PR not merged and check_pr is True
-        """
+        """Close flow and delete branch."""
         git = GitClient()
 
         logger.bind(
@@ -212,21 +133,7 @@ class FlowLifecycleMixin:
             "system",
             f"Flow closed, branch '{branch}' deleted",
         )
-        issue_links_raw = self.store.get_issue_links(branch)
-        issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
-        label_service = LabelService()
-        for link in issue_links:
-            if link.get("issue_role") != "task":
-                continue
-            issue_number = link.get("issue_number")
-            if issue_number is None:
-                continue
-            label_service.confirm_issue_state(
-                int(issue_number),
-                IssueState.DONE,
-                actor="flow:done",
-                force=True,
-            )
+        sync_flow_done_task_labels(self.store, branch)
 
         switched_to_target = switched_before_delete
         try:
@@ -261,13 +168,7 @@ class FlowLifecycleMixin:
         reason: str | None = None,
         blocked_by_issue: int | None = None,
     ) -> None:
-        """Mark flow as blocked.
-
-        Args:
-            branch: Branch name
-            reason: Optional blocking reason
-            blocked_by_issue: Optional issue number that blocks this flow
-        """
+        """Mark flow as blocked."""
         logger.bind(
             domain="flow",
             action="block",
@@ -304,22 +205,11 @@ class FlowLifecycleMixin:
             "system",
             f"Flow blocked{': ' + reason if reason else ''}",
         )
-        task_issue_number = flow_data.get("task_issue_number")
-        if task_issue_number is not None:
-            LabelService().confirm_issue_state(
-                int(task_issue_number),
-                IssueState.BLOCKED,
-                actor="flow:blocked",
-                force=True,
-            )
+        sync_flow_blocked_task_label(flow_data)
 
     def abort_flow(
         self: Any,
         branch: str,
     ) -> None:
-        """Abort flow and delete branch.
-
-        Args:
-            branch: Branch name
-        """
+        """Abort flow and delete branch."""
         abort_flow_impl(self.store, branch)
