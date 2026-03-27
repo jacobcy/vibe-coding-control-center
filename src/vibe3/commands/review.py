@@ -10,9 +10,9 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
+from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
-from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
@@ -34,6 +34,7 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
 
 def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
     """Render review result summary consistently."""
@@ -57,11 +58,6 @@ def _build_review_usecase(**kwargs: object) -> ReviewUsecase:
         command_builder=create_codeagent_command,
         **kwargs,
     )
-
-
-def _build_base_resolution_usecase() -> BaseResolutionUsecase:
-    """Construct shared base resolver for review commands."""
-    return BaseResolutionUsecase()
 
 
 @app.command()
@@ -142,7 +138,7 @@ def base(
 
     flow_service, current_branch = ensure_flow_for_current_branch()
     try:
-        resolved_base = _build_base_resolution_usecase().resolve_review_base(
+        resolved_base = build_base_resolution_usecase().resolve_review_base(
             base_branch,
             current_branch=current_branch,
         )

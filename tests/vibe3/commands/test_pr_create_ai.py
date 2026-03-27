@@ -67,7 +67,7 @@ class TestPRCreateCommandAI:
                     model_dump=lambda: {"number": 123},
                 )
                 with patch(
-                    "vibe3.commands.pr_create.BaseResolutionUsecase.collect_branch_material"
+                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
                 ) as mock_material:
                     mock_material.return_value = MagicMock(
                         commits=[],
@@ -100,7 +100,7 @@ pr:
                     model_dump=lambda: {"number": 123},
                 )
                 with patch(
-                    "vibe3.commands.pr_create.BaseResolutionUsecase.collect_branch_material"
+                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
                 ) as mock_material:
                     mock_material.return_value = MagicMock(
                         commits=["feat: add feature"],
@@ -114,11 +114,11 @@ pr:
     ) -> None:
         """Test pr create --ai --json uses AI result without prompting."""
         with patch(
-            "vibe3.commands.pr_create.BaseResolutionUsecase.resolve_pr_create_base",
+            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
             return_value="origin/main",
         ) as mock_resolve:
             with patch(
-                "vibe3.commands.pr_create.BaseResolutionUsecase.collect_branch_material"
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
             ) as mock_material:
                 mock_material.return_value = MagicMock(
                     commits=["feat: add feature"],
@@ -180,11 +180,11 @@ pr:
     ) -> None:
         """Resolved base should feed both AI context gathering and PR creation."""
         with patch(
-            "vibe3.commands.pr_create.BaseResolutionUsecase.resolve_pr_create_base",
+            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
             return_value="origin/feature-root",
         ) as mock_resolve:
             with patch(
-                "vibe3.commands.pr_create.BaseResolutionUsecase.collect_branch_material"
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
             ) as mock_material:
                 mock_material.return_value = MagicMock(
                     commits=["feat: add feature"],
@@ -211,9 +211,9 @@ pr:
                                     "body": "body",
                                 },
                             )
-                            (
-                                mock_service.return_value.create_draft_pr.return_value
-                            ) = mock_pr
+                            mock_service.return_value.create_draft_pr.return_value = (
+                                mock_pr
+                            )
 
                             result = runner.invoke(
                                 app,

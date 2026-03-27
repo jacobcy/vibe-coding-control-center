@@ -10,12 +10,11 @@ from loguru import logger
 from rich.console import Console
 from rich.prompt import Prompt
 
-from vibe3.commands.pr_helpers import noop_context
+from vibe3.commands.pr_helpers import build_base_resolution_usecase, noop_context
 from vibe3.config.settings import VibeConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.ai_service import AIService
-from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_created
@@ -28,11 +27,6 @@ def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
         and sys.stdin.isatty()
         and sys.stdout.isatty()
     )
-
-
-def _build_base_resolution_usecase() -> BaseResolutionUsecase:
-    """Construct shared base resolver for PR commands."""
-    return BaseResolutionUsecase()
 
 
 def register_create_command(app: typer.Typer) -> None:
@@ -75,9 +69,8 @@ def register_create_command(app: typer.Typer) -> None:
             else noop_context()
         )
         with ctx:
-            resolved_base = _build_base_resolution_usecase().resolve_pr_create_base(
-                base
-            )
+            base_resolver = build_base_resolution_usecase()
+            resolved_base = base_resolver.resolve_pr_create_base(base)
             logger.bind(command="pr create", title=title, base=resolved_base).info(
                 "Creating PR"
             )
@@ -100,7 +93,7 @@ def register_create_command(app: typer.Typer) -> None:
 
             if ai and not title:
                 console = Console()
-                material = _build_base_resolution_usecase().collect_branch_material(
+                material = base_resolver.collect_branch_material(
                     base_branch=resolved_base,
                     branch=branch,
                 )

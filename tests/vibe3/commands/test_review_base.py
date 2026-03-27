@@ -56,7 +56,7 @@ def test_review_base_defaults_to_origin_main():
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/main", auto_detected=True),
         ),
         patch(
@@ -84,7 +84,7 @@ def test_review_base_pass():
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/develop", auto_detected=False),
         ),
         patch(
@@ -113,7 +113,7 @@ def test_review_base_uses_shared_resolution_when_base_omitted():
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/main", auto_detected=True),
         ) as mock_resolve,
         patch(
