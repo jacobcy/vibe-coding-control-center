@@ -27,10 +27,25 @@ class PrePushInspectSummary:
     review_trigger: ReviewTrigger
 
 
+def _coerce_int(value: object, default: int) -> int:
+    """Convert value to int with safe fallback."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_list(value: object) -> list[str]:
+    """Convert value to list[str] with safe fallback."""
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
 def summarize_inspect_payload(payload: dict[str, object]) -> PrePushInspectSummary:
     """Convert raw inspect output into stable pre-push summary."""
     score_data = inspect_score(payload)
-    risk_level = str(score_data.get("level", "LOW"))
+    risk_level = str(score_data.get("level") or "LOW")
     block_review = bool(score_data.get("block", False))
 
     review_trigger: ReviewTrigger = "no"
@@ -41,12 +56,12 @@ def summarize_inspect_payload(payload: dict[str, object]) -> PrePushInspectSumma
 
     return PrePushInspectSummary(
         risk_level=risk_level,
-        risk_score=int(score_data.get("score", 0)),
+        risk_score=_coerce_int(score_data.get("score"), 0),
         block_review=block_review,
-        block_threshold=int(score_data.get("block_threshold", 12)),
-        risk_reason=str(score_data.get("reason", "")),
-        trigger_factors=[str(item) for item in score_data.get("trigger_factors", [])],
-        recommendations=[str(item) for item in score_data.get("recommendations", [])],
+        block_threshold=_coerce_int(score_data.get("block_threshold"), 12),
+        risk_reason=str(score_data.get("reason") or ""),
+        trigger_factors=_coerce_list(score_data.get("trigger_factors")),
+        recommendations=_coerce_list(score_data.get("recommendations")),
         review_trigger=review_trigger,
     )
 
