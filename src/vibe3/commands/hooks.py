@@ -35,14 +35,18 @@ app = typer.Typer(
 def _get_hooks_dir() -> Path:
     """获取真实的 Git hooks 目录，兼容 worktree 场景."""
     try:
+        cwd = _ROOT
         result = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
             capture_output=True,
             text=True,
             check=True,
-            cwd=_ROOT,
+            cwd=cwd,
         )
-        return Path(result.stdout.strip()) / "hooks"
+        git_common_dir = Path(result.stdout.strip())
+        if not git_common_dir.is_absolute():
+            git_common_dir = cwd / git_common_dir
+        return git_common_dir / "hooks"
     except subprocess.CalledProcessError:
         return _ROOT / ".git" / "hooks"
 
