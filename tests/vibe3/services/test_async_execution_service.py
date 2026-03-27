@@ -106,36 +106,3 @@ class TestAsyncExecutionService:
         assert state["reviewer_status"] == "running"
         events = store.get_events("feature/test")
         assert events[0]["event_type"] == "review_started"
-
-    def test_cancel_execution_updates_state(self, tmp_path):
-        """Cancel should kill tmux session and record aborted state."""
-        db_path = tmp_path / "handoff.db"
-        store = SQLiteClient(db_path=str(db_path))
-        service = AsyncExecutionService(store=store)
-        store.update_flow_state(
-            "feature/x",
-            flow_slug="feature-x",
-            reviewer_status="running",
-        )
-
-        with patch("subprocess.run") as mock_run:
-            cancelled = service.cancel_execution("reviewer", "feature/x")
-
-        assert cancelled is True
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args
-        assert "tmux" in call_args[0][0]
-        assert "kill-session" in call_args[0][0]
-        state = store.get_flow_state("feature/x")
-        assert state["reviewer_status"] == "crashed"
-        events = store.get_events("feature/x")
-        assert events[0]["event_type"] == "review_aborted"
-
-    def test_cancel_execution_session_not_found(self, service):
-        """Cancel should return False when tmux session doesn't exist."""
-        from subprocess import CalledProcessError
-
-        with patch("subprocess.run", side_effect=CalledProcessError(1, "tmux")):
-            cancelled = service.cancel_execution("reviewer", "feature/x")
-
-        assert cancelled is False

@@ -26,7 +26,7 @@ from vibe3.config.settings_pr import (
 class AIConfig(BaseModel):
     """AI 辅助配置.
 
-    用于 flow new --ai 和 pr create --ai 功能。
+    用于 AI 辅助文案能力（如 pr create --ai）。
     """
 
     api_key_env: str = Field(default="DEEPSEEK_API_KEY")

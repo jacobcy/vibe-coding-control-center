@@ -45,7 +45,7 @@ def ensure_flow_for_current_branch() -> tuple["FlowService", str]:
     except MainBranchProtectedError as e:
         typer.echo(f"Error: {e}\n", err=True)
         typer.echo("Tip: Create a feature branch first:", err=True)
-        typer.echo("  vibe3 flow new <branch-name> -c", err=True)
+        typer.echo("  vibe3 flow create <name>", err=True)
         raise typer.Exit(1)
 
     return flow_service, branch
