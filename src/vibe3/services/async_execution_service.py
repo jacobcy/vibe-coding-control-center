@@ -89,50 +89,6 @@ class AsyncExecutionService:
         except OSError:
             return "done"
 
-    def cancel_execution(
-        self,
-        role: ExecutionRole,
-        branch: str,
-    ) -> bool:
-        """Cancel a running async execution by killing its tmux session.
-
-        Args:
-            role: Execution role (planner/executor/reviewer)
-            branch: Branch name
-
-        Returns:
-            True if session was killed, False if not found
-        """
-        session_name = f"vibe3-{role}-{branch}"[:50].replace("/", "-")
-
-        try:
-            subprocess.run(
-                ["tmux", "kill-session", "-t", session_name],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError:
-            return False
-
-        persist_execution_lifecycle_event(
-            self.store,
-            branch,
-            role,
-            "aborted",
-            "system",
-            detail=f"{role} cancelled (tmux session: {session_name})",
-            refs={"reason": "cancelled"},
-        )
-
-        logger.bind(
-            domain="async_execution",
-            role=role,
-            branch=branch,
-            session=session_name,
-        ).info(f"{role} cancelled")
-
-        return True
-
     def complete_execution(
         self,
         role: ExecutionRole,

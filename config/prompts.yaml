@@ -1,5 +1,5 @@
 # AI Prompts 配置
-# 用于 flow new --ai 和 pr create --ai 功能
+# 用于 AI 文案辅助能力（如 pr create --ai）
 # 用户可自定义 Prompts 模板
 
 flow:

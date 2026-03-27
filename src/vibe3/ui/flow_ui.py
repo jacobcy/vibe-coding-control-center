@@ -210,7 +210,6 @@ _EVENT_COLOR: dict[str, str] = {
     "executor_started": "yellow",
     "executor_completed": "green",
     "executor_aborted": "red",
-    "executor_cancelled": "red",
     "reviewer_started": "yellow",
     "reviewer_completed": "green",
     "reviewer_aborted": "red",

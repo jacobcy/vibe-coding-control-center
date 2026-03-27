@@ -52,9 +52,6 @@ BindRoleOption = Annotated[
     Literal["task", "related", "dependency"],
     typer.Option("--role", help="Issue role (task, related, or dependency)"),
 ]
-CancelRoleArg = Annotated[
-    Literal["planner", "executor", "reviewer"], typer.Argument(help="Role to cancel")
-]
 
 app = typer.Typer(
     help="Manage logic flows.",
@@ -287,28 +284,6 @@ def list(
             )
         else:
             render_flows_table(flows)
-
-
-@app.command()
-def cancel(
-    role: CancelRoleArg,
-    flow_name: BranchArg = None,
-    trace: TraceOption = False,
-) -> None:
-    """Cancel a running async execution."""
-    with trace_scope(trace, "flow cancel", role=role):
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
-        service = FlowService()
-        branch = flow_name if flow_name else service.get_current_branch()
-
-        async_svc = AsyncExecutionService()
-        cancelled = async_svc.cancel_execution(role, branch)
-
-        if cancelled:
-            console.print(f"[green]✓[/] Cancelled {role} on {branch}")
-        else:
-            console.print(f"[yellow]No running {role} found on {branch}[/]")
 
 
 # Register lifecycle commands from flow_lifecycle.py
