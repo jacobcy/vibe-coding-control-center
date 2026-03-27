@@ -48,7 +48,7 @@ def test_pr_ready_with_coverage_passing(
         patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.services.review_pipeline_helpers.run_inspect_json",
             return_value=mock_inspect_passing,
         ),
     ):
@@ -88,7 +88,7 @@ def test_pr_ready_prints_risk_reason_and_breakdown(
     with (
         patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.services.review_pipeline_helpers.run_inspect_json",
             return_value=inspect_result,
         ),
     ):
@@ -128,7 +128,7 @@ def test_pr_ready_yes_bypass_coverage(mock_pr_response, mock_inspect_passing):
         patch("vibe3.services.coverage_service.CoverageService"),
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.services.review_pipeline_helpers.run_inspect_json",
             return_value=mock_inspect_passing,
         ),
     ):
@@ -169,7 +169,7 @@ def test_pr_ready_json_output(
         patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.services.review_pipeline_helpers.run_inspect_json",
             return_value=mock_inspect_passing,
         ),
     ):
@@ -196,7 +196,7 @@ def test_pr_ready_yaml_output(
         patch("vibe3.services.coverage_service.CoverageService") as mock_cov_service,
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch(
-            "vibe3.commands.review_helpers.run_inspect_json",
+            "vibe3.services.review_pipeline_helpers.run_inspect_json",
             return_value=mock_inspect_passing,
         ),
     ):

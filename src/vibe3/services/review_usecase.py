@@ -8,7 +8,6 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
-from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
@@ -21,6 +20,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.inspect_output_adapter import changed_symbols
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
+from vibe3.services.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 
 
 @dataclass

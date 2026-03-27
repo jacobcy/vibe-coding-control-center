@@ -7,7 +7,6 @@ from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
-from vibe3.services.task_binding_guard import ensure_task_issue_bound
 
 
 def switch(
@@ -34,7 +33,6 @@ def switch(
 
 def done(
     branch: Annotated[str | None, typer.Option("--branch", help="Branch name")] = None,
-    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip PR check")] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -44,9 +42,7 @@ def done(
         service = FlowService()
         target_branch = branch or service.get_current_branch()
 
-        logger.bind(command="flow done", branch=target_branch, yes=yes).info(
-            "Closing flow"
-        )
+        logger.bind(command="flow done", branch=target_branch).info("Closing flow")
 
         flow_status = service.get_flow_status(target_branch)
         if not flow_status:
@@ -57,17 +53,16 @@ def done(
             )
             raise typer.Exit(1)
 
-        try:
-            ensure_task_issue_bound(
-                flow_status,
-                yes=yes,
-                force_command="vibe3 flow done --yes",
+        if flow_status.task_issue_number is None:
+            typer.echo(
+                "Error: 当前 flow 未绑定 task issue\n"
+                "先执行 `vibe3 flow bind <issue> --role task`\n"
+                "若要放弃当前 flow，请执行 `vibe3 flow aborted`",
+                err=True,
             )
-        except RuntimeError as error:
-            typer.echo(str(error), err=True)
-            raise typer.Exit(1) from error
+            raise typer.Exit(1)
 
-        service.close_flow(target_branch, check_pr=not yes)
+        service.close_flow(target_branch, check_pr=True)
 
         typer.echo(f"Flow closed, branch '{target_branch}' deleted")
 

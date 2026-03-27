@@ -47,7 +47,7 @@ class TestFlowCloseBranchSwitching:
 
         service = FlowService(store=mock_store)
 
-        service.close_flow("task/current-flow")
+        service.close_flow("task/current-flow", check_pr=False)
 
         assert actions.index("switch:main") < actions.index(
             "delete_local:task/current-flow:True"
@@ -98,7 +98,7 @@ class TestFlowCloseBranchSwitching:
 
         service = FlowService(store=mock_store)
 
-        service.close_flow("task/current-flow")
+        service.close_flow("task/current-flow", check_pr=False)
 
         assert actions.index(
             "create:vibe/main-safe/wt-feature-handoff:origin/main"
@@ -149,7 +149,7 @@ class TestFlowCloseBranchSwitching:
 
         service = FlowService(store=mock_store)
 
-        service.close_flow("task/current-flow")
+        service.close_flow("task/current-flow", check_pr=False)
 
         assert "create:vibe/main-safe/wt-feature-handoff:origin/main" in actions
         assert "switch:main" not in actions
@@ -194,7 +194,7 @@ class TestFlowCloseBranchSwitching:
 
         service = FlowService(store=mock_store)
 
-        service.close_flow("task/current-flow")
+        service.close_flow("task/current-flow", check_pr=False)
 
         assert "create:main:origin/main" in actions
         assert not any(action.startswith("delete_local:") for action in actions)

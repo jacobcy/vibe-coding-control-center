@@ -65,9 +65,9 @@ class TestInspectJsonOutput:
 
     def test_inspect_json_contains_score(self) -> None:
         """Inspect JSON output should contain score section."""
-        from vibe3.commands.review_helpers import run_inspect_json
+        from vibe3.services.review_pipeline_helpers import run_inspect_json
 
-        with patch("vibe3.commands.review_helpers.subprocess.run") as mock_run:
+        with patch("vibe3.services.review_pipeline_helpers.subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.returncode = 0
             mock_result.stdout = json.dumps(

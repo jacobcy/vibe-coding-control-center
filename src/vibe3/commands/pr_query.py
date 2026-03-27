@@ -20,7 +20,6 @@ from vibe3.commands.output_format import (
     output_result,
 )
 from vibe3.commands.pr_helpers import noop_context
-from vibe3.commands.review_helpers import run_inspect_json
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -28,6 +27,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.inspect_output_adapter import as_list, dag, impact, score
 from vibe3.services.pr_query_usecase import PrQueryUsecase
 from vibe3.services.pr_service import PRService
+from vibe3.services.review_pipeline_helpers import run_inspect_json
 from vibe3.ui.pr_ui import render_pr_details
 
 
