@@ -34,7 +34,7 @@ case "$command" in
         source "$VIBE_LIB/doctor.sh"
         vibe_doctor "$@"
         ;;
-    tool)
+    tools)
         source "$VIBE_LIB/tool.sh"
         vibe_tool "$@"
         ;;
@@ -69,7 +69,7 @@ case "$command" in
         echo "  ${GREEN}skills${NC}   Skills 物理同步与状态检查"
         echo "  ${GREEN}keys${NC}     API 密钥安全管理"
         echo "  ${GREEN}clean${NC}    清理项目临时/构建文件"
-        echo "  ${GREEN}tool${NC}     AI 开发工具链安装/更新"
+        echo "  ${GREEN}tools${NC}    AI 开发工具链安装/更新"
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
         ;;
     flow|task|roadmap|check)
