@@ -22,7 +22,6 @@ vibe_skills() {
     local subcmd="${1:-help}"
     shift 2>/dev/null || true
     vibe_require jq || return 1
-    [[ -f "$(_vibe_skills_registry_file)" ]] || vibe_die "Missing registry: $(_vibe_skills_registry_file)"
 
     echo ""
     echo "🔄 Vibe Skills 同步工具"

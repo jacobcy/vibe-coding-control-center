@@ -13,7 +13,7 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 - 检查 PR 状态
 - PR 已合并 → 关闭 issue、清理工作区
-- 使用 `vibe flow done` shell 命令删除分支
+- 使用 `uv run python src/vibe3/cli.py flow done` shell 命令删除分支
 
 ## 停止点
 
@@ -36,17 +36,17 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 ```
 /vibe-done
   ├─ Step 1: 读取当前 flow 事实
-  │   ├─ vibe flow show
+  │   ├─ uv run python src/vibe3/cli.py flow show
   │   └─ 确认 flow、branch、task、issue、pr
   │
-  ├─ Step 2: 关闭 task
-  │   └─ vibe task update <task-id> --status completed --unassign
+  ├─ Step 2: 更新 task 状态
+  │   └─ uv run python src/vibe3/cli.py task status "Done"
   │
   ├─ Step 3: 关闭 issue
   │   └─ gh issue close <issue-number-or-ref>
   │
   ├─ Step 4: 关闭 flow
-  │   └─ vibe flow done
+  │   └─ uv run python src/vibe3/cli.py flow done
   │       ├─ PR 已 merged → 直接收尾
   │       ├─ PR 未 merged → 先检查 review evidence，再尝试 merge
   │       └─ 删除本地与远端 branch
@@ -62,10 +62,10 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 ## 核心边界
 
-- 允许：读取 `vibe flow show`、关闭 task、关闭 issue、执行 `vibe flow done`、写入 handoff
+- 允许：读取 `uv run python src/vibe3/cli.py flow show`、更新 task 状态、关闭 issue、执行 `uv run python src/vibe3/cli.py flow done`、写入 handoff
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
-- `vibe flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
-- 若 PR 尚未 merged，但已满足 review gate，`vibe flow done` 会先执行 merge，再继续 closeout
+- `uv run python src/vibe3/cli.py flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
+- 若 PR 尚未 merged，但已满足 review gate，`flow done` 会先执行 merge，再继续 closeout
 - 若 review evidence 尚不存在，或 PR 还没达到 merge 条件，必须停回 `/vibe-integrate`，不得强行继续
 
 ## Workflow
@@ -75,13 +75,13 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 先运行：
 
 ```bash
-vibe flow show
+uv run python src/vibe3/cli.py flow show
 ```
 
 必要时对指定目标运行：
 
 ```bash
-vibe flow show <feature-or-branch>
+uv run python src/vibe3/cli.py flow show <branch>
 ```
 
 确认：
@@ -98,11 +98,11 @@ vibe flow show <feature-or-branch>
 
 - PR 已 merged
   或
-- PR 虽未 merged，但 shell 真源已经表明它属于 review-ready，可交给 `vibe flow done` 执行 merge gate
+- PR 虽未 merged，但 shell 真源已经表明它属于 review-ready，可交给 `flow done` 执行 merge gate
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把过时 handoff 留给下一个环节。
 
-若没有 task 或 issue，后续步骤按“可跳过”处理，不要伪造关联。
+若没有 task 或 issue，后续步骤按"可跳过"处理，不要伪造关联。
 
 若当前事实显示：
 
@@ -111,12 +111,12 @@ vibe flow show <feature-or-branch>
 
 则立即停止，返回 `/vibe-integrate`，不要继续 Step 2 以后动作。
 
-### Step 2: 关闭 task
+### Step 2: 更新 task 状态
 
 若 `flow show` 返回 `current_task`，执行：
 
 ```bash
-vibe task update <task-id> --status completed --unassign
+uv run python src/vibe3/cli.py task status "Done"
 ```
 
 禁止直接编辑 `registry.json`。
@@ -141,13 +141,13 @@ gh issue close <issue-number-or-ref>
 执行：
 
 ```bash
-vibe flow done
+uv run python src/vibe3/cli.py flow done
 ```
 
 或在处理非当前分支时执行：
 
 ```bash
-vibe flow done --branch <ref>
+uv run python src/vibe3/cli.py flow done --branch <ref>
 ```
 
 该命令会负责：
@@ -213,6 +213,10 @@ vibe flow done --branch <ref>
 
 完成后必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
 
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone
+```
+
 ```markdown
 ## Flow Closure
 
@@ -231,8 +235,8 @@ vibe flow done --branch <ref>
 ## Restrictions
 
 - 不得修改业务源代码文件
-- 不得跳过 `vibe flow show` 直接猜测 task / issue / pr 关联
+- 不得跳过 `uv run python src/vibe3/cli.py flow show` 直接猜测 task / issue / pr 关联
 - 不得手工编辑 `.git/vibe/*.json`
 - 不得把未 merge 的 branch 强行 `flow done`
-- 若 `vibe flow done` 阻断，必须如实汇报原因，并停止收口
-- 不得把 merge 后的新需求伪装成“补充说明”继续留在旧 plan
+- 若 `flow done` 阻断，必须如实汇报原因，并停止收口
+- 不得把 merge 后的新需求伪装成"补充说明"继续留在旧 plan

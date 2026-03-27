@@ -85,6 +85,6 @@ vibe_doctor() {
     else
         log_warn "$found/$total tools found ($missing missing)"
         echo ""
-        echo "💡 Install missing tools: ${CYAN}vibe tool${NC}"
+        echo "Install missing tools: ${CYAN}vibe tools${NC}"
     fi
 }

@@ -8,9 +8,44 @@ _vibe_skills_project_count() {
     local c2=$(find "$VIBE_ROOT/supervisor" -mindepth 1 -maxdepth 1 -type d -name 'vibe-*' | wc -l)
     echo $(( ${c1:-0} + ${c2:-0} )) | tr -d ' '
 }
-_vibe_skills_global_agents() { jq -r '.global._agents[]' "$(_vibe_skills_registry_file)"; }
-_vibe_skills_project_agents() { jq -r '.project._agents[]' "$(_vibe_skills_registry_file)"; }
-_vibe_skills_superpowers() { jq -r '.global.packages[] | select(.source == "obra/superpowers") | .skills[].name' "$(_vibe_skills_registry_file)"; }
+
+# Read agents list from skills-expected.yaml (replaced registry.json in #204)
+_vibe_skills_expected_file() { echo "$VIBE_ROOT/skills/vibe-skills-manager/skills-expected.yaml"; }
+
+_vibe_skills_global_agents() {
+    local yaml_file="$(_vibe_skills_expected_file)"
+    if [[ -f "$yaml_file" ]]; then
+        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
+    else
+        echo "claude-code"
+        echo "antigravity"
+        echo "codex"
+        echo "kiro"
+    fi
+}
+
+_vibe_skills_project_agents() {
+    local yaml_file="$(_vibe_skills_expected_file)"
+    if [[ -f "$yaml_file" ]]; then
+        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
+    else
+        echo "claude-code"
+        echo "antigravity"
+        echo "codex"
+    fi
+}
+
+_vibe_skills_superpowers() {
+    local yaml_file="$(_vibe_skills_expected_file)"
+    if [[ -f "$yaml_file" ]]; then
+        grep -E '^\s+-\s+\S+' "$yaml_file" | head -n 5 | sed 's/^[[:space:]]*-[[:space:]]*//'
+    else
+        echo "claude-code"
+        echo "antigravity"
+        echo "codex"
+        echo "kiro"
+    fi
+}
 
 _vibe_skills_agent_dir() {
     case "$1" in
@@ -105,12 +140,12 @@ _vibe_skills_check_status() {
     local global_count linked_count project_count count agent agent_dir
     local -a agents
     echo ""
-    echo "${BOLD}📊 Skills 状态检查${NC}"
-    echo "─────────────────────────────────"
+    echo "${BOLD}Skills 状态检查${NC}"
+    echo "---------------------------------"
     echo ""
     echo "${CYAN}Claude Code Plugin:${NC}"
     [[ -f "$plugin_file" ]] && grep -q "superpowers@claude-plugins-official" "$plugin_file" 2>/dev/null &&
-        echo "  ✅ superpowers plugin 已安装" || echo "  ❌ superpowers plugin 未安装"
+        echo "  OK superpowers plugin 已安装" || echo "  X  superpowers plugin 未安装"
     echo ""
     echo "${CYAN}全局 Skills (~/.agents/skills/):${NC}"
     global_count="$(_vibe_skills_count_entries "$HOME/.agents/skills")"
@@ -142,8 +177,8 @@ _vibe_skills_run_audit() {
     local global_count project_count issues=0 linked target agent
     local -a agents project_agents
     echo ""
-    echo "${BOLD}🔍 Skills 审计报告${NC}"
-    echo "═══════════════════════════════════════════════════"
+    echo "${BOLD}Skills 审计报告${NC}"
+    echo "======================================"
     global_count="$(_vibe_skills_count_entries "$HOME/.agents/skills")"
     project_count="$(_vibe_skills_project_count)"
     agents=(${(f)"$(_vibe_skills_global_agents)"})
@@ -151,9 +186,9 @@ _vibe_skills_run_audit() {
     echo ""
     echo "${CYAN}[1] Claude Code Plugin${NC}"
     if [[ -f "$HOME/.claude/plugins/installed_plugins.json" ]] && grep -q "superpowers@claude-plugins-official" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
-        echo "    ✅ superpowers plugin: 已安装"
+        echo "    OK superpowers plugin: 已安装"
     else
-        echo "    ❌ superpowers plugin: 未安装"
+        echo "    X  superpowers plugin: 未安装"
         issues=$((issues + 1))
     fi
     echo ""
@@ -161,8 +196,8 @@ _vibe_skills_run_audit() {
     for agent in "${agents[@]}"; do
         linked="$global_count"
         [[ "$agent" == "codex" ]] || linked="$(_vibe_skills_count_entries "$(_vibe_skills_agent_dir "$agent")")"
-        [[ "$linked" -ge 10 ]] && echo "    ✅ $agent: $linked skills" || {
-            echo "    ⚠️  $agent: $linked skills (预期 ≥10)"
+        [[ "$linked" -ge 10 ]] && echo "    OK $agent: $linked skills" || {
+            echo "    !  $agent: $linked skills (预期 >=10)"
             issues=$((issues + 1))
         }
     done
@@ -171,13 +206,13 @@ _vibe_skills_run_audit() {
     for agent in "${project_agents[@]}"; do
         target="$(_vibe_skills_project_targets "$agent")"
         linked="$(_vibe_skills_count_entries "$target")"
-        [[ "$linked" -eq "$project_count" ]] && echo "    ✅ $target: $linked/$project_count vibe-* skills" || {
-            echo "    ⚠️  $target: $linked/$project_count vibe-* skills (不匹配)"
+        [[ "$linked" -eq "$project_count" ]] && echo "    OK $target: $linked/$project_count vibe-* skills" || {
+            echo "    !  $target: $linked/$project_count vibe-* skills (不匹配)"
             issues=$((issues + 1))
         }
     done
     echo ""
-    echo "═══════════════════════════════════════════════════"
-    (( issues == 0 )) && echo "${GREEN}✅ 审计通过，无问题${NC}" || echo "${YELLOW}⚠️  发现 $issues 个问题，建议运行同步修复${NC}"
+    echo "======================================"
+    (( issues == 0 )) && echo "${GREEN}审计通过，无问题${NC}" || echo "${YELLOW}发现 $issues 个问题，建议运行同步修复${NC}"
     echo ""
 }

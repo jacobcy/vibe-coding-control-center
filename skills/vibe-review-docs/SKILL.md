@@ -31,11 +31,11 @@ When invoked to review documentation, your goal is to ensure clarity, consistenc
 
 ## 1. Context Gathering (Align Truth)
 
-- **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
+- **Identify Intent**: Run `uv run python src/vibe3/cli.py review base` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
 - **Identify Files**:
   - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
   - For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
-- **Review Context**: Check if `CHANGELOG.md` has been reasonably updated by the `vibe flow pr --bump` process.
+- **Review Context**: Check if `CHANGELOG.md` has been reasonably updated.
 
 ## 2. Review Standards
 
@@ -61,3 +61,11 @@ Construct a structured report:
 ### 🟡 Formatting & Clarity Suggestions
 
 - **[File:Line]** Suggestions for better outline structure, markdown linting, or brevity.
+
+## 4. Handoff 记录
+
+完成审查后，更新 handoff：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-review-docs: Documentation review completed" --actor vibe-review-docs --kind milestone
+```
