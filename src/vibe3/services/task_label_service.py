@@ -32,11 +32,19 @@ class TaskLabelService:
         return self._add_vibe_task_label(issue_number)
 
     def _has_vibe_task_label(self, issue_number: int) -> bool:
-        result = subprocess.run(
-            ["gh", "issue", "view", str(issue_number), "--json", "labels"],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                ["gh", "issue", "view", str(issue_number), "--json", "labels"],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(
+                external="github",
+                operation="check_vibe_task_label",
+                issue_number=issue_number,
+            ).warning("gh command not found, skipping label check")
+            return False
 
         if result.returncode != 0:
             logger.bind(
@@ -57,18 +65,26 @@ class TaskLabelService:
         return False
 
     def _add_vibe_task_label(self, issue_number: int) -> bool:
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "edit",
-                str(issue_number),
-                "--add-label",
-                VIBE_TASK_LABEL,
-            ],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "issue",
+                    "edit",
+                    str(issue_number),
+                    "--add-label",
+                    VIBE_TASK_LABEL,
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(
+                external="github",
+                operation="add_vibe_task_label",
+                issue_number=issue_number,
+            ).warning("gh command not found, skipping label add")
+            return False
 
         if result.returncode != 0:
             logger.bind(

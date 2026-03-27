@@ -110,7 +110,10 @@ class PlanUsecase:
         self.flow_service.bind_spec(branch, spec_path, "user")
 
     def _build_issue_context(self, issue_number: int, heading: str) -> str | None:
-        issue = self.github_client.view_issue(issue_number)
+        try:
+            issue = self.github_client.view_issue(issue_number)
+        except (FileNotFoundError, RuntimeError):
+            return None
         if not isinstance(issue, dict):
             return None
         parts = [f"## {heading}", f"Issue: #{issue_number}"]
