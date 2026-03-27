@@ -66,7 +66,8 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 **通用原则:**
 
-- 必须通过 `uv run python src/vibe3/cli.py task` 命令获取数据和执行操作
+- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py task` 命令获取数据
+- Audit 模式必须通过 `uv run python src/vibe3/cli.py check` 命令进行核对和修复
 - 不得直接读取或修改 `registry.json`
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
@@ -79,9 +80,9 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 **Audit 模式:**
 
 - 必须通过 `uv run python src/vibe3/cli.py check --all` 获取核对结果
-- 必须通过真实存在的命令执行修复操作
+- 必须通过 `uv run python src/vibe3/cli.py check --fix` 执行修复操作
 - 不得直接修改 JSON 文件
-- 所有修复操作必须经过用户确认
+- **所有修复操作必须在用户明确确认后执行**
 
 如果 CLI 失败，直接报告失败原因并停止，不要绕过 CLI。
 
@@ -192,10 +193,9 @@ Recommendation
 ```bash
 # 完整核对
 uv run python src/vibe3/cli.py check --all
-
-# 自动修复
-uv run python src/vibe3/cli.py check --fix
 ```
+
+**注意**: 修复操作 (`--fix`) 必须在用户确认后才可执行。
 
 ## Step 2: 解析核对结果
 
@@ -243,7 +243,9 @@ uv run python src/vibe3/cli.py check --fix
 
 ## Step 5: 执行修复操作
 
-根据用户选择，调用 Shell 命令执行修复。
+**修复前必须获得用户明确确认。**
+
+根据用户确认，调用 Shell 命令执行修复：
 
 ```bash
 uv run python src/vibe3/cli.py check --fix

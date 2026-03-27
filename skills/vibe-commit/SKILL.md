@@ -40,7 +40,7 @@ PR 创建后 → 自动进入 `/vibe-integrate`
   │   └─ 检查 issue、flow、branch、task、pr
   │
   ├─ Step 2: 运行提交前 metadata preflight
-  │   ├─ uv run python src/vibe3/cli.py task show
+  │   ├─ uv run python src/vibe3/cli.py task show <branch>
   │   └─ 检查 task 的 issue_refs、spec_* 等元数据
   │
   ├─ Step 3: 审计工作区
@@ -115,8 +115,10 @@ uv run python src/vibe3/cli.py flow list
 若 `flow show` 返回了 `current_task`，继续读取：
 
 ```bash
-uv run python src/vibe3/cli.py task show
+uv run python src/vibe3/cli.py task show <branch>
 ```
+
+> **参数说明**：`<branch>` 为当前分支名，用于查找该分支绑定的 task 信息。
 
 第一版规则：
 

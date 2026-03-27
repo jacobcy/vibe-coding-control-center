@@ -74,8 +74,11 @@ intake gate 约束：
 先运行获取当前版本目标状态；必要时再补充文本输出：
 
 ```bash
+# 列出所有 task
 uv run python src/vibe3/cli.py task list
-uv run python src/vibe3/cli.py task show
+
+# 显示指定分支的 task 详情（可选，<branch> 为分支名）
+uv run python src/vibe3/cli.py task show <branch>
 ```
 
 获取：

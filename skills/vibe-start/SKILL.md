@@ -67,9 +67,10 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 ## 核心边界
 
-- 允许：读取当前 flow、从 issue 落 task 作为 execution bridge、创建 PR draft、写入 handoff
-- 不允许：创建新的 task 或 plan（除非没有指定）、绕过 plan 自由编码、跨 worktree 调度、进入执行阶段
+- 允许：读取当前 flow、将 issue 绑定到 flow 作为 execution bridge、创建 PR draft、写入 handoff
+- 不允许：绕过 issue 自由编码、跨 worktree 调度、进入执行阶段
 - 若发现当前 flow 已有 PR，本 skill 只能处理该 flow 合法范围内的 follow-up 或当前已绑定 task，不得把新目标堆进当前 flow
+- 当没有指定 task/plan 时，允许根据 issue 创建 plan 并绑定 issue 到 flow
 
 ## Workflow
 
@@ -85,6 +86,7 @@ uv run python src/vibe3/cli.py task list
 必要时补充：
 
 ```bash
+# 显示指定分支的 task 详情（<branch> 为分支名）
 uv run python src/vibe3/cli.py task show <branch>
 gh issue view <issue-ref>
 ```
@@ -98,9 +100,10 @@ gh issue view <issue-ref>
 
 ### Step 2: 准备 task 和 plan
 
-**情况 A：用户指定 task**
+**情况 A：用户指定分支**
 
 ```bash
+# 显示指定分支的 task 详情
 uv run python src/vibe3/cli.py task show <branch>
 ```
 
