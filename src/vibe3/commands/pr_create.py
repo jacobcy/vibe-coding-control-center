@@ -94,9 +94,7 @@ def register_create_command(app: typer.Typer) -> None:
         with ctx:
             base_resolver = build_base_resolution_usecase()
             flow_service = FlowService()
-            branch = _resolve_branch_for_ai_context(
-                flow_service.get_current_branch()
-            )
+            branch = _resolve_branch_for_ai_context(flow_service.get_current_branch())
             resolved_base = base_resolver.resolve_pr_create_base(base)
             logger.bind(command="pr create", title=title, base=resolved_base).info(
                 "Creating PR"

@@ -84,8 +84,9 @@ class PRService:
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
-            self._sync_pr_flow_state(existing, actor=actor)
-            return existing
+            hydrated_existing = self.github_client.get_pr(existing.number) or existing
+            self._sync_pr_flow_state(hydrated_existing, actor=actor)
+            return hydrated_existing
 
         # Ensure head branch exists on remote before gh pr create.
         try:

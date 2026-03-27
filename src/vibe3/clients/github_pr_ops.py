@@ -72,6 +72,21 @@ class PRMixin:
         pr = self.get_pr(pr_number)
         if pr is None:
             raise PRNotFoundError(pr_number)
+        if request.body and not pr.body.strip():
+            logger.bind(
+                external="github",
+                operation="create_pr",
+                pr_number=pr_number,
+            ).warning("Created PR body is empty; applying fallback body update")
+            pr = self.update_pr(
+                UpdatePRRequest(
+                    number=pr_number,
+                    title=None,
+                    body=request.body,
+                    draft=None,
+                    base_branch=None,
+                )
+            )
         return cast(PRResponse, pr)
 
     def get_pr(
