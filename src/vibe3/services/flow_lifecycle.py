@@ -212,7 +212,8 @@ class FlowLifecycleMixin:
             "system",
             f"Flow closed, branch '{branch}' deleted",
         )
-        issue_links = self.store.get_issue_links(branch) or []
+        issue_links_raw = self.store.get_issue_links(branch)
+        issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
         label_service = LabelService()
         for link in issue_links:
             if link.get("issue_role") != "task":
