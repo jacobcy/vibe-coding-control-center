@@ -29,6 +29,10 @@ class PrReadyUsecase:
         yes: bool,
     ) -> PRResponse:
         """Run gates, enforce confirmation, then mark PR ready."""
+        current_pr = self.pr_service.get_pr(pr_number)
+        if current_pr is not None and not current_pr.draft:
+            return self.pr_service.mark_ready(pr_number)
+
         self.gate_runner(pr_number, yes)
         if not yes and self.confirmer is not None and not self.confirmer(pr_number):
             raise PrReadyAbortedError("aborted by user")

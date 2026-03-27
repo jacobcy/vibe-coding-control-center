@@ -1,7 +1,7 @@
 # GitHub 标签标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-22
+**最后更新**: 2026-03-27
 **状态**: Active
 
 ---
@@ -294,7 +294,15 @@ agent 认领 issue 时：
 
 ---
 
-## 10. 术语规范
+## 10. 命令联动规范引用（V3）
+
+标签标准只定义“标签集合与语义”。
+
+`flow/branch`、`task/issue`、`pr` 的命令级联动判定与幂等规则，统一以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准。
+
+---
+
+## 11. 术语规范
 
 ### 正确说法
 

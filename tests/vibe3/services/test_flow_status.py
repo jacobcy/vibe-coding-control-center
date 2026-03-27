@@ -8,6 +8,7 @@ class TestFlowStatus:
 
     def test_get_flow_status_success(self, mock_store) -> None:
         """Test getting flow status."""
+        mock_store.get_flow_state.return_value["pr_ready_for_review"] = True
         mock_store.get_issue_links.return_value = [
             {
                 "branch": "test-branch",
@@ -24,6 +25,7 @@ class TestFlowStatus:
         assert result.branch == "test-branch"
         assert result.flow_slug == "test-flow"
         assert result.flow_status == "active"
+        assert result.pr_ready_for_review is True
         assert len(result.issues) == 1
         assert result.issues[0].issue_number == 101
         assert result.issues[0].issue_role == "task"

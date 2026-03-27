@@ -80,15 +80,12 @@ class PRService:
         # Get current branch
         head_branch = self.git_client.get_current_branch()
 
-        # Prevent duplicate PR creation for the same head branch.
+        # Idempotent behavior: if PR already exists for this branch, confirm and sync.
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
-            raise UserError(
-                f"PR already exists for branch '{head_branch}': "
-                f"#{existing.number} {existing.url}\n"
-                f"Use `vibe3 pr show --number {existing.number}` to continue."
-            )
+            self._sync_pr_flow_state(existing, actor=actor)
+            return existing
 
         # Ensure head branch exists on remote before gh pr create.
         try:
@@ -120,12 +117,7 @@ class PRService:
         pr = self.github_client.create_pr(request)
 
         # Update flow state and add event
-        self.store.update_flow_state(
-            head_branch,
-            pr_number=pr.number,
-            pr_ready_for_review=False,
-            latest_actor=actor,
-        )
+        self._sync_pr_flow_state(pr, actor=actor)
         self.store.add_event(
             head_branch, "pr_draft", actor, f"Draft PR #{pr.number} created: {pr.url}"
         )
@@ -183,7 +175,8 @@ class PRService:
             raise RuntimeError(f"PR #{pr_number} not found")
 
         if not pr.draft:
-            logger.bind(pr_number=pr_number).warning("PR is not a draft")
+            self._sync_pr_flow_state(pr, actor=actor)
+            logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
             return pr
 
         # Mark as ready
@@ -191,17 +184,17 @@ class PRService:
 
         # Add event
         branch = pr.head_branch
-        self.store.update_flow_state(
-            branch,
-            pr_ready_for_review=True,
-            latest_actor=actor,
-        )
+        self._sync_pr_flow_state(updated_pr, actor=actor)
         self.store.add_event(
             branch, "pr_ready", actor, f"PR #{pr_number} marked as ready for review"
         )
 
         logger.bind(pr_number=pr_number).success("PR marked as ready")
         return updated_pr
+
+    def sync_pr_state_from_remote(self, pr: PRResponse, actor: str = "system") -> None:
+        """Synchronize local flow PR fields from remote PR fact."""
+        self._sync_pr_flow_state(pr, actor=actor)
 
     def merge_pr(self, pr_number: int, actor: str = "unknown") -> PRResponse:
         """Merge PR.
@@ -281,3 +274,12 @@ class PRService:
 
         # Use version service for calculation (reads from VERSION file)
         return self.version_service.calculate_bump(group)
+
+    def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
+        """Persist PR linkage and readiness into flow cache."""
+        self.store.update_flow_state(
+            pr.head_branch,
+            pr_number=pr.number,
+            pr_ready_for_review=not pr.draft,
+            latest_actor=actor,
+        )

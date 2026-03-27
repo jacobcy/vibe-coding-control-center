@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.exceptions import UserError
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_service import PRService
 
@@ -129,14 +128,22 @@ def test_create_draft_pr_duplicate_branch_pr(
         )
     ]
 
+    mock_store = MagicMock()
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client") as mock_git_client:
-            mock_git_client.get_current_branch.return_value = "feature-branch"
+            with patch.object(pr_service, "store", mock_store):
+                mock_git_client.get_current_branch.return_value = "feature-branch"
 
-            with pytest.raises(UserError, match="PR already exists"):
-                pr_service.create_draft_pr(title="Test", body="Body")
+                pr = pr_service.create_draft_pr(title="Test", body="Body")
 
-            mock_git_client.push_branch.assert_not_called()
+                assert pr.number == 321
+                mock_git_client.push_branch.assert_not_called()
+                mock_store.update_flow_state.assert_called_once_with(
+                    "feature-branch",
+                    pr_number=321,
+                    pr_ready_for_review=False,
+                    latest_actor="server",
+                )
 
 
 def test_get_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:
@@ -177,7 +184,9 @@ def test_mark_ready_success(
 
     mock_github_client.check_auth.return_value = True
     mock_github_client.get_pr.return_value = mock_pr
-    mock_github_client.mark_ready.return_value = mock_pr
+    mock_github_client.mark_ready.return_value = mock_pr.model_copy(
+        update={"draft": False}
+    )
     mock_store = MagicMock()
 
     with patch.object(pr_service, "github_client", mock_github_client):
@@ -188,6 +197,7 @@ def test_mark_ready_success(
         mock_github_client.mark_ready.assert_called_once_with(123)
         mock_store.update_flow_state.assert_called_once_with(
             "feature-branch",
+            pr_number=123,
             pr_ready_for_review=True,
             latest_actor="unknown",
         )
@@ -197,6 +207,40 @@ def test_mark_ready_success(
             "unknown",
             "PR #123 marked as ready for review",
         )
+
+
+def test_mark_ready_already_ready_syncs_state(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
+    """mark_ready should confirm and sync when PR is already ready."""
+    ready_pr = PRResponse(
+        number=123,
+        title="Test PR",
+        body="Test body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/123",
+        draft=False,
+    )
+
+    mock_github_client.check_auth.return_value = True
+    mock_github_client.get_pr.return_value = ready_pr
+    mock_store = MagicMock()
+
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "store", mock_store):
+            pr = pr_service.mark_ready(123)
+
+    assert pr.number == 123
+    mock_github_client.mark_ready.assert_not_called()
+    mock_store.update_flow_state.assert_called_once_with(
+        "feature-branch",
+        pr_number=123,
+        pr_ready_for_review=True,
+        latest_actor="unknown",
+    )
+    mock_store.add_event.assert_not_called()
 
 
 def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:

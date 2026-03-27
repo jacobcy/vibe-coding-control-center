@@ -100,6 +100,13 @@ def register_create_command(app: typer.Typer) -> None:
 
             usecase = PRCreateUsecase(base_resolver=base_resolver)
             branch = _resolve_branch_for_ai_context(FlowService().get_current_branch())
+            pr_service = PRService()
+
+            existing_pr = pr_service.get_pr(branch=branch)
+            if existing_pr is not None:
+                pr_service.sync_pr_state_from_remote(existing_pr, actor="server")
+                _emit_pr_result(existing_pr, json_output, yaml_output)
+                return
 
             try:
                 usecase.check_flow_task(branch, yes=yes)
@@ -122,7 +129,7 @@ def register_create_command(app: typer.Typer) -> None:
             pr_body = ai_body if ai_body else body
             actor = "ai_assistant" if ai else "server"
 
-            pr = PRService().create_draft_pr(
+            pr = pr_service.create_draft_pr(
                 title=pr_title,
                 body=pr_body,
                 base_branch=resolved_base,

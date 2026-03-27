@@ -6,6 +6,9 @@
 
 ---
 
+> 状态确认优先、最小纠正与 `flow/task/pr` 联动判定表见
+> [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)。
+
 ## 一、核心概念
 
 ### 1.1 数据模型
