@@ -128,6 +128,18 @@ def test_create_draft_pr_duplicate_branch_pr(
         )
     ]
 
+    hydrated_pr = PRResponse(
+        number=321,
+        title="Existing PR",
+        body="Existing body",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="main",
+        url="https://github.com/org/repo/pull/321",
+        draft=True,
+    )
+    mock_github_client.get_pr.return_value = hydrated_pr
+
     mock_store = MagicMock()
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client") as mock_git_client:
@@ -137,7 +149,9 @@ def test_create_draft_pr_duplicate_branch_pr(
                 pr = pr_service.create_draft_pr(title="Test", body="Body")
 
                 assert pr.number == 321
+                assert pr.body == "Existing body"
                 mock_git_client.push_branch.assert_not_called()
+                mock_github_client.get_pr.assert_called_once_with(321)
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
                     pr_number=321,

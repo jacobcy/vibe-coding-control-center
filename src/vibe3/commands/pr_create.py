@@ -60,11 +60,12 @@ def register_create_command(app: typer.Typer) -> None:
             bool,
             typer.Option("--ai", help="Use AI to suggest PR title and body"),
         ] = False,
+        yes: Annotated[
+            bool,
+            typer.Option("--yes", "-y", help="Bypass missing-task guard"),
+        ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-        ] = False,
-        yes: Annotated[
-            bool, typer.Option("-y", "--yes", help="跳过 task 绑定检查并继续")
         ] = False,
         json_output: Annotated[
             bool, typer.Option("--json", help="JSON 格式输出")
@@ -92,14 +93,18 @@ def register_create_command(app: typer.Typer) -> None:
         )
         with ctx:
             base_resolver = build_base_resolution_usecase()
+            flow_service = FlowService()
+            branch = _resolve_branch_for_ai_context(flow_service.get_current_branch())
             resolved_base = base_resolver.resolve_pr_create_base(base)
             logger.bind(command="pr create", title=title, base=resolved_base).info(
                 "Creating PR"
             )
             interactive = _is_interactive(json_output, yaml_output)
 
-            usecase = PRCreateUsecase(base_resolver=base_resolver)
-            branch = _resolve_branch_for_ai_context(FlowService().get_current_branch())
+            usecase = PRCreateUsecase(
+                flow_service=flow_service,
+                base_resolver=base_resolver,
+            )
             pr_service = PRService()
 
             existing_pr = pr_service.get_pr(branch=branch)
