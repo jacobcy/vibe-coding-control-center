@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
-# v2/bin/vibe - CLI Entry Point for Vibe 2.0
-# Target: ~50 lines | Dispatches to lib/ modules
+# Vibe CLI - Basic utilities wrapper
+# V3 commands: use `vibe3` or `uv run python src/vibe3/cli.py`
 
 set -e
 
@@ -10,7 +10,6 @@ VIBE_SCRIPT_DIR="$(cd "$(dirname "$VIBE_SCRIPT_PATH")" && pwd)"
 VIBE_INSTALL_ROOT="$(cd "$VIBE_SCRIPT_DIR/.." && pwd)"
 
 # If invoked through the global install (~/.vibe/bin/vibe), prefer the current repo's bin/vibe.
-# We normalize both paths to handle potential symlinks or trailing slashes.
 VIBE_REAL_INSTALL_ROOT="$(cd "$VIBE_INSTALL_ROOT" && pwd -P 2>/dev/null || echo "$VIBE_INSTALL_ROOT")"
 VIBE_REAL_HOME_VIBE="$(cd "$HOME/.vibe" 2>/dev/null && pwd -P || echo "$HOME/.vibe")"
 
@@ -22,12 +21,8 @@ if [[ "$VIBE_REAL_INSTALL_ROOT" == "$VIBE_REAL_HOME_VIBE" ]] && command -v git >
     fi
 fi
 
-# Force local VIBE_ROOT if running from the source tree to avoid contamination
 export VIBE_ROOT="$VIBE_INSTALL_ROOT"
-
 source "$VIBE_ROOT/lib/config.sh"
-
-# ── Version ─────────────────────────────────────────────
 readonly VIBE_VERSION="$(get_vibe_version)"
 
 # ── Dispatcher ──────────────────────────────────────────
@@ -39,29 +34,13 @@ case "$command" in
         source "$VIBE_LIB/doctor.sh"
         vibe_doctor "$@"
         ;;
-    check)
-        source "$VIBE_LIB/check.sh"
-        vibe_check "$@"
-        ;;
-    tool)
+    tools)
         source "$VIBE_LIB/tool.sh"
         vibe_tool "$@"
         ;;
     keys)
         source "$VIBE_LIB/keys.sh"
         vibe_keys "$@"
-        ;;
-    flow)
-        source "$VIBE_LIB/flow.sh"
-        vibe_flow "$@"
-        ;;
-    task)
-        source "$VIBE_LIB/task.sh"
-        vibe_task "$@"
-        ;;
-    roadmap)
-        source "$VIBE_LIB/roadmap.sh"
-        vibe_roadmap "$@"
         ;;
     clean)
         source "$VIBE_LIB/clean.sh"
@@ -79,34 +58,28 @@ case "$command" in
         echo "Vibe $VIBE_VERSION"
         ;;
     help|--help|-h)
-        echo "${BOLD}Vibe Coding Control Center${NC} v${VIBE_VERSION}"
+        echo "${BOLD}Vibe CLI${NC} v${VIBE_VERSION} (basic utilities)"
         echo ""
         echo "Usage: ${CYAN}vibe <command>${NC} [args]"
         echo ""
-        echo "Primary Commands:"
-        echo "  ${GREEN}roadmap${NC}  planning mirror 管理：roadmap item = GitHub Project item mirror"
-        echo "  ${GREEN}task${NC}     execution record 生命周期管理（list, add, update, remove, audit）"
-        echo "  ${GREEN}flow${NC}     runtime container 编排；只消费已有 task"
-        echo "  ${GREEN}check${NC}    项目全要素审计与格式校验"
+        echo "For flow/task/pr commands, use: ${GREEN}vibe3${NC}"
         echo ""
-        echo "System Commands:"
+        echo "Utilities:"
         echo "  ${GREEN}doctor${NC}   环境诊断与依赖检查"
         echo "  ${GREEN}skills${NC}   Skills 物理同步与状态检查"
-        echo "  ${GREEN}keys${NC}     API 密钥安全管理 (list, set, get, init)"
+        echo "  ${GREEN}keys${NC}     API 密钥安全管理"
         echo "  ${GREEN}clean${NC}    清理项目临时/构建文件"
-        echo ""
-        echo "Utility Commands:"
-        echo "  ${GREEN}tool${NC}     AI 开发工具链安装/更新"
+        echo "  ${GREEN}tools${NC}    AI 开发工具链安装/更新"
         echo "  ${GREEN}alias${NC}    加载 Shell 快捷别名"
-        echo "  ${GREEN}version${NC}  显示当前版本号"
-        echo ""
-        echo "💡 提示：先明确 repo issue / roadmap item，再进入 task + flow 执行路径。"
+        ;;
+    flow|task|roadmap|check)
+        echo "${YELLOW}⚠️  This command has moved to V3.${NC}"
+        echo "Use: ${GREEN}vibe3 ${command} ${*}${NC}"
+        exit 1
         ;;
     *)
-        echo "${BOLD}Vibe Coding Control Center${NC} v${VIBE_VERSION}"
-        echo ""
-        echo "Usage: ${CYAN}vibe <command>${NC} [args]"
         echo "Unknown command: $command"
+        echo "Run 'vibe help' for usage."
         exit 1
         ;;
 esac

@@ -85,6 +85,25 @@
 | `component/client` | Client 层 |
 | `component/config` | 配置层 |
 
+### 路线图标签
+
+路线图标签用于规划迭代和优先级，是 issue 路线图真源。
+
+| 标签名称 | 描述 |
+|---------|------|
+| `roadmap/p0` | 当前迭代必须完成 |
+| `roadmap/p1` | 下个迭代优先完成 |
+| `roadmap/p2` | 有容量时完成 |
+| `roadmap/next` | 下个迭代规划中 |
+| `roadmap/future` | 未来考虑 |
+| `roadmap/rfc` | RFC/设计阶段 |
+
+**使用原则**：
+- 路线图标签表示"何时做"，优先级标签表示"多紧急"
+- 一个 issue 可以同时有 `roadmap/p0` 和 `priority/high`
+- 路线图标签用于迭代规划，优先级标签用于紧急度排序
+- `roadmap/rfc` 表示需要讨论设计，不直接进入开发
+
 ### 3.2 关系镜像标签
 
 ### `vibe-task`
