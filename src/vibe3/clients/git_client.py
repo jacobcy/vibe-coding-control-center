@@ -66,6 +66,10 @@ class GitClientProtocol(Protocol):
 
     def get_current_branch(self) -> str: ...
 
+    def get_commit_subjects(
+        self, base_ref: str, head_ref: str = "HEAD"
+    ) -> list[str]: ...
+
     def get_changed_files(self, source: ChangeSource) -> list[str]: ...
 
     def get_diff(self, source: ChangeSource) -> str: ...
@@ -105,6 +109,15 @@ class GitClient:
     def get_current_branch(self) -> str:
         """获取当前分支名."""
         return _get_current_branch(self._run)
+
+    def get_commit_subjects(
+        self, base_ref: str, head_ref: str = "HEAD"
+    ) -> list[str]:
+        """Get commit subjects between base and head refs."""
+        output = self._run(
+            ["log", f"{base_ref}..{head_ref}", "--oneline", "--format=%s"]
+        )
+        return [line.strip() for line in output.splitlines() if line.strip()]
 
     def get_current_commit(self) -> str:
         """Get current HEAD commit SHA."""

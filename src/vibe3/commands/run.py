@@ -17,10 +17,10 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.plan_helpers import get_agent_options
 from vibe3.config.settings import VibeConfig
-from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
-from vibe3.services.flow_service import FlowService
+from vibe3.services.execution_pipeline import run_execution_pipeline
 from vibe3.services.label_integration import transition_to_in_progress
 from vibe3.services.run_context_builder import build_run_context
+from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -41,61 +41,23 @@ def _run_execution(
     backend: str | None,
     model: str | None,
 ) -> None:
-    log = logger.bind(domain="run", plan_file=plan_file or "(lightweight)")
-
-    # Resolve task message
-    task = instructions
-    if instructions:
-        log.info("Using custom task message")
-        typer.echo(
-            f"-> Guidance: {instructions[:60]}{'...' if len(instructions) > 60 else ''}"
-        )
-
-    run_config = getattr(config, "run", None)
-    if not task and run_config and hasattr(run_config, "run_prompt"):
-        task = run_config.run_prompt
-
-    # Build execution request
-    request = ExecutionRequest(
-        role="executor",
-        context_builder=lambda: build_run_context(plan_file, config),
-        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
-            config,
-            agent,
-            backend,
-            model,
-            section="run",
-        ),
-        task=task,
+    usecase = RunUsecase(config=config)
+    request = usecase.create_execution_request(
+        plan_file=plan_file,
+        instructions=instructions,
+        agent=agent,
+        backend=backend,
+        model=model,
+        context_builder=build_run_context,
+        options_builder=get_agent_options,
         dry_run=dry_run,
-        handoff_kind="run",
-        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
     )
-
     run_execution_pipeline(request)
 
 
 def _find_skill_file(skill_name: str) -> Path | None:
-    """Find SKILL.md for a named skill under skills/ directory.
-
-    Searches from the git root upward to locate skills/<name>/SKILL.md.
-    """
-    try:
-        service = FlowService()
-        repo_root = Path(service.get_git_common_dir()).parent
-    except Exception:
-        repo_root = Path.cwd()
-
-    candidate = repo_root / "skills" / skill_name / "SKILL.md"
-    if candidate.exists():
-        return candidate
-
-    # Also check worktree root
-    cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
-    if cwd_candidate.exists():
-        return cwd_candidate
-
-    return None
+    """Find SKILL.md for a named skill under skills/ directory."""
+    return RunUsecase.find_skill_file(skill_name)
 
 
 def _run_skill(
@@ -117,26 +79,17 @@ def _run_skill(
 
     typer.echo(f"-> Skill: {skill_file}")
     skill_content = skill_file.read_text(encoding="utf-8")
-
-    task = instructions or f"Execute skill: {skill_name}"
-
-    # Build execution request
-    request = ExecutionRequest(
-        role="executor",
-        context_builder=lambda: skill_content,
-        options_builder=lambda: get_agent_options(  # type: ignore[call-arg]
-            config,
-            agent,
-            backend,
-            model,
-            section="run",
-        ),
-        task=task,
+    usecase = RunUsecase(config=config)
+    request = usecase.create_skill_execution_request(
+        skill_name=skill_name,
+        skill_content=skill_content,
+        instructions=instructions,
+        agent=agent,
+        backend=backend,
+        model=model,
+        options_builder=get_agent_options,
         dry_run=dry_run,
-        handoff_kind="run",
-        handoff_metadata={"skill": skill_name},
     )
-
     run_execution_pipeline(request)
 
 
@@ -173,25 +126,15 @@ def run_command(
 
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
+    usecase = RunUsecase(config=config, flow_service=flow_service)
 
     if async_mode and not dry_run:
         from vibe3.services.async_execution_service import AsyncExecutionService
 
         async_svc = AsyncExecutionService()
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "run", "--no-async"]
-        if instructions:
-            cmd.append(instructions)
-        if plan:
-            cmd.extend(["--plan", str(plan)])
-        if skill:
-            cmd.extend(["--skill", skill])
-        if agent:
-            cmd.extend(["--agent", agent])
-        if backend:
-            cmd.extend(["--backend", backend])
-        if model:
-            cmd.extend(["--model", model])
-
+        cmd = usecase.build_async_command(
+            instructions, plan, skill, agent, backend, model
+        )
         async_svc.start_async_execution("executor", cmd, branch)
         typer.echo("✓ Execution started in background")
         typer.echo("  vibe3 flow show    # Check status")
@@ -202,48 +145,35 @@ def run_command(
         _run_skill(skill, instructions, config, dry_run, agent, backend, model)
         return
 
-    # Determine execution mode
-    resolved_file = plan
+    try:
+        summary = usecase.resolve_run_mode(branch, instructions, plan, skill)
+    except ValueError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
-    if resolved_file:
-        # Explicit plan file provided
-        plan_file = str(resolved_file)
+    if summary.mode == "plan":
+        plan_file = summary.plan_file
         log = logger.bind(domain="run", action="run", plan_file=plan_file)
         log.info("Starting plan execution")
         typer.echo(f"-> Execute: {plan_file}")
-    elif instructions:
-        # Lightweight mode: only instructions
+    elif summary.mode == "lightweight":
         plan_file = None
         log = logger.bind(domain="run", action="run", plan_file="(lightweight)")
         log.info("Starting lightweight execution")
         typer.echo("-> Lightweight mode: running with instructions only")
-        typer.echo(
-            f"-> Task: {instructions[:60]}{'...' if len(instructions) > 60 else ''}"
-        )
+        if summary.message:
+            typer.echo(summary.message)
     else:
-        # Try to use flow's plan_ref
-        flow = flow_service.get_flow_status(branch)
-        if flow and flow.plan_ref:
-            plan_file = str(flow.plan_ref)
-            log = logger.bind(domain="run", action="run", plan_file=plan_file)
-            log.info("Starting plan execution from flow")
-            typer.echo(f"-> Using flow plan: {plan_file}")
-        else:
-            typer.echo(
-                "Error: No plan specified.\n"
-                "Use one of:\n"
-                "  vibe3 run <instructions>        # Lightweight mode\n"
-                "  vibe3 run --plan <file>         # With plan file\n"
-                "  vibe3 run --skill <name>        # With skill",
-                err=True,
-            )
-            raise typer.Exit(1)
+        plan_file = summary.plan_file
+        log = logger.bind(domain="run", action="run", plan_file=plan_file)
+        log.info("Starting plan execution from flow")
+        typer.echo(f"-> Using flow plan: {plan_file}")
 
     _run_execution(plan_file, config, dry_run, instructions, agent, backend, model)
 
-    flow = flow_service.get_flow_status(branch)
-    if not dry_run and flow and flow.task_issue_number:
-        result = transition_to_in_progress(flow.task_issue_number)
+    issue_number = usecase.transition_issue(branch)
+    if not dry_run and issue_number:
+        result = transition_to_in_progress(int(issue_number))
         if not result.success and result.error and result.error != "no_issue_bound":
             typer.echo(
                 f"Warning: Failed to transition issue state: {result.error}",

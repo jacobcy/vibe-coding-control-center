@@ -1,7 +1,6 @@
 """PR creation commands."""
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -16,55 +15,10 @@ from vibe3.config.settings import VibeConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.ai_service import AIService
+from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_created
-
-
-def _get_commits(base_branch: str = "main") -> list[str]:
-    """Get commit messages between current branch and base.
-
-    Args:
-        base_branch: Base branch name
-
-    Returns:
-        List of commit messages
-    """
-    try:
-        result = subprocess.run(
-            ["git", "log", f"{base_branch}..HEAD", "--oneline", "--format=%s"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
-    except subprocess.CalledProcessError:
-        return []
-
-
-def _get_changed_files(base_branch: str = "main") -> list[str]:
-    """Get list of changed files between current branch and base.
-
-    Args:
-        base_branch: Base branch name
-
-    Returns:
-        List of changed file paths
-    """
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", f"{base_branch}...HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
-    except subprocess.CalledProcessError:
-        return []
 
 
 def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
@@ -76,6 +30,11 @@ def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
     )
 
 
+def _build_base_resolution_usecase() -> BaseResolutionUsecase:
+    """Construct shared base resolver for PR commands."""
+    return BaseResolutionUsecase()
+
+
 def register_create_command(app: typer.Typer) -> None:
     """Register pr create command."""
 
@@ -83,7 +42,7 @@ def register_create_command(app: typer.Typer) -> None:
     def create(
         title: Annotated[str, typer.Option("-t", help="PR title")] = "",
         body: Annotated[str, typer.Option("-b", help="PR description")] = "",
-        base: Annotated[str, typer.Option(help="Base branch")] = "main",
+        base: Annotated[str | None, typer.Option(help="Base branch")] = None,
         ai: Annotated[
             bool,
             typer.Option("--ai", help="Use AI to suggest PR title and body"),
@@ -116,7 +75,12 @@ def register_create_command(app: typer.Typer) -> None:
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr create", title=title, base=base).info("Creating PR")
+            resolved_base = _build_base_resolution_usecase().resolve_pr_create_base(
+                base
+            )
+            logger.bind(command="pr create", title=title, base=resolved_base).info(
+                "Creating PR"
+            )
 
             pr_title = title
             pr_body = body
@@ -136,8 +100,12 @@ def register_create_command(app: typer.Typer) -> None:
 
             if ai and not title:
                 console = Console()
-                commits = _get_commits(base)
-                changed_files = _get_changed_files(base)
+                material = _build_base_resolution_usecase().collect_branch_material(
+                    base_branch=resolved_base,
+                    branch=branch,
+                )
+                commits = material.commits
+                changed_files = material.changed_files
 
                 if not commits:
                     if interactive:
@@ -202,7 +170,7 @@ def register_create_command(app: typer.Typer) -> None:
             pr = service.create_draft_pr(
                 title=pr_title,
                 body=pr_body,
-                base_branch=base,
+                base_branch=resolved_base,
                 actor=actor,
             )
 

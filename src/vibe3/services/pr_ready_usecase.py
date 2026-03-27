@@ -1,0 +1,31 @@
+"""Usecase helpers for PR ready command orchestration."""
+
+from typing import Callable
+
+from vibe3.models.pr import PRResponse
+from vibe3.services.pr_service import PRService
+
+
+class PrReadyUsecase:
+    """Coordinate PR ready sequencing while keeping UI in command layer."""
+
+    def __init__(
+        self,
+        pr_service: PRService,
+        gate_runner: Callable[[int, bool], None],
+        confirmer: Callable[[int], bool] | None = None,
+    ) -> None:
+        self.pr_service = pr_service
+        self.gate_runner = gate_runner
+        self.confirmer = confirmer
+
+    def mark_ready(
+        self,
+        pr_number: int,
+        yes: bool,
+    ) -> PRResponse:
+        """Run gates, enforce confirmation, then mark PR ready."""
+        self.gate_runner(pr_number, yes)
+        if not yes and self.confirmer is not None and not self.confirmer(pr_number):
+            raise RuntimeError("aborted by user")
+        return self.pr_service.mark_ready(pr_number)

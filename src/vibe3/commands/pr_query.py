@@ -25,8 +25,19 @@ from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.pr_query_usecase import PrQueryUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
+
+
+def _build_pr_query_usecase() -> PrQueryUsecase:
+    """Construct PR query usecase with command-local dependencies."""
+    service = PRService()
+    return PrQueryUsecase(
+        pr_service=service,
+        flow_service=FlowService(),
+        inspect_runner=run_inspect_json,
+    )
 
 
 def register_query_commands(app: typer.Typer) -> None:
@@ -77,70 +88,38 @@ def register_query_commands(app: typer.Typer) -> None:
                     message="Fetching PR details",
                 )
 
-            service = PRService()
+            usecase = _build_pr_query_usecase()
+            target = usecase.resolve_target(pr_number, branch)
+            pr_number = target.pr_number
+            branch = target.branch
+            if target.from_flow and target.current_branch is not None:
+                logger.bind(
+                    branch=target.current_branch,
+                    pr_number=pr_number,
+                ).debug("Found PR number in flow state")
 
-            # If no pr_number or branch provided, try to get from flow
-            current_branch: str | None = None
-            if not pr_number and not branch:
-                flow_service = FlowService()
-                current_branch = flow_service.get_current_branch()
-                flow_data = service.store.get_flow_state(current_branch)
-                if flow_data and flow_data.get("pr_number"):
-                    pr_number = flow_data["pr_number"]
-                    logger.bind(branch=current_branch, pr_number=pr_number).debug(
-                        "Found PR number in flow state"
-                    )
+            try:
+                pr = usecase.fetch_pr(pr_number, branch)
+            except LookupError:
+                typer.echo(
+                    usecase.build_missing_pr_message(
+                        pr_number=pr_number,
+                        branch=branch,
+                        current_branch=target.current_branch,
+                    ),
+                    err=True,
+                )
+                raise typer.Exit(1) from None
 
-            pr = service.get_pr(pr_number, branch)
-
-            if not pr:
-                # Get current branch for better error message
-                if not pr_number and not branch:
-                    if current_branch is None:
-                        current_branch = FlowService().get_current_branch()
-                    flow_status = FlowService().get_flow_status(current_branch)
-                    bind_hint = ""
-                    if not flow_status or flow_status.task_issue_number is None:
-                        bind_hint = (
-                            "\n提示：当前 flow 还没有 task，建议先执行\n"
-                            "  vibe3 flow bind <issue> --role task"
-                        )
-                    typer.echo(
-                        f"No PR found for current branch '{current_branch}'\n\n"
-                        "To create a PR, run:\n"
-                        f'  vibe3 pr create -t "Your PR title"{bind_hint}',
-                        err=True,
-                    )
-                else:
-                    target = f"PR #{pr_number}" if pr_number else f"branch '{branch}'"
-                    typer.echo(f"{target} not found", err=True)
-                raise typer.Exit(1)
-
-            # Get change analysis if pr_number is provided
+            analysis_summary = None
             analysis = None
             if pr_number:
-                # Fail-fast: if analysis fails, immediately throw
-                analysis = run_inspect_json(["pr", str(pr_number)])
+                analysis_summary = usecase.load_analysis_summary(pr_number)
+                analysis = analysis_summary.get("raw")
                 logger.debug("Successfully retrieved change analysis")
 
             if trace_output or json_output or yaml_output:
-                # Merge basic info and analysis results
-                result = pr.model_dump()
-                if analysis:
-                    score_data = analysis.get("score", {})  # type: ignore[attr-defined]
-                    impact_data = analysis.get("impact", {})  # type: ignore[attr-defined]
-                    dag_data = analysis.get("dag", {})  # type: ignore[attr-defined]
-
-                    result["analysis"] = {
-                        "risk_level": score_data.get("level"),  # type: ignore[attr-defined]
-                        "risk_score": score_data.get("score"),  # type: ignore[attr-defined]
-                        "changed_files_count": len(
-                            impact_data.get("changed_files", [])  # type: ignore[attr-defined]
-                        ),
-                        "impacted_modules_count": len(
-                            dag_data.get("impacted_modules", [])  # type: ignore[attr-defined]
-                        ),
-                    }
+                result = usecase.build_output_payload(pr, analysis_summary)
                 output_result(
                     result=result,
                     trace_output=trace_output,

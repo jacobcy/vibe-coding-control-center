@@ -56,11 +56,8 @@ def test_review_base_defaults_to_origin_main():
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
-        ),
-        patch(
-            "vibe3.utils.branch_utils.find_parent_branch",
-            return_value="origin/main",
+            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            return_value=MagicMock(base_branch="origin/main", auto_detected=True),
         ),
         patch(
             "vibe3.commands.review.ensure_flow_for_current_branch",
@@ -87,7 +84,8 @@ def test_review_base_pass():
             return_value=_mock_review("PASS"),
         ),
         patch(
-            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            return_value=MagicMock(base_branch="origin/develop", auto_detected=False),
         ),
         patch(
             "vibe3.commands.review.ensure_flow_for_current_branch",
@@ -96,6 +94,37 @@ def test_review_base_pass():
     ):
         result = runner.invoke(app, ["base", "origin/develop"])
     assert result.exit_code == 0
+
+
+def test_review_base_uses_shared_resolution_when_base_omitted():
+    """Review base should delegate omitted base handling to the shared resolver."""
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch(
+            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
+            return_value=_mock_result(),
+        ),
+        patch(
+            "vibe3.commands.review.parse_codex_review",
+            return_value=_mock_review("PASS"),
+        ),
+        patch(
+            "vibe3.commands.review.BaseResolutionUsecase.resolve_review_base",
+            return_value=MagicMock(base_branch="origin/main", auto_detected=True),
+        ) as mock_resolve,
+        patch(
+            "vibe3.commands.review.ensure_flow_for_current_branch",
+            return_value=(MagicMock(), "feature/test"),
+        ),
+    ):
+        result = runner.invoke(app, ["base"])
+
+    assert result.exit_code == 0
+    mock_resolve.assert_called_once_with(None, current_branch="feature/test")
 
 
 def test_review_base_does_not_have_publish_option():

@@ -1,12 +1,10 @@
 """Review command - Code review layer using inspect context and codeagent-wrapper."""
 
-from typing import Annotated, Optional, cast
+from typing import Annotated, Optional
 
 import typer
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _TRACE_OPT,
@@ -14,14 +12,14 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
-from vibe3.models.review import ReviewRequest, ReviewScope
+from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
 from vibe3.services.context_builder import build_review_context
-from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import parse_codex_review
+from vibe3.services.review_usecase import ReviewUsecase
 from vibe3.utils.trace import enable_trace
 
 _ASYNC_OPT = Annotated[
@@ -37,84 +35,33 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
+    """Render review result summary consistently."""
+    if verdict in {"ASYNC", "DRY_RUN"}:
+        return
+    typer.echo(f"\n=== Verdict: {verdict} ===")
+    if handoff_file:
+        typer.echo(f"→ Review saved to: {handoff_file}")
 
-def _run_review(
-    request: ReviewRequest,
-    config: VibeConfig,
-    dry_run: bool,
-    instructions: str | None,
-    issue_number: int | None = None,
-    pr_number: int | None = None,
-    branch: str | None = None,
-    async_mode: bool = False,
-) -> None:
-    log = logger.bind(domain="review", scope=request.scope.kind)
 
-    task = None
-    if pr_number:
-        if instructions:
-            task = f"审查 PR #{pr_number}: {instructions}"
-        elif config.review.review_prompt:
-            task = f"审查 PR #{pr_number}: {config.review.review_prompt}"
-        else:
-            task = f"审查 PR #{pr_number} 的变更"
-        log.info("Using PR-specific task")
-        typer.echo(f"→ Task: {task}")
-    elif instructions:
-        task = instructions
-        log.info("Using custom task message")
-        truncated = instructions[:60]
-        suffix = "..." if len(instructions) > 60 else ""
-        typer.echo(f"→ Custom task: {truncated}{suffix}")
-    elif config.review.review_prompt:
-        task = config.review.review_prompt
-        log.info("Using configured task from vibe.toml")
-    else:
-        log.info("Using prompt file only (no custom task)")
-
-    exec_svc = CodeagentExecutionService(config)
-    command = create_codeagent_command(
-        role="reviewer",
-        context_builder=lambda: build_review_context(request, config),
-        task=task,
-        dry_run=dry_run,
-        handoff_kind="review",
-        handoff_metadata={},
+def _build_review_usecase(**kwargs: object) -> ReviewUsecase:
+    """Construct review usecase with command-local dependencies."""
+    config = kwargs.pop("config", None) or VibeConfig.get_defaults()
+    return ReviewUsecase(
         config=config,
-        branch=branch,
+        inspect_runner=run_inspect_json,
+        snapshot_diff_builder=build_snapshot_diff,
+        review_parser=parse_codex_review,
+        context_builder=build_review_context,
+        execution_service_factory=CodeagentExecutionService,
+        command_builder=create_codeagent_command,
+        **kwargs,
     )
 
-    if async_mode and not dry_run and branch:
-        exec_svc.execute_async(command, branch)
-        return
 
-    result = exec_svc.execute_sync(command)
-
-    if dry_run:
-        return
-
-    raw = result.stdout
-    review = parse_codex_review(raw)
-
-    typer.echo(f"\n=== Verdict: {review.verdict} ===")
-
-    if result.handoff_file:
-        typer.echo(f"→ Review saved to: {result.handoff_file}")
-
-    if issue_number is not None:
-        label_result = transition_to_review(issue_number)
-        if (
-            not label_result.success
-            and label_result.error
-            and label_result.error != "no_issue_bound"
-        ):
-            typer.echo(
-                f"Warning: Failed to transition issue state: {label_result.error}",
-                err=True,
-            )
-
-    if review.verdict == "BLOCK":
-        raise typer.Exit(1)
+def _build_base_resolution_usecase() -> BaseResolutionUsecase:
+    """Construct shared base resolver for review commands."""
+    return BaseResolutionUsecase()
 
 
 @app.command()
@@ -144,33 +91,18 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting PR review")
     typer.echo(f"→ Review: PR #{pr_number}")
-
-    config = VibeConfig.get_defaults()
-
-    gh = GitHubClient()
-    pr_data = gh.get_pr(pr_number)
-    linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
-    issue_number = linked_issues[0] if linked_issues else None
-
-    log.info("Analyzing PR changes")
-    scope = ReviewScope.for_pr(pr_number)
-
-    # PR review uses inspect (GitHub API) to fetch PR diff
-    inspect_data = run_inspect_json(["pr", str(pr_number)])
-    changed_symbols_raw = inspect_data.get("changed_symbols", {})
-    changed_symbols = (
-        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
-    )
-
-    request = ReviewRequest(scope=scope, changed_symbols=changed_symbols)
-    _run_review(
+    usecase = _build_review_usecase()
+    request, issue_number = usecase.build_pr_review(pr_number)
+    result = usecase.execute_review(
         request,
-        config,
         dry_run,
         instructions,
         issue_number=issue_number,
         pr_number=pr_number,
     )
+    _emit_review_result(result.verdict, result.handoff_file)
+    if result.verdict == "BLOCK":
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -208,58 +140,40 @@ def base(
     if trace:
         enable_trace()
 
-    from vibe3.utils.branch_utils import find_parent_branch
-    from vibe3.utils.git_helpers import get_current_branch
+    flow_service, current_branch = ensure_flow_for_current_branch()
+    try:
+        resolved_base = _build_base_resolution_usecase().resolve_review_base(
+            base_branch,
+            current_branch=current_branch,
+        )
+    except RuntimeError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
-    current_branch = get_current_branch()
-
-    if base_branch is None:
-        base_branch = find_parent_branch(current_branch)
-        if base_branch is None:
-            typer.echo(
-                "Error: Could not auto-detect parent branch. "
-                "Please specify base branch explicitly.",
-                err=True,
-            )
-            raise typer.Exit(1)
-        typer.echo(f"→ Auto-detected parent branch: {base_branch}")
-
-    flow_service, _ = ensure_flow_for_current_branch()
+    if resolved_base.auto_detected:
+        typer.echo(f"→ Auto-detected parent branch: {resolved_base.base_branch}")
 
     log = logger.bind(
         domain="review",
         action="base",
         current_branch=current_branch,
-        base_branch=base_branch,
+        base_branch=resolved_base.base_branch,
     )
     log.info("Starting branch review")
-    typer.echo(f"→ Review: {current_branch} vs {base_branch}")
-
-    config = VibeConfig.get_defaults()
-
-    flow = flow_service.get_flow_status(current_branch)
-    issue_number = flow.task_issue_number if flow else None
-
-    log.info("Analyzing changed files")
-    scope = ReviewScope.for_base(base_branch)
-
-    structure_diff = build_snapshot_diff(base_branch, current_branch)
-
-    inspect_data = run_inspect_json(["base", base_branch])
-    changed_symbols_raw = inspect_data.get("changed_symbols", {})
-    changed_symbols = (
-        cast(dict[str, list[str]], changed_symbols_raw) if changed_symbols_raw else None
+    typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
+    usecase = _build_review_usecase(flow_service=flow_service)
+    request, issue_number = usecase.build_base_review(
+        current_branch,
+        resolved_base.base_branch,
     )
-
-    request = ReviewRequest(
-        scope=scope, changed_symbols=changed_symbols, structure_diff=structure_diff
-    )
-    _run_review(
+    result = usecase.execute_review(
         request,
-        config,
         dry_run,
         instructions,
         issue_number=issue_number,
         branch=current_branch,
         async_mode=async_mode,
     )
+    _emit_review_result(result.verdict, result.handoff_file)
+    if result.verdict == "BLOCK":
+        raise typer.Exit(1)
