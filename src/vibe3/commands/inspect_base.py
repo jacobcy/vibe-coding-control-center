@@ -54,13 +54,16 @@ def register(app: typer.Typer) -> None:
         if trace:
             enable_trace()
 
-        resolved_base = build_base_resolution_usecase().resolve_inspect_base(base_branch)
+        current_branch = get_current_branch()
+        resolved = build_base_resolution_usecase().resolve_inspect_base(
+            base_branch,
+            current_branch=current_branch,
+        )
+        resolved_base = resolved.base_branch
 
         # Validate base branch exists
         git_client = GitClient()
         validate_base_branch(git_client, resolved_base)
-
-        current_branch = get_current_branch()
 
         log = logger.bind(
             domain="inspect",

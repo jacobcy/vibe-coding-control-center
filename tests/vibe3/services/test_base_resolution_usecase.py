@@ -31,6 +31,35 @@ def test_resolve_review_base_uses_parent_detector_when_omitted() -> None:
     assert resolved.auto_detected is True
 
 
+def test_resolve_inspect_base_defaults_to_parent_policy() -> None:
+    """Inspect base should default to parent policy when omitted."""
+    usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: "feature/root")
+
+    resolved = usecase.resolve_inspect_base(None, current_branch="feature/child")
+
+    assert resolved.base_branch == "feature/root"
+    assert resolved.auto_detected is True
+
+
+def test_resolve_base_supports_current_and_main_tokens() -> None:
+    """Unified resolver should support current/main policy tokens."""
+    usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: "feature/root")
+
+    current = usecase.resolve_base(
+        requested_base="current",
+        current_branch="task/demo",
+        default_policy="main",
+    )
+    main = usecase.resolve_base(
+        requested_base="main",
+        current_branch="task/demo",
+        default_policy="current",
+    )
+
+    assert current.base_branch == "task/demo"
+    assert main.base_branch == "origin/main"
+
+
 def test_resolve_review_base_raises_when_parent_missing() -> None:
     """Review base should fail clearly when no parent branch can be inferred."""
     usecase = BaseResolutionUsecase(parent_branch_finder=lambda branch: None)

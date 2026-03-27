@@ -3,6 +3,7 @@
 from typing import Literal
 
 from vibe3.models.flow import CreateDecision, FlowState, IssueLink
+from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.task_service import TaskService
@@ -24,10 +25,12 @@ class FlowUsecase:
         flow_service: FlowService | None = None,
         task_service: TaskService | None = None,
         handoff_service: HandoffService | None = None,
+        base_resolver: BaseResolutionUsecase | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
         self.handoff_service = handoff_service or HandoffService()
+        self.base_resolver = base_resolver or BaseResolutionUsecase()
 
     def add_flow(
         self,
@@ -51,7 +54,7 @@ class FlowUsecase:
     def create_flow(
         self,
         name: str,
-        base: str = "main",
+        base: str | None = None,
         task: str | None = None,
         spec: str | None = None,
     ) -> FlowState:
@@ -60,7 +63,14 @@ class FlowUsecase:
         decision = self.flow_service.can_create_from_current_worktree(current_branch)
         self._validate_create_request(base, decision)
 
-        start_ref = self._resolve_start_ref(base, current_branch, decision)
+        default_policy: Literal["current", "main"] = (
+            "current" if decision.start_ref == current_branch else "main"
+        )
+        start_ref = self.base_resolver.resolve_flow_create_base(
+            requested_base=base,
+            current_branch=current_branch,
+            default_policy=default_policy,
+        )
         try:
             flow = self.flow_service.create_flow_with_branch(
                 slug=name,
@@ -106,7 +116,7 @@ class FlowUsecase:
             self.flow_service.bind_spec(branch, spec, "system")
 
     @staticmethod
-    def _validate_create_request(base: str, decision: CreateDecision) -> None:
+    def _validate_create_request(base: str | None, decision: CreateDecision) -> None:
         if not decision.allowed:
             raise FlowUsecaseError(decision.reason, decision.guidance)
 
@@ -118,15 +128,3 @@ class FlowUsecase:
                 "'--base current' is only allowed when current flow is blocked.",
                 "For independent new features, use 'vibe3 wtnew <name>' first.",
             )
-
-    @staticmethod
-    def _resolve_start_ref(
-        base: str,
-        current_branch: str,
-        decision: CreateDecision,
-    ) -> str:
-        if base == "main":
-            return decision.start_ref or "origin/main"
-        if base == "current":
-            return current_branch
-        return base

@@ -1,7 +1,7 @@
 """Shared base-resolution helpers for command-facing use cases."""
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Literal
 
 from vibe3.clients.git_client import GitClient, GitClientProtocol
 from vibe3.models.change_source import BranchSource
@@ -28,6 +28,8 @@ class BranchMaterial:
 class BaseResolutionUsecase:
     """Unify command-layer base-branch resolution semantics."""
 
+    BaseDefaultPolicy = Literal["parent", "current", "main"]
+
     def __init__(
         self,
         parent_branch_finder: Callable[[str | None], str | None] = find_parent_branch,
@@ -41,10 +43,17 @@ class BaseResolutionUsecase:
         """Resolve base branch for PR creation while preserving current default."""
         return requested_base or "main"
 
-    @staticmethod
-    def resolve_inspect_base(requested_base: str | None) -> str:
+    def resolve_inspect_base(
+        self,
+        requested_base: str | None,
+        current_branch: str,
+    ) -> ResolvedBase:
         """Resolve base branch for inspect-base mode."""
-        return requested_base or "origin/main"
+        return self.resolve_base(
+            requested_base=requested_base,
+            current_branch=current_branch,
+            default_policy="parent",
+        )
 
     def resolve_review_base(
         self,
@@ -52,16 +61,52 @@ class BaseResolutionUsecase:
         current_branch: str,
     ) -> ResolvedBase:
         """Resolve base branch for review-base mode."""
-        if requested_base:
-            return ResolvedBase(base_branch=requested_base, auto_detected=False)
+        return self.resolve_base(
+            requested_base=requested_base,
+            current_branch=current_branch,
+            default_policy="parent",
+        )
 
-        inferred = self.parent_branch_finder(current_branch)
-        if inferred is None:
-            raise RuntimeError(
-                "Could not auto-detect parent branch. "
-                "Please specify base branch explicitly."
-            )
-        return ResolvedBase(base_branch=inferred, auto_detected=True)
+    def resolve_flow_create_base(
+        self,
+        requested_base: str | None,
+        current_branch: str,
+        default_policy: BaseDefaultPolicy,
+    ) -> str:
+        """Resolve base/start-ref for flow create with status-aware defaults."""
+        return self.resolve_base(
+            requested_base=requested_base,
+            current_branch=current_branch,
+            default_policy=default_policy,
+        ).base_branch
+
+    def resolve_base(
+        self,
+        requested_base: str | None,
+        current_branch: str,
+        default_policy: BaseDefaultPolicy,
+    ) -> ResolvedBase:
+        """Resolve base branch using unified policy tokens.
+
+        Supported policy tokens:
+        - parent: closest parent branch inferred from topology
+        - current: current branch
+        - main: origin/main
+        """
+        token = (requested_base or default_policy).strip()
+        if token == "parent":
+            inferred = self.parent_branch_finder(current_branch)
+            if inferred is None:
+                raise RuntimeError(
+                    "Could not auto-detect parent branch. "
+                    "Please specify base branch explicitly."
+                )
+            return ResolvedBase(base_branch=inferred, auto_detected=True)
+        if token == "current":
+            return ResolvedBase(base_branch=current_branch, auto_detected=False)
+        if token == "main":
+            return ResolvedBase(base_branch="origin/main", auto_detected=False)
+        return ResolvedBase(base_branch=token, auto_detected=False)
 
     def collect_branch_material(
         self,

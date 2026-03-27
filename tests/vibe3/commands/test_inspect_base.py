@@ -13,8 +13,8 @@ from vibe3.commands.inspect import app
 runner = CliRunner()
 
 
-def test_inspect_base_default_main():
-    """Test inspect base with default origin/main branch."""
+def test_inspect_base_default_parent():
+    """Test inspect base defaults to parent policy."""
     mock_git = MagicMock()
     mock_git.get_changed_files.return_value = ["tests/test_foo.py", "docs/README.md"]
 
@@ -25,11 +25,14 @@ def test_inspect_base_default_main():
             with patch("vibe3.config.loader.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
-
-                result = runner.invoke(app, ["base"])
+                with patch(
+                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                    return_value=MagicMock(base_branch="feature/root"),
+                ):
+                    result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
-    assert "feature/test vs origin/main" in result.output
+    assert "feature/test vs feature/root" in result.output
     assert "No core files changed" in result.output
 
 
@@ -76,7 +79,11 @@ def test_inspect_base_with_core_files():
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
-                        result = runner.invoke(app, ["base"])
+                        with patch(
+                            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                            return_value=MagicMock(base_branch="feature/root"),
+                        ):
+                            result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
     assert "Core files changed (2)" in result.output
@@ -113,14 +120,18 @@ def test_inspect_base_json_output():
                                 "level": "MEDIUM",
                                 "block": False,
                             }
-                            result = runner.invoke(app, ["base", "--json"])
+                            with patch(
+                                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                                return_value=MagicMock(base_branch="feature/root"),
+                            ):
+                                result = runner.invoke(app, ["base", "--json"])
 
     assert result.exit_code == 0
     import json
 
     data = json.loads(result.output)
     assert data["current_branch"] == "feature/test"
-    assert data["base_branch"] == "origin/main"
+    assert data["base_branch"] == "feature/root"
     assert data["core_changed"] == 1
     assert data["total_changed"] == 1
     assert len(data["core_files"]) == 1
@@ -184,9 +195,9 @@ def test_inspect_base_uses_shared_base_resolver():
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
                 with patch(
                     "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
-                    return_value="origin/main",
+                    return_value=MagicMock(base_branch="feature/root"),
                 ) as mock_resolve:
                     result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
-    mock_resolve.assert_called_once_with(None)
+    mock_resolve.assert_called_once_with(None, current_branch="feature/test")

@@ -130,13 +130,16 @@ def create(
     task: TaskOption = None,
     spec: SpecOption = None,
     base: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--base",
             "-b",
-            help="Base branch (default: main, also supports 'current' or branch name)",
+            help=(
+                "Base policy/branch: parent|current|main|<branch>. "
+                "Default is status-aware: blocked->current, otherwise main."
+            ),
         ),
-    ] = "main",
+    ] = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
