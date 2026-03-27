@@ -74,7 +74,7 @@ case "$command" in
         ;;
     flow|task|roadmap|check)
         echo "${YELLOW}⚠️  This command has moved to V3.${NC}"
-        echo "Use: ${GREEN}vibe3 $command $@${NC}"
+        echo "Use: ${GREEN}vibe3 ${command} ${*}${NC}"
         exit 1
         ;;
     *)
