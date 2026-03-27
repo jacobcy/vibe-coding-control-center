@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Orchestra"
+  short_description: "Schedule flows globally and hand them to managers"
+  default_prompt: "Use $vibe-orchestra to reason about or operate multi-flow scheduling, preserve orchestra/manager boundaries, and dispatch single flows to the right manager."
