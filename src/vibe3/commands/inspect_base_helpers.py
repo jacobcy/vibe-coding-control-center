@@ -1,4 +1,4 @@
-"""Inspect base command helpers - 核心文件改动分析的辅助函数."""
+"""Inspect base command helpers."""
 
 from typing import Any
 
@@ -11,16 +11,21 @@ from vibe3.services.pr_scoring_service import PRDimensions, generate_score_repor
 from vibe3.services.serena_service import SerenaService
 
 
+def _code_paths() -> list[str]:
+    config = get_config()
+    return config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
+
+
+def _is_code_file(filepath: str, code_paths: list[str]) -> bool:
+    return any(filepath.startswith(path.rstrip("/")) for path in code_paths)
+
+
+def _is_test_file(filepath: str) -> bool:
+    return filepath.startswith(("tests/", "test_", "test/")) or "/tests/" in filepath or "/test/" in filepath or filepath.endswith("_test.py")
+
+
 def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
-    """Validate that base branch exists.
-
-    Args:
-        git_client: Git client instance
-        base_branch: Base branch name or ref
-
-    Raises:
-        UserError: If base branch doesn't exist
-    """
+    """Validate that base branch exists."""
 
     def ref_exists(ref: str) -> bool:
         try:
@@ -29,12 +34,11 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
         except GitError:
             return False
 
-    # Check various ref formats
     base_exists = (
-        ref_exists(base_branch)  # As provided (could be SHA, HEAD~5, etc.)
-        or ref_exists(f"refs/heads/{base_branch}")  # Local branch
-        or ref_exists(f"refs/remotes/{base_branch}")  # Remote ref (origin/main)
-        or ref_exists(f"refs/remotes/origin/{base_branch}")  # Shorthand remote
+        ref_exists(base_branch)
+        or ref_exists(f"refs/heads/{base_branch}")
+        or ref_exists(f"refs/remotes/{base_branch}")
+        or ref_exists(f"refs/remotes/origin/{base_branch}")
     )
 
     if not base_exists:
@@ -42,48 +46,26 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
             f"Base branch '{base_branch}' not found or invalid.\n\n"
             "Please provide a valid branch name or commit SHA.\n\n"
             "Examples:\n"
-            "  vibe inspect base              # Use default: origin/main\n"
-            "  vibe inspect base main         # Compare vs local main\n"
-            "  vibe inspect base develop      # Compare vs develop branch\n"
-            "  vibe inspect base HEAD~5       # Compare vs 5 commits ago"
+            "  vibe inspect base\n"
+            "  vibe inspect base main\n"
+            "  vibe inspect base develop\n"
+            "  vibe inspect base HEAD~5"
         ) from None
 
 
 def count_changed_lines_in_code_paths(git: GitClient, source: BranchSource) -> int:
-    """Count changed lines only in core code paths.
+    """Count changed lines only in configured code paths."""
+    code_paths = _code_paths()
 
-    Exclude docs, configs, scripts, tests to avoid inflating risk scores.
-
-    Args:
-        git: Git client instance
-        source: Branch source
-
-    Returns:
-        Number of changed lines in code paths
-    """
-    config = get_config()
-    code_paths = (
-        config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
-    )
-
-    def is_code_file(filepath: str) -> bool:
-        """Check if file is in code paths (not docs/configs)."""
-        return any(filepath.startswith(path.rstrip("/")) for path in code_paths)
-
-    # Parse diff to track which file each line belongs to
-    full_diff = git.get_diff(source)
     changed_lines = 0
     current_file = None
 
-    for line in full_diff.splitlines():
-        # Track which file we're in (diff format: "diff --git a/file b/file")
+    for line in git.get_diff(source).splitlines():
         if line.startswith("diff --git "):
             parts = line.split()
             if len(parts) >= 4:
-                # Extract filename from "a/file" (remove a/ prefix)
                 current_file = parts[2][2:]
-        elif current_file and is_code_file(current_file):
-            # Count +/- lines only in code files
+        elif current_file and _is_code_file(current_file, code_paths):
             if (
                 line.startswith(("+", "-"))
                 and not line.startswith("+++")
@@ -105,52 +87,16 @@ def build_json_output(
     core_files: list[dict[str, Any]],
     changed_lines: int,
 ) -> dict[str, Any]:
-    """Build JSON output for inspect base command.
+    """Build JSON output for inspect base command."""
+    code_paths = _code_paths()
 
-    Args:
-        git: Git client instance
-        source: Branch source
-        current_branch: Current branch name
-        base_branch: Base branch name
-        all_changed_files: All changed files
-        existing_files: Existing files
-        deleted_files: Deleted files
-        core_files: Core files with critical/public_api flags
-        changed_lines: Changed lines count
+    code_changed_files = [f for f in all_changed_files if _is_code_file(f, code_paths)]
 
-    Returns:
-        JSON-serializable result dict
-    """
-    # Filter: only count code files for risk scoring
-    # Exclude docs, configs, scripts, tests to avoid inflating risk scores
-    config = get_config()
-    code_paths = (
-        config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
-    )
-
-    def is_code_file(filepath: str) -> bool:
-        """Check if file is in code paths (not docs/configs/tests)."""
-        return any(filepath.startswith(path.rstrip("/")) for path in code_paths)
-
-    # Only count code files for changed_files dimension
-    code_changed_files = [f for f in all_changed_files if is_code_file(f)]
-
-    # Get AST-level analysis: changed functions
-    # Skip test files - they don't need AST analysis
     changed_symbols_by_file: dict[str, list[str]] = {}
     if existing_files:
         svc = SerenaService(git_client=git)
         for file in existing_files:
-            # Skip test files to save tokens
-            is_test = (
-                file.startswith("tests/")
-                or file.startswith("test/")
-                or "/tests/" in file
-                or "/test/" in file
-                or file.startswith("test_")
-                or file.endswith("_test.py")
-            )
-            if is_test:
+            if _is_test_file(file):
                 continue
 
             if file.endswith(".py"):
@@ -159,24 +105,20 @@ def build_json_output(
                     if changed_funcs:
                         changed_symbols_by_file[file] = changed_funcs
                 except Exception:
-                    # Skip files that can't be analyzed
                     pass
 
-    # Calculate score
     has_critical = any(f["critical_path"] for f in core_files)
     has_public_api = any(f["public_api"] for f in core_files)
 
-    # Get impacted modules for scoring
     impacted_modules = []
     if core_files:
-        # Only use existing files for DAG analysis
         core_paths = [f["path"] for f in core_files if not f.get("deleted", False)]
         if core_paths:
             dag = dag_service.expand_impacted_modules(core_paths)
             impacted_modules = dag.impacted_modules
 
     dims = PRDimensions(
-        changed_files=len(code_changed_files),  # Only count code files
+        changed_files=len(code_changed_files),
         changed_lines=changed_lines,
         impacted_modules=len(impacted_modules),
         critical_path_touch=has_critical,
@@ -188,12 +130,12 @@ def build_json_output(
         "current_branch": current_branch,
         "base_branch": base_branch,
         "core_files": core_files,
-        "total_changed": len(all_changed_files),  # Include deleted files
-        "code_changed": len(code_changed_files),  # Only code files
+        "total_changed": len(all_changed_files),
+        "code_changed": len(code_changed_files),
         "existing_changed": len(existing_files),
         "deleted_files": len(deleted_files),
         "core_changed": len(core_files),
-        "score": score_report,  # Add score for pre-push hook
+        "score": score_report,
     }
     if core_files:
         result["impacted_modules"] = impacted_modules
@@ -211,23 +153,14 @@ def print_human_output(
     deleted_files: list[str],
     core_files: list[dict[str, Any]],
 ) -> None:
-    """Print human-readable output for inspect base command.
-
-    Args:
-        current_branch: Current branch name
-        base_branch: Base branch name
-        all_changed_files: All changed files
-        existing_files: Existing files
-        deleted_files: Deleted files
-        core_files: Core files with critical/public_api flags
-    """
+    """Print human-readable output for inspect base command."""
     import typer
 
     typer.echo(f"=== Branch Analysis: {current_branch} vs {base_branch} ===\n")
 
     if deleted_files:
         typer.echo(f"⚠️  Deleted files: {len(deleted_files)}")
-        for f in deleted_files[:5]:  # Show first 5
+        for f in deleted_files[:5]:
             typer.echo(f"    - {f}")
         if len(deleted_files) > 5:
             typer.echo(f"    ... and {len(deleted_files) - 5} more")
@@ -253,7 +186,6 @@ def print_human_output(
         tag_str = ", ".join(tags)
         typer.echo(f"  - {file_info['path']} ({tag_str})")
 
-    # Only analyze existing files for DAG impact
     existing_core_paths = [f["path"] for f in core_files if not f.get("deleted", False)]
     if existing_core_paths:
         dag = dag_service.expand_impacted_modules(existing_core_paths)
