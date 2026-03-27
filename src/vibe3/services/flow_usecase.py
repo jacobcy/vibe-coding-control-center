@@ -8,6 +8,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
+from vibe3.services.task_usecase import TaskUsecase
 
 
 class FlowUsecaseError(RuntimeError):
@@ -101,10 +102,10 @@ class FlowUsecase:
 
     @staticmethod
     def _parse_issue_number(issue: str) -> int:
-        digits = "".join(filter(str.isdigit, issue))
-        if not digits:
-            raise ValueError(f"Invalid issue format: {issue}")
-        return int(digits)
+        try:
+            return TaskUsecase.parse_issue_ref(issue)
+        except ValueError as exc:
+            raise ValueError(f"Invalid issue format: {issue}") from exc
 
     def _apply_initial_bindings(
         self,

@@ -47,6 +47,42 @@ def test_add_flow_binds_refs_and_ensures_handoff() -> None:
     handoff_service.ensure_current_handoff.assert_called_once_with()
 
 
+def test_add_flow_parses_issue_number_from_issuecomment_url() -> None:
+    """Issue parsing should ignore issuecomment suffix when binding task."""
+    flow_service = MagicMock()
+    task_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = None
+    flow_service.create_flow.return_value = FlowState(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+    )
+    handoff_service = MagicMock()
+    spec_ref_service = MagicMock()
+    spec_ref_service.parse_spec_ref.return_value = SpecRefInfo(
+        raw="248",
+        kind="issue",
+        issue_number=248,
+        issue_title="Task title",
+        display="#248:Task title",
+    )
+
+    usecase = FlowUsecase(
+        flow_service=flow_service,
+        task_service=task_service,
+        handoff_service=handoff_service,
+        spec_ref_service=spec_ref_service,
+    )
+
+    usecase.add_flow(
+        "demo",
+        task="https://github.com/jacobcy/vibe-coding-control-center/issues/248#issuecomment-12345",
+    )
+
+    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+
+
 def test_create_flow_uses_decision_start_ref_and_binds_task() -> None:
     """Create flow should reuse service governance decision and bindings."""
     flow_service = MagicMock()
