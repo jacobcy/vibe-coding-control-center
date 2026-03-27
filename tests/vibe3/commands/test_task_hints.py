@@ -51,6 +51,7 @@ def test_pr_create_requires_yes_when_task_issue_missing(
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
+    mock_pr_service.get_pr.return_value = None
     mock_pr_service.create_draft_pr.return_value = MagicMock(model_dump=lambda: {})
     mock_pr_service_cls.return_value = mock_pr_service
 
@@ -81,6 +82,7 @@ def test_pr_create_allows_yes_when_task_issue_missing(
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
+    mock_pr_service.get_pr.return_value = None
     mock_pr_service.create_draft_pr.return_value = MagicMock(model_dump=lambda: {})
     mock_pr_service_cls.return_value = mock_pr_service
 
