@@ -1,10 +1,11 @@
 """Usecase helpers for PR query command orchestration."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
+from vibe3.services.inspect_output_adapter import pr_analysis_summary
 from vibe3.services.pr_service import PRService
 
 
@@ -92,19 +93,7 @@ class PrQueryUsecase:
         if self.inspect_runner is None:
             raise RuntimeError("inspect_runner is required for analysis loading")
         analysis = self.inspect_runner(["pr", str(pr_number)])
-        score_data = analysis.get("score", {})
-        impact_data = analysis.get("impact", {})
-        dag_data = analysis.get("dag", {})
-        score_items = cast(dict[str, Any], score_data) if score_data else {}
-        impact_items = cast(dict[str, Any], impact_data) if impact_data else {}
-        dag_items = cast(dict[str, Any], dag_data) if dag_data else {}
-        return {
-            "risk_level": score_items.get("level"),
-            "risk_score": score_items.get("score"),
-            "changed_files_count": len(impact_items.get("changed_files", [])),
-            "impacted_modules_count": len(dag_items.get("impacted_modules", [])),
-            "raw": analysis,
-        }
+        return pr_analysis_summary(analysis)
 
     @staticmethod
     def build_output_payload(

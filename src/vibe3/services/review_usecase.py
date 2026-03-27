@@ -1,7 +1,7 @@
 """Usecase layer for review command orchestration."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
 import typer
 from loguru import logger
@@ -18,6 +18,7 @@ from vibe3.services.codeagent_execution_service import (
 )
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.inspect_output_adapter import changed_symbols
 from vibe3.services.label_integration import transition_to_review
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 
@@ -191,7 +192,4 @@ class ReviewUsecase:
     ) -> dict[str, list[str]] | None:
         """Load changed_symbols from inspect output with stable casting."""
         inspect_data = self.inspect_runner(inspect_args)
-        changed_symbols_raw = inspect_data.get("changed_symbols", {})
-        if not changed_symbols_raw:
-            return None
-        return cast(dict[str, list[str]], changed_symbols_raw)
+        return changed_symbols(inspect_data)

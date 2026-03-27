@@ -25,6 +25,7 @@ from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.inspect_output_adapter import as_list, dag, impact, score
 from vibe3.services.pr_query_usecase import PrQueryUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
@@ -112,10 +113,8 @@ def register_query_commands(app: typer.Typer) -> None:
                 raise typer.Exit(1) from None
 
             analysis_summary = None
-            analysis = None
             if pr_number:
                 analysis_summary = usecase.load_analysis_summary(pr_number)
-                analysis = analysis_summary.get("raw")
                 logger.debug("Successfully retrieved change analysis")
 
             if trace_output or json_output or yaml_output:
@@ -131,32 +130,40 @@ def register_query_commands(app: typer.Typer) -> None:
                 render_pr_details(pr)
 
                 # Show change analysis
-                if analysis:
+                if analysis_summary:
+                    analysis = analysis_summary.get("raw")
+                    if not isinstance(analysis, dict):
+                        analysis = {}
+
                     console = Console()
 
                     console.print("\n[bold]### Change Analysis[/]")
-                    score = analysis.get("score", {})  # type: ignore[attr-defined]
-                    console.print(f"- [cyan]Risk Level[/]: {score.get('level', 'N/A')}")  # type: ignore[attr-defined]
-                    console.print(f"- [cyan]Risk Score[/]: {score.get('score', 'N/A')}")  # type: ignore[attr-defined]
-                    reason = score.get("reason")  # type: ignore[attr-defined]
+                    score_items = score(analysis)
+                    console.print(
+                        f"- [cyan]Risk Level[/]: {score_items.get('level', 'N/A')}"
+                    )
+                    console.print(
+                        f"- [cyan]Risk Score[/]: {score_items.get('score', 'N/A')}"
+                    )
+                    reason = score_items.get("reason")
                     if reason:
                         console.print(f"- [cyan]Reason[/]: {reason}")
-                    trigger_factors = score.get("trigger_factors", [])  # type: ignore[attr-defined]
+                    trigger_factors = as_list(score_items.get("trigger_factors"))
                     if trigger_factors:
                         console.print("- [cyan]Trigger Factors[/]:")
                         for factor in trigger_factors:
                             console.print(f"  - {factor}")
 
-                    impact = analysis.get("impact", {})  # type: ignore[attr-defined]
-                    changed_files = impact.get("changed_files", [])  # type: ignore[attr-defined]
+                    impact_items = impact(analysis)
+                    changed_files = as_list(impact_items.get("changed_files"))
                     console.print(f"- [cyan]Changed Files[/]: {len(changed_files)}")
 
-                    dag = analysis.get("dag", {})  # type: ignore[attr-defined]
-                    impacted_modules = dag.get("impacted_modules", [])  # type: ignore[attr-defined]
+                    dag_items = dag(analysis)
+                    impacted_modules = as_list(dag_items.get("impacted_modules"))
                     console.print(
                         f"- [cyan]Impacted Modules[/]: {len(impacted_modules)}"
                     )
-                    recommendations = score.get("recommendations", [])  # type: ignore[attr-defined]
+                    recommendations = as_list(score_items.get("recommendations"))
                     if recommendations:
                         console.print("- [cyan]Recommendations[/]:")
                         for item in recommendations:

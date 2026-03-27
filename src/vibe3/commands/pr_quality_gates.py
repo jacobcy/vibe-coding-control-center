@@ -88,29 +88,28 @@ def run_risk_gate(console: Console, pr_number: int) -> None:
         Exception: If risk check fails (fail-fast, no interactive bypass)
     """
     from vibe3.commands.review_helpers import run_inspect_json
+    from vibe3.services.inspect_output_adapter import score
 
     # Call inspect pr to get risk score
     analysis = run_inspect_json(["pr", str(pr_number)])
-    score_data = analysis.get("score", {})
-    # Type assertion for score dict
-    score = score_data if isinstance(score_data, dict) else {}
+    risk_score = score(analysis)
 
     # Check if blocked
-    if score.get("block", False):
+    if risk_score.get("block", False):
         console.print("\n[red]✗ 质量门禁失败[/]")
         console.print("[red]PR 被阻断：高风险变更[/]")
         console.print(
             "\n[yellow]风险评分[/]: "
-            f"{score.get('score', 'N/A')} "
-            f"({score.get('level', 'N/A')})"
+            f"{risk_score.get('score', 'N/A')} "
+            f"({risk_score.get('level', 'N/A')})"
         )
-        _render_score_explanation(console, score)
+        _render_score_explanation(console, risk_score)
 
         console.print("\n[dim]请修复问题或使用 --yes 跳过（不推荐）[/]")
         raise Exit(1)
 
     # Display passed info
     console.print("\n[green]✓ 质量门禁通过[/]")
-    console.print(f"[cyan]风险等级[/]: {score.get('level', 'N/A')}")
-    console.print(f"[cyan]风险评分[/]: {score.get('score', 'N/A')}")
-    _render_score_explanation(console, score)
+    console.print(f"[cyan]风险等级[/]: {risk_score.get('level', 'N/A')}")
+    console.print(f"[cyan]风险评分[/]: {risk_score.get('score', 'N/A')}")
+    _render_score_explanation(console, risk_score)
