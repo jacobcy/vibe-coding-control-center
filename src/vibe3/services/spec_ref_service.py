@@ -93,11 +93,26 @@ class SpecRefService:
         )
 
     def _fetch_issue_data(self, issue_number: int) -> dict | None:
-        result = subprocess.run(
-            ["gh", "issue", "view", str(issue_number), "--json", "number,title,body"],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "issue",
+                    "view",
+                    str(issue_number),
+                    "--json",
+                    "number,title,body",
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(
+                external="github",
+                operation="fetch_issue_data",
+                issue_number=issue_number,
+            ).warning("GitHub CLI not found, fallback to issue number only")
+            return None
 
         if result.returncode != 0:
             logger.bind(
