@@ -1,77 +1,51 @@
 """Shell metrics collector 单元测试."""
 
-from vibe3.services.shell_metrics_collector import collect_shell_metrics
+from pathlib import Path
+
+from vibe3.config.loader import get_config
+from vibe3.services.shell_metrics_collector import (
+    _collect_files,
+    collect_shell_metrics,
+)
+
+
+def _expected_files_from_config():
+    config = get_config()
+    root = Path(".")
+    files = []
+    for path in config.code_limits.code_paths.v2_shell:
+        pattern = f"{path}**/*.sh" if path.endswith("/") else path
+        files.extend(_collect_files(pattern, root))
+    return files
 
 
 class TestShellMetricsCollector:
     """Shell metrics 收集器测试."""
 
-    def test_collects_lib3_vibe_sh(self) -> None:
-        """回归测试: lib3/vibe.sh 必须被包含在 shell metrics 中.
-
-        背景: PR 208 发现 collect_shell_metrics 使用硬编码路径
-        ["bin/**/*.sh", "lib/**/*.sh", "bin/vibe"]，导致 lib3/ 被遗漏。
-        修复后应该从 config.code_limits.code_paths.v2_shell 读取路径。
-        """
+    def test_collects_configured_paths(self) -> None:
+        """验证按照配置收集 shell 文件，并覆盖 lib3 路径."""
         metrics = collect_shell_metrics()
+        expected_files = _expected_files_from_config()
 
-        # 验证 lib3/vibe.sh 在结果中
-        lib3_files = [f for f in metrics.files if "lib3" in f.path]
-        assert len(lib3_files) > 0, "lib3/ 目录应该被包含在 shell metrics 中"
+        actual_paths = {f.path for f in metrics.files}
+        expected_paths = {f.path for f in expected_files}
 
-        # 验证 lib3/vibe.sh 具体文件存在
-        lib3_vibe_sh = [f for f in metrics.files if f.path == "lib3/vibe.sh"]
-        assert len(lib3_vibe_sh) == 1, "lib3/vibe.sh 应该被收集"
-        assert lib3_vibe_sh[0].loc > 0, "lib3/vibe.sh 应该有内容"
+        assert actual_paths == expected_paths, "收集到的文件列表应与配置匹配"
+        assert "lib3/vibe.sh" in actual_paths, "lib3/vibe.sh 应该被收集"
+        assert any(p.startswith("lib3/") for p in actual_paths), "lib3/ 目录应被收集"
+        assert "bin/vibe" in actual_paths, "bin/vibe 应该被收集"
 
-    def test_file_count_increased_after_fix(self) -> None:
-        """验证修复后文件数量增加.
-
-        修复前: 51 files
-        修复后: 应该 >= 52 files (包含 lib3/vibe.sh)
-        """
+    def test_metrics_match_expected_counts(self) -> None:
+        """验证指标数值与实际文件行数一致."""
         metrics = collect_shell_metrics()
-        # 修复后至少应该有 52 个文件
-        assert (
-            metrics.file_count >= 52
-        ), f"期望至少 52 个文件，实际 {metrics.file_count} 个"
+        expected_files = _expected_files_from_config()
 
-    def test_total_loc_increased_after_fix(self) -> None:
-        """验证修复后总行数增加.
+        expected_total = sum(f.loc for f in expected_files)
+        expected_max = max((f.loc for f in expected_files), default=0)
 
-        修复前: 6682 LOC
-        修复后: 应该 >= 6764 LOC (包含 lib3/vibe.sh 的 82 行)
-        """
-        metrics = collect_shell_metrics()
-        # lib3/vibe.sh 有 82 行，所以至少应该增加这么多
-        assert (
-            metrics.total_loc >= 6764
-        ), f"期望至少 6764 行，实际 {metrics.total_loc} 行"
-
-    def test_uses_config_paths_not_hardcoded(self) -> None:
-        """验证使用配置路径而不是硬编码.
-
-        检查是否所有 config.code_limits.code_paths.v2_shell 中的路径
-        都被正确处理了。
-        """
-        metrics = collect_shell_metrics()
-
-        # 验证 lib/ 和 lib3/ 都有文件被收集
-        lib_files = [f for f in metrics.files if f.path.startswith("lib/")]
-        lib3_files = [f for f in metrics.files if f.path.startswith("lib3/")]
-        bin_vibe = [f for f in metrics.files if f.path == "bin/vibe"]
-
-        assert len(lib_files) > 0, "lib/ 目录应该有文件"
-        assert len(lib3_files) > 0, "lib3/ 目录应该有文件"
-        assert len(bin_vibe) == 1, "bin/vibe 应该被收集"
-
-    def test_returns_valid_layer_metrics(self) -> None:
-        """验证返回的 LayerMetrics 结构正确."""
-        metrics = collect_shell_metrics()
-
-        assert metrics.total_loc > 0
-        assert metrics.file_count > 0
-        assert metrics.max_file_loc > 0
+        assert metrics.file_count == len(expected_files)
+        assert metrics.total_loc == expected_total
+        assert metrics.max_file_loc == expected_max
         assert len(metrics.files) == metrics.file_count
         assert metrics.limit_total > 0
         assert metrics.limit_file_default > 0
