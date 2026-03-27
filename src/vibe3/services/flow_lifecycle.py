@@ -8,10 +8,12 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
+from vibe3.models.orchestration import IssueState
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_abort_ops import abort_flow_impl
 from vibe3.services.flow_close_target import resolve_close_target
 from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
+from vibe3.services.label_service import LabelService
 
 
 class FlowLifecycleMixin:
@@ -210,6 +212,20 @@ class FlowLifecycleMixin:
             "system",
             f"Flow closed, branch '{branch}' deleted",
         )
+        issue_links = self.store.get_issue_links(branch) or []
+        label_service = LabelService()
+        for link in issue_links:
+            if link.get("issue_role") != "task":
+                continue
+            issue_number = link.get("issue_number")
+            if issue_number is None:
+                continue
+            label_service.confirm_issue_state(
+                int(issue_number),
+                IssueState.DONE,
+                actor="flow:done",
+                force=True,
+            )
 
         switched_to_target = switched_before_delete
         try:
@@ -287,6 +303,14 @@ class FlowLifecycleMixin:
             "system",
             f"Flow blocked{': ' + reason if reason else ''}",
         )
+        task_issue_number = flow_data.get("task_issue_number")
+        if task_issue_number is not None:
+            LabelService().confirm_issue_state(
+                int(task_issue_number),
+                IssueState.BLOCKED,
+                actor="flow:blocked",
+                force=True,
+            )
 
     def abort_flow(
         self: Any,

@@ -1,6 +1,6 @@
 """Tests for flow lifecycle operations."""
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import ANY, MagicMock, Mock, patch
 
 import pytest
 
@@ -22,8 +22,10 @@ class TestFlowLifecycle:
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    @patch("vibe3.services.flow_lifecycle.LabelService")
     def test_close_flow_switches_off_current_branch_before_delete(
         self,
+        mock_label_service_class: MagicMock,
         mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
@@ -61,6 +63,10 @@ class TestFlowLifecycle:
         mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
+        mock_store.get_issue_links.return_value = [
+            {"issue_number": 220, "issue_role": "task"},
+            {"issue_number": 221, "issue_role": "related"},
+        ]
 
         service = FlowService(store=mock_store)
 
@@ -79,11 +85,19 @@ class TestFlowLifecycle:
             "system",
             "Flow closed, branch 'task/current-flow' deleted",
         )
+        mock_label_service_class.return_value.confirm_issue_state.assert_called_once_with(
+            220,
+            ANY,
+            actor="flow:done",
+            force=True,
+        )
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    @patch("vibe3.services.flow_lifecycle.LabelService")
     def test_close_flow_switches_to_single_dependent_without_pull(
         self,
+        _mock_label_service_class: MagicMock,
         mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
@@ -121,6 +135,7 @@ class TestFlowLifecycle:
         mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = ["task/dependent"]
+        mock_store.get_issue_links.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -133,8 +148,10 @@ class TestFlowLifecycle:
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    @patch("vibe3.services.flow_lifecycle.LabelService")
     def test_close_flow_raises_if_current_branch_cannot_switch_away(
         self,
+        _mock_label_service_class: MagicMock,
         mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
@@ -161,6 +178,7 @@ class TestFlowLifecycle:
         mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
+        mock_store.get_issue_links.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -174,8 +192,10 @@ class TestFlowLifecycle:
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    @patch("vibe3.services.flow_lifecycle.LabelService")
     def test_close_flow_does_not_pull_if_post_close_switch_fails(
         self,
+        _mock_label_service_class: MagicMock,
         mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
@@ -211,6 +231,7 @@ class TestFlowLifecycle:
         mock_gh_class.return_value = mock_gh
 
         mock_store.get_flow_dependents.return_value = []
+        mock_store.get_issue_links.return_value = []
 
         service = FlowService(store=mock_store)
 
@@ -221,8 +242,10 @@ class TestFlowLifecycle:
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     @patch("vibe3.services.flow_lifecycle.GitHubClient")
+    @patch("vibe3.services.flow_lifecycle.LabelService")
     def test_close_flow_rejects_when_pr_not_merged(
         self,
+        _mock_label_service_class: MagicMock,
         mock_gh_class: MagicMock,
         mock_git_class: MagicMock,
         mock_store: Mock,
@@ -249,3 +272,21 @@ class TestFlowLifecycle:
             service.close_flow("task/current-flow")
 
         mock_store.update_flow_state.assert_not_called()
+
+    @patch("vibe3.services.flow_lifecycle.LabelService")
+    def test_block_flow_syncs_task_issue_blocked_label(
+        self,
+        mock_label_service_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/current-flow",
+            "flow_slug": "current_flow",
+            "flow_status": "active",
+            "task_issue_number": 220,
+        }
+        service = FlowService(store=mock_store)
+
+        service.block_flow("task/current-flow", reason="waiting")
+
+        mock_label_service_class.return_value.confirm_issue_state.assert_called_once()

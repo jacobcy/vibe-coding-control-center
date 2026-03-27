@@ -16,13 +16,14 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
+from vibe3.models.orchestration import IssueState
 from vibe3.models.plan import PlanRequest
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
 from vibe3.services.flow_service import FlowService
-from vibe3.services.label_integration import transition_to_claimed
+from vibe3.services.label_service import LabelService
 from vibe3.services.plan_context_builder import build_plan_context
 from vibe3.services.plan_usecase import PlanUsecase
 from vibe3.services.spec_ref_service import SpecRefService
@@ -121,10 +122,14 @@ def task(
     )
 
     if not dry_run:
-        result = transition_to_claimed(task_input.issue_number)
-        if not result.success and result.error and result.error != "no_issue_bound":
+        result = LabelService().confirm_issue_state(
+            task_input.issue_number,
+            IssueState.CLAIMED,
+            actor="agent:plan",
+        )
+        if result == "blocked":
             typer.echo(
-                f"Warning: Failed to transition issue state: {result.error}",
+                "Warning: Failed to transition issue state: state_transition_blocked",
                 err=True,
             )
 

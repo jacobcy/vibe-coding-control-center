@@ -9,6 +9,7 @@ from loguru import logger
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.config.settings import VibeConfig
+from vibe3.models.orchestration import IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.services.codeagent_execution_service import (
@@ -18,7 +19,7 @@ from vibe3.services.codeagent_execution_service import (
 from vibe3.services.context_builder import build_review_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.inspect_output_adapter import changed_symbols
-from vibe3.services.label_integration import transition_to_review
+from vibe3.services.label_service import LabelService
 from vibe3.services.review_parser import ParsedReview, parse_codex_review
 from vibe3.services.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 
@@ -176,14 +177,14 @@ class ReviewUsecase:
         """Move linked issue into review state when possible."""
         if issue_number is None:
             return
-        label_result = transition_to_review(issue_number)
-        if (
-            not label_result.success
-            and label_result.error
-            and label_result.error != "no_issue_bound"
-        ):
+        label_result = LabelService().confirm_issue_state(
+            issue_number,
+            to_state=IssueState.REVIEW,
+            actor="agent:review",
+        )
+        if label_result == "blocked":
             typer.echo(
-                f"Warning: Failed to transition issue state: {label_result.error}",
+                "Warning: Failed to transition issue state: state_transition_blocked",
                 err=True,
             )
 
