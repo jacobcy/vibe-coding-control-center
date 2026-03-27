@@ -35,27 +35,20 @@ def test_flow_show_warns_when_task_issue_missing(mock_ensure, _render_timeline) 
 
 @patch("vibe3.commands.pr_create.render_pr_created")
 @patch("vibe3.commands.pr_create.PRService")
-@patch("vibe3.services.pr_create_usecase.FlowService")
 @patch("vibe3.commands.pr_create.FlowService")
 def test_pr_create_requires_yes_when_task_issue_missing(
-    mock_cmd_flow_service_cls,
-    mock_usecase_flow_service_cls,
-    mock_pr_service_cls,
-    _render_pr_created,
+    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
 ) -> None:
     """pr create should fail by default when current flow has no task."""
-    cmd_flow_service = MagicMock()
-    cmd_flow_service.get_current_branch.return_value = "task/demo"
-    mock_cmd_flow_service_cls.return_value = cmd_flow_service
-
-    usecase_flow_service = MagicMock()
-    usecase_flow_service.get_flow_status.return_value = FlowState(
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowState(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
         task_issue_number=None,
     )
-    mock_usecase_flow_service_cls.return_value = usecase_flow_service
+    mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
     mock_pr_service.get_pr.return_value = None
@@ -73,27 +66,20 @@ def test_pr_create_requires_yes_when_task_issue_missing(
 
 @patch("vibe3.commands.pr_create.render_pr_created")
 @patch("vibe3.commands.pr_create.PRService")
-@patch("vibe3.services.pr_create_usecase.FlowService")
 @patch("vibe3.commands.pr_create.FlowService")
 def test_pr_create_allows_yes_when_task_issue_missing(
-    mock_cmd_flow_service_cls,
-    mock_usecase_flow_service_cls,
-    mock_pr_service_cls,
-    _render_pr_created,
+    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
 ) -> None:
     """pr create --yes should bypass missing task guard."""
-    cmd_flow_service = MagicMock()
-    cmd_flow_service.get_current_branch.return_value = "task/demo"
-    mock_cmd_flow_service_cls.return_value = cmd_flow_service
-
-    usecase_flow_service = MagicMock()
-    usecase_flow_service.get_flow_status.return_value = FlowState(
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowState(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
         task_issue_number=None,
     )
-    mock_usecase_flow_service_cls.return_value = usecase_flow_service
+    mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
     mock_pr_service.get_pr.return_value = None
