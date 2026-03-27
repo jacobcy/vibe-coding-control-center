@@ -26,6 +26,7 @@ class FlowLifecycleMixin:
 
         Rules:
         - active: reject - current flow is in progress
+        - active + pr_ready_for_review: allow - current flow is waiting review
         - blocked: allow from current branch - user wants to create downstream flow
         - done/aborted/stale/no-flow: require fresh worktree check
 
@@ -46,6 +47,18 @@ class FlowLifecycleMixin:
             )
 
         status = flow_data.get("flow_status", "active")
+        is_waiting_review = bool(flow_data.get("pr_ready_for_review"))
+
+        if status == "active" and is_waiting_review:
+            return CreateDecision(
+                allowed=True,
+                reason=(
+                    "Current flow PR is ready and waiting review - "
+                    "safe to start a new target"
+                ),
+                start_ref=MAIN_BRANCH_REF,
+                requires_new_worktree=False,
+            )
 
         if status == "active":
             return CreateDecision(

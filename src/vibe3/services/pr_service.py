@@ -121,7 +121,10 @@ class PRService:
 
         # Update flow state and add event
         self.store.update_flow_state(
-            head_branch, pr_number=pr.number, latest_actor=actor
+            head_branch,
+            pr_number=pr.number,
+            pr_ready_for_review=False,
+            latest_actor=actor,
         )
         self.store.add_event(
             head_branch, "pr_draft", actor, f"Draft PR #{pr.number} created: {pr.url}"
@@ -188,6 +191,11 @@ class PRService:
 
         # Add event
         branch = pr.head_branch
+        self.store.update_flow_state(
+            branch,
+            pr_ready_for_review=True,
+            latest_actor=actor,
+        )
         self.store.add_event(
             branch, "pr_ready", actor, f"PR #{pr_number} marked as ready for review"
         )

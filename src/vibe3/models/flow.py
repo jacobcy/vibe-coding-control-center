@@ -26,6 +26,7 @@ class FlowState(BaseModel):
     flow_slug: str
     task_issue_number: int | None = None
     pr_number: int | None = None
+    pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
     report_ref: str | None = None
@@ -101,6 +102,7 @@ class FlowStatusResponse(BaseModel):
     flow_status: Literal["active", "blocked", "done", "stale", "aborted"]
     task_issue_number: int | None = None
     pr_number: int | None = None
+    pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
     report_ref: str | None = None
