@@ -24,7 +24,10 @@ from vibe3.ui.flow_ui import (
     render_flows_table,
 )
 
-FlowNameArg = Annotated[str, typer.Argument(help="Flow name")]
+FlowNameArg = Annotated[
+    str | None,
+    typer.Argument(help="Flow name (defaults to current branch name)"),
+]
 IssueArg = Annotated[
     str, typer.Argument(help="Issue reference to bind as task/related/dependency")
 ]
@@ -95,9 +98,16 @@ def _merge_issue_refs(
     return [primary, *tail]
 
 
+def _resolve_flow_name(name: str | None) -> str:
+    """Return explicit *name* or fall back to the current branch name."""
+    if name:
+        return name
+    return FlowService().get_current_branch()
+
+
 @app.command(name="add")
 def add(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: AddTaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
@@ -105,6 +115,7 @@ def add(
     json_output: JsonOption = False,
 ) -> None:
     """Add flow."""
+    name = _resolve_flow_name(name)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
@@ -134,7 +145,7 @@ def add(
 
 @app.command(name="new", deprecated=True, hidden=True)
 def new(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: TaskOption = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
@@ -149,7 +160,7 @@ def new(
 
 @app.command(name="create")
 def create(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: TaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
@@ -165,6 +176,7 @@ def create(
     json_output: JsonOption = False,
 ) -> None:
     """Create a new branch with flow state."""
+    name = _resolve_flow_name(name)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
     with trace_scope(trace, "flow create", name=name, base=base):
         logger.bind(command="flow create", name=name, base=base, task=task_refs).info(

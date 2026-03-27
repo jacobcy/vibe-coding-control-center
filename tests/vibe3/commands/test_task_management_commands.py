@@ -22,7 +22,7 @@ def test_flow_new_help_uses_optional_name_and_issue_flag() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root new [OPTIONS] NAME" in stdout
+    assert "Usage: root new [OPTIONS] [NAME]" in stdout
     assert "--task" in stdout or "--spec" in stdout
 
 
