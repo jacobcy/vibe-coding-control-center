@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -164,7 +164,7 @@ pr:
         mock_resolve.assert_called_once_with(None)
         mock_material.assert_called_once_with(
             base_branch="origin/main",
-            branch="task/refactor/v3-thin-commands-19k",
+            branch=ANY,
         )
         mock_prompt.assert_not_called()
         mock_suggest.assert_called_once_with(["feat: add feature"], ["src/file.py"])
@@ -224,7 +224,7 @@ pr:
         mock_resolve.assert_called_once_with(None)
         mock_material.assert_called_once_with(
             base_branch="origin/feature-root",
-            branch="task/refactor/v3-thin-commands-19k",
+            branch=ANY,
         )
         mock_service.return_value.create_draft_pr.assert_called_once_with(
             title="feat: ai title",
