@@ -96,6 +96,6 @@ setup() {
   run vibe alias --load
   [ "$status" -eq 0 ]
   [[ -f "$output" ]]
-  [[ "$output" =~ "alias/loader.sh" ]]
+  [[ "$output" =~ "lib/alias/loader.sh" ]]
   [[ ! "$output" =~ "config/aliases.sh" ]]
 }

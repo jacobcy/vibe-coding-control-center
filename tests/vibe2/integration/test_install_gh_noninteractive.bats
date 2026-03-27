@@ -93,7 +93,7 @@ EOF
 
   [ "$status" -eq 0 ]
   [ -f "$envrc_path" ]
-  [ -f "$home_dir/.vibe/alias/loader.sh" ]
+  [ -f "$home_dir/.vibe/lib/alias/loader.sh" ]
   grep -Fx 'source "$HOME/.venvs/vibe-center/bin/activate"' "$envrc_path"
   [[ "$(cat "$envrc_path")" != *"$fixture"* ]]
 }

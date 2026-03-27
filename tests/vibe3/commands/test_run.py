@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app as cli_app
-from vibe3.models.review_runner import AgentOptions, AgentResult
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -44,40 +43,29 @@ def test_run_file_not_found() -> None:
 
 def test_run_dry_run_shows_command() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
-    mock_result = AgentResult(exit_code=0, stdout="Mocked execution output", stderr="")
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
         with patch(
-            "vibe3.commands.run.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=mock_result,
-                handoff_file=None,
-                session_id=None,
-            ),
-        ) as mock_pipeline:
+            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            return_value=MagicMock(success=True),
+        ) as mock_execute:
             result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--dry-run"])
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
-    # Verify pipeline was called with correct request structure
-    request = mock_pipeline.call_args.args[0]
-    assert request.role == "executor"
-    assert request.dry_run is True
+    command = mock_execute.call_args.args[0]
+    assert command.role == "executor"
+    assert command.dry_run is True
 
 
 def test_run_with_agent_override() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
-    mock_result = AgentResult(exit_code=0, stdout="Mocked execution output", stderr="")
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
         with patch(
-            "vibe3.commands.run.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=mock_result,
-                handoff_file=None,
-                session_id=None,
-            ),
-        ) as mock_pipeline:
+            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            return_value=MagicMock(success=True),
+        ) as mock_execute:
             result = runner.invoke(
                 cli_app,
                 ["run", "--file", "plan.md", "--agent", "executor-pro", "--dry-run"],
@@ -85,25 +73,18 @@ def test_run_with_agent_override() -> None:
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
-    # Verify that the agent override is passed correctly in options
-    request = mock_pipeline.call_args.args[0]
-    options = request.options_builder()
-    assert options.agent == "executor-pro"
+    command = mock_execute.call_args.args[0]
+    assert command.agent == "executor-pro"
 
 
 def test_run_with_backend_override() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
-    mock_result = AgentResult(exit_code=0, stdout="Mocked execution output", stderr="")
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
         with patch(
-            "vibe3.commands.run.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=mock_result,
-                handoff_file=None,
-                session_id=None,
-            ),
-        ) as mock_pipeline:
+            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            return_value=MagicMock(success=True),
+        ) as mock_execute:
             result = runner.invoke(
                 cli_app,
                 [
@@ -120,58 +101,43 @@ def test_run_with_backend_override() -> None:
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
-    # Verify the backend/model overrides are passed correctly
-    request = mock_pipeline.call_args.args[0]
-    options = request.options_builder()
-    assert options.agent is None
-    assert options.backend == "claude"
-    assert options.model == "claude-3-opus"
+    command = mock_execute.call_args.args[0]
+    assert command.agent is None
+    assert command.backend == "claude"
+    assert command.model == "claude-3-opus"
 
 
 def test_run_uses_shared_agent_options_with_run_context() -> None:
     mock_context = "# Test Plan\n\n## Task\nTest execution"
-    mock_result = AgentResult(exit_code=0, stdout="Mocked execution output", stderr="")
 
     with patch("vibe3.commands.run.build_run_context", return_value=mock_context):
         with patch(
-            "vibe3.commands.run.run_execution_pipeline",
-            return_value=MagicMock(
-                agent_result=mock_result,
-                handoff_file=None,
-                session_id=None,
-            ),
-        ) as mock_pipeline:
+            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            return_value=MagicMock(success=True),
+        ) as mock_execute:
             result = runner.invoke(
                 cli_app,
                 ["run", "--file", "plan.md", "--dry-run"],
             )
 
     assert result.exit_code == 0
-    # Verify that execution request was properly constructed
-    request = mock_pipeline.call_args.args[0]
-    assert request.role == "executor"
-    assert request.dry_run is True
-    # Verify options_builder is callable and returns valid options
-    options = request.options_builder()
-    assert options is not None
+    command = mock_execute.call_args.args[0]
+    assert command.role == "executor"
+    assert command.dry_run is True
+    assert command.handoff_metadata == {"plan_ref": "plan.md"}
+    assert callable(command.context_builder)
 
 
 def test_run_skill_uses_shared_agent_options_with_run_context() -> None:
-    mock_result = AgentResult(exit_code=0, stdout="Mocked skill output", stderr="")
-
     with runner.isolated_filesystem():
         skill_file = Path("SKILL.md")
         skill_file.write_text("# Demo Skill", encoding="utf-8")
 
         with patch("vibe3.commands.run._find_skill_file", return_value=skill_file):
             with patch(
-                "vibe3.commands.run.run_execution_pipeline",
-                return_value=MagicMock(
-                    agent_result=mock_result,
-                    handoff_file=None,
-                    session_id=None,
-                ),
-            ) as mock_pipeline:
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
                 with patch(
                     "vibe3.commands.run.ensure_flow_for_current_branch",
                     return_value=(MagicMock(), "task/test-branch"),
@@ -182,42 +148,32 @@ def test_run_skill_uses_shared_agent_options_with_run_context() -> None:
                     )
 
     assert result.exit_code == 0
-    # Verify that execution request was properly constructed with skill metadata
-    request = mock_pipeline.call_args.args[0]
-    assert request.role == "executor"
-    assert request.dry_run is True
-    assert request.handoff_metadata == {"skill": "demo"}
+    command = mock_execute.call_args.args[0]
+    assert command.role == "executor"
+    assert command.dry_run is True
+    assert command.handoff_metadata == {"skill": "demo"}
+    assert command.context_builder() == "# Demo Skill"
 
 
 def test_run_skill_records_with_unified_recorder() -> None:
-    mock_result = AgentResult(exit_code=0, stdout="Mocked skill output", stderr="")
-    mock_options = AgentOptions(agent="executor", backend=None, model=None)
-
     with runner.isolated_filesystem():
         skill_file = Path("SKILL.md")
         skill_file.write_text("# Demo Skill", encoding="utf-8")
 
         with patch("vibe3.commands.run._find_skill_file", return_value=skill_file):
             with patch(
-                "vibe3.commands.run.run_execution_pipeline",
-                return_value=MagicMock(
-                    agent_result=mock_result,
-                    handoff_file=Path("/tmp/run.md"),
-                    session_id="sess-existing",
-                ),
-            ):
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
                 with patch(
-                    "vibe3.commands.run.get_agent_options", return_value=mock_options
+                    "vibe3.commands.run.ensure_flow_for_current_branch",
+                    return_value=(MagicMock(), "task/test-branch"),
                 ):
-                    with patch(
-                        "vibe3.commands.run.ensure_flow_for_current_branch",
-                        return_value=(MagicMock(), "task/test-branch"),
-                    ):
-                        result = runner.invoke(
-                            cli_app,
-                            ["run", "--skill", "demo"],
-                        )
+                    result = runner.invoke(
+                        cli_app,
+                        ["run", "--skill", "demo"],
+                    )
 
     assert result.exit_code == 0
-    # The handoff recording is now internal to run_execution_pipeline
-    # So we just verify the pipeline was called correctly
+    command = mock_execute.call_args.args[0]
+    assert command.task == "Execute skill: demo"

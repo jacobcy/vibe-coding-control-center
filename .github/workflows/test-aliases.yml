@@ -4,15 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'config/*.sh'
-      - 'alias/*.sh'
-      - 'tests/test-aliases.sh'
+      - "config/*.sh"
+      - "lib/alias/*.sh"
+      - "tests/test-aliases.sh"
   pull_request:
     branches: [main]
     paths:
-      - 'config/*.sh'
-      - 'alias/*.sh'
-      - 'tests/test-aliases.sh'
+      - "config/*.sh"
+      - "lib/alias/*.sh"
+      - "tests/test-aliases.sh"
 
 jobs:
   test-aliases:
@@ -23,26 +23,26 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install zsh (Ubuntu)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y zsh
+      - name: Install zsh (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
 
-    - name: Check zsh version
-      run: zsh --version
+      - name: Check zsh version
+        run: zsh --version
 
-    - name: Run syntax check on all alias files
-      shell: zsh {0}
-      run: |
-        cd $GITHUB_WORKSPACE
-        echo "Checking syntax of all alias and config files..."
-        for file in config/*.sh alias/*.sh; do
-          [[ -e "$file" ]] || continue
-          echo "Checking: $file"
-          zsh -n "$file"
-        done
-        echo "✓ All syntax checks passed"
+      - name: Run syntax check on all alias files
+        shell: zsh {0}
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "Checking syntax of all alias and config files..."
+          for file in config/*.sh lib/alias/*.sh; do
+            [[ -e "$file" ]] || continue
+            echo "Checking: $file"
+            zsh -n "$file"
+          done
+          echo "✓ All syntax checks passed"

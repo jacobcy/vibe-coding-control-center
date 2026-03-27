@@ -1,4 +1,4 @@
-"""Inspect change commands - PR/Commit 改动分析."""
+"""Inspect change commands."""
 
 from typing import Annotated
 
@@ -9,7 +9,7 @@ from vibe3.utils.trace import enable_trace
 
 
 def register(app: typer.Typer) -> None:
-    """Register change analysis commands on the given app."""
+    """Register change analysis commands."""
 
     @app.command()
     def pr(
@@ -21,21 +21,12 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
-        """PR change analysis with DAG impact.
-
-        Shows:
-        - Changed symbols (functions in diff hunks)
-        - Impacted modules (DAG upstream dependencies)
-        - Risk score and block status
-
-        Example: vibe inspect pr 42
-        """
+        """Run PR change analysis."""
         import json
 
         if trace:
             enable_trace()
 
-        # Validate PR number
         validate_pr_number(pr_number)
 
         result = build_change_analysis("pr", str(pr_number))
@@ -56,15 +47,7 @@ def register(app: typer.Typer) -> None:
             bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
         ] = False,
     ) -> None:
-        """Commit change analysis with DAG impact.
-
-        Shows:
-        - Changed symbols (functions in diff hunks)
-        - Impacted modules (DAG upstream dependencies)
-        - Risk score
-
-        Example: vibe inspect commit HEAD~1
-        """
+        """Run commit change analysis."""
         import json
 
         if trace:
@@ -76,45 +59,11 @@ def register(app: typer.Typer) -> None:
             typer.echo(json.dumps(result, indent=2, default=str))
             return
 
-        score = result["score"]
-        assert isinstance(score, dict)
-        dag = result["dag"]
-        assert isinstance(dag, dict)
-        changed_symbols = result.get("changed_symbols", {})
-        assert isinstance(changed_symbols, dict)
-
-        typer.echo(f"=== Commit {sha} Analysis ===")
-
-        # Show changed symbols
-        if changed_symbols:
-            typer.echo("\n  Changed symbols:")
-            for file, symbols in changed_symbols.items():
-                typer.echo(f"    {file}:")
-                for sym in symbols:
-                    typer.echo(f"      - {sym}")
-
-        # Show impacted modules
-        impacted = dag.get("impacted_modules", [])
-        assert isinstance(impacted, list)
-        typer.echo(f"\n  Impacted modules: {len(impacted)}")
-        if impacted:
-            for module in impacted[:10]:  # Show first 10
-                typer.echo(f"    - {module}")
-            if len(impacted) > 10:
-                typer.echo(f"    ... and {len(impacted) - 10} more")
-
-        # Show risk score
-        typer.echo(f"\n  Risk score: {score['score']} ({score['level']})")
+        _print_change_analysis("commit", sha, result)
 
 
 def _print_change_analysis(source_type: str, identifier: str, result: dict) -> None:
-    """Print change analysis result in consistent format.
-
-    Args:
-        source_type: "pr" | "commit" | "branch"
-        identifier: PR number, commit SHA, or branch name
-        result: Analysis result from build_change_analysis()
-    """
+    """Print change analysis result."""
     import typer
 
     score = result["score"]
@@ -124,7 +73,6 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
     changed_symbols = result.get("changed_symbols", {})
     assert isinstance(changed_symbols, dict)
 
-    # Title based on source type
     if source_type == "pr":
         typer.echo(f"=== PR #{identifier} Analysis ===")
     elif source_type == "commit":
@@ -132,7 +80,6 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
     else:
         typer.echo(f"=== Branch {identifier} Analysis ===")
 
-    # Show skipped files if any
     impact = result.get("impact", {})
     skipped_files = []
     if isinstance(impact, dict):
@@ -146,7 +93,6 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
             if len(skipped_files) > 5:
                 typer.echo(f"    ... and {len(skipped_files) - 5} more")
 
-    # Show changed symbols
     if changed_symbols:
         typer.echo("\n  Changed symbols:")
         for file, symbols in changed_symbols.items():
@@ -154,7 +100,6 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
             for sym in symbols:
                 typer.echo(f"      - {sym}")
 
-    # Show impacted modules
     impacted = dag.get("impacted_modules", [])
     assert isinstance(impacted, list)
     typer.echo(f"\n  Impacted modules: {len(impacted)}")
@@ -164,14 +109,11 @@ def _print_change_analysis(source_type: str, identifier: str, result: dict) -> N
         if len(impacted) > 10:
             typer.echo(f"    ... and {len(impacted) - 10} more")
 
-    # Show risk score
     typer.echo(f"\n  Risk score: {score['score']} ({score['level']})")
 
-    # Show block status for PR
     if source_type == "pr":
         typer.echo(f"  Block: {score['block']}")
 
-    # Show skipped files note (if any were skipped)
     if skipped_files:
         typer.echo(
             f"\n  ℹ️  Note: {len(skipped_files)} file(s) were skipped"

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# alias/loader.sh - Runtime alias loader for Vibe 2.0
+# lib/alias/loader.sh - Runtime alias loader for Vibe 2.0
 # Main entry point for user shell integration
 
 # ── Self-resolve VIBE_ROOT ────────────────────────────────

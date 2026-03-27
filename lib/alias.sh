@@ -84,7 +84,7 @@ _vibe_alias_list() {
 vibe_alias() {
     case "${1:-}" in
         --load)
-            echo "${VIBE_ROOT}/alias/loader.sh"
+            echo "${VIBE_ROOT}/lib/alias/loader.sh"
             ;;
         -h|--help)
             echo "${BOLD}Vibe Alias Manager${NC}"

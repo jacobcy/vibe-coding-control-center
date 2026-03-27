@@ -11,6 +11,7 @@ from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.services.flow_service import FlowService
+from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
@@ -22,79 +23,80 @@ from vibe3.ui.flow_ui import (
     render_flows_table,
 )
 
+FlowNameArg = Annotated[str, typer.Argument(help="Flow name")]
+IssueArg = Annotated[
+    str, typer.Argument(help="Issue reference to bind as task/related/dependency")
+]
+BranchArg = Annotated[
+    str | None, typer.Argument(help="Branch name (defaults to current branch)")
+]
+TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
+AddTaskOption = Annotated[
+    str | None,
+    typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
+]
+SpecOption = Annotated[
+    str | None, typer.Option("--spec", help="Spec file path or issue reference")
+]
+TraceOption = Annotated[
+    bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
+]
+JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
+SnapshotOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
+StatusFilterOption = Annotated[
+    Literal["active", "blocked", "done", "stale"] | None,
+    typer.Option("--status", help="Filter by status"),
+]
+BindRoleOption = Annotated[
+    Literal["task", "related", "dependency"],
+    typer.Option("--role", help="Issue role (task, related, or dependency)"),
+]
+CancelRoleArg = Annotated[
+    Literal["planner", "executor", "reviewer"], typer.Argument(help="Role to cancel")
+]
+
 app = typer.Typer(
-    help=(
-        "Manage logic flows (branch-centric: flows are automatically created "
-        "and managed based on git branches)\n\n"
-        "Single-Target Governance:\n"
-        "- One worktree, one active target at a time\n"
-        "- Use 'flow create' only when current flow is blocked or done\n"
-        "- Use 'wtnew' for new independent features"
-    ),
+    help="Manage logic flows.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
 
-def _parse_task_id(task_id: str) -> int:
-    """Parse a task identifier into an issue number."""
-    digits = "".join(filter(str.isdigit, task_id))
-    if not digits:
-        raise ValueError(f"Invalid task ID format: {task_id}")
-    return int(digits)
+def _build_flow_usecase() -> FlowUsecase:
+    return FlowUsecase(
+        flow_service=FlowService(),
+        task_service=TaskService(),
+        handoff_service=HandoffService(),
+    )
+
+
+def _print_flow_error(error: FlowUsecaseError) -> None:
+    console.print(f"[red]Error: {error}[/]")
+    if error.guidance:
+        console.print(f"[yellow]{error.guidance}[/]")
 
 
 @app.command(name="add")
 def add(
-    name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[
-        str | None,
-        typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
-    ] = None,
-    spec: Annotated[
-        str | None, typer.Option("--spec", help="Spec file path or issue reference")
-    ] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    name: FlowNameArg,
+    task: AddTaskOption = None,
+    spec: SpecOption = None,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
-    """Add flow to current branch.
-
-    This command registers a flow on the current branch.
-    The branch must not already have any flow record.
-
-    Examples:
-        vibe3 flow add my-feature
-    """
+    """Add flow."""
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task).info("Adding flow")
-
-        service = FlowService()
-        branch = service.get_current_branch()
-
-        existing_flow = service.get_flow_status(branch)
-        if existing_flow:
-            console.print(
-                f"[red]Error: Branch '{branch}' already has flow: "
-                f"{existing_flow.flow_slug}[/]"
+        try:
+            flow = _build_flow_usecase().add_flow(name=name, task=task, spec=spec)
+        except FlowUsecaseError as error:
+            _print_flow_error(error)
+            raise typer.Exit(1) from error
+        except ValueError:
+            logger.bind(command="flow add", task=task).warning(
+                "Invalid task ID format, skipping binding"
             )
-            raise typer.Exit(1)
-
-        flow = service.create_flow(slug=name, branch=branch)
-
-        if task:
-            try:
-                service.bind_task(branch, task, "system")
-            except ValueError:
-                logger.bind(command="flow add", task=task).warning(
-                    "Invalid task ID format, skipping binding"
-                )
-
-        if spec:
-            service.bind_spec(branch, spec, "system")
-
-        HandoffService().ensure_current_handoff()
+            flow = _build_flow_usecase().add_flow(name=name, spec=spec)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -102,24 +104,15 @@ def add(
             render_flow_created(flow, task)
 
 
-# Backward compatibility alias for 'flow new'
 @app.command(name="new", deprecated=True, hidden=True)
 def new(
-    name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[
-        str | None, typer.Option(help="Issue reference to bind as task")
-    ] = None,
-    spec: Annotated[str | None, typer.Option("--spec", help="Spec file path")] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    name: FlowNameArg,
+    task: TaskOption = None,
+    spec: SpecOption = None,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
-    """Deprecated: Use 'flow add' instead.
-
-    This command is kept for backward compatibility.
-    It will be removed in a future version.
-    """
+    """Deprecated alias for `flow add`."""
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
@@ -128,110 +121,40 @@ def new(
 
 @app.command(name="create")
 def create(
-    name: Annotated[str, typer.Argument(help="Flow name")],
-    task: Annotated[
-        str | None, typer.Option(help="Issue reference to bind as task")
-    ] = None,
-    spec: Annotated[
-        str | None, typer.Option("--spec", help="Spec file path or issue reference")
-    ] = None,
+    name: FlowNameArg,
+    task: TaskOption = None,
+    spec: SpecOption = None,
     base: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--base",
             "-b",
-            help="Base branch (default: main, also supports 'current' or branch name)",
+            help="Base policy/branch: parent|current|main|<branch>.",
         ),
-    ] = "main",
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    ] = None,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
-    """Create new branch with flow.
-
-    This command creates a new branch and registers a flow on it.
-
-    Base branch options:
-    - main (default): Create from origin/main
-    - current: Create from current branch
-    - <branch-name>: Create from specified branch
-
-    Single-target governance:
-    - If current flow is ACTIVE: reject and suggest 'vibe3 wtnew'
-    - If current flow is BLOCKED: allow from current branch (downstream)
-    - If current flow is DONE/ABORTED/STALE: allow from origin/main
-
-    Examples:
-        vibe3 flow create my-feature
-        vibe3 flow create my-feature --base main
-        vibe3 flow create my-feature --base current
-        vibe3 flow create my-feature --base feature/A
-    """
+    """Create a new branch with flow state."""
     with trace_scope(trace, "flow create", name=name, base=base):
         logger.bind(command="flow create", name=name, base=base, task=task).info(
             "Creating flow with new branch"
         )
-
-        service = FlowService()
-        current_branch = service.get_current_branch()
-
-        decision = service.can_create_from_current_worktree(current_branch)
-
-        if not decision.allowed:
-            console.print(f"[red]Error: {decision.reason}[/]")
-            if decision.guidance:
-                console.print(f"[yellow]{decision.guidance}[/]")
-            raise typer.Exit(1)
-
-        if decision.requires_new_worktree:
-            console.print(f"[yellow]Hint: {decision.guidance}[/]")
-            raise typer.Exit(1)
-
-        if base == "current" and not decision.allow_base_current:
-            console.print(
-                "[red]Error: '--base current' is only allowed "
-                "when current flow is blocked.[/]"
-            )
-            console.print(
-                "[yellow]For independent new features, "
-                "use 'vibe3 wtnew <name>' first.[/]"
-            )
-            raise typer.Exit(1)
-
-        if base == "main":
-            start_ref = decision.start_ref or "origin/main"
-        elif base == "current":
-            start_ref = current_branch
-        else:
-            start_ref = base
-
-        branch_name = f"task/{name}"
-
         try:
-            flow = service.create_flow_with_branch(slug=name, start_ref=start_ref)
-        except RuntimeError as e:
-            if "already exists" in str(e):
-                console.print(f"[red]Error: {e}[/]")
-                console.print(
-                    f"[yellow]Hint: Use different name or 'vibe3 flow switch {name}'[/]"
-                )
-            else:
-                console.print(f"[red]Error: {e}[/]")
-            raise typer.Exit(1)
-
-        if task:
-            try:
-                service.bind_task(branch_name, task, "system")
-            except ValueError:
-                logger.bind(command="flow create", task=task).warning(
-                    "Invalid task ID format, skipping binding"
-                )
-
-        if spec:
-            service.bind_spec(branch_name, spec, "system")
-
-        HandoffService().ensure_current_handoff()
+            flow = _build_flow_usecase().create_flow(
+                name=name,
+                base=base,
+                task=task,
+                spec=spec,
+            )
+        except FlowUsecaseError as error:
+            _print_flow_error(error)
+            raise typer.Exit(1) from error
+        except ValueError:
+            logger.bind(command="flow create", task=task).warning(
+                "Invalid task ID format, skipping binding"
+            )
+            flow = _build_flow_usecase().create_flow(name=name, base=base, spec=spec)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -241,39 +164,24 @@ def create(
 
 @app.command()
 def bind(
-    issue: Annotated[
-        str,
-        typer.Argument(help="Issue reference to bind as task/related/dependency"),
-    ],
-    role: Annotated[
-        Literal["task", "related", "dependency"],
-        typer.Option("--role", help="Issue role (task, related, or dependency)"),
-    ] = "task",
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    issue: IssueArg,
+    role: BindRoleOption = "task",
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
-    """Bind an issue to current flow as task, related, or dependency."""
+    """Bind an issue to current flow."""
     with trace_scope(trace, "flow bind", issue=issue, role=role):
         logger.bind(command="flow bind", issue=issue, role=role).info(
             "Binding issue to flow"
         )
-
-        flow_service = FlowService()
-        branch = flow_service.get_current_branch()
-        service = TaskService()
-
         try:
-            issue_number = _parse_task_id(issue)
-            link = service.link_issue(branch, issue_number, role)
-
+            link = _build_flow_usecase().bind_issue(issue, role)
             if json_output:
                 typer.echo(json.dumps(link.model_dump(), indent=2, default=str))
             else:
                 message = (
-                    f"[green]✓[/] Issue #{issue_number} linked as {role} "
-                    f"to flow {branch}"
+                    f"[green]✓[/] Issue #{link.issue_number} linked as {role} "
+                    f"to flow {link.branch}"
                 )
                 console.print(message)
         except ValueError:
@@ -283,14 +191,10 @@ def bind(
 
 @app.command()
 def show(
-    flow_name: Annotated[
-        str | None, typer.Argument(help="Branch name (defaults to current branch)")
-    ] = None,
-    snapshot: Annotated[bool, typer.Option("--snapshot", help="静态快照模式")] = False,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    flow_name: BranchArg = None,
+    snapshot: SnapshotOption = False,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
     """Show flow details for a branch."""
     with trace_scope(trace, "flow show"):
@@ -334,10 +238,8 @@ def show(
 
 @app.command()
 def status(
-    json_output: Annotated[bool, typer.Option("--json", help="JSON output")] = False,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
+    json_output: JsonOption = False,
+    trace: TraceOption = False,
 ) -> None:
     """Show flow status."""
     with trace_scope(trace, "flow status"):
@@ -361,14 +263,9 @@ def status(
 
 @app.command()
 def list(
-    status_filter: Annotated[
-        Literal["active", "blocked", "done", "stale"] | None,
-        typer.Option("--status", help="Filter by status"),
-    ] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,  # noqa: E501
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
+    status_filter: StatusFilterOption = None,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
     """List all flows."""
     with trace_scope(trace, "flow list"):
@@ -393,23 +290,11 @@ def list(
 
 @app.command()
 def cancel(
-    role: Annotated[
-        Literal["planner", "executor", "reviewer"],
-        typer.Argument(help="Role to cancel"),
-    ],
-    flow_name: Annotated[
-        str | None, typer.Argument(help="Branch name (defaults to current branch)")
-    ] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
+    role: CancelRoleArg,
+    flow_name: BranchArg = None,
+    trace: TraceOption = False,
 ) -> None:
-    """Cancel a running async execution.
-
-    Examples:
-        vibe3 flow cancel reviewer
-        vibe3 flow cancel planner task/my-feature
-    """
+    """Cancel a running async execution."""
     with trace_scope(trace, "flow cancel", role=role):
         from vibe3.services.async_execution_service import AsyncExecutionService
 

@@ -1,4 +1,4 @@
-"""Plan command - Create implementation plans using codeagent-wrapper."""
+"""Plan command."""
 
 from pathlib import Path
 from typing import Annotated, Optional
@@ -15,13 +15,16 @@ from vibe3.commands.command_options import (
     _TRACE_OPT,
     ensure_flow_for_current_branch,
 )
-from vibe3.commands.plan_helpers import run_plan
 from vibe3.config.settings import VibeConfig
-from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.plan import PlanRequest, PlanScope
+from vibe3.models.plan import PlanRequest
+from vibe3.services.codeagent_execution_service import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_integration import transition_to_claimed
 from vibe3.services.plan_context_builder import build_plan_context
+from vibe3.services.plan_usecase import PlanUsecase
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
 
@@ -33,48 +36,42 @@ app = typer.Typer(
 )
 
 
-def _build_issue_context(
-    issue_number: int,
-    heading: str,
-    github: GitHubClient,
-) -> str | None:
-    issue = github.view_issue(issue_number)
-    if not isinstance(issue, dict):
-        return None
-
-    parts = [f"## {heading}", f"Issue: #{issue_number}"]
-    title = issue.get("title")
-    body = issue.get("body")
-    if title:
-        parts.append(f"Title: {title}")
-    if body:
-        parts.append("")
-        parts.append(body)
-    return "\n".join(parts)
+def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUsecase:
+    """Construct plan usecase with command-local dependencies."""
+    return PlanUsecase(
+        config=config,
+        flow_service=flow_service,
+        github_client=GitHubClient(),
+        spec_ref_service=SpecRefService(),
+    )
 
 
-def _build_flow_plan_guidance(
-    flow: FlowStatusResponse | None,
-    issue_number: int,
-) -> str | None:
-    github = GitHubClient()
-    sections: list[str] = []
-
-    task_context = _build_issue_context(issue_number, "Task Issue Context", github)
-    if task_context:
-        sections.append(task_context)
-
-    spec_ref = getattr(flow, "spec_ref", None)
-    if spec_ref:
-        spec_service = SpecRefService()
-        spec_info = spec_service.parse_spec_ref(spec_ref)
-        spec_content = spec_service.get_spec_content_for_prompt(spec_info)
-        if spec_info.display and spec_info.display != spec_ref:
-            sections.append(f"## Spec Reference\nSpec Ref: {spec_info.display}")
-        if spec_content:
-            sections.append(f"## Spec Context\n{spec_content}")
-
-    return "\n\n".join(sections) if sections else None
+def _execute_plan_command(
+    *,
+    config: VibeConfig,
+    branch: str,
+    request: PlanRequest,
+    instructions: str | None,
+    dry_run: bool,
+    async_mode: bool,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> None:
+    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(request, config),
+        task=instructions or plan_prompt,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
+    )
+    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
 
 @app.command()
@@ -94,86 +91,37 @@ def task(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    """Create implementation plan for an issue.
-
-    If no issue number is provided, uses the current flow's task issue.
-
-    Examples:
-        vibe3 plan task              # Use current flow's task issue
-        vibe3 plan task 42           # Plan for issue #42
-        vibe3 plan task 42 --dry-run
-        vibe3 plan task 42 "Focus on security"
-        vibe3 plan task 42 --agent planner-pro
-        vibe3 plan task 42 --async   # Run in background
-    """
+    """Create implementation plan for an issue."""
     if trace:
         enable_trace()
 
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
+    usecase = _build_plan_usecase(config, flow_service)
 
-    if issue is None:
-        flow = flow_service.get_flow_status(branch)
-        if not flow or not flow.task_issue_number:
-            typer.echo(
-                "Error: No issue number provided and current flow has no task issue.\n"
-                "Use 'vibe3 plan task <issue>' or bind a task to the current flow.",
-                err=True,
-            )
-            raise typer.Exit(1)
-        issue = flow.task_issue_number
-        typer.echo(f"-> Using flow task: Issue #{issue}")
+    try:
+        task_input = usecase.resolve_task_plan(branch, issue)
+    except ValueError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
+    if task_input.used_flow_issue:
+        typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
-    if async_mode and not dry_run:
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
-        async_svc = AsyncExecutionService()
-        cmd = [
-            "uv",
-            "run",
-            "python",
-            "src/vibe3/cli.py",
-            "plan",
-            "task",
-            str(issue),
-            "--no-async",
-        ]
-        if instructions:
-            cmd.append(instructions)
-        if agent:
-            cmd.extend(["--agent", agent])
-        if backend:
-            cmd.extend(["--backend", backend])
-        if model:
-            cmd.extend(["--model", model])
-
-        async_svc.start_async_execution("planner", cmd, branch)
-        typer.echo("✓ Plan started in background")
-        typer.echo("  vibe3 flow show    # Check status")
-        return
-
-    import typer as typer_module
-
-    typer_module.echo(f"-> Plan: Issue #{issue}")
-
-    flow = flow_service.get_flow_status(branch)
-    guidance = _build_flow_plan_guidance(flow, issue) if flow else None
-
-    scope = PlanScope.for_task(issue)
-    request = PlanRequest(scope=scope, task_guidance=guidance)
-    run_plan(  # type: ignore[call-arg]
-        request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+    typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
+    _execute_plan_command(
+        config=config,
+        branch=branch,
+        request=task_input.request,
+        instructions=instructions,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
     )
 
     if not dry_run:
-        result = transition_to_claimed(issue)
+        result = transition_to_claimed(task_input.issue_number)
         if not result.success and result.error and result.error != "no_issue_bound":
             typer.echo(
                 f"Warning: Failed to transition issue state: {result.error}",
@@ -202,17 +150,7 @@ def spec(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    """Create implementation plan from a specification.
-
-    Provide either --file or --msg (not both).
-
-    Examples:
-        vibe3 plan spec --file spec.md
-        vibe3 plan spec --msg "Add dark mode support"
-        vibe3 plan spec -f spec.md "Prioritize performance"
-        vibe3 plan spec --msg "Refactor auth" --agent planner-pro
-        vibe3 plan spec --file spec.md --async  # Run in background
-    """
+    """Create implementation plan from a specification."""
     if trace:
         enable_trace()
 
@@ -226,60 +164,36 @@ def spec(
 
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
+    usecase = _build_plan_usecase(config, flow_service)
 
-    if async_mode and not dry_run:
-        from vibe3.services.async_execution_service import AsyncExecutionService
+    try:
+        spec_input = usecase.resolve_spec_plan(branch, file, msg)
+    except FileNotFoundError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
+    except ValueError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
-        async_svc = AsyncExecutionService()
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "plan", "spec", "--no-async"]
-        if file:
-            cmd.extend(["--file", str(file)])
-        if msg:
-            cmd.extend(["--msg", msg])
-        if instructions:
-            cmd.append(instructions)
-        if agent:
-            cmd.extend(["--agent", agent])
-        if backend:
-            cmd.extend(["--backend", backend])
-        if model:
-            cmd.extend(["--model", model])
-
-        async_svc.start_async_execution("planner", cmd, branch)
-        typer.echo("✓ Plan started in background")
-        typer.echo("  vibe3 flow show    # Check status")
-        return
-
-    description = ""
-    spec_path = None
     if file:
-        if not file.exists():
-            typer.echo(f"Error: File not found: {file}", err=True)
-            raise typer.Exit(1)
-        description = file.read_text(encoding="utf-8")
-        spec_path = str(file.resolve())
         typer.echo(f"-> Plan from file: {file}")
     elif msg:
-        description = msg
         typer.echo(f"-> Plan: {msg[:60]}{'...' if len(msg) > 60 else ''}")
 
-    if spec_path and not dry_run:
+    if spec_input.spec_path and not dry_run:
         try:
-            service = FlowService()
-            branch = service.get_current_branch()
-            service.bind_spec(branch, spec_path, "user")
+            usecase.bind_spec(branch, spec_input.spec_path)
         except Exception:
             pass
 
-    scope = PlanScope.for_spec(description)
-    request = PlanRequest(scope=scope)
-    run_plan(  # type: ignore[call-arg]
-        request,
-        config,
-        dry_run,
-        instructions,
-        agent,
-        backend,
-        model,
-        build_plan_context,
+    _execute_plan_command(
+        config=config,
+        branch=branch,
+        request=spec_input.request,
+        instructions=instructions,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
     )

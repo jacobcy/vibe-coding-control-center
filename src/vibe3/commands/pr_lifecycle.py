@@ -13,8 +13,32 @@ from loguru import logger
 from vibe3.commands.pr_helpers import noop_context
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_ready
+
+
+def _run_ready_gates(pr_number: int, yes: bool) -> None:
+    """Run command-scoped PR ready quality gates."""
+    from rich.console import Console
+
+    from vibe3.commands.pr_quality_gates import run_coverage_gate, run_risk_gate
+
+    console = Console()
+    run_coverage_gate(console, yes)
+    run_risk_gate(console, pr_number)
+
+
+def _build_pr_ready_usecase() -> PrReadyUsecase:
+    """Construct PR ready usecase with command-local dependencies."""
+    return PrReadyUsecase(
+        pr_service=PRService(),
+        gate_runner=_run_ready_gates,
+        confirmer=lambda pr_number: typer.confirm(
+            "Mark PR #"
+            f"{pr_number} as ready for review? (draft -> ready, irreversible)"
+        ),
+    )
 
 
 def register_lifecycle_commands(app: typer.Typer) -> None:
@@ -61,35 +85,11 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                 "Marking PR as ready for review"
             )
 
-            # 1. 质量门禁检查
-            from rich.console import Console
-
-            from vibe3.commands.pr_quality_gates import (
-                run_coverage_gate,
-                run_risk_gate,
-            )
-
-            console = Console()
-
-            # 1.1 覆盖率检查（业务错误，可用 --yes 绕过）
-            run_coverage_gate(console, yes)
-
-            # 1.2 风险评分检查（系统错误，不可绕过）
-            run_risk_gate(console, pr_number)
-
-            # 2. 确认操作（除非 --yes）
-            if not yes:
-                confirmed = typer.confirm(
-                    "Mark PR #"
-                    f"{pr_number} as ready for review? (draft -> ready, irreversible)"
-                )
-                if not confirmed:
-                    logger.info("Aborted by user")
-                    raise typer.Exit(0)
-
-            # 3. 标记为 ready（现有逻辑）
-            service = PRService()
-            pr = service.mark_ready(pr_number)
+            try:
+                pr = _build_pr_ready_usecase().mark_ready(pr_number=pr_number, yes=yes)
+            except PrReadyAbortedError:
+                logger.info("Aborted by user")
+                raise typer.Exit(0) from None
 
             if json_output:
                 typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))

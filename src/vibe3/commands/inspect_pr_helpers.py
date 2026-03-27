@@ -1,4 +1,4 @@
-"""PR-specific helper functions for inspect command."""
+"""PR helpers for inspect command."""
 
 from pathlib import Path
 from typing import cast
@@ -18,25 +18,7 @@ from vibe3.services.serena_service import SerenaService
 
 
 def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalysis:
-    """Analyze PR focusing on critical files.
-
-    Flow:
-    1. Get all changed files in PR
-    2. Filter critical files (touching critical/public-api paths)
-    3. Analyze only critical files once
-    4. Output comprehensive report
-
-    Args:
-        pr_number: PR number to analyze
-        verbose: Include detailed information
-
-    Returns:
-        PRCriticalAnalysis: Analysis result
-
-    Raises:
-        GitError: Unable to get PR information
-        GitHubError: GitHub API call failed
-    """
+    """Analyze PR and return structured critical-file report."""
 
     log = logger.bind(domain="inspect", action="pr_analysis", pr_number=pr_number)
     log.info("Analyzing PR")
@@ -45,22 +27,18 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
     git = GitClient(github_client=GitHubClient())
 
-    # 1. Get changed files
     all_changed_files = _get_pr_changed_files(pr_number)
     log.info(f"PR has {len(all_changed_files)} changed files")
 
-    # 2. Filter critical files
     critical_files = _filter_critical_files(all_changed_files)
     log.info(
         f"Found {len(critical_files)} critical files out of {len(all_changed_files)}"
     )
 
-    # 3. Analyze critical files
     critical_symbols, critical_file_dags = _analyze_critical_files(
         critical_files, pr_number
     )
 
-    # 4. Overall DAG analysis
     overall_dag = dag_service.expand_impacted_modules(all_changed_files)
     changed_lines = sum(
         1
@@ -70,7 +48,6 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
         and not line.startswith("---")
     )
 
-    # 5. Risk scoring
     score = _calculate_risk_score(
         all_changed_files,
         critical_files,
@@ -78,7 +55,6 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
         changed_lines=changed_lines,
     )
 
-    # 6. Get commits info (only if verbose)
     commits_info = _get_recent_commits(pr_number, limit=5) if verbose else []
 
     return PRCriticalAnalysis(
@@ -95,26 +71,13 @@ def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalys
 
 
 def _get_pr_changed_files(pr_number: int) -> list[str]:
-    """Get list of changed files in a PR (including deleted files).
-
-    Args:
-        pr_number: PR number
-
-    Returns:
-        List of all file paths changed in the PR
-
-    Raises:
-        GitError: Unable to get PR files
-        GitHubError: GitHub API error
-    """
+    """Return changed file paths for a PR, including deleted files."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
 
-    # Get raw file list from git (without Serena analysis)
     git = GitClient(github_client=GitHubClient())
     all_changed_files = git.get_changed_files(PRSource(pr_number=pr_number))
 
-    # Log deleted files but keep them in the list for counting/scoring
     deleted_files = [f for f in all_changed_files if not Path(f).exists()]
     if deleted_files:
         logger.bind(
@@ -129,14 +92,7 @@ def _get_pr_changed_files(pr_number: int) -> list[str]:
 
 
 def _filter_critical_files(files: list[str]) -> list[CriticalFileInfo]:
-    """Filter critical files based on configuration.
-
-    Args:
-        files: List of file paths
-
-    Returns:
-        List of CriticalFileInfo for matching files
-    """
+    """Filter files touching configured critical/public-api paths."""
     config = get_config()
     critical_paths = config.review_scope.critical_paths
     public_api_paths = config.review_scope.public_api_paths
@@ -165,15 +121,7 @@ def _analyze_critical_files(
     critical_files: list[CriticalFileInfo],
     pr_number: int,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
-    """Analyze critical files for symbols and dependencies.
-
-    Args:
-        critical_files: List of critical file info
-        pr_number: PR number for source reference
-
-    Returns:
-        Tuple of (critical_symbols, critical_file_dags)
-    """
+    """Extract changed symbols and DAG impact for critical Python files."""
     from vibe3.clients.git_client import GitClient
     from vibe3.clients.github_client import GitHubClient
 
@@ -188,18 +136,15 @@ def _analyze_critical_files(
         if not file.endswith(".py"):
             continue
 
-        # Skip AST/symbol analysis for deleted files
         if not Path(file).exists():
             continue
 
-        # Extract changed functions
         changed_funcs = svc.get_changed_functions(
             file, source=PRSource(pr_number=pr_number)
         )
         if changed_funcs:
             critical_symbols[file] = changed_funcs
 
-        # DAG impact scope
         dag = dag_service.expand_impacted_modules([file])
         if dag.impacted_modules:
             critical_file_dags[file] = dag.impacted_modules
@@ -213,16 +158,7 @@ def _calculate_risk_score(
     impacted_modules: list[str],
     changed_lines: int = 0,
 ) -> dict:
-    """Calculate risk score for the PR.
-
-    Args:
-        all_files: All changed files
-        critical_files: Critical files list
-        impacted_modules: List of impacted modules
-
-    Returns:
-        Risk score report dict
-    """
+    """Calculate PR risk score."""
     dims = PRDimensions(
         changed_files=len(all_files),
         impacted_modules=len(impacted_modules),
@@ -234,18 +170,7 @@ def _calculate_risk_score(
 
 
 def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
-    """Get recent commit information for a PR.
-
-    Args:
-        pr_number: PR number
-        limit: Maximum number of commits to return
-
-    Returns:
-        List of CommitInfo
-
-    Raises:
-        GitHubError: Unable to get PR commits
-    """
+    """Return latest commit messages for a PR."""
     from vibe3.clients.github_client import GitHubClient
     from vibe3.utils.git_helpers import get_commit_message
 
@@ -272,20 +197,13 @@ def _get_recent_commits(pr_number: int, limit: int = 5) -> list[CommitInfo]:
             )
         except Exception as e:
             logger.warning(f"Failed to get commit message for {sha}: {e}")
-            continue  # Skip failed commits, don't fail the whole analysis
+            continue
 
     return commits_info
 
 
 def _get_pr_commit_count(pr_number: int) -> int:
-    """Get total commit count for a PR.
-
-    Args:
-        pr_number: PR number
-
-    Returns:
-        Number of commits (0 if failed)
-    """
+    """Return total commit count for a PR."""
     from vibe3.clients.github_client import GitHubClient
 
     gh = GitHubClient()

@@ -49,6 +49,24 @@ class TestGetCurrentBranch:
                 client.get_current_branch()
 
 
+class TestGetCommitSubjects:
+    """get_commit_subjects 测试."""
+
+    def test_returns_commit_subjects_between_refs(self) -> None:
+        client = GitClient()
+        with patch.object(
+            client,
+            "_run",
+            return_value="feat: base resolver\nrefactor: thin pr create",
+        ) as mock_run:
+            subjects = client.get_commit_subjects("origin/main", "task/demo")
+
+        assert subjects == ["feat: base resolver", "refactor: thin pr create"]
+        mock_run.assert_called_once_with(
+            ["log", "origin/main..task/demo", "--oneline", "--format=%s"]
+        )
+
+
 class TestGetChangedFiles:
     """get_changed_files 统一接口测试."""
 

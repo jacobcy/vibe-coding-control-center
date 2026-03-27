@@ -5,8 +5,6 @@ from typing import Union
 
 from loguru import logger
 
-# Re-export from inspect_pr_helpers.
-# Implementation lives in inspect_pr_helpers; mock that module's namespace.
 from vibe3.commands.inspect_pr_helpers import (
     _analyze_critical_files,
     _calculate_risk_score,
@@ -16,8 +14,6 @@ from vibe3.commands.inspect_pr_helpers import (
     _get_recent_commits,
     build_pr_analysis,
 )
-
-# Re-export types for backward compatibility
 from vibe3.commands.inspect_types import (
     CommitInfo,
     CriticalFileInfo,
@@ -30,15 +26,11 @@ from vibe3.services.pr_scoring_service import PRDimensions, generate_score_repor
 from vibe3.services.serena_service import SerenaService
 
 __all__ = [
-    # Types
     "CriticalFileInfo",
     "CommitInfo",
     "PRCriticalAnalysis",
-    # Change analysis
     "build_change_analysis",
-    # PR validation
     "validate_pr_number",
-    # PR analysis
     "build_pr_analysis",
     "_get_pr_changed_files",
     "_filter_critical_files",
@@ -50,15 +42,7 @@ __all__ = [
 
 
 def build_change_analysis(source_type: str, identifier: str) -> dict[str, object]:
-    """执行改动分析流程（serena → dag → scoring）.
-
-    Args:
-        source_type: "pr" | "commit" | "branch"
-        identifier: PR 编号、commit SHA 或分支名
-
-    Returns:
-        包含 impact / dag / score 的分析结果 dict
-    """
+    """Run change analysis pipeline and return impact/dag/score."""
     import sys
     from io import StringIO
 
@@ -70,7 +54,6 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     )
     log.info("Running change analysis pipeline")
 
-    # 构建 ChangeSource
     source: Union[PRSource, CommitSource, BranchSource]
     if source_type == "pr":
         source = PRSource(pr_number=int(identifier))
@@ -79,27 +62,21 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     else:
         source = BranchSource(branch=identifier)
 
-    # Suppress Serena warnings
     old_stderr = sys.stderr
     sys.stderr = StringIO()
 
     try:
-        # 1. Serena 符号分析
-        # 注入 GitHubClient 如果是 PR source
         git_client = GitClient(
             github_client=GitHubClient() if source_type == "pr" else None
         )
         svc = SerenaService(git_client=git_client)
         impact = svc.analyze_changes(source)
 
-        # Restore stderr for our output
         sys.stderr = old_stderr
 
-        # 2. DAG 影响范围
         all_changed_files = impact.get("changed_files", [])
         assert isinstance(all_changed_files, list)
 
-        # Filter out files that no longer exist
         changed_files = [f for f in all_changed_files if Path(f).exists()]
         skipped_count = len(all_changed_files) - len(changed_files)
 
@@ -112,19 +89,15 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
                 f"Skipping {skipped_count} files that no longer exist in repository"
             )
 
-        # Add skipped files info to impact for display
         if skipped_count > 0:
             impact["skipped_files"] = [
                 f for f in all_changed_files if not Path(f).exists()
             ]
 
-        # Try to extract changed functions for each file (only existing files)
-        # Skip test files to save tokens - they don't need AST analysis
         changed_symbols_by_file: dict[str, list[str]] = {}
         skipped_tests = 0
 
         for file in changed_files:
-            # Skip test files
             is_test = (
                 file.startswith("tests/")
                 or file.startswith("test/")
@@ -161,8 +134,6 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             and not line.startswith("---")
         )
 
-        # 3. 风险评分
-        # Read critical and public API paths from config
         config = get_config()
         critical_paths = config.review_scope.critical_paths
         public_api_paths = config.review_scope.public_api_paths
@@ -182,12 +153,11 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
 
         return {
             "impact": impact,
-            "changed_symbols": changed_symbols_by_file,  # 新增：改动的符号
+            "changed_symbols": changed_symbols_by_file,
             "dag": dag.model_dump(),
             "score": score,
         }
     except Exception:
-        # Always restore stderr on error
         sys.stderr = old_stderr
         raise
 
@@ -196,26 +166,16 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
 
 
 def validate_pr_number(pr_number: int) -> None:
-    """Validate that a PR number refers to an actual PR.
-
-    Args:
-        pr_number: PR number to validate
-
-    Raises:
-        UserError: If the number refers to an issue instead of PR
-        PRNotFoundError: If neither PR nor issue exists with this number
-    """
+    """Validate that an identifier refers to an existing PR."""
     from vibe3.clients.github_client import GitHubClient
     from vibe3.exceptions import UserError
 
     gh = GitHubClient()
 
-    # Check if it's a PR
     pr = gh.get_pr(pr_number)
     if pr is not None:
-        return  # Valid PR
+        return
 
-    # Not a PR, check if it's an issue
     issue = gh.view_issue(pr_number)
     if issue == "network_error":
         raise UserError(
@@ -229,7 +189,6 @@ def validate_pr_number(pr_number: int) -> None:
             f"  Issue title: {issue.get('title', 'N/A')}"
         )
 
-    # Neither PR nor issue
     raise UserError(
         f"#{pr_number} does not exist or is not accessible.\n"
         f"  Please verify the number and ensure you have access to this repository."

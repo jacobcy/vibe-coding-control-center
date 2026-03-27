@@ -4,7 +4,6 @@ Tests CLI surface: argument validation, help output, exit codes.
 All external services (codeagent-wrapper, GitHub, Git) are mocked.
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner

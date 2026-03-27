@@ -145,3 +145,87 @@ def test_run_execution_pipeline_marks_aborted_when_execution_fails(
     aborted_state = store.update_flow_state.call_args_list[-1].kwargs
     assert aborted_state["executor_status"] == "crashed"
     assert aborted_state["execution_completed_at"] is not None
+
+
+@patch("vibe3.services.execution_pipeline.record_handoff_unified")
+@patch("vibe3.services.execution_pipeline.execute_agent")
+@patch(
+    "vibe3.services.execution_pipeline.load_session_id", return_value="sess-existing"
+)
+def test_run_execution_pipeline_skips_lifecycle_when_async_child(
+    _mock_session,
+    mock_execute,
+    mock_record,
+) -> None:
+    """Async child (VIBE3_ASYNC_CHILD=1) must NOT record lifecycle events.
+
+    The parent AsyncExecutionService owns lifecycle events for async runs.
+    Recording them in the child creates duplicate started/completed/aborted
+    entries in the flow timeline (issue #271).
+    """
+    store = MagicMock()
+    mock_execute.return_value = AgentResult(
+        exit_code=0,
+        stdout="done",
+        stderr="",
+        session_id="sess-new",
+    )
+    mock_record.return_value = Path("/tmp/run-report.md")
+
+    with (
+        patch.dict("os.environ", {"VIBE3_ASYNC_CHILD": "1"}),
+        patch(
+            "vibe3.services.execution_pipeline.SQLiteClient",
+            return_value=store,
+            create=True,
+        ),
+        patch(
+            "vibe3.clients.git_client.GitClient",
+            return_value=MagicMock(
+                get_current_branch=MagicMock(return_value="task/demo")
+            ),
+            create=True,
+        ),
+    ):
+        run_execution_pipeline(_make_request())
+
+    store.add_event.assert_not_called()
+    store.update_flow_state.assert_not_called()
+    mock_record.assert_called_once()
+
+
+@patch("vibe3.services.execution_pipeline.record_handoff_unified")
+@patch("vibe3.services.execution_pipeline.execute_agent")
+@patch(
+    "vibe3.services.execution_pipeline.load_session_id", return_value="sess-existing"
+)
+def test_run_execution_pipeline_async_child_no_aborted_on_failure(
+    _mock_session,
+    mock_execute,
+    mock_record,
+) -> None:
+    """Async child must NOT record aborted event even on execution failure."""
+    store = MagicMock()
+    mock_execute.side_effect = RuntimeError("Plan file not found: nonexistent.md")
+
+    with (
+        patch.dict("os.environ", {"VIBE3_ASYNC_CHILD": "1"}),
+        patch(
+            "vibe3.services.execution_pipeline.SQLiteClient",
+            return_value=store,
+            create=True,
+        ),
+        patch(
+            "vibe3.clients.git_client.GitClient",
+            return_value=MagicMock(
+                get_current_branch=MagicMock(return_value="task/demo")
+            ),
+            create=True,
+        ),
+        pytest.raises(RuntimeError, match="Plan file not found"),
+    ):
+        run_execution_pipeline(_make_request())
+
+    store.add_event.assert_not_called()
+    store.update_flow_state.assert_not_called()
+    mock_record.assert_not_called()

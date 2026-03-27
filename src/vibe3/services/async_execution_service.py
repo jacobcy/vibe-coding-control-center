@@ -6,7 +6,6 @@ in background processes, with status tracking in flow state.
 
 import os
 import subprocess
-import threading
 from typing import Literal
 
 from loguru import logger
@@ -37,23 +36,24 @@ class AsyncExecutionService:
         role: ExecutionRole,
         command: list[str],
         branch: str,
+        env: dict[str, str] | None = None,
     ) -> int:
-        """Start background execution of a command.
+        """Start background execution of a command in a tmux session.
 
         Args:
             role: Execution role (planner/executor/reviewer)
             command: Command to execute
             branch: Current branch name
+            env: Environment variables (ignored, tmux inherits parent env)
 
         Returns:
-            Process ID of the background process
+            Always returns 0 (tmux session name is the meaningful identifier).
         """
-        process = subprocess.Popen(
-            command,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=os.getcwd(),
+        session_name = f"vibe3-{role}-{branch}"[:50].replace("/", "-")
+
+        subprocess.run(
+            ["tmux", "new-session", "-d", "-s", session_name, "--"] + command,
+            check=True,
         )
 
         persist_execution_lifecycle_event(
@@ -62,55 +62,17 @@ class AsyncExecutionService:
             role,
             "started",
             "system",
-            detail=f"Started async {role}",
-            extra_state_updates={"execution_pid": process.pid},
+            detail=f"Started async {role} in tmux session: {session_name}",
         )
-
-        self._start_completion_watcher(process, role, branch)
 
         logger.bind(
             domain="async_execution",
             role=role,
             branch=branch,
-            pid=process.pid,
-        ).info(f"Started async {role}")
+            session=session_name,
+        ).info(f"Started async {role} in tmux")
 
-        return process.pid
-
-    def _start_completion_watcher(
-        self,
-        process: subprocess.Popen,
-        role: ExecutionRole,
-        branch: str,
-    ) -> None:
-        """Spawn background watcher to mark completion."""
-        watcher = threading.Thread(
-            target=self._wait_for_process,
-            args=(process, role, branch),
-            daemon=True,
-        )
-        watcher.start()
-
-    def _wait_for_process(
-        self,
-        process: subprocess.Popen,
-        role: ExecutionRole,
-        branch: str,
-    ) -> None:
-        """Wait for process exit and mark completion."""
-        try:
-            exit_code = process.wait()
-            success = exit_code == 0
-        except Exception as exc:  # pragma: no cover - defensive path
-            logger.bind(
-                domain="async_execution",
-                role=role,
-                branch=branch,
-            ).exception(f"Async {role} wait failed: {exc}")
-            self.complete_execution(role, branch, success=False)
-            return
-
-        self.complete_execution(role, branch, success=success)
+        return 0
 
     def check_execution_status(self, pid: int) -> ExecutionStatus:
         """Check if a background process is still running.
@@ -132,31 +94,25 @@ class AsyncExecutionService:
         role: ExecutionRole,
         branch: str,
     ) -> bool:
-        """Cancel a running background execution.
+        """Cancel a running async execution by killing its tmux session.
 
         Args:
             role: Execution role (planner/executor/reviewer)
             branch: Branch name
 
         Returns:
-            True if process was killed, False if not running
+            True if session was killed, False if not found
         """
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            return False
-
-        pid = flow_data.get("execution_pid")
-        if not pid:
-            return False
-
-        current_status = flow_data.get(f"{role}_status")
-        if current_status != "running":
-            return False
+        session_name = f"vibe3-{role}-{branch}"[:50].replace("/", "-")
 
         try:
-            os.killpg(os.getpgid(pid), 15)
-        except (OSError, ProcessLookupError):
-            pass
+            subprocess.run(
+                ["tmux", "kill-session", "-t", session_name],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError:
+            return False
 
         persist_execution_lifecycle_event(
             self.store,
@@ -164,7 +120,7 @@ class AsyncExecutionService:
             role,
             "aborted",
             "system",
-            detail=f"{role} was manually cancelled",
+            detail=f"{role} cancelled (tmux session: {session_name})",
             refs={"reason": "cancelled"},
         )
 
@@ -172,7 +128,7 @@ class AsyncExecutionService:
             domain="async_execution",
             role=role,
             branch=branch,
-            pid=pid,
+            session=session_name,
         ).info(f"{role} cancelled")
 
         return True
@@ -208,36 +164,3 @@ class AsyncExecutionService:
             branch=branch,
             status=status,
         ).info(f"{role} completed")
-
-
-def build_async_command(
-    base_command: list[str],
-    role: ExecutionRole,
-    branch: str,
-) -> list[str]:
-    """Build command for async execution with completion callback.
-
-    Args:
-        base_command: Original command (e.g., ["vibe3", "review", "base"])
-        role: Execution role
-        branch: Branch name
-
-    Returns:
-        Full command including completion callback
-    """
-    async_flag = "--no-async"
-    if async_flag not in base_command:
-        base_command.append(async_flag)
-
-    complete_cmd = [
-        "python",
-        "-m",
-        "vibe3",
-        "_complete_execution",
-        role,
-        branch,
-    ]
-
-    wrapped_command = base_command + ["&&"] + complete_cmd
-
-    return wrapped_command

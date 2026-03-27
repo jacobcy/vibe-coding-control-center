@@ -2,22 +2,19 @@
 """Task command handlers."""
 
 import json
-import re
 from contextlib import contextmanager
-from typing import Annotated, Iterator, List, Literal
+from typing import Annotated, Iterator, Literal
 
 import typer
 from loguru import logger
 
 from vibe3.commands.task_bridge import bridge_app
-from vibe3.exceptions import GitError
-from vibe3.models.flow import FlowState
 from vibe3.models.project_item import ProjectItemError
-from vibe3.models.task_bridge import HydrateError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
+from vibe3.services.task_usecase import TaskShowResult, TaskUsecase
 from vibe3.ui.task_ui import render_issue_linked
 
 app = typer.Typer(
@@ -31,14 +28,12 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def parse_issue_ref(issue_ref: str) -> int:
-    """Parse issue number from reference (number or GitHub URL)."""
-    if issue_ref.isdigit():
-        return int(issue_ref)
-    match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_ref)
-    if match:
-        return int(match.group(1))
-    raise ValueError(f"Invalid issue reference: {issue_ref}")
+def _build_task_usecase() -> TaskUsecase:
+    """Construct a task usecase with command-local service wiring."""
+    return TaskUsecase(
+        flow_service=FlowService(),
+        task_service=TaskService(),
+    )
 
 
 @app.command()
@@ -57,11 +52,10 @@ def list(
     if trace:
         setup_logging(verbose=2)
 
-    flow_service = FlowService()
+    usecase = _build_task_usecase()
 
     if issue is not None:
-        issue_number = parse_issue_ref(issue)
-        flows_data = flow_service.store.get_flows_by_issue(issue_number, role="related")
+        issue_number, flows_data = usecase.list_related_issue_tasks(issue)
         if not flows_data:
             typer.echo(f"No tasks linked to related issue #{issue_number}")
             return
@@ -78,19 +72,17 @@ def list(
             )
         return
 
-    all_flows_result: List[FlowState] = flow_service.list_flows()
-    store = flow_service.store
-    tasks = [f for f in all_flows_result if f.task_issue_number]
-    if not tasks:
+    task_rows = usecase.list_task_rows()
+    if not task_rows:
         typer.echo("No tasks found")
         return
     if json_output:
-        typer.echo(json.dumps([t.model_dump() for t in tasks], indent=2, default=str))
+        typer.echo(
+            json.dumps([row.__dict__ for row in task_rows], indent=2, default=str)
+        )
         return
-    for task_flow in tasks:
-        links = store.get_issue_links(task_flow.branch)
-        has_project_item = any(lnk.get("project_item_id") for lnk in links)
-        bound = "[bound]" if has_project_item else "[unbound]"
+    for task_flow in task_rows:
+        bound = "[bound]" if task_flow.bound else "[unbound]"
         typer.echo(
             f"  #{task_flow.task_issue_number}  {task_flow.flow_slug}  "
             f"{task_flow.flow_status}  {bound}  branch={task_flow.branch}"
@@ -104,15 +96,12 @@ def show(
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show task details, including remote GitHub Project fields."""
-    flow_service = FlowService()
+    usecase = _build_task_usecase()
     try:
-        target_branch = branch or flow_service.get_current_branch()
-    except GitError as e:
-        typer.echo(
-            f"Error: unable to resolve current branch ({e})",
-            err=True,
-        )
-        raise typer.Exit(1)
+        target_branch = usecase.resolve_branch(branch)
+    except RuntimeError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1) from error
 
     if trace:
         setup_logging(verbose=2)
@@ -123,86 +112,86 @@ def show(
         else _noop()
     )
     with ctx:
-        service = TaskService()
-        view = service.hydrate(target_branch)
+        task_result = usecase.show_task(target_branch)
+        _render_task_show(task_result, json_output)
 
-        if isinstance(view, HydrateError):
-            if view.type == "binding_invalid":
-                typer.echo(f"Error [{view.type}]: {view.message}", err=True)
-                raise typer.Exit(1)
 
-            task = service.get_task(target_branch)
-            if not task:
-                typer.echo(f"Task not found: {target_branch}", err=True)
-                raise typer.Exit(1)
-            if json_output:
-                typer.echo(json.dumps(task.model_dump(), indent=2, default=str))
-            else:
-                typer.echo(f"Branch: {task.branch}")
-                if task.task_issue_number:
-                    typer.echo(f"Task Issue: #{task.task_issue_number}")
-                typer.echo(f"Status (local flow): {task.flow_status}")
-                typer.echo(
-                    "未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task，"
-                    "再使用 vibe3 task bridge 同步到 GitHub Project。"
-                )
-            return
+def _render_task_show(task_result: TaskShowResult, json_output: bool) -> None:
+    """Render task show output while keeping show() thin."""
+    if task_result.hydrate_error:
+        _render_task_show_error(task_result, json_output)
+        return
+    if not task_result.view:
+        typer.echo(f"Task not found: {task_result.branch}", err=True)
+        raise typer.Exit(1)
+    view = task_result.view
+    if json_output:
+        typer.echo(json.dumps(view.model_dump(), indent=2, default=str))
+        return
 
-        if json_output:
-            typer.echo(json.dumps(view.model_dump(), indent=2, default=str))
-            return
+    bound_id = view.project_item_id.value if view.project_item_id else None
+    bind_status = "[bound]" if bound_id else "[unbound]"
+    typer.echo(f"Branch: {view.branch}")
+    typer.echo(f"Project Item {bind_status}: {bound_id or 'N/A'}")
 
-        bound_id = view.project_item_id.value if view.project_item_id else None
-        bind_status = "[bound]" if bound_id else "[unbound]"
-        typer.echo(f"Branch: {view.branch}")
-        typer.echo(f"Project Item {bind_status}: {bound_id or 'N/A'}")
+    if view.task_issue_number:
+        typer.echo(f"Task Issue: #{view.task_issue_number.value}")
+    if task_result.related_issue_numbers:
+        typer.echo(
+            "Related Issue(s): "
+            + "  ".join(f"#{number}" for number in task_result.related_issue_numbers)
+        )
+    if task_result.dependency_issue_numbers:
+        typer.echo(
+            "Dependencies: "
+            + "  ".join(f"#{number}" for number in task_result.dependency_issue_numbers)
+        )
+    if view.spec_ref:
+        typer.echo(f"Spec Ref: {view.spec_ref.value}")
+    if view.next_step:
+        typer.echo(f"Next Step: {view.next_step.value}")
+    if view.blocked_by:
+        typer.echo(f"Blocked By: {view.blocked_by.value}")
 
-        if view.task_issue_number:
-            typer.echo(f"Task Issue: #{view.task_issue_number.value}")
+    if view.offline_mode:
+        typer.echo("[offline mode] 远端读取失败，仅显示本地 bridge 字段")
+    else:
+        if view.title:
+            typer.echo(f"[remote] Title:    {view.title.value}")
+        if view.status:
+            typer.echo(f"[remote] Status:   {view.status.value}")
+        if view.priority:
+            typer.echo(f"[remote] Priority: {view.priority.value}")
+        if view.assignees:
+            typer.echo(f"[remote] Assignees: {', '.join(view.assignees.value)}")
 
-        store = flow_service.store
-        related_issues = [
-            lnk
-            for lnk in store.get_issue_links(target_branch)
-            if lnk["issue_role"] == "related"
-        ]
-        dependency_issues = [
-            lnk
-            for lnk in store.get_issue_links(target_branch)
-            if lnk["issue_role"] == "dependency"
-        ]
-        if related_issues:
-            typer.echo(
-                "Related Issue(s): "
-                + "  ".join(f"#{lnk['issue_number']}" for lnk in related_issues)
-            )
-        if dependency_issues:
-            typer.echo(
-                "Dependencies: "
-                + "  ".join(f"#{lnk['issue_number']}" for lnk in dependency_issues)
-            )
+    if view.identity_drift:
+        typer.echo("[warning] identity_drift=True: 本地与远端 identity 不一致")
 
-        if view.spec_ref:
-            typer.echo(f"Spec Ref: {view.spec_ref.value}")
-        if view.next_step:
-            typer.echo(f"Next Step: {view.next_step.value}")
-        if view.blocked_by:
-            typer.echo(f"Blocked By: {view.blocked_by.value}")
 
-        if view.offline_mode:
-            typer.echo("[offline mode] 远端读取失败，仅显示本地 bridge 字段")
-        else:
-            if view.title:
-                typer.echo(f"[remote] Title:    {view.title.value}")
-            if view.status:
-                typer.echo(f"[remote] Status:   {view.status.value}")
-            if view.priority:
-                typer.echo(f"[remote] Priority: {view.priority.value}")
-            if view.assignees:
-                typer.echo(f"[remote] Assignees: {', '.join(view.assignees.value)}")
-
-        if view.identity_drift:
-            typer.echo("[warning] identity_drift=True: 本地与远端 identity 不一致")
+def _render_task_show_error(task_result: TaskShowResult, json_output: bool) -> None:
+    """Render hydrate fallback or hard error for task show."""
+    error = task_result.hydrate_error
+    if not error:
+        return
+    if error.type == "binding_invalid":
+        typer.echo(f"Error [{error.type}]: {error.message}", err=True)
+        raise typer.Exit(1)
+    task = task_result.local_task
+    if not task:
+        typer.echo(f"Task not found: {task_result.branch}", err=True)
+        raise typer.Exit(1)
+    if json_output:
+        typer.echo(json.dumps(task.model_dump(), indent=2, default=str))
+        return
+    typer.echo(f"Branch: {task.branch}")
+    if task.task_issue_number:
+        typer.echo(f"Task Issue: #{task.task_issue_number}")
+    typer.echo(f"Status (local flow): {task.flow_status}")
+    typer.echo(
+        "未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task，"
+        "再使用 vibe3 task bridge 同步到 GitHub Project。"
+    )
 
 
 @app.command()
@@ -221,11 +210,7 @@ def link(
     ctx = trace_context(command="task link", domain="task") if trace else _noop()
     with ctx:
         try:
-            issue_number = parse_issue_ref(issue)
-            flow_service = FlowService()
-            branch = flow_service.get_current_branch()
-            service = TaskService()
-            issue_link = service.link_issue(branch, issue_number, role)
+            issue_link = _build_task_usecase().link_issue(issue, role)
 
             if json_output:
                 typer.echo(json.dumps(issue_link.model_dump(), indent=2, default=str))
@@ -248,10 +233,7 @@ def status(
 
     ctx = trace_context(command="task status", domain="task") if trace else _noop()
     with ctx:
-        flow_service = FlowService()
-        branch = flow_service.get_current_branch()
-        service = TaskService()
-        result = service.update_remote_task_status(branch, value)
+        branch, result = _build_task_usecase().update_remote_status(value)
 
         if isinstance(result, ProjectItemError):
             typer.echo(f"Error [{result.type}]: {result.message}", err=True)

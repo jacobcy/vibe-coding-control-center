@@ -1,0 +1,4 @@
+interface:
+  display_name: "Redundancy Audit"
+  short_description: "Find suspicious redundant or stale business logic"
+  default_prompt: "Use $vibe-redundancy-audit to produce a suspicion report and recommendation document for redundant business logic, repeated patterns, or stale compatibility paths."

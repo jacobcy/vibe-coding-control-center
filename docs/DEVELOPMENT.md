@@ -16,7 +16,7 @@ uv sync --all-extras
 
 **推荐方式：使用项目 alias**
 
-项目已配置便捷 alias（位于 `alias/vibe3.sh`）：
+项目已配置便捷 alias（位于 `lib/alias/vibe3.sh`）：
 
 ```bash
 # 安装所有依赖

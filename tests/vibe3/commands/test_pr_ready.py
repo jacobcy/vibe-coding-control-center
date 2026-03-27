@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.pr import app
+from vibe3.services.pr_ready_usecase import PrReadyAbortedError
 
 runner = CliRunner()
 
@@ -23,6 +24,20 @@ def test_pr_ready_help():
     assert "PR number" in result.output
     # Check for -yes or --yes (may have ANSI color codes)
     assert "-yes" in result.output or "--yes" in result.output
+
+
+def test_pr_ready_user_abort_exits_zero():
+    """pr ready confirmation abort should exit 0 without string-matching errors."""
+    aborted_usecase = MagicMock()
+    aborted_usecase.mark_ready.side_effect = PrReadyAbortedError("aborted by user")
+
+    with patch(
+        "vibe3.commands.pr_lifecycle._build_pr_ready_usecase",
+        return_value=aborted_usecase,
+    ):
+        result = runner.invoke(app, ["ready", "123"])
+
+    assert result.exit_code == 0
 
 
 def test_pr_ready_with_coverage_passing(
