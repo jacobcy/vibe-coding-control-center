@@ -1,6 +1,6 @@
 # Plan: AI 文本辅助集成
 
-**目标**: 在 `vibe3 flow new` 和 `vibe3 pr create` 中集成轻量 AI 辅助，生成符合格式的文本。
+**目标**: 为 `vibe3 pr create --ai` 提供轻量 AI 文案辅助（`flow new --ai` 已移除），生成符合格式的文本。
 
 **原则**:
 - 最小实现，不过度设计
@@ -26,7 +26,7 @@ Clients (外部 API)
 - `src/vibe3/services/ai_service.py` - AI 服务（单一职责：业务逻辑）
 
 **修改模块**:
-- `src/vibe3/commands/flow.py` - 添加 `--ai` 选项
+- （已取消）`src/vibe3/commands/flow.py` - 早期设计的 `--ai` 入口已废弃
 - `src/vibe3/commands/pr_create.py` - 添加 `--ai` 选项
 
 ### 1.2 配置设计
@@ -203,19 +203,17 @@ ai:
 ### Phase 4: Command 层集成
 
 **步骤**:
-1. 修改 `commands/flow.py` 添加 `--ai` 选项
+1. （已取消）保留 flow 手动输入，不再添加 `--ai` 选项
 2. 修改 `commands/pr_create.py` 添加 `--ai` 选项
 3. 编写集成测试
 
 **行为**:
 ```bash
-# flow new
-vibe3 flow new --ai --issue 220
-# → AI 生成 3 个建议，用户选择或手动输入
-
 # pr create
 vibe3 pr create --ai
 # → AI 生成 title 和 body，用户确认或编辑
+
+# flow new --ai 已移除
 ```
 
 **降级逻辑**:
@@ -317,7 +315,7 @@ def test_flow_new_with_ai():
    - 未来：可直接添加 `AnthropicClient`、`GeminiClient`
 
 2. **支持更多命令**:
-   - 当前：`flow new`、`pr create`
+   - 当前：`pr create`（`flow new --ai` 已移除）
    - 未来：`flow review`、`commit message` 等
 
 3. **支持自定义 prompts**:
@@ -355,7 +353,7 @@ class AIService:
 
 ## 七、成功标准
 
-- [ ] `vibe3 flow new --ai --issue 220` 能生成 slug 建议
+- [ ] `vibe3 pr create --ai` 能生成 title/body 建议
 - [ ] `vibe3 pr create --ai` 能生成 PR 内容建议
 - [ ] AI 禁用时行为正常
 - [ ] AI 失败时优雅降级
