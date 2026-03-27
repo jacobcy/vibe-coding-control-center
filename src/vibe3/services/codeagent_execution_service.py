@@ -1,5 +1,6 @@
 """Unified codeagent execution service for plan/review/run commands."""
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -152,7 +153,12 @@ class CodeagentExecutionService:
         cli_command = self._build_cli_command(command)
 
         async_svc = AsyncExecutionService()
-        pid = async_svc.start_async_execution(command.role, cli_command, branch)
+        # Mark child so run_execution_pipeline skips lifecycle recording
+        # (parent AsyncExecutionService owns lifecycle events).
+        child_env = {**os.environ, "VIBE3_ASYNC_CHILD": "1"}
+        pid = async_svc.start_async_execution(
+            command.role, cli_command, branch, env=child_env
+        )
 
         log.info("Started async execution", pid=pid)
         role_name = command.role.capitalize()

@@ -37,6 +37,7 @@ class AsyncExecutionService:
         role: ExecutionRole,
         command: list[str],
         branch: str,
+        env: dict[str, str] | None = None,
     ) -> int:
         """Start background execution of a command.
 
@@ -44,6 +45,7 @@ class AsyncExecutionService:
             role: Execution role (planner/executor/reviewer)
             command: Command to execute
             branch: Current branch name
+            env: Environment variables for the child process
 
         Returns:
             Process ID of the background process
@@ -54,6 +56,7 @@ class AsyncExecutionService:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=os.getcwd(),
+            env=env,
         )
 
         persist_execution_lifecycle_event(

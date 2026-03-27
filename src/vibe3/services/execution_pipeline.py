@@ -5,6 +5,7 @@ removing duplication across command layers and enforcing consistent
 session handling, execution, and handoff recording.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -76,12 +77,18 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
     # Build agent options early so the start event can record the actual actor.
     options = request.options_builder()
     actor = format_agent_actor(options)
+
+    # When running as an async child, the parent process owns lifecycle events.
+    # Skip recording to avoid duplicate started/completed/aborted entries.
+    _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+
     branch = None
     store = None
     if (
         not request.dry_run
         and request.role == "executor"
         and request.handoff_kind == "run"
+        and not _is_async_child
     ):
         from vibe3.clients.git_client import GitClient
 

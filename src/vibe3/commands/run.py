@@ -1,5 +1,6 @@
 """Run command - Execute implementation plans using codeagent-wrapper."""
 
+import os
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -135,7 +136,10 @@ def run_command(
         cmd = usecase.build_async_command(
             instructions, plan, skill, agent, backend, model
         )
-        async_svc.start_async_execution("executor", cmd, branch)
+        # Mark child so run_execution_pipeline skips lifecycle recording
+        # (parent AsyncExecutionService owns lifecycle events).
+        child_env = {**os.environ, "VIBE3_ASYNC_CHILD": "1"}
+        async_svc.start_async_execution("executor", cmd, branch, env=child_env)
         typer.echo("✓ Execution started in background")
         typer.echo("  vibe3 flow show    # Check status")
         return
