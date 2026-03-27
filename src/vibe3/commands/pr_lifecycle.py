@@ -13,6 +13,7 @@ from loguru import logger
 from vibe3.commands.pr_helpers import noop_context
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
+from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_ready_usecase import PrReadyAbortedError, PrReadyUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_ready
@@ -29,10 +30,10 @@ def _run_ready_gates(pr_number: int, yes: bool) -> None:
     run_risk_gate(console, pr_number)
 
 
-def _build_pr_ready_usecase() -> PrReadyUsecase:
+def _build_pr_ready_usecase(pr_service: PRService | None = None) -> PrReadyUsecase:
     """Construct PR ready usecase with command-local dependencies."""
     return PrReadyUsecase(
-        pr_service=PRService(),
+        pr_service=pr_service or PRService(),
         gate_runner=_run_ready_gates,
         confirmer=lambda pr_number: typer.confirm(
             "Mark PR #"
@@ -41,12 +42,37 @@ def _build_pr_ready_usecase() -> PrReadyUsecase:
     )
 
 
+def _resolve_ready_pr_number(
+    pr_number: int | None,
+    *,
+    pr_service: PRService,
+    flow_service: FlowService,
+) -> int:
+    """Resolve ready target PR number from arg or current flow context."""
+    if pr_number is not None:
+        return pr_number
+
+    branch = flow_service.get_current_branch()
+    flow_data = pr_service.store.get_flow_state(branch)
+    if flow_data and flow_data.get("pr_number") is not None:
+        return int(flow_data["pr_number"])
+
+    pr = pr_service.get_pr(branch=branch)
+    if pr is not None:
+        return pr.number
+
+    raise RuntimeError(
+        f"No PR found for current branch '{branch}'.\n"
+        "可显式指定：vibe3 pr ready <PR_NUMBER>"
+    )
+
+
 def register_lifecycle_commands(app: typer.Typer) -> None:
     """Register pr lifecycle commands."""
 
     @app.command()
     def ready(
-        pr_number: Annotated[int, typer.Argument(help="PR number")],
+        pr_number: Annotated[int | None, typer.Argument(help="PR number")] = None,
         yes: Annotated[
             bool, typer.Option("-y", "--yes", help="绕过业务逻辑检查并自动确认")
         ] = False,
@@ -75,18 +101,32 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         if trace:
             setup_logging(verbose=2)
 
+        pr_service = PRService()
+        flow_service = FlowService()
+        try:
+            target_pr_number = _resolve_ready_pr_number(
+                pr_number,
+                pr_service=pr_service,
+                flow_service=flow_service,
+            )
+        except RuntimeError as error:
+            typer.echo(f"Error: {error}", err=True)
+            raise typer.Exit(1) from error
+
         ctx = (
-            trace_context(command="pr ready", domain="pr", pr_number=pr_number)
+            trace_context(command="pr ready", domain="pr", pr_number=target_pr_number)
             if trace
             else noop_context()
         )
         with ctx:
-            logger.bind(command="pr ready", pr_number=pr_number, yes=yes).info(
+            logger.bind(command="pr ready", pr_number=target_pr_number, yes=yes).info(
                 "Marking PR as ready for review"
             )
 
             try:
-                pr = _build_pr_ready_usecase().mark_ready(pr_number=pr_number, yes=yes)
+                pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
+                    pr_number=target_pr_number, yes=yes
+                )
             except PrReadyAbortedError:
                 logger.info("Aborted by user")
                 raise typer.Exit(0) from None

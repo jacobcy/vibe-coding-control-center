@@ -10,11 +10,53 @@ from vibe3.services.pr_ready_usecase import PrReadyAbortedError
 runner = CliRunner()
 
 
-def test_pr_ready_missing_arg_shows_error():
-    """pr ready (missing PR number) → friendly error."""
-    result = runner.invoke(app, ["ready"])
-    assert result.exit_code != 0
-    assert "missing" in result.output.lower() or "error" in result.output.lower()
+def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
+    """pr ready (missing PR number) should resolve from current flow PR."""
+    with (
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch("vibe3.commands.pr_lifecycle.FlowService") as mock_flow_service,
+        patch(
+            "vibe3.commands.pr_lifecycle._build_pr_ready_usecase"
+        ) as mock_build_usecase,
+    ):
+        mock_pr_instance = MagicMock()
+        mock_pr_instance.store.get_flow_state.return_value = {"pr_number": 123}
+        mock_pr_service.return_value = mock_pr_instance
+
+        mock_flow_instance = MagicMock()
+        mock_flow_instance.get_current_branch.return_value = "task/demo"
+        mock_flow_service.return_value = mock_flow_instance
+
+        mock_usecase = MagicMock()
+        mock_usecase.mark_ready.return_value = mock_pr_response
+        mock_build_usecase.return_value = mock_usecase
+
+        result = runner.invoke(app, ["ready", "--yes"])
+
+        assert result.exit_code == 0
+        mock_usecase.mark_ready.assert_called_once_with(pr_number=123, yes=True)
+
+
+def test_pr_ready_without_arg_and_no_current_pr_shows_error():
+    """pr ready (missing PR number) should fail with clear hint when no PR found."""
+    with (
+        patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
+        patch("vibe3.commands.pr_lifecycle.FlowService") as mock_flow_service,
+    ):
+        mock_pr_instance = MagicMock()
+        mock_pr_instance.store.get_flow_state.return_value = {}
+        mock_pr_instance.get_pr.return_value = None
+        mock_pr_service.return_value = mock_pr_instance
+
+        mock_flow_instance = MagicMock()
+        mock_flow_instance.get_current_branch.return_value = "task/no-pr"
+        mock_flow_service.return_value = mock_flow_instance
+
+        result = runner.invoke(app, ["ready", "--yes"])
+
+        assert result.exit_code == 1
+        assert "No PR found for current branch 'task/no-pr'" in result.output
+        assert "vibe3 pr ready <PR_NUMBER>" in result.output
 
 
 def test_pr_ready_help():
