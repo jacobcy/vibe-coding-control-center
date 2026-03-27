@@ -126,7 +126,6 @@ class PlanUsecase:
             "plan",
             "task",
             str(issue_number),
-            "--no-async",
         ]
         if instructions:
             cmd.append(instructions)
@@ -148,7 +147,7 @@ class PlanUsecase:
         model: str | None,
     ) -> list[str]:
         """Build async command invocation for `plan spec`."""
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "plan", "spec", "--no-async"]
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "plan", "spec"]
         if file:
             cmd.extend(["--file", str(file)])
         if msg:

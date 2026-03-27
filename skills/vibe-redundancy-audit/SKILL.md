@@ -18,7 +18,8 @@ description: Use when the user wants to find suspicious redundant business logic
 
 - 本 skill 只做只读审查，不自动清理代码，不直接删除逻辑，不直接修改共享状态。
 - 本 skill 关注的是“业务语义冗余”和“分层职责重复”，不是单纯做文本去重。
-- 本 skill 输出的是 `可疑点`、`证据`、`建议`，不是自动下结论“这段代码必须删除”。
+- 本 skill 输出的是 `可疑点`、`证据`、`建议`，不是自动下结论”这段代码必须删除”。
+- 本 skill **必须**将审查结果写入 handoff，确保下游 agent 可追溯。
 - 若用户要直接评审某次代码改动的正确性或回归风险，优先使用 `vibe-review-code`。
 
 ## 目标
@@ -30,6 +31,7 @@ description: Use when the user wants to find suspicious redundant business logic
 - 相似业务判断在多个模块重复实现，而没有沉淀成共享能力
 - 兼容分支、历史 alias、临时 fallback 长期滞留，演变成隐性业务逻辑
 - 局部看都合理，但整体让代码库持续膨胀、复用下降、认知负担上升
+- **过度设计**：为了解决一个简单问题引入了不必要的抽象层、状态机、标志位或中间件。特征是"为了 X 而 Y，但 Y 本身比 X 更复杂"。发现后只标记，由人类确认是否简化
 
 ## 核心原则
 
@@ -116,12 +118,26 @@ uv run python src/vibe3/cli.py <subcommand>
    - 共享能力缺失
    - 疑似无人使用的业务逻辑
 5. 输出可疑点报告，并在需要时生成建议文档。
+6. **Handoff 记录（强制）**：审查完成后，**必须**使用标准 handoff 命令记录结果：
+   ```bash
+   # a. 将完整报告写入 .agent/reports/ 目录
+
+   # b. 记录审计事件
+   vibe3 handoff audit "<报告文件路径>" \
+     --next-step "下一步建议" \
+     --actor "<actor标识>"
+
+   # c. 用 handoff append 记录关键发现和下一步
+   vibe3 handoff append "发现摘要: ..." --actor "<actor标识>" --kind finding
+   vibe3 handoff append "下一步: ..." --actor "<actor标识>" --kind next
+   ```
+   **不得跳过此步骤**。handoff 是下游 agent（如 spec agent、执行 agent）获取审查结果的唯一标准通道。
 
 可疑点分类说明见 `references/suspicion-signals.md`。
 
 ## 输出契约
 
-输出必须分成两个层次：
+输出必须分成三个层次：
 
 ### 1. 可疑点报告
 
@@ -143,6 +159,26 @@ uv run python src/vibe3/cli.py <subcommand>
 - 哪些模块说明分层已经开始漂移
 
 建议文档是审查建议，不是清理执行单。
+
+### 3. Handoff 记录（强制，不可跳过）
+
+审查完成后，**必须**使用标准 handoff 命令将结果写入 handoff：
+
+```bash
+# 记录审计事件（引用报告文件）
+vibe3 handoff audit "<报告路径>" --next-step "..." --actor "<actor标识>"
+
+# 记录关键发现
+vibe3 handoff append "发现摘要: ..." --actor "<actor标识>" --kind finding
+
+# 记录下一步建议
+vibe3 handoff append "下一步: ..." --actor "<actor标识>" --kind next
+
+# 记录阻塞项（如有）
+vibe3 handoff append "阻塞: ..." --actor "<actor标识>" --kind blocker
+```
+
+完整报告存入 `.agent/reports/` 目录。不写 handoff 的审查结果视为未完成。
 
 ## 严格禁止
 

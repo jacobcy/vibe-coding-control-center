@@ -129,7 +129,7 @@ class RunUsecase:
         model: str | None,
     ) -> list[str]:
         """Build async command invocation for `run`."""
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "run", "--no-async"]
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py", "run"]
         if instructions:
             cmd.append(instructions)
         if plan:

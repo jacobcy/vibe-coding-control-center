@@ -191,8 +191,6 @@ class CodeagentExecutionService:
         elif command.role == "reviewer":
             cmd.extend(["review", "base"])
 
-        cmd.append("--no-async")
-
         if command.agent:
             cmd.extend(["--agent", command.agent])
         if command.backend:

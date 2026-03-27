@@ -137,6 +137,20 @@ vibe3 run "具体指令描述" --async
 vibe3 run --plan <plan-file.md> --async
 ```
 
+**团队工具**：
+
+manager 可以根据任务复杂度选择合适的团队协作模式：
+
+- **Sub-agent（Agent 工具）**：适合并行派发多个独立审计/分析任务，各 agent 互不依赖，结果汇总后由 manager 统一决策。例如同时派出 3 个 Explore agent 分别审查 commands / services / usecases 层。
+- **Agent Team（TeamCreate + SendMessage）**：适合需要多 agent 协作、有依赖关系的任务链。例如一个 agent 做分析、另一个 agent 基于分析结果写 spec、第三个 agent 执行修复。
+- **直接 `vibe3 run --async`**：适合单一明确的执行任务，不需要并行或协作。
+
+选择原则：
+
+- 任务之间**无依赖** → sub-agent 并行
+- 任务之间**有依赖** → agent team 串行协作
+- 任务**单一明确** → `vibe3 run --async`
+
 原则：
 
 - **必须** 加 `--async`，不得阻塞 manager 循环
@@ -149,27 +163,40 @@ vibe3 run --plan <plan-file.md> --async
 
 ```bash
 vibe3 flow show       # 查看 Timeline，观察 run_started / run_done / run_aborted
+vibe3 handoff show    # 查看 agent chain 和 handoff events
 ```
 
 观察要点：
 
 - `run_started` → agent 正在执行，继续等待
-- `run_done` → agent 完成，检查结果，决定下一步
+- `run_done` → agent 完成，检查 handoff 结果，决定下一步
 - `run_aborted` → agent 中止，分析原因，发 issue 或重新派发
 
 **manager 在 agent 执行期间可以做什么**：发现问题 → 提 issue
 **manager 在 agent 执行期间不能做什么**：直接写代码、修改文件
 
-### 4. 跟踪执行现场
+### 4. 跟踪执行现场（通过 Handoff）
 
-通过 `handoff show` 看执行状态，而不是靠记忆。
+**manager 不得凭记忆或感觉判断 agent 状态，必须通过 handoff 确认。**
 
-manager 需要持续确认：
+```bash
+vibe3 handoff show    # 查看 agent chain 和 handoff events
+```
 
-- 哪些 agent 已完成
-- 哪些 agent 仍在执行
-- 哪些 agent 卡住了
-- 当前 next step 是否清楚
+检查要点：
+
+- agent chain 中各角色是否已完成（pending → done）
+- handoff events 是否有记录（无记录说明 agent 未正确写入 handoff）
+- `current.md` 中 Findings / Next Actions 是否清晰
+- 哪些 agent 已完成、仍在执行、或卡住了
+- 是否有 blocker 需要处理
+
+**如果 agent 完成但 handoff 无记录**：manager 应记录此为 finding，并手动补充：
+
+```bash
+vibe3 handoff append "agent <name> 完成，但未写入 handoff，手动补充: ..." \
+  --actor "<manager标识>" --kind finding
+```
 
 ### 5. 推动形成 PR
 
@@ -191,9 +218,17 @@ PR 创建后，manager 不能立刻退出。
 
 ### 7. Findings 沉淀
 
-发现以下内容时，**立即**沉淀 issue（不要等，不要累积到最后）：
+发现以下内容时，**立即**沉淀（不要等，不要累积到最后）：
 
-- skill 描述错误（触发时机、命令格式、职责描述有误）
+- **沉淀到 handoff**（每次发现都必须）：
+
+  ```bash
+  vibe3 handoff append "发现: <具体描述>" --actor "<manager标识>" --kind finding
+  ```
+
+- **沉淀为 issue**（需要跟踪修复时）：
+
+  skill 描述错误（触发时机、命令格式、职责描述有误）
 - 命令行为异常（参数不对、错误提示不友好、产生虚假记录）
 - 流程不合理（阻塞用户、绕不开的强制依赖、缺少回退路径）
 - 当前范围外的新问题
@@ -240,6 +275,7 @@ zsh scripts/github/create_issue.sh \
 - manager 在 PR 未形成或 CI 未通过时就声称完成
 - manager 跳过 `handoff show` 凭感觉判断 agent 状态
 - manager 在 `run_aborted` 后不查原因就重复派发同一指令
+- manager 在发现 findings 后不写 handoff（必须用 `vibe3 handoff append --kind finding`）
 
 ## 与相邻 skill 的关系
 
