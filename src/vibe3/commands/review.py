@@ -18,6 +18,7 @@ from vibe3.services.codeagent_execution_service import (
     create_codeagent_command,
 )
 from vibe3.services.context_builder import build_review_context
+from vibe3.services.flow_service import FlowService
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_usecase import ReviewUsecase
 from vibe3.utils.trace import enable_trace
@@ -45,18 +46,18 @@ def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
         typer.echo(f"→ Review saved to: {handoff_file}")
 
 
-def _build_review_usecase(**kwargs: object) -> ReviewUsecase:
+def _build_review_usecase(
+    flow_service: FlowService | None = None,
+) -> ReviewUsecase:
     """Construct review usecase with command-local dependencies."""
-    config = kwargs.pop("config", None) or VibeConfig.get_defaults()
     return ReviewUsecase(
-        config=config,
+        flow_service=flow_service,
         inspect_runner=run_inspect_json,
         snapshot_diff_builder=build_snapshot_diff,
         review_parser=parse_codex_review,
         context_builder=build_review_context,
         execution_service_factory=CodeagentExecutionService,
         command_builder=create_codeagent_command,
-        **kwargs,
     )
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from vibe3.config.settings import VibeConfig
+from vibe3.config.settings import RunConfig, VibeConfig
 from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.services.flow_service import FlowService
 
@@ -176,7 +176,7 @@ class RunUsecase:
         return None
 
     def _default_run_prompt(self) -> str | None:
-        run_config = getattr(self.config, "run", None)
-        if run_config and hasattr(run_config, "run_prompt"):
+        run_config: RunConfig | None = getattr(self.config, "run", None)
+        if run_config:
             return run_config.run_prompt
         return None

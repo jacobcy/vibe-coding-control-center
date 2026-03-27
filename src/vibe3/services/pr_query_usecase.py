@@ -1,7 +1,7 @@
 """Usecase helpers for PR query command orchestration."""
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
@@ -95,11 +95,14 @@ class PrQueryUsecase:
         score_data = analysis.get("score", {})
         impact_data = analysis.get("impact", {})
         dag_data = analysis.get("dag", {})
+        score_items = cast(dict[str, Any], score_data) if score_data else {}
+        impact_items = cast(dict[str, Any], impact_data) if impact_data else {}
+        dag_items = cast(dict[str, Any], dag_data) if dag_data else {}
         return {
-            "risk_level": score_data.get("level"),
-            "risk_score": score_data.get("score"),
-            "changed_files_count": len(impact_data.get("changed_files", [])),
-            "impacted_modules_count": len(dag_data.get("impacted_modules", [])),
+            "risk_level": score_items.get("level"),
+            "risk_score": score_items.get("score"),
+            "changed_files_count": len(impact_items.get("changed_files", [])),
+            "impacted_modules_count": len(dag_items.get("impacted_modules", [])),
             "raw": analysis,
         }
 

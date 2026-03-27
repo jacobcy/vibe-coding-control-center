@@ -1,5 +1,7 @@
 """Usecase layer for review command orchestration."""
 
+import logging
+
 from dataclasses import dataclass
 from typing import Any, Callable, cast
 
@@ -11,6 +13,7 @@ from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.commands.review_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
+from vibe3.models.snapshot import StructureDiff
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
@@ -87,7 +90,10 @@ class ReviewUsecase:
         """Build request payload for base-branch review."""
         flow = self.flow_service.get_flow_status(current_branch)
         issue_number = flow.task_issue_number if flow else None
-        structure_diff = self.snapshot_diff_builder(base_branch, current_branch)
+        raw_diff = self.snapshot_diff_builder(base_branch, current_branch)
+        structure_diff = (
+            cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
+        )
         inspect_data = self.inspect_runner(["base", base_branch])
         changed_symbols_raw = inspect_data.get("changed_symbols", {})
         changed_symbols = (
@@ -155,7 +161,7 @@ class ReviewUsecase:
         instructions: str | None,
         request: ReviewRequest,
         pr_number: int | None,
-        log: logger.__class__,
+        log: Any,
     ) -> str | None:
         """Build task text used by the codeagent wrapper."""
         if pr_number:
