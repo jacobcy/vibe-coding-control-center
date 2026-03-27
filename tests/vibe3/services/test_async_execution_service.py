@@ -34,8 +34,9 @@ class TestAsyncExecutionService:
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args
-        assert call_args[0][0][0] == "tmux"
-        assert call_args[0][0][1] == "new-session"
+        cmd = call_args[0][0]
+        assert cmd[0] == "tmux"
+        assert cmd[1] == "new-session"
         assert call_args[1]["check"] is True
         assert mock_store.update_flow_state.called
 

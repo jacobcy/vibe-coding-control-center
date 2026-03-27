@@ -54,7 +54,6 @@ class AsyncExecutionService:
         subprocess.run(
             ["tmux", "new-session", "-d", "-s", session_name, "--"] + command,
             check=True,
-            cwd=os.getcwd(),
         )
 
         persist_execution_lifecycle_event(

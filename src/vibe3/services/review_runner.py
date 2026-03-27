@@ -99,8 +99,10 @@ def run_review_agent(
         AgentExecutionError: If wrapper is missing, times out, or returns non-zero exit
 
     """
+    import os
     import tempfile
 
+    project_root = os.getcwd()
     wrapper_path = DEFAULT_WRAPPER_PATH
     prompt_dir = Path.home() / ".codeagent" / "agents"
     prompt_dir.mkdir(parents=True, exist_ok=True)
@@ -139,9 +141,10 @@ def run_review_agent(
             else:
                 command.append("continue")
         else:
-            # New session mode: wrapper --agent <agent> --prompt-file <file> [task]
+            # New session mode: wrapper --agent <agent> --prompt-file <file> [task] [workdir]
             if task:
                 command.append(task)
+            command.append(project_root)
 
         # Dry-run mode: print command and prompt
         if dry_run:
@@ -157,12 +160,6 @@ def run_review_agent(
             return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
         try:
-            # Get current working directory (worktree or main repo)
-            # Use os.getcwd() to respect the current worktree context
-            import os
-
-            project_root = os.getcwd()
-
             # Run wrapper and capture output for parsing and persistence.
             result = subprocess.run(
                 command,
