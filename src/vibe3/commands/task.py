@@ -3,24 +3,19 @@
 
 import json
 from contextlib import contextmanager
-from typing import Annotated, Iterator, Literal
+from typing import Annotated, Iterator
 
 import typer
-from loguru import logger
 
-from vibe3.commands.task_bridge import bridge_app
-from vibe3.models.project_item import ProjectItemError
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 from vibe3.services.task_usecase import TaskShowResult, TaskUsecase
-from vibe3.ui.task_ui import render_issue_linked
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
 )
-app.add_typer(bridge_app, name="bridge")
 
 
 @contextmanager
@@ -188,55 +183,4 @@ def _render_task_show_error(task_result: TaskShowResult, json_output: bool) -> N
     if task.task_issue_number:
         typer.echo(f"Task Issue: #{task.task_issue_number}")
     typer.echo(f"Status (local flow): {task.flow_status}")
-    typer.echo(
-        "未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task，"
-        "再使用 vibe3 task bridge 同步到 GitHub Project。"
-    )
-
-
-@app.command()
-def link(
-    issue: Annotated[str, typer.Argument(help="Issue number (or URL)")],
-    role: Annotated[
-        Literal["related", "dependency"], typer.Option(help="Issue role")
-    ] = "related",
-    trace: Annotated[bool, typer.Option("--trace")] = False,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
-) -> None:
-    """Link an issue to current flow."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="task link", domain="task") if trace else _noop()
-    with ctx:
-        try:
-            issue_link = _build_task_usecase().link_issue(issue, role)
-
-            if json_output:
-                typer.echo(json.dumps(issue_link.model_dump(), indent=2, default=str))
-            else:
-                render_issue_linked(issue_link)
-        except ValueError as e:
-            logger.error(f"Invalid issue reference: {e}")
-            typer.echo(f"Error: {e}", err=True)
-            raise typer.Exit(1)
-
-
-@app.command()
-def status(
-    value: Annotated[str, typer.Argument(help="目标状态值，如 'In Progress'、'Done'")],
-    trace: Annotated[bool, typer.Option("--trace")] = False,
-) -> None:
-    """Update remote GitHub Project task status (唯一合法写入路径)."""
-    if trace:
-        setup_logging(verbose=2)
-
-    ctx = trace_context(command="task status", domain="task") if trace else _noop()
-    with ctx:
-        branch, result = _build_task_usecase().update_remote_status(value)
-
-        if isinstance(result, ProjectItemError):
-            typer.echo(f"Error [{result.type}]: {result.message}", err=True)
-            raise typer.Exit(1)
-
-        typer.echo(f"✓ Remote task status updated to '{value}' on branch '{branch}'")
+    typer.echo("未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task。")

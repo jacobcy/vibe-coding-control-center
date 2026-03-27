@@ -2,30 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from vibe3.models.project_item import LinkError, ProjectItemData, ProjectItemError
+from vibe3.models.project_item import ProjectItemError
 from vibe3.models.task_bridge import HydrateError
 from vibe3.services.task_service import TaskService
-
-
-class TestTaskBridgeLinking:
-    """Tests for linking local flow to remote project item."""
-
-    def test_link_project_item_requires_existing_flow(self, mock_store) -> None:
-        """link-project must attach to an existing flow, not create a shell row."""
-        mock_store.get_flow_state.return_value = None
-        mock_client = MagicMock()
-        mock_client.get_item.return_value = ProjectItemData(
-            item_id="PVTI_123",
-            node_id="NODE_123",
-        )
-
-        service = TaskService(store=mock_store, project_client=mock_client)
-        result = service.link_project_item("missing-branch", "PVTI_123")
-
-        assert isinstance(result, LinkError)
-        assert result.type == "flow_not_found"
-        mock_store.update_bridge_fields.assert_not_called()
-        mock_store.add_event.assert_not_called()
 
 
 class TestTaskBridgeHydration:

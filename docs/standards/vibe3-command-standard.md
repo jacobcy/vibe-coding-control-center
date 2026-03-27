@@ -1,7 +1,7 @@
 # Vibe3 命令设计标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-23
+**最后更新**: 2026-03-27
 **状态**: Active
 
 ---
@@ -72,14 +72,17 @@ SQLite (本地缓存)                 GitHub (真源)
 
 | 命令 | 职责 | 视角 | 用户 |
 |------|------|------|------|
-| `flow new` | 创建 flow，可选绑定 task issue | Flow 创建 | 开发者 |
+| `flow add` | 注册当前分支为 flow，可选绑定 task/spec | Flow 创建 | 开发者 |
+| `flow create` | 创建新分支并注册 flow，可选绑定 task/spec | Flow 创建 | 开发者 |
 | `flow show` | 显示完整执行现场信息 | 执行现场管理 | 开发者 |
 | `flow bind` | 绑定 issue 到 flow（指定 role） | Flow 绑定 | 开发者 |
-| `task link` | 为当前 flow 记录 related/dependency issue | Issue 关联 | 开发者 |
 | `task show` | 显示 GitHub Project 管理信息 | 项目管理 | 管理者 |
 | `task list` | 列出所有 task | Task 查询 | 所有用户 |
-| `task status` | 更新 GitHub Project task 状态 | 状态更新 | 管理者 |
-| `task bridge link-project` | 绑定 flow 到 Project item | 绑定管理 | 管理者 |
+| `pr create/show/ready` | PR 生命周期联动（读取/写入当前 flow） | PR 协作 | 开发者 |
+
+**兼容说明**：
+- `flow new` 为历史别名，标准入口为 `flow add`
+- `task link` / `task status` / `task bridge` 不再作为标准流程推荐（收敛到 flow 驱动）
 
 ### 2.2 flow show vs task show
 
@@ -98,30 +101,22 @@ SQLite (本地缓存)                 GitHub (真源)
 
 ### 2.3 Issue 关联规则
 
-**两种不同的关系**:
+**统一关系入口**:
 
-1. **Issue 和 Flow 的关系**（存本地 SQLite）:
-   ```bash
-   # flow bind: 指定 issue 是 flow 的 task
-   vibe3 flow bind 220
-   # SQLite: flow_issue_links(branch, 220, role='task')
-   # 如启用标签自动化，可据此镜像 vibe-task 标签
-   ```
+```bash
+# flow bind: 统一写入 issue -> flow 关系
+vibe3 flow bind 220
+# SQLite: flow_issue_links(branch, 220, role='task')
 
-2. **当前 flow 的补充 issue 关系**（当前存本地 SQLite）:
-   ```bash
-   # task link: 为当前 flow 记录 related issue
-   vibe3 task link 219 --role related
-   # SQLite: flow_issue_links(branch, 219, role='related')
+vibe3 flow bind 219 --role related
+# SQLite: flow_issue_links(branch, 219, role='related')
 
-   # task link: 为当前 flow 记录 dependency issue
-   vibe3 task link 218 --role dependency
-   # SQLite: flow_issue_links(branch, 218, role='dependency')
-   ```
+vibe3 flow bind 218 --role dependency
+# SQLite: flow_issue_links(branch, 218, role='dependency')
+```
 
 **关键原则**:
 - `flow bind`: Issue → Flow 关系，存本地，是 task 指针入口
-- `task link`: 为当前 flow 增加 `related/dependency` 关系，当前也存本地
 - 一个 flow 只能有一个 task issue
 - 标签自动化只能镜像 `issue_role`，不能反向决定 `issue_role`
 
@@ -206,48 +201,57 @@ def parse_issue_ref(issue_ref: str) -> int:
 
 ## 四、Flow 命令参数规范
 
-### 4.1 flow new
+### 4.1 flow add
 
 ```bash
-vibe3 flow new [name] [--issue <issue>] [--branch <ref>] [--save-unstash]
+vibe3 flow add <name> [--task <issue>] [--spec <spec-ref>]
 ```
 
 **参数**:
-- `name`: Flow 显示名称（可选，默认从 branch 生成）
-  - 类型: `str | None`
-  - 帮助: "Flow name (default: branch name without prefix)"
-  - 生成规则: `task/my-feature` → `my-feature`
-- `--issue`: Issue number，绑定为 task issue（可选）
+- `name`: Flow 显示名称（必需）
   - 类型: `str`
-  - 帮助: "Issue number (or URL) to bind as task"
-- `--branch`: 起点分支（可选，默认：origin/main）
+- `--task`: Task issue 引用（可选，支持 number/#number/URL）
   - 类型: `str`
-  - 帮助: "Start ref for branch creation"
-- `--save-unstash`: 将当前未提交改动带入新分支（可选）
-  - 类型: `bool`
-  - 帮助: "Stash and carry uncommitted changes to new branch"
+- `--spec`: spec 引用（可选，支持文件路径或 issue 引用）
+  - 类型: `str`
 
 **行为**:
-- 创建新分支 `<branch>/<name>`
+- 在当前分支注册 flow（不创建新分支）
 - 初始化 flow_state 记录
-- 如果提供 `--issue`，绑定 task issue
-- 如果指定 `--save-unstash`，stash 当前改动并恢复到新分支
+- 如提供 `--task/--spec`，注册后统一走绑定编排
 
 **示例**:
 ```bash
-# 创建 flow 并绑定 issue
-vibe3 flow new --issue 220
-# → 创建分支 task/flow-status-transitions（从 issue 标题生成）
-# → 绑定 #220 为 task issue
+# 在当前分支注册 flow
+vibe3 flow add reports-storage
 
-# 从非 main 分支创建
-vibe3 flow new feature-b --branch origin/dev
-
-# 带入未提交改动
-vibe3 flow new feature-b --save-unstash
+# 注册并绑定 task/spec
+vibe3 flow add reports-storage --task 220 --spec docs/specs/reports.md
 ```
 
-### 4.2 flow switch
+### 4.2 flow create
+
+```bash
+vibe3 flow create <name> [--task <issue>] [--spec <spec-ref>] [--base <ref>]
+```
+
+**行为**:
+- 创建新分支 `task/<name>`
+- 在新分支注册 flow
+- 如提供 `--task/--spec`，注册后走与 `flow add` 相同的绑定编排
+
+**示例**:
+```bash
+vibe3 flow create reports-storage --task 220
+vibe3 flow create inspect-metrics --task 279 --spec 279
+```
+
+**兼容说明**:
+- `flow new` 保留为兼容别名，标准文档不再作为主入口
+- 历史调用示例等价迁移到 `flow add` / `flow create`
+```
+
+### 4.3 flow switch
 
 ```bash
 vibe3 flow switch <name>
@@ -271,7 +275,7 @@ vibe3 flow switch my-feature
 # → 恢复 stash
 ```
 
-### 4.3 flow done
+### 4.4 flow done
 
 ```bash
 vibe3 flow done [--branch <ref>] [--yes]
@@ -301,7 +305,7 @@ vibe3 flow done
 vibe3 flow done --yes
 ```
 
-### 4.4 flow blocked
+### 4.5 flow blocked
 
 ```bash
 vibe3 flow blocked [--reason <reason>] [--by <issue>] [--branch <ref>]
@@ -335,7 +339,7 @@ vibe3 flow blocked --by 218
 vibe3 flow blocked --by 218 --reason "需要 #218 先完成"
 ```
 
-### 4.5 flow aborted
+### 4.6 flow aborted
 
 ```bash
 vibe3 flow aborted [--branch <ref>]
@@ -356,7 +360,7 @@ vibe3 flow aborted [--branch <ref>]
 vibe3 flow aborted
 ```
 
-### 4.6 flow show
+### 4.7 flow show
 
 ```bash
 vibe3 flow show [branch]
@@ -375,7 +379,7 @@ vibe3 flow show [branch]
 - 显示 flow 的完整信息
 - 包括所有 issues（task, related, dependency）
 
-### 4.7 flow bind
+### 4.8 flow bind
 
 ```bash
 vibe3 flow bind <issue> [--role <role>] [--branch <branch>]
@@ -420,47 +424,7 @@ vibe3 flow bind 220 --branch task/my-feature
 
 ## 五、Task 命令参数规范
 
-### 5.1 task link
-
-```bash
-vibe3 task link <issue> [--role <role>]
-```
-
-**参数**:
-- `issue`: Issue number (or URL)（必需）
-  - 类型: `str`
-  - 帮助: "Issue number (or URL)"
-- `--role`: Issue role（可选，默认 "related"）
-  - 类型: `Literal["related", "dependency"]`
-  - 默认值: `"related"`
-  - 帮助: "Issue role (related/dependency)"
-  - **注意**: task link 是 issue → issue 关系，不支持 `--role task`
-
-**行为**:
-- 为当前 branch 对应 flow 写入本地 `flow_issue_links`
-- 允许补充 `related` / `dependency` 关系
-- GitHub body / label 镜像属于后续自动化，不是当前 CLI 已实现行为
-
-**语义**:
-- `task link` 为**当前 flow**补充非主 task 的 issue 关系
-- 与 `flow bind` 不同：
-  - `flow bind`: Issue → Flow 关系（存本地，支持 `task/related/dependency`）
-  - `task link`: 当前 flow 的补充关系入口（存本地，只支持 `related/dependency`）
-
-**示例**:
-```bash
-# 当前 flow 增加 related issue
-vibe3 task link 219 --role related
-# 在 SQLite 中为当前 flow 记录 role='related'
-
-# 当前 flow 增加 dependency issue
-vibe3 task link 218 --role dependency
-# 在 SQLite 中为当前 flow 记录 role='dependency'
-```
-
-**注意**: 后续 GitHub 标签自动化必须消费同一套 role，不得额外定义第二套参数或状态机
-
-### 5.2 task show
+### 5.1 task show
 
 ```bash
 vibe3 task show <branch>
@@ -475,7 +439,7 @@ vibe3 task show <branch>
 - 显示 GitHub Project 管理信息
 - 包括 Project 字段、绑定状态
 
-### 5.3 task list
+### 5.2 task list
 
 ```bash
 vibe3 task list [--issue <issue>]
@@ -500,65 +464,14 @@ vibe3 task list
 vibe3 task list --issue 221
 ```
 
-### 5.4 task status
+### 5.3 迁移与弃用
 
-```bash
-vibe3 task status <status>
-```
+标准流程收敛后，以下命令不再推荐：
+- `task link` → 统一迁移到 `flow bind --role related|dependency`
+- `task bridge` → 由 `flow bind --role task|dependency` 自动完成
+- `task status` → 目标由 flow 生命周期自动联动远端 Project 状态
 
-**参数**:
-- `status`: GitHub Project Status 选项值（必需）
-  - 类型: `str`
-  - 帮助: "Project status value (e.g. Todo, In Progress, Done)"
-
-**行为**:
-- 更新 GitHub Project 中对应 item 的 Status 字段
-- 状态值必须与 Project 中配置的选项名称匹配（大小写不敏感）
-- 通过当前分支 flow_state 中的 project_item_id 定位目标 item
-
-**示例**:
-```bash
-# 更新状态为 In Progress
-vibe3 task status "In Progress"
-
-# 更新状态为 Done
-vibe3 task status "Done"
-```
-
-### 5.5 task bridge link-project
-
-```bash
-vibe3 task bridge link-project [item_id] [--from-issue <issue>] [--force]
-```
-
-**参数**:
-- `item_id`: GitHub Project Item ID（可选，二选一）
-  - 类型: `str | None`
-  - 帮助: "Project item ID (e.g. PVTI_xxx)"
-- `--from-issue`: 通过 issue number 反查 item（可选，二选一）
-  - 类型: `str | None`
-  - 帮助: "Issue number (or URL) to find project item"
-- `--force`: 强制覆盖已有绑定（可选）
-  - 类型: `bool`
-  - 帮助: "Force overwrite existing binding"
-
-**行为**:
-- 将当前 flow 绑定到 GitHub Project item
-- 更新 flow_state.project_item_id 和 project_node_id
-- `--from-issue` 会先在 Project 中查找该 issue 对应的 item
-- `item_id` 直接使用提供的 item ID
-
-**示例**:
-```bash
-# 通过 issue number 反查绑定（推荐）
-vibe3 task bridge link-project --from-issue 221
-
-# 直接提供 item ID
-vibe3 task bridge link-project PVTI_lAHOAAGiOs4BRZJ8zgoAgV0
-
-# 强制覆盖已有绑定
-vibe3 task bridge link-project --from-issue 221 --force
-```
+在兼容期内如果命令仍存在，视为历史兼容入口，不作为标准流程的一部分。
 
 ---
 

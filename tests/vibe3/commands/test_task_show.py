@@ -49,7 +49,7 @@ def test_task_show_defaults_to_current_branch_when_missing_argument() -> None:
 
 
 def test_task_show_prompts_flow_bind_when_task_is_unbound() -> None:
-    """Unbound tasks should point users to flow bind, not task bridge."""
+    """Unbound tasks should point users to flow bind."""
     with (
         patch("vibe3.commands.task.FlowService") as flow_service_cls,
         patch("vibe3.commands.task.TaskService") as service_cls,
@@ -77,4 +77,4 @@ def test_task_show_prompts_flow_bind_when_task_is_unbound() -> None:
 
     assert result.exit_code == 0
     assert "vibe3 flow bind <issue_number>" in result.output
-    assert "vibe3 task bridge" in result.output
+    assert "task bridge" not in result.output

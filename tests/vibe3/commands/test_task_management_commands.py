@@ -1,7 +1,7 @@
 """Tests for flow/task command parameter semantics."""
 
 import re
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -47,15 +47,11 @@ def test_flow_show_help_uses_branch_name() -> None:
     assert "Branch name" in stdout
 
 
-def test_task_link_help_uses_issue_and_new_roles() -> None:
+def test_task_link_command_removed() -> None:
     result = runner.invoke(task_app, ["link", "--help"])
-    stdout = strip_ansi(result.stdout)
 
-    assert result.exit_code == 0
-    assert "Usage: root link [OPTIONS] ISSUE" in stdout
-    assert "related|dependency" in stdout
-    assert "task|repo" not in stdout
-    assert "ISSUE_URL" not in stdout
+    assert result.exit_code != 0
+    assert "No such command" in (result.stdout + result.stderr)
 
 
 def test_task_list_help_uses_issue_option() -> None:
@@ -82,26 +78,11 @@ def test_flow_bind_supports_related_role() -> None:
     task_service.link_issue.assert_called_once_with("task/demo", 219, "task")
 
 
-def test_task_link_defaults_to_related_role() -> None:
-    issue_link = Mock()
+def test_task_status_command_removed() -> None:
+    result = runner.invoke(task_app, ["status", "Done"])
 
-    with (
-        patch("vibe3.commands.task.FlowService") as flow_service_cls,
-        patch("vibe3.commands.task.TaskService") as task_service_cls,
-        patch("vibe3.commands.task.render_issue_linked"),
-    ):
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        flow_service_cls.return_value = flow_service
-
-        task_service_cls.return_value.link_issue.return_value = issue_link
-
-        result = runner.invoke(task_app, ["link", "219"])
-
-    assert result.exit_code == 0
-    task_service_cls.return_value.link_issue.assert_called_once_with(
-        "task/demo", 219, "related"
-    )
+    assert result.exit_code != 0
+    assert "No such command" in (result.stdout + result.stderr)
 
 
 # ==============================================================================

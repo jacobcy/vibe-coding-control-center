@@ -4,13 +4,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
-from vibe3.models.project_item import LinkError, ProjectItemError
+from vibe3.models.project_item import LinkError
 from vibe3.models.task_bridge import HydratedTaskView, HydrateError, TaskBridgeModel
 from vibe3.services.task_bridge_lookup import hydrate_task
 from vibe3.services.task_bridge_mutation import (
     auto_link_issue_to_project,
-    link_project_item,
-    update_remote_task_status,
 )
 
 if TYPE_CHECKING:
@@ -53,18 +51,6 @@ class TaskBridgeMixin:
     def hydrate(self: Any, branch: str) -> HydratedTaskView | HydrateError:
         """从远端 GitHub Project 读取 task 真值，合并为 HydratedTaskView（只读）。"""
         return hydrate_task(self, branch)
-
-    def update_remote_task_status(
-        self: Any, branch: str, status: str
-    ) -> bool | ProjectItemError:
-        """通过 GitHub API 更新远端 Project item 的 task 状态（唯一合法写入路径）。"""
-        return update_remote_task_status(self, branch, status)
-
-    def link_project_item(
-        self: Any, branch: str, project_item_id: str, force: bool = False
-    ) -> TaskBridgeModel | LinkError:
-        """将本地 task bridge 与远端 GitHub Project item 绑定。"""
-        return link_project_item(self, branch, project_item_id, force)
 
     def auto_link_issue_to_project(
         self: Any, branch: str, issue_number: int

@@ -1,14 +1,7 @@
 """Task UI rendering."""
 
-from vibe3.models.flow import FlowState, IssueLink
+from vibe3.models.flow import FlowState
 from vibe3.ui.console import console
-
-
-def render_issue_linked(link: IssueLink) -> None:
-    console.print("[green]✓[/] Issue linked to flow")
-    console.print(f"  issue   #{link.issue_number}")
-    console.print(f"  role    {link.issue_role}")
-    console.print(f"  branch  {link.branch}")
 
 
 def render_no_active_task() -> None:

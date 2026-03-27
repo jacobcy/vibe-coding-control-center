@@ -6,6 +6,7 @@ from vibe3.models.flow import CreateDecision, FlowState, IssueLink
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
 
 
@@ -26,11 +27,13 @@ class FlowUsecase:
         task_service: TaskService | None = None,
         handoff_service: HandoffService | None = None,
         base_resolver: BaseResolutionUsecase | None = None,
+        spec_ref_service: SpecRefService | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
         self.handoff_service = handoff_service or HandoffService()
         self.base_resolver = base_resolver or BaseResolutionUsecase()
+        self.spec_ref_service = spec_ref_service or SpecRefService()
 
     def add_flow(
         self,
@@ -47,7 +50,7 @@ class FlowUsecase:
             )
 
         flow = self.flow_service.create_flow(slug=name, branch=branch)
-        self._bind_optional_refs(branch, task, spec)
+        self._apply_initial_bindings(branch, task, spec)
         self.handoff_service.ensure_current_handoff()
         return flow
 
@@ -83,7 +86,7 @@ class FlowUsecase:
             raise FlowUsecaseError(str(exc), guidance) from exc
 
         branch = f"task/{name}"
-        self._bind_optional_refs(branch, task, spec)
+        self._apply_initial_bindings(branch, task, spec)
         self.handoff_service.ensure_current_handoff()
         return flow
 
@@ -94,8 +97,7 @@ class FlowUsecase:
     ) -> IssueLink:
         """Bind an issue to the current flow."""
         branch = self.flow_service.get_current_branch()
-        issue_number = self._parse_issue_number(issue)
-        return self.task_service.link_issue(branch, issue_number, role)
+        return self._link_issue(branch, issue, role)
 
     @staticmethod
     def _parse_issue_number(issue: str) -> int:
@@ -104,16 +106,34 @@ class FlowUsecase:
             raise ValueError(f"Invalid issue format: {issue}")
         return int(digits)
 
-    def _bind_optional_refs(
+    def _apply_initial_bindings(
         self,
         branch: str,
         task: str | None,
         spec: str | None,
     ) -> None:
         if task:
-            self.flow_service.bind_task(branch, task, "system")
+            self._link_issue(branch, task, "task")
+            if not spec:
+                self._bind_task_as_spec_ref(branch, task)
         if spec:
             self.flow_service.bind_spec(branch, spec, "system")
+
+    def _link_issue(
+        self,
+        branch: str,
+        issue_ref: str,
+        role: Literal["task", "related", "dependency"],
+    ) -> IssueLink:
+        issue_number = self._parse_issue_number(issue_ref)
+        return self.task_service.link_issue(branch, issue_number, role)
+
+    def _bind_task_as_spec_ref(self, branch: str, task: str) -> None:
+        """Derive spec_ref from bound task issue for issue-first workflows."""
+        issue_number = self._parse_issue_number(task)
+        spec_info = self.spec_ref_service.parse_spec_ref(str(issue_number))
+        if spec_info.display:
+            self.flow_service.bind_spec(branch, spec_info.display, "system")
 
     @staticmethod
     def _validate_create_request(base: str | None, decision: CreateDecision) -> None:
