@@ -11,9 +11,7 @@ from vibe3.services.task_usecase import TaskUsecase
 
 def test_parse_issue_ref_accepts_github_url() -> None:
     """Issue parsing should support GitHub issue URLs."""
-    assert (
-        TaskUsecase.parse_issue_ref("https://github.com/acme/repo/issues/248") == 248
-    )
+    assert TaskUsecase.parse_issue_ref("https://github.com/acme/repo/issues/248") == 248
 
 
 def test_show_task_returns_local_fallback_on_hydrate_error() -> None:

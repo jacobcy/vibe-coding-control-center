@@ -115,6 +115,7 @@ def show(
         task_result = usecase.show_task(target_branch)
         _render_task_show(task_result, json_output)
 
+
 def _render_task_show(task_result: TaskShowResult, json_output: bool) -> None:
     """Render task show output while keeping show() thin."""
     if task_result.hydrate_error:
