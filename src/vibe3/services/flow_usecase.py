@@ -1,5 +1,6 @@
 """Usecase layer for flow command orchestration."""
 
+from collections.abc import Sequence
 from typing import Literal
 
 from vibe3.models.flow import CreateDecision, FlowState, IssueLink
@@ -39,7 +40,7 @@ class FlowUsecase:
     def add_flow(
         self,
         name: str,
-        task: str | None = None,
+        task: str | Sequence[str] | None = None,
         spec: str | None = None,
     ) -> FlowState:
         """Create a flow on the current branch and apply optional bindings."""
@@ -59,7 +60,7 @@ class FlowUsecase:
         self,
         name: str,
         base: str | None = None,
-        task: str | None = None,
+        task: str | Sequence[str] | None = None,
         spec: str | None = None,
     ) -> FlowState:
         """Create a branch-backed flow while enforcing worktree governance."""
@@ -110,13 +111,22 @@ class FlowUsecase:
     def _apply_initial_bindings(
         self,
         branch: str,
-        task: str | None,
+        task: str | Sequence[str] | None,
         spec: str | None,
     ) -> None:
-        if task:
-            self._link_issue(branch, task, "task")
+        task_refs = self._normalize_task_refs(task)
+        if task_refs:
+            bound_task_numbers: list[int] = []
+            for task_ref in task_refs:
+                link = self._link_issue(branch, task_ref, "task")
+                bound_task_numbers.append(link.issue_number)
+            if len(bound_task_numbers) > 1:
+                self.flow_service.store.update_flow_state(
+                    branch,
+                    task_issue_number=bound_task_numbers[0],
+                )
             if not spec:
-                self._bind_task_as_spec_ref(branch, task)
+                self._bind_task_as_spec_ref(branch, task_refs[0])
         if spec:
             self.flow_service.bind_spec(branch, spec, "system")
 
@@ -135,6 +145,14 @@ class FlowUsecase:
         spec_info = self.spec_ref_service.parse_spec_ref(str(issue_number))
         if spec_info.display:
             self.flow_service.bind_spec(branch, spec_info.display, "system")
+
+    @staticmethod
+    def _normalize_task_refs(task: str | Sequence[str] | None) -> list[str]:
+        if task is None:
+            return []
+        if isinstance(task, str):
+            return [task]
+        return [ref for ref in task if ref]
 
     @staticmethod
     def _validate_create_request(base: str | None, decision: CreateDecision) -> None:

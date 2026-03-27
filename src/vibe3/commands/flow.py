@@ -2,7 +2,7 @@
 """Flow command handlers."""
 
 import json
-from typing import Annotated, Literal
+from typing import Annotated, List, Literal
 
 import typer
 from loguru import logger
@@ -32,6 +32,10 @@ BranchArg = Annotated[
     str | None, typer.Argument(help="Branch name (defaults to current branch)")
 ]
 TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
+CreateTaskTailArg = Annotated[
+    List[str] | None,
+    typer.Argument(hidden=True),
+]
 AddTaskOption = Annotated[
     str | None,
     typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
@@ -72,6 +76,21 @@ def _print_flow_error(error: FlowUsecaseError) -> None:
     console.print(f"[red]Error: {error}[/]")
     if error.guidance:
         console.print(f"[yellow]{error.guidance}[/]")
+
+
+def _merge_create_task_refs(
+    task: str | None,
+    task_tail: List[str] | None,
+) -> str | List[str] | None:
+    """Support both '--task 281 --task 282' and '--task 281 282' styles."""
+    tail = task_tail or []
+    if not tail:
+        return task
+    if task is None:
+        raise typer.BadParameter(
+            "Additional task refs require '--task <issue>' prefix."
+        )
+    return [task, *tail]
 
 
 @app.command(name="add")
@@ -121,6 +140,7 @@ def new(
 def create(
     name: FlowNameArg,
     task: TaskOption = None,
+    task_tail: CreateTaskTailArg = None,
     spec: SpecOption = None,
     base: Annotated[
         str | None,
@@ -134,22 +154,23 @@ def create(
     json_output: JsonOption = False,
 ) -> None:
     """Create a new branch with flow state."""
+    task_refs = _merge_create_task_refs(task, task_tail)
     with trace_scope(trace, "flow create", name=name, base=base):
-        logger.bind(command="flow create", name=name, base=base, task=task).info(
+        logger.bind(command="flow create", name=name, base=base, task=task_refs).info(
             "Creating flow with new branch"
         )
         try:
             flow = _build_flow_usecase().create_flow(
                 name=name,
                 base=base,
-                task=task,
+                task=task_refs,
                 spec=spec,
             )
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
         except ValueError:
-            logger.bind(command="flow create", task=task).warning(
+            logger.bind(command="flow create", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
             flow = _build_flow_usecase().create_flow(name=name, base=base, spec=spec)
@@ -157,7 +178,14 @@ def create(
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
-            render_flow_created(flow, task)
+            render_flow_created(
+                flow,
+                (
+                    " ".join(task_refs)
+                    if task_refs is not None and not isinstance(task_refs, str)
+                    else task_refs
+                ),
+            )
 
 
 @app.command()

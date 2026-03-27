@@ -132,6 +132,59 @@ def test_create_flow_uses_decision_start_ref_and_binds_task() -> None:
     handoff_service.ensure_current_handoff.assert_called_once_with()
 
 
+def test_create_flow_supports_multiple_task_refs() -> None:
+    """Create flow should bind multiple task refs and keep first as primary task."""
+    flow_service = MagicMock()
+    task_service = MagicMock()
+    flow_service.get_current_branch.return_value = "main"
+    flow_service.can_create_from_current_worktree.return_value = CreateDecision(
+        allowed=True,
+        reason="No active flow in current worktree",
+        start_ref="origin/main",
+        requires_new_worktree=False,
+    )
+    flow_service.create_flow_with_branch.return_value = FlowState(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+    )
+    flow_service.store = MagicMock()
+    task_service.link_issue.side_effect = [
+        MagicMock(issue_number=281, issue_role="task", branch="task/demo"),
+        MagicMock(issue_number=282, issue_role="task", branch="task/demo"),
+    ]
+    handoff_service = MagicMock()
+    spec_ref_service = MagicMock()
+    spec_ref_service.parse_spec_ref.return_value = SpecRefInfo(
+        raw="281",
+        kind="issue",
+        issue_number=281,
+        issue_title="Primary task",
+        display="#281:Primary task",
+    )
+
+    usecase = FlowUsecase(
+        flow_service=flow_service,
+        task_service=task_service,
+        handoff_service=handoff_service,
+        spec_ref_service=spec_ref_service,
+    )
+
+    usecase.create_flow("demo", base="main", task=["281", "282"])
+
+    assert task_service.link_issue.call_args_list[0].args == ("task/demo", 281, "task")
+    assert task_service.link_issue.call_args_list[1].args == ("task/demo", 282, "task")
+    flow_service.store.update_flow_state.assert_called_once_with(
+        "task/demo",
+        task_issue_number=281,
+    )
+    flow_service.bind_spec.assert_called_once_with(
+        "task/demo",
+        "#281:Primary task",
+        "system",
+    )
+
+
 def test_task_derived_spec_ref_is_skipped_when_display_unavailable() -> None:
     """Task-based spec binding should be skipped when display cannot be resolved."""
     flow_service = MagicMock()
