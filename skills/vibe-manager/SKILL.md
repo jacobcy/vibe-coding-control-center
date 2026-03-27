@@ -66,12 +66,19 @@ vibe3 handoff show   # agent 执行状态
 需要沉淀 findings 为 issue 时，走以下入口：
 
 ```bash
-# 快速单条 issue（通用）
-gh issue create --title "<title>" --body "<body>"
+# 通用 issue 创建脚本（避免 gh CLI 权限限制）
+zsh scripts/github/create_issue.sh \
+  --title "bug: <具体描述>" \
+  --body "## 问题\n...\n## 复现步骤\n..."
 
-# 批量创建 manager 流程问题（项目专用脚本）
-zsh scripts/github/create_manager_issues.sh          # 实际创建
-zsh scripts/github/create_manager_issues.sh --dry-run # 预览不创建
+# 从文件读取正文
+zsh scripts/github/create_issue.sh --title "..." --body-file /tmp/body.md
+
+# 指定 label（逗号分隔）
+zsh scripts/github/create_issue.sh --title "..." --body "..." --label "bug,improvement"
+
+# 预览不创建
+zsh scripts/github/create_issue.sh --title "..." --body "..." --dry-run
 ```
 
 ## 何时介入
@@ -195,11 +202,11 @@ PR 创建后，manager 不能立刻退出。
 - review / CI 中暴露出的独立问题
 
 ```bash
-# 发现单个问题立即创建
-gh issue create --title "bug: <具体描述>" --body "<复现步骤和预期行为>"
-
-# 批量创建（见 scripts/github/create_manager_issues.sh）
-zsh scripts/github/create_manager_issues.sh
+# 发现问题立即创建（见 scripts/github/create_issue.sh）
+zsh scripts/github/create_issue.sh \
+  --title "bug: <具体描述>" \
+  --body "## 问题\n...\n## 复现步骤\n..." \
+  --label "bug"
 ```
 
 ## 输出契约
