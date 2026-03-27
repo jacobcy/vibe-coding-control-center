@@ -25,11 +25,18 @@ from vibe3.services.run_context_builder import build_run_context
 from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
 
-app = typer.Typer(name="run", help="Execute implementation plans using codeagent-wrapper", no_args_is_help=False, invoke_without_command=True, rich_markup_mode="rich")
+app = typer.Typer(
+    name="run",
+    help="Execute implementation plans using codeagent-wrapper",
+    no_args_is_help=False,
+    invoke_without_command=True,
+    rich_markup_mode="rich",
+)
 
 
 def _find_skill_file(skill_name: str) -> Path | None:
     return RunUsecase.find_skill_file(skill_name)
+
 
 def _execute_run_command(
     *,

@@ -8,12 +8,12 @@ import typer
 from loguru import logger
 
 from vibe3.commands.pr_helpers import build_base_resolution_usecase, noop_context
+from vibe3.models.pr import PRResponse
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
-from vibe3.models.pr import PRResponse
 from vibe3.ui.pr_ui import render_pr_created
 
 
@@ -34,9 +34,7 @@ def _emit_pr_result(pr: PRResponse, json_output: bool, yaml_output: bool) -> Non
         import yaml
 
         typer.echo(
-            yaml.dump(
-                pr.model_dump(), default_flow_style=False, allow_unicode=True
-            )
+            yaml.dump(pr.model_dump(), default_flow_style=False, allow_unicode=True)
         )
     else:
         render_pr_created(pr)

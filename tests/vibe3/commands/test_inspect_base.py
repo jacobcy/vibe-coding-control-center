@@ -189,7 +189,9 @@ def test_inspect_base_uses_shared_base_resolver():
     mock_git.get_changed_files.return_value = []
 
     with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
-        with patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"):
+        with patch(
+            "vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"
+        ):
             with patch("vibe3.config.loader.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]

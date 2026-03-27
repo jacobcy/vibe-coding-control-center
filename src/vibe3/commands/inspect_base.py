@@ -25,7 +25,10 @@ def register(app: typer.Typer) -> None:
         base_branch: Annotated[
             str | None,
             typer.Argument(
-                help="Base policy/branch: parent|current|main|<branch> (default: parent)"
+                help=(
+                    "Base policy/branch: parent|current|main|<branch> "
+                    "(default: parent)"
+                )
             ),
         ] = None,
         json_out: Annotated[

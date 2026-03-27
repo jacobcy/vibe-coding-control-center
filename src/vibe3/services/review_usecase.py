@@ -1,7 +1,7 @@
 """Usecase layer for review command orchestration."""
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import typer
 from loguru import logger

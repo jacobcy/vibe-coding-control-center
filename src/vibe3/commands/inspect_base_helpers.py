@@ -13,7 +13,9 @@ from vibe3.services.serena_service import SerenaService
 
 def _code_paths() -> list[str]:
     config = get_config()
-    return config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
+    return (
+        config.code_limits.code_paths.v2_shell + config.code_limits.code_paths.v3_python
+    )
 
 
 def _is_code_file(filepath: str, code_paths: list[str]) -> bool:
@@ -21,7 +23,12 @@ def _is_code_file(filepath: str, code_paths: list[str]) -> bool:
 
 
 def _is_test_file(filepath: str) -> bool:
-    return filepath.startswith(("tests/", "test_", "test/")) or "/tests/" in filepath or "/test/" in filepath or filepath.endswith("_test.py")
+    return (
+        filepath.startswith(("tests/", "test_", "test/"))
+        or "/tests/" in filepath
+        or "/test/" in filepath
+        or filepath.endswith("_test.py")
+    )
 
 
 def validate_base_branch(git_client: GitClient, base_branch: str) -> None:

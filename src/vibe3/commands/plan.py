@@ -28,7 +28,12 @@ from vibe3.services.plan_usecase import PlanUsecase
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
 
-app = typer.Typer(name="plan", help="Create implementation plans using codeagent-wrapper", no_args_is_help=True, rich_markup_mode="rich")
+app = typer.Typer(
+    name="plan",
+    help="Create implementation plans using codeagent-wrapper",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+)
 
 
 def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUsecase:

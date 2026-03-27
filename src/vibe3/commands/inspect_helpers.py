@@ -14,7 +14,6 @@ from vibe3.commands.inspect_pr_helpers import (
     _get_recent_commits,
     build_pr_analysis,
 )
-
 from vibe3.commands.inspect_types import (
     CommitInfo,
     CriticalFileInfo,
