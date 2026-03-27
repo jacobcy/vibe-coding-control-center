@@ -50,7 +50,7 @@ class TestPRCreateCommandAI:
                     model_dump=lambda: {"number": 123},
                 )
                 with patch(
-                    "vibe3.commands.pr_create.VibeConfig.get_defaults"
+                    "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
                 ) as mock_config:
                     mock_config.return_value.ai.enabled = False
                     result = runner.invoke(app, ["pr", "create", "--ai"])
@@ -67,7 +67,7 @@ class TestPRCreateCommandAI:
                     model_dump=lambda: {"number": 123},
                 )
                 with patch(
-                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
+                    "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
                 ) as mock_material:
                     mock_material.return_value = MagicMock(
                         commits=[],
@@ -100,7 +100,7 @@ pr:
                     model_dump=lambda: {"number": 123},
                 )
                 with patch(
-                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
+                    "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
                 ) as mock_material:
                     mock_material.return_value = MagicMock(
                         commits=["feat: add feature"],
@@ -118,25 +118,25 @@ pr:
             return_value="origin/main",
         ) as mock_resolve:
             with patch(
-                "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
+                "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
             ) as mock_material:
                 mock_material.return_value = MagicMock(
                     commits=["feat: add feature"],
                     changed_files=["src/file.py"],
                 )
                 with patch(
-                    "vibe3.commands.pr_create.VibeConfig.get_defaults"
+                    "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
                 ) as mock_config:
                     mock_config.return_value.ai = AIConfig()
                     with patch(
-                        "vibe3.commands.pr_create.AIService.suggest_pr_content"
+                        "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
                     ) as mock_suggest:
                         mock_suggest.return_value = (
                             "feat: ai title",
                             "Summary\n\n- change",
                         )
                         with patch(
-                            "vibe3.commands.pr_create.Prompt.ask"
+                            "vibe3.services.pr_create_usecase.Prompt.ask"
                         ) as mock_prompt:
                             with patch(
                                 "vibe3.commands.pr_create.PRService"
@@ -184,18 +184,18 @@ pr:
             return_value="origin/feature-root",
         ) as mock_resolve:
             with patch(
-                "vibe3.commands.pr_helpers.BaseResolutionUsecase.collect_branch_material"
+                "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
             ) as mock_material:
                 mock_material.return_value = MagicMock(
                     commits=["feat: add feature"],
                     changed_files=["src/file.py"],
                 )
                 with patch(
-                    "vibe3.commands.pr_create.VibeConfig.get_defaults"
+                    "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
                 ) as mock_config:
                     mock_config.return_value.ai = AIConfig()
                     with patch(
-                        "vibe3.commands.pr_create.AIService.suggest_pr_content"
+                        "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
                     ) as mock_suggest:
                         mock_suggest.return_value = ("feat: ai title", "body")
                         with patch(
