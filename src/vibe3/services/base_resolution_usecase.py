@@ -41,6 +41,11 @@ class BaseResolutionUsecase:
         """Resolve base branch for PR creation while preserving current default."""
         return requested_base or "main"
 
+    @staticmethod
+    def resolve_inspect_base(requested_base: str | None) -> str:
+        """Resolve base branch for inspect-base mode."""
+        return requested_base or "origin/main"
+
     def resolve_review_base(
         self,
         requested_base: str | None,

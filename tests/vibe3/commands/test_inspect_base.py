@@ -170,3 +170,23 @@ def test_inspect_base_help():
     result = runner.invoke(app, ["base", "--help"])
     assert result.exit_code == 0
     assert "core" in result.output.lower() or "critical" in result.output.lower()
+
+
+def test_inspect_base_uses_shared_base_resolver():
+    """inspect base should resolve branch through shared base resolver."""
+    mock_git = MagicMock()
+    mock_git.get_changed_files.return_value = []
+
+    with patch("vibe3.clients.git_client.GitClient", return_value=mock_git):
+        with patch("vibe3.utils.git_helpers.get_current_branch", return_value="feature/test"):
+            with patch("vibe3.config.loader.get_config") as mock_config:
+                mock_config.return_value.review_scope.critical_paths = ["src/core/"]
+                mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
+                with patch(
+                    "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_inspect_base",
+                    return_value="origin/main",
+                ) as mock_resolve:
+                    result = runner.invoke(app, ["base"])
+
+    assert result.exit_code == 0
+    mock_resolve.assert_called_once_with(None)

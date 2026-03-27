@@ -67,16 +67,9 @@ class ReviewUsecase:
         pr_data = self.github_client.get_pr(pr_number)
         linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
         issue_number = linked_issues[0] if linked_issues else None
-        inspect_data = self.inspect_runner(["pr", str(pr_number)])
-        changed_symbols_raw = inspect_data.get("changed_symbols", {})
-        changed_symbols = (
-            cast(dict[str, list[str]], changed_symbols_raw)
-            if changed_symbols_raw
-            else None
-        )
         request = ReviewRequest(
             scope=ReviewScope.for_pr(pr_number),
-            changed_symbols=changed_symbols,
+            changed_symbols=self._load_changed_symbols(["pr", str(pr_number)]),
         )
         return request, issue_number
 
@@ -92,16 +85,9 @@ class ReviewUsecase:
         structure_diff = (
             cast(StructureDiff | None, raw_diff) if raw_diff is not None else None
         )
-        inspect_data = self.inspect_runner(["base", base_branch])
-        changed_symbols_raw = inspect_data.get("changed_symbols", {})
-        changed_symbols = (
-            cast(dict[str, list[str]], changed_symbols_raw)
-            if changed_symbols_raw
-            else None
-        )
         request = ReviewRequest(
             scope=ReviewScope.for_base(base_branch),
-            changed_symbols=changed_symbols,
+            changed_symbols=self._load_changed_symbols(["base", base_branch]),
             structure_diff=structure_diff,
         )
         return request, issue_number
@@ -199,3 +185,13 @@ class ReviewUsecase:
                 f"Warning: Failed to transition issue state: {label_result.error}",
                 err=True,
             )
+
+    def _load_changed_symbols(
+        self, inspect_args: list[str]
+    ) -> dict[str, list[str]] | None:
+        """Load changed_symbols from inspect output with stable casting."""
+        inspect_data = self.inspect_runner(inspect_args)
+        changed_symbols_raw = inspect_data.get("changed_symbols", {})
+        if not changed_symbols_raw:
+            return None
+        return cast(dict[str, list[str]], changed_symbols_raw)

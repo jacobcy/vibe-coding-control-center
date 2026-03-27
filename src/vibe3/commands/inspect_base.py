@@ -13,6 +13,7 @@ from vibe3.commands.inspect_base_helpers import (
     print_human_output,
     validate_base_branch,
 )
+from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.utils.trace import enable_trace
 
 
@@ -22,11 +23,11 @@ def register(app: typer.Typer) -> None:
     @app.command()
     def base(
         base_branch: Annotated[
-            str,
+            str | None,
             typer.Argument(
                 help="Base branch to compare against (default: origin/main)"
             ),
-        ] = "origin/main",
+        ] = None,
         json_out: Annotated[
             bool, typer.Option("--json", help="Output as JSON")
         ] = False,
@@ -53,9 +54,11 @@ def register(app: typer.Typer) -> None:
         if trace:
             enable_trace()
 
+        resolved_base = build_base_resolution_usecase().resolve_inspect_base(base_branch)
+
         # Validate base branch exists
         git_client = GitClient()
-        validate_base_branch(git_client, base_branch)
+        validate_base_branch(git_client, resolved_base)
 
         current_branch = get_current_branch()
 
@@ -63,12 +66,12 @@ def register(app: typer.Typer) -> None:
             domain="inspect",
             action="base_analysis",
             current_branch=current_branch,
-            base_branch=base_branch,
+            base_branch=resolved_base,
         )
         log.info("Analyzing core file changes")
 
         git = GitClient(github_client=GitHubClient())
-        source = BranchSource(branch=current_branch, base=base_branch)
+        source = BranchSource(branch=current_branch, base=resolved_base)
         all_changed_files = git.get_changed_files(source)
 
         # Count changed lines only in code paths
@@ -113,7 +116,7 @@ def register(app: typer.Typer) -> None:
                 git=git,
                 source=source,
                 current_branch=current_branch,
-                base_branch=base_branch,
+                base_branch=resolved_base,
                 all_changed_files=all_changed_files,
                 existing_files=existing_files,
                 deleted_files=deleted_files,
@@ -126,7 +129,7 @@ def register(app: typer.Typer) -> None:
         # Human-readable output
         print_human_output(
             current_branch=current_branch,
-            base_branch=base_branch,
+            base_branch=resolved_base,
             all_changed_files=all_changed_files,
             existing_files=existing_files,
             deleted_files=deleted_files,
