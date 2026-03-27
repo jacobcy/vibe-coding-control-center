@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Prefix族定义
-所有用户可见的 alias/function 命令 SHALL 遵循 `<工具前缀><动作>` 的命名模式，前缀族与对应工具的映射关系 SHALL 在此 spec 中定义并强制执行。
+所有用户可见的 lib/alias/function 命令 SHALL 遵循 `<工具前缀><动作>` 的命名模式，前缀族与对应工具的映射关系 SHALL 在此 spec 中定义并强制执行。
 
 已定义的前缀族：
 

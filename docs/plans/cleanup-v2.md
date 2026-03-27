@@ -62,7 +62,7 @@
 ## 实际情况分析
 
 ### V2 仍在使用的地方
-1. **alias/vibe.sh** - Shell 别名
+1. **lib/alias/vibe.sh** - Shell 别名
 2. **scripts/tools/** - 工具脚本
 3. **scripts/hooks/** - Git hooks
 4. **skills/** - Skill 脚本

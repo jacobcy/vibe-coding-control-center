@@ -28,14 +28,14 @@ sys.exit(completed.returncode)
 }
 
 @test "wtrm --help exits without hanging" {
-  run_zsh_with_timeout "source \"$VIBE_ROOT/lib/utils.sh\"; source \"$VIBE_ROOT/alias/worktree.sh\"; wtrm --help"
+  run_zsh_with_timeout "source \"$VIBE_ROOT/lib/utils.sh\"; source \"$VIBE_ROOT/lib/alias/worktree.sh\"; wtrm --help"
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "usage: wtrm [--yes] [--delete-remote]" ]]
 }
 
 @test "wtrm rejects extra positional args without hanging" {
-  run_zsh_with_timeout "source \"$VIBE_ROOT/lib/utils.sh\"; source \"$VIBE_ROOT/alias/worktree.sh\"; wtrm one two"
+  run_zsh_with_timeout "source \"$VIBE_ROOT/lib/utils.sh\"; source \"$VIBE_ROOT/lib/alias/worktree.sh\"; wtrm one two"
 
   [ "$status" -eq 1 ]
   [[ "$output" =~ "Unexpected argument: two" ]]

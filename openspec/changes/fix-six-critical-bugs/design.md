@@ -2,7 +2,7 @@
 
 ## Context
 
-Vibe Center is a development orchestration tool that manages toolchains, keys, worktree/tmux workflows, and agent rules. The codebase consists of shell scripts organized in `lib/`, `alias/`, and `scripts/` directories.
+Vibe Center is a development orchestration tool that manages toolchains, keys, worktree/tmux workflows, and agent rules. The codebase consists of shell scripts organized in `lib/`, `lib/alias/`, and `scripts/` directories.
 
 The system operates on a three-tier architecture:
 - **Tier 3 (Supervisor)**: Governance and flow control

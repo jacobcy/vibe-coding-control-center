@@ -36,10 +36,10 @@ SH
 
   mkdir -p "$aliases_dir"
   cp "$BATS_TEST_DIRNAME/../../../config/aliases.sh" "$config_dir/aliases.sh"
-  cp "$BATS_TEST_DIRNAME/../../../alias/git.sh" "$aliases_dir/git.sh"
-  cp "$BATS_TEST_DIRNAME/../../../alias/vibe.sh" "$aliases_dir/vibe.sh"
+  cp "$BATS_TEST_DIRNAME/../../../lib/alias/git.sh" "$aliases_dir/git.sh"
+  cp "$BATS_TEST_DIRNAME/../../../lib/alias/vibe.sh" "$aliases_dir/vibe.sh"
 
   run env HOME="$home_dir" zsh -c 'source "'"$config_dir"'/aliases.sh"'
   [ "$status" -eq 0 ]
-  [[ ! "$output" =~ "alias/loader.sh not found" ]]
+  [[ ! "$output" =~ "lib/alias/loader.sh not found" ]]
 }
