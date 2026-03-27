@@ -211,36 +211,3 @@ class AsyncExecutionService:
             branch=branch,
             status=status,
         ).info(f"{role} completed")
-
-
-def build_async_command(
-    base_command: list[str],
-    role: ExecutionRole,
-    branch: str,
-) -> list[str]:
-    """Build command for async execution with completion callback.
-
-    Args:
-        base_command: Original command (e.g., ["vibe3", "review", "base"])
-        role: Execution role
-        branch: Branch name
-
-    Returns:
-        Full command including completion callback
-    """
-    async_flag = "--no-async"
-    if async_flag not in base_command:
-        base_command.append(async_flag)
-
-    complete_cmd = [
-        "python",
-        "-m",
-        "vibe3",
-        "_complete_execution",
-        role,
-        branch,
-    ]
-
-    wrapped_command = base_command + ["&&"] + complete_cmd
-
-    return wrapped_command
