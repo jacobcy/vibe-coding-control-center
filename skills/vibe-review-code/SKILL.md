@@ -16,8 +16,8 @@ description: Use when the user wants a structured code review for local or PR-bo
 
 **使用场景**:
 
-1. **PR 前**: 在运行 `vibe flow pr` 之前，进行深度静态分析
-2. **PR 后**: 根据 `vibe flow review` 的反馈修复代码
+1. **PR 前**: 在创建 PR 之前，进行深度静态分析
+2. **PR 后**: 根据 `uv run python src/vibe3/cli.py review pr` 的反馈修复代码
 
 语义边界：
 
@@ -44,20 +44,18 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 - 主会话 token 不被消耗
 - 可并行执行其他任务
 
-### 方案 B：使用 Codex 本地审查（最快）
+### 方案 B：使用本地审查（最快）
 
 ```bash
-# 使用 codex 进行本地代码审查（如果可用）
-vibe flow review --local
+# 使用 vibe3 进行本地代码审查
+uv run python src/vibe3/cli.py review base
 ```
 
 **优势**:
 
-- 零 token 消耗（本地 LLM）
+- 零外部 token 消耗
 - 执行速度最快
 - 深度静态分析
-
-**Fallback**: 如果 codex 不可用，自动回退到 copilot（如果配置）
 
 ### 方案 C：传统 AI 审查
 
@@ -78,9 +76,9 @@ vibe flow review --local
 
 ## 1. Context Gathering (Align Truth)
 
-- **Identify Intent**: Run `vibe flow review` (Physical Tier 1) to determine the current state of the PR and project health.
+- **Identify Intent**: Run `uv run python src/vibe3/cli.py review base` (Physical Tier 1) to determine the current state of the PR and project health.
 - **Fetch Diff**:
-  - If a PR exists (opened by `flow review` or confirmed): Use `gh pr diff` to fetch the source of truth for changes.
+  - If a PR exists (opened): Use `gh pr diff` to fetch the source of truth for changes.
   - If local only: Use `git diff main...HEAD`.
 - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
 - **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
@@ -158,3 +156,11 @@ Each finding MUST include:
 - `issue`
 - `failure mode`
 - `minimal fix`
+
+## 6. Handoff 记录
+
+完成审查后，更新 handoff：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-review-code: Code review completed" --actor vibe-review-code --kind milestone
+```

@@ -24,7 +24,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 - 架构调整
 - **必须有 review evidence**：
   - 优先：在线 Codex/Copilot review
-  - 备选：`vibe flow review --local` 本地 review
+  - 备选：`uv run python src/vibe3/cli.py review base` 本地 review
 
 ## 停止点
 
@@ -44,8 +44,8 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 ```
 /vibe-integrate
   ├─ Step 1: 建立整合上下文
-  │   ├─ vibe flow show
-  │   ├─ vibe flow status
+  │   ├─ uv run python src/vibe3/cli.py flow show
+  │   ├─ uv run python src/vibe3/cli.py flow status
   │   └─ 确认要处理的 PR、stacked 关系
   │
   ├─ Step 2: PR Review 状态审核（分层处理）
@@ -55,7 +55,7 @@ description: Use when the user wants to assess, unblock, and merge one or more P
   │   └─ 复杂场景（代码逻辑/架构）
   │       ├─ 检查在线 Codex/Copilot review
   │       ├─ 无在线 review → 等待或触发 @codex comment
-  │       └─ 备选：vibe flow review --local
+  │       └─ 备选：uv run python src/vibe3/cli.py review base
   │
   ├─ Step 3: 审核合并条件
   │   ├─ CI 是否通过
@@ -93,15 +93,15 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 优先读取：
 
 ```bash
-vibe flow show
-vibe flow status
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py flow status
 ```
 
 必要时再看：
 
 ```bash
-vibe flow list
-vibe roadmap status
+uv run python src/vibe3/cli.py flow list
+uv run python src/vibe3/cli.py task list
 ```
 
 结合 `.agent/context/task.md`，先确认：
@@ -138,18 +138,18 @@ vibe roadmap status
 
 1. **优先：在线 Codex/Copilot review**
 
-   ```bash
-   vibe flow review [pr_number]
-   ```
+    ```bash
+    uv run python src/vibe3/cli.py review pr [pr_number]
+    ```
 
-   - 检查 PR 上是否有 Codex/Copilot 的 review comment
-   - 若无在线 review，在 PR 中添加 `@codex` comment 触发 review
-   - 等待 10 分钟后重新检查
+    - 检查 PR 上是否有 Codex/Copilot 的 review comment
+    - 若无在线 review，在 PR 中添加 `@codex` comment 触发 review
+    - 等待 10 分钟后重新检查
 
 2. **备选：本地 review**
-   ```bash
-   vibe flow review --local
-   ```
+    ```bash
+    uv run python src/vibe3/cli.py review base
+    ```
 
    - 在线 review 不可用时使用
    - 将 review 结果回贴到 PR comment
@@ -178,7 +178,7 @@ vibe roadmap status
 ```bash
 gh pr view <pr>
 gh pr checks <pr>
-vibe flow review <pr>
+uv run python src/vibe3/cli.py review pr <pr>
 ```
 
 ### Step 4: 处理阻塞项
@@ -225,6 +225,10 @@ vibe flow review <pr>
 ### Step 6: 写入 handoff
 
 完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-integrate: PR review completed" --actor vibe-integrate --kind milestone
+```
 
 ```markdown
 ## Skill Handoff
