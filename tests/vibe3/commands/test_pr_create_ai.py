@@ -241,9 +241,8 @@ pr:
                                         "body": "body",
                                     },
                                 )
-                                mock_service.return_value.create_draft_pr.return_value = (
-                                    mock_pr
-                                )
+                                svc = mock_service.return_value
+                                svc.create_draft_pr.return_value = mock_pr
 
                                 result = runner.invoke(
                                     app,
