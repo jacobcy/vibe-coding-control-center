@@ -1,4 +1,4 @@
-"""Plan command - Create implementation plans using codeagent-wrapper."""
+"""Plan command."""
 
 from pathlib import Path
 from typing import Annotated, Optional
@@ -16,6 +16,7 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
+from vibe3.models.plan import PlanRequest
 from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
@@ -27,12 +28,7 @@ from vibe3.services.plan_usecase import PlanUsecase
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
 
-app = typer.Typer(
-    name="plan",
-    help="Create implementation plans using codeagent-wrapper",
-    no_args_is_help=True,
-    rich_markup_mode="rich",
-)
+app = typer.Typer(name="plan", help="Create implementation plans using codeagent-wrapper", no_args_is_help=True, rich_markup_mode="rich")
 
 
 def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUsecase:
@@ -43,6 +39,34 @@ def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUs
         github_client=GitHubClient(),
         spec_ref_service=SpecRefService(),
     )
+
+
+def _execute_plan_command(
+    *,
+    config: VibeConfig,
+    branch: str,
+    request: PlanRequest,
+    instructions: str | None,
+    dry_run: bool,
+    async_mode: bool,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+) -> None:
+    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
+    command = create_codeagent_command(
+        role="planner",
+        context_builder=lambda: build_plan_context(request, config),
+        task=instructions or plan_prompt,
+        dry_run=dry_run,
+        handoff_kind="plan",
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
+    )
+    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
 
 @app.command()
@@ -62,18 +86,7 @@ def task(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    """Create implementation plan for an issue.
-
-    If no issue number is provided, uses the current flow's task issue.
-
-    Examples:
-        vibe3 plan task              # Use current flow's task issue
-        vibe3 plan task 42           # Plan for issue #42
-        vibe3 plan task 42 --dry-run
-        vibe3 plan task 42 "Focus on security"
-        vibe3 plan task 42 --agent planner-pro
-        vibe3 plan task 42 --async   # Run in background
-    """
+    """Create implementation plan for an issue."""
     if trace:
         enable_trace()
 
@@ -90,21 +103,17 @@ def task(
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
     typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
-    task = instructions or plan_prompt
-    command = create_codeagent_command(
-        role="planner",
-        context_builder=lambda: build_plan_context(task_input.request, config),
-        task=task,
+    _execute_plan_command(
+        config=config,
+        branch=branch,
+        request=task_input.request,
+        instructions=instructions,
         dry_run=dry_run,
-        handoff_kind="plan",
+        async_mode=async_mode,
         agent=agent,
         backend=backend,
         model=model,
-        config=config,
-        branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
     if not dry_run:
         result = transition_to_claimed(task_input.issue_number)
@@ -136,17 +145,7 @@ def spec(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    """Create implementation plan from a specification.
-
-    Provide either --file or --msg (not both).
-
-    Examples:
-        vibe3 plan spec --file spec.md
-        vibe3 plan spec --msg "Add dark mode support"
-        vibe3 plan spec -f spec.md "Prioritize performance"
-        vibe3 plan spec --msg "Refactor auth" --agent planner-pro
-        vibe3 plan spec --file spec.md --async  # Run in background
-    """
+    """Create implementation plan from a specification."""
     if trace:
         enable_trace()
 
@@ -182,18 +181,14 @@ def spec(
         except Exception:
             pass
 
-    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
-    task = instructions or plan_prompt
-    command = create_codeagent_command(
-        role="planner",
-        context_builder=lambda: build_plan_context(spec_input.request, config),
-        task=task,
+    _execute_plan_command(
+        config=config,
+        branch=branch,
+        request=spec_input.request,
+        instructions=instructions,
         dry_run=dry_run,
-        handoff_kind="plan",
+        async_mode=async_mode,
         agent=agent,
         backend=backend,
         model=model,
-        config=config,
-        branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)

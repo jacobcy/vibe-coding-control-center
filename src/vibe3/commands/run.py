@@ -1,7 +1,7 @@
-"""Run command - Execute implementation plans using codeagent-wrapper."""
+"""Run command."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Callable, Optional
 
 import typer
 from loguru import logger
@@ -25,16 +25,42 @@ from vibe3.services.run_context_builder import build_run_context
 from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
 
-app = typer.Typer(
-    name="run",
-    help="Execute implementation plans using codeagent-wrapper",
-    no_args_is_help=False,
-    invoke_without_command=True,
-    rich_markup_mode="rich",
-)
+app = typer.Typer(name="run", help="Execute implementation plans using codeagent-wrapper", no_args_is_help=False, invoke_without_command=True, rich_markup_mode="rich")
+
+
 def _find_skill_file(skill_name: str) -> Path | None:
-    """Find SKILL.md for a named skill under skills/ directory."""
     return RunUsecase.find_skill_file(skill_name)
+
+def _execute_run_command(
+    *,
+    config: VibeConfig,
+    branch: str,
+    instructions: str | None,
+    context_builder: Callable[[], str],
+    dry_run: bool,
+    async_mode: bool,
+    agent: str | None,
+    backend: str | None,
+    model: str | None,
+    handoff_metadata: dict[str, object] | None,
+) -> None:
+    run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
+    command = create_codeagent_command(
+        role="executor",
+        context_builder=context_builder,
+        task=instructions or run_prompt,
+        dry_run=dry_run,
+        handoff_kind="run",
+        handoff_metadata=handoff_metadata,
+        agent=agent,
+        backend=backend,
+        model=model,
+        config=config,
+        branch=branch,
+    )
+    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
 def run_command(
     instructions: Annotated[
         Optional[str],
@@ -57,12 +83,7 @@ def run_command(
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
 ) -> None:
-    """Execute implementation plan or skill using codeagent-wrapper.
-
-    Default: runs current flow's plan_ref.
-    Use --plan to specify a plan file, or --skill to run a project skill.
-    Use --async to run in background.
-    """
+    """Execute implementation plan or skill."""
     if trace:
         enable_trace()
 
@@ -70,7 +91,6 @@ def run_command(
     flow_service, branch = ensure_flow_for_current_branch()
     usecase = RunUsecase(flow_service=flow_service)
 
-    # --skill mode
     if skill:
         skill_file = _find_skill_file(skill)
         if not skill_file:
@@ -82,21 +102,18 @@ def run_command(
 
         typer.echo(f"-> Skill: {skill_file}")
         skill_content = skill_file.read_text(encoding="utf-8")
-        exec_svc = CodeagentExecutionService(config)
-        command = create_codeagent_command(
-            role="executor",
+        _execute_run_command(
+            config=config,
+            branch=branch,
+            instructions=instructions or f"Execute skill: {skill}",
             context_builder=lambda: skill_content,
-            task=instructions or f"Execute skill: {skill}",
             dry_run=dry_run,
-            handoff_kind="run",
-            handoff_metadata={"skill": skill},
+            async_mode=async_mode,
             agent=agent,
             backend=backend,
             model=model,
-            config=config,
-            branch=branch,
+            handoff_metadata={"skill": skill},
         )
-        exec_svc.execute(command, async_mode=async_mode)
         return
 
     try:
@@ -123,22 +140,18 @@ def run_command(
         log.info("Starting plan execution from flow")
         typer.echo(f"-> Using flow plan: {plan_file}")
 
-    exec_svc = CodeagentExecutionService(config)
-    run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
-    command = create_codeagent_command(
-        role="executor",
+    _execute_run_command(
+        config=config,
+        branch=branch,
+        instructions=instructions,
         context_builder=lambda: build_run_context(plan_file, config),
-        task=instructions or run_prompt,
         dry_run=dry_run,
-        handoff_kind="run",
-        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
+        async_mode=async_mode,
         agent=agent,
         backend=backend,
         model=model,
-        config=config,
-        branch=branch,
+        handoff_metadata={"plan_ref": plan_file} if plan_file else None,
     )
-    exec_svc.execute(command, async_mode=async_mode)
 
     issue_number = usecase.transition_issue(branch)
     if not dry_run and issue_number:

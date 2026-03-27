@@ -56,12 +56,7 @@ CancelRoleArg = Annotated[
 ]
 
 app = typer.Typer(
-    help=(
-        "Manage logic flows.\n\nSingle-Target Governance:\n"
-        "- One worktree, one active target at a time\n"
-        "- Use 'flow create' only when current flow is blocked or done\n"
-        "- Use 'wtnew' for new independent features"
-    ),
+    help="Manage logic flows.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -89,7 +84,7 @@ def add(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Add flow to the current branch."""
+    """Add flow."""
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task).info("Adding flow")
         try:
@@ -134,10 +129,7 @@ def create(
         typer.Option(
             "--base",
             "-b",
-            help=(
-                "Base policy/branch: parent|current|main|<branch>. "
-                "Default is status-aware: blocked->current, otherwise main."
-            ),
+            help="Base policy/branch: parent|current|main|<branch>.",
         ),
     ] = None,
     trace: TraceOption = False,
@@ -177,7 +169,7 @@ def bind(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Bind an issue to current flow as task, related, or dependency."""
+    """Bind an issue to current flow."""
     with trace_scope(trace, "flow bind", issue=issue, role=role):
         logger.bind(command="flow bind", issue=issue, role=role).info(
             "Binding issue to flow"
