@@ -31,12 +31,12 @@ description: Use when the user wants to save session context, says "/vibe-save",
 特别约束：
 
 - `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v3/handoff-governance-standard.md` 为准。
-- Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成“自动判断”或“自动修复”。见 `docs/standards/v3/python-capability-design.md`。
+- Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成"自动判断"或"自动修复"。见 `docs/standards/v3/python-capability-design.md`。
 
 ## Command Boundary
 
 - `/vibe-save` 负责判断这次会话哪些内容值得保留。
-- `vibe task update` 之类的 Shell 命令只用于同步共享真源中的最小必要事实。
+- `uv run python src/vibe3/cli.py task status` 之类的 Shell 命令只用于同步共享真源中的最小必要事实。
 - `git` / `gh` 可以用于读取当前 branch、dirty、PR 等现场事实。
 - 不得直接编辑 `.git/vibe/*.json`。
 - 不得假设 `.agent/governance.yaml` 中的 hook 已经自动执行。
@@ -53,7 +53,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 默认不做：
 
 - 不默认创建 `memory/<topic>.md`。
-- 不把 `vibe flow status` 之类查询命令描述成“自动对齐”。
+- 不把 `uv run python src/vibe3/cli.py flow status` 之类查询命令描述成"自动对齐"。
 - 不把 save 描述成由 governance hook 自动编排完成。
 
 ## Workflow
@@ -62,7 +62,6 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 优先读取：
 
-- `$(git rev-parse --git-common-dir)/vibe/worktrees.json`
 - `$(git rev-parse --git-common-dir)/vibe/registry.json`
 - `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`（如果当前目录承载的 `flow` 已能从共享真源识别 `task`）
 - `.agent/context/task.md`
@@ -77,6 +76,13 @@ description: Use when the user wants to save session context, says "/vibe-save",
 - 当前 `git status --short`
 - 当前 branch
 - 当前 PR / review 事实（如会话内容涉及）
+
+可通过以下命令获取：
+
+```bash
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py task list
+```
 
 ### Step 2: 审阅并更新 `.agent/context/task.md`
 
@@ -94,7 +100,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 6. 下一步
 7. 关键文件
 
-`task.md` 应优先回答“下个会话接手时需要知道什么”，而不是扩展成认知档案库。
+`task.md` 应优先回答"下个会话接手时需要知道什么"，而不是扩展成认知档案库。
 
 ### Step 3: 仅在必要时同步共享真源
 
@@ -102,8 +108,14 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 - 使用现有 Shell API 同步最小必要事实。
 - 优先同步 `next_step`，必要时同步 `status` 或 `pr_ref`。
-- 若 execution spec 在本会话已明确，使用 `vibe task update` 同步 `spec_standard/spec_ref`。
+- 若 execution spec 在本会话已明确，使用 `uv run python src/vibe3/cli.py task status` 同步状态。
 - 不在 save 阶段替上层流程做新的任务拆分、归属判断或优先级判断。
+
+同步 handoff 到共享存储：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor vibe-save --kind milestone
+```
 
 如果当前目录尚未识别出当前 `flow` 对应的 `task`：
 

@@ -23,11 +23,11 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ## 核心原则
 
-- **不重造轮子**：直接调用 `gh` CLI 和 `vibe roadmap` 命令。
+- **不重造轮子**：直接调用 `gh` CLI 和 `uv run python src/vibe3/cli.py task` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
-- **先读 shell 输出**：先读取 `gh` / `vibe roadmap` 输出，再做编排判断。
-- **只做 intake，不做排期**：Issue 创建后是否进入 roadmap mirror、何时进入版本窗口，由 `vibe-roadmap` 决定。
-- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入 roadmap mirror 的候选资格；创建后通过 `vibe roadmap sync` 入 GitHub Project，而不是直接变成 execution record。
+- **先读 shell 输出**：先读取 `gh` / `vibe3` 输出，再做编排判断。
+- **只做 intake，不做排期**：Issue 创建后是否进入规划、何时进入版本窗口，由 `vibe-roadmap` 决定。
+- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入流程的候选资格；创建后通过 `uv run python src/vibe3/cli.py flow bind` 绑定到 flow，而不是直接变成 execution record。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
 ## 使用逻辑
@@ -46,11 +46,11 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
   - **高相似度**：展示重复 Issue，建议用户在原 Issue 下评论或合并。
   - **低相似度**：继续创建流程。
 
-### Step 3: Roadmap 上下文检查
+### Step 3: 上下文检查
 
-- 必须先运行 `vibe roadmap list` 检查是否已有对应 `roadmap item`。
-- 如果 Issue 标题与某个 Roadmap Item 匹配，只记录上下文供后续 `vibe-roadmap` 参考。
-- `roadmap item` 只解释为 GitHub Project item mirror，不把 issue 直接当作本地 task，也不在这里决定 roadmap 排期。
+- 必须先运行 `uv run python src/vibe3/cli.py task list` 检查是否已有相关的 task。
+- 如果 Issue 标题与某个 Task 匹配，只记录上下文供后续参考。
+- task 只解释为执行记录，不把 issue 直接当作本地 task，也不在这里决定排期。
 
 ### Step 4: 填充与润饰
 
@@ -78,9 +78,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ## 对象边界
 
 - `repo issue`: 需求来源与讨论入口
-- `roadmap item`: GitHub Project item mirror
-- `task`: execution record，由 `vibe-task` / shell 流程负责
-- `flow`: execution record 的运行时现场
+- `task`: execution record，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task` 管理
+- `flow`: execution record 的运行时现场，通过 `uv run python src/vibe3/cli.py flow` 管理
 
 ## Failure Handling
 
@@ -90,6 +89,10 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ## Handoff 记录
 
 完成当前 skill 后，若发现流程、文档或命令问题，需在 `.agent/context/task.md` 记录：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-issue: Issue created" --actor vibe-issue --kind milestone
+```
 
 ```markdown
 ## Issues Found

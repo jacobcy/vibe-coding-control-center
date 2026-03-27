@@ -5,7 +5,7 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 # /vibe-continue - Resume Current Flow
 
-`/vibe-continue` 的目标是恢复当前目录承载的 `flow` 所对应任务的上下文，但恢复顺序必须是“共享事实优先，本地 handoff 补充”，而不是反过来。
+`/vibe-continue` 的目标是恢复当前目录承载的 `flow` 所对应任务的上下文，但恢复顺序必须是"共享事实优先，本地 handoff 补充"，而不是反过来。
 
 **核心原则：**
 
@@ -46,8 +46,7 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 1. 当前 `git` 现场（`git branch --show-current`、`git status --short`、必要时 `gh pr view`）
 2. `$(git rev-parse --git-common-dir)/vibe/registry.json`
 3. `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`
-4. `$(git rev-parse --git-common-dir)/vibe/worktrees.json`（如果存在，只作兼容期辅助线索）
-5. `.agent/context/task.md`（如果存在）
+4. `.agent/context/task.md`（如果存在）
 
 必要时再补充：
 
@@ -61,13 +60,19 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 优先从 `git` 现场、共享 `registry.json` 与 task detail 识别：
 
+```bash
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py task list
+uv run python src/vibe3/cli.py handoff show
+```
+
+识别内容：
+
 - 当前 task
 - `next_step`
 - `plan_path`
 - 当前 runtime 绑定事实
 - `primary_issue_ref`（若存在，它就是 `task issue` 的显式落点）
-
-`worktrees.json` 若存在，只能作为兼容期 hint，不能先于 `registry.json` 抢占当前 task 识别权。
 
 如果共享真源中无法识别当前 task，不要把 `task.md` 直接抬升成替代真源；它只能作为本地 handoff 线索。
 
@@ -92,7 +97,7 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 - dirty / clean
 - 当前 PR 状态
 
-continue 阶段可以报告不一致，但不要把查询命令说成“自动对齐”，也不要调用未验证的隐式修复动作。
+continue 阶段可以报告不一致，但不要把查询命令说成"自动对齐"，也不要调用未验证的隐式修复动作。
 
 ### Step 4: 给出继续建议
 

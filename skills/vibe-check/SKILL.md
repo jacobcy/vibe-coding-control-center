@@ -5,7 +5,7 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 # /vibe-check (/check) - task-flow 审计驱动修复
 
-`vibe check(shell)` 只负责审计。`vibe-check` skill 负责：
+`uv run python src/vibe3/cli.py check` (shell) 只负责审计。`vibe-check` skill 负责：
 
 1. 读取审计输出
 2. 做业务判断
@@ -16,7 +16,6 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 对象约束：
 
-- `roadmap item = GitHub Project item mirror`
 - `task = execution record`
 - `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
 - 任何修复都必须先读 shell 审计输出，再决定动作
@@ -34,7 +33,6 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 共享真源固定为：
 
-- `$(git rev-parse --git-common-dir)/vibe/roadmap.json`
 - `$(git rev-parse --git-common-dir)/vibe/registry.json`
 - `$(git rev-parse --git-common-dir)/vibe/worktrees.json`（兼容期 cache / audit hint）
 
@@ -42,7 +40,7 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 - skill 直接编辑 `.git/vibe/*.json`
 - 把 `.agent/context/task.md` 当作共享真源
-- 把 `vibe check(shell)` 扩展成默认自动修复器
+- 把 `uv run python src/vibe3/cli.py check` 扩展成默认自动修复器
 
 ## 执行流程
 
@@ -51,17 +49,17 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 先运行：
 
 ```bash
-vibe check
+uv run python src/vibe3/cli.py check
 ```
 
 必要时补充定向检查：
 
 ```bash
-vibe check link
-vibe roadmap audit --check-links
+uv run python src/vibe3/cli.py check --all
+uv run python src/vibe3/cli.py check --fix
 ```
 
-若要核对 execution spec 证据，可额外读取 `vibe task list` 或 `vibe task show <task-id> ` 的 `spec_standard/spec_ref` 字段。
+若要核对 execution spec 证据，可额外读取 `uv run python src/vibe3/cli.py task list` 或 `uv run python src/vibe3/cli.py task show` 的 `spec_standard/spec_ref` 字段。
 
 ## 职责边界
 
@@ -74,9 +72,9 @@ vibe roadmap audit --check-links
 
 `vibe-check` 不处理：
 
-- `roadmap item <-> task` 对应关系修复
-- roadmap item 未链接 task 的规划问题
-- task 应该归属于哪个 roadmap item 的语义判断
+- `task <-> issue` 对应关系修复
+- task 未链接 issue 的规划问题
+- task 应该归属于哪个 issue 的语义判断
 - GitHub Issue intake、模板补全、查重与创建
 
 `execution_record_id` 与 `spec_standard/spec_ref` 只能作为审计证据或转交依据，不得在 skill 内重写成 GitHub 官方身份。
@@ -85,7 +83,6 @@ vibe roadmap audit --check-links
 
 其中：
 
-- roadmap 规划与版本归类属于 `vibe-roadmap`
 - Issue intake 与 GitHub 创建属于 `vibe-issue`
 - 此 skill 中的 `worktree` 只表示物理目录容器，不表示 runtime 主体；runtime 主语仍是 `task <-> flow` / branch 绑定
 
@@ -104,9 +101,9 @@ vibe roadmap audit --check-links
 当前允许的确定性修复：
 
 - `completed/archived task still has runtime binding: <task-id>`
-  - 修复命令：`vibe task update <task-id> --unassign`
+  - 修复命令：`uv run python src/vibe3/cli.py check --fix`
 - 当前目录承载的 flow 就是目标 task 的确定性现场
-  - 修复命令：`vibe task update <task-id> --bind-current`
+  - 修复命令：`uv run python src/vibe3/cli.py check --fix`
 
 ### B. 需要用户确认
 
@@ -137,8 +134,7 @@ vibe roadmap audit --check-links
 对 A 类问题，逐条调用 shell 命令，不做 JSON 直写：
 
 ```bash
-vibe task update "$task_id" --unassign
-vibe task update "$task_id" --bind-current
+uv run python src/vibe3/cli.py check --fix
 ```
 
 如果命令失败：
@@ -152,13 +148,7 @@ vibe task update "$task_id" --bind-current
 修复后必须重新运行：
 
 ```bash
-vibe check
-```
-
-若修的是链接问题，额外运行：
-
-```bash
-vibe check link
+uv run python src/vibe3/cli.py check
 ```
 
 ## Step 5: 报告
@@ -178,19 +168,19 @@ vibe check link
 
 已自动修复：
 - completed/archived task still has runtime binding: 2026-03-08-foo
-  command: vibe task update 2026-03-08-foo --unassign
+  command: uv run python src/vibe3/cli.py check --fix
 
 需要确认：
 - runtime points to missing worktree: 2026-03-08-bar:wt-old
   reason: shell 无法仅凭审计结果判断应解绑还是重绑
 
 验证结果：
-- vibe check link  -> clean
+- uv run python src/vibe3/cli.py check  -> clean
 ```
 
 ## 与其他命令的关系
 
-- `vibe check`：审计
-- `vibe task update`：原子写入
+- `uv run python src/vibe3/cli.py check`：审计
+- `uv run python src/vibe3/cli.py task status`：更新 task 状态
 - `/vibe-check`：解释 task-flow 审计并编排修复
-- `/vibe-task`：处理 roadmap-task 与 registry 审计修复
+- `/vibe-task`：处理 task 与 registry 审计修复

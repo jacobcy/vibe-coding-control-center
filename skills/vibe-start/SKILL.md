@@ -42,22 +42,22 @@ description: Use when the user wants to execute the current flow's bound tasks f
 ```
 /vibe-start [--task <task>] [--plan <plan>]
   ├─ Step 0: Check Prerequisites
-  │   ├─ vibe flow show
-  │   ├─ vibe task list
-  │   └─ 检查 issue、roadmap item、plan、task 是否就位
+  │   ├─ uv run python src/vibe3/cli.py flow show
+  │   ├─ uv run python src/vibe3/cli.py task list
+  │   └─ 检查 issue、task、plan 是否就位
   │
   ├─ Step 1: 读取当前 flow、issue 与 task
-  │   ├─ vibe flow show
+  │   ├─ uv run python src/vibe3/cli.py flow show
   │   ├─ gh issue view <issue-ref>
   │   └─ 检查 issue_refs、primary_issue_ref、current_task
   │
   ├─ Step 2: 从 issue 落 task 并选择执行目标
   │   ├─ 未指定 task/plan → 根据 issue 编写 plan
-  │   ├─ 创建 task：vibe task add --spec-standard --spec-ref
+  │   ├─ 绑定 issue 到当前 flow: uv run python src/vibe3/cli.py flow bind <issue>
   │   └─ 绑定 task 到当前 flow
   │
   ├─ Step 3: 创建 PR draft
-  │   ├─ vibe flow pr --base <ref> --msg "<description>"
+  │   ├─ uv run python src/vibe3/cli.py pr create --base <ref>
   │   └─ PR 包含 plan 文件或为空 PR
   │
   └─ Step 4: 写入 handoff 与停止
@@ -67,9 +67,10 @@ description: Use when the user wants to execute the current flow's bound tasks f
 
 ## 核心边界
 
-- 允许：读取当前 flow、从 issue 落 task 作为 execution bridge、创建 PR draft、写入 handoff
-- 不允许：创建新的 roadmap item 或 plan、绕过 plan 自由编码、跨 worktree 调度、进入执行阶段
+- 允许：读取当前 flow、将 issue 绑定到 flow 作为 execution bridge、创建 PR draft、写入 handoff
+- 不允许：绕过 issue 自由编码、跨 worktree 调度、进入执行阶段
 - 若发现当前 flow 已有 PR，本 skill 只能处理该 flow 合法范围内的 follow-up 或当前已绑定 task，不得把新目标堆进当前 flow
+- 当没有指定 task/plan 时，允许根据 issue 创建 plan 并绑定 issue 到 flow
 
 ## Workflow
 
@@ -78,16 +79,16 @@ description: Use when the user wants to execute the current flow's bound tasks f
 优先读取：
 
 ```bash
-vibe flow show
-vibe roadmap status
+uv run python src/vibe3/cli.py flow show
+uv run python src/vibe3/cli.py task list
 ```
 
 必要时补充：
 
 ```bash
-vibe task list
+# 显示指定分支的 task 详情（<branch> 为分支名）
+uv run python src/vibe3/cli.py task show <branch>
 gh issue view <issue-ref>
-vibe roadmap list
 ```
 
 检查点：
@@ -99,32 +100,31 @@ vibe roadmap list
 
 ### Step 2: 准备 task 和 plan
 
-**情况 A：用户指定 task**
+**情况 A：用户指定分支**
 
 ```bash
-vibe task show <task-id>
+# 显示指定分支的 task 详情
+uv run python src/vibe3/cli.py task show <branch>
 ```
 
 **情况 B：用户指定 plan**
 
 ```bash
 ls docs/plans/<plan-name>.md
-vibe task add --spec-standard <standard> --spec-ref <plan-path>
 ```
 
 **情况 C：都没有**
 
 - 根据 primary_issue_ref 编写 plan（保存到 `docs/plans/` 目录）
-- 使用 `vibe task add --spec-standard openspec --spec-ref <plan-path>` 创建 task
-- 使用 `vibe task update --bind-current` 绑定到当前 flow
+- 使用 `uv run python src/vibe3/cli.py flow bind <issue>` 绑定 issue 到当前 flow
 
 ### Step 3: 创建 PR draft
 
 创建空的 PR draft 或包含 plan 文件的 PR：
 
 ```bash
-# 创建 PR（首次需要提供 CHANGELOG message）
-vibe flow pr --base <ref> --msg "<description>"
+# 创建 PR draft
+uv run python src/vibe3/cli.py pr create --base <ref>
 ```
 
 注意：
@@ -132,15 +132,15 @@ vibe flow pr --base <ref> --msg "<description>"
 - PR 用于占位，不包含实现代码
 - 如果已有 plan 文件，应包含在 PR 中
 - PR 创建后当前 flow 进入 `open + had_pr` 状态
-- 首次发布需要提供有效的 CHANGELOG message
-- **PR 创建后需要手动关联到 task**：
-  ```bash
-  vibe task update <task-id> --pr "gh-<pr-number>"
-  ```
+- **PR 创建后需要手动关联到 task**
 
 ### Step 4: 写入 handoff
 
 完成后更新 `.agent/context/task.md`，至少记录：
+
+```bash
+uv run python src/vibe3/cli.py handoff append "vibe-start: execution environment ready" --actor vibe-start --kind milestone
+```
 
 ```markdown
 ## Skill Handoff
@@ -167,7 +167,7 @@ vibe flow pr --base <ref> --msg "<description>"
 ## Restrictions
 
 - 不得把 `.agent/context/task.md` 当正式执行图纸
-- 不得把“跳过”写成“完成”
+- 不得把"跳过"写成"完成"
 - 不得在缺 `spec_ref` 时继续编码
 - 不得绕过 issue 直接凭空创建 task
 - 不得把任意 `issue_ref` 默认写成当前 task 的主 issue
