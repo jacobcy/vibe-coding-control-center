@@ -78,6 +78,12 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         )
         svc = SerenaService(git_client=git_client)
         impact = svc.analyze_changes(source)
+        untracked_files: set[str] = set()
+        if source_type == "uncommit":
+            try:
+                untracked_files = set(git_client.get_untracked_files())
+            except Exception:
+                untracked_files = set()
 
         sys.stderr = old_stderr
 
@@ -140,6 +146,18 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             and not line.startswith("+++")
             and not line.startswith("---")
         )
+        if untracked_files:
+            for file in changed_files:
+                if file not in untracked_files:
+                    continue
+                try:
+                    changed_lines += max(
+                        1, len(Path(file).read_text(encoding="utf-8").splitlines())
+                    )
+                except OSError:
+                    log.bind(file=file).warning(
+                        "Failed to count lines for untracked file"
+                    )
 
         config = get_config()
         critical_paths = config.review_scope.critical_paths

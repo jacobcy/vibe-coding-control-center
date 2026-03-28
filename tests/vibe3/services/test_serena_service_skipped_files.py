@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.models.change_source import UncommittedSource
 from vibe3.services.serena_service import SerenaService
 
 
@@ -114,3 +115,20 @@ def test_get_changed_functions_missing_file(temp_dir):
 
     # Should return empty list for missing file
     assert result == []
+
+
+def test_get_changed_functions_untracked_file(temp_dir):
+    """Test get_changed_functions treats untracked files as full-file changes."""
+    new_file = temp_dir / "new_module.py"
+    new_file.write_text(
+        "def alpha():\n" "    return 1\n\n" "def beta():\n" "    return 2\n"
+    )
+
+    mock_git_client = MagicMock()
+    mock_git_client.get_untracked_files.return_value = [str(new_file)]
+
+    service = SerenaService(git_client=mock_git_client)
+
+    result = service.get_changed_functions(str(new_file), source=UncommittedSource())
+
+    assert result == ["alpha", "beta"]

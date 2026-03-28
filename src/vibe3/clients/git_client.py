@@ -28,6 +28,9 @@ from vibe3.clients.git_status_ops import (
     get_diff as _get_diff,
 )
 from vibe3.clients.git_status_ops import (
+    get_untracked_files as _get_untracked_files,
+)
+from vibe3.clients.git_status_ops import (
     has_uncommitted_changes as _has_uncommitted_changes,
 )
 from vibe3.clients.git_status_ops import (
@@ -144,6 +147,10 @@ class GitClient:
     def get_diff(self, source: ChangeSource) -> str:
         """统一接口：获取 diff 内容."""
         return _get_diff(self._run, source, self._github_client, self._pr_diff_cache)
+
+    def get_untracked_files(self) -> list[str]:
+        """Return untracked files in the worktree."""
+        return _get_untracked_files(self._run)
 
     def stash_push(self, message: str | None = None) -> str:
         """Stash current changes, return stash ref."""

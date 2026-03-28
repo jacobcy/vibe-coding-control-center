@@ -1,7 +1,7 @@
 """Inspect command - 信息提供层，输出结构化数据供 vibe review 消费."""
 
 import json
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 import typer
 
@@ -9,6 +9,7 @@ from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
 from vibe3.commands.inspect_symbols import register as register_symbols
 from vibe3.services import command_analyzer, dag_service, structure_service
+from vibe3.services.command_analyzer_helpers import find_command_file
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -22,6 +23,22 @@ _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
     bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
 ]
+
+
+def _list_analyzable_top_level_commands(
+    commands_root: str = "src/vibe3/commands",
+) -> list[str]:
+    """Return root CLI commands that have analyzable command files."""
+    from vibe3.cli import app as root_app  # noqa: I001
+    from typer.main import get_command  # noqa: I001
+
+    names: list[str] = []
+    click_app = cast(Any, get_command(root_app))
+    for name in click_app.commands.keys():
+        if name and find_command_file(name, None, commands_root):
+            names.append(name)
+    return sorted(dict.fromkeys(names))
+
 
 # Register extracted commands
 register_symbols(app)
@@ -122,10 +139,7 @@ def commands(
         enable_trace()
 
     if not command:
-        names = ", ".join(
-            cmd.name or (cmd.callback.__name__ if cmd.callback else "")
-            for cmd in app.registered_commands
-        )
+        names = ", ".join(_list_analyzable_top_level_commands())
         typer.echo(f"Available commands: {names}")
         return
 
