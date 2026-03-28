@@ -30,9 +30,10 @@ TraceOption = Annotated[bool, typer.Option("--trace")]
 
 def _fetch_issue_titles(
     gh: "GitHubClient", flow_status: "FlowStatusResponse"
-) -> tuple[dict[int, str], "dict[str, object] | None", bool]:
+) -> "tuple[dict[int, str], dict[str, object] | None, bool, dict[str, object] | None]":
     titles: dict[int, str] = {}
     network_error = False
+    milestone_data: dict[str, object] | None = None
     numbers: set[int] = set()
     if flow_status.task_issue_number:
         numbers.add(flow_status.task_issue_number)
@@ -45,6 +46,23 @@ def _fetch_issue_titles(
             break
         if isinstance(result, dict):
             titles[n] = result.get("title", "")
+            if n == flow_status.task_issue_number and result.get("milestone"):
+                ms = result["milestone"]
+                ms_issues = gh.get_milestone_issues(ms["number"])
+                open_count = sum(
+                    1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN"
+                )
+                closed_count = sum(
+                    1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
+                )
+                milestone_data = {
+                    "number": ms["number"],
+                    "title": ms["title"],
+                    "open": open_count,
+                    "closed": closed_count,
+                    "issues": ms_issues,
+                    "task_issue": n,
+                }
     pr_data: dict[str, object] | None = None
     if flow_status.pr_number and not network_error:
         try:
@@ -59,11 +77,14 @@ def _fetch_issue_titles(
                 }
         except Exception:
             network_error = True
-    return titles, pr_data, network_error
+    return titles, pr_data, network_error, milestone_data
 
 
 def show(
-    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name (defaults to current branch)"),
+    ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
     json_output: JsonOption = False,
@@ -88,10 +109,12 @@ def show(
                 from vibe3.clients.github_client import GitHubClient
 
                 gh = GitHubClient()
-                issue_titles, pr_data, net_err = _fetch_issue_titles(gh, flow_status)
+                issue_titles, pr_data, net_err, milestone_data = _fetch_issue_titles(
+                    gh, flow_status
+                )
                 if net_err:
                     render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
-                render_flow_status(flow_status, issue_titles, pr_data)
+                render_flow_status(flow_status, issue_titles, pr_data, milestone_data)
             return
 
         timeline = service.get_flow_timeline(target_branch)
@@ -106,7 +129,35 @@ def show(
             }
             typer.echo(json.dumps(output, indent=2, default=str))
         else:
-            render_flow_timeline(timeline["state"], timeline["events"])
+            milestone_data = None
+            task_issue = timeline["state"].task_issue_number
+            if task_issue:
+                from vibe3.clients.github_client import GitHubClient
+
+                gh = GitHubClient()
+                issue = gh.view_issue(task_issue)
+                if isinstance(issue, dict) and issue.get("milestone"):
+                    ms = issue["milestone"]
+                    ms_issues = gh.get_milestone_issues(ms["number"])
+                    open_count = sum(
+                        1
+                        for i in ms_issues
+                        if str(i.get("state", "")).upper() == "OPEN"
+                    )
+                    closed_count = sum(
+                        1
+                        for i in ms_issues
+                        if str(i.get("state", "")).upper() == "CLOSED"
+                    )
+                    milestone_data = {
+                        "number": ms["number"],
+                        "title": ms["title"],
+                        "open": open_count,
+                        "closed": closed_count,
+                        "issues": ms_issues,
+                        "task_issue": task_issue,
+                    }
+            render_flow_timeline(timeline["state"], timeline["events"], milestone_data)
             if timeline["state"].task_issue_number is None:
                 console.print(
                     "[yellow]提示：当前 flow 还没有 task，建议 "

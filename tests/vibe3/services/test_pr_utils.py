@@ -1,6 +1,6 @@
 """Tests for PR utility functions."""
 
-from vibe3.models.pr import PRMetadata
+from vibe3.models.pr import PRMetadata, normalize_actor
 from vibe3.services.pr_utils import (
     _build_linked_section,
     _has_issue_linked,
@@ -69,38 +69,47 @@ class TestBuildLinkedSection:
         assert _build_linked_section(metadata, body) == ""
 
 
-class TestBuildPrBody:
-    """Tests for build_pr_body."""
+class TestNormalizeActor:
+    """Tests for normalize_actor."""
 
-    def test_no_metadata_passthrough(self) -> None:
-        assert build_pr_body("plain body") == "plain body"
+    def test_standard_format_passthrough(self) -> None:
+        assert normalize_actor("claude/sonnet-4.6") == "claude/sonnet-4.6"
 
-    def test_metadata_appended(self) -> None:
-        metadata = PRMetadata(branch="feature-1", task_issue=None)
-        result = build_pr_body("body", metadata)
-        assert result.startswith("body")
-        assert "**Branch:** feature-1" in result
+    def test_placeholder_unknown(self) -> None:
+        assert normalize_actor("unknown") is None
 
-    def test_task_issue_injected_at_top(self) -> None:
-        metadata = PRMetadata(branch="feature-1", task_issue=42)
-        result = build_pr_body("body", metadata)
-        assert result.startswith("Closes #42\n\nbody")
-        assert "**Task Issue:** #42" in result
+    def test_placeholder_system(self) -> None:
+        assert normalize_actor("system") is None
 
-    def test_no_duplicate_linking_keyword(self) -> None:
-        metadata = PRMetadata(branch="feature-1", task_issue=42)
-        body = "Fixes #42\n\nOriginal body"
-        result = build_pr_body(body, metadata)
-        # Should not prepend another Closes/Fixes
-        assert result.startswith("Fixes #42\n\nOriginal body")
-        # Count occurrences of linking keywords for #42
-        count = result.count("#42")
-        assert count == 2  # one in body, one in metadata section
+    def test_placeholder_server(self) -> None:
+        assert normalize_actor("server") is None
 
-    def test_task_issue_only_in_metadata_when_zero(self) -> None:
-        metadata = PRMetadata(branch="feature-1", task_issue=0)
-        result = build_pr_body("body", metadata)
-        assert not result.startswith("Closes")
+    def test_placeholder_ai_assistant(self) -> None:
+        assert normalize_actor("ai_assistant") is None
+
+    def test_empty_string(self) -> None:
+        assert normalize_actor("") is None
+
+    def test_whitespace_only(self) -> None:
+        assert normalize_actor("  ") is None
+
+    def test_legacy_agent_claude(self) -> None:
+        assert normalize_actor("Agent-Claude") == "claude"
+
+    def test_legacy_agent_claude_lowercase(self) -> None:
+        assert normalize_actor("agent-claude") == "claude"
+
+    def test_legacy_agent_codex(self) -> None:
+        assert normalize_actor("Agent-Codex") == "codex"
+
+    def test_legacy_openai_bot(self) -> None:
+        assert normalize_actor("openai-code-agent[bot]") == "openai"
+
+    def test_backend_only_passthrough(self) -> None:
+        assert normalize_actor("claude") == "claude"
+
+    def test_strips_whitespace(self) -> None:
+        assert normalize_actor("  claude/sonnet  ") == "claude/sonnet"
 
 
 class TestContributors:
@@ -110,33 +119,51 @@ class TestContributors:
         metadata = PRMetadata()
         assert metadata.contributors == []
 
-    def test_empty_when_all_default(self) -> None:
-        metadata = PRMetadata(planner="unknown", executor="system", reviewer="server")
+    def test_empty_when_all_placeholder(self) -> None:
+        metadata = PRMetadata(
+            planner="unknown",
+            executor="system",
+            reviewer="server",
+            latest="ai_assistant",
+        )
         assert metadata.contributors == []
 
-    def test_filters_and_deduplicates(self) -> None:
+    def test_dedup_after_normalization(self) -> None:
         metadata = PRMetadata(
-            planner="claude-opus",
-            executor="claude-opus",  # duplicate
-            reviewer="system",  # default
+            planner="Agent-Claude",
+            executor="claude/sonnet-4.6",
+            reviewer="claude-opus",
         )
-        assert metadata.contributors == ["claude-opus"]
+        # Agent-Claude and claude/sonnet-4.6 share backend "claude",
+        # the more specific form wins. claude-opus is a different backend.
+        assert metadata.contributors == ["claude/sonnet-4.6", "claude-opus"]
+
+    def test_legacy_and_standard_merge(self) -> None:
+        metadata = PRMetadata(
+            planner="Agent-Claude",
+            executor="claude/sonnet-4.6",
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6"]
 
     def test_preserves_order(self) -> None:
         metadata = PRMetadata(
             planner="codex/gpt-5.4",
             executor="claude/sonnet-4.5",
-            reviewer="claude/sonnet-4.5",  # duplicate
+            reviewer="claude/sonnet-4.5",
+            latest="codex/gpt-5.4",
         )
         assert metadata.contributors == ["codex/gpt-5.4", "claude/sonnet-4.5"]
 
-    def test_case_insensitive_default_filter(self) -> None:
-        metadata = PRMetadata(planner="Unknown", executor="System")
-        assert metadata.contributors == []
+    def test_includes_latest_actor(self) -> None:
+        metadata = PRMetadata(latest="claude/sonnet-4.6")
+        assert metadata.contributors == ["claude/sonnet-4.6"]
 
-    def test_empty_string_filtered(self) -> None:
-        metadata = PRMetadata(planner="", executor="claude-opus")
-        assert metadata.contributors == ["claude-opus"]
+    def test_latest_deduped_with_other_roles(self) -> None:
+        metadata = PRMetadata(
+            planner="claude/sonnet-4.6",
+            latest="claude/sonnet-4.6",
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6"]
 
     def test_latest_actor_included(self) -> None:
         metadata = PRMetadata(latest="codex/gpt-5.4")
@@ -150,22 +177,44 @@ class TestContributors:
         assert metadata.contributors == ["claude-opus"]
 
 
-class TestBuildPrBodyContributors:
-    """Tests for contributors section in build_pr_body."""
+class TestBuildPrBody:
+    """Tests for build_pr_body."""
 
-    def test_no_contributors_section_when_all_default(self) -> None:
+    def test_no_metadata_passthrough(self) -> None:
+        assert build_pr_body("plain body") == "plain body"
+
+    def test_closes_prepended(self) -> None:
+        metadata = PRMetadata(branch="f1", task_issue=42)
+        result = build_pr_body("body", metadata)
+        assert result.startswith("Closes #42\n\nbody")
+
+    def test_no_duplicate_closes(self) -> None:
+        metadata = PRMetadata(branch="f1", task_issue=42)
+        body = "Fixes #42\n\nOriginal body"
+        result = build_pr_body(body, metadata)
+        assert result.startswith("Fixes #42\n\nOriginal body")
+
+    def test_no_closes_when_task_zero(self) -> None:
+        metadata = PRMetadata(branch="f1", task_issue=0)
+        result = build_pr_body("body", metadata)
+        assert not result.startswith("Closes")
+
+    def test_no_contributors_section_when_all_placeholder(self) -> None:
         metadata = PRMetadata(branch="f1", planner="unknown", executor="system")
         result = build_pr_body("body", metadata)
         assert "Contributors" not in result
+        assert "Vibe3 Metadata" not in result
+        assert "Branch:" not in result
 
     def test_contributors_section_rendered(self) -> None:
         metadata = PRMetadata(
             branch="f1",
-            planner="claude-opus",
-            executor="claude-sonnet",
+            planner="claude/sonnet-4.6",
+            executor="codex/gpt-5.4",
         )
         result = build_pr_body("body", metadata)
-        assert "**Contributors:** claude-opus, claude-sonnet" in result
+        assert "## Contributors" in result
+        assert "claude/sonnet-4.6, codex/gpt-5.4" in result
 
     def test_contributors_with_three_distinct(self) -> None:
         metadata = PRMetadata(
@@ -175,23 +224,28 @@ class TestBuildPrBodyContributors:
             reviewer="agent-c",
         )
         result = build_pr_body("body", metadata)
-        assert "**Contributors:** agent-a, agent-b, agent-c" in result
-
-    def test_idempotent_no_duplicate_block(self) -> None:
-        metadata = PRMetadata(
-            branch="f1",
-            planner="claude-opus",
-            executor="claude-opus",
-        )
-        result = build_pr_body("body", metadata)
-        count = result.count("Contributors")
-        assert count == 1
+        assert "agent-a, agent-b, agent-c" in result
 
     def test_no_contributors_when_no_metadata(self) -> None:
         result = build_pr_body("plain body")
         assert "Contributors" not in result
 
-    def test_reviewer_in_metadata_section(self) -> None:
-        metadata = PRMetadata(branch="f1", reviewer="claude-opus")
+    def test_closes_and_contributors_combined(self) -> None:
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=42,
+            planner="claude/sonnet-4.6",
+        )
         result = build_pr_body("body", metadata)
-        assert "**Reviewer:** claude-opus" in result
+        assert result.startswith("Closes #42\n\nbody")
+        assert "## Contributors" in result
+        assert "claude/sonnet-4.6" in result
+
+    def test_idempotent_contributors(self) -> None:
+        metadata = PRMetadata(
+            branch="f1",
+            planner="claude/sonnet-4.6",
+            executor="claude/sonnet-4.6",
+        )
+        result = build_pr_body("body", metadata)
+        assert result.count("claude/sonnet-4.6") == 1
