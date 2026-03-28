@@ -2,7 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from vibe3.models.flow import FlowState, FlowStatusResponse
+import pytest
+
+from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse
 from vibe3.services.flow_usecase import FlowUsecase
 
 
@@ -104,3 +106,25 @@ def test_bind_issue_delegates_to_task_service() -> None:
     task_service.link_issue.assert_called_once_with(
         "task/demo", 248, "dependency", actor=None
     )
+
+
+def test_create_flow_rejects_invalid_task_before_branch_creation() -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "main"
+    flow_service.can_create_from_current_worktree.return_value = CreateDecision(
+        allowed=True,
+        reason="No active flow in current worktree",
+        start_ref="origin/main",
+        requires_new_worktree=False,
+    )
+    usecase = FlowUsecase(
+        flow_service=flow_service,
+        task_service=MagicMock(),
+        handoff_service=MagicMock(),
+        spec_ref_service=MagicMock(),
+    )
+
+    with pytest.raises(ValueError, match="Invalid issue format: abc"):
+        usecase.create_flow("demo", base="main", task="abc")
+
+    flow_service.create_flow_with_branch.assert_not_called()

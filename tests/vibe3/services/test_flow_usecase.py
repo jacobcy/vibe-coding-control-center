@@ -192,28 +192,6 @@ def test_create_flow_supports_multiple_task_refs() -> None:
     )
 
 
-def test_create_flow_rejects_invalid_task_before_branch_creation() -> None:
-    flow_service = MagicMock()
-    flow_service.get_current_branch.return_value = "main"
-    flow_service.can_create_from_current_worktree.return_value = CreateDecision(
-        allowed=True,
-        reason="No active flow in current worktree",
-        start_ref="origin/main",
-        requires_new_worktree=False,
-    )
-    usecase = FlowUsecase(
-        flow_service=flow_service,
-        task_service=MagicMock(),
-        handoff_service=MagicMock(),
-        spec_ref_service=MagicMock(),
-    )
-
-    with pytest.raises(ValueError, match="Invalid issue format: abc"):
-        usecase.create_flow("demo", base="main", task="abc")
-
-    flow_service.create_flow_with_branch.assert_not_called()
-
-
 def test_task_derived_spec_ref_is_skipped_when_display_unavailable() -> None:
     """Task-based spec binding should be skipped when display cannot be resolved."""
     flow_service = MagicMock()
