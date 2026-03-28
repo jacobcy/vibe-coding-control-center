@@ -263,22 +263,9 @@ class PRService:
         return merged_pr
 
     def calculate_version_bump(
-        self,
-        pr_number: int,
-        group: str | None = None,
+        self, pr_number: int, group: str | None = None
     ) -> VersionBumpResponse:
-        """Calculate version bump for PR.
-
-        Args:
-            pr_number: PR number
-            group: Task group (feature/bug/docs/chore)
-
-        Returns:
-            Version bump response
-
-        Raises:
-            RuntimeError: If PR not found
-        """
+        """Calculate version bump for PR."""
         logger.bind(
             domain="pr",
             action="calculate_version_bump",
@@ -286,12 +273,9 @@ class PRService:
             group=group,
         ).info("Calculating version bump")
 
-        # Get PR to verify it exists
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
-
-        # Use version service for calculation (reads from VERSION file)
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
