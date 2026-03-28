@@ -138,6 +138,17 @@ class TestContributors:
         metadata = PRMetadata(planner="", executor="claude-opus")
         assert metadata.contributors == ["claude-opus"]
 
+    def test_latest_actor_included(self) -> None:
+        metadata = PRMetadata(latest="codex/gpt-5.4")
+        assert metadata.contributors == ["codex/gpt-5.4"]
+
+    def test_latest_actor_deduplicated(self) -> None:
+        metadata = PRMetadata(
+            planner="claude-opus",
+            latest="claude-opus",
+        )
+        assert metadata.contributors == ["claude-opus"]
+
 
 class TestBuildPrBodyContributors:
     """Tests for contributors section in build_pr_body."""

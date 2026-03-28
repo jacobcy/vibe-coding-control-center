@@ -32,6 +32,7 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         planner=flow_data.get("planner_actor"),
         executor=flow_data.get("executor_actor"),
         reviewer=flow_data.get("reviewer_actor"),
+        latest=flow_data.get("latest_actor"),
     )
 
     logger.bind(

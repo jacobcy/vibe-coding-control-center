@@ -26,6 +26,7 @@ class PRMetadata(BaseModel):
     planner: Optional[str] = Field(None, description="Planner agent")
     executor: Optional[str] = Field(None, description="Executor agent")
     reviewer: Optional[str] = Field(None, description="Reviewer agent")
+    latest: Optional[str] = Field(None, description="Latest actor")
 
     @property
     def contributors(self) -> list[str]:
@@ -37,7 +38,7 @@ class PRMetadata(BaseModel):
         default_values = {"unknown", "system", "server", ""}
         seen: set[str] = set()
         result: list[str] = []
-        for actor in (self.planner, self.executor, self.reviewer):
+        for actor in (self.planner, self.executor, self.reviewer, self.latest):
             if actor and actor.lower() not in default_values and actor not in seen:
                 seen.add(actor)
                 result.append(actor)
