@@ -5,12 +5,7 @@ description: Use when the user wants a structured code review for local or PR-bo
 
 # Vibe Code Review Protocol
 
-标准真源：
-
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
-- 交付 flow / PR / worktree 语义以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 **核心职责**: 代码质量审查（PR 提交前后的深度分析）
 
@@ -81,7 +76,7 @@ uv run python src/vibe3/cli.py review base
   - If a PR exists (opened): Use `gh pr diff` to fetch the source of truth for changes.
   - If local only: Use `git diff main...HEAD`.
 - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
-- **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
+- **Review Context**: Cross-reference with the Task README and the original goal from `vibe3 handoff show`.
 
 ## 2. Serena 使用步骤（审查前）
 

@@ -20,7 +20,11 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 ## 停止点
 
-PR 创建后 → 自动进入 `/vibe-integrate`
+PR 创建后停止，输出：
+
+- ✅ commit 已推送
+- ✅ PR 已创建
+- **下一步**：运行 `/vibe-integrate` 检查 CI / review 并推进合并
 
 ## 必读文档
 
@@ -29,7 +33,6 @@ PR 创建后 → 自动进入 `/vibe-integrate`
 - `docs/standards/v3/command-standard.md`
 - `docs/standards/v3/handoff-governance-standard.md`
 - `docs/standards/github-labels-standard.md`
-- `.agent/context/task.md`
 
 ## 完整流程
 
@@ -70,9 +73,9 @@ PR 创建后 → 自动进入 `/vibe-integrate`
   │   ├─ commit 只服务一个交付目标
   │   └─ uv run python src/vibe3/cli.py pr create --base <ref>
   │
-  └─ Step 7: 写入 handoff 与自动进入 /vibe-integrate
-      ├─ 更新 .agent/context/task.md
-      └─ 自动进入 /vibe-integrate
+  └─ Step 7: 写入 handoff 并停止
+      ├─ vibe3 handoff append
+      └─ 停止，等待用户确认后运行 /vibe-integrate
 ```
 
 只要 shell 参数、子命令或 flag 有任何不确定，先运行对应命令的 `--help`。
@@ -104,7 +107,7 @@ uv run python src/vibe3/cli.py flow list
 
 - 当前 `issue` / `flow` / `branch` / `task` / `pr`
 - 当前 flow 是否已经进入 `open + had_pr`
-- `.agent/context/task.md` 里上一环节留下了什么 handoff
+- `vibe3 handoff show` 里上一环节留下了什么 handoff
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能继续沿用旧判断。
 
@@ -324,25 +327,23 @@ gh pr view <pr-number>
 gh pr edit <pr-number> --add-label "type/feature,scope/python,status/ready-for-review"
 ```
 
-### Step 7: PR 发出后的强制停点
+### Step 7: 写入 handoff 并停止
 
-PR 创建成功后，必须立即把当前 flow 视为 `open + had_pr`。
+PR 创建成功后，当前 flow 进入 `open + had_pr` 状态，skill 在此停止。
 
-此时：
+此阶段：
 
 - 允许：进入 `/vibe-integrate` 检查 review、CI、merge 阻塞
 - 不允许：直接进入 `/vibe-done`
-- 不允许：把当前 flow 当作下一个新目标继续开发现场
+- 不允许：把当前 flow 当作下一个新目标继续开发
 
-若用户问"下一步是什么"，默认回答应是：
+若用户问"下一步是什么"，回答：
 
-- 先去 `/vibe-integrate`
-- 先确认或补齐 review evidence
-- 再决定是否已满足 `uv run python src/vibe3/cli.py flow done` 的收口条件
+> 运行 `/vibe-integrate` 检查 CI 状态和 review，确认合并条件后推进。
 
 ### Step 8: 写入 handoff
 
-完成当前 skill 后，必须更新 `.agent/context/task.md`：
+完成当前 skill 后，运行：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --actor vibe-commit --kind milestone

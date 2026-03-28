@@ -49,7 +49,7 @@
 ## Context And File Hygiene
 - 不在终端直接喷大体量内容；优先摘要、截断、过滤。
 - 长期共享记忆使用 `.agent/context/memory.md`。
-- 当前短期上下文使用 `.agent/context/task.md`。
+- 当前 flow handoff 通过 `vibe3 handoff show` 读取，通过 `vibe3 handoff append` 写入。
 - 跨 worktree 共享状态写入 `.git/vibe/`（位于主仓库 git common dir）。
 - 不在项目根目录随意落临时文件。
 - 仓库相关的临时脚本、调试输出、scratch 文件统一放 `temp/`，便于追踪并由清理流程统一处理。

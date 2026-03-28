@@ -49,7 +49,13 @@ class FlowQueryMixin:
         state_data = self.store.get_flow_state(branch)
         if not state_data:
             return None
-        return FlowState(**state_data)
+        try:
+            return FlowState(**state_data)
+        except ValidationError as exc:
+            logger.bind(domain="flow", branch=branch).warning(
+                f"Flow has invalid data: {exc}"
+            )
+            return None
 
     def get_flow_status(self, branch: str) -> FlowStatusResponse | None:
         """Get flow status for branch."""
@@ -63,34 +69,40 @@ class FlowQueryMixin:
             return None
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
-        return FlowStatusResponse(
-            branch=flow_data["branch"],
-            flow_slug=flow_data["flow_slug"],
-            flow_status=flow_data["flow_status"],
-            task_issue_number=flow_data.get("task_issue_number"),
-            pr_number=flow_data.get("pr_number"),
-            pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
-            spec_ref=flow_data.get("spec_ref"),
-            plan_ref=flow_data.get("plan_ref"),
-            report_ref=flow_data.get("report_ref"),
-            audit_ref=flow_data.get("audit_ref"),
-            planner_actor=flow_data.get("planner_actor"),
-            planner_session_id=flow_data.get("planner_session_id"),
-            executor_actor=flow_data.get("executor_actor"),
-            executor_session_id=flow_data.get("executor_session_id"),
-            reviewer_actor=flow_data.get("reviewer_actor"),
-            reviewer_session_id=flow_data.get("reviewer_session_id"),
-            latest_actor=flow_data.get("latest_actor"),
-            blocked_by=flow_data.get("blocked_by"),
-            next_step=flow_data.get("next_step"),
-            issues=issues,
-            planner_status=flow_data.get("planner_status"),
-            executor_status=flow_data.get("executor_status"),
-            reviewer_status=flow_data.get("reviewer_status"),
-            execution_pid=flow_data.get("execution_pid"),
-            execution_started_at=flow_data.get("execution_started_at"),
-            execution_completed_at=flow_data.get("execution_completed_at"),
-        )
+        try:
+            return FlowStatusResponse(
+                branch=flow_data["branch"],
+                flow_slug=flow_data["flow_slug"],
+                flow_status=flow_data["flow_status"],
+                task_issue_number=flow_data.get("task_issue_number"),
+                pr_number=flow_data.get("pr_number"),
+                pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
+                spec_ref=flow_data.get("spec_ref"),
+                plan_ref=flow_data.get("plan_ref"),
+                report_ref=flow_data.get("report_ref"),
+                audit_ref=flow_data.get("audit_ref"),
+                planner_actor=flow_data.get("planner_actor"),
+                planner_session_id=flow_data.get("planner_session_id"),
+                executor_actor=flow_data.get("executor_actor"),
+                executor_session_id=flow_data.get("executor_session_id"),
+                reviewer_actor=flow_data.get("reviewer_actor"),
+                reviewer_session_id=flow_data.get("reviewer_session_id"),
+                latest_actor=flow_data.get("latest_actor"),
+                blocked_by=flow_data.get("blocked_by"),
+                next_step=flow_data.get("next_step"),
+                issues=issues,
+                planner_status=flow_data.get("planner_status"),
+                executor_status=flow_data.get("executor_status"),
+                reviewer_status=flow_data.get("reviewer_status"),
+                execution_pid=flow_data.get("execution_pid"),
+                execution_started_at=flow_data.get("execution_started_at"),
+                execution_completed_at=flow_data.get("execution_completed_at"),
+            )
+        except ValidationError as exc:
+            logger.bind(domain="flow", branch=branch).warning(
+                f"Flow status has invalid data: {exc}"
+            )
+            return None
 
     def list_flows(
         self,

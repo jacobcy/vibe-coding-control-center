@@ -15,7 +15,7 @@ tags: [workflow, vibe, execution, orchestration]
 - 它默认以 `repo issue -> flow` 作为用户执行主链视角。
 - 它负责在当前 flow 中从 issue 落 task 作为 execution bridge，再把 execution spec 交给执行体系。
 - 具体 task 选择顺序、`auto` 模式、blocker 分类、handoff 写回，都下沉到 `vibe-start` skill。
-- `.agent/context/task.md` 只是 handoff 补充，不是执行图纸。
+- `vibe3 handoff show` 输出只是 handoff 补充，不是执行图纸。
 
 ## Steps
 

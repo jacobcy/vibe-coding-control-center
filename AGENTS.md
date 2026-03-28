@@ -6,6 +6,16 @@ Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
 > **Single Source of Truth**: Each document has a specific responsibility. See [SOUL.md](SOUL.md) §0 for document responsibility matrix.
 > If other root-level agent files exist, treat them as aliases and follow this file.
 
+## 🗺️ 项目导览（先读这个）
+
+**不熟悉本项目？先运行 `/vibe-instruction`**（技能文件：`skills/vibe-instruction/SKILL.md`）
+
+该技能解释：
+- vibe2 shell 和 vibe3 python 各自负责什么
+- vibe3 的核心命令（`flow show/create/bind/done/blocked`、`task show`、`handoff` 等）
+- 标准开发工作流（`/vibe-new` → 编码 → `/vibe-commit` → `/vibe-integrate` → `/vibe-done`）
+- 常见场景速查
+
 ## 📚 Essential Reading
 
 Follow this reading order. Each document is the authority for its domain:
@@ -21,22 +31,26 @@ Follow this reading order. Each document is the authority for its domain:
 ## 📍 Project Identity
 
 This project has **two parallel implementations**:
-1. **V2 (Shell)** — Zsh implementation (`bin/`, `lib/`, `tests/vibe2/`)
-2. **V3 (Python)** — Python implementation (`src/vibe3/`, `tests/vibe3/`)
+
+1. **V2 (Shell)** — Zsh alias 和环境工具（`bin/`, `lib/`, `config/aliases.zsh`）
+2. **V3 (Python)** — issue/flow/PR 管理主系统（`src/vibe3/`, `tests/vibe3/`）
+
+> V2 的 `bin/vibe flow|task` 等命令已重定向到 V3，V2 主要提供 alias（`wtnew`、`vup`）和环境工具。
 
 ## 📍 Workspace Structure
 
 - **V2 (Shell)**: `bin/`, `lib/`, `config/`
 - **V3 (Python)**: `src/vibe3/` (see [.agent/rules/python-standards.md](.agent/rules/python-standards.md))
-- **Skills**: `skills/`
+- **Skills**: `skills/`（各技能的 SKILL.md 文件）
 - **Workflows, rules, context**: `.agent/`
-- **Shared state truth**: `.git/vibe/`（位于主仓库 git common dir）
+- **Shared state truth**: `.git/vibe3/`（位于主仓库 git common dir，即最顶层 `.git`）
 
 ## 🚀 Quick Start
 
-1. **Verify environment**: Run `bin/vibe check`
-2. **Check current work**: Read `.agent/context/task.md`
-3. **Understand execution rules**: Read [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md) and [.agent/rules/patterns.md](.agent/rules/patterns.md)
+1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
+2. **检查当前 flow**: 运行 `uv run python src/vibe3/cli.py flow show`
+3. **查看当前任务**: 运行 `uv run python src/vibe3/cli.py task show`
+4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
 
 ## 🤖 Protocol
 

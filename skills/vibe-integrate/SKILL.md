@@ -37,7 +37,6 @@ description: Use when the user wants to assess, unblock, and merge one or more P
 - `docs/standards/v3/worktree-lifecycle-standard.md`
 - `docs/standards/v3/command-standard.md`
 - `docs/standards/v3/handoff-governance-standard.md`
-- `.agent/context/task.md`
 
 ## 完整流程
 
@@ -104,7 +103,7 @@ uv run python src/vibe3/cli.py flow list
 uv run python src/vibe3/cli.py task list
 ```
 
-结合 `.agent/context/task.md`，先确认：
+结合 `vibe3 handoff show` 输出，先确认：
 
 - 当前要处理哪些 PR
 - 哪些 PR 是独立的，哪些是 stacked
@@ -224,7 +223,7 @@ uv run python src/vibe3/cli.py review pr <pr>
 
 ### Step 6: 写入 handoff
 
-完成当前 skill 后，必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+完成后运行：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-integrate: PR review completed" --actor vibe-integrate --kind milestone
