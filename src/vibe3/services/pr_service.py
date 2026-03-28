@@ -12,7 +12,11 @@ from vibe3.models.pr import (
     PRResponse,
     VersionBumpResponse,
 )
-from vibe3.services.pr_utils import build_pr_body, get_metadata_from_flow
+from vibe3.services.pr_utils import (
+    build_pr_body,
+    check_upstream_conflicts,
+    get_metadata_from_flow,
+)
 from vibe3.services.version_service import VersionService
 
 
@@ -76,6 +80,13 @@ class PRService:
             raise RuntimeError(
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
+
+        # Check for merge conflicts with the target base branch
+        check_upstream_conflicts(
+            self.git_client,
+            "create",
+            base_branch=base_branch,
+        )
 
         # Get current branch
         head_branch = self.git_client.get_current_branch()
@@ -175,6 +186,13 @@ class PRService:
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
 
+        # Check for merge conflicts with the PR base branch
+        check_upstream_conflicts(
+            self.git_client,
+            "ready",
+            base_branch=pr.base_branch,
+        )
+
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=actor)
             logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
@@ -245,22 +263,9 @@ class PRService:
         return merged_pr
 
     def calculate_version_bump(
-        self,
-        pr_number: int,
-        group: str | None = None,
+        self, pr_number: int, group: str | None = None
     ) -> VersionBumpResponse:
-        """Calculate version bump for PR.
-
-        Args:
-            pr_number: PR number
-            group: Task group (feature/bug/docs/chore)
-
-        Returns:
-            Version bump response
-
-        Raises:
-            RuntimeError: If PR not found
-        """
+        """Calculate version bump for PR."""
         logger.bind(
             domain="pr",
             action="calculate_version_bump",
@@ -268,12 +273,9 @@ class PRService:
             group=group,
         ).info("Calculating version bump")
 
-        # Get PR to verify it exists
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
-
-        # Use version service for calculation (reads from VERSION file)
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
