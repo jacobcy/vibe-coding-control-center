@@ -19,7 +19,6 @@ from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
     render_flow_status,
-    render_flow_status_table,
     render_flow_timeline,
     render_flows_table,
 )
@@ -148,11 +147,8 @@ def add(
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
-        except ValueError:
-            logger.bind(command="flow add", task=task_refs).warning(
-                "Invalid task ID format, skipping binding"
-            )
-            flow = usecase.add_flow(name=name, spec=spec, actor=actor)
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -223,11 +219,8 @@ def create(
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
-        except ValueError:
-            logger.bind(command="flow create", task=task_refs).warning(
-                "Invalid task ID format, skipping binding"
-            )
-            flow = usecase.create_flow(name=name, base=base, spec=spec, actor=actor)
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -351,7 +344,7 @@ def status(
             if not flow_status:
                 logger.info("No active flow on current branch")
                 raise typer.Exit(0)
-            render_flow_status_table(flow_status)
+            render_flow_status(flow_status)
 
 
 @app.command()

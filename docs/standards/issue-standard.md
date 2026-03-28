@@ -102,7 +102,6 @@ vibe3 flow bind 218 --role dependency
 
 说明：
 - Issue 与 Flow 的角色关系统一由 `flow bind` 表达
-- `task link` 属于历史兼容入口，不作为标准流程推荐
 
 **约束**：
 1. 一个 flow 只有一个 task 指针，重复 `flow bind <issue>` 会覆盖 `flow_state.task_issue_number`
@@ -146,8 +145,8 @@ WHERE issue_role = 'repo';
 ## 查询语义
 
 ```bash
-# 查看某个 issue 的所有关联 flow
-vibe3 task list --issue 219
+# 查看所有本地 task（flow 维度）
+vibe3 task list
 
 # 查看 flow 完整信息
 vibe3 task show task/my-feature

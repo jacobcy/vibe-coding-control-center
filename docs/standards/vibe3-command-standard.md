@@ -85,7 +85,7 @@ SQLite (本地缓存)                 GitHub (真源)
 
 **兼容说明**：
 - `flow new` 为历史别名，标准入口为 `flow add`
-- `task link` / `task status` / `task bridge` 不再作为标准流程推荐（收敛到 flow 驱动）
+- `task status` 不再作为标准流程推荐（收敛到 flow 驱动）
 
 ### 2.2 flow show vs task show
 
@@ -449,29 +449,21 @@ vibe3 task list [--issue <issue>]
 ```
 
 **参数**:
-- `--issue`: Issue number，当前按 task issue 反查 flow（可选）
-  - 类型: `int | None`
-  - 帮助: "Issue number to find linked flows"
+- 无（仅 `--trace` / `--json` 等通用输出参数）
 
 **行为**:
 - 列出所有 task（有 task_issue_number 的 flow）
-- 如果提供 `--issue`，当前查询该 task issue 关联的 flow
 - 搜索和状态过滤属于后续扩展
 
 **示例**:
 ```bash
 # 列出所有 task
 vibe3 task list
-
-# 反查关联 task
-vibe3 task list --issue 221
 ```
 
 ### 5.3 迁移与弃用
 
 标准流程收敛后，以下命令不再推荐：
-- `task link` → 统一迁移到 `flow bind --role related|dependency`
-- `task bridge` → 由 `flow bind --role task|dependency` 自动完成
 - `task status` → 目标由 flow 生命周期自动联动远端 Project 状态
 
 在兼容期内如果命令仍存在，视为历史兼容入口，不作为标准流程的一部分。

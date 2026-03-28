@@ -220,27 +220,17 @@ class SQLiteClient:
             ).debug("Retrieved all flows")
             return flows
 
-    def get_flows_by_issue(
-        self, issue_number: int, role: str | None = None
-    ) -> list[dict[str, Any]]:
+    def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get all flows linked to a given issue number."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            if role:
-                cursor.execute(
-                    "SELECT f.* FROM flow_state f "
-                    "JOIN flow_issue_links l ON f.branch = l.branch "
-                    "WHERE l.issue_number = ? AND l.issue_role = ?",
-                    (issue_number, role),
-                )
-            else:
-                cursor.execute(
-                    "SELECT f.* FROM flow_state f "
-                    "JOIN flow_issue_links l ON f.branch = l.branch "
-                    "WHERE l.issue_number = ?",
-                    (issue_number,),
-                )
+            cursor.execute(
+                "SELECT f.* FROM flow_state f "
+                "JOIN flow_issue_links l ON f.branch = l.branch "
+                "WHERE l.issue_number = ? AND l.issue_role = ?",
+                (issue_number, role),
+            )
             flows = [dict(row) for row in cursor.fetchall()]
             logger.bind(
                 external="sqlite",

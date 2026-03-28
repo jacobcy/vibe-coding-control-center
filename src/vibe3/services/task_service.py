@@ -84,60 +84,10 @@ class TaskService(TaskBridgeMixin):
             issue_role=role,
         )
 
-    def update_flow_status(
-        self,
-        branch: str,
-        status: Literal["active", "blocked", "done", "stale"],
-    ) -> FlowState:
-        """Update local flow scene status.
-
-        NOTE: flow_status 是本地执行现场状态，不等于 GitHub Project task 状态真源。
-        """
-        logger.bind(
-            domain="task",
-            action="update_flow_status",
-            branch=branch,
-            status=status,
-        ).info("Updating local flow scene status")
-
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
-
-        self.store.update_flow_state(branch, flow_status=status)
-        self.store.add_event(
-            branch, "status_updated", "system", f"Status changed to {status}"
-        )
-        return FlowState(**flow_data)
-        return FlowState(**flow_data)
-
     def get_task(self, branch: str) -> FlowState | None:
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             return None
-        return FlowState(**flow_data)
-
-    def set_next_step(
-        self,
-        branch: str,
-        next_step: str,
-    ) -> FlowState:
-        """Set next step for a task."""
-        logger.bind(
-            domain="task",
-            action="set_next_step",
-            branch=branch,
-            next_step=next_step,
-        ).info("Setting next step")
-
-        self.store.update_flow_state(branch, next_step=next_step)
-        self.store.add_event(
-            branch, "next_step_set", "system", f"Next step: {next_step}"
-        )
-
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            raise RuntimeError(f"Flow not found for branch {branch}")
         return FlowState(**flow_data)
