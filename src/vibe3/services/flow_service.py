@@ -109,7 +109,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         self,
         slug: str,
         start_ref: str = MAIN_BRANCH_REF,
-        save_unstash: bool = False,
         actor: str | None = None,
     ) -> FlowState:
         """Create a new flow and create branch.
@@ -117,7 +116,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         Args:
             slug: Flow name/slug
             start_ref: Starting reference for new branch
-            save_unstash: Whether to stash and restore current changes
 
         Returns:
             Created flow state
@@ -138,22 +136,16 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if self.git_client.branch_exists(branch):
             raise RuntimeError(f"Branch '{branch}' already exists")
 
-        if self.git_client.has_uncommitted_changes() and not save_unstash:
+        has_changes = self.git_client.has_uncommitted_changes()
+        if has_changes:
             raise RuntimeError(
                 "Worktree has uncommitted changes. "
-                "Use --save-unstash to stash them automatically."
+                "Please commit or stash them before flow create."
             )
-
-        stash_ref = None
-        if save_unstash and self.git_client.has_uncommitted_changes():
-            stash_ref = self.git_client.stash_push(message=f"vibe flow new {slug}")
 
         self.git_client.create_branch(branch, start_ref)
 
         flow = self.create_flow(slug, branch, actor=actor)
-
-        if stash_ref:
-            self.git_client.stash_apply(stash_ref)
 
         return flow
 
