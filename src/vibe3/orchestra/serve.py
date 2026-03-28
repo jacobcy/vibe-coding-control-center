@@ -1,4 +1,4 @@
-"""vibe3 serve command - foreground server for GitHub label orchestration."""
+"""vibe3 serve command - foreground server for GitHub assignee-driven orchestration."""
 
 import os
 import signal
@@ -89,17 +89,24 @@ def start(
 ) -> None:
     """Start Orchestra server (runs in foreground).
 
-    This server monitors GitHub issues for state label changes and
-    triggers corresponding commands (plan/run/review).
+    This server polls GitHub for assignee changes on open issues and
+    dispatches manager agents for execution. Labels are updated by managers
+    as display-only status indicators.
+
+    Primary trigger: issue assigned to a configured manager username
+      (default: "vibe-manager"). The server checks issue dependencies
+      (blocked-by references in body) before dispatching.
+
+    Concurrency is limited to max_concurrent_flows (default: 3).
 
     NOTE: This runs in the foreground. For background execution,
-    use nohup, tmux, or a process manager:
-
-        # Using nohup
-        nohup vibe3 serve start --interval 60 > orchestra.log 2>&1 &
+    use nohup or tmux:
 
         # Using tmux
         tmux new -d -s orchestra 'vibe3 serve start'
+
+        # Using nohup
+        nohup vibe3 serve start > orchestra.log 2>&1 &
 
     Examples:
         vibe3 serve start

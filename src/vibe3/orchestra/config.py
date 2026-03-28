@@ -66,6 +66,10 @@ class OrchestraConfig(BaseModel):
     max_concurrent_flows: int = Field(default=3, ge=1)
     dry_run: bool = False
     pid_file: Path = Field(default=Path(".git/vibe/orchestra.pid"))
+    manager_usernames: list[str] = Field(
+        default_factory=lambda: ["vibe-manager"],
+        description="GitHub usernames whose assignment signals manager dispatch",
+    )
     master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
 
     @classmethod
@@ -95,5 +99,8 @@ class OrchestraConfig(BaseModel):
             polling_interval=getattr(orchestra_config, "polling_interval", 60),
             repo=getattr(orchestra_config, "repo", None),
             max_concurrent_flows=getattr(orchestra_config, "max_concurrent_flows", 3),
+            manager_usernames=getattr(
+                orchestra_config, "manager_usernames", ["vibe-manager"]
+            ),
             master_agent=master_agent,
         )

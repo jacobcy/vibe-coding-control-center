@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.dependency_checker import DependencyChecker
 from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.master_handler import MasterAgentHandler
 from vibe3.orchestra.models import IssueInfo, Trigger
@@ -29,6 +30,9 @@ class Poller:
         self._running = False
         self._executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
         self._master_handler = MasterAgentHandler(config, self._executor)
+        self._assignee_cache: dict[int, frozenset[str]] = {}
+        self._dep_checker = DependencyChecker(repo=config.repo)
+        self._cold_start: bool = True
 
     def start(self) -> None:
         """Start the polling loop."""
@@ -59,6 +63,9 @@ class Poller:
             except Exception as e:
                 logger.bind(domain="orchestra").error(f"Tick failed: {e}")
 
+            # After first tick, cold start is complete
+            self._cold_start = False
+
             await asyncio.sleep(self.config.polling_interval)
 
     def stop(self) -> None:
@@ -79,7 +86,23 @@ class Poller:
             await self._process_issue_async(issue)
 
     async def _process_issue_async(self, issue: IssueInfo) -> None:
-        """Process a single issue asynchronously."""
+        """Process a single issue asynchronously.
+
+        Primary path: assignee-based dispatch.
+        Legacy path: master agent triage for new unlabelled issues.
+        """
+        # --- Primary path: assignee signal ---
+        newly_assigned = self._get_newly_assigned_managers(issue)
+        if newly_assigned and not self._cold_start:
+            logger.bind(domain="orchestra").info(
+                f"Issue #{issue.number} assigned to manager(s): {newly_assigned}"
+            )
+            if self._check_dependencies(issue.number):
+                task = asyncio.create_task(self._dispatch_manager_with_semaphore(issue))
+                self._active_tasks.add(task)
+            # else: deferred; will be re-evaluated on next tick
+
+        # --- Legacy path: master agent triage for brand-new issues ---
         previous_state = self._state_cache.get(issue.number)
 
         if issue.state is None and issue.number not in self._seen_issues:
@@ -87,14 +110,14 @@ class Poller:
                 task = asyncio.create_task(self._handle_new_issue_with_semaphore(issue))
                 self._active_tasks.add(task)
             self._seen_issues.add(issue.number)
-
         elif issue.state and previous_state != issue.state:
+            # Label changed: route via label state machine (legacy fallback)
             trigger = self.router.route(issue, previous_state)
             if trigger:
                 prev = previous_state.value if previous_state else "none"
                 curr = issue.state.value if issue.state else "none"
                 logger.bind(domain="orchestra").info(
-                    f"State change: #{issue.number} {prev} -> {curr}"
+                    f"Label state change: #{issue.number} {prev} -> {curr}"
                 )
                 task = asyncio.create_task(
                     self._dispatch_with_semaphore(trigger, issue.number)
@@ -102,6 +125,41 @@ class Poller:
                 self._active_tasks.add(task)
 
         self._state_cache[issue.number] = issue.state
+
+    def _get_newly_assigned_managers(self, issue: IssueInfo) -> list[str]:
+        """Return manager usernames newly assigned to this issue since last poll."""
+        prev = self._assignee_cache.get(issue.number, frozenset())
+        curr = frozenset(issue.assignees)
+        self._assignee_cache[issue.number] = curr
+        newly_assigned = curr - prev
+        return [u for u in newly_assigned if u in self.config.manager_usernames]
+
+    def _check_dependencies(self, issue_number: int) -> bool:
+        """Return True if all blocking issues are resolved."""
+        resolved, blockers = self._dep_checker.check(issue_number)
+        if not resolved:
+            logger.bind(domain="orchestra").info(
+                f"Issue #{issue_number} blocked by: {blockers}"
+            )
+        return resolved
+
+    async def _dispatch_manager_with_semaphore(self, issue: IssueInfo) -> None:
+        """Dispatch manager with semaphore to limit concurrency."""
+        if self._semaphore is None:
+            return
+        async with self._semaphore:
+            log = logger.bind(domain="orchestra", issue=issue.number)
+            log.info(f"Starting manager dispatch for issue #{issue.number}")
+            try:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    self._executor, self.dispatcher.dispatch_manager, issue
+                )
+                log.info(f"Manager dispatch completed for issue #{issue.number}")
+            except asyncio.CancelledError:
+                log.info(f"Manager dispatch cancelled for issue #{issue.number}")
+            except Exception as e:
+                log.error(f"Manager dispatch failed for issue #{issue.number}: {e}")
 
     async def _dispatch_with_semaphore(
         self, trigger: Trigger, issue_number: int
@@ -164,7 +222,7 @@ class Poller:
             "--state",
             "open",
             "--json",
-            "number,title,labels,url",
+            "number,title,labels,assignees,url",
             "--limit",
             "100",
         ]
@@ -190,12 +248,14 @@ class Poller:
                 if state:
                     break
 
+            assignees = [a["login"] for a in item.get("assignees", [])]
             issues.append(
                 IssueInfo(
                     number=item["number"],
                     title=item["title"],
                     state=state,
                     labels=labels,
+                    assignees=assignees,
                     url=item.get("url"),
                 )
             )

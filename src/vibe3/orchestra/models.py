@@ -14,6 +14,7 @@ class IssueInfo(BaseModel):
     title: str
     state: IssueState | None
     labels: list[str] = Field(default_factory=list)
+    assignees: list[str] = Field(default_factory=list)  # GitHub login names
     url: str | None = None
 
     @property

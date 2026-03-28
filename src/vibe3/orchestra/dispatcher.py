@@ -144,6 +144,94 @@ class Dispatcher:
 
         return cmd
 
+    def dispatch_manager(self, issue: IssueInfo) -> bool:
+        """Dispatch manager execution for an assignee-triggered issue.
+
+        Full lifecycle:
+        1. Create (or reuse) flow for the issue
+        2. Update state label to in-progress (display only)
+        3. Run vibe3 task execution for the issue
+
+        Args:
+            issue: Issue to execute
+
+        Returns:
+            True if execution completed successfully
+        """
+        log = logger.bind(
+            domain="orchestra",
+            action="manager_dispatch",
+            issue=issue.number,
+        )
+
+        # Step 1: ensure flow exists
+        try:
+            flow = self.orchestrator.create_flow_for_issue(issue)
+            log.info(f"Flow ready: branch={flow.get('branch')}")
+        except RuntimeError as e:
+            log.error(f"Flow creation failed: {e}")
+            return False
+
+        # Step 2: update display label
+        if not self.dry_run:
+            self._update_state_label(issue.number, IssueState.IN_PROGRESS)
+
+        # Step 3: run manager execution
+        cmd = [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "run",
+            f"Implement issue #{issue.number}: {issue.title}",
+        ]
+
+        log.info(f"Dispatching manager: {' '.join(cmd)}")
+
+        if self.dry_run:
+            log.info("Dry run, skipping execution")
+            return True
+
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                log.error(f"Manager execution failed: {result.stderr}")
+                return False
+            log.info("Manager execution completed successfully")
+            return True
+        except subprocess.TimeoutExpired:
+            log.error("Manager execution timed out")
+            return False
+        except Exception as e:
+            log.error(f"Manager execution error: {e}")
+            return False
+
+    def _update_state_label(self, issue_number: int, state: IssueState) -> None:
+        """Update issue state label (display only, does not drive logic).
+
+        Adds the state label and removes any other state/* labels.
+        """
+        try:
+            from vibe3.services.label_service import LabelService
+
+            LabelService(repo=self.config.repo).confirm_issue_state(
+                issue_number,
+                state,
+                actor="orchestra:manager",
+                force=True,
+            )
+        except Exception as e:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to update label for #{issue_number}: {e}"
+            )
+
     def _build_review_command(
         self, cmd: list[str], issue: IssueInfo, to_state: IssueState
     ) -> list[str] | None:
