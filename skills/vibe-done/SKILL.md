@@ -29,7 +29,6 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 - `docs/standards/v3/worktree-lifecycle-standard.md`
 - `docs/standards/v3/command-standard.md`
 - `docs/standards/v3/handoff-governance-standard.md`
-- `.agent/context/task.md`
 
 ## 完整流程
 
@@ -170,7 +169,7 @@ uv run python src/vibe3/cli.py flow done --branch <ref>
 执行问题反馈：
 
 1. **汇总问题清单**
-   - 从 `.agent/context/task.md` 读取当前 flow 的所有问题记录
+   - 从 `vibe3 handoff show` 读取当前 flow 的所有问题记录
    - 按严重等级分类：high / medium / low
 
 2. **创建或更新 Issue**
@@ -211,7 +210,7 @@ uv run python src/vibe3/cli.py flow done --branch <ref>
 
 ### Step 6: 写入 handoff
 
-完成后必须更新 `.agent/context/task.md`，至少写入一段最新 handoff：
+完成后运行：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor vibe-done --kind milestone

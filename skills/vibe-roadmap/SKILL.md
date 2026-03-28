@@ -21,20 +21,10 @@ intake gate 约束：
 对象约束：
 
 - `repo issue`: 需求来源
-- `task item = GitHub Project item mirror`
-- `task = execution record`
-- `spec_standard/spec_ref` 是 task 侧扩展桥接字段，不是 GitHub Project 官方来源类型
-- task bridge = 规划层 mirror 同步
-- `task audit` = execution record 审计 / 修复
-- OpenSpec 注册 = execution spec 来源桥接
+- `task item`: GitHub Project item
 - 任何规划判断都必须先读 shell 输出，再做编排
 
-标准真源：
-
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
-- task / flow / worktree 语义以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 **Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
 
@@ -64,7 +54,6 @@ intake gate 约束：
 - `repo issue` intake、模板补全、查重：交给 `vibe-issue`
 - `task <-> flow` 映射核对与修复：交给 `vibe-task`
 - `task <-> flow` / worktree runtime 修复：交给 `vibe-check`
-- OpenSpec / plan 到 `spec_standard/spec_ref` 的 execution spec 写回：交给 `vibe-task` 或 task 写入路径
 - parent issue / sub-issue 的范围判断：交给 `vibe-issue` 等 skill/workflow；`vibe-roadmap` 只消费判断结果
 
 ## Workflow
@@ -138,16 +127,15 @@ uv run python src/vibe3/cli.py task show <branch>
 
 - 检查是否有版本目标
 - 无目标 → 要求人类讨论确定
-- 有目标 → 提示当前规划窗口有哪些 task item 可供继续拆成 task execution record
-- 是否拆 task execution record、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
-- 不得把扩展层的 `spec_standard/spec_ref` 描述成 GitHub Project 官方来源类型
+- 有目标 → 提示当前规划窗口有哪些 task item 可供继续拆成 task
+- 是否拆 task、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
 
 ### Step 5: 同步到 GitHub Project
 
-如需将 issue 链接到 GitHub Project：
+如需将 issue 绑定到 flow：
 
 ```bash
-uv run python src/vibe3/cli.py task bridge <issue_number>
+uv run python src/vibe3/cli.py flow bind <issue_number>
 ```
 
 ## Roadmap 分类状态
@@ -174,5 +162,5 @@ uv run python src/vibe3/cli.py task bridge <issue_number>
 - `许愿池`: GitHub `repo issues`（需求池）
 - `repo issue`: 需求来源与讨论入口，不是 execution record
 - `Task Item`: GitHub Project item，规划层工作单元
-- `Task`: execution record，执行层最小单元
-- `Flow`: task execution record 的运行时容器，通常由一个 worktree / branch 承载
+- `Task`: 执行层最小单元
+- `Flow`: task 的运行时容器，通常由一个 worktree / branch 承载

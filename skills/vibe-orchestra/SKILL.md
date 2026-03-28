@@ -5,12 +5,8 @@ description: Use when the user wants a global heartbeat-style issue triage orche
 
 # Vibe Orchestra
 
-标准真源：
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
-- flow / task / worktree 生命周期语义以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
 - orchestra 角色边界与动机以 issue `#250` 为准。
 
 **核心职责**: 作为全局心跳程序的治理者，周期性检查 GitHub issues，判断是否接收、拒绝、拆分、合并、补依赖、调整优先级，并通过标签组织执行秩序。
