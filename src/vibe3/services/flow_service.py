@@ -3,6 +3,7 @@
 from typing import Literal
 
 from loguru import logger
+from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
@@ -98,7 +99,12 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if not flow_data:
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
-        return FlowState(**flow_data)
+        try:
+            return FlowState(**flow_data)
+        except ValidationError as exc:
+            raise RuntimeError(
+                f"Created flow has invalid data for branch {branch}: {exc}"
+            ) from exc
 
     def create_flow_with_branch(
         self,
@@ -181,9 +187,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
 
         if not target_flow:
             raise RuntimeError(f"Flow '{target}' not found")
-
-        if not self.git_client.branch_exists(target_flow.branch):
-            raise RuntimeError(f"Branch '{target_flow.branch}' does not exist")
 
         stash_ref = None
         if self.git_client.has_uncommitted_changes():
@@ -270,7 +273,18 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 
-        return [FlowState(**flow) for flow in flows_data]
+        flows: list[FlowState] = []
+        for flow in flows_data:
+            try:
+                flows.append(FlowState(**flow))
+            except ValidationError as exc:
+                branch = flow.get("branch", "<unknown>")
+                logger.bind(
+                    domain="flow",
+                    action="list",
+                    branch=branch,
+                ).warning(f"Skipping flow with invalid data: {exc}")
+        return flows
 
     def get_flow_timeline(self, branch: str) -> dict:
         state_data = self.store.get_flow_state(branch)
@@ -278,4 +292,13 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             return {"state": None, "events": []}
         events_data = self.store.get_events(branch, limit=100)
         events = [FlowEvent(**e) for e in events_data]
-        return {"state": FlowState(**state_data), "events": events}
+        try:
+            state = FlowState(**state_data)
+        except ValidationError as exc:
+            logger.bind(
+                domain="flow",
+                action="get_timeline",
+                branch=branch,
+            ).warning(f"Flow has invalid data: {exc}")
+            return {"state": None, "events": []}
+        return {"state": state, "events": events}

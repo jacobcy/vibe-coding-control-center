@@ -480,11 +480,11 @@ vibe3 task link 218 --role dependency
 
 ### 6.3 Standard Subcommands
 
-- `show [<flow-name>|<branch>]`
+- `show [--branch <branch>]`
 - `status`
 - `list`
 - `new <name>`
-- `switch <name>`
+- `switch --branch <branch-or-slug>`
 - `bind <issue>`
 - `pr`
 - `review`
@@ -502,6 +502,8 @@ vibe3 task link 218 --role dependency
 
 `show` 支持：
 
+- `--branch` / `-b`: 指定分支名（可选，默认当前分支）
+- `--snapshot`: 静态快照模式
 - `--json`
 
 `review` 支持：
@@ -527,8 +529,9 @@ vibe3 task link 218 --role dependency
 
 ### 6.6 Naming Rules
 
-- `new <name>`、`switch <name>` 中的 `name` 是 flow 命名输入，不定义 roadmap item、feature 或 task
-- `show [<flow-name>|<branch>]` 可以接受 flow slug 或 branch ref
+- `new <name>` 中的 `name` 是 flow 命名输入，不定义 roadmap item、feature 或 task
+- `switch --branch <branch-or-slug>` 使用 `--branch` 选项指定目标分支或 flow slug
+- `show --branch <branch>` 使用 `--branch` 选项指定分支名（可选，默认当前分支）
 - `feature` 若出现，只能是 roadmap item `type=feature`，不是 flow 共享模型字段
 - `bind <issue>` 中的 `issue` 支持数字或完整 GitHub URL
 

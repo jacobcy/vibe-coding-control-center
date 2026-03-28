@@ -56,11 +56,14 @@ class FlowState(BaseModel):
 
         - idle -> active (default state)
         - missing -> stale (inactive state)
+        - merged -> done (completed state)
         """
         if v == "idle":
             return "active"
         if v == "missing":
             return "stale"
+        if v == "merged":
+            return "done"
         return v
 
 

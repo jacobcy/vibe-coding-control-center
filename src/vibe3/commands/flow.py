@@ -28,9 +28,6 @@ FlowNameArg = Annotated[str, typer.Argument(help="Flow name")]
 IssueArg = Annotated[
     str, typer.Argument(help="Issue reference to bind as task/related/dependency")
 ]
-BranchArg = Annotated[
-    str | None, typer.Argument(help="Branch name (defaults to current branch)")
-]
 TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
 TaskTailArg = Annotated[
     List[str] | None,
@@ -241,20 +238,20 @@ def bind(
 
 @app.command()
 def show(
-    flow_name: BranchArg = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name (defaults to current branch)"),
+    ] = None,
     snapshot: SnapshotOption = False,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
     """Show flow details for a branch."""
     with trace_scope(trace, "flow show"):
-        logger.bind(command="flow show", flow_name=flow_name).info(
-            "Showing flow details"
-        )
+        logger.bind(command="flow show", branch=branch).info("Showing flow details")
 
-        if flow_name:
+        if branch:
             service = FlowService()
-            branch = flow_name
         else:
             service, branch = ensure_flow_for_current_branch()
 
