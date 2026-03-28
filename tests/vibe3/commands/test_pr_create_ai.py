@@ -37,7 +37,7 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 0
         assert json.loads(result.output)["number"] == 456
         mock_service.return_value.sync_pr_state_from_remote.assert_called_once_with(
-            existing_pr, actor="server"
+            existing_pr, actor=None
         )
         mock_service.return_value.create_draft_pr.assert_not_called()
 
@@ -57,7 +57,7 @@ class TestPRCreateCommandAI:
                 title="Test PR",
                 body="",
                 base_branch="main",
-                actor="server",
+                actor=None,
             )
 
     def test_pr_create_ai_disabled(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -197,7 +197,7 @@ pr:
             title="feat: ai title",
             body="Summary\n\n- change",
             base_branch="origin/main",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )
 
     def test_pr_create_uses_resolved_base_for_ai_context_and_pr_request(
@@ -259,5 +259,5 @@ pr:
             title="feat: ai title",
             body="body",
             base_branch="origin/feature-root",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )

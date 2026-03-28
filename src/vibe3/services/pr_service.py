@@ -17,6 +17,7 @@ from vibe3.services.pr_utils import (
     check_upstream_conflicts,
     get_metadata_from_flow,
 )
+from vibe3.services.signature_service import SignatureService
 from vibe3.services.version_service import VersionService
 
 
@@ -48,7 +49,7 @@ class PRService:
         title: str,
         body: str,
         base_branch: str = "main",
-        actor: str = "server",
+        actor: str | None = None,
     ) -> PRResponse:
         """Create a draft PR.
 
@@ -90,13 +91,18 @@ class PRService:
 
         # Get current branch
         head_branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            head_branch,
+            explicit_actor=actor,
+        )
 
         # Idempotent behavior: if PR already exists for this branch, confirm and sync.
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
             hydrated_existing = self.github_client.get_pr(existing.number) or existing
-            self._sync_pr_flow_state(hydrated_existing, actor=actor)
+            self._sync_pr_flow_state(hydrated_existing, actor=effective_actor)
             return hydrated_existing
 
         # Ensure head branch exists on remote before gh pr create.
@@ -129,9 +135,12 @@ class PRService:
         pr = self.github_client.create_pr(request)
 
         # Update flow state and add event
-        self._sync_pr_flow_state(pr, actor=actor)
+        self._sync_pr_flow_state(pr, actor=effective_actor)
         self.store.add_event(
-            head_branch, "pr_draft", actor, f"Draft PR #{pr.number} created: {pr.url}"
+            head_branch,
+            "pr_draft",
+            effective_actor,
+            f"Draft PR #{pr.number} created: {pr.url}",
         )
 
         logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
@@ -158,7 +167,7 @@ class PRService:
 
         return self.github_client.get_pr(pr_number, branch)
 
-    def mark_ready(self, pr_number: int, actor: str = "unknown") -> PRResponse:
+    def mark_ready(self, pr_number: int, actor: str | None = None) -> PRResponse:
         """Mark PR as ready for review.
 
         Args:
@@ -185,6 +194,11 @@ class PRService:
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
 
         # Check for merge conflicts with the PR base branch
         check_upstream_conflicts(
@@ -194,7 +208,7 @@ class PRService:
         )
 
         if not pr.draft:
-            self._sync_pr_flow_state(pr, actor=actor)
+            self._sync_pr_flow_state(pr, actor=effective_actor)
             logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
             return pr
 
@@ -203,19 +217,29 @@ class PRService:
 
         # Add event
         branch = pr.head_branch
-        self._sync_pr_flow_state(updated_pr, actor=actor)
+        self._sync_pr_flow_state(updated_pr, actor=effective_actor)
         self.store.add_event(
-            branch, "pr_ready", actor, f"PR #{pr_number} marked as ready for review"
+            branch,
+            "pr_ready",
+            effective_actor,
+            f"PR #{pr_number} marked as ready for review",
         )
 
         logger.bind(pr_number=pr_number).success("PR marked as ready")
         return updated_pr
 
-    def sync_pr_state_from_remote(self, pr: PRResponse, actor: str = "system") -> None:
+    def sync_pr_state_from_remote(
+        self, pr: PRResponse, actor: str | None = None
+    ) -> None:
         """Synchronize local flow PR fields from remote PR fact."""
-        self._sync_pr_flow_state(pr, actor=actor)
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
+        self._sync_pr_flow_state(pr, actor=effective_actor)
 
-    def merge_pr(self, pr_number: int, actor: str = "unknown") -> PRResponse:
+    def merge_pr(self, pr_number: int, actor: str | None = None) -> PRResponse:
         """Merge PR.
 
         Args:
@@ -242,6 +266,11 @@ class PRService:
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
 
         # Merge PR and update flow state
         merged_pr = self.github_client.merge_pr(pr_number)
@@ -250,12 +279,12 @@ class PRService:
         self.store.update_flow_state(
             branch,
             flow_status="done",
-            latest_actor=actor,
+            latest_actor=effective_actor,
         )
         self.store.add_event(
             branch,
             "pr_merge",
-            actor,
+            effective_actor,
             f"PR #{pr_number} merged",
         )
 

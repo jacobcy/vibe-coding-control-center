@@ -3,10 +3,11 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from vibe3.models.flow import CreateDecision, FlowState, IssueLink
+from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse, IssueLink
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.signature_service import SignatureService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
 from vibe3.services.task_usecase import TaskUsecase
@@ -42,19 +43,60 @@ class FlowUsecase:
         name: str,
         task: str | Sequence[str] | None = None,
         spec: str | None = None,
+        actor: str | None = None,
     ) -> FlowState:
         """Create a flow on the current branch and apply optional bindings."""
         branch = self.flow_service.get_current_branch()
         existing_flow = self.flow_service.get_flow_status(branch)
         if existing_flow:
-            raise FlowUsecaseError(
-                f"Branch '{branch}' already has flow: {existing_flow.flow_slug}"
+            self._confirm_existing_flow(
+                branch=branch,
+                existing_flow=existing_flow,
+                task=task,
+                spec=spec,
+                actor=actor,
             )
+            confirmed = self.flow_service.get_flow_state(branch)
+            if confirmed is not None:
+                return confirmed
+            return FlowState(**existing_flow.model_dump(exclude={"issues"}))
 
-        flow = self.flow_service.create_flow(slug=name, branch=branch)
-        self._apply_initial_bindings(branch, task, spec)
+        flow = self.flow_service.create_flow(slug=name, branch=branch, actor=actor)
+        self._apply_initial_bindings(branch, task, spec, actor=actor)
         self.handoff_service.ensure_current_handoff()
         return flow
+
+    def _confirm_existing_flow(
+        self,
+        branch: str,
+        existing_flow: FlowStatusResponse,
+        task: str | Sequence[str] | None,
+        spec: str | None,
+        actor: str | None,
+    ) -> None:
+        """Idempotent add behavior for existing flow.
+
+        - `--actor` updates default flow signature (latest_actor)
+        - `--task` appends task links but does not overwrite primary task
+        - `--spec` confirms/updates spec binding with minimum action
+        """
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=existing_flow.latest_actor,
+        )
+        self.flow_service.store.update_flow_state(branch, latest_actor=effective_actor)
+
+        task_refs = self._normalize_task_refs(task)
+        original_primary = existing_flow.task_issue_number
+        if task_refs:
+            for task_ref in task_refs:
+                self._link_issue(branch, task_ref, "task", actor=effective_actor)
+            if original_primary is not None:
+                self.flow_service.store.update_flow_state(
+                    branch, task_issue_number=original_primary
+                )
+        if spec:
+            self.flow_service.bind_spec(branch, spec, effective_actor)
 
     def create_flow(
         self,
@@ -62,6 +104,7 @@ class FlowUsecase:
         base: str | None = None,
         task: str | Sequence[str] | None = None,
         spec: str | None = None,
+        actor: str | None = None,
     ) -> FlowState:
         """Create a branch-backed flow while enforcing worktree governance."""
         current_branch = self.flow_service.get_current_branch()
@@ -80,6 +123,7 @@ class FlowUsecase:
             flow = self.flow_service.create_flow_with_branch(
                 slug=name,
                 start_ref=start_ref,
+                actor=actor,
             )
         except RuntimeError as exc:
             guidance = None
@@ -88,7 +132,7 @@ class FlowUsecase:
             raise FlowUsecaseError(str(exc), guidance) from exc
 
         branch = f"task/{name}"
-        self._apply_initial_bindings(branch, task, spec)
+        self._apply_initial_bindings(branch, task, spec, actor=actor)
         self.handoff_service.ensure_current_handoff()
         return flow
 
@@ -96,10 +140,11 @@ class FlowUsecase:
         self,
         issue: str,
         role: Literal["task", "related", "dependency"] = "task",
+        actor: str | None = None,
     ) -> IssueLink:
         """Bind an issue to the current flow."""
         branch = self.flow_service.get_current_branch()
-        return self._link_issue(branch, issue, role)
+        return self._link_issue(branch, issue, role, actor=actor)
 
     @staticmethod
     def _parse_issue_number(issue: str) -> int:
@@ -113,12 +158,13 @@ class FlowUsecase:
         branch: str,
         task: str | Sequence[str] | None,
         spec: str | None,
+        actor: str | None = None,
     ) -> None:
         task_refs = self._normalize_task_refs(task)
         if task_refs:
             bound_task_numbers: list[int] = []
             for task_ref in task_refs:
-                link = self._link_issue(branch, task_ref, "task")
+                link = self._link_issue(branch, task_ref, "task", actor=actor)
                 bound_task_numbers.append(link.issue_number)
             if len(bound_task_numbers) > 1:
                 self.flow_service.store.update_flow_state(
@@ -126,25 +172,28 @@ class FlowUsecase:
                     task_issue_number=bound_task_numbers[0],
                 )
             if not spec:
-                self._bind_task_as_spec_ref(branch, task_refs[0])
+                self._bind_task_as_spec_ref(branch, task_refs[0], actor=actor)
         if spec:
-            self.flow_service.bind_spec(branch, spec, "system")
+            self.flow_service.bind_spec(branch, spec, actor)
 
     def _link_issue(
         self,
         branch: str,
         issue_ref: str,
         role: Literal["task", "related", "dependency"],
+        actor: str | None = None,
     ) -> IssueLink:
         issue_number = self._parse_issue_number(issue_ref)
-        return self.task_service.link_issue(branch, issue_number, role)
+        return self.task_service.link_issue(branch, issue_number, role, actor=actor)
 
-    def _bind_task_as_spec_ref(self, branch: str, task: str) -> None:
+    def _bind_task_as_spec_ref(
+        self, branch: str, task: str, actor: str | None = None
+    ) -> None:
         """Derive spec_ref from bound task issue for issue-first workflows."""
         issue_number = self._parse_issue_number(task)
         spec_info = self.spec_ref_service.parse_spec_ref(str(issue_number))
         if spec_info.display:
-            self.flow_service.bind_spec(branch, spec_info.display, "system")
+            self.flow_service.bind_spec(branch, spec_info.display, actor)
 
     @staticmethod
     def _normalize_task_refs(task: str | Sequence[str] | None) -> list[str]:

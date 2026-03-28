@@ -52,7 +52,6 @@ def record_handoff(
     # Build update kwargs
     update_kwargs = {
         actor_role: actor,
-        "latest_actor": actor,
         "next_step": next_step,
         "blocked_by": blocked_by,
     }

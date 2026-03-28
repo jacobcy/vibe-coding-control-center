@@ -47,7 +47,6 @@ class TestRecordPlan:
             "feature/test-branch",
             plan_ref="docs/plans/feature-x.md",
             planner_actor="claude/sonnet-4.6",
-            latest_actor="claude/sonnet-4.6",
             next_step="Implement feature",
             blocked_by=None,
         )
@@ -88,7 +87,6 @@ class TestRecordReport:
             report_ref="docs/reports/review-42.md",
             # Fixed: was reviewer_actor, now executor_actor
             executor_actor="codex/gpt-5.4",
-            latest_actor="codex/gpt-5.4",
             next_step="Address review comments",
             blocked_by=None,
         )
@@ -113,7 +111,6 @@ class TestRecordAudit:
             "feature/test-branch",
             audit_ref="docs/audits/security-check.md",
             reviewer_actor="copilot/gpt-4",
-            latest_actor="copilot/gpt-4",
             next_step="Fix security issues",
             blocked_by=None,
         )

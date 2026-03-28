@@ -7,6 +7,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.models.flow import FlowState, IssueLink
 from vibe3.models.project_item import LinkError
+from vibe3.services.signature_service import SignatureService
 from vibe3.services.task_bridge_mixin import TaskBridgeMixin
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ class TaskService(TaskBridgeMixin):
         branch: str,
         issue_number: int,
         role: Literal["task", "related", "dependency"] = "related",
+        actor: str | None = None,
     ) -> IssueLink:
         """Link an issue to a flow."""
         logger.bind(
@@ -43,18 +45,25 @@ class TaskService(TaskBridgeMixin):
             role=role,
         ).info("Linking issue to flow")
 
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
+
         self.store.add_issue_link(branch, issue_number, role)
 
         if role == "task":
             self.store.update_flow_state(
                 branch,
                 task_issue_number=issue_number,
+                latest_actor=effective_actor,
             )
 
         self.store.add_event(
             branch,
             "issue_linked",
-            "system",
+            effective_actor,
             f"Issue #{issue_number} linked as {role}",
         )
 

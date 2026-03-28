@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_event_service import (
     create_handoff_artifact,
@@ -14,6 +15,7 @@ from vibe3.services.review_runner import (
     format_agent_actor,
     resolve_actor_backend_model,
 )
+from vibe3.services.signature_service import SignatureService
 
 HandoffKind = Literal["plan", "run", "review"]
 
@@ -128,7 +130,11 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         return None
 
     branch, artifact_file = artifact
-    actor = format_agent_actor(record.options)
+    actor = SignatureService.resolve_for_branch(
+        SQLiteClient(),
+        branch,
+        explicit_actor=format_agent_actor(record.options),
+    )
     backend, model = resolve_actor_backend_model(record.options)
 
     detail, derived_refs = _build_detail(record, artifact_file)

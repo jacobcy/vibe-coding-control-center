@@ -57,6 +57,7 @@ class TestFlowCloseBranchSwitching:
         mock_store.update_flow_state.assert_called_once_with(
             "task/current-flow",
             flow_status="done",
+            latest_actor="workflow",
         )
 
     @patch("vibe3.services.flow_lifecycle.GitClient")

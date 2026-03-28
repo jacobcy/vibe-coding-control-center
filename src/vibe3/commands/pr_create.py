@@ -109,7 +109,7 @@ def register_create_command(app: typer.Typer) -> None:
 
             existing_pr = pr_service.get_pr(branch=branch)
             if existing_pr is not None:
-                pr_service.sync_pr_state_from_remote(existing_pr, actor="server")
+                pr_service.sync_pr_state_from_remote(existing_pr, actor=None)
                 _emit_pr_result(existing_pr, json_output, yaml_output)
                 return
 
@@ -132,7 +132,7 @@ def register_create_command(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             pr_body = ai_body if ai_body else body
-            actor = "ai_assistant" if ai else "server"
+            actor = "ai-assistant" if ai else None
 
             pr = pr_service.create_draft_pr(
                 title=pr_title,

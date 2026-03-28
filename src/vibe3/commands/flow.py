@@ -50,6 +50,14 @@ TraceOption = Annotated[
     bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
 ]
 JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
+ActorOption = Annotated[
+    str | None,
+    typer.Option(
+        "--actor",
+        "-a",
+        help="Flow 默认署名（示例: codex/gpt-5.4）",
+    ),
+]
 SnapshotOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
 StatusFilterOption = Annotated[
     Literal["active", "blocked", "done", "stale"] | None,
@@ -117,10 +125,18 @@ def add(
     task: AddTaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
+    actor: ActorOption = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Add flow."""
+    """Add flow.
+
+    Idempotent behavior:
+    - If current branch has no flow: create new flow.
+    - If flow already exists: confirm existing flow; `--actor` updates default
+      flow signature; `--task` appends task bindings without overriding
+      the original primary task.
+    """
     flow_service = FlowService()
     name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
@@ -128,7 +144,7 @@ def add(
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
         try:
-            flow = usecase.add_flow(name=name, task=task_refs, spec=spec)
+            flow = usecase.add_flow(name=name, task=task_refs, spec=spec, actor=actor)
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
@@ -136,7 +152,7 @@ def add(
             logger.bind(command="flow add", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
-            flow = usecase.add_flow(name=name, spec=spec)
+            flow = usecase.add_flow(name=name, spec=spec, actor=actor)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -163,7 +179,7 @@ def new(
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
-    add(name, task, None, spec, trace, json_output)
+    add(name, task, None, spec, None, trace, json_output)
 
 
 @app.command(name="create")
@@ -172,6 +188,7 @@ def create(
     task: TaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
+    actor: ActorOption = None,
     base: Annotated[
         str | None,
         typer.Option(
@@ -183,7 +200,10 @@ def create(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Create a new branch with flow state."""
+    """Create a new branch with flow state.
+
+    `--actor` sets the default flow signature for subsequent workflow events.
+    """
     flow_service = FlowService()
     name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
@@ -198,6 +218,7 @@ def create(
                 base=base,
                 task=task_refs,
                 spec=spec,
+                actor=actor,
             )
         except FlowUsecaseError as error:
             _print_flow_error(error)
@@ -206,7 +227,7 @@ def create(
             logger.bind(command="flow create", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
-            flow = usecase.create_flow(name=name, base=base, spec=spec)
+            flow = usecase.create_flow(name=name, base=base, spec=spec, actor=actor)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))

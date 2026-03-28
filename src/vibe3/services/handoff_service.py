@@ -10,6 +10,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.services.handoff_recorder import record_handoff
 from vibe3.services.handoff_template import get_handoff_template
+from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -146,7 +147,7 @@ class HandoffService:
     def append_current_handoff(
         self,
         message: str,
-        actor: str,
+        actor: str | None,
         kind: str = "note",
     ) -> Path:
         """Append a lightweight update block to current.md.
@@ -159,17 +160,23 @@ class HandoffService:
         Returns:
             Path to the current.md file
         """
+        branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
         logger.bind(
             domain="handoff",
             action="append_current_handoff",
-            actor=actor,
+            actor=effective_actor,
             kind=kind,
         ).info("Appending handoff update")
 
         handoff_path = self.ensure_current_handoff()
         content = handoff_path.read_text(encoding="utf-8")
         timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
-        update_block = f"### {timestamp} | {actor} | {kind}\n{message}\n"
+        update_block = f"### {timestamp} | {effective_actor} | {kind}\n{message}\n"
 
         updates_heading = "## Updates\n"
         if updates_heading in content:
@@ -186,7 +193,7 @@ class HandoffService:
         plan_ref: str,
         next_step: str | None,
         blocked_by: str | None,
-        actor: str,
+        actor: str | None,
         session_id: str | None = None,
     ) -> None:
         """Record plan handoff.
@@ -198,6 +205,12 @@ class HandoffService:
             actor: Actor identifier
             session_id: Optional session ID from codeagent-wrapper
         """
+        branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
         record_handoff(
             self.store,
             self.git_client,
@@ -205,7 +218,7 @@ class HandoffService:
             plan_ref,
             next_step,
             blocked_by,
-            actor,
+            effective_actor,
             session_id=session_id,
         )
 
@@ -214,7 +227,7 @@ class HandoffService:
         report_ref: str,
         next_step: str | None,
         blocked_by: str | None,
-        actor: str,
+        actor: str | None,
         session_id: str | None = None,
     ) -> None:
         """Record report handoff.
@@ -226,6 +239,12 @@ class HandoffService:
             actor: Actor identifier
             session_id: Optional session ID from codeagent-wrapper
         """
+        branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
         record_handoff(
             self.store,
             self.git_client,
@@ -233,7 +252,7 @@ class HandoffService:
             report_ref,
             next_step,
             blocked_by,
-            actor,
+            effective_actor,
             session_id=session_id,
         )
 
@@ -242,7 +261,7 @@ class HandoffService:
         audit_ref: str,
         next_step: str | None,
         blocked_by: str | None,
-        actor: str,
+        actor: str | None,
         session_id: str | None = None,
     ) -> None:
         """Record audit handoff.
@@ -254,6 +273,12 @@ class HandoffService:
             actor: Actor identifier
             session_id: Optional session ID from codeagent-wrapper
         """
+        branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
         record_handoff(
             self.store,
             self.git_client,
@@ -261,7 +286,7 @@ class HandoffService:
             audit_ref,
             next_step,
             blocked_by,
-            actor,
+            effective_actor,
             session_id=session_id,
         )
 

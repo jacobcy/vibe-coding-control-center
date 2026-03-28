@@ -78,11 +78,12 @@ class TestFlowLifecycle:
         mock_store.update_flow_state.assert_called_once_with(
             "task/current-flow",
             flow_status="done",
+            latest_actor="workflow",
         )
         mock_store.add_event.assert_called_once_with(
             "task/current-flow",
             "flow_closed",
-            "system",
+            "workflow",
             "Flow closed, branch 'task/current-flow' deleted",
         )
         mock_sync_done_labels.assert_called_once_with(mock_store, "task/current-flow")

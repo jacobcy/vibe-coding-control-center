@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.models.flow import CreateDecision, FlowState
+from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse
 from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
 from vibe3.services.spec_ref_service import SpecRefInfo
 
@@ -40,9 +40,11 @@ def test_add_flow_binds_refs_and_ensures_handoff() -> None:
     result = usecase.add_flow("demo", task="248", spec="docs/plans/demo.md")
 
     assert result.branch == "task/demo"
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "task", actor=None
+    )
     flow_service.bind_spec.assert_called_once_with(
-        "task/demo", "docs/plans/demo.md", "system"
+        "task/demo", "docs/plans/demo.md", None
     )
     handoff_service.ensure_current_handoff.assert_called_once_with()
 
@@ -80,7 +82,9 @@ def test_add_flow_parses_issue_number_from_issuecomment_url() -> None:
         task="https://github.com/jacobcy/vibe-coding-control-center/issues/248#issuecomment-12345",
     )
 
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "task", actor=None
+    )
 
 
 def test_create_flow_uses_decision_start_ref_and_binds_task() -> None:
@@ -122,12 +126,15 @@ def test_create_flow_uses_decision_start_ref_and_binds_task() -> None:
     flow_service.create_flow_with_branch.assert_called_once_with(
         slug="demo",
         start_ref="origin/main",
+        actor=None,
     )
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "task", actor=None
+    )
     flow_service.bind_spec.assert_called_once_with(
         "task/demo",
         "#248:Task title",
-        "system",
+        None,
     )
     handoff_service.ensure_current_handoff.assert_called_once_with()
 
@@ -181,7 +188,7 @@ def test_create_flow_supports_multiple_task_refs() -> None:
     flow_service.bind_spec.assert_called_once_with(
         "task/demo",
         "#281:Primary task",
-        "system",
+        None,
     )
 
 
@@ -214,7 +221,9 @@ def test_task_derived_spec_ref_is_skipped_when_display_unavailable() -> None:
 
     usecase.add_flow("demo", task="248")
 
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "task", actor=None
+    )
     flow_service.bind_spec.assert_not_called()
 
 
@@ -247,11 +256,13 @@ def test_explicit_spec_takes_precedence_over_task_derived_spec() -> None:
 
     usecase.add_flow("demo", task="248", spec="docs/specs/explicit.md")
 
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "task", actor=None
+    )
     flow_service.bind_spec.assert_called_once_with(
         "task/demo",
         "docs/specs/explicit.md",
-        "system",
+        None,
     )
 
 
@@ -279,6 +290,87 @@ def test_create_flow_rejects_invalid_base_current_request() -> None:
     assert "only allowed when current flow is blocked" in str(exc_info.value)
 
 
+def test_add_flow_existing_branch_updates_actor_without_recreate() -> None:
+    """Existing flow add should only confirm state and update default actor."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=248,
+        latest_actor="codex/gpt-5.4",
+    )
+    flow_service.get_flow_state.return_value = FlowState(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=248,
+        latest_actor="claude/sonnet-4.6",
+    )
+    flow_service.store = MagicMock()
+
+    usecase = FlowUsecase(
+        flow_service=flow_service,
+        task_service=MagicMock(),
+        handoff_service=MagicMock(),
+    )
+
+    result = usecase.add_flow("demo", actor="claude/sonnet-4.6")
+
+    assert result.latest_actor == "claude/sonnet-4.6"
+    flow_service.create_flow.assert_not_called()
+    flow_service.store.update_flow_state.assert_any_call(
+        "task/demo", latest_actor="claude/sonnet-4.6"
+    )
+
+
+def test_add_flow_existing_branch_appends_tasks_but_keeps_primary() -> None:
+    """Appending --task on existing flow should not overwrite original primary task."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=248,
+        latest_actor="codex/gpt-5.4",
+    )
+    flow_service.get_flow_state.return_value = FlowState(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=248,
+        latest_actor="codex/gpt-5.4",
+    )
+    flow_service.store = MagicMock()
+
+    task_service = MagicMock()
+    task_service.link_issue.side_effect = [
+        MagicMock(issue_number=281, issue_role="task", branch="task/demo"),
+        MagicMock(issue_number=282, issue_role="task", branch="task/demo"),
+    ]
+
+    usecase = FlowUsecase(
+        flow_service=flow_service,
+        task_service=task_service,
+        handoff_service=MagicMock(),
+    )
+
+    usecase.add_flow("demo", task=["281", "282"])
+
+    first_call = task_service.link_issue.call_args_list[0]
+    second_call = task_service.link_issue.call_args_list[1]
+    assert first_call.args == ("task/demo", 281, "task")
+    assert first_call.kwargs == {"actor": "codex/gpt-5.4"}
+    assert second_call.args == ("task/demo", 282, "task")
+    assert second_call.kwargs == {"actor": "codex/gpt-5.4"}
+    flow_service.store.update_flow_state.assert_any_call(
+        "task/demo",
+        task_issue_number=248,
+    )
+
+
 def test_bind_issue_delegates_to_task_service() -> None:
     """Bind issue should parse refs and delegate to TaskService."""
     flow_service = MagicMock()
@@ -296,4 +388,6 @@ def test_bind_issue_delegates_to_task_service() -> None:
     result = usecase.bind_issue("#248", "dependency")
 
     assert result.issue_number == 248
-    task_service.link_issue.assert_called_once_with("task/demo", 248, "dependency")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 248, "dependency", actor=None
+    )
