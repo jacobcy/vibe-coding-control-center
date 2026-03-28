@@ -122,13 +122,12 @@ def test_task_link_command_removed() -> None:
     assert "No such command" in (result.stdout + result.stderr)
 
 
-def test_task_list_help_uses_issue_option() -> None:
+def test_task_list_help_no_issue_filter_option() -> None:
     result = runner.invoke(task_app, ["list", "--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "--issue" in stdout
-    assert "--repo-issue" not in stdout
+    assert "--issue" not in stdout
 
 
 def test_flow_bind_supports_related_role() -> None:

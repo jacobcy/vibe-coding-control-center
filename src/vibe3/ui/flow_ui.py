@@ -136,11 +136,6 @@ def render_flow_status(
     console.print()
 
 
-def render_flow_status_table(status: FlowStatusResponse) -> None:
-    """Alias kept for compatibility."""
-    render_flow_status(status)
-
-
 def render_flows_table(flows: list[FlowState]) -> None:
     """flow list — YAML style, one block per flow (branch-centric)."""
     for flow in flows:

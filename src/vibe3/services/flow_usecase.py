@@ -1,5 +1,6 @@
 """Usecase layer for flow command orchestration."""
 
+import re
 from collections.abc import Sequence
 from typing import Literal
 
@@ -10,7 +11,6 @@ from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
-from vibe3.services.task_usecase import TaskUsecase
 
 
 class FlowUsecaseError(RuntimeError):
@@ -148,10 +148,13 @@ class FlowUsecase:
 
     @staticmethod
     def _parse_issue_number(issue: str) -> int:
-        try:
-            return TaskUsecase.parse_issue_ref(issue)
-        except ValueError as exc:
-            raise ValueError(f"Invalid issue format: {issue}") from exc
+        digits = issue.removeprefix("#")
+        if digits.isdigit():
+            return int(digits)
+        match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue)
+        if match:
+            return int(match.group(1))
+        raise ValueError(f"Invalid issue format: {issue}")
 
     def _apply_initial_bindings(
         self,

@@ -1,6 +1,5 @@
 """Usecase layer for task command orchestration."""
 
-import re
 from dataclasses import dataclass
 
 from vibe3.exceptions import GitError
@@ -18,7 +17,6 @@ class TaskListRow:
     flow_slug: str
     flow_status: str
     task_issue_number: int | None
-    bound: bool
 
 
 @dataclass
@@ -44,23 +42,6 @@ class TaskUsecase:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
 
-    @staticmethod
-    def parse_issue_ref(issue_ref: str) -> int:
-        """Parse issue number from plain number or GitHub URL."""
-        digits = issue_ref.removeprefix("#")
-        if digits.isdigit():
-            return int(digits)
-        match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue_ref)
-        if match:
-            return int(match.group(1))
-        raise ValueError(f"Invalid issue reference: {issue_ref}")
-
-    def list_related_issue_tasks(self, issue_ref: str) -> tuple[int, list[dict]]:
-        """List flows related to the given issue reference."""
-        issue_number = self.parse_issue_ref(issue_ref)
-        flows = self.flow_service.store.get_flows_by_issue(issue_number, role="related")
-        return issue_number, flows
-
     def list_task_rows(self) -> list[TaskListRow]:
         """List local tasks as UI-oriented rows."""
         task_flows = [
@@ -68,14 +49,12 @@ class TaskUsecase:
         ]
         rows: list[TaskListRow] = []
         for task_flow in task_flows:
-            links = self.flow_service.store.get_issue_links(task_flow.branch)
             rows.append(
                 TaskListRow(
                     branch=task_flow.branch,
                     flow_slug=task_flow.flow_slug,
                     flow_status=task_flow.flow_status,
                     task_issue_number=task_flow.task_issue_number,
-                    bound=any(link.get("project_item_id") for link in links),
                 )
             )
         return rows

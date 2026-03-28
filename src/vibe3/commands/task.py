@@ -33,13 +33,6 @@ def _build_task_usecase() -> TaskUsecase:
 
 @app.command()
 def list(
-    issue: Annotated[
-        str | None,
-        typer.Option(
-            "--issue",
-            help="Issue number (or URL) — 查找该 issue 作为 related 角色关联的 flow",
-        ),
-    ] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -48,24 +41,6 @@ def list(
         setup_logging(verbose=2)
 
     usecase = _build_task_usecase()
-
-    if issue is not None:
-        issue_number, flows_data = usecase.list_related_issue_tasks(issue)
-        if not flows_data:
-            typer.echo(f"No tasks linked to related issue #{issue_number}")
-            return
-        if json_output:
-            typer.echo(json.dumps(flows_data, indent=2, default=str))
-            return
-        typer.echo(f"Tasks linked to related issue #{issue_number}:")
-        for f in flows_data:
-            task_num = f.get("task_issue_number")
-            bound = "[bound]" if f.get("project_item_id") else "[unbound]"
-            typer.echo(
-                f"  #{task_num or '?'}  {f['flow_slug']}  "
-                f"{f['flow_status']}  {bound}  branch={f['branch']}"
-            )
-        return
 
     task_rows = usecase.list_task_rows()
     if not task_rows:
@@ -77,10 +52,9 @@ def list(
         )
         return
     for task_flow in task_rows:
-        bound = "[bound]" if task_flow.bound else "[unbound]"
         typer.echo(
             f"  #{task_flow.task_issue_number}  {task_flow.flow_slug}  "
-            f"{task_flow.flow_status}  {bound}  branch={task_flow.branch}"
+            f"{task_flow.flow_status}  branch={task_flow.branch}"
         )
 
 
