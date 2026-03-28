@@ -111,7 +111,7 @@ def test_flow_show_help_uses_branch_name() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root show [OPTIONS] [FLOW_NAME]" in stdout
+    assert "Usage: root show [OPTIONS] [BRANCH]" in stdout
     assert "Branch name" in stdout
 
 
