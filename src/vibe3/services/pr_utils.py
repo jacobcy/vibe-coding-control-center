@@ -3,7 +3,9 @@
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.exceptions import GitError, UserError
 from vibe3.models.pr import PRMetadata
 
 
@@ -107,3 +109,35 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
         metadata_section += f"**Executor:** {metadata.executor}\n"
 
     return linked_section + body + metadata_section
+
+
+def check_upstream_conflicts(git_client: GitClient, action: str) -> None:
+    """Fetch origin/main and dry-run merge to detect conflicts.
+
+    On conflict: raise UserError to halt the calling command.
+    On network/fetch failure: log warning and continue (non-blocking).
+
+    Args:
+        git_client: GitClient instance for fetch and merge operations
+        action: Context label for log/error messages (e.g. "create", "ready")
+
+    Raises:
+        UserError: When merge conflicts are detected
+    """
+    target = "origin/main"
+    try:
+        git_client.fetch("origin", "main")
+    except GitError:
+        logger.bind(domain="pr", action=action).warning(
+            f"Failed to fetch {target}, skipping conflict check"
+        )
+        return
+
+    if git_client.check_merge_conflicts(target):
+        raise UserError(
+            f"Merge conflict detected between current branch and {target}\n"
+            f"Resolve before {action}:\n"
+            f"  1. git rebase {target}\n"
+            f"  2. Resolve any conflicts\n"
+            f"  3. Re-run vibe3 pr {action}"
+        )
