@@ -188,6 +188,9 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if not target_flow:
             raise RuntimeError(f"Flow '{target}' not found")
 
+        if not self.git_client.branch_exists(target_flow.branch):
+            raise RuntimeError(f"Branch '{target_flow.branch}' not found")
+
         stash_ref = None
         if self.git_client.has_uncommitted_changes():
             stash_ref = self.git_client.stash_push(message=f"vibe flow switch {target}")
