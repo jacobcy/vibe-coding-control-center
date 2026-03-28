@@ -8,7 +8,7 @@ from vibe3.services.label_service import LabelService
 
 def _is_terminal_flow_status(status: str | None) -> bool:
     """Return whether a flow status is terminal for task closing decisions."""
-    return status in {"done", "aborted", "stale"}
+    return status in {"done", "aborted", "stale", "merged"}
 
 
 def _issue_has_other_open_task_flows(

@@ -3,6 +3,7 @@
 from typing import Literal
 
 from loguru import logger
+from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
@@ -223,38 +224,45 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
-        return FlowStatusResponse(
-            branch=flow_data["branch"],
-            flow_slug=flow_data["flow_slug"],
-            flow_status=flow_data["flow_status"],
-            task_issue_number=flow_data.get("task_issue_number"),
-            pr_number=flow_data.get("pr_number"),
-            pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
-            spec_ref=flow_data.get("spec_ref"),
-            plan_ref=flow_data.get("plan_ref"),
-            report_ref=flow_data.get("report_ref"),
-            audit_ref=flow_data.get("audit_ref"),
-            planner_actor=flow_data.get("planner_actor"),
-            planner_session_id=flow_data.get("planner_session_id"),
-            executor_actor=flow_data.get("executor_actor"),
-            executor_session_id=flow_data.get("executor_session_id"),
-            reviewer_actor=flow_data.get("reviewer_actor"),
-            reviewer_session_id=flow_data.get("reviewer_session_id"),
-            latest_actor=flow_data.get("latest_actor"),
-            blocked_by=flow_data.get("blocked_by"),
-            next_step=flow_data.get("next_step"),
-            issues=issues,
-            planner_status=flow_data.get("planner_status"),
-            executor_status=flow_data.get("executor_status"),
-            reviewer_status=flow_data.get("reviewer_status"),
-            execution_pid=flow_data.get("execution_pid"),
-            execution_started_at=flow_data.get("execution_started_at"),
-            execution_completed_at=flow_data.get("execution_completed_at"),
-        )
+        try:
+            return FlowStatusResponse(
+                branch=flow_data["branch"],
+                flow_slug=flow_data["flow_slug"],
+                flow_status=flow_data["flow_status"],
+                task_issue_number=flow_data.get("task_issue_number"),
+                pr_number=flow_data.get("pr_number"),
+                pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
+                spec_ref=flow_data.get("spec_ref"),
+                plan_ref=flow_data.get("plan_ref"),
+                report_ref=flow_data.get("report_ref"),
+                audit_ref=flow_data.get("audit_ref"),
+                planner_actor=flow_data.get("planner_actor"),
+                planner_session_id=flow_data.get("planner_session_id"),
+                executor_actor=flow_data.get("executor_actor"),
+                executor_session_id=flow_data.get("executor_session_id"),
+                reviewer_actor=flow_data.get("reviewer_actor"),
+                reviewer_session_id=flow_data.get("reviewer_session_id"),
+                latest_actor=flow_data.get("latest_actor"),
+                blocked_by=flow_data.get("blocked_by"),
+                next_step=flow_data.get("next_step"),
+                issues=issues,
+                planner_status=flow_data.get("planner_status"),
+                executor_status=flow_data.get("executor_status"),
+                reviewer_status=flow_data.get("reviewer_status"),
+                execution_pid=flow_data.get("execution_pid"),
+                execution_started_at=flow_data.get("execution_started_at"),
+                execution_completed_at=flow_data.get("execution_completed_at"),
+            )
+        except ValidationError:
+            logger.warning(
+                "Flow state for branch '{}' has unparseable fields, returning None",
+                branch,
+            )
+            return None
 
     def list_flows(
         self,
-        status: Literal["active", "blocked", "done", "stale"] | None = None,
+        status: Literal["active", "blocked", "done", "stale", "merged"] | None = None,
     ) -> list[FlowState]:
         """List flows.
 
@@ -275,7 +283,19 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
 
-        return [FlowState(**flow) for flow in flows_data]
+        flows: list[FlowState] = []
+        for flow in flows_data:
+            try:
+                flows.append(FlowState(**flow))
+            except ValidationError:
+                branch = flow.get("branch", "?")
+                raw_status = flow.get("flow_status", "?")
+                logger.warning(
+                    "Skipping flow with unparseable state: branch={}, flow_status={}",
+                    branch,
+                    raw_status,
+                )
+        return flows
 
     def get_flow_timeline(self, branch: str) -> dict:
         state_data = self.store.get_flow_state(branch)
