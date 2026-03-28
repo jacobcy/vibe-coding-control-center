@@ -232,10 +232,17 @@ class GitClient:
                     target_ref,
                 ]
             )
-            # No conflicts -- abort the dry-run merge
-            self._run(["merge", "--abort"])
+            # No conflicts. In "Already up to date" case no merge state exists,
+            # so abort may fail and should be ignored.
+            try:
+                self._run(["merge", "--abort"])
+            except GitError:
+                pass
             return False
         except GitError:
-            # Conflict or error -- abort and report
-            self._run(["merge", "--abort"])
+            # Conflict or error -- best-effort abort and report conflict.
+            try:
+                self._run(["merge", "--abort"])
+            except GitError:
+                pass
             return True
