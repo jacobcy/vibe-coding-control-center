@@ -73,7 +73,7 @@ input_examples:
 
 **历史 Pattern 匹配：**
 
-- 读取 `.agent/context/task.md`
+- 运行 `vibe3 handoff show`
 - 查找相似特征的已完成任务：
   - 相同类型 + 相似复杂度 → 高置信度
   - 相同模块 + 相似范围 → 中置信度
@@ -93,7 +93,7 @@ input_examples:
 用户说："帮我修个 bug，首页加载太慢"
 
 - 分析：Bug修复，简单，单模块，明确
-- 历史：task.md 中 `fix-*` 大多用 superpower
+- 历史：`fix-*` 类任务大多用 superpower
 - 决策：高置信度 → **无感选择 Superpower**，直接进入
 
 用户说："帮我设计一个新系统"
@@ -128,7 +128,7 @@ input_examples:
   - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
   - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`
 - 记录完成后，通过 `vibe task update <task_id> --next-step "Entry: Gate 1 Scope Gate"` 标记进度。
-- 框架选择记录在 `.agent/context/task.md` 中，格式：`- <feature> (framework: <superpower|openspec>)`。
+- 框架选择通过 `vibe3 handoff append` 记录，格式：`- <feature> (framework: <superpower|openspec>)`。
 - 同时记录需求特征，用于 future pattern 匹配。
   **选择提示模板（仅在需要询问时使用）：**
 

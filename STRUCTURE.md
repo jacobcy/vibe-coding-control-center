@@ -71,7 +71,7 @@ vibe-center/
 ├── .agent/                      # AI 工作区
 │   ├── README.md                # AI 工作区说明
 │   ├── context/                 # AI 上下文
-│   │   ├── task.md              # [UNTRACKED] 当前 flow handoff 草稿（.gitignore）
+│   │   ├── task.md              # [UNTRACKED] 由 vibe3 handoff 命令管理，不直接编辑
 │   │   └── memory.md            # [TRACKED] 跨项目长期记忆与架构共识
 │   ├── rules/                   # 编码规则
 │   │   ├── coding-standards.md  # 编码标准
@@ -242,7 +242,7 @@ vibe3 inspect commit <sha>                 # 改动影响范围
 
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离） | 每个动作后 |
+| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff` 命令访问，不直接编辑） | 每个动作后 |
 | `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
 
 #### `.agent/rules/` - 编码规则
@@ -423,7 +423,7 @@ ls ~/.vibe/
 | `README.md` | 用户可见功能变更 | 功能介绍、快速开始 |
 | `DEVELOPER.md` | 开发流程、工具变更 | 开发流程、工具使用 |
 | `docs/README.md` | 文档结构变更 | 文档组织、导航 |
-| `.agent/context/task.md` | 每个新任务 | 当前任务状态 |
+| `vibe3 handoff append` | 每个新任务 / skill 完成后 | 当前 flow handoff 状态（`vibe3 handoff show` 读取） |
 | `.agent/context/memory.md` | 重要决策时 | 历史决策记录 |
 
 ## 🎯 设计原则
@@ -469,7 +469,7 @@ ls ~/.vibe/
 1. 阅读 `AGENTS.md` - 入口指南
 2. 阅读 `CLAUDE.md` - 项目规则
 3. 阅读 `SOUL.md` - 核心原则
-4. 阅读 `.agent/context/task.md` - 当前任务
+4. 运行 `vibe3 handoff show` - 当前 handoff 状态
 
 ### 我要创建新任务
 1. 阅读 `docs/README.md` - 文档结构

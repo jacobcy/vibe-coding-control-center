@@ -16,18 +16,11 @@ description: Use when the user wants to inspect or repair task-flow/worktree run
 
 对象约束：
 
-- `task = execution record`
-- `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
 - 任何修复都必须先读 shell 审计输出，再决定动作
 
 **Announce at start:** "我正在使用 vibe-check 技能读取 shell 审计结果，并在可确定时通过 Shell API 修复共享状态问题。"
 
-标准真源：
-
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
-- task / flow / worktree 生命周期语义以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 ## 真源边界
 
@@ -59,7 +52,7 @@ uv run python src/vibe3/cli.py check --all
 uv run python src/vibe3/cli.py check --fix
 ```
 
-若要核对 execution spec 证据，可额外读取 `uv run python src/vibe3/cli.py task list` 或 `uv run python src/vibe3/cli.py task show` 的 `spec_standard/spec_ref` 字段。
+若要核对 flow/task 状态，可额外读取 `uv run python src/vibe3/cli.py task list` 或 `uv run python src/vibe3/cli.py task show`。
 
 ## 职责边界
 
@@ -68,7 +61,7 @@ uv run python src/vibe3/cli.py check --fix
 - task runtime 指向不存在的 worktree
 - 已完成 / 已归档 task 仍残留 runtime 绑定
 - 当前现场绑定与 task runtime 的确定性修复
-- 基于 shell 输出可直接确认的 execution spec 缺失提示
+- 基于 shell 输出可直接确认的 flow/task 状态缺失提示
 
 `vibe-check` 不处理：
 
@@ -77,7 +70,7 @@ uv run python src/vibe3/cli.py check --fix
 - task 应该归属于哪个 issue 的语义判断
 - GitHub Issue intake、模板补全、查重与创建
 
-`execution_record_id` 与 `spec_standard/spec_ref` 只能作为审计证据或转交依据，不得在 skill 内重写成 GitHub 官方身份。
+flow/task 绑定的 task issue 只能作为审计证据或转交依据，不得在 skill 内重写成 GitHub 官方身份。
 
 前三项属于 `vibe-task` 的审计/修复范围。
 

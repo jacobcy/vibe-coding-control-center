@@ -14,12 +14,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - `vibe-roadmap` 负责 Issue 已存在之后的版本规划与优先级归类。
 - `vibe-task` 与 `vibe-check` 不负责 Issue 创建治理。
 
-标准真源：
-
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md` 为准。
-
-相关标准文档目录：`docs/standards/`
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 ## 核心原则
 
@@ -27,7 +22,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe3` 输出，再做编排判断。
 - **只做 intake，不做排期**：Issue 创建后是否进入规划、何时进入版本窗口，由 `vibe-roadmap` 决定。
-- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入流程的候选资格；创建后通过 `uv run python src/vibe3/cli.py flow bind` 绑定到 flow，而不是直接变成 execution record。
+- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入流程的候选资格；创建后通过 `uv run python src/vibe3/cli.py flow bind <issue>` 绑定到 flow。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
 ## 使用逻辑
@@ -78,7 +73,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ## 对象边界
 
 - `repo issue`: 需求来源与讨论入口
-- `task`: execution record，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task` 管理
+- `task`: 执行记录，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task` 管理
 - `flow`: execution record 的运行时现场，通过 `uv run python src/vibe3/cli.py flow` 管理
 
 ## Failure Handling
@@ -88,7 +83,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ## Handoff 记录
 
-完成当前 skill 后，若发现流程、文档或命令问题，需在 `.agent/context/task.md` 记录：
+若发现问题，运行 `vibe3 handoff append` 记录：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-issue: Issue created" --actor vibe-issue --kind milestone
