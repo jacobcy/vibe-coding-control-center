@@ -201,3 +201,48 @@ class GitClient:
             args.append("-u")
         args.extend([remote, branch_name])
         self._run(args)
+
+    def fetch(self, remote: str = "origin", ref: str | None = None) -> None:
+        """Fetch from remote.
+
+        Args:
+            remote: Remote name
+            ref: Optional refspec (e.g. 'main'). Fetches all if None.
+        """
+        args = ["fetch", remote]
+        if ref:
+            args.append(ref)
+        self._run(args)
+
+    def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
+        """Dry-run merge to detect conflicts without modifying working tree.
+
+        Args:
+            target_ref: Ref to merge into current branch (e.g. origin/main)
+
+        Returns:
+            True if conflicts detected, False if clean merge possible
+        """
+        try:
+            self._run(
+                [
+                    "merge",
+                    "--no-commit",
+                    "--no-ff",
+                    target_ref,
+                ]
+            )
+            # No conflicts. In "Already up to date" case no merge state exists,
+            # so abort may fail and should be ignored.
+            try:
+                self._run(["merge", "--abort"])
+            except GitError:
+                pass
+            return False
+        except GitError:
+            # Conflict or error -- best-effort abort and report conflict.
+            try:
+                self._run(["merge", "--abort"])
+            except GitError:
+                pass
+            return True
