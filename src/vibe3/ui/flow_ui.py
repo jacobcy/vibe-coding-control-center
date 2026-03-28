@@ -23,6 +23,17 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
     console.print(f"{pad}[dim]{key}:[/] {value}")
 
 
+def _render_flow_row(flow: FlowState, title: str | None = None) -> None:
+    status_text = _status_text(flow.flow_status).plain
+    console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
+    _kv("flow_slug", flow.flow_slug, 1)
+    task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
+    _kv("task_issue", task_str, 1)
+    if title is not None:
+        _kv("title", title, 1)
+    console.print()
+
+
 def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
     console.print(f"[green]✓[/] Flow created: [cyan]{flow.flow_slug}[/]")
     _kv("branch", flow.branch, 1)
@@ -48,15 +59,14 @@ def render_flow_status(
     if status.issues:
         related_issues = [i for i in status.issues if i.issue_role == "related"]
         dependency_issues = [i for i in status.issues if i.issue_role == "dependency"]
-        if related_issues:
-            console.print("  [dim]related_issues:[/]")
-            for i in related_issues:
-                title = titles.get(i.issue_number, "")
-                suffix = f"  [dim]{title}[/]" if title else ""
-                console.print(f"    - #{i.issue_number}{suffix}")
-        if dependency_issues:
-            console.print("  [dim]dependencies:[/]")
-            for i in dependency_issues:
+        for label, items in (
+            ("related_issues", related_issues),
+            ("dependencies", dependency_issues),
+        ):
+            if not items:
+                continue
+            console.print(f"  [dim]{label}:[/]")
+            for i in items:
                 title = titles.get(i.issue_number, "")
                 suffix = f"  [dim]{title}[/]" if title else ""
                 console.print(f"    - #{i.issue_number}{suffix}")
@@ -75,15 +85,14 @@ def render_flow_status(
             "  [dim]pr:[/] [yellow]—[/]  "
             "[dim][hint: run `vibe3 check --fix` to detect][/]"
         )
-    console.print("  [dim]plan:[/]")
-    _kv("actor", status.planner_actor or "—", 2)
-    _kv("ref", status.plan_ref or "—", 2)
-    console.print("  [dim]execute:[/]")
-    _kv("actor", status.executor_actor or "—", 2)
-    _kv("ref", status.report_ref or "—", 2)
-    console.print("  [dim]review:[/]")
-    _kv("actor", status.reviewer_actor or "—", 2)
-    _kv("ref", status.audit_ref or "—", 2)
+    for stage, actor, ref in (
+        ("plan", status.planner_actor, status.plan_ref),
+        ("execute", status.executor_actor, status.report_ref),
+        ("review", status.reviewer_actor, status.audit_ref),
+    ):
+        console.print(f"  [dim]{stage}:[/]")
+        _kv("actor", actor or "—", 2)
+        _kv("ref", ref or "—", 2)
     if status.spec_ref:
         _kv("spec", status.spec_ref, 1)
     if status.blocked_by:
@@ -120,12 +129,7 @@ def render_flow_status(
 def render_flows_table(flows: list[FlowState]) -> None:
     """flow list — YAML style, one block per flow."""
     for flow in flows:
-        task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-        status_text = _status_text(flow.flow_status).plain
-        console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
-        _kv("flow_slug", flow.flow_slug, 1)
-        _kv("task_issue", task_str, 1)
-        console.print()
+        _render_flow_row(flow)
 
 
 def render_flows_status_dashboard(
@@ -134,26 +138,8 @@ def render_flows_status_dashboard(
     """flow status dashboard — YAML style with remote title."""
     for flow in flows:
         task_num = flow.task_issue_number
-        task_str = f"#{task_num}" if task_num else "—"
         title = titles.get(task_num, "—") if task_num else "—"
-        status_text = _status_text(flow.flow_status).plain
-        console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
-        _kv("flow_slug", flow.flow_slug, 1)
-        _kv("task_issue", task_str, 1)
-        _kv("title", title, 1)
-        console.print()
-
-
-def render_no_flow(branch: str) -> None:
-    console.print(f"[yellow]no flow found[/] for branch: {branch}")
-
-
-def render_no_active_flow() -> None:
-    console.print("[yellow]no active flow[/]")
-
-
-def render_no_flows() -> None:
-    console.print("[yellow]no flows found[/]")
+        _render_flow_row(flow, title)
 
 
 def render_error(message: str) -> None:

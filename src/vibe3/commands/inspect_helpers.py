@@ -20,7 +20,12 @@ from vibe3.commands.inspect_types import (
     PRCriticalAnalysis,
 )
 from vibe3.config.loader import get_config
-from vibe3.models.change_source import BranchSource, CommitSource, PRSource
+from vibe3.models.change_source import (
+    BranchSource,
+    CommitSource,
+    PRSource,
+    UncommittedSource,
+)
 from vibe3.services import dag_service
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
 from vibe3.services.serena_service import SerenaService
@@ -54,11 +59,13 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     )
     log.info("Running change analysis pipeline")
 
-    source: Union[PRSource, CommitSource, BranchSource]
+    source: Union[PRSource, CommitSource, BranchSource, UncommittedSource]
     if source_type == "pr":
         source = PRSource(pr_number=int(identifier))
     elif source_type == "commit":
         source = CommitSource(sha=identifier)
+    elif source_type == "uncommit":
+        source = UncommittedSource()
     else:
         source = BranchSource(branch=identifier)
 

@@ -23,7 +23,6 @@ class FileSnapshot(BaseModel):
     functions: list[FunctionSnapshot] = Field(default_factory=list)
     function_count: int = 0
     imports: list[str] = Field(default_factory=list)
-    imported_by: list[str] = Field(default_factory=list)
 
 
 class ModuleSnapshot(BaseModel):

@@ -61,6 +61,29 @@ def register(app: typer.Typer) -> None:
 
         _print_change_analysis("commit", sha, result)
 
+    @app.command(name="uncommit")
+    def uncommit(
+        json_out: Annotated[
+            bool, typer.Option("--json", help="Output as JSON")
+        ] = False,
+        trace: Annotated[
+            bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
+        ] = False,
+    ) -> None:
+        """Run analysis for uncommitted working tree changes."""
+        import json
+
+        if trace:
+            enable_trace()
+
+        result = build_change_analysis("uncommit", "working-tree")
+
+        if json_out:
+            typer.echo(json.dumps(result, indent=2, default=str))
+            return
+
+        _print_change_analysis("uncommitted", "working-tree", result)
+
 
 def _print_change_analysis(source_type: str, identifier: str, result: dict) -> None:
     """Print change analysis result."""

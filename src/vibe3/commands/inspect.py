@@ -1,7 +1,6 @@
 """Inspect command - 信息提供层，输出结构化数据供 vibe review 消费."""
 
 import json
-from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -9,12 +8,7 @@ import typer
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
 from vibe3.commands.inspect_symbols import register as register_symbols
-from vibe3.services import (
-    command_analyzer,
-    dag_service,
-    metrics_service,
-    structure_service,
-)
+from vibe3.services import command_analyzer, dag_service, structure_service
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -23,20 +17,6 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-AVAILABLE_COMMANDS = [
-    "flow",
-    "task",
-    "plan",
-    "run",
-    "pr",
-    "inspect",
-    "review",
-    "hooks",
-    "handoff",
-    "check",
-    "snapshot",
-]
 
 _JSON_OPT = Annotated[bool, typer.Option("--json", help="Output as JSON")]
 _TRACE_OPT = Annotated[
@@ -47,94 +27,6 @@ _TRACE_OPT = Annotated[
 register_symbols(app)
 register_base(app)
 register_change(app)
-
-
-@app.command()
-def metrics(
-    json_out: _JSON_OPT = False,
-    trace: _TRACE_OPT = False,
-) -> None:
-    """Show code metrics (LOC, file counts, limit violations)."""
-    if trace:
-        enable_trace()
-
-    report = metrics_service.collect_metrics()
-
-    if json_out:
-        typer.echo(json.dumps(report.model_dump(), indent=2))
-        return
-
-    shell = report.shell
-    python = report.python
-
-    # Shell Metrics
-    typer.echo("=== Shell Metrics ===")
-    typer.echo(
-        f"  Total LOC : {shell.total_loc} / {shell.limit_total} "
-        f"{'✅' if shell.total_ok else '❌'}"
-    )
-    typer.echo(
-        f"  Max file  : {shell.max_file_loc} / {shell.limit_file_max} "
-        f"{'✅' if shell.file_ok else '❌'}"
-    )
-    typer.echo(f"  Files     : {shell.file_count}")
-
-    if shell.errors:
-        typer.echo(f"  ❌ 超限文件 ({len(shell.errors)}):")
-        for f in shell.errors:
-            typer.echo(f"    {f.path}: {f.loc} 行 > {shell.limit_file_max}")
-    if shell.warnings:
-        typer.echo(f"  ⚠️  大文件 ({len(shell.warnings)}):")
-        for f in shell.warnings:
-            typer.echo(f"    {f.path}: {f.loc} 行 > {shell.limit_file_default}")
-
-    # Scripts Metrics
-    if report.scripts:
-        scripts = report.scripts
-        typer.echo("\n=== Scripts Metrics ===")
-        typer.echo(f"  Total LOC : {scripts.total_loc}")
-        typer.echo(f"  Max file  : {scripts.max_file_loc}")
-        typer.echo(f"  Files     : {scripts.file_count}")
-
-    # Python Metrics
-    typer.echo("\n=== Python Metrics ===")
-    typer.echo(
-        f"  Total LOC : {python.total_loc} / {python.limit_total} "
-        f"{'✅' if python.total_ok else '❌'}"
-    )
-    typer.echo(
-        f"  Max file  : {python.max_file_loc} / {python.limit_file_max} "
-        f"{'✅' if python.file_ok else '❌'}"
-    )
-    typer.echo(f"  Files     : {python.file_count}")
-
-    if python.errors:
-        typer.echo(f"  ❌ 超限文件 ({len(python.errors)}):")
-        for f in python.errors:
-            typer.echo(f"    {f.path}: {f.loc} 行 > {python.limit_file_max}")
-    if python.warnings:
-        typer.echo(f"  ⚠️  大文件 ({len(python.warnings)}):")
-        for f in python.warnings:
-            typer.echo(f"    {f.path}: {f.loc} 行 > {python.limit_file_default}")
-
-    # Python 分层展示
-    if python.subdirs:
-        typer.echo("\n  By Directory:")
-        for subdir in python.subdirs:
-            typer.echo(
-                f"    {subdir.name + '/':<14}: {subdir.loc:>5} LOC, "
-                f"{subdir.file_count:>2} files, max {subdir.max_file_loc}"
-            )
-
-    # Dead Functions Warning
-    if report.dead_functions:
-        typer.echo("\n=== Dead Functions Warning ===")
-        typer.echo(f"  Potentially unused functions ({len(report.dead_functions)}):")
-        for df in report.dead_functions:
-            typer.echo(f"    {df.name} in {df.file}")
-        typer.echo(
-            "\n  Note: Some functions may be entry points or used via reflection"
-        )
 
 
 @app.command(name="files")
@@ -187,12 +79,10 @@ def files_(
                 for imp_by in result.imported_by:
                     typer.echo(f"    - {imp_by}")
     else:
-        results = []
-        for p in sorted(Path("src/vibe3").glob("**/*.py")):
-            if "__pycache__" in str(p):
-                continue
-            file_struct = structure_service.analyze_python_file(str(p))
-            results.append(file_struct.model_dump())
+        results = [
+            file_struct.model_dump()
+            for file_struct in structure_service.collect_python_file_structures()
+        ]
 
         if json_out:
             typer.echo(json.dumps(results, indent=2))
@@ -232,7 +122,11 @@ def commands(
         enable_trace()
 
     if not command:
-        typer.echo(f"Available commands: {', '.join(AVAILABLE_COMMANDS)}")
+        names = ", ".join(
+            cmd.name or (cmd.callback.__name__ if cmd.callback else "")
+            for cmd in app.registered_commands
+        )
+        typer.echo(f"Available commands: {names}")
         return
 
     result = command_analyzer.analyze_command(command, subcommand or None)
