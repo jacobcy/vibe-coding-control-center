@@ -14,6 +14,37 @@ _LINKED_ISSUE_RE = re.compile(
 )
 
 
+_BLOCKED_BY_RE = re.compile(
+    r"(?:blocked\s+by|depends\s+on|依赖)[:\s]+([#\d,\s#]+)",
+    re.IGNORECASE,
+)
+
+
+def parse_blocked_by(body: str) -> list[int]:
+    """Parse issue numbers from 'Blocked by' or 'Depends on' lines in issue body.
+
+    Recognises patterns like:
+      Blocked by: #333, #336
+      Depends on: #333
+      依赖 #338
+
+    Args:
+        body: Issue body text
+
+    Returns:
+        List of blocking issue numbers (deduplicated, order preserved)
+    """
+    seen: set[int] = set()
+    result: list[int] = []
+    for m in _BLOCKED_BY_RE.finditer(body or ""):
+        for num in re.findall(r"\d+", m.group(1)):
+            n = int(num)
+            if n not in seen:
+                seen.add(n)
+                result.append(n)
+    return result
+
+
 def parse_linked_issues(body: str) -> list[int]:
     """Parse issue numbers from PR body using GitHub closing keywords.
 
@@ -123,7 +154,7 @@ class IssuesMixin:
             "view",
             str(issue_number),
             "--json",
-            "number,title,body,state,updatedAt,labels,comments",
+            "number,title,body,state,updatedAt,labels,comments,milestone",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -153,4 +184,40 @@ class IssuesMixin:
                 f"Issue #{issue_number} not found: {stderr.strip()}"
             )
             return None
+        return json.loads(result.stdout)  # type: ignore[no-any-return]
+
+    def get_milestone_issues(self: Any, milestone_number: int) -> list[dict[str, Any]]:
+        """Get all issues in a milestone (open + closed).
+
+        Args:
+            milestone_number: GitHub milestone number
+
+        Returns:
+            List of dicts with keys: number, title, state
+        """
+        logger.bind(
+            external="github",
+            operation="get_milestone_issues",
+            milestone=milestone_number,
+        ).debug("Calling GitHub API: get_milestone_issues")
+        cmd = [
+            "gh",
+            "issue",
+            "list",
+            "--milestone",
+            str(milestone_number),
+            "--state",
+            "all",
+            "--limit",
+            "50",
+            "--json",
+            "number,title,state,labels,body",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            err = result.stderr.strip()
+            logger.bind(external="github", error=result.stderr).warning(
+                f"Failed to get milestone {milestone_number} issues: {err}"
+            )
+            return []
         return json.loads(result.stdout)  # type: ignore[no-any-return]

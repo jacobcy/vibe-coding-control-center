@@ -76,5 +76,5 @@ def test_task_show_prompts_flow_bind_when_task_is_unbound() -> None:
         result = runner.invoke(app, ["show"])
 
     assert result.exit_code == 0
-    assert "vibe3 flow bind <issue_number>" in result.output
+    assert "未绑定 GitHub Project item" in result.output
     assert "task bridge" not in result.output
