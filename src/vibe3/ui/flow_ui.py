@@ -40,14 +40,11 @@ def render_flow_status(
     issue_titles: dict[int, str] | None = None,
     pr_data: dict[str, object] | None = None,
 ) -> None:
-    """flow show — full detail, YAML style (branch-centric)."""
+    """flow show — full detail, YAML style."""
     titles = issue_titles or {}
-    # Branch as primary key with flow status
     status_text = _status_text(status.flow_status).plain
     console.print(f"[cyan bold]{status.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", status.flow_slug, 1)
-
-    # issues with titles
     if status.task_issue_number:
         n = status.task_issue_number
         title = titles.get(n, "")
@@ -68,8 +65,6 @@ def render_flow_status(
                 title = titles.get(i.issue_number, "")
                 suffix = f"  [dim]{title}[/]" if title else ""
                 console.print(f"    - #{i.issue_number}{suffix}")
-
-    # PR
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
@@ -85,8 +80,6 @@ def render_flow_status(
             "  [dim]pr:[/] [yellow]—[/]  "
             "[dim][hint: run `vibe3 check --fix` to detect][/]"
         )
-
-    # plan / execute / review
     console.print("  [dim]plan:[/]")
     _kv("actor", status.planner_actor or "—", 2)
     _kv("ref", status.plan_ref or "—", 2)
@@ -98,16 +91,12 @@ def render_flow_status(
     console.print("  [dim]review:[/]")
     _kv("actor", status.reviewer_actor or "—", 2)
     _kv("ref", status.audit_ref or "—", 2)
-
-    # misc
     if status.spec_ref:
         _kv("spec", status.spec_ref, 1)
     if status.blocked_by:
         _kv("blocked_by", status.blocked_by, 1)
     if status.next_step:
         _kv("next_step", status.next_step, 1)
-
-    # execution status
     execution_statuses = [
         ("planner", status.planner_status),
         ("executor", status.executor_status),
@@ -137,10 +126,9 @@ def render_flow_status(
 
 
 def render_flows_table(flows: list[FlowState]) -> None:
-    """flow list — YAML style, one block per flow (branch-centric)."""
+    """flow list — YAML style, one block per flow."""
     for flow in flows:
         task_str = f"#{flow.task_issue_number}" if flow.task_issue_number else "—"
-        # Branch as primary key with flow status
         status_text = _status_text(flow.flow_status).plain
         console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
         _kv("flow_slug", flow.flow_slug, 1)
@@ -151,12 +139,11 @@ def render_flows_table(flows: list[FlowState]) -> None:
 def render_flows_status_dashboard(
     flows: list[FlowState], titles: dict[int, str]
 ) -> None:
-    """flow status dashboard — YAML style with remote title (branch-centric)."""
+    """flow status dashboard — YAML style with remote title."""
     for flow in flows:
         task_num = flow.task_issue_number
         task_str = f"#{task_num}" if task_num else "—"
         title = titles.get(task_num, "—") if task_num else "—"
-        # Branch as primary key with flow status
         status_text = _status_text(flow.flow_status).plain
         console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
         _kv("flow_slug", flow.flow_slug, 1)
@@ -215,7 +202,6 @@ _EVENT_COLOR: dict[str, str] = {
 
 
 def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
-    # Branch as primary key with flow status
     status_text = _status_text(state.flow_status).plain
     console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", state.flow_slug, 1)

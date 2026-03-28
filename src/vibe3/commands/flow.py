@@ -128,14 +128,7 @@ def add(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Add flow.
-
-    Idempotent behavior:
-    - If current branch has no flow: create new flow.
-    - If flow already exists: confirm existing flow; `--actor` updates default
-      flow signature; `--task` appends task bindings without overriding
-      the original primary task.
-    """
+    """Add flow to current branch (idempotent)."""
     flow_service = FlowService()
     name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
@@ -196,10 +189,7 @@ def create(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Create a new branch with flow state.
-
-    `--actor` sets the default flow signature for subsequent workflow events.
-    """
+    """Create a new branch with flow state."""
     flow_service = FlowService()
     name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
