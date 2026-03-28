@@ -30,11 +30,6 @@ def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
         _kv("task", task_id, 1)
 
 
-def render_flow_bound(flow: FlowState, task_id: str) -> None:
-    console.print(f"[green]✓[/] Task bound: [cyan]{flow.flow_slug}[/]")
-    _kv("task", task_id, 1)
-
-
 def render_flow_status(
     status: FlowStatusResponse,
     issue_titles: dict[int, str] | None = None,
@@ -83,11 +78,9 @@ def render_flow_status(
     console.print("  [dim]plan:[/]")
     _kv("actor", status.planner_actor or "—", 2)
     _kv("ref", status.plan_ref or "—", 2)
-
     console.print("  [dim]execute:[/]")
     _kv("actor", status.executor_actor or "—", 2)
     _kv("ref", status.report_ref or "—", 2)
-
     console.print("  [dim]review:[/]")
     _kv("actor", status.reviewer_actor or "—", 2)
     _kv("ref", status.audit_ref or "—", 2)
@@ -121,7 +114,6 @@ def render_flow_status(
             _kv("started", status.execution_started_at[:19], 2)
         if status.execution_pid:
             _kv("pid", status.execution_pid, 2)
-
     console.print()
 
 
