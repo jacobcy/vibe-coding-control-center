@@ -769,13 +769,15 @@ vibe3 pr create -t <title> [-b <body>] [--base <branch>]
 ```
 
 **Metadata 自动读取**:
-- 不需要用户手动指定 task、flow、spec、planner、executor
+- 不需要用户手动指定 task、flow、spec、planner、executor、reviewer
 - 系统自动从当前 flow_state 读取：
   - `task_issue_number` → Task issue
   - `flow_slug` → Flow
   - `spec_ref` → Spec reference
   - `planner_actor` → Planner agent
   - `executor_actor` → Executor agent
+  - `reviewer_actor` → Reviewer agent
+- 当存在非默认 actor 时，自动生成 **Contributors** 区块（去重 + 过滤 unknown/system/server）
 
 **行为**:
 - 从当前分支创建 draft PR

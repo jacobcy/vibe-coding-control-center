@@ -25,6 +25,23 @@ class PRMetadata(BaseModel):
     spec_ref: Optional[str] = Field(None, description="Spec reference path")
     planner: Optional[str] = Field(None, description="Planner agent")
     executor: Optional[str] = Field(None, description="Executor agent")
+    reviewer: Optional[str] = Field(None, description="Reviewer agent")
+
+    @property
+    def contributors(self) -> list[str]:
+        """Return deduplicated, filtered list of non-default actors.
+
+        Filters out common placeholder values (unknown, system, server, None)
+        and deduplicates while preserving declaration order.
+        """
+        default_values = {"unknown", "system", "server", ""}
+        seen: set[str] = set()
+        result: list[str] = []
+        for actor in (self.planner, self.executor, self.reviewer):
+            if actor and actor.lower() not in default_values and actor not in seen:
+                seen.add(actor)
+                result.append(actor)
+        return result
 
 
 class CreatePRRequest(BaseModel):

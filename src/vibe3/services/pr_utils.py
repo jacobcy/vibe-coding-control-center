@@ -29,6 +29,7 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         spec_ref=flow_data.get("spec_ref"),
         planner=flow_data.get("planner_actor"),
         executor=flow_data.get("executor_actor"),
+        reviewer=flow_data.get("reviewer_actor"),
     )
 
     logger.bind(
@@ -105,5 +106,11 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
         metadata_section += f"**Planner:** {metadata.planner}\n"
     if metadata.executor:
         metadata_section += f"**Executor:** {metadata.executor}\n"
+    if metadata.reviewer:
+        metadata_section += f"**Reviewer:** {metadata.reviewer}\n"
+
+    contributors = metadata.contributors
+    if contributors:
+        metadata_section += "\n**Contributors:** " + ", ".join(contributors) + "\n"
 
     return linked_section + body + metadata_section
