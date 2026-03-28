@@ -81,8 +81,12 @@ class PRService:
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Check for merge conflicts with origin/main
-        check_upstream_conflicts(self.git_client, "create")
+        # Check for merge conflicts with the target base branch
+        check_upstream_conflicts(
+            self.git_client,
+            "create",
+            base_branch=base_branch,
+        )
 
         # Get current branch
         head_branch = self.git_client.get_current_branch()
@@ -177,13 +181,17 @@ class PRService:
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Check for merge conflicts with origin/main
-        check_upstream_conflicts(self.git_client, "ready")
-
         # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
+
+        # Check for merge conflicts with the PR base branch
+        check_upstream_conflicts(
+            self.git_client,
+            "ready",
+            base_branch=pr.base_branch,
+        )
 
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=actor)

@@ -94,6 +94,80 @@ def test_fetch_failure_does_not_block(
                 assert pr.number == 1
 
 
+def test_create_conflict_check_uses_base_branch(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
+    """Conflict check should align with chosen base branch."""
+    mock_github_client.check_auth.return_value = True
+    mock_github_client.list_prs_for_branch.return_value = []
+    mock_github_client.create_pr.return_value = PRResponse(
+        number=7,
+        title="",
+        body="",
+        state=PRState.OPEN,
+        head_branch="feature",
+        base_branch="develop",
+        url="",
+        draft=True,
+    )
+
+    git = MagicMock()
+    git.fetch.return_value = None
+    git.check_merge_conflicts.return_value = False
+    git.get_current_branch.return_value = "feature"
+    git.push_branch.return_value = None
+
+    mock_store = MagicMock()
+    mock_store.get_flow_state.return_value = {}
+
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "git_client", git):
+            with patch.object(pr_service, "store", mock_store):
+                pr_service.create_draft_pr(
+                    title="T",
+                    body="B",
+                    base_branch="develop",
+                )
+
+    git.fetch.assert_called_once_with("origin", "develop")
+    git.check_merge_conflicts.assert_called_once_with("origin/develop")
+    mock_github_client.create_pr.assert_called_once()
+
+
+def test_mark_ready_conflict_check_uses_pr_base(
+    pr_service: PRService, mock_github_client: MagicMock
+) -> None:
+    """mark_ready should use PR base branch when checking conflicts."""
+    mock_pr = PRResponse(
+        number=2,
+        title="",
+        body="",
+        state=PRState.OPEN,
+        head_branch="feature-branch",
+        base_branch="release",
+        url="",
+        draft=True,
+    )
+
+    mock_github_client.check_auth.return_value = True
+    mock_github_client.get_pr.return_value = mock_pr
+    mock_github_client.mark_ready.return_value = mock_pr
+
+    git = MagicMock()
+    git.fetch.return_value = None
+    git.check_merge_conflicts.return_value = False
+
+    mock_store = MagicMock()
+
+    with patch.object(pr_service, "github_client", mock_github_client):
+        with patch.object(pr_service, "git_client", git):
+            with patch.object(pr_service, "store", mock_store):
+                pr_service.mark_ready(2)
+
+    git.fetch.assert_called_once_with("origin", "release")
+    git.check_merge_conflicts.assert_called_once_with("origin/release")
+
+
 def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) -> None:
     """Test merge PR success."""
     mock_pr = PRResponse(

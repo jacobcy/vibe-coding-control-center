@@ -111,8 +111,13 @@ def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
     return linked_section + body + metadata_section
 
 
-def check_upstream_conflicts(git_client: GitClient, action: str) -> None:
-    """Fetch origin/main and dry-run merge to detect conflicts.
+def check_upstream_conflicts(
+    git_client: GitClient,
+    action: str,
+    base_branch: str = "main",
+    remote: str = "origin",
+) -> None:
+    """Fetch base branch and dry-run merge to detect conflicts.
 
     On conflict: raise UserError to halt the calling command.
     On network/fetch failure: log warning and continue (non-blocking).
@@ -120,13 +125,17 @@ def check_upstream_conflicts(git_client: GitClient, action: str) -> None:
     Args:
         git_client: GitClient instance for fetch and merge operations
         action: Context label for log/error messages (e.g. "create", "ready")
+        base_branch: Target base branch for the PR (branch name or remote ref)
+        remote: Remote name to fetch from
 
     Raises:
         UserError: When merge conflicts are detected
     """
-    target = "origin/main"
+    prefixed = base_branch.startswith(f"{remote}/")
+    target = base_branch if prefixed else f"{remote}/{base_branch}"
+    fetch_ref = base_branch.removeprefix(f"{remote}/") if prefixed else base_branch
     try:
-        git_client.fetch("origin", "main")
+        git_client.fetch(remote, fetch_ref)
     except GitError:
         logger.bind(domain="pr", action=action).warning(
             f"Failed to fetch {target}, skipping conflict check"
