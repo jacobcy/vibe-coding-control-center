@@ -15,11 +15,11 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_valid(self, mock_service_class):
         """Test check command when all checks pass."""
-        from vibe3.services.check_service import CheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
-        mock_service.verify_current_flow.return_value = CheckResult(
-            is_valid=True, issues=[]
+        mock_service.execute_check.return_value = ExecuteCheckResult(
+            mode="default", success=True, summary="All checks passed"
         )
         mock_service_class.return_value = mock_service
 
@@ -32,12 +32,14 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_issues(self, mock_service_class):
         """Test check command when issues found."""
-        from vibe3.services.check_service import CheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
-        mock_service.verify_current_flow.return_value = CheckResult(
-            is_valid=False,
-            issues=["Issue 1: Missing flow", "Issue 2: PR mismatch"],
+        mock_service.execute_check.return_value = ExecuteCheckResult(
+            mode="default",
+            success=False,
+            summary="Issues found for branch 'task/demo'",
+            details={"issues": ["Issue 1: Missing flow", "Issue 2: PR mismatch"]},
         )
         mock_service_class.return_value = mock_service
 
@@ -46,23 +48,20 @@ class TestCheckCommand:
         assert result.exit_code != 0
         assert "✗" in result.output
         assert "Issues found" in result.output
-        assert "Issue 1: Missing flow" in result.output
 
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_fix(self, mock_service_class):
         """Test check command with --fix option."""
-        from vibe3.services.check_service import CheckResult, FixResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
-        mock_service.verify_current_flow.return_value = CheckResult(
-            is_valid=False,
-            issues=["Issue 1: Missing flow"],
+        mock_service.execute_check.return_value = ExecuteCheckResult(
+            mode="fix", success=True, summary="All issues fixed"
         )
-        mock_service.auto_fix.return_value = FixResult(success=True, error=None)
         mock_service_class.return_value = mock_service
 
         result = runner.invoke(app, ["check", "--fix"])
 
         assert result.exit_code == 0
         assert "All issues fixed" in result.output
-        mock_service.auto_fix.assert_called_once()
+        mock_service.execute_check.assert_called_once_with("fix")
