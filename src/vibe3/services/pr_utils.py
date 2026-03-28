@@ -30,6 +30,7 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         planner=flow_data.get("planner_actor"),
         executor=flow_data.get("executor_actor"),
         reviewer=flow_data.get("reviewer_actor"),
+        latest=flow_data.get("latest_actor"),
     )
 
     logger.bind(
@@ -75,42 +76,21 @@ def _build_linked_section(metadata: PRMetadata, body: str) -> str:
 
 
 def build_pr_body(body: str, metadata: PRMetadata | None = None) -> str:
-    """Build PR body with metadata.
+    """Build PR body with issue linkage and contributor signature.
 
-    If a task issue is bound, prepends ``Closes #<n>`` to trigger GitHub's
-    native issue-PR linkage (unless the body already contains a linking
-    keyword for that issue).
-
-    Args:
-        body: Original PR body
-        metadata: PR metadata
-
-    Returns:
-        Enhanced PR body with linking section and metadata
+    - If a task issue is bound, prepends ``Closes #<n>`` to trigger GitHub's
+      native issue-PR linkage (unless already present).
+    - If flow_state contains non-placeholder actors, appends a Contributors
+      section with normalized, deduplicated signatures.
     """
     if not metadata:
         return body
 
     linked_section = _build_linked_section(metadata, body)
-    metadata_section = "\n\n---\n\n## Vibe3 Metadata\n\n"
-
-    if metadata.branch:
-        metadata_section += f"**Branch:** {metadata.branch}\n"
-    if metadata.task_issue:
-        metadata_section += f"**Task Issue:** #{metadata.task_issue}\n"
-    if metadata.flow_slug:
-        metadata_section += f"**Flow:** {metadata.flow_slug}\n"
-    if metadata.spec_ref:
-        metadata_section += f"**Spec Ref:** {metadata.spec_ref}\n"
-    if metadata.planner:
-        metadata_section += f"**Planner:** {metadata.planner}\n"
-    if metadata.executor:
-        metadata_section += f"**Executor:** {metadata.executor}\n"
-    if metadata.reviewer:
-        metadata_section += f"**Reviewer:** {metadata.reviewer}\n"
 
     contributors = metadata.contributors
-    if contributors:
-        metadata_section += "\n**Contributors:** " + ", ".join(contributors) + "\n"
+    if not contributors:
+        return linked_section + body
 
-    return linked_section + body + metadata_section
+    signature = "\n\n---\n\n" + "## Contributors\n\n" + ", ".join(contributors) + "\n"
+    return linked_section + body + signature

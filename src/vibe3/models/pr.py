@@ -6,6 +6,37 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Placeholder actors that should not appear in contributor signatures.
+_PLACEHOLDER_ACTORS = frozenset({"unknown", "system", "server", "ai_assistant", ""})
+
+# Legacy actor alias -> normalized backend identifier.
+_LEGACY_ALIAS_MAP: dict[str, str] = {
+    "agent-claude": "claude",
+    "claude-ai": "claude",
+    "agent-codex": "codex",
+    "openai-code-agent[bot]": "openai",
+    "openai-code-agent": "openai",
+}
+
+
+def normalize_actor(actor: str) -> str | None:
+    """Normalize an actor identifier to standard ``backend/model`` format.
+
+    Handles:
+    - Already standard format (``claude/sonnet-4.6``) -> pass through
+    - Legacy aliases (``Agent-Claude``) -> ``claude``
+    - Placeholder values -> ``None`` (filtered out)
+    - Empty string -> ``None``
+    """
+    if not actor or not actor.strip():
+        return None
+    key = actor.strip().lower()
+    if key in _PLACEHOLDER_ACTORS:
+        return None
+    if key in _LEGACY_ALIAS_MAP:
+        return _LEGACY_ALIAS_MAP[key]
+    return actor.strip()
+
 
 class PRState(str, Enum):
     """PR state."""
@@ -26,22 +57,33 @@ class PRMetadata(BaseModel):
     planner: Optional[str] = Field(None, description="Planner agent")
     executor: Optional[str] = Field(None, description="Executor agent")
     reviewer: Optional[str] = Field(None, description="Reviewer agent")
+    latest: Optional[str] = Field(None, description="Latest actor")
 
     @property
     def contributors(self) -> list[str]:
-        """Return deduplicated, filtered list of non-default actors.
+        """Return normalized, deduplicated list of non-placeholder actors.
 
-        Filters out common placeholder values (unknown, system, server, None)
-        and deduplicates while preserving declaration order.
+        Source fields: planner, executor, reviewer, latest.
+        Dedup is by backend (part before ``/``) so that ``Agent-Claude``
+        and ``claude/sonnet-4.6`` merge into a single entry.  When the
+        same backend appears multiple times, the most specific form
+        (the one containing a model) wins.
         """
-        default_values = {"unknown", "system", "server", ""}
-        seen: set[str] = set()
-        result: list[str] = []
-        for actor in (self.planner, self.executor, self.reviewer):
-            if actor and actor.lower() not in default_values and actor not in seen:
-                seen.add(actor)
-                result.append(actor)
-        return result
+        backend_map: dict[str, str] = {}
+        field_order: list[str] = []
+
+        for raw in (self.planner, self.executor, self.reviewer, self.latest):
+            normalized = normalize_actor(raw) if raw else None
+            if not normalized:
+                continue
+            backend = normalized.split("/")[0]
+            if backend not in backend_map:
+                field_order.append(backend)
+                backend_map[backend] = normalized
+            elif "/" in normalized and "/" not in backend_map[backend]:
+                backend_map[backend] = normalized
+
+        return [backend_map[b] for b in field_order]
 
 
 class CreatePRRequest(BaseModel):
