@@ -83,7 +83,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ## Handoff 记录
 
-完成当前 skill 后，若发现流程、文档或命令问题，需在 `.agent/context/task.md` 记录：
+若发现问题，运行 `vibe3 handoff append` 记录：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-issue: Issue created" --actor vibe-issue --kind milestone

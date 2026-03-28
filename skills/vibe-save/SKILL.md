@@ -1,6 +1,6 @@
 ---
 name: vibe-save
-description: Use when the user wants to save session context, says "/vibe-save", or when ending a session and you want to preserve work state. Save a clear local handoff in task.md and sync only minimal shared task facts.
+description: Use when the user wants to save session context, says /vibe-save, or when ending a session and you want to preserve work state. Use vibe3 handoff to record the current state.
 ---
 
 # /vibe-save - Session Handoff Save
@@ -9,7 +9,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 **核心原则：**
 
-- 以 `.agent/context/task.md` 为默认保存载体。
+- 以 `vibe3 handoff append` 记录当前状态。
 - 共享真源只同步最小必要事实，不在 skill 中堆叠额外业务推断。
 - 只有当本次会话形成了稳定、可复用的项目共识时，才更新 `.agent/context/memory.md`。
 - 任何共享状态判断都必须先读 shell 输出，再决定是否写回。
@@ -20,7 +20,6 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 特别约束：
 
-- `.agent/context/task.md` 的读取、写入与修正义务以 `docs/standards/v3/handoff-governance-standard.md` 为准。
 - Shell 可以调用 `git` / `gh` / worktree 动作，但 skill 不得把这些机械步骤改写成"自动判断"或"自动修复"。
 
 ## Command Boundary
@@ -36,7 +35,7 @@ description: Use when the user wants to save session context, says "/vibe-save",
 
 `/vibe-save` 默认只做三件事：
 
-1. 更新 `.agent/context/task.md`，作为下个会话继续工作的主 handoff。
+1. 运行 `vibe3 handoff append` 记录当前状态，作为下个会话的主 handoff。
 2. 如果当前目录承载的 `flow` 已能从共享真源识别当前 `task`，则通过 Shell 命令同步最小共享事实，例如 `status`、`next_step`、必要时的 `pr_ref`。
 3. 仅当本次会话形成稳定项目共识时，才更新 `.agent/context/memory.md`。
 
@@ -69,13 +68,13 @@ uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py task list
 ```
 
-### Step 2: 审阅并更新 `.agent/context/task.md`
+### Step 2: 写入 handoff
 
 在写入前必须先完整审阅已有内容，并先核查共享真源与现场事实。
 
 若发现现有 handoff 与当前事实不一致，必须先修正，再退出当前 skill。
 
-推荐将 `task.md` 保持为单文件 handoff，至少覆盖：
+使用 `vibe3 handoff append` 写入，至少覆盖：
 
 1. 当前任务
 2. 当前现场
@@ -85,7 +84,7 @@ uv run python src/vibe3/cli.py task list
 6. 下一步
 7. 关键文件
 
-`task.md` 应优先回答"下个会话接手时需要知道什么"，而不是扩展成认知档案库。
+handoff 应优先回答"下个会话接手时需要知道什么"，而不是扩展成认知档案库。
 
 ### Step 3: 仅在必要时同步共享真源
 
@@ -104,7 +103,7 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 
 如果当前目录尚未识别出当前 `flow` 对应的 `task`：
 
-- 只更新本地 `task.md` handoff。
+- 只运行 `vibe3 handoff append` 写入当前状态。
 - 明确向用户说明本次未回写共享 task 状态。
 
 ### Step 4: 仅在形成稳定共识时更新 `memory.md`
@@ -117,12 +116,12 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 
 摘要应说明：
 
-- `task.md` 是否已更新
+- handoff 是否已写入（`vibe3 handoff show` 可验证）
 - 是否同步了共享 task 状态
 - 是否更新了 `memory.md`
 - 当前最关键的下一步是什么
 
-## Recommended `task.md` Shape
+## 推荐的 handoff 格式
 
 ```markdown
 # Current Task
@@ -162,6 +161,6 @@ uv run python src/vibe3/cli.py handoff append "session save: <summary>" --actor 
 
 ## Design Decisions
 
-1. `task.md` 是默认 handoff 载体，避免 save 默认散落出过多文件。
+1. `vibe3 handoff append` 是标准写入方式，避免 save 默认散落出过多文件。
 2. 共享真源只同步最小必要事实，不把 save 扩展成 workflow 编排器。
 3. `memory.md` 只记录稳定共识，不承担每次会话的临时状态保存。

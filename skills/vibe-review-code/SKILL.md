@@ -76,7 +76,7 @@ uv run python src/vibe3/cli.py review base
   - If a PR exists (opened): Use `gh pr diff` to fetch the source of truth for changes.
   - If local only: Use `git diff main...HEAD`.
 - If local: Use `git diff` and `git diff --cached` for uncommitted changes; use `git diff main...HEAD` for committed branch diffs.
-- **Review Context**: Cross-reference with the Task README and the original goal from `.agent/context/task.md`.
+- **Review Context**: Cross-reference with the Task README and the original goal from `vibe3 handoff show`.
 
 ## 2. Serena 使用步骤（审查前）
 

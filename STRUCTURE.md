@@ -242,7 +242,7 @@ vibe3 inspect commit <sha>                 # 改动影响范围
 
 | 文件 | 职责 | 更新频率 |
 |------|------|---------|
-| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离） | 每个动作后 |
+| `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff` 命令访问，不直接编辑） | 每个动作后 |
 | `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
 
 #### `.agent/rules/` - 编码规则
@@ -469,7 +469,7 @@ ls ~/.vibe/
 1. 阅读 `AGENTS.md` - 入口指南
 2. 阅读 `CLAUDE.md` - 项目规则
 3. 阅读 `SOUL.md` - 核心原则
-4. 阅读 `.agent/context/task.md` - 当前任务
+4. 运行 `vibe3 handoff show` - 当前 handoff 状态
 
 ### 我要创建新任务
 1. 阅读 `docs/README.md` - 文档结构

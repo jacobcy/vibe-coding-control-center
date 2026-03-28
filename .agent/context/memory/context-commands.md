@@ -14,12 +14,12 @@
 
 ### /save
 - **用途**: 会话结束时保存上下文
-- **存储**: `.agent/context/memory/<topic>.md`, `.agent/context/task.md`
+- **存储**: `.agent/context/memory/<topic>.md`，handoff 通过 `vibe3 handoff append` 写入
 - **触发**: 手动 `/save` + Stop Hook 提醒 (>8 轮)
 
 ### /continue
 - **用途**: 新会话开始时恢复上下文
-- **读取**: `.agent/context/task.md`, `.agent/context/memory.md`, `.agent/context/memory/<topic>.md`
+- **读取**: `vibe3 handoff show`，`.agent/context/memory.md`, `.agent/context/memory/<topic>.md`
 - **触发**: 手动 `/continue`
 
 ### /check

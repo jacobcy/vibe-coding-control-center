@@ -33,7 +33,6 @@ PR 创建后停止，输出：
 - `docs/standards/v3/command-standard.md`
 - `docs/standards/v3/handoff-governance-standard.md`
 - `docs/standards/github-labels-standard.md`
-- `.agent/context/task.md`
 
 ## 完整流程
 
@@ -75,7 +74,7 @@ PR 创建后停止，输出：
   │   └─ uv run python src/vibe3/cli.py pr create --base <ref>
   │
   └─ Step 7: 写入 handoff 并停止
-      ├─ 更新 .agent/context/task.md
+      ├─ vibe3 handoff append
       └─ 停止，等待用户确认后运行 /vibe-integrate
 ```
 
@@ -108,7 +107,7 @@ uv run python src/vibe3/cli.py flow list
 
 - 当前 `issue` / `flow` / `branch` / `task` / `pr`
 - 当前 flow 是否已经进入 `open + had_pr`
-- `.agent/context/task.md` 里上一环节留下了什么 handoff
+- `vibe3 handoff show` 里上一环节留下了什么 handoff
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能继续沿用旧判断。
 
@@ -344,7 +343,7 @@ PR 创建成功后，当前 flow 进入 `open + had_pr` 状态，skill 在此停
 
 ### Step 8: 写入 handoff
 
-完成当前 skill 后，必须更新 `.agent/context/task.md`：
+完成当前 skill 后，运行：
 
 ```bash
 uv run python src/vibe3/cli.py handoff append "vibe-commit: PR created" --actor vibe-commit --kind milestone

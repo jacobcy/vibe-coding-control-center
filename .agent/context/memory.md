@@ -103,7 +103,7 @@ vibe task update <task-id> --next-step <step>
 ### 核心共识
 
 **审阅优先原则 (Review-First Principle)**：
-- 在写入任何持久化上下文（如 `memory.md`, `task.md`）之前，必须先读取并审阅已有内容。
+- 在写入任何持久化上下文（如 `memory.md`、handoff）之前，必须先读取并审阅已有内容。
 - 若发现已有内容陈旧、有误或与当前事实冲突，必须先进行修正，而非直接追加。
 - 目的：防止 AI 生成的上下文变成不可读的“屎山”，保持认知对齐的纯净度。
 
