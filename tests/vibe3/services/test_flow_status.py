@@ -101,3 +101,36 @@ class TestFlowList:
         assert len(result) == 1
         assert result[0].flow_slug == "flow-1"
         assert result[0].flow_status == "active"
+
+    def test_list_flows_skips_unparseable_rows(self, mock_store) -> None:
+        """Test list_flows skips rows with unknown flow_status without crashing."""
+        mock_store.get_all_flows.return_value = [
+            {
+                "branch": "branch-ok",
+                "flow_slug": "flow-ok",
+                "flow_status": "active",
+                "updated_at": "2026-03-16T00:00:00",
+            },
+            {
+                "branch": "branch-bad",
+                "flow_slug": "flow-bad",
+                "flow_status": "unknown_future_status",
+                "updated_at": "2026-03-16T00:00:00",
+            },
+        ]
+
+        service = FlowService(store=mock_store)
+        result = service.list_flows()
+
+        assert len(result) == 1
+        assert result[0].branch == "branch-ok"
+
+    def test_get_flow_status_returns_none_on_invalid_data(self, mock_store) -> None:
+        """Test get_flow_status returns None when flow data has unparseable fields."""
+        mock_store.get_flow_state.return_value["flow_status"] = "unknown_future_status"
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store)
+        result = service.get_flow_status("test-branch")
+
+        assert result is None
