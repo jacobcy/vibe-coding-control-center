@@ -1,175 +1,192 @@
 ---
 name: vibe-new
-description: Use when the user wants to create or intake the next delivery target from roadmap items, handoff blockers, or missing task specs, and needs plan/task binding without entering implementation.
+description: Use when starting a new development task. Handles the full setup from issue selection to flow creation, issue binding, and PR draft creation — ready to code. Replaces the old vibe-new + vibe-start two-step sequence.
 ---
 
-# /vibe-new - 创建 Flow 与同步 Issue
+# /vibe-new - 开始新任务
+
+`/vibe-new` 是任务启动的全流程入口，覆盖从 issue 确认到 PR draft 创建的完整准备阶段。
+
+**完成后状态**：flow 已创建、issue 已绑定、PR draft 已发出，可直接开始编写代码。
+
+---
 
 ## 核心职责
 
-`vibe-new` 只负责创建逻辑 flow 并同步 issue，不进入执行，也不创建 task。
+1. 确认或创建目标 issue
+2. 创建或注册 flow（绑定分支）
+3. 绑定 issue 到 flow
+4. 创建 PR draft（占位）
+5. 停止并等待用户开始编码
 
-**核心职责**：
+**不做的事**：不写业务代码，不进入实现，不跨 worktree 调度。
 
-- 创建逻辑 flow（不创建物理 worktree）
-- 没指定 issue → 通过 `/vibe-issue` 创建 issue
-- 有 issue 且已有 `vibe-task` label 或在 GitHub Project 中 → 绑定到 flow
-- 不创建 task，不进入执行
+---
 
 ## 停止点
 
 完成后输出：
 
-- ✅ flow 已创建
-- ✅ issue 已同步
-- **下一步**：使用 `/vibe-start` 开始执行
+- ✅ issue 已确认
+- ✅ flow 已创建/注册
+- ✅ issue 已绑定到 flow
+- ✅ PR draft 已创建
+- **下一步**：开始编码，完成后运行 `/vibe-commit`
 
-## 必读文档
-
-- `docs/standards/v3/git-workflow-standard.md` (flow 生命周期)
-- `.agent/context/task.md` (当前上下文)
-
-相关文档：
-
-- 术语：`docs/standards/glossary.md`
-- 动作语义：`docs/standards/action-verbs.md`
-- Skill 标准：`docs/standards/v3/skill-standard.md`
+---
 
 ## 完整流程
 
 ```
 /vibe-new <feature>
   ├─ Step 1: 读取当前上下文
-  │   ├─ uv run python src/vibe3/cli.py flow show
-  │   ├─ uv run python src/vibe3/cli.py task list
-  │   └─ 检查当前 flow、task 列表、handoff blocker
+  │   ├─ vibe3 flow show
+  │   ├─ vibe3 flow status
+  │   └─ 检查当前 branch、flow、已绑定 issue
   │
-  ├─ Step 2: 选择 intake 来源
-  │   ├─ 当前 flow 需要切换到新 issue
-  │   ├─ handoff blocker
-  │   ├─ task item / repo issue
-  │   └─ 用户显式指定的目标
+  ├─ Step 2: 确认目标 issue
+  │   ├─ 用户指定 → 直接使用
+  │   ├─ 无 issue → 调用 /vibe-issue 创建
+  │   └─ gh issue view <number> 确认内容
   │
-  ├─ Step 3: 补齐上游规划对象
-  │   ├─ 缺 issue → 调用 /vibe-issue
-  │   ├─ 缺 flow → uv run python src/vibe3/cli.py flow bind <issue>
-  │   └─ 缺 plan → 等待 /vibe-start 编写 plan
+  ├─ Step 3: 准备 flow
+  │   ├─ 场景A：需要新分支
+  │   │   └─ vibe3 flow create <name> --task <issue> --base main
+  │   ├─ 场景B：已在目标分支，首次注册
+  │   │   ├─ vibe3 flow add
+  │   │   └─ vibe3 flow bind <issue> --role task
+  │   └─ 场景C：已有 flow，只需绑定新 issue
+  │       └─ vibe3 flow bind <issue> --role task
   │
-  ├─ Step 4: 处理 flow 现场
-  │   ├─ 创建逻辑 flow：uv run python src/vibe3/cli.py flow create <slug> --base main
-  │   └─ 同步 issue：uv run python src/vibe3/cli.py flow bind <issue>
+  ├─ Step 4: 创建 PR draft
+  │   └─ vibe3 pr create --base main
   │
-  └─ Step 5: 写入 handoff 与停止
-      ├─ 更新 .agent/context/task.md
-      └─ 输出停止点信息，等待用户执行 /vibe-start
+  └─ Step 5: 写入 handoff 并停止
+      └─ vibe3 handoff append "vibe-new: ready to code" --actor vibe-new --kind milestone
 ```
 
-## 核心边界
-
-- 允许：读取 handoff、检查 task 列表、确认主 issue、判断旧 flow 到新 flow 的转换方式、必要时创建新的逻辑 flow
-- 不允许：修改业务代码、进入实现、创建或更新 task、伪造没有 plan 的 task、擅自新建或切换物理 worktree
-- 若当前 flow 已有 PR，只允许为下一个目标准备新的逻辑 flow，不得继续在当前 flow 中开发新目标
+---
 
 ## Workflow
 
 ### Step 1: 读取当前上下文
 
-优先读取：
-
 ```bash
-uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py task list
-```
-
-必要时补充：
-
-```bash
-uv run python src/vibe3/cli.py task show <task-id>
+vibe3 flow show       # 当前 branch 的 flow 详情
+vibe3 flow status     # 所有活跃 flow 一览
 ```
 
 检查点：
+- 当前 branch 是否已有 flow？（`flow show` 能正常输出）
+- 当前 flow 是否已绑定 task issue？
+- 当前 flow 是否已有 PR？（有 PR 则不得在此 flow 继续开发新目标）
 
-- 当前 flow 是否已有 `current_task`
-- 当前 flow 是否已经 `open + had_pr`
-- 当前 task 列表中是否存在待处理的 item
-- `.agent/context/task.md` 是否存在 handoff blocker 或待 intake 事项
+若当前 flow 已有 PR，必须先执行 `vibe3 flow done` 或切换到新分支，再开始新任务。
 
-### Step 2: 选择 intake 来源
-
-按以下顺序选择目标来源：
-
-1. 当前 flow 已绑定但需要切换到新的主 issue / 新的 flow 语义
-2. `.agent/context/task.md` 中明确记录的 handoff blocker
-3. 当前已存在但尚未进入新 flow 的 task item / repo issue
-4. 用户显式指定的目标
-
-如果以上来源都不存在，停止并报告"当前没有可 intake 的目标"。
-
-### Step 3: 补齐上游规划对象
-
-规则固定如下：
-
-- 缺少 `repo issue` 或 bug 边界不清时，先委托 `vibe-issue`
-- 缺少 flow 绑定时：
-  - 如果 issue 已有 `vibe-task` label 或已在 GitHub Project 中：直接运行 `uv run python src/vibe3/cli.py flow bind <issue>`
-  - 如果 issue 没有 label 且不在 Project 中：先添加 label 或添加到 Project，然后 `uv run python src/vibe3/cli.py flow bind <issue>`
-  - 如果还没有 GitHub issue：先运行 `/vibe-issue` 创建 issue，然后绑定
-- 缺少 plan 时，等待 `/vibe-start` 编写 plan（vibe-new 不负责创建 plan）
-- 只有进入 `/vibe-start` 后，才允许从 issue 落 task 作为 execution bridge 并写入 `spec_standard/spec_ref`
-
-### Step 4: 处理 flow 现场
-
-当主 issue 与 plan 已确定后，再决定是否需要新的逻辑 flow：
-
-- 若当前目录还没有承载目标 flow，默认使用：
+### Step 2: 确认目标 issue
 
 ```bash
-uv run python src/vibe3/cli.py flow create <slug> --base main
+# 查看 issue 内容
+gh issue view <number>
+
+# 若无 issue，调用 /vibe-issue 创建
 ```
 
-- 若只是把已有 issue 绑定到当前 flow，使用：
+### Step 3: 准备 flow
+
+**场景 A：当前在 main/无关分支，需要新建分支开发**
 
 ```bash
-uv run python src/vibe3/cli.py flow bind <issue>
+# 创建新分支 + flow，同时绑定 task issue
+vibe3 flow create <name> --task <issue-number> --base main
 ```
 
-- 若当前目录只需要切到新的逻辑 flow，保持在 flow 层完成切换，不在这里绑定 task
+> `--base main` 确保从最新主干拉取。`<name>` 建议用 `task/<issue>-brief` 格式。
 
-- 未经人类明确授权，不得使用 `wtnew`、`vnew`、`git worktree add`
-
-### Step 5: 写入 handoff 与停止点
-
-完成后更新 `.agent/context/task.md`，至少记录：
+**场景 B：已经 `git checkout -b` 切到新分支，需要注册 flow**
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "vibe-new: flow created and issue bound" --actor vibe-new --kind milestone
+# 注册当前分支为 flow
+vibe3 flow add
+
+# 绑定 task issue
+vibe3 flow bind <issue-number> --role task
 ```
+
+**场景 C：已有 flow，需要追加绑定更多 issue**
+
+```bash
+# 绑定关联 issue（非主任务）
+vibe3 flow bind <issue-number> --role related
+
+# 绑定依赖 issue
+vibe3 flow bind <issue-number> --role dependency
+```
+
+### Step 4: 创建 PR draft
+
+```bash
+vibe3 pr create --base main
+```
+
+PR draft 用于：
+- 占位（表明此分支已有开发计划）
+- 触发 CI 流水线
+- 记录开发范围（在 PR body 中关联 issue）
+
+> 若创建失败（无提交），先做一次空 commit：`git commit --allow-empty -m "chore: init flow"`
+
+### Step 5: 写入 handoff 并停止
+
+```bash
+vibe3 handoff append "vibe-new: flow ready, PR draft created" \
+  --actor vibe-new --kind milestone
+```
+
+记录格式：
 
 ```markdown
 ## Skill Handoff
 
 - skill: vibe-new
 - updated_at: <ISO-8601>
-- target: <issue-or-task-item>
-- plan: <plan-path-or-none>
-- task: none
-- flow: <flow-or-none>
-- next: /vibe-start
-
-## Issues Found (可选)
-
-- type: <flow|doc|command|other>
-- severity: <low|medium|high>
-- description: <问题描述>
-- context: <发现场景>
-- suggestion: <改进建议（可选）>
+- issue: <issue-number>
+- flow: <flow-slug>
+- branch: <branch-name>
+- pr: <pr-draft-number>
+- next: 开始编码，完成后运行 /vibe-commit
 ```
 
-然后停止，不进入执行。
+然后停止，等待用户开始编码。
+
+---
+
+## 有依赖时的处理
+
+如果当前任务依赖另一个 issue 未完成：
+
+```bash
+# 完成 flow 创建后，立即标记为 blocked
+vibe3 flow blocked --task <blocking-issue-number> --reason "需要 #X 先完成"
+
+# 可安全切走处理其他任务
+git checkout <other-branch>
+
+# 依赖解除后切回来继续
+git checkout <this-branch>
+vibe3 flow show
+```
+
+---
+
+## 核心边界
+
+- 允许：读取 flow 状态、创建 flow、绑定 issue、创建 PR draft、写入 handoff
+- 不允许：修改业务代码、进入实现阶段、跨 worktree 调度、未经授权创建物理 worktree（`wtnew`、`git worktree add`）
+- 若当前 flow 已有 PR：只能为下一个目标准备新 flow，不得继续在当前 flow 堆新目标
 
 ## Restrictions
 
-- 不得在本 skill 内创建 task；从 issue 落 task 是 `/vibe-start` 的责任
-- 不得把 handoff 直接当真源，必须先核查 shell 输出
-- 不得把 `flow`、`task`、`issue` 混成同一对象
-- 不得在 skill 里把物理 worktree 当默认隔离手段
+- 不得把 handoff 当真源，必须先核查 `vibe3 flow show` 输出
+- 不得在没有 issue 的情况下创建 flow（issue 是 flow 的规划依据）
+- 不得把 `flow bind` 和 `flow add` 混用（`add` 注册分支，`bind` 绑定 issue）
