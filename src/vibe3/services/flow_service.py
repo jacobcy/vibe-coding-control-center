@@ -1,17 +1,13 @@
 """Flow service implementation."""
 
-from typing import Literal
-
 from loguru import logger
+from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import (
-    FlowEvent,
     FlowState,
-    FlowStatusResponse,
-    IssueLink,
     MainBranchProtectedError,
 )
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
@@ -102,7 +98,12 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if not flow_data:
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
-        return FlowState(**flow_data)
+        try:
+            return FlowState(**flow_data)
+        except ValidationError as exc:
+            raise RuntimeError(
+                f"Created flow has invalid data for branch {branch}: {exc}"
+            ) from exc
 
     def create_flow_with_branch(
         self,
@@ -187,9 +188,6 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         if not target_flow:
             raise RuntimeError(f"Flow '{target}' not found")
 
-        if not self.git_client.branch_exists(target_flow.branch):
-            raise RuntimeError(f"Branch '{target_flow.branch}' does not exist")
-
         stash_ref = None
         if self.git_client.has_uncommitted_changes():
             stash_ref = self.git_client.stash_push(message=f"vibe flow switch {target}")
@@ -200,87 +198,3 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             self.git_client.stash_apply(stash_ref)
 
         return target_flow
-
-    def get_flow_status(self, branch: str) -> FlowStatusResponse | None:
-        """Get flow status.
-
-        Args:
-            branch: Git branch name
-
-        Returns:
-            Flow status response or None if not found
-        """
-        logger.bind(
-            domain="flow",
-            action="get_status",
-            branch=branch,
-        ).debug("Getting flow status")
-
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            return None
-
-        issue_links = self.store.get_issue_links(branch)
-        issues = [IssueLink(**link) for link in issue_links]
-
-        return FlowStatusResponse(
-            branch=flow_data["branch"],
-            flow_slug=flow_data["flow_slug"],
-            flow_status=flow_data["flow_status"],
-            task_issue_number=flow_data.get("task_issue_number"),
-            pr_number=flow_data.get("pr_number"),
-            pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
-            spec_ref=flow_data.get("spec_ref"),
-            plan_ref=flow_data.get("plan_ref"),
-            report_ref=flow_data.get("report_ref"),
-            audit_ref=flow_data.get("audit_ref"),
-            planner_actor=flow_data.get("planner_actor"),
-            planner_session_id=flow_data.get("planner_session_id"),
-            executor_actor=flow_data.get("executor_actor"),
-            executor_session_id=flow_data.get("executor_session_id"),
-            reviewer_actor=flow_data.get("reviewer_actor"),
-            reviewer_session_id=flow_data.get("reviewer_session_id"),
-            latest_actor=flow_data.get("latest_actor"),
-            blocked_by=flow_data.get("blocked_by"),
-            next_step=flow_data.get("next_step"),
-            issues=issues,
-            planner_status=flow_data.get("planner_status"),
-            executor_status=flow_data.get("executor_status"),
-            reviewer_status=flow_data.get("reviewer_status"),
-            execution_pid=flow_data.get("execution_pid"),
-            execution_started_at=flow_data.get("execution_started_at"),
-            execution_completed_at=flow_data.get("execution_completed_at"),
-        )
-
-    def list_flows(
-        self,
-        status: Literal["active", "blocked", "done", "stale"] | None = None,
-    ) -> list[FlowState]:
-        """List flows.
-
-        Args:
-            status: Optional status filter
-
-        Returns:
-            List of flow states
-        """
-        logger.bind(
-            domain="flow",
-            action="list",
-            status=status,
-        ).debug("Listing flows")
-
-        flows_data = self.store.get_all_flows()
-
-        if status:
-            flows_data = [f for f in flows_data if f.get("flow_status") == status]
-
-        return [FlowState(**flow) for flow in flows_data]
-
-    def get_flow_timeline(self, branch: str) -> dict:
-        state_data = self.store.get_flow_state(branch)
-        if not state_data:
-            return {"state": None, "events": []}
-        events_data = self.store.get_events(branch, limit=100)
-        events = [FlowEvent(**e) for e in events_data]
-        return {"state": FlowState(**state_data), "events": events}

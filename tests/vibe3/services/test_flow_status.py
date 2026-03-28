@@ -30,6 +30,17 @@ class TestFlowStatus:
         assert result.issues[0].issue_number == 101
         assert result.issues[0].issue_role == "task"
 
+    def test_get_flow_status_migrates_legacy_merged_status(self, mock_store) -> None:
+        """Test legacy merged status is normalized in status responses."""
+        mock_store.get_flow_state.return_value["flow_status"] = "merged"
+        mock_store.get_issue_links.return_value = []
+
+        service = FlowService(store=mock_store)
+        result = service.get_flow_status("test-branch")
+
+        assert result is not None
+        assert result.flow_status == "done"
+
     def test_get_flow_status_not_found(self, mock_store) -> None:
         """Test getting flow status when not found."""
         mock_store.get_flow_state.return_value = None
