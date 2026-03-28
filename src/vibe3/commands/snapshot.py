@@ -35,6 +35,8 @@ def build(
     - Dependency graph
     - Quality metrics
 
+    This is the canonical structure entrypoint; use `snapshot show` for review.
+
     Examples:
         vibe3 snapshot build
         vibe3 snapshot build --json

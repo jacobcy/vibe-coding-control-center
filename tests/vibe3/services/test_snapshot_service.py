@@ -2,10 +2,12 @@
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from vibe3.services.snapshot_lookup import find_snapshot_by_branch
+from vibe3.services.structure_service import FileStructure, FunctionInfo
 
 
 @pytest.fixture
@@ -153,3 +155,74 @@ def test_find_snapshot_by_branch_nonexistent_dir(
     result = find_snapshot_by_branch("main")
 
     assert result is None
+
+
+def test_build_snapshot_uses_shared_python_collection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """build_snapshot should reuse shared Python file collection helper."""
+    from vibe3.services import snapshot_service
+
+    root = tmp_path / "src" / "vibe3"
+    root.mkdir(parents=True)
+    (root / "a.py").write_text("def a():\n    return 1\n")
+    (root / "b.py").write_text("def b():\n    return 2\n")
+
+    fake_git = MagicMock()
+    fake_git.get_current_branch.return_value = "task/demo"
+    fake_git.get_current_commit.return_value = "abcdef1234567890"
+    monkeypatch.setattr(snapshot_service, "GitClient", lambda: fake_git)
+
+    collected = [
+        FileStructure(
+            path=str(root / "a.py"),
+            language="python",
+            total_loc=2,
+            functions=[FunctionInfo(name="a", line=1, loc=2)],
+            function_count=1,
+        ),
+        FileStructure(
+            path=str(root / "b.py"),
+            language="python",
+            total_loc=2,
+            functions=[FunctionInfo(name="b", line=1, loc=2)],
+            function_count=1,
+        ),
+    ]
+
+    collect_calls: list[str] = []
+
+    def fake_collect(root_arg: str) -> list[FileStructure]:
+        collect_calls.append(root_arg)
+        return collected
+
+    class Node:
+        def __init__(self, imports: list[str]) -> None:
+            self.imports = imports
+
+    monkeypatch.setattr(
+        snapshot_service.structure_service,
+        "collect_python_file_structures",
+        fake_collect,
+    )
+    monkeypatch.setattr(
+        snapshot_service.dag_service,
+        "_extract_imports",
+        lambda path: [f"imports:{path}"],
+    )
+    monkeypatch.setattr(
+        snapshot_service.dag_service,
+        "build_module_graph",
+        lambda root_arg: {
+            "vibe3.a": Node([]),
+            "vibe3.b": Node([]),
+        },
+    )
+
+    snapshot = snapshot_service.build_snapshot(root=str(root))
+
+    assert collect_calls == [str(root)]
+    assert snapshot.metrics.total_files == 2
+    assert snapshot.files[0].imports == [f"imports:{str(root / 'a.py')}"]
+    assert snapshot.files[1].imports == [f"imports:{str(root / 'b.py')}"]
+    assert "imported_by" not in snapshot.files[0].model_dump()

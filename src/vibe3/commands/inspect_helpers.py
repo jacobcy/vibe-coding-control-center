@@ -20,7 +20,12 @@ from vibe3.commands.inspect_types import (
     PRCriticalAnalysis,
 )
 from vibe3.config.loader import get_config
-from vibe3.models.change_source import BranchSource, CommitSource, PRSource
+from vibe3.models.change_source import (
+    BranchSource,
+    CommitSource,
+    PRSource,
+    UncommittedSource,
+)
 from vibe3.services import dag_service
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
 from vibe3.services.serena_service import SerenaService
@@ -54,11 +59,13 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
     )
     log.info("Running change analysis pipeline")
 
-    source: Union[PRSource, CommitSource, BranchSource]
+    source: Union[PRSource, CommitSource, BranchSource, UncommittedSource]
     if source_type == "pr":
         source = PRSource(pr_number=int(identifier))
     elif source_type == "commit":
         source = CommitSource(sha=identifier)
+    elif source_type == "uncommit":
+        source = UncommittedSource()
     else:
         source = BranchSource(branch=identifier)
 
@@ -71,6 +78,12 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         )
         svc = SerenaService(git_client=git_client)
         impact = svc.analyze_changes(source)
+        untracked_files: set[str] = set()
+        if source_type == "uncommit":
+            try:
+                untracked_files = set(git_client.get_untracked_files())
+            except Exception:
+                untracked_files = set()
 
         sys.stderr = old_stderr
 
@@ -133,6 +146,18 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             and not line.startswith("+++")
             and not line.startswith("---")
         )
+        if untracked_files:
+            for file in changed_files:
+                if file not in untracked_files:
+                    continue
+                try:
+                    changed_lines += max(
+                        1, len(Path(file).read_text(encoding="utf-8").splitlines())
+                    )
+                except OSError:
+                    log.bind(file=file).warning(
+                        "Failed to count lines for untracked file"
+                    )
 
         config = get_config()
         critical_paths = config.review_scope.critical_paths

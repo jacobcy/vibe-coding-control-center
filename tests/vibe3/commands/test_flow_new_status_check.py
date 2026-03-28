@@ -6,7 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.models.flow import FlowStatusResponse
+from vibe3.models.flow import FlowState, FlowStatusResponse
 
 runner = CliRunner()
 
@@ -34,22 +34,31 @@ class TestFlowAddStatusCheck:
         mock_service.create_flow.assert_called_once_with(
             slug="new-flow",
             branch="feature/test",
+            actor=None,
         )
 
     @pytest.mark.parametrize("flow_status", ["active", "done", "aborted", "stale"])
     @patch("vibe3.commands.flow.FlowService")
-    def test_existing_flow_blocks_creation(self, mock_service_class, flow_status: str):
-        """Any existing flow record should block creation."""
+    def test_existing_flow_confirms_idempotently(
+        self, mock_service_class, flow_status: str
+    ):
+        """Existing flow should be confirmed idempotently."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "feature/test"
-        mock_flow = MagicMock(spec=FlowStatusResponse)
-        mock_flow.flow_status = flow_status
-        mock_flow.flow_slug = "test-flow"
+        mock_flow = FlowStatusResponse(
+            branch="feature/test",
+            flow_slug="test-flow",
+            flow_status=flow_status,
+        )
         mock_service.get_flow_status.return_value = mock_flow
+        mock_service.get_flow_state.return_value = FlowState(
+            branch="feature/test",
+            flow_slug="test-flow",
+            flow_status=flow_status,
+        )
         mock_service_class.return_value = mock_service
 
         result = runner.invoke(app, ["flow", "add", "new-flow"])
 
-        assert result.exit_code == 1
-        assert "already has flow" in result.output.lower()
+        assert result.exit_code == 0
         mock_service.create_flow.assert_not_called()

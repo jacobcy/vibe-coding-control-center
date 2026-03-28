@@ -75,12 +75,12 @@ class TestGetChangedFiles:
         return GitClient()
 
     def test_uncommitted_merges_staged_and_unstaged(self, client: GitClient) -> None:
-        with patch.object(client, "_run", side_effect=["a.py\nb.py", "c.py"]):
+        with patch.object(client, "_run", side_effect=["a.py\nb.py", "c.py", "d.py"]):
             files = client.get_changed_files(UncommittedSource())
-        assert sorted(files) == ["a.py", "b.py", "c.py"]
+        assert sorted(files) == ["a.py", "b.py", "c.py", "d.py"]
 
     def test_uncommitted_deduplicates(self, client: GitClient) -> None:
-        with patch.object(client, "_run", side_effect=["a.py", "a.py"]):
+        with patch.object(client, "_run", side_effect=["a.py", "a.py", ""]):
             files = client.get_changed_files(UncommittedSource())
         assert files == ["a.py"]
 
@@ -148,3 +148,33 @@ class TestGetDiff:
         """测试 PR diff 但未注入 GitHubClient 时抛出错误."""
         with pytest.raises(GitError, match="requires GitHubClient"):
             client.get_diff(PRSource(pr_number=99))
+
+
+class TestCheckMergeConflicts:
+    """check_merge_conflicts 测试."""
+
+    def test_returns_false_when_abort_not_needed(self) -> None:
+        """merge 成功但无 merge state 时，abort 失败也应视为无冲突."""
+        client = GitClient()
+        with patch.object(
+            client,
+            "_run",
+            side_effect=[
+                "",
+                GitError("merge --abort", "There is no merge to abort"),
+            ],
+        ):
+            assert client.check_merge_conflicts("origin/main") is False
+
+    def test_returns_true_when_conflict_and_abort_fails(self) -> None:
+        """merge 冲突且 abort 失败时，不应抛异常，应返回有冲突."""
+        client = GitClient()
+        with patch.object(
+            client,
+            "_run",
+            side_effect=[
+                GitError("merge", "CONFLICT"),
+                GitError("merge --abort", "There is no merge to abort"),
+            ],
+        ):
+            assert client.check_merge_conflicts("origin/main") is True

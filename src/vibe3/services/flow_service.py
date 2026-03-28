@@ -19,6 +19,7 @@ from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 from vibe3.services.flow_query_mixin import FlowQueryMixin
+from vibe3.services.signature_service import SignatureService
 
 
 class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
@@ -57,6 +58,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         self,
         slug: str,
         branch: str,
+        actor: str | None = None,
     ) -> FlowState:
         """Create a new flow.
 
@@ -82,16 +84,18 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             slug=slug,
             branch=branch,
         ).info("Creating flow")
+        effective_actor = SignatureService.resolve_actor(explicit_actor=actor)
 
         self.store.update_flow_state(
             branch,
             flow_slug=slug,
+            latest_actor=effective_actor,
         )
 
         self.store.add_event(
             branch,
             "flow_created",
-            "system",
+            effective_actor,
             f"Flow '{slug}' created",
         )
 
@@ -111,6 +115,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         slug: str,
         start_ref: str = MAIN_BRANCH_REF,
         save_unstash: bool = False,
+        actor: str | None = None,
     ) -> FlowState:
         """Create a new flow and create branch.
 
@@ -150,7 +155,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
 
         self.git_client.create_branch(branch, start_ref)
 
-        flow = self.create_flow(slug, branch)
+        flow = self.create_flow(slug, branch, actor=actor)
 
         if stash_ref:
             self.git_client.stash_apply(stash_ref)

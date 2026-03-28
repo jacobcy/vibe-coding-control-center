@@ -7,7 +7,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 
 
-def abort_flow_impl(store: Any, branch: str) -> None:
+def abort_flow_impl(store: Any, branch: str, actor: str = "workflow") -> None:
     """Abort flow and delete branch."""
     git = GitClient()
 
@@ -27,10 +27,10 @@ def abort_flow_impl(store: Any, branch: str) -> None:
             "Failed to delete remote branch, continuing"
         )
 
-    store.update_flow_state(branch, flow_status="aborted")
+    store.update_flow_state(branch, flow_status="aborted", latest_actor=actor)
     store.add_event(
         branch,
         "flow_aborted",
-        "system",
+        actor,
         f"Flow aborted, branch '{branch}' deleted",
     )

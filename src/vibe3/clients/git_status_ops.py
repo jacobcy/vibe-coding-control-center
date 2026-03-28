@@ -134,11 +134,18 @@ def _get_uncommitted_files(run: Callable[[list[str]], str]) -> list[str]:
     """获取未提交改动文件（暂存 + 工作区）."""
     staged = run(["diff", "--name-only", "--cached"])
     unstaged = run(["diff", "--name-only"])
+    untracked = run(["ls-files", "--others", "--exclude-standard"])
     all_files = set()
-    for line in (staged + "\n" + unstaged).splitlines():
+    for line in (staged + "\n" + unstaged + "\n" + untracked).splitlines():
         if line.strip():
             all_files.add(line.strip())
     return sorted(all_files)
+
+
+def get_untracked_files(run: Callable[[list[str]], str]) -> list[str]:
+    """获取未跟踪文件列表."""
+    output = run(["ls-files", "--others", "--exclude-standard"])
+    return [f for f in output.splitlines() if f.strip()]
 
 
 def _get_commit_files(run: Callable[[list[str]], str], sha: str) -> list[str]:

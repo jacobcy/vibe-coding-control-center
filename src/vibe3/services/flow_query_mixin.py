@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.models.flow import FlowEvent, FlowState
+from vibe3.services.signature_service import SignatureService
 
 if TYPE_CHECKING:
     from vibe3.clients.git_client import GitClient
@@ -61,7 +62,7 @@ class FlowQueryMixin:
         self,
         branch: str,
         spec_ref: str,
-        actor: str = "system",
+        actor: str | None = None,
     ) -> None:
         """Bind a spec to a flow.
 
@@ -70,8 +71,15 @@ class FlowQueryMixin:
             spec_ref: Spec file reference
             actor: Actor performing the bind
         """
-        self.store.update_flow_state(branch, spec_ref=spec_ref, latest_actor=actor)
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
+        self.store.update_flow_state(
+            branch, spec_ref=spec_ref, latest_actor=effective_actor
+        )
         self.store.add_event(
-            branch, "spec_bound", actor, detail=f"Spec bound: {spec_ref}"
+            branch, "spec_bound", effective_actor, detail=f"Spec bound: {spec_ref}"
         )
         logger.bind(branch=branch, spec=spec_ref).info("Spec bound to flow")

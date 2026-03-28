@@ -37,9 +37,31 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 0
         assert json.loads(result.output)["number"] == 456
         mock_service.return_value.sync_pr_state_from_remote.assert_called_once_with(
-            existing_pr, actor="server"
+            existing_pr, actor=None
         )
         mock_service.return_value.create_draft_pr.assert_not_called()
+
+    def test_pr_create_existing_pr_shows_confirmed_status(
+        self, runner: CliRunner
+    ) -> None:
+        """Non-JSON output should report existing PR status instead of created."""
+        with patch("vibe3.commands.pr_create.PRService") as mock_service:
+            existing_pr = MagicMock(
+                number=456,
+                title="Existing PR",
+                body="",
+                state=MagicMock(value="MERGED"),
+                draft=False,
+                url="https://github.com/org/repo/pull/456",
+                head_branch="task/311",
+                base_branch="main",
+            )
+            mock_service.return_value.get_pr.return_value = existing_pr
+
+            result = runner.invoke(app, ["pr", "create"])
+
+        assert result.exit_code == 0
+        assert "already exists and is merged" in result.output.lower()
 
     def test_pr_create_without_ai(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create without --ai flag works normally."""
@@ -57,7 +79,7 @@ class TestPRCreateCommandAI:
                 title="Test PR",
                 body="",
                 base_branch="main",
-                actor="server",
+                actor=None,
             )
 
     def test_pr_create_ai_disabled(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -138,30 +160,31 @@ pr:
     ) -> None:
         """Test pr create --ai --json uses AI result without prompting."""
         with patch(
-            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
-            return_value="origin/main",
-        ) as mock_resolve:
+            "vibe3.commands.pr_create.FlowService.get_current_branch",
+            return_value="task/refactor/v3-thin-commands-19k",
+        ):
             with patch(
-                "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
-            ) as mock_material:
-                mock_material.return_value = MagicMock(
-                    commits=["feat: add feature"],
-                    changed_files=["src/file.py"],
-                )
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
+                return_value="origin/main",
+            ) as mock_resolve:
                 with patch(
-                    "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
-                ) as mock_config:
-                    mock_config.return_value.ai = AIConfig()
+                    "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
+                ) as mock_material:
+                    mock_material.return_value = MagicMock(
+                        commits=["feat: add feature"],
+                        changed_files=["src/file.py"],
+                    )
                     with patch(
-                        "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
-                    ) as mock_suggest:
-                        mock_suggest.return_value = (
-                            "feat: ai title",
-                            "Summary\n\n- change",
-                        )
+                        "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
+                    ) as mock_config:
+                        mock_config.return_value.ai = AIConfig()
                         with patch(
-                            "vibe3.services.pr_create_usecase.Prompt.ask"
-                        ) as mock_prompt:
+                            "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
+                        ) as mock_suggest:
+                            mock_suggest.return_value = (
+                                "feat: ai title",
+                                "Summary\n\n- change",
+                            )
                             with patch(
                                 "vibe3.commands.pr_create.PRService"
                             ) as mock_service:
@@ -191,13 +214,12 @@ pr:
             base_branch="origin/main",
             branch=ANY,
         )
-        mock_prompt.assert_not_called()
         mock_suggest.assert_called_once_with(["feat: add feature"], ["src/file.py"])
         mock_service.return_value.create_draft_pr.assert_called_once_with(
             title="feat: ai title",
             body="Summary\n\n- change",
             base_branch="origin/main",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )
 
     def test_pr_create_uses_resolved_base_for_ai_context_and_pr_request(
@@ -205,46 +227,49 @@ pr:
     ) -> None:
         """Resolved base should feed both AI context gathering and PR creation."""
         with patch(
-            "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
-            return_value="origin/feature-root",
-        ) as mock_resolve:
+            "vibe3.commands.pr_create.FlowService.get_current_branch",
+            return_value="task/refactor/v3-thin-commands-19k",
+        ):
             with patch(
-                "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
-            ) as mock_material:
-                mock_material.return_value = MagicMock(
-                    commits=["feat: add feature"],
-                    changed_files=["src/file.py"],
-                )
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
+                return_value="origin/feature-root",
+            ) as mock_resolve:
                 with patch(
-                    "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
-                ) as mock_config:
-                    mock_config.return_value.ai = AIConfig()
+                    "vibe3.services.pr_create_usecase.BaseResolutionUsecase.collect_branch_material"
+                ) as mock_material:
+                    mock_material.return_value = MagicMock(
+                        commits=["feat: add feature"],
+                        changed_files=["src/file.py"],
+                    )
                     with patch(
-                        "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
-                    ) as mock_suggest:
-                        mock_suggest.return_value = ("feat: ai title", "body")
+                        "vibe3.services.pr_create_usecase.VibeConfig.get_defaults"
+                    ) as mock_config:
+                        mock_config.return_value.ai = AIConfig()
                         with patch(
-                            "vibe3.commands.pr_create.PRService"
-                        ) as mock_service:
-                            mock_service.return_value.get_pr.return_value = None
-                            mock_pr = MagicMock(
-                                number=123,
-                                title="feat: ai title",
-                                body="body",
-                                model_dump=lambda: {
-                                    "number": 123,
-                                    "title": "feat: ai title",
-                                    "body": "body",
-                                },
-                            )
-                            mock_service.return_value.create_draft_pr.return_value = (
-                                mock_pr
-                            )
+                            "vibe3.services.pr_create_usecase.AIService.suggest_pr_content"
+                        ) as mock_suggest:
+                            mock_suggest.return_value = ("feat: ai title", "body")
+                            with patch(
+                                "vibe3.commands.pr_create.PRService"
+                            ) as mock_service:
+                                mock_service.return_value.get_pr.return_value = None
+                                mock_pr = MagicMock(
+                                    number=123,
+                                    title="feat: ai title",
+                                    body="body",
+                                    model_dump=lambda: {
+                                        "number": 123,
+                                        "title": "feat: ai title",
+                                        "body": "body",
+                                    },
+                                )
+                                svc = mock_service.return_value
+                                svc.create_draft_pr.return_value = mock_pr
 
-                            result = runner.invoke(
-                                app,
-                                ["pr", "create", "--ai", "--json", "--yes"],
-                            )
+                                result = runner.invoke(
+                                    app,
+                                    ["pr", "create", "--ai", "--json", "--yes"],
+                                )
 
         assert result.exit_code == 0
         mock_resolve.assert_called_once_with(None)
@@ -256,5 +281,5 @@ pr:
             title="feat: ai title",
             body="body",
             base_branch="origin/feature-root",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )

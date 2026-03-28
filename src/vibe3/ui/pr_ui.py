@@ -15,6 +15,26 @@ def render_pr_created(pr: PRResponse) -> None:
     )
 
 
+def render_pr_confirmed(pr: PRResponse) -> None:
+    """Render existing PR confirmation with current state."""
+    status = pr.state.value
+    if status == "MERGED":
+        prefix = "[yellow]ℹ[/] PR already exists and is merged"
+    elif status == "CLOSED":
+        prefix = "[yellow]ℹ[/] PR already exists and is closed"
+    elif pr.draft:
+        prefix = "[yellow]ℹ[/] Draft PR already exists"
+    else:
+        prefix = "[yellow]ℹ[/] PR already exists"
+
+    console.print(prefix)
+    console.print(f"\n[cyan]PR #{pr.number}[/]: {pr.title}")
+    console.print(f"[dim]{pr.url}[/]")
+    console.print(
+        f"\nBranch: [yellow]{pr.head_branch}[/] → [yellow]{pr.base_branch}[/]"
+    )
+
+
 def render_pr_details(pr: PRResponse) -> None:
     console.print(f"\n[bold cyan]PR #{pr.number}[/]: {pr.title}\n")
 

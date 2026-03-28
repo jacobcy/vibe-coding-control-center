@@ -12,7 +12,12 @@ from vibe3.models.pr import (
     PRResponse,
     VersionBumpResponse,
 )
-from vibe3.services.pr_utils import build_pr_body, get_metadata_from_flow
+from vibe3.services.pr_utils import (
+    build_pr_body,
+    check_upstream_conflicts,
+    get_metadata_from_flow,
+)
+from vibe3.services.signature_service import SignatureService
 from vibe3.services.version_service import VersionService
 
 
@@ -26,14 +31,7 @@ class PRService:
         store: SQLiteClient | None = None,
         version_service: VersionService | None = None,
     ) -> None:
-        """Initialize PR service.
-
-        Args:
-            github_client: GitHub client for API operations
-            git_client: Git client for repository operations
-            store: SQLiteClient instance for persistence
-            version_service: Version service for version calculations
-        """
+        """Initialize PR service."""
         self.github_client = github_client or GitHubClient()
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
@@ -44,25 +42,9 @@ class PRService:
         title: str,
         body: str,
         base_branch: str = "main",
-        actor: str = "server",
+        actor: str | None = None,
     ) -> PRResponse:
-        """Create a draft PR.
-
-        Metadata (task, flow, spec, planner, executor) is automatically
-        read from the current flow state.
-
-        Args:
-            title: PR title
-            body: PR body/description
-            base_branch: Base branch name
-            actor: Actor creating the PR
-
-        Returns:
-            Created PR response
-
-        Raises:
-            RuntimeError: If PR creation fails
-        """
+        """Create a draft PR."""
         logger.bind(
             domain="pr",
             action="create_draft",
@@ -71,24 +53,31 @@ class PRService:
             actor=actor,
         ).info("Creating draft PR")
 
-        # Check auth
         if not self.github_client.check_auth():
             raise RuntimeError(
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Get current branch
-        head_branch = self.git_client.get_current_branch()
+        check_upstream_conflicts(
+            self.git_client,
+            "create",
+            base_branch=base_branch,
+        )
 
-        # Idempotent behavior: if PR already exists for this branch, confirm and sync.
+        head_branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            head_branch,
+            explicit_actor=actor,
+        )
+
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
             hydrated_existing = self.github_client.get_pr(existing.number) or existing
-            self._sync_pr_flow_state(hydrated_existing, actor=actor)
+            self._sync_pr_flow_state(hydrated_existing, actor=effective_actor)
             return hydrated_existing
 
-        # Ensure head branch exists on remote before gh pr create.
         try:
             self.git_client.push_branch(head_branch, set_upstream=True)
         except GitError as exc:
@@ -99,13 +88,8 @@ class PRService:
                 f"  2. Ensure you have push permission to origin"
             ) from exc
 
-        # Read metadata from flow state
         metadata = get_metadata_from_flow(self.store, head_branch)
-
-        # Build PR body with metadata
         enhanced_body = build_pr_body(body, metadata)
-
-        # Create PR
         request = CreatePRRequest(
             title=title,
             body=enhanced_body,
@@ -117,10 +101,12 @@ class PRService:
 
         pr = self.github_client.create_pr(request)
 
-        # Update flow state and add event
-        self._sync_pr_flow_state(pr, actor=actor)
+        self._sync_pr_flow_state(pr, actor=effective_actor)
         self.store.add_event(
-            head_branch, "pr_draft", actor, f"Draft PR #{pr.number} created: {pr.url}"
+            head_branch,
+            "pr_draft",
+            effective_actor,
+            f"Draft PR #{pr.number} created: {pr.url}",
         )
 
         logger.bind(pr_number=pr.number, url=pr.url).success("Draft PR created")
@@ -129,15 +115,7 @@ class PRService:
     def get_pr(
         self, pr_number: int | None = None, branch: str | None = None
     ) -> PRResponse | None:
-        """Get PR details.
-
-        Args:
-            pr_number: PR number
-            branch: Branch name
-
-        Returns:
-            PR response or None if not found
-        """
+        """Get PR details."""
         logger.bind(
             domain="pr", action="get", pr_number=pr_number, branch=branch
         ).debug("Getting PR")
@@ -147,97 +125,93 @@ class PRService:
 
         return self.github_client.get_pr(pr_number, branch)
 
-    def mark_ready(self, pr_number: int, actor: str = "unknown") -> PRResponse:
-        """Mark PR as ready for review.
-
-        Args:
-            pr_number: PR number
-            actor: Actor marking PR as ready
-
-        Returns:
-            Updated PR response
-
-        Raises:
-            RuntimeError: If operation fails
-        """
+    def mark_ready(self, pr_number: int, actor: str | None = None) -> PRResponse:
+        """Mark PR as ready for review."""
         logger.bind(
             domain="pr", action="mark_ready", pr_number=pr_number, actor=actor
         ).info("Marking PR as ready")
 
-        # Check auth
         if not self.github_client.check_auth():
             raise RuntimeError(
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
+
+        check_upstream_conflicts(
+            self.git_client,
+            "ready",
+            base_branch=pr.base_branch,
+        )
 
         if not pr.draft:
-            self._sync_pr_flow_state(pr, actor=actor)
+            self._sync_pr_flow_state(pr, actor=effective_actor)
             logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
             return pr
 
-        # Mark as ready
         updated_pr = self.github_client.mark_ready(pr_number)
-
-        # Add event
         branch = pr.head_branch
-        self._sync_pr_flow_state(updated_pr, actor=actor)
+        self._sync_pr_flow_state(updated_pr, actor=effective_actor)
         self.store.add_event(
-            branch, "pr_ready", actor, f"PR #{pr_number} marked as ready for review"
+            branch,
+            "pr_ready",
+            effective_actor,
+            f"PR #{pr_number} marked as ready for review",
         )
 
         logger.bind(pr_number=pr_number).success("PR marked as ready")
         return updated_pr
 
-    def sync_pr_state_from_remote(self, pr: PRResponse, actor: str = "system") -> None:
+    def sync_pr_state_from_remote(
+        self, pr: PRResponse, actor: str | None = None
+    ) -> None:
         """Synchronize local flow PR fields from remote PR fact."""
-        self._sync_pr_flow_state(pr, actor=actor)
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
+        self._sync_pr_flow_state(pr, actor=effective_actor)
 
-    def merge_pr(self, pr_number: int, actor: str = "unknown") -> PRResponse:
-        """Merge PR.
-
-        Args:
-            pr_number: PR number
-            actor: Actor merging the PR
-
-        Returns:
-            Merged PR response
-
-        Raises:
-            RuntimeError: If merge fails
-        """
+    def merge_pr(self, pr_number: int, actor: str | None = None) -> PRResponse:
+        """Merge PR."""
         logger.bind(domain="pr", action="merge", pr_number=pr_number, actor=actor).info(
             "Merging PR"
         )
 
-        # Check auth
         if not self.github_client.check_auth():
             raise RuntimeError(
                 "Not authenticated to GitHub. Run 'gh auth login' first."
             )
 
-        # Get PR first to check state
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            pr.head_branch,
+            explicit_actor=actor,
+        )
 
-        # Merge PR and update flow state
         merged_pr = self.github_client.merge_pr(pr_number)
 
         branch = pr.head_branch
         self.store.update_flow_state(
             branch,
             flow_status="done",
-            latest_actor=actor,
+            latest_actor=effective_actor,
         )
         self.store.add_event(
             branch,
             "pr_merge",
-            actor,
+            effective_actor,
             f"PR #{pr_number} merged",
         )
 
@@ -245,22 +219,9 @@ class PRService:
         return merged_pr
 
     def calculate_version_bump(
-        self,
-        pr_number: int,
-        group: str | None = None,
+        self, pr_number: int, group: str | None = None
     ) -> VersionBumpResponse:
-        """Calculate version bump for PR.
-
-        Args:
-            pr_number: PR number
-            group: Task group (feature/bug/docs/chore)
-
-        Returns:
-            Version bump response
-
-        Raises:
-            RuntimeError: If PR not found
-        """
+        """Calculate version bump for PR."""
         logger.bind(
             domain="pr",
             action="calculate_version_bump",
@@ -268,12 +229,9 @@ class PRService:
             group=group,
         ).info("Calculating version bump")
 
-        # Get PR to verify it exists
         pr = self.github_client.get_pr(pr_number)
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
-
-        # Use version service for calculation (reads from VERSION file)
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:

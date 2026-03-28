@@ -423,23 +423,7 @@ provider 只允许：
 - task 完成后必须清空 runtime 绑定
 - task 归档后必须清空 runtime 绑定
 
-### 5.8 `task link` 语义
-
-`vibe3 task link` 为当前 flow 记录 `related` / `dependency` issue 关系：
-
-```bash
-# 为当前 flow 增加 related issue
-vibe3 task link 219 --role related
-
-# 为当前 flow 增加 dependency issue
-vibe3 task link 218 --role dependency
-```
-
-**关键区别**:
-- `flow bind`: Issue → Flow 关系（支持 `task/related/dependency`，更新 `task_issue_number`）
-- `task link`: 当前 flow 的补充关系入口（只支持 `related/dependency`）
-
-### 5.9 Prohibited Semantics
+### 5.8 Prohibited Semantics
 
 禁止：
 

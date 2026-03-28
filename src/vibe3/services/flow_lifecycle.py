@@ -17,6 +17,7 @@ from vibe3.services.flow_label_sync import (
     sync_flow_done_task_labels,
 )
 from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
+from vibe3.services.signature_service import SignatureService
 
 
 class FlowLifecycleMixin:
@@ -43,6 +44,7 @@ class FlowLifecycleMixin:
         self: Any,
         branch: str,
         check_pr: bool = True,
+        actor: str | None = None,
     ) -> None:
         """Close flow and delete branch."""
         git = GitClient()
@@ -62,6 +64,10 @@ class FlowLifecycleMixin:
             )
         if check_pr:
             ensure_flow_pr_merged(GitHubClient(), flow_data, branch)
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=flow_data.get("latest_actor"),
+        )
 
         try:
             close_target = self.resolve_close_target(branch)
@@ -125,12 +131,16 @@ class FlowLifecycleMixin:
                 branch=branch,
             ).warning("Failed to delete remote branch, continuing")
 
-        self.store.update_flow_state(branch, flow_status="done")
+        self.store.update_flow_state(
+            branch,
+            flow_status="done",
+            latest_actor=effective_actor,
+        )
 
         self.store.add_event(
             branch,
             "flow_closed",
-            "system",
+            effective_actor,
             f"Flow closed, branch '{branch}' deleted",
         )
         sync_flow_done_task_labels(self.store, branch)
@@ -167,6 +177,7 @@ class FlowLifecycleMixin:
         branch: str,
         reason: str | None = None,
         blocked_by_issue: int | None = None,
+        actor: str | None = None,
     ) -> None:
         """Mark flow as blocked."""
         logger.bind(
@@ -184,10 +195,20 @@ class FlowLifecycleMixin:
                 f"先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支"
             )
 
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=flow_data.get("latest_actor"),
+        )
+
         if blocked_by_issue:
             from vibe3.services.task_service import TaskService
 
-            TaskService().link_issue(branch, blocked_by_issue, role="dependency")
+            TaskService().link_issue(
+                branch,
+                blocked_by_issue,
+                role="dependency",
+                actor=effective_actor,
+            )
 
         blocked_by = reason or (
             f"Blocked by issue #{blocked_by_issue}" if blocked_by_issue else None
@@ -197,12 +218,13 @@ class FlowLifecycleMixin:
             branch,
             flow_status="blocked",
             blocked_by=blocked_by,
+            latest_actor=effective_actor,
         )
 
         self.store.add_event(
             branch,
             "flow_blocked",
-            "system",
+            effective_actor,
             f"Flow blocked{': ' + reason if reason else ''}",
         )
         sync_flow_blocked_task_label(flow_data)
@@ -210,6 +232,12 @@ class FlowLifecycleMixin:
     def abort_flow(
         self: Any,
         branch: str,
+        actor: str | None = None,
     ) -> None:
         """Abort flow and delete branch."""
-        abort_flow_impl(self.store, branch)
+        flow_data = self.store.get_flow_state(branch) or {}
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=flow_data.get("latest_actor"),
+        )
+        abort_flow_impl(self.store, branch, actor=effective_actor)

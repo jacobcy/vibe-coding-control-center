@@ -17,7 +17,7 @@ def _record_handoff_reference(
     ref_value: str,
     next_step: str | None,
     blocked_by: str | None,
-    actor: str,
+    actor: str | None,
     trace: bool,
     method_name: str,
 ) -> None:
@@ -55,13 +55,16 @@ def init(
 def append(
     message: Annotated[str, typer.Argument(help="Message to append")],
     actor: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--actor",
             "-a",
-            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+            help=(
+                "Actor identifier (format: backend/model, e.g., codex/gpt-5.4). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
         ),
-    ] = "unknown",
+    ] = None,
     kind: Annotated[
         str,
         typer.Option("--kind", "-k", help="Update kind (finding/blocker/next/note)"),
@@ -92,13 +95,16 @@ def plan(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--actor",
             "-a",
-            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+            help=(
+                "Actor identifier (format: backend/model, e.g., codex/gpt-5.4). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
         ),
-    ] = "unknown",
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -125,13 +131,16 @@ def report(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--actor",
             "-a",
-            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+            help=(
+                "Actor identifier (format: backend/model, e.g., codex/gpt-5.4). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
         ),
-    ] = "unknown",
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -158,13 +167,16 @@ def audit(
         str | None, typer.Option("--blocked-by", "-b", help="Blocker description")
     ] = None,
     actor: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--actor",
             "-a",
-            help="Actor identifier (format: backend/model, e.g., codex/gpt-5.4)",
+            help=(
+                "Actor identifier (format: backend/model, e.g., codex/gpt-5.4). "
+                "Default: flow actor if configured, otherwise workflow."
+            ),
         ),
-    ] = "unknown",
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,

@@ -23,11 +23,12 @@ class TestFlowCreation:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             flow_slug="test-flow",
+            latest_actor="workflow",
         )
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "flow_created",
-            "system",
+            "workflow",
             "Flow 'test-flow' created",
         )
 
