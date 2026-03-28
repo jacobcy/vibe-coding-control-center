@@ -92,8 +92,12 @@ class FlowUsecase:
             for task_ref in task_refs:
                 self._link_issue(branch, task_ref, "task", actor=effective_actor)
             if original_primary is not None:
-                self.flow_service.store.update_flow_state(
-                    branch, task_issue_number=original_primary
+                # Preserve primary task truth in flow_issue_links(task) and flow_state.
+                self._link_issue(
+                    branch,
+                    str(original_primary),
+                    "task",
+                    actor=effective_actor,
                 )
         if spec:
             self.flow_service.bind_spec(branch, spec, effective_actor)
@@ -110,6 +114,8 @@ class FlowUsecase:
         current_branch = self.flow_service.get_current_branch()
         decision = self.flow_service.can_create_from_current_worktree(current_branch)
         self._validate_create_request(base, decision)
+        task_refs = self._normalize_task_refs(task)
+        self._validate_issue_refs(task_refs)
 
         default_policy: Literal["current", "main"] = (
             "current" if decision.start_ref == current_branch else "main"
@@ -132,7 +138,7 @@ class FlowUsecase:
             raise FlowUsecaseError(str(exc), guidance) from exc
 
         branch = f"task/{name}"
-        self._apply_initial_bindings(branch, task, spec, actor=actor)
+        self._apply_initial_bindings(branch, task_refs, spec, actor=actor)
         self.handoff_service.ensure_current_handoff()
         return flow
 
@@ -205,6 +211,10 @@ class FlowUsecase:
         if isinstance(task, str):
             return [task]
         return [ref for ref in task if ref]
+
+    def _validate_issue_refs(self, refs: Sequence[str]) -> None:
+        for ref in refs:
+            self._parse_issue_number(ref)
 
     @staticmethod
     def _validate_create_request(base: str | None, decision: CreateDecision) -> None:

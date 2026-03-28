@@ -63,6 +63,7 @@ def test_add_flow_existing_branch_appends_tasks_but_keeps_primary() -> None:
     task_service.link_issue.side_effect = [
         MagicMock(issue_number=281, issue_role="task", branch="task/demo"),
         MagicMock(issue_number=282, issue_role="task", branch="task/demo"),
+        MagicMock(issue_number=248, issue_role="task", branch="task/demo"),
     ]
 
     usecase = FlowUsecase(
@@ -79,10 +80,9 @@ def test_add_flow_existing_branch_appends_tasks_but_keeps_primary() -> None:
     assert first_call.kwargs == {"actor": "codex/gpt-5.4"}
     assert second_call.args == ("task/demo", 282, "task")
     assert second_call.kwargs == {"actor": "codex/gpt-5.4"}
-    flow_service.store.update_flow_state.assert_any_call(
-        "task/demo",
-        task_issue_number=248,
-    )
+    third_call = task_service.link_issue.call_args_list[2]
+    assert third_call.args == ("task/demo", 248, "task")
+    assert third_call.kwargs == {"actor": "codex/gpt-5.4"}
 
 
 def test_bind_issue_delegates_to_task_service() -> None:
