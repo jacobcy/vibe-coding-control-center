@@ -16,16 +16,14 @@ description: Use when the user wants to resume previous work, says "/vibe-contin
 
 **Announce at start:** "我正在使用 /vibe-continue 技能来恢复当前 flow 的任务上下文。"
 
-## Truth Sources
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
-以下语义以标准为准：
+**快速命令参考**：
 
-- `docs/standards/v3/skill-standard.md`
-- `docs/standards/v3/command-standard.md`
-- `docs/standards/v3/python-capability-design.md`
-- `docs/standards/v3/git-workflow-standard.md`
-- `docs/standards/v3/handoff-governance-standard.md`
-- `docs/standards/glossary.md`
+```bash
+uv run python src/vibe3/cli.py flow show    # 查看当前 flow 状态
+uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
+```
 
 特别约束：
 

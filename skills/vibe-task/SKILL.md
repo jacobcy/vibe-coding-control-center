@@ -1,6 +1,6 @@
 ---
 name: vibe-task
-description: Use when the user wants a cross-worktree flow/task overview, asks which existing flow or task context to resume next in the current repo, wants to inspect task registry health, needs audit and repair of task mappings, or mentions "/vibe-task" or "vibe task audit". Do not use for project-level roadmap prioritization or task-flow runtime repair.
+description: Use when the user wants a cross-worktree flow/task overview, asks which existing flow or task context to resume next in the current repo, wants to inspect task registry health, needs flow/task status check and repair, or mentions "/vibe-task". Do not use for project-level roadmap prioritization or task-flow runtime repair.
 ---
 
 # /vibe-task - Cross-Worktree Task Overview & Task Audit
@@ -11,12 +11,7 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 `vibe-task` 是 task-centered audit，不处理 runtime / recovery audit。
 
-标准真源：
-
-- 术语与默认动作语义以 `docs/standards/glossary.md`、`docs/standards/action-verbs.md` 为准。
-- Skill 与 Shell 边界以 `docs/standards/v3/skill-standard.md`、`docs/standards/v3/command-standard.md`、`docs/standards/v3/python-capability-design.md` 为准。
-- 触发时机与相邻 skill 分流以 `docs/standards/v3/skill-trigger-standard.md` 为准。
-- task / flow / worktree 生命周期语义以 `docs/standards/v3/git-workflow-standard.md`、`docs/standards/v3/worktree-lifecycle-standard.md` 为准。
+> 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 **职责拆分:**
 
@@ -29,10 +24,6 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 - 用户主链：`repo issue -> flow -> plan/spec -> commit -> PR -> done`
 - 内部桥接链：`repo issue -> task -> flow`
-- `task = execution record / execution bridge`
-- `spec_standard/spec_ref` 是 task 的 execution spec 扩展字段
-- `task audit` = execution record 审计 / 修复
-- OpenSpec / plans 注册 = execution spec 来源桥接
 - 任何判断都必须先读 shell 输出，再做语义分析
 
 **Announce at start:**
@@ -53,7 +44,6 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 ### Audit Mode
 
-- `vibe task audit`
 - `/vibe-task audit`
 - `核对任务注册`
 - `修复任务数据对应关系`
@@ -75,7 +65,7 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 - 必须先运行 `uv run python src/vibe3/cli.py task list`
 - 不得补充 CLI 未提供的字段
-- 若 CLI 已返回 `spec_standard/spec_ref`，必须把它们当作 execution spec 展示或解释
+- 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
 
@@ -124,7 +114,6 @@ uv run python src/vibe3/cli.py flow show
 - status
 - current subtask
 - next step
-- spec standard / spec ref（如果 CLI 提供）
 
 不得补充 CLI 未提供的字段。
 
@@ -176,7 +165,7 @@ Recommendation
 **本技能负责的修复类型:**
 
 - task 数据质量问题
-- task 缺少 `spec_standard/spec_ref` 或 execution spec 与当前资料不一致
+- task 绑定的 task issue 缺失或与当前资料不一致
 
 **本技能不负责:**
 
@@ -204,8 +193,8 @@ uv run python src/vibe3/cli.py check --all
 从命令输出中提取：
 
 - Tasks without issue
-- 缺 `spec_standard/spec_ref` 的 task
-- 已有 task 但缺 `pr_ref` / issue bridge 的样本
+- 缺绑定 task issue 的 task
+- 已有 task 但缺 `pr_ref` 的样本
 
 **判断逻辑:**
 
