@@ -81,7 +81,10 @@ def _fetch_issue_titles(
 
 
 def show(
-    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", "-b", help="Branch name (defaults to current branch)"),
+    ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,
     json_output: JsonOption = False,
