@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from vibe3.commands.flow import app as flow_app
 from vibe3.commands.task import app as task_app
+from vibe3.models.flow import FlowState
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -22,8 +23,73 @@ def test_flow_new_help_uses_optional_name_and_issue_flag() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root new [OPTIONS] NAME" in stdout
+    assert "Usage: root new [OPTIONS] [NAME]" in stdout
     assert "--task" in stdout or "--spec" in stdout
+
+
+@patch("vibe3.commands.flow.FlowUsecase")
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_add_defaults_to_current_branch_slug(
+    mock_service_cls: MagicMock, mock_usecase_cls: MagicMock
+) -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo-feature"
+    mock_service_cls.return_value = flow_service
+
+    flow_state = FlowState(branch="task/demo-feature", flow_slug="demo-feature")
+    mock_usecase = MagicMock()
+    mock_usecase.add_flow.return_value = flow_state
+    mock_usecase_cls.return_value = mock_usecase
+
+    result = runner.invoke(flow_app, ["add"])
+
+    assert result.exit_code == 0
+    mock_usecase_cls.assert_called_once()
+    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase.add_flow.assert_called_once_with(
+        name="demo-feature",
+        task=None,
+        spec=None,
+    )
+
+
+@patch("vibe3.commands.flow.FlowUsecase")
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_create_defaults_to_current_branch_slug(
+    mock_service_cls: MagicMock, mock_usecase_cls: MagicMock
+) -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "feature/new-ui"
+    mock_service_cls.return_value = flow_service
+
+    flow_state = FlowState(branch="task/new-ui", flow_slug="new-ui")
+    mock_usecase = MagicMock()
+    mock_usecase.create_flow.return_value = flow_state
+    mock_usecase_cls.return_value = mock_usecase
+
+    result = runner.invoke(flow_app, ["create", "--base", "origin/main"])
+
+    assert result.exit_code == 0
+    mock_usecase_cls.assert_called_once()
+    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase.create_flow.assert_called_once_with(
+        name="new-ui",
+        base="origin/main",
+        task=None,
+        spec=None,
+    )
+
+
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_add_rejects_detached_head_default(mock_service_cls: MagicMock) -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "HEAD"
+    mock_service_cls.return_value = flow_service
+
+    result = runner.invoke(flow_app, ["add"])
+
+    assert result.exit_code != 0
+    assert "detached" in result.output or "HEAD" in result.output
 
 
 def test_flow_bind_help_uses_issue_and_role() -> None:

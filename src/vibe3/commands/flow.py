@@ -24,7 +24,10 @@ from vibe3.ui.flow_ui import (
     render_flows_table,
 )
 
-FlowNameArg = Annotated[str, typer.Argument(help="Flow name")]
+FlowNameArg = Annotated[
+    str | None,
+    typer.Argument(help="Flow name (defaults to current branch name)"),
+]
 IssueArg = Annotated[
     str, typer.Argument(help="Issue reference to bind as task/related/dependency")
 ]
@@ -64,9 +67,9 @@ app = typer.Typer(
 )
 
 
-def _build_flow_usecase() -> FlowUsecase:
+def _build_flow_usecase(flow_service: FlowService | None = None) -> FlowUsecase:
     return FlowUsecase(
-        flow_service=FlowService(),
+        flow_service=flow_service or FlowService(),
         task_service=TaskService(),
         handoff_service=HandoffService(),
     )
@@ -95,9 +98,22 @@ def _merge_issue_refs(
     return [primary, *tail]
 
 
+def _resolve_flow_name(
+    name: str | None, flow_service: FlowService | None = None
+) -> str:
+    """Return explicit *name* or derive slug from the current branch."""
+    if name:
+        return name
+    flow_service = flow_service or FlowService()
+    branch = flow_service.get_current_branch()
+    if branch == "HEAD":
+        raise typer.BadParameter("Cannot infer flow name from detached HEAD")
+    return branch.rsplit("/", 1)[-1] or branch
+
+
 @app.command(name="add")
 def add(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: AddTaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
@@ -105,11 +121,14 @@ def add(
     json_output: JsonOption = False,
 ) -> None:
     """Add flow."""
+    flow_service = FlowService()
+    name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
+    usecase = _build_flow_usecase(flow_service)
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
         try:
-            flow = _build_flow_usecase().add_flow(name=name, task=task_refs, spec=spec)
+            flow = usecase.add_flow(name=name, task=task_refs, spec=spec)
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
@@ -117,7 +136,7 @@ def add(
             logger.bind(command="flow add", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
-            flow = _build_flow_usecase().add_flow(name=name, spec=spec)
+            flow = usecase.add_flow(name=name, spec=spec)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -134,7 +153,7 @@ def add(
 
 @app.command(name="new", deprecated=True, hidden=True)
 def new(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: TaskOption = None,
     spec: SpecOption = None,
     trace: TraceOption = False,
@@ -149,7 +168,7 @@ def new(
 
 @app.command(name="create")
 def create(
-    name: FlowNameArg,
+    name: FlowNameArg = None,
     task: TaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
@@ -165,13 +184,16 @@ def create(
     json_output: JsonOption = False,
 ) -> None:
     """Create a new branch with flow state."""
+    flow_service = FlowService()
+    name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
+    usecase = _build_flow_usecase(flow_service)
     with trace_scope(trace, "flow create", name=name, base=base):
         logger.bind(command="flow create", name=name, base=base, task=task_refs).info(
             "Creating flow with new branch"
         )
         try:
-            flow = _build_flow_usecase().create_flow(
+            flow = usecase.create_flow(
                 name=name,
                 base=base,
                 task=task_refs,
@@ -184,7 +206,7 @@ def create(
             logger.bind(command="flow create", task=task_refs).warning(
                 "Invalid task ID format, skipping binding"
             )
-            flow = _build_flow_usecase().create_flow(name=name, base=base, spec=spec)
+            flow = usecase.create_flow(name=name, base=base, spec=spec)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
