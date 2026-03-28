@@ -12,7 +12,6 @@ _STATUS_COLOR: dict[str, str] = {
     "done": "dim",
     "blocked": "red",
     "stale": "yellow",
-    "merged": "cyan",
 }
 
 

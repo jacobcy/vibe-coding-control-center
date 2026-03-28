@@ -106,7 +106,7 @@ class FlowQueryMixin:
 
     def list_flows(
         self,
-        status: Literal["active", "blocked", "done", "stale", "merged"] | None = None,
+        status: Literal["active", "blocked", "done", "stale"] | None = None,
     ) -> list[FlowState]:
         """List flows with optional status filter."""
         logger.bind(
