@@ -6,6 +6,27 @@ from vibe3.models.orchestration import IssueState
 from vibe3.services.label_service import LabelService
 
 
+def _is_terminal_flow_status(status: str | None) -> bool:
+    """Return whether a flow status is terminal for task closing decisions."""
+    return status in {"done", "aborted", "stale"}
+
+
+def _issue_has_other_open_task_flows(
+    store: Any, branch: str, issue_number: int
+) -> bool:
+    """Check if issue is still bound as task by other non-terminal flows."""
+    linked_flows = store.get_flows_by_issue(issue_number, role="task")
+    flows = linked_flows if isinstance(linked_flows, list) else []
+    for flow in flows:
+        other_branch = flow.get("branch")
+        if not other_branch or other_branch == branch:
+            continue
+        flow_status = flow.get("flow_status")
+        if not _is_terminal_flow_status(flow_status):
+            return True
+    return False
+
+
 def sync_flow_done_task_labels(store: Any, branch: str) -> None:
     """Sync all task-role issues in a flow to state/done."""
     issue_links_raw = store.get_issue_links(branch)
@@ -16,6 +37,8 @@ def sync_flow_done_task_labels(store: Any, branch: str) -> None:
             continue
         issue_number = link.get("issue_number")
         if issue_number is None:
+            continue
+        if _issue_has_other_open_task_flows(store, branch, int(issue_number)):
             continue
         label_service.confirm_issue_state(
             int(issue_number),

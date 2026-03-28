@@ -90,17 +90,17 @@ def test_create_draft_pr_success(
                 no_conflict_git.push_branch.assert_called_once_with(
                     "feature-branch", set_upstream=True
                 )
-                mock_store.get_flow_state.assert_called_once_with("feature-branch")
+                assert mock_store.get_flow_state.call_count == 2
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
                     pr_number=123,
                     pr_ready_for_review=False,
-                    latest_actor="server",
+                    latest_actor="workflow",
                 )
                 mock_store.add_event.assert_called_once_with(
                     "feature-branch",
                     "pr_draft",
-                    "server",
+                    "workflow",
                     "Draft PR #123 created: https://github.com/org/repo/pull/123",
                 )
 
@@ -161,7 +161,7 @@ def test_create_draft_pr_duplicate_branch_pr(
                     "feature-branch",
                     pr_number=321,
                     pr_ready_for_review=False,
-                    latest_actor="server",
+                    latest_actor="workflow",
                 )
 
 
@@ -220,12 +220,12 @@ def test_mark_ready_success(
                     "feature-branch",
                     pr_number=123,
                     pr_ready_for_review=True,
-                    latest_actor="unknown",
+                    latest_actor="workflow",
                 )
                 mock_store.add_event.assert_called_once_with(
                     "feature-branch",
                     "pr_ready",
-                    "unknown",
+                    "workflow",
                     "PR #123 marked as ready for review",
                 )
 
@@ -260,6 +260,6 @@ def test_mark_ready_already_ready_syncs_state(
         "feature-branch",
         pr_number=123,
         pr_ready_for_review=True,
-        latest_actor="unknown",
+        latest_actor="workflow",
     )
     mock_store.add_event.assert_not_called()

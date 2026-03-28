@@ -460,35 +460,21 @@ vibe3 task list
 
 输出：
 ```
-  #220  task-bridge-github-project  active  [bound]  branch=task/task-bridge-github-project
-  #221  reports-unified-storage     active  [bound]  branch=task/reports-unified-storage
-  #222  pr-show-complete            active  [bound]  branch=task/pr-show-complete
-  #223  reports-cleanup             active  [bound]  branch=task/reports-cleanup
+  #220  task-bridge-github-project  active  branch=task/task-bridge-github-project
+  #221  reports-unified-storage     active  branch=task/reports-unified-storage
+  #222  pr-show-complete            active  branch=task/pr-show-complete
+  #223  reports-cleanup             active  branch=task/reports-cleanup
 ```
 
 ### 搜索 issue
 
-当前 `vibe3 task list` 只支持 `--issue` 反查 flow，不支持 `--search` / `--status`。
+`vibe3 task list` 只负责列出现有 flow/task 现场，不提供 issue 检索参数。
 
 如需搜索 GitHub issue，请使用：
 
 ```bash
 gh search issues "report"
 ```
-
-### 从 related issue 反查 flow
-
-```bash
-vibe3 task list --issue 221
-```
-
-输出：
-```
-Tasks linked to related issue #221:
-  #221  reports-unified-storage  active  [bound]  branch=task/reports-unified-storage
-```
-
-> **注意**：`--issue` 参数按 `related` 角色查询，不是按 `task` 角色。
 
 ### 查看单个 task 详情（含远端字段）
 

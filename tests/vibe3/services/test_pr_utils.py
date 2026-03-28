@@ -101,3 +101,97 @@ class TestBuildPrBody:
         metadata = PRMetadata(branch="feature-1", task_issue=0)
         result = build_pr_body("body", metadata)
         assert not result.startswith("Closes")
+
+
+class TestContributors:
+    """Tests for PRMetadata.contributors property."""
+
+    def test_empty_when_all_none(self) -> None:
+        metadata = PRMetadata()
+        assert metadata.contributors == []
+
+    def test_empty_when_all_default(self) -> None:
+        metadata = PRMetadata(planner="unknown", executor="system", reviewer="server")
+        assert metadata.contributors == []
+
+    def test_filters_and_deduplicates(self) -> None:
+        metadata = PRMetadata(
+            planner="claude-opus",
+            executor="claude-opus",  # duplicate
+            reviewer="system",  # default
+        )
+        assert metadata.contributors == ["claude-opus"]
+
+    def test_preserves_order(self) -> None:
+        metadata = PRMetadata(
+            planner="codex/gpt-5.4",
+            executor="claude/sonnet-4.5",
+            reviewer="claude/sonnet-4.5",  # duplicate
+        )
+        assert metadata.contributors == ["codex/gpt-5.4", "claude/sonnet-4.5"]
+
+    def test_case_insensitive_default_filter(self) -> None:
+        metadata = PRMetadata(planner="Unknown", executor="System")
+        assert metadata.contributors == []
+
+    def test_empty_string_filtered(self) -> None:
+        metadata = PRMetadata(planner="", executor="claude-opus")
+        assert metadata.contributors == ["claude-opus"]
+
+    def test_latest_actor_included(self) -> None:
+        metadata = PRMetadata(latest="codex/gpt-5.4")
+        assert metadata.contributors == ["codex/gpt-5.4"]
+
+    def test_latest_actor_deduplicated(self) -> None:
+        metadata = PRMetadata(
+            planner="claude-opus",
+            latest="claude-opus",
+        )
+        assert metadata.contributors == ["claude-opus"]
+
+
+class TestBuildPrBodyContributors:
+    """Tests for contributors section in build_pr_body."""
+
+    def test_no_contributors_section_when_all_default(self) -> None:
+        metadata = PRMetadata(branch="f1", planner="unknown", executor="system")
+        result = build_pr_body("body", metadata)
+        assert "Contributors" not in result
+
+    def test_contributors_section_rendered(self) -> None:
+        metadata = PRMetadata(
+            branch="f1",
+            planner="claude-opus",
+            executor="claude-sonnet",
+        )
+        result = build_pr_body("body", metadata)
+        assert "**Contributors:** claude-opus, claude-sonnet" in result
+
+    def test_contributors_with_three_distinct(self) -> None:
+        metadata = PRMetadata(
+            branch="f1",
+            planner="agent-a",
+            executor="agent-b",
+            reviewer="agent-c",
+        )
+        result = build_pr_body("body", metadata)
+        assert "**Contributors:** agent-a, agent-b, agent-c" in result
+
+    def test_idempotent_no_duplicate_block(self) -> None:
+        metadata = PRMetadata(
+            branch="f1",
+            planner="claude-opus",
+            executor="claude-opus",
+        )
+        result = build_pr_body("body", metadata)
+        count = result.count("Contributors")
+        assert count == 1
+
+    def test_no_contributors_when_no_metadata(self) -> None:
+        result = build_pr_body("plain body")
+        assert "Contributors" not in result
+
+    def test_reviewer_in_metadata_section(self) -> None:
+        metadata = PRMetadata(branch="f1", reviewer="claude-opus")
+        result = build_pr_body("body", metadata)
+        assert "**Reviewer:** claude-opus" in result

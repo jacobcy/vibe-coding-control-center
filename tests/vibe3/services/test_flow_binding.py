@@ -27,11 +27,12 @@ class TestFlowBinding:
         mock_store.update_flow_state.assert_called_once_with(
             "test-branch",
             task_issue_number=123,
+            latest_actor="test-actor",
         )
         mock_store.add_event.assert_called_once_with(
             "test-branch",
             "issue_linked",
-            "system",
+            "test-actor",
             "Issue #123 linked as task",
         )
 

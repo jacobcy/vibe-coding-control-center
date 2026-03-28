@@ -15,7 +15,7 @@ from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_create_usecase import PRCreateUsecase
 from vibe3.services.pr_service import PRService
-from vibe3.ui.pr_ui import render_pr_created
+from vibe3.ui.pr_ui import render_pr_confirmed, render_pr_created
 
 
 def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
@@ -27,7 +27,13 @@ def _is_interactive(json_output: bool, yaml_output: bool) -> bool:
     )
 
 
-def _emit_pr_result(pr: PRResponse, json_output: bool, yaml_output: bool) -> None:
+def _emit_pr_result(
+    pr: PRResponse,
+    json_output: bool,
+    yaml_output: bool,
+    *,
+    existing: bool = False,
+) -> None:
     """Render PR creation result in the requested format."""
     if json_output:
         typer.echo(json.dumps(pr.model_dump(), indent=2, default=str))
@@ -38,7 +44,10 @@ def _emit_pr_result(pr: PRResponse, json_output: bool, yaml_output: bool) -> Non
             yaml.dump(pr.model_dump(), default_flow_style=False, allow_unicode=True)
         )
     else:
-        render_pr_created(pr)
+        if existing:
+            render_pr_confirmed(pr)
+        else:
+            render_pr_created(pr)
 
 
 def _resolve_branch_for_ai_context(current_branch: str) -> str:
@@ -109,8 +118,13 @@ def register_create_command(app: typer.Typer) -> None:
 
             existing_pr = pr_service.get_pr(branch=branch)
             if existing_pr is not None:
-                pr_service.sync_pr_state_from_remote(existing_pr, actor="server")
-                _emit_pr_result(existing_pr, json_output, yaml_output)
+                pr_service.sync_pr_state_from_remote(existing_pr, actor=None)
+                _emit_pr_result(
+                    existing_pr,
+                    json_output,
+                    yaml_output,
+                    existing=True,
+                )
                 return
 
             try:
@@ -132,7 +146,7 @@ def register_create_command(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             pr_body = ai_body if ai_body else body
-            actor = "ai_assistant" if ai else "server"
+            actor = "ai-assistant" if ai else None
 
             pr = pr_service.create_draft_pr(
                 title=pr_title,

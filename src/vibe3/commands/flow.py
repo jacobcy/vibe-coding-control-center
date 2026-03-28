@@ -19,7 +19,6 @@ from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_flow_created,
     render_flow_status,
-    render_flow_status_table,
     render_flow_timeline,
     render_flows_table,
 )
@@ -50,6 +49,14 @@ TraceOption = Annotated[
     bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
 ]
 JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
+ActorOption = Annotated[
+    str | None,
+    typer.Option(
+        "--actor",
+        "-a",
+        help="Flow 默认署名（示例: codex/gpt-5.4）",
+    ),
+]
 SnapshotOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
 StatusFilterOption = Annotated[
     Literal["active", "blocked", "done", "stale"] | None,
@@ -117,10 +124,11 @@ def add(
     task: AddTaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
+    actor: ActorOption = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Add flow."""
+    """Add flow to current branch (idempotent)."""
     flow_service = FlowService()
     name = _resolve_flow_name(name, flow_service)
     task_refs = _merge_issue_refs(task, task_tail, primary_hint="--task <issue>")
@@ -128,15 +136,12 @@ def add(
     with trace_scope(trace, "flow add", name=name):
         logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
         try:
-            flow = usecase.add_flow(name=name, task=task_refs, spec=spec)
+            flow = usecase.add_flow(name=name, task=task_refs, spec=spec, actor=actor)
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
-        except ValueError:
-            logger.bind(command="flow add", task=task_refs).warning(
-                "Invalid task ID format, skipping binding"
-            )
-            flow = usecase.add_flow(name=name, spec=spec)
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -163,7 +168,7 @@ def new(
     console.print(
         "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
     )
-    add(name, task, None, spec, trace, json_output)
+    add(name, task, None, spec, None, trace, json_output)
 
 
 @app.command(name="create")
@@ -172,6 +177,7 @@ def create(
     task: TaskOption = None,
     task_tail: TaskTailArg = None,
     spec: SpecOption = None,
+    actor: ActorOption = None,
     base: Annotated[
         str | None,
         typer.Option(
@@ -198,15 +204,13 @@ def create(
                 base=base,
                 task=task_refs,
                 spec=spec,
+                actor=actor,
             )
         except FlowUsecaseError as error:
             _print_flow_error(error)
             raise typer.Exit(1) from error
-        except ValueError:
-            logger.bind(command="flow create", task=task_refs).warning(
-                "Invalid task ID format, skipping binding"
-            )
-            flow = usecase.create_flow(name=name, base=base, spec=spec)
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -330,7 +334,7 @@ def status(
             if not flow_status:
                 logger.info("No active flow on current branch")
                 raise typer.Exit(0)
-            render_flow_status_table(flow_status)
+            render_flow_status(flow_status)
 
 
 @app.command()

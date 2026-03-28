@@ -340,10 +340,6 @@ CREATE TABLE flow_events (
 - `handoff audit` - 记录 audit handoff
 - `handoff append` - 追加轻量更新到 current.md
 
-**Task 操作**：
-- `task link` - 关联 issue 到 flow
-- `task status` - 更新 GitHub Project task 状态
-
 **PR 操作**：
 - `pr draft` - 创建 draft PR
 - `pr merge` - 合并 PR

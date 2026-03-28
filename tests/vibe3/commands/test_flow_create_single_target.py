@@ -65,6 +65,7 @@ class TestFlowCreateSingleTarget:
         mock_service.create_flow_with_branch.assert_called_once_with(
             slug="new-feature",
             start_ref="task/blocked-flow",
+            actor=None,
         )
 
     @patch("vibe3.commands.flow.HandoffService")
@@ -97,6 +98,7 @@ class TestFlowCreateSingleTarget:
         mock_service.create_flow_with_branch.assert_called_once_with(
             slug="new-feature",
             start_ref="task/blocked-flow",
+            actor=None,
         )
 
     @patch("vibe3.commands.flow.HandoffService")
@@ -127,6 +129,7 @@ class TestFlowCreateSingleTarget:
         mock_service.create_flow_with_branch.assert_called_once_with(
             slug="new-feature",
             start_ref="origin/main",
+            actor=None,
         )
 
     @patch("vibe3.commands.flow.HandoffService")
@@ -157,6 +160,7 @@ class TestFlowCreateSingleTarget:
         mock_service.create_flow_with_branch.assert_called_once_with(
             slug="new-feature",
             start_ref="origin/main",
+            actor=None,
         )
 
     @patch("vibe3.commands.flow.HandoffService")

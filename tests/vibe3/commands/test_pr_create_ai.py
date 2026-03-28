@@ -37,9 +37,31 @@ class TestPRCreateCommandAI:
         assert result.exit_code == 0
         assert json.loads(result.output)["number"] == 456
         mock_service.return_value.sync_pr_state_from_remote.assert_called_once_with(
-            existing_pr, actor="server"
+            existing_pr, actor=None
         )
         mock_service.return_value.create_draft_pr.assert_not_called()
+
+    def test_pr_create_existing_pr_shows_confirmed_status(
+        self, runner: CliRunner
+    ) -> None:
+        """Non-JSON output should report existing PR status instead of created."""
+        with patch("vibe3.commands.pr_create.PRService") as mock_service:
+            existing_pr = MagicMock(
+                number=456,
+                title="Existing PR",
+                body="",
+                state=MagicMock(value="MERGED"),
+                draft=False,
+                url="https://github.com/org/repo/pull/456",
+                head_branch="task/311",
+                base_branch="main",
+            )
+            mock_service.return_value.get_pr.return_value = existing_pr
+
+            result = runner.invoke(app, ["pr", "create"])
+
+        assert result.exit_code == 0
+        assert "already exists and is merged" in result.output.lower()
 
     def test_pr_create_without_ai(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create without --ai flag works normally."""
@@ -57,7 +79,7 @@ class TestPRCreateCommandAI:
                 title="Test PR",
                 body="",
                 base_branch="main",
-                actor="server",
+                actor=None,
             )
 
     def test_pr_create_ai_disabled(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -197,7 +219,7 @@ pr:
             title="feat: ai title",
             body="Summary\n\n- change",
             base_branch="origin/main",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )
 
     def test_pr_create_uses_resolved_base_for_ai_context_and_pr_request(
@@ -259,5 +281,5 @@ pr:
             title="feat: ai title",
             body="body",
             base_branch="origin/feature-root",
-            actor="ai_assistant",
+            actor="ai-assistant",
         )

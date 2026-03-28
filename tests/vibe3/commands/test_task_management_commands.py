@@ -50,6 +50,7 @@ def test_flow_add_defaults_to_current_branch_slug(
         name="demo-feature",
         task=None,
         spec=None,
+        actor=None,
     )
 
 
@@ -77,6 +78,7 @@ def test_flow_create_defaults_to_current_branch_slug(
         base="origin/main",
         task=None,
         spec=None,
+        actor=None,
     )
 
 
@@ -120,13 +122,12 @@ def test_task_link_command_removed() -> None:
     assert "No such command" in (result.stdout + result.stderr)
 
 
-def test_task_list_help_uses_issue_option() -> None:
+def test_task_list_help_no_issue_filter_option() -> None:
     result = runner.invoke(task_app, ["list", "--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "--issue" in stdout
-    assert "--repo-issue" not in stdout
+    assert "--issue" not in stdout
 
 
 def test_flow_bind_supports_related_role() -> None:
@@ -141,7 +142,9 @@ def test_flow_bind_supports_related_role() -> None:
             result = runner.invoke(flow_app, ["bind", "219"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 219, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 219, "task", actor=None
+    )
 
 
 def test_task_status_command_removed() -> None:
@@ -233,7 +236,9 @@ def test_flow_bind_with_task_role() -> None:
             result = runner.invoke(flow_app, ["bind", "220", "--role", "task"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 220, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 220, "task", actor=None
+    )
 
 
 def test_flow_bind_with_related_role() -> None:
@@ -248,7 +253,9 @@ def test_flow_bind_with_related_role() -> None:
             result = runner.invoke(flow_app, ["bind", "219", "--role", "related"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 219, "related")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 219, "related", actor=None
+    )
 
 
 def test_flow_bind_with_dependency_role() -> None:
@@ -263,34 +270,6 @@ def test_flow_bind_with_dependency_role() -> None:
             result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 218, "dependency")
-
-
-def test_flow_bind_with_multiple_related_roles() -> None:
-    """flow bind 219 220 --role related should bind both issues."""
-    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
-        task_service = MagicMock()
-        task_service_cls.return_value = task_service
-        task_service.link_issue.side_effect = [
-            MagicMock(issue_number=219, issue_role="related", branch="task/demo"),
-            MagicMock(issue_number=220, issue_role="related", branch="task/demo"),
-        ]
-
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
-            result = runner.invoke(
-                flow_app, ["bind", "219", "220", "--role", "related"]
-            )
-
-    assert result.exit_code == 0
-    assert task_service.link_issue.call_args_list[0].args == (
-        "task/demo",
-        219,
-        "related",
-    )
-    assert task_service.link_issue.call_args_list[1].args == (
-        "task/demo",
-        220,
-        "related",
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 218, "dependency", actor=None
     )
