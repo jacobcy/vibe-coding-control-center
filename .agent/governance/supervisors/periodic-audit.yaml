@@ -117,7 +117,7 @@ checks:
     target: handoff_vs_truth
     goal: "Detect drift between handoff narratives and actual repository facts."
     data_sources:
-      - .agent/context/task.md
+      - vibe3 handoff show
       - git
       - vibe shell outputs
     predicates:

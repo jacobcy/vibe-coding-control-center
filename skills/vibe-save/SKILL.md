@@ -51,9 +51,8 @@ description: Use when the user wants to save session context, says /vibe-save, o
 
 优先读取：
 
-- `$(git rev-parse --git-common-dir)/vibe/registry.json`
-- `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`（如果当前目录承载的 `flow` 已能从共享真源识别 `task`）
-- `.agent/context/task.md`
+- `vibe3 flow show`（当前 flow 状态）
+- `vibe3 handoff show`（当前 handoff 记录）
 
 必要时补充读取：
 

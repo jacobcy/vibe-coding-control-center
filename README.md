@@ -76,7 +76,7 @@ Vibe Center 3.0 推行了极其稳定的抽象分层模型：
 - `bin/` & `lib/` (Tier 1): CLI 和核心执行器（物理源）
 - `config/` (Tier 1): Alias 定义及配置文件
 - `skills/` (Tier 2): Vibe Agent Slash 技能库所在处
-- `.agent/`: (Tier 3): 流程、规则和智能上下文（含跨团队共识 `memory.md` 与本地未追踪的忽略缓冲区 `task.md`）
+- `.agent/`: (Tier 3): 流程、规则和智能上下文（含跨团队共识 `memory.md`；handoff 通过 `vibe3 handoff show/append` 访问）
 
 ## 文档
 
