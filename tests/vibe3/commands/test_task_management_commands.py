@@ -34,18 +34,20 @@ def test_flow_add_defaults_to_current_branch_slug(
 ) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo-feature"
+    flow_service.resolve_flow_name.return_value = "demo-feature"
     mock_service_cls.return_value = flow_service
 
     flow_state = FlowState(branch="task/demo-feature", flow_slug="demo-feature")
     mock_usecase = MagicMock()
     mock_usecase.add_flow.return_value = flow_state
-    mock_usecase_cls.return_value = mock_usecase
+    mock_usecase_cls.create.return_value = mock_usecase
+    mock_usecase_cls.validate_issue_refs.return_value = None
 
     result = runner.invoke(flow_app, ["add"])
 
     assert result.exit_code == 0
-    mock_usecase_cls.assert_called_once()
-    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase_cls.create.assert_called_once()
+    assert mock_usecase_cls.create.call_args.args[0] is flow_service
     mock_usecase.add_flow.assert_called_once_with(
         name="demo-feature",
         task=None,
@@ -61,18 +63,20 @@ def test_flow_create_defaults_to_current_branch_slug(
 ) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "feature/new-ui"
+    flow_service.resolve_flow_name.return_value = "new-ui"
     mock_service_cls.return_value = flow_service
 
     flow_state = FlowState(branch="task/new-ui", flow_slug="new-ui")
     mock_usecase = MagicMock()
     mock_usecase.create_flow.return_value = flow_state
-    mock_usecase_cls.return_value = mock_usecase
+    mock_usecase_cls.create.return_value = mock_usecase
+    mock_usecase_cls.validate_issue_refs.return_value = None
 
     result = runner.invoke(flow_app, ["create", "--base", "origin/main"])
 
     assert result.exit_code == 0
-    mock_usecase_cls.assert_called_once()
-    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase_cls.create.assert_called_once()
+    assert mock_usecase_cls.create.call_args.args[0] is flow_service
     mock_usecase.create_flow.assert_called_once_with(
         name="new-ui",
         base="origin/main",
@@ -86,6 +90,9 @@ def test_flow_create_defaults_to_current_branch_slug(
 def test_flow_add_rejects_detached_head_default(mock_service_cls: MagicMock) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "HEAD"
+    flow_service.resolve_flow_name.side_effect = ValueError(
+        "Cannot infer flow name from detached HEAD"
+    )
     mock_service_cls.return_value = flow_service
 
     result = runner.invoke(flow_app, ["add"])

@@ -22,6 +22,7 @@ class TestFlowAddStatusCheck:
         """A branch without any flow record should create a new flow."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "feature/test"
+        mock_service.resolve_flow_name.return_value = "new-flow"
         mock_service.get_flow_status.return_value = None
         mock_service.create_flow.return_value = MagicMock(
             flow_slug="new-flow", branch="feature/test"

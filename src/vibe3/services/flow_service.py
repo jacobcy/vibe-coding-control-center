@@ -49,6 +49,25 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         """
         return self.git_client.get_current_branch()
 
+    def resolve_flow_name(self, name: str | None = None) -> str:
+        """Return explicit name or derive slug from current branch.
+
+        Args:
+            name: Explicit flow name. If None, derives from current branch.
+
+        Returns:
+            Flow name/slug
+
+        Raises:
+            ValueError: If cannot infer name from detached HEAD
+        """
+        if name:
+            return name
+        branch = self.get_current_branch()
+        if branch == "HEAD":
+            raise ValueError("Cannot infer flow name from detached HEAD")
+        return branch.rsplit("/", 1)[-1] or branch
+
     def create_flow(
         self,
         slug: str,
