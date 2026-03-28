@@ -196,11 +196,11 @@ def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) 
             mock_store.update_flow_state.assert_called_once_with(
                 "feature-branch",
                 flow_status="done",
-                latest_actor="unknown",
+                latest_actor="workflow",
             )
             mock_store.add_event.assert_called_once_with(
                 "feature-branch",
                 "pr_merge",
-                "unknown",
+                "workflow",
                 "PR #123 merged",
             )

@@ -40,7 +40,7 @@ def test_flow_add_task_bound_uses_system_actor_by_default(
 
     assert result.exit_code == 0
     task_service.link_issue.assert_called_once_with(
-        "task/set-default-flow", 248, "task"
+        "task/set-default-flow", 248, "task", actor=None
     )
 
 
@@ -103,7 +103,7 @@ def test_flow_bind_defaults_to_task_role(flow_service_cls, task_service_cls) -> 
 
     assert result.exit_code == 0
     task_service.link_issue.assert_called_once_with(
-        "task/set-default-flow", 248, "task"
+        "task/set-default-flow", 248, "task", actor=None
     )
 
 
@@ -122,7 +122,7 @@ def test_flow_bind_accepts_dependency_role(flow_service_cls, task_service_cls) -
 
     assert result.exit_code == 0
     task_service.link_issue.assert_called_once_with(
-        "task/set-default-flow", 248, "dependency"
+        "task/set-default-flow", 248, "dependency", actor=None
     )
 
 

@@ -50,6 +50,7 @@ def test_flow_add_defaults_to_current_branch_slug(
         name="demo-feature",
         task=None,
         spec=None,
+        actor=None,
     )
 
 
@@ -77,6 +78,7 @@ def test_flow_create_defaults_to_current_branch_slug(
         base="origin/main",
         task=None,
         spec=None,
+        actor=None,
     )
 
 
@@ -141,7 +143,9 @@ def test_flow_bind_supports_related_role() -> None:
             result = runner.invoke(flow_app, ["bind", "219"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 219, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 219, "task", actor=None
+    )
 
 
 def test_task_status_command_removed() -> None:
@@ -233,7 +237,9 @@ def test_flow_bind_with_task_role() -> None:
             result = runner.invoke(flow_app, ["bind", "220", "--role", "task"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 220, "task")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 220, "task", actor=None
+    )
 
 
 def test_flow_bind_with_related_role() -> None:
@@ -248,7 +254,9 @@ def test_flow_bind_with_related_role() -> None:
             result = runner.invoke(flow_app, ["bind", "219", "--role", "related"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 219, "related")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 219, "related", actor=None
+    )
 
 
 def test_flow_bind_with_dependency_role() -> None:
@@ -263,7 +271,9 @@ def test_flow_bind_with_dependency_role() -> None:
             result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
 
     assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with("task/demo", 218, "dependency")
+    task_service.link_issue.assert_called_once_with(
+        "task/demo", 218, "dependency", actor=None
+    )
 
 
 def test_flow_bind_with_multiple_related_roles() -> None:
@@ -289,8 +299,10 @@ def test_flow_bind_with_multiple_related_roles() -> None:
         219,
         "related",
     )
+    assert task_service.link_issue.call_args_list[0].kwargs == {"actor": None}
     assert task_service.link_issue.call_args_list[1].args == (
         "task/demo",
         220,
         "related",
     )
+    assert task_service.link_issue.call_args_list[1].kwargs == {"actor": None}
