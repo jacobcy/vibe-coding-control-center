@@ -179,7 +179,6 @@ vibe3 snapshot diff --baseline main    # 与当前 main 对比
 |------|----------|------|--------|------|
 | `inspect files` | 文件/目录 | 文件级 | 否 | 人类快速查看 |
 | `inspect symbols` | 符号 | 符号级 | 否 | 引用分析 |
-| `inspect metrics` | 代码库 | 指标级 | 否 | 度量统计 |
 | `snapshot build/show/diff` | 代码库 | 模块级 | 是 | Agent 编排、质量治理 |
 
 ---
@@ -276,7 +275,6 @@ snapshot 是派生数据，不应进入 Git。
 
 - `vibe3 inspect structure` 的单文件/目录结构分析入口
 - `dag_service` 的依赖关系能力
-- `metrics_service` 的度量统计能力
 - `review` 链路的 explainability 输出
 
 ### 8.2 需要新增

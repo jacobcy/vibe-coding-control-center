@@ -27,10 +27,10 @@ related_docs:
 
 ## 一、阻断性问题（P0 - 必须修复）
 
-### 1.1 `hooks` 命令未注册
+### 1.1 历史问题：`hooks` 命令曾未注册
 
 **问题描述**：
-- `hooks` 命令已实现（[commands/hooks.py](../../../src/vibe3/commands/hooks.py)）
+- 当时存在 `hooks` 命令实现（现已移除）
 - 但未注册到主 CLI
 - 用户无法使用 `vibe hooks install-hooks` 命令
 
@@ -225,7 +225,7 @@ Error: No such command 'hooks'.
 
 ### 8.1 CRITICAL 级别问题
 
-#### Issue #1: hooks 命令未注册到 CLI
+#### Issue #1: 历史上的 hooks 命令未注册到 CLI
 **文件**: `src/vibe3/cli.py:13-24`
 **影响**: 用户无法运行 `vibe hooks install-hooks`，Git Hook 自动化完全不可用
 

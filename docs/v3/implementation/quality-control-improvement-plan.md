@@ -113,7 +113,6 @@
 | **风险评分** | `inspect pr` + `pr_scoring_service.py` | ✅ PR ready使用 | 可用于pre-push |
 | **AST分析** | `services/serena_service.py` | ✅ inspect使用 | 可用于本地review |
 | **依赖图分析** | `services/dag_service.py` | ✅ inspect使用 | 可用于影响分析 |
-| **Metrics统计** | `services/metrics_service.py` | ✅ inspect使用 | 可用于结构治理 |
 
 **关键发现**：
 - 🎯 **CoverageService已完整实现，可以直接用于pre-push**
@@ -122,19 +121,18 @@
 
 ---
 
-### 1.4 hooks 命令现状
+### 1.4 hook 脚本现状
 
-**当前命令**（`src/vibe3/commands/hooks.py`）：
+**当前入口**：
 ```bash
-vibe hooks install-hooks    # 安装 post-commit hook
-vibe hooks uninstall-hooks  # 卸载 post-commit hook
+bash scripts/hooks/pre-push.sh
+bash scripts/hooks/check-python-loc.sh
+bash scripts/hooks/check-shell-loc.sh
 ```
 
 **问题**：
-- ❌ 没有 `list` 命令，看不到已安装的hooks
-- ❌ 只支持 post-commit hook
-- ❌ post-commit hook依赖已废弃的命令
-- ❌ 不支持 pre-push hook 安装
+- 需要保持 shell 脚本与 CI 共用同一实现
+- 不应额外维护独立的 Python CLI 包装层
 
 ---
 
@@ -610,8 +608,6 @@ def install_hook(
 - [ ] Pre-push hook脚本创建
 - [ ] 覆盖率检查集成（强制）
 - [ ] 风险评分决策逻辑（条件review）
-- [ ] `vibe hooks list` 命令可用
-- [ ] `vibe hooks install <hook>` 命令可用
 - [ ] 文档更新（README + CLAUDE.md）
 
 ### 关键澄清
@@ -691,7 +687,7 @@ def install_hook(
 
 | 风险 | 概率 | 影响 | 缓解措施 |
 |------|------|------|---------|
-| Hooks配置复杂 | 低 | 中 | 提供清晰的文档和 `vibe hooks list` |
+| Hooks配置复杂 | 低 | 中 | 提供清晰的 shell 脚本文档 |
 | 服务依赖过多 | 低 | 中 | 保持服务独立，最小依赖 |
 
 ---
@@ -735,9 +731,7 @@ def install_hook(
    - 覆盖率检查（强制）
    - 风险评分决策（条件review）(2h)
 2. 🎯 集成到 pre-commit 配置 (1h)
-3. 🎯 增强 `vibe hooks` 命令：
-   - `vibe hooks list` 显示所有hooks状态
-   - `vibe hooks install <hook>` 安装指定hook (1.5h)
+3. 🎯 保持 hook 脚本与 CI 共享同一实现
 4. 🎯 更新文档
 
 ### 澄清说明
