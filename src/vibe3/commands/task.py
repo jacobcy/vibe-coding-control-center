@@ -12,6 +12,7 @@ from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 from vibe3.services.task_usecase import TaskShowResult, TaskUsecase
+from vibe3.ui.task_ui import render_task_milestone
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
@@ -21,6 +22,30 @@ app = typer.Typer(
 @contextmanager
 def _noop() -> Iterator[None]:
     yield
+
+
+def _fetch_milestone_data(issue_number: int) -> "dict[str, object] | None":
+    """Fetch milestone orchestration context for a task issue from GitHub."""
+    from vibe3.clients.github_client import GitHubClient
+
+    gh = GitHubClient()
+    issue = gh.view_issue(issue_number)
+    if not isinstance(issue, dict) or not issue.get("milestone"):
+        return None
+    ms = issue["milestone"]
+    ms_issues = gh.get_milestone_issues(ms["number"])
+    open_count = sum(1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN")
+    closed_count = sum(
+        1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
+    )
+    return {
+        "number": ms["number"],
+        "title": ms["title"],
+        "open": open_count,
+        "closed": closed_count,
+        "issues": ms_issues,
+        "task_issue": issue_number,
+    }
 
 
 def _build_task_usecase() -> TaskUsecase:
@@ -137,6 +162,11 @@ def _render_task_show(task_result: TaskShowResult, json_output: bool) -> None:
     if view.identity_drift:
         typer.echo("[warning] identity_drift=True: 本地与远端 identity 不一致")
 
+    if view.task_issue_number and not json_output:
+        milestone_data = _fetch_milestone_data(view.task_issue_number.value)
+        if milestone_data:
+            render_task_milestone(view.task_issue_number.value, milestone_data)
+
 
 def _render_task_show_error(task_result: TaskShowResult, json_output: bool) -> None:
     """Render hydrate fallback or hard error for task show."""
@@ -157,4 +187,9 @@ def _render_task_show_error(task_result: TaskShowResult, json_output: bool) -> N
     if task.task_issue_number:
         typer.echo(f"Task Issue: #{task.task_issue_number}")
     typer.echo(f"Status (local flow): {task.flow_status}")
-    typer.echo("未绑定 task，请先运行 vibe3 flow bind <issue_number> 绑定 task。")
+    typer.echo(f"[hint] {error.message}")
+
+    if task.task_issue_number:
+        milestone_data = _fetch_milestone_data(task.task_issue_number)
+        if milestone_data:
+            render_task_milestone(task.task_issue_number, milestone_data)

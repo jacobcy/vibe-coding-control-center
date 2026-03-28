@@ -19,6 +19,17 @@ class MainBranchProtectedError(Exception):
 ExecutionStatus = Literal["pending", "running", "done", "crashed"]
 
 
+def _migrate_flow_status_value(v: str) -> str:
+    """Normalize legacy flow status values."""
+    if v == "idle":
+        return "active"
+    if v == "missing":
+        return "stale"
+    if v == "merged":
+        return "done"
+    return v
+
+
 class FlowState(BaseModel):
     """Flow state model."""
 
@@ -58,12 +69,9 @@ class FlowState(BaseModel):
 
         - idle -> active (default state)
         - missing -> stale (inactive state)
+        - merged -> done (completed state)
         """
-        if v == "idle":
-            return "active"
-        if v == "missing":
-            return "stale"
-        return v
+        return _migrate_flow_status_value(v)
 
 
 class IssueLink(BaseModel):
@@ -125,6 +133,12 @@ class FlowStatusResponse(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+
+    @field_validator("flow_status", mode="before")
+    @classmethod
+    def migrate_flow_status(cls, v: str) -> str:
+        """Migrate legacy flow status values for status responses."""
+        return _migrate_flow_status_value(v)
 
 
 class CreateDecision(BaseModel):

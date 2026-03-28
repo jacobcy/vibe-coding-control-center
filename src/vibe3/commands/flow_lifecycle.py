@@ -10,18 +10,29 @@ from vibe3.services.flow_service import FlowService
 
 
 def switch(
-    target: Annotated[str, typer.Argument(help="Flow slug or branch name")],
+    branch: Annotated[
+        str | None,
+        typer.Option("--branch", help="Branch name or flow slug to switch to"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Switch to existing flow."""
-    with trace_scope(trace, "flow switch", domain="flow", target=target):
-        logger.bind(command="flow switch", target=target).info("Switching to flow")
+    if branch is None:
+        typer.echo(
+            "Error: 必须指定目标分支或 flow slug\n"
+            "使用: vibe3 flow switch --branch <branch-or-slug>",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    with trace_scope(trace, "flow switch", domain="flow", target=branch):
+        logger.bind(command="flow switch", target=branch).info("Switching to flow")
 
         service = FlowService()
-        flow = service.switch_flow(target)
+        flow = service.switch_flow(branch)
 
         if json_output:
             import json

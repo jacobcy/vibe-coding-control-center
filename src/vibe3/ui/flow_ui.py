@@ -1,5 +1,7 @@
 """Flow UI rendering."""
 
+from typing import Any
+
 from rich.text import Text
 
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse
@@ -42,10 +44,49 @@ def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
         _kv("task", task_id, 1)
 
 
+def render_milestone(
+    milestone_data: "dict[str, Any]", current_issue: "int | None" = None
+) -> None:
+    from vibe3.clients.github_issues_ops import parse_blocked_by
+
+    ms_title = milestone_data["title"]
+    open_count = int(milestone_data.get("open", 0))
+    closed_count = int(milestone_data.get("closed", 0))
+    total = open_count + closed_count
+    progress = f"{closed_count}/{total} done" if total else "0 issues"
+    console.print(f"\n[bold]--- Milestone: {ms_title} [{progress}] ---[/]")
+    issues: list[dict[str, Any]] = list(milestone_data.get("issues") or [])
+    for item in sorted(issues, key=lambda x: int(x["number"])):
+        n = int(item["number"])
+        state = str(item.get("state", "open")).upper()
+        title = str(item.get("title", ""))
+        labels = [lb["name"] for lb in (item.get("labels") or [])]
+        is_blocked = "status/blocked" in labels
+        is_done = state == "CLOSED"
+
+        if is_done:
+            icon = "[green]x[/]"
+        elif is_blocked:
+            icon = "[red]![/]"
+        else:
+            icon = "[ ]"
+
+        current = "  [dim]<- this flow[/]" if n == current_issue else ""
+        console.print(f"  {icon}  [dim]#{n}[/]  {title}{current}")
+
+        if is_blocked:
+            body = str(item.get("body") or "")
+            blockers = parse_blocked_by(body)
+            if blockers:
+                blocker_str = "  ".join(f"#{b}" for b in blockers)
+                console.print(f"       [red dim]blocked by: {blocker_str}[/]")
+
+
 def render_flow_status(
     status: FlowStatusResponse,
     issue_titles: dict[int, str] | None = None,
-    pr_data: dict[str, object] | None = None,
+    pr_data: dict[str, Any] | None = None,
+    milestone_data: dict[str, Any] | None = None,
 ) -> None:
     """flow show — full detail, YAML style."""
     titles = issue_titles or {}
@@ -100,6 +141,8 @@ def render_flow_status(
         _kv("blocked_by", status.blocked_by, 1)
     if status.next_step:
         _kv("next_step", status.next_step, 1)
+    if milestone_data:
+        render_milestone(milestone_data, status.task_issue_number)
     execution_statuses = [
         ("planner", status.planner_status),
         ("executor", status.executor_status),
@@ -180,7 +223,11 @@ _EVENT_COLOR: dict[str, str] = {
 }
 
 
-def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
+def render_flow_timeline(
+    state: FlowState,
+    events: list[FlowEvent],
+    milestone_data: dict[str, Any] | None = None,
+) -> None:
     status_text = _status_text(state.flow_status).plain
     console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", state.flow_slug, 1)
@@ -224,6 +271,17 @@ def render_flow_timeline(state: FlowState, events: list[FlowEvent]) -> None:
             if ref:
                 console.print(f"  [dim]📎 {ref}[/]")
         console.print()
+
+    if milestone_data:
+        ms_title = milestone_data["title"]
+        open_count = int(milestone_data.get("open", 0))
+        closed_count = int(milestone_data.get("closed", 0))
+        total = open_count + closed_count
+        progress = f"{closed_count}/{total} done" if total else "—"
+        console.print(
+            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
+            "  [dim]→ vibe3 task show[/]"
+        )
 
     refs_shown = False
     for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:

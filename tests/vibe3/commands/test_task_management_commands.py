@@ -106,13 +106,24 @@ def test_flow_bind_help_uses_issue_and_role() -> None:
     assert "actor" not in stdout
 
 
-def test_flow_show_help_uses_branch_name() -> None:
+def test_flow_show_help_uses_branch_option() -> None:
     result = runner.invoke(flow_app, ["show", "--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "Usage: root show [OPTIONS] [BRANCH]" in stdout
+    assert "Usage: root show [OPTIONS]" in stdout
+    assert "--branch" in stdout
     assert "Branch name" in stdout
+
+
+def test_flow_switch_help_uses_branch_option() -> None:
+    result = runner.invoke(flow_app, ["switch", "--help"])
+    stdout = strip_ansi(result.stdout)
+
+    assert result.exit_code == 0
+    assert "Usage: root switch [OPTIONS]" in stdout
+    assert "--branch" in stdout
+    assert "Branch name or flow slug" in stdout
 
 
 def test_task_link_command_removed() -> None:
