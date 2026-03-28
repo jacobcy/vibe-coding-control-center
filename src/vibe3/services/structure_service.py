@@ -153,3 +153,22 @@ def analyze_file(file_path: str) -> FileStructure:
         return analyze_shell_file(file_path)
     else:
         raise StructureError(f"Unsupported file type: {file_path}")
+
+
+def collect_python_file_structures(root: str = "src/vibe3") -> list[FileStructure]:
+    """Collect structure data for all Python files under a root directory."""
+    log = logger.bind(domain="structure", action="collect_python_files", root=root)
+    log.info("Collecting Python file structures")
+
+    root_path = Path(root)
+    if not root_path.exists():
+        raise StructureError(f"Root directory not found: {root}")
+
+    results: list[FileStructure] = []
+    for py_file in sorted(root_path.glob("**/*.py")):
+        if "__pycache__" in str(py_file):
+            continue
+        results.append(analyze_python_file(str(py_file)))
+
+    log.bind(files=len(results)).success("Python file structures collected")
+    return results

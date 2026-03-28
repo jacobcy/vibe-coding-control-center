@@ -75,12 +75,12 @@ class TestGetChangedFiles:
         return GitClient()
 
     def test_uncommitted_merges_staged_and_unstaged(self, client: GitClient) -> None:
-        with patch.object(client, "_run", side_effect=["a.py\nb.py", "c.py"]):
+        with patch.object(client, "_run", side_effect=["a.py\nb.py", "c.py", "d.py"]):
             files = client.get_changed_files(UncommittedSource())
-        assert sorted(files) == ["a.py", "b.py", "c.py"]
+        assert sorted(files) == ["a.py", "b.py", "c.py", "d.py"]
 
     def test_uncommitted_deduplicates(self, client: GitClient) -> None:
-        with patch.object(client, "_run", side_effect=["a.py", "a.py"]):
+        with patch.object(client, "_run", side_effect=["a.py", "a.py", ""]):
             files = client.get_changed_files(UncommittedSource())
         assert files == ["a.py"]
 

@@ -28,6 +28,6 @@ def test_inspect_no_args_shows_help():
 def test_inspect_help_flag():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "metrics" in result.output
-    assert "structure" in result.output
+    assert "metrics" not in result.output
+    assert "uncommit" in result.output
     assert "pr" in result.output

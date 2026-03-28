@@ -76,18 +76,12 @@ def build_snapshot(root: str = "src/vibe3") -> StructureSnapshot:
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         snapshot_id = StructureSnapshot.generate_id(branch, commit_short, timestamp)
 
-        root_path = Path(root)
-        if not root_path.exists():
-            raise SnapshotError(f"Root directory not found: {root}")
-
+        file_structures = structure_service.collect_python_file_structures(root)
         files: list[FileSnapshot] = []
         module_map: dict[str, ModuleSnapshot] = {}
 
-        for py_file in sorted(root_path.glob("**/*.py")):
-            if "__pycache__" in str(py_file):
-                continue
-            rel_path = str(py_file)
-            file_struct = structure_service.analyze_python_file(rel_path)
+        for file_struct in file_structures:
+            rel_path = file_struct.path
             imports = dag_service._extract_imports(rel_path)
 
             file_snapshot = FileSnapshot(
@@ -100,7 +94,6 @@ def build_snapshot(root: str = "src/vibe3") -> StructureSnapshot:
                 ],
                 function_count=file_struct.function_count,
                 imports=imports,
-                imported_by=[],
             )
             files.append(file_snapshot)
 

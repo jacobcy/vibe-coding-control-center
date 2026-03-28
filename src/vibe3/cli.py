@@ -17,7 +17,6 @@ from vibe3.commands import (
     check,
     flow,
     handoff,
-    hooks,
     inspect,
     plan,
     pr,
@@ -59,7 +58,6 @@ app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
 app.add_typer(review.app, name="review")
 app.add_typer(handoff.app, name="handoff")
-app.add_typer(hooks.app, name="hooks")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")

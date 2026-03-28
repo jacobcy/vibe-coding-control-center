@@ -10,8 +10,8 @@ from vibe3.models.flow import FlowState
 runner = CliRunner()
 
 
-@patch("vibe3.commands.flow.render_flow_timeline")
-@patch("vibe3.commands.flow.ensure_flow_for_current_branch")
+@patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.commands.flow_status.ensure_flow_for_current_branch")
 def test_flow_show_auto_ensures_current_branch(mock_ensure, _render_timeline) -> None:
     """flow show should auto-ensure flow for current branch before showing timeline."""
     flow_service = MagicMock()

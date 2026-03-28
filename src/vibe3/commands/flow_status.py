@@ -6,8 +6,11 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
+from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
+from vibe3.services.task_binding_guard import build_bind_task_hint
+from vibe3.ui.console import console
 from vibe3.ui.flow_ui import (
     render_error,
     render_flow_status,
@@ -18,6 +21,11 @@ from vibe3.ui.flow_ui import (
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
     from vibe3.models.flow import FlowStatusResponse
+
+
+StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
+JsonOption = Annotated[bool, typer.Option("--json")]
+TraceOption = Annotated[bool, typer.Option("--trace")]
 
 
 def _fetch_issue_titles(
@@ -56,14 +64,17 @@ def _fetch_issue_titles(
 
 def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
-    snapshot: Annotated[bool, typer.Option("--snapshot", help="静态快照模式")] = False,
-    trace: Annotated[bool, typer.Option("--trace")] = False,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
+    snapshot: StatusOption = False,
+    trace: TraceOption = False,
+    json_output: JsonOption = False,
 ) -> None:
     """Show flow details."""
     with trace_scope(trace, "flow show", domain="flow"):
-        service = FlowService()
-        target_branch = branch if branch else service.get_current_branch()
+        if branch:
+            service = FlowService()
+            target_branch = branch
+        else:
+            service, target_branch = ensure_flow_for_current_branch()
 
         if snapshot:
             flow_status = service.get_flow_status(target_branch)
@@ -96,11 +107,16 @@ def show(
             typer.echo(json.dumps(output, indent=2, default=str))
         else:
             render_flow_timeline(timeline["state"], timeline["events"])
+            if timeline["state"].task_issue_number is None:
+                console.print(
+                    "[yellow]提示：当前 flow 还没有 task，建议 "
+                    f"{build_bind_task_hint()}[/]"
+                )
 
 
 def status(
-    json_output: Annotated[bool, typer.Option("--json")] = False,
-    trace: Annotated[bool, typer.Option("--trace")] = False,
+    json_output: JsonOption = False,
+    trace: TraceOption = False,
 ) -> None:
     """Show dashboard of all active flows."""
     with trace_scope(trace, "flow status", domain="flow"):

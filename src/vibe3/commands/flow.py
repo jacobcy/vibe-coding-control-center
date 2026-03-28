@@ -7,21 +7,15 @@ from typing import Annotated, List, Literal
 import typer
 from loguru import logger
 
-from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
+from vibe3.commands.flow_status import show, status
 from vibe3.services.flow_service import FlowService
 from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.task_binding_guard import build_bind_task_hint
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui import (
-    render_flow_created,
-    render_flow_status,
-    render_flow_timeline,
-    render_flows_table,
-)
+from vibe3.ui.flow_ui import render_flow_created, render_flows_table
 
 FlowNameArg = Annotated[
     str | None,
@@ -29,9 +23,6 @@ FlowNameArg = Annotated[
 ]
 IssueArg = Annotated[
     str, typer.Argument(help="Issue reference to bind as task/related/dependency")
-]
-BranchArg = Annotated[
-    str | None, typer.Argument(help="Branch name (defaults to current branch)")
 ]
 TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
 TaskTailArg = Annotated[
@@ -57,7 +48,6 @@ ActorOption = Annotated[
         help="Flow 默认署名（示例: codex/gpt-5.4）",
     ),
 ]
-SnapshotOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
 StatusFilterOption = Annotated[
     Literal["active", "blocked", "done", "stale"] | None,
     typer.Option("--status", help="Filter by status"),
@@ -266,78 +256,6 @@ def bind(
 
 
 @app.command()
-def show(
-    flow_name: BranchArg = None,
-    snapshot: SnapshotOption = False,
-    trace: TraceOption = False,
-    json_output: JsonOption = False,
-) -> None:
-    """Show flow details for a branch."""
-    with trace_scope(trace, "flow show"):
-        logger.bind(command="flow show", flow_name=flow_name).info(
-            "Showing flow details"
-        )
-
-        if flow_name:
-            service = FlowService()
-            branch = flow_name
-        else:
-            service, branch = ensure_flow_for_current_branch()
-
-        if snapshot:
-            flow_status = service.get_flow_status(branch)
-            if not flow_status:
-                logger.error(f"Flow not found: {branch}")
-                raise typer.Exit(1)
-            render_flow_status(flow_status)
-            return
-
-        timeline = service.get_flow_timeline(branch)
-        if not timeline["state"]:
-            logger.error(f"Flow not found: {branch}")
-            raise typer.Exit(1)
-
-        if json_output:
-            output = {
-                "state": timeline["state"].model_dump(),
-                "events": [e.model_dump() for e in timeline["events"]],
-            }
-            typer.echo(json.dumps(output, indent=2, default=str))
-        else:
-            render_flow_timeline(timeline["state"], timeline["events"])
-            if timeline["state"].task_issue_number is None:
-                console.print(
-                    "[yellow]提示：当前 flow 还没有 task，建议 "
-                    f"{build_bind_task_hint()}[/]"
-                )
-
-
-@app.command()
-def status(
-    json_output: JsonOption = False,
-    trace: TraceOption = False,
-) -> None:
-    """Show flow status."""
-    with trace_scope(trace, "flow status"):
-        logger.bind(command="flow status", json_output=json_output).info(
-            "Getting flow status"
-        )
-
-        service = FlowService()
-        branch = service.get_current_branch()
-        flow_status = service.get_flow_status(branch)
-
-        if json_output:
-            output = flow_status.model_dump() if flow_status else {}
-            typer.echo(json.dumps(output, indent=2, default=str))
-        else:
-            if not flow_status:
-                logger.info("No active flow on current branch")
-                raise typer.Exit(0)
-            render_flow_status(flow_status)
-
-
-@app.command()
 def list(
     status_filter: StatusFilterOption = None,
     trace: TraceOption = False,
@@ -369,3 +287,5 @@ app.command(name="switch")(switch)
 app.command(name="done")(done)
 app.command(name="blocked")(blocked)
 app.command(name="aborted")(aborted)
+app.command(name="show")(show)
+app.command(name="status")(status)

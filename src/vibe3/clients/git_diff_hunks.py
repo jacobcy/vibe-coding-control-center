@@ -1,6 +1,7 @@
 """Git diff hunk parsing utilities."""
 
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -47,6 +48,16 @@ def get_diff_hunk_ranges(
         source_type=source.type,
     )
     log.debug("Getting diff hunk ranges")
+
+    if source.type == ChangeSourceType.UNCOMMITTED:
+        untracked_files = set(git_client.get_untracked_files())
+        if file_path in untracked_files:
+            try:
+                content = Path(file_path).read_text(encoding="utf-8")
+            except OSError:
+                return []
+            line_count = max(1, len(content.splitlines()))
+            return [(1, line_count)]
 
     try:
         # Get diff for this specific file

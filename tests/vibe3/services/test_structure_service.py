@@ -7,6 +7,7 @@ from vibe3.services.structure_service import (
     analyze_file,
     analyze_python_file,
     analyze_shell_file,
+    collect_python_file_structures,
 )
 
 PYTHON_SOURCE = """\
@@ -103,3 +104,27 @@ class TestAnalyzeFile:
         f.write_text("puts 'hi'\n")
         with pytest.raises(StructureError, match="Unsupported"):
             analyze_file(str(f))
+
+
+class TestCollectPythonFileStructures:
+    """collect_python_file_structures 测试."""
+
+    def test_collects_python_files_and_skips_pycache(self, tmp_path) -> None:
+        root = tmp_path / "src" / "vibe3"
+        cached = root / "__pycache__"
+        cached.mkdir(parents=True)
+        root.mkdir(parents=True, exist_ok=True)
+
+        file_a = root / "a.py"
+        file_a.write_text("def a():\n    return 1\n")
+        file_b = root / "nested" / "b.py"
+        file_b.parent.mkdir(parents=True, exist_ok=True)
+        file_b.write_text("def b():\n    return 2\n")
+        (cached / "c.py").write_text("def c():\n    return 3\n")
+
+        results = collect_python_file_structures(str(root))
+
+        assert len(results) == 2
+        paths = {r.path for r in results}
+        assert str(file_a) in paths
+        assert str(file_b) in paths

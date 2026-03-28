@@ -150,7 +150,7 @@ vibe3 inspect pr 42 --trace
 **使用场景**:
 ```bash
 vibe3 inspect pr 42 --json | jq '.impact'
-RESULT=$(vibe3 inspect metrics --json)
+RESULT=$(vibe3 inspect base main --json)
 ```
 
 ---

@@ -81,6 +81,7 @@ SQLite (本地缓存)                 GitHub (真源)
 | `flow bind` | 绑定 issue 到 flow（指定 role） | Flow 绑定 | 开发者 |
 | `task show` | 显示 GitHub Project 管理信息 | 项目管理 | 管理者 |
 | `task list` | 列出所有 task | Task 查询 | 所有用户 |
+| `snapshot build/show/diff` | 代码库结构基线与对比 | 结构治理 | 开发者 |
 | `pr create/show/ready` | PR 生命周期联动（读取/写入当前 flow） | PR 协作 | 开发者 |
 
 **兼容说明**：
@@ -95,6 +96,10 @@ SQLite (本地缓存)                 GitHub (真源)
 - ✅ 显示 PR 信息（从 GitHub PRs API）
 - ✅ 显示 plan/execute/review 引用
 - ✅ 显示阻塞关系
+
+**结构入口**
+- `snapshot build/show/diff` 是结构与快照视角的标准入口
+- review / governance 语义以 `snapshot` 为准
 
 **task show** - GitHub Project 管理视角
 - ✅ 显示 Project 绑定状态（bound/unbound）
