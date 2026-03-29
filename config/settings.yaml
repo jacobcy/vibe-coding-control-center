@@ -326,24 +326,56 @@ run:
 
 # Orchestra Configuration
 # =======================
-# Background daemon for GitHub label-driven orchestration
+# Webhook daemon for orchestration integrations
 orchestra:
-  # Enable orchestra daemon
+  # Enable webhook server itself (must be true if you want reviewer webhook handling)
   enabled: true
 
-  # Polling interval in seconds (minimum 30s due to GitHub API limits)
+  # Polling interval in seconds (effective only when polling.enabled=true)
   polling_interval: 60
 
-  # GitHub repository (optional, defaults to current repo)
-  # repo: "owner/repo"
+  # Polling fallback (for missed webhook events)
+  polling:
+    enabled: false
+
+  # GitHub repository (optional). null 表示默认使用当前工作目录对应仓库
+  repo: null
+
+  # HTTP port for webhook receiver
+  port: 8080
+
+  # Webhook secret (set to same value as GitHub webhook secret)
+  webhook_secret: "vibe-coding-control-center"
 
   # Maximum concurrent flows
   max_concurrent_flows: 3
 
-  # Master agent for issue triage
+  # Manager usernames used as reviewer/assignee match target
+  manager_usernames:
+    - "vibe-manager-agent"
+    - "vibe-manager"
+
+  # Proactive manager dispatch via issues/assigned
+  assignee_dispatch:
+    enabled: true
+    # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
+    use_worktree: true
+
+  # PR reviewer-triggered review execution
+  pr_review_dispatch:
+    enabled: true
+    async_mode: true
+    # reviewer 默认复用 PR 对应已有 worktree；如需强制新 worktree 可开启
+    use_worktree: false
+
+  # @mention auto-ack in issue comments
+  comment_reply:
+    enabled: false
+
+  # Master agent for issue triage (disabled in reviewer-only mode)
   master_agent:
     # Enable master agent for new issue triage
-    enabled: true
+    enabled: false
 
     # Agent preset name (passed to codeagent-wrapper)
     agent: "master-controller"

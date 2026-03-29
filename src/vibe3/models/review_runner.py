@@ -21,6 +21,7 @@ class AgentOptions:
         agent: The agent preset name (passed to codeagent-wrapper)
         model: Optional model override
         backend: Backend name (for database recording or direct use)
+        worktree: Whether to pass --worktree to codeagent-wrapper
         timeout_seconds: Maximum execution time (default: 600 seconds)
 
     Usage:
@@ -33,6 +34,7 @@ class AgentOptions:
     agent: str | None = None
     model: str | None = None
     backend: str | None = None
+    worktree: bool = False
     timeout_seconds: int = 600
 
 

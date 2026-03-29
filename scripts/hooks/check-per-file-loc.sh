@@ -73,6 +73,7 @@ IGNORE_FILES=(
   "src/vibe3/commands/flow.py"  # TODO: Extract GitHub Project auto-link logic
   "src/vibe3/commands/review.py"  # TODO: Extract session management
   "src/vibe3/clients/sqlite_client.py"  # TODO: Extract issue link queries to sqlite_issue_queries.py
+  "scripts/tsu.sh"  # External script, not subject to LOC limits
 )
 
 warnings=0

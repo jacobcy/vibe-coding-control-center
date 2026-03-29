@@ -1,146 +1,236 @@
-"""vibe3 serve command - foreground server for GitHub label orchestration."""
+"""vibe3 serve command - HTTP + heartbeat server for GitHub webhook orchestration."""
 
+import asyncio
 import os
 import signal
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated
 
 import typer
-from loguru import logger
+import uvicorn
+from fastapi import FastAPI
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.poller import Poller
+from vibe3.orchestra.dispatcher import Dispatcher
+from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
+from vibe3.orchestra.heartbeat import HeartbeatServer
+from vibe3.orchestra.serve_utils import (
+    _setup_tailscale_webhook,
+    _start_async_serve,
+    _validate_pid_file,
+)
+from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
+from vibe3.orchestra.services.comment_reply import CommentReplyService
+from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
+from vibe3.orchestra.webhook_handler import make_webhook_router
 
 app = typer.Typer(
-    help="Orchestra server for GitHub label-driven orchestration (runs in foreground)",
+    help="Orchestra server: GitHub webhook receiver + heartbeat polling",
     no_args_is_help=True,
 )
 
 
-def _is_orchestra_process(pid: int) -> bool:
-    """Check if a PID is actually an orchestra process.
+def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
+    """Instantiate heartbeat + FastAPI app with registered services."""
+    heartbeat = HeartbeatServer(config)
 
-    Args:
-        pid: Process ID to check
+    # Shared resources (reduces duplication)
+    shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
+    shared_github = GitHubClient()
+    shared_orchestrator = FlowOrchestrator(config)
+    shared_dispatcher = Dispatcher(
+        config,
+        dry_run=config.dry_run,
+        orchestrator=shared_orchestrator,
+    )
 
-    Returns:
-        True if the process is orchestra, False otherwise
-    """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "command="],
-            capture_output=True,
-            text=True,
-            timeout=5,
+    if config.assignee_dispatch.enabled:
+        heartbeat.register(
+            AssigneeDispatchService(
+                config,
+                dispatcher=shared_dispatcher,
+                github=shared_github,
+                executor=shared_executor,
+            )
         )
-        if result.returncode != 0:
-            return False
+    if config.comment_reply.enabled:
+        heartbeat.register(
+            CommentReplyService(
+                config,
+                github=shared_github,
+            )
+        )
+    if config.pr_review_dispatch.enabled:
+        heartbeat.register(
+            PRReviewDispatchService(
+                config,
+                dispatcher=shared_dispatcher,
+                executor=shared_executor,
+            )
+        )
 
-        cmdline = result.stdout.strip().lower()
-        return "vibe3" in cmdline and "serve" in cmdline
-    except Exception:
-        return False
+    fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
+    fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
+    return heartbeat, fastapi_app
 
 
-def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
-    """Validate PID file and check if process is running.
+async def _run(config: OrchestraConfig, port: int) -> None:
+    """Run heartbeat + HTTP server concurrently."""
+    heartbeat, fastapi_app = _build_server(config)
 
-    Args:
-        pid_file: Path to PID file
+    uv_config = uvicorn.Config(
+        fastapi_app,
+        host="0.0.0.0",
+        port=port,
+        log_level="warning",  # loguru handles our logs
+    )
+    uv_server = uvicorn.Server(uv_config)
 
-    Returns:
-        Tuple of (pid, is_valid_orchestra_process)
-    """
-    if not pid_file.exists():
-        return None, False
-
-    try:
-        pid = int(pid_file.read_text().strip())
-    except ValueError:
-        return None, False
-
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return pid, False
-    except PermissionError:
-        return pid, False
-
-    return pid, _is_orchestra_process(pid)
+    await asyncio.gather(
+        heartbeat.run(),
+        uv_server.serve(),
+    )
 
 
 @app.command()
 def start(
     interval: Annotated[
-        int, typer.Option("--interval", "-i", help="Polling interval in seconds")
-    ] = 60,
+        int | None,
+        typer.Option(
+            "--interval",
+            "-i",
+            help=(
+                "Polling interval override in seconds. "
+                "Default uses orchestra.polling_interval from config/settings.yaml"
+            ),
+        ),
+    ] = None,
+    port: Annotated[
+        int | None,
+        typer.Option(
+            "--port",
+            "-p",
+            help=(
+                "Webhook receiver port override. "
+                "Default uses orchestra.port from config/settings.yaml"
+            ),
+        ),
+    ] = None,
     repo: Annotated[
-        str | None, typer.Option("--repo", "-r", help="GitHub repo (owner/repo)")
+        str | None,
+        typer.Option(
+            "--repo",
+            "-r",
+            help=(
+                "GitHub repo override (owner/repo). "
+                "Default uses orchestra.repo; if unset, uses current repository"
+            ),
+        ),
     ] = None,
     dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Only log actions, don't execute")
+        bool,
+        typer.Option("--dry-run", help="Log actions without executing"),
+    ] = False,
+    async_mode: Annotated[
+        bool,
+        typer.Option("--async", help="Run in tmux background session"),
+    ] = False,
+    ts: Annotated[
+        bool,
+        typer.Option(
+            "--ts",
+            help=(
+                "Temporary testing mode: auto-run scripts/tsu.sh to expose "
+                "public webhook URL for current port"
+            ),
+        ),
     ] = False,
     verbose: Annotated[
-        int, typer.Option("-v", "--verbose", count=True, help="Increase verbosity")
+        int,
+        typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
     ] = 0,
 ) -> None:
-    """Start Orchestra server (runs in foreground).
+    """Start Orchestra server (HTTP webhook receiver + heartbeat polling).
 
-    This server monitors GitHub issues for state label changes and
-    triggers corresponding commands (plan/run/review).
+    Listens for GitHub webhook events on POST /webhook/github and
+    dispatches manager agents based on issue assignee changes.
 
-    NOTE: This runs in the foreground. For background execution,
-    use nohup, tmux, or a process manager:
+    Polling fallback runs every --interval seconds to catch any events
+    missed by the webhook (e.g. during downtime).
 
-        # Using nohup
-        nohup vibe3 serve start --interval 60 > orchestra.log 2>&1 &
+    By default, port/repo come from config/settings.yaml:
+    - orchestra.port
+    - orchestra.repo (if unset, gh resolves current repository by working directory)
 
-        # Using tmux
-        tmux new -d -s orchestra 'vibe3 serve start'
+    Configure GitHub to send webhook events to:
+        http://<your-server>:<port>/webhook/github
 
     Examples:
         vibe3 serve start
-        vibe3 serve start --interval 30
+        vibe3 serve start --port 9000 --interval 900
         vibe3 serve start --repo owner/repo --dry-run
+        vibe3 serve start --async --ts
     """
     setup_logging(verbose=verbose)
 
     config = OrchestraConfig.from_settings()
+    if not config.enabled:
+        typer.echo("Orchestra is disabled in config (orchestra.enabled=false)")
+        raise typer.Exit(1)
 
-    if interval != 60:
-        config.polling_interval = interval
+    overrides: dict[str, object] = {}
+    if interval is not None:
+        overrides["polling_interval"] = interval
+    if port is not None:
+        overrides["port"] = port
     if repo is not None:
-        config.repo = repo
+        overrides["repo"] = repo
     if dry_run:
-        config.dry_run = dry_run
+        overrides["dry_run"] = dry_run
+    if overrides:
+        config = config.model_copy(update=overrides)
 
+    # Check for existing process
     pid, is_valid = _validate_pid_file(config.pid_file)
     if is_valid:
         typer.echo(f"Orchestra server already running (PID: {pid})")
         raise typer.Exit(1)
     elif pid is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
-        config.pid_file.unlink()
+        config.pid_file.unlink(missing_ok=True)
 
-    log = logger.bind(domain="orchestra", action="serve")
-    log.info(
-        "Starting Orchestra server",
-        interval=config.polling_interval,
-        repo=config.repo,
-        dry_run=config.dry_run,
-    )
+    if async_mode:
+        ok, msg = _start_async_serve(config, verbose)
+        typer.echo(msg)
+        if not ok:
+            raise typer.Exit(1)
+        if ts:
+            ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
+            typer.echo(ts_msg)
+            if not ts_ok:
+                raise typer.Exit(1)
+        raise typer.Exit(0)
+
+    if ts:
+        ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
+        typer.echo(ts_msg)
+        if not ts_ok:
+            raise typer.Exit(1)
 
     typer.echo(
-        f"Starting Orchestra server (interval: {config.polling_interval}s, "
+        f"Starting Orchestra server on port {config.port} "
+        f"(tick interval: {config.polling_interval}s, "
         f"max_concurrent: {config.max_concurrent_flows})"
     )
+    typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
-    poller = Poller(config)
-    poller.start()
+    try:
+        asyncio.run(_run(config, config.port))
+    except KeyboardInterrupt:
+        typer.echo("Orchestra server stopped")
 
 
 @app.command()

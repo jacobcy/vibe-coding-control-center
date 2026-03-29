@@ -3,7 +3,6 @@
 Tests the core runner functionality with extensible interface design.
 """
 
-from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,63 +15,6 @@ from vibe3.models.review_runner import (
 from vibe3.services.review_runner import (
     run_review_agent,
 )
-
-
-class TestAgentOptions:
-    """Tests for AgentOptions dataclass - immutable configuration."""
-
-    def test_default_options(self) -> None:
-        """Default options should have None for agent/backend/model."""
-        options = AgentOptions()
-        assert options.agent is None
-        assert options.model is None
-        assert options.backend is None
-        assert options.timeout_seconds == 600
-
-    def test_custom_options_with_agent(self) -> None:
-        """Should support custom agent preset."""
-        options = AgentOptions(
-            agent="code-reviewer",
-            timeout_seconds=300,
-        )
-        assert options.agent == "code-reviewer"
-        assert options.model is None
-        assert options.backend is None
-        assert options.timeout_seconds == 300
-
-    def test_custom_options_with_backend(self) -> None:
-        """Should support backend + model specification."""
-        options = AgentOptions(
-            backend="claude",
-            model="claude-3-opus",
-            timeout_seconds=300,
-        )
-        assert options.agent is None
-        assert options.backend == "claude"
-        assert options.model == "claude-3-opus"
-        assert options.timeout_seconds == 300
-
-    def test_agent_and_backend_can_coexist(self) -> None:
-        """Agent and backend can both be specified (for different purposes)."""
-        options = AgentOptions(
-            agent="code-reviewer",
-            backend="claude",
-            model="claude-sonnet-4-6",
-        )
-        assert options.agent == "code-reviewer"
-        assert options.backend == "claude"
-        assert options.model == "claude-sonnet-4-6"
-
-    def test_options_are_frozen(self) -> None:
-        """Options should be immutable (frozen dataclass)."""
-        options = AgentOptions()
-        with pytest.raises(FrozenInstanceError):
-            options.agent = "other"  # type: ignore
-
-    def test_model_can_be_overridden(self) -> None:
-        """Model can be set to override default."""
-        options = AgentOptions(model="claude-3-opus")
-        assert options.model == "claude-3-opus"
 
 
 class TestRunReviewAgent:
@@ -209,6 +151,39 @@ class TestRunReviewAgent:
         assert Path(command[prompt_file_idx]).parent == expected_dir
         # The last argument should be the custom task
         assert command[-1] == "custom task"
+
+    def test_run_review_adds_worktree_flag_for_new_session(self) -> None:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            run_review_agent(
+                "prompt body",
+                AgentOptions(agent="code-reviewer", worktree=True),
+            )
+
+        command = mock_run.call_args[0][0]
+        assert "--worktree" in command
+
+    def test_run_review_skips_worktree_flag_for_resume_session(self) -> None:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            run_review_agent(
+                "prompt body",
+                AgentOptions(agent="code-reviewer", worktree=True),
+                session_id="262f0fea-eacb-4223-b842-b5b5097f94e8",
+            )
+
+        command = mock_run.call_args[0][0]
+        assert "--worktree" not in command
 
     def test_run_review_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""

@@ -10,6 +10,8 @@ dependencies = [
     "pyyaml>=6.0.3",
     "litellm>=1.0.0",
     "serena-agent @ git+https://github.com/oraios/serena@v0.1.4",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
 ]
 
 [project.scripts]
@@ -56,4 +58,6 @@ dev = [
     "pre-commit>=3.0.0",
     "types-pyyaml>=6.0.12.20250915",
     "hypothesis>=6.151.9",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
 ]
