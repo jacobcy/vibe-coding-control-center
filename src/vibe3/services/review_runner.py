@@ -132,6 +132,10 @@ def run_review_agent(
         # Add prompt file (always needed for correct AST context)
         command.extend(["--prompt-file", cast(str, prompt_file_path)])
 
+        # `--worktree` only applies to new session execution.
+        if options.worktree and not session_id:
+            command.append("--worktree")
+
         if session_id:
             # Resume mode with session_id
             command.append("resume")

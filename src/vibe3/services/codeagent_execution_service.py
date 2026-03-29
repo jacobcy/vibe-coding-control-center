@@ -2,49 +2,29 @@
 
 import os
 import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Callable, Literal, Sequence
+from typing import Literal, Sequence
 
 from loguru import logger
 from typer import echo
 
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
+from vibe3.services.codeagent_models import (
+    CodeagentCommand,
+    CodeagentResult,
+    ExecutionRole,
+    create_codeagent_command,
+)
 from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
 
-ExecutionRole = Literal["planner", "executor", "reviewer"]
-
-
-@dataclass
-class CodeagentCommand:
-    """Configuration for a codeagent command execution."""
-
-    role: ExecutionRole
-    context_builder: Callable[[], str]
-    task: str | None = None
-    dry_run: bool = False
-    handoff_kind: str = "run"
-    handoff_metadata: dict[str, Any] | None = None
-    agent: str | None = None
-    backend: str | None = None
-    model: str | None = None
-    config: VibeConfig | None = None
-    branch: str | None = None
-    cli_args: list[str] | None = None
-
-
-@dataclass
-class CodeagentResult:
-    """Result of codeagent execution."""
-
-    success: bool
-    exit_code: int = 0
-    stdout: str = ""
-    stderr: str = ""
-    handoff_file: Path | None = None
-    session_id: str | None = None
-    pid: int | None = None
+# Re-export models for backward compatibility with existing imports.
+__all__ = [
+    "ExecutionRole",
+    "CodeagentCommand",
+    "CodeagentResult",
+    "create_codeagent_command",
+    "CodeagentExecutionService",
+]
 
 
 class CodeagentExecutionService:
@@ -59,6 +39,7 @@ class CodeagentExecutionService:
         agent: str | None = None,
         backend: str | None = None,
         model: str | None = None,
+        worktree: bool = False,
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
@@ -76,18 +57,33 @@ class CodeagentExecutionService:
             config_model = getattr(ac, "model", None)
 
         if agent:
-            return AgentOptions(agent=agent, backend=None, model=None)
+            return AgentOptions(
+                agent=agent, backend=None, model=None, worktree=worktree
+            )
 
         if backend:
             return AgentOptions(
-                agent=None, backend=backend, model=model or config_model
+                agent=None,
+                backend=backend,
+                model=model or config_model,
+                worktree=worktree,
             )
 
         if config_agent:
-            return AgentOptions(agent=config_agent, backend=None, model=None)
+            return AgentOptions(
+                agent=config_agent,
+                backend=None,
+                model=None,
+                worktree=worktree,
+            )
 
         if config_backend:
-            return AgentOptions(agent=None, backend=config_backend, model=config_model)
+            return AgentOptions(
+                agent=None,
+                backend=config_backend,
+                model=config_model,
+                worktree=worktree,
+            )
 
         raise ValueError(
             f"No agent configuration found for '{section}' command. "
@@ -112,6 +108,7 @@ class CodeagentExecutionService:
             agent=command.agent,
             backend=command.backend,
             model=command.model,
+            worktree=command.worktree,
         )
 
         request = ExecutionRequest(
@@ -227,61 +224,8 @@ class CodeagentExecutionService:
             cmd.extend(["--backend", command.backend])
         if command.model:
             cmd.extend(["--model", command.model])
+        if command.worktree:
+            cmd.append("--worktree")
         if command.task:
             cmd.append(command.task)
         return cmd
-
-
-def create_codeagent_command(
-    role: ExecutionRole,
-    context_builder: Callable[[], str],
-    task: str | None = None,
-    dry_run: bool = False,
-    handoff_kind: str | None = None,
-    handoff_metadata: dict[str, Any] | None = None,
-    agent: str | None = None,
-    backend: str | None = None,
-    model: str | None = None,
-    config: VibeConfig | None = None,
-    branch: str | None = None,
-    cli_args: list[str] | None = None,
-) -> CodeagentCommand:
-    """Factory function to create CodeagentCommand.
-
-    Args:
-        role: Execution role (planner/executor/reviewer)
-        context_builder: Function that builds prompt context
-        task: Optional task message
-        dry_run: Dry run mode
-        handoff_kind: Kind for handoff recording
-        handoff_metadata: Additional metadata for handoff
-        agent: Agent preset override
-        backend: Backend override
-        model: Model override
-        config: VibeConfig instance
-        branch: Current branch (for async execution)
-        cli_args: Optional explicit CLI args used for async self-invocation
-
-    Returns:
-        CodeagentCommand instance
-    """
-    kind_map: dict[ExecutionRole, str] = {
-        "planner": "plan",
-        "executor": "run",
-        "reviewer": "review",
-    }
-
-    return CodeagentCommand(
-        role=role,
-        context_builder=context_builder,
-        task=task,
-        dry_run=dry_run,
-        handoff_kind=handoff_kind or kind_map.get(role, "run"),
-        handoff_metadata=handoff_metadata,
-        agent=agent,
-        backend=backend,
-        model=model,
-        config=config,
-        branch=branch,
-        cli_args=cli_args,
-    )

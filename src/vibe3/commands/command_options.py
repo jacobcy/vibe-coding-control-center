@@ -23,6 +23,13 @@ _BACKEND_OPT = Annotated[
     Optional[str], typer.Option("--backend", help="Override backend")
 ]
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
+_WORKTREE_OPT = Annotated[
+    bool,
+    typer.Option(
+        "--worktree",
+        help="Pass --worktree to codeagent-wrapper (new isolated worktree execution)",
+    ),
+]
 
 
 def ensure_flow_for_current_branch() -> tuple["FlowService", str]:

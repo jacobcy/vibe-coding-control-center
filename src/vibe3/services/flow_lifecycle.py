@@ -1,6 +1,5 @@
 """Flow lifecycle operations - close, block, abort."""
 
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -18,6 +17,10 @@ from vibe3.services.flow_label_sync import (
     sync_flow_done_task_labels,
 )
 from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
+from vibe3.services.flow_restore_branch import (
+    is_baseline_restore_branch,
+    resolve_baseline_branch_for_worktree_root,
+)
 from vibe3.services.signature_service import SignatureService
 
 
@@ -26,22 +29,6 @@ class FlowLifecycleMixin:
 
     store: Any
     git_client: Any
-
-    _BASELINE_WORKTREE_BRANCHES: dict[str, str] = {
-        "main": "main",
-        "develop": "develop",
-        "bugfix": "bugfix",
-    }
-
-    @classmethod
-    def _resolve_baseline_branch_for_worktree_root(
-        cls,
-        worktree_root: str | None,
-    ) -> str | None:
-        if not worktree_root:
-            return None
-        worktree_name = Path(worktree_root).name.lower()
-        return cls._BASELINE_WORKTREE_BRANCHES.get(worktree_name)
 
     def can_create_from_current_worktree(
         self: Any,
@@ -104,7 +91,7 @@ class FlowLifecycleMixin:
                 branch=branch,
             ).warning(f"Failed to resolve worktree root: {e}")
 
-        baseline_branch = self._resolve_baseline_branch_for_worktree_root(worktree_root)
+        baseline_branch = resolve_baseline_branch_for_worktree_root(worktree_root)
         if target_branch == "main":
             if baseline_branch:
                 target_branch = baseline_branch
@@ -127,10 +114,9 @@ class FlowLifecycleMixin:
                     worktree_root=worktree_root,
                 ).info("Non-baseline worktree; using safe restore branch")
 
-        if (
-            target_branch in self._BASELINE_WORKTREE_BRANCHES
-            and git.is_branch_occupied_by_worktree(target_branch)
-        ):
+        if is_baseline_restore_branch(
+            target_branch
+        ) and git.is_branch_occupied_by_worktree(target_branch):
             target_branch = git.get_safe_main_branch_name()
             should_pull = False
             logger.bind(

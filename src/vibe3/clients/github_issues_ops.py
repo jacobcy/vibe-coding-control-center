@@ -7,6 +7,8 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.github_issue_admin_ops import IssueAdminMixin
+
 # Patterns GitHub uses to auto-close issues via PR body
 _LINKED_ISSUE_RE = re.compile(
     r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*#(\d+)",
@@ -66,7 +68,7 @@ def parse_linked_issues(body: str) -> list[int]:
     return result
 
 
-class IssuesMixin:
+class IssuesMixin(IssueAdminMixin):
     """Mixin for issues-related operations."""
 
     def list_merged_prs(self: Any, limit: int = 100) -> list[dict[str, Any]]:
@@ -135,8 +137,16 @@ class IssuesMixin:
             return []
         return json.loads(result.stdout)  # type: ignore[no-any-return]
 
-    def view_issue(self: Any, issue_number: int) -> "dict[str, Any] | None | str":
+    def view_issue(
+        self: Any, issue_number: int, repo: str | None = None
+    ) -> "dict[str, Any] | None | str":
         """View a GitHub issue.
+
+        Args:
+            issue_number: GitHub issue number.
+            repo: Optional ``owner/repo`` string. When provided, passes
+                ``--repo`` to ``gh`` so the correct repository is queried
+                regardless of the current working directory.
 
         Returns:
             dict: issue data on success
@@ -156,6 +166,8 @@ class IssuesMixin:
             "--json",
             "number,title,body,state,updatedAt,labels,comments,milestone",
         ]
+        if repo:
+            cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             stderr = result.stderr or ""
