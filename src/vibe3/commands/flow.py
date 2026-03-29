@@ -12,6 +12,7 @@ from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
 from vibe3.commands.flow_status import show, status
 from vibe3.services.flow_service import FlowService
 from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
+from vibe3.services.handoff_service import HandoffService  # noqa: F401
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_flow_created, render_flows_table
