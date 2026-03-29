@@ -28,12 +28,15 @@ def _fetch_milestone_data(issue_number: int) -> "dict[str, object] | None":
     """Fetch milestone orchestration context for a task issue from GitHub."""
     from vibe3.clients.github_client import GitHubClient
 
-    gh = GitHubClient()
-    issue = gh.view_issue(issue_number)
-    if not isinstance(issue, dict) or not issue.get("milestone"):
+    try:
+        gh = GitHubClient()
+        issue = gh.view_issue(issue_number)
+        if not isinstance(issue, dict) or not issue.get("milestone"):
+            return None
+        ms = issue["milestone"]
+        ms_issues = gh.get_milestone_issues(ms["number"])
+    except (FileNotFoundError, RuntimeError):
         return None
-    ms = issue["milestone"]
-    ms_issues = gh.get_milestone_issues(ms["number"])
     open_count = sum(1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN")
     closed_count = sum(
         1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
