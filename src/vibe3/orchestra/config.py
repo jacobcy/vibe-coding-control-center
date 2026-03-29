@@ -39,6 +39,12 @@ STATE_TRIGGERS: list[StateTrigger] = [
 ]
 
 
+class CommentReplyConfig(BaseModel):
+    """Configuration for the comment reply service."""
+
+    enabled: bool = True
+
+
 class MasterAgentConfig(BaseModel):
     """Master agent configuration."""
 
@@ -61,16 +67,19 @@ class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
     enabled: bool = True
-    polling_interval: int = Field(default=60, ge=30)
+    polling_interval: int = Field(default=900, ge=60)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
     dry_run: bool = False
     pid_file: Path = Field(default=Path(".git/vibe/orchestra.pid"))
+    port: int = Field(default=8080, ge=1, le=65535)
+    webhook_secret: str | None = None
     manager_usernames: list[str] = Field(
         default_factory=lambda: ["vibe-manager"],
         description="GitHub usernames whose assignment signals manager dispatch",
     )
     master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
+    comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -94,13 +103,23 @@ class OrchestraConfig(BaseModel):
                 timeout_seconds=getattr(master_cfg, "timeout_seconds", 300),
             )
 
+        comment_reply_cfg = getattr(orchestra_config, "comment_reply", None)
+        comment_reply = CommentReplyConfig()
+        if comment_reply_cfg:
+            comment_reply = CommentReplyConfig(
+                enabled=getattr(comment_reply_cfg, "enabled", True),
+            )
+
         return cls(
             enabled=getattr(orchestra_config, "enabled", True),
-            polling_interval=getattr(orchestra_config, "polling_interval", 60),
+            polling_interval=getattr(orchestra_config, "polling_interval", 900),
             repo=getattr(orchestra_config, "repo", None),
             max_concurrent_flows=getattr(orchestra_config, "max_concurrent_flows", 3),
+            port=getattr(orchestra_config, "port", 8080),
+            webhook_secret=getattr(orchestra_config, "webhook_secret", None),
             manager_usernames=getattr(
                 orchestra_config, "manager_usernames", ["vibe-manager"]
             ),
             master_agent=master_agent,
+            comment_reply=comment_reply,
         )

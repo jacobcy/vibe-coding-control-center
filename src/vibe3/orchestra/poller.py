@@ -35,7 +35,19 @@ class Poller:
         self._cold_start: bool = True
 
     def start(self) -> None:
-        """Start the polling loop."""
+        """Start the polling loop.
+
+        .. deprecated::
+            Use HeartbeatServer from vibe3.orchestra.heartbeat instead.
+            This class is kept for backward compatibility only.
+        """
+        import warnings
+
+        warnings.warn(
+            "Poller is deprecated; use HeartbeatServer with AssigneeDispatchService.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._running = True
         self._write_pid()
 

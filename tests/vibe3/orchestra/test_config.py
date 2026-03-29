@@ -11,13 +11,13 @@ from vibe3.orchestra.config import STATE_TRIGGERS, MasterAgentConfig, OrchestraC
 
 def test_default_config():
     assert OrchestraConfig().enabled is True
-    assert OrchestraConfig().polling_interval == 60
+    assert OrchestraConfig().polling_interval == 900
     assert OrchestraConfig().dry_run is False
 
 
 def test_config_validation():
-    config = OrchestraConfig(polling_interval=30, max_concurrent_flows=5)
-    assert config.polling_interval == 30
+    config = OrchestraConfig(polling_interval=60, max_concurrent_flows=5)
+    assert config.polling_interval == 60
     assert config.max_concurrent_flows == 5
 
 
@@ -53,11 +53,11 @@ def test_master_agent_config():
 def test_orchestra_config_with_master_agent():
     master = MasterAgentConfig(enabled=False, agent="test-agent")
     config = OrchestraConfig(
-        polling_interval=45,
+        polling_interval=120,
         max_concurrent_flows=2,
         master_agent=master,
     )
-    assert config.polling_interval == 45
+    assert config.polling_interval == 120
     assert config.max_concurrent_flows == 2
     assert config.master_agent.enabled is False
     assert config.master_agent.agent == "test-agent"
