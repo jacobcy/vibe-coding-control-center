@@ -8,6 +8,7 @@ from loguru import logger
 
 from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
+from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import build_bind_task_hint
 from vibe3.ui.console import console
@@ -19,8 +20,7 @@ from vibe3.ui.flow_ui import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.clients.github_client import GitHubClient
-    from vibe3.models.flow import FlowStatusResponse
+    pass
 
 
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
@@ -29,68 +29,6 @@ AllOption = Annotated[
 ]
 JsonOption = Annotated[bool, typer.Option("--json")]
 TraceOption = Annotated[bool, typer.Option("--trace")]
-
-
-def _fetch_issue_titles(
-    gh: "GitHubClient", flow_status: "FlowStatusResponse"
-) -> "tuple[dict[int, str], dict[str, object] | None, bool, dict[str, object] | None]":
-    titles: dict[int, str] = {}
-    network_error = False
-    milestone_data: dict[str, object] | None = None
-    numbers: set[int] = set()
-    if flow_status.task_issue_number:
-        numbers.add(flow_status.task_issue_number)
-    for link in flow_status.issues:
-        numbers.add(link.issue_number)
-    for n in numbers:
-        try:
-            result = gh.view_issue(n)
-        except Exception as e:
-            logger.debug(f"Skipping flow: {e}")
-            continue
-        if result == "network_error":
-            network_error = True
-            break
-        if isinstance(result, dict):
-            titles[n] = result.get("title", "")
-            if n == flow_status.task_issue_number and result.get("milestone"):
-                ms = result["milestone"]
-                ms_issues = gh.get_milestone_issues(ms["number"])
-                open_count = sum(
-                    1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN"
-                )
-                closed_count = sum(
-                    1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
-                )
-                milestone_data = {
-                    "number": ms["number"],
-                    "title": ms["title"],
-                    "open": open_count,
-                    "closed": closed_count,
-                    "issues": ms_issues,
-                    "task_issue": n,
-                }
-    pr_data: dict[str, object] | None = None
-    if not network_error:
-        try:
-            pr = None
-            if flow_status.pr_number:
-                pr = gh.get_pr(flow_status.pr_number)
-            if not pr:
-                # Remote-first fallback: cached PR id may miss or drift.
-                pr = gh.get_pr(branch=flow_status.branch)
-            if pr:
-                pr_data = {
-                    "number": pr.number,
-                    "title": pr.title,
-                    "state": pr.state.value,
-                    "draft": pr.draft,
-                    "url": pr.url,
-                }
-        except Exception as e:
-            logger.debug(f"Skipping flow: {e}")
-            network_error = True
-    return titles, pr_data, network_error, milestone_data
 
 
 def show(
@@ -111,22 +49,91 @@ def show(
             service, target_branch = ensure_flow_for_current_branch()
 
         if snapshot:
-            flow_status = service.get_flow_status(target_branch)
-            if not flow_status:
-                logger.error(f"Flow not found: {target_branch}")
-                raise typer.Exit(1)
-            if json_output:
-                typer.echo(json.dumps(flow_status.model_dump(), indent=2, default=str))
-            else:
-                # TODO: move GitHubClient calls to a service method in a follow-up PR
-                from vibe3.clients.github_client import GitHubClient
+            projection_service = FlowProjectionService()
+            projection = projection_service.get_projection(target_branch)
 
-                gh = GitHubClient()
-                issue_titles, pr_data, net_err, milestone_data = _fetch_issue_titles(
-                    gh, flow_status
+            if json_output:
+                # Convert projection to dict for JSON output
+                output = {
+                    "branch": projection.branch,
+                    "flow_slug": projection.flow_slug,
+                    "flow_status": projection.flow_status,
+                    "task_issue_number": projection.task_issue_number,
+                    "pr_number": projection.pr_number,
+                    "pr_ready_for_review": projection.pr_ready_for_review,
+                    "spec_ref": projection.spec_ref,
+                    "plan_ref": projection.plan_ref,
+                    "report_ref": projection.report_ref,
+                    "audit_ref": projection.audit_ref,
+                    "planner_actor": projection.planner_actor,
+                    "planner_session_id": projection.planner_session_id,
+                    "executor_actor": projection.executor_actor,
+                    "executor_session_id": projection.executor_session_id,
+                    "reviewer_actor": projection.reviewer_actor,
+                    "reviewer_session_id": projection.reviewer_session_id,
+                    "latest_actor": projection.latest_actor,
+                    "blocked_by": projection.blocked_by,
+                    "next_step": projection.next_step,
+                    "planner_status": projection.planner_status,
+                    "executor_status": projection.executor_status,
+                    "reviewer_status": projection.reviewer_status,
+                    "execution_pid": projection.execution_pid,
+                    "execution_started_at": projection.execution_started_at,
+                    "execution_completed_at": projection.execution_completed_at,
+                    "project_item_id": projection.project_item_id,
+                    "title": projection.title,
+                    "body": projection.body,
+                    "status": projection.status,
+                    "priority": projection.priority,
+                    "assignees": projection.assignees,
+                    "offline_mode": projection.offline_mode,
+                    "identity_drift": projection.identity_drift,
+                    "pr_title": projection.pr_title,
+                    "pr_state": projection.pr_state,
+                    "pr_draft": projection.pr_draft,
+                    "pr_url": projection.pr_url,
+                }
+                typer.echo(json.dumps(output, indent=2, default=str))
+            else:
+                flow_status = service.get_flow_status(target_branch)
+                if not flow_status:
+                    logger.error(f"Flow not found: {target_branch}")
+                    raise typer.Exit(1)
+
+                # Fetch issue titles and milestone data using projection service
+                issue_numbers = set()
+                if flow_status.task_issue_number:
+                    issue_numbers.add(flow_status.task_issue_number)
+                for link in flow_status.issues:
+                    issue_numbers.add(link.issue_number)
+
+                issue_titles, network_error = projection_service.get_issue_titles(
+                    list(issue_numbers)
                 )
-                if net_err:
+                milestone_data = None
+                if flow_status.task_issue_number and not network_error:
+                    milestone_data = projection_service.get_milestone_data(
+                        flow_status.task_issue_number
+                    )
+
+                # Build PR data from projection
+                pr_data = None
+                if projection.pr_number and not projection.pr_fetch_error:
+                    pr_data = {
+                        "number": projection.pr_number,
+                        "title": projection.pr_title,
+                        "state": projection.pr_state,
+                        "draft": projection.pr_draft,
+                        "url": projection.pr_url,
+                    }
+
+                if (
+                    network_error
+                    or projection.hydrate_error
+                    or projection.pr_fetch_error
+                ):
                     render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
+
                 render_flow_status(flow_status, issue_titles, pr_data, milestone_data)
             return
 
@@ -145,31 +152,8 @@ def show(
             milestone_data = None
             task_issue = timeline["state"].task_issue_number
             if task_issue:
-                from vibe3.clients.github_client import GitHubClient
-
-                gh = GitHubClient()
-                issue = gh.view_issue(task_issue)
-                if isinstance(issue, dict) and issue.get("milestone"):
-                    ms = issue["milestone"]
-                    ms_issues = gh.get_milestone_issues(ms["number"])
-                    open_count = sum(
-                        1
-                        for i in ms_issues
-                        if str(i.get("state", "")).upper() == "OPEN"
-                    )
-                    closed_count = sum(
-                        1
-                        for i in ms_issues
-                        if str(i.get("state", "")).upper() == "CLOSED"
-                    )
-                    milestone_data = {
-                        "number": ms["number"],
-                        "title": ms["title"],
-                        "open": open_count,
-                        "closed": closed_count,
-                        "issues": ms_issues,
-                        "task_issue": task_issue,
-                    }
+                projection_service = FlowProjectionService()
+                milestone_data = projection_service.get_milestone_data(task_issue)
             render_flow_timeline(timeline["state"], timeline["events"], milestone_data)
             if timeline["state"].task_issue_number is None:
                 console.print(
@@ -198,19 +182,23 @@ def status(
         if not flows:
             typer.echo("No active flows")
             raise typer.Exit(0)
-        # TODO: move GitHubClient calls to a service method in a follow-up PR
-        from vibe3.clients.git_client import GitClient
-        from vibe3.clients.github_client import GitHubClient
 
-        gh = GitHubClient()
-        git = GitClient()
-        titles: dict[int, str] = {}
+        # Use projection service to fetch issue titles
+        projection_service = FlowProjectionService()
+        issue_numbers = set()
+        for flow in flows:
+            if flow.task_issue_number:
+                issue_numbers.add(flow.task_issue_number)
+
+        titles, net_err = projection_service.get_issue_titles(list(issue_numbers))
+
+        # Build PR and worktree maps via projection service
         pr_map: dict[str, dict[str, object]] = {}
         worktree_map: dict[str, str] = {}
-        net_err = False
-
-        # Get worktree to branch mapping
         try:
+            from vibe3.clients.git_client import GitClient
+
+            git = GitClient()
             worktree_output = git._run(["worktree", "list", "--porcelain"])
             current_worktree = ""
             for line in worktree_output.splitlines():
@@ -219,29 +207,15 @@ def status(
                     current_worktree = line.split(" ", 1)[1]
                 elif line.startswith("branch ") and current_worktree:
                     branch_ref = line.split(" ", 1)[1]
-                    branch = branch_ref.removeprefix(
-                        "refs/heads/"
-                    )  # Get full branch name
-                    # Store only worktree basename for concise display
+                    branch = branch_ref.removeprefix("refs/heads/")
                     worktree_name = current_worktree.split("/")[-1]
                     worktree_map[branch] = worktree_name
         except Exception:
             pass
+
         for flow in flows:
-            if flow.task_issue_number and flow.task_issue_number not in titles:
-                r = gh.view_issue(flow.task_issue_number)
-                if r == "network_error":
-                    net_err = True
-                    break
-                if isinstance(r, dict):
-                    titles[flow.task_issue_number] = r.get("title", "")
-            # Fetch PR data for each flow (remote-first fallback)
             try:
-                pr = None
-                if flow.pr_number:
-                    pr = gh.get_pr(flow.pr_number)
-                if not pr:
-                    pr = gh.get_pr(branch=flow.branch)
+                pr = projection_service.pr_service.get_pr(branch=flow.branch)
                 if pr:
                     pr_map[flow.branch] = {
                         "number": pr.number,
@@ -253,6 +227,7 @@ def status(
                     }
             except Exception:
                 pass
+
         if net_err:
             render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")
         render_flows_status_dashboard(flows, titles, pr_map, worktree_map)
