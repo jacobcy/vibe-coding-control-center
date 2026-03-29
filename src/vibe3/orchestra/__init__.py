@@ -2,7 +2,7 @@
 
 Primary entry point: HeartbeatServer (vibe3 serve start)
   - AssigneeDispatchService: dispatches manager on issues/assigned webhook
-  - CommentReplyService: acknowledges @vibe-manager mentions
+  - CommentReplyService: acknowledges @vibe-manager-agent (or configured) mentions
   - Polling fallback every 15 min via on_tick()
 """
 

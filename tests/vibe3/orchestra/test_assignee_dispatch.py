@@ -20,7 +20,7 @@ def _svc() -> AssigneeDispatchService:
 
 def _assigned_event(
     issue_number: int = 42,
-    assignee: str = "vibe-manager",
+    assignee: str = "vibe-manager-agent",
 ) -> GitHubEvent:
     return GitHubEvent(
         event_type="issues",
@@ -65,7 +65,7 @@ async def test_on_tick_cold_start_dispatches_assigned_issue_without_flow() -> No
             "number": 42,
             "title": "test issue",
             "labels": [{"name": "priority/high"}],
-            "assignees": [{"login": "vibe-manager"}],
+            "assignees": [{"login": "vibe-manager-agent"}],
             "url": "https://example.com/issues/42",
         }
     ]
@@ -94,7 +94,7 @@ async def test_on_tick_prunes_assignee_cache() -> None:
             "number": 42,
             "title": "issue 42",
             "labels": [],
-            "assignees": [{"login": "vibe-manager"}],
+            "assignees": [{"login": "vibe-manager-agent"}],
             "url": "https://example.com/issues/42",
         },
         {
@@ -113,7 +113,7 @@ async def test_on_tick_prunes_assignee_cache() -> None:
 
     # Prepopulate cache with extra issue
     svc._assignee_cache = {
-        42: frozenset(["vibe-manager"]),
+        42: frozenset(["vibe-manager-agent"]),
         43: frozenset(["alice"]),
         999: frozenset(["bob"]),  # Issue not in current scan
     }

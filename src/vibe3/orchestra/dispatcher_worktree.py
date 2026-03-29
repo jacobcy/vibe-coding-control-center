@@ -96,12 +96,24 @@ class WorktreeResolverMixin:
         target = self.repo_path / ".worktrees" / f"issue-{issue_number}"
 
         if target.exists():
+            # Valid worktree: .git file present means git tracks it
+            if (target / ".git").exists():
+                logger.bind(
+                    domain="orchestra",
+                    issue=issue_number,
+                    branch=branch,
+                    worktree=str(target),
+                ).info("Reusing existing manager worktree")
+                return target
             logger.bind(
                 domain="orchestra",
                 issue=issue_number,
                 branch=branch,
                 worktree=str(target),
-            ).warning("Manager worktree path already exists; cannot auto-create")
+            ).warning(
+                "Manager worktree path exists but has no .git file; "
+                "remove it manually to allow auto-creation"
+            )
             return None
 
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -145,11 +157,18 @@ class WorktreeResolverMixin:
         Priority:
         1. Worktree that currently has PR head branch checked out
         2. Dispatcher default repo_path
+
+        Uses the shared GitHubClient from the orchestrator when available,
+        falling back to a new instance otherwise.
         """
         try:
-            from vibe3.clients.github_client import GitHubClient
+            github = getattr(getattr(self, "orchestrator", None), "github", None)
+            if github is None:
+                from vibe3.clients.github_client import GitHubClient
 
-            pr = GitHubClient().get_pr(pr_number)
+                github = GitHubClient()
+
+            pr = github.get_pr(pr_number)
             if not pr or not pr.head_branch:
                 return self.repo_path
 

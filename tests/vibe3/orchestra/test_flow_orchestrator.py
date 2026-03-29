@@ -2,7 +2,6 @@
 
 from unittest.mock import patch
 
-from tests.vibe3.orchestra.conftest import CompletedProcess
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import FlowOrchestrator
@@ -66,7 +65,7 @@ class TestFlowOrchestrator:
 
         assert pr_number is None
 
-    def test_create_flow_for_issue_creates_branch_ref_without_checkout(self):
+    def test_create_flow_for_issue_delegates_to_git_client_create_branch_ref(self):
         config = OrchestraConfig()
         orchestrator = FlowOrchestrator(config)
         issue = make_issue(number=222, title="orchestra branch create")
@@ -77,7 +76,7 @@ class TestFlowOrchestrator:
 
         with patch.object(orchestrator.git, "branch_exists", return_value=False):
             with patch.object(
-                orchestrator, "_create_branch_ref", return_value=None
+                orchestrator.git, "create_branch_ref", return_value=None
             ) as mock_create_ref:
                 with patch.object(
                     orchestrator.flow_service,
@@ -94,16 +93,3 @@ class TestFlowOrchestrator:
             "task/issue-222",
             start_ref="origin/main",
         )
-
-    def test_create_branch_ref_uses_git_branch_not_checkout(self):
-        config = OrchestraConfig()
-        orchestrator = FlowOrchestrator(config)
-
-        with patch(
-            "subprocess.run",
-            return_value=CompletedProcess(returncode=0),
-        ) as mock_run:
-            orchestrator._create_branch_ref("task/issue-223", "origin/main")
-
-        assert mock_run.call_args.args[0][:2] == ["git", "branch"]
-        assert "checkout" not in mock_run.call_args.args[0]

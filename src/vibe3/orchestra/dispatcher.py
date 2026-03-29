@@ -99,8 +99,7 @@ class Dispatcher(WorktreeResolverMixin):
         log.info(f"Manager dispatch using branch: {flow_branch} (cwd={manager_cwd})")
 
         # Step 2: update display label
-        if not self.dry_run:
-            self._update_state_label(issue.number, IssueState.IN_PROGRESS)
+        self._update_state_label(issue.number, IssueState.IN_PROGRESS)
 
         # Step 3: run manager execution
         cmd = self._normalize_manager_command(cmd, manager_cwd)

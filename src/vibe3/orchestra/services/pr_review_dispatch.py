@@ -47,12 +47,8 @@ class PRReviewDispatchService(ServiceBase):
             )
             return
 
-        cmd, review_cwd = self._dispatcher.prepare_pr_review_dispatch(pr_number)
         logger.bind(domain="orchestra", pr=pr_number).info(
             f"PR review dispatch triggered ({reason})"
-        )
-        logger.bind(domain="orchestra", pr=pr_number).info(
-            f"Parsed webhook to command: {' '.join(cmd)} (cwd={review_cwd})"
         )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

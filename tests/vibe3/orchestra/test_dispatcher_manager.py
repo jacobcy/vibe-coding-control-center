@@ -162,16 +162,11 @@ class TestManagerDispatchIntegration:
                 with patch.object(
                     dispatcher, "_normalize_manager_command", return_value=["uv"]
                 ):
-                    with patch.object(
-                        dispatcher.orchestrator,
-                        "switch_to_flow_branch",
-                    ) as mock_switch:
-                        with patch(
-                            "subprocess.run",
-                            return_value=CompletedProcess(returncode=0),
-                        ) as mock_run:
-                            result = dispatcher.dispatch_manager(issue)
+                    with patch(
+                        "subprocess.run",
+                        return_value=CompletedProcess(returncode=0),
+                    ) as mock_run:
+                        result = dispatcher.dispatch_manager(issue)
 
         assert result is True
-        mock_switch.assert_not_called()
         assert mock_run.call_args.kwargs["cwd"] == Path("/tmp/wt-issue-102")

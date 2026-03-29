@@ -97,7 +97,7 @@ async def _run(config: OrchestraConfig, port: int) -> None:
 @app.command()
 def start(
     interval: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--interval",
             "-i",
@@ -106,9 +106,9 @@ def start(
                 "Default uses orchestra.polling_interval from config/settings.yaml"
             ),
         ),
-    ] = 900,
+    ] = None,
     port: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--port",
             "-p",
@@ -117,7 +117,7 @@ def start(
                 "Default uses orchestra.port from config/settings.yaml"
             ),
         ),
-    ] = 8080,
+    ] = None,
     repo: Annotated[
         str | None,
         typer.Option(
@@ -180,14 +180,17 @@ def start(
         typer.echo("Orchestra is disabled in config (orchestra.enabled=false)")
         raise typer.Exit(1)
 
-    if interval != 900:
-        config = config.model_copy(update={"polling_interval": interval})
-    if port != 8080:
-        config = config.model_copy(update={"port": port})
+    overrides: dict[str, object] = {}
+    if interval is not None:
+        overrides["polling_interval"] = interval
+    if port is not None:
+        overrides["port"] = port
     if repo is not None:
-        config = config.model_copy(update={"repo": repo})
+        overrides["repo"] = repo
     if dry_run:
-        config = config.model_copy(update={"dry_run": dry_run})
+        overrides["dry_run"] = dry_run
+    if overrides:
+        config = config.model_copy(update=overrides)
 
     # Check for existing process
     pid, is_valid = _validate_pid_file(config.pid_file)

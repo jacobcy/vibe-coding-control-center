@@ -23,6 +23,7 @@ class HeartbeatServer:
         self._event_queue: asyncio.Queue[GitHubEvent] = asyncio.Queue()
         self._semaphore = asyncio.Semaphore(config.max_concurrent_flows)
         self._running = False
+        self._pending_tasks: set[asyncio.Task[None]] = set()
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
@@ -103,7 +104,9 @@ class HeartbeatServer:
                 event = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
-            asyncio.create_task(self._dispatch_event(event))
+            task = asyncio.create_task(self._dispatch_event(event))
+            self._pending_tasks.add(task)
+            task.add_done_callback(self._pending_tasks.discard)
 
     async def _dispatch_event(self, event: GitHubEvent) -> None:
         matching = [

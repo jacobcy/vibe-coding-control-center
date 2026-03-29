@@ -121,10 +121,13 @@ class AssigneeDispatchService(ServiceBase):
         for issue in self._sort_by_priority(ready):
             await self._dispatch_if_ready(issue, source="tick")
 
-        # Prune cache to only keep issues seen in current scan
+        # Prune caches to only keep issues seen in current scan
         seen_numbers = {item["number"] for item in raw}
         self._assignee_cache = {
             k: v for k, v in self._assignee_cache.items() if k in seen_numbers
+        }
+        self._dispatched_issues = {
+            n for n in self._dispatched_issues if n in seen_numbers
         }
 
         self._cold_start = False

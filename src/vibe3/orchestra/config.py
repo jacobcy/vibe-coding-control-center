@@ -90,7 +90,7 @@ class OrchestraConfig(BaseModel):
     port: int = Field(default=8080, ge=1, le=65535)
     webhook_secret: str | None = None
     manager_usernames: list[str] = Field(
-        default_factory=lambda: ["vibe-manager"],
+        default_factory=lambda: ["vibe-manager-agent"],
         description="GitHub usernames whose assignment signals manager dispatch",
     )
     master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
