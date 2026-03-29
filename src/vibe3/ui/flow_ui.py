@@ -25,7 +25,12 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
     console.print(f"{pad}[dim]{key}:[/] {value}")
 
 
-def _render_flow_row(flow: FlowState, title: str | None = None) -> None:
+def _render_flow_row(
+    flow: FlowState,
+    title: str | None = None,
+    pr_data: dict[str, object] | None = None,
+    worktree: str | None = None,
+) -> None:
     status_text = _status_text(flow.flow_status).plain
     console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", flow.flow_slug, 1)
@@ -33,6 +38,20 @@ def _render_flow_row(flow: FlowState, title: str | None = None) -> None:
     _kv("task_issue", task_str, 1)
     if title is not None:
         _kv("title", title, 1)
+    if worktree:
+        _kv("worktree", worktree, 1)
+    if pr_data:
+        draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
+        state = str(pr_data.get("state", "")).lower()
+        title = str(pr_data.get("title", ""))
+        title_suffix = f"  {title}" if title else ""
+        console.print(
+            f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
+            f"  [dim]{state}[/]{title_suffix}"
+        )
+        # Remove redundant worktree display since it's already shown above
+    elif flow.pr_number:
+        _kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
     console.print()
 
 
@@ -118,6 +137,9 @@ def render_flow_status(
             f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
             f"  [dim]{state}[/]  {pr_data.get('title', '')}"
         )
+        worktree = pr_data.get("worktree")
+        if worktree:
+            _kv("worktree", worktree, 2)
         _kv("url", pr_data.get("url", ""), 2)
     elif status.pr_number:
         _kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
@@ -176,13 +198,21 @@ def render_flows_table(flows: list[FlowState]) -> None:
 
 
 def render_flows_status_dashboard(
-    flows: list[FlowState], titles: dict[int, str]
+    flows: list[FlowState],
+    titles: dict[int, str],
+    pr_map: dict[str, dict[str, object]] | None = None,
+    worktree_map: dict[str, str] | None = None,
 ) -> None:
-    """flow status dashboard — YAML style with remote title."""
+    """flow status dashboard — YAML style with remote title and PR status."""
+    pr_map = pr_map or {}
+    worktree_map = worktree_map or {}
     for flow in flows:
         task_num = flow.task_issue_number
         title = titles.get(task_num, "—") if task_num else "—"
-        _render_flow_row(flow, title)
+        worktree = worktree_map.get(flow.branch)
+        _render_flow_row(
+            flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
+        )
 
 
 def render_error(message: str) -> None:
