@@ -84,8 +84,9 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
                             "message": "",
                         }
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Skipping item: {e}")
+                continue
         elif in_updates and updates and line.strip():
             if updates[-1]["message"]:
                 updates[-1]["message"] += "\n" + line

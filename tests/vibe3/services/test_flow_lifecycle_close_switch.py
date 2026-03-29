@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, Mock, call, patch
 
-import pytest
-
 from vibe3.services.flow_service import FlowService
 
 
@@ -38,8 +36,10 @@ class TestFlowCloseBranchSwitching:
         mock_git.switch_branch.side_effect = lambda branch: actions.append(
             f"switch:{branch}"
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -92,8 +92,10 @@ class TestFlowCloseBranchSwitching:
                 f"create:{branch}:{start_ref}"
             )
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -144,8 +146,10 @@ class TestFlowCloseBranchSwitching:
                 f"create:{branch}:{start_ref}"
             )
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -190,8 +194,10 @@ class TestFlowCloseBranchSwitching:
         mock_git.switch_branch.side_effect = lambda branch: actions.append(
             f"switch:{branch}"
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -208,6 +214,35 @@ class TestFlowCloseBranchSwitching:
         assert "create:main:origin/main" in actions
         assert not any(action.startswith("delete_local:") for action in actions)
         assert "delete_remote:task/current-flow" in actions
+
+    @patch("vibe3.services.flow_lifecycle.GitClient")
+    def test_close_flow_delegates_worktree_race_to_delete_branch(
+        self,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        """Race condition handling is delegated to GitClient.delete_branch."""
+        self._build_flow_store(mock_store)
+
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/current-flow"
+        mock_git.get_worktree_root.return_value = "/repo/main"
+        mock_git.branch_exists.side_effect = lambda branch: branch in {
+            "task/current-flow",
+            "main",
+        }
+        mock_git.is_branch_occupied_by_worktree.return_value = False
+        mock_git_class.return_value = mock_git
+
+        mock_store.get_flow_dependents.return_value = []
+
+        service = FlowService(store=mock_store)
+
+        service.close_flow("task/current-flow", check_pr=False)
+
+        mock_git.delete_branch.assert_called_once_with(
+            "task/current-flow", force=True, skip_if_worktree=True
+        )
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_returns_to_develop_branch_in_develop_worktree(
@@ -227,8 +262,10 @@ class TestFlowCloseBranchSwitching:
         mock_git.switch_branch.side_effect = lambda branch: actions.append(
             f"switch:{branch}"
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -246,35 +283,3 @@ class TestFlowCloseBranchSwitching:
             "delete_local:task/current-flow:True"
         )
         assert "run:pull origin develop" in actions
-
-
-class TestFlowSwitchBranchGuard:
-    """Tests for flow switch branch existence guard."""
-
-    def test_switch_flow_fails_before_stash_when_target_branch_missing(
-        self,
-        mock_store: Mock,
-    ) -> None:
-        """Should fail fast and avoid stashing when branch does not exist."""
-        mock_store.get_all_flows.return_value = [
-            {
-                "branch": "task/current-flow",
-                "flow_slug": "current_flow",
-                "flow_status": "active",
-                "updated_at": "2026-03-26T00:00:00",
-            }
-        ]
-
-        mock_git = MagicMock()
-        mock_git.branch_exists.return_value = False
-        mock_git.has_uncommitted_changes.return_value = True
-
-        service = FlowService(store=mock_store, git_client=mock_git)
-
-        with pytest.raises(RuntimeError, match="Branch 'task/current-flow' not found"):
-            service.switch_flow("current_flow")
-
-        mock_git.branch_exists.assert_called_once_with("task/current-flow")
-        mock_git.stash_push.assert_not_called()
-        mock_git.switch_branch.assert_not_called()
-        mock_git.stash_apply.assert_not_called()

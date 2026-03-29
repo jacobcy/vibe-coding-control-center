@@ -171,7 +171,7 @@ class FlowLifecycleMixin:
                 "Skipping local branch deletion."
             )
         elif git.branch_exists(branch):
-            git.delete_branch(branch, force=True)
+            git.delete_branch(branch, force=True, skip_if_worktree=True)
 
         try:
             git.delete_remote_branch(branch)

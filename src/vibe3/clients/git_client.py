@@ -3,6 +3,8 @@
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
+from loguru import logger
+
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
 )
@@ -174,9 +176,14 @@ class GitClient:
         """Switch to existing branch."""
         _switch_branch(branch_name)
 
-    def delete_branch(self, branch_name: str, force: bool = False) -> None:
+    def delete_branch(
+        self,
+        branch_name: str,
+        force: bool = False,
+        skip_if_worktree: bool = False,
+    ) -> None:
         """Delete local branch."""
-        _delete_branch(branch_name, force=force)
+        _delete_branch(branch_name, force=force, skip_if_worktree=skip_if_worktree)
 
     def delete_remote_branch(self, branch_name: str) -> None:
         """Delete remote branch."""
@@ -243,13 +250,13 @@ class GitClient:
             # so abort may fail and should be ignored.
             try:
                 self._run(["merge", "--abort"])
-            except GitError:
-                pass
+            except GitError as e:
+                logger.debug(f"Merge abort failed, ignoring: {e}")
             return False
         except GitError:
             # Conflict or error -- best-effort abort and report conflict.
             try:
                 self._run(["merge", "--abort"])
-            except GitError:
-                pass
+            except GitError as e:
+                logger.debug(f"Merge abort failed, ignoring: {e}")
             return True

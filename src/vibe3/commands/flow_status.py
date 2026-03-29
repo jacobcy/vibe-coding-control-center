@@ -43,7 +43,11 @@ def _fetch_issue_titles(
     for link in flow_status.issues:
         numbers.add(link.issue_number)
     for n in numbers:
-        result = gh.view_issue(n)
+        try:
+            result = gh.view_issue(n)
+        except Exception as e:
+            logger.debug(f"Skipping flow: {e}")
+            continue
         if result == "network_error":
             network_error = True
             break
@@ -83,7 +87,8 @@ def _fetch_issue_titles(
                     "draft": pr.draft,
                     "url": pr.url,
                 }
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Skipping flow: {e}")
             network_error = True
     return titles, pr_data, network_error, milestone_data
 

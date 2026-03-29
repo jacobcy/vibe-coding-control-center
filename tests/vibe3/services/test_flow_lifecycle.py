@@ -42,8 +42,10 @@ class TestFlowLifecycle:
         mock_git.switch_branch.side_effect = lambda branch: actions.append(
             f"switch:{branch}"
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -111,8 +113,10 @@ class TestFlowLifecycle:
         mock_git.switch_branch.side_effect = lambda branch: actions.append(
             f"switch:{branch}"
         )
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
@@ -208,8 +212,10 @@ class TestFlowLifecycle:
         mock_git.get_worktree_root.return_value = "/repo/wt-codex"
         mock_git.branch_exists.return_value = True
         mock_git.is_branch_occupied_by_worktree.return_value = False
-        mock_git.delete_branch.side_effect = lambda branch, force=False: actions.append(
-            f"delete_local:{branch}:{force}"
+        mock_git.delete_branch.side_effect = (
+            lambda branch, force=False, skip_if_worktree=False: actions.append(
+                f"delete_local:{branch}:{force}"
+            )
         )
         mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
             f"delete_remote:{branch}"
