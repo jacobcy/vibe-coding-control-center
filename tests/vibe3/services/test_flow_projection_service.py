@@ -102,6 +102,46 @@ def test_flow_projection_with_remote_data():
     assert projection.pr_url == "https://github.com/test/repo/pull/456"
 
 
+def test_flow_projection_with_draft_pr_state():
+    """Draft PR state should be preserved in projection."""
+    mock_flow_service = MagicMock()
+    mock_flow_status = FlowStatusResponse(
+        branch="task/test-branch",
+        flow_slug="test-branch",
+        flow_status="active",
+    )
+    mock_flow_service.get_flow_status.return_value = mock_flow_status
+
+    mock_task_service = MagicMock()
+
+    mock_pr = PRResponse(
+        number=457,
+        title="Draft PR",
+        state=PRState.DRAFT,
+        draft=True,
+        url="https://github.com/test/repo/pull/457",
+        head_branch="task/test-branch",
+        base_branch="main",
+        body="PR body",
+        created_at="2024-01-01T00:00:00Z",
+        updated_at="2024-01-01T00:00:00Z",
+    )
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_pr.return_value = mock_pr
+
+    service = FlowProjectionService(
+        flow_service=mock_flow_service,
+        task_service=mock_task_service,
+        pr_service=mock_pr_service,
+    )
+
+    projection = service.get_projection("task/test-branch")
+
+    assert projection.pr_state == "DRAFT"
+    assert projection.pr_draft is True
+    assert projection.pr_ready_for_review is False
+
+
 def test_flow_projection_offline_mode():
     """Test projection when remote fetch fails."""
     mock_flow_service = MagicMock()

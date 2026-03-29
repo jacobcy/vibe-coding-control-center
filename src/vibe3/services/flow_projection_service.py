@@ -1,7 +1,7 @@
 """Flow projection service - unified local + remote data reading layer."""
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.task_bridge import HydrateError
@@ -52,7 +52,7 @@ class FlowProjection:
     # Remote PR facts (from GitHub API)
     pr_number: int | None = None
     pr_title: str | None = None
-    pr_state: Literal["open", "closed", "merged"] | None = None
+    pr_state: str | None = None
     pr_draft: bool | None = None
     pr_url: str | None = None
     pr_ready_for_review: bool | None = None
@@ -150,7 +150,7 @@ class FlowProjectionService:
             if pr:
                 projection.pr_number = pr.number
                 projection.pr_title = pr.title
-                projection.pr_state = pr.state.value  # type: ignore[assignment]
+                projection.pr_state = pr.state.value
                 projection.pr_draft = pr.draft
                 projection.pr_url = pr.url
                 projection.pr_ready_for_review = not pr.draft
