@@ -5,8 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.commands.flow_status import _fetch_issue_titles
-from vibe3.models.flow import FlowState, FlowStatusResponse
+from vibe3.models.flow import FlowState
 from vibe3.models.pr import PRResponse, PRState
 
 runner = CliRunner()
@@ -25,42 +24,58 @@ def _mock_pr(number: int = 123, branch: str = "task/demo") -> PRResponse:
     )
 
 
-def test_fetch_issue_titles_resolves_pr_by_branch_when_local_cache_missing() -> None:
-    gh = MagicMock()
-    gh.get_pr.return_value = _mock_pr()
-    flow_status = FlowStatusResponse(
+def test_projection_pr_resolves_by_branch() -> None:
+    """PR data is fetched by branch via projection service, not cached pr_number."""
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_pr.return_value = _mock_pr()
+    mock_flow_service = MagicMock()
+
+    from vibe3.models.flow import FlowStatusResponse
+
+    mock_flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
         pr_number=None,
     )
 
-    _titles, pr_data, network_error, _milestone = _fetch_issue_titles(gh, flow_status)
+    from vibe3.services.flow_projection_service import FlowProjectionService
 
-    assert network_error is False
-    assert pr_data is not None
-    assert pr_data["number"] == 123
-    gh.get_pr.assert_called_once_with(branch="task/demo")
+    svc = FlowProjectionService(
+        flow_service=mock_flow_service, pr_service=mock_pr_service
+    )
+    projection = svc.get_projection("task/demo")
+
+    assert projection.pr_number == 123
+    assert projection.pr_title == "Demo PR"
+    mock_pr_service.get_pr.assert_called_once_with(branch="task/demo")
 
 
-def test_fetch_issue_titles_falls_back_to_branch_when_cached_pr_not_found() -> None:
-    gh = MagicMock()
-    gh.get_pr.side_effect = [None, _mock_pr(number=456)]
-    flow_status = FlowStatusResponse(
+def test_projection_pr_branch_fallback_when_cached_misses() -> None:
+    """When PR is not found by cached number, projection falls back to branch."""
+    mock_pr_service = MagicMock()
+    mock_pr_service.get_pr.return_value = _mock_pr(number=456)
+    mock_flow_service = MagicMock()
+
+    from vibe3.models.flow import FlowStatusResponse
+
+    mock_flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
         pr_number=999,
     )
 
-    _titles, pr_data, network_error, _milestone = _fetch_issue_titles(gh, flow_status)
+    from vibe3.services.flow_projection_service import FlowProjectionService
 
-    assert network_error is False
-    assert pr_data is not None
-    assert pr_data["number"] == 456
-    assert gh.get_pr.call_count == 2
-    assert gh.get_pr.call_args_list[0].args == (999,)
-    assert gh.get_pr.call_args_list[1].kwargs == {"branch": "task/demo"}
+    svc = FlowProjectionService(
+        flow_service=mock_flow_service, pr_service=mock_pr_service
+    )
+    projection = svc.get_projection("task/demo")
+
+    # PR fetched by branch, not by cached pr_number
+    assert projection.pr_number == 456
+    mock_pr_service.get_pr.assert_called_once_with(branch="task/demo")
 
 
 def _make_flow_state(
