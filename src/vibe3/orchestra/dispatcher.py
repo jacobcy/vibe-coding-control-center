@@ -22,11 +22,12 @@ class Dispatcher(WorktreeResolverMixin):
         config: OrchestraConfig,
         dry_run: bool = False,
         repo_path: Path | None = None,
+        orchestrator: FlowOrchestrator | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
-        self.orchestrator = FlowOrchestrator(config)
+        self.orchestrator = orchestrator or FlowOrchestrator(config)
 
     @staticmethod
     def _run_command(cmd: list[str], cwd: Path, label: str) -> bool:

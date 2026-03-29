@@ -3,14 +3,18 @@
 import asyncio
 import os
 import signal
+from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated
 
 import typer
 import uvicorn
 from fastapi import FastAPI
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.dispatcher import Dispatcher
+from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.serve_utils import (
     _setup_tailscale_webhook,
@@ -32,12 +36,40 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
     heartbeat = HeartbeatServer(config)
 
+    # Shared resources (reduces duplication)
+    shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
+    shared_github = GitHubClient()
+    shared_orchestrator = FlowOrchestrator(config)
+    shared_dispatcher = Dispatcher(
+        config,
+        dry_run=config.dry_run,
+        orchestrator=shared_orchestrator,
+    )
+
     if config.assignee_dispatch.enabled:
-        heartbeat.register(AssigneeDispatchService(config))
+        heartbeat.register(
+            AssigneeDispatchService(
+                config,
+                dispatcher=shared_dispatcher,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
     if config.comment_reply.enabled:
-        heartbeat.register(CommentReplyService(config))
+        heartbeat.register(
+            CommentReplyService(
+                config,
+                github=shared_github,
+            )
+        )
     if config.pr_review_dispatch.enabled:
-        heartbeat.register(PRReviewDispatchService(config))
+        heartbeat.register(
+            PRReviewDispatchService(
+                config,
+                dispatcher=shared_dispatcher,
+                executor=shared_executor,
+            )
+        )
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

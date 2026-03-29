@@ -17,10 +17,17 @@ class PRReviewDispatchService(ServiceBase):
 
     event_types = ["pull_request"]
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        dispatcher: Dispatcher | None = None,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> None:
         self.config = config
-        self._executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-        self._dispatcher = Dispatcher(config, dry_run=config.dry_run)
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=config.max_concurrent_flows,
+        )
+        self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
 
     async def handle_event(self, event: GitHubEvent) -> None:
         action = event.action

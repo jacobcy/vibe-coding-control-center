@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from vibe3.models.orchestration import IssueState
-
-_log = logging.getLogger(__name__)
 
 
 class IssueInfo(BaseModel):
@@ -17,7 +15,7 @@ class IssueInfo(BaseModel):
 
     number: int
     title: str
-    state: IssueState | None
+    state: IssueState | None = None
     labels: list[str] = Field(default_factory=list)
     assignees: list[str] = Field(default_factory=list)  # GitHub login names
     url: str | None = None
@@ -40,14 +38,25 @@ class IssueInfo(BaseModel):
         Returns None if the payload cannot be parsed.
         """
         try:
+            labels = [lb["name"] for lb in payload.get("labels", [])]
+
+            state = None
+            for lb in labels:
+                parsed = IssueState.from_label(lb)
+                if parsed is not None:
+                    state = parsed
+                    break
+
             return cls(
                 number=int(payload["number"]),
                 title=str(payload.get("title", "")),
-                state=None,
-                labels=[lb["name"] for lb in payload.get("labels", [])],
+                state=state,
+                labels=labels,
                 assignees=[a["login"] for a in payload.get("assignees", [])],
                 url=payload.get("html_url") or payload.get("url"),
             )
         except (KeyError, ValueError) as exc:
-            _log.warning("Cannot parse issue payload: %s", exc)
+            logger.bind(domain="orchestra").warning(
+                f"Cannot parse issue payload: {exc}"
+            )
             return None

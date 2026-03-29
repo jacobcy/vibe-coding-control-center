@@ -23,9 +23,13 @@ class CommentReplyService(ServiceBase):
 
     event_types = ["issue_comment"]
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        github: GitHubClient | None = None,
+    ) -> None:
         self.config = config
-        self._github = GitHubClient()
+        self._github = github or GitHubClient()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         if event.action not in ("created", "edited"):

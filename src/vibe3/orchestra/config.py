@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from vibe3.services.review_runner import AgentOptions
@@ -26,7 +27,9 @@ def _default_pid_file() -> Path:
                     common_path = (Path.cwd() / common_path).resolve()
                 return common_path / "vibe3" / "orchestra.pid"
     except Exception:
-        pass
+        logger.bind(domain="orchestra").debug(
+            "Cannot resolve git common dir, using default PID path"
+        )
     return Path(".git/vibe3/orchestra.pid")
 
 
@@ -102,74 +105,42 @@ class OrchestraConfig(BaseModel):
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
-        """Load config from settings.yaml."""
+        """Load config from settings.yaml via OrchestraSettings."""
         from vibe3.config.settings import VibeConfig
 
-        config = VibeConfig.get_defaults()
-        orchestra_config = getattr(config, "orchestra", None)
+        settings = VibeConfig.get_defaults()
+        src = settings.orchestra
 
-        if not orchestra_config:
-            return cls()
-
-        master_cfg = getattr(orchestra_config, "master_agent", None)
-        master_agent = MasterAgentConfig()
-        if master_cfg:
-            master_agent = MasterAgentConfig(
-                enabled=getattr(master_cfg, "enabled", True),
-                agent=getattr(master_cfg, "agent", "master-controller"),
-                backend=getattr(master_cfg, "backend", None),
-                model=getattr(master_cfg, "model", None),
-                timeout_seconds=getattr(master_cfg, "timeout_seconds", 300),
-            )
-
-        comment_reply_cfg = getattr(orchestra_config, "comment_reply", None)
-        comment_reply = CommentReplyConfig()
-        if comment_reply_cfg:
-            comment_reply = CommentReplyConfig(
-                enabled=getattr(comment_reply_cfg, "enabled", True),
-            )
-
-        polling_cfg = getattr(orchestra_config, "polling", None)
-        polling = PollingConfig()
-        if polling_cfg:
-            polling = PollingConfig(
-                enabled=getattr(polling_cfg, "enabled", True),
-            )
-
-        assignee_dispatch_cfg = getattr(orchestra_config, "assignee_dispatch", None)
-        assignee_dispatch = AssigneeDispatchConfig()
-        if assignee_dispatch_cfg:
-            assignee_dispatch = AssigneeDispatchConfig(
-                enabled=getattr(assignee_dispatch_cfg, "enabled", True),
-                use_worktree=getattr(assignee_dispatch_cfg, "use_worktree", True),
-            )
-
-        pr_review_cfg = getattr(orchestra_config, "pr_review_dispatch", None)
-        pr_review_dispatch = PRReviewDispatchConfig()
-        if pr_review_cfg:
-            pr_review_dispatch = PRReviewDispatchConfig(
-                enabled=getattr(pr_review_cfg, "enabled", True),
-                async_mode=getattr(pr_review_cfg, "async_mode", False),
-                use_worktree=getattr(pr_review_cfg, "use_worktree", False),
-            )
-
-        repo = getattr(orchestra_config, "repo", None)
+        repo = src.repo
         if isinstance(repo, str):
             repo = repo.strip() or None
 
         return cls(
-            enabled=getattr(orchestra_config, "enabled", True),
-            polling_interval=getattr(orchestra_config, "polling_interval", 900),
+            enabled=src.enabled,
+            polling_interval=src.polling_interval,
             repo=repo,
-            max_concurrent_flows=getattr(orchestra_config, "max_concurrent_flows", 3),
-            port=getattr(orchestra_config, "port", 8080),
-            webhook_secret=getattr(orchestra_config, "webhook_secret", None),
-            manager_usernames=getattr(
-                orchestra_config, "manager_usernames", ["vibe-manager"]
+            max_concurrent_flows=src.max_concurrent_flows,
+            port=src.port,
+            webhook_secret=src.webhook_secret,
+            manager_usernames=src.manager_usernames,
+            master_agent=MasterAgentConfig(
+                enabled=src.master_agent.enabled,
+                agent=src.master_agent.agent,
+                backend=src.master_agent.backend,
+                model=src.master_agent.model,
+                timeout_seconds=src.master_agent.timeout_seconds,
             ),
-            master_agent=master_agent,
-            polling=polling,
-            assignee_dispatch=assignee_dispatch,
-            comment_reply=comment_reply,
-            pr_review_dispatch=pr_review_dispatch,
+            polling=PollingConfig(enabled=src.polling.enabled),
+            assignee_dispatch=AssigneeDispatchConfig(
+                enabled=src.assignee_dispatch.enabled,
+                use_worktree=src.assignee_dispatch.use_worktree,
+            ),
+            comment_reply=CommentReplyConfig(
+                enabled=src.comment_reply.enabled,
+            ),
+            pr_review_dispatch=PRReviewDispatchConfig(
+                enabled=src.pr_review_dispatch.enabled,
+                async_mode=src.pr_review_dispatch.async_mode,
+                use_worktree=src.pr_review_dispatch.use_worktree,
+            ),
         )

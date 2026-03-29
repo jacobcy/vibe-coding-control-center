@@ -32,16 +32,27 @@ class AssigneeDispatchService(ServiceBase):
 
     event_types = ["issues"]
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        dispatcher: Dispatcher | None = None,
+        github: GitHubClient | None = None,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> None:
         self.config = config
-        self._executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-        self._dispatcher = Dispatcher(config, dry_run=config.dry_run)
-        self._dep_checker = DependencyChecker(repo=config.repo)
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=config.max_concurrent_flows,
+        )
+        self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
+        self._dep_checker = DependencyChecker(
+            repo=config.repo,
+            github=github,
+        )
         # Polling fallback state
         self._assignee_cache: dict[int, frozenset[str]] = {}
         self._cold_start = True
         self._dispatched_issues: set[int] = set()
-        self._github = GitHubClient()
+        self._github = github or GitHubClient()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to issues/assigned webhook event."""
@@ -109,6 +120,12 @@ class AssigneeDispatchService(ServiceBase):
 
         for issue in self._sort_by_priority(ready):
             await self._dispatch_if_ready(issue, source="tick")
+
+        # Prune cache to only keep issues seen in current scan
+        seen_numbers = {item["number"] for item in raw}
+        self._assignee_cache = {
+            k: v for k, v in self._assignee_cache.items() if k in seen_numbers
+        }
 
         self._cold_start = False
 

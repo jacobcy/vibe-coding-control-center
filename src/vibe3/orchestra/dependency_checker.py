@@ -27,9 +27,13 @@ def parse_blocked_by(body: str) -> list[int]:
 class DependencyChecker:
     """Checks if all blocking issues for a given issue are resolved."""
 
-    def __init__(self, repo: str | None = None) -> None:
+    def __init__(
+        self,
+        repo: str | None = None,
+        github: GitHubClient | None = None,
+    ) -> None:
         self.repo = repo
-        self._github = GitHubClient()
+        self._github = github or GitHubClient()
 
     def fetch_body(self, issue_number: int) -> str:
         """Fetch issue body via GitHubClient.view_issue()."""

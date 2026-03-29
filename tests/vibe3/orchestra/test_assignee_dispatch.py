@@ -85,35 +85,37 @@ async def test_on_tick_cold_start_dispatches_assigned_issue_without_flow() -> No
 
 
 @pytest.mark.asyncio
-async def test_on_tick_skips_dispatch_when_flow_already_exists() -> None:
+async def test_on_tick_prunes_assignee_cache() -> None:
+    """Assignee cache is pruned to only keep issues seen in current scan."""
     svc = _svc()
     svc._github = MagicMock()
-    svc._github.list_issues_with_assignees.side_effect = [
-        [
-            {
-                "number": 42,
-                "title": "test issue",
-                "labels": [],
-                "assignees": [],
-                "url": "https://example.com/issues/42",
-            }
-        ],
-        [
-            {
-                "number": 42,
-                "title": "test issue",
-                "labels": [],
-                "assignees": [{"login": "vibe-manager"}],
-                "url": "https://example.com/issues/42",
-            }
-        ],
+    svc._github.list_issues_with_assignees.return_value = [
+        {
+            "number": 42,
+            "title": "issue 42",
+            "labels": [],
+            "assignees": [{"login": "vibe-manager"}],
+            "url": "https://example.com/issues/42",
+        },
+        {
+            "number": 43,
+            "title": "issue 43",
+            "labels": [],
+            "assignees": [{"login": "alice"}],
+            "url": "https://example.com/issues/43",
+        },
     ]
     svc._dep_checker = MagicMock()
     svc._dep_checker.check.return_value = (True, [])
     svc._dispatcher = MagicMock()
     svc._dispatcher.dispatch_manager.return_value = True
-    svc._dispatcher.orchestrator.get_flow_for_issue.return_value = {
-        "branch": "task/issue-42"
+    svc._dispatcher.orchestrator.get_flow_for_issue.return_value = None
+
+    # Prepopulate cache with extra issue
+    svc._assignee_cache = {
+        42: frozenset(["vibe-manager"]),
+        43: frozenset(["alice"]),
+        999: frozenset(["bob"]),  # Issue not in current scan
     }
 
     with patch(
@@ -121,6 +123,7 @@ async def test_on_tick_skips_dispatch_when_flow_already_exists() -> None:
         return_value=_ImmediateLoop(),
     ):
         await svc.on_tick()
-        await svc.on_tick()
 
-    svc._dispatcher.dispatch_manager.assert_not_called()
+    # Cache should be pruned to only issues seen in scan
+    assert list(svc._assignee_cache.keys()) == [42, 43]
+    assert 999 not in svc._assignee_cache
