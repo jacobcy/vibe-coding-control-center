@@ -1,13 +1,53 @@
-"""Tests for flow blocked command --pr option."""
+"""Tests for flow blocked command guards."""
 
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from vibe3.cli import app
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
 
 runner = CliRunner()
+
+
+def test_flow_blocked_rejects_missing_flow() -> None:
+    """Blocking a branch with no flow should fail with clear error."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "do/20260329-5f79a6"
+    flow_service.get_flow_status.return_value = None
+
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+        result = runner.invoke(
+            app, ["flow", "blocked", "--branch", "do/20260329-5f79a6"]
+        )
+
+    assert result.exit_code == 1
+    assert "没有 flow" in result.output
+    flow_service.block_flow.assert_not_called()
+
+
+def test_flow_blocked_succeeds_when_flow_exists() -> None:
+    """Blocking a branch with an existing flow should proceed."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+        issues=[],
+    )
+
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+        result = runner.invoke(
+            app, ["flow", "blocked", "--branch", "task/demo", "--reason", "waiting"]
+        )
+
+    assert result.exit_code == 0
+    flow_service.block_flow.assert_called_once_with(
+        "task/demo", reason="waiting", blocked_by_issue=None
+    )
 
 
 def test_flow_blocked_supports_pr_option() -> None:
