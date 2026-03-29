@@ -7,6 +7,7 @@ from loguru import logger
 
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_service import FlowService
+from vibe3.services.pr_service import PRService
 
 
 def switch(
@@ -14,25 +15,42 @@ def switch(
         str | None,
         typer.Option("--branch", help="Branch name or flow slug to switch to"),
     ] = None,
+    pr: Annotated[
+        int | None,
+        typer.Option("--pr", help="PR number to resolve head branch from"),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
 ) -> None:
     """Switch to existing flow."""
-    if branch is None:
+    if branch is not None and pr is not None:
+        typer.echo("Error: 不能同时指定 --branch 与 --pr", err=True)
+        raise typer.Exit(1)
+
+    target = branch
+    if pr is not None:
+        pr_data = PRService().get_pr(pr_number=pr)
+        if pr_data is None:
+            typer.echo(f"Error: 未找到 PR #{pr}", err=True)
+            raise typer.Exit(1)
+        target = pr_data.head_branch
+
+    if target is None:
         typer.echo(
-            "Error: 必须指定目标分支或 flow slug\n"
-            "使用: vibe3 flow switch --branch <branch-or-slug>",
+            "Error: 必须指定目标分支/flow slug，或指定 PR 号\n"
+            "使用: vibe3 flow switch --branch <branch-or-slug>\n"
+            "  或: vibe3 flow switch --pr <pr-number>",
             err=True,
         )
         raise typer.Exit(1)
 
-    with trace_scope(trace, "flow switch", domain="flow", target=branch):
-        logger.bind(command="flow switch", target=branch).info("Switching to flow")
+    with trace_scope(trace, "flow switch", domain="flow", target=target):
+        logger.bind(command="flow switch", target=target).info("Switching to flow")
 
         service = FlowService()
-        flow = service.switch_flow(branch)
+        flow = service.switch_flow(target)
 
         if json_output:
             import json
@@ -60,15 +78,6 @@ def done(
             typer.echo(
                 f"Error: 当前分支 '{target_branch}' 没有 flow\n"
                 "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
-                err=True,
-            )
-            raise typer.Exit(1)
-
-        if flow_status.task_issue_number is None:
-            typer.echo(
-                "Error: 当前 flow 未绑定 task issue\n"
-                "先执行 `vibe3 flow bind <issue> --role task`\n"
-                "若要放弃当前 flow，请执行 `vibe3 flow aborted`",
                 err=True,
             )
             raise typer.Exit(1)

@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.commands.flow import app
@@ -209,4 +210,53 @@ def test_flow_create_supports_multiple_task_refs_in_single_flag_style(
         "task/multi-task",
         282,
         "task",
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["issue465", "issue-465", "issue_465", "task465", "task-465", "task_465"],
+)
+@patch("vibe3.commands.flow.TaskService")
+@patch("vibe3.commands.flow.HandoffService")
+@patch("vibe3.commands.flow.render_flow_created")
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_create_infers_task_from_supported_name_patterns(
+    flow_service_cls,
+    _render_flow_created,
+    _handoff_service_cls,
+    task_service_cls,
+    name: str,
+) -> None:
+    """flow create should infer task issue from issue/task shorthand names."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "main"
+    flow_service.resolve_flow_name.return_value = name
+    flow_service.can_create_from_current_worktree.return_value = CreateDecision(
+        allowed=True,
+        reason="No active flow in current worktree",
+        start_ref="origin/main",
+        requires_new_worktree=False,
+    )
+    flow_service.create_flow_with_branch.return_value = FlowState(
+        branch=f"task/{name}",
+        flow_slug=name,
+        flow_status="active",
+    )
+    flow_service_cls.return_value = flow_service
+
+    task_service = MagicMock()
+    task_service_cls.return_value = task_service
+    task_service.link_issue.return_value = MagicMock(
+        issue_number=465, issue_role="task", branch=f"task/{name}"
+    )
+
+    result = runner.invoke(app, ["create", name])
+
+    assert result.exit_code == 0
+    task_service.link_issue.assert_called_once_with(
+        f"task/{name}",
+        465,
+        "task",
+        actor=None,
     )
