@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
+AllOption = Annotated[
+    bool, typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）")
+]
 JsonOption = Annotated[bool, typer.Option("--json")]
 TraceOption = Annotated[bool, typer.Option("--trace")]
 
@@ -171,13 +174,17 @@ def show(
 
 
 def status(
+    all_flows: AllOption = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
 ) -> None:
-    """Show dashboard of all active flows."""
+    """Show dashboard of all active flows.
+
+    By default only shows active flows. Use --all to include done/aborted/stale.
+    """
     with trace_scope(trace, "flow status", domain="flow"):
         service = FlowService()
-        flows = service.list_flows(status="active")
+        flows = service.list_flows(status=None if all_flows else "active")
         if json_output:
             typer.echo(
                 json.dumps([f.model_dump() for f in flows], indent=2, default=str)

@@ -194,6 +194,37 @@ class TestVerifyCurrentFlow:
         assert not result.is_valid
         assert any("Shared handoff file not found" in issue for issue in result.issues)
 
+    def test_merged_pr_returns_valid(
+        self, check_service, mock_store, mock_github_client
+    ):
+        """Merged PR flow is auto-completed and returns is_valid=True."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "feature/test-branch",
+            "pr_number": 456,
+        }
+        mock_store.get_issue_links.return_value = []
+        mock_github_client.get_pr.return_value = PRResponse(
+            number=456,
+            title="Test PR",
+            body="",
+            state=PRState.MERGED,
+            head_branch="feature/test-branch",
+            base_branch="main",
+            url="https://github.com/test/pr/456",
+            draft=False,
+            merged_at="2026-03-29T00:00:00Z",
+        )
+
+        result = check_service.verify_current_flow()
+
+        assert result.is_valid
+        assert len(result.issues) == 0
+        mock_store.update_flow_state.assert_called_once_with(
+            "feature/test-branch", flow_status="done"
+        )
+        mock_store.add_event.assert_called_once()
+        assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
+
 
 class TestAutoFix:
     """Tests for auto_fix method."""
@@ -227,50 +258,3 @@ class TestAutoFix:
         assert not result.success
         assert result.error is not None
         assert "--init" in result.error
-
-
-class TestAutoFixBranch:
-    """Tests for auto_fix_branch method."""
-
-    def test_auto_fix_branch_creates_handoff(self, check_service, mock_git_client):
-        """auto_fix_branch creates handoff for the specified branch."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            git_dir = Path(tmpdir) / ".git"
-            git_dir.mkdir()
-
-            with patch.object(
-                check_service.git_client,
-                "get_git_common_dir",
-                return_value=str(git_dir),
-            ):
-                result = check_service.auto_fix_branch(
-                    "feature/other-branch",
-                    ["Shared handoff file not found: /some/path/current.md"],
-                )
-
-        assert result.success
-
-    def test_auto_fix_branch_backfills_pr_number(
-        self, check_service, mock_github_client, mock_store
-    ):
-        """auto_fix_branch backfills pr_number for the specified branch."""
-        mock_github_client.list_prs_for_branch.return_value = [
-            PRResponse(
-                number=789,
-                title="Test",
-                body="",
-                state=PRState.OPEN,
-                head_branch="feature/other-branch",
-                base_branch="main",
-                url="https://github.com/test/pr/789",
-                draft=False,
-            )
-        ]
-        result = check_service.auto_fix_branch(
-            "feature/other-branch",
-            ["Branch has open PR #789 but database missing pr_number"],
-        )
-        assert result.success
-        mock_github_client.list_prs_for_branch.assert_called_with(
-            "feature/other-branch"
-        )

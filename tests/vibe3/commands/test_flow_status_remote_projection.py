@@ -1,10 +1,15 @@
 """Tests for flow status remote-first PR projection behavior."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from typer.testing import CliRunner
+
+from vibe3.cli import app
 from vibe3.commands.flow_status import _fetch_issue_titles
-from vibe3.models.flow import FlowStatusResponse
+from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
+
+runner = CliRunner()
 
 
 def _mock_pr(number: int = 123, branch: str = "task/demo") -> PRResponse:
@@ -56,3 +61,50 @@ def test_fetch_issue_titles_falls_back_to_branch_when_cached_pr_not_found() -> N
     assert gh.get_pr.call_count == 2
     assert gh.get_pr.call_args_list[0].args == (999,)
     assert gh.get_pr.call_args_list[1].kwargs == {"branch": "task/demo"}
+
+
+def _make_flow_state(
+    branch: str = "task/demo",
+    status: str = "active",
+    pr_number: int | None = None,
+) -> FlowState:
+    return FlowState(
+        branch=branch,
+        flow_slug=branch.replace("/", "-"),
+        flow_status=status,
+        pr_number=pr_number,
+        updated_at="2026-03-29T00:00:00",
+    )
+
+
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_status_default_filters_active(mock_service_class) -> None:
+    """flow status without --all only shows active flows."""
+    mock_service = MagicMock()
+    mock_service.list_flows.return_value = [
+        _make_flow_state("task/active-1"),
+        _make_flow_state("task/active-2"),
+    ]
+    mock_service_class.return_value = mock_service
+
+    result = runner.invoke(app, ["flow", "status"])
+
+    assert result.exit_code == 0
+    mock_service.list_flows.assert_called_once_with(status="active")
+
+
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_status_all_shows_everything(mock_service_class) -> None:
+    """flow status --all passes status=None to list_flows."""
+    mock_service = MagicMock()
+    mock_service.list_flows.return_value = [
+        _make_flow_state("task/active-1"),
+        _make_flow_state("task/old-done", status="done"),
+        _make_flow_state("task/aborted-1", status="aborted"),
+    ]
+    mock_service_class.return_value = mock_service
+
+    result = runner.invoke(app, ["flow", "status", "--all"])
+
+    assert result.exit_code == 0
+    mock_service.list_flows.assert_called_once_with(status=None)

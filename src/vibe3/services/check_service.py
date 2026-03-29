@@ -119,7 +119,6 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                     pr_state=pr.state.value,
                 ).info("PR closed/merged, marking flow as done")
 
-                # Mark flow as done
                 self.store.update_flow_state(branch, flow_status="done")
                 self.store.add_event(
                     branch,
@@ -127,9 +126,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                     "system",
                     f"Flow auto-completed: PR #{pr_number} is {pr.state.value}",
                 )
-                issues.append(
-                    f"ℹ️ Flow marked as done: PR #{pr_number} is {pr.state.value}"
-                )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
 
         # Check for missing PR (branch has PR but database doesn't record it)
         if not pr_number:
@@ -140,17 +137,20 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                     f"Branch has open PR #{pr_num} but database missing pr_number"
                 )
 
-        # ref files exist
-        for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
-            ref_value = flow_data.get(ref_field)
-            if ref_value and not Path(ref_value).exists():
-                issues.append(f"{ref_field} file not found: {ref_value}")
+        # ref files exist (skip for terminal flows — artifacts may be cleaned up)
+        flow_status = flow_data.get("flow_status", "active")
+        if flow_status not in ("done", "aborted", "stale"):
+            for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
+                ref_value = flow_data.get(ref_field)
+                if ref_value and not Path(ref_value).exists():
+                    issues.append(f"{ref_field} file not found: {ref_value}")
 
-        # shared current.md
-        git_dir = self.git_client.get_git_common_dir()
-        handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
-        if not handoff_path.exists():
-            issues.append(f"Shared handoff file not found: {handoff_path}")
+        # shared current.md (skip for terminal flows)
+        if flow_status not in ("done", "aborted", "stale"):
+            git_dir = self.git_client.get_git_common_dir()
+            handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
+            if not handoff_path.exists():
+                issues.append(f"Shared handoff file not found: {handoff_path}")
 
         is_valid = len(issues) == 0
         logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).info(
