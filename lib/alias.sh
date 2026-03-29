@@ -13,7 +13,7 @@ _vibe_alias_list() {
         shift
     done
 
-    local src_dir="${VIBE_ROOT}/alias"
+    local src_dir="${VIBE_LIB}/alias"
     echo "${BOLD}Vibe Alias Gallery${NC}"
     if [[ $show_all -eq 0 && -z "$filter_target" ]]; then
         echo "💡 Showing ${CYAN}featured${NC} aliases. Use ${YELLOW}vibe alias -a${NC} for all."

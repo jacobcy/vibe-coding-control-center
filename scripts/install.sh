@@ -36,7 +36,7 @@ done
 _append_to_rc() {
     local rc_file="$1" content="$2" marker="$3"
     [[ -f "$rc_file" ]] || touch "$rc_file"
-    if grep -qF "$marker" "$rc_file" 2>/dev/null; then
+    if grep -qF "$marker" "$rc_file" 2>/dev/null || grep -qF "$content" "$rc_file" 2>/dev/null; then
         log_info "Configuration already present in $rc_file"
     else
         echo -e "\n# $marker\n$content" >> "$rc_file"
@@ -65,11 +65,52 @@ _setup_gh_noninteractive() {
     log_success "Configured gh for non-interactive mode"
 }
 
-_require_uv_cli() {
-    if command -v uv >/dev/null 2>&1; then
+VIBE_UV_BIN=""
+
+_ensure_uv_cli() {
+    local local_bin="$HOME/.local/bin"
+    local local_uv="$local_bin/uv"
+    local system_uv=""
+
+    mkdir -p "$local_bin"
+    export PATH="$local_bin:$PATH"
+
+    if [[ -x "$local_uv" ]]; then
+        VIBE_UV_BIN="$local_uv"
         return 0
     fi
-    log_warn "uv CLI not found. Direnv auto-venv setup will be skipped."
+
+    if command -v uv >/dev/null 2>&1; then
+        system_uv="$(command -v uv)"
+    fi
+
+    log_info "Ensuring uv is installed at $local_uv ..."
+
+    if command -v curl >/dev/null 2>&1; then
+        if ! curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$local_bin" sh >/dev/null 2>&1; then
+            log_warn "Failed to install uv via curl installer."
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if ! wget -qO- https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$local_bin" sh >/dev/null 2>&1; then
+            log_warn "Failed to install uv via wget installer."
+        fi
+    elif [[ -z "$system_uv" ]]; then
+        log_warn "Neither curl nor wget is available, cannot auto-install uv."
+    fi
+
+    if [[ -x "$local_uv" ]]; then
+        VIBE_UV_BIN="$local_uv"
+        log_success "Installed uv at $local_uv"
+        return 0
+    fi
+
+    if [[ -n "$system_uv" ]]; then
+        VIBE_UV_BIN="$system_uv"
+        log_warn "Falling back to system uv at $system_uv (local install unavailable)."
+        return 0
+    fi
+
+    log_warn "uv installation finished but executable not found at $local_uv"
     return 1
 }
 
@@ -123,14 +164,9 @@ _setup_direnv() {
 
     # Check if direnv is installed
     if ! command -v direnv &> /dev/null; then
-        log_info "direnv not installed, skipping auto-venv setup"
+        log_info "direnv not installed, skipping direnv integration"
         return 0
     fi
-
-    _require_uv_cli || {
-        log_info "Direnv hook configured, but auto-venv setup skipped (uv missing)."
-        return 0
-    }
 
     # Add direnv hook to RC file
     local direnv_hook='eval "$(direnv hook zsh)"'
@@ -139,36 +175,6 @@ _setup_direnv() {
         log_info "Added direnv hook to $RC_FILE"
     else
         log_info "direnv hook already present in $RC_FILE"
-    fi
-
-    # Check and set UV_PROJECT_ENVIRONMENT
-    local venv_path="$HOME/.venvs/vibe-center"
-
-    # Create global venv if not exists
-    if [[ ! -d "$venv_path" ]]; then
-        log_info "Creating global venv at $venv_path..."
-        mkdir -p "$HOME/.venvs"
-        uv venv "$venv_path"
-    else
-        log_info "Global venv already exists at $venv_path"
-    fi
-
-    # Check if UV_PROJECT_ENVIRONMENT is already set in environment
-    if [[ -n "$UV_PROJECT_ENVIRONMENT" ]]; then
-        log_info "UV_PROJECT_ENVIRONMENT is already set: $UV_PROJECT_ENVIRONMENT"
-        if [[ "$UV_PROJECT_ENVIRONMENT" != "$venv_path" && "$UV_PROJECT_ENVIRONMENT" != "\$HOME/.venvs/vibe-center" ]]; then
-            log_warn "UV_PROJECT_ENVIRONMENT points to a different location: $UV_PROJECT_ENVIRONMENT"
-            log_warn "Vibe Center expects: $venv_path"
-        fi
-    else
-        # Check if it's set in shell config
-        local uv_env_export="export UV_PROJECT_ENVIRONMENT=\"\$HOME/.venvs/vibe-center\""
-        if ! grep -qF 'UV_PROJECT_ENVIRONMENT' "$RC_FILE" 2>/dev/null; then
-            _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
-            log_info "Added UV_PROJECT_ENVIRONMENT to $RC_FILE"
-        else
-            log_info "UV_PROJECT_ENVIRONMENT already set in $RC_FILE"
-        fi
     fi
 
     # Create .envrc in source root if not exists
@@ -188,7 +194,38 @@ _setup_direnv() {
     log_success "direnv setup complete!"
 }
 
-# Auto-run direnv setup if direnv is installed
+_setup_uv_environment() {
+    log_step "Setting up uv environment..."
+
+    _append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
+
+    if ! _ensure_uv_cli; then
+        log_warn "uv setup incomplete; skipping venv bootstrap."
+        return 0
+    fi
+
+    local venv_path="$HOME/.venvs/vibe-center"
+    if [[ ! -d "$venv_path" ]]; then
+        log_info "Creating global venv at $venv_path..."
+        mkdir -p "$HOME/.venvs"
+        "$VIBE_UV_BIN" venv "$venv_path"
+    else
+        log_info "Global venv already exists at $venv_path"
+    fi
+
+    local uv_env_export='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
+    _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
+
+    if [[ -n "$UV_PROJECT_ENVIRONMENT" && "$UV_PROJECT_ENVIRONMENT" != "$venv_path" && "$UV_PROJECT_ENVIRONMENT" != "\$HOME/.venvs/vibe-center" ]]; then
+        log_warn "Current UV_PROJECT_ENVIRONMENT differs: $UV_PROJECT_ENVIRONMENT"
+        log_warn "Recommended value: $venv_path"
+    fi
+
+    log_success "uv environment setup complete."
+}
+
+# Auto-run uv + direnv setup
+_setup_uv_environment
 _setup_direnv
 
 # 8. Finalize
