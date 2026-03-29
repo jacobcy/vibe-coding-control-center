@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher, FlowOrchestrator
+from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.models import IssueInfo, Trigger
 
 
@@ -32,6 +32,13 @@ def make_trigger(
         command=command,
         args=args or ["task"],
     )
+
+
+class _Completed:
+    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
 
 
 class TestDispatcherBuildCommand:
@@ -127,55 +134,6 @@ class TestDispatcherBuildCommand:
         assert cmd is None
 
 
-class TestFlowOrchestrator:
-    """Tests for FlowOrchestrator."""
-
-    def test_get_flow_for_issue(self):
-        config = OrchestraConfig()
-        orchestrator = FlowOrchestrator(config)
-
-        with patch.object(
-            orchestrator.store,
-            "get_flows_by_issue",
-            return_value=[{"branch": "task/test", "pr_number": 123}],
-        ):
-            flow = orchestrator.get_flow_for_issue(42)
-
-        assert flow is not None
-        assert flow["branch"] == "task/test"
-
-    def test_get_flow_for_issue_returns_none(self):
-        config = OrchestraConfig()
-        orchestrator = FlowOrchestrator(config)
-
-        with patch.object(orchestrator.store, "get_flows_by_issue", return_value=[]):
-            flow = orchestrator.get_flow_for_issue(42)
-
-        assert flow is None
-
-    def test_get_pr_for_issue_from_flow(self):
-        config = OrchestraConfig()
-        orchestrator = FlowOrchestrator(config)
-
-        with patch.object(
-            orchestrator,
-            "get_flow_for_issue",
-            return_value={"branch": "task/test", "pr_number": 789},
-        ):
-            pr_number = orchestrator.get_pr_for_issue(42)
-
-        assert pr_number == 789
-
-    def test_get_pr_for_issue_returns_none_without_flow(self):
-        config = OrchestraConfig()
-        orchestrator = FlowOrchestrator(config)
-
-        with patch.object(orchestrator, "get_flow_for_issue", return_value=None):
-            pr_number = orchestrator.get_pr_for_issue(42)
-
-        assert pr_number is None
-
-
 class TestDispatcherDryRun:
     """Tests for dry run mode."""
 
@@ -194,13 +152,6 @@ class TestDispatcherDryRun:
 
         assert result is True
         mock_run.assert_not_called()
-
-
-class _Completed:
-    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
 
 
 class TestDispatcherReviewWorktreeResolution:

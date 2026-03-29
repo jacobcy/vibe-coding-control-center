@@ -1,5 +1,7 @@
 """Flow orchestration utilities for orchestra dispatcher."""
 
+import subprocess
+
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
@@ -68,7 +70,7 @@ class FlowOrchestrator:
         # Ensure branch exists (GitClient, no uncommitted-changes guard)
         if not self.git.branch_exists(branch):
             try:
-                self.git.create_branch(branch, start_ref="origin/main")
+                self._create_branch_ref(branch, start_ref="origin/main")
             except Exception as exc:
                 raise RuntimeError(
                     f"Failed to create branch '{branch}': {exc}"
@@ -103,6 +105,30 @@ class FlowOrchestrator:
 
         log.info(f"Created flow '{slug}' on branch '{branch}'")
         return flow_state.model_dump()
+
+    def _create_branch_ref(self, branch: str, start_ref: str) -> None:
+        """Create branch ref from start_ref without checkout.
+
+        Orchestra must avoid mutating the serve process worktree state.
+        """
+        result = subprocess.run(
+            ["git", "branch", branch, start_ref],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            if "already exists" in stderr.lower():
+                return
+            raise RuntimeError(stderr or "unknown git branch error")
+
+        logger.bind(
+            domain="orchestra",
+            action="create_branch_ref",
+            branch=branch,
+            start_ref=start_ref,
+        ).info("Created branch ref for orchestra flow")
 
     def get_pr_for_issue(self, issue_number: int) -> int | None:
         """Get PR number for an issue.
