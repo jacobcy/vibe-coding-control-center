@@ -1,6 +1,5 @@
 """Usecase layer for flow command orchestration."""
 
-import re
 from collections.abc import Sequence
 from typing import Literal
 
@@ -9,6 +8,10 @@ from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse, Iss
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
+from vibe3.services.issue_ref_utils import (
+    infer_task_issue_from_flow_name,
+    parse_issue_number,
+)
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
@@ -46,16 +49,7 @@ class FlowUsecase:
         task_service: TaskService | None = None,
         handoff_service: HandoffService | None = None,
     ) -> "FlowUsecase":
-        """Create FlowUsecase with default dependencies.
-
-        Args:
-            flow_service: Optional FlowService instance. If None, creates default.
-            task_service: Optional TaskService instance. If None, creates default.
-            handoff_service: Optional HandoffService instance. If None, creates default.
-
-        Returns:
-            FlowUsecase instance with default dependencies.
-        """
+        """Create FlowUsecase with default dependencies."""
         return cls(
             flow_service=flow_service or FlowService(),
             task_service=task_service or TaskService(),
@@ -147,7 +141,7 @@ class FlowUsecase:
         self._validate_create_request(base, decision)
         task_refs = self._normalize_task_refs(task)
         if not task_refs:
-            inferred_issue = self._infer_task_issue_from_flow_name(name)
+            inferred_issue = infer_task_issue_from_flow_name(name)
             if inferred_issue is not None:
                 task_refs = [str(inferred_issue)]
         self._validate_issue_refs(task_refs)
@@ -177,20 +171,6 @@ class FlowUsecase:
         self.handoff_service.ensure_current_handoff()
         return flow
 
-    @staticmethod
-    def _infer_task_issue_from_flow_name(name: str) -> int | None:
-        """Infer task issue number from flow name shorthand when possible."""
-        patterns = (
-            r"^(?:issue|task)[-_]?(\d+)$",
-            r"^task/(\d+)$",
-            r"^task/(?:issue|task)[-_]?(\d+)$",
-        )
-        for pattern in patterns:
-            match = re.match(pattern, name, re.IGNORECASE)
-            if match:
-                return int(match.group(1))
-        return None
-
     def _try_auto_close_done_eligible_flow(
         self,
         branch: str,
@@ -219,16 +199,6 @@ class FlowUsecase:
         """Bind an issue to the current flow."""
         branch = self.flow_service.get_current_branch()
         return self._link_issue(branch, issue, role, actor=actor)
-
-    @staticmethod
-    def _parse_issue_number(issue: str) -> int:
-        digits = issue.removeprefix("#")
-        if digits.isdigit():
-            return int(digits)
-        match = re.search(r"github\.com/[^/]+/[^/]+/issues/(\d+)", issue)
-        if match:
-            return int(match.group(1))
-        raise ValueError(f"Invalid issue format: {issue}")
 
     def _apply_initial_bindings(
         self,
@@ -260,14 +230,14 @@ class FlowUsecase:
         role: Literal["task", "related", "dependency"],
         actor: str | None = None,
     ) -> IssueLink:
-        issue_number = self._parse_issue_number(issue_ref)
+        issue_number = parse_issue_number(issue_ref)
         return self.task_service.link_issue(branch, issue_number, role, actor=actor)
 
     def _bind_task_as_spec_ref(
         self, branch: str, task: str, actor: str | None = None
     ) -> None:
         """Derive spec_ref from bound task issue for issue-first workflows."""
-        issue_number = self._parse_issue_number(task)
+        issue_number = parse_issue_number(task)
         spec_info = self.spec_ref_service.parse_spec_ref(str(issue_number))
         if spec_info.display:
             self.flow_service.bind_spec(branch, spec_info.display, actor)
@@ -282,7 +252,7 @@ class FlowUsecase:
 
     def _validate_issue_refs(self, refs: Sequence[str]) -> None:
         for ref in refs:
-            self._parse_issue_number(ref)
+            parse_issue_number(ref)
 
     @staticmethod
     def validate_issue_refs(
@@ -291,21 +261,7 @@ class FlowUsecase:
         *,
         primary_hint: str,
     ) -> str | list[str] | None:
-        """Validate and merge issue references from command arguments.
-
-        Supports both repeated option and trailing-args styles for issue refs.
-
-        Args:
-            primary: Primary issue reference (e.g., from --task option)
-            tail: Additional issue references (e.g., from trailing arguments)
-            primary_hint: Hint message for error when primary is missing
-
-        Returns:
-            Merged issue references as string or list, or None if no refs provided
-
-        Raises:
-            ValueError: If tail refs provided without primary ref
-        """
+        """Validate and merge issue refs from command arguments."""
         tail = tail or []
         if not tail:
             return primary
