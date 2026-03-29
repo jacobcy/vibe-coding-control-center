@@ -1,5 +1,6 @@
 """Flow lifecycle operations - close, block, abort."""
 
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -25,6 +26,22 @@ class FlowLifecycleMixin:
 
     store: Any
     git_client: Any
+
+    _BASELINE_WORKTREE_BRANCHES: dict[str, str] = {
+        "main": "main",
+        "develop": "develop",
+        "bugfix": "bugfix",
+    }
+
+    @classmethod
+    def _resolve_baseline_branch_for_worktree_root(
+        cls,
+        worktree_root: str | None,
+    ) -> str | None:
+        if not worktree_root:
+            return None
+        worktree_name = Path(worktree_root).name.lower()
+        return cls._BASELINE_WORKTREE_BRANCHES.get(worktree_name)
 
     def can_create_from_current_worktree(
         self: Any,
@@ -77,8 +94,42 @@ class FlowLifecycleMixin:
             logger.warning(f"Failed to resolve close target: {e}")
             target_branch, should_pull = "main", True
 
-        if target_branch == "main" and git.is_branch_occupied_by_worktree(
-            target_branch
+        worktree_root = ""
+        try:
+            worktree_root = git.get_worktree_root()
+        except Exception as e:
+            logger.bind(
+                domain="flow",
+                action="close",
+                branch=branch,
+            ).warning(f"Failed to resolve worktree root: {e}")
+
+        baseline_branch = self._resolve_baseline_branch_for_worktree_root(worktree_root)
+        if target_branch == "main":
+            if baseline_branch:
+                target_branch = baseline_branch
+                should_pull = True
+                logger.bind(
+                    domain="flow",
+                    action="close",
+                    branch=branch,
+                    target=target_branch,
+                    worktree_root=worktree_root,
+                ).info("Using baseline restore branch for current worktree")
+            else:
+                target_branch = git.get_safe_main_branch_name()
+                should_pull = False
+                logger.bind(
+                    domain="flow",
+                    action="close",
+                    branch=branch,
+                    target=target_branch,
+                    worktree_root=worktree_root,
+                ).info("Non-baseline worktree; using safe restore branch")
+
+        if (
+            target_branch in self._BASELINE_WORKTREE_BRANCHES
+            and git.is_branch_occupied_by_worktree(target_branch)
         ):
             target_branch = git.get_safe_main_branch_name()
             should_pull = False
@@ -162,9 +213,9 @@ class FlowLifecycleMixin:
 
             if should_pull and switched_to_target:
                 try:
-                    git._run(["pull"])
+                    git._run(["pull", "origin", target_branch])
                     logger.info(
-                        f"Switched to {target_branch} and pulled latest changes"
+                        f"Switched to {target_branch} and synced origin/{target_branch}"
                     )
                 except Exception as e:
                     logger.warning(f"Failed to pull: {e}")

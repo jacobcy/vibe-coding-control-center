@@ -39,7 +39,10 @@ vibe_require() {
 
 vibe_find_cmd() {
     local cmd="$1" p
-    command -v "$cmd" 2>/dev/null && return 0
+    if p="$(command -v "$cmd" 2>/dev/null)"; then
+        echo "$p"
+        return 0
+    fi
     for p in "/opt/homebrew/bin/$cmd" "/usr/local/bin/$cmd" "/usr/bin/$cmd"; do [[ -x "$p" ]] && { echo "$p"; return 0; }; done
     return 1
 }
