@@ -1,6 +1,6 @@
 """Check service implementation."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
@@ -29,16 +29,6 @@ class FixResult:
 
     success: bool
     error: str | None = None
-
-
-@dataclass
-class InitResult:
-    """Result of remote index init."""
-
-    total_flows: int
-    updated: int
-    skipped: int
-    unresolvable: list[str] = field(default_factory=list)
 
 
 class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
@@ -292,26 +282,3 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
         Delegates to auto_fix with explicit branch parameter.
         """
         return self.auto_fix(issues, branch=branch)
-
-    # ------------------------------------------------------------------
-    # Remote index init (network, writes task_issue_number)
-    # ------------------------------------------------------------------
-
-    def init_remote_index(self, pr_limit: int = 200) -> InitResult:
-        """全量扫描远端，回填所有 flow 的 task_issue_number。
-
-        路径 A — merged PR body 解析 Closes/Fixes/Resolves #xxx
-        路径 B — GitHub Project items closingIssuesReferences
-        已有 task_issue_number 的 flow 跳过（不覆盖）。
-        """
-        logger.bind(domain="check", action="init_remote_index").info(
-            "Building remote index (PR body + GitHub Project items)"
-        )
-        branch_issue_map = self._build_branch_issue_map(pr_limit)
-        updated, skipped, unresolvable = self._backfill_flows(branch_issue_map)
-        return InitResult(
-            total_flows=len(self.store.get_all_flows()),
-            updated=updated,
-            skipped=skipped,
-            unresolvable=unresolvable,
-        )

@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from vibe3.services.check_service import CheckResult, FixResult, InitResult
+    from vibe3.services.check_remote_index_mixin import InitResult
+    from vibe3.services.check_service import CheckResult, FixResult
 
 
 @dataclass
