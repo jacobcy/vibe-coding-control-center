@@ -352,7 +352,7 @@ orchestra:
 
   # Manager usernames used as reviewer/assignee match target
   manager_usernames:
-    - "vibe-manager"
+    - "jacobcy"
 
   # Proactive manager dispatch via issues/assigned
   assignee_dispatch:
@@ -361,7 +361,7 @@ orchestra:
   # PR reviewer-triggered review execution
   pr_review_dispatch:
     enabled: true
-    async_mode: false
+    async_mode: true
 
   # @mention auto-ack in issue comments
   comment_reply:
