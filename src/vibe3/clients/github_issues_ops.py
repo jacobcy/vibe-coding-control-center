@@ -137,8 +137,16 @@ class IssuesMixin(IssueAdminMixin):
             return []
         return json.loads(result.stdout)  # type: ignore[no-any-return]
 
-    def view_issue(self: Any, issue_number: int) -> "dict[str, Any] | None | str":
+    def view_issue(
+        self: Any, issue_number: int, repo: str | None = None
+    ) -> "dict[str, Any] | None | str":
         """View a GitHub issue.
+
+        Args:
+            issue_number: GitHub issue number.
+            repo: Optional ``owner/repo`` string. When provided, passes
+                ``--repo`` to ``gh`` so the correct repository is queried
+                regardless of the current working directory.
 
         Returns:
             dict: issue data on success
@@ -158,6 +166,8 @@ class IssuesMixin(IssueAdminMixin):
             "--json",
             "number,title,body,state,updatedAt,labels,comments,milestone",
         ]
+        if repo:
+            cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             stderr = result.stderr or ""

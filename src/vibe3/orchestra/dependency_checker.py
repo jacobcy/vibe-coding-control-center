@@ -55,7 +55,7 @@ class DependencyChecker:
             if now - ts < _CACHE_TTL_SECONDS:
                 return data
 
-        result = self._github.view_issue(issue_number)
+        result = self._github.view_issue(issue_number, repo=self.repo)
         if not result or result == "network_error":
             logger.bind(domain="orchestra").warning(
                 f"Cannot fetch issue #{issue_number}"
