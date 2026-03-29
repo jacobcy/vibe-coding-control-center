@@ -13,6 +13,7 @@ from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _MODEL_OPT,
     _TRACE_OPT,
+    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
@@ -58,6 +59,7 @@ def _execute_plan_command(
     agent: str | None,
     backend: str | None,
     model: str | None,
+    worktree: bool,
 ) -> None:
     plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
     command = create_codeagent_command(
@@ -69,6 +71,7 @@ def _execute_plan_command(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
         config=config,
         branch=branch,
     )
@@ -91,6 +94,7 @@ def task(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Create implementation plan for an issue."""
     if trace:
@@ -119,6 +123,7 @@ def task(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
     )
 
     if not dry_run:
@@ -154,6 +159,7 @@ def spec(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Create implementation plan from a specification."""
     if trace:
@@ -201,4 +207,5 @@ def spec(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
     )

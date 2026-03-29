@@ -1,5 +1,6 @@
 """Tests for PRReviewDispatchService."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,13 +26,13 @@ def _pr_event(
     pr_number: int = 347,
 ) -> GitHubEvent:
     payload = {
+        "number": pr_number,
         "pull_request": {
-            "number": pr_number,
             "title": "test pr",
             "requested_reviewers": [
                 {"login": login} for login in (requested_reviewers or [])
             ],
-        }
+        },
     }
     if requested_reviewer is not None:
         payload["requested_reviewer"] = {"login": requested_reviewer}
@@ -47,6 +48,10 @@ def _pr_event(
 async def test_review_requested_dispatches_for_manager_reviewer() -> None:
     svc = _svc()
     svc._dispatcher = MagicMock()
+    svc._dispatcher.prepare_pr_review_dispatch.return_value = (
+        ["uv", "run", "python", "-m", "vibe3", "review", "pr", "347"],
+        Path("/tmp/repo"),
+    )
     svc._dispatcher.dispatch_pr_review.return_value = True
 
     with patch(
@@ -80,6 +85,10 @@ async def test_review_requested_ignores_non_manager_reviewer() -> None:
 async def test_ready_for_review_dispatches_when_manager_requested() -> None:
     svc = _svc()
     svc._dispatcher = MagicMock()
+    svc._dispatcher.prepare_pr_review_dispatch.return_value = (
+        ["uv", "run", "python", "-m", "vibe3", "review", "pr", "347"],
+        Path("/tmp/repo"),
+    )
     svc._dispatcher.dispatch_pr_review.return_value = True
 
     with patch(
@@ -90,6 +99,33 @@ async def test_ready_for_review_dispatches_when_manager_requested() -> None:
             _pr_event(
                 "ready_for_review",
                 requested_reviewers=["vibe-manager", "teammate"],
+            )
+        )
+
+    svc._dispatcher.dispatch_pr_review.assert_called_once_with(347)
+
+
+@pytest.mark.asyncio
+async def test_review_requested_dispatches_when_manager_in_requested_reviewers() -> (
+    None
+):
+    svc = _svc()
+    svc._dispatcher = MagicMock()
+    svc._dispatcher.prepare_pr_review_dispatch.return_value = (
+        ["uv", "run", "python", "-m", "vibe3", "review", "pr", "347"],
+        Path("/tmp/repo"),
+    )
+    svc._dispatcher.dispatch_pr_review.return_value = True
+
+    with patch(
+        "vibe3.orchestra.services.pr_review_dispatch.asyncio.get_event_loop",
+        return_value=_ImmediateLoop(),
+    ):
+        await svc.handle_event(
+            _pr_event(
+                "review_requested",
+                requested_reviewer=None,
+                requested_reviewers=["vibe-manager"],
             )
         )
 

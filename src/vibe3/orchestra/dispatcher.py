@@ -164,6 +164,13 @@ class Dispatcher:
             issue=issue.number,
         )
 
+        cmd = self.build_manager_command(issue)
+        if self.dry_run:
+            log.info("Dry run: skipping flow creation/label updates")
+            log.info(f"Dispatching manager: {' '.join(cmd)}")
+            log.info("Dry run, skipping execution")
+            return True
+
         # Step 1: ensure flow exists
         try:
             flow = self.orchestrator.create_flow_for_issue(issue)
@@ -172,26 +179,20 @@ class Dispatcher:
             log.error(f"Flow creation failed: {e}")
             return False
 
+        # Step 1.5: switch to issue flow branch so `vibe3 run` resolves
+        # the correct flow context and issue linkage.
+        branch = self.orchestrator.switch_to_flow_branch(issue.number)
+        if not branch:
+            log.error(f"Cannot dispatch manager: no valid branch for #{issue.number}")
+            return False
+        log.info(f"Manager dispatch using branch: {branch}")
+
         # Step 2: update display label
         if not self.dry_run:
             self._update_state_label(issue.number, IssueState.IN_PROGRESS)
 
         # Step 3: run manager execution
-        cmd = [
-            "uv",
-            "run",
-            "python",
-            "-m",
-            "vibe3",
-            "run",
-            f"Implement issue #{issue.number}: {issue.title}",
-        ]
-
         log.info(f"Dispatching manager: {' '.join(cmd)}")
-
-        if self.dry_run:
-            log.info("Dry run, skipping execution")
-            return True
 
         try:
             result = subprocess.run(
@@ -221,10 +222,7 @@ class Dispatcher:
             pr_number=pr_number,
         )
 
-        cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
-        if self.config.pr_review_dispatch.async_mode:
-            cmd.append("--async")
-        review_cwd = self._resolve_review_cwd(pr_number)
+        cmd, review_cwd = self.prepare_pr_review_dispatch(pr_number)
         log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")
 
         if self.dry_run:
@@ -250,6 +248,33 @@ class Dispatcher:
         except Exception as e:
             log.error(f"Review execution error: {e}")
             return False
+
+    def build_manager_command(self, issue: IssueInfo) -> list[str]:
+        """Build executable manager command for an issue."""
+        cmd = [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "run",
+        ]
+        if self.config.assignee_dispatch.use_worktree:
+            cmd.append("--worktree")
+        cmd.append(f"Implement issue #{issue.number}: {issue.title}")
+        return cmd
+
+    def prepare_pr_review_dispatch(self, pr_number: int) -> tuple[list[str], Path]:
+        """Prepare executable PR review command and working directory."""
+        cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
+        if self.config.pr_review_dispatch.async_mode:
+            cmd.append("--async")
+        if self.config.pr_review_dispatch.use_worktree:
+            cmd.append("--worktree")
+            review_cwd = self.repo_path
+        else:
+            review_cwd = self._resolve_review_cwd(pr_number)
+        return cmd, review_cwd
 
     def _resolve_review_cwd(self, pr_number: int) -> Path:
         """Resolve best worktree cwd for PR review execution.

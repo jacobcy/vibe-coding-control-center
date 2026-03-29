@@ -27,6 +27,7 @@ class TestAgentOptions:
         assert options.agent is None
         assert options.model is None
         assert options.backend is None
+        assert options.worktree is False
         assert options.timeout_seconds == 600
 
     def test_custom_options_with_agent(self) -> None:
@@ -209,6 +210,39 @@ class TestRunReviewAgent:
         assert Path(command[prompt_file_idx]).parent == expected_dir
         # The last argument should be the custom task
         assert command[-1] == "custom task"
+
+    def test_run_review_adds_worktree_flag_for_new_session(self) -> None:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            run_review_agent(
+                "prompt body",
+                AgentOptions(agent="code-reviewer", worktree=True),
+            )
+
+        command = mock_run.call_args[0][0]
+        assert "--worktree" in command
+
+    def test_run_review_skips_worktree_flag_for_resume_session(self) -> None:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            run_review_agent(
+                "prompt body",
+                AgentOptions(agent="code-reviewer", worktree=True),
+                session_id="262f0fea-eacb-4223-b842-b5b5097f94e8",
+            )
+
+        command = mock_run.call_args[0][0]
+        assert "--worktree" not in command
 
     def test_run_review_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""

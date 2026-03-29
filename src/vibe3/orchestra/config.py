@@ -78,6 +78,7 @@ class AssigneeDispatchConfig(BaseModel):
     """Configuration for assignee-based manager dispatch."""
 
     enabled: bool = True
+    use_worktree: bool = True
 
 
 class PRReviewDispatchConfig(BaseModel):
@@ -85,6 +86,7 @@ class PRReviewDispatchConfig(BaseModel):
 
     enabled: bool = True
     async_mode: bool = False
+    use_worktree: bool = False
 
 
 class MasterAgentConfig(BaseModel):
@@ -171,6 +173,7 @@ class OrchestraConfig(BaseModel):
         if assignee_dispatch_cfg:
             assignee_dispatch = AssigneeDispatchConfig(
                 enabled=getattr(assignee_dispatch_cfg, "enabled", True),
+                use_worktree=getattr(assignee_dispatch_cfg, "use_worktree", True),
             )
 
         pr_review_cfg = getattr(orchestra_config, "pr_review_dispatch", None)
@@ -179,12 +182,17 @@ class OrchestraConfig(BaseModel):
             pr_review_dispatch = PRReviewDispatchConfig(
                 enabled=getattr(pr_review_cfg, "enabled", True),
                 async_mode=getattr(pr_review_cfg, "async_mode", False),
+                use_worktree=getattr(pr_review_cfg, "use_worktree", False),
             )
+
+        repo = getattr(orchestra_config, "repo", None)
+        if isinstance(repo, str):
+            repo = repo.strip() or None
 
         return cls(
             enabled=getattr(orchestra_config, "enabled", True),
             polling_interval=getattr(orchestra_config, "polling_interval", 900),
-            repo=getattr(orchestra_config, "repo", None),
+            repo=repo,
             max_concurrent_flows=getattr(orchestra_config, "max_concurrent_flows", 3),
             port=getattr(orchestra_config, "port", 8080),
             webhook_secret=getattr(orchestra_config, "webhook_secret", None),

@@ -23,9 +23,11 @@ orchestra:
     enabled: false
   assignee_dispatch:
     enabled: false
+    use_worktree: true
   pr_review_dispatch:
     enabled: true
     async_mode: false
+    use_worktree: false
   comment_reply:
     enabled: false
   master_agent:
@@ -44,6 +46,12 @@ uv run python src/vibe3/cli.py serve start -v --port 8080 --repo jacobcy/vibe-co
 
 ```bash
 uv run python src/vibe3/cli.py serve start --async -v --port 8080 --repo jacobcy/vibe-coding-control-center
+```
+
+临时公网联调用（自动调用仓库 `scripts/tsu.sh`）：
+
+```bash
+uv run python src/vibe3/cli.py serve start --async -v --ts
 ```
 
 检查健康状态：
@@ -88,6 +96,7 @@ curl -sS -i -X POST "http://127.0.0.1:8080/webhook/github" \
 ```text
 Received: pull_request/review_requested (source=webhook)
 PR review dispatch triggered (requested_reviewer=your-github-login)
+Parsed webhook to command: uv run python -m vibe3 review pr 347 (cwd=...)
 Resolved PR review to matching worktree
 Dispatching review: uv run python -m vibe3 review pr 347 (cwd=...)
 Review execution completed successfully
@@ -97,6 +106,7 @@ Review execution completed successfully
 - `Resolved PR review to matching worktree` 表示已根据 PR `head_branch` 找到对应 worktree。
 - 找不到时会回退到 `serve` 进程启动目录。
 - 若 `pr_review_dispatch.async_mode=true`，命令会追加 `--async` 并转入 tmux 后台执行。
+- 若 `pr_review_dispatch.use_worktree=true`，命令会追加 `--worktree`（不走 PR worktree 匹配路径）。
 
 ## 5. 结果验收
 

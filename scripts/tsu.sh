@@ -147,6 +147,7 @@ start_plain() {
   nohup "${TAILSCALED_BIN}" \
     --tun=userspace-networking \
     --socks5-server=127.0.0.1:1055 \
+    --statedir="${STATE_DIR}" \
     --state="${STATE}" \
     --socket="${SOCK}" \
     --port=41641 \
@@ -187,6 +188,7 @@ start_tmux() {
         exec \"${TAILSCALED_BIN}\" \
           --tun=userspace-networking \
           --socks5-server=127.0.0.1:1055 \
+          --statedir=\"${STATE_DIR}\" \
           --state=\"${STATE}\" \
           --socket=\"${SOCK}\" \
           --port=41641 >> \"${LOG}\" 2>&1

@@ -50,6 +50,8 @@ related_docs:
 
 - 触发条件：`issues/assigned` 且 assignee 在 `manager_usernames`。
 - 执行动作：创建/复用 flow，检查依赖后调度 manager 执行。
+- 默认策略：`assignee_dispatch.use_worktree=true`，通过 `vibe3 run --worktree ...` 触发独立临时 worktree 执行。
+- 执行前会切换到 issue 对应 flow 分支再调用 `vibe3 run`，建议在专用、干净的 serve 工作树中运行。
 - 心跳会对当前已分配 issue 做重检（依赖/flow 存在性），避免漏调度。
 
 代码参考：
@@ -62,6 +64,8 @@ related_docs:
 - 触发事件：`pull_request/review_requested`、`pull_request/ready_for_review`。
 - 触发条件：requested reviewer 命中 `manager_usernames`。
 - 执行动作：调度 `vibe3 review pr <pr_number>`。
+- 默认策略：优先复用 PR 对应已有 worktree（按 `head_branch` 匹配），不新建 worktree。
+- 可选：`pr_review_dispatch.use_worktree=true` 时改为 `vibe3 review pr <pr_number> --worktree`。
 - 可选异步：`pr_review_dispatch.async_mode=true` 时，调度为 `vibe3 review pr <pr_number> --async`（tmux 后台执行，不阻塞当前进程）。
 
 代码参考：

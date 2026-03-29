@@ -25,6 +25,82 @@ app = typer.Typer(
 )
 
 
+def _resolve_tsu_script() -> Path | None:
+    """Resolve scripts/tsu.sh path from current repo/worktree."""
+    env_path = os.environ.get("VIBE3_TSU_SCRIPT")
+    if env_path:
+        candidate = Path(env_path).expanduser()
+        if candidate.exists():
+            return candidate
+
+    cwd_candidate = (Path.cwd() / "scripts" / "tsu.sh").resolve()
+    if cwd_candidate.exists():
+        return cwd_candidate
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            root = Path(result.stdout.strip())
+            candidate = root / "scripts" / "tsu.sh"
+            if candidate.exists():
+                return candidate
+    except Exception:
+        pass
+
+    return None
+
+
+def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
+    """Enable temporary Tailscale Funnel webhook via scripts/tsu.sh."""
+    tsu = _resolve_tsu_script()
+    if tsu is None:
+        return (
+            False,
+            "Cannot enable --ts: scripts/tsu.sh not found "
+            "(set VIBE3_TSU_SCRIPT to override)",
+        )
+
+    try:
+        # Best-effort start; command is idempotent when already running.
+        subprocess.run(
+            [str(tsu), "start"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        # Keep going; next command reports a concrete failure if unavailable.
+        pass
+
+    try:
+        result = subprocess.run(
+            [str(tsu), "serve", "webhook", str(port)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False, f"Cannot execute tsu script: {tsu}"
+    except Exception as exc:
+        return False, f"Tailscale webhook setup failed: {exc}"
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if result.returncode != 0:
+        detail = stderr or stdout or f"exit={result.returncode}"
+        return False, f"Tailscale webhook setup failed: {detail}"
+
+    return True, stdout or f"Tailscale webhook configured for port {port}"
+
+
 def _is_orchestra_process(pid: int) -> bool:
     """Check if a PID is actually an orchestra process."""
     import subprocess
@@ -56,7 +132,7 @@ def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
 
     try:
         pid = int(pid_file.read_text().strip())
-    except ValueError:
+    except (ValueError, OSError):
         return None, False
 
     try:
@@ -165,16 +241,35 @@ def start(
     interval: Annotated[
         int,
         typer.Option(
-            "--interval", "-i", help="Polling interval in seconds (fallback tick)"
+            "--interval",
+            "-i",
+            help=(
+                "Polling interval override in seconds. "
+                "Default uses orchestra.polling_interval from config/settings.yaml"
+            ),
         ),
     ] = 900,
     port: Annotated[
         int,
-        typer.Option("--port", "-p", help="HTTP port for webhook receiver"),
+        typer.Option(
+            "--port",
+            "-p",
+            help=(
+                "Webhook receiver port override. "
+                "Default uses orchestra.port from config/settings.yaml"
+            ),
+        ),
     ] = 8080,
     repo: Annotated[
         str | None,
-        typer.Option("--repo", "-r", help="GitHub repo (owner/repo)"),
+        typer.Option(
+            "--repo",
+            "-r",
+            help=(
+                "GitHub repo override (owner/repo). "
+                "Default uses orchestra.repo; if unset, uses current repository"
+            ),
+        ),
     ] = None,
     dry_run: Annotated[
         bool,
@@ -183,6 +278,16 @@ def start(
     async_mode: Annotated[
         bool,
         typer.Option("--async", help="Run in tmux background session"),
+    ] = False,
+    ts: Annotated[
+        bool,
+        typer.Option(
+            "--ts",
+            help=(
+                "Temporary testing mode: auto-run scripts/tsu.sh to expose "
+                "public webhook URL for current port"
+            ),
+        ),
     ] = False,
     verbose: Annotated[
         int,
@@ -197,6 +302,10 @@ def start(
     Polling fallback runs every --interval seconds to catch any events
     missed by the webhook (e.g. during downtime).
 
+    By default, port/repo come from config/settings.yaml:
+    - orchestra.port
+    - orchestra.repo (if unset, gh resolves current repository by working directory)
+
     Configure GitHub to send webhook events to:
         http://<your-server>:<port>/webhook/github
 
@@ -204,6 +313,7 @@ def start(
         vibe3 serve start
         vibe3 serve start --port 9000 --interval 900
         vibe3 serve start --repo owner/repo --dry-run
+        vibe3 serve start --async --ts
     """
     setup_logging(verbose=verbose)
 
@@ -235,7 +345,18 @@ def start(
         typer.echo(msg)
         if not ok:
             raise typer.Exit(1)
+        if ts:
+            ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
+            typer.echo(ts_msg)
+            if not ts_ok:
+                raise typer.Exit(1)
         raise typer.Exit(0)
+
+    if ts:
+        ts_ok, ts_msg = _setup_tailscale_webhook(config.port)
+        typer.echo(ts_msg)
+        if not ts_ok:
+            raise typer.Exit(1)
 
     typer.echo(
         f"Starting Orchestra server on port {config.port} "

@@ -36,6 +36,7 @@ def make_webhook_router(
         request: Request,
         x_github_event: str = Header(...),
         x_hub_signature_256: str | None = Header(None),
+        x_github_delivery: str | None = Header(None),
     ) -> JSONResponse:
         body = await request.body()
 
@@ -52,8 +53,14 @@ def make_webhook_router(
 
         action = str(payload.get("action", ""))
 
-        logger.bind(domain="orchestra", action="webhook").info(
-            f"Received: {x_github_event}/{action} (source=webhook)"
+        logger.bind(
+            domain="orchestra",
+            action="webhook",
+            delivery=x_github_delivery,
+        ).info(
+            "Received: "
+            f"{x_github_event}/{action} "
+            f"(source=webhook, delivery={x_github_delivery or '-'})"
         )
 
         event = GitHubEvent(

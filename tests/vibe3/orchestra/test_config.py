@@ -15,8 +15,10 @@ def test_default_config():
     assert OrchestraConfig().dry_run is False
     assert OrchestraConfig().polling.enabled is True
     assert OrchestraConfig().assignee_dispatch.enabled is True
+    assert OrchestraConfig().assignee_dispatch.use_worktree is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
     assert OrchestraConfig().pr_review_dispatch.async_mode is False
+    assert OrchestraConfig().pr_review_dispatch.use_worktree is False
     pid_path = OrchestraConfig().pid_file.as_posix()
     assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
         ".git/vibe3/orchestra.pid"
@@ -91,10 +93,12 @@ def test_from_settings_loads_yaml_config():
                         },
                         "assignee_dispatch": {
                             "enabled": False,
+                            "use_worktree": False,
                         },
                         "pr_review_dispatch": {
                             "enabled": False,
                             "async_mode": True,
+                            "use_worktree": True,
                         },
                     }
                 }
@@ -118,7 +122,39 @@ def test_from_settings_loads_yaml_config():
             assert config.master_agent.timeout_seconds == 600
             assert config.polling.enabled is False
             assert config.assignee_dispatch.enabled is False
+            assert config.assignee_dispatch.use_worktree is False
             assert config.pr_review_dispatch.enabled is False
             assert config.pr_review_dispatch.async_mode is True
+            assert config.pr_review_dispatch.use_worktree is True
+        finally:
+            settings_module.VibeConfig.get_defaults = original_get_defaults
+
+
+def test_from_settings_normalizes_empty_repo_to_none():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        settings_path = Path(tmpdir) / "settings.yaml"
+        settings_path.write_text(
+            yaml.dump(
+                {
+                    "orchestra": {
+                        "enabled": True,
+                        "repo": "",
+                    }
+                }
+            )
+        )
+
+        import vibe3.config.settings as settings_module
+
+        original_get_defaults = settings_module.VibeConfig.get_defaults
+
+        def mock_get_defaults():
+            return settings_module.VibeConfig.from_yaml(settings_path)
+
+        settings_module.VibeConfig.get_defaults = staticmethod(mock_get_defaults)
+
+        try:
+            config = OrchestraConfig.from_settings()
+            assert config.repo is None
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults

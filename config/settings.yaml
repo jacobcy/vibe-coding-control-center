@@ -338,8 +338,8 @@ orchestra:
   polling:
     enabled: false
 
-  # GitHub repository (optional, defaults to current repo)
-  repo: "jacobcy/vibe-coding-control-center"
+  # GitHub repository (optional). null 表示默认使用当前工作目录对应仓库
+  repo: null
 
   # HTTP port for webhook receiver
   port: 8080
@@ -352,16 +352,21 @@ orchestra:
 
   # Manager usernames used as reviewer/assignee match target
   manager_usernames:
+    - "vibe-manager"
     - "jacobcy"
 
   # Proactive manager dispatch via issues/assigned
   assignee_dispatch:
-    enabled: false
+    enabled: true
+    # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
+    use_worktree: true
 
   # PR reviewer-triggered review execution
   pr_review_dispatch:
     enabled: true
     async_mode: true
+    # reviewer 默认复用 PR 对应已有 worktree；如需强制新 worktree 可开启
+    use_worktree: false
 
   # @mention auto-ack in issue comments
   comment_reply:

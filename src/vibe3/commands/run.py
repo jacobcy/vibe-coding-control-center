@@ -13,6 +13,7 @@ from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _MODEL_OPT,
     _TRACE_OPT,
+    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
@@ -50,6 +51,7 @@ def _execute_run_command(
     agent: str | None,
     backend: str | None,
     model: str | None,
+    worktree: bool,
     handoff_metadata: dict[str, object] | None,
 ) -> None:
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
@@ -63,6 +65,7 @@ def _execute_run_command(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
         config=config,
         branch=branch,
     )
@@ -99,6 +102,7 @@ def run_command(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Execute implementation plan or skill."""
     if trace:
@@ -129,6 +133,7 @@ def run_command(
             agent=agent,
             backend=backend,
             model=model,
+            worktree=worktree,
             handoff_metadata={"skill": skill},
         )
         return
@@ -173,6 +178,7 @@ def run_command(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
         handoff_metadata={"plan_ref": plan_file} if plan_file else None,
     )
 
@@ -213,6 +219,7 @@ def default(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
@@ -227,4 +234,5 @@ def default(
         agent,
         backend,
         model,
+        worktree,
     )

@@ -211,6 +211,7 @@ class OrchestraAssigneeDispatchSettings(BaseModel):
     """Assignee-driven orchestra dispatch settings."""
 
     enabled: bool = True
+    use_worktree: bool = True
 
 
 class OrchestraPRReviewDispatchSettings(BaseModel):
@@ -218,6 +219,7 @@ class OrchestraPRReviewDispatchSettings(BaseModel):
 
     enabled: bool = True
     async_mode: bool = False
+    use_worktree: bool = False
 
 
 class OrchestraSettings(BaseModel):

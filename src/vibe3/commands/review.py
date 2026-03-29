@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _TRACE_OPT,
+    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
@@ -72,6 +73,7 @@ def pr(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     async_mode: _ASYNC_OPT = False,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
 
@@ -101,6 +103,7 @@ def pr(
         pr_number=pr_number,
         branch=branch,
         async_mode=async_mode,
+        worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict == "BLOCK":
@@ -122,6 +125,7 @@ def base(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     async_mode: _ASYNC_OPT = False,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -175,6 +179,7 @@ def base(
             handoff_kind="review",
             config=config,
             branch=current_branch,
+            worktree=worktree,
         )
         CodeagentExecutionService(config).execute(command, async_mode=True)
         return
@@ -191,6 +196,7 @@ def base(
         issue_number=issue_number,
         branch=current_branch,
         async_mode=async_mode,
+        worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict == "BLOCK":

@@ -29,6 +29,7 @@ class CodeagentCommand:
     agent: str | None = None
     backend: str | None = None
     model: str | None = None
+    worktree: bool = False
     config: VibeConfig | None = None
     branch: str | None = None
     cli_args: list[str] | None = None
@@ -59,6 +60,7 @@ class CodeagentExecutionService:
         agent: str | None = None,
         backend: str | None = None,
         model: str | None = None,
+        worktree: bool = False,
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
@@ -76,18 +78,33 @@ class CodeagentExecutionService:
             config_model = getattr(ac, "model", None)
 
         if agent:
-            return AgentOptions(agent=agent, backend=None, model=None)
+            return AgentOptions(
+                agent=agent, backend=None, model=None, worktree=worktree
+            )
 
         if backend:
             return AgentOptions(
-                agent=None, backend=backend, model=model or config_model
+                agent=None,
+                backend=backend,
+                model=model or config_model,
+                worktree=worktree,
             )
 
         if config_agent:
-            return AgentOptions(agent=config_agent, backend=None, model=None)
+            return AgentOptions(
+                agent=config_agent,
+                backend=None,
+                model=None,
+                worktree=worktree,
+            )
 
         if config_backend:
-            return AgentOptions(agent=None, backend=config_backend, model=config_model)
+            return AgentOptions(
+                agent=None,
+                backend=config_backend,
+                model=config_model,
+                worktree=worktree,
+            )
 
         raise ValueError(
             f"No agent configuration found for '{section}' command. "
@@ -112,6 +129,7 @@ class CodeagentExecutionService:
             agent=command.agent,
             backend=command.backend,
             model=command.model,
+            worktree=command.worktree,
         )
 
         request = ExecutionRequest(
@@ -227,6 +245,8 @@ class CodeagentExecutionService:
             cmd.extend(["--backend", command.backend])
         if command.model:
             cmd.extend(["--model", command.model])
+        if command.worktree:
+            cmd.append("--worktree")
         if command.task:
             cmd.append(command.task)
         return cmd
@@ -242,6 +262,7 @@ def create_codeagent_command(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
+    worktree: bool = False,
     config: VibeConfig | None = None,
     branch: str | None = None,
     cli_args: list[str] | None = None,
@@ -258,6 +279,7 @@ def create_codeagent_command(
         agent: Agent preset override
         backend: Backend override
         model: Model override
+        worktree: Whether to use codeagent-wrapper --worktree mode
         config: VibeConfig instance
         branch: Current branch (for async execution)
         cli_args: Optional explicit CLI args used for async self-invocation
@@ -281,6 +303,7 @@ def create_codeagent_command(
         agent=agent,
         backend=backend,
         model=model,
+        worktree=worktree,
         config=config,
         branch=branch,
         cli_args=cli_args,
