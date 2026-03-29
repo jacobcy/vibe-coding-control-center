@@ -100,7 +100,11 @@ def register_query_commands(app: typer.Typer) -> None:
                 ).debug("Found PR number in flow state")
 
             try:
-                pr = usecase.fetch_pr(pr_number, branch)
+                pr = usecase.fetch_pr(
+                    pr_number,
+                    branch,
+                    current_branch=target.current_branch,
+                )
             except LookupError:
                 typer.echo(
                     usecase.build_missing_pr_message(

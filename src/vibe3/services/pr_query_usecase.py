@@ -56,9 +56,17 @@ class PrQueryUsecase:
             from_flow=resolved_pr is not None,
         )
 
-    def fetch_pr(self, pr_number: int | None, branch: str | None) -> PRResponse:
+    def fetch_pr(
+        self,
+        pr_number: int | None,
+        branch: str | None,
+        current_branch: str | None = None,
+    ) -> PRResponse:
         """Load PR or raise a command-facing lookup error."""
         pr = self.pr_service.get_pr(pr_number, branch)
+        if not pr and pr_number is not None and current_branch:
+            # Remote-first fallback: cached pr_number may drift; retry by branch truth.
+            pr = self.pr_service.get_pr(branch=current_branch)
         if not pr:
             raise LookupError("PR not found")
         return pr

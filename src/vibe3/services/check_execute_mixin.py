@@ -4,14 +4,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from vibe3.services.check_service import CheckResult, FixResult, InitResult
+    from vibe3.services.check_remote_index_mixin import InitResult
+    from vibe3.services.check_service import CheckResult, FixResult
 
 
 @dataclass
 class ExecuteCheckResult:
     """Result of execute_check."""
 
-    mode: Literal["default", "init", "all", "fix"]
+    mode: Literal["default", "init", "all", "fix", "fix_all"]
     success: bool
     summary: str
     details: dict = field(default_factory=dict)
@@ -36,9 +37,13 @@ class CheckExecuteMixin:
         """Auto-fix issues. Must be implemented by mixed-in class."""
         raise NotImplementedError
 
+    def auto_fix_branch(self, branch: str, issues: list[str]) -> "FixResult":
+        """Auto-fix issues for a specific branch."""
+        raise NotImplementedError
+
     def execute_check(
         self,
-        mode: Literal["default", "init", "all", "fix"] = "default",
+        mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
         branch: str | None = None,
     ) -> ExecuteCheckResult:
         """Unified check execution with mode-based routing.
@@ -56,6 +61,8 @@ class CheckExecuteMixin:
             return self._handle_all_mode()
         elif mode == "fix":
             return self._handle_fix_mode(branch)
+        elif mode == "fix_all":
+            return self._handle_fix_all_mode()
         else:
             return self._handle_default_mode(branch)
 
@@ -87,6 +94,48 @@ class CheckExecuteMixin:
                 else f"{len(invalid)}/{len(results)} flows have issues"
             ),
             details={"invalid": invalid},
+        )
+
+    def _handle_fix_all_mode(self) -> "ExecuteCheckResult":
+        """Handle --fix --all mode: check every flow and auto-fix fixable issues."""
+        results = self.verify_all_flows()
+        invalid = [r for r in results if not r.is_valid]
+        if not invalid:
+            return ExecuteCheckResult(
+                mode="fix_all",
+                success=True,
+                summary=f"All {len(results)} flows passed",
+            )
+
+        fixed_count = 0
+        failed: list[str] = []
+        for r in invalid:
+            fix_result = self.auto_fix_branch(r.branch, r.issues)
+            if fix_result.success:
+                fixed_count += 1
+            else:
+                error_msg = fix_result.error or "unknown error"
+                failed.append(f"{r.branch}: {error_msg}")
+
+        total = len(invalid)
+        if failed:
+            return ExecuteCheckResult(
+                mode="fix_all",
+                success=False,
+                summary=(
+                    f"Fixed {fixed_count}/{total}, "
+                    f"{len(failed)} had unfixable issues"
+                ),
+                details={"fixed": fixed_count, "failed": failed},
+            )
+        return ExecuteCheckResult(
+            mode="fix_all",
+            success=True,
+            summary=(
+                f"All {fixed_count} fixable issues resolved "
+                f"across {len(results)} flows"
+            ),
+            details={"fixed": fixed_count},
         )
 
     def _handle_fix_mode(self, branch: str | None) -> ExecuteCheckResult:
