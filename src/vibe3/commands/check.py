@@ -15,7 +15,7 @@ app = typer.Typer(
 
 
 def _emit_check_details(
-    mode: Literal["default", "init", "all", "fix"],
+    mode: Literal["default", "init", "all", "fix", "fix_all"],
     details: dict[str, Any],
     *,
     fix_requested: bool,
@@ -41,6 +41,15 @@ def _emit_check_details(
             for issue in issues:
                 typer.echo(f"    - {issue}", err=True)
             typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
+        return
+
+    if mode == "fix_all":
+        fixed_count = details.get("fixed", 0)
+        failed = details.get("failed") or []
+        if fixed_count:
+            typer.echo(f"  Fixed: {fixed_count} flows")
+        for f in failed:
+            typer.echo(f"  Failed: {f}", err=True)
         return
 
     issues = details.get("issues") or []
@@ -92,6 +101,8 @@ def check(
       [green]vibe3 check --fix[/green]   Auto-fix current branch
                          Fixable: missing handoff file, missing pr_number
 
+      [green]vibe3 check --fix --all[/green]  Check + fix all flows
+
       [green]vibe3 check --init[/green]  Scan merged PRs + GitHub Project items,
                          back-fill task_issue_number for all flows.
                          Network call to GitHub. Writes to local store.
@@ -106,8 +117,14 @@ def check(
 
     try:
         service = CheckService()
-        mode: Literal["default", "init", "all", "fix"] = (
-            "init" if init else "all" if all_flows else "fix" if fix else "default"
+        mode: Literal["default", "init", "all", "fix", "fix_all"] = (
+            "init"
+            if init
+            else (
+                "fix_all"
+                if fix and all_flows
+                else "all" if all_flows else "fix" if fix else "default"
+            )
         )
         if mode == "init":
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")

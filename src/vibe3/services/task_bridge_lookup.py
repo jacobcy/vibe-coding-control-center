@@ -13,24 +13,11 @@ def hydrate_task(
     branch: str,
 ) -> HydratedTaskView | HydrateError:
     """从远端 GitHub Project 读取 task 真值，合并为 HydratedTaskView（只读）。"""
-    # Auto-ensure flow for branch
-    from vibe3.models.flow import MainBranchProtectedError
-    from vibe3.services.flow_service import FlowService
-
-    try:
-        FlowService().ensure_flow_for_branch(branch)
-    except MainBranchProtectedError as e:
-        return HydrateError(
-            type="main_branch_protected",
-            message=str(e),
-        )
-
     flow_data = self.store.get_flow_state(branch)
     if not flow_data:
-        # Should not happen after ensure_flow_for_branch, handle defensively
         return HydrateError(
             type="no_remote_identity",
-            message=f"Branch '{branch}' flow creation failed unexpectedly",
+            message=f"Branch '{branch}' 没有 flow 记录，无法查看 task",
         )
 
     project_item_id = flow_data.get("project_item_id")

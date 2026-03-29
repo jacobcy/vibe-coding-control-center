@@ -6,6 +6,7 @@ from io import StringIO
 from typing import Annotated
 
 import typer
+from loguru import logger
 
 from vibe3.services.serena_service import SerenaService
 from vibe3.utils.trace import enable_trace
@@ -101,8 +102,9 @@ def register(app: typer.Typer) -> None:
             else:
                 _print_symbol_references(result)
 
-        except Exception:
+        except Exception as e:
             sys.stderr = old_stderr
+            logger.debug(f"Skipping: {e}")
             raise
 
 

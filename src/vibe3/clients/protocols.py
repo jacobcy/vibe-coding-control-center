@@ -96,6 +96,8 @@ class GitHubClientProtocol(Protocol):
         """View a GitHub issue. Returns 'network_error' string on network failure."""
         ...
 
-    def list_prs_for_branch(self, branch: str) -> list[PRResponse]:
+    def list_prs_for_branch(
+        self, branch: str, *, state: str | None = None
+    ) -> list[PRResponse]:
         """List PRs for a specific branch."""
         ...
