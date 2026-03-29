@@ -4,23 +4,18 @@ Primary entry point: HeartbeatServer (vibe3 serve start)
   - AssigneeDispatchService: dispatches manager on issues/assigned webhook
   - CommentReplyService: acknowledges @vibe-manager mentions
   - Polling fallback every 15 min via on_tick()
-
-Legacy label-state-machine (Dispatcher + Router) kept for reference.
 """
 
 from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
 from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.master import TriageDecision, run_master_agent
-from vibe3.orchestra.models import IssueInfo, Trigger
-from vibe3.orchestra.router import Router
+from vibe3.orchestra.models import IssueInfo
 
 __all__ = [
     "MasterAgentConfig",
     "OrchestraConfig",
     "Dispatcher",
     "IssueInfo",
-    "Router",
     "TriageDecision",
-    "Trigger",
     "run_master_agent",
 ]

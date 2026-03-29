@@ -5,7 +5,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from vibe3.models.orchestration import IssueState
 from vibe3.services.review_runner import AgentOptions
 
 
@@ -29,37 +28,6 @@ def _default_pid_file() -> Path:
     except Exception:
         pass
     return Path(".git/vibe3/orchestra.pid")
-
-
-class StateTrigger(BaseModel):
-    """Trigger configuration for a state transition."""
-
-    from_state: IssueState | None
-    to_state: IssueState
-    command: str
-    args: list[str] = Field(default_factory=list)
-
-
-STATE_TRIGGERS: list[StateTrigger] = [
-    StateTrigger(
-        from_state=IssueState.READY,
-        to_state=IssueState.CLAIMED,
-        command="plan",
-        args=["task"],
-    ),
-    StateTrigger(
-        from_state=IssueState.CLAIMED,
-        to_state=IssueState.IN_PROGRESS,
-        command="run",
-        args=["execute"],
-    ),
-    StateTrigger(
-        from_state=IssueState.IN_PROGRESS,
-        to_state=IssueState.REVIEW,
-        command="review",
-        args=["pr"],
-    ),
-]
 
 
 class CommentReplyConfig(BaseModel):

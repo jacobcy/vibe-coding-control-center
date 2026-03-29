@@ -35,6 +35,16 @@ class HeartbeatServer:
     def service_names(self) -> list[str]:
         return [type(s).__name__ for s in self._services]
 
+    @property
+    def queue_size(self) -> int:
+        """Current number of events waiting in the queue."""
+        return self._event_queue.qsize()
+
+    @property
+    def running(self) -> bool:
+        """Whether the heartbeat server is currently running."""
+        return self._running
+
     async def emit(self, event: GitHubEvent) -> None:
         """Push a GitHub event onto the queue for async processing."""
         await self._event_queue.put(event)

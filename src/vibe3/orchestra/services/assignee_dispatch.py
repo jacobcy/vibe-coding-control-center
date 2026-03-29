@@ -122,9 +122,6 @@ class AssigneeDispatchService(ServiceBase):
             log.info(f"Deferred: blocked by {blockers}")
             return
 
-        cmd = self._dispatcher.build_manager_command(issue)
-        log.info(f"Parsed webhook to command: {' '.join(cmd)}")
-
         loop = asyncio.get_event_loop()
         dispatched = await loop.run_in_executor(
             self._executor, self._dispatcher.dispatch_manager, issue

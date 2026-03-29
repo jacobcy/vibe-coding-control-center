@@ -79,7 +79,7 @@ def make_webhook_router(
             {
                 "status": "ok",
                 "services": heartbeat.service_names,
-                "queue_size": heartbeat._event_queue.qsize(),
+                "queue_size": heartbeat.queue_size,
             }
         )
 
@@ -87,7 +87,7 @@ def make_webhook_router(
     async def status() -> JSONResponse:
         return JSONResponse(
             {
-                "running": heartbeat._running,
+                "running": heartbeat.running,
                 "services": heartbeat.service_names,
                 "polling_interval": heartbeat.config.polling_interval,
                 "polling_enabled": heartbeat.config.polling.enabled,
