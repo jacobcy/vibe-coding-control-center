@@ -51,7 +51,10 @@ related_docs:
 - 触发条件：`issues/assigned` 且 assignee 在 `manager_usernames`。
 - 执行动作：创建/复用 flow，检查依赖后调度 manager 执行。
 - 默认策略：`assignee_dispatch.use_worktree=true`，通过 `vibe3 run --worktree ...` 触发独立临时 worktree 执行。
-- 执行前会切换到 issue 对应 flow 分支再调用 `vibe3 run`，建议在专用、干净的 serve 工作树中运行。
+- 执行语义（当前真源）：
+  - 不切换 `serve` 进程当前分支，避免污染守护进程工作树。
+  - 优先在已存在的 issue 分支 worktree 执行；不存在则自动创建 `.worktrees/issue-<number>`。
+  - 对旧分支兼容：若目标分支暂不支持 `vibe3 run --worktree`，自动降级去掉该参数继续执行。
 - 心跳会对当前已分配 issue 做重检（依赖/flow 存在性），避免漏调度。
 
 代码参考：
@@ -84,6 +87,7 @@ related_docs:
 
 - [prd-orchestra-integration.md](prd-orchestra-integration.md) - 当前 PRD（含本版边界）
 - [github-issue-draft.md](github-issue-draft.md) - follow-up issue 拆分草稿
+- [release-handoff.md](release-handoff.md) - 发布接手手册（给后续 agent）
 - [debug-reviewer-webhook.md](debug-reviewer-webhook.md) - reviewer webhook 调试与验收手册
 
 ## 快速开始
