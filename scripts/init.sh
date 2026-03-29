@@ -58,6 +58,17 @@ _symlink_files() {
 
 echo -e "\n\033[1;36m🔧 Setting up Vibe Center development environment...\033[0m"
 
+# ── 0.5 Ensure uv CLI is discoverable ─────────────────────────────────────
+if ! command -v uv &> /dev/null; then
+  if [[ -x "$HOME/.local/bin/uv" ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+    echo "✅ uv detected at ~/.local/bin/uv"
+  else
+    echo -e "\033[1;33m⚠️  Warning: uv CLI not found in PATH\033[0m"
+    echo "   Please run: scripts/install.sh (it bootstraps uv to ~/.local/bin)"
+  fi
+fi
+
 # ── 0. Check UV_PROJECT_ENVIRONMENT ───────────────────────────────────────
 # Verify that UV_PROJECT_ENVIRONMENT is set and points to global venv
 if [[ -z "$UV_PROJECT_ENVIRONMENT" ]]; then

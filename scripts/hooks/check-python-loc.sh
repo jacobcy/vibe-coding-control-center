@@ -8,7 +8,7 @@
 # Uses only the Python standard library so it can run before uv sync.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
-#   - src/vibe3/
+#   - src/vibe3/ (excluding plugin modules such as src/vibe3/orchestra/)
 #
 # Note: scripts/ NOT included in total LOC (checked separately for single-file limits only)
 
@@ -51,8 +51,12 @@ config = parse_config("config/settings.yaml")
 limit_total = int(config["code_limits.total_file_loc.v3_python"])
 
 total_loc = 0
+excluded_prefixes = ("src/vibe3/orchestra/",)
 for path in Path("src/vibe3").rglob("*.py"):
+  posix_path = path.as_posix()
   if "__pycache__" in path.parts or path.name == "__init__.py":
+    continue
+  if any(posix_path.startswith(prefix) for prefix in excluded_prefixes):
     continue
   total_loc += sum(1 for _ in path.open())
 

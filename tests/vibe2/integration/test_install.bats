@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export VIBE_ROOT="$BATS_TEST_DIRNAME/../.."
+  export VIBE_ROOT="$BATS_TEST_DIRNAME/../../.."
 }
 
 @test "install migrates pending task title as YAML-safe single-line frontmatter" {

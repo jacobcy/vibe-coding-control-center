@@ -146,6 +146,7 @@ def test_flow_switch_help_uses_branch_option() -> None:
     assert "Usage: root switch [OPTIONS]" in stdout
     assert "--branch" in stdout
     assert "Branch name or flow slug" in stdout
+    assert "--pr" in stdout
 
 
 def test_task_link_command_removed() -> None:
