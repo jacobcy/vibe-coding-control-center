@@ -106,5 +106,6 @@ def branch_exists(branch_name: str) -> bool:
     try:
         _run_git(["rev-parse", "--verify", branch_name])
         return True
-    except GitError:
+    except GitError as e:
+        logger.debug(f"Branch check failed: {e}")
         return False

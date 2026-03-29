@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from loguru import logger
+
 from vibe3.clients.git_client import GitClient
 from vibe3.config.loader import get_config
 from vibe3.exceptions import GitError, UserError
@@ -111,8 +113,8 @@ def build_json_output(
                     changed_funcs = svc.get_changed_functions(file, source=source)
                     if changed_funcs:
                         changed_symbols_by_file[file] = changed_funcs
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Skipping: {e}")
 
     has_critical = any(f["critical_path"] for f in core_files)
     has_public_api = any(f["public_api"] for f in core_files)

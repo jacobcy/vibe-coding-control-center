@@ -59,8 +59,8 @@ class GitHubProjectClient(GitHubClientBase, ProjectQueryMixin, ProjectMutationMi
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"GitHub auth token retrieval failed: {e}")
         return None
 
     def _run_graphql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:

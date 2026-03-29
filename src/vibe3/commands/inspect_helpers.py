@@ -82,7 +82,8 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         if source_type == "uncommit":
             try:
                 untracked_files = set(git_client.get_untracked_files())
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Skipping: {e}")
                 untracked_files = set()
 
         sys.stderr = old_stderr

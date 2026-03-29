@@ -3,6 +3,8 @@
 import subprocess
 from typing import TYPE_CHECKING, Protocol
 
+from loguru import logger
+
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
 )
@@ -243,13 +245,13 @@ class GitClient:
             # so abort may fail and should be ignored.
             try:
                 self._run(["merge", "--abort"])
-            except GitError:
-                pass
+            except GitError as e:
+                logger.debug(f"Merge abort failed, ignoring: {e}")
             return False
         except GitError:
             # Conflict or error -- best-effort abort and report conflict.
             try:
                 self._run(["merge", "--abort"])
-            except GitError:
-                pass
+            except GitError as e:
+                logger.debug(f"Merge abort failed, ignoring: {e}")
             return True
