@@ -45,7 +45,9 @@ def test_flow_blocked_succeeds_when_flow_exists() -> None:
         )
 
     assert result.exit_code == 0
-    flow_service.block_flow.assert_called_once()
+    flow_service.block_flow.assert_called_once_with(
+        "task/demo", reason="waiting", blocked_by_issue=None
+    )
 
 
 def test_flow_blocked_supports_pr_option() -> None:

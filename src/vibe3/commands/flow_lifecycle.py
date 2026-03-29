@@ -41,6 +41,18 @@ def resolve_target_branch(branch: str | None, pr: int | None) -> str | None:
     return branch
 
 
+def require_flow(service: FlowService, branch: str) -> None:
+    """Exit with error if no flow exists for the given branch."""
+    if service.get_flow_status(branch):
+        return
+    typer.echo(
+        f"Error: 目标分支 '{branch}' 没有 flow\n"
+        "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+        err=True,
+    )
+    raise typer.Exit(1)
+
+
 def switch(
     branch: Annotated[
         str | None,
@@ -99,14 +111,7 @@ def done(
 
         logger.bind(command="flow done", branch=target_branch).info("Closing flow")
 
-        flow_status = service.get_flow_status(target_branch)
-        if not flow_status:
-            typer.echo(
-                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
-                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
-                err=True,
-            )
-            raise typer.Exit(1)
+        require_flow(service, target_branch)
 
         service.close_flow(target_branch, check_pr=True)
 
@@ -154,14 +159,7 @@ def blocked(
             by=by,
         ).info("Blocking flow")
 
-        flow_status = service.get_flow_status(target_branch)
-        if not flow_status:
-            typer.echo(
-                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
-                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
-                err=True,
-            )
-            raise typer.Exit(1)
+        require_flow(service, target_branch)
 
         blocked_by_issue = task if task is not None else by
         service.block_flow(
@@ -194,14 +192,7 @@ def aborted(
 
         logger.bind(command="flow aborted", branch=target_branch).info("Aborting flow")
 
-        flow_status = service.get_flow_status(target_branch)
-        if not flow_status:
-            typer.echo(
-                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
-                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
-                err=True,
-            )
-            raise typer.Exit(1)
+        require_flow(service, target_branch)
 
         service.abort_flow(target_branch)
 
