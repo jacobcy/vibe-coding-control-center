@@ -52,6 +52,13 @@ _get_shell_rc() {
     esac
 }
 
+_get_direnv_hook() {
+    case "$SHELL" in
+        */bash) echo 'eval "$(direnv hook bash)"' ;;
+        *) echo 'eval "$(direnv hook zsh)"' ;;
+    esac
+}
+
 _setup_gh_noninteractive() {
     log_step "Setting up GitHub CLI defaults..."
 
@@ -169,7 +176,8 @@ _setup_direnv() {
     fi
 
     # Add direnv hook to RC file
-    local direnv_hook='eval "$(direnv hook zsh)"'
+    local direnv_hook
+    direnv_hook="$(_get_direnv_hook)"
     if ! grep -qF 'direnv hook zsh' "$RC_FILE" 2>/dev/null; then
         _append_to_rc "$RC_FILE" "$direnv_hook" "direnv"
         log_info "Added direnv hook to $RC_FILE"
