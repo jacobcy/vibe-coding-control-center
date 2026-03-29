@@ -4,6 +4,7 @@ import re
 from collections.abc import Sequence
 from typing import Literal
 
+from vibe3.exceptions import UserError
 from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse, IssueLink
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
@@ -136,6 +137,13 @@ class FlowUsecase:
         """Create a branch-backed flow while enforcing worktree governance."""
         current_branch = self.flow_service.get_current_branch()
         decision = self.flow_service.can_create_from_current_worktree(current_branch)
+        if not decision.allowed and self._try_auto_close_done_eligible_flow(
+            current_branch, actor=actor
+        ):
+            current_branch = self.flow_service.get_current_branch()
+            decision = self.flow_service.can_create_from_current_worktree(
+                current_branch
+            )
         self._validate_create_request(base, decision)
         task_refs = self._normalize_task_refs(task)
         self._validate_issue_refs(task_refs)
@@ -164,6 +172,25 @@ class FlowUsecase:
         self._apply_initial_bindings(branch, task_refs, spec, actor=actor)
         self.handoff_service.ensure_current_handoff()
         return flow
+
+    def _try_auto_close_done_eligible_flow(
+        self,
+        branch: str,
+        actor: str | None = None,
+    ) -> bool:
+        """Auto-close current active flow when PR merge guard allows it."""
+        flow_status = self.flow_service.get_flow_status(branch)
+        if flow_status is None or flow_status.flow_status != "active":
+            return False
+
+        try:
+            if actor is None:
+                self.flow_service.close_flow(branch, check_pr=True)
+            else:
+                self.flow_service.close_flow(branch, check_pr=True, actor=actor)
+        except UserError:
+            return False
+        return True
 
     def bind_issue(
         self,
