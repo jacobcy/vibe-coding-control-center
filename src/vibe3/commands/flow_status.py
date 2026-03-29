@@ -64,9 +64,14 @@ def _fetch_issue_titles(
                     "task_issue": n,
                 }
     pr_data: dict[str, object] | None = None
-    if flow_status.pr_number and not network_error:
+    if not network_error:
         try:
-            pr = gh.get_pr(flow_status.pr_number)
+            pr = None
+            if flow_status.pr_number:
+                pr = gh.get_pr(flow_status.pr_number)
+            if not pr:
+                # Remote-first fallback: cached PR id may miss or drift.
+                pr = gh.get_pr(branch=flow_status.branch)
             if pr:
                 pr_data = {
                     "number": pr.number,
