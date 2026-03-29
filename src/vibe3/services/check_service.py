@@ -57,7 +57,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     # Single-branch check
     # ------------------------------------------------------------------
 
-    def verify_current_flow(self, fix: bool = False) -> CheckResult:
+    def verify_current_flow(self) -> CheckResult:
         """Verify current branch flow consistency.
 
         Checks:
@@ -174,8 +174,8 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     # Local auto-fix (current branch, no network)
     # ------------------------------------------------------------------
 
-    def auto_fix(self, issues: list[str]) -> FixResult:
-        """Auto-fix local consistency issues for the current branch.
+    def auto_fix(self, issues: list[str], *, branch: str | None = None) -> FixResult:
+        """Auto-fix local consistency issues for a branch.
 
         Handles:
         - Missing shared current.md (creates empty placeholder)
@@ -183,7 +183,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
 
         Some fixes require network access to GitHub.
         """
-        branch = self.git_client.get_current_branch()
+        branch = branch or self.git_client.get_current_branch()
         fixed: list[str] = []
 
         for issue in issues:
@@ -234,6 +234,13 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 + f"\n{hint}",
             )
         return FixResult(success=True)
+
+    def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
+        """Auto-fix issues for a specific branch.
+
+        Delegates to auto_fix with explicit branch parameter.
+        """
+        return self.auto_fix(issues, branch=branch)
 
     # ------------------------------------------------------------------
     # Remote index init (network, writes task_issue_number)

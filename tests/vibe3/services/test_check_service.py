@@ -227,3 +227,50 @@ class TestAutoFix:
         assert not result.success
         assert result.error is not None
         assert "--init" in result.error
+
+
+class TestAutoFixBranch:
+    """Tests for auto_fix_branch method."""
+
+    def test_auto_fix_branch_creates_handoff(self, check_service, mock_git_client):
+        """auto_fix_branch creates handoff for the specified branch."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_dir = Path(tmpdir) / ".git"
+            git_dir.mkdir()
+
+            with patch.object(
+                check_service.git_client,
+                "get_git_common_dir",
+                return_value=str(git_dir),
+            ):
+                result = check_service.auto_fix_branch(
+                    "feature/other-branch",
+                    ["Shared handoff file not found: /some/path/current.md"],
+                )
+
+        assert result.success
+
+    def test_auto_fix_branch_backfills_pr_number(
+        self, check_service, mock_github_client, mock_store
+    ):
+        """auto_fix_branch backfills pr_number for the specified branch."""
+        mock_github_client.list_prs_for_branch.return_value = [
+            PRResponse(
+                number=789,
+                title="Test",
+                body="",
+                state=PRState.OPEN,
+                head_branch="feature/other-branch",
+                base_branch="main",
+                url="https://github.com/test/pr/789",
+                draft=False,
+            )
+        ]
+        result = check_service.auto_fix_branch(
+            "feature/other-branch",
+            ["Branch has open PR #789 but database missing pr_number"],
+        )
+        assert result.success
+        mock_github_client.list_prs_for_branch.assert_called_with(
+            "feature/other-branch"
+        )
