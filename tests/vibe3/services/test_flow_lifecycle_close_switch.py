@@ -210,6 +210,49 @@ class TestFlowCloseBranchSwitching:
         assert "delete_remote:task/current-flow" in actions
 
     @patch("vibe3.services.flow_lifecycle.GitClient")
+    def test_close_flow_handles_worktree_occupied_race_during_delete(
+        self,
+        mock_git_class: MagicMock,
+        mock_store: Mock,
+    ) -> None:
+        """Delete race should be tolerated when branch becomes worktree-occupied."""
+        self._build_flow_store(mock_store)
+
+        actions: list[str] = []
+        mock_git = MagicMock()
+        mock_git.get_current_branch.return_value = "task/current-flow"
+        mock_git.get_worktree_root.return_value = "/repo/main"
+        mock_git.branch_exists.side_effect = (
+            lambda branch: branch in {"task/current-flow", "main"}
+        )
+        mock_git.is_branch_occupied_by_worktree.return_value = False
+        mock_git.switch_branch.side_effect = lambda branch: actions.append(
+            f"switch:{branch}"
+        )
+        mock_git.delete_branch.side_effect = RuntimeError(
+            "error: cannot delete branch 'task/current-flow' "
+            "used by worktree at '/repo/wt-other'"
+        )
+        mock_git.delete_remote_branch.side_effect = lambda branch: actions.append(
+            f"delete_remote:{branch}"
+        )
+        mock_git._run.side_effect = lambda args: actions.append(f"run:{' '.join(args)}")
+        mock_git_class.return_value = mock_git
+
+        mock_store.get_flow_dependents.return_value = []
+
+        service = FlowService(store=mock_store)
+
+        service.close_flow("task/current-flow", check_pr=False)
+
+        assert "delete_remote:task/current-flow" in actions
+        mock_store.update_flow_state.assert_called_once_with(
+            "task/current-flow",
+            flow_status="done",
+            latest_actor="workflow",
+        )
+
+    @patch("vibe3.services.flow_lifecycle.GitClient")
     def test_close_flow_returns_to_develop_branch_in_develop_worktree(
         self,
         mock_git_class: MagicMock,
