@@ -175,6 +175,7 @@ def test_flow_create_supports_multiple_task_refs_in_single_flag_style(
     """flow create --task 281 282 should bind both task issues."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "main"
+    flow_service.resolve_flow_name.return_value = "multi-task"
     flow_service.can_create_from_current_worktree.return_value = CreateDecision(
         allowed=True,
         reason="No active flow in current worktree",

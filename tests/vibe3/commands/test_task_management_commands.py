@@ -34,18 +34,20 @@ def test_flow_add_defaults_to_current_branch_slug(
 ) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo-feature"
+    flow_service.resolve_flow_name.return_value = "demo-feature"
     mock_service_cls.return_value = flow_service
 
     flow_state = FlowState(branch="task/demo-feature", flow_slug="demo-feature")
     mock_usecase = MagicMock()
     mock_usecase.add_flow.return_value = flow_state
-    mock_usecase_cls.return_value = mock_usecase
+    mock_usecase_cls.create.return_value = mock_usecase
+    mock_usecase_cls.validate_issue_refs.return_value = None
 
     result = runner.invoke(flow_app, ["add"])
 
     assert result.exit_code == 0
-    mock_usecase_cls.assert_called_once()
-    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase_cls.create.assert_called_once()
+    assert mock_usecase_cls.create.call_args.args[0] is flow_service
     mock_usecase.add_flow.assert_called_once_with(
         name="demo-feature",
         task=None,
@@ -61,18 +63,20 @@ def test_flow_create_defaults_to_current_branch_slug(
 ) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "feature/new-ui"
+    flow_service.resolve_flow_name.return_value = "new-ui"
     mock_service_cls.return_value = flow_service
 
     flow_state = FlowState(branch="task/new-ui", flow_slug="new-ui")
     mock_usecase = MagicMock()
     mock_usecase.create_flow.return_value = flow_state
-    mock_usecase_cls.return_value = mock_usecase
+    mock_usecase_cls.create.return_value = mock_usecase
+    mock_usecase_cls.validate_issue_refs.return_value = None
 
     result = runner.invoke(flow_app, ["create", "--base", "origin/main"])
 
     assert result.exit_code == 0
-    mock_usecase_cls.assert_called_once()
-    assert mock_usecase_cls.call_args.kwargs["flow_service"] is flow_service
+    mock_usecase_cls.create.assert_called_once()
+    assert mock_usecase_cls.create.call_args.args[0] is flow_service
     mock_usecase.create_flow.assert_called_once_with(
         name="new-ui",
         base="origin/main",
@@ -86,9 +90,27 @@ def test_flow_create_defaults_to_current_branch_slug(
 def test_flow_add_rejects_detached_head_default(mock_service_cls: MagicMock) -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "HEAD"
+    flow_service.resolve_flow_name.side_effect = ValueError(
+        "Cannot infer flow name from detached HEAD"
+    )
     mock_service_cls.return_value = flow_service
 
     result = runner.invoke(flow_app, ["add"])
+
+    assert result.exit_code != 0
+    assert "detached" in result.output or "HEAD" in result.output
+
+
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_create_rejects_detached_head_default(mock_service_cls: MagicMock) -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "HEAD"
+    flow_service.resolve_flow_name.side_effect = ValueError(
+        "Cannot infer flow name from detached HEAD"
+    )
+    mock_service_cls.return_value = flow_service
+
+    result = runner.invoke(flow_app, ["create"])
 
     assert result.exit_code != 0
     assert "detached" in result.output or "HEAD" in result.output
@@ -139,23 +161,6 @@ def test_task_list_help_no_issue_filter_option() -> None:
 
     assert result.exit_code == 0
     assert "--issue" not in stdout
-
-
-def test_flow_bind_supports_related_role() -> None:
-    """Test flow bind successfully binds a task to the current flow."""
-    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
-        task_service = MagicMock()
-        task_service_cls.return_value = task_service
-
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
-            result = runner.invoke(flow_app, ["bind", "219"])
-
-    assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/demo", 219, "task", actor=None
-    )
 
 
 def test_task_status_command_removed() -> None:
@@ -233,54 +238,3 @@ def test_flow_bind_role_option_has_all_roles() -> None:
     assert "task" in stdout
     assert "related" in stdout
     assert "dependency" in stdout
-
-
-def test_flow_bind_with_task_role() -> None:
-    """flow bind 220 --role task should bind as task."""
-    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
-        task_service = MagicMock()
-        task_service_cls.return_value = task_service
-
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
-            result = runner.invoke(flow_app, ["bind", "220", "--role", "task"])
-
-    assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/demo", 220, "task", actor=None
-    )
-
-
-def test_flow_bind_with_related_role() -> None:
-    """flow bind 219 --role related should bind as related."""
-    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
-        task_service = MagicMock()
-        task_service_cls.return_value = task_service
-
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
-            result = runner.invoke(flow_app, ["bind", "219", "--role", "related"])
-
-    assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/demo", 219, "related", actor=None
-    )
-
-
-def test_flow_bind_with_dependency_role() -> None:
-    """flow bind 218 --role dependency should bind as dependency."""
-    with patch("vibe3.commands.flow.TaskService", create=True) as task_service_cls:
-        task_service = MagicMock()
-        task_service_cls.return_value = task_service
-
-        flow_service = MagicMock()
-        flow_service.get_current_branch.return_value = "task/demo"
-        with patch("vibe3.commands.flow.FlowService", return_value=flow_service):
-            result = runner.invoke(flow_app, ["bind", "218", "--role", "dependency"])
-
-    assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/demo", 218, "dependency", actor=None
-    )

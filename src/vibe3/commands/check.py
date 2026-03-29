@@ -1,9 +1,8 @@
 """Check command implementation."""
 
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 import typer
-from loguru import logger
 
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
@@ -13,6 +12,42 @@ app = typer.Typer(
     help="Verify handoff store consistency",
     rich_markup_mode="rich",
 )
+
+
+def _emit_check_details(
+    mode: Literal["default", "init", "all", "fix"],
+    details: dict[str, Any],
+    *,
+    fix_requested: bool,
+) -> None:
+    """Render mode-specific check details for CLI visibility."""
+    if mode == "init":
+        unresolvable = details.get("unresolvable") or []
+        if unresolvable:
+            typer.echo(
+                f"  Unresolvable ({len(unresolvable)} branches — "
+                "no linked issues found in PR body):"
+            )
+            for branch in unresolvable:
+                typer.echo(f"    {branch}")
+        return
+
+    if mode == "all":
+        invalid = details.get("invalid") or []
+        for result in invalid:
+            branch = getattr(result, "branch", "<unknown>")
+            issues = getattr(result, "issues", [])
+            typer.echo(f"\n  [{branch}]", err=True)
+            for issue in issues:
+                typer.echo(f"    - {issue}", err=True)
+            typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
+        return
+
+    issues = details.get("issues") or []
+    for issue in issues:
+        typer.echo(f"  - {issue}", err=True)
+    if mode == "default" and issues and not fix_requested:
+        typer.echo("\n  → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
 
 
 @app.callback(invoke_without_command=True)
@@ -71,69 +106,20 @@ def check(
 
     try:
         service = CheckService()
-
-        # --init: remote index back-fill
-        if init:
-            logger.bind(command="check", mode="init").info(
-                "Scanning merged PRs to back-fill task_issue_number"
-            )
+        mode: Literal["default", "init", "all", "fix"] = (
+            "init" if init else "all" if all_flows else "fix" if fix else "default"
+        )
+        if mode == "init":
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")
-            result = service.init_remote_index()
-            typer.echo(
-                f"✓ Done  total={result.total_flows}  "
-                f"updated={result.updated}  skipped={result.skipped}"
-            )
-            if result.unresolvable:
-                typer.echo(
-                    f"  Unresolvable ({len(result.unresolvable)} branches — "
-                    "no linked issues found in PR body):"
-                )
-                for b in result.unresolvable:
-                    typer.echo(f"    {b}")
-            return
+        result = service.execute_check(mode)
 
-        # --all: check every flow
-        if all_flows:
-            logger.bind(command="check", mode="all").info("Checking all flows")
-            results = service.verify_all_flows()
-            invalid = [r for r in results if not r.is_valid]
-            if not invalid:
-                typer.echo(f"✓ All {len(results)} flows passed")
-                return
-            typer.echo(f"✗ {len(invalid)}/{len(results)} flows have issues:", err=True)
-            for r in invalid:
-                typer.echo(f"\n  [{r.branch}]", err=True)
-                for issue in r.issues:
-                    typer.echo(f"    - {issue}", err=True)
-                typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
-            raise typer.Exit(code=1)
-
-        # default: check current branch
-        logger.bind(command="check", mode="single").info("Checking current branch")
-        result_single = service.verify_current_flow()
-        if result_single.is_valid:
-            typer.echo("✓ All checks passed")
-            return
-
-        typer.echo(f"✗ Issues found for branch '{result_single.branch}':", err=True)
-        for issue in result_single.issues:
-            typer.echo(f"  - {issue}", err=True)
-
-        if fix:
-            typer.echo("\nAttempting auto-fix...")
-            fix_result = service.auto_fix(result_single.issues)
-            if fix_result.success:
-                typer.echo("✓ All issues fixed")
-            else:
-                typer.echo(f"✗ {fix_result.error}", err=True)
-                raise typer.Exit(code=1)
+        if result.success:
+            typer.echo(f"✓ {result.summary}")
+            _emit_check_details(mode, result.details, fix_requested=fix)
         else:
-            typer.echo(
-                "\n  → Run [cyan]vibe3 check --fix[/] to auto-fix",
-                err=True,
-            )
+            typer.echo(f"✗ {result.summary}", err=True)
+            _emit_check_details(mode, result.details, fix_requested=fix)
             raise typer.Exit(code=1)
-
     finally:
         if trace_ctx:
             trace_ctx.__exit__(None, None, None)

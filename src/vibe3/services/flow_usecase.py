@@ -38,6 +38,29 @@ class FlowUsecase:
         self.base_resolver = base_resolver or BaseResolutionUsecase()
         self.spec_ref_service = spec_ref_service or SpecRefService()
 
+    @classmethod
+    def create(
+        cls,
+        flow_service: FlowService | None = None,
+        task_service: TaskService | None = None,
+        handoff_service: HandoffService | None = None,
+    ) -> "FlowUsecase":
+        """Create FlowUsecase with default dependencies.
+
+        Args:
+            flow_service: Optional FlowService instance. If None, creates default.
+            task_service: Optional TaskService instance. If None, creates default.
+            handoff_service: Optional HandoffService instance. If None, creates default.
+
+        Returns:
+            FlowUsecase instance with default dependencies.
+        """
+        return cls(
+            flow_service=flow_service or FlowService(),
+            task_service=task_service or TaskService(),
+            handoff_service=handoff_service or HandoffService(),
+        )
+
     def add_flow(
         self,
         name: str,
@@ -215,6 +238,35 @@ class FlowUsecase:
     def _validate_issue_refs(self, refs: Sequence[str]) -> None:
         for ref in refs:
             self._parse_issue_number(ref)
+
+    @staticmethod
+    def validate_issue_refs(
+        primary: str | None,
+        tail: list[str] | None,
+        *,
+        primary_hint: str,
+    ) -> str | list[str] | None:
+        """Validate and merge issue references from command arguments.
+
+        Supports both repeated option and trailing-args styles for issue refs.
+
+        Args:
+            primary: Primary issue reference (e.g., from --task option)
+            tail: Additional issue references (e.g., from trailing arguments)
+            primary_hint: Hint message for error when primary is missing
+
+        Returns:
+            Merged issue references as string or list, or None if no refs provided
+
+        Raises:
+            ValueError: If tail refs provided without primary ref
+        """
+        tail = tail or []
+        if not tail:
+            return primary
+        if primary is None:
+            raise ValueError(f"Additional issue refs require '{primary_hint}' prefix.")
+        return [primary, *tail]
 
     @staticmethod
     def _validate_create_request(base: str | None, decision: CreateDecision) -> None:

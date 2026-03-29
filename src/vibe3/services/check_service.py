@@ -9,6 +9,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.pr import PRState
+from vibe3.services.check_execute_mixin import CheckExecuteMixin
 from vibe3.services.check_remote_index_mixin import CheckRemoteIndexMixin
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -40,7 +41,7 @@ class InitResult:
     unresolvable: list[str] = field(default_factory=list)
 
 
-class CheckService(CheckRemoteIndexMixin):
+class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     """Service for verifying handoff store consistency."""
 
     def __init__(

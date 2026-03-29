@@ -45,6 +45,7 @@ class TestFlowCreateSingleTarget:
         """Blocked flow should allow create from current branch."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "task/blocked-flow"
+        mock_service.resolve_flow_name.return_value = "new-feature"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
             reason="Current flow is blocked - spawn downstream",
@@ -76,6 +77,7 @@ class TestFlowCreateSingleTarget:
         """Blocked flow should explicitly allow --base current."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "task/blocked-flow"
+        mock_service.resolve_flow_name.return_value = "new-feature"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
             reason="Current flow is blocked - spawn downstream",
@@ -109,6 +111,7 @@ class TestFlowCreateSingleTarget:
         """When no flow exists but user wants independent feature, guide to wtnew."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "main"
+        mock_service.resolve_flow_name.return_value = "new-feature"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
             reason="No active flow in current worktree",
@@ -140,6 +143,7 @@ class TestFlowCreateSingleTarget:
         """Done flow should start new flow from origin/main."""
         mock_service = MagicMock()
         mock_service.get_current_branch.return_value = "task/done-flow"
+        mock_service.resolve_flow_name.return_value = "new-feature"
         mock_service.can_create_from_current_worktree.return_value = CreateDecision(
             allowed=True,
             reason="Current flow is done - safe to start new target",
