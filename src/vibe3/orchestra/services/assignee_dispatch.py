@@ -83,6 +83,23 @@ class AssigneeDispatchService(ServiceBase):
             ),
         )
 
+        if self._cold_start:
+            # Warm-up pass: only record current assignees to avoid dispatching
+            # historical assignments after a server restart.
+            self._assignee_cache = {
+                item["number"]: frozenset(a["login"] for a in item.get("assignees", []))
+                for item in raw
+                if "number" in item
+            }
+            self._dispatched_issues = {
+                n for n in self._dispatched_issues if n in self._assignee_cache
+            }
+            self._cold_start = False
+            logger.bind(domain="orchestra").info(
+                f"Tick warm-up: cached assignees for {len(self._assignee_cache)} issues"
+            )
+            return
+
         ready: list[IssueInfo] = []
         blocked: list[tuple[int, list[int]]] = []
 

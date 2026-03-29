@@ -57,8 +57,11 @@ async def test_handle_event_dispatches_when_assigned_to_manager() -> None:
 
 
 @pytest.mark.asyncio
-async def test_on_tick_cold_start_dispatches_assigned_issue_without_flow() -> None:
+async def test_on_tick_dispatches_on_new_assignment_after_warmup() -> None:
+    """After warm-up, newly assigned manager triggers dispatch."""
     svc = _svc()
+    svc._cold_start = False
+    svc._assignee_cache = {42: frozenset()}
     svc._github = MagicMock()
     svc._github.list_issues_with_assignees.return_value = [
         {
@@ -82,6 +85,34 @@ async def test_on_tick_cold_start_dispatches_assigned_issue_without_flow() -> No
         await svc.on_tick()
 
     svc._dispatcher.dispatch_manager.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_cold_start_warmup_skips_dispatch() -> None:
+    svc = _svc()
+    svc._github = MagicMock()
+    svc._github.list_issues_with_assignees.return_value = [
+        {
+            "number": 99,
+            "title": "warm-up issue",
+            "labels": [],
+            "assignees": [{"login": "vibe-manager-agent"}],
+            "url": "https://example.com/issues/99",
+        }
+    ]
+    svc._dep_checker = MagicMock()
+    svc._dispatcher = MagicMock()
+
+    with patch(
+        "vibe3.orchestra.services.assignee_dispatch.asyncio.get_event_loop",
+        return_value=_ImmediateLoop(),
+    ):
+        await svc.on_tick()
+
+    svc._dispatcher.dispatch_manager.assert_not_called()
+    svc._dep_checker.check.assert_not_called()
+    assert svc._assignee_cache == {99: frozenset(["vibe-manager-agent"])}
+    assert svc._cold_start is False
 
 
 @pytest.mark.asyncio
