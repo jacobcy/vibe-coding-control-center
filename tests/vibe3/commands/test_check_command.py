@@ -35,6 +35,7 @@ class TestCheckCommand:
         assert result.exit_code == 0
         assert "✓" in result.output
         assert "All checks passed" in result.output
+        assert "vibe3 check --fix" not in result.output
 
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_issues(self, mock_service_class):
@@ -56,6 +57,7 @@ class TestCheckCommand:
         assert "✗" in result.output
         assert "Issues found" in result.output
         assert "Issue 1: Missing flow" in result.output
+        assert "vibe3 check --fix" in result.output
 
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_fix(self, mock_service_class):

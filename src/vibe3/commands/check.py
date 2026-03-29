@@ -46,7 +46,7 @@ def _emit_check_details(
     issues = details.get("issues") or []
     for issue in issues:
         typer.echo(f"  - {issue}", err=True)
-    if mode == "default" and not fix_requested:
+    if mode == "default" and issues and not fix_requested:
         typer.echo("\n  → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
 
 
