@@ -154,6 +154,15 @@ def blocked(
             by=by,
         ).info("Blocking flow")
 
+        flow_status = service.get_flow_status(target_branch)
+        if not flow_status:
+            typer.echo(
+                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
+                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+                err=True,
+            )
+            raise typer.Exit(1)
+
         blocked_by_issue = task if task is not None else by
         service.block_flow(
             target_branch, reason=reason, blocked_by_issue=blocked_by_issue
@@ -184,6 +193,15 @@ def aborted(
         )
 
         logger.bind(command="flow aborted", branch=target_branch).info("Aborting flow")
+
+        flow_status = service.get_flow_status(target_branch)
+        if not flow_status:
+            typer.echo(
+                f"Error: 当前分支 '{target_branch}' 没有 flow\n"
+                "先执行 `vibe3 flow add <name>` 或切到已有 flow 的分支",
+                err=True,
+            )
+            raise typer.Exit(1)
 
         service.abort_flow(target_branch)
 
