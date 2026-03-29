@@ -245,7 +245,7 @@ class TestFlowCloseBranchSwitching:
         assert actions.index("switch:develop") < actions.index(
             "delete_local:task/current-flow:True"
         )
-        assert "run:pull origin main" in actions
+        assert "run:pull origin develop" in actions
 
 
 class TestFlowSwitchBranchGuard:

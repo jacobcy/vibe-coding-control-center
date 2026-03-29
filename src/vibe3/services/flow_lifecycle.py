@@ -213,8 +213,10 @@ class FlowLifecycleMixin:
 
             if should_pull and switched_to_target:
                 try:
-                    git._run(["pull", "origin", "main"])
-                    logger.info(f"Switched to {target_branch} and synced origin/main")
+                    git._run(["pull", "origin", target_branch])
+                    logger.info(
+                        f"Switched to {target_branch} and synced origin/{target_branch}"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to pull: {e}")
 
