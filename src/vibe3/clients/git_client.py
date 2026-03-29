@@ -176,9 +176,14 @@ class GitClient:
         """Switch to existing branch."""
         _switch_branch(branch_name)
 
-    def delete_branch(self, branch_name: str, force: bool = False) -> None:
+    def delete_branch(
+        self,
+        branch_name: str,
+        force: bool = False,
+        skip_if_worktree: bool = False,
+    ) -> None:
         """Delete local branch."""
-        _delete_branch(branch_name, force=force)
+        _delete_branch(branch_name, force=force, skip_if_worktree=skip_if_worktree)
 
     def delete_remote_branch(self, branch_name: str) -> None:
         """Delete remote branch."""

@@ -55,18 +55,40 @@ def switch_branch(branch_name: str) -> None:
     )
 
 
-def delete_branch(branch_name: str, force: bool = False) -> None:
+def delete_branch(
+    branch_name: str,
+    force: bool = False,
+    skip_if_worktree: bool = False,
+) -> None:
     """Delete local branch.
 
     Args:
         branch_name: Branch to delete
         force: Force delete even if not merged
+        skip_if_worktree: If True, suppress errors when branch is
+            occupied by another worktree (race condition between
+            check and delete).
     """
     flag = "-D" if force else "-d"
-    _run_git(["branch", flag, branch_name])
-    logger.bind(
-        domain="git", action="delete_branch", branch=branch_name, force=force
-    ).info("Deleted local branch")
+    try:
+        _run_git(["branch", flag, branch_name])
+        logger.bind(
+            domain="git",
+            action="delete_branch",
+            branch=branch_name,
+            force=force,
+        ).info("Deleted local branch")
+    except GitError as e:
+        if skip_if_worktree and "used by worktree" in str(e):
+            logger.bind(
+                domain="git",
+                action="delete_branch",
+                branch=branch_name,
+            ).warning(
+                f"Branch '{branch_name}' is occupied by worktree, skipping deletion"
+            )
+            return
+        raise
 
 
 def delete_remote_branch(branch_name: str) -> None:

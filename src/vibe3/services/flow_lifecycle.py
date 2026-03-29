@@ -171,21 +171,7 @@ class FlowLifecycleMixin:
                 "Skipping local branch deletion."
             )
         elif git.branch_exists(branch):
-            try:
-                git.delete_branch(branch, force=True)
-            except Exception as e:
-                error_message = str(e)
-                if "used by worktree" in error_message:
-                    logger.bind(
-                        domain="flow",
-                        action="close",
-                        branch=branch,
-                    ).warning(
-                        f"Branch '{branch}' became occupied by another worktree "
-                        "during close. Skipping local branch deletion."
-                    )
-                else:
-                    raise
+            git.delete_branch(branch, force=True, skip_if_worktree=True)
 
         try:
             git.delete_remote_branch(branch)
