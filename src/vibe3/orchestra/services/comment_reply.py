@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import re
-import subprocess
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 
@@ -25,6 +25,7 @@ class CommentReplyService(ServiceBase):
 
     def __init__(self, config: OrchestraConfig) -> None:
         self.config = config
+        self._github = GitHubClient()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         if event.action not in ("created", "edited"):
@@ -46,31 +47,17 @@ class CommentReplyService(ServiceBase):
         self._post_ack(issue_number)
 
     def _post_ack(self, issue_number: int) -> None:
-        """Post a lightweight acknowledgement comment."""
+        """Post a lightweight acknowledgement comment via GitHubClient."""
         body = (
-            "> `@vibe-manager` received your message. "
+            "> 👋 `@vibe-manager` received your message. "
             "The orchestra server will process this shortly."
         )
-        cmd = [
-            "gh",
-            "issue",
-            "comment",
-            str(issue_number),
-            "--body",
-            body,
-        ]
-        if self.config.repo:
-            cmd.extend(["--repo", self.config.repo])
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if result.returncode != 0:
-                logger.bind(domain="orchestra").warning(
-                    f"Failed to post ack on #{issue_number}: {result.stderr.strip()}"
-                )
-            else:
-                logger.bind(domain="orchestra").info(f"Ack posted on #{issue_number}")
-        except Exception as exc:
-            logger.bind(domain="orchestra").error(
-                f"Error posting ack on #{issue_number}: {exc}"
+        success = self._github.add_comment(
+            issue_number, body=body, repo=self.config.repo
+        )
+        if success:
+            logger.bind(domain="orchestra").info(f"Ack posted on #{issue_number}")
+        else:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to post ack on #{issue_number}"
             )

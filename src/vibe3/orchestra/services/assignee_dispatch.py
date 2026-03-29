@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
 from vibe3.orchestra.dispatcher import Dispatcher
@@ -33,6 +32,7 @@ class AssigneeDispatchService(ServiceBase):
         # Polling fallback state
         self._assignee_cache: dict[int, frozenset[str]] = {}
         self._cold_start = True
+        self._github = GitHubClient()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to issues/assigned webhook event."""
@@ -64,35 +64,14 @@ class AssigneeDispatchService(ServiceBase):
 
     async def on_tick(self) -> None:
         """Polling fallback: scan open issues for any missed assignments."""
-        cmd = [
-            "gh",
-            "issue",
-            "list",
-            "--state",
-            "open",
-            "--json",
-            "number,title,labels,assignees,url",
-            "--limit",
-            "100",
-        ]
-        if self.config.repo:
-            cmd.extend(["--repo", self.config.repo])
+        raw = await asyncio.get_event_loop().run_in_executor(
+            self._executor,
+            lambda: self._github.list_issues_with_assignees(
+                limit=100, repo=self.config.repo
+            ),
+        )
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        except Exception as exc:
-            logger.bind(domain="orchestra").error(f"Polling failed: {exc}")
-            return
-
-        if result.returncode != 0:
-            logger.bind(domain="orchestra").error(
-                f"gh issue list failed: {result.stderr.strip()}"
-            )
-            return
-
-        items: list[dict] = json.loads(result.stdout)
-
-        for item in items:
+        for item in raw:
             assignees = [a["login"] for a in item.get("assignees", [])]
             prev = self._assignee_cache.get(item["number"], frozenset())
             curr = frozenset(assignees)
@@ -126,8 +105,7 @@ class AssigneeDispatchService(ServiceBase):
             logger.bind(domain="orchestra").info(
                 f"Tick: dispatching #{issue.number} (newly assigned {newly_assigned})"
             )
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
+            await asyncio.get_event_loop().run_in_executor(
                 self._executor, self._dispatcher.dispatch_manager, issue
             )
 

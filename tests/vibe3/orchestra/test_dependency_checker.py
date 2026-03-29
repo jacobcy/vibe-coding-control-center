@@ -1,6 +1,6 @@
 """Tests for DependencyChecker."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from vibe3.orchestra.dependency_checker import DependencyChecker, parse_blocked_by
 
@@ -56,23 +56,47 @@ def _make_checker() -> DependencyChecker:
 
 def test_is_closed_returns_true_for_closed_issue():
     checker = _make_checker()
-    mock_result = MagicMock(returncode=0, stdout='{"state":"CLOSED"}')
-    with patch("subprocess.run", return_value=mock_result):
+    with patch.object(checker._github, "view_issue", return_value={"state": "CLOSED"}):
         assert checker.is_closed(42) is True
 
 
 def test_is_closed_returns_false_for_open_issue():
     checker = _make_checker()
-    mock_result = MagicMock(returncode=0, stdout='{"state":"OPEN"}')
-    with patch("subprocess.run", return_value=mock_result):
+    with patch.object(checker._github, "view_issue", return_value={"state": "OPEN"}):
         assert checker.is_closed(42) is False
 
 
 def test_is_closed_returns_false_on_gh_error():
     checker = _make_checker()
-    mock_result = MagicMock(returncode=1, stderr="Not found", stdout="")
-    with patch("subprocess.run", return_value=mock_result):
+    with patch.object(checker._github, "view_issue", return_value=None):
         assert checker.is_closed(999) is False
+
+
+def test_is_closed_returns_false_on_network_error():
+    checker = _make_checker()
+    with patch.object(checker._github, "view_issue", return_value="network_error"):
+        assert checker.is_closed(999) is False
+
+
+# --- DependencyChecker.fetch_body ---
+
+
+def test_fetch_body_returns_body():
+    checker = _make_checker()
+    with patch.object(
+        checker._github,
+        "view_issue",
+        return_value={"body": "blocked by #5", "state": "OPEN"},
+    ):
+        body = checker.fetch_body(10)
+    assert "blocked by #5" in body
+
+
+def test_fetch_body_returns_empty_on_error():
+    checker = _make_checker()
+    with patch.object(checker._github, "view_issue", return_value=None):
+        body = checker.fetch_body(10)
+    assert body == ""
 
 
 # --- DependencyChecker.all_resolved ---

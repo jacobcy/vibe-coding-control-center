@@ -1,22 +1,35 @@
 """Flow orchestration utilities for orchestra dispatcher."""
 
-import subprocess
-
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.models import IssueInfo
+from vibe3.services.flow_service import FlowService
+from vibe3.services.task_service import TaskService
 
 
 class FlowOrchestrator:
-    """Manages issue-to-flow mapping and command execution."""
+    """Manages issue-to-flow mapping and command execution.
 
-    def __init__(self, config: OrchestraConfig):
+    Uses FlowService and TaskService for all state mutations so that
+    orchestra-created flows participate in the standard flow lifecycle
+    (events recorded, vibe3 flow show works, etc.).
+
+    Git branch creation is handled directly via GitClient because
+    FlowService.create_flow_with_branch() has an uncommitted-changes
+    guard that is inappropriate for a background server context.
+    """
+
+    def __init__(self, config: OrchestraConfig) -> None:
         self.config = config
         self.store = SQLiteClient()
         self.git = GitClient()
+        self.flow_service = FlowService(store=self.store, git_client=self.git)
+        self.task_service = TaskService(store=self.store)
+        self.github = GitHubClient()
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
         """Get flow linked to an issue."""
@@ -24,13 +37,16 @@ class FlowOrchestrator:
         return flows[0] if flows else None
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict:
-        """Create a new flow for an issue with real git branch.
+        """Create (or reuse) a flow for an issue.
+
+        Uses FlowService.create_flow() so lifecycle events are recorded
+        and the flow is visible via `vibe3 flow show`.
 
         Args:
             issue: Issue to create flow for
 
         Returns:
-            Created flow data
+            Flow state dict
 
         Raises:
             RuntimeError: If flow creation fails
@@ -49,76 +65,57 @@ class FlowOrchestrator:
         slug = f"issue-{issue.number}"
         branch = f"task/{slug}"
 
-        if self.git.branch_exists(branch):
-            log.info(f"Branch '{branch}' already exists, binding to existing")
-            self.store.add_issue_link(branch, issue.number, "task")
-            self.store.update_flow_state(branch, task_issue_number=issue.number)
-            return self.store.get_flow_state(branch) or {}
-
-        current_branch = self.git.get_current_branch()
-
-        try:
-            self.git.create_branch(branch, start_ref="origin/main")
-            self.git.switch_branch(branch)
-
-            self.store.update_flow_state(branch, flow_slug=slug)
-            self.store.add_issue_link(branch, issue.number, "task")
-            self.store.update_flow_state(branch, task_issue_number=issue.number)
-
-            log.info(
-                f"Created flow '{slug}' with branch '{branch}' "
-                f"for issue #{issue.number}"
-            )
-            return self.store.get_flow_state(branch) or {}
-
-        except Exception as e:
-            log.error(f"Failed to create flow: {e}")
+        # Ensure branch exists (GitClient, no uncommitted-changes guard)
+        if not self.git.branch_exists(branch):
             try:
-                self.git.switch_branch(current_branch)
-            except Exception:
-                pass
-            raise RuntimeError(f"Failed to create flow for issue #{issue.number}: {e}")
+                self.git.create_branch(branch, start_ref="origin/main")
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to create branch '{branch}': {exc}"
+                ) from exc
+
+        # Register flow via FlowService (lifecycle events, proper recording)
+        try:
+            flow_state = self.flow_service.create_flow(
+                slug=slug,
+                branch=branch,
+                actor="orchestra",
+            )
+        except Exception as exc:
+            # Guard against race condition: re-check if flow was created concurrently
+            existing = self.store.get_flow_state(branch)
+            if existing:
+                log.warning(
+                    f"Flow created concurrently for #{issue.number}, using existing"
+                )
+                return existing
+            raise RuntimeError(
+                f"Failed to create flow for issue #{issue.number}: {exc}"
+            ) from exc
+
+        # Bind issue via TaskService
+        try:
+            self.task_service.link_issue(
+                branch, issue.number, "task", actor="orchestra"
+            )
+        except Exception as exc:
+            log.warning(f"Failed to link issue #{issue.number} to flow: {exc}")
+
+        log.info(f"Created flow '{slug}' on branch '{branch}'")
+        return flow_state.model_dump()
 
     def get_pr_for_issue(self, issue_number: int) -> int | None:
         """Get PR number for an issue.
 
         Priority:
         1. PR stored in flow state
-        2. Query GitHub for PR with closing keyword
+        2. GitHub API lookup via GitHubClient
         """
         flow = self.get_flow_for_issue(issue_number)
         if flow and flow.get("pr_number"):
             return int(flow["pr_number"])
 
-        cmd = [
-            "gh",
-            "pr",
-            "list",
-            "--state",
-            "all",
-            "--json",
-            "number,closingIssuesReferences",
-            "--limit",
-            "10",
-        ]
-        if self.config.repo:
-            cmd.extend(["--repo", self.config.repo])
-
-        try:
-            import json
-
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                prs = json.loads(result.stdout)
-                for pr in prs:
-                    refs = pr.get("closingIssuesReferences", [])
-                    for ref in refs:
-                        if ref.get("number") == issue_number:
-                            return int(pr["number"])
-        except Exception as e:
-            logger.bind(domain="orchestra").error(f"Failed to get PR: {e}")
-
-        return None
+        return self.github.get_pr_for_issue(issue_number, repo=self.config.repo)
 
     def switch_to_flow_branch(self, issue_number: int) -> str | None:
         """Switch to the branch for a flow.
@@ -156,6 +153,8 @@ class FlowOrchestrator:
                 f"Switched to branch '{branch}' for issue #{issue_number}"
             )
             return str(branch)
-        except Exception as e:
-            logger.bind(domain="orchestra").error(f"Failed to switch branch: {e}")
+        except Exception as exc:
+            logger.bind(domain="orchestra").error(
+                f"Failed to switch to branch '{branch}': {exc}"
+            )
             return None
