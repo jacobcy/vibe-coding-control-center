@@ -146,6 +146,10 @@ class FlowUsecase:
             )
         self._validate_create_request(base, decision)
         task_refs = self._normalize_task_refs(task)
+        if not task_refs:
+            inferred_issue = self._infer_task_issue_from_flow_name(name)
+            if inferred_issue is not None:
+                task_refs = [str(inferred_issue)]
         self._validate_issue_refs(task_refs)
 
         default_policy: Literal["current", "main"] = (
@@ -172,6 +176,20 @@ class FlowUsecase:
         self._apply_initial_bindings(branch, task_refs, spec, actor=actor)
         self.handoff_service.ensure_current_handoff()
         return flow
+
+    @staticmethod
+    def _infer_task_issue_from_flow_name(name: str) -> int | None:
+        """Infer task issue number from flow name shorthand when possible."""
+        patterns = (
+            r"^(?:issue|task)[-_]?(\d+)$",
+            r"^task/(\d+)$",
+            r"^task/(?:issue|task)[-_]?(\d+)$",
+        )
+        for pattern in patterns:
+            match = re.match(pattern, name, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+        return None
 
     def _try_auto_close_done_eligible_flow(
         self,
