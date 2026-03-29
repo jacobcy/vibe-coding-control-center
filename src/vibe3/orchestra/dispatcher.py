@@ -11,6 +11,8 @@ from vibe3.orchestra.dispatcher_worktree import WorktreeResolverMixin
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.orchestra.models import IssueInfo
 
+_DISPATCH_TIMEOUT = 3600
+
 
 class Dispatcher(WorktreeResolverMixin):
     """Dispatches commands based on triggers with flow orchestration."""
@@ -25,6 +27,34 @@ class Dispatcher(WorktreeResolverMixin):
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
         self.orchestrator = FlowOrchestrator(config)
+
+    @staticmethod
+    def _run_command(cmd: list[str], cwd: Path, label: str) -> bool:
+        """Execute a subprocess command with timeout and structured logging.
+
+        Returns True on success, False on failure/timeout.
+        """
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=_DISPATCH_TIMEOUT,
+            )
+            if result.returncode != 0:
+                logger.bind(domain="orchestra").error(
+                    f"{label} failed: {result.stderr}"
+                )
+                return False
+            logger.bind(domain="orchestra").info(f"{label} completed successfully")
+            return True
+        except subprocess.TimeoutExpired:
+            logger.bind(domain="orchestra").error(f"{label} timed out")
+            return False
+        except Exception as e:
+            logger.bind(domain="orchestra").error(f"{label} error: {e}")
+            return False
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Dispatch manager execution for an assignee-triggered issue."""
@@ -75,25 +105,7 @@ class Dispatcher(WorktreeResolverMixin):
         cmd = self._normalize_manager_command(cmd, manager_cwd)
         log.info(f"Dispatching manager: {' '.join(cmd)}")
 
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=manager_cwd,
-                capture_output=True,
-                text=True,
-                timeout=3600,
-            )
-            if result.returncode != 0:
-                log.error(f"Manager execution failed: {result.stderr}")
-                return False
-            log.info("Manager execution completed successfully")
-            return True
-        except subprocess.TimeoutExpired:
-            log.error("Manager execution timed out")
-            return False
-        except Exception as e:
-            log.error(f"Manager execution error: {e}")
-            return False
+        return self._run_command(cmd, manager_cwd, "Manager execution")
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
         """Dispatch PR review command for reviewer-triggered events."""
@@ -110,25 +122,7 @@ class Dispatcher(WorktreeResolverMixin):
             log.info("Dry run, skipping execution")
             return True
 
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=review_cwd,
-                capture_output=True,
-                text=True,
-                timeout=3600,
-            )
-            if result.returncode != 0:
-                log.error(f"Review execution failed: {result.stderr}")
-                return False
-            log.info("Review execution completed successfully")
-            return True
-        except subprocess.TimeoutExpired:
-            log.error("Review execution timed out")
-            return False
-        except Exception as e:
-            log.error(f"Review execution error: {e}")
-            return False
+        return self._run_command(cmd, review_cwd, "Review execution")
 
     def build_manager_command(self, issue: IssueInfo) -> list[str]:
         """Build executable manager command for an issue."""

@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.vibe3.orchestra.conftest import CompletedProcess
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import Dispatcher
@@ -16,13 +17,6 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
         state=IssueState.CLAIMED,
         labels=["state/claimed"],
     )
-
-
-class _Completed:
-    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
 
 
 class TestDispatcherReviewWorktreeResolution:
@@ -47,7 +41,7 @@ class TestDispatcherReviewWorktreeResolution:
         ):
             with patch(
                 "subprocess.run",
-                return_value=_Completed(returncode=0),
+                return_value=CompletedProcess(returncode=0),
             ) as mock_run:
                 result = dispatcher.dispatch_pr_review(42)
 
@@ -66,7 +60,7 @@ class TestDispatcherReviewWorktreeResolution:
         ):
             with patch(
                 "subprocess.run",
-                return_value=_Completed(returncode=0),
+                return_value=CompletedProcess(returncode=0),
             ) as mock_run:
                 result = dispatcher.dispatch_pr_review(42)
 
@@ -128,7 +122,7 @@ class TestDispatcherReviewWorktreeResolution:
 
         with patch(
             "subprocess.run",
-            return_value=_Completed(returncode=0, stdout=output),
+            return_value=CompletedProcess(returncode=0, stdout=output),
         ):
             wt = dispatcher._find_worktree_for_branch("task/issue250-orchestra-manager")
 

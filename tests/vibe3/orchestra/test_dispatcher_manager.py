@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.vibe3.orchestra.conftest import CompletedProcess
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import Dispatcher
@@ -16,13 +17,6 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
         state=IssueState.CLAIMED,
         labels=["state/claimed"],
     )
-
-
-class _Completed:
-    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
 
 
 class TestManagerCwdResolution:
@@ -76,7 +70,7 @@ class TestManagerCwdResolution:
 
         with patch(
             "subprocess.run",
-            return_value=_Completed(returncode=0),
+            return_value=CompletedProcess(returncode=0),
         ) as mock_run:
             path = dispatcher._ensure_manager_worktree(77, "task/issue-77")
 
@@ -174,7 +168,7 @@ class TestManagerDispatchIntegration:
                     ) as mock_switch:
                         with patch(
                             "subprocess.run",
-                            return_value=_Completed(returncode=0),
+                            return_value=CompletedProcess(returncode=0),
                         ) as mock_run:
                             result = dispatcher.dispatch_manager(issue)
 

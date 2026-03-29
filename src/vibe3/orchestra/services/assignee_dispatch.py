@@ -14,6 +14,14 @@ from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 from vibe3.orchestra.models import IssueInfo
 
+_PRIORITY_MAP: dict[str, int] = {
+    "priority/urgent": 0,
+    "priority/high": 1,
+    "priority/medium": 2,
+    "priority/low": 3,
+}
+_PRIORITY_DEFAULT = 2
+
 
 class AssigneeDispatchService(ServiceBase):
     """Dispatch manager execution when an issue is assigned to a manager username.
@@ -46,7 +54,7 @@ class AssigneeDispatchService(ServiceBase):
             return
 
         issue_payload = event.payload.get("issue", {})
-        issue = self._parse_issue_payload(issue_payload)
+        issue = IssueInfo.from_github_payload(issue_payload)
         if issue is None:
             return
 
@@ -57,7 +65,7 @@ class AssigneeDispatchService(ServiceBase):
 
     async def on_tick(self) -> None:
         """Polling fallback: scan open issues for any missed assignments."""
-        raw = await asyncio.get_event_loop().run_in_executor(
+        raw = await asyncio.get_running_loop().run_in_executor(
             self._executor,
             lambda: self._github.list_issues_with_assignees(
                 limit=100, repo=self.config.repo
@@ -76,14 +84,9 @@ class AssigneeDispatchService(ServiceBase):
             if not any(user in self.config.manager_usernames for user in curr):
                 continue
 
-            issue = IssueInfo(
-                number=item["number"],
-                title=item["title"],
-                state=None,
-                labels=[lb["name"] for lb in item.get("labels", [])],
-                assignees=assignees,
-                url=item.get("url"),
-            )
+            issue = IssueInfo.from_github_payload(item)
+            if issue is None:
+                continue
             if self._has_flow(issue.number):
                 continue
 
@@ -122,7 +125,7 @@ class AssigneeDispatchService(ServiceBase):
             log.info(f"Deferred: blocked by {blockers}")
             return
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         dispatched = await loop.run_in_executor(
             self._executor, self._dispatcher.dispatch_manager, issue
         )
@@ -140,32 +143,11 @@ class AssigneeDispatchService(ServiceBase):
             return False
 
     def _sort_by_priority(self, issues: list[IssueInfo]) -> list[IssueInfo]:
-        priority_map = {
-            "priority/urgent": 0,
-            "priority/high": 1,
-            "priority/medium": 2,
-            "priority/low": 3,
-        }
-
         def score(issue: IssueInfo) -> tuple[int, int]:
-            values = [priority_map.get(lb.lower(), 2) for lb in issue.labels]
-            best = min(values) if values else 2
+            priorities = [
+                _PRIORITY_MAP.get(lb.lower(), _PRIORITY_DEFAULT) for lb in issue.labels
+            ]
+            best = min(priorities) if priorities else _PRIORITY_DEFAULT
             return (best, issue.number)
 
         return sorted(issues, key=score)
-
-    def _parse_issue_payload(self, payload: dict) -> IssueInfo | None:
-        try:
-            return IssueInfo(
-                number=int(payload["number"]),
-                title=str(payload.get("title", "")),
-                state=None,
-                labels=[lb["name"] for lb in payload.get("labels", [])],
-                assignees=[a["login"] for a in payload.get("assignees", [])],
-                url=payload.get("html_url"),
-            )
-        except (KeyError, ValueError) as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Cannot parse issue payload: {exc}"
-            )
-            return None

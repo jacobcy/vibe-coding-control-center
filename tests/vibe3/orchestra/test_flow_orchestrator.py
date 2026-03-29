@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+from tests.vibe3.orchestra.conftest import CompletedProcess
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import FlowOrchestrator
@@ -15,13 +16,6 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
         state=IssueState.CLAIMED,
         labels=["state/claimed"],
     )
-
-
-class _Completed:
-    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
 
 
 class TestFlowOrchestrator:
@@ -107,7 +101,7 @@ class TestFlowOrchestrator:
 
         with patch(
             "subprocess.run",
-            return_value=_Completed(returncode=0),
+            return_value=CompletedProcess(returncode=0),
         ) as mock_run:
             orchestrator._create_branch_ref("task/issue-223", "origin/main")
 
