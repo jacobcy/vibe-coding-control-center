@@ -16,6 +16,7 @@ def test_default_config():
     assert OrchestraConfig().polling.enabled is True
     assert OrchestraConfig().assignee_dispatch.enabled is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
+    assert OrchestraConfig().pr_review_dispatch.async_mode is False
     pid_path = OrchestraConfig().pid_file.as_posix()
     assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
         ".git/vibe3/orchestra.pid"
@@ -93,6 +94,7 @@ def test_from_settings_loads_yaml_config():
                         },
                         "pr_review_dispatch": {
                             "enabled": False,
+                            "async_mode": True,
                         },
                     }
                 }
@@ -117,5 +119,6 @@ def test_from_settings_loads_yaml_config():
             assert config.polling.enabled is False
             assert config.assignee_dispatch.enabled is False
             assert config.pr_review_dispatch.enabled is False
+            assert config.pr_review_dispatch.async_mode is True
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults

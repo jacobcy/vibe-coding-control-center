@@ -222,6 +222,8 @@ class Dispatcher:
         )
 
         cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
+        if self.config.pr_review_dispatch.async_mode:
+            cmd.append("--async")
         review_cwd = self._resolve_review_cwd(pr_number)
         log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")
 

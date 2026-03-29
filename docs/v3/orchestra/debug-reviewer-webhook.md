@@ -23,6 +23,7 @@ orchestra:
     enabled: false
   pr_review_dispatch:
     enabled: true
+    async_mode: false
   comment_reply:
     enabled: false
   master_agent:
@@ -87,6 +88,7 @@ Review execution completed successfully
 说明：
 - `Resolved PR review to matching worktree` 表示已根据 PR `head_branch` 找到对应 worktree。
 - 找不到时会回退到 `serve` 进程启动目录。
+- 若 `pr_review_dispatch.async_mode=true`，命令会追加 `--async` 并转入 tmux 后台执行。
 
 ## 5. 结果验收
 

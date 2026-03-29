@@ -58,6 +58,7 @@ related_docs:
 - 触发事件：`pull_request/review_requested`、`pull_request/ready_for_review`。
 - 触发条件：requested reviewer 命中 `manager_usernames`。
 - 执行动作：调度 `vibe3 review pr <pr_number>`。
+- 可选异步：`pr_review_dispatch.async_mode=true` 时，调度为 `vibe3 review pr <pr_number> --async`（tmux 后台执行，不阻塞当前进程）。
 
 代码参考：
 - `src/vibe3/orchestra/services/pr_review_dispatch.py`

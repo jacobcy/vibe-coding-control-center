@@ -84,6 +84,7 @@ class PRReviewDispatchConfig(BaseModel):
     """Configuration for PR review dispatch service."""
 
     enabled: bool = True
+    async_mode: bool = False
 
 
 class MasterAgentConfig(BaseModel):
@@ -177,6 +178,7 @@ class OrchestraConfig(BaseModel):
         if pr_review_cfg:
             pr_review_dispatch = PRReviewDispatchConfig(
                 enabled=getattr(pr_review_cfg, "enabled", True),
+                async_mode=getattr(pr_review_cfg, "async_mode", False),
             )
 
         return cls(

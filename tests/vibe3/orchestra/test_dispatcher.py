@@ -220,6 +220,25 @@ class TestDispatcherReviewWorktreeResolution:
         assert result is True
         mock_run.assert_called_once()
         assert mock_run.call_args.kwargs["cwd"] == Path("/tmp/wt-feature")
+        assert "--async" not in mock_run.call_args.args[0]
+
+    def test_dispatch_pr_review_appends_async_flag_when_enabled(self):
+        config = OrchestraConfig()
+        config.pr_review_dispatch.async_mode = True
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+
+        with patch.object(
+            dispatcher, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
+        ):
+            with patch(
+                "subprocess.run",
+                return_value=_Completed(returncode=0),
+            ) as mock_run:
+                result = dispatcher.dispatch_pr_review(42)
+
+        assert result is True
+        mock_run.assert_called_once()
+        assert "--async" in mock_run.call_args.args[0]
 
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()

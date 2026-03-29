@@ -92,6 +92,7 @@ def test_review_pr_help():
     result = runner.invoke(app, ["pr", "--help"])
     assert result.exit_code == 0
     assert "PR number" in result.output
+    assert "--async" in result.output
 
 
 def test_review_pr_does_not_have_publish_option():
@@ -152,3 +153,25 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
         result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
+
+
+def test_review_pr_async_dispatches_background_execution():
+    with (
+        patch(
+            "vibe3.commands.review.run_inspect_json",
+            return_value=_mock_inspect_data(),
+        ),
+        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
+        patch("vibe3.commands.review.get_current_branch", return_value="task/issue250"),
+        patch(
+            "vibe3.commands.review.CodeagentExecutionService.execute",
+            return_value=_mock_result(),
+        ) as mock_execute,
+        patch("vibe3.commands.review.parse_codex_review") as mock_parse,
+    ):
+        result = runner.invoke(app, ["pr", "42", "--async"])
+
+    assert result.exit_code == 0
+    mock_execute.assert_called_once()
+    assert mock_execute.call_args.kwargs["async_mode"] is True
+    mock_parse.assert_not_called()

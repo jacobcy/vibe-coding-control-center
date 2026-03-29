@@ -361,6 +361,7 @@ orchestra:
   # PR reviewer-triggered review execution
   pr_review_dispatch:
     enabled: true
+    async_mode: false
 
   # @mention auto-ack in issue comments
   comment_reply:
