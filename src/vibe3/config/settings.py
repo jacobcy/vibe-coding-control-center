@@ -195,13 +195,34 @@ class MasterAgentSettings(BaseModel):
     timeout_seconds: int = 300
 
 
+class OrchestraCommentReplySettings(BaseModel):
+    """Comment reply settings for orchestra."""
+
+    enabled: bool = True
+
+
+class OrchestraPRReviewDispatchSettings(BaseModel):
+    """PR review dispatch settings for orchestra."""
+
+    enabled: bool = True
+
+
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
     enabled: bool = True
-    polling_interval: int = 60
+    polling_interval: int = 900
+    port: int = 8080
+    webhook_secret: str | None = None
+    manager_usernames: list[str] = Field(default_factory=lambda: ["vibe-manager"])
     repo: str | None = None
     max_concurrent_flows: int = 3
+    comment_reply: OrchestraCommentReplySettings = Field(
+        default_factory=OrchestraCommentReplySettings
+    )
+    pr_review_dispatch: OrchestraPRReviewDispatchSettings = Field(
+        default_factory=OrchestraPRReviewDispatchSettings
+    )
     master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
 
 

@@ -15,6 +15,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
+from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.webhook_handler import make_webhook_router
 
 app = typer.Typer(
@@ -74,6 +75,8 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     heartbeat.register(AssigneeDispatchService(config))
     if config.comment_reply.enabled:
         heartbeat.register(CommentReplyService(config))
+    if config.pr_review_dispatch.enabled:
+        heartbeat.register(PRReviewDispatchService(config))
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

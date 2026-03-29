@@ -13,6 +13,7 @@ def test_default_config():
     assert OrchestraConfig().enabled is True
     assert OrchestraConfig().polling_interval == 900
     assert OrchestraConfig().dry_run is False
+    assert OrchestraConfig().pr_review_dispatch.enabled is True
 
 
 def test_config_validation():
@@ -78,6 +79,9 @@ def test_from_settings_loads_yaml_config():
                             "agent": "test-controller",
                             "timeout_seconds": 600,
                         },
+                        "pr_review_dispatch": {
+                            "enabled": False,
+                        },
                     }
                 }
             )
@@ -98,5 +102,6 @@ def test_from_settings_loads_yaml_config():
             assert config.max_concurrent_flows == 5
             assert config.master_agent.agent == "test-controller"
             assert config.master_agent.timeout_seconds == 600
+            assert config.pr_review_dispatch.enabled is False
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults

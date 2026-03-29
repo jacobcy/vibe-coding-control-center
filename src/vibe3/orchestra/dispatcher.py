@@ -213,6 +213,41 @@ class Dispatcher:
             log.error(f"Manager execution error: {e}")
             return False
 
+    def dispatch_pr_review(self, pr_number: int) -> bool:
+        """Dispatch PR review command for reviewer-triggered events."""
+        log = logger.bind(
+            domain="orchestra",
+            action="review_dispatch",
+            pr_number=pr_number,
+        )
+
+        cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
+        log.info(f"Dispatching review: {' '.join(cmd)}")
+
+        if self.dry_run:
+            log.info("Dry run, skipping execution")
+            return True
+
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                log.error(f"Review execution failed: {result.stderr}")
+                return False
+            log.info("Review execution completed successfully")
+            return True
+        except subprocess.TimeoutExpired:
+            log.error("Review execution timed out")
+            return False
+        except Exception as e:
+            log.error(f"Review execution error: {e}")
+            return False
+
     def _update_state_label(self, issue_number: int, state: IssueState) -> None:
         """Update issue state label (display only, does not drive logic).
 

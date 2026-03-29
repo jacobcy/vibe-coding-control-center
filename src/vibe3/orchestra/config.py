@@ -45,6 +45,12 @@ class CommentReplyConfig(BaseModel):
     enabled: bool = True
 
 
+class PRReviewDispatchConfig(BaseModel):
+    """Configuration for PR review dispatch service."""
+
+    enabled: bool = True
+
+
 class MasterAgentConfig(BaseModel):
     """Master agent configuration."""
 
@@ -80,6 +86,9 @@ class OrchestraConfig(BaseModel):
     )
     master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
     comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
+    pr_review_dispatch: PRReviewDispatchConfig = Field(
+        default_factory=PRReviewDispatchConfig
+    )
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -110,6 +119,13 @@ class OrchestraConfig(BaseModel):
                 enabled=getattr(comment_reply_cfg, "enabled", True),
             )
 
+        pr_review_cfg = getattr(orchestra_config, "pr_review_dispatch", None)
+        pr_review_dispatch = PRReviewDispatchConfig()
+        if pr_review_cfg:
+            pr_review_dispatch = PRReviewDispatchConfig(
+                enabled=getattr(pr_review_cfg, "enabled", True),
+            )
+
         return cls(
             enabled=getattr(orchestra_config, "enabled", True),
             polling_interval=getattr(orchestra_config, "polling_interval", 900),
@@ -122,4 +138,5 @@ class OrchestraConfig(BaseModel):
             ),
             master_agent=master_agent,
             comment_reply=comment_reply,
+            pr_review_dispatch=pr_review_dispatch,
         )
