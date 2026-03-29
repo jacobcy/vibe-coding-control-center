@@ -1,5 +1,6 @@
 """Tests for Orchestra dispatcher."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 from vibe3.models.orchestration import IssueState
@@ -193,3 +194,71 @@ class TestDispatcherDryRun:
 
         assert result is True
         mock_run.assert_not_called()
+
+
+class _Completed:
+    def __init__(self, returncode: int = 0, stdout: str = "", stderr: str = "") -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class TestDispatcherReviewWorktreeResolution:
+    def test_dispatch_pr_review_uses_resolved_worktree(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+
+        with patch.object(
+            dispatcher, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
+        ):
+            with patch(
+                "subprocess.run",
+                return_value=_Completed(returncode=0),
+            ) as mock_run:
+                result = dispatcher.dispatch_pr_review(42)
+
+        assert result is True
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["cwd"] == Path("/tmp/wt-feature")
+
+    def test_find_worktree_for_branch_parses_porcelain_output(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        output = (
+            "worktree /tmp/repo\n"
+            "HEAD abcdef0\n"
+            "branch refs/heads/main\n"
+            "\n"
+            "worktree /tmp/wt-feature\n"
+            "HEAD 1234567\n"
+            "branch refs/heads/task/issue250-orchestra-manager\n"
+            "\n"
+        )
+
+        with patch(
+            "subprocess.run",
+            return_value=_Completed(returncode=0, stdout=output),
+        ):
+            wt = dispatcher._find_worktree_for_branch("task/issue250-orchestra-manager")
+
+        assert wt == Path("/tmp/wt-feature")
+
+    def test_resolve_review_cwd_falls_back_to_repo_path(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+
+        class _PR:
+            head_branch = "task/missing"
+
+        with patch(
+            "vibe3.clients.github_client.GitHubClient.get_pr",
+            return_value=_PR(),
+        ):
+            with patch.object(
+                dispatcher,
+                "_find_worktree_for_branch",
+                return_value=None,
+            ):
+                cwd = dispatcher._resolve_review_cwd(99)
+
+        assert cwd == Path("/tmp/repo")

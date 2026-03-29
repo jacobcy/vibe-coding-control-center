@@ -72,7 +72,8 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
     heartbeat = HeartbeatServer(config)
 
-    heartbeat.register(AssigneeDispatchService(config))
+    if config.assignee_dispatch.enabled:
+        heartbeat.register(AssigneeDispatchService(config))
     if config.comment_reply.enabled:
         heartbeat.register(CommentReplyService(config))
     if config.pr_review_dispatch.enabled:
@@ -145,6 +146,10 @@ def start(
     setup_logging(verbose=verbose)
 
     config = OrchestraConfig.from_settings()
+    if not config.enabled:
+        typer.echo("Orchestra is disabled in config (orchestra.enabled=false)")
+        raise typer.Exit(1)
+
     if interval != 900:
         config = config.model_copy(update={"polling_interval": interval})
     if port != 8080:

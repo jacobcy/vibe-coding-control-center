@@ -83,6 +83,7 @@ def make_webhook_router(
                 "running": heartbeat._running,
                 "services": heartbeat.service_names,
                 "polling_interval": heartbeat.config.polling_interval,
+                "polling_enabled": heartbeat.config.polling.enabled,
                 "max_concurrent": heartbeat.config.max_concurrent_flows,
             }
         )

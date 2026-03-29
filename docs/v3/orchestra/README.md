@@ -67,6 +67,7 @@ related_docs:
 
 - [prd-orchestra-integration.md](prd-orchestra-integration.md) - 当前 PRD（含本版边界）
 - [github-issue-draft.md](github-issue-draft.md) - follow-up issue 拆分草稿
+- [debug-reviewer-webhook.md](debug-reviewer-webhook.md) - reviewer webhook 调试与验收手册
 
 ## 快速开始
 

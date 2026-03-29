@@ -222,7 +222,8 @@ class Dispatcher:
         )
 
         cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
-        log.info(f"Dispatching review: {' '.join(cmd)}")
+        review_cwd = self._resolve_review_cwd(pr_number)
+        log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")
 
         if self.dry_run:
             log.info("Dry run, skipping execution")
@@ -231,7 +232,7 @@ class Dispatcher:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=self.repo_path,
+                cwd=review_cwd,
                 capture_output=True,
                 text=True,
                 timeout=3600,
@@ -247,6 +248,76 @@ class Dispatcher:
         except Exception as e:
             log.error(f"Review execution error: {e}")
             return False
+
+    def _resolve_review_cwd(self, pr_number: int) -> Path:
+        """Resolve best worktree cwd for PR review execution.
+
+        Priority:
+        1. Worktree that currently has PR head branch checked out
+        2. Dispatcher default repo_path
+        """
+        try:
+            from vibe3.clients.github_client import GitHubClient
+
+            pr = GitHubClient().get_pr(pr_number)
+            if not pr or not pr.head_branch:
+                return self.repo_path
+
+            worktree = self._find_worktree_for_branch(pr.head_branch)
+            if worktree:
+                logger.bind(
+                    domain="orchestra",
+                    pr_number=pr_number,
+                    branch=pr.head_branch,
+                    worktree=str(worktree),
+                ).info("Resolved PR review to matching worktree")
+                return worktree
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to resolve PR worktree for #{pr_number}: {exc}"
+            )
+
+        return self.repo_path
+
+    def _find_worktree_for_branch(self, branch: str) -> Path | None:
+        """Find worktree path whose checked-out branch matches `branch`."""
+        try:
+            result = subprocess.run(
+                ["git", "worktree", "list", "--porcelain"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except Exception:
+            return None
+
+        if result.returncode != 0:
+            return None
+
+        current_worktree: str | None = None
+        current_branch: str | None = None
+
+        def matched() -> Path | None:
+            if current_worktree and current_branch == f"refs/heads/{branch}":
+                return Path(current_worktree)
+            return None
+
+        for raw in result.stdout.splitlines():
+            line = raw.strip()
+            if not line:
+                found = matched()
+                if found:
+                    return found
+                current_worktree = None
+                current_branch = None
+                continue
+            if line.startswith("worktree "):
+                current_worktree = line.split(" ", 1)[1]
+            elif line.startswith("branch "):
+                current_branch = line.split(" ", 1)[1]
+
+        return matched()
 
     def _update_state_label(self, issue_number: int, state: IssueState) -> None:
         """Update issue state label (display only, does not drive logic).

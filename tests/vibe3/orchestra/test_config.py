@@ -13,7 +13,13 @@ def test_default_config():
     assert OrchestraConfig().enabled is True
     assert OrchestraConfig().polling_interval == 900
     assert OrchestraConfig().dry_run is False
+    assert OrchestraConfig().polling.enabled is True
+    assert OrchestraConfig().assignee_dispatch.enabled is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
+    pid_path = OrchestraConfig().pid_file.as_posix()
+    assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
+        ".git/vibe3/orchestra.pid"
+    )
 
 
 def test_config_validation():
@@ -79,6 +85,12 @@ def test_from_settings_loads_yaml_config():
                             "agent": "test-controller",
                             "timeout_seconds": 600,
                         },
+                        "polling": {
+                            "enabled": False,
+                        },
+                        "assignee_dispatch": {
+                            "enabled": False,
+                        },
                         "pr_review_dispatch": {
                             "enabled": False,
                         },
@@ -102,6 +114,8 @@ def test_from_settings_loads_yaml_config():
             assert config.max_concurrent_flows == 5
             assert config.master_agent.agent == "test-controller"
             assert config.master_agent.timeout_seconds == 600
+            assert config.polling.enabled is False
+            assert config.assignee_dispatch.enabled is False
             assert config.pr_review_dispatch.enabled is False
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults

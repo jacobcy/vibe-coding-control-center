@@ -1,11 +1,34 @@
 """Orchestra configuration."""
 
+import subprocess
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 from vibe3.models.orchestration import IssueState
 from vibe3.services.review_runner import AgentOptions
+
+
+def _default_pid_file() -> Path:
+    """Resolve PID path under shared git common dir when available."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            git_common_dir = result.stdout.strip()
+            if git_common_dir:
+                common_path = Path(git_common_dir)
+                if not common_path.is_absolute():
+                    common_path = (Path.cwd() / common_path).resolve()
+                return common_path / "vibe3" / "orchestra.pid"
+    except Exception:
+        pass
+    return Path(".git/vibe3/orchestra.pid")
 
 
 class StateTrigger(BaseModel):
@@ -45,6 +68,18 @@ class CommentReplyConfig(BaseModel):
     enabled: bool = True
 
 
+class PollingConfig(BaseModel):
+    """Configuration for heartbeat polling fallback."""
+
+    enabled: bool = True
+
+
+class AssigneeDispatchConfig(BaseModel):
+    """Configuration for assignee-based manager dispatch."""
+
+    enabled: bool = True
+
+
 class PRReviewDispatchConfig(BaseModel):
     """Configuration for PR review dispatch service."""
 
@@ -77,7 +112,7 @@ class OrchestraConfig(BaseModel):
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
     dry_run: bool = False
-    pid_file: Path = Field(default=Path(".git/vibe/orchestra.pid"))
+    pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
     webhook_secret: str | None = None
     manager_usernames: list[str] = Field(
@@ -85,6 +120,10 @@ class OrchestraConfig(BaseModel):
         description="GitHub usernames whose assignment signals manager dispatch",
     )
     master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
+    polling: PollingConfig = Field(default_factory=PollingConfig)
+    assignee_dispatch: AssigneeDispatchConfig = Field(
+        default_factory=AssigneeDispatchConfig
+    )
     comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
@@ -119,6 +158,20 @@ class OrchestraConfig(BaseModel):
                 enabled=getattr(comment_reply_cfg, "enabled", True),
             )
 
+        polling_cfg = getattr(orchestra_config, "polling", None)
+        polling = PollingConfig()
+        if polling_cfg:
+            polling = PollingConfig(
+                enabled=getattr(polling_cfg, "enabled", True),
+            )
+
+        assignee_dispatch_cfg = getattr(orchestra_config, "assignee_dispatch", None)
+        assignee_dispatch = AssigneeDispatchConfig()
+        if assignee_dispatch_cfg:
+            assignee_dispatch = AssigneeDispatchConfig(
+                enabled=getattr(assignee_dispatch_cfg, "enabled", True),
+            )
+
         pr_review_cfg = getattr(orchestra_config, "pr_review_dispatch", None)
         pr_review_dispatch = PRReviewDispatchConfig()
         if pr_review_cfg:
@@ -137,6 +190,8 @@ class OrchestraConfig(BaseModel):
                 orchestra_config, "manager_usernames", ["vibe-manager"]
             ),
             master_agent=master_agent,
+            polling=polling,
+            assignee_dispatch=assignee_dispatch,
             comment_reply=comment_reply,
             pr_review_dispatch=pr_review_dispatch,
         )

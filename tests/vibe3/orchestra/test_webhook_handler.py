@@ -113,3 +113,4 @@ def test_status_endpoint() -> None:
     data = resp.json()
     assert "running" in data
     assert "polling_interval" in data
+    assert "polling_enabled" in data

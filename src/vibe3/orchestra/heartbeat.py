@@ -46,12 +46,14 @@ class HeartbeatServer:
         log = logger.bind(domain="orchestra", action="start")
         log.info(
             f"HeartbeatServer started (tick_interval={self.config.polling_interval}s, "
+            f"polling_enabled={self.config.polling.enabled}, "
             f"max_concurrent={self.config.max_concurrent_flows}, "
             f"services={self.service_names})"
         )
         try:
             async with asyncio.TaskGroup() as tg:
-                tg.create_task(self._tick_loop())
+                if self.config.polling.enabled:
+                    tg.create_task(self._tick_loop())
                 tg.create_task(self._event_loop())
         except* Exception as eg:
             for exc in eg.exceptions:

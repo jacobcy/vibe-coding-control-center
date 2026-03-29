@@ -201,6 +201,18 @@ class OrchestraCommentReplySettings(BaseModel):
     enabled: bool = True
 
 
+class OrchestraPollingSettings(BaseModel):
+    """Polling fallback settings for orchestra heartbeat."""
+
+    enabled: bool = True
+
+
+class OrchestraAssigneeDispatchSettings(BaseModel):
+    """Assignee-driven orchestra dispatch settings."""
+
+    enabled: bool = True
+
+
 class OrchestraPRReviewDispatchSettings(BaseModel):
     """PR review dispatch settings for orchestra."""
 
@@ -217,6 +229,10 @@ class OrchestraSettings(BaseModel):
     manager_usernames: list[str] = Field(default_factory=lambda: ["vibe-manager"])
     repo: str | None = None
     max_concurrent_flows: int = 3
+    polling: OrchestraPollingSettings = Field(default_factory=OrchestraPollingSettings)
+    assignee_dispatch: OrchestraAssigneeDispatchSettings = Field(
+        default_factory=OrchestraAssigneeDispatchSettings
+    )
     comment_reply: OrchestraCommentReplySettings = Field(
         default_factory=OrchestraCommentReplySettings
     )
