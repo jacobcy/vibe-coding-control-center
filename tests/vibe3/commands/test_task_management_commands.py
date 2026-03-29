@@ -101,6 +101,21 @@ def test_flow_add_rejects_detached_head_default(mock_service_cls: MagicMock) -> 
     assert "detached" in result.output or "HEAD" in result.output
 
 
+@patch("vibe3.commands.flow.FlowService")
+def test_flow_create_rejects_detached_head_default(mock_service_cls: MagicMock) -> None:
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "HEAD"
+    flow_service.resolve_flow_name.side_effect = ValueError(
+        "Cannot infer flow name from detached HEAD"
+    )
+    mock_service_cls.return_value = flow_service
+
+    result = runner.invoke(flow_app, ["create"])
+
+    assert result.exit_code != 0
+    assert "detached" in result.output or "HEAD" in result.output
+
+
 def test_flow_bind_help_uses_issue_and_role() -> None:
     result = runner.invoke(flow_app, ["bind", "--help"])
     stdout = strip_ansi(result.stdout)

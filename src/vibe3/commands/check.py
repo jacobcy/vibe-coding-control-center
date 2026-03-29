@@ -1,6 +1,6 @@
 """Check command implementation."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import typer
 
@@ -12,6 +12,42 @@ app = typer.Typer(
     help="Verify handoff store consistency",
     rich_markup_mode="rich",
 )
+
+
+def _emit_check_details(
+    mode: Literal["default", "init", "all", "fix"],
+    details: dict[str, Any],
+    *,
+    fix_requested: bool,
+) -> None:
+    """Render mode-specific check details for CLI visibility."""
+    if mode == "init":
+        unresolvable = details.get("unresolvable") or []
+        if unresolvable:
+            typer.echo(
+                f"  Unresolvable ({len(unresolvable)} branches — "
+                "no linked issues found in PR body):"
+            )
+            for branch in unresolvable:
+                typer.echo(f"    {branch}")
+        return
+
+    if mode == "all":
+        invalid = details.get("invalid") or []
+        for result in invalid:
+            branch = getattr(result, "branch", "<unknown>")
+            issues = getattr(result, "issues", [])
+            typer.echo(f"\n  [{branch}]", err=True)
+            for issue in issues:
+                typer.echo(f"    - {issue}", err=True)
+            typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
+        return
+
+    issues = details.get("issues") or []
+    for issue in issues:
+        typer.echo(f"  - {issue}", err=True)
+    if mode == "default" and not fix_requested:
+        typer.echo("\n  → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
 
 
 @app.callback(invoke_without_command=True)
@@ -73,14 +109,16 @@ def check(
         mode: Literal["default", "init", "all", "fix"] = (
             "init" if init else "all" if all_flows else "fix" if fix else "default"
         )
+        if mode == "init":
+            typer.echo("Scanning merged PRs to back-fill task_issue_number...")
         result = service.execute_check(mode)
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
+            _emit_check_details(mode, result.details, fix_requested=fix)
         else:
             typer.echo(f"✗ {result.summary}", err=True)
-            if not fix and mode == "default":
-                typer.echo("\n  → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
+            _emit_check_details(mode, result.details, fix_requested=fix)
             raise typer.Exit(code=1)
     finally:
         if trace_ctx:

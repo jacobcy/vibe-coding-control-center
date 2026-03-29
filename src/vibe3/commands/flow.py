@@ -150,12 +150,15 @@ def create(
     """Create a new branch with flow state."""
     flow_service = FlowService()
     task_service = TaskService()
-    name = flow_service.resolve_flow_name(name)
-    task_refs = FlowUsecase.validate_issue_refs(
-        task, task_tail, primary_hint="--task <issue>"
-    )
-    usecase = FlowUsecase.create(flow_service, task_service=task_service)
     with trace_scope(trace, "flow create", name=name, base=base):
+        try:
+            name = flow_service.resolve_flow_name(name)
+            task_refs = FlowUsecase.validate_issue_refs(
+                task, task_tail, primary_hint="--task <issue>"
+            )
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
+        usecase = FlowUsecase.create(flow_service, task_service=task_service)
         logger.bind(command="flow create", name=name, base=base, task=task_refs).info(
             "Creating flow with new branch"
         )
