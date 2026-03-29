@@ -1,6 +1,6 @@
 """Check service implementation."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
@@ -31,16 +31,6 @@ class FixResult:
     error: str | None = None
 
 
-@dataclass
-class InitResult:
-    """Result of remote index init."""
-
-    total_flows: int
-    updated: int
-    skipped: int
-    unresolvable: list[str] = field(default_factory=list)
-
-
 class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     """Service for verifying handoff store consistency."""
 
@@ -57,7 +47,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     # Single-branch check
     # ------------------------------------------------------------------
 
-    def verify_current_flow(self, fix: bool = False) -> CheckResult:
+    def verify_current_flow(self) -> CheckResult:
         """Verify current branch flow consistency.
 
         Checks:
@@ -85,8 +75,9 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 branch=branch,
             )
 
-        # task issue exists on GitHub
+        # task issue exists and is open on GitHub
         task_issue = flow_data.get("task_issue_number")
+        task_issue_closed = False
         if task_issue:
             issue = self.github_client.view_issue(task_issue)
             if issue == "network_error":
@@ -95,6 +86,11 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 )
             elif not issue:
                 issues.append(f"Task issue #{task_issue} not found on GitHub")
+            elif (
+                isinstance(issue, dict)
+                and str(issue.get("state", "")).upper() == "CLOSED"
+            ):
+                task_issue_closed = True
 
         # only one task issue per branch
         issue_links = self.store.get_issue_links(branch)
@@ -111,52 +107,97 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
 
             # Check if PR is closed or merged - auto-complete flow
             if pr and (pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at):
-                logger.bind(
-                    domain="check",
-                    action="auto_complete_flow",
-                    branch=branch,
-                    pr_number=pr_number,
-                    pr_state=pr.state.value,
-                ).info("PR closed/merged, marking flow as done")
-
-                # Mark flow as done
-                self.store.update_flow_state(branch, flow_status="done")
-                self.store.add_event(
+                self._mark_flow_done(
                     branch,
-                    "flow_auto_completed",
-                    "system",
-                    f"Flow auto-completed: PR #{pr_number} is {pr.state.value}",
+                    f"PR #{pr_number} is {pr.state.value}",
                 )
-                issues.append(
-                    f"ℹ️ Flow marked as done: PR #{pr_number} is {pr.state.value}"
-                )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
 
         # Check for missing PR (branch has PR but database doesn't record it)
         if not pr_number:
             prs = self.github_client.list_prs_for_branch(branch)
             if prs:
-                pr_num = prs[0].number
+                pr = prs[0]
+                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                    # PR found and merged — backfill pr_number and auto-complete
+                    self.store.update_flow_state(
+                        branch, pr_number=pr.number, latest_actor="check --fix"
+                    )
+                    self._mark_flow_done(
+                        branch,
+                        f"PR #{pr.number} is {pr.state.value} "
+                        "(back-filled from branch lookup)",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
                 issues.append(
-                    f"Branch has open PR #{pr_num} but database missing pr_number"
+                    f"Branch has open PR #{pr.number} but database missing pr_number"
                 )
+            else:
+                # list_prs_for_branch only returns open PRs;
+                # also check merged/closed to catch stale flows
+                all_prs = self.github_client.list_prs_for_branch(branch, state="all")
+                merged_prs = [
+                    p for p in all_prs if p.state == PRState.MERGED or p.merged_at
+                ]
+                if merged_prs:
+                    pr = merged_prs[0]
+                    self.store.update_flow_state(
+                        branch, pr_number=pr.number, latest_actor="check --fix"
+                    )
+                    self._mark_flow_done(
+                        branch,
+                        f"PR #{pr.number} is MERGED (found via --state all lookup)",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
 
-        # ref files exist
-        for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
-            ref_value = flow_data.get(ref_field)
-            if ref_value and not Path(ref_value).exists():
-                issues.append(f"{ref_field} file not found: {ref_value}")
+        # Auto-complete when task issue is closed (and no open PR)
+        if task_issue_closed and not pr_number:
+            prs_check = (
+                self.github_client.list_prs_for_branch(branch) if not pr_number else []
+            )
+            open_prs = [p for p in prs_check if p.state == PRState.OPEN]
+            if not open_prs:
+                self._mark_flow_done(
+                    branch,
+                    f"Task issue #{task_issue} is CLOSED (no open PR found)",
+                )
+                return CheckResult(is_valid=True, branch=branch, issues=[])
 
-        # shared current.md
-        git_dir = self.git_client.get_git_common_dir()
-        handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
-        if not handoff_path.exists():
-            issues.append(f"Shared handoff file not found: {handoff_path}")
+        # ref files exist (skip for terminal flows — artifacts may be cleaned up)
+        flow_status = flow_data.get("flow_status", "active")
+        if flow_status not in ("done", "aborted", "stale"):
+            for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
+                ref_value = flow_data.get(ref_field)
+                if ref_value and not Path(ref_value).exists():
+                    issues.append(f"{ref_field} file not found: {ref_value}")
+
+        # shared current.md (skip for terminal flows)
+        if flow_status not in ("done", "aborted", "stale"):
+            git_dir = self.git_client.get_git_common_dir()
+            handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
+            if not handoff_path.exists():
+                issues.append(f"Shared handoff file not found: {handoff_path}")
 
         is_valid = len(issues) == 0
         logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).info(
             "Check completed"
         )
         return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
+
+    def _mark_flow_done(self, branch: str, reason: str) -> None:
+        """Mark a flow as done and record the event."""
+        logger.bind(
+            domain="check",
+            action="auto_complete_flow",
+            branch=branch,
+        ).info(f"Auto-completing flow: {reason}")
+        self.store.update_flow_state(branch, flow_status="done")
+        self.store.add_event(
+            branch,
+            "flow_auto_completed",
+            "system",
+            f"Flow auto-completed: {reason}",
+        )
 
     # ------------------------------------------------------------------
     # All-flows check
@@ -174,8 +215,8 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     # Local auto-fix (current branch, no network)
     # ------------------------------------------------------------------
 
-    def auto_fix(self, issues: list[str]) -> FixResult:
-        """Auto-fix local consistency issues for the current branch.
+    def auto_fix(self, issues: list[str], *, branch: str | None = None) -> FixResult:
+        """Auto-fix local consistency issues for a branch.
 
         Handles:
         - Missing shared current.md (creates empty placeholder)
@@ -183,7 +224,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
 
         Some fixes require network access to GitHub.
         """
-        branch = self.git_client.get_current_branch()
+        branch = branch or self.git_client.get_current_branch()
         fixed: list[str] = []
 
         for issue in issues:
@@ -235,25 +276,9 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             )
         return FixResult(success=True)
 
-    # ------------------------------------------------------------------
-    # Remote index init (network, writes task_issue_number)
-    # ------------------------------------------------------------------
+    def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
+        """Auto-fix issues for a specific branch.
 
-    def init_remote_index(self, pr_limit: int = 200) -> InitResult:
-        """全量扫描远端，回填所有 flow 的 task_issue_number。
-
-        路径 A — merged PR body 解析 Closes/Fixes/Resolves #xxx
-        路径 B — GitHub Project items closingIssuesReferences
-        已有 task_issue_number 的 flow 跳过（不覆盖）。
+        Delegates to auto_fix with explicit branch parameter.
         """
-        logger.bind(domain="check", action="init_remote_index").info(
-            "Building remote index (PR body + GitHub Project items)"
-        )
-        branch_issue_map = self._build_branch_issue_map(pr_limit)
-        updated, skipped, unresolvable = self._backfill_flows(branch_issue_map)
-        return InitResult(
-            total_flows=len(self.store.get_all_flows()),
-            updated=updated,
-            skipped=skipped,
-            unresolvable=unresolvable,
-        )
+        return self.auto_fix(issues, branch=branch)

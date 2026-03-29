@@ -1,10 +1,22 @@
 """Check service remote index operations."""
 
+from dataclasses import dataclass, field
+
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+
+
+@dataclass
+class InitResult:
+    """Result of remote index init."""
+
+    total_flows: int
+    updated: int
+    skipped: int
+    unresolvable: list[str] = field(default_factory=list)
 
 
 class CheckRemoteIndexMixin:
@@ -112,3 +124,22 @@ class CheckRemoteIndexMixin:
             updated += 1
 
         return updated, skipped, unresolvable
+
+    def init_remote_index(self, pr_limit: int = 200) -> InitResult:
+        """全量扫描远端，回填所有 flow 的 task_issue_number。
+
+        路径 A — merged PR body 解析 Closes/Fixes/Resolves #xxx
+        路径 B — GitHub Project items closingIssuesReferences
+        已有 task_issue_number 的 flow 跳过（不覆盖）。
+        """
+        logger.bind(domain="check", action="init_remote_index").info(
+            "Building remote index (PR body + GitHub Project items)"
+        )
+        branch_issue_map = self._build_branch_issue_map(pr_limit)
+        updated, skipped, unresolvable = self._backfill_flows(branch_issue_map)
+        return InitResult(
+            total_flows=len(self.store.get_all_flows()),
+            updated=updated,
+            skipped=skipped,
+            unresolvable=unresolvable,
+        )

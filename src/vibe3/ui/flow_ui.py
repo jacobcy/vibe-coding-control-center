@@ -4,8 +4,12 @@ from typing import Any
 
 from rich.text import Text
 
-from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse
+from vibe3.models.flow import FlowState, FlowStatusResponse
 from vibe3.ui.console import console
+from vibe3.ui.flow_ui_timeline import (  # noqa: F401
+    render_flow_timeline,
+    render_milestone,
+)
 
 _STATUS_COLOR: dict[str, str] = {
     "active": "green",
@@ -25,7 +29,12 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
     console.print(f"{pad}[dim]{key}:[/] {value}")
 
 
-def _render_flow_row(flow: FlowState, title: str | None = None) -> None:
+def _render_flow_row(
+    flow: FlowState,
+    title: str | None = None,
+    pr_data: dict[str, object] | None = None,
+    worktree: str | None = None,
+) -> None:
     status_text = _status_text(flow.flow_status).plain
     console.print(f"[cyan]{flow.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", flow.flow_slug, 1)
@@ -33,6 +42,20 @@ def _render_flow_row(flow: FlowState, title: str | None = None) -> None:
     _kv("task_issue", task_str, 1)
     if title is not None:
         _kv("title", title, 1)
+    if worktree:
+        _kv("worktree", worktree, 1)
+    if pr_data:
+        draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
+        state = str(pr_data.get("state", "")).lower()
+        title = str(pr_data.get("title", ""))
+        title_suffix = f"  {title}" if title else ""
+        console.print(
+            f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
+            f"  [dim]{state}[/]{title_suffix}"
+        )
+        # Remove redundant worktree display since it's already shown above
+    elif flow.pr_number:
+        _kv("pr", f"#{flow.pr_number}  [dim](offline)[/]", 1)
     console.print()
 
 
@@ -41,44 +64,6 @@ def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
     _kv("branch", flow.branch, 1)
     if task_id:
         _kv("task", task_id, 1)
-
-
-def render_milestone(
-    milestone_data: "dict[str, Any]", current_issue: "int | None" = None
-) -> None:
-    from vibe3.clients.github_issues_ops import parse_blocked_by
-
-    ms_title = milestone_data["title"]
-    open_count = int(milestone_data.get("open", 0))
-    closed_count = int(milestone_data.get("closed", 0))
-    total = open_count + closed_count
-    progress = f"{closed_count}/{total} done" if total else "0 issues"
-    console.print(f"\n[bold]--- Milestone: {ms_title} [{progress}] ---[/]")
-    issues: list[dict[str, Any]] = list(milestone_data.get("issues") or [])
-    for item in sorted(issues, key=lambda x: int(x["number"])):
-        n = int(item["number"])
-        state = str(item.get("state", "open")).upper()
-        title = str(item.get("title", ""))
-        labels = [lb["name"] for lb in (item.get("labels") or [])]
-        is_blocked = "status/blocked" in labels
-        is_done = state == "CLOSED"
-
-        if is_done:
-            icon = "[green]x[/]"
-        elif is_blocked:
-            icon = "[red]![/]"
-        else:
-            icon = "[ ]"
-
-        current = "  [dim]<- this flow[/]" if n == current_issue else ""
-        console.print(f"  {icon}  [dim]#{n}[/]  {title}{current}")
-
-        if is_blocked:
-            body = str(item.get("body") or "")
-            blockers = parse_blocked_by(body)
-            if blockers:
-                blocker_str = "  ".join(f"#{b}" for b in blockers)
-                console.print(f"       [red dim]blocked by: {blocker_str}[/]")
 
 
 def render_flow_status(
@@ -118,6 +103,9 @@ def render_flow_status(
             f"  [dim]pr:[/] #{pr_data['number']}{draft_tag}"
             f"  [dim]{state}[/]  {pr_data.get('title', '')}"
         )
+        worktree = pr_data.get("worktree")
+        if worktree:
+            _kv("worktree", worktree, 2)
         _kv("url", pr_data.get("url", ""), 2)
     elif status.pr_number:
         _kv("pr", f"#{status.pr_number}  [dim](offline)[/]", 1)
@@ -176,121 +164,22 @@ def render_flows_table(flows: list[FlowState]) -> None:
 
 
 def render_flows_status_dashboard(
-    flows: list[FlowState], titles: dict[int, str]
+    flows: list[FlowState],
+    titles: dict[int, str],
+    pr_map: dict[str, dict[str, object]] | None = None,
+    worktree_map: dict[str, str] | None = None,
 ) -> None:
-    """flow status dashboard — YAML style with remote title."""
+    """flow status dashboard — YAML style with remote title and PR status."""
+    pr_map = pr_map or {}
+    worktree_map = worktree_map or {}
     for flow in flows:
         task_num = flow.task_issue_number
         title = titles.get(task_num, "—") if task_num else "—"
-        _render_flow_row(flow, title)
+        worktree = worktree_map.get(flow.branch)
+        _render_flow_row(
+            flow, title, pr_data=pr_map.get(flow.branch), worktree=worktree
+        )
 
 
 def render_error(message: str) -> None:
     console.print(f"[red]✗[/] {message}")
-
-
-_EVENT_COLOR: dict[str, str] = {
-    "flow_created": "cyan",
-    "task_bound": "cyan",
-    "issue_linked": "cyan",
-    "status_updated": "dim",
-    "next_step_set": "dim",
-    "pr_created": "yellow",
-    "pr_ready": "yellow",
-    "pr_merged": "green",
-    "run_started": "yellow",
-    "run_completed": "green",
-    "run_aborted": "red",
-    "plan_started": "yellow",
-    "plan_completed": "green",
-    "plan_aborted": "red",
-    "review_started": "yellow",
-    "review_completed": "green",
-    "review_aborted": "red",
-    "planner_started": "yellow",
-    "planner_completed": "green",
-    "planner_aborted": "red",
-    "executor_started": "yellow",
-    "executor_completed": "green",
-    "executor_aborted": "red",
-    "reviewer_started": "yellow",
-    "reviewer_completed": "green",
-    "reviewer_aborted": "red",
-    "handoff_plan": "blue",
-    "handoff_run": "blue",
-    "handoff_review": "magenta",
-}
-
-
-def render_flow_timeline(
-    state: FlowState,
-    events: list[FlowEvent],
-    milestone_data: dict[str, Any] | None = None,
-) -> None:
-    status_text = _status_text(state.flow_status).plain
-    console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
-    _kv("flow_slug", state.flow_slug, 1)
-    if state.task_issue_number:
-        console.print(f"  [dim]task[/]        #{state.task_issue_number}")
-    else:
-        console.print(
-            "  [yellow]task[/]        [dim]not bound[/]  "
-            "[dim]→ vibe3 flow bind <task-id>[/]"
-        )
-    if state.pr_number:
-        console.print(f"  [dim]pr[/]          #{state.pr_number}")
-    if state.spec_ref:
-        console.print(f"  [dim]spec[/]        {state.spec_ref}")
-    if state.next_step:
-        console.print(f"  [dim]next[/]        {state.next_step}")
-    console.print()
-
-    if not events:
-        console.print("[dim]  no events[/]")
-        return
-
-    console.print("[bold]═══ Timeline ═══[/]")
-    console.print()
-
-    for event in reversed(events):
-        color = _EVENT_COLOR.get(event.event_type, "white")
-        time_str = event.created_at[:16].replace("T", " ")
-        actor_short = event.actor
-        console.print(
-            f"[dim]{time_str}[/]  [{color}]{event.event_type}[/]  [dim]{actor_short}[/]"
-        )
-        if event.detail:
-            console.print(f"  {event.detail}")
-        if event.refs:
-            files = event.refs.get("files") if isinstance(event.refs, dict) else None
-            if files and isinstance(files, list):
-                for f in files:
-                    console.print(f"  [dim]📎 {f}[/]")
-            ref = event.refs.get("ref") if isinstance(event.refs, dict) else None
-            if ref:
-                console.print(f"  [dim]📎 {ref}[/]")
-        console.print()
-
-    if milestone_data:
-        ms_title = milestone_data["title"]
-        open_count = int(milestone_data.get("open", 0))
-        closed_count = int(milestone_data.get("closed", 0))
-        total = open_count + closed_count
-        progress = f"{closed_count}/{total} done" if total else "—"
-        console.print(
-            f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
-            "  [dim]→ vibe3 task show[/]"
-        )
-
-    refs_shown = False
-    for label in ["spec_ref", "plan_ref", "report_ref", "audit_ref"]:
-        val = getattr(state, label, None)
-        if val:
-            if not refs_shown:
-                console.print("[bold]═══ Refs ═══[/]")
-                refs_shown = True
-            actor_field = label.replace("_ref", "_actor")
-            actor = getattr(state, actor_field, None) or ""
-            actor_str = f"  [dim]{actor}[/]" if actor else ""
-            console.print(f"  [dim]{label}[/]  {val}{actor_str}")
-    console.print()
