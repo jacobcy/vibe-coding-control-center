@@ -4,6 +4,7 @@ Tests CLI surface: argument validation, help output, exit codes.
 All external services (codeagent-wrapper, GitHub, Git) are mocked.
 """
 
+import re
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -11,6 +12,11 @@ from typer.testing import CliRunner
 from vibe3.commands.review import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes for CI-safe assertions."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _mock_review(verdict: str = "PASS"):
@@ -90,16 +96,18 @@ def test_review_pr_block_exits_1():
 
 def test_review_pr_help():
     result = runner.invoke(app, ["pr", "--help"])
+    output = _strip_ansi(result.output)
     assert result.exit_code == 0
-    assert "PR number" in result.output
-    assert "--async" in result.output
+    assert "PR number" in output
+    assert "--async" in output
 
 
 def test_review_pr_does_not_have_publish_option():
     """review pr should NOT have --publish option (local-only)."""
     result = runner.invoke(app, ["pr", "--help"])
+    output = _strip_ansi(result.output)
     assert result.exit_code == 0
-    assert "--publish" not in result.output
+    assert "--publish" not in output
 
 
 def test_review_pr_is_local_only():
