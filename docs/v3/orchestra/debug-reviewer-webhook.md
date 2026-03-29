@@ -38,6 +38,12 @@ orchestra:
 uv run python src/vibe3/cli.py serve start -v --port 8080 --repo jacobcy/vibe-coding-control-center
 ```
 
+后台模式（tmux）：
+
+```bash
+uv run python src/vibe3/cli.py serve start --async -v --port 8080 --repo jacobcy/vibe-coding-control-center
+```
+
 检查健康状态：
 
 ```bash

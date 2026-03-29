@@ -3,6 +3,7 @@
 import asyncio
 import os
 import signal
+import subprocess
 from pathlib import Path
 from typing import Annotated
 
@@ -84,6 +85,63 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     return heartbeat, fastapi_app
 
 
+def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[str]:
+    """Build self-invocation command for async tmux startup."""
+    cmd = [
+        "uv",
+        "run",
+        "python",
+        "src/vibe3/cli.py",
+        "serve",
+        "start",
+        "--interval",
+        str(config.polling_interval),
+        "--port",
+        str(config.port),
+    ]
+    if config.repo:
+        cmd.extend(["--repo", config.repo])
+    if config.dry_run:
+        cmd.append("--dry-run")
+    for _ in range(verbose):
+        cmd.append("-v")
+    return cmd
+
+
+def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
+    """Start serve command in tmux session.
+
+    Returns:
+        (success, message)
+    """
+    session_name = "vibe3-orchestra-serve"
+    cmd = _build_async_serve_command(config, verbose)
+    try:
+        subprocess.run(
+            ["tmux", "new-session", "-d", "-s", session_name, "--"] + cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return False, "tmux not found, cannot start --async serve mode"
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        if "duplicate session" in stderr.lower():
+            return (
+                False,
+                f"Async serve session already exists: {session_name} "
+                "(use `tmux ls` / `tmux kill-session -t vibe3-orchestra-serve`)",
+            )
+        return False, f"Failed to start async serve: {stderr or str(exc)}"
+
+    return (
+        True,
+        f"Started Orchestra server in tmux session: {session_name}\n"
+        "Use `vibe3 serve status` or `tmux attach -t vibe3-orchestra-serve` to inspect",
+    )
+
+
 async def _run(config: OrchestraConfig, port: int) -> None:
     """Run heartbeat + HTTP server concurrently."""
     heartbeat, fastapi_app = _build_server(config)
@@ -121,6 +179,10 @@ def start(
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Log actions without executing"),
+    ] = False,
+    async_mode: Annotated[
+        bool,
+        typer.Option("--async", help="Run in tmux background session"),
     ] = False,
     verbose: Annotated[
         int,
@@ -167,6 +229,13 @@ def start(
     elif pid is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
+
+    if async_mode:
+        ok, msg = _start_async_serve(config, verbose)
+        typer.echo(msg)
+        if not ok:
+            raise typer.Exit(1)
+        raise typer.Exit(0)
 
     typer.echo(
         f"Starting Orchestra server on port {config.port} "
