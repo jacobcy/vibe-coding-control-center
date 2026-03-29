@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.commands.task import app
-from vibe3.models.task_bridge import HydrateError
+from vibe3.models.task_bridge import FieldSource, HydratedTaskView, HydrateError
+from vibe3.services.task_usecase import TaskShowResult
 
 runner = CliRunner()
 
@@ -78,3 +79,33 @@ def test_task_show_prompts_flow_bind_when_task_is_unbound() -> None:
     assert result.exit_code == 0
     assert "未绑定 GitHub Project item" in result.output
     assert "task bridge" not in result.output
+
+
+def test_task_show_renders_remote_body_when_available() -> None:
+    """task show should render remote body when hydrate includes it."""
+    view = HydratedTaskView(
+        branch="task/demo",
+        project_item_id=FieldSource(value="PVTI_123", source="local"),
+        title=FieldSource(value="Demo title", source="remote"),
+        body=FieldSource(value="Demo body", source="remote"),
+    )
+    result_payload = TaskShowResult(
+        branch="task/demo",
+        view=view,
+        related_issue_numbers=[],
+        dependency_issue_numbers=[],
+    )
+    usecase = MagicMock()
+    usecase.resolve_branch.return_value = "task/demo"
+    usecase.show_task.return_value = result_payload
+
+    with (
+        patch("vibe3.commands.task._build_task_usecase", return_value=usecase),
+        patch("vibe3.commands.task._fetch_milestone_data", return_value=None),
+    ):
+        result = runner.invoke(app, ["show", "task/demo"])
+
+    assert result.exit_code == 0
+    assert "[remote] Title:" in result.output
+    assert "[remote] Body:" in result.output
+    assert "Demo body" in result.output

@@ -124,3 +124,46 @@ class TestCheckCommand:
         assert "Scanning merged PRs to back-fill task_issue_number" in result.output
         assert "Unresolvable (1 branches" in result.output
         assert "task/no-linked-issue" in result.output
+
+    @patch("vibe3.commands.check.CheckService")
+    def test_check_command_fix_all(self, mock_service_class):
+        """Test check command with --fix --all options."""
+        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+
+        mock_service = MagicMock()
+        mock_service.execute_check.return_value = ExecuteCheckResult(
+            mode="fix_all",
+            success=True,
+            summary="All 3 fixable issues resolved across 5 flows",
+            details={"fixed": 3},
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["check", "--fix", "--all"])
+
+        assert result.exit_code == 0
+        assert "Fixed: 3 flows" in result.output
+        mock_service.execute_check.assert_called_once_with("fix_all")
+
+    @patch("vibe3.commands.check.CheckService")
+    def test_check_command_fix_all_with_failures(self, mock_service_class):
+        """Test check command with --fix --all when some flows fail."""
+        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+
+        mock_service = MagicMock()
+        mock_service.execute_check.return_value = ExecuteCheckResult(
+            mode="fix_all",
+            success=False,
+            summary="Fixed 2/3, 1 had unfixable issues",
+            details={
+                "fixed": 2,
+                "failed": ["task/demo: --init hint"],
+            },
+        )
+        mock_service_class.return_value = mock_service
+
+        result = runner.invoke(app, ["check", "--fix", "--all"])
+
+        assert result.exit_code != 0
+        assert "Fixed: 2 flows" in result.output
+        assert "task/demo" in result.output

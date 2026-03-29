@@ -155,6 +155,8 @@ def _render_task_show(task_result: TaskShowResult, json_output: bool) -> None:
     else:
         if view.title:
             typer.echo(f"[remote] Title:    {view.title.value}")
+        if view.body:
+            typer.echo(f"[remote] Body:     {view.body.value}")
         if view.status:
             typer.echo(f"[remote] Status:   {view.status.value}")
         if view.priority:

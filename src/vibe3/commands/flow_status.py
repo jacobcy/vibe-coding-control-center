@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 
 StatusOption = Annotated[bool, typer.Option("--snapshot", help="静态快照模式")]
+AllOption = Annotated[
+    bool, typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）")
+]
 JsonOption = Annotated[bool, typer.Option("--json")]
 TraceOption = Annotated[bool, typer.Option("--trace")]
 
@@ -64,9 +67,14 @@ def _fetch_issue_titles(
                     "task_issue": n,
                 }
     pr_data: dict[str, object] | None = None
-    if flow_status.pr_number and not network_error:
+    if not network_error:
         try:
-            pr = gh.get_pr(flow_status.pr_number)
+            pr = None
+            if flow_status.pr_number:
+                pr = gh.get_pr(flow_status.pr_number)
+            if not pr:
+                # Remote-first fallback: cached PR id may miss or drift.
+                pr = gh.get_pr(branch=flow_status.branch)
             if pr:
                 pr_data = {
                     "number": pr.number,
@@ -166,13 +174,17 @@ def show(
 
 
 def status(
+    all_flows: AllOption = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
 ) -> None:
-    """Show dashboard of all active flows."""
+    """Show dashboard of all active flows.
+
+    By default only shows active flows. Use --all to include done/aborted/stale.
+    """
     with trace_scope(trace, "flow status", domain="flow"):
         service = FlowService()
-        flows = service.list_flows(status="active")
+        flows = service.list_flows(status=None if all_flows else "active")
         if json_output:
             typer.echo(
                 json.dumps([f.model_dump() for f in flows], indent=2, default=str)
@@ -182,11 +194,34 @@ def status(
             typer.echo("No active flows")
             raise typer.Exit(0)
         # TODO: move GitHubClient calls to a service method in a follow-up PR
+        from vibe3.clients.git_client import GitClient
         from vibe3.clients.github_client import GitHubClient
 
         gh = GitHubClient()
+        git = GitClient()
         titles: dict[int, str] = {}
+        pr_map: dict[str, dict[str, object]] = {}
+        worktree_map: dict[str, str] = {}
         net_err = False
+
+        # Get worktree to branch mapping
+        try:
+            worktree_output = git._run(["worktree", "list", "--porcelain"])
+            current_worktree = ""
+            for line in worktree_output.splitlines():
+                line = line.strip()
+                if line.startswith("worktree "):
+                    current_worktree = line.split(" ", 1)[1]
+                elif line.startswith("branch ") and current_worktree:
+                    branch_ref = line.split(" ", 1)[1]
+                    branch = branch_ref.removeprefix(
+                        "refs/heads/"
+                    )  # Get full branch name
+                    # Store only worktree basename for concise display
+                    worktree_name = current_worktree.split("/")[-1]
+                    worktree_map[branch] = worktree_name
+        except Exception:
+            pass
         for flow in flows:
             if flow.task_issue_number and flow.task_issue_number not in titles:
                 r = gh.view_issue(flow.task_issue_number)
@@ -195,6 +230,24 @@ def status(
                     break
                 if isinstance(r, dict):
                     titles[flow.task_issue_number] = r.get("title", "")
+            # Fetch PR data for each flow (remote-first fallback)
+            try:
+                pr = None
+                if flow.pr_number:
+                    pr = gh.get_pr(flow.pr_number)
+                if not pr:
+                    pr = gh.get_pr(branch=flow.branch)
+                if pr:
+                    pr_map[flow.branch] = {
+                        "number": pr.number,
+                        "title": pr.title,
+                        "state": pr.state.value,
+                        "draft": pr.draft,
+                        "url": pr.url,
+                        "worktree": worktree_map.get(flow.branch),
+                    }
+            except Exception:
+                pass
         if net_err:
             render_error("网络故障，远端 issue title 不可用（本地数据仍显示）")
-        render_flows_status_dashboard(flows, titles)
+        render_flows_status_dashboard(flows, titles, pr_map, worktree_map)

@@ -94,3 +94,22 @@ def test_fetch_pr_raises_when_missing() -> None:
 
     with pytest.raises(LookupError, match="PR not found"):
         usecase.fetch_pr(pr_number=123, branch=None)
+
+
+def test_fetch_pr_falls_back_to_current_branch_when_cached_pr_missing() -> None:
+    pr_service = MagicMock()
+    pr_service.get_pr.side_effect = [None, _pr_response()]
+    usecase = PrQueryUsecase(pr_service=pr_service, flow_service=MagicMock())
+
+    result = usecase.fetch_pr(
+        pr_number=999,
+        branch=None,
+        current_branch="task/demo",
+    )
+
+    assert result.number == 123
+    assert pr_service.get_pr.call_count == 2
+    first_call = pr_service.get_pr.call_args_list[0]
+    second_call = pr_service.get_pr.call_args_list[1]
+    assert first_call.args == (999, None)
+    assert second_call.kwargs == {"branch": "task/demo"}

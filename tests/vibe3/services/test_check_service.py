@@ -30,8 +30,10 @@ def mock_git_client():
 
 @pytest.fixture
 def mock_github_client():
-    """Create a mock GitHubClient."""
-    return MagicMock(spec=GitHubClient)
+    """Create a mock GitHubClient with safe defaults."""
+    client = MagicMock(spec=GitHubClient)
+    client.list_prs_for_branch.return_value = []
+    return client
 
 
 @pytest.fixture
@@ -193,6 +195,37 @@ class TestVerifyCurrentFlow:
 
         assert not result.is_valid
         assert any("Shared handoff file not found" in issue for issue in result.issues)
+
+    def test_merged_pr_returns_valid(
+        self, check_service, mock_store, mock_github_client
+    ):
+        """Merged PR flow is auto-completed and returns is_valid=True."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "feature/test-branch",
+            "pr_number": 456,
+        }
+        mock_store.get_issue_links.return_value = []
+        mock_github_client.get_pr.return_value = PRResponse(
+            number=456,
+            title="Test PR",
+            body="",
+            state=PRState.MERGED,
+            head_branch="feature/test-branch",
+            base_branch="main",
+            url="https://github.com/test/pr/456",
+            draft=False,
+            merged_at="2026-03-29T00:00:00Z",
+        )
+
+        result = check_service.verify_current_flow()
+
+        assert result.is_valid
+        assert len(result.issues) == 0
+        mock_store.update_flow_state.assert_called_once_with(
+            "feature/test-branch", flow_status="done"
+        )
+        mock_store.add_event.assert_called_once()
+        assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
 
 
 class TestAutoFix:

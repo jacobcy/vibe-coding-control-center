@@ -59,11 +59,14 @@ class PRQueryMixin:
 
         return commits
 
-    def list_prs_for_branch(self: Any, branch: str) -> list[PRResponse]:
+    def list_prs_for_branch(
+        self: Any, branch: str, *, state: str | None = None
+    ) -> list[PRResponse]:
         """List PRs for a specific branch.
 
         Args:
             branch: Branch name to query
+            state: PR state filter (None = open only, "all" = all states)
 
         Returns:
             List of PR response objects (empty list if no PRs found)
@@ -74,20 +77,19 @@ class PRQueryMixin:
             branch=branch,
         ).debug("Calling GitHub API: list_prs")
 
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch,
-                "--json",
-                "number,title,state,isDraft,url,headRefName,baseRefName",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        cmd = [
+            "gh",
+            "pr",
+            "list",
+            "--head",
+            branch,
+            "--json",
+            "number,title,state,isDraft,url,headRefName,baseRefName,mergedAt",
+        ]
+        if state:
+            cmd.extend(["--state", state])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # Parse PR list from output
         prs_data = json.loads(result.stdout.strip())
@@ -107,7 +109,7 @@ class PRQueryMixin:
                     ci_passed=False,
                     created_at=None,
                     updated_at=None,
-                    merged_at=None,
+                    merged_at=pr_data.get("mergedAt"),
                     metadata=None,
                 )
             )
