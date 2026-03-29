@@ -20,8 +20,12 @@ related_docs:
 
 ## 概述
 
-**Orchestra** 是 Vibe Center v3 的 self-hosted 调度子系统。
+**Orchestra** 是 Vibe Center v3 的 self-hosted webhook 调度子系统（非 GitHub Actions self-hosted runner）。
 目标是让 GitHub 事件触发本地 agent 执行，并在无人值守场景下先实现最小闭环。
+
+边界说明：
+- 本系统通过 `POST /webhook/github` 接收 GitHub 事件，再在本机执行 `vibe3` 命令。
+- 本系统不负责执行 GitHub Actions job；因此不等价于 `runs-on: self-hosted` runner。
 
 ## 当前状态
 
@@ -31,7 +35,7 @@ related_docs:
 
 ## 本版已实现（MVP）
 
-### 1) Self-hosted 事件服务
+### 1) Self-hosted webhook 事件服务（非 Actions runner）
 
 - `vibe3 serve start` 启动 HTTP webhook + heartbeat。
 - Webhook 接口：`POST /webhook/github`（支持 HMAC 校验）。
@@ -64,6 +68,14 @@ related_docs:
 - `src/vibe3/orchestra/services/pr_review_dispatch.py`
 - `src/vibe3/orchestra/dispatcher.py`
 
+## 事件到执行链路（当前真源）
+
+1. GitHub 触发 issue/pr 事件并投递 webhook
+2. `vibe3 serve` 接收事件并验签
+3. Orchestra 根据事件类型和配置判断是否触发
+4. 命中 issue assignee 规则时，触发 manager 执行链
+5. 命中 pr reviewer 规则时，触发 reviewer 执行链
+
 ## 文档导航
 
 - [prd-orchestra-integration.md](prd-orchestra-integration.md) - 当前 PRD（含本版边界）
@@ -73,7 +85,7 @@ related_docs:
 ## 快速开始
 
 ```bash
-# 启动 orchestra（self-hosted）
+# 启动 orchestra（webhook 服务）
 vibe3 serve start --port 8080 --interval 900
 
 # GitHub webhook 配置事件：

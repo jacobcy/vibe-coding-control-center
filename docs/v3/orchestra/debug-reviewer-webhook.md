@@ -4,6 +4,8 @@
 
 目标：确认 GitHub webhook 事件能够触发本地 `vibe3 review pr <number>`，并生成可观测产物。
 
+边界说明：这里调试的是 webhook -> 本机执行链路，不是 GitHub Actions self-hosted runner。
+
 ## 1. 配置基线（reviewer-only 模式）
 
 `config/settings.yaml` 的 `orchestra` 建议如下：
@@ -15,7 +17,7 @@ orchestra:
   port: 8080
   webhook_secret: "your-secret"
   manager_usernames:
-    - "vibe-manager"
+    - "your-github-login"
 
   polling:
     enabled: false
@@ -62,10 +64,10 @@ curl -sS http://127.0.0.1:8080/status
 示例（本地模拟 `review_requested`）：
 
 ```bash
-payload='{"action":"review_requested","requested_reviewer":{"login":"vibe-manager"},"pull_request":{"number":347,"requested_reviewers":[{"login":"vibe-manager"}]}}'
+payload='{"action":"review_requested","requested_reviewer":{"login":"your-github-login"},"pull_request":{"number":347,"requested_reviewers":[{"login":"your-github-login"}]}}'
 sig=$(uv run python - <<'PY'
 import hmac, hashlib
-payload=b'{"action":"review_requested","requested_reviewer":{"login":"vibe-manager"},"pull_request":{"number":347,"requested_reviewers":[{"login":"vibe-manager"}]}}'
+payload=b'{"action":"review_requested","requested_reviewer":{"login":"your-github-login"},"pull_request":{"number":347,"requested_reviewers":[{"login":"your-github-login"}]}}'
 secret=b'your-secret'
 print("sha256=" + hmac.new(secret, payload, hashlib.sha256).hexdigest())
 PY
@@ -85,7 +87,7 @@ curl -sS -i -X POST "http://127.0.0.1:8080/webhook/github" \
 
 ```text
 Received: pull_request/review_requested (source=webhook)
-PR review dispatch triggered (requested_reviewer=vibe-manager)
+PR review dispatch triggered (requested_reviewer=your-github-login)
 Resolved PR review to matching worktree
 Dispatching review: uv run python -m vibe3 review pr 347 (cwd=...)
 Review execution completed successfully
@@ -127,9 +129,9 @@ uv run python src/vibe3/cli.py flow show
   - `scripts/tsu.sh funnel status`
   - `scripts/tsu.sh serve list`
 
-## 7. 概念澄清：`vibe-manager` vs `code-reviewer`
+## 7. 概念澄清：`manager_usernames` vs `code-reviewer`
 
-- `requested_reviewer=vibe-manager`：GitHub 侧“触发身份”（用户名匹配条件）。
+- `requested_reviewer=<your-github-login>`：GitHub 侧“触发身份”（用户名匹配条件）。
 - `code-reviewer`：本地执行 `vibe3 review pr` 时使用的 agent preset（由 `review.agent_config.agent` 决定）。
 
 两者不是同一个概念：
