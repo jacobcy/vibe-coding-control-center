@@ -171,3 +171,45 @@ def is_branch_occupied_by_worktree(
         occupied=False,
     ).debug("Checked branch worktree occupation")
     return False
+
+
+def get_worktrees_for_branch(
+    run: Callable[[list[str]], str],
+    branch_name: str,
+) -> list[str]:
+    """Return paths of worktrees that have the given branch checked out.
+
+    Excludes the current worktree if it holds the branch (caller handles that).
+
+    Args:
+        run: Git command runner function
+        branch_name: Branch name to look for
+
+    Returns:
+        List of worktree root paths (may be empty)
+    """
+    if not branch_name:
+        return []
+
+    current_worktree = get_worktree_root(run)
+    current_branch = run(["branch", "--show-current"])
+    output = run(["worktree", "list", "--porcelain"])
+    ref = f"refs/heads/{branch_name}"
+
+    occupied: list[str] = []
+    for wt_path, wt_branch in _parse_worktree_list(output):
+        if wt_branch != ref:
+            continue
+        if branch_name == current_branch:
+            if wt_path and wt_path != current_worktree:
+                occupied.append(wt_path)
+        elif wt_path:
+            occupied.append(wt_path)
+
+    logger.bind(
+        domain="git",
+        action="get_worktrees_for_branch",
+        branch=branch_name,
+        count=len(occupied),
+    ).debug("Found worktrees for branch")
+    return occupied

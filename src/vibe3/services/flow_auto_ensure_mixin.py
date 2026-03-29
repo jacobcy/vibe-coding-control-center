@@ -13,15 +13,21 @@ class FlowAutoEnsureMixin:
     store: SQLiteClient
     config: VibeConfig
 
+    SAFE_BRANCH_PREFIX = "vibe/main-safe/"
+
     def _is_main_branch(self, branch: str) -> bool:
         """Check if branch is a protected main branch.
 
-        Args:
-            branch: Branch name to check
-
-        Returns:
-            True if branch is protected
+        Protected branches include:
+        - Configured protected_branches (e.g. main, master, develop)
+        - Remote tracking variants (origin/main, etc.)
+        - Safe branches created by flow close (vibe/main-safe/...)
         """
+        # Strip remote prefix for safe branch check (origin/vibe/main-safe/...)
+        local_name = branch.split("/", 1)[1] if branch.startswith("origin/") else branch
+        if local_name.startswith(self.SAFE_BRANCH_PREFIX):
+            return True
+
         # Check against configured protected branches
         protected = self.config.flow.protected_branches
 

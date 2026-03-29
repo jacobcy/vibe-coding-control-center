@@ -64,6 +64,9 @@ from vibe3.clients.git_worktree_ops import (
     get_worktree_root as _get_worktree_root,
 )
 from vibe3.clients.git_worktree_ops import (
+    get_worktrees_for_branch as _get_worktrees_for_branch,
+)
+from vibe3.clients.git_worktree_ops import (
     is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
 )
 from vibe3.exceptions import GitError
@@ -152,6 +155,10 @@ class GitClient:
     def find_worktree_path_for_branch(self, branch_name: str) -> Path | None:
         """Find worktree path whose checked-out branch matches ``branch_name``."""
         return _find_worktree_path_for_branch(self._run, branch_name)
+
+    def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
+        """Return paths of worktrees that have the given branch checked out."""
+        return _get_worktrees_for_branch(self._run, branch_name)
 
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
