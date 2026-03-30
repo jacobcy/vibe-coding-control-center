@@ -163,21 +163,15 @@ class FlowQueryMixin:
 
     def get_flow_timeline(self, branch: str) -> dict:
         """Get flow state and recent events for timeline view."""
-        state_data = self.store.get_flow_state(branch)
-        if not state_data:
+        # Use hydrated status instead of raw flow_state to get truth fields
+        status = self.get_flow_status(branch)
+        if not status:
             return {"state": None, "events": []}
+
         events_data = self.store.get_events(branch, limit=100)
         events = [FlowEvent(**e) for e in events_data]
-        try:
-            state = FlowState(**state_data)
-        except ValidationError as exc:
-            logger.bind(
-                domain="flow",
-                action="get_timeline",
-                branch=branch,
-            ).warning(f"Flow has invalid data: {exc}")
-            return {"state": None, "events": []}
-        return {"state": state, "events": events}
+
+        return {"state": status, "events": events}
 
     def get_git_common_dir(self) -> str:
         """Get git common directory path.
