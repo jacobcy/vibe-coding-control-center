@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.services.snapshot_lookup import find_snapshot_by_branch
+from vibe3.services.snapshot_service import find_snapshot_by_branch
 from vibe3.services.structure_service import FileStructure, FunctionInfo
 
 
@@ -67,10 +67,9 @@ def test_find_snapshot_by_branch_main(
     snapshot_dir: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding the most recent snapshot for main branch."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: snapshot_dir)
 
     result = find_snapshot_by_branch("main")
 
@@ -83,10 +82,9 @@ def test_find_snapshot_by_branch_feature(
     snapshot_dir: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding snapshot for feature branch."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: snapshot_dir)
 
     result = find_snapshot_by_branch("feature-xyz")
 
@@ -99,10 +97,9 @@ def test_find_snapshot_by_branch_not_found(
     snapshot_dir: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding snapshot for non-existent branch returns None."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: snapshot_dir)
 
     result = find_snapshot_by_branch("non-existent-branch")
 
@@ -113,10 +110,9 @@ def test_find_snapshot_by_branch_origin_prefix(
     snapshot_dir: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding snapshot with origin/ prefix normalization."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: snapshot_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: snapshot_dir)
 
     # Should find "main" snapshot even when searching for "origin/main"
     result = find_snapshot_by_branch("origin/main")
@@ -130,12 +126,11 @@ def test_find_snapshot_by_branch_empty_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding snapshot in empty directory returns None."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: empty_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: empty_dir)
 
     result = find_snapshot_by_branch("main")
 
@@ -146,11 +141,10 @@ def test_find_snapshot_by_branch_nonexistent_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Test finding snapshot in non-existent directory returns None."""
-    from vibe3.services import snapshot_lookup, snapshot_service
+    from vibe3.services import snapshot_service
 
     nonexistent_dir = tmp_path / "nonexistent"
     monkeypatch.setattr(snapshot_service, "_get_snapshot_dir", lambda: nonexistent_dir)
-    monkeypatch.setattr(snapshot_lookup, "_get_snapshot_dir", lambda: nonexistent_dir)
 
     result = find_snapshot_by_branch("main")
 
