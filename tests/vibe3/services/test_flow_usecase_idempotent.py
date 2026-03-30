@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse
+from vibe3.models.flow import CreateDecision, FlowStatusResponse
 from vibe3.services.flow_usecase import FlowUsecase
 
 
@@ -12,13 +12,6 @@ def test_add_flow_existing_branch_updates_actor_without_recreate() -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
     flow_service.get_flow_status.return_value = FlowStatusResponse(
-        branch="task/demo",
-        flow_slug="demo",
-        flow_status="active",
-        task_issue_number=248,
-        latest_actor="codex/gpt-5.4",
-    )
-    flow_service.get_flow_state.return_value = FlowState(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
@@ -46,13 +39,6 @@ def test_add_flow_existing_branch_appends_tasks_but_keeps_primary() -> None:
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
     flow_service.get_flow_status.return_value = FlowStatusResponse(
-        branch="task/demo",
-        flow_slug="demo",
-        flow_status="active",
-        task_issue_number=248,
-        latest_actor="codex/gpt-5.4",
-    )
-    flow_service.get_flow_state.return_value = FlowState(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",

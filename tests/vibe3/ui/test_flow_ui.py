@@ -1,11 +1,11 @@
 """Tests for flow timeline rendering."""
 
-from vibe3.models.flow import FlowEvent, FlowState
+from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.flow_ui import render_flow_timeline
 
 
 def test_render_flow_timeline_shows_run_lifecycle_events(capsys) -> None:
-    state = FlowState(
+    state = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",

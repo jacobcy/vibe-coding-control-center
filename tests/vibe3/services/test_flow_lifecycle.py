@@ -20,9 +20,9 @@ class TestFlowLifecycle:
             "updated_at": "2026-03-26T00:00:00",
         }
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
-    @patch("vibe3.services.flow_lifecycle.GitHubClient")
-    @patch("vibe3.services.flow_lifecycle.sync_flow_done_task_labels")
+    @patch("vibe3.services.flow_close_ops.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitHubClient")
+    @patch("vibe3.services.flow_close_ops.sync_flow_done_task_labels")
     def test_close_flow_switches_off_current_branch_before_delete(
         self,
         mock_sync_done_labels: MagicMock,
@@ -91,9 +91,9 @@ class TestFlowLifecycle:
         )
         mock_sync_done_labels.assert_called_once_with(mock_store, "task/current-flow")
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
-    @patch("vibe3.services.flow_lifecycle.GitHubClient")
-    @patch("vibe3.services.flow_lifecycle.sync_flow_done_task_labels")
+    @patch("vibe3.services.flow_close_ops.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitHubClient")
+    @patch("vibe3.services.flow_close_ops.sync_flow_done_task_labels")
     def test_close_flow_switches_to_single_dependent_without_pull(
         self,
         _mock_sync_done_labels: MagicMock,
@@ -148,9 +148,9 @@ class TestFlowLifecycle:
         )
         assert not any(action.startswith("run:pull") for action in actions)
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
-    @patch("vibe3.services.flow_lifecycle.GitHubClient")
-    @patch("vibe3.services.flow_lifecycle.sync_flow_done_task_labels")
+    @patch("vibe3.services.flow_close_ops.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitHubClient")
+    @patch("vibe3.services.flow_close_ops.sync_flow_done_task_labels")
     def test_close_flow_raises_if_current_branch_cannot_switch_away(
         self,
         _mock_sync_done_labels: MagicMock,
@@ -193,9 +193,9 @@ class TestFlowLifecycle:
         mock_git.delete_branch.assert_not_called()
         mock_store.update_flow_state.assert_not_called()
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
-    @patch("vibe3.services.flow_lifecycle.GitHubClient")
-    @patch("vibe3.services.flow_lifecycle.sync_flow_done_task_labels")
+    @patch("vibe3.services.flow_close_ops.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitHubClient")
+    @patch("vibe3.services.flow_close_ops.sync_flow_done_task_labels")
     def test_close_flow_does_not_pull_if_post_close_switch_fails(
         self,
         _mock_sync_done_labels: MagicMock,
@@ -246,9 +246,9 @@ class TestFlowLifecycle:
         assert "delete_local:task/current-flow:True" in actions
         assert not any(action.startswith("run:pull") for action in actions)
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
-    @patch("vibe3.services.flow_lifecycle.GitHubClient")
-    @patch("vibe3.services.flow_lifecycle.sync_flow_done_task_labels")
+    @patch("vibe3.services.flow_close_ops.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitHubClient")
+    @patch("vibe3.services.flow_close_ops.sync_flow_done_task_labels")
     def test_close_flow_rejects_when_pr_not_merged(
         self,
         _mock_sync_done_labels: MagicMock,
@@ -289,12 +289,9 @@ class TestFlowLifecycle:
             "branch": "task/current-flow",
             "flow_slug": "current_flow",
             "flow_status": "active",
-            "task_issue_number": 220,
         }
         service = FlowService(store=mock_store)
 
         service.block_flow("task/current-flow", reason="waiting")
 
-        mock_sync_blocked_label.assert_called_once_with(
-            mock_store.get_flow_state.return_value
-        )
+        mock_sync_blocked_label.assert_called_once_with(mock_store, "task/current-flow")

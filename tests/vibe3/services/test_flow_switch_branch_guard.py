@@ -23,6 +23,7 @@ class TestFlowSwitchBranchGuard:
                 "updated_at": "2026-03-26T00:00:00",
             }
         ]
+        mock_store.get_issue_links.return_value = []
 
         mock_git = MagicMock()
         mock_git.branch_exists.return_value = False

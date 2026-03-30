@@ -234,8 +234,10 @@ related_docs:
 
 ### 7.3 Computed Fields
 
-以下字段只能运行时计算，不能持久化为共享真源：
+以下字段只能运行时计算（从 GitHub 或本地关联关系中 hydrate），不能持久化为 `flow_state` 共享真源：
 
+- `task_issue_number`（从 `flow_issue_links` 获取）
+- `pr_number`, `pr_ready_for_review`（从 GitHub PR 获取）
 - `dirty`
 - `ready` / `blocked` / `blockers`（若后续启用）
 - 临时统计字段
@@ -253,6 +255,7 @@ related_docs:
 
 禁止：
 
+- 在 `flow_state` 中持久化 GitHub 外部真源字段（如 `pr_number`, `pr_ready_for_review`, `task_issue_number`）
 - 用 GitHub Projects 记录现场信息（现场信息存 `flow_state` 表）
 - 用 `flow_state` 表记录规划优先级
 - 用 `flow_worktrees` 表承担历史归档

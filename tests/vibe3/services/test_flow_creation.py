@@ -1,10 +1,10 @@
 """Tests for Flow creation functionality."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 
 
@@ -13,13 +13,22 @@ class TestFlowCreation:
 
     def test_create_flow_success(self, mock_store) -> None:
         """Test creating a flow successfully."""
-        service = FlowService(store=mock_store)
-        result = service.create_flow(
-            slug="test-flow",
-            branch="test-branch",
-        )
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-flow",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+        }
+        mock_store.get_issue_links.return_value = []
 
-        assert isinstance(result, FlowState)
+        service = FlowService(store=mock_store)
+        with patch("vibe3.services.flow_query_mixin.GitHubClient"):
+            result = service.create_flow(
+                slug="test-flow",
+                branch="test-branch",
+            )
+
+        assert isinstance(result, FlowStatusResponse)
         assert result.flow_slug == "test-flow"
         assert result.branch == "test-branch"
         assert result.flow_status == "active"
@@ -38,11 +47,20 @@ class TestFlowCreation:
 
     def test_create_flow_no_task_id(self, mock_store) -> None:
         """create_flow no longer accepts task_id; binding via TaskService."""
+        mock_store.get_flow_state.return_value = {
+            "branch": "test-branch",
+            "flow_slug": "test-flow",
+            "flow_status": "active",
+            "updated_at": "2026-03-16T00:00:00",
+        }
+        mock_store.get_issue_links.return_value = []
+
         service = FlowService(store=mock_store)
-        result = service.create_flow(
-            slug="test-flow",
-            branch="test-branch",
-        )
+        with patch("vibe3.services.flow_query_mixin.GitHubClient"):
+            result = service.create_flow(
+                slug="test-flow",
+                branch="test-branch",
+            )
 
         assert result.flow_slug == "test-flow"
         # No add_issue_link call — task binding is separate
@@ -71,12 +89,15 @@ class TestFlowCreation:
             "flow_status": "active",
             "updated_at": "2026-03-16T00:00:00",
         }
+        mock_store.get_issue_links.return_value = []
+
         mock_git = Mock()
         mock_git.branch_exists.return_value = False
         mock_git.has_uncommitted_changes.return_value = False
 
         service = FlowService(store=mock_store, git_client=mock_git)
-        result = service.create_flow_with_branch("demo")
+        with patch("vibe3.services.flow_query_mixin.GitHubClient"):
+            result = service.create_flow_with_branch("demo")
 
         assert result.flow_slug == "demo"
         mock_git.has_uncommitted_changes.assert_called_once()

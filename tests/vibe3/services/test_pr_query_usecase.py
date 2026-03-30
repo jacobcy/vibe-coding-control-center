@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.pr_query_usecase import PrQueryUsecase
 
@@ -38,7 +38,7 @@ def test_resolve_target_uses_flow_pr_when_inputs_missing() -> None:
 
 def test_build_missing_pr_message_includes_bind_hint_when_task_missing() -> None:
     flow_service = MagicMock()
-    flow_service.get_flow_status.return_value = FlowState(
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",

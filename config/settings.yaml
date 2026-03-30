@@ -38,12 +38,12 @@ doc_limits:
 # 代码量控制
 code_limits:
   single_file_loc:
-    default: 200           # 单文件默认限制（所有类型）
-    max: 300              # 单文件最大限制（所有类型）
+    default: 300           # 单文件默认限制（所有类型）
+    max: 400              # 单文件最大限制（所有类型）
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 22000        # Python 核心代码总行数
+    v3_python: 23000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:

@@ -3,7 +3,7 @@
 import json
 from typing import TYPE_CHECKING
 
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.milestone_service import MilestoneContext
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_milestone
@@ -16,7 +16,7 @@ def render_no_active_task() -> None:
     console.print("[yellow]no active task[/]")
 
 
-def render_task_details(flow_state: FlowState) -> None:
+def render_task_details(flow_state: FlowStatusResponse) -> None:
     console.print(f"\n[bold]{flow_state.flow_slug}[/]")
     console.print(f"  branch  {flow_state.branch}")
     console.print(f"  status  {flow_state.flow_status}")

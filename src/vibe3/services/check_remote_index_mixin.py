@@ -7,6 +7,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.models.flow import IssueLink
 
 
 @dataclass
@@ -91,12 +92,10 @@ class CheckRemoteIndexMixin:
 
         for flow in all_flows:
             branch = flow["branch"]
-            # Skip if already has task_issue_number in state (legacy)
-            # or already has a task role issue linked (new truth).
+            # Skip if already has task_issue_number resolved.
             existing_links = self.store.get_issue_links(branch)
-            has_task_link = any(lnk["issue_role"] == "task" for lnk in existing_links)
 
-            if flow.get("task_issue_number") or has_task_link:
+            if IssueLink.resolve_task_number(existing_links):
                 skipped += 1
                 continue
             issues_for_branch = branch_issue_map.get(branch, [])

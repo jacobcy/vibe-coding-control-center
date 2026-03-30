@@ -2,6 +2,7 @@
 
 from typing import Callable
 
+from vibe3.models.flow import IssueLink
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
 from vibe3.services.label_service import LabelService
@@ -48,10 +49,13 @@ class PrReadyUsecase:
 
     def _sync_merge_ready_label(self, pr: PRResponse) -> None:
         """Sync linked task issue to state/merge-ready after PR becomes ready."""
-        flow = self.pr_service.store.get_flow_state(pr.head_branch)
-        if not flow:
-            return
-        task_issue = flow.get("task_issue_number")
+        try:
+            links = self.pr_service.store.get_issue_links(pr.head_branch)
+        except Exception:
+            links = []
+
+        task_issue = IssueLink.resolve_task_number(links)
+
         if task_issue is None:
             return
         self.label_service.confirm_issue_state(

@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_schema import init_schema
 
 
@@ -18,7 +19,6 @@ class SQLiteClient:
     VALID_FLOW_STATE_FIELDS = {
         "branch",
         "flow_slug",
-        "task_issue_number",
         "spec_ref",
         "plan_ref",
         "report_ref",
@@ -47,7 +47,7 @@ class SQLiteClient:
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
             # Use git common dir to ensure shared state across worktrees
-            git_dir = os.popen("git rev-parse --git-common-dir").read().strip()
+            git_dir = GitClient().get_git_common_dir()
             vibe3_dir = os.path.join(git_dir, "vibe3")
             os.makedirs(vibe3_dir, exist_ok=True)
             db_path = os.path.join(vibe3_dir, "handoff.db")
@@ -274,6 +274,32 @@ class SQLiteClient:
             >>> dependents = store.get_flow_dependents("feature/A")
             >>> # ["feature/B"] or ["feature/B", "feature/C"]
         """
+        # Resolve primary task issue from flow_issue_links (truth-first)
+        task_issue_number: int | None = None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT issue_number
+                FROM flow_issue_links
+                WHERE branch = ? AND issue_role = 'task'
+                LIMIT 1
+                """,
+                (branch,),
+            )
+            row = cursor.fetchone()
+            if row and row[0] is not None:
+                task_issue_number = int(row[0])
+
+        if task_issue_number is None:
+            logger.bind(
+                external="sqlite",
+                operation="get_flow_dependents",
+                branch=branch,
+                dependents_count=0,
+            ).debug("No task issue bound; no dependents")
+            return []
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -281,16 +307,12 @@ class SQLiteClient:
                 SELECT DISTINCT fil.branch
                 FROM flow_issue_links fil
                 JOIN flow_state fs ON fil.branch = fs.branch
-                WHERE fil.issue_number = (
-                    SELECT task_issue_number
-                    FROM flow_state
-                    WHERE branch = ?
-                )
-                AND fil.issue_role = 'dependency'
-                AND fs.flow_status = 'active'
+                WHERE fil.issue_number = ?
+                  AND fil.issue_role = 'dependency'
+                  AND fs.flow_status = 'active'
                 ORDER BY fil.branch
                 """,
-                (branch,),
+                (task_issue_number,),
             )
             dependents = [row[0] for row in cursor.fetchall()]
             logger.bind(

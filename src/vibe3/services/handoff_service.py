@@ -8,8 +8,6 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
-from vibe3.services.handoff_recorder import record_handoff
-from vibe3.services.handoff_template import get_handoff_template
 from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -188,108 +186,6 @@ class HandoffService:
         logger.bind(path=str(handoff_path)).success("Appended handoff update")
         return handoff_path
 
-    def record_plan(
-        self,
-        plan_ref: str,
-        next_step: str | None,
-        blocked_by: str | None,
-        actor: str | None,
-        session_id: str | None = None,
-    ) -> None:
-        """Record plan handoff.
-
-        Args:
-            plan_ref: Plan document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
-        branch = self.git_client.get_current_branch()
-        effective_actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=actor,
-        )
-        record_handoff(
-            self.store,
-            self.git_client,
-            "plan",
-            plan_ref,
-            next_step,
-            blocked_by,
-            effective_actor,
-            session_id=session_id,
-        )
-
-    def record_report(
-        self,
-        report_ref: str,
-        next_step: str | None,
-        blocked_by: str | None,
-        actor: str | None,
-        session_id: str | None = None,
-    ) -> None:
-        """Record report handoff.
-
-        Args:
-            report_ref: Report document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
-        branch = self.git_client.get_current_branch()
-        effective_actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=actor,
-        )
-        record_handoff(
-            self.store,
-            self.git_client,
-            "report",
-            report_ref,
-            next_step,
-            blocked_by,
-            effective_actor,
-            session_id=session_id,
-        )
-
-    def record_audit(
-        self,
-        audit_ref: str,
-        next_step: str | None,
-        blocked_by: str | None,
-        actor: str | None,
-        session_id: str | None = None,
-    ) -> None:
-        """Record audit handoff.
-
-        Args:
-            audit_ref: Audit document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
-        branch = self.git_client.get_current_branch()
-        effective_actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=actor,
-        )
-        record_handoff(
-            self.store,
-            self.git_client,
-            "audit",
-            audit_ref,
-            next_step,
-            blocked_by,
-            effective_actor,
-            session_id=session_id,
-        )
-
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.
 
@@ -297,4 +193,52 @@ class HandoffService:
             Template string for new handoff files
         """
         branch = self.git_client.get_current_branch()
-        return get_handoff_template(branch)
+        return _get_handoff_template(branch)
+
+
+# ---------------------------------------------------------------------------
+# Template generation (from handoff_template.py)
+# ---------------------------------------------------------------------------
+
+
+def _get_handoff_template(branch: str) -> str:
+    """Get minimal handoff template."""
+    return f"""# Handoff: {branch}
+
+> This is a lightweight handoff file for agent-to-agent communication.
+> It is NOT a source of truth - all authoritative data is in the SQLite store.
+
+## Meta
+
+- Branch: {branch}
+- Updated at: TBD
+- Latest actor: unknown
+
+## Summary
+
+<!-- Brief summary of current state -->
+
+## Findings
+
+<!-- Open findings and observations -->
+
+## Blockers
+
+<!-- Current blockers -->
+
+## Next Actions
+
+<!-- Suggested next actions -->
+
+## Key Files
+
+<!-- Important files for the next agent -->
+
+## Evidence Refs
+
+<!-- Links to plans, reports, PRs, issues, or logs -->
+
+## Updates
+
+<!-- Append-only lightweight updates -->
+"""

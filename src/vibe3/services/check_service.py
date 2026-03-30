@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.flow import IssueLink
 from vibe3.models.pr import PRState
 from vibe3.services.check_execute_mixin import CheckExecuteMixin
 from vibe3.services.check_remote_index_mixin import CheckRemoteIndexMixin
@@ -77,12 +78,8 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
 
         # task issue exists and is open on GitHub
         issue_links = self.store.get_issue_links(branch)
+        task_issue = IssueLink.resolve_task_number(issue_links)
         task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
-        task_issue = (
-            task_issues[0]["issue_number"]
-            if task_issues
-            else flow_data.get("task_issue_number")
-        )
 
         task_issue_closed = False
         if task_issue:

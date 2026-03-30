@@ -4,17 +4,17 @@ from collections.abc import Sequence
 from typing import Literal
 
 from vibe3.exceptions import UserError
-from vibe3.models.flow import CreateDecision, FlowState, FlowStatusResponse, IssueLink
+from vibe3.models.flow import CreateDecision, FlowStatusResponse, IssueLink
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.issue_ref_utils import (
-    infer_task_issue_from_flow_name,
-    parse_issue_number,
-)
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
+from vibe3.utils.issue_ref import (
+    infer_task_issue_from_flow_name,
+    parse_issue_number,
+)
 
 
 class FlowUsecaseError(RuntimeError):
@@ -62,7 +62,7 @@ class FlowUsecase:
         task: str | Sequence[str] | None = None,
         spec: str | None = None,
         actor: str | None = None,
-    ) -> FlowState:
+    ) -> FlowStatusResponse:
         """Create a flow on the current branch and apply optional bindings."""
         branch = self.flow_service.get_current_branch()
         existing_flow = self.flow_service.get_flow_status(branch)
@@ -74,10 +74,10 @@ class FlowUsecase:
                 spec=spec,
                 actor=actor,
             )
-            confirmed = self.flow_service.get_flow_state(branch)
+            confirmed = self.flow_service.get_flow_status(branch)
             if confirmed is not None:
                 return confirmed
-            return FlowState(**existing_flow.model_dump(exclude={"issues"}))
+            return existing_flow
 
         flow = self.flow_service.create_flow(slug=name, branch=branch, actor=actor)
         self._apply_initial_bindings(branch, task, spec, actor=actor)
@@ -127,7 +127,7 @@ class FlowUsecase:
         task: str | Sequence[str] | None = None,
         spec: str | None = None,
         actor: str | None = None,
-    ) -> FlowState:
+    ) -> FlowStatusResponse:
         """Create a branch-backed flow while enforcing worktree governance."""
         current_branch = self.flow_service.get_current_branch()
         decision = self.flow_service.can_create_from_current_worktree(current_branch)
@@ -209,15 +209,8 @@ class FlowUsecase:
     ) -> None:
         task_refs = self._normalize_task_refs(task)
         if task_refs:
-            bound_task_numbers: list[int] = []
             for task_ref in task_refs:
-                link = self._link_issue(branch, task_ref, "task", actor=actor)
-                bound_task_numbers.append(link.issue_number)
-            if len(bound_task_numbers) > 1:
-                self.flow_service.store.update_flow_state(
-                    branch,
-                    task_issue_number=bound_task_numbers[0],
-                )
+                self._link_issue(branch, task_ref, "task", actor=actor)
             if not spec:
                 self._bind_task_as_spec_ref(branch, task_refs[0], actor=actor)
         if spec:

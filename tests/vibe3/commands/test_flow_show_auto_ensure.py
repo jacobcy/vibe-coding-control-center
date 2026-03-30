@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 
 runner = CliRunner()
 
@@ -16,7 +16,7 @@ def test_flow_show_auto_ensures_current_branch(mock_ensure, _render_timeline) ->
     """flow show should auto-ensure flow for current branch before showing timeline."""
     flow_service = MagicMock()
     flow_service.get_flow_timeline.return_value = {
-        "state": FlowState(
+        "state": FlowStatusResponse(
             branch="task/auto-ensure-show",
             flow_slug="auto_ensure_show",
             flow_status="active",

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from vibe3.exceptions import GitError
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.task_bridge import HydratedTaskView, HydrateError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
@@ -26,7 +26,7 @@ class TaskShowResult:
     branch: str
     view: HydratedTaskView | None = None
     hydrate_error: HydrateError | None = None
-    local_task: FlowState | None = None
+    local_task: FlowStatusResponse | None = None
     related_issue_numbers: list[int] | None = None
     dependency_issue_numbers: list[int] | None = None
 

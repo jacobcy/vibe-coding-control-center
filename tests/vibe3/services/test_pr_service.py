@@ -66,11 +66,13 @@ def test_create_draft_pr_success(
     mock_store.get_flow_state.return_value = {
         "branch": "feature-branch",
         "flow_slug": "test-flow",
-        "task_issue_number": 101,
         "spec_ref": None,
         "planner_actor": None,
         "executor_actor": None,
     }
+    mock_store.get_issue_links.return_value = [
+        {"branch": "feature-branch", "issue_number": 101, "issue_role": "task"}
+    ]
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client", no_conflict_git):
@@ -144,6 +146,7 @@ def test_create_draft_pr_duplicate_branch_pr(
     mock_github_client.get_pr.return_value = hydrated_pr
 
     mock_store = MagicMock()
+    mock_store.get_issue_links.return_value = []
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client", no_conflict_git):
             with patch.object(pr_service, "store", mock_store):
@@ -203,6 +206,7 @@ def test_mark_ready_success(
         update={"draft": False}
     )
     mock_store = MagicMock()
+    mock_store.get_issue_links.return_value = []
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client", no_conflict_git):
@@ -242,6 +246,7 @@ def test_mark_ready_already_ready_syncs_state(
     mock_github_client.check_auth.return_value = True
     mock_github_client.get_pr.return_value = ready_pr
     mock_store = MagicMock()
+    mock_store.get_issue_links.return_value = []
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "git_client", no_conflict_git):
