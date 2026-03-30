@@ -221,27 +221,6 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                     f"Created missing handoff file: {handoff_path}"
                 )
 
-            # Fix missing pr_number
-            elif "database missing pr_number" in issue:
-                prs = self.github_client.list_prs_for_branch(branch)
-                if prs:
-                    pr_number = prs[0].number
-                    # No longer backfill pr_number to SQLite
-                    self.store.add_event(
-                        branch,
-                        "pr_verified",
-                        "check --fix",
-                        f"PR #{pr_number} verified on GitHub (truth only)",
-                    )
-                    fixed.append(issue)
-                    logger.bind(
-                        domain="check", action="fix", branch=branch, pr_number=pr_number
-                    ).info("PR verified on GitHub (remote-first)")
-                else:
-                    logger.bind(domain="check", branch=branch).warning(
-                        "PR not found on GitHub, cannot fix"
-                    )
-
         unfixed = [i for i in issues if i not in fixed]
         if unfixed:
             hint = (

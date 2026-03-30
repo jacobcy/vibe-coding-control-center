@@ -130,11 +130,12 @@ class CheckRemoteIndexMixin:
         return updated, skipped, unresolvable
 
     def init_remote_index(self, pr_limit: int = 200) -> InitResult:
-        """全量扫描远端，回填所有 flow 的 task_issue_number。
+        """全量扫描远端，绑定 flow 与 task issue 的关联关系到 flow_issue_links。
 
         路径 A — merged PR body 解析 Closes/Fixes/Resolves #xxx
         路径 B — GitHub Project items closingIssuesReferences
-        已有 task_issue_number 的 flow 跳过（不覆盖）。
+        已有 task role issue link 的 flow 跳过（不覆盖）。
+        不回填远端真源字段到本地 SQLite（GitHub-as-truth）。
         """
         logger.bind(domain="check", action="init_remote_index").info(
             "Building remote index (PR body + GitHub Project items)"
