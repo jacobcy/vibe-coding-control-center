@@ -307,6 +307,10 @@ class Dispatcher(WorktreeResolverMixin):
                     category=category,
                     reason=reason,
                 )
+            else:
+                log.warning(
+                    f"Cannot record dispatch event: no flow branch for #{issue.number}"
+                )
         else:
             # Business error - keep in-progress, don't auto-block
             log.warning("Business error, keeping state/in-progress")
@@ -320,6 +324,10 @@ class Dispatcher(WorktreeResolverMixin):
                     issue_number=issue.number,
                     category=category,
                     reason="Business logic error, manual intervention may be needed",
+                )
+            else:
+                log.warning(
+                    f"Cannot record dispatch event: no flow branch for #{issue.number}"
                 )
 
     def _post_failure_comment(self, issue_number: int, reason: str) -> None:

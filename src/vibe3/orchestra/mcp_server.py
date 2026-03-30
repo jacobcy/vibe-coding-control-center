@@ -195,7 +195,7 @@ def create_mcp_server(
 
             store = SQLiteClient()
             events = store.get_events(
-                branch="",  # Get all branches
+                branch=None,  # None = query all branches
                 event_type="dispatch_result",
                 limit=limit,
             )

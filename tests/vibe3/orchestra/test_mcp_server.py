@@ -198,6 +198,66 @@ class TestMCPTools:
         assert issue["pr_number"] == 456
 
 
+class TestMCPDispatchHistory:
+    """Tests for orchestra_dispatch_history tool correctness."""
+
+    def test_get_events_with_branch_none_queries_all(self, tmp_path):
+        """
+        SQLiteClient.get_events(branch=None) should return events from all branches.
+        """
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        db_file = str(tmp_path / "test.db")
+        store = SQLiteClient(db_path=db_file)
+
+        # Insert events on different branches
+        store.add_event(
+            "task/issue-1", "dispatch_result", "orchestra:dispatcher", "success"
+        )
+        store.add_event(
+            "task/issue-2", "dispatch_result", "orchestra:dispatcher", "failed:timeout"
+        )
+        store.add_event("task/issue-3", "other_event", "orchestra:dispatcher", "other")
+
+        # branch=None should return all dispatch_result events (2 of them)
+        events = store.get_events(branch=None, event_type="dispatch_result")
+        assert len(events) == 2
+        branches = {e["branch"] for e in events}
+        assert branches == {"task/issue-1", "task/issue-2"}
+
+    def test_get_events_with_branch_str_filters_correctly(self, tmp_path):
+        """SQLiteClient.get_events(branch='...') should still filter by branch."""
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        db_file = str(tmp_path / "test.db")
+        store = SQLiteClient(db_path=db_file)
+
+        store.add_event("task/issue-1", "dispatch_result", "actor", "success")
+        store.add_event("task/issue-2", "dispatch_result", "actor", "success")
+
+        events = store.get_events(branch="task/issue-1")
+        assert len(events) == 1
+        assert events[0]["branch"] == "task/issue-1"
+
+    def test_dispatch_history_branch_empty_string_was_broken(self, tmp_path):
+        """
+        Demonstrate that branch='' returns empty (old bug) while branch=None works.
+        """
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        db_file = str(tmp_path / "test.db")
+        store = SQLiteClient(db_path=db_file)
+        store.add_event("task/issue-1", "dispatch_result", "actor", "success")
+
+        # branch="" returns empty (no events have branch="")
+        empty = store.get_events(branch="", event_type="dispatch_result")
+        assert empty == []
+
+        # branch=None returns all
+        all_events = store.get_events(branch=None, event_type="dispatch_result")
+        assert len(all_events) == 1
+
+
 class TestMCPServerIntegration:
     """Integration tests for MCP server with serve_utils."""
 
