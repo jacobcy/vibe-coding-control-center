@@ -193,11 +193,12 @@ def create_mcp_server(
         try:
             from vibe3.clients import SQLiteClient
 
+            safe_limit = max(1, min(limit, 100))
             store = SQLiteClient()
             events = store.get_events(
                 branch=None,  # None = query all branches
                 event_type="dispatch_result",
-                limit=limit,
+                limit=safe_limit,
             )
 
             formatted_events = [
