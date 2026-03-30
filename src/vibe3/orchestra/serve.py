@@ -3,97 +3,24 @@
 import asyncio
 import os
 import signal
-from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated
 
 import typer
 import uvicorn
-from fastapi import FastAPI
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
-from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.serve_utils import (
+    _build_server,
     _setup_tailscale_webhook,
     _start_async_serve,
     _validate_pid_file,
 )
-from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
-from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
-from vibe3.orchestra.services.status_service import (
-    OrchestraSnapshot,
-    OrchestraStatusService,
-)
-from vibe3.orchestra.webhook_handler import make_webhook_router
 
 app = typer.Typer(
     help="Orchestra server: GitHub webhook receiver + heartbeat polling",
     no_args_is_help=True,
 )
-
-
-def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
-    """Instantiate heartbeat + FastAPI app with registered services."""
-    heartbeat = HeartbeatServer(config)
-
-    # Shared resources (reduces duplication)
-    shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_github = GitHubClient()
-    shared_orchestrator = FlowOrchestrator(config)
-    shared_dispatcher = Dispatcher(
-        config,
-        dry_run=config.dry_run,
-        orchestrator=shared_orchestrator,
-    )
-
-    # Status service for HTTP endpoint and CLI
-    status_service = OrchestraStatusService(
-        config,
-        github=shared_github,
-        orchestrator=shared_orchestrator,
-    )
-
-    if config.assignee_dispatch.enabled:
-        heartbeat.register(
-            AssigneeDispatchService(
-                config,
-                dispatcher=shared_dispatcher,
-                github=shared_github,
-                executor=shared_executor,
-            )
-        )
-    if config.comment_reply.enabled:
-        heartbeat.register(
-            CommentReplyService(
-                config,
-                github=shared_github,
-            )
-        )
-    if config.pr_review_dispatch.enabled:
-        heartbeat.register(
-            PRReviewDispatchService(
-                config,
-                dispatcher=shared_dispatcher,
-                executor=shared_executor,
-            )
-        )
-
-    fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
-    fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
-
-    # Store status_service for HTTP endpoint
-    fastapi_app.state.status_service = status_service
-
-    @fastapi_app.get("/status")
-    def get_status() -> OrchestraSnapshot:
-        """Get current orchestra status snapshot."""
-        return status_service.snapshot()
-
-    return heartbeat, fastapi_app
 
 
 async def _run(config: OrchestraConfig, port: int) -> None:

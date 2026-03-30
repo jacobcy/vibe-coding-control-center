@@ -4,10 +4,11 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from loguru import logger
-
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
+)
+from vibe3.clients.git_branch_ops import (
+    check_merge_conflicts as _check_merge_conflicts,
 )
 from vibe3.clients.git_branch_ops import (
     create_branch as _create_branch,
@@ -287,34 +288,5 @@ class GitClient:
         self._run(args)
 
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
-        """Dry-run merge to detect conflicts without modifying working tree.
-
-        Args:
-            target_ref: Ref to merge into current branch (e.g. origin/main)
-
-        Returns:
-            True if conflicts detected, False if clean merge possible
-        """
-        try:
-            self._run(
-                [
-                    "merge",
-                    "--no-commit",
-                    "--no-ff",
-                    target_ref,
-                ]
-            )
-            # No conflicts. In "Already up to date" case no merge state exists,
-            # so abort may fail and should be ignored.
-            try:
-                self._run(["merge", "--abort"])
-            except GitError as e:
-                logger.debug(f"Merge abort failed, ignoring: {e}")
-            return False
-        except GitError:
-            # Conflict or error -- best-effort abort and report conflict.
-            try:
-                self._run(["merge", "--abort"])
-            except GitError as e:
-                logger.debug(f"Merge abort failed, ignoring: {e}")
-            return True
+        """Dry-run merge to detect conflicts without modifying working tree."""
+        return _check_merge_conflicts(self._run, target_ref)
