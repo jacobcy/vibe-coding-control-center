@@ -163,17 +163,28 @@ class TestManagerDispatchIntegration:
                     dispatcher, "_normalize_manager_command", return_value=["uv"]
                 ):
                     with patch.object(
-                        dispatcher.orchestrator,
-                        "get_pr_for_issue",
-                        return_value=None,  # No PR for this test
-                    ):
-                        with patch(
-                            "subprocess.run",
-                            return_value=CompletedProcess(returncode=0),
-                        ) as mock_run:
-                            result = dispatcher.dispatch_manager(issue)
+                        dispatcher,
+                        "_record_dispatch_event",
+                        return_value=None,
+                    ) as mock_record_event:
+                        with patch.object(
+                            dispatcher.orchestrator,
+                            "get_pr_for_issue",
+                            return_value=None,  # No PR for this test
+                        ):
+                            with patch(
+                                "subprocess.run",
+                                return_value=CompletedProcess(returncode=0),
+                            ) as mock_run:
+                                result = dispatcher.dispatch_manager(issue)
 
         assert result is True
+        mock_record_event.assert_called_once_with(
+            "task/issue-102",
+            success=True,
+            issue_number=102,
+            pr_number=None,
+        )
         # Check that subprocess.run was called with the correct cwd at some point
         # (other calls may follow, e.g. git rev-parse from SQLiteClient)
         cwd_calls = [c for c in mock_run.call_args_list if c[1].get("cwd") is not None]
