@@ -91,7 +91,12 @@ class CheckRemoteIndexMixin:
 
         for flow in all_flows:
             branch = flow["branch"]
-            if flow.get("task_issue_number"):
+            # Skip if already has task_issue_number in state (legacy)
+            # or already has a task role issue linked (new truth).
+            existing_links = self.store.get_issue_links(branch)
+            has_task_link = any(lnk["issue_role"] == "task" for lnk in existing_links)
+
+            if flow.get("task_issue_number") or has_task_link:
                 skipped += 1
                 continue
             issues_for_branch = branch_issue_map.get(branch, [])

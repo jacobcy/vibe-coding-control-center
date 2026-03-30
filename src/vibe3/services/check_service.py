@@ -105,31 +105,45 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
 
         # PR verification (Remote-first)
         # We no longer rely on local pr_number cache; always check GitHub truth.
-        prs = self.github_client.list_prs_for_branch(branch)
-        if not prs:
-            # Check merged/closed to catch stale flows
-            all_prs = self.github_client.list_prs_for_branch(branch, state="all")
-            prs = [p for p in all_prs if p.state != PRState.OPEN]
+        try:
+            prs = self.github_client.list_prs_for_branch(branch)
+            if not prs:
+                # Check merged/closed to catch stale flows
+                all_prs = self.github_client.list_prs_for_branch(branch, state="all")
+                prs = [p for p in all_prs if p.state != PRState.OPEN]
 
-        if prs:
-            pr = prs[0]
-            # Check if PR is closed or merged - auto-complete flow
-            if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                self._mark_flow_done(
-                    branch,
-                    f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
-                )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
+            if prs:
+                pr = prs[0]
+                # Check if PR is closed or merged - auto-complete flow
+                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
+                    self._mark_flow_done(
+                        branch,
+                        f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+        except Exception as e:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to verify PR status from GitHub: {e}"
+            )
+            # Don't fail the whole check, just skip PR truth verification
+            # and report it if we have no local pr_number either.
+            if not flow_data.get("pr_number"):
+                issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
         # Auto-complete when task issue is closed (and no open PR found)
         if task_issue_closed:
-            open_prs = self.github_client.list_prs_for_branch(branch)
-            if not open_prs:
-                self._mark_flow_done(
-                    branch,
-                    f"Task issue #{task_issue} is CLOSED (no open PR found)",
+            try:
+                open_prs = self.github_client.list_prs_for_branch(branch)
+                if not open_prs:
+                    self._mark_flow_done(
+                        branch,
+                        f"Task issue #{task_issue} is CLOSED (no open PR found)",
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+            except Exception as e:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to check for open PRs after task issue closed: {e}"
                 )
-                return CheckResult(is_valid=True, branch=branch, issues=[])
 
         # ref files exist (skip for terminal flows — artifacts may be cleaned up)
         flow_status = flow_data.get("flow_status", "active")

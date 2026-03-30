@@ -18,6 +18,7 @@ class SQLiteClient:
     VALID_FLOW_STATE_FIELDS = {
         "branch",
         "flow_slug",
+        "task_issue_number",
         "spec_ref",
         "plan_ref",
         "report_ref",
