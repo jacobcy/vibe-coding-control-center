@@ -14,6 +14,9 @@ dependencies = [
     "uvicorn[standard]>=0.23.0",
 ]
 
+[project.optional-dependencies]
+mcp = ["mcp>=1.0.0"]
+
 [project.scripts]
 vibe3 = "vibe3.cli:main"
 

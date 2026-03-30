@@ -38,17 +38,23 @@ class Dispatcher(WorktreeResolverMixin):
                 cooldown_seconds=config.circuit_breaker.cooldown_seconds,
                 half_open_max_tests=config.circuit_breaker.half_open_max_tests,
             )
+        # Track last error category for feedback loop
+        self._last_error_category: str | None = None
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a subprocess command with timeout and structured logging.
 
         Returns True on success, False on failure/timeout.
         """
+        # Reset error category before each run
+        self._last_error_category = None
+
         # Check circuit breaker before dispatch
         if self._circuit_breaker and not self._circuit_breaker.allow_request():
             logger.bind(domain="orchestra").warning(
                 f"{label} blocked by circuit breaker"
             )
+            self._last_error_category = "circuit_breaker"
             return False
 
         try:
@@ -64,10 +70,11 @@ class Dispatcher(WorktreeResolverMixin):
                     f"{label} failed: {result.stderr}"
                 )
                 # Record failure for circuit breaker
+                category = classify_failure(
+                    result.returncode, result.stderr or "", timed_out=False
+                )
+                self._last_error_category = category
                 if self._circuit_breaker:
-                    category = classify_failure(
-                        result.returncode, result.stderr or "", timed_out=False
-                    )
                     self._circuit_breaker.record_failure(category)
                 return False
             logger.bind(domain="orchestra").info(f"{label} completed successfully")
@@ -77,18 +84,16 @@ class Dispatcher(WorktreeResolverMixin):
             return True
         except subprocess.TimeoutExpired:
             logger.bind(domain="orchestra").error(f"{label} timed out")
+            category = classify_failure(returncode=1, stderr="timeout", timed_out=True)
+            self._last_error_category = category
             if self._circuit_breaker:
-                category = classify_failure(
-                    returncode=1, stderr="timeout", timed_out=True
-                )
                 self._circuit_breaker.record_failure(category)
             return False
         except Exception as e:
             logger.bind(domain="orchestra").error(f"{label} error: {e}")
+            category = classify_failure(returncode=1, stderr=str(e), timed_out=False)
+            self._last_error_category = category
             if self._circuit_breaker:
-                category = classify_failure(
-                    returncode=1, stderr=str(e), timed_out=False
-                )
                 self._circuit_breaker.record_failure(category)
             return False
 
@@ -156,7 +161,15 @@ class Dispatcher(WorktreeResolverMixin):
         cmd = self._normalize_manager_command(cmd, manager_cwd)
         log.info(f"Dispatching manager: {' '.join(cmd)}")
 
-        return self._run_command(cmd, manager_cwd, "Manager execution")
+        success = self._run_command(cmd, manager_cwd, "Manager execution")
+
+        # Step 4: feedback loop - update state based on result
+        if success:
+            self._on_dispatch_success(issue, flow_branch)
+        else:
+            self._on_dispatch_failure(issue, self._last_error_category or "unknown")
+
+        return success
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
         """Dispatch PR review command for reviewer-triggered events."""
@@ -209,4 +222,166 @@ class Dispatcher(WorktreeResolverMixin):
         except Exception as e:
             logger.bind(domain="orchestra").warning(
                 f"Failed to update label for #{issue_number}: {e}"
+            )
+
+    def _on_dispatch_success(self, issue: IssueInfo, flow_branch: str) -> None:
+        """Handle successful dispatch: check PR and update state to review.
+
+        Args:
+            issue: Issue that was dispatched
+            flow_branch: Flow branch name
+        """
+        log = logger.bind(
+            domain="orchestra",
+            action="dispatch_success",
+            issue=issue.number,
+        )
+
+        # Check if PR exists
+        pr_number = self.orchestrator.get_pr_for_issue(issue.number)
+        if pr_number:
+            # Update state to review
+            self._update_state_label(issue.number, IssueState.REVIEW)
+            log.info(
+                f"Dispatch success, PR #{pr_number} exists, "
+                f"advancing to state/review"
+            )
+
+            # Record event in flow history
+            self._record_dispatch_event(
+                flow_branch,
+                success=True,
+                issue_number=issue.number,
+                pr_number=pr_number,
+            )
+        else:
+            # No PR yet, keep in-progress state
+            log.info("Dispatch success, no PR yet, keeping state/in-progress")
+
+            # Record event in flow history
+            self._record_dispatch_event(
+                flow_branch,
+                success=True,
+                issue_number=issue.number,
+                pr_number=None,
+            )
+
+    def _on_dispatch_failure(self, issue: IssueInfo, category: str) -> None:
+        """Handle dispatch failure: update state and post comment.
+
+        Args:
+            issue: Issue that failed to dispatch
+            category: Error category (api_error, timeout, business_error, etc.)
+        """
+        log = logger.bind(
+            domain="orchestra",
+            action="dispatch_failure",
+            issue=issue.number,
+            category=category,
+        )
+
+        # For api_error and timeout, block the issue
+        if category in ("api_error", "timeout", "circuit_breaker"):
+            self._update_state_label(issue.number, IssueState.BLOCKED)
+            reason = f"Orchestra dispatch 失败（{category}），已暂停调度，等待恢复"
+            self._post_failure_comment(issue.number, reason)
+            log.warning(f"Issue blocked due to {category}")
+
+            # Record event in flow history
+            flow = self.orchestrator.get_flow_for_issue(issue.number)
+            if flow and flow.get("branch"):
+                self._record_dispatch_event(
+                    flow["branch"],
+                    success=False,
+                    issue_number=issue.number,
+                    category=category,
+                    reason=reason,
+                )
+            else:
+                log.warning(
+                    f"Cannot record dispatch event: no flow branch for #{issue.number}"
+                )
+        else:
+            # Business error - keep in-progress, don't auto-block
+            log.warning("Business error, keeping state/in-progress")
+
+            # Record event in flow history
+            flow = self.orchestrator.get_flow_for_issue(issue.number)
+            if flow and flow.get("branch"):
+                self._record_dispatch_event(
+                    flow["branch"],
+                    success=False,
+                    issue_number=issue.number,
+                    category=category,
+                    reason="Business logic error, manual intervention may be needed",
+                )
+            else:
+                log.warning(
+                    f"Cannot record dispatch event: no flow branch for #{issue.number}"
+                )
+
+    def _post_failure_comment(self, issue_number: int, reason: str) -> None:
+        """Post failure comment on issue.
+
+        Args:
+            issue_number: Issue number
+            reason: Failure reason
+        """
+        try:
+            from vibe3.clients.github_client import GitHubClient
+
+            GitHubClient().add_comment(
+                issue_number,
+                f"[Orchestra] {reason}",
+                repo=self.config.repo,
+            )
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to post failure comment for #{issue_number}: {exc}"
+            )
+
+    def _record_dispatch_event(
+        self,
+        flow_branch: str,
+        success: bool,
+        issue_number: int,
+        pr_number: int | None = None,
+        category: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        """Record dispatch result as flow event for traceability.
+
+        Args:
+            flow_branch: Flow branch name
+            success: Whether dispatch succeeded
+            issue_number: Issue number
+            pr_number: PR number (if exists)
+            category: Error category (if failed)
+            reason: Failure reason (if failed)
+        """
+        try:
+            from vibe3.clients import SQLiteClient
+
+            store = SQLiteClient()
+            event_data: dict[str, int | str | None] = {
+                "success": success,
+                "issue": issue_number,
+            }
+            if pr_number is not None:
+                event_data["pr"] = pr_number
+            if category is not None:
+                event_data["category"] = category
+            if reason is not None:
+                event_data["reason"] = reason
+
+            store.add_event(
+                branch=flow_branch,
+                event_type="dispatch_result",
+                actor="orchestra:dispatcher",
+                detail="success" if success else f"failed:{category}",
+                refs=event_data,
+            )
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to record dispatch event for #{issue_number}: {exc}"
             )

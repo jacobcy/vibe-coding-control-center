@@ -138,23 +138,42 @@ class SQLiteClient:
 
     def get_events(
         self,
-        branch: str,
+        branch: str | None = None,
         event_type: str | None = None,
         event_type_prefix: str | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
+        """Get flow events.
+
+        Args:
+            branch: Filter by branch name. Pass None to query all branches.
+            event_type: Filter by exact event type.
+            event_type_prefix: Filter by event type prefix.
+            limit: Max number of results.
+            offset: Pagination offset.
+        """
+        normalized_branch = branch
+        if isinstance(normalized_branch, str) and not normalized_branch.strip():
+            normalized_branch = None
+
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = "SELECT * FROM flow_events WHERE branch = ?"
-            params: list[Any] = [branch]
+            conditions: list[str] = []
+            params: list[Any] = []
+            if normalized_branch is not None:
+                conditions.append("branch = ?")
+                params.append(normalized_branch)
             if event_type:
-                query += " AND event_type = ?"
+                conditions.append("event_type = ?")
                 params.append(event_type)
             if event_type_prefix:
-                query += " AND event_type LIKE ?"
+                conditions.append("event_type LIKE ?")
                 params.append(f"{event_type_prefix}%")
+            query = "SELECT * FROM flow_events"
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
             query += " ORDER BY created_at DESC"
             if limit is not None:
                 query += " LIMIT ? OFFSET ?"
