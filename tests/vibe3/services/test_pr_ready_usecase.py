@@ -27,9 +27,9 @@ def test_mark_ready_runs_gates_then_marks_ready() -> None:
     ready_pr = _pr_response().model_copy(update={"draft": False})
     pr_service.get_pr.return_value = draft_pr
     pr_service.mark_ready.return_value = ready_pr
-    pr_service.store.get_flow_state.return_value = {
-        "task_issue_number": 220,
-    }
+    pr_service.store.get_issue_links.return_value = [
+        {"branch": "task/demo", "issue_number": 220, "issue_role": "task"}
+    ]
     label_service = MagicMock()
     usecase = PrReadyUsecase(pr_service=pr_service, gate_runner=gate_runner)
     usecase.label_service = label_service
@@ -67,9 +67,9 @@ def test_mark_ready_already_ready_skips_gates() -> None:
     ready_pr = _pr_response().model_copy(update={"draft": False, "is_ready": True})
     pr_service.get_pr.return_value = ready_pr
     pr_service.mark_ready.return_value = ready_pr
-    pr_service.store.get_flow_state.return_value = {
-        "task_issue_number": 220,
-    }
+    pr_service.store.get_issue_links.return_value = [
+        {"branch": "task/demo", "issue_number": 220, "issue_role": "task"}
+    ]
     label_service = MagicMock()
     usecase = PrReadyUsecase(pr_service=pr_service, gate_runner=gate_runner)
     usecase.label_service = label_service

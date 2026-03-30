@@ -26,7 +26,7 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
 
     metadata = PRMetadata(
         branch=branch,
-        task_issue=flow_data.get("task_issue_number"),
+        task_issue=None,
         flow_slug=flow_data.get("flow_slug"),
         spec_ref=flow_data.get("spec_ref"),
         planner=flow_data.get("planner_actor"),
@@ -34,6 +34,18 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         reviewer=flow_data.get("reviewer_actor"),
         latest=flow_data.get("latest_actor"),
     )
+
+    try:
+        links = store.get_issue_links(branch)
+    except Exception:
+        links = []
+    for link in links:
+        if link.get("issue_role") == "task":
+            metadata.task_issue = link.get("issue_number")
+            break
+
+    if metadata.task_issue is None:
+        metadata.task_issue = flow_data.get("task_issue_number")
 
     logger.bind(
         branch=branch,

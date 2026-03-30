@@ -273,6 +273,40 @@ class SQLiteClient:
             >>> dependents = store.get_flow_dependents("feature/A")
             >>> # ["feature/B"] or ["feature/B", "feature/C"]
         """
+        # Resolve primary task issue from flow_issue_links (truth-first)
+        task_issue_number: int | None = None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT issue_number
+                FROM flow_issue_links
+                WHERE branch = ? AND issue_role = 'task'
+                LIMIT 1
+                """,
+                (branch,),
+            )
+            row = cursor.fetchone()
+            if row and row[0] is not None:
+                task_issue_number = int(row[0])
+            else:
+                cursor.execute(
+                    "SELECT task_issue_number FROM flow_state WHERE branch = ?",
+                    (branch,),
+                )
+                legacy = cursor.fetchone()
+                if legacy and legacy[0] is not None:
+                    task_issue_number = int(legacy[0])
+
+        if task_issue_number is None:
+            logger.bind(
+                external="sqlite",
+                operation="get_flow_dependents",
+                branch=branch,
+                dependents_count=0,
+            ).debug("No task issue bound; no dependents")
+            return []
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -280,19 +314,12 @@ class SQLiteClient:
                 SELECT DISTINCT fil.branch
                 FROM flow_issue_links fil
                 JOIN flow_state fs ON fil.branch = fs.branch
-                WHERE fil.issue_number = (
-                    SELECT issue_number
-                    FROM flow_issue_links
-                    WHERE branch = ?
-                      AND issue_role = 'task'
-                    ORDER BY created_at ASC
-                    LIMIT 1
-                )
-                AND fil.issue_role = 'dependency'
-                AND fs.flow_status = 'active'
+                WHERE fil.issue_number = ?
+                  AND fil.issue_role = 'dependency'
+                  AND fs.flow_status = 'active'
                 ORDER BY fil.branch
                 """,
-                (branch,),
+                (task_issue_number,),
             )
             dependents = [row[0] for row in cursor.fetchall()]
             logger.bind(

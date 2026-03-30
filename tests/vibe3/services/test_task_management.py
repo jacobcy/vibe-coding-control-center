@@ -15,11 +15,16 @@ class TestTaskRetrieval:
             "branch": "test-branch",
             "flow_slug": "test-flow",
             "flow_status": "active",
-            "task_issue_number": 101,
             "next_step": "Complete tests",
             "updated_at": "2026-03-16T00:00:00",
         }
-        mock_store.get_issue_links.return_value = []
+        mock_store.get_issue_links.return_value = [
+            {
+                "branch": "test-branch",
+                "issue_number": 101,
+                "issue_role": "task",
+            }
+        ]
 
         service = TaskService(store=mock_store)
         with patch("vibe3.services.flow_query_mixin.GitHubClient"):

@@ -92,13 +92,14 @@ class FlowQueryMixin:
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
-        # Resolve task_issue_number from issues (truth)
-        task_issue_number = flow_data.get("task_issue_number")
-        if not task_issue_number:
-            for issue in issues:
-                if issue.issue_role == "task":
-                    task_issue_number = issue.issue_number
-                    break
+        # Resolve task_issue_number from issue links (truth-first, legacy fallback)
+        task_issue_number: int | None = None
+        for issue in issues:
+            if issue.issue_role == "task":
+                task_issue_number = issue.issue_number
+                break
+        if task_issue_number is None:
+            task_issue_number = flow_data.get("task_issue_number")
 
         try:
             return FlowStatusResponse(
@@ -153,15 +154,16 @@ class FlowQueryMixin:
         for flow in flows_data:
             branch = flow.get("branch", "<unknown>")
             try:
-                # Basic hydration: task_issue_number from issue_links (local)
+                # Basic hydration: task_issue_number from issue_links (local truth)
                 issue_links = self.store.get_issue_links(branch)
                 issues = [IssueLink(**link) for link in issue_links]
-                task_issue_number = flow.get("task_issue_number")
-                if not task_issue_number:
-                    for issue in issues:
-                        if issue.issue_role == "task":
-                            task_issue_number = issue.issue_number
-                            break
+                task_issue_number: int | None = None
+                for issue in issues:
+                    if issue.issue_role == "task":
+                        task_issue_number = issue.issue_number
+                        break
+                if task_issue_number is None:
+                    task_issue_number = flow.get("task_issue_number")
 
                 flows.append(
                     FlowStatusResponse(

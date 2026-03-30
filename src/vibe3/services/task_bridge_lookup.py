@@ -20,6 +20,16 @@ def hydrate_task(
             message=f"Branch '{branch}' 没有 flow 记录，无法查看 task",
         )
 
+    issue_links = self.store.get_issue_links(branch)
+    task_issue = None
+    for link in issue_links:
+        if link.get("issue_role") == "task":
+            task_issue = link.get("issue_number")
+            break
+
+    if task_issue is None:
+        task_issue = flow_data.get("task_issue_number")
+
     project_item_id = flow_data.get("project_item_id")
     if not project_item_id:
         return HydrateError(
@@ -33,10 +43,8 @@ def hydrate_task(
     local_node_id = flow_data.get("project_node_id")
     view = HydratedTaskView(branch=branch)
     view.project_item_id = FieldSource(value=project_item_id, source="local")
-    if flow_data.get("task_issue_number"):
-        view.task_issue_number = FieldSource(
-            value=flow_data["task_issue_number"], source="local"
-        )
+    if task_issue:
+        view.task_issue_number = FieldSource(value=task_issue, source="local")
     if flow_data.get("spec_ref"):
         view.spec_ref = FieldSource(value=flow_data["spec_ref"], source="local")
     if flow_data.get("next_step"):

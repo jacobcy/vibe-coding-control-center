@@ -64,7 +64,7 @@ class TestIssueLinking:
         assert result.issue_number == 102
         assert result.issue_role == "task"
 
-        # Verify store calls - task role should only update mutable local fields
+        # Verify store calls - task role should update latest actor only
         mock_store_for_task.add_issue_link.assert_called_once_with(
             "test-branch", 102, "task"
         )

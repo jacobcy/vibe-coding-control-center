@@ -48,10 +48,20 @@ class PrReadyUsecase:
 
     def _sync_merge_ready_label(self, pr: PRResponse) -> None:
         """Sync linked task issue to state/merge-ready after PR becomes ready."""
-        flow = self.pr_service.store.get_flow_state(pr.head_branch)
-        if not flow:
-            return
-        task_issue = flow.get("task_issue_number")
+        task_issue: int | None = None
+        try:
+            links = self.pr_service.store.get_issue_links(pr.head_branch)
+        except Exception:
+            links = []
+        for link in links:
+            if link.get("issue_role") == "task":
+                task_issue = link.get("issue_number")
+                break
+
+        if task_issue is None:
+            flow = self.pr_service.store.get_flow_state(pr.head_branch)
+            if flow:
+                task_issue = flow.get("task_issue_number")
         if task_issue is None:
             return
         self.label_service.confirm_issue_state(
