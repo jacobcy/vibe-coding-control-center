@@ -7,6 +7,7 @@ import typer
 from vibe3.observability import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.ui.orchestra_ui import render_orchestra_status
 
 app = typer.Typer(
     help="Orchestra system management commands",
@@ -43,24 +44,4 @@ def status(
     service = OrchestraStatusService(config)
     snapshot = service.snapshot()
 
-    if json_output:
-        import json
-        from dataclasses import asdict
-
-        def serialize_state(obj: object) -> object:
-            if hasattr(obj, "value"):
-                return obj.value
-            return obj
-
-        data = asdict(snapshot)
-        # Convert IssueState enum to string
-        for entry in data.get("active_issues", []):
-            if entry.get("state"):
-                entry["state"] = (
-                    entry["state"].value
-                    if hasattr(entry["state"], "value")
-                    else entry["state"]
-                )
-        typer.echo(json.dumps(data, indent=2, default=serialize_state))
-    else:
-        typer.echo(service.format_snapshot(snapshot))
+    render_orchestra_status(snapshot, json_output)

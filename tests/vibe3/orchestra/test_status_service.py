@@ -11,6 +11,7 @@ from vibe3.orchestra.services.status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
+from vibe3.ui.orchestra_ui import _format_snapshot
 
 
 def _make_config() -> OrchestraConfig:
@@ -108,10 +109,7 @@ class TestOrchestraStatusService:
         assert len(snapshot.active_issues) == 2
 
     def test_format_snapshot(self) -> None:
-        """format_snapshot produces readable output."""
-        config = _make_config()
-        service = OrchestraStatusService(config)
-
+        """_format_snapshot produces readable output."""
         entry = IssueStatusEntry(
             number=42,
             title="Test issue title",
@@ -132,7 +130,7 @@ class TestOrchestraStatusService:
             active_worktrees=1,
         )
 
-        output = service.format_snapshot(snapshot)
+        output = _format_snapshot(snapshot)
 
         assert "Orchestra Status" in output
         assert "#42" in output
