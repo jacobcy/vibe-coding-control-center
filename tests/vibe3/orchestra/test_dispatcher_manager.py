@@ -162,11 +162,18 @@ class TestManagerDispatchIntegration:
                 with patch.object(
                     dispatcher, "_normalize_manager_command", return_value=["uv"]
                 ):
-                    with patch(
-                        "subprocess.run",
-                        return_value=CompletedProcess(returncode=0),
-                    ) as mock_run:
-                        result = dispatcher.dispatch_manager(issue)
+                    with patch.object(
+                        dispatcher.orchestrator,
+                        "get_pr_for_issue",
+                        return_value=None,  # No PR for this test
+                    ):
+                        with patch(
+                            "subprocess.run",
+                            return_value=CompletedProcess(returncode=0),
+                        ) as mock_run:
+                            result = dispatcher.dispatch_manager(issue)
 
         assert result is True
-        assert mock_run.call_args.kwargs["cwd"] == Path("/tmp/wt-issue-102")
+        # Check that subprocess.run was called with correct cwd
+        call_args = mock_run.call_args
+        assert call_args[1].get("cwd") == Path("/tmp/wt-issue-102")

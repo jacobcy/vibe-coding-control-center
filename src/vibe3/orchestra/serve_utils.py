@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI
+from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.orchestra.config import OrchestraConfig
@@ -94,6 +95,23 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
         return status_service.snapshot()
+
+    # Mount MCP server (optional, gracefully degrades if mcp package not available)
+    try:
+        from vibe3.orchestra.mcp_server import create_mcp_server
+
+        mcp = create_mcp_server(status_service)
+        # Mount SSE endpoint for MCP
+        fastapi_app.mount("/mcp", mcp.sse_app())
+        logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
+    except ImportError as exc:
+        logger.bind(domain="orchestra").debug(
+            f"MCP package not available, skipping MCP server: {exc}"
+        )
+    except Exception as exc:
+        logger.bind(domain="orchestra").warning(
+            f"Failed to mount MCP server, continuing without MCP: {exc}"
+        )
 
     return heartbeat, fastapi_app
 
