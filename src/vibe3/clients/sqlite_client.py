@@ -153,14 +153,18 @@ class SQLiteClient:
             limit: Max number of results.
             offset: Pagination offset.
         """
+        normalized_branch = branch
+        if isinstance(normalized_branch, str) and not normalized_branch.strip():
+            normalized_branch = None
+
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             conditions: list[str] = []
             params: list[Any] = []
-            if branch is not None:
+            if normalized_branch is not None:
                 conditions.append("branch = ?")
-                params.append(branch)
+                params.append(normalized_branch)
             if event_type:
                 conditions.append("event_type = ?")
                 params.append(event_type)

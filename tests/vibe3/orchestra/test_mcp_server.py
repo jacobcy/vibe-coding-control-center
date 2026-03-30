@@ -239,22 +239,18 @@ class TestMCPDispatchHistory:
         assert len(events) == 1
         assert events[0]["branch"] == "task/issue-1"
 
-    def test_dispatch_history_branch_empty_string_was_broken(self, tmp_path):
-        """
-        Demonstrate that branch='' returns empty (old bug) while branch=None works.
-        """
+    def test_dispatch_history_branch_empty_string_queries_all(self, tmp_path):
+        """branch='' should be normalized to query all branches (same as None)."""
         from vibe3.clients.sqlite_client import SQLiteClient
 
         db_file = str(tmp_path / "test.db")
         store = SQLiteClient(db_path=db_file)
         store.add_event("task/issue-1", "dispatch_result", "actor", "success")
 
-        # branch="" returns empty (no events have branch="")
-        empty = store.get_events(branch="", event_type="dispatch_result")
-        assert empty == []
-
-        # branch=None returns all
+        # branch="" now behaves like branch=None
+        empty_branch_events = store.get_events(branch="", event_type="dispatch_result")
         all_events = store.get_events(branch=None, event_type="dispatch_result")
+        assert len(empty_branch_events) == 1
         assert len(all_events) == 1
 
 
