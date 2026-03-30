@@ -30,7 +30,8 @@ def test_build_server_registers_only_enabled_services() -> None:
         pr_review_dispatch=PRReviewDispatchConfig(enabled=True),
     )
     heartbeat, _ = _build_server(cfg)
-    assert heartbeat.service_names == ["PRReviewDispatchService"]
+    # GovernanceService is always registered (tick-based)
+    assert heartbeat.service_names == ["PRReviewDispatchService", "GovernanceService"]
 
 
 def test_start_exits_when_orchestra_disabled(monkeypatch) -> None:

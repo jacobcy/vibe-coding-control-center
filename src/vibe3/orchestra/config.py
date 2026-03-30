@@ -78,6 +78,25 @@ class MasterAgentConfig(BaseModel):
         )
 
 
+class CircuitBreakerConfig(BaseModel):
+    """Configuration for dispatch-level circuit breaker."""
+
+    enabled: bool = True
+    failure_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive failures to trigger OPEN",
+    )
+    cooldown_seconds: int = Field(
+        default=300,
+        ge=60,
+        description="Duration of OPEN state",
+    )
+    half_open_max_tests: int = Field(
+        default=1, ge=1, description="Test requests allowed in HALF_OPEN"
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
@@ -102,6 +121,7 @@ class OrchestraConfig(BaseModel):
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
     )
+    circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -114,6 +134,17 @@ class OrchestraConfig(BaseModel):
         repo = src.repo
         if isinstance(repo, str):
             repo = repo.strip() or None
+
+        # Build circuit_breaker config with defaults
+        circuit_breaker_config = CircuitBreakerConfig()
+        if hasattr(src, "circuit_breaker") and src.circuit_breaker:
+            cb = src.circuit_breaker
+            circuit_breaker_config = CircuitBreakerConfig(
+                enabled=getattr(cb, "enabled", True),
+                failure_threshold=getattr(cb, "failure_threshold", 3),
+                cooldown_seconds=getattr(cb, "cooldown_seconds", 300),
+                half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
+            )
 
         return cls(
             enabled=src.enabled,
@@ -143,4 +174,5 @@ class OrchestraConfig(BaseModel):
                 async_mode=src.pr_review_dispatch.async_mode,
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
+            circuit_breaker=circuit_breaker_config,
         )

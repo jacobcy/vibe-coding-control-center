@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -14,6 +15,9 @@ from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.services.label_service import LabelService
+
+if TYPE_CHECKING:
+    from vibe3.orchestra.circuit_breaker import CircuitBreaker
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,8 @@ class OrchestraSnapshot:
     active_issues: tuple[IssueStatusEntry, ...]
     active_flows: int
     active_worktrees: int
+    circuit_breaker_state: str = "closed"
+    circuit_breaker_failures: int = 0
 
 
 class OrchestraStatusService:
@@ -55,6 +61,7 @@ class OrchestraStatusService:
     - State labels (via LabelService)
     - Flow state (via FlowOrchestrator)
     - Worktrees (via GitClient)
+    - Circuit Breaker (via CircuitBreaker)
     """
 
     def __init__(
@@ -62,10 +69,12 @@ class OrchestraStatusService:
         config: OrchestraConfig,
         github: GitHubClient | None = None,
         orchestrator: FlowOrchestrator | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
         self._orchestrator = orchestrator or FlowOrchestrator(config)
+        self._circuit_breaker = circuit_breaker
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
 
@@ -141,6 +150,8 @@ class OrchestraStatusService:
             active_issues=tuple(entries),
             active_flows=active_flows,
             active_worktrees=len(worktrees),
+            circuit_breaker_state=self._get_circuit_breaker_state(),
+            circuit_breaker_failures=self._get_circuit_breaker_failures(),
         )
 
         log.debug(
@@ -188,3 +199,15 @@ class OrchestraStatusService:
         except Exception as exc:
             logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
             return {}
+
+    def _get_circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state."""
+        if self._circuit_breaker:
+            return self._circuit_breaker.state_value
+        return "disabled"
+
+    def _get_circuit_breaker_failures(self) -> int:
+        """Get current circuit breaker failure count."""
+        if self._circuit_breaker:
+            return self._circuit_breaker.failure_count
+        return 0
