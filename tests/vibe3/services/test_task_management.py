@@ -1,6 +1,8 @@
 """Tests for Task management functionality."""
 
-from vibe3.models.flow import FlowState
+from unittest.mock import patch
+
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.task_service import TaskService
 
 
@@ -17,12 +19,14 @@ class TestTaskRetrieval:
             "next_step": "Complete tests",
             "updated_at": "2026-03-16T00:00:00",
         }
+        mock_store.get_issue_links.return_value = []
 
         service = TaskService(store=mock_store)
-        result = service.get_task("test-branch")
+        with patch("vibe3.services.flow_query_mixin.GitHubClient"):
+            result = service.get_task("test-branch")
 
         assert result is not None
-        assert isinstance(result, FlowState)
+        assert isinstance(result, FlowStatusResponse)
         assert result.flow_slug == "test-flow"
         assert result.task_issue_number == 101
         assert result.next_step == "Complete tests"

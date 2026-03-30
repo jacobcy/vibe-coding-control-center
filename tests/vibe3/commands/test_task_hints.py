@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 
 runner = CliRunner()
 
@@ -16,7 +16,7 @@ def test_flow_show_warns_when_task_issue_missing(mock_ensure, _render_timeline) 
     """flow show should suggest binding a task when none is present."""
     flow_service = MagicMock()
     flow_service.get_flow_timeline.return_value = {
-        "state": FlowState(
+        "state": FlowStatusResponse(
             branch="task/demo",
             flow_slug="demo",
             flow_status="active",
@@ -42,7 +42,7 @@ def test_pr_create_requires_yes_when_task_issue_missing(
     """pr create should fail by default when current flow has no task."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
-    flow_service.get_flow_status.return_value = FlowState(
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
@@ -73,7 +73,7 @@ def test_pr_create_allows_yes_when_task_issue_missing(
     """pr create --yes should bypass missing task guard."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
-    flow_service.get_flow_status.return_value = FlowState(
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
@@ -100,7 +100,7 @@ def test_pr_show_missing_pr_includes_bind_hint(
     """pr show should include bind hint when current flow has no task."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
-    flow_service.get_flow_status.return_value = FlowState(
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
