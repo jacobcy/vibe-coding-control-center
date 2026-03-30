@@ -18,7 +18,6 @@ class SQLiteClient:
     VALID_FLOW_STATE_FIELDS = {
         "branch",
         "flow_slug",
-        "task_issue_number",
         "spec_ref",
         "plan_ref",
         "report_ref",
@@ -282,9 +281,12 @@ class SQLiteClient:
                 FROM flow_issue_links fil
                 JOIN flow_state fs ON fil.branch = fs.branch
                 WHERE fil.issue_number = (
-                    SELECT task_issue_number
-                    FROM flow_state
+                    SELECT issue_number
+                    FROM flow_issue_links
                     WHERE branch = ?
+                      AND issue_role = 'task'
+                    ORDER BY created_at ASC
+                    LIMIT 1
                 )
                 AND fil.issue_role = 'dependency'
                 AND fs.flow_status = 'active'

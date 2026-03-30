@@ -64,13 +64,12 @@ class TestIssueLinking:
         assert result.issue_number == 102
         assert result.issue_role == "task"
 
-        # Verify store calls - task role should update flow_state
+        # Verify store calls - task role should only update mutable local fields
         mock_store_for_task.add_issue_link.assert_called_once_with(
             "test-branch", 102, "task"
         )
         mock_store_for_task.update_flow_state.assert_called_once_with(
             "test-branch",
-            task_issue_number=102,
             latest_actor="workflow",
         )
         mock_store_for_task.add_event.assert_called_once()

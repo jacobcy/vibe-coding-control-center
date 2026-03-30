@@ -57,7 +57,6 @@ class TaskService(TaskBridgeMixin, FlowQueryMixin):
         if role == "task":
             self.store.update_flow_state(
                 branch,
-                task_issue_number=issue_number,
                 latest_actor=effective_actor,
             )
 
