@@ -166,6 +166,7 @@ class TestOrchestraStatusService:
             worktree_path="/repo/.worktrees/issue-42",
             has_pr=False,
             pr_number=None,
+            blocked_by=(333, 336),
         )
         snapshot = OrchestraSnapshot(
             timestamp=1700000000.0,
@@ -181,6 +182,7 @@ class TestOrchestraStatusService:
         assert "#42" in output
         assert "state/in-progress" in output
         assert "flow=task/issue-42" in output
+        assert "blocked_by=#333, #336" in output
         assert "Flows: 1 active" in output
 
 

@@ -9,6 +9,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
@@ -29,6 +30,7 @@ class IssueStatusEntry:
     worktree_path: str | None
     has_pr: bool
     pr_number: int | None
+    blocked_by: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,9 @@ class OrchestraStatusService:
                 pr_number = self._orchestrator.get_pr_for_issue(number)
                 has_pr = pr_number is not None
 
+            # Parse blocked_by from issue body
+            blocked_by_list = parse_blocked_by(issue.get("body") or "")
+
             entries.append(
                 IssueStatusEntry(
                     number=number,
@@ -126,6 +131,7 @@ class OrchestraStatusService:
                     worktree_path=worktree_path,
                     has_pr=has_pr,
                     pr_number=pr_number,
+                    blocked_by=tuple(blocked_by_list),
                 )
             )
 

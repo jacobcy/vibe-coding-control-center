@@ -53,8 +53,12 @@ def _format_snapshot(snapshot: OrchestraSnapshot) -> str:
             title_short = (
                 entry.title[:30] + "..." if len(entry.title) > 30 else entry.title
             )
+            blocked_str = ""
+            if entry.blocked_by:
+                blocked_str = f" blocked_by=#{', #'.join(map(str, entry.blocked_by))}"
             lines.append(
-                f"  #{entry.number:<4} {title_short:<33} {state_str:<18} {flow_str}"
+                f"  #{entry.number:<4} {title_short:<33} "
+                f"{state_str:<18} {flow_str}{blocked_str}"
             )
 
     lines.extend(

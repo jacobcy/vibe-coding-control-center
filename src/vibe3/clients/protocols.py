@@ -88,8 +88,19 @@ class GitHubClientProtocol(Protocol):
         """Get PR diff."""
         ...
 
-    def list_issues(self, limit: int = 30, state: str = "open") -> list[dict[str, Any]]:
-        """List GitHub issues."""
+    def list_issues(
+        self,
+        limit: int = 30,
+        state: str = "open",
+        assignee: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List GitHub issues.
+
+        Args:
+            limit: Maximum number of issues to fetch
+            state: Issue state filter (open, closed, all)
+            assignee: Filter by assignee username
+        """
         ...
 
     def view_issue(
