@@ -182,7 +182,7 @@ class CircuitBreaker:
             elapsed = time.time() - self.last_failure_time
             if elapsed >= self.cooldown_seconds:
                 self.state = CircuitState.HALF_OPEN
-                self._half_open_tests = 0
+                self._half_open_tests = 1  # Count this probe request
                 logger.bind(domain="orchestra", action="circuit_breaker").warning(
                     "Circuit breaker: OPEN -> HALF_OPEN (cooldown expired)"
                 )
