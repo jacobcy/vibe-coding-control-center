@@ -19,8 +19,6 @@ class SQLiteClient:
         "branch",
         "flow_slug",
         "task_issue_number",
-        "pr_number",
-        "pr_ready_for_review",
         "spec_ref",
         "plan_ref",
         "report_ref",

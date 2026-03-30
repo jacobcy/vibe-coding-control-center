@@ -235,10 +235,13 @@ class PRService:
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
-        """Persist PR linkage and readiness into flow cache."""
+        """Persist PR linkage and readiness into flow cache.
+
+        Note: pr_number and pr_ready_for_review are now remote truth,
+        no longer persisted to local SQLite flow_state.
+        We only update latest_actor here to track activity.
+        """
         self.store.update_flow_state(
             pr.head_branch,
-            pr_number=pr.number,
-            pr_ready_for_review=not pr.draft,
             latest_actor=actor,
         )

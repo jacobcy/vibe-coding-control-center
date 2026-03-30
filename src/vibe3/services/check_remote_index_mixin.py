@@ -91,7 +91,12 @@ class CheckRemoteIndexMixin:
 
         for flow in all_flows:
             branch = flow["branch"]
-            if flow.get("task_issue_number"):
+            # Skip if already has task_issue_number in state (legacy)
+            # or already has a task role issue linked (new truth).
+            existing_links = self.store.get_issue_links(branch)
+            has_task_link = any(lnk["issue_role"] == "task" for lnk in existing_links)
+
+            if flow.get("task_issue_number") or has_task_link:
                 skipped += 1
                 continue
             issues_for_branch = branch_issue_map.get(branch, [])
@@ -100,15 +105,14 @@ class CheckRemoteIndexMixin:
                 continue
 
             task_issue, extra_issues = issues_for_branch[0], issues_for_branch[1:]
-            self.store.update_flow_state(
-                branch, task_issue_number=task_issue, latest_actor="check --init"
-            )
+            # No longer backfill task_issue_number to flow_state.
+            # Relationship truth is now in flow_issue_links.
             self.store.add_issue_link(branch, task_issue, "task")
             self.store.add_event(
                 branch,
                 "issue_linked",
                 "check --init",
-                f"Issue #{task_issue} back-filled as task",
+                f"Issue #{task_issue} bound as task (truth in flow_issue_links)",
             )
             for extra in extra_issues:
                 self.store.add_issue_link(branch, extra, "repo")
@@ -116,21 +120,22 @@ class CheckRemoteIndexMixin:
                     branch,
                     "issue_linked",
                     "check --init",
-                    f"Issue #{extra} back-filled as repo",
+                    f"Issue #{extra} bound as repo",
                 )
             logger.bind(domain="check", branch=branch, task_issue=task_issue).info(
-                "Back-filled task_issue_number"
+                "Bound task_issue_number (flow_issue_links)"
             )
             updated += 1
 
         return updated, skipped, unresolvable
 
     def init_remote_index(self, pr_limit: int = 200) -> InitResult:
-        """全量扫描远端，回填所有 flow 的 task_issue_number。
+        """全量扫描远端，绑定 flow 与 task issue 的关联关系到 flow_issue_links。
 
         路径 A — merged PR body 解析 Closes/Fixes/Resolves #xxx
         路径 B — GitHub Project items closingIssuesReferences
-        已有 task_issue_number 的 flow 跳过（不覆盖）。
+        已有 task role issue link 的 flow 跳过（不覆盖）。
+        不回填远端真源字段到本地 SQLite（GitHub-as-truth）。
         """
         logger.bind(domain="check", action="init_remote_index").info(
             "Building remote index (PR body + GitHub Project items)"

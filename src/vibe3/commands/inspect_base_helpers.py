@@ -9,6 +9,10 @@ from vibe3.config.loader import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.change_source import BranchSource
 from vibe3.services import dag_service
+from vibe3.services.change_scope_service import (
+    collect_changed_symbols,
+    count_changed_lines,
+)
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
 from vibe3.services.serena_service import SerenaService
 
@@ -22,15 +26,6 @@ def _code_paths() -> list[str]:
 
 def _is_code_file(filepath: str, code_paths: list[str]) -> bool:
     return any(filepath.startswith(path.rstrip("/")) for path in code_paths)
-
-
-def _is_test_file(filepath: str) -> bool:
-    return (
-        filepath.startswith(("tests/", "test_", "test/"))
-        or "/tests/" in filepath
-        or "/test/" in filepath
-        or filepath.endswith("_test.py")
-    )
 
 
 def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
@@ -65,24 +60,7 @@ def validate_base_branch(git_client: GitClient, base_branch: str) -> None:
 def count_changed_lines_in_code_paths(git: GitClient, source: BranchSource) -> int:
     """Count changed lines only in configured code paths."""
     code_paths = _code_paths()
-
-    changed_lines = 0
-    current_file = None
-
-    for line in git.get_diff(source).splitlines():
-        if line.startswith("diff --git "):
-            parts = line.split()
-            if len(parts) >= 4:
-                current_file = parts[2][2:]
-        elif current_file and _is_code_file(current_file, code_paths):
-            if (
-                line.startswith(("+", "-"))
-                and not line.startswith("+++")
-                and not line.startswith("---")
-            ):
-                changed_lines += 1
-
-    return changed_lines
+    return count_changed_lines(git.get_diff(source), code_paths=code_paths)
 
 
 def build_json_output(
@@ -104,17 +82,15 @@ def build_json_output(
     changed_symbols_by_file: dict[str, list[str]] = {}
     if existing_files:
         svc = SerenaService(git_client=git)
-        for file in existing_files:
-            if _is_test_file(file):
-                continue
-
-            if file.endswith(".py"):
-                try:
-                    changed_funcs = svc.get_changed_functions(file, source=source)
-                    if changed_funcs:
-                        changed_symbols_by_file[file] = changed_funcs
-                except Exception as e:
-                    logger.debug(f"Skipping: {e}")
+        changed_symbols_by_file, skipped_tests = collect_changed_symbols(
+            svc,
+            source,
+            existing_files,
+        )
+        if skipped_tests > 0:
+            logger.bind(skipped_test_files=skipped_tests).info(
+                "Skipped test files for AST analysis"
+            )
 
     has_critical = any(f["critical_path"] for f in core_files)
     has_public_api = any(f["public_api"] for f in core_files)

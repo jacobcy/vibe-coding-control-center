@@ -1,6 +1,6 @@
 """Tests for flow create decision behavior."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from vibe3.services.flow_service import FlowService
 
@@ -53,12 +53,16 @@ class TestFlowCreateDecision:
             "branch": "task/reviewing-flow",
             "flow_slug": "reviewing_flow",
             "flow_status": "active",
-            "pr_ready_for_review": 1,
             "updated_at": "2026-03-26T00:00:00",
         }
 
-        service = FlowService(store=mock_store)
-        decision = service.can_create_from_current_worktree("task/reviewing-flow")
+        # Mock GitHubClient to return a ready PR
+        with patch("vibe3.services.flow_create_decision.GitHubClient") as mock_gh_class:
+            mock_gh = mock_gh_class.return_value
+            mock_gh.get_pr.return_value = Mock(is_ready=True)
+
+            service = FlowService(store=mock_store)
+            decision = service.can_create_from_current_worktree("task/reviewing-flow")
 
         assert decision.allowed is True
         assert decision.start_ref == "origin/main"
