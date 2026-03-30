@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.models.flow import IssueLink
 from vibe3.models.project_item import ProjectItemError
 from vibe3.models.task_bridge import FieldSource, HydratedTaskView, HydrateError
 
@@ -21,14 +22,7 @@ def hydrate_task(
         )
 
     issue_links = self.store.get_issue_links(branch)
-    task_issue = None
-    for link in issue_links:
-        if link.get("issue_role") == "task":
-            task_issue = link.get("issue_number")
-            break
-
-    if task_issue is None:
-        task_issue = flow_data.get("task_issue_number")
+    task_issue = IssueLink.resolve_task_number(issue_links)
 
     project_item_id = flow_data.get("project_item_id")
     if not project_item_id:

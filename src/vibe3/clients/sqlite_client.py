@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_schema import init_schema
 
 
@@ -46,7 +47,7 @@ class SQLiteClient:
     def __init__(self, db_path: str | None = None) -> None:
         if db_path is None:
             # Use git common dir to ensure shared state across worktrees
-            git_dir = os.popen("git rev-parse --git-common-dir").read().strip()
+            git_dir = GitClient().get_git_common_dir()
             vibe3_dir = os.path.join(git_dir, "vibe3")
             os.makedirs(vibe3_dir, exist_ok=True)
             db_path = os.path.join(vibe3_dir, "handoff.db")
@@ -289,20 +290,6 @@ class SQLiteClient:
             row = cursor.fetchone()
             if row and row[0] is not None:
                 task_issue_number = int(row[0])
-            else:
-                # Backward compatibility: read legacy column only when it exists.
-                columns = {
-                    r[1]
-                    for r in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
-                }
-                if "task_issue_number" in columns:
-                    cursor.execute(
-                        "SELECT task_issue_number FROM flow_state WHERE branch = ?",
-                        (branch,),
-                    )
-                    legacy = cursor.fetchone()
-                    if legacy and legacy[0] is not None:
-                        task_issue_number = int(legacy[0])
 
         if task_issue_number is None:
             logger.bind(

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.task_bridge import HydrateError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.pr_service import PRService
@@ -61,32 +62,10 @@ class FlowProjection:
     hydrate_error: HydrateError | None = None
     pr_fetch_error: bool = False
 
-
-class FlowProjectionService:
-    """Unified projection service for reading flow data with remote facts."""
-
-    def __init__(
-        self,
-        flow_service: FlowService | None = None,
-        task_service: TaskService | None = None,
-        pr_service: PRService | None = None,
-        github_client: GitHubClient | None = None,
-    ) -> None:
-        self.flow_service = flow_service or FlowService()
-        self.task_service = task_service or TaskService()
-        self.pr_service = pr_service or PRService()
-        self.github_client = github_client or GitHubClient()
-
-    def get_projection(
-        self, branch: str, include_remote: bool = True
-    ) -> FlowProjection:
-        """Get unified flow projection combining local and remote data."""
-        # Get local flow state first
-        flow_status = self.flow_service.get_flow_status(branch)
-        if not flow_status:
-            raise ValueError(f"Flow not found for branch: {branch}")
-
-        projection = FlowProjection(
+    @classmethod
+    def from_flow_status(cls, flow_status: FlowStatusResponse) -> "FlowProjection":
+        """Build projection from hydrated flow status response."""
+        return cls(
             branch=flow_status.branch,
             flow_slug=flow_status.flow_slug,
             flow_status=flow_status.flow_status,
@@ -113,6 +92,33 @@ class FlowProjectionService:
             execution_started_at=flow_status.execution_started_at,
             execution_completed_at=flow_status.execution_completed_at,
         )
+
+
+class FlowProjectionService:
+    """Unified projection service for reading flow data with remote facts."""
+
+    def __init__(
+        self,
+        flow_service: FlowService | None = None,
+        task_service: TaskService | None = None,
+        pr_service: PRService | None = None,
+        github_client: GitHubClient | None = None,
+    ) -> None:
+        self.flow_service = flow_service or FlowService()
+        self.task_service = task_service or TaskService()
+        self.pr_service = pr_service or PRService()
+        self.github_client = github_client or GitHubClient()
+
+    def get_projection(
+        self, branch: str, include_remote: bool = True
+    ) -> FlowProjection:
+        """Get unified flow projection combining local and remote data."""
+        # Get local flow state first
+        flow_status = self.flow_service.get_flow_status(branch)
+        if not flow_status:
+            raise ValueError(f"Flow not found for branch: {branch}")
+
+        projection = FlowProjection.from_flow_status(flow_status)
 
         if not include_remote:
             return projection

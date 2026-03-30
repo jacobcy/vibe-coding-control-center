@@ -188,23 +188,16 @@ class HandoffService:
         logger.bind(path=str(handoff_path)).success("Appended handoff update")
         return handoff_path
 
-    def record_plan(
+    def _record_item(
         self,
-        plan_ref: str,
+        kind: str,
+        ref: str,
         next_step: str | None,
         blocked_by: str | None,
         actor: str | None,
         session_id: str | None = None,
     ) -> None:
-        """Record plan handoff.
-
-        Args:
-            plan_ref: Plan document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
+        """Helper to record a handoff item."""
         branch = self.git_client.get_current_branch()
         effective_actor = SignatureService.resolve_for_branch(
             self.store,
@@ -214,12 +207,25 @@ class HandoffService:
         record_handoff(
             self.store,
             self.git_client,
-            "plan",
-            plan_ref,
+            kind,
+            ref,
             next_step,
             blocked_by,
             effective_actor,
             session_id=session_id,
+        )
+
+    def record_plan(
+        self,
+        plan_ref: str,
+        next_step: str | None,
+        blocked_by: str | None,
+        actor: str | None,
+        session_id: str | None = None,
+    ) -> None:
+        """Record plan handoff."""
+        self._record_item(
+            "plan", plan_ref, next_step, blocked_by, actor, session_id=session_id
         )
 
     def record_report(
@@ -230,30 +236,9 @@ class HandoffService:
         actor: str | None,
         session_id: str | None = None,
     ) -> None:
-        """Record report handoff.
-
-        Args:
-            report_ref: Report document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
-        branch = self.git_client.get_current_branch()
-        effective_actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=actor,
-        )
-        record_handoff(
-            self.store,
-            self.git_client,
-            "report",
-            report_ref,
-            next_step,
-            blocked_by,
-            effective_actor,
-            session_id=session_id,
+        """Record report handoff."""
+        self._record_item(
+            "report", report_ref, next_step, blocked_by, actor, session_id=session_id
         )
 
     def record_audit(
@@ -264,30 +249,9 @@ class HandoffService:
         actor: str | None,
         session_id: str | None = None,
     ) -> None:
-        """Record audit handoff.
-
-        Args:
-            audit_ref: Audit document reference
-            next_step: Next step suggestion
-            blocked_by: Blocker description
-            actor: Actor identifier
-            session_id: Optional session ID from codeagent-wrapper
-        """
-        branch = self.git_client.get_current_branch()
-        effective_actor = SignatureService.resolve_for_branch(
-            self.store,
-            branch,
-            explicit_actor=actor,
-        )
-        record_handoff(
-            self.store,
-            self.git_client,
-            "audit",
-            audit_ref,
-            next_step,
-            blocked_by,
-            effective_actor,
-            session_id=session_id,
+        """Record audit handoff."""
+        self._record_item(
+            "audit", audit_ref, next_step, blocked_by, actor, session_id=session_id
         )
 
     def _get_handoff_template(self) -> str:
