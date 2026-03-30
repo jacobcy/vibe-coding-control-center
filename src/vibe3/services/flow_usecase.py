@@ -8,13 +8,13 @@ from vibe3.models.flow import CreateDecision, FlowStatusResponse, IssueLink
 from vibe3.services.base_resolution_usecase import BaseResolutionUsecase
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.issue_ref_utils import (
-    infer_task_issue_from_flow_name,
-    parse_issue_number,
-)
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.services.task_service import TaskService
+from vibe3.utils.issue_ref import (
+    infer_task_issue_from_flow_name,
+    parse_issue_number,
+)
 
 
 class FlowUsecaseError(RuntimeError):

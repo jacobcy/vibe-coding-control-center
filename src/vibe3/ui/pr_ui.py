@@ -1,8 +1,6 @@
 """PR UI components."""
 
-from rich.table import Table
-
-from vibe3.models.pr import PRResponse, ReviewResponse, VersionBumpResponse
+from vibe3.models.pr import PRResponse
 from vibe3.ui.console import console
 
 
@@ -77,47 +75,5 @@ def render_pr_ready(pr: PRResponse) -> None:
     console.print(f"[dim]{pr.url}[/]")
 
 
-def render_pr_merged(pr: PRResponse) -> None:
-    console.print(f"[green]✓[/] PR #{pr.number} merged successfully!")
-    console.print(f"[dim]Branch {pr.head_branch} has been deleted[/]")
-
-
-def render_version_bump(response: VersionBumpResponse) -> None:
-    console.print("\n[bold]Version Bump Calculation[/]")
-    console.print(f"\ncurrent  {response.current_version}")
-    console.print(f"bump     [yellow]{response.bump_type.value}[/]")
-    console.print(f"next     [green]{response.next_version}[/]")
-    console.print(f"\n[dim]{response.reason}[/]")
-
-
-def render_pr_list(prs: list[PRResponse]) -> None:
-    """Render list of PRs as a borderless table."""
-    table = Table(box=None, pad_edge=False, show_header=True, header_style="bold dim")
-    table.add_column("number", style="cyan", no_wrap=True)
-    table.add_column("title", style="white")
-    table.add_column("status", style="yellow")
-    table.add_column("branch", style="dim")
-
-    for pr in prs:
-        status = pr.state.value + (" (draft)" if pr.draft else "")
-        table.add_row(f"#{pr.number}", pr.title[:50], status, pr.head_branch)
-
-    console.print(table)
-
-
 def render_error(message: str) -> None:
     console.print(f"[red]✗[/] {message}")
-
-
-def render_warning(message: str) -> None:
-    console.print(f"[yellow]⚠[/] {message}")
-
-
-def render_pr_review(response: ReviewResponse) -> None:
-    console.print(f"[green]✓[/] Review completed for PR #{response.pr_number}")
-    if response.published:
-        console.print("[dim]Review published as a comment[/]")
-    else:
-        console.print("[dim]Review not published[/]")
-    console.print("\n[bold]Review Content:[/]\n")
-    console.print(response.review_body)

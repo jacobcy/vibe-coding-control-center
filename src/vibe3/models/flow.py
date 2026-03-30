@@ -92,6 +92,24 @@ class IssueLink(BaseModel):
             return "related"
         return v
 
+    @staticmethod
+    def resolve_task_number(
+        links: list["IssueLink"] | list[dict],
+    ) -> int | None:
+        """Resolve the primary task issue number from links.
+
+        Truth: any issue with 'task' role.
+        """
+        for link in links:
+            role = link.get("issue_role") if isinstance(link, dict) else link.issue_role
+            if role == "task":
+                return (
+                    link.get("issue_number")
+                    if isinstance(link, dict)
+                    else link.issue_number
+                )
+        return None
+
 
 class FlowEvent(BaseModel):
     id: int | None = None
@@ -138,6 +156,54 @@ class FlowStatusResponse(BaseModel):
     def migrate_flow_status(cls, v: str) -> str:
         """Migrate legacy flow status values for status responses."""
         return _migrate_flow_status_value(v)
+
+    @classmethod
+    def from_state(
+        cls,
+        state: FlowState | dict,
+        issues: list[IssueLink] | None = None,
+        pr_number: int | None = None,
+        pr_ready: bool | None = None,
+    ) -> "FlowStatusResponse":
+        """Build a hydrated response from state and links."""
+        data = state.model_dump() if isinstance(state, FlowState) else dict(state)
+        issues = issues or []
+
+        # Truth-only: resolve task issue number from links
+        resolved_task_issue_number = IssueLink.resolve_task_number(issues)
+
+        return cls(
+            branch=data["branch"],
+            flow_slug=data["flow_slug"],
+            flow_status=data.get("flow_status", "active"),
+            task_issue_number=resolved_task_issue_number,
+            pr_number=pr_number if pr_number is not None else data.get("pr_number"),
+            pr_ready_for_review=(
+                pr_ready
+                if pr_ready is not None
+                else bool(data.get("pr_ready_for_review"))
+            ),
+            spec_ref=data.get("spec_ref"),
+            plan_ref=data.get("plan_ref"),
+            report_ref=data.get("report_ref"),
+            audit_ref=data.get("audit_ref"),
+            planner_actor=data.get("planner_actor"),
+            planner_session_id=data.get("planner_session_id"),
+            executor_actor=data.get("executor_actor"),
+            executor_session_id=data.get("executor_session_id"),
+            reviewer_actor=data.get("reviewer_actor"),
+            reviewer_session_id=data.get("reviewer_session_id"),
+            latest_actor=data.get("latest_actor"),
+            blocked_by=data.get("blocked_by"),
+            next_step=data.get("next_step"),
+            issues=issues,
+            planner_status=data.get("planner_status"),
+            executor_status=data.get("executor_status"),
+            reviewer_status=data.get("reviewer_status"),
+            execution_pid=data.get("execution_pid"),
+            execution_started_at=data.get("execution_started_at"),
+            execution_completed_at=data.get("execution_completed_at"),
+        )
 
 
 class CreateDecision(BaseModel):

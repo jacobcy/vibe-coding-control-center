@@ -74,13 +74,13 @@ class FlowQueryMixin:
 
         # Fetch PR info from GitHub (truth)
         gh = GitHubClient()
-        pr_number = flow_data.get("pr_number")
-        pr_ready = flow_data.get("pr_ready_for_review", False)
+        pr_number_hint = flow_data.get("pr_number")
+        pr_number, pr_ready = pr_number_hint, bool(flow_data.get("pr_ready_for_review"))
 
         try:
             # Remote-first: if pr_number exists in local cache, use it as hint;
             # otherwise lookup by branch.
-            pr = gh.get_pr(pr_number, branch)
+            pr = gh.get_pr(pr_number_hint, branch)
             if pr:
                 pr_number = pr.number
                 pr_ready = pr.is_ready
@@ -92,43 +92,12 @@ class FlowQueryMixin:
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
 
-        # Resolve task_issue_number from issue links (truth-first, legacy fallback)
-        task_issue_number: int | None = None
-        for issue in issues:
-            if issue.issue_role == "task":
-                task_issue_number = issue.issue_number
-                break
-        if task_issue_number is None:
-            task_issue_number = flow_data.get("task_issue_number")
-
         try:
-            return FlowStatusResponse(
-                branch=flow_data["branch"],
-                flow_slug=flow_data["flow_slug"],
-                flow_status=flow_data["flow_status"],
-                task_issue_number=task_issue_number,
-                pr_number=pr_number,
-                pr_ready_for_review=pr_ready,
-                spec_ref=flow_data.get("spec_ref"),
-                plan_ref=flow_data.get("plan_ref"),
-                report_ref=flow_data.get("report_ref"),
-                audit_ref=flow_data.get("audit_ref"),
-                planner_actor=flow_data.get("planner_actor"),
-                planner_session_id=flow_data.get("planner_session_id"),
-                executor_actor=flow_data.get("executor_actor"),
-                executor_session_id=flow_data.get("executor_session_id"),
-                reviewer_actor=flow_data.get("reviewer_actor"),
-                reviewer_session_id=flow_data.get("reviewer_session_id"),
-                latest_actor=flow_data.get("latest_actor"),
-                blocked_by=flow_data.get("blocked_by"),
-                next_step=flow_data.get("next_step"),
+            return FlowStatusResponse.from_state(
+                flow_data,
                 issues=issues,
-                planner_status=flow_data.get("planner_status"),
-                executor_status=flow_data.get("executor_status"),
-                reviewer_status=flow_data.get("reviewer_status"),
-                execution_pid=flow_data.get("execution_pid"),
-                execution_started_at=flow_data.get("execution_started_at"),
-                execution_completed_at=flow_data.get("execution_completed_at"),
+                pr_number=pr_number,
+                pr_ready=pr_ready,
             )
         except ValidationError as exc:
             logger.bind(domain="flow", branch=branch).warning(
@@ -157,44 +126,8 @@ class FlowQueryMixin:
                 # Basic hydration: task_issue_number from issue_links (local truth)
                 issue_links = self.store.get_issue_links(branch)
                 issues = [IssueLink(**link) for link in issue_links]
-                task_issue_number: int | None = None
-                for issue in issues:
-                    if issue.issue_role == "task":
-                        task_issue_number = issue.issue_number
-                        break
-                if task_issue_number is None:
-                    task_issue_number = flow.get("task_issue_number")
 
-                flows.append(
-                    FlowStatusResponse(
-                        branch=flow["branch"],
-                        flow_slug=flow["flow_slug"],
-                        flow_status=flow["flow_status"],
-                        task_issue_number=task_issue_number,
-                        pr_number=flow.get("pr_number"),
-                        pr_ready_for_review=bool(flow.get("pr_ready_for_review")),
-                        spec_ref=flow.get("spec_ref"),
-                        plan_ref=flow.get("plan_ref"),
-                        report_ref=flow.get("report_ref"),
-                        audit_ref=flow.get("audit_ref"),
-                        planner_actor=flow.get("planner_actor"),
-                        planner_session_id=flow.get("planner_session_id"),
-                        executor_actor=flow.get("executor_actor"),
-                        executor_session_id=flow.get("executor_session_id"),
-                        reviewer_actor=flow.get("reviewer_actor"),
-                        reviewer_session_id=flow.get("reviewer_session_id"),
-                        latest_actor=flow.get("latest_actor"),
-                        blocked_by=flow.get("blocked_by"),
-                        next_step=flow.get("next_step"),
-                        issues=issues,
-                        planner_status=flow.get("planner_status"),
-                        executor_status=flow.get("executor_status"),
-                        reviewer_status=flow.get("reviewer_status"),
-                        execution_pid=flow.get("execution_pid"),
-                        execution_started_at=flow.get("execution_started_at"),
-                        execution_completed_at=flow.get("execution_completed_at"),
-                    )
-                )
+                flows.append(FlowStatusResponse.from_state(flow, issues=issues))
             except (ValidationError, KeyError) as exc:
                 logger.bind(
                     domain="flow",

@@ -122,6 +122,20 @@ def init_schema(conn: sqlite3.Connection) -> None:
         "UPDATE flow_issue_links SET issue_role = 'related' WHERE issue_role = 'repo'"
     )
 
+    # Migration: Backfill task_issue_number to flow_issue_links if legacy column exists
+    if "task_issue_number" in existing:
+        cursor.execute("""
+            INSERT OR IGNORE INTO flow_issue_links
+                (branch, issue_number, issue_role, created_at)
+            SELECT branch, task_issue_number, 'task', datetime('now')
+            FROM flow_state
+            WHERE task_issue_number IS NOT NULL
+            """)
+
+        logger.bind(external="sqlite", operation="migration").info(
+            "Backfilled task_issue_number from flow_state to flow_issue_links"
+        )
+
     cursor.execute(
         "INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', 'v3')"
     )

@@ -47,9 +47,7 @@ from vibe3.clients.git_status_ops import (
     stash_push as _stash_push,
 )
 from vibe3.clients.git_worktree_ops import (
-    _is_worktree_clean,
     _parse_worktree_list,
-    _remove_worktree,
 )
 from vibe3.clients.git_worktree_ops import (
     find_worktree_path_for_branch as _find_worktree_path_for_branch,
@@ -174,26 +172,6 @@ class GitClient:
         """
         output = self._run(["worktree", "list", "--porcelain"])
         return _parse_worktree_list(output)
-
-    def is_worktree_clean(self, wt_path: Path) -> bool:
-        """Check if a worktree has no uncommitted changes.
-
-        Args:
-            wt_path: Path to the worktree
-
-        Returns:
-            True if clean, False if dirty or on error
-        """
-        return _is_worktree_clean(wt_path)
-
-    def remove_worktree(self, wt_path: Path, force: bool = False) -> None:
-        """Remove a worktree.
-
-        Args:
-            wt_path: Path to the worktree
-            force: Force removal even if dirty
-        """
-        _remove_worktree(wt_path, force=force)
 
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""

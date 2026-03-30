@@ -6,6 +6,7 @@ from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.exceptions import GitError, UserError
+from vibe3.models.flow import IssueLink
 from vibe3.models.pr import PRMetadata
 
 
@@ -39,13 +40,8 @@ def get_metadata_from_flow(store: SQLiteClient, branch: str) -> PRMetadata | Non
         links = store.get_issue_links(branch)
     except Exception:
         links = []
-    for link in links:
-        if link.get("issue_role") == "task":
-            metadata.task_issue = link.get("issue_number")
-            break
 
-    if metadata.task_issue is None:
-        metadata.task_issue = flow_data.get("task_issue_number")
+    metadata.task_issue = IssueLink.resolve_task_number(links)
 
     logger.bind(
         branch=branch,
