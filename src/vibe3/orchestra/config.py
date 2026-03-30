@@ -78,6 +78,43 @@ class MasterAgentConfig(BaseModel):
         )
 
 
+class CircuitBreakerConfig(BaseModel):
+    """Configuration for dispatch-level circuit breaker."""
+
+    enabled: bool = True
+    failure_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive failures to trigger OPEN",
+    )
+    cooldown_seconds: int = Field(
+        default=300,
+        ge=60,
+        description="Duration of OPEN state",
+    )
+    half_open_max_tests: int = Field(
+        default=1, ge=1, description="Test requests allowed in HALF_OPEN"
+    )
+
+
+class GovernanceConfig(BaseModel):
+    """Configuration for periodic governance scan service."""
+
+    enabled: bool = True
+    skill: str = Field(
+        default="vibe-orchestra",
+        description="Governance skill to execute via vibe3 run --plan",
+    )
+    dry_run: bool = False
+    interval_ticks: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Run governance scan every N heartbeat ticks (~1h at default interval)"
+        ),
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
@@ -102,6 +139,8 @@ class OrchestraConfig(BaseModel):
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
     )
+    circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
+    governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -114,6 +153,37 @@ class OrchestraConfig(BaseModel):
         repo = src.repo
         if isinstance(repo, str):
             repo = repo.strip() or None
+
+        # Build circuit_breaker config with defaults
+        circuit_breaker_config = CircuitBreakerConfig()
+        if hasattr(src, "circuit_breaker") and src.circuit_breaker:
+            cb = src.circuit_breaker
+            circuit_breaker_config = CircuitBreakerConfig(
+                enabled=getattr(cb, "enabled", True),
+                failure_threshold=getattr(cb, "failure_threshold", 3),
+                cooldown_seconds=getattr(cb, "cooldown_seconds", 300),
+                half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
+            )
+
+        governance_defaults: dict[str, bool | str | int] = {
+            "enabled": True,
+            "skill": "vibe-orchestra",
+            "dry_run": False,
+            "interval_ticks": 4,
+        }
+        governance_src = getattr(src, "governance", None)
+        if governance_src is not None:
+            if isinstance(governance_src, dict):
+                governance_defaults.update(governance_src)
+            else:
+                governance_defaults.update(
+                    {
+                        "enabled": getattr(governance_src, "enabled", True),
+                        "skill": getattr(governance_src, "skill", "vibe-orchestra"),
+                        "dry_run": getattr(governance_src, "dry_run", False),
+                        "interval_ticks": getattr(governance_src, "interval_ticks", 4),
+                    }
+                )
 
         return cls(
             enabled=src.enabled,
@@ -143,4 +213,6 @@ class OrchestraConfig(BaseModel):
                 async_mode=src.pr_review_dispatch.async_mode,
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
+            circuit_breaker=circuit_breaker_config,
+            governance=GovernanceConfig.model_validate(governance_defaults),
         )

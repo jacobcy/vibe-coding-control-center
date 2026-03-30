@@ -17,6 +17,7 @@ from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
+from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.status_service import (
     OrchestraSnapshot,
@@ -40,10 +41,12 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     )
 
     # Status service for HTTP endpoint and CLI
+    # Pass circuit_breaker from dispatcher for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
         orchestrator=shared_orchestrator,
+        circuit_breaker=shared_dispatcher._circuit_breaker,
     )
 
     if config.assignee_dispatch.enabled:
@@ -66,6 +69,16 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         heartbeat.register(
             PRReviewDispatchService(
                 config,
+                dispatcher=shared_dispatcher,
+                executor=shared_executor,
+            )
+        )
+
+    if config.governance.enabled:
+        heartbeat.register(
+            GovernanceService(
+                config,
+                status_service=status_service,
                 dispatcher=shared_dispatcher,
                 executor=shared_executor,
             )

@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from vibe3.orchestra.config import (
     AssigneeDispatchConfig,
     CommentReplyConfig,
+    GovernanceConfig,
     OrchestraConfig,
     PRReviewDispatchConfig,
 )
@@ -30,7 +31,18 @@ def test_build_server_registers_only_enabled_services() -> None:
         pr_review_dispatch=PRReviewDispatchConfig(enabled=True),
     )
     heartbeat, _ = _build_server(cfg)
-    assert heartbeat.service_names == ["PRReviewDispatchService"]
+    assert heartbeat.service_names == ["PRReviewDispatchService", "GovernanceService"]
+
+
+def test_build_server_governance_disabled() -> None:
+    cfg = OrchestraConfig(
+        assignee_dispatch=AssigneeDispatchConfig(enabled=False),
+        comment_reply=CommentReplyConfig(enabled=False),
+        pr_review_dispatch=PRReviewDispatchConfig(enabled=False),
+        governance=GovernanceConfig(enabled=False),
+    )
+    heartbeat, _ = _build_server(cfg)
+    assert heartbeat.service_names == []
 
 
 def test_start_exits_when_orchestra_disabled(monkeypatch) -> None:

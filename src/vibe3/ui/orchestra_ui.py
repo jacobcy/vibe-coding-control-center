@@ -66,7 +66,15 @@ def _format_snapshot(snapshot: OrchestraSnapshot) -> str:
             "",
             f"Flows: {snapshot.active_flows} active",
             f"Worktrees: {snapshot.active_worktrees} total",
+            f"Circuit breaker: {snapshot.circuit_breaker_state} "
+            f"(failures={snapshot.circuit_breaker_failures})",
         ]
     )
+
+    if snapshot.circuit_breaker_last_failure:
+        last_ts = datetime.fromtimestamp(
+            snapshot.circuit_breaker_last_failure
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        lines.append(f"Last breaker failure: {last_ts}")
 
     return "\n".join(lines)
