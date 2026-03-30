@@ -159,3 +159,44 @@ class TestDispatcherReviewWorktreeResolution:
         mock_resolve.assert_not_called()
         assert "--worktree" in cmd
         assert cwd == Path("/tmp/repo")
+
+
+class TestDispatcherSkillDispatch:
+    def test_dispatch_skill_builds_correct_command(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+
+        with patch.object(dispatcher, "_run_command", return_value=True) as mock_run:
+            result = dispatcher.dispatch_skill("vibe-orchestra")
+
+        assert result is True
+        mock_run.assert_called_once()
+        cmd = mock_run.call_args[0][0]
+        assert cmd == [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "run",
+            "--skill",
+            "vibe-orchestra",
+            "--async",
+        ]
+
+    def test_dispatch_skill_dry_run_skips_execution(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, dry_run=True, repo_path=Path("/tmp/repo"))
+
+        result = dispatcher.dispatch_skill("vibe-orchestra")
+
+        assert result is True
+
+    def test_dispatch_skill_returns_false_on_failure(self):
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+
+        with patch.object(dispatcher, "_run_command", return_value=False):
+            result = dispatcher.dispatch_skill("vibe-orchestra")
+
+        assert result is False

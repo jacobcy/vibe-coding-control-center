@@ -60,6 +60,18 @@ class PRReviewDispatchConfig(BaseModel):
     use_worktree: bool = False
 
 
+class OrchestraSkillConfig(BaseModel):
+    """Orchestra skill periodic execution settings."""
+
+    enabled: bool = True
+    skill_name: str = "vibe-orchestra"
+    timeout_seconds: int = Field(
+        default=300,
+        ge=30,
+        description="Timeout for skill execution",
+    )
+
+
 class MasterAgentConfig(BaseModel):
     """Master agent configuration."""
 
@@ -102,6 +114,7 @@ class OrchestraConfig(BaseModel):
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
     )
+    orchestra_skill: OrchestraSkillConfig = Field(default_factory=OrchestraSkillConfig)
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -142,5 +155,10 @@ class OrchestraConfig(BaseModel):
                 enabled=src.pr_review_dispatch.enabled,
                 async_mode=src.pr_review_dispatch.async_mode,
                 use_worktree=src.pr_review_dispatch.use_worktree,
+            ),
+            orchestra_skill=OrchestraSkillConfig(
+                enabled=src.orchestra_skill.enabled,
+                skill_name=src.orchestra_skill.skill_name,
+                timeout_seconds=src.orchestra_skill.timeout_seconds,
             ),
         )

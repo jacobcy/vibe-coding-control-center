@@ -222,6 +222,14 @@ class OrchestraPRReviewDispatchSettings(BaseModel):
     use_worktree: bool = False
 
 
+class OrchestraSkillSettings(BaseModel):
+    """Orchestra skill periodic execution settings."""
+
+    enabled: bool = True
+    skill_name: str = "vibe-orchestra"
+    timeout_seconds: int = 300
+
+
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
@@ -243,6 +251,9 @@ class OrchestraSettings(BaseModel):
         default_factory=OrchestraPRReviewDispatchSettings
     )
     master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
+    orchestra_skill: OrchestraSkillSettings = Field(
+        default_factory=OrchestraSkillSettings
+    )
 
 
 class VibeConfig(BaseModel):

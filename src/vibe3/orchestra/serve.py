@@ -23,6 +23,7 @@ from vibe3.orchestra.serve_utils import (
 )
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
+from vibe3.orchestra.services.orchestra_skill_service import OrchestraSkillService
 from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.webhook_handler import make_webhook_router
 
@@ -68,6 +69,13 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
                 config,
                 dispatcher=shared_dispatcher,
                 executor=shared_executor,
+            )
+        )
+    if config.orchestra_skill.enabled:
+        heartbeat.register(
+            OrchestraSkillService(
+                config,
+                dispatcher=shared_dispatcher,
             )
         )
 

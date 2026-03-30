@@ -10,6 +10,7 @@ from vibe3.orchestra.config import (
     AssigneeDispatchConfig,
     CommentReplyConfig,
     OrchestraConfig,
+    OrchestraSkillConfig,
     PRReviewDispatchConfig,
 )
 from vibe3.orchestra.serve import (
@@ -28,6 +29,7 @@ def test_build_server_registers_only_enabled_services() -> None:
         assignee_dispatch=AssigneeDispatchConfig(enabled=False),
         comment_reply=CommentReplyConfig(enabled=False),
         pr_review_dispatch=PRReviewDispatchConfig(enabled=True),
+        orchestra_skill=OrchestraSkillConfig(enabled=False),
     )
     heartbeat, _ = _build_server(cfg)
     assert heartbeat.service_names == ["PRReviewDispatchService"]
@@ -133,9 +135,7 @@ def test_start_help_mentions_config_port_and_current_repo_defaults() -> None:
     assert "current repository" in result.stdout.lower()
 
 
-def test_validate_pid_file_handles_read_errors(
-    tmp_path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+def test_validate_pid_file_handles_read_errors(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     pid_file = tmp_path / "orchestra.pid"
     pid_file.write_text("123")
 

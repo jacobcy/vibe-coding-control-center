@@ -83,7 +83,7 @@ class Dispatcher(WorktreeResolverMixin):
         flow_branch = str(flow.get("branch") or "").strip()
         if not flow_branch:
             log.error(
-                "Cannot dispatch manager: flow branch missing " f"for #{issue.number}"
+                f"Cannot dispatch manager: flow branch missing for #{issue.number}"
             )
             return False
 
@@ -123,6 +123,33 @@ class Dispatcher(WorktreeResolverMixin):
             return True
 
         return self._run_command(cmd, review_cwd, "Review execution")
+
+    def dispatch_skill(self, skill_name: str) -> bool:
+        """Dispatch orchestra skill execution for periodic triage."""
+        log = logger.bind(
+            domain="orchestra",
+            action="skill_dispatch",
+            skill=skill_name,
+        )
+
+        cmd = [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "run",
+            "--skill",
+            skill_name,
+            "--async",
+        ]
+        log.info(f"Dispatching skill: {skill_name}")
+
+        if self.dry_run:
+            log.info(f"Dry run: {' '.join(cmd)}")
+            return True
+
+        return self._run_command(cmd, self.repo_path, f"Skill execution ({skill_name})")
 
     def build_manager_command(self, issue: IssueInfo) -> list[str]:
         """Build executable manager command for an issue."""
