@@ -9,7 +9,6 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check_service import CheckService
 
 
@@ -65,27 +64,16 @@ class TestAutoFixBranch:
 
         assert result.success
 
-    def test_auto_fix_branch_backfills_pr_number(
-        self, check_service, mock_github_client, mock_store
+    def test_auto_fix_branch_unknown_issue_is_unfixable(
+        self, check_service, mock_github_client
     ):
-        """auto_fix_branch backfills pr_number for the specified branch."""
-        mock_github_client.list_prs_for_branch.return_value = [
-            PRResponse(
-                number=789,
-                title="Test",
-                body="",
-                state=PRState.OPEN,
-                head_branch="feature/other-branch",
-                base_branch="main",
-                url="https://github.com/test/pr/789",
-                draft=False,
-            )
-        ]
+        """auto_fix_branch reports failure for unrecognised issue strings."""
+        # "database missing pr_number" is no longer emitted by _check_branch
+        # (GitHub-as-truth: PR state is fetched live, not cached locally).
+        # Passing it to auto_fix should return success=False cleanly.
         result = check_service.auto_fix_branch(
             "feature/other-branch",
             ["Branch has open PR #789 but database missing pr_number"],
         )
-        assert result.success
-        mock_github_client.list_prs_for_branch.assert_called_with(
-            "feature/other-branch"
-        )
+        assert not result.success
+        mock_github_client.list_prs_for_branch.assert_not_called()

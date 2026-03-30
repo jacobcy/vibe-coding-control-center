@@ -27,6 +27,11 @@ from vibe3.models.change_source import (
     UncommittedSource,
 )
 from vibe3.services import dag_service
+from vibe3.services.change_scope_service import (
+    classify_changed_files,
+    collect_changed_symbols,
+    count_changed_lines,
+)
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
 from vibe3.services.serena_service import SerenaService
 
@@ -91,8 +96,9 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         all_changed_files = impact.get("changed_files", [])
         assert isinstance(all_changed_files, list)
 
-        changed_files = [f for f in all_changed_files if Path(f).exists()]
-        skipped_count = len(all_changed_files) - len(changed_files)
+        scope = classify_changed_files(all_changed_files)
+        changed_files = scope.existing_files
+        skipped_count = len(scope.deleted_files)
 
         if skipped_count > 0:
             log.bind(
@@ -104,30 +110,14 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
             )
 
         if skipped_count > 0:
-            impact["skipped_files"] = [
-                f for f in all_changed_files if not Path(f).exists()
-            ]
+            impact["skipped_files"] = scope.deleted_files
 
-        changed_symbols_by_file: dict[str, list[str]] = {}
-        skipped_tests = 0
-
-        for file in changed_files:
-            is_test = (
-                file.startswith("tests/")
-                or file.startswith("test/")
-                or "/tests/" in file
-                or "/test/" in file
-                or file.startswith("test_")
-                or file.endswith("_test.py")
-            )
-            if is_test:
-                skipped_tests += 1
-                continue
-
-            if file.endswith(".py"):
-                changed_funcs = svc.get_changed_functions(file, source=source)
-                if changed_funcs:
-                    changed_symbols_by_file[file] = changed_funcs
+        changed_symbols_by_file, skipped_tests = collect_changed_symbols(
+            svc,
+            source,
+            changed_files,
+            fail_fast=True,
+        )
 
         if skipped_tests > 0:
             log.bind(skipped_test_files=skipped_tests).info(
@@ -140,13 +130,7 @@ def build_change_analysis(source_type: str, identifier: str) -> dict[str, object
         ).info("Extracted changed symbols from diff")
 
         dag = dag_service.expand_impacted_modules(changed_files)
-        changed_lines = sum(
-            1
-            for line in git_client.get_diff(source).splitlines()
-            if (line.startswith("+") or line.startswith("-"))
-            and not line.startswith("+++")
-            and not line.startswith("---")
-        )
+        changed_lines = count_changed_lines(git_client.get_diff(source))
         if untracked_files:
             for file in changed_files:
                 if file not in untracked_files:

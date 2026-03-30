@@ -39,7 +39,17 @@ class TaskBridgeModel(BaseModel):
     # --- Truth 字段标记（ClassVar，不参与序列化/持久化）---
     # 这些字段只能从 GitHub Project 实时读取，禁止写入本地 SQLite
     TRUTH_FIELDS: ClassVar[frozenset[str]] = frozenset(
-        {"title", "body", "status", "priority", "milestone", "assignees"}
+        {
+            "title",
+            "body",
+            "status",
+            "priority",
+            "milestone",
+            "assignees",
+            "pr_number",
+            "pr_ready_for_review",
+            "task_issue_number",
+        }
     )
 
     @classmethod

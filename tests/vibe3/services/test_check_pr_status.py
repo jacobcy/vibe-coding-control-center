@@ -25,7 +25,6 @@ class TestPRStatusDetection:
         store.update_flow_state(
             "task/my-feature",
             flow_slug="my_feature",
-            pr_number=42,
             flow_status="active",
         )
 
@@ -46,8 +45,11 @@ class TestPRStatusDetection:
             base_branch="main",
             url="https://github.com/test/pr/42",
             merged_at="2026-03-25T00:00:00Z",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
         )
-        github_client.get_pr.return_value = merged_pr
+        github_client.list_prs_for_branch.return_value = [merged_pr]
 
         # Create handoff file to avoid missing file warning
         from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -73,7 +75,6 @@ class TestPRStatusDetection:
         store.update_flow_state(
             "task/my-feature",
             flow_slug="my_feature",
-            pr_number=42,
             flow_status="active",
         )
 
@@ -93,8 +94,11 @@ class TestPRStatusDetection:
             head_branch="task/my-feature",
             base_branch="main",
             url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
         )
-        github_client.get_pr.return_value = closed_pr
+        github_client.list_prs_for_branch.return_value = [closed_pr]
 
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir
@@ -120,7 +124,6 @@ class TestPRStatusDetection:
         store.update_flow_state(
             "task/my-feature",
             flow_slug="my_feature",
-            pr_number=42,
             flow_status="active",
         )
 
@@ -140,8 +143,11 @@ class TestPRStatusDetection:
             head_branch="task/my-feature",
             base_branch="main",
             url="https://github.com/test/pr/42",
+            draft=False,
+            is_ready=True,
+            ci_passed=True,
         )
-        github_client.get_pr.return_value = open_pr
+        github_client.list_prs_for_branch.return_value = [open_pr]
 
         # Create handoff file
         from vibe3.utils.git_helpers import get_branch_handoff_dir
