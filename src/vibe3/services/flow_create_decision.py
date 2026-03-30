@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import CreateDecision
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 
@@ -26,8 +27,6 @@ def decide_create_from_current_worktree(
     status = flow_data.get("flow_status", "active")
 
     # Fetch real-time PR readiness from GitHub
-    from vibe3.clients.github_client import GitHubClient
-
     gh = GitHubClient()
     is_waiting_review = False
     pr_number = flow_data.get("pr_number")

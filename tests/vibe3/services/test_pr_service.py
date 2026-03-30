@@ -93,8 +93,6 @@ def test_create_draft_pr_success(
                 assert mock_store.get_flow_state.call_count == 2
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
-                    pr_number=123,
-                    pr_ready_for_review=False,
                     latest_actor="workflow",
                 )
                 mock_store.add_event.assert_called_once_with(
@@ -159,8 +157,6 @@ def test_create_draft_pr_duplicate_branch_pr(
                 mock_github_client.get_pr.assert_called_once_with(321)
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
-                    pr_number=321,
-                    pr_ready_for_review=False,
                     latest_actor="workflow",
                 )
 
@@ -218,8 +214,6 @@ def test_mark_ready_success(
                 no_conflict_git.fetch.assert_called_once_with("origin", "main")
                 mock_store.update_flow_state.assert_called_once_with(
                     "feature-branch",
-                    pr_number=123,
-                    pr_ready_for_review=True,
                     latest_actor="workflow",
                 )
                 mock_store.add_event.assert_called_once_with(
@@ -258,8 +252,6 @@ def test_mark_ready_already_ready_syncs_state(
     mock_github_client.mark_ready.assert_not_called()
     mock_store.update_flow_state.assert_called_once_with(
         "feature-branch",
-        pr_number=123,
-        pr_ready_for_review=True,
         latest_actor="workflow",
     )
     mock_store.add_event.assert_not_called()

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal
 from loguru import logger
 from pydantic import ValidationError
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowEvent, FlowState, FlowStatusResponse, IssueLink
 from vibe3.services.signature_service import SignatureService
 
@@ -72,8 +73,6 @@ class FlowQueryMixin:
             return None
 
         # Fetch PR info from GitHub (truth)
-        from vibe3.clients.github_client import GitHubClient
-
         gh = GitHubClient()
         pr_number = flow_data.get("pr_number")
         pr_ready = flow_data.get("pr_ready_for_review", False)
