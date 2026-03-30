@@ -64,7 +64,8 @@ class TestIssueLinking:
         assert result.issue_number == 102
         assert result.issue_role == "task"
 
-        # Verify store calls - task role should update latest actor only
+        # Verify store calls - task role updates latest_actor only.
+        # It no longer writes task_issue_number into flow_state.
         mock_store_for_task.add_issue_link.assert_called_once_with(
             "test-branch", 102, "task"
         )

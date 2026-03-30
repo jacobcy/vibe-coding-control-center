@@ -55,6 +55,8 @@ class TaskService(TaskBridgeMixin, FlowQueryMixin):
         self.store.add_issue_link(branch, issue_number, role)
 
         if role == "task":
+            # task_issue_number is no longer stored in flow_state.
+            # We only update latest_actor to track activity.
             self.store.update_flow_state(
                 branch,
                 latest_actor=effective_actor,

@@ -290,13 +290,19 @@ class SQLiteClient:
             if row and row[0] is not None:
                 task_issue_number = int(row[0])
             else:
-                cursor.execute(
-                    "SELECT task_issue_number FROM flow_state WHERE branch = ?",
-                    (branch,),
-                )
-                legacy = cursor.fetchone()
-                if legacy and legacy[0] is not None:
-                    task_issue_number = int(legacy[0])
+                # Backward compatibility: read legacy column only when it exists.
+                columns = {
+                    r[1]
+                    for r in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
+                }
+                if "task_issue_number" in columns:
+                    cursor.execute(
+                        "SELECT task_issue_number FROM flow_state WHERE branch = ?",
+                        (branch,),
+                    )
+                    legacy = cursor.fetchone()
+                    if legacy and legacy[0] is not None:
+                        task_issue_number = int(legacy[0])
 
         if task_issue_number is None:
             logger.bind(

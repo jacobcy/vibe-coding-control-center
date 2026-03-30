@@ -181,10 +181,8 @@ def test_create_flow_supports_multiple_task_refs() -> None:
 
     assert task_service.link_issue.call_args_list[0].args == ("task/demo", 281, "task")
     assert task_service.link_issue.call_args_list[1].args == ("task/demo", 282, "task")
-    flow_service.store.update_flow_state.assert_called_once_with(
-        "task/demo",
-        task_issue_number=281,
-    )
+    # update_flow_state is NOT called for task_issue_number anymore
+    flow_service.store.update_flow_state.assert_not_called()
     flow_service.bind_spec.assert_called_once_with(
         "task/demo",
         "#281:Primary task",
