@@ -70,14 +70,12 @@ class Dispatcher(WorktreeResolverMixin):
                     f"{label} failed: {result.stderr}"
                 )
                 # Record failure for circuit breaker
+                category = classify_failure(
+                    result.returncode, result.stderr or "", timed_out=False
+                )
+                self._last_error_category = category
                 if self._circuit_breaker:
-                    category = classify_failure(
-                        result.returncode, result.stderr or "", timed_out=False
-                    )
-                    self._last_error_category = category
                     self._circuit_breaker.record_failure(category)
-                else:
-                    self._last_error_category = "business_error"
                 return False
             logger.bind(domain="orchestra").info(f"{label} completed successfully")
             # Record success for circuit breaker
@@ -86,25 +84,21 @@ class Dispatcher(WorktreeResolverMixin):
             return True
         except subprocess.TimeoutExpired:
             logger.bind(domain="orchestra").error(f"{label} timed out")
+            category = classify_failure(
+                returncode=1, stderr="timeout", timed_out=True
+            )
+            self._last_error_category = category
             if self._circuit_breaker:
-                category = classify_failure(
-                    returncode=1, stderr="timeout", timed_out=True
-                )
-                self._last_error_category = category
                 self._circuit_breaker.record_failure(category)
-            else:
-                self._last_error_category = "timeout"
             return False
         except Exception as e:
             logger.bind(domain="orchestra").error(f"{label} error: {e}")
+            category = classify_failure(
+                returncode=1, stderr=str(e), timed_out=False
+            )
+            self._last_error_category = category
             if self._circuit_breaker:
-                category = classify_failure(
-                    returncode=1, stderr=str(e), timed_out=False
-                )
-                self._last_error_category = category
                 self._circuit_breaker.record_failure(category)
-            else:
-                self._last_error_category = "api_error"
             return False
 
     def run_governance_command(self, cmd: list[str], label: str) -> bool:
