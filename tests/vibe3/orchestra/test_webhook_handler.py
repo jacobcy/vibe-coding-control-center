@@ -106,9 +106,9 @@ def test_health_endpoint() -> None:
     assert "status" in resp.json()
 
 
-def test_status_endpoint() -> None:
+def test_heartbeat_endpoint() -> None:
     client, _ = _make_app()
-    resp = client.get("/status")
+    resp = client.get("/heartbeat")
     assert resp.status_code == 200
     data = resp.json()
     assert "running" in data
