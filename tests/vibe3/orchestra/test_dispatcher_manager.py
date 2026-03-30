@@ -174,6 +174,8 @@ class TestManagerDispatchIntegration:
                             result = dispatcher.dispatch_manager(issue)
 
         assert result is True
-        # Check that subprocess.run was called with correct cwd
-        call_args = mock_run.call_args
-        assert call_args[1].get("cwd") == Path("/tmp/wt-issue-102")
+        # Check that subprocess.run was called with the correct cwd at some point
+        # (other calls may follow, e.g. git rev-parse from SQLiteClient)
+        cwd_calls = [c for c in mock_run.call_args_list if c[1].get("cwd") is not None]
+        assert len(cwd_calls) == 1
+        assert cwd_calls[0][1]["cwd"] == Path("/tmp/wt-issue-102")
