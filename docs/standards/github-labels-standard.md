@@ -1,20 +1,25 @@
 # GitHub 标签标准
 
 **维护者**: Vibe Team
-**最后更新**: 2026-03-27
+**最后更新**: 2026-03-30
 **状态**: Active
+**文档类型**: 标准规范
 
 ---
 
 ## 1. 目标
 
-这份标准定义 GitHub labels 在 V3 中承担的职责。
+本文档定义 GitHub labels 的**语义标准**和**真源规则**。
 
-目标不是“给 issue 多打几个标签”，而是建立三层清晰语义：
+**本文档回答的问题**:
+- 标签的语义是什么？（为什么用）
+- 标签的真源边界是什么？（何时用）
+- 标签的状态机规则是什么？（怎么用才对）
 
-1. 分类标签：说明这是什么工作
-2. 关系镜像标签：说明这个 issue 是否是执行项
-3. 编排状态标签：说明当前处于 flow 循环的哪一阶段
+**本文档不回答的问题**:
+- 有哪些标签？→ 见 [github-labels-reference.md](github-labels-reference.md)
+- 如何用标签管理 roadmap？→ 见 [roadmap-label-management.md](roadmap-label-management.md)
+- 具体命令怎么用？→ 见 [vibe3-user-guide.md](vibe3-user-guide.md)
 
 ---
 
@@ -22,139 +27,146 @@
 
 ### 2.1 真源分层
 
-- GitHub issue：任务身份真源
-- SQLite `flow_issue_links.issue_role`：issue 与 flow 的关系真源
-- GitHub `state/*` labels：编排状态真源
-- GitHub `vibe-task`：关系镜像标签，不是真源
-- GitHub Project：UI，不是真源
+| 层级 | 真源 | 说明 |
+|------|------|------|
+| GitHub issue | 任务身份真源 | 所有工作项都是 GitHub issue |
+| SQLite `flow_issue_links.issue_role` | issue 与 flow 的关系真源 | 本地存储，离线可用 |
+| GitHub `state/*` labels | 编排状态真源 | 多 agent 协作状态 |
+| GitHub `roadmap/*` labels | 路线图规划真源 | 迭代规划状态 |
+| GitHub `priority/*` labels | 优先级真源 | 紧急度排序 |
+| GitHub `vibe-task` | 关系镜像标签 | 不是真源，是镜像 |
+| GitHub Project | UI 展示 | 不是真源 |
 
 ### 2.2 基本原则
 
-1. 标签可以镜像真源，但不能反向改义。
-2. `task/related/dependency` 是关系，不是状态。
-3. `state/*` 是状态，不是类型。
-4. 不允许再引入 `repo` 旧语义。
+1. **标签可以镜像真源，但不能反向改义**
+2. **`task/related/dependency` 是关系，不是状态**
+3. **`state/*` 是状态，不是类型**
+4. **`roadmap/*` 是规划，不是执行状态**
+5. **`priority/*` 是紧急度，不是规划**
+6. 不允许再引入 `repo` 旧语义
 
 ---
 
-## 3. 标签分层
+## 3. 标签语义标准
 
-### 3.1 分类标签
+### 3.1 标签分类语义
 
-分类标签用于描述工作属性，不参与状态机裁定。
+#### 类型标签 (type/*)
 
-### 类型标签
+**语义**: 说明"这是什么工作"
 
-| 标签名称 | 描述 |
-|---------|------|
-| `type/feature` | 新功能 |
-| `type/fix` | Bug 修复 |
-| `type/refactor` | 重构 |
-| `type/docs` | 文档 |
-| `type/test` | 测试 |
-| `type/chore` | 杂项 |
-| `type/task` | 综合型任务 |
+**使用原则**:
+- 每个 issue 应该有且只有一个 `type/*` 标签
+- 用于分类和统计
+- 不参与状态机裁定
 
-### 优先级标签
+#### 优先级标签 (priority/*)
 
-| 标签名称 | 描述 |
-|---------|------|
-| `priority/high` | 高优先级 |
-| `priority/medium` | 中优先级 |
-| `priority/low` | 低优先级 |
+**语义**: 说明"多紧急"
 
-### 范围标签
+**使用原则**:
+- 每个 issue 应该有一个 `priority/*` 标签
+- `priority/high` = 核心功能、关键 bug 修复
+- `priority/medium` = 重要但非紧急的功能
+- `priority/low` = 优化、改进等非关键任务
+- 优先级与 roadmap 状态独立
 
-| 标签名称 | 描述 |
-|---------|------|
-| `scope/python` | Python 改动 |
-| `scope/shell` | Shell 改动 |
-| `scope/documentation` | 文档改动 |
-| `scope/infrastructure` | 基础设施 |
-| `scope/skill` | Skill 改动 |
-| `scope/supervisor` | agent/workflow/rules 改动 |
+#### 范围标签 (scope/*)
 
-### 组件标签
+**语义**: 说明"影响范围"
 
-| 标签名称 | 描述 |
-|---------|------|
-| `component/cli` | CLI 入口 |
-| `component/flow` | Flow 相关 |
-| `component/task` | Task 相关 |
-| `component/pr` | PR 相关 |
-| `component/client` | Client 层 |
-| `component/config` | 配置层 |
+**使用原则**:
+- 可选标签
+- 用于过滤和分类
+- 可以有多个
 
-### 路线图标签
+#### 组件标签 (component/*)
 
-路线图标签用于规划迭代和优先级，是 issue 路线图真源。
+**语义**: 说明"涉及哪个组件"
 
-| 标签名称 | 描述 |
-|---------|------|
-| `roadmap/p0` | 当前迭代必须完成 |
-| `roadmap/p1` | 下个迭代优先完成 |
-| `roadmap/p2` | 有容量时完成 |
-| `roadmap/next` | 下个迭代规划中 |
-| `roadmap/future` | 未来考虑 |
-| `roadmap/rfc` | RFC/设计阶段 |
+**使用原则**:
+- 可选标签
+- 用于责任划分
+- 可以有多个
 
-**使用原则**：
-- 路线图标签表示"何时做"，优先级标签表示"多紧急"
+### 3.2 路线图标签语义 (roadmap/*)
+
+**语义**: 说明"何时做"
+
+**使用原则**:
+- 路线图标签表示规划窗口
+- 与优先级标签配合使用
+- 一个 issue 只能有一个 `roadmap/*` 标签
+
+| 标签 | 语义 | 决策标准 |
+|------|------|----------|
+| `roadmap/p0` | 当前迭代必须完成 | 阻断性问题、核心功能 |
+| `roadmap/p1` | 下个迭代优先完成 | 重要功能、已规划的功能 |
+| `roadmap/p2` | 有容量时完成 | 一般功能、改进项 |
+| `roadmap/next` | 下个迭代规划中 | 待确认的功能 |
+| `roadmap/future` | 未来考虑 | 长期规划、想法阶段 |
+| `roadmap/rfc` | RFC/设计阶段 | 需要讨论设计，不直接进入开发 |
+
+**重要约束**:
+- 路线图标签表示"何时做"
+- 优先级标签表示"多紧急"
 - 一个 issue 可以同时有 `roadmap/p0` 和 `priority/high`
-- 路线图标签用于迭代规划，优先级标签用于紧急度排序
 - `roadmap/rfc` 表示需要讨论设计，不直接进入开发
 
-### 3.2 关系镜像标签
+### 3.3 关系镜像标签语义
 
-### `vibe-task`
+#### `vibe-task`
 
-`vibe-task` 是执行项镜像标签。
+**语义**: 执行项镜像标签
 
-它的职责只有一个：让 GitHub / Project 视角能快速筛出“被纳入 flow 管理的执行 issue”。
+**职责**: 让 GitHub / Project 视角能快速筛出"被纳入 flow 管理的执行 issue"
 
-映射规则：
+**映射规则**:
 
-| `issue_role` | `vibe-task` |
-|--------------|-------------|
-| `task` | 应添加 |
-| `dependency` | 应添加 |
-| `related` | 不添加 |
+| `issue_role` | `vibe-task` 动作 |
+|--------------|------------------|
+| `task` | 确保存在（幂等 add） |
+| `dependency` | 确保存在（幂等 add） |
+| `related` | 不存在则跳过 |
 
-重要约束：
-
+**重要约束**:
 - `vibe-task` 不能作为 task 真源
 - `vibe-task` 不能反推出 `issue_role`
 - 标签自动化失败时，不能改写本地 role
 
-### 3.3 编排状态标签
+### 3.4 编排状态标签语义 (state/*)
 
-编排状态标签是多 agent 协作的远端状态机真源。
+**语义**: 说明"当前处于 flow 循环的哪一阶段"
 
-### 状态集合
+**使用原则**:
+- 编排状态标签是多 agent 协作的远端状态机真源
+- 一个 issue 任一时刻只能有一个 `state/*` 标签
+- 状态变更优先发生在 issue 上，而不是 Project 字段上
 
-| 标签名称 | 含义 |
-|---------|------|
-| `state/ready` | 可认领 |
-| `state/claimed` | 已认领，待进入执行 |
-| `state/in-progress` | 执行中 |
-| `state/blocked` | 阻塞中 |
-| `state/handoff` | 待交接 |
-| `state/review` | 待 review |
-| `state/merge-ready` | 已满足合并条件 |
-| `state/done` | 已完成 |
+#### 状态集合
 
-### 状态机约束
+| 标签名称 | 语义 | 使用场景 |
+|---------|------|----------|
+| `state/ready` | 可认领 | 任务可认领 |
+| `state/claimed` | 已认领，待进入执行 | 已认领，准备执行 |
+| `state/in-progress` | 执行中 | 正在执行 |
+| `state/blocked` | 阻塞中 | 被阻塞，无法继续 |
+| `state/handoff` | 待交接 | 需要交接 |
+| `state/review` | 待 review | 等待 review |
+| `state/merge-ready` | 已满足合并条件 | 可合并 |
+| `state/done` | 已完成 | 已完成 |
 
-1. 一个 issue 任一时刻只能有一个 `state/*` 标签。
-2. 状态变更优先发生在 issue 上，而不是 Project 字段上。
-3. Project 只能镜像 `state/*`，不能定义第二套状态。
-4. handoff 负责解释状态，label 负责表示状态。
+#### 状态机约束
 
----
+1. 一个 issue 任一时刻只能有一个 `state/*` 标签
+2. 状态变更优先发生在 issue 上，而不是 Project 字段上
+3. Project 只能镜像 `state/*`，不能定义第二套状态
+4. handoff 负责解释状态，label 负责表示状态
 
-## 4. 状态迁移规则
+#### 状态迁移规则
 
-### 4.1 推荐主链
+**推荐主链**:
 
 ```text
 state/ready
@@ -166,14 +178,14 @@ state/ready
   -> state/done
 ```
 
-### 4.2 允许的旁路
+**允许的旁路**:
 
 - `state/in-progress -> state/blocked`
 - `state/blocked -> state/in-progress`
 - `state/review -> state/in-progress`
 - `state/handoff -> state/in-progress`
 
-### 4.3 不允许的跳转
+**不允许的跳转**:
 
 以下跳转默认视为异常，需要人工确认：
 
@@ -184,9 +196,9 @@ state/ready
 
 ---
 
-## 5. Agent 协作规则
+## 4. Agent 协作规则
 
-### 5.1 认领
+### 4.1 认领
 
 agent 认领 issue 时：
 
@@ -194,7 +206,7 @@ agent 认领 issue 时：
 2. 更新为 `state/claimed`
 3. 写入或更新 assignee / handoff 最小上下文
 
-### 5.2 执行
+### 4.2 执行
 
 进入实际修改后：
 
@@ -202,14 +214,14 @@ agent 认领 issue 时：
 2. 持续更新 handoff
 3. 保持 `state/*` 单值
 
-### 5.3 阻塞
+### 4.3 阻塞
 
 当 agent 无法继续推进时：
 
 1. 切换到 `state/blocked`
 2. handoff 中必须写明阻塞原因和下一步
 
-### 5.4 交接
+### 4.4 交接
 
 当任务需要换手时：
 
@@ -217,7 +229,7 @@ agent 认领 issue 时：
 2. handoff 必须完整
 3. 接手方读取 handoff 后再进入 `state/in-progress`
 
-### 5.5 Review 与完成
+### 4.5 Review 与完成
 
 1. 待 review 时使用 `state/review`
 2. 达到可合并条件时使用 `state/merge-ready`
@@ -225,33 +237,37 @@ agent 认领 issue 时：
 
 ---
 
-## 6. 与 issue-role 的关系
+## 5. 与 issue-role 的关系
 
-### 6.1 关系与状态是两层语义
+### 5.1 关系与状态是两层语义
 
 | 层 | 真源 | 例子 |
 |----|------|------|
 | 关系层 | SQLite `issue_role` | `task / related / dependency` |
+| 规划层 | GitHub `roadmap/*` labels | `p0 / p1 / p2` |
+| 优先级层 | GitHub `priority/*` labels | `high / medium / low` |
 | 状态层 | GitHub `state/*` labels | `ready / blocked / review` |
 
-### 6.2 不能混写
+### 5.2 不能混写
 
-错误示例：
+**错误示例**:
 
 - 把 `dependency` 当成一种状态
 - 把 `review` 当成一种 issue 类型
-- 用 `vibe-task` 表达 “现在正在执行”
+- 用 `vibe-task` 表达 "现在正在执行"
+- 把 `roadmap/p0` 等同于 `priority/high`
 
-正确示例：
+**正确示例**:
 
 - `issue_role = dependency` + `state/blocked`
 - `issue_role = task` + `state/in-progress`
+- `roadmap/p0` + `priority/high` + `state/in-progress`
 
 ---
 
-## 7. 历史标签处理
+## 6. 历史标签处理
 
-### 7.1 旧 `status/*` 标签
+### 6.1 旧 `status/*` 标签
 
 旧文档中的以下标签不再作为编排真源：
 
@@ -260,59 +276,46 @@ agent 认领 issue 时：
 - `status/ready-for-review`
 - `status/wip`
 
-处理原则：
+**处理原则**:
 
 1. 不再把 `status/*` 作为流程状态标准
 2. 后续自动化应迁移到 `state/*`
 3. 如仓库已有旧标签，可保留一段过渡期，但不能继续写入新逻辑
 
-### 7.2 `repo` 旧语义
+### 6.2 `repo` 旧语义
 
 - 历史 `repo -> related` 迁移必须先完成
 - 不允许新增任何依赖 `repo` 的标签或规则
 
 ---
 
-## 8. 自动化要求
+## 7. 自动化要求
 
-1. 自动化只消费统一后的 `task/related/dependency` 和 `state/*`。
-2. `issue_role -> vibe-task` 是单向镜像。
-3. `state/* -> Project Flow Lane` 是单向镜像。
-4. 自动化失败不得修改本地 role。
-5. 自动化补偿必须幂等。
+1. 自动化只消费统一后的 `task/related/dependency` 和 `state/*`
+2. `issue_role -> vibe-task` 是单向镜像
+3. `state/* -> Project Flow Lane` 是单向镜像
+4. `roadmap/*` 和 `priority/*` 由人工或 governance skill 管理
+5. 自动化失败不得修改本地 role
+6. 自动化补偿必须幂等
 
 ---
 
-## 9. 最小落地版本
+## 8. 最小落地版本
 
 第一阶段必须落地的标签只有两组：
 
 1. `vibe-task`
 2. `state/*`
 
-其余 `type/*`、`priority/*`、`scope/*`、`component/*` 保持现有分类能力即可。
+其余 `type/*`、`priority/*`、`scope/*`、`component/*`、`roadmap/*` 保持现有分类能力即可。
 
 ---
 
-## 10. 命令联动规范引用（V3）
+## 9. 参考文档
 
-标签标准只定义“标签集合与语义”。
-
-`flow/branch`、`task/issue`、`pr` 的命令级联动判定与幂等规则，统一以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准。
-
----
-
-## 11. 术语规范
-
-### 正确说法
-
-- “给 issue 加 `state/in-progress`，表示正在执行”
-- “给 issue 镜像 `vibe-task`，表示它是执行项”
-- “`issue_role` 决定关系，`state/*` 决定阶段”
-
-### 错误说法
-
-- “`vibe-task` 就是 task 真源”
-- “Project 列位就等于状态真源”
-- “`dependency` 就是 blocked”
-- “`status/wip` 继续作为标准流程标签”
+- [github-labels-reference.md](github-labels-reference.md) - 标签速查手册（有哪些标签）
+- [roadmap-label-management.md](roadmap-label-management.md) - 如何使用标签管理 roadmap
+- [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) - 状态同步标准
+- [issue-standard.md](issue-standard.md) - Issue 标准
+- [vibe3-command-standard.md](vibe3-command-standard.md) - 命令设计标准
+- [vibe3-user-guide.md](vibe3-user-guide.md) - 用户操作手册
