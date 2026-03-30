@@ -144,8 +144,14 @@ class OrchestraStatusService:
         return snapshot
 
     def _get_manager_issues(self) -> list[dict]:
-        """Get open issues assigned to manager usernames."""
+        """Get open issues assigned to manager usernames.
+
+        Deduplicates issues by number to avoid counting the same issue
+        multiple times when assigned to multiple managers.
+        """
+        seen_numbers: set[int] = set()
         issues: list[dict] = []
+
         for username in self.config.manager_usernames:
             try:
                 result = self._github.list_issues(
@@ -153,8 +159,13 @@ class OrchestraStatusService:
                     assignee=username,
                     limit=50,
                 )
-                if result:
-                    issues.extend(result)
+                if not result:
+                    continue
+                for issue in result:
+                    number = issue.get("number")
+                    if number and number not in seen_numbers:
+                        seen_numbers.add(number)
+                        issues.append(issue)
             except Exception as exc:
                 logger.bind(domain="orchestra").warning(
                     f"Failed to list issues for {username}: {exc}"

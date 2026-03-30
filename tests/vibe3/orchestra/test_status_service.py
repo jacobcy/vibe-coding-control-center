@@ -108,6 +108,51 @@ class TestOrchestraStatusService:
 
         assert len(snapshot.active_issues) == 2
 
+    def test_snapshot_deduplicates_issues(self) -> None:
+        """Issues assigned to multiple managers are deduplicated."""
+        config = OrchestraConfig(
+            enabled=True,
+            polling_interval=900,
+            repo="test/repo",
+            manager_usernames=["manager-1", "manager-2"],
+        )
+        service = OrchestraStatusService(config)
+
+        # Same issue returned by both managers
+        shared_issue = {
+            "number": 42,
+            "title": "Shared issue",
+            "assignees": [{"login": "manager-1"}, {"login": "manager-2"}],
+        }
+        unique_issue = {
+            "number": 43,
+            "title": "Unique issue",
+            "assignees": [{"login": "manager-2"}],
+        }
+
+        with (
+            patch.object(
+                service._github,
+                "list_issues",
+                side_effect=[
+                    [shared_issue],  # manager-1's issues
+                    [shared_issue, unique_issue],  # manager-2's issues
+                ],
+            ),
+            patch.object(service._label_service, "get_state", return_value=None),
+            patch.object(
+                service._orchestrator, "get_flow_for_issue", return_value=None
+            ),
+            patch.object(service._git, "list_worktrees", return_value=[]),
+        ):
+            snapshot = service.snapshot()
+
+        # Should have 2 unique issues, not 3
+        assert len(snapshot.active_issues) == 2
+        issue_numbers = [e.number for e in snapshot.active_issues]
+        assert 42 in issue_numbers
+        assert 43 in issue_numbers
+
     def test_format_snapshot(self) -> None:
         """_format_snapshot produces readable output."""
         entry = IssueStatusEntry(
