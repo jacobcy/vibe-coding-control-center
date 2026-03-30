@@ -63,6 +63,8 @@ class GovernanceService(ServiceBase):
         self._dispatcher = dispatcher
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
         self._tick_count = 0
+        self._skill = config.governance.skill
+        self._dry_run = config.governance.dry_run
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """No-op: governance service is tick-based only."""
@@ -108,7 +110,7 @@ class GovernanceService(ServiceBase):
         # 3. Build plan
         plan_content = self._build_governance_plan(snapshot)
 
-        if self.config.dry_run:
+        if self._dry_run:
             log.info("Dry run: would execute governance plan:")
             log.info(f"\n{plan_content}")
             return
@@ -160,58 +162,50 @@ class GovernanceService(ServiceBase):
         Returns:
             Markdown content for governance plan
         """
-        lines = [
-            "# Orchestra Governance Scan",
-            "",
-            "## System Status",
-            "",
-            f"- **Active Issues**: {len(snapshot.active_issues)}",
-            f"- **Active Flows**: {snapshot.active_flows}",
-            f"- **Active Worktrees**: {snapshot.active_worktrees}",
-            f"- **Circuit Breaker**: {snapshot.circuit_breaker_state}",
-            "",
-            "## Issue Queue",
-            "",
-        ]
+        active_count = len(snapshot.active_issues)
+        issue_lines: list[str] = []
+        for entry in snapshot.active_issues[:20]:
+            state_label = entry.state.to_label() if entry.state else "state/unknown"
+            blocked = (
+                f" [blocked_by={', '.join(f'#{b}' for b in entry.blocked_by)}]"
+                if entry.blocked_by
+                else ""
+            )
+            issue_lines.append(
+                f"- #{entry.number}: {entry.title[:60]} | {state_label}{blocked}"
+            )
 
-        if snapshot.active_issues:
-            lines.append("| # | Title | State | Assignee | Flow | Blocked By |")
-            lines.append("|---|-------|-------|----------|------|------------|")
+        truncated_note = ""
+        if active_count > 20:
+            truncated_note = (
+                f"\n(已截断，仅显示前 20 条 / 共 {active_count} 条活跃 issue)"
+            )
 
-            for issue in snapshot.active_issues[:20]:  # Limit to 20 issues
-                state = issue.state.value if issue.state else "unknown"
-                assignee = issue.assignee or "-"
-                flow = "yes" if issue.has_flow else "-"
-                blocked = (
-                    ", ".join(f"#{b}" for b in issue.blocked_by)
-                    if issue.blocked_by
-                    else "-"
-                )
-                lines.append(
-                    f"| #{issue.number} | {issue.title[:40]} | {state} | "
-                    f"{assignee} | {flow} | {blocked} |"
-                )
-        else:
-            lines.append("No active issues assigned to manager usernames.")
-
-        lines.extend(
+        return "\n".join(
             [
+                "# Orchestra Governance Scan",
                 "",
-                "## Instructions",
+                "## 当前系统状态",
                 "",
-                "Execute `vibe-orchestra governance` workflow:",
+                f"- 活跃 issue: {active_count}",
+                f"- 活跃 flow: {snapshot.active_flows}",
+                f"- 活跃 worktree: {snapshot.active_worktrees}",
+                f"- Circuit breaker: {snapshot.circuit_breaker_state} "
+                f"(failures={snapshot.circuit_breaker_failures})",
                 "",
-                "1. **Priority Review**: Ensure issues have appropriate "
-                "priority labels",
-                "2. **Dependency Check**: Verify blocked_by issues are resolved",
-                "3. **Assignment**: For READY issues without flow, assign to "
-                "vibe-manager-agent",
-                "4. **Cleanup**: Close or unassign stale issues",
+                "## Issue 列表",
                 "",
-                "Use `gh issue edit` to make changes. Changes will trigger "
-                "webhook events that dispatch manager agents automatically.",
+                "\n".join(issue_lines) or "(无活跃 issue)",
+                truncated_note,
+                "",
+                "## 指令",
+                "",
+                f"请根据以上状态执行 {self._skill} governance：",
+                "1. 检查 issue 优先级是否合理（参考 priority/* labels）",
+                "2. 检查 blocked_by 中的依赖是否已解除",
+                "3. 对 READY 状态且高优先级的 issue，分配给 vibe-manager-agent",
+                "4. 对 BLOCKED 状态的 issue，如 blocker 已关闭则推进状态",
+                "5. 记录决策原因（通过 issue comment）",
                 "",
             ]
         )
-
-        return "\n".join(lines)

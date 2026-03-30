@@ -101,6 +101,11 @@ class GovernanceConfig(BaseModel):
     """Configuration for periodic governance scan service."""
 
     enabled: bool = True
+    skill: str = Field(
+        default="vibe-orchestra",
+        description="Governance skill to execute via vibe3 run --plan",
+    )
+    dry_run: bool = False
     interval_ticks: int = Field(
         default=4,
         ge=1,
@@ -160,6 +165,26 @@ class OrchestraConfig(BaseModel):
                 half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
             )
 
+        governance_defaults = {
+            "enabled": True,
+            "skill": "vibe-orchestra",
+            "dry_run": False,
+            "interval_ticks": 4,
+        }
+        governance_src = getattr(src, "governance", None)
+        if governance_src is not None:
+            if isinstance(governance_src, dict):
+                governance_defaults.update(governance_src)
+            else:
+                governance_defaults.update(
+                    {
+                        "enabled": getattr(governance_src, "enabled", True),
+                        "skill": getattr(governance_src, "skill", "vibe-orchestra"),
+                        "dry_run": getattr(governance_src, "dry_run", False),
+                        "interval_ticks": getattr(governance_src, "interval_ticks", 4),
+                    }
+                )
+
         return cls(
             enabled=src.enabled,
             polling_interval=src.polling_interval,
@@ -189,10 +214,5 @@ class OrchestraConfig(BaseModel):
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
             circuit_breaker=circuit_breaker_config,
-            governance=GovernanceConfig(
-                enabled=getattr(getattr(src, "governance", None), "enabled", True),
-                interval_ticks=getattr(
-                    getattr(src, "governance", None), "interval_ticks", 4
-                ),
-            ),
+            governance=GovernanceConfig(**governance_defaults),
         )

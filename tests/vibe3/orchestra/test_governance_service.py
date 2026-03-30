@@ -3,7 +3,9 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from vibe3.orchestra.config import OrchestraConfig
+import pytest
+
+from vibe3.orchestra.config import GovernanceConfig, OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.status_service import (
     IssueStatusEntry,
@@ -62,8 +64,6 @@ class TestGovernanceService:
 
     def test_tick_interval_from_config(self):
         """Governance should only run on config.governance.interval_ticks boundary."""
-        from vibe3.orchestra.config import GovernanceConfig
-
         config = OrchestraConfig(governance=GovernanceConfig(interval_ticks=4))
         service = _make_service(config=config)
 
@@ -91,7 +91,7 @@ class TestGovernanceService:
         )
         plan = service._build_governance_plan(snapshot)
         assert "# Orchestra Governance Scan" in plan
-        assert "No active issues" in plan
+        assert "(无活跃 issue)" in plan
 
     def test_build_governance_plan_with_issues(self):
         """Plan should include issue details."""
@@ -175,7 +175,8 @@ class TestGovernanceService:
         assert service._dispatcher is not None
         assert hasattr(service._dispatcher, "run_governance_command")
 
-    def test_skip_when_circuit_breaker_open(self):
+    @pytest.mark.asyncio
+    async def test_skip_when_circuit_breaker_open(self):
         """Governance skips dispatch when circuit breaker is OPEN (snapshot check)."""
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
@@ -188,11 +189,67 @@ class TestGovernanceService:
         )
         dispatcher = _make_dispatcher()
         service = GovernanceService(
-            config=OrchestraConfig(dry_run=True),
+            config=OrchestraConfig(
+                governance=GovernanceConfig(dry_run=True, interval_ticks=1)
+            ),
             status_service=MockStatusService(snapshot),
             dispatcher=dispatcher,
         )
-        # snapshot reflects open state
-        assert service._status_service.snapshot().circuit_breaker_state == "open"
-        # dispatcher.run_governance_command should not be called on open circuit
+
+        await service._run_governance()
+        dispatcher.run_governance_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_on_tick_runs_on_interval_and_respects_dry_run(self, monkeypatch):
+        """Governance runs on interval and uses governance.dry_run."""
+        snapshot = OrchestraSnapshot(
+            timestamp=0.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            circuit_breaker_state="closed",
+            circuit_breaker_failures=0,
+        )
+        dispatcher = _make_dispatcher()
+        service = GovernanceService(
+            config=OrchestraConfig(
+                governance=GovernanceConfig(interval_ticks=2, dry_run=True)
+            ),
+            status_service=MockStatusService(snapshot),
+            dispatcher=dispatcher,
+        )
+        # Force tick boundary
+        service._tick_count = 1
+
+        called = {"count": 0}
+
+        async def fake_run():
+            called["count"] += 1
+
+        monkeypatch.setattr(service, "_run_governance", fake_run)
+
+        await service.on_tick()
+        assert called["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_run_governance_honors_governance_dry_run(self):
+        """Dry run stops before dispatch invocation."""
+        snapshot = OrchestraSnapshot(
+            timestamp=0.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            circuit_breaker_state="closed",
+            circuit_breaker_failures=0,
+        )
+        dispatcher = _make_dispatcher()
+        service = GovernanceService(
+            config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
+            status_service=MockStatusService(snapshot),
+            dispatcher=dispatcher,
+        )
+
+        await service._run_governance()
         dispatcher.run_governance_command.assert_not_called()

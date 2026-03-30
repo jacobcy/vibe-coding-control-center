@@ -50,6 +50,11 @@ class TestClassifyFailure:
         category = classify_failure(1, "PR review rejected")
         assert category == "business_error"
 
+    def test_timeout_error(self):
+        """Timeouts should be classified distinctly and count toward breaker."""
+        category = classify_failure(1, "command timed out", timed_out=True)
+        assert category == "timeout"
+
     def test_unknown_error(self):
         """Unknown errors should count toward breaker (conservative)."""
         category = classify_failure(1, "Something went wrong")
@@ -178,3 +183,4 @@ class TestCircuitBreaker:
         cb.reset()
         assert cb.state == CircuitState.CLOSED
         assert cb.failure_count == 0
+        assert cb.last_failure_timestamp is None

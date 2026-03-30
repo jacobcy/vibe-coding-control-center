@@ -23,21 +23,30 @@ class CircuitState(str, Enum):
 
 
 # Error categories for circuit breaker decision
-ErrorCategory = Literal["api_error", "business_error", "unknown"]
+ErrorCategory = Literal["api_error", "business_error", "timeout", "unknown"]
 
 
-def classify_failure(returncode: int, stderr: str) -> ErrorCategory:
+def classify_failure(
+    returncode: int,
+    stderr: str,
+    timed_out: bool = False,
+) -> ErrorCategory:
     """Classify dispatch failure for circuit breaker decision.
 
     Args:
         returncode: Process exit code
         stderr: Standard error output
+        timed_out: Whether the subprocess timed out
 
     Returns:
         "api_error": API/token/rate limit failure -> counts toward breaker
         "business_error": normal business failure -> does not count
+        "timeout": process timeout -> counts toward breaker
         "unknown": unclassified -> counts toward breaker (conservative)
     """
+    if timed_out:
+        return "timeout"
+
     if returncode == 0:
         return "business_error"  # Should not happen, but safe default
 
@@ -212,3 +221,8 @@ class CircuitBreaker:
     def state_value(self) -> str:
         """Get current state as string for serialization."""
         return self.state.value
+
+    @property
+    def last_failure_timestamp(self) -> float | None:
+        """Expose last failure timestamp if recorded."""
+        return self.last_failure_time or None

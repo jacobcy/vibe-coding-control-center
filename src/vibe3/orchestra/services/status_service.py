@@ -48,6 +48,7 @@ class OrchestraSnapshot:
     active_worktrees: int
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
+    circuit_breaker_last_failure: float | None = None
 
 
 class OrchestraStatusService:
@@ -152,6 +153,7 @@ class OrchestraStatusService:
             active_worktrees=len(worktrees),
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
+            circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),
         )
 
         log.debug(
@@ -211,3 +213,11 @@ class OrchestraStatusService:
         if self._circuit_breaker:
             return self._circuit_breaker.failure_count
         return 0
+
+    def _get_circuit_breaker_last_failure(self) -> float | None:
+        """Get the last failure timestamp."""
+        if self._circuit_breaker and getattr(
+            self._circuit_breaker, "last_failure_timestamp", None
+        ):
+            return self._circuit_breaker.last_failure_timestamp
+        return None

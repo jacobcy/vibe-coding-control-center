@@ -65,7 +65,9 @@ class Dispatcher(WorktreeResolverMixin):
                 )
                 # Record failure for circuit breaker
                 if self._circuit_breaker:
-                    category = classify_failure(result.returncode, result.stderr or "")
+                    category = classify_failure(
+                        result.returncode, result.stderr or "", timed_out=False
+                    )
                     self._circuit_breaker.record_failure(category)
                 return False
             logger.bind(domain="orchestra").info(f"{label} completed successfully")
@@ -75,15 +77,19 @@ class Dispatcher(WorktreeResolverMixin):
             return True
         except subprocess.TimeoutExpired:
             logger.bind(domain="orchestra").error(f"{label} timed out")
-            # Timeout counts as API error (could be API hang)
             if self._circuit_breaker:
-                self._circuit_breaker.record_failure("api_error")
+                category = classify_failure(
+                    returncode=1, stderr="timeout", timed_out=True
+                )
+                self._circuit_breaker.record_failure(category)
             return False
         except Exception as e:
             logger.bind(domain="orchestra").error(f"{label} error: {e}")
-            # Unknown error counts toward breaker (conservative)
             if self._circuit_breaker:
-                self._circuit_breaker.record_failure("unknown")
+                category = classify_failure(
+                    returncode=1, stderr=str(e), timed_out=False
+                )
+                self._circuit_breaker.record_failure(category)
             return False
 
     def run_governance_command(self, cmd: list[str], label: str) -> bool:

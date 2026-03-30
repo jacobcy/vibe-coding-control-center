@@ -222,6 +222,24 @@ class OrchestraPRReviewDispatchSettings(BaseModel):
     use_worktree: bool = False
 
 
+class OrchestraCircuitBreakerSettings(BaseModel):
+    """Circuit breaker settings for orchestra dispatch."""
+
+    enabled: bool = True
+    failure_threshold: int = 3
+    cooldown_seconds: int = 300
+    half_open_max_tests: int = 1
+
+
+class OrchestraGovernanceSettings(BaseModel):
+    """Periodic governance scan settings."""
+
+    enabled: bool = True
+    interval_ticks: int = 4
+    skill: str = "vibe-orchestra"
+    dry_run: bool = False
+
+
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
@@ -243,6 +261,12 @@ class OrchestraSettings(BaseModel):
         default_factory=OrchestraPRReviewDispatchSettings
     )
     master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
+    circuit_breaker: OrchestraCircuitBreakerSettings = Field(
+        default_factory=OrchestraCircuitBreakerSettings
+    )
+    governance: OrchestraGovernanceSettings = Field(
+        default_factory=OrchestraGovernanceSettings
+    )
 
 
 class VibeConfig(BaseModel):

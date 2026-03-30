@@ -184,6 +184,31 @@ class TestOrchestraStatusService:
         assert "flow=task/issue-42" in output
         assert "blocked_by=#333, #336" in output
         assert "Flows: 1 active" in output
+        assert "Circuit breaker: closed" in output
+
+    def test_snapshot_includes_circuit_breaker_metadata(self) -> None:
+        """Snapshot surfaces circuit breaker state and last failure."""
+        config = _make_config()
+        mock_cb = type(
+            "CB",
+            (),
+            {
+                "state_value": "half_open",
+                "failure_count": 2,
+                "last_failure_timestamp": 123.0,
+            },
+        )()
+        service = OrchestraStatusService(config, circuit_breaker=mock_cb)
+
+        with (
+            patch.object(service._github, "list_issues", return_value=[]),
+            patch.object(service._git, "list_worktrees", return_value=[]),
+        ):
+            snapshot = service.snapshot()
+
+        assert snapshot.circuit_breaker_state == "half_open"
+        assert snapshot.circuit_breaker_failures == 2
+        assert snapshot.circuit_breaker_last_failure == 123.0
 
 
 class TestIssueStatusEntry:
