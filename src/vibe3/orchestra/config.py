@@ -165,7 +165,7 @@ class OrchestraConfig(BaseModel):
                 half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
             )
 
-        governance_defaults = {
+        governance_defaults: dict[str, bool | str | int] = {
             "enabled": True,
             "skill": "vibe-orchestra",
             "dry_run": False,
@@ -214,5 +214,5 @@ class OrchestraConfig(BaseModel):
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
             circuit_breaker=circuit_breaker_config,
-            governance=GovernanceConfig(**governance_defaults),
+            governance=GovernanceConfig.model_validate(governance_defaults),
         )
