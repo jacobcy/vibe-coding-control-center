@@ -11,16 +11,6 @@ from vibe3.exceptions import GitHubError, UserError
 class ReviewMixin:
     """Mixin for review-related operations."""
 
-    def add_pr_comment(self: Any, pr_number: int, body: str) -> None:
-        """Add comment to PR."""
-        logger.bind(
-            external="github", operation="add_comment", pr_number=pr_number
-        ).debug("Calling GitHub API: add_pr_comment")
-        subprocess.run(
-            ["gh", "pr", "comment", str(pr_number), "--body", body],
-            check=True,
-        )
-
     def get_pr_diff(self: Any, pr_number: int) -> str:
         """Get PR diff.
 
