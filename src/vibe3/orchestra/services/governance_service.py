@@ -15,6 +15,7 @@ import asyncio
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -25,12 +26,19 @@ from vibe3.orchestra.services.status_service import (
     OrchestraStatusService,
 )
 
+if TYPE_CHECKING:
+    from vibe3.orchestra.dispatcher import Dispatcher
+
 
 class GovernanceService(ServiceBase):
     """Periodic governance scan service.
 
     Runs governance skill on a configurable interval to maintain
     issue queue health. Does not handle webhook events - only tick-based.
+
+    Execution is delegated to Dispatcher.run_governance_command() so that
+    circuit breaker protection and error classification apply uniformly
+    to both manager dispatch and governance scans.
     """
 
     event_types: list[str] = []  # No webhook events, tick-based only
@@ -39,23 +47,22 @@ class GovernanceService(ServiceBase):
         self,
         config: OrchestraConfig,
         status_service: OrchestraStatusService,
+        dispatcher: Dispatcher,
         executor: ThreadPoolExecutor | None = None,
-        governance_interval: int = 4,
     ) -> None:
         """Initialize governance service.
 
         Args:
             config: Orchestra configuration
-            status_service: Status service for snapshots
-            executor: Thread pool for subprocess execution
-            governance_interval: Run governance every N ticks
+            status_service: Status service for building context snapshots
+            dispatcher: Shared dispatcher for command execution and circuit breaker
+            executor: Thread pool for async->sync bridge (defaults to single worker)
         """
         self.config = config
         self._status_service = status_service
+        self._dispatcher = dispatcher
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
         self._tick_count = 0
-        self._governance_interval = governance_interval
-        self._last_run_time: float = 0.0
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """No-op: governance service is tick-based only."""
@@ -65,7 +72,7 @@ class GovernanceService(ServiceBase):
         """Run governance scan on interval."""
         self._tick_count += 1
 
-        if self._tick_count % self._governance_interval != 0:
+        if self._tick_count % self.config.governance.interval_ticks != 0:
             return
 
         log = logger.bind(domain="orchestra", action="governance")
@@ -80,17 +87,20 @@ class GovernanceService(ServiceBase):
         """Execute governance scan.
 
         1. Get current status snapshot
-        2. Build governance plan
-        3. Execute via vibe3 run --plan
+        2. Check circuit breaker state
+        3. Build governance plan
+        4. Execute via vibe3 run --plan (through shared Dispatcher)
         """
+        loop = asyncio.get_running_loop()
         log = logger.bind(domain="orchestra", action="governance")
 
         # 1. Get snapshot
-        snapshot = await asyncio.get_running_loop().run_in_executor(
+        snapshot = await loop.run_in_executor(
             self._executor, self._status_service.snapshot
         )
 
-        # 2. Check circuit breaker - skip governance if breaker is open
+        # 2. Skip if circuit breaker is open (dispatcher will also check, but
+        #    skip early to avoid building the plan unnecessarily)
         if snapshot.circuit_breaker_state == "open":
             log.warning("Skipping governance: circuit breaker is OPEN")
             return
@@ -103,14 +113,19 @@ class GovernanceService(ServiceBase):
             log.info(f"\n{plan_content}")
             return
 
-        # 4. Write to temp file and execute
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False
-        ) as plan_file:
-            plan_file.write(plan_content)
-            plan_path = Path(plan_file.name)
-
+        # 4. Write temp file and dispatch through shared Dispatcher
+        # Using try/finally mirrors the pattern in master.py for safe cleanup.
+        plan_path: Path | None = None
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".md",
+                prefix="governance_plan_",
+                delete=False,
+            ) as f:
+                f.write(plan_content)
+                plan_path = Path(f.name)
+
             cmd = [
                 "uv",
                 "run",
@@ -121,48 +136,20 @@ class GovernanceService(ServiceBase):
                 "--plan",
                 str(plan_path),
             ]
-            log.info(f"Executing: {' '.join(cmd)}")
+            log.info(f"Executing governance: {' '.join(cmd)}")
 
-            result = await asyncio.get_running_loop().run_in_executor(
+            success = await loop.run_in_executor(
                 self._executor,
-                lambda: self._execute_command(cmd),
+                lambda: self._dispatcher.run_governance_command(cmd, "Governance scan"),
             )
 
-            if result:
+            if success:
                 log.info("Governance scan completed successfully")
             else:
                 log.warning("Governance scan returned non-zero exit code")
         finally:
-            # Cleanup temp file
-            plan_path.unlink(missing_ok=True)
-
-    def _execute_command(self, cmd: list[str]) -> bool:
-        """Execute command synchronously."""
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=600,  # 10 minute timeout
-            )
-            if result.returncode != 0:
-                logger.bind(domain="orchestra", action="governance").error(
-                    f"Command failed: {result.stderr}"
-                )
-                return False
-            return True
-        except subprocess.TimeoutExpired:
-            logger.bind(domain="orchestra", action="governance").error(
-                "Command timed out"
-            )
-            return False
-        except Exception as exc:
-            logger.bind(domain="orchestra", action="governance").error(
-                f"Command error: {exc}"
-            )
-            return False
+            if plan_path:
+                plan_path.unlink(missing_ok=True)
 
     def _build_governance_plan(self, snapshot: OrchestraSnapshot) -> str:
         """Build governance plan content from snapshot.
@@ -194,7 +181,7 @@ class GovernanceService(ServiceBase):
             for issue in snapshot.active_issues[:20]:  # Limit to 20 issues
                 state = issue.state.value if issue.state else "unknown"
                 assignee = issue.assignee or "-"
-                flow = "✓" if issue.has_flow else "-"
+                flow = "yes" if issue.has_flow else "-"
                 blocked = (
                     ", ".join(f"#{b}" for b in issue.blocked_by)
                     if issue.blocked_by
@@ -222,8 +209,7 @@ class GovernanceService(ServiceBase):
                 "4. **Cleanup**: Close or unassign stale issues",
                 "",
                 "Use `gh issue edit` to make changes. Changes will trigger "
-                "webhook events",
-                "that dispatch manager agents automatically.",
+                "webhook events that dispatch manager agents automatically.",
                 "",
             ]
         )

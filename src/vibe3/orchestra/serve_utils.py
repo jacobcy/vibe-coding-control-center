@@ -74,15 +74,15 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             )
         )
 
-    # Governance service for periodic issue maintenance
-    # Runs every governance_interval ticks (default: 4 ticks = ~1 hour)
-    heartbeat.register(
-        GovernanceService(
-            config,
-            status_service=status_service,
-            executor=shared_executor,
+    if config.governance.enabled:
+        heartbeat.register(
+            GovernanceService(
+                config,
+                status_service=status_service,
+                dispatcher=shared_dispatcher,
+                executor=shared_executor,
+            )
         )
-    )
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

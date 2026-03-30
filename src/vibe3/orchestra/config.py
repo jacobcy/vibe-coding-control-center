@@ -97,6 +97,19 @@ class CircuitBreakerConfig(BaseModel):
     )
 
 
+class GovernanceConfig(BaseModel):
+    """Configuration for periodic governance scan service."""
+
+    enabled: bool = True
+    interval_ticks: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Run governance scan every N heartbeat ticks (~1h at default interval)"
+        ),
+    )
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
@@ -122,6 +135,7 @@ class OrchestraConfig(BaseModel):
         default_factory=PRReviewDispatchConfig
     )
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
+    governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -175,4 +189,10 @@ class OrchestraConfig(BaseModel):
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
             circuit_breaker=circuit_breaker_config,
+            governance=GovernanceConfig(
+                enabled=getattr(getattr(src, "governance", None), "enabled", True),
+                interval_ticks=getattr(
+                    getattr(src, "governance", None), "interval_ticks", 4
+                ),
+            ),
         )

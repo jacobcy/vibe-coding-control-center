@@ -86,6 +86,15 @@ class Dispatcher(WorktreeResolverMixin):
                 self._circuit_breaker.record_failure("unknown")
             return False
 
+    def run_governance_command(self, cmd: list[str], label: str) -> bool:
+        """Run a governance command through the shared dispatch machinery.
+
+        Uses the same circuit breaker and error classification as manager
+        dispatch, ensuring governance failures are tracked consistently.
+        Executes in repo_path (not a specific worktree).
+        """
+        return self._run_command(cmd, self.repo_path, label)
+
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for status reporting."""
