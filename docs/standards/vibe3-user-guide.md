@@ -14,6 +14,8 @@
 | **GitHub Issue** | GitHub Issues API | flow_issue_links 索引 | 工作项，可以是需求、任务或缺陷 |
 | **Issue Role** | SQLite flow_issue_links | flow_issue_links 表 | Issue 在 Flow 中的角色（唯一真源）|
 | **Flow** | 本地 SQLite | flow_state 表 | 执行现场，代表"正在哪个 branch 上做" |
+| **Task Issue Number** | SQLite flow_issue_links | flow_issue_links 表 | 通过 role=task hydrate 获取（GitHub-as-truth）|
+| **PR Number** | GitHub PR API | GitHub | 实时查询，不持久化到本地 flow_state |
 
 ### Flow 标识
 
@@ -24,7 +26,7 @@
 CREATE TABLE flow_state (
     branch TEXT PRIMARY KEY,        -- 这是指针，唯一标识
     flow_slug TEXT NOT NULL,        -- 这是显示名称
-    task_issue_number INTEGER,
+    flow_status TEXT NOT NULL DEFAULT 'active',
     ...
 )
 ```
@@ -535,8 +537,8 @@ vibe3 flow list --status active   # 按状态过滤
 - `--base` - 目标分支（可选，默认 main）
 
 **Metadata 自动读取**：
-系统自动从 flow_state 读取以下信息并附加到 PR body：
-- Task Issue（task_issue_number）
+系统自动从 flow 现场读取以下信息并附加到 PR body：
+- Task Issue（从 `flow_issue_links` hydrate）
 - Flow（flow_slug）
 - Spec Reference（spec_ref）
 - Planner Actor（planner_actor）

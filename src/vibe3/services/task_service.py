@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
-from vibe3.models.flow import FlowState, IssueLink
+from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.models.project_item import LinkError
+from vibe3.services.flow_query_mixin import FlowQueryMixin
 from vibe3.services.signature_service import SignatureService
 from vibe3.services.task_bridge_mixin import TaskBridgeMixin
 
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from vibe3.clients.github_project_client import GitHubProjectClient
 
 
-class TaskService(TaskBridgeMixin):
+class TaskService(TaskBridgeMixin, FlowQueryMixin):
     """Service for managing task state.
 
     task 状态真源在 GitHub Project，本地 SQLite 只存 flow 执行现场状态。
@@ -84,10 +85,7 @@ class TaskService(TaskBridgeMixin):
             issue_role=role,
         )
 
-    def get_task(self, branch: str) -> FlowState | None:
+    def get_task(self, branch: str) -> FlowStatusResponse | None:
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
-            return None
-        return FlowState(**flow_data)
+        return self.get_flow_status(branch)

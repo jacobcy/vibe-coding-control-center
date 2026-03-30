@@ -35,9 +35,6 @@ class FlowState(BaseModel):
 
     branch: str
     flow_slug: str
-    task_issue_number: int | None = None
-    pr_number: int | None = None
-    pr_ready_for_review: bool = False
     spec_ref: str | None = None
     plan_ref: str | None = None
     report_ref: str | None = None
@@ -61,6 +58,8 @@ class FlowState(BaseModel):
     execution_pid: int | None = None
     execution_started_at: str | None = None
     execution_completed_at: str | None = None
+
+    model_config = {"extra": "ignore"}
 
     @field_validator("flow_status", mode="before")
     @classmethod

@@ -16,9 +16,6 @@ _CREATE_FLOW_STATE = """
     CREATE TABLE IF NOT EXISTS flow_state (
         branch TEXT PRIMARY KEY,
         flow_slug TEXT NOT NULL,
-        task_issue_number INTEGER,
-        pr_number INTEGER,
-        pr_ready_for_review INTEGER NOT NULL DEFAULT 0,
         spec_ref TEXT,
         plan_ref TEXT,
         report_ref TEXT,
@@ -86,12 +83,9 @@ def init_schema(conn: sqlite3.Connection) -> None:
         row[1] for row in cursor.execute("PRAGMA table_info(flow_state)").fetchall()
     }
     # Safe to use f-string: col values are hardcoded in the loop below
-    for col in ("project_item_id", "project_node_id", "pr_ready_for_review"):
+    for col in ("project_item_id", "project_node_id"):
         if col not in existing:
-            col_type = (
-                "INTEGER NOT NULL DEFAULT 0" if col == "pr_ready_for_review" else "TEXT"
-            )
-            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} {col_type}")
+            cursor.execute(f"ALTER TABLE flow_state ADD COLUMN {col} TEXT")
             logger.bind(external="sqlite", operation="migration").info(
                 f"Added {col} column to flow_state"
             )

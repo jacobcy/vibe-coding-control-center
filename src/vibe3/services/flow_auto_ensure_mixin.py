@@ -4,7 +4,7 @@ from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.models.flow import FlowState, MainBranchProtectedError
+from vibe3.models.flow import FlowStatusResponse, MainBranchProtectedError
 
 
 class FlowAutoEnsureMixin:
@@ -42,7 +42,9 @@ class FlowAutoEnsureMixin:
 
         return False
 
-    def ensure_flow_for_branch(self, branch: str, slug: str | None = None) -> FlowState:
+    def ensure_flow_for_branch(
+        self, branch: str, slug: str | None = None
+    ) -> FlowStatusResponse:
         """Ensure flow exists for branch, creating if needed.
 
         Args:
@@ -50,7 +52,7 @@ class FlowAutoEnsureMixin:
             slug: Optional flow slug (defaults to derived from branch)
 
         Returns:
-            Existing or newly created FlowState
+            Existing or newly created FlowStatusResponse
 
         Raises:
             MainBranchProtectedError: If branch is main/master
@@ -78,7 +80,7 @@ class FlowAutoEnsureMixin:
                 branch=branch,
                 existing=True,
             ).debug("Flow already exists")
-            return FlowState(**existing.model_dump())
+            return existing
 
         # Generate slug from branch if not provided
         if not slug:

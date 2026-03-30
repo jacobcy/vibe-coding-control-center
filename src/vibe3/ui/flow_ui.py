@@ -4,7 +4,7 @@ from typing import Any
 
 from rich.text import Text
 
-from vibe3.models.flow import FlowState, FlowStatusResponse
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui_timeline import (  # noqa: F401
     render_flow_timeline,
@@ -30,7 +30,7 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
 
 
 def _render_flow_row(
-    flow: FlowState,
+    flow: FlowStatusResponse,
     title: str | None = None,
     pr_data: dict[str, object] | None = None,
     worktree: str | None = None,
@@ -59,7 +59,7 @@ def _render_flow_row(
     console.print()
 
 
-def render_flow_created(flow: FlowState, task_id: str | None = None) -> None:
+def render_flow_created(flow: FlowStatusResponse, task_id: str | None = None) -> None:
     console.print(f"[green]✓[/] Flow created: [cyan]{flow.flow_slug}[/]")
     _kv("branch", flow.branch, 1)
     if task_id:
@@ -157,14 +157,14 @@ def render_flow_status(
     console.print()
 
 
-def render_flows_table(flows: list[FlowState]) -> None:
+def render_flows_table(flows: list[FlowStatusResponse]) -> None:
     """flow list — YAML style, one block per flow."""
     for flow in flows:
         _render_flow_row(flow)
 
 
 def render_flows_status_dashboard(
-    flows: list[FlowState],
+    flows: list[FlowStatusResponse],
     titles: dict[int, str],
     pr_map: dict[str, dict[str, object]] | None = None,
     worktree_map: dict[str, str] | None = None,

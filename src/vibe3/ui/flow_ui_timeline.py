@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from vibe3.models.flow import FlowEvent, FlowState
+from vibe3.models.flow import FlowEvent, FlowStatusResponse
 from vibe3.ui.console import console
 
 _EVENT_COLOR: dict[str, str] = {
@@ -77,7 +77,7 @@ def render_milestone(
 
 
 def render_flow_timeline(
-    state: FlowState,
+    state: FlowStatusResponse,
     events: list[FlowEvent],
     milestone_data: dict[str, Any] | None = None,
 ) -> None:

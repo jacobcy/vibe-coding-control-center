@@ -138,7 +138,7 @@ class FlowQueryMixin:
     def list_flows(
         self,
         status: Literal["active", "blocked", "done", "stale"] | None = None,
-    ) -> list[FlowState]:
+    ) -> list[FlowStatusResponse]:
         """List flows with optional status filter."""
         logger.bind(
             domain="flow",
@@ -148,12 +148,52 @@ class FlowQueryMixin:
         flows_data = self.store.get_all_flows()
         if status:
             flows_data = [f for f in flows_data if f.get("flow_status") == status]
-        flows: list[FlowState] = []
+
+        flows: list[FlowStatusResponse] = []
         for flow in flows_data:
+            branch = flow.get("branch", "<unknown>")
             try:
-                flows.append(FlowState(**flow))
-            except ValidationError as exc:
-                branch = flow.get("branch", "<unknown>")
+                # Basic hydration: task_issue_number from issue_links (local)
+                issue_links = self.store.get_issue_links(branch)
+                issues = [IssueLink(**link) for link in issue_links]
+                task_issue_number = flow.get("task_issue_number")
+                if not task_issue_number:
+                    for issue in issues:
+                        if issue.issue_role == "task":
+                            task_issue_number = issue.issue_number
+                            break
+
+                flows.append(
+                    FlowStatusResponse(
+                        branch=flow["branch"],
+                        flow_slug=flow["flow_slug"],
+                        flow_status=flow["flow_status"],
+                        task_issue_number=task_issue_number,
+                        pr_number=flow.get("pr_number"),
+                        pr_ready_for_review=bool(flow.get("pr_ready_for_review")),
+                        spec_ref=flow.get("spec_ref"),
+                        plan_ref=flow.get("plan_ref"),
+                        report_ref=flow.get("report_ref"),
+                        audit_ref=flow.get("audit_ref"),
+                        planner_actor=flow.get("planner_actor"),
+                        planner_session_id=flow.get("planner_session_id"),
+                        executor_actor=flow.get("executor_actor"),
+                        executor_session_id=flow.get("executor_session_id"),
+                        reviewer_actor=flow.get("reviewer_actor"),
+                        reviewer_session_id=flow.get("reviewer_session_id"),
+                        latest_actor=flow.get("latest_actor"),
+                        blocked_by=flow.get("blocked_by"),
+                        next_step=flow.get("next_step"),
+                        issues=issues,
+                        planner_status=flow.get("planner_status"),
+                        executor_status=flow.get("executor_status"),
+                        reviewer_status=flow.get("reviewer_status"),
+                        execution_pid=flow.get("execution_pid"),
+                        execution_started_at=flow.get("execution_started_at"),
+                        execution_completed_at=flow.get("execution_completed_at"),
+                    )
+                )
+            except (ValidationError, KeyError) as exc:
                 logger.bind(
                     domain="flow",
                     action="list",

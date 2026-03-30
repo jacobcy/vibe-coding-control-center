@@ -18,21 +18,29 @@ SQLite (本地缓存)                 GitHub (真源)
 ├── flow_state                   ├── Issues (真源)
 │   ├── branch (PK)              │   └── 所有 issue 都是 GitHub issue
 │   ├── flow_slug                │
-│   ├── task_issue_number        └── Projects (真源)
-│   ├── pr_number                    └── Project items
-│   ├── flow_status
-│   ├── project_item_id
-│   └── project_node_id
+│   ├── flow_status              └── Projects (真源)
+│   ├── project_item_id              └── Project items
+│   ├── project_node_id          │
+│   └── updated_at               └── Pull Requests (真源)
+│                                    └── pr_number (真源)
 │
-└── flow_issue_links (唯一真源)
+└── flow_issue_links (关系真源)
     ├── branch
     ├── issue_number
     └── issue_role (task/related/dependency)
 ```
 
-**重要**: SQLite 只是本地缓存，可以从 GitHub 重建
+**重要**: SQLite 只保留运行时执行现场与最小离线索引，GitHub 真源字段实时读取。
 
-### 1.2 Flow 标识
+### 1.2 Hydration 规则
+
+以下字段为运行时计算字段（Hydrated Fields），禁止持久化到 `flow_state`：
+
+- `task_issue_number`: 优先从 `flow_issue_links` (role=task) 读取
+- `pr_number`: 从 GitHub PR API 实时查询
+- `pr_ready_for_review`: 从 GitHub PR API 实时查询
+
+### 1.3 Flow 标识
 
 **`branch` 是 PRIMARY KEY（指针）**，`flow_slug` 是显示名称。
 
@@ -506,8 +514,7 @@ vibe3 pr create -t <title> [-b <body>] [--base <branch>]
 **行为**:
 - 从当前分支创建 draft PR
 - 自动在 PR body 中添加 Vibe3 Metadata 章节
-- 更新 flow_state.pr_number
-- 添加 pr_draft 事件
+- 添加 pr_draft 事件（不再持久化 pr_number 到 flow_state）
 
 **示例**:
 ```bash
