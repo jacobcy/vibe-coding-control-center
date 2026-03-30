@@ -48,6 +48,7 @@ def mock_store(flow_state_data):
     """Mock Vibe3Store with pre-configured responses."""
     store = Mock()
     store.get_flow_state.return_value = flow_state_data
+    store.get_issue_links.return_value = []
     return store
 
 
@@ -57,6 +58,13 @@ def mock_store_with_task(flow_state_data):
     flow_state_data["task_issue_number"] = 101
     store = Mock()
     store.get_flow_state.return_value = flow_state_data
+    store.get_issue_links.return_value = [
+        {
+            "branch": flow_state_data["branch"],
+            "issue_number": flow_state_data["task_issue_number"],
+            "issue_role": "task",
+        }
+    ]
     return store
 
 
@@ -81,4 +89,5 @@ def mock_store_for_task(issue_link_data):
     """Mock store configured for task service tests."""
     store = Mock()
     store.get_issue_links.return_value = [issue_link_data]
+    store.get_flow_state.return_value = None
     return store

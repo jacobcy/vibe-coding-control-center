@@ -17,7 +17,7 @@ class TestFlowCloseBranchSwitching:
             "updated_at": "2026-03-26T00:00:00",
         }
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_uses_safe_branch_on_dependency_lookup_failure(
         self,
         mock_git_class: MagicMock,
@@ -65,7 +65,7 @@ class TestFlowCloseBranchSwitching:
             latest_actor="workflow",
         )
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_switches_to_safe_branch_when_main_is_occupied(
         self,
         mock_git_class: MagicMock,
@@ -121,7 +121,7 @@ class TestFlowCloseBranchSwitching:
         )
         mock_git.get_safe_main_branch_name.assert_called_once()
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_uses_safe_branch_when_main_is_occupied_on_post_close(
         self,
         mock_git_class: MagicMock,
@@ -167,7 +167,7 @@ class TestFlowCloseBranchSwitching:
         assert "switch:main" not in actions
         assert not any(action.startswith("run:pull") for action in actions)
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_skips_local_delete_when_branch_is_occupied_by_other_worktree(
         self,
         mock_git_class: MagicMock,
@@ -215,7 +215,7 @@ class TestFlowCloseBranchSwitching:
         assert not any(action.startswith("delete_local:") for action in actions)
         assert "delete_remote:task/current-flow" in actions
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_delegates_worktree_race_to_delete_branch(
         self,
         mock_git_class: MagicMock,
@@ -244,7 +244,7 @@ class TestFlowCloseBranchSwitching:
             "task/current-flow", force=True, skip_if_worktree=True
         )
 
-    @patch("vibe3.services.flow_lifecycle.GitClient")
+    @patch("vibe3.services.flow_close_ops.GitClient")
     def test_close_flow_returns_to_develop_branch_in_develop_worktree(
         self,
         mock_git_class: MagicMock,

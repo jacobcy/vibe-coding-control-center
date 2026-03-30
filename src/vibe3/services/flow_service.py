@@ -1,24 +1,24 @@
 """Flow service implementation."""
 
 from loguru import logger
-from pydantic import ValidationError
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.flow import (
-    FlowState,
+    FlowStatusResponse,
     MainBranchProtectedError,
 )
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
-from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 from vibe3.services.flow_query_mixin import FlowQueryMixin
 from vibe3.services.signature_service import SignatureService
 
 
-class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
+class FlowService(FlowLifecycleMixin, FlowQueryMixin):
     """Service for managing flow state."""
+
+    SAFE_BRANCH_PREFIX = "vibe/main-safe/"
 
     store: SQLiteClient
     git_client: GitClient
@@ -49,6 +49,87 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         """
         return self.git_client.get_current_branch()
 
+    # ------------------------------------------------------------------
+    # Main branch detection (from flow_auto_ensure_mixin.py)
+    # ------------------------------------------------------------------
+
+    def _is_main_branch(self, branch: str) -> bool:
+        """Check if branch is a protected main branch.
+
+        Protected branches include:
+        - Configured protected_branches (e.g. main, master, develop)
+        - Remote tracking variants (origin/main, etc.)
+        - Safe branches created by flow close (vibe/main-safe/...)
+        """
+        # Strip remote prefix for safe branch check (origin/vibe/main-safe/...)
+        local_name = branch.split("/", 1)[1] if branch.startswith("origin/") else branch
+        if local_name.startswith(self.SAFE_BRANCH_PREFIX):
+            return True
+
+        # Check against configured protected branches
+        protected = self.config.flow.protected_branches
+
+        # Direct match
+        if branch in protected:
+            return True
+
+        # Check for remote tracking branches (origin/main, etc.)
+        for protected_branch in protected:
+            if branch == f"origin/{protected_branch}":
+                return True
+
+        return False
+
+    def ensure_flow_for_branch(
+        self, branch: str, slug: str | None = None
+    ) -> FlowStatusResponse:
+        """Ensure flow exists for branch, creating if needed.
+
+        Args:
+            branch: Git branch name
+            slug: Optional flow slug (defaults to derived from branch)
+
+        Returns:
+            Existing or newly created FlowStatusResponse
+
+        Raises:
+            MainBranchProtectedError: If branch is main/master
+        """
+        # Guard against main branch
+        if self._is_main_branch(branch):
+            raise MainBranchProtectedError(
+                f"Cannot create flow on protected branch '{branch}'. "
+                "Switch to a feature branch first."
+            )
+
+        # Check if flow already exists
+        existing = self.get_flow_status(branch)
+        if existing:
+            logger.bind(
+                domain="flow",
+                action="ensure",
+                branch=branch,
+                existing=True,
+            ).debug("Flow already exists")
+            return existing
+
+        # Generate slug from branch if not provided
+        if not slug:
+            parts = branch.split("/")
+            branch_name = parts[-1] if len(parts) > 1 else branch
+            slug = branch_name.replace("-", "_")
+
+        # Create new flow
+        logger.bind(
+            domain="flow",
+            action="ensure",
+            branch=branch,
+            slug=slug,
+            existing=False,
+        ).info("Creating flow via ensure")
+
+        return self.create_flow(slug=slug, branch=branch)
+
     def resolve_flow_name(self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.
 
@@ -73,7 +154,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         slug: str,
         branch: str,
         actor: str | None = None,
-    ) -> FlowState:
+    ) -> FlowStatusResponse:
         """Create a new flow.
 
         Args:
@@ -113,31 +194,27 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             f"Flow '{slug}' created",
         )
 
-        flow_data = self.store.get_flow_state(branch)
-        if not flow_data:
+        status = self.get_flow_status(branch)
+        if not status:
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
-        try:
-            return FlowState(**flow_data)
-        except ValidationError as exc:
-            raise RuntimeError(
-                f"Created flow has invalid data for branch {branch}: {exc}"
-            ) from exc
+        return status
 
     def create_flow_with_branch(
         self,
         slug: str,
         start_ref: str = MAIN_BRANCH_REF,
         actor: str | None = None,
-    ) -> FlowState:
+    ) -> FlowStatusResponse:
         """Create a new flow and create branch.
 
         Args:
             slug: Flow name/slug
             start_ref: Starting reference for new branch
+            actor: Actor creating the flow
 
         Returns:
-            Created flow state
+            Created flow status
 
         Raises:
             RuntimeError: If branch already exists or worktree is dirty
@@ -168,17 +245,14 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
 
         return flow
 
-    def switch_flow(
-        self,
-        target: str,
-    ) -> FlowState:
-        """Switch to existing flow.
+    def switch_flow(self, target: str) -> FlowStatusResponse:
+        """Switch to a different flow.
 
         Args:
-            target: Flow slug or branch name to switch to
+            target: Flow name or branch name
 
         Returns:
-            Flow state of the target flow
+            Flow status of the target flow
 
         Raises:
             RuntimeError: If flow not found
@@ -190,7 +264,7 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
         ).info("Switching to flow")
 
         flows = self.list_flows()
-        target_flow = None
+        target_flow: FlowStatusResponse | None = None
         for flow in flows:
             if flow.flow_slug == target or flow.branch == target:
                 target_flow = flow

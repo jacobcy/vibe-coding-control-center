@@ -17,8 +17,10 @@ class TestTaskBridgeHydration:
             "flow_slug": "test-flow",
             "project_item_id": "PVTI_123",
             "project_node_id": "NODE_123",
-            "task_issue_number": 220,
         }
+        mock_store.get_issue_links.return_value = [
+            {"branch": "test-branch", "issue_number": 220, "issue_role": "task"}
+        ]
         mock_client = MagicMock()
         mock_client.get_item.return_value = ProjectItemError(
             type="not_found",
@@ -38,8 +40,10 @@ class TestTaskBridgeHydration:
             "flow_slug": "test-flow",
             "project_item_id": "PVTI_123",
             "project_node_id": "NODE_123",
-            "task_issue_number": 220,
         }
+        mock_store.get_issue_links.return_value = [
+            {"branch": "test-branch", "issue_number": 220, "issue_role": "task"}
+        ]
         mock_client = MagicMock()
         mock_client.get_item.return_value = ProjectItemError(
             type="network_error",

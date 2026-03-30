@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.models.flow import IssueLink
 from vibe3.models.project_item import LinkError, ProjectItemError
 from vibe3.models.task_bridge import TaskBridgeModel
 from vibe3.services.label_service import LabelService
@@ -53,6 +54,8 @@ def auto_link_issue_to_project(
     flow_data = self.store.get_flow_state(branch) or {}
     existing_item_id = flow_data.get("project_item_id")
     if existing_item_id == item.item_id:
+        issue_links = self.store.get_issue_links(branch)
+        primary_task = IssueLink.resolve_task_number(issue_links)
         logger.bind(
             domain="task",
             action="auto_link_issue_to_project",
@@ -64,7 +67,7 @@ def auto_link_issue_to_project(
             branch=branch,
             project_item_id=flow_data.get("project_item_id"),
             project_node_id=flow_data.get("project_node_id"),
-            task_issue_number=flow_data.get("task_issue_number"),
+            task_issue_number=primary_task,
             spec_ref=flow_data.get("spec_ref"),
             plan_ref=flow_data.get("plan_ref"),
             next_step=flow_data.get("next_step"),
@@ -92,11 +95,13 @@ def auto_link_issue_to_project(
     ).info("Auto-linked issue to GitHub Project")
 
     flow_data = self.store.get_flow_state(branch) or {}
+    issue_links = self.store.get_issue_links(branch)
+    primary_task = IssueLink.resolve_task_number(issue_links)
     return TaskBridgeModel(
         branch=branch,
         project_item_id=flow_data.get("project_item_id"),
         project_node_id=flow_data.get("project_node_id"),
-        task_issue_number=flow_data.get("task_issue_number"),
+        task_issue_number=primary_task,
         spec_ref=flow_data.get("spec_ref"),
         plan_ref=flow_data.get("plan_ref"),
         next_step=flow_data.get("next_step"),

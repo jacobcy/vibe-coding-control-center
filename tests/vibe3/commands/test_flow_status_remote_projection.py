@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.models.flow import FlowState
+from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.pr import PRResponse, PRState
 
 runner = CliRunner()
@@ -82,8 +82,8 @@ def _make_flow_state(
     branch: str = "task/demo",
     status: str = "active",
     pr_number: int | None = None,
-) -> FlowState:
-    return FlowState(
+) -> FlowStatusResponse:
+    return FlowStatusResponse(
         branch=branch,
         flow_slug=branch.replace("/", "-"),
         flow_status=status,
