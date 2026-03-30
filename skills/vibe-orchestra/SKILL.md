@@ -11,6 +11,11 @@ description: Use when the user wants a global heartbeat-style issue triage orche
 
 **核心职责**: 作为全局心跳程序的治理者，周期性检查 GitHub issues，判断是否接收、拒绝、拆分、合并、补依赖、调整优先级，并通过标签组织执行秩序。
 
+**新增核心职责**:
+- 只负责 vibe-task 这层的编排
+- 决定 flow 完成几个 task，还是一个 flow 只完成一个 task 的一部分
+- 管理 task 之间的依赖关系和执行顺序
+
 语义边界：
 
 - `vibe-orchestra` 只负责 GitHub issue / label 层的全局治理，不负责实现执行。
@@ -43,6 +48,8 @@ description: Use when the user wants a global heartbeat-style issue triage orche
 - 当前是否存在前置依赖
 - 如果有多个 issue，谁优先、谁排后
 - 现有标签是否能准确表达这些判断
+- flow 完成几个 task，还是一个 flow 只完成一个 task 的一部分
+- task 之间的依赖关系和执行顺序
 
 它的作用是“组织秩序”，不是“组织执行”。
 
@@ -207,5 +214,5 @@ uv run python src/vibe3/cli.py <subcommand>
 ## 与相邻 skill 的关系
 
 - `vibe-manager`：单个 flow/task 的执行治理者
-- `vibe-roadmap`：项目级规划与版本内容治理
+- `vibe-roadmap`：负责脏数据的清洗，标准化，和第一层审查，把 issue 合理的关闭或者转化为 vibe-task
 - `vibe-issue`：单个 issue 的创建、补全、查重与模板治理
