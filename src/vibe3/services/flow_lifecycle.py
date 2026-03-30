@@ -276,7 +276,7 @@ class FlowLifecycleMixin:
             effective_actor,
             f"Flow blocked{': ' + reason if reason else ''}",
         )
-        sync_flow_blocked_task_label(flow_data)
+        sync_flow_blocked_task_label(self.store, branch)
 
     def abort_flow(
         self: Any,

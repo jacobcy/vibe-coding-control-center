@@ -15,19 +15,19 @@
 
 ```
 SQLite (本地缓存)                 GitHub (真源)
-├── flow_state                   ├── Issues (真源)
-│   ├── branch (PK)              │   └── 所有 issue 都是 GitHub issue
-│   ├── flow_slug                │
-│   ├── flow_status              └── Projects (真源)
-│   ├── project_item_id              └── Project items
-│   ├── project_node_id          │
-│   └── updated_at               └── Pull Requests (真源)
-│                                    └── pr_number (真源)
-│
-└── flow_issue_links (关系真源)
-    ├── branch
-    ├── issue_number
-    └── issue_role (task/related/dependency)
++-- flow_state                   +-- Issues (真源)
+|   +-- branch (PK)              |   +-- 所有 issue 都是 GitHub issue
+|   +-- flow_slug                |
+|   +-- flow_status              +-- Projects (真源)
+|   +-- project_item_id              +-- Project items
+|   +-- project_node_id          |
+|   +-- updated_at               +-- Pull Requests (真源)
+|                                    +-- pr_number (真源)
+|
++-- flow_issue_links (关系真源)
+    +-- branch
+    +-- issue_number
+    +-- issue_role (task/related/dependency)
 ```
 
 **重要**: SQLite 只保留运行时执行现场与最小离线索引，GitHub 真源字段实时读取。

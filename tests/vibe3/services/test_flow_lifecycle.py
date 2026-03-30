@@ -289,12 +289,9 @@ class TestFlowLifecycle:
             "branch": "task/current-flow",
             "flow_slug": "current_flow",
             "flow_status": "active",
-            "task_issue_number": 220,
         }
         service = FlowService(store=mock_store)
 
         service.block_flow("task/current-flow", reason="waiting")
 
-        mock_sync_blocked_label.assert_called_once_with(
-            mock_store.get_flow_state.return_value
-        )
+        mock_sync_blocked_label.assert_called_once_with(mock_store, "task/current-flow")
