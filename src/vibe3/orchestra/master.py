@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -104,9 +105,6 @@ def run_master_agent(
         log.info("Dry run, skipping master agent")
         return TriageDecision(action="none", reason="dry_run")
 
-    with Path("/tmp/master_prompt.md").open("w") as f:
-        f.write(prompt)
-
     command = [str(DEFAULT_WRAPPER_PATH)]
     if options.agent:
         command.extend(["--agent", options.agent])
@@ -117,13 +115,21 @@ def run_master_agent(
     else:
         command.extend(["--agent", "master-controller"])
 
-    command.extend(["--prompt-file", "/tmp/master_prompt.md"])
     command.append("--output-format")
     command.append("json")
 
     log.info(f"Running master agent: {' '.join(command)}")
 
+    prompt_path: str | None = None
     try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", prefix="master_prompt_", delete=False
+        ) as f:
+            f.write(prompt)
+            prompt_path = f.name
+
+        command.extend(["--prompt-file", prompt_path])
+
         result = subprocess.run(
             command,
             capture_output=True,
@@ -147,3 +153,6 @@ def run_master_agent(
     except Exception as e:
         log.error(f"Master agent error: {e}")
         return TriageDecision(action="none", reason=str(e))
+    finally:
+        if prompt_path:
+            Path(prompt_path).unlink(missing_ok=True)

@@ -1,11 +1,11 @@
 """Master agent utilities for orchestra."""
 
-import json
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.master import TriageDecision, run_master_agent
@@ -16,16 +16,13 @@ from vibe3.services.label_service import LabelService
 class MasterAgentHandler:
     """Handles master agent triage for new issues."""
 
-    def __init__(self, config: OrchestraConfig, executor: ThreadPoolExecutor):
+    def __init__(self, config: OrchestraConfig, executor: ThreadPoolExecutor) -> None:
         self.config = config
         self.executor = executor
+        self._github = GitHubClient()
 
     def handle(self, issue: IssueInfo) -> TriageDecision | None:
-        """Handle new issue with master agent.
-
-        Returns:
-            TriageDecision or None if failed
-        """
+        """Handle new issue with master agent."""
         log = logger.bind(
             domain="orchestra",
             action="master",
@@ -51,14 +48,13 @@ class MasterAgentHandler:
         return decision
 
     def execute_decision(self, issue_number: int, decision: TriageDecision) -> None:
-        """Execute master agent decision."""
+        """Execute master agent decision using GitHubClient."""
         if decision.action == "close":
-            cmd = ["gh", "issue", "close", str(issue_number)]
-            if self.config.repo:
-                cmd.extend(["--repo", self.config.repo])
-            if decision.comment_body:
-                cmd.extend(["--comment", decision.comment_body])
-            subprocess.run(cmd, capture_output=True)
+            self._github.close_issue(
+                issue_number,
+                comment=decision.comment_body,
+                repo=self.config.repo,
+            )
 
         elif decision.action == "triage":
             LabelService(repo=self.config.repo).confirm_issue_state(
@@ -69,39 +65,17 @@ class MasterAgentHandler:
             )
 
         elif decision.action == "comment" and decision.comment_body:
-            cmd = [
-                "gh",
-                "issue",
-                "comment",
-                str(issue_number),
-                "--body",
-                decision.comment_body,
-            ]
-            if self.config.repo:
-                cmd.extend(["--repo", self.config.repo])
-            subprocess.run(cmd, capture_output=True)
+            self._github.add_comment(
+                issue_number,
+                body=decision.comment_body,
+                repo=self.config.repo,
+            )
 
-    def _fetch_issue_details(self, issue_number: int) -> dict | None:
-        """Fetch full issue details from GitHub."""
-        cmd = [
-            "gh",
-            "issue",
-            "view",
-            str(issue_number),
-            "--json",
-            "number,title,body,labels,url,createdAt,user",
-        ]
-
-        if self.config.repo:
-            cmd.extend(["--repo", self.config.repo])
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-            if result.returncode != 0:
-                return None
-
-            return dict(json.loads(result.stdout))
-        except Exception as e:
-            logger.bind(domain="orchestra").error(f"Failed to fetch issue: {e}")
+    def _fetch_issue_details(self, issue_number: int) -> dict[str, Any] | None:
+        """Fetch issue details via GitHubClient."""
+        data = self._github.view_issue(issue_number)
+        if not data or data == "network_error":
             return None
+        if isinstance(data, dict):
+            return data
+        return None

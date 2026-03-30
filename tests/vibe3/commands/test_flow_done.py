@@ -27,7 +27,9 @@ def test_flow_done_allows_missing_task_issue_and_delegates_pr_guard() -> None:
         result = runner.invoke(app, ["flow", "done"])
 
     assert result.exit_code == 0
-    flow_service.close_flow.assert_called_once_with("task/demo", check_pr=True)
+    flow_service.close_flow.assert_called_once_with(
+        "task/demo", check_pr=True, delete_worktree=False
+    )
 
 
 def test_flow_done_passes_pr_check_when_task_issue_exists() -> None:
@@ -46,7 +48,9 @@ def test_flow_done_passes_pr_check_when_task_issue_exists() -> None:
         result = runner.invoke(app, ["flow", "done"])
 
     assert result.exit_code == 0
-    flow_service.close_flow.assert_called_once_with("task/demo", check_pr=True)
+    flow_service.close_flow.assert_called_once_with(
+        "task/demo", check_pr=True, delete_worktree=False
+    )
 
 
 def test_flow_done_supports_pr_option() -> None:
@@ -80,7 +84,9 @@ def test_flow_done_supports_pr_option() -> None:
     assert result.exit_code == 0
     pr_service.get_pr.assert_called_once_with(pr_number=456)
     flow_service.get_flow_status.assert_called_once_with("task/from-pr")
-    flow_service.close_flow.assert_called_once_with("task/from-pr", check_pr=True)
+    flow_service.close_flow.assert_called_once_with(
+        "task/from-pr", check_pr=True, delete_worktree=False
+    )
 
 
 def test_flow_done_rejects_branch_and_pr_together() -> None:
@@ -104,3 +110,24 @@ def test_flow_done_reports_missing_pr() -> None:
 
     assert result.exit_code == 1
     assert "未找到 PR #999" in result.output
+
+
+def test_flow_done_passes_delete_worktree_flag() -> None:
+    """--delete-worktree should be forwarded to close_flow."""
+    flow_service = MagicMock()
+    flow_service.get_current_branch.return_value = "task/demo"
+    flow_service.get_flow_status.return_value = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+        issues=[],
+    )
+
+    with patch("vibe3.commands.flow_lifecycle.FlowService", return_value=flow_service):
+        result = runner.invoke(app, ["flow", "done", "--delete-worktree"])
+
+    assert result.exit_code == 0
+    flow_service.close_flow.assert_called_once_with(
+        "task/demo", check_pr=True, delete_worktree=True
+    )

@@ -1,6 +1,7 @@
 """Git client - 封装 git 命令，提供统一改动获取接口."""
 
 import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from loguru import logger
@@ -10,6 +11,9 @@ from vibe3.clients.git_branch_ops import (
 )
 from vibe3.clients.git_branch_ops import (
     create_branch as _create_branch,
+)
+from vibe3.clients.git_branch_ops import (
+    create_branch_ref as _create_branch_ref,
 )
 from vibe3.clients.git_branch_ops import (
     delete_branch as _delete_branch,
@@ -42,6 +46,9 @@ from vibe3.clients.git_status_ops import (
     stash_push as _stash_push,
 )
 from vibe3.clients.git_worktree_ops import (
+    find_worktree_path_for_branch as _find_worktree_path_for_branch,
+)
+from vibe3.clients.git_worktree_ops import (
     get_current_branch as _get_current_branch,
 )
 from vibe3.clients.git_worktree_ops import (
@@ -55,6 +62,9 @@ from vibe3.clients.git_worktree_ops import (
 )
 from vibe3.clients.git_worktree_ops import (
     get_worktree_root as _get_worktree_root,
+)
+from vibe3.clients.git_worktree_ops import (
+    get_worktrees_for_branch as _get_worktrees_for_branch,
 )
 from vibe3.clients.git_worktree_ops import (
     is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
@@ -142,6 +152,14 @@ class GitClient:
         """Check whether any worktree already has this branch checked out."""
         return _is_branch_occupied_by_worktree(self._run, branch_name)
 
+    def find_worktree_path_for_branch(self, branch_name: str) -> Path | None:
+        """Find worktree path whose checked-out branch matches ``branch_name``."""
+        return _find_worktree_path_for_branch(self._run, branch_name)
+
+    def get_worktrees_for_branch(self, branch_name: str) -> list[str]:
+        """Return paths of worktrees that have the given branch checked out."""
+        return _get_worktrees_for_branch(self._run, branch_name)
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
         return _get_changed_files(self._run, source, self._github_client)
@@ -169,8 +187,14 @@ class GitClient:
     # ── 分支管理方法（委托给 git_branch_ops）──────────────────
 
     def create_branch(self, branch_name: str, start_ref: str = "origin/main") -> None:
-        """Create a new branch from start_ref."""
+        """Create a new branch from start_ref and switch to it."""
         _create_branch(branch_name, start_ref)
+
+    def create_branch_ref(
+        self, branch_name: str, start_ref: str = "origin/main"
+    ) -> None:
+        """Create a branch ref without checking it out."""
+        _create_branch_ref(branch_name, start_ref)
 
     def switch_branch(self, branch_name: str) -> None:
         """Switch to existing branch."""

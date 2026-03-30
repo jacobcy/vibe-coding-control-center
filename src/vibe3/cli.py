@@ -125,19 +125,30 @@ def run_command(
         Optional[str],
         typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
     ] = None,
+    worktree: Annotated[
+        bool,
+        typer.Option(
+            "--worktree",
+            help=(
+                "Pass --worktree to codeagent-wrapper "
+                "(new isolated worktree execution)"
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
     resolved_plan = plan or file
     run.run_command(
-        instructions,
-        resolved_plan,
-        skill,
-        trace,
-        dry_run,
-        async_mode,
-        agent,
-        backend,
-        model,
+        instructions=instructions,
+        plan=resolved_plan,
+        skill=skill,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
     )
 
 

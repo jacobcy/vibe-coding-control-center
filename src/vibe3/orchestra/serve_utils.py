@@ -1,0 +1,185 @@
+"""Utility functions for orchestra serve command.
+
+Private helpers extracted from serve.py to keep it under 300 lines.
+"""
+
+import os
+import subprocess
+from pathlib import Path
+
+from vibe3.orchestra.config import OrchestraConfig
+
+
+def _resolve_tsu_script() -> Path | None:
+    """Resolve scripts/tsu.sh path from current repo/worktree."""
+    env_path = os.environ.get("VIBE3_TSU_SCRIPT")
+    if env_path:
+        candidate = Path(env_path).expanduser()
+        if candidate.exists():
+            return candidate
+
+    cwd_candidate = (Path.cwd() / "scripts" / "tsu.sh").resolve()
+    if cwd_candidate.exists():
+        return cwd_candidate
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            root = Path(result.stdout.strip())
+            candidate = root / "scripts" / "tsu.sh"
+            if candidate.exists():
+                return candidate
+    except Exception:
+        pass
+
+    return None
+
+
+def _setup_tailscale_webhook(port: int) -> tuple[bool, str]:
+    """Enable temporary Tailscale Funnel webhook via scripts/tsu.sh."""
+    tsu = _resolve_tsu_script()
+    if tsu is None:
+        return (
+            False,
+            "Cannot enable --ts: scripts/tsu.sh not found "
+            "(set VIBE3_TSU_SCRIPT to override)",
+        )
+
+    try:
+        # Best-effort start; command is idempotent when already running.
+        subprocess.run(
+            [str(tsu), "start"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        # Keep going; next command reports a concrete failure if unavailable.
+        pass
+
+    try:
+        result = subprocess.run(
+            [str(tsu), "serve", "webhook", str(port)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False, f"Cannot execute tsu script: {tsu}"
+    except Exception as exc:
+        return False, f"Tailscale webhook setup failed: {exc}"
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if result.returncode != 0:
+        detail = stderr or stdout or f"exit={result.returncode}"
+        return False, f"Tailscale webhook setup failed: {detail}"
+
+    return True, stdout or f"Tailscale webhook configured for port {port}"
+
+
+def _is_orchestra_process(pid: int) -> bool:
+    """Check if a PID is actually an orchestra process."""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return False
+
+        cmdline = result.stdout.strip().lower()
+        return "vibe3" in cmdline and "serve" in cmdline
+    except Exception:
+        return False
+
+
+def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
+    """Validate PID file and check if process is running.
+
+    Returns:
+        Tuple of (pid, is_valid_orchestra_process)
+    """
+    if not pid_file.exists():
+        return None, False
+
+    try:
+        pid = int(pid_file.read_text().strip())
+    except (ValueError, OSError):
+        return None, False
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return pid, False
+    except PermissionError:
+        return pid, False
+
+    return pid, _is_orchestra_process(pid)
+
+
+def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[str]:
+    """Build self-invocation command for async tmux startup."""
+    cmd = [
+        "uv",
+        "run",
+        "python",
+        "src/vibe3/cli.py",
+        "serve",
+        "start",
+        "--interval",
+        str(config.polling_interval),
+        "--port",
+        str(config.port),
+    ]
+    if config.repo:
+        cmd.extend(["--repo", config.repo])
+    if config.dry_run:
+        cmd.append("--dry-run")
+    for _ in range(verbose):
+        cmd.append("-v")
+    return cmd
+
+
+def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
+    """Start serve command in tmux session.
+
+    Returns:
+        (success, message)
+    """
+    session_name = "vibe3-orchestra-serve"
+    cmd = _build_async_serve_command(config, verbose)
+    try:
+        subprocess.run(
+            ["tmux", "new-session", "-d", "-s", session_name, "--"] + cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return False, "tmux not found, cannot start --async serve mode"
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        if "duplicate session" in stderr.lower():
+            return (
+                False,
+                f"Async serve session already exists: {session_name} "
+                "(use `tmux ls` / `tmux kill-session -t vibe3-orchestra-serve`)",
+            )
+        return False, f"Failed to start async serve: {stderr or str(exc)}"
+
+    return (
+        True,
+        f"Started Orchestra server in tmux session: {session_name}\n"
+        "Use `vibe3 serve status` or `tmux attach -t vibe3-orchestra-serve` to inspect",
+    )

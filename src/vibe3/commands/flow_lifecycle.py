@@ -98,6 +98,10 @@ def done(
     pr: Annotated[
         int | None, typer.Option("--pr", help="PR number to resolve head branch from")
     ] = None,
+    delete_worktree: Annotated[
+        bool,
+        typer.Option("--delete-worktree", help="Delete worktree if branch is occupied"),
+    ] = False,
     trace: Annotated[
         bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
     ] = False,
@@ -113,9 +117,17 @@ def done(
 
         require_flow(service, target_branch)
 
-        service.close_flow(target_branch, check_pr=True)
+        branch_deleted = service.close_flow(
+            target_branch, check_pr=True, delete_worktree=delete_worktree
+        )
 
-        typer.echo(f"Flow closed, branch '{target_branch}' deleted")
+        if branch_deleted:
+            typer.echo(f"Flow closed, branch '{target_branch}' deleted")
+        else:
+            typer.echo(
+                f"Flow closed, branch '{target_branch}' preserved "
+                "(occupied by other worktree)"
+            )
 
 
 def blocked(

@@ -8,6 +8,7 @@ from loguru import logger
 from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _TRACE_OPT,
+    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
@@ -21,6 +22,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.services.review_usecase import ReviewUsecase
+from vibe3.utils.git_helpers import get_current_branch
 from vibe3.utils.trace import enable_trace
 
 _ASYNC_OPT = Annotated[
@@ -70,6 +72,8 @@ def pr(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = False,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
 
@@ -90,12 +94,16 @@ def pr(
     typer.echo(f"→ Review: PR #{pr_number}")
     usecase = _build_review_usecase()
     request, issue_number = usecase.build_pr_review(pr_number)
+    branch = get_current_branch() if async_mode and not dry_run else None
     result = usecase.execute_review(
         request,
         dry_run,
         instructions,
         issue_number=issue_number,
         pr_number=pr_number,
+        branch=branch,
+        async_mode=async_mode,
+        worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict == "BLOCK":
@@ -117,6 +125,7 @@ def base(
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
     async_mode: _ASYNC_OPT = False,
+    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -170,6 +179,7 @@ def base(
             handoff_kind="review",
             config=config,
             branch=current_branch,
+            worktree=worktree,
         )
         CodeagentExecutionService(config).execute(command, async_mode=True)
         return
@@ -186,6 +196,7 @@ def base(
         issue_number=issue_number,
         branch=current_branch,
         async_mode=async_mode,
+        worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict == "BLOCK":

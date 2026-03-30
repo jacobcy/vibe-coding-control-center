@@ -85,3 +85,25 @@ class TestMainBranchGuard:
         # ASSERT
         assert flow.branch == "task/some-feature"
         assert flow.flow_status == "active"
+
+    def test_ensure_flow_rejects_safe_branch(self, tmp_path):
+        """Should reject flow creation on vibe/main-safe/ branches."""
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        service = FlowService(store=store)
+
+        with pytest.raises(MainBranchProtectedError) as exc_info:
+            service.ensure_flow_for_branch("vibe/main-safe/wt-feature-handoff-1a2b3c4d")
+
+        assert "protected branch" in str(exc_info.value).lower()
+
+    def test_ensure_flow_rejects_safe_branch_origin(self, tmp_path):
+        """Should reject flow creation on origin/vibe/main-safe/ branches."""
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        service = FlowService(store=store)
+
+        with pytest.raises(MainBranchProtectedError) as exc_info:
+            service.ensure_flow_for_branch(
+                "origin/vibe/main-safe/wt-feature-handoff-1a2b3c4d"
+            )
+
+        assert "protected branch" in str(exc_info.value).lower()

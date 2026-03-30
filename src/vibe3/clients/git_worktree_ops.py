@@ -93,6 +93,56 @@ def get_safe_main_branch_name(run: Callable[[list[str]], str]) -> str:
     return branch_name
 
 
+def _parse_worktree_list(output: str) -> list[tuple[str, str]]:
+    """Parse ``git worktree list --porcelain`` output.
+
+    Returns:
+        List of (worktree_path, branch_ref) tuples.
+    """
+    entries: list[tuple[str, str]] = []
+    wt_path = ""
+    wt_branch = ""
+
+    def flush() -> None:
+        nonlocal wt_path, wt_branch
+        if wt_path:
+            entries.append((wt_path, wt_branch))
+        wt_path = ""
+        wt_branch = ""
+
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line:
+            flush()
+            continue
+        if line.startswith("worktree "):
+            wt_path = line.split(" ", 1)[1]
+        elif line.startswith("branch "):
+            wt_branch = line.split(" ", 1)[1]
+
+    flush()
+    return entries
+
+
+def find_worktree_path_for_branch(
+    run: Callable[[list[str]], str],
+    branch_name: str,
+) -> Path | None:
+    """Find worktree path whose checked-out branch matches ``branch_name``.
+
+    Returns:
+        Path to the worktree, or None if not found.
+    """
+    if not branch_name:
+        return None
+    output = run(["worktree", "list", "--porcelain"])
+    ref = f"refs/heads/{branch_name}"
+    for wt_path, wt_branch in _parse_worktree_list(output):
+        if wt_branch == ref:
+            return Path(wt_path)
+    return None
+
+
 def is_branch_occupied_by_worktree(
     run: Callable[[list[str]], str],
     branch_name: str,
@@ -105,41 +155,61 @@ def is_branch_occupied_by_worktree(
     current_branch = run(["branch", "--show-current"])
     output = run(["worktree", "list", "--porcelain"])
 
-    occupied = False
-    record_worktree = ""
-    record_branch = ""
-
-    def flush_record() -> None:
-        nonlocal occupied, record_worktree, record_branch
-        if record_branch != f"refs/heads/{branch_name}":
-            record_worktree = ""
-            record_branch = ""
-            return
-
-        if branch_name == current_branch:
-            if record_worktree and record_worktree != current_worktree:
-                occupied = True
-        elif record_worktree:
-            occupied = True
-
-        record_worktree = ""
-        record_branch = ""
-
-    for raw_line in output.splitlines():
-        line = raw_line.strip()
-        if not line:
-            flush_record()
+    for wt_path, wt_branch in _parse_worktree_list(output):
+        if wt_branch != f"refs/heads/{branch_name}":
             continue
-        if line.startswith("worktree "):
-            record_worktree = line.split(" ", 1)[1]
-        elif line.startswith("branch "):
-            record_branch = line.split(" ", 1)[1]
+        if branch_name == current_branch:
+            if wt_path and wt_path != current_worktree:
+                return True
+        elif wt_path:
+            return True
 
-    flush_record()
     logger.bind(
         domain="git",
         action="is_branch_occupied_by_worktree",
         branch=branch_name,
-        occupied=occupied,
+        occupied=False,
     ).debug("Checked branch worktree occupation")
+    return False
+
+
+def get_worktrees_for_branch(
+    run: Callable[[list[str]], str],
+    branch_name: str,
+) -> list[str]:
+    """Return paths of worktrees that have the given branch checked out.
+
+    Excludes the current worktree if it holds the branch (caller handles that).
+
+    Args:
+        run: Git command runner function
+        branch_name: Branch name to look for
+
+    Returns:
+        List of worktree root paths (may be empty)
+    """
+    if not branch_name:
+        return []
+
+    current_worktree = get_worktree_root(run)
+    current_branch = run(["branch", "--show-current"])
+    output = run(["worktree", "list", "--porcelain"])
+    ref = f"refs/heads/{branch_name}"
+
+    occupied: list[str] = []
+    for wt_path, wt_branch in _parse_worktree_list(output):
+        if wt_branch != ref:
+            continue
+        if branch_name == current_branch:
+            if wt_path and wt_path != current_worktree:
+                occupied.append(wt_path)
+        elif wt_path:
+            occupied.append(wt_path)
+
+    logger.bind(
+        domain="git",
+        action="get_worktrees_for_branch",
+        branch=branch_name,
+        count=len(occupied),
+    ).debug("Found worktrees for branch")
     return occupied

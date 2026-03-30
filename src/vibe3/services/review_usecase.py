@@ -103,6 +103,7 @@ class ReviewUsecase:
         pr_number: int | None = None,
         branch: str | None = None,
         async_mode: bool = False,
+        worktree: bool = False,
     ) -> ReviewRunResult:
         """Execute review request and return a command-facing summary."""
         log = logger.bind(domain="review", scope=request.scope.kind)
@@ -117,6 +118,7 @@ class ReviewUsecase:
             handoff_metadata={},
             config=self.config,
             branch=branch,
+            worktree=worktree,
         )
         if async_mode and not dry_run and branch:
             exec_svc.execute(command, async_mode=True)

@@ -31,7 +31,7 @@ def _run_git(args: list[str]) -> str:
 
 
 def create_branch(branch_name: str, start_ref: str = "origin/main") -> None:
-    """Create a new branch from start_ref.
+    """Create a new branch from start_ref and switch to it.
 
     Args:
         branch_name: Name of the new branch
@@ -41,6 +41,33 @@ def create_branch(branch_name: str, start_ref: str = "origin/main") -> None:
     logger.bind(
         domain="git", action="create_branch", branch=branch_name, start_ref=start_ref
     ).info("Created branch")
+
+
+def create_branch_ref(branch_name: str, start_ref: str = "origin/main") -> None:
+    """Create a branch ref without checking it out.
+
+    Unlike ``create_branch``, this does NOT switch the worktree.
+    Useful in server/daemon contexts where the current checkout must
+    remain unchanged (e.g. orchestra serve).
+
+    No-op if the branch already exists.
+
+    Args:
+        branch_name: Name of the new branch
+        start_ref: Starting reference (default: origin/main)
+    """
+    try:
+        _run_git(["branch", branch_name, start_ref])
+    except GitError as exc:
+        if "already exists" in str(exc).lower():
+            return
+        raise
+    logger.bind(
+        domain="git",
+        action="create_branch_ref",
+        branch=branch_name,
+        start_ref=start_ref,
+    ).info("Created branch ref (no checkout)")
 
 
 def switch_branch(branch_name: str) -> None:

@@ -1,6 +1,5 @@
 """Flow lifecycle operations - close, block, abort."""
 
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -18,6 +17,10 @@ from vibe3.services.flow_label_sync import (
     sync_flow_done_task_labels,
 )
 from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
+from vibe3.services.flow_restore_branch import (
+    is_baseline_restore_branch,
+    resolve_baseline_branch_for_worktree_root,
+)
 from vibe3.services.signature_service import SignatureService
 
 
@@ -26,22 +29,6 @@ class FlowLifecycleMixin:
 
     store: Any
     git_client: Any
-
-    _BASELINE_WORKTREE_BRANCHES: dict[str, str] = {
-        "main": "main",
-        "develop": "develop",
-        "bugfix": "bugfix",
-    }
-
-    @classmethod
-    def _resolve_baseline_branch_for_worktree_root(
-        cls,
-        worktree_root: str | None,
-    ) -> str | None:
-        if not worktree_root:
-            return None
-        worktree_name = Path(worktree_root).name.lower()
-        return cls._BASELINE_WORKTREE_BRANCHES.get(worktree_name)
 
     def can_create_from_current_worktree(
         self: Any,
@@ -57,21 +44,62 @@ class FlowLifecycleMixin:
         """Resolve target branch for flow close with explicit rules."""
         return resolve_close_target(self.store, branch)
 
+    def _delete_branch_with_cleanup(
+        self: Any,
+        git: GitClient,
+        branch: str,
+        delete_worktree: bool = False,
+    ) -> bool:
+        """Handle worktree occupation and delete branch."""
+        _log = logger.bind(domain="flow", action="close", branch=branch)
+        branch_deleted = False
+
+        occupied_wts = git.get_worktrees_for_branch(branch)
+        if occupied_wts:
+            if delete_worktree:
+                for wt_path in occupied_wts:
+                    _log.bind(worktree=wt_path).info("Deleting occupied worktree")
+                    git._run(["worktree", "remove", wt_path, "--force"])
+            else:
+                _log.warning(
+                    f"Branch '{branch}' is checked out in another "
+                    "worktree. Skipping local branch deletion."
+                )
+
+        if not git.is_branch_occupied_by_worktree(branch) and git.branch_exists(branch):
+            git.delete_branch(branch, force=True, skip_if_worktree=True)
+            _log.info("Local branch deleted")
+            branch_deleted = True
+
+        try:
+            git.delete_remote_branch(branch)
+            _log.info("Remote branch deleted")
+        except Exception:
+            _log.warning("Failed to delete remote branch, continuing")
+
+        return branch_deleted
+
     def close_flow(
         self: Any,
         branch: str,
         check_pr: bool = True,
         actor: str | None = None,
-    ) -> None:
-        """Close flow and delete branch."""
-        git = GitClient()
+        delete_worktree: bool = False,
+    ) -> bool:
+        """Close flow and delete branch.
 
-        logger.bind(
-            domain="flow",
-            action="close",
-            branch=branch,
-            check_pr=check_pr,
-        ).info("Closing flow")
+        Args:
+            branch: Branch to close
+            check_pr: Whether to verify PR is merged
+            actor: Actor performing the action
+            delete_worktree: Whether to delete worktree if branch is occupied
+
+        Returns:
+            True if branch was actually deleted, False otherwise
+        """
+        git = GitClient()
+        _log = logger.bind(domain="flow", action="close", branch=branch)
+        _log.info("Closing flow", check_pr=check_pr)
 
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
@@ -98,47 +126,29 @@ class FlowLifecycleMixin:
         try:
             worktree_root = git.get_worktree_root()
         except Exception as e:
-            logger.bind(
-                domain="flow",
-                action="close",
-                branch=branch,
-            ).warning(f"Failed to resolve worktree root: {e}")
+            _log.warning(f"Failed to resolve worktree root: {e}")
 
-        baseline_branch = self._resolve_baseline_branch_for_worktree_root(worktree_root)
+        baseline_branch = resolve_baseline_branch_for_worktree_root(worktree_root)
         if target_branch == "main":
             if baseline_branch:
                 target_branch = baseline_branch
                 should_pull = True
-                logger.bind(
-                    domain="flow",
-                    action="close",
-                    branch=branch,
-                    target=target_branch,
-                    worktree_root=worktree_root,
-                ).info("Using baseline restore branch for current worktree")
+                _log.bind(worktree_root=worktree_root).info(
+                    "Using baseline restore branch for current worktree"
+                )
             else:
                 target_branch = git.get_safe_main_branch_name()
                 should_pull = False
-                logger.bind(
-                    domain="flow",
-                    action="close",
-                    branch=branch,
-                    target=target_branch,
-                    worktree_root=worktree_root,
-                ).info("Non-baseline worktree; using safe restore branch")
+                _log.bind(worktree_root=worktree_root).info(
+                    "Non-baseline worktree; using safe restore branch"
+                )
 
-        if (
-            target_branch in self._BASELINE_WORKTREE_BRANCHES
-            and git.is_branch_occupied_by_worktree(target_branch)
-        ):
+        if is_baseline_restore_branch(
+            target_branch
+        ) and git.is_branch_occupied_by_worktree(target_branch):
             target_branch = git.get_safe_main_branch_name()
             should_pull = False
-            logger.bind(
-                domain="flow",
-                action="close",
-                branch=branch,
-                target=target_branch,
-            ).info("Main branch is occupied; switching to safe branch")
+            _log.info("Main branch is occupied; switching to safe branch")
 
         switched_before_delete = False
         if git.get_current_branch() == branch:
@@ -154,33 +164,11 @@ class FlowLifecycleMixin:
                 ) from e
 
             switched_before_delete = True
-            logger.bind(
-                domain="flow",
-                action="close",
-                branch=branch,
-                target=target_branch,
-            ).info("Switched away from closing branch")
+            _log.bind(target=target_branch).info("Switched away from closing branch")
 
-        if git.is_branch_occupied_by_worktree(branch):
-            logger.bind(
-                domain="flow",
-                action="close",
-                branch=branch,
-            ).warning(
-                f"Branch '{branch}' is checked out in another worktree. "
-                "Skipping local branch deletion."
-            )
-        elif git.branch_exists(branch):
-            git.delete_branch(branch, force=True, skip_if_worktree=True)
-
-        try:
-            git.delete_remote_branch(branch)
-        except Exception:
-            logger.bind(
-                domain="flow",
-                action="close",
-                branch=branch,
-            ).warning("Failed to delete remote branch, continuing")
+        branch_deleted: bool = self._delete_branch_with_cleanup(
+            git, branch, delete_worktree=delete_worktree
+        )
 
         self.store.update_flow_state(
             branch,
@@ -188,11 +176,19 @@ class FlowLifecycleMixin:
             latest_actor=effective_actor,
         )
 
+        event_message = "Flow closed"
+        if branch_deleted:
+            event_message += f", branch '{branch}' deleted"
+        else:
+            event_message += (
+                f", branch '{branch}' preserved (occupied by other worktree)"
+            )
+
         self.store.add_event(
             branch,
             "flow_closed",
             effective_actor,
-            f"Flow closed, branch '{branch}' deleted",
+            event_message,
         )
         sync_flow_done_task_labels(self.store, branch)
 
@@ -222,6 +218,8 @@ class FlowLifecycleMixin:
 
         except Exception as e:
             logger.warning(f"Failed to switch after close: {e}")
+
+        return branch_deleted
 
     def block_flow(
         self: Any,
