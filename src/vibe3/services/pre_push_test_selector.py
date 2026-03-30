@@ -61,6 +61,24 @@ def select_pre_push_tests(
                 unmapped_sources.append(rel)
 
     if unmapped_sources:
+        # Directory-scoped fallback: run tests in the same subdirectory
+        # as the unmapped source files rather than the full suite.
+        dir_targets: set[str] = set()
+        for src_path in unmapped_sources:
+            src_rel = Path(src_path).relative_to("src/vibe3")
+            test_dir = root / "tests" / "vibe3" / src_rel.parent
+            if test_dir.exists() and any(test_dir.glob("test_*.py")):
+                dir_targets.add(test_dir.relative_to(root).as_posix())
+        if dir_targets:
+            return PrePushTestSelection(
+                mode="incremental",
+                tests=sorted(dir_targets),
+                reason=(
+                    "no direct test file mapping, "
+                    "scoped to test directory of changed source"
+                ),
+                unmapped_sources=sorted(unmapped_sources),
+            )
         return PrePushTestSelection(
             mode="full",
             tests=["tests/vibe3"],

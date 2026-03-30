@@ -103,7 +103,7 @@ if [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
 fi
 
 echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
-uv run pytest "${TEST_TARGETS[@]}" -v --tb=short || {
+uv run pytest "${TEST_TARGETS[@]}" -n auto -q --tb=short || {
     echo "ERROR: Tests failed"
     exit 1
 }

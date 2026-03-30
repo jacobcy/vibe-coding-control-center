@@ -17,16 +17,29 @@ def test_maps_source_file_to_related_tests() -> None:
     assert "tests/vibe3/services/test_pre_push_scope.py" in selection.tests
 
 
-def test_falls_back_to_full_when_source_mapping_missing() -> None:
+def test_falls_back_to_dir_when_source_mapping_missing() -> None:
+    # A real source file with no exact test file match should scope to
+    # the test directory rather than the full suite.
     selection = select_pre_push_tests(
         ["src/vibe3/services/not_real_selector_target.py"]
     )
 
-    assert selection.mode == "full"
-    assert selection.tests == ["tests/vibe3"]
+    assert selection.mode == "incremental"
+    assert selection.tests == ["tests/vibe3/services"]
     assert selection.unmapped_sources == [
         "src/vibe3/services/not_real_selector_target.py"
     ]
+
+
+def test_falls_back_to_full_when_test_dir_missing() -> None:
+    # If the corresponding test directory doesn't exist at all, fall back
+    # to the full suite.
+    selection = select_pre_push_tests(
+        ["src/vibe3/nonexistent_subpackage/some_module.py"]
+    )
+
+    assert selection.mode == "full"
+    assert selection.tests == ["tests/vibe3"]
 
 
 def test_uses_smoke_fallback_when_no_targets() -> None:
