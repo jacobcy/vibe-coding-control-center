@@ -24,6 +24,10 @@ from vibe3.orchestra.serve_utils import (
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
+from vibe3.orchestra.services.status_service import (
+    OrchestraSnapshot,
+    OrchestraStatusService,
+)
 from vibe3.orchestra.webhook_handler import make_webhook_router
 
 app = typer.Typer(
@@ -43,6 +47,13 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     shared_dispatcher = Dispatcher(
         config,
         dry_run=config.dry_run,
+        orchestrator=shared_orchestrator,
+    )
+
+    # Status service for HTTP endpoint and CLI
+    status_service = OrchestraStatusService(
+        config,
+        github=shared_github,
         orchestrator=shared_orchestrator,
     )
 
@@ -73,6 +84,15 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
+
+    # Store status_service for HTTP endpoint
+    fastapi_app.state.status_service = status_service
+
+    @fastapi_app.get("/status")
+    def get_status() -> OrchestraSnapshot:
+        """Get current orchestra status snapshot."""
+        return status_service.snapshot()
+
     return heartbeat, fastapi_app
 
 
