@@ -6,6 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.circuit_breaker import CircuitBreaker, classify_failure
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher_worktree import WorktreeResolverMixin
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
@@ -23,18 +24,33 @@ class Dispatcher(WorktreeResolverMixin):
         dry_run: bool = False,
         repo_path: Path | None = None,
         orchestrator: FlowOrchestrator | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
         self.orchestrator = orchestrator or FlowOrchestrator(config)
+        # Initialize circuit breaker if enabled
+        self._circuit_breaker = circuit_breaker
+        if self._circuit_breaker is None and config.circuit_breaker.enabled:
+            self._circuit_breaker = CircuitBreaker(
+                failure_threshold=config.circuit_breaker.failure_threshold,
+                cooldown_seconds=config.circuit_breaker.cooldown_seconds,
+                half_open_max_tests=config.circuit_breaker.half_open_max_tests,
+            )
 
-    @staticmethod
-    def _run_command(cmd: list[str], cwd: Path, label: str) -> bool:
+    def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a subprocess command with timeout and structured logging.
 
         Returns True on success, False on failure/timeout.
         """
+        # Check circuit breaker before dispatch
+        if self._circuit_breaker and not self._circuit_breaker.allow_request():
+            logger.bind(domain="orchestra").warning(
+                f"{label} blocked by circuit breaker"
+            )
+            return False
+
         try:
             result = subprocess.run(
                 cmd,
@@ -47,15 +63,50 @@ class Dispatcher(WorktreeResolverMixin):
                 logger.bind(domain="orchestra").error(
                     f"{label} failed: {result.stderr}"
                 )
+                # Record failure for circuit breaker
+                if self._circuit_breaker:
+                    category = classify_failure(
+                        result.returncode, result.stderr or "", timed_out=False
+                    )
+                    self._circuit_breaker.record_failure(category)
                 return False
             logger.bind(domain="orchestra").info(f"{label} completed successfully")
+            # Record success for circuit breaker
+            if self._circuit_breaker:
+                self._circuit_breaker.record_success()
             return True
         except subprocess.TimeoutExpired:
             logger.bind(domain="orchestra").error(f"{label} timed out")
+            if self._circuit_breaker:
+                category = classify_failure(
+                    returncode=1, stderr="timeout", timed_out=True
+                )
+                self._circuit_breaker.record_failure(category)
             return False
         except Exception as e:
             logger.bind(domain="orchestra").error(f"{label} error: {e}")
+            if self._circuit_breaker:
+                category = classify_failure(
+                    returncode=1, stderr=str(e), timed_out=False
+                )
+                self._circuit_breaker.record_failure(category)
             return False
+
+    def run_governance_command(self, cmd: list[str], label: str) -> bool:
+        """Run a governance command through the shared dispatch machinery.
+
+        Uses the same circuit breaker and error classification as manager
+        dispatch, ensuring governance failures are tracked consistently.
+        Executes in repo_path (not a specific worktree).
+        """
+        return self._run_command(cmd, self.repo_path, label)
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for status reporting."""
+        if self._circuit_breaker:
+            return self._circuit_breaker.state_value
+        return "disabled"
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Dispatch manager execution for an assignee-triggered issue."""

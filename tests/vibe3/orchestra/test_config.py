@@ -13,6 +13,10 @@ def test_default_config():
     assert OrchestraConfig().polling_interval == 900
     assert OrchestraConfig().dry_run is False
     assert OrchestraConfig().polling.enabled is True
+    assert OrchestraConfig().governance.enabled is True
+    assert OrchestraConfig().governance.interval_ticks == 4
+    assert OrchestraConfig().governance.skill == "vibe-orchestra"
+    assert OrchestraConfig().governance.dry_run is False
     assert OrchestraConfig().assignee_dispatch.enabled is True
     assert OrchestraConfig().assignee_dispatch.use_worktree is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
@@ -90,6 +94,12 @@ def test_from_settings_loads_yaml_config():
                             "async_mode": True,
                             "use_worktree": True,
                         },
+                        "governance": {
+                            "enabled": True,
+                            "interval_ticks": 6,
+                            "skill": "custom-skill",
+                            "dry_run": True,
+                        },
                     }
                 }
             )
@@ -116,6 +126,10 @@ def test_from_settings_loads_yaml_config():
             assert config.pr_review_dispatch.enabled is False
             assert config.pr_review_dispatch.async_mode is True
             assert config.pr_review_dispatch.use_worktree is True
+            assert config.governance.enabled is True
+            assert config.governance.interval_ticks == 6
+            assert config.governance.skill == "custom-skill"
+            assert config.governance.dry_run is True
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults
 
