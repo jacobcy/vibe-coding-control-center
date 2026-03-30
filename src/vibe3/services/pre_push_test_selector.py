@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Sequence
 
+from vibe3.services.change_scope_service import classify_changed_files
+
 SMOKE_TEST_TARGETS = (
     "tests/vibe3/services/test_pre_push_scope.py",
     "tests/vibe3/integration/test_review_shell_contract.py",
@@ -38,27 +40,21 @@ def select_pre_push_tests(
     selected: set[str] = set()
     unmapped_sources: list[str] = []
 
-    for raw in changed_files:
-        rel = raw.strip()
-        if not rel:
-            continue
+    scope = classify_changed_files(changed_files, repo_root=root)
 
-        if _is_python_test_path(rel):
-            test_path = root / rel
-            if test_path.exists():
-                selected.add(rel)
-            continue
+    for test_path in scope.v3_test_files:
+        if (root / test_path).exists():
+            selected.add(test_path)
 
-        if rel.startswith("scripts/hooks/"):
-            selected.update(_existing_targets(root, HOOK_TEST_TARGETS))
-            continue
+    if scope.hook_files:
+        selected.update(_existing_targets(root, HOOK_TEST_TARGETS))
 
-        if _is_v3_source_path(rel):
-            mapped = _map_source_to_tests(rel, root)
-            if mapped:
-                selected.update(mapped)
-            else:
-                unmapped_sources.append(rel)
+    for src_path in scope.v3_source_files:
+        mapped = _map_source_to_tests(src_path, root)
+        if mapped:
+            selected.update(mapped)
+        else:
+            unmapped_sources.append(src_path)
 
     if unmapped_sources:
         # Layer 2: DAG-based import analysis.
@@ -169,14 +165,6 @@ def _find_tests_via_dag(src_files: list[str], root: Path) -> set[str]:
         return hits
     except Exception:  # noqa: BLE001
         return set()
-
-
-def _is_python_test_path(path: str) -> bool:
-    return path.startswith("tests/vibe3/") and path.endswith(".py")
-
-
-def _is_v3_source_path(path: str) -> bool:
-    return path.startswith("src/vibe3/") and path.endswith(".py")
 
 
 def _existing_targets(root: Path, targets: Sequence[str]) -> list[str]:
