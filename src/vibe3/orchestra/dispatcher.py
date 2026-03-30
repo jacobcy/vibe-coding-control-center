@@ -84,18 +84,14 @@ class Dispatcher(WorktreeResolverMixin):
             return True
         except subprocess.TimeoutExpired:
             logger.bind(domain="orchestra").error(f"{label} timed out")
-            category = classify_failure(
-                returncode=1, stderr="timeout", timed_out=True
-            )
+            category = classify_failure(returncode=1, stderr="timeout", timed_out=True)
             self._last_error_category = category
             if self._circuit_breaker:
                 self._circuit_breaker.record_failure(category)
             return False
         except Exception as e:
             logger.bind(domain="orchestra").error(f"{label} error: {e}")
-            category = classify_failure(
-                returncode=1, stderr=str(e), timed_out=False
-            )
+            category = classify_failure(returncode=1, stderr=str(e), timed_out=False)
             self._last_error_category = category
             if self._circuit_breaker:
                 self._circuit_breaker.record_failure(category)
