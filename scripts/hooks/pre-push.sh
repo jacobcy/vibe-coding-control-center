@@ -96,17 +96,16 @@ else
     TEST_REASON="VIBE_PREPUSH_FULL=1"
 fi
 
-if [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
-    TEST_MODE="full"
-    TEST_REASON="empty target set, fallback to full suite"
-    TEST_TARGETS=("tests/vibe3")
+if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
+    echo "  -> Tests skipped ($TEST_REASON)"
+    echo "     (no local targets determined; CI runs full suite)"
+else
+    echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
+    uv run pytest "${TEST_TARGETS[@]}" -n auto -q --tb=short || {
+        echo "ERROR: Tests failed"
+        exit 1
+    }
 fi
-
-echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
-uv run pytest "${TEST_TARGETS[@]}" -n auto -q --tb=short || {
-    echo "ERROR: Tests failed"
-    exit 1
-}
 
 # 4. LOC checks (fast, <2s) - WARNING ONLY in pre-push
 echo "  -> LOC checks (warning only)..."

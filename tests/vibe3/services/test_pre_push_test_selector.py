@@ -49,15 +49,15 @@ def test_falls_back_to_dir_when_source_mapping_missing() -> None:
     ]
 
 
-def test_falls_back_to_full_when_test_dir_missing() -> None:
-    # If the corresponding test directory doesn't exist at all, fall back
-    # to the full suite.
+def test_skips_when_test_dir_missing() -> None:
+    # If the corresponding test directory doesn't exist at all, skip local run
+    # instead of falling back to full suite (CI covers full suite).
     selection = select_pre_push_tests(
         ["src/vibe3/nonexistent_subpackage/some_module.py"]
     )
 
-    assert selection.mode == "full"
-    assert selection.tests == ["tests/vibe3"]
+    assert selection.mode == "skip"
+    assert selection.tests == []
 
 
 def test_uses_smoke_fallback_when_no_targets() -> None:
@@ -65,6 +65,17 @@ def test_uses_smoke_fallback_when_no_targets() -> None:
 
     assert selection.mode == "smoke"
     assert "tests/vibe3/services/test_pre_push_scope.py" in selection.tests
+
+
+def test_skips_when_no_applicable_files() -> None:
+    # Non-Python, non-hook changes should skip (not go to full suite).
+    # CI handles full coverage; locally there's nothing deterministic to run.
+    selection = select_pre_push_tests(["docs/standards/some-standard.md"])
+
+    assert selection.mode in ("smoke", "skip")
+    # Either smoke (if smoke files exist) or skip - both are acceptable;
+    # the key invariant is it must NOT fall back to full suite.
+    assert selection.tests != ["tests/vibe3"]
 
 
 def test_maps_hook_changes_to_hook_regression_tests() -> None:

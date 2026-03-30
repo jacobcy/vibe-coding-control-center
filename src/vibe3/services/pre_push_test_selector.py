@@ -24,7 +24,7 @@ HOOK_TEST_TARGETS = (
 class PrePushTestSelection:
     """Resolved test plan for pre-push."""
 
-    mode: Literal["incremental", "smoke", "full"]
+    mode: Literal["incremental", "smoke", "full", "skip"]
     tests: list[str]
     reason: str
     unmapped_sources: list[str] = field(default_factory=list)
@@ -96,9 +96,12 @@ def select_pre_push_tests(
                 unmapped_sources=sorted(unmapped_sources),
             )
         return PrePushTestSelection(
-            mode="full",
-            tests=["tests/vibe3"],
-            reason="source-to-test mapping missing, fallback to full suite",
+            mode="skip",
+            tests=[],
+            reason=(
+                "no test directory for changed source, "
+                "skipping local run (CI covers full suite)"
+            ),
             unmapped_sources=sorted(unmapped_sources),
         )
 
@@ -118,9 +121,9 @@ def select_pre_push_tests(
         )
 
     return PrePushTestSelection(
-        mode="full",
-        tests=["tests/vibe3"],
-        reason="smoke tests unavailable, fallback to full suite",
+        mode="skip",
+        tests=[],
+        reason="no applicable test targets, skipping local run (CI covers full suite)",
     )
 
 
