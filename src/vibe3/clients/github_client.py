@@ -5,12 +5,9 @@ from vibe3.clients.github_issues_ops import IssuesMixin
 from vibe3.clients.github_pr_ops import PRMixin
 from vibe3.clients.github_pr_query_ops import PRQueryMixin
 from vibe3.clients.github_review_ops import ReviewMixin
-from vibe3.clients.github_status_ops import StatusMixin
 
 
-class GitHubClient(
-    GitHubClientBase, PRMixin, PRQueryMixin, ReviewMixin, StatusMixin, IssuesMixin
-):
+class GitHubClient(GitHubClientBase, PRMixin, PRQueryMixin, ReviewMixin, IssuesMixin):
     """GitHub client for interacting with GitHub via gh CLI.
 
     This class combines all mixins to provide comprehensive GitHub operations:
@@ -18,7 +15,6 @@ class GitHubClient(
     - PR operations (create, get, update, merge)
     - PR query operations (list, commits)
     - Review operations (comments, reviews, diff)
-    - Status operations (commit status, SHA retrieval)
     - Issues operations (list, view)
     """
 

@@ -10,14 +10,15 @@ from vibe3.models.flow import (
     MainBranchProtectedError,
 )
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
-from vibe3.services.flow_auto_ensure_mixin import FlowAutoEnsureMixin
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 from vibe3.services.flow_query_mixin import FlowQueryMixin
 from vibe3.services.signature_service import SignatureService
 
 
-class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
+class FlowService(FlowLifecycleMixin, FlowQueryMixin):
     """Service for managing flow state."""
+
+    SAFE_BRANCH_PREFIX = "vibe/main-safe/"
 
     store: SQLiteClient
     git_client: GitClient
@@ -47,6 +48,87 @@ class FlowService(FlowAutoEnsureMixin, FlowLifecycleMixin, FlowQueryMixin):
             Current branch name
         """
         return self.git_client.get_current_branch()
+
+    # ------------------------------------------------------------------
+    # Main branch detection (from flow_auto_ensure_mixin.py)
+    # ------------------------------------------------------------------
+
+    def _is_main_branch(self, branch: str) -> bool:
+        """Check if branch is a protected main branch.
+
+        Protected branches include:
+        - Configured protected_branches (e.g. main, master, develop)
+        - Remote tracking variants (origin/main, etc.)
+        - Safe branches created by flow close (vibe/main-safe/...)
+        """
+        # Strip remote prefix for safe branch check (origin/vibe/main-safe/...)
+        local_name = branch.split("/", 1)[1] if branch.startswith("origin/") else branch
+        if local_name.startswith(self.SAFE_BRANCH_PREFIX):
+            return True
+
+        # Check against configured protected branches
+        protected = self.config.flow.protected_branches
+
+        # Direct match
+        if branch in protected:
+            return True
+
+        # Check for remote tracking branches (origin/main, etc.)
+        for protected_branch in protected:
+            if branch == f"origin/{protected_branch}":
+                return True
+
+        return False
+
+    def ensure_flow_for_branch(
+        self, branch: str, slug: str | None = None
+    ) -> FlowStatusResponse:
+        """Ensure flow exists for branch, creating if needed.
+
+        Args:
+            branch: Git branch name
+            slug: Optional flow slug (defaults to derived from branch)
+
+        Returns:
+            Existing or newly created FlowStatusResponse
+
+        Raises:
+            MainBranchProtectedError: If branch is main/master
+        """
+        # Guard against main branch
+        if self._is_main_branch(branch):
+            raise MainBranchProtectedError(
+                f"Cannot create flow on protected branch '{branch}'. "
+                "Switch to a feature branch first."
+            )
+
+        # Check if flow already exists
+        existing = self.get_flow_status(branch)
+        if existing:
+            logger.bind(
+                domain="flow",
+                action="ensure",
+                branch=branch,
+                existing=True,
+            ).debug("Flow already exists")
+            return existing
+
+        # Generate slug from branch if not provided
+        if not slug:
+            parts = branch.split("/")
+            branch_name = parts[-1] if len(parts) > 1 else branch
+            slug = branch_name.replace("-", "_")
+
+        # Create new flow
+        logger.bind(
+            domain="flow",
+            action="ensure",
+            branch=branch,
+            slug=slug,
+            existing=False,
+        ).info("Creating flow via ensure")
+
+        return self.create_flow(slug=slug, branch=branch)
 
     def resolve_flow_name(self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.

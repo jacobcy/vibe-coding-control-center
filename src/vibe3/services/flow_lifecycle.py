@@ -4,15 +4,15 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import UserError
 from vibe3.models.flow import CloseTargetDecision, CreateDecision
-from vibe3.services.flow_abort_ops import abort_flow_impl
-from vibe3.services.flow_close_ops import close_flow_impl
-from vibe3.services.flow_close_target import resolve_close_target
-from vibe3.services.flow_create_decision import decide_create_from_current_worktree
-from vibe3.services.flow_label_sync import (
+from vibe3.services.flow_close_ops import (
+    close_flow_impl,
+    resolve_close_target,
     sync_flow_blocked_task_label,
 )
+from vibe3.services.flow_create_decision import decide_create_from_current_worktree
 from vibe3.services.signature_service import SignatureService
 
 
@@ -121,4 +121,33 @@ class FlowLifecycleMixin:
             explicit_actor=actor,
             flow_actor=flow_data.get("latest_actor"),
         )
-        abort_flow_impl(self.store, branch, actor=effective_actor)
+        _abort_flow_impl(self.store, branch, actor=effective_actor)
+
+
+def _abort_flow_impl(store: Any, branch: str, actor: str = "workflow") -> None:
+    """Abort flow and delete branch."""
+    git = GitClient()
+
+    logger.bind(domain="flow", action="abort", branch=branch).info("Aborting flow")
+
+    flow_data = store.get_flow_state(branch)
+    if not flow_data:
+        raise RuntimeError(f"Flow not found for branch {branch}")
+
+    if git.branch_exists(branch):
+        git.delete_branch(branch, force=True)
+
+    try:
+        git.delete_remote_branch(branch)
+    except Exception:
+        logger.bind(domain="flow", action="abort", branch=branch).warning(
+            "Failed to delete remote branch, continuing"
+        )
+
+    store.update_flow_state(branch, flow_status="aborted", latest_actor=actor)
+    store.add_event(
+        branch,
+        "flow_aborted",
+        actor,
+        f"Flow aborted, branch '{branch}' deleted",
+    )

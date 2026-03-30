@@ -1,20 +1,194 @@
-"""Implementation of flow close operations."""
+"""Implementation of flow close operations.
 
+Includes: close, branch cleanup, PR merge guard, close target resolution,
+restore branch helpers, and label sync for lifecycle events.
+"""
+
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.exceptions import UserError
+from vibe3.models.flow import CloseTargetDecision
+from vibe3.models.orchestration import IssueState
+from vibe3.models.pr import PRState
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
-from vibe3.services.flow_label_sync import sync_flow_done_task_labels
-from vibe3.services.flow_pr_guard import ensure_flow_pr_merged
-from vibe3.services.flow_restore_branch import (
-    is_baseline_restore_branch,
-    resolve_baseline_branch_for_worktree_root,
-)
+from vibe3.services.label_service import LabelService
 from vibe3.services.signature_service import SignatureService
+
+# ---------------------------------------------------------------------------
+# Restore branch helpers (from flow_restore_branch.py)
+# ---------------------------------------------------------------------------
+
+_BASELINE_WORKTREE_BRANCHES: dict[str, str] = {
+    "main": "main",
+    "develop": "develop",
+    "bugfix": "bugfix",
+}
+
+
+def resolve_baseline_branch_for_worktree_root(worktree_root: str | None) -> str | None:
+    """Resolve baseline restore branch for a worktree root path."""
+    if not worktree_root:
+        return None
+    worktree_name = Path(worktree_root).name.lower()
+    return _BASELINE_WORKTREE_BRANCHES.get(worktree_name)
+
+
+def is_baseline_restore_branch(branch: str) -> bool:
+    """Return whether branch is one of baseline restore branches."""
+    return branch in _BASELINE_WORKTREE_BRANCHES
+
+
+# ---------------------------------------------------------------------------
+# PR merge guard (from flow_pr_guard.py)
+# ---------------------------------------------------------------------------
+
+
+def ensure_flow_pr_merged(
+    gh_client: Any,
+    flow_data: dict[str, Any],
+    branch: str,
+) -> None:
+    """Ensure the flow has a merged PR before allowing flow close."""
+    pr_number = flow_data.get("pr_number")
+    try:
+        pr = gh_client.get_pr(pr_number) if pr_number else None
+        if pr is None:
+            pr = gh_client.get_pr(branch=branch)
+    except Exception as error:
+        raise UserError(
+            "无法检查当前 flow 的 PR merge 状态。\n"
+            "请先确认 PR 已 merged；\n"
+            "若要放弃当前 flow，请执行 `vibe3 flow aborted`。\n"
+            f"原始错误: {error}"
+        ) from error
+
+    if not pr:
+        raise UserError(
+            "当前 flow 未找到可关闭的 PR。\n"
+            "请先执行 `vibe3 pr create` 并完成 merge；"
+            "若要放弃当前 flow，请执行 `vibe3 flow aborted`。"
+        )
+
+    merged = pr.state == PRState.MERGED or pr.merged_at is not None
+    if not merged:
+        raise UserError(
+            f"PR #{pr.number} 尚未 merged，不能关闭 flow。\n"
+            "请先完成 merge；若要放弃当前 flow，请执行 `vibe3 flow aborted`。"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Close target resolution (from flow_close_target.py)
+# ---------------------------------------------------------------------------
+
+
+def resolve_close_target(store: Any, branch: str) -> CloseTargetDecision:
+    """Resolve target branch for flow close with explicit rules."""
+    dependency_store = store
+    if not hasattr(dependency_store, "get_flow_dependents"):
+        dependency_store = SQLiteClient()
+
+    try:
+        dependents = dependency_store.get_flow_dependents(branch)
+    except Exception as e:
+        logger.warning(f"Failed to query flow dependents: {e}")
+        dependents = []
+
+    if len(dependents) == 1:
+        return CloseTargetDecision(
+            target_branch=dependents[0],
+            should_pull=False,
+            reason="Single active dependent flow exists",
+        )
+
+    if len(dependents) > 1:
+        logger.warning(
+            f"Multiple active flows depend on '{branch}': {', '.join(dependents)}\n"
+            f"Use 'vibe3 flow switch <branch>' to switch to specific branch"
+        )
+
+    return CloseTargetDecision(
+        target_branch="main",
+        should_pull=True,
+        reason="No single active dependent - returning to safe branch",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Label sync for lifecycle events (from flow_label_sync.py)
+# ---------------------------------------------------------------------------
+
+
+def _is_terminal_flow_status(status: str | None) -> bool:
+    """Return whether a flow status is terminal for task closing decisions."""
+    return status in {"done", "aborted", "stale"}
+
+
+def _issue_has_other_open_task_flows(
+    store: Any, branch: str, issue_number: int
+) -> bool:
+    """Check if issue is still bound as task by other non-terminal flows."""
+    linked_flows = store.get_flows_by_issue(issue_number, role="task")
+    flows = linked_flows if isinstance(linked_flows, list) else []
+    for flow in flows:
+        other_branch = flow.get("branch")
+        if not other_branch or other_branch == branch:
+            continue
+        flow_status = flow.get("flow_status")
+        if not _is_terminal_flow_status(flow_status):
+            return True
+    return False
+
+
+def sync_flow_done_task_labels(store: Any, branch: str) -> None:
+    """Sync all task-role issues in a flow to state/done."""
+    issue_links_raw = store.get_issue_links(branch)
+    issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
+    label_service = LabelService()
+    for link in issue_links:
+        if link.get("issue_role") != "task":
+            continue
+        issue_number = link.get("issue_number")
+        if issue_number is None:
+            continue
+        if _issue_has_other_open_task_flows(store, branch, int(issue_number)):
+            continue
+        label_service.confirm_issue_state(
+            int(issue_number),
+            IssueState.DONE,
+            actor="flow:done",
+            force=True,
+        )
+
+
+def sync_flow_blocked_task_label(store: Any, branch: str) -> None:
+    """Sync task-role issues in a flow to state/blocked when flow is blocked."""
+    issue_links_raw = store.get_issue_links(branch)
+    issue_links = issue_links_raw if isinstance(issue_links_raw, list) else []
+    label_service = LabelService()
+    for link in issue_links:
+        if link.get("issue_role") != "task":
+            continue
+        issue_number = link.get("issue_number")
+        if issue_number is None:
+            continue
+        label_service.confirm_issue_state(
+            int(issue_number),
+            IssueState.BLOCKED,
+            actor="flow:blocked",
+            force=True,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Branch cleanup and close implementation
+# ---------------------------------------------------------------------------
 
 
 def delete_branch_with_cleanup(
@@ -94,8 +268,6 @@ def close_flow_impl(
         if resolve_close_target_fn:
             close_target = resolve_close_target_fn(branch)
         else:
-            from vibe3.services.flow_close_target import resolve_close_target
-
             close_target = resolve_close_target(store, branch)
         target_branch = close_target.target_branch
         should_pull = close_target.should_pull
