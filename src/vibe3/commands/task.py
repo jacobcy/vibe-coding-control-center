@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Task command handlers."""
 
-import json
 from contextlib import contextmanager
 from typing import Annotated, Iterator
 
@@ -10,9 +9,13 @@ import typer
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
+from vibe3.services.milestone_service import MilestoneService
 from vibe3.services.task_service import TaskService
-from vibe3.services.task_usecase import TaskShowResult, TaskUsecase
-from vibe3.ui.task_ui import render_task_milestone
+from vibe3.services.task_usecase import TaskUsecase
+from vibe3.ui.task_ui import (
+    render_task_show_error_with_milestone,
+    render_task_show_with_milestone,
+)
 
 app = typer.Typer(
     help="Manage execution tasks", no_args_is_help=True, rich_markup_mode="rich"
@@ -24,33 +27,6 @@ def _noop() -> Iterator[None]:
     yield
 
 
-def _fetch_milestone_data(issue_number: int) -> "dict[str, object] | None":
-    """Fetch milestone orchestration context for a task issue from GitHub."""
-    from vibe3.clients.github_client import GitHubClient
-
-    try:
-        gh = GitHubClient()
-        issue = gh.view_issue(issue_number)
-        if not isinstance(issue, dict) or not issue.get("milestone"):
-            return None
-        ms = issue["milestone"]
-        ms_issues = gh.get_milestone_issues(ms["number"])
-    except (FileNotFoundError, RuntimeError):
-        return None
-    open_count = sum(1 for i in ms_issues if str(i.get("state", "")).upper() == "OPEN")
-    closed_count = sum(
-        1 for i in ms_issues if str(i.get("state", "")).upper() == "CLOSED"
-    )
-    return {
-        "number": ms["number"],
-        "title": ms["title"],
-        "open": open_count,
-        "closed": closed_count,
-        "issues": ms_issues,
-        "task_issue": issue_number,
-    }
-
-
 def _build_task_usecase() -> TaskUsecase:
     """Construct a task usecase with command-local service wiring."""
     return TaskUsecase(
@@ -59,12 +35,19 @@ def _build_task_usecase() -> TaskUsecase:
     )
 
 
+def _build_milestone_service() -> MilestoneService:
+    """Construct a milestone service."""
+    return MilestoneService()
+
+
 @app.command()
 def list(
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """List all tasks (flows with task issue bound)."""
+    import json
+
     if trace:
         setup_logging(verbose=2)
 
@@ -94,6 +77,8 @@ def show(
 ) -> None:
     """Show task details, including remote GitHub Project fields."""
     usecase = _build_task_usecase()
+    milestone_svc = _build_milestone_service()
+
     try:
         target_branch = usecase.resolve_branch(branch)
     except RuntimeError as error:
@@ -110,91 +95,22 @@ def show(
     )
     with ctx:
         task_result = usecase.show_task(target_branch)
-        _render_task_show(task_result, json_output)
 
+        # Fetch milestone context if task has an issue number
+        milestone_ctx = None
+        issue_number = None
+        if task_result.view and task_result.view.task_issue_number:
+            issue_number = task_result.view.task_issue_number.value
+        elif task_result.local_task and task_result.local_task.task_issue_number:
+            issue_number = task_result.local_task.task_issue_number
 
-def _render_task_show(task_result: TaskShowResult, json_output: bool) -> None:
-    """Render task show output while keeping show() thin."""
-    if task_result.hydrate_error:
-        _render_task_show_error(task_result, json_output)
-        return
-    if not task_result.view:
-        typer.echo(f"Task not found: {task_result.branch}", err=True)
-        raise typer.Exit(1)
-    view = task_result.view
-    if json_output:
-        typer.echo(json.dumps(view.model_dump(), indent=2, default=str))
-        return
+        if issue_number:
+            milestone_ctx = milestone_svc.get_milestone_context(issue_number)
 
-    bound_id = view.project_item_id.value if view.project_item_id else None
-    bind_status = "[bound]" if bound_id else "[unbound]"
-    typer.echo(f"Branch: {view.branch}")
-    typer.echo(f"Project Item {bind_status}: {bound_id or 'N/A'}")
-
-    if view.task_issue_number:
-        typer.echo(f"Task Issue: #{view.task_issue_number.value}")
-    if task_result.related_issue_numbers:
-        typer.echo(
-            "Related Issue(s): "
-            + "  ".join(f"#{number}" for number in task_result.related_issue_numbers)
-        )
-    if task_result.dependency_issue_numbers:
-        typer.echo(
-            "Dependencies: "
-            + "  ".join(f"#{number}" for number in task_result.dependency_issue_numbers)
-        )
-    if view.spec_ref:
-        typer.echo(f"Spec Ref: {view.spec_ref.value}")
-    if view.next_step:
-        typer.echo(f"Next Step: {view.next_step.value}")
-    if view.blocked_by:
-        typer.echo(f"Blocked By: {view.blocked_by.value}")
-
-    if view.offline_mode:
-        typer.echo("[offline mode] 远端读取失败，仅显示本地 bridge 字段")
-    else:
-        if view.title:
-            typer.echo(f"[remote] Title:    {view.title.value}")
-        if view.body:
-            typer.echo(f"[remote] Body:     {view.body.value}")
-        if view.status:
-            typer.echo(f"[remote] Status:   {view.status.value}")
-        if view.priority:
-            typer.echo(f"[remote] Priority: {view.priority.value}")
-        if view.assignees:
-            typer.echo(f"[remote] Assignees: {', '.join(view.assignees.value)}")
-
-    if view.identity_drift:
-        typer.echo("[warning] identity_drift=True: 本地与远端 identity 不一致")
-
-    if view.task_issue_number and not json_output:
-        milestone_data = _fetch_milestone_data(view.task_issue_number.value)
-        if milestone_data:
-            render_task_milestone(view.task_issue_number.value, milestone_data)
-
-
-def _render_task_show_error(task_result: TaskShowResult, json_output: bool) -> None:
-    """Render hydrate fallback or hard error for task show."""
-    error = task_result.hydrate_error
-    if not error:
-        return
-    if error.type == "binding_invalid":
-        typer.echo(f"Error [{error.type}]: {error.message}", err=True)
-        raise typer.Exit(1)
-    task = task_result.local_task
-    if not task:
-        typer.echo(f"Task not found: {task_result.branch}", err=True)
-        raise typer.Exit(1)
-    if json_output:
-        typer.echo(json.dumps(task.model_dump(), indent=2, default=str))
-        return
-    typer.echo(f"Branch: {task.branch}")
-    if task.task_issue_number:
-        typer.echo(f"Task Issue: #{task.task_issue_number}")
-    typer.echo(f"Status (local flow): {task.flow_status}")
-    typer.echo(f"[hint] {error.message}")
-
-    if task.task_issue_number:
-        milestone_data = _fetch_milestone_data(task.task_issue_number)
-        if milestone_data:
-            render_task_milestone(task.task_issue_number, milestone_data)
+        # Delegate rendering to UI layer
+        if task_result.hydrate_error:
+            render_task_show_error_with_milestone(
+                task_result, milestone_ctx, json_output
+            )
+        else:
+            render_task_show_with_milestone(task_result, milestone_ctx, json_output)

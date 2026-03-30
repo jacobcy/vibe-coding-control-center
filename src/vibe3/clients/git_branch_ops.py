@@ -4,6 +4,7 @@ This module provides branch-related git operations extracted from GitClient.
 """
 
 import subprocess
+from typing import Callable
 
 from loguru import logger
 
@@ -158,3 +159,30 @@ def branch_exists(branch_name: str) -> bool:
     except GitError as e:
         logger.debug(f"Branch check failed: {e}")
         return False
+
+
+def check_merge_conflicts(run_func: Callable, target_ref: str = "origin/main") -> bool:
+    """Dry-run merge to detect conflicts without modifying working tree.
+
+    Args:
+        run_func: Function to execute git commands (e.g. GitClient._run)
+        target_ref: Ref to merge into current branch (e.g. origin/main)
+
+    Returns:
+        True if conflicts detected, False if clean merge possible
+    """
+    try:
+        run_func(["merge", "--no-commit", "--no-ff", target_ref])
+        # No conflicts. Abort may fail if "Already up to date".
+        try:
+            run_func(["merge", "--abort"])
+        except GitError as e:
+            logger.debug(f"Merge abort failed, ignoring: {e}")
+        return False
+    except GitError:
+        # Conflict or error -- best-effort abort and report conflict.
+        try:
+            run_func(["merge", "--abort"])
+        except GitError as e:
+            logger.debug(f"Merge abort failed, ignoring: {e}")
+        return True

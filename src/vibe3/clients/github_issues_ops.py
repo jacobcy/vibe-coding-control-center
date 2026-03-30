@@ -109,14 +109,24 @@ class IssuesMixin(IssueAdminMixin):
         return json.loads(result.stdout)  # type: ignore[no-any-return]
 
     def list_issues(
-        self: Any, limit: int = 30, state: str = "open"
+        self: Any,
+        limit: int = 30,
+        state: str = "open",
+        assignee: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List GitHub issues."""
+        """List GitHub issues.
+
+        Args:
+            limit: Maximum number of issues to fetch
+            state: Issue state filter (open, closed, all)
+            assignee: Filter by assignee username
+        """
         logger.bind(
             external="github",
             operation="list_issues",
             limit=limit,
             state=state,
+            assignee=assignee,
         ).debug("Calling GitHub API: list_issues")
         cmd = [
             "gh",
@@ -127,8 +137,10 @@ class IssuesMixin(IssueAdminMixin):
             "--state",
             state,
             "--json",
-            "number,title,state,updatedAt,labels",
+            "number,title,state,updatedAt,labels,assignees",
         ]
+        if assignee:
+            cmd.extend(["--assignee", assignee])
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(

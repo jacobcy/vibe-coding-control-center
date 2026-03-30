@@ -213,3 +213,68 @@ def get_worktrees_for_branch(
         count=len(occupied),
     ).debug("Found worktrees for branch")
     return occupied
+
+
+def _is_worktree_clean(wt_path: Path) -> bool:
+    """Check if a worktree has no uncommitted changes.
+
+    Args:
+        wt_path: Path to the worktree
+
+    Returns:
+        True if clean, False if dirty or on error
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(wt_path), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        is_clean = result.returncode == 0 and not result.stdout.strip()
+        logger.bind(
+            domain="git",
+            action="is_worktree_clean",
+            path=str(wt_path),
+            clean=is_clean,
+        ).debug("Checked worktree clean status")
+        return is_clean
+    except Exception as exc:
+        logger.bind(
+            domain="git",
+            action="is_worktree_clean",
+            path=str(wt_path),
+            error=str(exc),
+        ).warning("Failed to check worktree clean status")
+        return False
+
+
+def _remove_worktree(wt_path: Path, force: bool = False) -> None:
+    """Remove a worktree.
+
+    Args:
+        wt_path: Path to the worktree
+        force: Force removal even if dirty
+
+    Raises:
+        GitError: If removal fails
+    """
+    import subprocess
+
+    from vibe3.exceptions import GitError
+
+    cmd = ["git", "worktree", "remove", str(wt_path)]
+    if force:
+        cmd.append("--force")
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        raise GitError("worktree remove", result.stderr)
+
+    logger.bind(
+        domain="git",
+        action="remove_worktree",
+        path=str(wt_path),
+    ).info("Removed worktree")

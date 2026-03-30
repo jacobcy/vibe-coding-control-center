@@ -4,10 +4,11 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from loguru import logger
-
 from vibe3.clients.git_branch_ops import (
     branch_exists as _branch_exists,
+)
+from vibe3.clients.git_branch_ops import (
+    check_merge_conflicts as _check_merge_conflicts,
 )
 from vibe3.clients.git_branch_ops import (
     create_branch as _create_branch,
@@ -44,6 +45,11 @@ from vibe3.clients.git_status_ops import (
 )
 from vibe3.clients.git_status_ops import (
     stash_push as _stash_push,
+)
+from vibe3.clients.git_worktree_ops import (
+    _is_worktree_clean,
+    _parse_worktree_list,
+    _remove_worktree,
 )
 from vibe3.clients.git_worktree_ops import (
     find_worktree_path_for_branch as _find_worktree_path_for_branch,
@@ -160,6 +166,35 @@ class GitClient:
         """Return paths of worktrees that have the given branch checked out."""
         return _get_worktrees_for_branch(self._run, branch_name)
 
+    def list_worktrees(self) -> list[tuple[str, str]]:
+        """List all worktrees.
+
+        Returns:
+            List of (worktree_path, branch_ref) tuples.
+        """
+        output = self._run(["worktree", "list", "--porcelain"])
+        return _parse_worktree_list(output)
+
+    def is_worktree_clean(self, wt_path: Path) -> bool:
+        """Check if a worktree has no uncommitted changes.
+
+        Args:
+            wt_path: Path to the worktree
+
+        Returns:
+            True if clean, False if dirty or on error
+        """
+        return _is_worktree_clean(wt_path)
+
+    def remove_worktree(self, wt_path: Path, force: bool = False) -> None:
+        """Remove a worktree.
+
+        Args:
+            wt_path: Path to the worktree
+            force: Force removal even if dirty
+        """
+        _remove_worktree(wt_path, force=force)
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
         return _get_changed_files(self._run, source, self._github_client)
@@ -253,34 +288,5 @@ class GitClient:
         self._run(args)
 
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
-        """Dry-run merge to detect conflicts without modifying working tree.
-
-        Args:
-            target_ref: Ref to merge into current branch (e.g. origin/main)
-
-        Returns:
-            True if conflicts detected, False if clean merge possible
-        """
-        try:
-            self._run(
-                [
-                    "merge",
-                    "--no-commit",
-                    "--no-ff",
-                    target_ref,
-                ]
-            )
-            # No conflicts. In "Already up to date" case no merge state exists,
-            # so abort may fail and should be ignored.
-            try:
-                self._run(["merge", "--abort"])
-            except GitError as e:
-                logger.debug(f"Merge abort failed, ignoring: {e}")
-            return False
-        except GitError:
-            # Conflict or error -- best-effort abort and report conflict.
-            try:
-                self._run(["merge", "--abort"])
-            except GitError as e:
-                logger.debug(f"Merge abort failed, ignoring: {e}")
-            return True
+        """Dry-run merge to detect conflicts without modifying working tree."""
+        return _check_merge_conflicts(self._run, target_ref)

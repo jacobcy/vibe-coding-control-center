@@ -83,8 +83,9 @@ def make_webhook_router(
             }
         )
 
-    @router.get("/status")
-    async def status() -> JSONResponse:
+    @router.get("/heartbeat")
+    async def heartbeat_status() -> JSONResponse:
+        """Legacy heartbeat status (use /status for full orchestra snapshot)."""
         return JSONResponse(
             {
                 "running": heartbeat.running,

@@ -18,6 +18,7 @@ from vibe3.commands import (
     flow,
     handoff,
     inspect,
+    orchestra,
     plan,
     pr,
     review,
@@ -61,6 +62,7 @@ app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
+app.add_typer(orchestra.app, name="orchestra")
 
 
 @app.callback()

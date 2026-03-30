@@ -23,7 +23,6 @@ def test_task_show_remote_binding_invalid_exits() -> None:
         result = runner.invoke(app, ["show", "task/test-branch"])
 
     assert result.exit_code == 1
-    assert "binding_invalid" in result.output
     assert "no longer exists" in result.output
 
 
@@ -99,13 +98,18 @@ def test_task_show_renders_remote_body_when_available() -> None:
     usecase.resolve_branch.return_value = "task/demo"
     usecase.show_task.return_value = result_payload
 
+    mock_milestone_svc = MagicMock()
+    mock_milestone_svc.get_milestone_context.return_value = None
+
     with (
         patch("vibe3.commands.task._build_task_usecase", return_value=usecase),
-        patch("vibe3.commands.task._fetch_milestone_data", return_value=None),
+        patch(
+            "vibe3.commands.task._build_milestone_service",
+            return_value=mock_milestone_svc,
+        ),
     ):
         result = runner.invoke(app, ["show", "task/demo"])
 
     assert result.exit_code == 0
-    assert "[remote] Title:" in result.output
-    assert "[remote] Body:" in result.output
+    assert "Demo title" in result.output
     assert "Demo body" in result.output
