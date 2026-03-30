@@ -58,7 +58,10 @@ class FlowQueryMixin:
             return None
 
     def get_flow_status(self, branch: str) -> FlowStatusResponse | None:
-        """Get flow status for branch."""
+        """Get flow status for branch.
+
+        Reads bridge fields from SQLite and hydrates PR info from GitHub.
+        """
         logger.bind(
             domain="flow",
             action="get_status",
@@ -67,16 +70,45 @@ class FlowQueryMixin:
         flow_data = self.store.get_flow_state(branch)
         if not flow_data:
             return None
+
+        # Fetch PR info from GitHub (truth)
+        from vibe3.clients.github_client import GitHubClient
+
+        gh = GitHubClient()
+        pr_number = flow_data.get("pr_number")
+        pr_ready = flow_data.get("pr_ready_for_review", False)
+
+        try:
+            # Remote-first: if pr_number exists in local cache, use it as hint;
+            # otherwise lookup by branch.
+            pr = gh.get_pr(pr_number, branch)
+            if pr:
+                pr_number = pr.number
+                pr_ready = pr.is_ready
+        except Exception as e:
+            logger.bind(domain="flow", branch=branch).warning(
+                f"Failed to hydrate PR status from GitHub: {e}"
+            )
+
         issue_links = self.store.get_issue_links(branch)
         issues = [IssueLink(**link) for link in issue_links]
+
+        # Resolve task_issue_number from issues (truth)
+        task_issue_number = flow_data.get("task_issue_number")
+        if not task_issue_number:
+            for issue in issues:
+                if issue.issue_role == "task":
+                    task_issue_number = issue.issue_number
+                    break
+
         try:
             return FlowStatusResponse(
                 branch=flow_data["branch"],
                 flow_slug=flow_data["flow_slug"],
                 flow_status=flow_data["flow_status"],
-                task_issue_number=flow_data.get("task_issue_number"),
-                pr_number=flow_data.get("pr_number"),
-                pr_ready_for_review=flow_data.get("pr_ready_for_review", False),
+                task_issue_number=task_issue_number,
+                pr_number=pr_number,
+                pr_ready_for_review=pr_ready,
                 spec_ref=flow_data.get("spec_ref"),
                 plan_ref=flow_data.get("plan_ref"),
                 report_ref=flow_data.get("report_ref"),

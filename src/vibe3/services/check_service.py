@@ -76,7 +76,14 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             )
 
         # task issue exists and is open on GitHub
-        task_issue = flow_data.get("task_issue_number")
+        issue_links = self.store.get_issue_links(branch)
+        task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
+        task_issue = (
+            task_issues[0]["issue_number"]
+            if task_issues
+            else flow_data.get("task_issue_number")
+        )
+
         task_issue_closed = False
         if task_issue:
             issue = self.github_client.view_issue(task_issue)
@@ -93,69 +100,30 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 task_issue_closed = True
 
         # only one task issue per branch
-        issue_links = self.store.get_issue_links(branch)
-        task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
         if len(task_issues) > 1:
             issues.append(f"Multiple task issues for branch '{branch}'")
 
-        # PR matches branch
-        pr_number = flow_data.get("pr_number")
-        if pr_number:
-            pr = self.github_client.get_pr(pr_number)
-            if pr and pr.head_branch != branch:
-                issues.append(f"PR #{pr_number} does not match branch '{branch}'")
+        # PR verification (Remote-first)
+        # We no longer rely on local pr_number cache; always check GitHub truth.
+        prs = self.github_client.list_prs_for_branch(branch)
+        if not prs:
+            # Check merged/closed to catch stale flows
+            all_prs = self.github_client.list_prs_for_branch(branch, state="all")
+            prs = [p for p in all_prs if p.state != PRState.OPEN]
 
+        if prs:
+            pr = prs[0]
             # Check if PR is closed or merged - auto-complete flow
-            if pr and (pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at):
+            if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
                 self._mark_flow_done(
                     branch,
-                    f"PR #{pr_number} is {pr.state.value}",
+                    f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
                 )
                 return CheckResult(is_valid=True, branch=branch, issues=[])
 
-        # Check for missing PR (branch has PR but database doesn't record it)
-        if not pr_number:
-            prs = self.github_client.list_prs_for_branch(branch)
-            if prs:
-                pr = prs[0]
-                if pr.state in (PRState.CLOSED, PRState.MERGED) or pr.merged_at:
-                    # PR found and merged — backfill pr_number and auto-complete
-                    self.store.update_flow_state(
-                        branch, pr_number=pr.number, latest_actor="check --fix"
-                    )
-                    self._mark_flow_done(
-                        branch,
-                        f"PR #{pr.number} is {pr.state.value} "
-                        "(back-filled from branch lookup)",
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-                issues.append(
-                    f"Branch has open PR #{pr.number} but database missing pr_number"
-                )
-            else:
-                # list_prs_for_branch only returns open PRs;
-                # also check merged/closed to catch stale flows
-                all_prs = self.github_client.list_prs_for_branch(branch, state="all")
-                merged_prs = [
-                    p for p in all_prs if p.state == PRState.MERGED or p.merged_at
-                ]
-                if merged_prs:
-                    pr = merged_prs[0]
-                    self.store.update_flow_state(
-                        branch, pr_number=pr.number, latest_actor="check --fix"
-                    )
-                    self._mark_flow_done(
-                        branch,
-                        f"PR #{pr.number} is MERGED (found via --state all lookup)",
-                    )
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
-
-        # Auto-complete when task issue is closed (and no open PR)
-        if task_issue_closed and not pr_number:
-            prs_check = (
-                self.github_client.list_prs_for_branch(branch) if not pr_number else []
-            )
-            open_prs = [p for p in prs_check if p.state == PRState.OPEN]
+        # Auto-complete when task issue is closed (and no open PR found)
+        if task_issue_closed:
+            open_prs = self.github_client.list_prs_for_branch(branch)
             if not open_prs:
                 self._mark_flow_done(
                     branch,
@@ -244,19 +212,17 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 prs = self.github_client.list_prs_for_branch(branch)
                 if prs:
                     pr_number = prs[0].number
-                    self.store.update_flow_state(
-                        branch, pr_number=pr_number, latest_actor="check --fix"
-                    )
+                    # No longer backfill pr_number to SQLite
                     self.store.add_event(
                         branch,
-                        "pr_linked",
+                        "pr_verified",
                         "check --fix",
-                        f"PR #{pr_number} linked to flow",
+                        f"PR #{pr_number} verified on GitHub (truth only)",
                     )
                     fixed.append(issue)
                     logger.bind(
                         domain="check", action="fix", branch=branch, pr_number=pr_number
-                    ).info("Back-filled pr_number")
+                    ).info("PR verified on GitHub (remote-first)")
                 else:
                     logger.bind(domain="check", branch=branch).warning(
                         "PR not found on GitHub, cannot fix"

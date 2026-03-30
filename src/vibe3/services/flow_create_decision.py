@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from loguru import logger
+
 from vibe3.models.flow import CreateDecision
 from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 
@@ -22,7 +24,23 @@ def decide_create_from_current_worktree(
         )
 
     status = flow_data.get("flow_status", "active")
-    is_waiting_review = bool(flow_data.get("pr_ready_for_review"))
+
+    # Fetch real-time PR readiness from GitHub
+    from vibe3.clients.github_client import GitHubClient
+
+    gh = GitHubClient()
+    is_waiting_review = False
+    pr_number = flow_data.get("pr_number")
+    try:
+        pr = gh.get_pr(pr_number, current_branch)
+        if pr:
+            is_waiting_review = pr.is_ready
+    except Exception as e:
+        logger.bind(domain="flow", branch=current_branch).warning(
+            f"Failed to check PR readiness for decision: {e}"
+        )
+        # Fallback to local cache if offline/error
+        is_waiting_review = bool(flow_data.get("pr_ready_for_review"))
 
     if status == "active" and is_waiting_review:
         return CreateDecision(

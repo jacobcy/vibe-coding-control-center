@@ -100,15 +100,14 @@ class CheckRemoteIndexMixin:
                 continue
 
             task_issue, extra_issues = issues_for_branch[0], issues_for_branch[1:]
-            self.store.update_flow_state(
-                branch, task_issue_number=task_issue, latest_actor="check --init"
-            )
+            # No longer backfill task_issue_number to flow_state.
+            # Relationship truth is now in flow_issue_links.
             self.store.add_issue_link(branch, task_issue, "task")
             self.store.add_event(
                 branch,
                 "issue_linked",
                 "check --init",
-                f"Issue #{task_issue} back-filled as task",
+                f"Issue #{task_issue} bound as task (truth in flow_issue_links)",
             )
             for extra in extra_issues:
                 self.store.add_issue_link(branch, extra, "repo")
@@ -116,10 +115,10 @@ class CheckRemoteIndexMixin:
                     branch,
                     "issue_linked",
                     "check --init",
-                    f"Issue #{extra} back-filled as repo",
+                    f"Issue #{extra} bound as repo",
                 )
             logger.bind(domain="check", branch=branch, task_issue=task_issue).info(
-                "Back-filled task_issue_number"
+                "Bound task_issue_number (flow_issue_links)"
             )
             updated += 1
 
