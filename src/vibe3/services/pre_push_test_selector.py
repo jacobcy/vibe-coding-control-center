@@ -61,7 +61,23 @@ def select_pre_push_tests(
                 unmapped_sources.append(rel)
 
     if unmapped_sources:
-        # Directory-scoped fallback: run tests in the same subdirectory
+        # Layer 2: DAG-based import analysis.
+        # Reuses dag_service (same infrastructure as the inspect risk-assessment step)
+        # to find which test files transitively import the changed modules.
+        # e.g. change check_remote_index_mixin.py (no named test file) →
+        #   check_service.py imports it → test_check_service.py imports check_service
+        #   → run only those 3 tests instead of the full services directory.
+        dag_targets = _find_tests_via_dag(unmapped_sources, root)
+        if dag_targets:
+            all_targets = selected | dag_targets
+            return PrePushTestSelection(
+                mode="incremental",
+                tests=sorted(all_targets),
+                reason="DAG import analysis resolved tests from unmapped sources",
+                unmapped_sources=sorted(unmapped_sources),
+            )
+
+        # Layer 3: Directory-scoped fallback: run tests in the same subdirectory
         # as the unmapped source files rather than the full suite.
         dir_targets: set[str] = set()
         for src_path in unmapped_sources:
@@ -106,6 +122,50 @@ def select_pre_push_tests(
         tests=["tests/vibe3"],
         reason="smoke tests unavailable, fallback to full suite",
     )
+
+
+def _find_tests_via_dag(src_files: list[str], root: Path) -> set[str]:
+    """Find test files that transitively import any of the changed source modules.
+
+    Reuses dag_service infrastructure (the same code used for risk assessment in
+    the inspect step) to go beyond file-name heuristics:
+      1. Build the src import graph and BFS-expand impacted modules from seed files.
+      2. Scan test files with the same AST import extractor to find which tests
+         actually import any impacted module.
+
+    Returns an empty set on any failure so callers degrade to directory fallback.
+    """
+    try:
+        from vibe3.services.dag_service import (  # noqa: PLC0415
+            _extract_imports,
+            expand_impacted_modules,
+        )
+    except ImportError:
+        return set()
+
+    try:
+        impact = expand_impacted_modules(list(src_files))
+        affected = set(impact.impacted_modules)
+        if not affected:
+            return set()
+
+        test_root = root / "tests" / "vibe3"
+        if not test_root.exists():
+            return set()
+
+        hits: set[str] = set()
+        for test_file in sorted(test_root.glob("**/test_*.py")):
+            if "__pycache__" in str(test_file):
+                continue
+            file_imports = _extract_imports(str(test_file))
+            if any(imp in affected for imp in file_imports):
+                try:
+                    hits.add(test_file.relative_to(root).as_posix())
+                except ValueError:
+                    pass
+        return hits
+    except Exception:  # noqa: BLE001
+        return set()
 
 
 def _is_python_test_path(path: str) -> bool:

@@ -17,9 +17,27 @@ def test_maps_source_file_to_related_tests() -> None:
     assert "tests/vibe3/services/test_pre_push_scope.py" in selection.tests
 
 
+def test_dag_resolves_tests_for_unmapped_source() -> None:
+    # check_remote_index_mixin.py has no test_check_remote_index_mixin.py (name miss).
+    # But check_service.py imports it, and test_check_service.py imports check_service.
+    # DAG layer should narrow to those tests instead of the full services directory.
+    selection = select_pre_push_tests(
+        ["src/vibe3/services/check_remote_index_mixin.py"]
+    )
+
+    assert selection.mode == "incremental"
+    # Must include tests that import check_service (which imports the mixin)
+    assert "tests/vibe3/services/test_check_service.py" in selection.tests
+    # Must NOT fall back to the full directory
+    assert "tests/vibe3/services" not in selection.tests
+    assert selection.unmapped_sources == [
+        "src/vibe3/services/check_remote_index_mixin.py"
+    ]
+
+
 def test_falls_back_to_dir_when_source_mapping_missing() -> None:
-    # A real source file with no exact test file match should scope to
-    # the test directory rather than the full suite.
+    # A real source file with no exact test file match AND no tests importing it
+    # via DAG should scope to the test directory rather than the full suite.
     selection = select_pre_push_tests(
         ["src/vibe3/services/not_real_selector_target.py"]
     )
