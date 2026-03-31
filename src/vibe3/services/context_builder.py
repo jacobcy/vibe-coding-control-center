@@ -1,17 +1,15 @@
-"""Context builder - Build context for codeagent-wrapper review.
+"""Context builder - assemble prompt body for the review agent.
 
-This module constructs a stable prompt format for the review agent through
-composable section builders. Each section builder is responsible for one
-aspect of the review context:
+Public API:
+- ``build_review_prompt_body(request, config)`` - assemble review prompt body
+- ``make_review_context_builder(request, config)`` - PromptContextBuilder
 
-- build_policy_section: Static review policy
-- build_tools_guide_section: Project-specific analysis tools
-- build_ast_analysis_section: Runtime symbol/DAG analysis
-- build_review_task_section: Task guidance
-- build_output_contract_section: Output format requirements
-
-The main build_review_context() function orchestrates these sections.
+Section builders remain available for direct composition:
+- build_policy_section, build_tools_guide_section, build_ast_analysis_section
+- build_review_task_section, build_output_contract_section
 """
+
+from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -21,6 +19,7 @@ from loguru import logger
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
 from vibe3.models.review import ReviewRequest
+from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 from vibe3.services.snapshot_diff_section import build_snapshot_diff_section
 
 
@@ -169,73 +168,71 @@ Where:
 - BLOCK: Critical issues that must be fixed before merge"""
 
 
-def build_review_context(
+def build_review_prompt_body(
     request: ReviewRequest, config: VibeConfig | None = None
 ) -> str:
-    """Build review context from request and configuration.
-
-    This is the orchestration function that:
-    1. Loads configuration if not provided
-    2. Calls section builders
-    3. Assembles final prompt
+    """Assemble the review prompt body from policy, tools, analysis, and output format.
 
     Args:
-        request: Review request containing scope, symbols, and task
-        config: VibeConfig instance (loads from settings.yaml if None)
+        request: Review request containing scope, symbols, and task.
+        config: VibeConfig instance (loads from settings.yaml if None).
 
     Returns:
-        Complete review context string
+        Assembled review prompt body string.
 
     Raises:
-        ContextBuilderError: Build failed
-
-    Examples:
-        >>> scope = ReviewScope.for_base("main")
-        >>> request = ReviewRequest(scope=scope)
-        >>> context = build_review_context(request)
-        >>> assert "Review Task" in context
-        >>> assert "VERDICT" in context
+        ContextBuilderError: Build failed.
     """
-    log = logger.bind(domain="context_builder", action="build_review_context")
-    log.info("Building review context")
+    log = logger.bind(domain="context_builder", action="build_review_prompt_body")
+    log.info("Building review prompt body")
 
-    # Load config if not provided
     if config is None:
         config = VibeConfig.get_defaults()
 
-    # Build sections
     sections: list[str] = []
 
-    # 1. Policy section (required)
     policy = build_policy_section(config.review.policy_file)
     sections.append(policy)
 
-    # 2. Tools guide section (optional)
     tools_guide = build_tools_guide_section(config.review.common_rules)
     if tools_guide:
         sections.append(tools_guide)
 
-    # 3. Snapshot diff section (optional)
     snapshot_diff = build_snapshot_diff_section(request.structure_diff)
     if snapshot_diff:
         sections.append(snapshot_diff)
 
-    # 4. AST analysis section (optional - always include when available)
     ast_analysis = build_ast_analysis_section(
         request.changed_symbols, request.symbol_dag
     )
     if ast_analysis:
         sections.append(ast_analysis)
 
-    # 4. Review task section
     task = build_review_task_section(request.task_guidance or config.review.review_task)
     sections.append(task)
 
-    # 5. Output contract section
     output_contract = build_output_contract_section(config.review.output_format)
     sections.append(output_contract)
 
-    # Assemble final context
-    context = "\n\n---\n\n".join(sections)
-    log.bind(context_len=len(context)).success("Review context built")
-    return context
+    body = "\n\n---\n\n".join(sections)
+    log.bind(body_len=len(body)).success("Review prompt body built")
+    return body
+
+
+def make_review_context_builder(
+    request: ReviewRequest,
+    config: VibeConfig | None = None,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for the review command.
+
+    Routes through PromptAssembler with template key ``review.default``
+    and a single provider that calls ``build_review_prompt_body``.
+    """
+    cfg = config or VibeConfig.get_defaults()
+    return make_context_builder(
+        template_key="review.default",
+        body_provider_key="review.context",
+        body_fn=lambda: build_review_prompt_body(request, cfg),
+        prompts_path=prompts_path,
+    )

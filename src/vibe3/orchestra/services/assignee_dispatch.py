@@ -8,11 +8,11 @@ from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
 from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
-from vibe3.orchestra.models import IssueInfo
 
 _PRIORITY_MAP: dict[str, int] = {
     "priority/urgent": 0,

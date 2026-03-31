@@ -25,7 +25,9 @@ from vibe3.services.codeagent_execution_service import (
 )
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
-from vibe3.services.plan_context_builder import build_plan_context
+from vibe3.services.plan_context_builder import (
+    make_plan_context_builder,
+)
 from vibe3.services.plan_usecase import PlanUsecase
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
@@ -64,7 +66,7 @@ def _execute_plan_command(
     plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
     command = create_codeagent_command(
         role="planner",
-        context_builder=lambda: build_plan_context(request, config),
+        context_builder=make_plan_context_builder(request, config),
         task=instructions or plan_prompt,
         dry_run=dry_run,
         handoff_kind="plan",

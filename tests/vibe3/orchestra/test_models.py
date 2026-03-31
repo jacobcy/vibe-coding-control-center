@@ -1,7 +1,6 @@
 """Tests for Orchestra models."""
 
-from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.models import IssueInfo
+from vibe3.models.orchestration import IssueInfo, IssueState
 
 
 def test_issue_info_slug():

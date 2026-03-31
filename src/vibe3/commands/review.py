@@ -17,7 +17,7 @@ from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
-from vibe3.services.context_builder import build_review_context
+from vibe3.services.context_builder import make_review_context_builder
 from vibe3.services.flow_service import FlowService
 from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
@@ -57,7 +57,7 @@ def _build_review_usecase(
         inspect_runner=run_inspect_json,
         snapshot_diff_builder=build_snapshot_diff,
         review_parser=parse_codex_review,
-        context_builder=build_review_context,
+        context_builder=make_review_context_builder,
         execution_service_factory=CodeagentExecutionService,
         command_builder=create_codeagent_command,
     )

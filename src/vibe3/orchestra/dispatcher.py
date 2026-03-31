@@ -5,12 +5,20 @@ from pathlib import Path
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.circuit_breaker import CircuitBreaker, classify_failure
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher_worktree import WorktreeResolverMixin
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
-from vibe3.orchestra.models import IssueInfo
+from vibe3.prompts.assembler import PromptAssembler
+from vibe3.prompts.models import (
+    PromptRecipe,
+    PromptRenderResult,
+    PromptVariableSource,
+    VariableSourceKind,
+)
+from vibe3.prompts.provider_registry import ProviderRegistry
+from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 
 _DISPATCH_TIMEOUT = 3600
 
@@ -25,11 +33,13 @@ class Dispatcher(WorktreeResolverMixin):
         repo_path: Path | None = None,
         orchestrator: FlowOrchestrator | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        prompts_path: Path | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
         self.orchestrator = orchestrator or FlowOrchestrator(config)
+        self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         # Initialize circuit breaker if enabled
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
@@ -40,6 +50,8 @@ class Dispatcher(WorktreeResolverMixin):
             )
         # Track last error category for feedback loop
         self._last_error_category: str | None = None
+        # Set after build_manager_command; used for dry-run provenance logging
+        self.last_manager_render_result: PromptRenderResult | None = None
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a subprocess command with timeout and structured logging.
@@ -189,12 +201,48 @@ class Dispatcher(WorktreeResolverMixin):
         return self._run_command(cmd, review_cwd, "Review execution")
 
     def build_manager_command(self, issue: IssueInfo) -> list[str]:
-        """Build executable manager command for an issue."""
+        """Build executable manager command for an issue via recipe assembly."""
+        task_text = self._render_manager_prompt(issue)
         cmd = ["uv", "run", "python", "-m", "vibe3", "run"]
         if self.config.assignee_dispatch.use_worktree:
             cmd.append("--worktree")
-        cmd.append(f"Implement issue #{issue.number}: {issue.title}")
+        cmd.append(task_text)
         return cmd
+
+    def _build_manager_recipe(self) -> PromptRecipe:
+        """Build the PromptRecipe for manager dispatch.
+
+        issue_number and issue_title are provider-sourced from runtime context.
+        """
+        ad = self.config.assignee_dispatch
+        variables: dict[str, PromptVariableSource] = {
+            "issue_number": PromptVariableSource(
+                kind=VariableSourceKind.PROVIDER, provider="manager.issue_number"
+            ),
+            "issue_title": PromptVariableSource(
+                kind=VariableSourceKind.PROVIDER, provider="manager.issue_title"
+            ),
+        }
+        if ad.include_skill_content and ad.skill:
+            variables["skill_content"] = PromptVariableSource(
+                kind=VariableSourceKind.SKILL, skill=ad.skill
+            )
+        return PromptRecipe(
+            template_key=ad.prompt_template,
+            variables=variables,
+            description="Manager task dispatch",
+        )
+
+    def _render_manager_prompt(self, issue: IssueInfo) -> str:
+        """Render manager task instructions via PromptAssembler."""
+        registry = ProviderRegistry()
+        registry.register("manager.issue_number", lambda ctx: str(issue.number))
+        registry.register("manager.issue_title", lambda ctx: issue.title)
+        recipe = self._build_manager_recipe()
+        assembler = PromptAssembler(prompts_path=self._prompts_path, registry=registry)
+        result = assembler.render(recipe, runtime_context={})
+        self.last_manager_render_result = result
+        return result.rendered_text
 
     def prepare_pr_review_dispatch(self, pr_number: int) -> tuple[list[str], Path]:
         """Prepare executable PR review command and working directory."""

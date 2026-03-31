@@ -21,6 +21,7 @@ from vibe3.commands import (
     orchestra,
     plan,
     pr,
+    prompt_check,
     review,
     run,
     snapshot,
@@ -63,6 +64,7 @@ app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(orchestra.app, name="orchestra")
+app.add_typer(prompt_check.app, name="prompt")
 
 
 @app.callback()
