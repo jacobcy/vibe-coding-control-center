@@ -76,11 +76,11 @@ vibe3 flow show --trace     # 含调用链追踪
 # 查看所有活跃 flow 仪表盘
 vibe3 flow status
 
-# 列出所有 flow
-vibe3 flow list
+# 全局状态面板 (Orchestra + Flows)
+vibe3 status
 
 # 在已有分支上注册 flow（不创建新分支）
-vibe3 flow add
+vibe3 flow update
 
 # 绑定 issue 到当前 flow
 vibe3 flow bind <issue-number>                    # 默认 role=task
@@ -91,18 +91,15 @@ vibe3 flow bind <issue-number> --role dependency
 vibe3 flow blocked --task <blocking-issue-number>
 vibe3 flow blocked --reason "等待外部反馈"
 
-# 运行一致性检查（自动关闭已合并的 flow）
-vibe3 check --all --fix
+# 运行一致性检查（自动关闭已合并或已删除分支的 flow）
+vibe3 check
 ```
 
-#### task - 任务上下文
+#### status - 全局状态看板
 
 ```bash
-# 查看当前任务（含 milestone 编排视图）
-vibe3 task show
-
-# 列出所有有任务绑定的 flow
-vibe3 task list
+# 查看 Orchestra 追踪的 Issue 进度及活跃 Flow
+vibe3 status
 ```
 
 #### handoff - agent 交接记录
@@ -187,7 +184,7 @@ vibe3 flow show     # 确认状态，继续开发
 git checkout -b task/issue-123
 
 # 2. 注册当前分支为 flow
-vibe3 flow add
+vibe3 flow update
 
 # 3. 绑定任务 issue
 vibe3 flow bind 123 --role task

@@ -74,9 +74,14 @@ def status(
                     if flow
                     else "  [dim]flow:[/] [yellow](none)[/]"
                 )
-                status_color = "green" if issue.state == "ready" else "yellow"
+                state_val = (
+                    issue.state.value
+                    if issue.state and hasattr(issue.state, "value")
+                    else (issue.state or "unknown")
+                )
+                status_color = "green" if state_val == "ready" else "yellow"
                 console.print(
-                    f"  #{issue.number}  [{status_color}]{issue.state:10}[/]  "
+                    f"  #{issue.number}  [{status_color}]{state_val:10}[/]  "
                     f"{issue.title[:40]}..."
                 )
                 console.print(f"             {flow_info}")

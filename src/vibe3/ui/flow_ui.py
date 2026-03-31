@@ -135,13 +135,14 @@ def render_flow_status(
         _kv("next_step", status.next_step, 1)
 
     # Compact actor summary
-    actors = [
-        f"[dim]latest:[/] {status.latest_actor or '—'}",
-        f"[dim]plan:[/] {status.planner_actor or '—'}",
-        f"[dim]run:[/] {status.executor_actor or '—'}",
-        f"[dim]review:[/] {status.reviewer_actor or '—'}",
-    ]
-    console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
+    if status.latest_actor:
+        actors = [
+            f"[dim]latest:[/] {status.latest_actor or '—'}",
+            f"[dim]plan:[/] {status.planner_actor or '—'}",
+            f"[dim]run:[/] {status.executor_actor or '—'}",
+            f"[dim]review:[/] {status.reviewer_actor or '—'}",
+        ]
+        console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
 
     if milestone_data:
         render_milestone(milestone_data, status.task_issue_number)
