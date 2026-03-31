@@ -44,6 +44,8 @@ def _render_flow_row(
         _kv("title", title, 1)
     if worktree:
         _kv("worktree", worktree, 1)
+    if flow.latest_actor:
+        _kv("actor", flow.latest_actor, 1)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
@@ -131,6 +133,16 @@ def render_flow_status(
         _kv("blocked_by", status.blocked_by, 1)
     if status.next_step:
         _kv("next_step", status.next_step, 1)
+
+    # Compact actor summary
+    actors = [
+        f"[dim]latest:[/] {status.latest_actor or '—'}",
+        f"[dim]plan:[/] {status.planner_actor or '—'}",
+        f"[dim]run:[/] {status.executor_actor or '—'}",
+        f"[dim]review:[/] {status.reviewer_actor or '—'}",
+    ]
+    console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
+
     if milestone_data:
         render_milestone(milestone_data, status.task_issue_number)
     execution_statuses = [
@@ -158,12 +170,6 @@ def render_flow_status(
         if status.execution_pid:
             _kv("pid", status.execution_pid, 2)
     console.print()
-
-
-def render_flows_table(flows: list[FlowStatusResponse]) -> None:
-    """flow list — YAML style, one block per flow."""
-    for flow in flows:
-        _render_flow_row(flow)
 
 
 def render_flows_status_dashboard(

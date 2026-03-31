@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -114,6 +114,8 @@ class PRResponse(BaseModel):
     updated_at: Optional[datetime] = Field(None, description="Updated at")
     merged_at: Optional[datetime] = Field(None, description="Merged at")
     metadata: Optional[PRMetadata] = Field(None, description="PR metadata")
+    comments: list[dict[str, Any]] = Field(default_factory=list)
+    review_comments: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class UpdatePRRequest(BaseModel):

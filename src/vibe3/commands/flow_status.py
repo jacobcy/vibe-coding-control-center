@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.command_options import ensure_flow_for_current_branch
 from vibe3.commands.common import trace_scope
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
@@ -43,11 +42,53 @@ def show(
 ) -> None:
     """Show flow details."""
     with trace_scope(trace, "flow show", domain="flow"):
+        service = FlowService()
         if branch:
-            service = FlowService()
             target_branch = branch
         else:
-            service, target_branch = ensure_flow_for_current_branch()
+            target_branch = service.get_current_branch()
+
+        flow_status = service.get_flow_status(target_branch)
+
+        # Handle non-registered flow or special branches
+        if not flow_status or flow_status.flow_status == "aborted":
+            if not json_output:
+                from vibe3.services.flow_service import FlowService as FlowService_
+
+                is_safe = target_branch.startswith(FlowService_.SAFE_BRANCH_PREFIX)
+                is_aborted = flow_status and flow_status.flow_status == "aborted"
+
+                if is_safe:
+                    console.print(
+                        f"[yellow]提示：当前分支 '{target_branch}' 为安全分支（只读），"
+                        "不建议在此开发。[/]"
+                    )
+                    console.print(
+                        "[yellow]建议切换到新分支：`git checkout -b <new-branch>`[/]"
+                    )
+                elif is_aborted:
+                    console.print(
+                        f"[red]警告：当前分支 '{target_branch}' 的 flow 已被标记为 "
+                        "aborted（已废弃）。[/]"
+                    )
+                    console.print("[yellow]不建议继续在此开发，建议创建新分支。[/]")
+                else:
+                    console.print(
+                        f"[yellow]提示：当前分支 '{target_branch}' 尚未注册为 flow。[/]"
+                    )
+                    console.print(
+                        "[cyan]运行 `vibe3 flow update` 即可追踪此分支的开发进度。[/]"
+                    )
+
+                raise typer.Exit(0)
+            else:
+                if not flow_status:
+                    typer.echo(
+                        json.dumps(
+                            {"error": "Flow not registered", "branch": target_branch}
+                        )
+                    )
+                    raise typer.Exit(1)
 
         if snapshot:
             projection_service = FlowProjectionService()

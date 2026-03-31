@@ -13,23 +13,18 @@ from vibe3.commands.flow_status import show, status
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
-from vibe3.ui.flow_ui import render_flow_created, render_flows_table
+from vibe3.ui.flow_ui import render_flow_created
 
-FlowNameArg = Annotated[
+BranchArg = Annotated[
     str | None,
-    typer.Argument(help="Flow name (defaults to current branch name)"),
+    typer.Argument(help="Branch to update (defaults to current)"),
 ]
 IssueArg = Annotated[
     str, typer.Argument(help="Issue reference to bind as task/related/dependency")
 ]
-TaskOption = Annotated[str | None, typer.Option(help="Issue reference to bind as task")]
 TaskTailArg = Annotated[
     List[str] | None,
     typer.Argument(hidden=True),
-]
-AddTaskOption = Annotated[
-    str | None,
-    typer.Option(help="Task issue reference (e.g., 123, #123, or issue URL)"),
 ]
 SpecOption = Annotated[
     str | None, typer.Option("--spec", help="Spec file path or issue reference")
@@ -44,6 +39,14 @@ ActorOption = Annotated[
         "--actor",
         "-a",
         help="Flow 默认署名（示例: codex/gpt-5.4）",
+    ),
+]
+NameOption = Annotated[
+    str | None,
+    typer.Option(
+        "--name",
+        "-n",
+        help="Flow 名称/Slug (默认从 branch 推断)",
     ),
 ]
 StatusFilterOption = Annotated[
@@ -77,43 +80,38 @@ def _merge_issue_refs(
     return [primary, *tail]
 
 
-@app.command(name="add")
-def add(
-    name: FlowNameArg = None,
-    task: AddTaskOption = None,
-    task_tail: TaskTailArg = None,
-    spec: SpecOption = None,
+@app.command(name="update")
+def update(
+    branch: BranchArg = None,
+    name: NameOption = None,
     actor: ActorOption = None,
+    spec: SpecOption = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Add flow to current branch (idempotent)."""
+    """Update flow metadata (idempotent add/update)."""
     flow_service = FlowService()
-    task_service = TaskService()
-    with trace_scope(trace, "flow add", name=name):
-        try:
-            name = flow_service.resolve_flow_name(name)
-            task_refs = _merge_issue_refs(
-                task, task_tail, primary_hint="--task <issue>"
+    with trace_scope(trace, "flow update", branch=branch):
+        if not branch:
+            branch = flow_service.get_current_branch()
+
+        # Register/Ensure flow
+        flow = flow_service.ensure_flow_for_branch(branch=branch, slug=name)
+
+        # Update metadata if explicitly provided
+        if name or actor:
+            from vibe3.services.signature_service import SignatureService
+
+            effective_actor = SignatureService.resolve_actor(explicit_actor=actor)
+            flow_service.store.update_flow_state(
+                branch,
+                flow_slug=name if name else flow.flow_slug,
+                latest_actor=effective_actor,
             )
-        except ValueError as error:
-            raise typer.BadParameter(str(error)) from error
-
-        # Register flow via FlowService instead of FlowUsecase
-        flow = flow_service.ensure_flow_for_branch(
-            branch=flow_service.get_current_branch(), slug=name
-        )
-
-        # Link issues
-        from vibe3.utils.issue_ref import parse_issue_number
-
-        if task_refs:
-            refs: List[str] = (
-                [task_refs] if isinstance(task_refs, str) else list(task_refs)
-            )
-            for ref in refs:
-                issue_number = parse_issue_number(ref)
-                task_service.link_issue(flow.branch, issue_number, "task", actor=actor)
+            # Re-fetch flow state
+            updated = flow_service.get_flow_status(branch)
+            if updated:
+                flow = updated
 
         if spec:
             flow_service.bind_spec(flow.branch, spec, actor)
@@ -121,14 +119,7 @@ def add(
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
         else:
-            render_flow_created(
-                flow,
-                (
-                    " ".join(task_refs)
-                    if task_refs is not None and not isinstance(task_refs, str)
-                    else task_refs
-                ),
-            )
+            render_flow_created(flow)
 
 
 @app.command()
@@ -180,33 +171,6 @@ def bind(
         except ValueError:
             logger.error(f"Invalid issue format: {issue_refs}")
             raise typer.BadParameter(f"Invalid issue format: {issue_refs}")
-
-
-@app.command(name="list")
-def list_flows(
-    status_filter: StatusFilterOption = None,
-    trace: TraceOption = False,
-    json_output: JsonOption = False,
-) -> None:
-    """List all flows."""
-    with trace_scope(trace, "flow list"):
-        logger.bind(command="flow list", status_filter=status_filter).info(
-            "Listing flows"
-        )
-
-        service = FlowService()
-        flows = service.list_flows(status=status_filter)
-
-        if not flows:
-            logger.info("No flows found")
-            raise typer.Exit(0)
-
-        if json_output:
-            typer.echo(
-                json.dumps([f.model_dump() for f in flows], indent=2, default=str)
-            )
-        else:
-            render_flows_table(flows)
 
 
 # Register lifecycle commands from flow_lifecycle.py

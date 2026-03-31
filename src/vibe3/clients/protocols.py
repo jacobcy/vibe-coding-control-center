@@ -64,3 +64,11 @@ class GitHubClientProtocol(Protocol):
     ) -> list[PRResponse]:
         """List PRs for a specific branch."""
         ...
+
+    def list_pr_comments(self, pr_number: int) -> list[dict[str, Any]]:
+        """List general comments on a PR."""
+        ...
+
+    def list_pr_review_comments(self, pr_number: int) -> list[dict[str, Any]]:
+        """List review (inline) comments on a PR."""
+        ...

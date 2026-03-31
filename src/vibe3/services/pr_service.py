@@ -123,7 +123,11 @@ class PRService:
         if branch is None and pr_number is None:
             branch = self.git_client.get_current_branch()
 
-        return self.github_client.get_pr(pr_number, branch)
+        pr = self.github_client.get_pr(pr_number, branch)
+        if pr:
+            pr.comments = self.github_client.list_pr_comments(pr.number)
+            pr.review_comments = self.github_client.list_pr_review_comments(pr.number)
+        return pr
 
     def mark_ready(self, pr_number: int, actor: str | None = None) -> PRResponse:
         """Mark PR as ready for review."""

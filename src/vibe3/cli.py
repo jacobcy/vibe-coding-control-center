@@ -18,14 +18,13 @@ from vibe3.commands import (
     flow,
     handoff,
     inspect,
-    orchestra,
     plan,
     pr,
     prompt_check,
     review,
     run,
     snapshot,
-    task,
+    status,
 )
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
@@ -54,7 +53,6 @@ app = typer.Typer(
 
 # Register subcommands
 app.add_typer(flow.app, name="flow")
-app.add_typer(task.app, name="task")
 app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
@@ -63,8 +61,17 @@ app.add_typer(handoff.app, name="handoff")
 app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
-app.add_typer(orchestra.app, name="orchestra")
 app.add_typer(prompt_check.app, name="prompt")
+
+
+@app.command(name="status")
+def status_command(
+    all_flows: status.AllOption = False,
+    json_output: status.JsonOption = False,
+    trace: status.TraceOption = False,
+) -> None:
+    """Show dashboard of all active flows and orchestra status."""
+    status.status(all_flows=all_flows, json_output=json_output, trace=trace)
 
 
 @app.callback()

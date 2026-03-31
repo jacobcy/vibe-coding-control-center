@@ -69,6 +69,33 @@ def render_pr_details(pr: PRResponse) -> None:
         body_preview = pr.body[:200] + ("..." if len(pr.body) > 200 else "")
         console.print(body_preview)
 
+    if pr.review_comments:
+        console.print("\n[bold cyan]### Review Comments[/]")
+        # Sort by path and line
+        sorted_reviews = sorted(
+            pr.review_comments,
+            key=lambda x: (str(x.get("path", "")), int(x.get("line") or 0)),
+        )
+        for comment in sorted_reviews:
+            user = comment.get("user", {}).get("login", "unknown")
+            body = comment.get("body", "")
+            path = comment.get("path", "")
+            line = comment.get("line", "")
+            created = str(comment.get("created_at", ""))[:16].replace("T", " ")
+            console.print(
+                f"  [yellow]{user}[/] [dim]({created})[/] [cyan]{path}:{line}[/]"
+            )
+            console.print(f"    {body}")
+
+    if pr.comments:
+        console.print("\n[bold cyan]### General Comments[/]")
+        for comment in pr.comments:
+            user = comment.get("author", {}).get("login", "unknown")
+            body = comment.get("body", "")
+            created = str(comment.get("createdAt", ""))[:16].replace("T", " ")
+            console.print(f"  [yellow]{user}[/] [dim]({created})[/]")
+            console.print(f"    {body}")
+
 
 def render_pr_ready(pr: PRResponse) -> None:
     console.print(f"[green]✓[/] PR #{pr.number} marked as ready for review")
