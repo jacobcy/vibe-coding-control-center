@@ -4,10 +4,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tests.vibe3.orchestra.conftest import CompletedProcess
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.models import IssueInfo
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -159,3 +158,90 @@ class TestDispatcherReviewWorktreeResolution:
         mock_resolve.assert_not_called()
         assert "--worktree" in cmd
         assert cwd == Path("/tmp/repo")
+
+
+class TestDispatcherManagerRecipeDrivenPrompt:
+    """Assert manager dispatch uses recipe-driven prompt assembly."""
+
+    def test_build_manager_recipe_returns_prompt_recipe(self):
+        """Dispatcher should expose _build_manager_recipe() returning a PromptRecipe."""
+        from vibe3.prompts.models import PromptRecipe
+
+        config = OrchestraConfig()
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        recipe = dispatcher._build_manager_recipe()
+        assert isinstance(recipe, PromptRecipe)
+
+    def test_build_manager_recipe_uses_configured_template_key(self):
+        """Recipe template_key should come from config, not be hardcoded."""
+        from vibe3.orchestra.config import AssigneeDispatchConfig
+
+        config = OrchestraConfig(
+            assignee_dispatch=AssigneeDispatchConfig(
+                prompt_template="orchestra.assignee_dispatch.manager"
+            )
+        )
+        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        recipe = dispatcher._build_manager_recipe()
+        assert recipe.template_key == "orchestra.assignee_dispatch.manager"
+
+    def test_build_manager_command_still_produces_correct_last_arg(self, tmp_path):
+        """Default template should produce same text as the old hardcoded format."""
+        import yaml
+
+        from vibe3.orchestra.config import AssigneeDispatchConfig
+
+        # Write the default template to a tmp prompts.yaml
+        templates = {
+            "orchestra": {
+                "assignee_dispatch": {
+                    "manager": "Implement issue #{issue_number}: {issue_title}"
+                }
+            }
+        }
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
+
+        config = OrchestraConfig(
+            assignee_dispatch=AssigneeDispatchConfig(
+                prompt_template="orchestra.assignee_dispatch.manager"
+            )
+        )
+        dispatcher = Dispatcher(
+            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
+        )
+        issue = make_issue(number=88, title="Improve parser")
+        cmd = dispatcher.build_manager_command(issue)
+        assert cmd[-1] == "Implement issue #88: Improve parser"
+
+    def test_dispatch_manager_dry_run_logs_rendered_prompt(self, tmp_path, capsys):
+        """Dry run should be able to show rendered prompt (not hardcoded string)."""
+        import yaml
+
+        from vibe3.orchestra.config import AssigneeDispatchConfig
+
+        templates = {
+            "orchestra": {
+                "assignee_dispatch": {
+                    "manager": "Implement issue #{issue_number}: {issue_title}"
+                }
+            }
+        }
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
+
+        config = OrchestraConfig(
+            dry_run=True,
+            assignee_dispatch=AssigneeDispatchConfig(
+                prompt_template="orchestra.assignee_dispatch.manager"
+            ),
+        )
+        dispatcher = Dispatcher(
+            config, dry_run=True, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
+        )
+        issue = make_issue(number=42, title="Dry run test")
+        dispatcher.build_manager_command(issue)
+        assert dispatcher.last_manager_render_result is not None
+        assert "Implement issue #42: Dry run test" in (
+            dispatcher.last_manager_render_result.rendered_text
+        )

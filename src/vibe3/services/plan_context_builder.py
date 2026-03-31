@@ -1,8 +1,13 @@
-"""Plan context builder - Build context for planning agent.
+"""Plan context builder - assemble prompt body for planning agent.
 
-This module constructs stable prompt format for the planning agent
-through composable section builders.
+Public API:
+- ``build_plan_prompt_body(request, config)`` - assemble the full plan prompt string
+- ``make_plan_context_builder(request, config)`` - PromptContextBuilder (via assembler)
+
+Section builders (build_plan_policy_section, etc.) remain available for direct use.
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -11,6 +16,7 @@ from loguru import logger
 from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import VibeError
 from vibe3.models.plan import PlanRequest
+from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
 
 
 class PlanContextBuilderError(VibeError):
@@ -110,17 +116,23 @@ Output a structured plan in this format:
 [Optional additional context]"""
 
 
-def build_plan_context(
+def build_plan_prompt_body(
     request: PlanRequest,
     config: VibeConfig | None = None,
 ) -> str:
-    """Build plan context from request and configuration."""
-    from vibe3.services.context_builder import (
-        build_tools_guide_section,
-    )
+    """Assemble the plan prompt body from policy, tools guide, task, and output format.
 
-    log = logger.bind(domain="plan_context_builder", action="build_plan_context")
-    log.info("Building plan context")
+    Args:
+        request: PlanRequest with scope and task guidance.
+        config: VibeConfig instance.
+
+    Returns:
+        Assembled plan prompt body string.
+    """
+    from vibe3.services.context_builder import build_tools_guide_section
+
+    log = logger.bind(domain="plan_context_builder", action="build_plan_prompt_body")
+    log.info("Building plan prompt body")
 
     if config is None:
         config = VibeConfig.get_defaults()
@@ -150,6 +162,25 @@ def build_plan_context(
     output_contract = build_plan_output_contract_section(output_format)
     sections.append(output_contract)
 
-    context = "\n\n---\n\n".join(sections)
-    log.bind(context_len=len(context)).success("Plan context built")
-    return context
+    body = "\n\n---\n\n".join(sections)
+    log.bind(body_len=len(body)).success("Plan prompt body built")
+    return body
+
+
+def make_plan_context_builder(
+    request: PlanRequest,
+    config: VibeConfig | None = None,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for the plan command.
+
+    Routes through PromptAssembler with template key ``plan.default``
+    and a single provider that calls ``build_plan_prompt_body``.
+    """
+    cfg = config or VibeConfig.get_defaults()
+    return make_context_builder(
+        template_key="plan.default",
+        body_provider_key="plan.context",
+        body_fn=lambda: build_plan_prompt_body(request, cfg),
+        prompts_path=prompts_path,
+    )

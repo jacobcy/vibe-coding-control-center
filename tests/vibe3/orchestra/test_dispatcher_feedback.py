@@ -4,10 +4,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from tests.vibe3.orchestra.conftest import CompletedProcess
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.models import IssueInfo
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:

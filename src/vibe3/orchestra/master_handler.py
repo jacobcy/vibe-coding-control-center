@@ -6,10 +6,9 @@ from typing import Any
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.master import TriageDecision, run_master_agent
-from vibe3.orchestra.models import IssueInfo
 from vibe3.services.label_service import LabelService
 
 

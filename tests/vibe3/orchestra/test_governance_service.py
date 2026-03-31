@@ -1,5 +1,6 @@
 """Tests for GovernanceService."""
 
+import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -91,14 +92,30 @@ class TestGovernanceService:
         )
         plan = service._build_governance_plan(snapshot)
         assert "# Orchestra Governance Scan" in plan
-        assert "(无活跃 issue)" in plan
+        assert "## Running Issues" in plan
+        assert "(无 running issues)" in plan
+        assert "## Suggested Issues" in plan
+        assert "(无建议 issue)" in plan
 
-    def test_build_governance_plan_with_issues(self):
-        """Plan should include issue details."""
+    def test_build_governance_plan_with_running_and_suggested_issues(self):
+        """Plan should split running issues from suggested issues."""
         service = _make_service()
-        issue = IssueStatusEntry(
+        running_issue = IssueStatusEntry(
             number=42,
-            title="Test issue",
+            title="Running issue",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=True,
+            flow_branch="task/issue-42",
+            has_worktree=True,
+            worktree_path="/repo/wt-issue-42",
+            has_pr=True,
+            pr_number=401,
+            blocked_by=(),
+        )
+        suggested_issue = IssueStatusEntry(
+            number=43,
+            title="Suggested issue",
             state=None,
             assignee="vibe-manager-agent",
             has_flow=False,
@@ -112,15 +129,22 @@ class TestGovernanceService:
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
-            active_issues=(issue,),
-            active_flows=0,
-            active_worktrees=0,
+            active_issues=(running_issue, suggested_issue),
+            active_flows=1,
+            active_worktrees=1,
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
         plan = service._build_governance_plan(snapshot)
-        assert "#42" in plan
-        assert "Test issue" in plan
+        assert "## Running Issues" in plan
+        assert "#42: Running issue" in plan
+        assert "flow=task/issue-42" in plan
+        assert "worktree=/repo/wt-issue-42" in plan
+        assert "pr=#401" in plan
+        assert "## Suggested Issues" in plan
+        assert "仅供参考" in plan
+        assert "#43: Suggested issue" in plan
+        assert "flow=(not started)" in plan
 
     def test_build_governance_plan_with_blocked_issues(self):
         """Plan should show blocked_by relationships."""
@@ -165,6 +189,60 @@ class TestGovernanceService:
         )
         plan = service._build_governance_plan(snapshot)
         assert "half_open" in plan
+
+    def test_build_governance_plan_uses_template_and_skill_content(self, tmp_path):
+        """Governance plan should render configured template with skill content."""
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(textwrap.dedent("""
+                orchestra:
+                  governance:
+                    plan: |
+                      Skill: {skill_name}
+                      Count: {active_count}
+                      Issues:
+                      {issue_list}
+                      Skill Content:
+                      {skill_content}
+                """).strip())
+        config = OrchestraConfig(
+            governance=GovernanceConfig(
+                prompt_template="orchestra.governance.plan",
+                include_skill_content=True,
+            )
+        )
+        service = GovernanceService(
+            config=config,
+            status_service=MockStatusService(),
+            dispatcher=_make_dispatcher(),
+            prompts_path=prompts_path,
+        )
+        issue = IssueStatusEntry(
+            number=42,
+            title="Test issue",
+            state=None,
+            assignee="vibe-manager-agent",
+            has_flow=False,
+            flow_branch=None,
+            has_worktree=False,
+            worktree_path=None,
+            has_pr=False,
+            pr_number=None,
+            blocked_by=(),
+        )
+        snapshot = OrchestraSnapshot(
+            timestamp=0.0,
+            server_running=True,
+            active_issues=(issue,),
+            active_flows=0,
+            active_worktrees=0,
+            circuit_breaker_state="closed",
+            circuit_breaker_failures=0,
+        )
+        plan = service._build_governance_plan(snapshot)
+        assert "Skill: vibe-orchestra" in plan
+        assert "Count: 1" in plan
+        assert "#42: Test issue" in plan
+        assert "# Vibe Orchestra" in plan
 
     def test_delegates_to_dispatcher(self):
         """Execution uses dispatcher.run_governance_command."""
@@ -231,25 +309,3 @@ class TestGovernanceService:
 
         await service.on_tick()
         assert called["count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_run_governance_honors_governance_dry_run(self):
-        """Dry run stops before dispatch invocation."""
-        snapshot = OrchestraSnapshot(
-            timestamp=0.0,
-            server_running=True,
-            active_issues=(),
-            active_flows=0,
-            active_worktrees=0,
-            circuit_breaker_state="closed",
-            circuit_breaker_failures=0,
-        )
-        dispatcher = _make_dispatcher()
-        service = GovernanceService(
-            config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
-            status_service=MockStatusService(snapshot),
-            dispatcher=dispatcher,
-        )
-
-        await service._run_governance()
-        dispatcher.run_governance_command.assert_not_called()

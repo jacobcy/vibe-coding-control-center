@@ -16,7 +16,7 @@ from vibe3.services.codeagent_execution_service import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
-from vibe3.services.context_builder import build_review_context
+from vibe3.services.context_builder import make_review_context_builder
 from vibe3.services.flow_service import FlowService
 from vibe3.services.inspect_output_adapter import changed_symbols
 from vibe3.services.label_service import LabelService
@@ -46,9 +46,7 @@ class ReviewUsecase:
             build_snapshot_diff
         ),
         review_parser: Callable[[str], ParsedReview] = parse_codex_review,
-        context_builder: Callable[[ReviewRequest, VibeConfig], str] = (
-            build_review_context
-        ),
+        context_builder: Callable[..., object] = make_review_context_builder,
         execution_service_factory: Callable[[VibeConfig], Any] = (
             CodeagentExecutionService
         ),
@@ -111,7 +109,7 @@ class ReviewUsecase:
         exec_svc = self.execution_service_factory(self.config)
         command = self.command_builder(
             role="reviewer",
-            context_builder=lambda: self.context_builder(request, self.config),
+            context_builder=self.context_builder(request, self.config),
             task=task,
             dry_run=dry_run,
             handoff_kind="review",

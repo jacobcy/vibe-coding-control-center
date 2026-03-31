@@ -67,6 +67,10 @@ class RunUsecase:
         flow_service: FlowService | None = None,
     ) -> Path | None:
         """Find SKILL.md for a named skill under skills/ directory."""
+        cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
+        if cwd_candidate.exists():
+            return cwd_candidate
+
         try:
             service = flow_service or FlowService()
             repo_root = Path(service.get_git_common_dir()).parent
@@ -76,7 +80,4 @@ class RunUsecase:
         candidate = repo_root / "skills" / skill_name / "SKILL.md"
         if candidate.exists():
             return candidate
-        cwd_candidate = Path.cwd() / "skills" / skill_name / "SKILL.md"
-        if cwd_candidate.exists():
-            return cwd_candidate
         return None

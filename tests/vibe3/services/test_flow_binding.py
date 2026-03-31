@@ -35,7 +35,8 @@ class TestFlowBinding:
             "Issue #123 linked as task",
         )
 
-    def test_bind_flow_already_bound(self, mock_store) -> None:
+    @patch.object(TaskService, "auto_link_issue_to_project")
+    def test_bind_flow_already_bound(self, mock_auto_link, mock_store) -> None:
         """Binding again overwrites — link_issue is idempotent at store level."""
         service = TaskService(store=mock_store)
         result = service.link_issue(

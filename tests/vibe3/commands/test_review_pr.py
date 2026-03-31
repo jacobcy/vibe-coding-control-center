@@ -58,7 +58,6 @@ def test_review_pr_pass():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ) as mock_inspect,
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -80,7 +79,6 @@ def test_review_pr_block_exits_1():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -117,7 +115,6 @@ def test_review_pr_is_local_only():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -148,7 +145,6 @@ def test_review_pr_preserves_existing_session_id_when_wrapper_returns_none():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -169,7 +165,6 @@ def test_review_pr_async_dispatches_background_execution():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch("vibe3.commands.review.get_current_branch", return_value="task/issue250"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute",
