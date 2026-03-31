@@ -1,18 +1,18 @@
 """Command dispatcher with flow orchestration."""
 
-import subprocess
 from pathlib import Path
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.circuit_breaker import CircuitBreaker, classify_failure
+from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.orchestra.circuit_breaker import CircuitBreaker
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dispatcher_worktree import WorktreeResolverMixin
+from vibe3.orchestra.executor import run_command
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
-from vibe3.orchestra.models import IssueInfo
-
-_DISPATCH_TIMEOUT = 3600
+from vibe3.orchestra.prompts import build_manager_command, render_manager_prompt
+from vibe3.prompts.models import PromptRecipe, PromptRenderResult
+from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 
 
 class Dispatcher(WorktreeResolverMixin):
@@ -25,11 +25,13 @@ class Dispatcher(WorktreeResolverMixin):
         repo_path: Path | None = None,
         orchestrator: FlowOrchestrator | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        prompts_path: Path | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
         self.orchestrator = orchestrator or FlowOrchestrator(config)
+        self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         # Initialize circuit breaker if enabled
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
@@ -40,62 +42,19 @@ class Dispatcher(WorktreeResolverMixin):
             )
         # Track last error category for feedback loop
         self._last_error_category: str | None = None
+        # Set after build_manager_command; used for dry-run provenance logging
+        self.last_manager_render_result: PromptRenderResult | None = None
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a subprocess command with timeout and structured logging.
 
-        Returns True on success, False on failure/timeout.
+        Delegates to executor.run_command.
         """
-        # Reset error category before each run
-        self._last_error_category = None
-
-        # Check circuit breaker before dispatch
-        if self._circuit_breaker and not self._circuit_breaker.allow_request():
-            logger.bind(domain="orchestra").warning(
-                f"{label} blocked by circuit breaker"
-            )
-            self._last_error_category = "circuit_breaker"
-            return False
-
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=_DISPATCH_TIMEOUT,
-            )
-            if result.returncode != 0:
-                logger.bind(domain="orchestra").error(
-                    f"{label} failed: {result.stderr}"
-                )
-                # Record failure for circuit breaker
-                category = classify_failure(
-                    result.returncode, result.stderr or "", timed_out=False
-                )
-                self._last_error_category = category
-                if self._circuit_breaker:
-                    self._circuit_breaker.record_failure(category)
-                return False
-            logger.bind(domain="orchestra").info(f"{label} completed successfully")
-            # Record success for circuit breaker
-            if self._circuit_breaker:
-                self._circuit_breaker.record_success()
-            return True
-        except subprocess.TimeoutExpired:
-            logger.bind(domain="orchestra").error(f"{label} timed out")
-            category = classify_failure(returncode=1, stderr="timeout", timed_out=True)
-            self._last_error_category = category
-            if self._circuit_breaker:
-                self._circuit_breaker.record_failure(category)
-            return False
-        except Exception as e:
-            logger.bind(domain="orchestra").error(f"{label} error: {e}")
-            category = classify_failure(returncode=1, stderr=str(e), timed_out=False)
-            self._last_error_category = category
-            if self._circuit_breaker:
-                self._circuit_breaker.record_failure(category)
-            return False
+        success, category = run_command(
+            cmd, cwd, label, circuit_breaker=self._circuit_breaker
+        )
+        self._last_error_category = category
+        return success
 
     def run_governance_command(self, cmd: list[str], label: str) -> bool:
         """Run a governance command through the shared dispatch machinery.
@@ -121,7 +80,12 @@ class Dispatcher(WorktreeResolverMixin):
             issue=issue.number,
         )
 
-        cmd = self.build_manager_command(issue)
+        render_result = render_manager_prompt(
+            self.config, issue, prompts_path=self._prompts_path
+        )
+        self.last_manager_render_result = render_result
+        cmd = build_manager_command(self.config, render_result.rendered_text)
+
         if self.dry_run:
             log.info("Dry run: skipping flow creation/label updates")
             log.info(f"Dispatching manager: {' '.join(cmd)}")
@@ -189,12 +153,18 @@ class Dispatcher(WorktreeResolverMixin):
         return self._run_command(cmd, review_cwd, "Review execution")
 
     def build_manager_command(self, issue: IssueInfo) -> list[str]:
-        """Build executable manager command for an issue."""
-        cmd = ["uv", "run", "python", "-m", "vibe3", "run"]
-        if self.config.assignee_dispatch.use_worktree:
-            cmd.append("--worktree")
-        cmd.append(f"Implement issue #{issue.number}: {issue.title}")
-        return cmd
+        """Proxy for prompts.build_manager_command, used in tests."""
+        render_result = render_manager_prompt(
+            self.config, issue, prompts_path=self._prompts_path
+        )
+        self.last_manager_render_result = render_result
+        return build_manager_command(self.config, render_result.rendered_text)
+
+    def _build_manager_recipe(self) -> PromptRecipe:
+        """Proxy for prompts.build_manager_recipe, used in tests."""
+        from vibe3.orchestra.prompts import build_manager_recipe
+
+        return build_manager_recipe(self.config)
 
     def prepare_pr_review_dispatch(self, pr_number: int) -> tuple[list[str], Path]:
         """Prepare executable PR review command and working directory."""

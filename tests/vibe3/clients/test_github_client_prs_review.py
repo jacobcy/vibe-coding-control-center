@@ -1,12 +1,46 @@
-"""Tests for GitHub API file limit error handling."""
+"""Tests for GitHub client."""
 
 import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_review_ops import ReviewMixin
 from vibe3.exceptions import GitHubError, UserError
+
+
+@pytest.fixture
+def github_client() -> GitHubClient:
+    """Create GitHub client fixture."""
+    return GitHubClient()
+
+
+@pytest.fixture
+def mock_subprocess() -> MagicMock:
+    """Mock subprocess.run."""
+    with patch("vibe3.clients.github_client_base.subprocess.run") as mock:
+        yield mock
+
+
+def test_check_auth_success(
+    github_client: GitHubClient, mock_subprocess: MagicMock
+) -> None:
+    """Test auth check success."""
+    mock_subprocess.return_value.returncode = 0
+
+    result = github_client.check_auth()
+
+    assert result is True
+    mock_subprocess.assert_called_once_with(
+        ["gh", "auth", "status"],
+        capture_output=True,
+        text=True,
+    )
+
+
+def _client() -> GitHubClient:
+    return GitHubClient()
 
 
 @pytest.fixture
@@ -124,3 +158,10 @@ def test_error_message_suggests_alternatives(review_mixin):
         assert "Alternatives:" in error_msg
         assert "vibe inspect branch" in error_msg
         assert "pull/200/files" in error_msg
+
+
+def _client() -> GitHubClient:
+    return GitHubClient()
+
+
+# -- list_issues_with_assignees --

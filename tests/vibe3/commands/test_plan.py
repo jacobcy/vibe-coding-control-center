@@ -133,3 +133,35 @@ def test_plan_task_includes_issue_and_spec_context(
     assert "Task body" in context
     assert "Spec title" in context
     assert "Spec body" in context
+
+
+class TestPlanContextBuilderUsesAssembler:
+    """Assert plan command context builders go through PromptAssembler."""
+
+    def test_make_plan_context_builder_calls_body_builder(self) -> None:
+        """make_plan_context_builder should invoke build_plan_prompt_body."""
+        from unittest.mock import MagicMock, patch
+
+        from vibe3.config.settings import VibeConfig
+        from vibe3.services.plan_context_builder import make_plan_context_builder
+
+        config = VibeConfig.get_defaults()
+        request = MagicMock()
+        with patch(
+            "vibe3.services.plan_context_builder.build_plan_prompt_body",
+            return_value="assembled plan body",
+        ):
+            cb = make_plan_context_builder(request, config)
+            text = cb()
+
+        assert text == "assembled plan body"
+        assert cb.last_result is not None
+        assert cb.last_result.recipe_key == "plan.default"
+
+    def test_plan_context_builder_no_longer_exports_build_plan_context(self) -> None:
+        """build_plan_context (old name) must not exist in plan_context_builder."""
+        import vibe3.services.plan_context_builder as mod
+
+        assert not hasattr(
+            mod, "build_plan_context"
+        ), "build_plan_context should be deleted; use build_plan_prompt_body"

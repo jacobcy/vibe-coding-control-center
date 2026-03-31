@@ -46,7 +46,6 @@ def test_review_base_defaults_to_origin_main():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -74,7 +73,6 @@ def test_review_base_pass():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),
@@ -103,7 +101,6 @@ def test_review_base_uses_shared_resolution_when_base_omitted():
             "vibe3.commands.review.run_inspect_json",
             return_value=_mock_inspect_data(),
         ),
-        patch("vibe3.commands.review.build_review_context", return_value="ctx"),
         patch(
             "vibe3.commands.review.CodeagentExecutionService.execute_sync",
             return_value=_mock_result(),

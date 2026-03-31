@@ -1,37 +1,47 @@
-"""Run context builder - Build context for execution agent.
+"""Run context builder - assemble prompt body for execution agent.
 
-Reuses plan_context_builder logic but changes:
-- Task section: execute the plan
-- Output contract: code changes + report
+Public API:
+- ``build_run_prompt_body(plan_file, config)`` - assemble the full prompt string
+- ``make_run_context_builder(plan_file, config)`` - PromptContextBuilder (via assembler)
+- ``make_skill_context_builder(skill_content)`` - PromptContextBuilder for skill mode
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 
 from loguru import logger
 
 from vibe3.config.settings import VibeConfig
+from vibe3.prompts.assembler import PromptAssembler
+from vibe3.prompts.context_builder import PromptContextBuilder, make_context_builder
+from vibe3.prompts.models import (
+    PromptRecipe,
+    PromptVariableSource,
+    VariableSourceKind,
+)
+from vibe3.prompts.provider_registry import ProviderRegistry
 
 
-def build_run_context(
+def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
 ) -> str:
-    """Build run context from a plan file.
+    """Assemble the run prompt body from policy, tools guide, plan, and output format.
 
     Args:
-        plan_file: Path to plan file (markdown), or None for lightweight mode
-        config: VibeConfig instance
+        plan_file: Path to plan file (markdown), or None for lightweight mode.
+        config: VibeConfig instance.
 
     Returns:
-        Complete run context string
+        Assembled prompt body string.
     """
     if config is None:
         config = VibeConfig.get_defaults()
 
-    log = logger.bind(domain="run_context_builder", action="build_run_context")
-    log.info("Building run context from plan file")
+    log = logger.bind(domain="run_context_builder", action="build_run_prompt_body")
+    log.info("Building run prompt body")
 
-    # Load plan content if provided
     plan_content = None
     if plan_file:
         if not Path(plan_file).exists():
@@ -52,7 +62,6 @@ def build_run_context(
     if tools_guide:
         sections.append(tools_guide)
 
-    # Add plan content if provided
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
@@ -64,11 +73,9 @@ def build_run_context(
         "- Output a report of changes made"
     )
 
-    # Use output_format from config or default
     if run_config and hasattr(run_config, "output_format"):
-        output_format = run_config.output_format
+        output_format: str = run_config.output_format
     else:
-        # Default format for backward compatibility
         output_format = """## Output format requirements
 
 You MUST output a structured report in this EXACT format at the END of your response,
@@ -92,6 +99,48 @@ no matter what. Do not include this section in your response until the very end.
 
     sections.append(output_format)
 
-    context = "\n\n---\n\n".join(sections)
-    log.bind(context_len=len(context)).success("Run context built")
-    return context
+    body = "\n\n---\n\n".join(sections)
+    log.bind(body_len=len(body)).success("Run prompt body built")
+    return body
+
+
+def make_run_context_builder(
+    plan_file: str | None,
+    config: VibeConfig | None = None,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for plan/flow_plan/lightweight run mode.
+
+    The returned callable routes through PromptAssembler with template key
+    ``run.plan`` and a single provider that calls ``build_run_prompt_body``.
+    """
+    cfg = config or VibeConfig.get_defaults()
+    return make_context_builder(
+        template_key="run.plan",
+        body_provider_key="run.context",
+        body_fn=lambda: build_run_prompt_body(plan_file, cfg),
+        prompts_path=prompts_path,
+    )
+
+
+def make_skill_context_builder(
+    skill_content: str,
+    prompts_path: Path | None = None,
+) -> PromptContextBuilder:
+    """Create a PromptContextBuilder for skill execution mode.
+
+    The returned callable routes through PromptAssembler with template key
+    ``run.skill`` and a LITERAL source for ``skill_content``.
+    """
+    recipe = PromptRecipe(
+        template_key="run.skill",
+        variables={
+            "skill_content": PromptVariableSource(
+                kind=VariableSourceKind.LITERAL,
+                value=skill_content,
+            )
+        },
+    )
+    registry = ProviderRegistry()
+    assembler = PromptAssembler(prompts_path=prompts_path, registry=registry)
+    return PromptContextBuilder(assembler, recipe)

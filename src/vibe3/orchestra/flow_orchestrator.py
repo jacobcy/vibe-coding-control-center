@@ -5,8 +5,8 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.models import IssueInfo
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 

@@ -50,6 +50,18 @@ class AssigneeDispatchConfig(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
+    prompt_template: str = Field(
+        default="orchestra.assignee_dispatch.manager",
+        description="Dotted prompts.yaml path used to render the manager task prompt",
+    )
+    skill: str | None = Field(
+        default="vibe-manager",
+        description="Skill to include in manager prompt (None disables skill content)",
+    )
+    include_skill_content: bool = Field(
+        default=False,
+        description="Whether to inline the skill body into the manager prompt",
+    )
 
 
 class PRReviewDispatchConfig(BaseModel):
@@ -103,7 +115,15 @@ class GovernanceConfig(BaseModel):
     enabled: bool = True
     skill: str = Field(
         default="vibe-orchestra",
-        description="Governance skill to execute via vibe3 run --plan",
+        description="Governance skill material to include in the composed prompt",
+    )
+    prompt_template: str = Field(
+        default="orchestra.governance.plan",
+        description="Dotted prompts.yaml path used to render governance prompt",
+    )
+    include_skill_content: bool = Field(
+        default=True,
+        description="Whether to inline the governance skill body into the prompt",
     )
     dry_run: bool = False
     interval_ticks: int = Field(
@@ -168,6 +188,8 @@ class OrchestraConfig(BaseModel):
         governance_defaults: dict[str, bool | str | int] = {
             "enabled": True,
             "skill": "vibe-orchestra",
+            "prompt_template": "orchestra.governance.plan",
+            "include_skill_content": True,
             "dry_run": False,
             "interval_ticks": 4,
         }
@@ -180,6 +202,14 @@ class OrchestraConfig(BaseModel):
                     {
                         "enabled": getattr(governance_src, "enabled", True),
                         "skill": getattr(governance_src, "skill", "vibe-orchestra"),
+                        "prompt_template": getattr(
+                            governance_src,
+                            "prompt_template",
+                            "orchestra.governance.plan",
+                        ),
+                        "include_skill_content": getattr(
+                            governance_src, "include_skill_content", True
+                        ),
                         "dry_run": getattr(governance_src, "dry_run", False),
                         "interval_ticks": getattr(governance_src, "interval_ticks", 4),
                     }
@@ -204,6 +234,15 @@ class OrchestraConfig(BaseModel):
             assignee_dispatch=AssigneeDispatchConfig(
                 enabled=src.assignee_dispatch.enabled,
                 use_worktree=src.assignee_dispatch.use_worktree,
+                prompt_template=getattr(
+                    src.assignee_dispatch,
+                    "prompt_template",
+                    "orchestra.assignee_dispatch.manager",
+                ),
+                skill=getattr(src.assignee_dispatch, "skill", "vibe-manager"),
+                include_skill_content=getattr(
+                    src.assignee_dispatch, "include_skill_content", False
+                ),
             ),
             comment_reply=CommentReplyConfig(
                 enabled=src.comment_reply.enabled,

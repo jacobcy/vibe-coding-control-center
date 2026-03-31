@@ -1,6 +1,49 @@
 # AI Prompts 配置
 # 用于 AI 文案辅助能力（如 pr create --ai）
 # 用户可自定义 Prompts 模板
+#
+# =============================================================================
+# Prompt Assembly Layer - Recipe Schema and Variable Source Kinds
+# =============================================================================
+#
+# vibe3 使用统一 Prompt Assembly 层：每个命令通过 PromptRecipe 声明模板和变量来源，
+# PromptAssembler 负责解析、校验、渲染，并输出 PromptRenderResult（含 provenance）。
+#
+# Variable source kinds（变量来源类型）:
+#   literal   - 字面量值（直接写死）
+#   skill     - 从 skills/<name>/SKILL.md 读取内容
+#   file      - 从指定文件路径读取内容
+#   command   - 执行子命令并捕获 stdout
+#   provider  - 调用 ProviderRegistry 中注册的 Python callable
+#
+# Recipe 示例（在 Python 代码中构造）:
+#   PromptRecipe(
+#     template_key="orchestra.assignee_dispatch.manager",
+#     variables={
+#       "issue_number": PromptVariableSource(kind="literal", value="42"),
+#       "issue_title":  PromptVariableSource(kind="provider", provider="issue.title"),
+#     }
+#   )
+#
+# 干跑（dry run）行为:
+#   - context_builder() 被调用，assembler 正常渲染
+#   - PromptContextBuilder.last_result 保存 PromptRenderResult（含 provenance）
+#   - 上层命令可读取 last_result.provenance 展示变量来源
+#
+# 验证工具:
+#   vibe3 prompt check run.plan               # 检查模板 key 是否存在，列出所需变量
+#   vibe3 prompt check run.plan --json        # 输出 JSON
+#   vibe3 prompt check --list                 # 列出所有已知模板 key
+#
+# 迁移说明（Legacy context builders）:
+#   旧函数 build_run_context / build_plan_context / build_review_context 已删除。
+#   新入口：
+#     make_run_context_builder(plan_file, config)    -> PromptContextBuilder
+#     make_plan_context_builder(request, config)     -> PromptContextBuilder
+#     make_review_context_builder(request, config)   -> PromptContextBuilder
+#   这些工厂函数返回 PromptContextBuilder（callable），由 create_codeagent_command
+#   的 context_builder= 参数接收。
+# =============================================================================
 
 flow:
   slug_suggestion:
@@ -65,3 +108,75 @@ pr:
       3. Testing (how to verify)
 
       Use markdown format. Do not include code blocks in the body.
+
+orchestra:
+  governance:
+    # Selected by config/settings.yaml -> orchestra.governance.prompt_template
+    # Available template variables:
+    # - {skill_name}
+    # - {skill_content}
+    # - {server_status}
+    # - {running_issue_count}
+    # - {suggested_issue_count}
+    # - {running_issue_details}
+    # - {suggested_issue_details}
+    # - {active_count}
+    # - {active_flows}
+    # - {active_worktrees}
+    # - {circuit_breaker_state}
+    # - {circuit_breaker_failures}
+    # - {issue_list}
+    # - {truncated_note}
+    plan: |
+      # Orchestra Governance Scan
+
+      ## Governance Material
+      - Skill: {skill_name}
+
+      {skill_content}
+
+      ## Runtime Summary
+      - Server: {server_status}
+      - Running issues: {running_issue_count}
+      - Suggested issues: {suggested_issue_count}
+      - Active flows: {active_flows}
+      - Circuit breaker: {circuit_breaker_state} (failures={circuit_breaker_failures})
+
+      ## Running Issues
+      {running_issue_details}
+
+      ## Suggested Issues
+      仅供参考；最终仍需结合 flow / worktree / PR 现场判断。
+      {suggested_issue_details}
+
+      ## 指令
+      请只围绕以下治理问题做判断：
+      1. 当前哪些 issue 已经在运行
+      2. 当前哪些 issue 值得建议启动
+      3. 是否需要最小 label 调整来表达上述判断
+      4. 如果暂不建议启动，说明原因
+
+  assignee_dispatch:
+    # Template for the manager task instructions.
+    # Available template variables:
+    # - {issue_number}
+    # - {issue_title}
+    manager: "Implement issue #{issue_number}: {issue_title}"
+
+run:
+  # Template for plan/flow_plan/lightweight execution mode.
+  # Variable: {run_prompt_body} - fully assembled prompt body from run_context_builder.
+  plan: "{run_prompt_body}"
+  # Template for skill execution mode.
+  # Variable: {skill_content} - raw content of the skill's SKILL.md file.
+  skill: "{skill_content}"
+
+plan:
+  # Template for plan command (task / spec modes).
+  # Variable: {plan_prompt_body} - fully assembled prompt body from plan_context_builder.
+  default: "{plan_prompt_body}"
+
+review:
+  # Template for review command (pr / base modes).
+  # Variable: {review_prompt_body} - fully assembled prompt body from context_builder.
+  default: "{review_prompt_body}"

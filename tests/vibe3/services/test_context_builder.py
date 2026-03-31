@@ -14,7 +14,7 @@ from vibe3.services.context_builder import (
     build_ast_analysis_section,
     build_output_contract_section,
     build_policy_section,
-    build_review_context,
+    build_review_prompt_body,
     build_review_task_section,
     build_tools_guide_section,
 )
@@ -133,10 +133,10 @@ class TestBuildOutputContractSection:
         assert "VERDICT: PASS | MAJOR | BLOCK" in result
 
 
-class TestBuildReviewContext:
-    """Tests for build_review_context orchestration (integration test)."""
+class TestBuildReviewPromptBody:
+    """Tests for build_review_prompt_body orchestration (integration test)."""
 
-    def test_build_review_context_with_ast_analysis(self) -> None:
+    def test_build_review_prompt_body_with_ast_analysis(self) -> None:
         """Context should include AST analysis when provided."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
@@ -144,34 +144,34 @@ class TestBuildReviewContext:
             scope = ReviewScope.for_base("main")
             request = ReviewRequest(
                 scope=scope,
-                changed_symbols={"src/review.py": ["build_review_context"]},
+                changed_symbols={"src/review.py": ["build_review_prompt_body"]},
             )
-            context = build_review_context(request)
+            context = build_review_prompt_body(request)
 
         # Should include AST analysis
         assert "Changed Functions" in context
-        assert "build_review_context" in context
+        assert "build_review_prompt_body" in context
 
-    def test_build_review_context_includes_verdict_format(self) -> None:
+    def test_build_review_prompt_body_includes_verdict_format(self) -> None:
         """Context should specify VERDICT output format."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
             request = ReviewRequest(scope=scope)
-            context = build_review_context(request)
+            context = build_review_prompt_body(request)
 
         assert "VERDICT:" in context
         assert "PASS" in context or "MAJOR" in context or "BLOCK" in context
 
-    def test_build_review_context_minimal_without_ast(self) -> None:
+    def test_build_review_prompt_body_minimal_without_ast(self) -> None:
         """Context should work without AST analysis (reviewer uses git diff)."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
             request = ReviewRequest(scope=scope)
-            context = build_review_context(request)
+            context = build_review_prompt_body(request)
 
         # Should include policy and task guidance
         assert "Review Policy" in context
@@ -182,7 +182,7 @@ class TestBuildReviewContext:
         assert "risk score" not in context.lower()
         assert "total_changed" not in context.lower()
 
-    def test_build_review_context_handles_missing_policy(self) -> None:
+    def test_build_review_prompt_body_handles_missing_policy(self) -> None:
         """Should raise error when policy file is missing."""
         with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
             mock_read.side_effect = OSError("File not found")
@@ -191,14 +191,14 @@ class TestBuildReviewContext:
             request = ReviewRequest(scope=scope)
 
             with pytest.raises(Exception):  # ContextBuilderError
-                build_review_context(request)
+                build_review_prompt_body(request)
 
-    def test_build_review_context_hides_internal_prompt_wiring(self) -> None:
+    def test_build_review_prompt_body_hides_internal_prompt_wiring(self) -> None:
         """Context should not leak internal file/config wiring to the agent."""
         scope = ReviewScope.for_base("main")
         request = ReviewRequest(scope=scope)
 
-        context = build_review_context(request)
+        context = build_review_prompt_body(request)
 
         forbidden_tokens = (
             "common.md",

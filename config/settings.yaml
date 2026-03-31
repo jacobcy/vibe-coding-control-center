@@ -332,11 +332,11 @@ orchestra:
   enabled: true
 
   # Polling interval in seconds (effective only when polling.enabled=true)
-  polling_interval: 60
+  polling_interval: 900
 
   # Polling fallback (for missed webhook events)
   polling:
-    enabled: false
+    enabled: true
 
   # GitHub repository (optional). null 表示默认使用当前工作目录对应仓库
   repo: null
@@ -353,7 +353,6 @@ orchestra:
   # Manager usernames used as reviewer/assignee match target
   manager_usernames:
     - "vibe-manager-agent"
-    - "vibe-manager"
 
   # Proactive manager dispatch via issues/assigned
   assignee_dispatch:
@@ -377,8 +376,8 @@ orchestra:
     # Enable master agent for new issue triage
     enabled: false
 
-    # Agent preset name (passed to codeagent-wrapper)
-    agent: "master-controller"
+    # Agent preset name (passed to codeagent-wranipper)
+    agent: "oracle"
 
     # Backend for direct execution
     # backend: "claude"
@@ -388,3 +387,15 @@ orchestra:
 
     # Timeout in seconds
     timeout_seconds: 300
+
+  # Governance prompt composition
+  governance:
+    enabled: true
+    interval_ticks: 1
+    # Skill body source: skills/<name>/SKILL.md
+    skill: "vibe-orchestra"
+    # Template selector: config/prompts.yaml under this dotted key
+    prompt_template: "orchestra.governance.plan"
+    # Whether to inline the skill body into the composed governance prompt
+    include_skill_content: true
+    dry_run: true

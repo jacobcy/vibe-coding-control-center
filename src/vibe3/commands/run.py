@@ -23,7 +23,10 @@ from vibe3.services.codeagent_execution_service import (
     create_codeagent_command,
 )
 from vibe3.services.label_service import LabelService
-from vibe3.services.run_context_builder import build_run_context
+from vibe3.services.run_context_builder import (
+    make_run_context_builder,
+    make_skill_context_builder,
+)
 from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
 
@@ -127,7 +130,7 @@ def run_command(
             config=config,
             branch=branch,
             instructions=instructions or f"Execute skill: {skill}",
-            context_builder=lambda: skill_content,
+            context_builder=make_skill_context_builder(skill_content),
             dry_run=dry_run,
             async_mode=async_mode,
             agent=agent,
@@ -172,7 +175,7 @@ def run_command(
         config=config,
         branch=branch,
         instructions=instructions,
-        context_builder=lambda: build_run_context(plan_file, config),
+        context_builder=make_run_context_builder(plan_file, config),
         dry_run=dry_run,
         async_mode=async_mode,
         agent=agent,
