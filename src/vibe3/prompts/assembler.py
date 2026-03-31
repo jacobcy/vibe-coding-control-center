@@ -13,6 +13,7 @@ from vibe3.prompts.models import (
     PromptRenderResult,
     PromptVariableProvenance,
     PromptVariableSource,
+    VariableSourceKind,
 )
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import (
@@ -99,8 +100,6 @@ class PromptAssembler:
 
 def _describe_source(source: PromptVariableSource) -> str:
     """Return a human-readable description of where a variable came from."""
-    from vibe3.prompts.models import VariableSourceKind
-
     if source.kind == VariableSourceKind.LITERAL:
         return "literal"
     if source.kind == VariableSourceKind.SKILL:
