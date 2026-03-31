@@ -8,11 +8,11 @@ Public API:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from vibe3.prompts.assembler import _TEMPLATE_VAR_RE, _describe_source
 from vibe3.prompts.models import (
     PromptRecipe,
     PromptVariableProvenance,
@@ -23,9 +23,6 @@ from vibe3.prompts.template_loader import (
     DEFAULT_PROMPTS_PATH,
     resolve_prompt_template,
 )
-
-# Matches {variable_name} in Python format strings
-_TEMPLATE_VAR_RE = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
 
 
 @dataclass(frozen=True)
@@ -177,7 +174,7 @@ class PromptValidationService:
 
         return PromptValidationResult(
             template_key=recipe.template_key,
-            is_valid=not any(i.kind not in {"file_not_found"} for i in issues),
+            is_valid=all(i.kind == "file_not_found" for i in issues),
             issues=tuple(issues),
             preview_text=rendered,
             provenance=tuple(provenance_list),
@@ -233,18 +230,3 @@ class PromptValidationService:
                 )
 
         return "", None
-
-
-def _describe_source(source: Any) -> str:
-    """Return a human-readable description of a variable source."""
-    if source.kind == VariableSourceKind.LITERAL:
-        return "literal"
-    if source.kind == VariableSourceKind.SKILL:
-        return f"skill:{source.skill}"
-    if source.kind == VariableSourceKind.FILE:
-        return f"file:{source.path}"
-    if source.kind == VariableSourceKind.COMMAND:
-        return f"command:{source.command}"
-    if source.kind == VariableSourceKind.PROVIDER:
-        return f"provider:{source.provider}"
-    return "unknown"
