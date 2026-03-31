@@ -43,7 +43,22 @@ class CodeagentExecutionService:
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
-        Priority: CLI --agent > CLI --backend/--model > Config agent > Config backend
+        ``agent`` and ``backend`` are mutually exclusive entry points:
+
+        - agent mode  : pass ``--agent <preset>`` to codeagent-wrapper.
+                        The preset's backend/model are defined in models.json.
+                        ``model`` is irrelevant and ignored in this mode.
+        - backend mode: pass ``--backend <name>`` [``--model <name>``].
+                        ``model`` is optional — omitting it lets the backend
+                        use its own default from models.json.
+
+        Resolution priority (first match wins):
+
+        1. CLI ``--agent``   → agent mode,   model ignored
+        2. CLI ``--backend`` → backend mode, CLI ``--model`` used if given
+                               (config model is NOT inherited — be explicit)
+        3. Config ``agent``  → agent mode,   model ignored
+        4. Config ``backend``→ backend mode, config ``model`` used if present
         """
         target_config = getattr(self.config, section, None)
         config_agent = None
@@ -56,33 +71,24 @@ class CodeagentExecutionService:
             config_backend = getattr(ac, "backend", None)
             config_model = getattr(ac, "model", None)
 
+        # 1. CLI --agent: preset mode, model is managed by the preset itself
         if agent:
-            return AgentOptions(
-                agent=agent, backend=None, model=None, worktree=worktree
-            )
+            return AgentOptions(agent=agent, worktree=worktree)
 
+        # 2. CLI --backend: backend mode, use CLI --model only (no config fallback)
+        #    Rationale: user explicitly chose a backend override; if they wanted
+        #    a specific model they would have passed --model too.
         if backend:
-            return AgentOptions(
-                agent=None,
-                backend=backend,
-                model=model or config_model,
-                worktree=worktree,
-            )
+            return AgentOptions(backend=backend, model=model, worktree=worktree)
 
+        # 3. Config agent: preset mode
         if config_agent:
-            return AgentOptions(
-                agent=config_agent,
-                backend=None,
-                model=None,
-                worktree=worktree,
-            )
+            return AgentOptions(agent=config_agent, worktree=worktree)
 
+        # 4. Config backend: backend mode, apply config model as the intended default
         if config_backend:
             return AgentOptions(
-                agent=None,
-                backend=config_backend,
-                model=config_model,
-                worktree=worktree,
+                backend=config_backend, model=config_model, worktree=worktree
             )
 
         raise ValueError(
