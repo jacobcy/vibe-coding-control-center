@@ -5,6 +5,12 @@ from typing import Annotated, Optional
 import typer
 from loguru import logger
 
+from vibe3.agents.review_agent import ReviewUsecase
+from vibe3.agents.review_parser import parse_codex_review
+from vibe3.agents.runner import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _TRACE_OPT,
@@ -13,15 +19,9 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.config.settings import VibeConfig
-from vibe3.services.codeagent_execution_service import (
-    CodeagentExecutionService,
-    create_codeagent_command,
-)
 from vibe3.services.context_builder import make_review_context_builder
 from vibe3.services.flow_service import FlowService
-from vibe3.services.review_parser import parse_codex_review
 from vibe3.services.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.services.review_usecase import ReviewUsecase
 from vibe3.utils.git_helpers import get_current_branch
 from vibe3.utils.trace import enable_trace
 

@@ -6,7 +6,7 @@ Tests the inspect-score trigger mechanism for local review.
 import json
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.review_runner import AgentOptions
+from vibe3.agents.review_runner import AgentOptions
 
 
 class TestInspectScoreTrigger:

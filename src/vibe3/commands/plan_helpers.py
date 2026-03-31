@@ -2,9 +2,9 @@
 
 from typing import Literal
 
+from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.codeagent_execution_service import CodeagentExecutionService
 
 
 def get_agent_options(

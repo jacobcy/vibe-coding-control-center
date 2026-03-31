@@ -1,4 +1,7 @@
-"""Data models and factory for codeagent execution commands."""
+"""Data models and factory for codeagent execution commands.
+
+Migrated from vibe3.services.codeagent_models.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path

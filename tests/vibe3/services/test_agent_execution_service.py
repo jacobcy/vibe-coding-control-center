@@ -2,12 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
+from vibe3.agents.session_service import execute_agent, load_session_id
 from vibe3.models.review_runner import AgentOptions, AgentResult
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
 
 
-@patch("vibe3.services.agent_execution_service.FlowService")
-@patch("vibe3.services.agent_execution_service.GitClient")
+@patch("vibe3.agents.session_service.FlowService")
+@patch("vibe3.agents.session_service.GitClient")
 def test_load_session_id_returns_role_session(git_cls, flow_service_cls) -> None:
     git_cls.return_value.get_current_branch.return_value = "task/demo"
     flow_status = MagicMock(executor_session_id="sess-123")
@@ -18,7 +18,7 @@ def test_load_session_id_returns_role_session(git_cls, flow_service_cls) -> None
     assert session_id == "sess-123"
 
 
-@patch("vibe3.services.agent_execution_service.run_review_agent")
+@patch("vibe3.agents.session_service.run_review_agent")
 def test_execute_agent_returns_effective_session_id(mock_run) -> None:
     mock_run.return_value = AgentResult(
         exit_code=0,

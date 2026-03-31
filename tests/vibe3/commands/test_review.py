@@ -39,8 +39,8 @@ class TestReviewContextBuilderUsesAssembler:
 
     def test_review_usecase_context_builder_uses_assembler(self) -> None:
         """ReviewUsecase should build context through assembler-backed callable."""
+        from vibe3.agents.review_agent import ReviewUsecase
         from vibe3.services.context_builder import make_review_context_builder
-        from vibe3.services.review_usecase import ReviewUsecase
 
         usecase = ReviewUsecase()
         # The default context_builder should be make_review_context_builder

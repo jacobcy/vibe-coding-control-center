@@ -1,4 +1,7 @@
-"""Usecase layer for run command orchestration."""
+"""Usecase layer for run command orchestration.
+
+Migrated from vibe3.services.run_usecase.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
+from vibe3.agents.run_agent import RunUsecase
 from vibe3.cli import app as cli_app
-from vibe3.services.run_usecase import RunUsecase
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 

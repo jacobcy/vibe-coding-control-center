@@ -1,15 +1,6 @@
 """Review parser - Parse output from codeagent-wrapper.
 
-This module parses the output from codeagent-wrapper review agent.
-It is designed to be robust against wrapper output noise such as:
-- Session/log preamble
-- Markdown headers
-- Extra newlines
-- Timestamp logs
-
-Output format expected:
-    path/to/file.py:42 [MAJOR] concise issue description
-    VERDICT: PASS | MAJOR | BLOCK
+Migrated from vibe3.services.review_parser.
 """
 
 import re

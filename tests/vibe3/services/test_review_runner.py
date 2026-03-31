@@ -8,12 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.agents.review_runner import (
+    run_review_agent,
+)
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
-)
-from vibe3.services.review_runner import (
-    run_review_agent,
 )
 
 
@@ -27,7 +27,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(
                 agent="code-reviewer",
@@ -51,7 +51,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
             result = run_review_agent("prompt body", options)
@@ -70,7 +70,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "Error: something failed\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
 
@@ -87,7 +87,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "stdout ignored\n"
         mock_result.stderr = "wrapper stderr details\n"
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
 
@@ -100,7 +100,7 @@ class TestRunReviewAgent:
         """Runner should give clear error when wrapper not found."""
         from vibe3.exceptions import AgentExecutionError
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("codeagent-wrapper not found")
             options = AgentOptions(agent="code-reviewer")
 
@@ -115,7 +115,7 @@ class TestRunReviewAgent:
 
         from vibe3.exceptions import AgentExecutionError
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(
                 cmd=["codeagent-wrapper"], timeout=300
             )
@@ -136,7 +136,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "Result\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
             run_review_agent("my prompt file content", options, task="custom task")
@@ -158,7 +158,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             run_review_agent(
                 "prompt body",
@@ -174,7 +174,7 @@ class TestRunReviewAgent:
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.return_value = mock_result
             run_review_agent(
                 "prompt body",
@@ -193,7 +193,7 @@ class TestRunReviewAgent:
         mock_result.stderr = ""
 
         with patch(
-            "vibe3.services.review_runner.subprocess.run", return_value=mock_result
+            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
         ):
             result = run_review_agent(
                 "prompt body", AgentOptions(agent="code-reviewer")
@@ -213,7 +213,7 @@ class TestRunReviewAgent:
         mock_result.stderr = ""
 
         with patch(
-            "vibe3.services.review_runner.subprocess.run", return_value=mock_result
+            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
         ):
             result = run_review_agent(
                 "prompt body", AgentOptions(agent="code-reviewer")
@@ -224,14 +224,14 @@ class TestRunReviewAgent:
     def test_run_review_handles_os_error(self) -> None:
         """Runner should handle OSError gracefully."""
 
-        with patch("vibe3.services.review_runner.subprocess.run") as mock_run:
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
             mock_run.side_effect = OSError("I/O error")
 
             with pytest.raises(OSError, match="I/O error"):
                 run_review_agent("prompt body", AgentOptions(agent="code-reviewer"))
 
-    @patch("vibe3.services.review_runner.subprocess.run")
-    @patch("vibe3.services.review_runner.Path.mkdir")
+    @patch("vibe3.agents.backends.codeagent.subprocess.run")
+    @patch("vibe3.agents.backends.codeagent.Path.mkdir")
     def test_run_review_creates_codeagent_agents_dir(
         self, mock_mkdir, mock_run
     ) -> None:
@@ -247,8 +247,8 @@ class TestRunReviewAgent:
         assert result.exit_code == 0
         mock_mkdir.assert_any_call(parents=True, exist_ok=True)
 
-    @patch("vibe3.services.review_runner.subprocess.run")
-    @patch("vibe3.services.review_runner.Path.mkdir")
+    @patch("vibe3.agents.backends.codeagent.subprocess.run")
+    @patch("vibe3.agents.backends.codeagent.Path.mkdir")
     def test_run_review_uses_codeagent_agents_dir_for_prompt_file(
         self, mock_mkdir, mock_run
     ) -> None:

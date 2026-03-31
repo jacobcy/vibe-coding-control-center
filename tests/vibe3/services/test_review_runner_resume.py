@@ -2,12 +2,12 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from vibe3.agents.review_runner import run_review_agent
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.review_runner import run_review_agent
 
 
-@patch("subprocess.run")
-@patch("tempfile.NamedTemporaryFile")
+@patch("vibe3.agents.backends.codeagent.subprocess.run")
+@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
 def test_run_review_agent_resume_mode(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"

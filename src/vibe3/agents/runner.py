@@ -1,4 +1,7 @@
-"""Unified codeagent execution service for plan/review/run commands."""
+"""Unified codeagent execution service for plan/review/run commands.
+
+Migrated from vibe3.services.codeagent_execution_service.
+"""
 
 import os
 import sys
@@ -7,17 +10,17 @@ from typing import Literal, Sequence
 from loguru import logger
 from typer import echo
 
-from vibe3.config.settings import VibeConfig
-from vibe3.models.review_runner import AgentOptions
-from vibe3.services.codeagent_models import (
+from vibe3.agents.models import (
     CodeagentCommand,
     CodeagentResult,
     ExecutionRole,
     create_codeagent_command,
 )
-from vibe3.services.execution_pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.agents.pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.config.settings import VibeConfig
+from vibe3.models.review_runner import AgentOptions
 
-# Re-export models for backward compatibility with existing imports.
+# Re-export models for backward compatibility.
 __all__ = [
     "ExecutionRole",
     "CodeagentCommand",

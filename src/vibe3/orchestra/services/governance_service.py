@@ -361,7 +361,7 @@ class GovernanceService(ServiceBase):
         return Path.cwd() / self._prompts_path
 
     def _resolve_skill_path(self) -> Path | None:
-        from vibe3.services.run_usecase import RunUsecase
+        from vibe3.agents.run_agent import RunUsecase
 
         return RunUsecase.find_skill_file(self._skill)
 

@@ -13,9 +13,11 @@ from typing import Any, Callable
 from loguru import logger
 from typer import echo
 
+from vibe3.agents.base import AgentBackend
+from vibe3.agents.review_runner import format_agent_actor
+from vibe3.agents.session_service import load_session_id
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions, AgentResult
-from vibe3.services.agent_execution_service import execute_agent, load_session_id
 from vibe3.services.execution_lifecycle import (
     ExecutionRole,
     persist_execution_lifecycle_event,
@@ -24,7 +26,6 @@ from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
     record_handoff_unified,
 )
-from vibe3.services.review_runner import format_agent_actor
 
 
 @dataclass
@@ -49,7 +50,10 @@ class ExecutionResult:
     session_id: str | None
 
 
-def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
+def run_execution_pipeline(
+    request: ExecutionRequest,
+    backend: AgentBackend | None = None,
+) -> ExecutionResult:
     """Run the full agent execution pipeline.
 
     Handles:
@@ -60,10 +64,16 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
 
     Args:
         request: Execution configuration
+        backend: 可选的 agent 执行后端（默认为 CodeagentBackend）
 
     Returns:
         ExecutionResult with agent output, handoff path, and effective session ID
     """
+    if backend is None:
+        from vibe3.agents.backends.codeagent import CodeagentBackend
+
+        backend = CodeagentBackend()
+
     log = logger.bind(
         domain="execution_pipeline",
         role=request.role,
@@ -126,9 +136,9 @@ def run_execution_pipeline(request: ExecutionRequest) -> ExecutionResult:
         echo(f"-> Executing with {options.agent or options.backend}...")
 
         # Execute agent
-        result = execute_agent(
-            options,
-            prompt_content,
+        result = backend.run(
+            prompt=prompt_content,
+            options=options,
             task=request.task,
             dry_run=request.dry_run,
             session_id=session_id,

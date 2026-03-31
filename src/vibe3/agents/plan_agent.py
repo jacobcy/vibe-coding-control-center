@@ -1,4 +1,7 @@
-"""Usecase layer for plan command orchestration."""
+"""Usecase layer for plan command orchestration.
+
+Migrated from vibe3.services.plan_usecase.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path

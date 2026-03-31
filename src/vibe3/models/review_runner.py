@@ -64,7 +64,7 @@ class AgentResult:
         cls, cp: subprocess.CompletedProcess[str]
     ) -> "AgentResult":
         """Create result from a CompletedProcess."""
-        from vibe3.services.review_runner import extract_session_id
+        from vibe3.agents.review_runner import extract_session_id
 
         stdout = cp.stdout or ""
         return cls(

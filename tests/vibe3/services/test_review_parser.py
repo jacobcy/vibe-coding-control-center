@@ -3,7 +3,7 @@
 Tests the parsing of codeagent-wrapper output.
 """
 
-from vibe3.services.review_parser import (
+from vibe3.agents.review_parser import (
     ParsedReview,
     ReviewComment,
     convert_to_github_format,

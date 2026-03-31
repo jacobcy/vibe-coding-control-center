@@ -1,14 +1,17 @@
-"""Shared execution service for command -> codeagent-wrapper workflows."""
+"""Shared execution service for command -> codeagent-wrapper workflows.
+
+Migrated from vibe3.services.agent_execution_service.
+"""
 
 from typing import Literal
 
 from loguru import logger
 
+from vibe3.agents.review_runner import run_review_agent
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import SystemError, UserError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.services.flow_service import FlowService
-from vibe3.services.review_runner import run_review_agent
 
 SessionRole = Literal["planner", "executor", "reviewer"]
 
