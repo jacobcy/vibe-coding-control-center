@@ -10,17 +10,14 @@ from vibe3.models.flow import FlowState
 runner = CliRunner()
 
 
-@patch("vibe3.commands.flow.TaskService")
 @patch("vibe3.commands.flow.render_flow_created")
 @patch("vibe3.commands.flow.FlowService")
-def test_flow_add_task_bound_uses_system_actor_by_default(
+def test_flow_update_idempotent(
     flow_service_cls,
     _render_flow_created,
-    task_service_cls,
 ) -> None:
-    """flow add without --actor should link task issue with system ownership."""
+    """flow update should ensure flow exists."""
     flow_service = MagicMock()
-    task_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/set-default-flow"
 
     flow = FlowState(
@@ -29,61 +26,15 @@ def test_flow_add_task_bound_uses_system_actor_by_default(
         flow_status="active",
         task_issue_number=None,
     )
-    flow_service.get_flow_status.return_value = None
-    flow_service.create_flow.return_value = flow
+    flow_service.get_flow_status.return_value = flow
     flow_service.ensure_flow_for_branch.return_value = flow
     flow_service_cls.return_value = flow_service
-    task_service_cls.return_value = task_service
 
-    result = runner.invoke(app, ["add", "set-default-flow", "--task", "248"])
-
-    assert result.exit_code == 0
-    task_service.link_issue.assert_called_once_with(
-        "task/set-default-flow", 248, "task", actor=None
-    )
-
-
-@patch("vibe3.commands.flow.TaskService")
-@patch("vibe3.commands.flow.render_flow_created")
-@patch("vibe3.commands.flow.FlowService")
-def test_flow_add_supports_multiple_task_refs_in_single_flag_style(
-    flow_service_cls,
-    _render_flow_created,
-    task_service_cls,
-) -> None:
-    """flow add --task 281 282 should bind both task issues."""
-    flow_service = MagicMock()
-    task_service = MagicMock()
-    flow_service.get_current_branch.return_value = "task/set-default-flow"
-    flow_service.get_flow_status.return_value = None
-    flow = FlowState(
-        branch="task/set-default-flow",
-        flow_slug="set-default-flow",
-        flow_status="active",
-        task_issue_number=None,
-    )
-    flow_service.create_flow.return_value = flow
-    flow_service.ensure_flow_for_branch.return_value = flow
-    flow_service.store = MagicMock()
-    flow_service_cls.return_value = flow_service
-    task_service_cls.return_value = task_service
-    task_service.link_issue.side_effect = [
-        MagicMock(issue_number=281, issue_role="task", branch="task/set-default-flow"),
-        MagicMock(issue_number=282, issue_role="task", branch="task/set-default-flow"),
-    ]
-
-    result = runner.invoke(app, ["add", "set-default-flow", "--task", "281", "282"])
+    result = runner.invoke(app, ["update", "--name", "set-default-flow"])
 
     assert result.exit_code == 0
-    assert task_service.link_issue.call_args_list[0].args == (
-        "task/set-default-flow",
-        281,
-        "task",
-    )
-    assert task_service.link_issue.call_args_list[1].args == (
-        "task/set-default-flow",
-        282,
-        "task",
+    flow_service.ensure_flow_for_branch.assert_called_once_with(
+        branch="task/set-default-flow", slug="set-default-flow"
     )
 
 

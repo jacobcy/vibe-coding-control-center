@@ -52,10 +52,10 @@ description: Use when starting a new development task. Handles the full setup fr
   ├─ Step 3: 准备 flow
   │   ├─ 场景A：需要新分支
   │   │   ├─ git checkout -b <branch-name>
-  │   │   ├─ vibe3 flow add
+  │   │   ├─ vibe3 flow update
   │   │   └─ vibe3 flow bind <issue> --role task
   │   ├─ 场景B：已在目标分支，首次注册
-  │   │   ├─ vibe3 flow add
+  │   │   ├─ vibe3 flow update
   │   │   └─ vibe3 flow bind <issue> --role task
   │   └─ 场景C：已有 flow，只需绑定新 issue
   │       └─ vibe3 flow bind <issue> --role task
@@ -103,7 +103,7 @@ gh issue view <number>
 git checkout -b task/issue-123
 
 # 2. 注册当前分支为 flow
-vibe3 flow add
+vibe3 flow update
 
 # 3. 绑定 task issue
 vibe3 flow bind 123 --role task
@@ -113,7 +113,7 @@ vibe3 flow bind 123 --role task
 
 ```bash
 # 注册当前分支为 flow
-vibe3 flow add
+vibe3 flow update
 
 # 绑定 task issue
 vibe3 flow bind <issue-number> --role task

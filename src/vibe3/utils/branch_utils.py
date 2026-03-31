@@ -39,7 +39,7 @@ def find_parent_branch(current_branch: str | None = None) -> str | None:
 
         # Get all branches
         result = subprocess.run(
-            ["git", "branch", "-a", "--format=%(refname:short)"],
+            ["git", "branch", "-l", "--format=%(refname:short)"],
             capture_output=True,
             text=True,
             check=True,

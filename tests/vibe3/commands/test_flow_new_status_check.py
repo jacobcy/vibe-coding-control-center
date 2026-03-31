@@ -25,7 +25,7 @@ class TestFlowAddStatusCheck:
         )
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(app, ["flow", "add", "new-flow"])
+        result = runner.invoke(app, ["flow", "update", "--name", "new-flow"])
 
         assert result.exit_code == 0
         mock_service.ensure_flow_for_branch.assert_called_once_with(
@@ -54,7 +54,7 @@ class TestFlowAddStatusCheck:
         )
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(app, ["flow", "add", "new-flow"])
+        result = runner.invoke(app, ["flow", "update", "--name", "new-flow"])
 
         assert result.exit_code == 0
         mock_service.create_flow.assert_not_called()

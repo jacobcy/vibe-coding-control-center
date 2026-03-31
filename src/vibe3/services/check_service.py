@@ -76,6 +76,24 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 branch=branch,
             )
 
+        # Check if local branch still exists
+        try:
+            # Use git branch --list to check only local branches
+            output = self.git_client._run(["branch", "--list", branch])
+            if not output.strip():
+                # Not found locally. Check if it's a safe branch.
+                from vibe3.services.flow_service import FlowService
+
+                if not branch.startswith(FlowService.SAFE_BRANCH_PREFIX):
+                    self._mark_flow_aborted(
+                        branch, f"Branch '{branch}' no longer exists locally"
+                    )
+                    return CheckResult(is_valid=True, branch=branch, issues=[])
+        except Exception as e:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to verify local branch existence: {e}"
+            )
+
         # task issue exists and is open on GitHub
         issue_links = self.store.get_issue_links(branch)
         task_issue = IssueLink.resolve_task_number(issue_links)
@@ -176,6 +194,21 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             "flow_auto_completed",
             "system",
             f"Flow auto-completed: {reason}",
+        )
+
+    def _mark_flow_aborted(self, branch: str, reason: str) -> None:
+        """Mark a flow as aborted and record the event."""
+        logger.bind(
+            domain="check",
+            action="auto_abort_flow",
+            branch=branch,
+        ).info(f"Auto-aborting flow: {reason}")
+        self.store.update_flow_state(branch, flow_status="aborted")
+        self.store.add_event(
+            branch,
+            "flow_auto_aborted",
+            "system",
+            f"Flow auto-aborted: {reason}",
         )
 
     # ------------------------------------------------------------------

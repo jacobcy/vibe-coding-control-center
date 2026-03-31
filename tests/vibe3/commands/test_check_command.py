@@ -26,7 +26,7 @@ class TestCheckCommand:
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
-            mode="default", success=True, summary="All checks passed"
+            mode="fix_all", success=True, summary="All checks passed", details={}
         )
         mock_service_class.return_value = mock_service
 
@@ -35,7 +35,6 @@ class TestCheckCommand:
         assert result.exit_code == 0
         assert "✓" in result.output
         assert "All checks passed" in result.output
-        assert "vibe3 check --fix" not in result.output
 
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_issues(self, mock_service_class):
@@ -44,10 +43,10 @@ class TestCheckCommand:
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
-            mode="default",
+            mode="fix_all",
             success=False,
             summary="Issues found for branch 'task/demo'",
-            details={"issues": ["Issue 1: Missing flow", "Issue 2: PR mismatch"]},
+            details={"failed": ["task/demo: PR mismatch"]},
         )
         mock_service_class.return_value = mock_service
 
@@ -56,53 +55,7 @@ class TestCheckCommand:
         assert result.exit_code != 0
         assert "✗" in result.output
         assert "Issues found" in result.output
-        assert "Issue 1: Missing flow" in result.output
-        assert "vibe3 check --fix" in result.output
-
-    @patch("vibe3.commands.check.CheckService")
-    def test_check_command_with_fix(self, mock_service_class):
-        """Test check command with --fix option."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
-
-        mock_service = MagicMock()
-        mock_service.execute_check.return_value = ExecuteCheckResult(
-            mode="fix", success=True, summary="All issues fixed"
-        )
-        mock_service_class.return_value = mock_service
-
-        result = runner.invoke(app, ["check", "--fix"])
-
-        assert result.exit_code == 0
-        assert "All issues fixed" in result.output
-        mock_service.execute_check.assert_called_once_with("fix")
-
-    @patch("vibe3.commands.check.CheckService")
-    def test_check_command_all_shows_per_flow_details(self, mock_service_class):
-        """Test --all mode prints per-flow issue details."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
-
-        mock_service = MagicMock()
-        mock_service.execute_check.return_value = ExecuteCheckResult(
-            mode="all",
-            success=False,
-            summary="1/2 flows have issues",
-            details={
-                "invalid": [
-                    _InvalidFlowResult(
-                        branch="task/demo",
-                        issues=["Issue 1: Missing flow", "Issue 2: PR mismatch"],
-                    )
-                ]
-            },
-        )
-        mock_service_class.return_value = mock_service
-
-        result = runner.invoke(app, ["check", "--all"])
-
-        assert result.exit_code != 0
-        assert "[task/demo]" in result.output
-        assert "Issue 1: Missing flow" in result.output
-        assert "Issue 2: PR mismatch" in result.output
+        assert "task/demo: PR mismatch" in result.output
 
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_init_shows_unresolvable_details(self, mock_service_class):
@@ -126,44 +79,21 @@ class TestCheckCommand:
         assert "task/no-linked-issue" in result.output
 
     @patch("vibe3.commands.check.CheckService")
-    def test_check_command_fix_all(self, mock_service_class):
-        """Test check command with --fix --all options."""
+    def test_check_command_fix_all_output(self, mock_service_class):
+        """Test check command summary output."""
         from vibe3.services.check_execute_mixin import ExecuteCheckResult
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
             mode="fix_all",
             success=True,
-            summary="All 3 fixable issues resolved across 5 flows",
+            summary="All 3 fixable issues resolved",
             details={"fixed": 3},
         )
         mock_service_class.return_value = mock_service
 
-        result = runner.invoke(app, ["check", "--fix", "--all"])
+        result = runner.invoke(app, ["check"])
 
         assert result.exit_code == 0
         assert "Fixed: 3 flows" in result.output
         mock_service.execute_check.assert_called_once_with("fix_all")
-
-    @patch("vibe3.commands.check.CheckService")
-    def test_check_command_fix_all_with_failures(self, mock_service_class):
-        """Test check command with --fix --all when some flows fail."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
-
-        mock_service = MagicMock()
-        mock_service.execute_check.return_value = ExecuteCheckResult(
-            mode="fix_all",
-            success=False,
-            summary="Fixed 2/3, 1 had unfixable issues",
-            details={
-                "fixed": 2,
-                "failed": ["task/demo: --init hint"],
-            },
-        )
-        mock_service_class.return_value = mock_service
-
-        result = runner.invoke(app, ["check", "--fix", "--all"])
-
-        assert result.exit_code != 0
-        assert "Fixed: 2 flows" in result.output
-        assert "task/demo" in result.output

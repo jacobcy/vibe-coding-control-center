@@ -71,7 +71,11 @@ def register_create_command(app: typer.Typer) -> None:
         ] = False,
         yes: Annotated[
             bool,
-            typer.Option("--yes", "-y", help="Bypass missing-task guard"),
+            typer.Option(
+                "--yes",
+                "-y",
+                help="Confirm you are human and want to create a draft PR",
+            ),
         ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -83,11 +87,21 @@ def register_create_command(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Create draft PR.
+        """Create draft PR (Human-only entrance).
 
         Metadata (task, flow, spec, planner, executor) is automatically
         read from the current flow state.
         """
+        if not yes:
+            from vibe3.ui.console import console
+
+            console.print(
+                "[yellow]此命令仅建议人类使用。Agent 请直接使用 "
+                "`gh pr create --draft` 命令。[/]"
+            )
+            console.print("[yellow]如需继续，请使用 --yes 确认。[/]")
+            raise typer.Exit(0)
+
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)
             raise typer.Exit(1)

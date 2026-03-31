@@ -103,7 +103,7 @@ vibe3 flow show       # 确认当前 flow 和 task 状态
   ```
 
 - 若 task 已绑定，继续 Phase 1。
-- 若当前分支无 flow，先执行 `vibe3 flow add <name>`。
+- 若当前分支无 flow，先执行 `vibe3 flow update --name <name>`。
 
 **前置检查未通过，manager 不得进入派发阶段。**
 

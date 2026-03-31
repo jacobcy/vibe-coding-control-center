@@ -11,20 +11,25 @@ runner = CliRunner()
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
-@patch("vibe3.commands.flow_status.ensure_flow_for_current_branch")
-def test_flow_show_warns_when_task_issue_missing(mock_ensure, _render_timeline) -> None:
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_show_warns_when_task_issue_missing(
+    mock_service_cls, _render_timeline
+) -> None:
     """flow show should suggest binding a task when none is present."""
-    flow_service = MagicMock()
-    flow_service.get_flow_timeline.return_value = {
-        "state": FlowStatusResponse(
-            branch="task/demo",
-            flow_slug="demo",
-            flow_status="active",
-            task_issue_number=None,
-        ),
+    mock_service = MagicMock()
+    mock_service.get_current_branch.return_value = "task/demo"
+    flow_status = FlowStatusResponse(
+        branch="task/demo",
+        flow_slug="demo",
+        flow_status="active",
+        task_issue_number=None,
+    )
+    mock_service.get_flow_status.return_value = flow_status
+    mock_service.get_flow_timeline.return_value = {
+        "state": flow_status,
         "events": [],
     }
-    mock_ensure.return_value = (flow_service, "task/demo")
+    mock_service_cls.return_value = mock_service
 
     result = runner.invoke(app, ["flow", "show"])
 
@@ -33,34 +38,26 @@ def test_flow_show_warns_when_task_issue_missing(mock_ensure, _render_timeline) 
     assert "vibe3 flow bind <issue> --role task" in result.stdout
 
 
-@patch("vibe3.commands.pr_create.render_pr_created")
 @patch("vibe3.commands.pr_create.PRService")
 @patch("vibe3.commands.pr_create.FlowService")
-def test_pr_create_requires_yes_when_task_issue_missing(
-    mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
+def test_pr_create_requires_human_confirmation(
+    mock_flow_service_cls, mock_pr_service_cls
 ) -> None:
-    """pr create should fail by default when current flow has no task."""
+    """pr create should exit with human confirmation warning by default."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
-    flow_service.get_flow_status.return_value = FlowStatusResponse(
-        branch="task/demo",
-        flow_slug="demo",
-        flow_status="active",
-        task_issue_number=None,
-    )
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()
     mock_pr_service.get_pr.return_value = None
-    mock_pr_service.create_draft_pr.return_value = MagicMock(model_dump=lambda: {})
     mock_pr_service_cls.return_value = mock_pr_service
 
     result = runner.invoke(app, ["pr", "create", "-t", "Test PR"])
 
-    assert result.exit_code == 1
-    assert "未绑定 task issue" in result.output
-    assert "vibe3 flow bind <issue> --role task" in result.output
-    assert "vibe3 pr create --yes" in result.output
+    # New behavior: exits with 0 and shows human-only warning
+    assert result.exit_code == 0
+    assert "此命令仅建议人类使用" in result.output
+    assert "--yes 确认" in result.output
     mock_pr_service.create_draft_pr.assert_not_called()
 
 
@@ -70,15 +67,16 @@ def test_pr_create_requires_yes_when_task_issue_missing(
 def test_pr_create_allows_yes_when_task_issue_missing(
     mock_flow_service_cls, mock_pr_service_cls, _render_pr_created
 ) -> None:
-    """pr create --yes should bypass missing task guard."""
+    """pr create --yes should bypass gates."""
     flow_service = MagicMock()
     flow_service.get_current_branch.return_value = "task/demo"
-    flow_service.get_flow_status.return_value = FlowStatusResponse(
+    flow_status = FlowStatusResponse(
         branch="task/demo",
         flow_slug="demo",
         flow_status="active",
         task_issue_number=None,
     )
+    flow_service.get_flow_status.return_value = flow_status
     mock_flow_service_cls.return_value = flow_service
 
     mock_pr_service = MagicMock()

@@ -15,7 +15,7 @@ app = typer.Typer(
 
 
 def _emit_check_details(
-    mode: Literal["default", "init", "all", "fix", "fix_all"],
+    mode: Literal["init", "fix_all"],
     details: dict[str, Any],
     *,
     fix_requested: bool,
@@ -32,17 +32,6 @@ def _emit_check_details(
                 typer.echo(f"    {branch}")
         return
 
-    if mode == "all":
-        invalid = details.get("invalid") or []
-        for result in invalid:
-            branch = getattr(result, "branch", "<unknown>")
-            issues = getattr(result, "issues", [])
-            typer.echo(f"\n  [{branch}]", err=True)
-            for issue in issues:
-                typer.echo(f"    - {issue}", err=True)
-            typer.echo("    → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
-        return
-
     if mode == "fix_all":
         fixed_count = details.get("fixed", 0)
         failed = details.get("failed") or []
@@ -52,29 +41,10 @@ def _emit_check_details(
             typer.echo(f"  Failed: {f}", err=True)
         return
 
-    issues = details.get("issues") or []
-    for issue in issues:
-        typer.echo(f"  - {issue}", err=True)
-    if mode == "default" and issues and not fix_requested:
-        typer.echo("\n  → Run [cyan]vibe3 check --fix[/] to auto-fix", err=True)
-
 
 @app.callback(invoke_without_command=True)
 def check(
     ctx: typer.Context,
-    fix: Annotated[
-        bool,
-        typer.Option(
-            "--fix",
-            help="Auto-fix issues for current branch (may require network)",
-        ),
-    ] = False,
-    all_flows: Annotated[
-        bool,
-        typer.Option(
-            "--all", help="Check all flows in the store, not just current branch"
-        ),
-    ] = False,
     init: Annotated[
         bool,
         typer.Option(
@@ -92,21 +62,13 @@ def check(
 ) -> None:
     """Verify handoff store consistency.
 
-    [bold]Modes:[/bold]
+    Default mode: Check + fix all active flows.
+    (Fixable: missing handoff file, missing pr_number, aborted status)
 
-      [green]vibe3 check[/green]         Check current branch only
+    [green]vibe3 check[/green]         Verify all flows + auto-fix
 
-      [green]vibe3 check --all[/green]   Check all flows (report only)
-
-      [green]vibe3 check --fix[/green]   Auto-fix current branch
-                         Fixable: missing handoff file, missing pr_number
-
-      [green]vibe3 check --fix --all[/green]  Check + fix all flows
-
-      [green]vibe3 check --init[/green]  Scan merged PRs + GitHub Project items,
+    [green]vibe3 check --init[/green]  Scan merged PRs + GitHub items,
                          back-fill task_issue_number for all flows.
-                         Network call to GitHub. Writes to local store.
-                         Skips flows that already have task_issue_number.
     """
     if trace:
         setup_logging(verbose=2)
@@ -117,25 +79,18 @@ def check(
 
     try:
         service = CheckService()
-        mode: Literal["default", "init", "all", "fix", "fix_all"] = (
-            "init"
-            if init
-            else (
-                "fix_all"
-                if fix and all_flows
-                else "all" if all_flows else "fix" if fix else "default"
-            )
-        )
+        mode: Literal["init", "fix_all"] = "init" if init else "fix_all"
+
         if mode == "init":
             typer.echo("Scanning merged PRs to back-fill task_issue_number...")
         result = service.execute_check(mode)
 
         if result.success:
             typer.echo(f"✓ {result.summary}")
-            _emit_check_details(mode, result.details, fix_requested=fix)
+            _emit_check_details(mode, result.details, fix_requested=True)
         else:
             typer.echo(f"✗ {result.summary}", err=True)
-            _emit_check_details(mode, result.details, fix_requested=fix)
+            _emit_check_details(mode, result.details, fix_requested=True)
             raise typer.Exit(code=1)
     finally:
         if trace_ctx:

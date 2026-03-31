@@ -45,7 +45,7 @@ description: Use when you have switched to an existing branch (via git checkout)
   │   └─ 检查 flow 是否存在、issue 是否绑定
   │
   ├─ Step 2: 补齐缺失环境（如有需要）
-  │   ├─ 无 flow → 提示用 vibe3 flow add 注册
+  │   ├─ 无 flow → 提示用 vibe3 flow update 注册
   │   ├─ 无 issue 绑定 → vibe3 flow bind <issue> --role task
   │   └─ 无 PR draft → vibe3 pr create --base main
   │
@@ -86,7 +86,7 @@ gh issue view <blocking-issue>
 
 ```bash
 # 注册当前分支
-vibe3 flow add
+vibe3 flow update
 # 绑定 task issue
 vibe3 flow bind <issue-number> --role task
 ```

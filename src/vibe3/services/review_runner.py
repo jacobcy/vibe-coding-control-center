@@ -10,11 +10,14 @@ Design principles:
 NOTE: This file is in critical_paths to ensure changes trigger thorough review.
 """
 
+import json
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Final, cast
+from typing import Any, Final, cast
+
+from loguru import logger
 
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
@@ -23,6 +26,49 @@ from vibe3.models.review_runner import AgentOptions, AgentResult
 DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
 )
+
+# Path to codeagent models config
+MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
+
+
+def sync_models_json(options: AgentOptions) -> None:
+    """Sync effective backend/model to ~/.codeagent/models.json.
+
+    In backend mode: updates default_backend (and default_model if specified),
+    so codeagent-wrapper uses vibe3's config instead of whatever is in the file.
+
+    In agent preset mode: no-op — codeagent manages the preset's backend/model
+    from its own config.
+    """
+    if not options.backend:
+        return  # agent preset mode — codeagent reads preset config itself
+
+    try:
+        existing: dict[str, Any] = {}
+        if MODELS_JSON_PATH.exists():
+            existing = json.loads(MODELS_JSON_PATH.read_text())
+    except Exception as exc:
+        logger.bind(domain="review_runner").warning(
+            f"Failed to read models.json, will overwrite: {exc}"
+        )
+        existing = {}
+
+    existing["default_backend"] = options.backend
+    if options.model:
+        existing["default_model"] = options.model
+
+    try:
+        MODELS_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+        MODELS_JSON_PATH.write_text(json.dumps(existing, indent=2))
+        logger.bind(
+            domain="review_runner",
+            backend=options.backend,
+            model=options.model,
+        ).debug("Synced models.json")
+    except Exception as exc:
+        logger.bind(domain="review_runner").warning(
+            f"Failed to write models.json: {exc}"
+        )
 
 
 def extract_session_id(stdout: str) -> str | None:
@@ -101,6 +147,9 @@ def run_review_agent(
     """
     import os
     import tempfile
+
+    # Ensure codeagent uses vibe3's backend/model config
+    sync_models_json(options)
 
     project_root = os.getcwd()
     wrapper_path = DEFAULT_WRAPPER_PATH
