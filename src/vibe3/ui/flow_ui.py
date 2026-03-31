@@ -71,12 +71,15 @@ def render_flow_status(
     issue_titles: dict[int, str] | None = None,
     pr_data: dict[str, Any] | None = None,
     milestone_data: dict[str, Any] | None = None,
+    parent_branch: str | None = None,
 ) -> None:
     """flow show — full detail, YAML style."""
     titles = issue_titles or {}
     status_text = _status_text(status.flow_status).plain
     console.print(f"[cyan bold]{status.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", status.flow_slug, 1)
+    if parent_branch:
+        _kv("parent", parent_branch, 1)
     if status.task_issue_number:
         n = status.task_issue_number
         title = titles.get(n, "")

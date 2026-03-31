@@ -1,4 +1,4 @@
-"""Flow lifecycle commands - switch, done, blocked, aborted."""
+"""Flow lifecycle commands - blocked."""
 
 from typing import Annotated
 
@@ -51,83 +51,6 @@ def require_flow(service: FlowService, branch: str) -> None:
         err=True,
     )
     raise typer.Exit(1)
-
-
-def switch(
-    branch: Annotated[
-        str | None,
-        typer.Option("--branch", help="Branch name or flow slug to switch to"),
-    ] = None,
-    pr: Annotated[
-        int | None,
-        typer.Option("--pr", help="PR number to resolve head branch from"),
-    ] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-    json_output: Annotated[bool, typer.Option("--json", help="JSON 格式输出")] = False,
-) -> None:
-    """Switch to existing flow."""
-    target = resolve_target_branch(branch, pr)
-
-    if target is None:
-        typer.echo(
-            "Error: 必须指定目标分支/flow slug，或指定 PR 号\n"
-            "使用: vibe3 flow switch --branch <branch-or-slug>\n"
-            "  或: vibe3 flow switch --pr <pr-number>",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    with trace_scope(trace, "flow switch", domain="flow", target=target):
-        logger.bind(command="flow switch", target=target).info("Switching to flow")
-
-        service = FlowService()
-        flow = service.switch_flow(target)
-
-        if json_output:
-            import json
-
-            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-        else:
-            typer.echo(f"Switched to flow '{flow.flow_slug}' on branch '{flow.branch}'")
-
-
-def done(
-    branch: Annotated[str | None, typer.Option("--branch", help="Branch name")] = None,
-    pr: Annotated[
-        int | None, typer.Option("--pr", help="PR number to resolve head branch from")
-    ] = None,
-    delete_worktree: Annotated[
-        bool,
-        typer.Option("--delete-worktree", help="Delete worktree if branch is occupied"),
-    ] = False,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-) -> None:
-    """Close flow and delete branch."""
-    with trace_scope(trace, "flow done", domain="flow"):
-        service = FlowService()
-        target_branch = (
-            resolve_target_branch(branch, pr) or service.get_current_branch()
-        )
-
-        logger.bind(command="flow done", branch=target_branch).info("Closing flow")
-
-        require_flow(service, target_branch)
-
-        branch_deleted = service.close_flow(
-            target_branch, check_pr=True, delete_worktree=delete_worktree
-        )
-
-        if branch_deleted:
-            typer.echo(f"Flow closed, branch '{target_branch}' deleted")
-        else:
-            typer.echo(
-                f"Flow closed, branch '{target_branch}' preserved "
-                "(occupied by other worktree)"
-            )
 
 
 def blocked(
@@ -184,28 +107,3 @@ def blocked(
         if blocked_by_issue:
             msg += f" (blocked by #{blocked_by_issue})"
         typer.echo(msg)
-
-
-def aborted(
-    branch: Annotated[str | None, typer.Option("--branch", help="Branch name")] = None,
-    pr: Annotated[
-        int | None, typer.Option("--pr", help="PR number to resolve head branch from")
-    ] = None,
-    trace: Annotated[
-        bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
-    ] = False,
-) -> None:
-    """Abort flow and delete branch."""
-    with trace_scope(trace, "flow aborted", domain="flow"):
-        service = FlowService()
-        target_branch = (
-            resolve_target_branch(branch, pr) or service.get_current_branch()
-        )
-
-        logger.bind(command="flow aborted", branch=target_branch).info("Aborting flow")
-
-        require_flow(service, target_branch)
-
-        service.abort_flow(target_branch)
-
-        typer.echo(f"Flow aborted, branch '{target_branch}' deleted")

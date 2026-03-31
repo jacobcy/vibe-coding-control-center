@@ -122,6 +122,8 @@ docs/audits/
 .codex
 .trae/
 .kiro/
+.augment/
+.codebuddy/
 .claude/
 !.claude/rules/  # Exception: share project-specific rules with team
 .aider*

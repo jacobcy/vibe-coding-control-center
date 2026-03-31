@@ -182,9 +182,21 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
     # All-flows check
     # ------------------------------------------------------------------
 
-    def verify_all_flows(self) -> list[CheckResult]:
-        """Run consistency checks for every flow in the store."""
+    def verify_all_flows(
+        self, status: str | list[str] | None = "active"
+    ) -> list[CheckResult]:
+        """Run consistency checks for flows in the store.
+
+        Args:
+            status: Flow status filter (single string or list).
+                   Defaults to "active" only to avoid checking terminal flows.
+                   Pass None to check all flows.
+        """
         all_flows = self.store.get_all_flows()
+        if status:
+            statuses = [status] if isinstance(status, str) else status
+            all_flows = [f for f in all_flows if f.get("flow_status") in statuses]
+
         results = []
         for flow in all_flows:
             results.append(self._check_branch(flow["branch"]))

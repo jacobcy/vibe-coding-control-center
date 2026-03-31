@@ -79,10 +79,6 @@ vibe3 flow status
 # 列出所有 flow
 vibe3 flow list
 
-# 在新分支创建 flow（同时指定任务 issue）
-vibe3 flow create <name> --task <issue-number>
-vibe3 flow create <name> --base main
-
 # 在已有分支上注册 flow（不创建新分支）
 vibe3 flow add
 
@@ -95,11 +91,8 @@ vibe3 flow bind <issue-number> --role dependency
 vibe3 flow blocked --task <blocking-issue-number>
 vibe3 flow blocked --reason "等待外部反馈"
 
-# 结束并删除 flow（推荐方式）
-vibe3 flow done
-
-# 切换到其他 flow（无需 flow done，直接 checkout）
-git checkout <other-branch>
+# 运行一致性检查（自动关闭已合并的 flow）
+vibe3 check --all --fix
 ```
 
 #### task - 任务上下文
@@ -166,10 +159,10 @@ vibe3 --trace <cmd>   # 任意命令加 --trace 可追踪调用链
 
 | 阶段 | skill | 职责 |
 |------|-------|------|
-| 开始任务 | `/vibe-new` | 选 issue → 创建/注册 flow → 绑定 issue → 创建 PR draft → 停止等待开发 |
-| 提交代码 | `/vibe-commit` | 整理变更 → 分组 commit → 推送 PR → 停止 |
+| 开始任务 | `/vibe-new` | 选 issue → 切分支 → 注册 flow → 绑定 issue → 创建 PR draft |
+| 提交代码 | `/vibe-commit` | 整理变更 → 分组 commit → 推送 PR |
 | 整合合并 | `/vibe-integrate` | 检查 CI / review → 解除阻塞 → 合并 PR |
-| 收口归档 | `/vibe-done` | 关闭 issue → 执行 `flow done` → 清理工作区 |
+| 收口归档 | `/vibe-done` | 关闭 issue → 运行 `vibe3 check --all --fix` 同步状态 |
 
 ### 有依赖时的处理
 
@@ -190,15 +183,16 @@ vibe3 flow show     # 确认状态，继续开发
 ### 在已有分支上继续工作
 
 ```bash
-# 从非活跃分支创建新 flow
-vibe3 flow create <name> --task <issue>
+# 1. 创建新分支 (git 原生)
+git checkout -b task/issue-123
 
-# 在当前分支注册 flow（已有 branch，首次使用 vibe3）
+# 2. 注册当前分支为 flow
 vibe3 flow add
 
-# 绑定任务 issue（已有 flow 但未绑定 task）
-vibe3 flow bind <issue> --role task
+# 3. 绑定任务 issue
+vibe3 flow bind 123 --role task
 ```
+
 
 ---
 
@@ -233,10 +227,11 @@ vibe3 check
 ## 常见误区
 
 1. **flow ≠ branch**：flow 是绑定在 branch 上的元数据（issue、PR、状态），branch 只是载体
-2. **flow done ≠ git branch -d**：`flow done` 会同时清理本地/远端 branch 和 flow 元数据
-3. **不需要 vibe-new 也可以 commit**：vibe-new 是 agent 流程入口，人工开发随时可以 commit
-4. **--trace 不影响功能**：任何命令加 `--trace` 只增加日志输出，不改变行为
-5. **task show 和 flow show 的区别**：`flow show` 是开发时间线视角，`task show` 是项目编排视角（milestone）
+2. **不再需要 flow create**：直接使用 `git checkout -b` 即可，vibe3 会被动注册或显式 `flow add`
+3. **不再需要 flow done**：PR 合并后，`vibe3 check --all --fix` 会自动识别并关闭 flow
+4. **不需要 vibe-new 也可以 commit**：vibe-new 是 agent 流程入口，人工开发随时可以 commit
+5. **--trace 不影响功能**：任何命令加 `--trace` 只增加日志输出，不改变行为
+
 
 ---
 
