@@ -164,20 +164,6 @@ class QualityConfig(BaseModel):
     test_coverage: TestCoverageConfig = Field(default_factory=TestCoverageConfig)
 
 
-class GitHubProjectConfig(BaseModel):
-    """GitHub Projects v2 配置。
-
-    owner_type: "org" 或 "user"
-    owner: GitHub 组织名或用户名
-    project_number: GitHub Project number（URL 末尾的数字）
-    """
-
-    owner_type: str = Field(default="org")
-    owner: str = Field(default="")
-    project_number: int = Field(default=0)
-    org: str = Field(default="", description="已废弃，请使用 owner")
-
-
 class VibeConfig(BaseModel):
     """Root configuration model."""
 
@@ -189,7 +175,6 @@ class VibeConfig(BaseModel):
     plan: PlanConfig = Field(default_factory=PlanConfig)
     run: RunConfig = Field(default_factory=RunConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
-    github_project: GitHubProjectConfig = Field(default_factory=GitHubProjectConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
     orchestra: OrchestraSettings = Field(default_factory=OrchestraSettings)
 

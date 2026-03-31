@@ -80,12 +80,15 @@ def render_flow_timeline(
     state: FlowStatusResponse,
     events: list[FlowEvent],
     milestone_data: dict[str, Any] | None = None,
+    parent_branch: str | None = None,
 ) -> None:
     from vibe3.ui.flow_ui import _kv, _status_text
 
     status_text = _status_text(state.flow_status).plain
     console.print(f"[bold cyan]{state.branch}[/]  [dim](Flow: {status_text})[/]")
     _kv("flow_slug", state.flow_slug, 1)
+    if parent_branch:
+        _kv("parent", parent_branch, 1)
     if state.task_issue_number:
         console.print(f"  [dim]task[/]        #{state.task_issue_number}")
     else:

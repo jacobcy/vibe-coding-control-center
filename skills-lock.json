@@ -26,6 +26,11 @@
       "sourceType": "github",
       "computedHash": "9edba9a38684c060fdc38290f640e1dc0c37de286723ac9be73bacacf7cd6f3d"
     },
+    "gstack": {
+      "source": "garrytan/gstack",
+      "sourceType": "github",
+      "computedHash": "1846e0f4f443f0ccf2c2678ac26b6cfa8690bad018f33348b1d6e3ae1b89cbe2"
+    },
     "receiving-code-review": {
       "source": "obra/superpowers",
       "sourceType": "github",

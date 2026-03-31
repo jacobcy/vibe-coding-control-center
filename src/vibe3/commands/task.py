@@ -13,7 +13,6 @@ from vibe3.services.milestone_service import MilestoneService
 from vibe3.services.task_service import TaskService
 from vibe3.services.task_usecase import TaskUsecase
 from vibe3.ui.task_ui import (
-    render_task_show_error_with_milestone,
     render_task_show_with_milestone,
 )
 
@@ -75,7 +74,7 @@ def show(
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Show task details, including remote GitHub Project fields."""
+    """Show task details."""
     usecase = _build_task_usecase()
     milestone_svc = _build_milestone_service()
 
@@ -99,18 +98,11 @@ def show(
         # Fetch milestone context if task has an issue number
         milestone_ctx = None
         issue_number = None
-        if task_result.view and task_result.view.task_issue_number:
-            issue_number = task_result.view.task_issue_number.value
-        elif task_result.local_task and task_result.local_task.task_issue_number:
+        if task_result.local_task and task_result.local_task.task_issue_number:
             issue_number = task_result.local_task.task_issue_number
 
         if issue_number:
             milestone_ctx = milestone_svc.get_milestone_context(issue_number)
 
         # Delegate rendering to UI layer
-        if task_result.hydrate_error:
-            render_task_show_error_with_milestone(
-                task_result, milestone_ctx, json_output
-            )
-        else:
-            render_task_show_with_milestone(task_result, milestone_ctx, json_output)
+        render_task_show_with_milestone(task_result, milestone_ctx, json_output)

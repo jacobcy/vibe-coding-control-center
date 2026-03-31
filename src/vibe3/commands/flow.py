@@ -8,11 +8,9 @@ import typer
 from loguru import logger
 
 from vibe3.commands.common import trace_scope
-from vibe3.commands.flow_lifecycle import aborted, blocked, done, switch
+from vibe3.commands.flow_lifecycle import blocked
 from vibe3.commands.flow_status import show, status
 from vibe3.services.flow_service import FlowService
-from vibe3.services.flow_usecase import FlowUsecase, FlowUsecaseError
-from vibe3.services.handoff_service import HandoffService  # noqa: F401
 from vibe3.services.task_service import TaskService
 from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_flow_created, render_flows_table
@@ -64,10 +62,19 @@ app = typer.Typer(
 )
 
 
-def _print_flow_error(error: FlowUsecaseError) -> None:
-    console.print(f"[red]Error: {error}[/]")
-    if error.guidance:
-        console.print(f"[yellow]{error.guidance}[/]")
+def _merge_issue_refs(
+    primary: str | None,
+    tail: list[str] | None,
+    *,
+    primary_hint: str,
+) -> str | list[str] | None:
+    """Validate and merge issue refs from command arguments."""
+    tail = tail or []
+    if not tail:
+        return primary
+    if primary is None:
+        raise ValueError(f"Additional issue refs require '{primary_hint}' prefix.")
+    return [primary, *tail]
 
 
 @app.command(name="add")
@@ -86,95 +93,30 @@ def add(
     with trace_scope(trace, "flow add", name=name):
         try:
             name = flow_service.resolve_flow_name(name)
-            task_refs = FlowUsecase.validate_issue_refs(
+            task_refs = _merge_issue_refs(
                 task, task_tail, primary_hint="--task <issue>"
             )
         except ValueError as error:
             raise typer.BadParameter(str(error)) from error
-        usecase = FlowUsecase.create(flow_service, task_service=task_service)
-        logger.bind(command="flow add", name=name, task=task_refs).info("Adding flow")
-        try:
-            flow = usecase.add_flow(name=name, task=task_refs, spec=spec, actor=actor)
-        except FlowUsecaseError as error:
-            _print_flow_error(error)
-            raise typer.Exit(1) from error
-        except ValueError as error:
-            raise typer.BadParameter(str(error)) from error
 
-        if json_output:
-            typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
-        else:
-            render_flow_created(
-                flow,
-                (
-                    " ".join(task_refs)
-                    if task_refs is not None and not isinstance(task_refs, str)
-                    else task_refs
-                ),
-            )
-
-
-@app.command(name="new", deprecated=True, hidden=True)
-def new(
-    name: FlowNameArg = None,
-    task: TaskOption = None,
-    spec: SpecOption = None,
-    trace: TraceOption = False,
-    json_output: JsonOption = False,
-) -> None:
-    """Deprecated alias for `flow add`."""
-    console.print(
-        "[yellow]Warning: 'flow new' is deprecated. Use 'flow add' instead.[/]"
-    )
-    add(name, task, None, spec, None, trace, json_output)
-
-
-@app.command(name="create")
-def create(
-    name: FlowNameArg = None,
-    task: TaskOption = None,
-    task_tail: TaskTailArg = None,
-    spec: SpecOption = None,
-    actor: ActorOption = None,
-    base: Annotated[
-        str | None,
-        typer.Option(
-            "--base",
-            "-b",
-            help="Base policy/branch: parent|current|main|<branch>.",
-        ),
-    ] = None,
-    trace: TraceOption = False,
-    json_output: JsonOption = False,
-) -> None:
-    """Create a new branch with flow state."""
-    flow_service = FlowService()
-    task_service = TaskService()
-    with trace_scope(trace, "flow create", name=name, base=base):
-        try:
-            name = flow_service.resolve_flow_name(name)
-            task_refs = FlowUsecase.validate_issue_refs(
-                task, task_tail, primary_hint="--task <issue>"
-            )
-        except ValueError as error:
-            raise typer.BadParameter(str(error)) from error
-        usecase = FlowUsecase.create(flow_service, task_service=task_service)
-        logger.bind(command="flow create", name=name, base=base, task=task_refs).info(
-            "Creating flow with new branch"
+        # Register flow via FlowService instead of FlowUsecase
+        flow = flow_service.ensure_flow_for_branch(
+            branch=flow_service.get_current_branch(), slug=name
         )
-        try:
-            flow = usecase.create_flow(
-                name=name,
-                base=base,
-                task=task_refs,
-                spec=spec,
-                actor=actor,
+
+        # Link issues
+        from vibe3.utils.issue_ref import parse_issue_number
+
+        if task_refs:
+            refs: List[str] = (
+                [task_refs] if isinstance(task_refs, str) else list(task_refs)
             )
-        except FlowUsecaseError as error:
-            _print_flow_error(error)
-            raise typer.Exit(1) from error
-        except ValueError as error:
-            raise typer.BadParameter(str(error)) from error
+            for ref in refs:
+                issue_number = parse_issue_number(ref)
+                task_service.link_issue(flow.branch, issue_number, "task", actor=actor)
+
+        if spec:
+            flow_service.bind_spec(flow.branch, spec, actor)
 
         if json_output:
             typer.echo(json.dumps(flow.model_dump(), indent=2, default=str))
@@ -198,9 +140,9 @@ def bind(
     json_output: JsonOption = False,
 ) -> None:
     """Bind an issue to current flow."""
-    issue_refs = FlowUsecase.validate_issue_refs(
-        issue, issue_tail, primary_hint="<issue>"
-    )
+    from vibe3.utils.issue_ref import parse_issue_number
+
+    issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
     if issue_refs is None:  # pragma: no cover - defensive
         raise typer.BadParameter("Missing issue reference")
     refs: List[str] = [issue_refs] if isinstance(issue_refs, str) else issue_refs
@@ -211,12 +153,14 @@ def bind(
         try:
             flow_service = FlowService()
             task_service = TaskService()
-            links = [
-                FlowUsecase.create(flow_service, task_service=task_service).bind_issue(
-                    ref, role
-                )
-                for ref in refs
-            ]
+            branch = flow_service.get_current_branch()
+
+            links = []
+            for ref in refs:
+                issue_number = parse_issue_number(ref)
+                link = task_service.link_issue(branch, issue_number, role, actor=None)
+                links.append(link)
+
             if json_output:
                 if len(links) == 1:
                     typer.echo(json.dumps(links[0].model_dump(), indent=2, default=str))
@@ -238,8 +182,8 @@ def bind(
             raise typer.BadParameter(f"Invalid issue format: {issue_refs}")
 
 
-@app.command()
-def list(
+@app.command(name="list")
+def list_flows(
     status_filter: StatusFilterOption = None,
     trace: TraceOption = False,
     json_output: JsonOption = False,
@@ -266,9 +210,6 @@ def list(
 
 
 # Register lifecycle commands from flow_lifecycle.py
-app.command(name="switch")(switch)
-app.command(name="done")(done)
 app.command(name="blocked")(blocked)
-app.command(name="aborted")(aborted)
 app.command(name="show")(show)
 app.command(name="status")(status)

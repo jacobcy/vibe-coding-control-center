@@ -51,7 +51,9 @@ description: Use when starting a new development task. Handles the full setup fr
   │
   ├─ Step 3: 准备 flow
   │   ├─ 场景A：需要新分支
-  │   │   └─ vibe3 flow create <name> --task <issue> --base main
+  │   │   ├─ git checkout -b <branch-name>
+  │   │   ├─ vibe3 flow add
+  │   │   └─ vibe3 flow bind <issue> --role task
   │   ├─ 场景B：已在目标分支，首次注册
   │   │   ├─ vibe3 flow add
   │   │   └─ vibe3 flow bind <issue> --role task
@@ -97,11 +99,15 @@ gh issue view <number>
 **场景 A：当前在 main/无关分支，需要新建分支开发**
 
 ```bash
-# 创建新分支 + flow，同时绑定 task issue
-vibe3 flow create <name> --task <issue-number> --base main
-```
+# 1. 创建新分支 (建议用 task/issue-<N> 格式)
+git checkout -b task/issue-123
 
-> `--base main` 确保从最新主干拉取。`<name>` 建议用 `task/<issue>-brief` 格式。
+# 2. 注册当前分支为 flow
+vibe3 flow add
+
+# 3. 绑定 task issue
+vibe3 flow bind 123 --role task
+```
 
 **场景 B：已经 `git checkout -b` 切到新分支，需要注册 flow**
 

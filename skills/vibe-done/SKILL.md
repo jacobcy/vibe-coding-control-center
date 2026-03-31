@@ -12,8 +12,8 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 **核心职责**：
 
 - 检查 PR 状态
-- PR 已合并 → 关闭 issue、清理工作区
-- 使用 `uv run python src/vibe3/cli.py flow done` shell 命令删除分支
+- PR 已合并 → 关闭 issue
+- 使用 `vibe3 check --all --fix` 自动同步并标记 flow 为 done
 
 ## 停止点
 
@@ -44,11 +44,10 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
   ├─ Step 3: 关闭 issue
   │   └─ gh issue close <issue-number-or-ref>
   │
-  ├─ Step 4: 关闭 flow
-  │   └─ uv run python src/vibe3/cli.py flow done
-  │       ├─ PR 已 merged → 直接收尾
-  │       ├─ PR 未 merged → 先检查 review evidence，再尝试 merge
-  │       └─ 删除本地与远端 branch
+  ├─ Step 4: 关闭 flow (自动)
+  │   └─ vibe3 check --all --fix
+  │       ├─ PR 已 merged → 自动标记 flow 为 done
+  │       └─ 保持本地数据库与 GitHub 状态一致
   │
   ├─ Step 5: 汇总并反馈问题
   │   ├─ 从 handoff 提取 Issues Found
@@ -140,27 +139,20 @@ gh issue close <issue-number-or-ref>
 执行：
 
 ```bash
-uv run python src/vibe3/cli.py flow done
-```
-
-或在处理非当前分支时执行：
-
-```bash
-uv run python src/vibe3/cli.py flow done --branch <ref>
+vibe3 check --all --fix
 ```
 
 该命令会负责：
 
-- 若 PR 已 merged，直接兼容收尾
-- 若 PR 未 merged，先检查 review evidence，再尝试 merge
-- 写入 flow 历史
-- 删除本地与远端 branch
+- 检测所有 active flows 关联的远端 PR
+- 若 PR 已 merged 或 closed，自动标记本地 flow 为 `done`
+- 写入 flow 自动完成事件
 
 该命令不会负责：
 
-- 关闭 task
-- 关闭 issue
-- 自动修复异常中间态
+- 强行 merge 未就绪的 PR
+- 关闭关联的 GitHub Issue (由 Step 3 负责)
+- 手工删除分支（不再作为 vibe3 核心动作，由用户自行决定或 git 原生清理）
 
 ### Step 5: 汇总并反馈问题
 
@@ -236,6 +228,6 @@ uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor v
 - 不得修改业务源代码文件
 - 不得跳过 `uv run python src/vibe3/cli.py flow show` 直接猜测 task / issue / pr 关联
 - 不得手工编辑 `.git/vibe/*.json`
-- 不得把未 merge 的 branch 强行 `flow done`
-- 若 `flow done` 阻断，必须如实汇报原因，并停止收口
+- 建议运行 `vibe3 check --all --fix` 来确保状态正确同步
+- 不得在 PR 合并前伪装收口
 - 不得把 merge 后的新需求伪装成"补充说明"继续留在旧 plan

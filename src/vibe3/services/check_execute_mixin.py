@@ -25,7 +25,9 @@ class CheckExecuteMixin:
         """Initialize remote index. Must be implemented by mixed-in class."""
         raise NotImplementedError
 
-    def verify_all_flows(self) -> list["CheckResult"]:
+    def verify_all_flows(
+        self, status: str | list[str] | None = "active"
+    ) -> list["CheckResult"]:
         """Verify all flows. Must be implemented by mixed-in class."""
         raise NotImplementedError
 
@@ -82,29 +84,29 @@ class CheckExecuteMixin:
         )
 
     def _handle_all_mode(self) -> ExecuteCheckResult:
-        """Handle --all mode: check every flow."""
-        results = self.verify_all_flows()
+        """Handle --all mode: check active flows."""
+        results = self.verify_all_flows(status="active")
         invalid = [r for r in results if not r.is_valid]
         return ExecuteCheckResult(
             mode="all",
             success=len(invalid) == 0,
             summary=(
-                f"All {len(results)} flows passed"
+                f"All {len(results)} active flows passed"
                 if not invalid
-                else f"{len(invalid)}/{len(results)} flows have issues"
+                else f"{len(invalid)}/{len(results)} active flows have issues"
             ),
             details={"invalid": invalid},
         )
 
     def _handle_fix_all_mode(self) -> "ExecuteCheckResult":
-        """Handle --fix --all mode: check every flow and auto-fix fixable issues."""
-        results = self.verify_all_flows()
+        """Handle --fix --all mode: check active flows and auto-fix fixable issues."""
+        results = self.verify_all_flows(status="active")
         invalid = [r for r in results if not r.is_valid]
         if not invalid:
             return ExecuteCheckResult(
                 mode="fix_all",
                 success=True,
-                summary=f"All {len(results)} flows passed",
+                summary=f"All {len(results)} active flows passed",
             )
 
         fixed_count = 0

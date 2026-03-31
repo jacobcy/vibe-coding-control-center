@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.task_bridge import HydratedTaskView, HydrateError
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 
@@ -21,11 +20,9 @@ class TaskListRow:
 
 @dataclass
 class TaskShowResult:
-    """Task show query result with local and remote context."""
+    """Task show query result with local context."""
 
     branch: str
-    view: HydratedTaskView | None = None
-    hydrate_error: HydrateError | None = None
     local_task: FlowStatusResponse | None = None
     related_issue_numbers: list[int] | None = None
     dependency_issue_numbers: list[int] | None = None
@@ -69,16 +66,9 @@ class TaskUsecase:
             raise RuntimeError(f"unable to resolve current branch ({exc})") from exc
 
     def show_task(self, branch: str | None = None) -> TaskShowResult:
-        """Load task detail with local fallback state."""
+        """Load task detail from local state."""
         target_branch = self.resolve_branch(branch)
-        view = self.task_service.hydrate(target_branch)
-        if isinstance(view, HydrateError):
-            local_task = self.task_service.get_task(target_branch)
-            return TaskShowResult(
-                branch=target_branch,
-                hydrate_error=view,
-                local_task=local_task,
-            )
+        local_task = self.task_service.get_task(target_branch)
 
         issue_links = self.flow_service.store.get_issue_links(target_branch)
         related_issue_numbers = [
@@ -93,7 +83,7 @@ class TaskUsecase:
         ]
         return TaskShowResult(
             branch=target_branch,
-            view=view,
+            local_task=local_task,
             related_issue_numbers=related_issue_numbers,
             dependency_issue_numbers=dependency_issue_numbers,
         )

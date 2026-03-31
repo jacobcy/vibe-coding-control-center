@@ -16,17 +16,14 @@ def test_link_issue_task_on_fresh_db(tmp_path):
     # ACT: link issue as task
     # This used to write task_issue_number to flow_state.
     # Now it should only use flow_issue_links.
-    from unittest.mock import patch
-
-    with patch.object(TaskService, "auto_link_issue_to_project"):
-        service.link_issue("task/test", 123, role="task")
+    service.link_issue("task/test", 220, role="task")
 
     # ASSERT
     links = store.get_issue_links("task/test")
     assert any(
-        link["issue_number"] == 123 and link["issue_role"] == "task" for link in links
+        link["issue_number"] == 220 and link["issue_role"] == "task" for link in links
     )
 
     # Hydrate should find it
     status = service.get_flow_status("task/test")
-    assert status.task_issue_number == 123
+    assert status.task_issue_number == 220

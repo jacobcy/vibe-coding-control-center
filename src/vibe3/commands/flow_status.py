@@ -18,6 +18,7 @@ from vibe3.ui.flow_ui import (
     render_flow_timeline,
     render_flows_status_dashboard,
 )
+from vibe3.utils.branch_utils import find_parent_branch
 
 if TYPE_CHECKING:
     pass
@@ -60,37 +61,12 @@ def show(
                     "flow_status": projection.flow_status,
                     "task_issue_number": projection.task_issue_number,
                     "pr_number": projection.pr_number,
-                    "pr_ready_for_review": projection.pr_ready_for_review,
                     "spec_ref": projection.spec_ref,
-                    "plan_ref": projection.plan_ref,
-                    "report_ref": projection.report_ref,
-                    "audit_ref": projection.audit_ref,
-                    "planner_actor": projection.planner_actor,
-                    "planner_session_id": projection.planner_session_id,
-                    "executor_actor": projection.executor_actor,
-                    "executor_session_id": projection.executor_session_id,
-                    "reviewer_actor": projection.reviewer_actor,
-                    "reviewer_session_id": projection.reviewer_session_id,
-                    "latest_actor": projection.latest_actor,
                     "blocked_by": projection.blocked_by,
                     "next_step": projection.next_step,
-                    "planner_status": projection.planner_status,
-                    "executor_status": projection.executor_status,
-                    "reviewer_status": projection.reviewer_status,
-                    "execution_pid": projection.execution_pid,
-                    "execution_started_at": projection.execution_started_at,
-                    "execution_completed_at": projection.execution_completed_at,
-                    "project_item_id": projection.project_item_id,
-                    "title": projection.title,
-                    "body": projection.body,
-                    "status": projection.status,
-                    "priority": projection.priority,
-                    "assignees": projection.assignees,
                     "offline_mode": projection.offline_mode,
-                    "identity_drift": projection.identity_drift,
-                    "pr_title": projection.pr_title,
-                    "pr_state": projection.pr_state,
-                    "pr_draft": projection.pr_draft,
+                    "pr_status": projection.pr_status,
+                    "pr_is_draft": projection.pr_is_draft,
                     "pr_url": projection.pr_url,
                 }
                 typer.echo(json.dumps(output, indent=2, default=str))
@@ -121,9 +97,8 @@ def show(
                 if projection.pr_number and not projection.pr_fetch_error:
                     pr_data = {
                         "number": projection.pr_number,
-                        "title": projection.pr_title,
-                        "state": projection.pr_state,
-                        "draft": projection.pr_draft,
+                        "state": projection.pr_status,
+                        "draft": projection.pr_is_draft,
                         "url": projection.pr_url,
                     }
 
@@ -134,7 +109,14 @@ def show(
                 ):
                     render_error("网络故障，远端 issue/PR 信息不可用（本地数据仍显示）")
 
-                render_flow_status(flow_status, issue_titles, pr_data, milestone_data)
+                parent_branch = find_parent_branch(target_branch)
+                render_flow_status(
+                    flow_status,
+                    issue_titles,
+                    pr_data,
+                    milestone_data,
+                    parent_branch=parent_branch,
+                )
             return
 
         timeline = service.get_flow_timeline(target_branch)
@@ -143,23 +125,31 @@ def show(
             raise typer.Exit(1)
 
         if json_output:
-            output = {
+            json_data = {
                 "state": timeline["state"].model_dump(),
                 "events": [e.model_dump() for e in timeline["events"]],
             }
-            typer.echo(json.dumps(output, indent=2, default=str))
+            typer.echo(json.dumps(json_data, indent=2, default=str))
         else:
             milestone_data = None
             task_issue = timeline["state"].task_issue_number
             if task_issue:
                 projection_service = FlowProjectionService()
                 milestone_data = projection_service.get_milestone_data(task_issue)
-            render_flow_timeline(timeline["state"], timeline["events"], milestone_data)
+
+            parent_branch = find_parent_branch(target_branch)
+            render_flow_timeline(
+                timeline["state"],
+                timeline["events"],
+                milestone_data,
+                parent_branch=parent_branch,
+            )
             if timeline["state"].task_issue_number is None:
                 console.print(
                     "[yellow]提示：当前 flow 还没有 task，建议 "
                     f"{build_bind_task_hint()}[/]"
                 )
+            return
 
 
 def status(
@@ -172,8 +162,17 @@ def status(
     By default only shows active flows. Use --all to include done/aborted/stale.
     """
     with trace_scope(trace, "flow status", domain="flow"):
+        from vibe3.services.check_service import CheckService
+
+        # Auto-mark merged flows before listing
+        try:
+            CheckService().verify_all_flows()
+        except Exception:
+            pass  # check failure should not block status display
+
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
+
         if json_output:
             typer.echo(
                 json.dumps([f.model_dump() for f in flows], indent=2, default=str)
@@ -215,8 +214,12 @@ def status(
 
         for flow in flows:
             try:
-                pr = projection_service.pr_service.get_pr(branch=flow.branch)
-                if pr:
+                # Check current branch PR
+                prs = projection_service.pr_service.github_client.list_prs_for_branch(
+                    flow.branch
+                )
+                if prs:
+                    pr = prs[0]
                     pr_map[flow.branch] = {
                         "number": pr.number,
                         "title": pr.title,

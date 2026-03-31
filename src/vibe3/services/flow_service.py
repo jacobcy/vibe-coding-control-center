@@ -9,7 +9,6 @@ from vibe3.models.flow import (
     FlowStatusResponse,
     MainBranchProtectedError,
 )
-from vibe3.services.base_resolution_usecase import MAIN_BRANCH_REF
 from vibe3.services.flow_lifecycle import FlowLifecycleMixin
 from vibe3.services.flow_query_mixin import FlowQueryMixin
 from vibe3.services.signature_service import SignatureService
@@ -199,90 +198,3 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
         return status
-
-    def create_flow_with_branch(
-        self,
-        slug: str,
-        start_ref: str = MAIN_BRANCH_REF,
-        actor: str | None = None,
-    ) -> FlowStatusResponse:
-        """Create a new flow and create branch.
-
-        Args:
-            slug: Flow name/slug
-            start_ref: Starting reference for new branch
-            actor: Actor creating the flow
-
-        Returns:
-            Created flow status
-
-        Raises:
-            RuntimeError: If branch already exists or worktree is dirty
-        """
-        branch = f"task/{slug}"
-
-        logger.bind(
-            domain="flow",
-            action="create_with_branch",
-            slug=slug,
-            branch=branch,
-            start_ref=start_ref,
-        ).info("Creating flow with branch")
-
-        if self.git_client.branch_exists(branch):
-            raise RuntimeError(f"Branch '{branch}' already exists")
-
-        has_changes = self.git_client.has_uncommitted_changes()
-        if has_changes:
-            raise RuntimeError(
-                "Worktree has uncommitted changes. "
-                "Please commit or stash them before flow create."
-            )
-
-        self.git_client.create_branch(branch, start_ref)
-
-        flow = self.create_flow(slug, branch, actor=actor)
-
-        return flow
-
-    def switch_flow(self, target: str) -> FlowStatusResponse:
-        """Switch to a different flow.
-
-        Args:
-            target: Flow name or branch name
-
-        Returns:
-            Flow status of the target flow
-
-        Raises:
-            RuntimeError: If flow not found
-        """
-        logger.bind(
-            domain="flow",
-            action="switch",
-            target=target,
-        ).info("Switching to flow")
-
-        flows = self.list_flows()
-        target_flow: FlowStatusResponse | None = None
-        for flow in flows:
-            if flow.flow_slug == target or flow.branch == target:
-                target_flow = flow
-                break
-
-        if not target_flow:
-            raise RuntimeError(f"Flow '{target}' not found")
-
-        if not self.git_client.branch_exists(target_flow.branch):
-            raise RuntimeError(f"Branch '{target_flow.branch}' not found")
-
-        stash_ref = None
-        if self.git_client.has_uncommitted_changes():
-            stash_ref = self.git_client.stash_push(message=f"vibe flow switch {target}")
-
-        self.git_client.switch_branch(target_flow.branch)
-
-        if stash_ref:
-            self.git_client.stash_apply(stash_ref)
-
-        return target_flow
