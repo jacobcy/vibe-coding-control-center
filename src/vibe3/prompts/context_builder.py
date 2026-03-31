@@ -13,7 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from vibe3.prompts.assembler import PromptAssembler
-from vibe3.prompts.models import PromptRecipe, PromptRenderResult
+from vibe3.prompts.models import (
+    PromptRecipe,
+    PromptRenderResult,
+    PromptVariableSource,
+    VariableSourceKind,
+)
 from vibe3.prompts.provider_registry import ProviderRegistry
 
 
@@ -62,8 +67,6 @@ def make_context_builder(
     Returns:
         PromptContextBuilder ready to be used as CodeagentCommand.context_builder.
     """
-    from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
-
     prefix = body_provider_key.split(".")[0]  # "run", "plan", "review"
     variable_name = f"{prefix}_prompt_body"
 
