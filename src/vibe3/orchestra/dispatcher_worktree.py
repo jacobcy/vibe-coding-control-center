@@ -23,20 +23,25 @@ class WorktreeResolverMixin:
     repo_path: Path
     config: OrchestraConfig
 
-    def _resolve_manager_cwd(self, issue_number: int, flow_branch: str) -> Path | None:
+    def _resolve_manager_cwd(
+        self, issue_number: int, flow_branch: str
+    ) -> tuple[Path | None, bool]:
         """Resolve stable cwd for manager execution on a flow branch.
 
         Priority:
         1. Current repo_path when already on flow branch
         2. Existing worktree that has the flow branch checked out
         3. Create a dedicated orchestra worktree for this issue branch
+
+        Returns:
+            (cwd_path, is_temporary)
         """
         if self._is_current_branch(flow_branch):
-            return self.repo_path
+            return self.repo_path, False
 
         existing = self._find_worktree_for_branch(flow_branch)
         if existing:
-            return existing
+            return existing, False
 
         return self._ensure_manager_worktree(issue_number, flow_branch)
 
@@ -91,7 +96,9 @@ class WorktreeResolverMixin:
         stripped: str = result.stdout.strip()
         return stripped == branch
 
-    def _ensure_manager_worktree(self, issue_number: int, branch: str) -> Path | None:
+    def _ensure_manager_worktree(
+        self, issue_number: int, branch: str
+    ) -> tuple[Path | None, bool]:
         """Create dedicated manager worktree for issue flow branch when missing."""
         target = self.repo_path / ".worktrees" / f"issue-{issue_number}"
 
@@ -104,7 +111,7 @@ class WorktreeResolverMixin:
                     branch=branch,
                     worktree=str(target),
                 ).info("Reusing existing manager worktree")
-                return target
+                return target, False
             logger.bind(
                 domain="orchestra",
                 issue=issue_number,
@@ -114,7 +121,7 @@ class WorktreeResolverMixin:
                 "Manager worktree path exists but has no .git file; "
                 "remove it manually to allow auto-creation"
             )
-            return None
+            return None, False
 
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -132,7 +139,7 @@ class WorktreeResolverMixin:
                 branch=branch,
                 worktree=str(target),
             ).warning(f"Failed to create manager worktree: {exc}")
-            return None
+            return None, False
 
         if result.returncode != 0:
             logger.bind(
@@ -141,7 +148,7 @@ class WorktreeResolverMixin:
                 branch=branch,
                 worktree=str(target),
             ).warning(f"Failed to create manager worktree: {result.stderr.strip()}")
-            return None
+            return None, False
 
         logger.bind(
             domain="orchestra",
@@ -149,7 +156,7 @@ class WorktreeResolverMixin:
             branch=branch,
             worktree=str(target),
         ).info("Created manager worktree for flow branch")
-        return target
+        return target, True
 
     def _resolve_review_cwd(self, pr_number: int) -> Path:
         """Resolve best worktree cwd for PR review execution.

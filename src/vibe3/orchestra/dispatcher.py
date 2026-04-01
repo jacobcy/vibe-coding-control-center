@@ -111,33 +111,46 @@ class Dispatcher(WorktreeResolverMixin):
             return False
 
         # Step 1.5: resolve manager execution cwd
-        manager_cwd = self._resolve_manager_cwd(issue.number, flow_branch)
+        manager_cwd, is_temporary = self._resolve_manager_cwd(issue.number, flow_branch)
         if not manager_cwd:
             log.error(
                 "Cannot dispatch manager: unable to resolve worktree "
                 f"for #{issue.number}"
             )
             return False
-        log.info(f"Manager dispatch using branch: {flow_branch} (cwd={manager_cwd})")
+        log.info(
+            f"Manager dispatch using branch: {flow_branch} "
+            f"(cwd={manager_cwd}, temp={is_temporary})"
+        )
 
-        # Step 2: update display label to in-progress (occupancy signal)
-        self.result_handler.update_state_label(issue.number, IssueState.IN_PROGRESS)
+        try:
+            # Step 2: update display label to in-progress (occupancy signal)
+            self.result_handler.update_state_label(issue.number, IssueState.IN_PROGRESS)
 
-        # Step 3: run manager execution
-        cmd = self._normalize_manager_command(cmd, manager_cwd)
-        log.info(f"Dispatching manager: {' '.join(cmd)}")
+            # Step 3: run manager execution
+            cmd = self._normalize_manager_command(cmd, manager_cwd)
+            log.info(f"Dispatching manager: {' '.join(cmd)}")
 
-        success = self._run_command(cmd, manager_cwd, "Manager execution")
+            success = self._run_command(cmd, manager_cwd, "Manager execution")
 
-        # Step 4: feedback loop - update state based on result
-        if success:
-            self.result_handler.on_dispatch_success(issue, flow_branch)
-        else:
-            self.result_handler.on_dispatch_failure(
-                issue, self._last_error_category or "unknown"
-            )
+            # Step 4: feedback loop - update state based on result
+            if success:
+                self.result_handler.on_dispatch_success(issue, flow_branch)
+            else:
+                self.result_handler.on_dispatch_failure(
+                    issue, self._last_error_category or "unknown"
+                )
 
-        return success
+            return success
+        finally:
+            if is_temporary and manager_cwd:
+                log.info(f"Recycling temporary worktree: {manager_cwd}")
+                try:
+                    from vibe3.clients.git_client import GitClient
+
+                    GitClient().remove_worktree(manager_cwd, force=True)
+                except Exception as e:
+                    log.warning(f"Failed to recycle worktree {manager_cwd}: {e}")
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
         """Dispatch PR review command."""
