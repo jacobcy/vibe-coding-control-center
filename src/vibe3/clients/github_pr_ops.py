@@ -352,7 +352,7 @@ class PRMixin:
             )
             return cast(list[dict[str, Any]], json.loads(result.stdout))
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to list PR comments: {e.stderr}")
+            raise_gh_pr_error(e, "list comments")
             return []
 
     def create_pr_comment(self: Any, pr_number: int, body: str) -> str:

@@ -34,9 +34,14 @@ class GitHubClientBase:
                 check=True,
             )
             return result.stdout.strip()
-        except Exception:
-            logger.error("Failed to get current GitHub user")
-            return ""
+        except subprocess.CalledProcessError as e:
+            from vibe3.exceptions import GitHubError
+
+            error_msg = (e.stderr or str(e)).strip()
+            raise GitHubError(
+                status_code=e.returncode,
+                message=f"Failed to get current GitHub user: {error_msg}",
+            ) from e
 
     def _extract_pr_number(self, pr_url: str) -> int:
         """Extract PR number from URL.
