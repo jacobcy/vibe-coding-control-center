@@ -131,7 +131,6 @@ class CodeagentExecutionService:
         )
 
         log.info("Starting sync execution")
-        echo(f"-> Executing with {options.agent or options.backend}...")
 
         result = run_execution_pipeline(request)
 
@@ -199,9 +198,19 @@ class CodeagentExecutionService:
         if command.cli_args:
             return self.build_self_invocation(command.cli_args)
 
-        current_argv = list(sys.argv[1:]) if len(sys.argv) > 1 else []
-        if current_argv:
-            return self.build_self_invocation(current_argv)
+        if len(sys.argv) > 1:
+            # sys.argv[0] must be cli.py or vibe3 (installed script)
+            # to be safe for self-invocation.
+            executable = sys.argv[0]
+            if not (executable.endswith("cli.py") or executable.endswith("vibe3")):
+                from vibe3.exceptions import UserError
+
+                raise UserError(
+                    f"Cannot safely build self-invocation from current executable: "
+                    f"{executable}. Async execution requires running "
+                    "via 'vibe3' or 'cli.py'."
+                )
+            return self.build_self_invocation(list(sys.argv[1:]))
 
         return self._build_fallback_cli_command(command)
 

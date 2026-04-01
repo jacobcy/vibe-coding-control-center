@@ -8,10 +8,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from vibe3.agents.review_runner import (
-    DEFAULT_WRAPPER_PATH,
-    AgentOptions,
-)
+from vibe3.agents.review_runner import DEFAULT_WRAPPER_PATH
+from vibe3.models.review_runner import AgentOptions
 
 
 @dataclass(frozen=True)

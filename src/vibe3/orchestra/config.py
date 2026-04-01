@@ -6,7 +6,7 @@ from pathlib import Path
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from vibe3.agents.review_runner import AgentOptions
+from vibe3.models.review_runner import AgentOptions
 
 
 def _default_pid_file() -> Path:
