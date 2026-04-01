@@ -25,6 +25,7 @@ from vibe3.commands import (
     run,
     snapshot,
     status,
+    task,
 )
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
@@ -53,6 +54,7 @@ app = typer.Typer(
 
 # Register subcommands
 app.add_typer(flow.app, name="flow")
+app.add_typer(task.app, name="task")
 app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
