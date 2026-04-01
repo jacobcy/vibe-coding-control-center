@@ -40,7 +40,7 @@ def run_coverage_gate(console: Console, yes: bool = False) -> None:
         console.print("\n[yellow]⚠️  Skipping coverage gate (--yes)[/]")
         return
 
-    from vibe3.services.coverage_service import CoverageService
+    from vibe3.analysis.coverage_service import CoverageService
 
     console.print("\n[cyan]Running coverage check...[/]")
 
@@ -87,8 +87,8 @@ def run_risk_gate(console: Console, pr_number: int) -> None:
         Exit: If risk gate fails
         Exception: If risk check fails (fail-fast, no interactive bypass)
     """
-    from vibe3.services.inspect_output_adapter import score
-    from vibe3.services.review_pipeline_helpers import run_inspect_json
+    from vibe3.agents.review_pipeline_helpers import run_inspect_json
+    from vibe3.analysis.inspect_output_adapter import score
 
     # Call inspect pr to get risk score
     analysis = run_inspect_json(["pr", str(pr_number)])

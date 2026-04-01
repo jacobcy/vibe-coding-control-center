@@ -6,6 +6,9 @@ from typing import Annotated, Optional
 import typer
 
 from vibe3.agents.plan_agent import PlanUsecase
+from vibe3.agents.plan_prompt import (
+    make_plan_context_builder,
+)
 from vibe3.agents.runner import (
     CodeagentExecutionService,
     create_codeagent_command,
@@ -26,9 +29,6 @@ from vibe3.models.orchestration import IssueState
 from vibe3.models.plan import PlanRequest
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
-from vibe3.services.plan_context_builder import (
-    make_plan_context_builder,
-)
 from vibe3.services.spec_ref_service import SpecRefService
 from vibe3.utils.trace import enable_trace
 

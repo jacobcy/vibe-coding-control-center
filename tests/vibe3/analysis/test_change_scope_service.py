@@ -1,6 +1,6 @@
 """Tests for shared change-scope utilities."""
 
-from vibe3.services.change_scope_service import (
+from vibe3.analysis.change_scope_service import (
     classify_changed_files,
     count_changed_lines,
     is_test_file,

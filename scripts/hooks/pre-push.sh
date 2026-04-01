@@ -5,7 +5,7 @@ set -euo pipefail
 echo "Running pre-push checks..."
 PUSH_STDIN=$(cat)
 
-SCOPE_JSON=$(printf '%s' "$PUSH_STDIN" | uv run python -m vibe3.services.pre_push_scope) || {
+SCOPE_JSON=$(printf '%s' "$PUSH_STDIN" | uv run python -m vibe3.analysis.pre_push_scope) || {
     echo "ERROR: Failed to resolve pre-push review scope"
     exit 1
 }
@@ -64,7 +64,7 @@ if [ "${VIBE_PREPUSH_FULL:-0}" != "1" ]; then
         CHANGED_FILES=""
     }
 
-    TEST_PLAN_JSON=$(printf '%s\n' "$CHANGED_FILES" | uv run python -m vibe3.services.pre_push_test_selector) || {
+    TEST_PLAN_JSON=$(printf '%s\n' "$CHANGED_FILES" | uv run python -m vibe3.analysis.pre_push_test_selector) || {
         echo "  -> Failed to resolve incremental test targets, fallback to full suite"
         TEST_PLAN_JSON=""
     }
@@ -122,9 +122,9 @@ INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json
     exit 1
 }
 
-echo "$INSPECT_JSON" | uv run python -m vibe3.services.pre_push_inspect_summary --render
+echo "$INSPECT_JSON" | uv run python -m vibe3.analysis.pre_push_inspect_summary --render
 REVIEW_TRIGGER=$(
-    echo "$INSPECT_JSON" | uv run python -m vibe3.services.pre_push_inspect_summary --field review_trigger
+    echo "$INSPECT_JSON" | uv run python -m vibe3.analysis.pre_push_inspect_summary --field review_trigger
 )
 
 # 6. Trigger async local review when inspect score reaches block threshold

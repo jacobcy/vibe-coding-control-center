@@ -8,7 +8,7 @@ import sys
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
-from vibe3.services.inspect_output_adapter import score as inspect_score
+from vibe3.analysis.inspect_output_adapter import score as inspect_score
 
 ReviewTrigger = Literal["yes-async", "recommended-manual", "no"]
 

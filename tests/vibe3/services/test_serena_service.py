@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import BranchSource, UncommittedSource
-from vibe3.services.serena_service import SerenaService
 
 
 class TestAnalyzeFile:
@@ -56,7 +56,7 @@ class TestAnalyzeFiles:
 
     def test_summary_counts_files(self, mock_client: MagicMock) -> None:
         service = SerenaService(client=mock_client)
-        with patch("vibe3.services.serena_file_analyzer.Path") as mock_path:
+        with patch("vibe3.analysis.serena_file_analyzer.Path") as mock_path:
             mock_path.return_value.exists.return_value = True
             result = service.analyze_files(["a.py", "b.py"])
         assert result["summary"]["files"] == 2  # type: ignore[index]

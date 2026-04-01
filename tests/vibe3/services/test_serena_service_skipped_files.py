@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.models.change_source import UncommittedSource
-from vibe3.services.serena_service import SerenaService
 
 
 @pytest.fixture
@@ -107,7 +107,7 @@ def test_get_changed_functions_missing_file(temp_dir):
     from vibe3.models.change_source import CommitSource
 
     # Mock get_diff_hunk_ranges function
-    with patch("vibe3.services.serena_service.get_diff_hunk_ranges") as mock_get_ranges:
+    with patch("vibe3.analysis.serena_service.get_diff_hunk_ranges") as mock_get_ranges:
         mock_get_ranges.return_value = [(1, 10)]
         result = service.get_changed_functions(
             str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")

@@ -129,7 +129,7 @@ def build_plan_prompt_body(
     Returns:
         Assembled plan prompt body string.
     """
-    from vibe3.services.context_builder import build_tools_guide_section
+    from vibe3.agents.review_prompt import build_tools_guide_section
 
     log = logger.bind(domain="plan_context_builder", action="build_plan_prompt_body")
     log.info("Building plan prompt body")

@@ -2,7 +2,7 @@
 
 import pytest
 
-from vibe3.services.dag_service import (
+from vibe3.analysis.dag_service import (
     DAGError,
     ModuleNode,
     build_module_graph,

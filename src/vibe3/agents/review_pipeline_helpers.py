@@ -7,13 +7,13 @@ from typing import Any
 import typer
 from loguru import logger
 
-from vibe3.models.snapshot import StructureDiff
-from vibe3.services.snapshot_diff import compute_diff
-from vibe3.services.snapshot_service import (
+from vibe3.analysis.snapshot_diff import compute_diff
+from vibe3.analysis.snapshot_service import (
     SnapshotError,
     build_snapshot,
     find_snapshot_by_branch,
 )
+from vibe3.models.snapshot import StructureDiff
 
 
 def run_inspect_json(args: list[str]) -> dict[str, object]:

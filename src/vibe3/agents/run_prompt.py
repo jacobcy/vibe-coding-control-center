@@ -56,7 +56,7 @@ def build_run_prompt_body(
         if policy_path and Path(policy_path).exists():
             sections.append(Path(policy_path).read_text(encoding="utf-8"))
 
-    from vibe3.services.context_builder import build_tools_guide_section
+    from vibe3.agents.review_prompt import build_tools_guide_section
 
     tools_guide = build_tools_guide_section(getattr(run_config, "common_rules", None))
     if tools_guide:

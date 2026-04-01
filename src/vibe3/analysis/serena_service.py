@@ -5,12 +5,12 @@ from pathlib import Path
 
 from loguru import logger
 
+from vibe3.analysis.serena_file_analyzer import analyze_files
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.git_diff_hunks import get_diff_hunk_ranges
 from vibe3.clients.serena_client import SerenaClient
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import ChangeSource
-from vibe3.services.serena_file_analyzer import analyze_files
 
 
 class SerenaService:
@@ -155,7 +155,7 @@ class SerenaService:
         Returns:
             File analysis dict with symbols and references
         """
-        from vibe3.services.serena_file_analyzer import analyze_file as _analyze_file
+        from vibe3.analysis.serena_file_analyzer import analyze_file as _analyze_file
 
         return _analyze_file(relative_file, self.client, self._is_cli_file)
 

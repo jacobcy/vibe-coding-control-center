@@ -6,6 +6,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from vibe3.analysis import dag_service, structure_service
 from vibe3.clients.git_client import GitClient
 from vibe3.exceptions import VibeError
 from vibe3.models.snapshot import (
@@ -16,7 +17,6 @@ from vibe3.models.snapshot import (
     StructureMetrics,
     StructureSnapshot,
 )
-from vibe3.services import dag_service, structure_service
 
 
 class SnapshotError(VibeError):

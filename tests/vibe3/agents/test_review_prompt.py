@@ -8,8 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vibe3.models.review import ReviewRequest, ReviewScope
-from vibe3.services.context_builder import (
+from vibe3.agents.review_prompt import (
     ContextBuilderError,
     build_ast_analysis_section,
     build_output_contract_section,
@@ -18,6 +17,7 @@ from vibe3.services.context_builder import (
     build_review_task_section,
     build_tools_guide_section,
 )
+from vibe3.models.review import ReviewRequest, ReviewScope
 
 
 class TestBuildPolicySection:
@@ -138,7 +138,7 @@ class TestBuildReviewPromptBody:
 
     def test_build_review_prompt_body_with_ast_analysis(self) -> None:
         """Context should include AST analysis when provided."""
-        with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
+        with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
@@ -154,7 +154,7 @@ class TestBuildReviewPromptBody:
 
     def test_build_review_prompt_body_includes_verdict_format(self) -> None:
         """Context should specify VERDICT output format."""
-        with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
+        with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
@@ -166,7 +166,7 @@ class TestBuildReviewPromptBody:
 
     def test_build_review_prompt_body_minimal_without_ast(self) -> None:
         """Context should work without AST analysis (reviewer uses git diff)."""
-        with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
+        with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
             mock_read.return_value = "# Review Policy\nTest policy content"
 
             scope = ReviewScope.for_base("main")
@@ -184,7 +184,7 @@ class TestBuildReviewPromptBody:
 
     def test_build_review_prompt_body_handles_missing_policy(self) -> None:
         """Should raise error when policy file is missing."""
-        with patch("vibe3.services.context_builder.Path.read_text") as mock_read:
+        with patch("vibe3.agents.review_prompt.Path.read_text") as mock_read:
             mock_read.side_effect = OSError("File not found")
 
             scope = ReviewScope.for_base("main")

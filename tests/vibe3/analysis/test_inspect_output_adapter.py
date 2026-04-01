@@ -1,6 +1,6 @@
 """Tests for inspect output adapter helpers."""
 
-from vibe3.services.inspect_output_adapter import changed_symbols, pr_analysis_summary
+from vibe3.analysis.inspect_output_adapter import changed_symbols, pr_analysis_summary
 
 
 def test_changed_symbols_filters_invalid_entries() -> None:

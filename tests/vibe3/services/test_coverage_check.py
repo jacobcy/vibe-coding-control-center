@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.analysis.coverage_service import CoverageService
 from vibe3.models.coverage import CoverageReport
-from vibe3.services.coverage_service import CoverageService
 
 
 def test_run_coverage_check_success(

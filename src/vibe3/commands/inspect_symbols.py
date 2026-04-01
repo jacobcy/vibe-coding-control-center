@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from vibe3.services.serena_service import SerenaService
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.utils.trace import enable_trace
 
 

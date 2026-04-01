@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Sequence
 
-from vibe3.services.change_scope_service import classify_changed_files
+from vibe3.analysis.change_scope_service import classify_changed_files
 
 SMOKE_TEST_TARGETS = (
     "tests/vibe3/services/test_pre_push_scope.py",
@@ -135,7 +135,7 @@ def _find_tests_via_dag(src_files: list[str], root: Path) -> set[str]:
     Returns an empty set on any failure so callers degrade to directory fallback.
     """
     try:
-        from vibe3.services.dag_service import (  # noqa: PLC0415
+        from vibe3.analysis.dag_service import (  # noqa: PLC0415
             _extract_imports,
             expand_impacted_modules,
         )

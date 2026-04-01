@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from vibe3.services.pre_push_scope import resolve_pre_push_scope
+from vibe3.analysis.pre_push_scope import resolve_pre_push_scope
 
 ZERO_SHA = "0" * 40
 

@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
+from vibe3.agents.plan_prompt import build_plan_prompt_body
+from vibe3.agents.run_prompt import build_run_prompt_body
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
-from vibe3.services.plan_context_builder import build_plan_prompt_body
-from vibe3.services.run_context_builder import build_run_prompt_body
 
 FORBIDDEN_INTERNAL_TOKENS = (
     "common.md",

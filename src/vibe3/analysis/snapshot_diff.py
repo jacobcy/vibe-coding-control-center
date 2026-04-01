@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from vibe3.analysis.snapshot_service import SnapshotError
 from vibe3.models.snapshot import (
     DependencyChange,
     DiffSummary,
@@ -13,7 +14,6 @@ from vibe3.models.snapshot import (
     StructureDiff,
     StructureSnapshot,
 )
-from vibe3.services.snapshot_service import SnapshotError
 
 
 def _diff_files(

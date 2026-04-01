@@ -1,23 +1,23 @@
-"""Check service implementation."""
+"""Check service implementation for verifying handoff store consistency."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.models.flow import IssueLink
 from vibe3.models.pr import PRState
-from vibe3.services.check_execute_mixin import CheckExecuteMixin
-from vibe3.services.check_remote_index_mixin import CheckRemoteIndexMixin
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
 @dataclass
 class CheckResult:
-    """Result of consistency check."""
+    """Result of consistency check for a single branch."""
 
     is_valid: bool
     issues: list[str]
@@ -26,14 +26,34 @@ class CheckResult:
 
 @dataclass
 class FixResult:
-    """Result of auto-fix."""
+    """Result of auto-fix operation."""
 
     success: bool
     error: str | None = None
 
 
-class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
-    """Service for verifying handoff store consistency."""
+@dataclass
+class InitResult:
+    """Result of remote index initialization."""
+
+    total_flows: int
+    updated: int
+    skipped: int
+    unresolvable: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ExecuteCheckResult:
+    """Result of unified check execution."""
+
+    mode: Literal["default", "init", "all", "fix", "fix_all"]
+    success: bool
+    summary: str
+    details: dict = field(default_factory=dict)
+
+
+class CheckService:
+    """Service for verifying handoff store consistency and auto-fixing issues."""
 
     def __init__(
         self,
@@ -41,26 +61,208 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
         git_client: GitClient | None = None,
         github_client: GitHubClient | None = None,
     ) -> None:
-        super().__init__(store=store, github_client=github_client)
+        self.store = store or SQLiteClient()
         self.git_client = git_client or GitClient()
+        self.github_client = github_client or GitHubClient()
 
     # ------------------------------------------------------------------
-    # Single-branch check
+    # Unified Execution (Flattened from CheckExecuteMixin)
+    # ------------------------------------------------------------------
+
+    def execute_check(
+        self,
+        mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
+        branch: str | None = None,
+    ) -> ExecuteCheckResult:
+        """Unified check execution with mode-based routing.
+
+        Args:
+            mode: Check mode (default, init, all, fix, fix_all)
+            branch: Branch name for single-branch check. If None, uses current branch.
+
+        Returns:
+            ExecuteCheckResult with mode, success, summary, and details
+        """
+        if mode == "init":
+            return self._handle_init_mode()
+        elif mode == "all":
+            return self._handle_all_mode()
+        elif mode == "fix":
+            return self._handle_fix_mode(branch)
+        elif mode == "fix_all":
+            return self._handle_fix_all_mode()
+        else:
+            return self._handle_default_mode(branch)
+
+    def _handle_init_mode(self) -> ExecuteCheckResult:
+        """Handle --init mode: scan merged PRs to back-fill task_issue_number."""
+        result = self.init_remote_index()
+        return ExecuteCheckResult(
+            mode="init",
+            success=True,
+            summary=(
+                f"Done  total={result.total_flows}  "
+                f"updated={result.updated}  skipped={result.skipped}"
+            ),
+            details=(
+                {"unresolvable": result.unresolvable} if result.unresolvable else {}
+            ),
+        )
+
+    def _handle_all_mode(self) -> ExecuteCheckResult:
+        """Handle --all mode: check active flows."""
+        results = self.verify_all_flows(status="active")
+        invalid = [r for r in results if not r.is_valid]
+        return ExecuteCheckResult(
+            mode="all",
+            success=len(invalid) == 0,
+            summary=(
+                f"All {len(results)} active flows passed"
+                if not invalid
+                else f"{len(invalid)}/{len(results)} active flows have issues"
+            ),
+            details={"invalid": invalid},
+        )
+
+    def _handle_fix_all_mode(self) -> ExecuteCheckResult:
+        """Handle --fix --all mode: check active flows and auto-fix fixable issues."""
+        results = self.verify_all_flows(status="active")
+        invalid = [r for r in results if not r.is_valid]
+        if not invalid:
+            return ExecuteCheckResult(
+                mode="fix_all",
+                success=True,
+                summary=f"All {len(results)} active flows passed",
+            )
+
+        fixed_count = 0
+        failed: list[str] = []
+        for r in invalid:
+            fix_result = self.auto_fix_branch(r.branch, r.issues)
+            if fix_result.success:
+                fixed_count += 1
+            else:
+                error_msg = fix_result.error or "unknown error"
+                failed.append(f"{r.branch}: {error_msg}")
+
+        total = len(invalid)
+        if failed:
+            return ExecuteCheckResult(
+                mode="fix_all",
+                success=False,
+                summary=(
+                    f"Fixed {fixed_count}/{total}, "
+                    f"{len(failed)} had unfixable issues"
+                ),
+                details={"fixed": fixed_count, "failed": failed},
+            )
+        return ExecuteCheckResult(
+            mode="fix_all",
+            success=True,
+            summary=(
+                f"All {fixed_count} fixable issues resolved "
+                f"across {len(results)} flows"
+            ),
+            details={"fixed": fixed_count},
+        )
+
+    def _handle_fix_mode(self, branch: str | None) -> ExecuteCheckResult:
+        """Handle --fix mode: auto-fix current branch."""
+        result_single = self.verify_current_flow()
+        if result_single.is_valid:
+            return ExecuteCheckResult(
+                mode="fix", success=True, summary="All checks passed"
+            )
+
+        fix_result = self.auto_fix(result_single.issues, branch=branch)
+        return ExecuteCheckResult(
+            mode="fix",
+            success=fix_result.success,
+            summary=(
+                "All issues fixed"
+                if fix_result.success
+                else f"Error: {fix_result.error}"
+            ),
+            details={"issues": result_single.issues},
+        )
+
+    def _handle_default_mode(self, branch: str | None) -> ExecuteCheckResult:
+        """Handle default mode: check current branch."""
+        result_single = self.verify_current_flow()
+        return ExecuteCheckResult(
+            mode="default",
+            success=result_single.is_valid,
+            summary=(
+                "All checks passed"
+                if result_single.is_valid
+                else f"Issues found for branch '{result_single.branch}'"
+            ),
+            details={"issues": result_single.issues},
+        )
+
+    # ------------------------------------------------------------------
+    # Remote Index Init (Flattened from CheckRemoteIndexMixin)
+    # ------------------------------------------------------------------
+
+    def init_remote_index(self, pr_limit: int = 50) -> InitResult:
+        """From remote sync flow state (mostly back-filling task_issue_number)."""
+        logger.bind(domain="check", pr_limit=pr_limit).info("Initializing remote index")
+
+        branch_issue_map: dict[str, list[int]] = {}
+
+        # Path A: merged PR body
+        for pr in self.github_client.list_merged_prs(limit=pr_limit):
+            branch_name = pr.get("headRefName", "")
+            if not branch_name:
+                continue
+            for n in parse_linked_issues(pr.get("body") or ""):
+                branch_issue_map.setdefault(branch_name, [])
+                if n not in branch_issue_map[branch_name]:
+                    branch_issue_map[branch_name].append(n)
+        logger.bind(
+            domain="check", path="pr_body", branches_resolved=len(branch_issue_map)
+        ).info("Remote index build done (Path A)")
+
+        all_flows = self.store.get_all_flows()
+        updated, skipped, unresolvable = 0, 0, []
+
+        for flow in all_flows:
+            branch = flow["branch"]
+            # Skip if already has task_issue_number resolved.
+            existing_links = self.store.get_issue_links(branch)
+
+            if IssueLink.resolve_task_number(existing_links):
+                skipped += 1
+                continue
+
+            # Resolve from map
+            issues = branch_issue_map.get(branch)
+            if not issues:
+                unresolvable.append(branch)
+                continue
+
+            # Update first one as task
+            from vibe3.services.task_service import TaskService
+
+            TaskService(store=self.store).link_issue(
+                branch, issues[0], "task", actor="check:init"
+            )
+            updated += 1
+
+        return InitResult(
+            total_flows=len(all_flows),
+            updated=updated,
+            skipped=skipped,
+            unresolvable=unresolvable,
+        )
+
+    # ------------------------------------------------------------------
+    # Core Logic
     # ------------------------------------------------------------------
 
     def verify_current_flow(self) -> CheckResult:
-        """Verify current branch flow consistency.
-
-        Checks:
-        - Flow record exists for current branch
-        - task_issue_number exists on GitHub
-        - Only one task issue per branch
-        - pr_number matches current branch
-        - plan_ref / report_ref / audit_ref files exist
-        - shared current.md exists for active flow
-        """
+        """Verify current branch flow consistency."""
         logger.bind(domain="check", action="verify").info("Verifying flow consistency")
-
         branch = self.git_client.get_current_branch()
         return self._check_branch(branch)
 
@@ -119,7 +321,6 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             issues.append(f"Multiple task issues for branch '{branch}'")
 
         # PR verification (Remote-first)
-        # We no longer rely on local pr_number cache; always check GitHub truth.
         try:
             prs = self.github_client.list_prs_for_branch(branch)
             if not prs:
@@ -140,8 +341,6 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to verify PR status from GitHub: {e}"
             )
-            # Don't fail the whole check, just skip PR truth verification
-            # and report it if we have no local pr_number either.
             if not flow_data.get("pr_number"):
                 issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
@@ -160,7 +359,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                     f"Failed to check for open PRs after task issue closed: {e}"
                 )
 
-        # ref files exist (skip for terminal flows — artifacts may be cleaned up)
+        # ref files exist
         flow_status = flow_data.get("flow_status", "active")
         if flow_status not in ("done", "aborted", "stale"):
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
@@ -168,7 +367,7 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
                 if ref_value and not Path(ref_value).exists():
                     issues.append(f"{ref_field} file not found: {ref_value}")
 
-        # shared current.md (skip for terminal flows)
+        # shared current.md
         if flow_status not in ("done", "aborted", "stale"):
             git_dir = self.git_client.get_git_common_dir()
             handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
@@ -211,20 +410,10 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             f"Flow auto-aborted: {reason}",
         )
 
-    # ------------------------------------------------------------------
-    # All-flows check
-    # ------------------------------------------------------------------
-
     def verify_all_flows(
         self, status: str | list[str] | None = "active"
     ) -> list[CheckResult]:
-        """Run consistency checks for flows in the store.
-
-        Args:
-            status: Flow status filter (single string or list).
-                   Defaults to "active" only to avoid checking terminal flows.
-                   Pass None to check all flows.
-        """
+        """Run consistency checks for flows in the store."""
         all_flows = self.store.get_all_flows()
         if status:
             statuses = [status] if isinstance(status, str) else status
@@ -235,29 +424,17 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
             results.append(self._check_branch(flow["branch"]))
         return results
 
-    # ------------------------------------------------------------------
-    # Local auto-fix (current branch, no network)
-    # ------------------------------------------------------------------
-
     def auto_fix(self, issues: list[str], *, branch: str | None = None) -> FixResult:
-        """Auto-fix local consistency issues for a branch.
-
-        Handles:
-        - Missing shared current.md (creates empty placeholder)
-        - Missing pr_number (queries GitHub and updates database)
-
-        Some fixes require network access to GitHub.
-        """
+        """Auto-fix local consistency issues for a branch."""
         branch = branch or self.git_client.get_current_branch()
         fixed: list[str] = []
 
         for issue in issues:
-            # Fix missing handoff file
             if "Shared handoff file not found" in issue:
                 git_dir = self.git_client.get_git_common_dir()
                 handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
                 handoff_path.parent.mkdir(parents=True, exist_ok=True)
-                handoff_path.write_text(f"# {branch}\n")
+                handoff_path.write_text(f"# {branch}\n", encoding="utf-8")
                 fixed.append(issue)
                 logger.bind(domain="check", action="fix", branch=branch).info(
                     f"Created missing handoff file: {handoff_path}"
@@ -278,8 +455,5 @@ class CheckService(CheckRemoteIndexMixin, CheckExecuteMixin):
         return FixResult(success=True)
 
     def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
-        """Auto-fix issues for a specific branch.
-
-        Delegates to auto_fix with explicit branch parameter.
-        """
+        """Auto-fix issues for a specific branch."""
         return self.auto_fix(issues, branch=branch)

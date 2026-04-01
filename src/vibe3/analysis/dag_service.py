@@ -75,7 +75,7 @@ def _extract_imports(file_path: str) -> list[str]:
                     imports.append(alias.name)
         elif isinstance(node, ast.ImportFrom):
             if node.module and node.module.startswith("vibe3"):
-                # 处理 "from vibe3.services import dag_service" 的情况
+                # 处理 "from vibe3.analysis import dag_service" 的情况
                 # 尝试组合完整模块路径，如果存在于模块图中则记录
                 for alias in node.names:
                     full_module = f"{node.module}.{alias.name}"

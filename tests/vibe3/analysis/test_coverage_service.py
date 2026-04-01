@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibe3.services.coverage_service import CoverageService
+from vibe3.analysis.coverage_service import CoverageService
 
 
 def test_coverage_service_initialization(coverage_service: CoverageService) -> None:

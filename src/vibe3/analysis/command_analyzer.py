@@ -7,14 +7,14 @@ from typing import Set
 from loguru import logger
 from pydantic import BaseModel
 
-from vibe3.exceptions import VibeError
-from vibe3.models.inspection import CallNode, CommandInspection
-from vibe3.services.command_analyzer_helpers import (
+from vibe3.analysis.command_analyzer_helpers import (
     find_callee_file,
     find_command_file,
     should_expand,
     should_show_in_tree,
 )
+from vibe3.exceptions import VibeError
+from vibe3.models.inspection import CallNode, CommandInspection
 
 
 class CommandAnalyzerError(VibeError):

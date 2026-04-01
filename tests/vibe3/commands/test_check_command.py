@@ -22,7 +22,7 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_valid(self, mock_service_class):
         """Test check command when all checks pass."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
@@ -39,7 +39,7 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_with_issues(self, mock_service_class):
         """Test check command when issues found."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
@@ -60,7 +60,7 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_init_shows_unresolvable_details(self, mock_service_class):
         """Test --init mode prints unresolvable branch details."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(
@@ -81,7 +81,7 @@ class TestCheckCommand:
     @patch("vibe3.commands.check.CheckService")
     def test_check_command_fix_all_output(self, mock_service_class):
         """Test check command summary output."""
-        from vibe3.services.check_execute_mixin import ExecuteCheckResult
+        from vibe3.services.check_service import ExecuteCheckResult
 
         mock_service = MagicMock()
         mock_service.execute_check.return_value = ExecuteCheckResult(

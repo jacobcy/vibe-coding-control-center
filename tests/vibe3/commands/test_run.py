@@ -213,7 +213,7 @@ class TestRunContextBuilderUsesAssembler:
 
     def test_make_skill_context_builder_returns_skill_content(self) -> None:
         """make_skill_context_builder should return skill text via assembler."""
-        from vibe3.services.run_context_builder import make_skill_context_builder
+        from vibe3.agents.run_prompt import make_skill_context_builder
 
         cb = make_skill_context_builder("# Demo Skill")
         text = cb()
@@ -221,7 +221,7 @@ class TestRunContextBuilderUsesAssembler:
 
     def test_skill_context_builder_exposes_render_result(self) -> None:
         """Context builder should expose last_result after being called."""
-        from vibe3.services.run_context_builder import make_skill_context_builder
+        from vibe3.agents.run_prompt import make_skill_context_builder
 
         cb = make_skill_context_builder("# My Skill")
         cb()
@@ -233,12 +233,12 @@ class TestRunContextBuilderUsesAssembler:
         """make_run_context_builder provider should invoke build_run_prompt_body."""
         from unittest.mock import patch
 
+        from vibe3.agents.run_prompt import make_run_context_builder
         from vibe3.config.settings import VibeConfig
-        from vibe3.services.run_context_builder import make_run_context_builder
 
         config = VibeConfig.get_defaults()
         with patch(
-            "vibe3.services.run_context_builder.build_run_prompt_body",
+            "vibe3.agents.run_prompt.build_run_prompt_body",
             return_value="assembled run body",
         ):
             cb = make_run_context_builder(None, config)
@@ -250,7 +250,7 @@ class TestRunContextBuilderUsesAssembler:
 
     def test_run_context_builder_no_longer_exports_build_run_context(self) -> None:
         """build_run_context (old name) must not exist in run_context_builder."""
-        import vibe3.services.run_context_builder as mod
+        import vibe3.agents.run_prompt as mod
 
         assert not hasattr(
             mod, "build_run_context"

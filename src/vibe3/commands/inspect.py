@@ -5,11 +5,11 @@ from typing import Annotated, Any, cast
 
 import typer
 
+from vibe3.analysis import command_analyzer, dag_service, structure_service
+from vibe3.analysis.command_analyzer_helpers import find_command_file
 from vibe3.commands.inspect_base import register as register_base
 from vibe3.commands.inspect_change import register as register_change
 from vibe3.commands.inspect_symbols import register as register_symbols
-from vibe3.services import command_analyzer, dag_service, structure_service
-from vibe3.services.command_analyzer_helpers import find_command_file
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(

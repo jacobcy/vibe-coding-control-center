@@ -2,6 +2,7 @@
 
 import pytest
 
+from vibe3.analysis.snapshot_diff_section import build_snapshot_diff_section
 from vibe3.models.snapshot import (
     DependencyChange,
     DiffSummary,
@@ -10,7 +11,6 @@ from vibe3.models.snapshot import (
     ModuleChange,
     StructureDiff,
 )
-from vibe3.services.snapshot_diff_section import build_snapshot_diff_section
 
 
 @pytest.fixture
