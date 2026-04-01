@@ -30,21 +30,27 @@
 首选命令：
 
 ```bash
-uv run python src/vibe3/cli.py inspect symbols <file|file:symbol>
-uv run python src/vibe3/cli.py inspect structure <file>
+uv run python src/vibe3/cli.py inspect symbols <file>
+uv run python src/vibe3/cli.py inspect symbols <file>:<symbol>
+uv run python src/vibe3/cli.py inspect files <file>
 uv run python src/vibe3/cli.py inspect commit <sha>
 uv run python src/vibe3/cli.py inspect base --json
 ```
 
 使用规则：
-- 改函数前，先跑 `inspect symbols` 看引用位置。
-- 理解单文件职责时，先跑 `inspect structure`。
+- 改函数前，先跑 `inspect symbols <file>:<symbol>` 看引用位置。
+- 理解单文件职责、LOC、imports 与 imported-by 时，先跑 `inspect files`。
 - 评估一组提交或 review 范围时，优先 `inspect commit`。
 - 判断当前分支风险和影响面时，优先 `inspect base --json`。
+- `inspect commands` 只在分析 CLI 拓扑、命令注册关系时使用，不作为默认第一选择。
+
+注意：
+- 当前实际 CLI 中**没有** `inspect structure` 子命令，不要继续引用它。
+- `inspect symbols` 的稳定用法是 `<file>` 或 `<file>:<symbol>`；不要把“symbol-only 全仓搜索”当默认能力。
 
 ### 2. 语义理解与跨文件探索
 
-不知道代码在哪、职责边界不清、需要理解实现意图时，使用 `mcp__auggie__codebase_retrieval`。
+不知道代码在哪、职责边界不清、需要理解实现意图时，使用 `mcp_auggie_codebase-retrieval`。
 
 适合：
 - 找负责某项功能的模块
@@ -96,7 +102,7 @@ uv run python src/vibe3/cli.py handoff append "<message>" --kind finding --actor
 
 ```bash
 uv run python src/vibe3/cli.py inspect symbols path/to/file.py:symbol_name
-uv run python src/vibe3/cli.py inspect structure path/to/file.py
+uv run python src/vibe3/cli.py inspect files path/to/file.py
 ```
 
 ### 做 review 前

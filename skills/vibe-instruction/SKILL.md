@@ -128,9 +128,9 @@ vibe3 pr create --base <ref>  # 创建 PR
 #### inspect - 代码分析（开发工具）
 
 ```bash
-vibe3 inspect symbols <file>       # 符号引用分析
-vibe3 inspect structure <file>     # 文件结构 + 依赖
-vibe3 inspect commit <sha>         # 改动影响范围
+vibe3 inspect symbols <file>:<symbol>  # 符号引用分析
+vibe3 inspect files <file>             # 文件结构 + 依赖
+vibe3 inspect commit <sha>             # 改动影响范围
 ```
 
 #### 其他实用命令

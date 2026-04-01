@@ -52,11 +52,10 @@ Phase 1 提供能力层，Phase 2 提供编排层，职责清晰分离。
 
 **命令列表**:
 - `vibe inspect` - 综合信息展示
-- `vibe inspect metrics` - 显示代码量指标
-- `vibe inspect structure` - 显示文件结构分析
-- `vibe inspect symbols [file]` - 代码符号分析（默认：当前目录）
-  - `vibe inspect symbols` - 显示当前目录的代码符号
-  - `vibe inspect symbols lib/flow.sh` - 显示指定文件的代码符号
+- `vibe inspect files <file>` - 显示单文件结构分析（LOC、函数、imports、imported_by）
+- `vibe inspect symbols <file>` / `vibe inspect symbols <file>:<symbol>` - 代码符号分析
+    - `vibe inspect symbols src/vibe3/services/dag_service.py` - 显示指定文件的符号
+    - `vibe inspect symbols src/vibe3/services/dag_service.py:build_module_graph` - 显示指定符号的引用
 - `vibe inspect commands [cmd]` - 命令结构查看（**静态分析，不执行**）
   - `vibe inspect commands` - 显示所有命令列表
   - `vibe inspect commands review` - 显示 `vibe review` 的子命令
@@ -64,6 +63,7 @@ Phase 1 提供能力层，Phase 2 提供编排层，职责清晰分离。
 - `vibe inspect pr <number>` - PR 改动分析（输出 JSON）
 - `vibe inspect commit <sha>` - Commit 改动分析（输出 JSON）
 - `vibe inspect base <branch>` - 相对分支的改动分析（输出 JSON）
+- `vibe inspect uncommit` - 工作区未提交改动分析（输出 JSON）
 
 **架构对齐**:
 - ✅ 符合 Tier 1 (Shell 能力层) 定位：确定性操作、结构化输出
@@ -349,13 +349,13 @@ lib/flow.sh:128 - Warning: Untested function
 
 **命令列表**:
 - `vibe inspect` - 综合信息展示
-- `vibe inspect metrics` - 显示代码量指标
-- `vibe inspect structure` - 显示文件结构分析
-- `vibe inspect symbols [file]` - 代码符号分析
+- `vibe inspect files <file>` - 单文件结构分析
+- `vibe inspect symbols <file>` / `vibe inspect symbols <file>:<symbol>` - 代码符号分析
 - `vibe inspect commands [cmd]` - 命令结构查看
 - `vibe inspect pr <number>` - PR 改动分析（输出 JSON）
 - `vibe inspect commit <sha>` - Commit 改动分析（输出 JSON）
 - `vibe inspect base <branch>` - 相对分支的改动分析（输出 JSON）
+- `vibe inspect uncommit` - 工作区未提交改动分析（输出 JSON）
 
 **实现示例**:
 ```python

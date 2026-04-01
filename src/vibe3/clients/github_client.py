@@ -1,13 +1,16 @@
 """GitHub client implementation."""
 
 from vibe3.clients.github_client_base import GitHubClientBase
+from vibe3.clients.github_comment_ops import CommentMixin
 from vibe3.clients.github_issues_ops import IssuesMixin
 from vibe3.clients.github_pr_ops import PRMixin
 from vibe3.clients.github_pr_query_ops import PRQueryMixin
 from vibe3.clients.github_review_ops import ReviewMixin
 
 
-class GitHubClient(GitHubClientBase, PRMixin, PRQueryMixin, ReviewMixin, IssuesMixin):
+class GitHubClient(
+    GitHubClientBase, PRMixin, PRQueryMixin, ReviewMixin, IssuesMixin, CommentMixin
+):
     """GitHub client for interacting with GitHub via gh CLI.
 
     This class combines all mixins to provide comprehensive GitHub operations:

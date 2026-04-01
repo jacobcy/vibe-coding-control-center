@@ -12,6 +12,7 @@ from vibe3.models.pr import (
     PRResponse,
     VersionBumpResponse,
 )
+from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
 from vibe3.services.pr_utils import (
     build_pr_body,
     check_upstream_conflicts,
@@ -36,6 +37,7 @@ class PRService:
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
         self.version_service = version_service or VersionService()
+        self.briefing_service = PRReviewBriefingService(self.github_client)
 
     def create_draft_pr(
         self,
@@ -74,9 +76,9 @@ class PRService:
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
-            hydrated_existing = self.github_client.get_pr(existing.number) or existing
-            self._sync_pr_flow_state(hydrated_existing, actor=effective_actor)
-            return hydrated_existing
+            hydrated = self.github_client.get_pr(existing.number) or existing
+            self._sync_pr_flow_state(hydrated, actor=effective_actor)
+            return hydrated
 
         try:
             self.git_client.push_branch(head_branch, set_upstream=True)
@@ -157,12 +159,26 @@ class PRService:
 
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=effective_actor)
-            logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
+            try:
+                self.briefing_service.publish_briefing(pr_number)
+            except Exception as e:
+                logger.bind(pr_number=pr_number).warning(
+                    f"Briefing update failed (PR still ready): {e}"
+                )
+            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
             return pr
 
         updated_pr = self.github_client.mark_ready(pr_number)
         branch = pr.head_branch
         self._sync_pr_flow_state(updated_pr, actor=effective_actor)
+
+        try:
+            self.briefing_service.publish_briefing(pr_number)
+        except Exception as e:
+            logger.bind(pr_number=pr_number).warning(
+                f"Briefing publication failed (PR marked ready): {e}"
+            )
+
         self.store.add_event(
             branch,
             "pr_ready",
@@ -239,12 +255,7 @@ class PRService:
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
-        """Persist PR linkage and readiness into flow cache.
-
-        Note: pr_number and pr_ready_for_review are now remote truth,
-        no longer persisted to local SQLite flow_state.
-        We only update latest_actor here to track activity.
-        """
+        """Persist activity to flow."""
         self.store.update_flow_state(
             pr.head_branch,
             latest_actor=actor,

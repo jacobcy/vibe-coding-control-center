@@ -12,18 +12,80 @@ from vibe3.models.pr import PRResponse, PRState
 class PRQueryMixin:
     """Mixin for PR query operations."""
 
+    def get_pr(
+        self: Any, pr_number: int | None = None, branch: str | None = None
+    ) -> PRResponse | None:
+        """Get PR by number or branch."""
+        logger.bind(
+            external="github",
+            operation="get_pr",
+            pr_number=pr_number,
+            branch=branch,
+        ).debug("Calling GitHub API: get_pull_request")
+
+        target = str(pr_number) if pr_number else branch
+        if not target:
+            # Try current branch
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            target = result.stdout.strip()
+
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    target,
+                    "--json",
+                    "number,title,body,state,headRefName,baseRefName,"
+                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
+                ],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(external="github", target=target).warning(
+                "GitHub CLI (gh) not found, skipping PR lookup"
+            )
+            return None
+
+        if result.returncode != 0:
+            logger.bind(external="github", target=target).warning("PR not found")
+            return None
+
+        data = json.loads(result.stdout)
+
+        # Determine is_ready: not a draft
+        is_ready = not bool(data.get("isDraft", True))
+
+        # Determine ci_passed: check statusCheckRollup
+        status_rollup = data.get("statusCheckRollup")
+        ci_passed = status_rollup == "SUCCESS" if status_rollup else False
+
+        return PRResponse(
+            number=int(data["number"]),
+            title=str(data["title"]),
+            body=str(data.get("body", "")),
+            state=PRState(data["state"]),
+            head_branch=str(data["headRefName"]),
+            base_branch=str(data["baseRefName"]),
+            url=str(data["url"]),
+            draft=bool(data.get("isDraft", False)),
+            is_ready=is_ready,
+            ci_passed=ci_passed,
+            created_at=data.get("createdAt"),
+            updated_at=data.get("updatedAt"),
+            merged_at=data.get("mergedAt"),
+            metadata=None,
+        )
+
     def get_pr_commits(self: Any, pr_number: int) -> list[str]:
-        """Get list of commit SHAs for a PR.
-
-        Args:
-            pr_number: PR number
-
-        Returns:
-            List of commit SHA strings
-
-        Raises:
-            subprocess.CalledProcessError: If gh command fails
-        """
+        """Get list of commit SHAs for a PR."""
         logger.bind(
             external="github",
             operation="get_pr_commits",
@@ -62,15 +124,7 @@ class PRQueryMixin:
     def list_prs_for_branch(
         self: Any, branch: str, *, state: str | None = None
     ) -> list[PRResponse]:
-        """List PRs for a specific branch.
-
-        Args:
-            branch: Branch name to query
-            state: PR state filter (None = open only, "all" = all states)
-
-        Returns:
-            List of PR response objects (empty list if no PRs found)
-        """
+        """List PRs for a specific branch."""
         logger.bind(
             external="github",
             operation="list_prs_for_branch",

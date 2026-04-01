@@ -1,12 +1,11 @@
 """Usecase helpers for PR ready command orchestration."""
 
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-from vibe3.models.flow import IssueLink
-from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse
-from vibe3.services.label_service import LabelService
-from vibe3.services.pr_service import PRService
+
+if TYPE_CHECKING:
+    from vibe3.services.pr_service import PRService
 
 
 class PrReadyAbortedError(RuntimeError):
@@ -18,49 +17,22 @@ class PrReadyUsecase:
 
     def __init__(
         self,
-        pr_service: PRService,
-        gate_runner: Callable[[int, bool], None],
+        pr_service: "PRService",
         confirmer: Callable[[int], bool] | None = None,
-        label_service: LabelService | None = None,
     ) -> None:
         self.pr_service = pr_service
-        self.gate_runner = gate_runner
         self.confirmer = confirmer
-        self.label_service = label_service or LabelService()
 
     def mark_ready(
         self,
         pr_number: int,
         yes: bool,
     ) -> PRResponse:
-        """Run gates, enforce confirmation, then mark PR ready."""
+        """Enforce confirmation, then mark PR ready."""
         current_pr = self.pr_service.get_pr(pr_number)
         if current_pr is not None and not current_pr.draft:
-            pr = self.pr_service.mark_ready(pr_number)
-            self._sync_merge_ready_label(pr)
-            return pr
+            return self.pr_service.mark_ready(pr_number)
 
-        self.gate_runner(pr_number, yes)
         if not yes and self.confirmer is not None and not self.confirmer(pr_number):
             raise PrReadyAbortedError("aborted by user")
-        pr = self.pr_service.mark_ready(pr_number)
-        self._sync_merge_ready_label(pr)
-        return pr
-
-    def _sync_merge_ready_label(self, pr: PRResponse) -> None:
-        """Sync linked task issue to state/merge-ready after PR becomes ready."""
-        try:
-            links = self.pr_service.store.get_issue_links(pr.head_branch)
-        except Exception:
-            links = []
-
-        task_issue = IssueLink.resolve_task_number(links)
-
-        if task_issue is None:
-            return
-        self.label_service.confirm_issue_state(
-            int(task_issue),
-            IssueState.MERGE_READY,
-            actor="pr:ready",
-            force=True,
-        )
+        return self.pr_service.mark_ready(pr_number)

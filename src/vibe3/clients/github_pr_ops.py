@@ -1,55 +1,20 @@
 """GitHub client PR operations."""
 
-import json
 import subprocess
 from typing import Any, cast
 
 from loguru import logger
 
-from vibe3.exceptions import GitHubError, PRNotFoundError, UserError
-from vibe3.models.pr import CreatePRRequest, PRResponse, PRState, UpdatePRRequest
-
-
-def raise_gh_pr_error(
-    error: subprocess.CalledProcessError,
-    operation: str,
-    user_tips: str | None = None,
-) -> None:
-    """Normalize gh pr command failure into unified error types."""
-    error_msg = (error.stderr or error.stdout or f"Failed to {operation}").strip()
-    lower_msg = error_msg.lower()
-
-    recoverable_patterns = (
-        "already exists",
-        "no commits between",
-        "must push the current branch",
-        "head sha can't be blank",
-        "already ready for review",
-        "is in draft mode",
-        "is not mergeable",
-        "checks are failing",
-        "no pull requests found",
-    )
-    if any(pattern in lower_msg for pattern in recoverable_patterns):
-        tips = f"\nTips:\n{user_tips}" if user_tips else ""
-        raise UserError(f"PR {operation} failed: {error_msg}{tips}") from error
-
-    raise GitHubError(
-        status_code=error.returncode,
-        message=f"gh pr {operation} failed: {error_msg}",
-    ) from error
+from vibe3.clients.github_client_base import raise_gh_pr_error
+from vibe3.exceptions import PRNotFoundError
+from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest
 
 
 class PRMixin:
     """Mixin for PR-related operations."""
 
     def create_pr(self: Any, request: CreatePRRequest) -> PRResponse:
-        """Create a pull request.
-
-        Raises:
-            UserError: User/actionable PR creation failures.
-            GitHubError: Non-recoverable gh/GitHub failures.
-        """
+        """Create a pull request."""
         logger.bind(
             external="github",
             operation="create_pr",
@@ -117,79 +82,6 @@ class PRMixin:
                 )
             )
         return cast(PRResponse, pr)
-
-    def get_pr(
-        self: Any, pr_number: int | None = None, branch: str | None = None
-    ) -> PRResponse | None:
-        """Get PR by number or branch."""
-        logger.bind(
-            external="github",
-            operation="get_pr",
-            pr_number=pr_number,
-            branch=branch,
-        ).debug("Calling GitHub API: get_pull_request")
-
-        target = str(pr_number) if pr_number else branch
-        if not target:
-            # Try current branch
-            result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            target = result.stdout.strip()
-
-        try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "view",
-                    target,
-                    "--json",
-                    "number,title,body,state,headRefName,baseRefName,"
-                    "url,isDraft,createdAt,updatedAt,mergedAt,mergeable,statusCheckRollup",
-                ],
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            logger.bind(external="github", target=target).warning(
-                "GitHub CLI (gh) not found, skipping PR lookup"
-            )
-            return None
-
-        if result.returncode != 0:
-            logger.bind(external="github", target=target).warning("PR not found")
-            return None
-
-        data = json.loads(result.stdout)
-
-        # Determine is_ready: not a draft
-        is_ready = not bool(data.get("isDraft", True))
-
-        # Determine ci_passed: check statusCheckRollup
-        # statusCheckRollup can be null, "SUCCESS", "FAILURE", "PENDING", etc.
-        status_rollup = data.get("statusCheckRollup")
-        ci_passed = status_rollup == "SUCCESS" if status_rollup else False
-
-        return PRResponse(
-            number=int(data["number"]),
-            title=str(data["title"]),
-            body=str(data.get("body", "")),
-            state=PRState(data["state"]),
-            head_branch=str(data["headRefName"]),
-            base_branch=str(data["baseRefName"]),
-            url=str(data["url"]),
-            draft=bool(data.get("isDraft", False)),
-            is_ready=is_ready,
-            ci_passed=ci_passed,
-            created_at=data.get("createdAt"),
-            updated_at=data.get("updatedAt"),
-            merged_at=data.get("mergedAt"),
-            metadata=None,
-        )
 
     def update_pr(self: Any, request: UpdatePRRequest) -> PRResponse:
         """Update a pull request."""

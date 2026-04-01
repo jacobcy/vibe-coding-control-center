@@ -34,7 +34,7 @@
 | GitHub `state/*` labels | 编排状态真源 | 多 agent 协作状态 |
 | GitHub `roadmap/*` labels | 路线图规划真源 | 迭代规划状态 |
 | GitHub `priority/*` labels | 优先级真源 | 紧急度排序 |
-| GitHub `vibe-task` | 关系镜像标签 | 不是真源，是镜像 |
+| GitHub `vibe-task` | 可视化辅助标签 | 辅助 Project 视图识别 Flow 任务 |
 | GitHub Project | UI 展示 | 不是真源 |
 
 ### 2.2 基本原则
@@ -114,26 +114,17 @@
 - 一个 issue 可以同时有 `roadmap/p0` 和 `priority/high`
 - `roadmap/rfc` 表示需要讨论设计，不直接进入开发
 
-### 3.3 关系镜像标签语义
+### 3.3 可视化辅助标签语义
 
 #### `vibe-task`
 
-**语义**: 执行项镜像标签
+**语义**: Roadmap / Flow 可视化辅助
 
-**职责**: 让 GitHub / Project 视角能快速筛出"被纳入 flow 管理的执行 issue"
+**职责**: 让 GitHub Project 视图能通过标签快速识别出“当前正在或曾被纳入 vibe3 flow 管理的任务”。
 
 **映射规则**:
-
-| `issue_role` | `vibe-task` 动作 |
-|--------------|------------------|
-| `task` | 确保存在（幂等 add） |
-| `dependency` | 确保存在（幂等 add） |
-| `related` | 不存在则跳过 |
-
-**重要约束**:
-- `vibe-task` 不能作为 task 真源
-- `vibe-task` 不能反推出 `issue_role`
-- 标签自动化失败时，不能改写本地 role
+- 由 `vibe3` 命令在任务进入 flow 时可选添加。
+- 不再作为自动化同步的硬性指标。
 
 ### 3.4 编排状态标签语义 (state/*)
 
