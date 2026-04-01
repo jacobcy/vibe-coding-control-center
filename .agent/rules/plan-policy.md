@@ -27,9 +27,9 @@
 优先工具见公共规则；规划阶段通常至少会用到：
 - `uv run python src/vibe3/cli.py handoff show`
 - `vibe3 inspect symbols`
-- `vibe3 inspect structure`
+- `vibe3 inspect files`
 - `vibe3 inspect base --json`
-- `mcp__auggie__codebase_retrieval`
+- `mcp_auggie_codebase-retrieval`
 
 ## 任务分型
 
@@ -52,7 +52,13 @@
 - 哪些内容属于运行时 prompt
 - 哪些内容属于静态配置
 - 是否会影响 plan / review / run 的拼接结果和 agent 行为
+- 是否存在规则文档引用了现场并不存在的工具或子命令
 - 哪些执行中发现事项应单独落到 handoff，而不是写进正文输出
+
+如果计划涉及工具选择或分析流程调整，额外要求：
+- 用当前 CLI 实际帮助输出确认 inspect 子命令是否存在
+- 把 `inspect files` 视为单文件结构工具，而不是影响面分析替代品
+- 仅在需要理解命令静态拓扑时才纳入 `inspect commands`
 
 ### 风险较高改动
 

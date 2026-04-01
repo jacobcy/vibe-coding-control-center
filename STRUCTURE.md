@@ -182,9 +182,9 @@ uv run mypy src/vibe3                      # 类型检查
 
 **代码分析**：
 ```bash
-vibe3 inspect symbols <file|file:symbol>  # 符号引用分析
-vibe3 inspect structure <file>             # 文件结构 + 依赖关系
-vibe3 inspect commit <sha>                 # 改动影响范围
+vibe3 inspect symbols <file>:<symbol>     # 符号引用分析
+vibe3 inspect files <file>                # 文件结构 + 依赖关系
+vibe3 inspect commit <sha>                # 改动影响范围
 ```
 
 ### `lib/` - V2 Shell 核心逻辑

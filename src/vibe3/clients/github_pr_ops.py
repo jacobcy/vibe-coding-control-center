@@ -2,7 +2,7 @@
 
 import json
 import subprocess
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from loguru import logger
 
@@ -14,7 +14,7 @@ def raise_gh_pr_error(
     error: subprocess.CalledProcessError,
     operation: str,
     user_tips: str | None = None,
-) -> None:
+) -> NoReturn:
     """Normalize gh pr command failure into unified error types."""
     error_msg = (error.stderr or error.stdout or f"Failed to {operation}").strip()
     lower_msg = error_msg.lower()
@@ -170,7 +170,6 @@ class PRMixin:
         is_ready = not bool(data.get("isDraft", True))
 
         # Determine ci_passed: check statusCheckRollup
-        # statusCheckRollup can be null, "SUCCESS", "FAILURE", "PENDING", etc.
         status_rollup = data.get("statusCheckRollup")
         ci_passed = status_rollup == "SUCCESS" if status_rollup else False
 
@@ -330,7 +329,6 @@ class PRMixin:
         ).debug("Calling GitHub API: list_pr_comments")
 
         try:
-            # First get repo nameWithOwner
             repo_result = subprocess.run(
                 ["gh", "repo", "view", "--json", "nameWithOwner"],
                 capture_output=True,
@@ -339,7 +337,6 @@ class PRMixin:
             )
             repo = json.loads(repo_result.stdout)["nameWithOwner"]
 
-            # Use gh api directly to get full comment objects
             result = subprocess.run(
                 [
                     "gh",
@@ -350,10 +347,17 @@ class PRMixin:
                 text=True,
                 check=True,
             )
-            return cast(list[dict[str, Any]], json.loads(result.stdout))
+            raw_comments = json.loads(result.stdout)
+
+            # Normalize REST fields to project contract
+            normalized = []
+            for c in raw_comments:
+                c["author"] = c.get("user", {})
+                c["createdAt"] = c.get("created_at")
+                normalized.append(c)
+            return cast(list[dict[str, Any]], normalized)
         except subprocess.CalledProcessError as e:
             raise_gh_pr_error(e, "list comments")
-            return []
 
     def create_pr_comment(self: Any, pr_number: int, body: str) -> str:
         """Create a comment on a PR. Returns comment URL."""
@@ -380,7 +384,6 @@ class PRMixin:
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             raise_gh_pr_error(e, "comment")
-            return ""
 
     def update_pr_comment(self: Any, comment_id: str, body: str) -> str:
         """Update an existing PR comment via GitHub API."""
@@ -391,7 +394,6 @@ class PRMixin:
         ).debug("Calling GitHub API: update_pr_comment")
 
         try:
-            # Get repo nameWithOwner
             repo_result = subprocess.run(
                 ["gh", "repo", "view", "--json", "nameWithOwner"],
                 capture_output=True,
@@ -400,7 +402,6 @@ class PRMixin:
             )
             repo = json.loads(repo_result.stdout)["nameWithOwner"]
 
-            # Standard REST path for updating a comment
             result = subprocess.run(
                 [
                     "gh",
@@ -420,7 +421,6 @@ class PRMixin:
             return cast(str, data.get("html_url", comment_id))
         except subprocess.CalledProcessError as e:
             raise_gh_pr_error(e, f"update comment {comment_id}")
-            return ""
 
     def _extract_pr_number(self, pr_url: str) -> int:
         """Extract PR number from URL."""
