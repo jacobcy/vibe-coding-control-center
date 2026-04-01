@@ -52,7 +52,7 @@ uv run python src/vibe3/cli.py check --all
 uv run python src/vibe3/cli.py check --fix
 ```
 
-若要核对 flow/task 状态，可额外读取 `uv run python src/vibe3/cli.py task list` 或 `uv run python src/vibe3/cli.py task show`。
+若要核对当前现场与全局状态，可额外读取 `uv run python src/vibe3/cli.py flow show` 或 `uv run python src/vibe3/cli.py status`。
 
 ## 职责边界
 
@@ -174,6 +174,6 @@ uv run python src/vibe3/cli.py check
 ## 与其他命令的关系
 
 - `uv run python src/vibe3/cli.py check`：审计
-- `uv run python src/vibe3/cli.py task status`：更新 task 状态
+- `uv run python src/vibe3/cli.py flow show` / `uv run python src/vibe3/cli.py status`：读取当前现场与全局状态
 - `/vibe-check`：解释 task-flow 审计并编排修复
 - `/vibe-task`：处理 task 与 registry 审计修复

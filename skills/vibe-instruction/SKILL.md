@@ -30,6 +30,7 @@ vibe-center/
 V2 是基础 Shell 实现，通过 `config/aliases.zsh` 提供常用 alias。
 
 **激活方式**：
+
 ```bash
 source $(vibe alias --load)
 # 或直接 source config/aliases.zsh
@@ -37,10 +38,10 @@ source $(vibe alias --load)
 
 **核心 alias（常用）**：
 
-| alias | 含义 |
-|-------|------|
+| alias            | 含义                                |
+| ---------------- | ----------------------------------- |
 | `wtnew <branch>` | 创建新 worktree（git worktree add） |
-| `vup` | 更新主仓库 + 当前 worktree |
+| `vup`            | 更新主仓库 + 当前 worktree          |
 
 **V2 主命令**：
 
@@ -59,6 +60,7 @@ bin/vibe keys <list|set|get|init>  # 密钥管理
 V3 是主要的 issue → flow → PR 管理工具。
 
 **运行方式**（必须用 uv）：
+
 ```bash
 uv run python src/vibe3/cli.py <command>
 # 或通过 alias: vibe3 <command>
@@ -154,12 +156,12 @@ vibe3 --trace <cmd>   # 任意命令加 --trace 可追踪调用链
 
 ### 各阶段说明
 
-| 阶段 | skill | 职责 |
-|------|-------|------|
-| 开始任务 | `/vibe-new` | 选 issue → 切分支 → 注册 flow → 绑定 issue → 创建 PR draft |
-| 提交代码 | `/vibe-commit` | 整理变更 → 分组 commit → 推送 PR |
-| 整合合并 | `/vibe-integrate` | 检查 CI / review → 解除阻塞 → 合并 PR |
-| 收口归档 | `/vibe-done` | 关闭 issue → 运行 `vibe3 check --all --fix` 同步状态 |
+| 阶段     | skill             | 职责                                                       |
+| -------- | ----------------- | ---------------------------------------------------------- |
+| 开始任务 | `/vibe-new`       | 选 issue → 切分支 → 注册 flow → 绑定 issue → 创建 PR draft |
+| 提交代码 | `/vibe-commit`    | 整理变更 → 分组 commit → 推送 PR                           |
+| 整合合并 | `/vibe-integrate` | 检查 CI / review → 解除阻塞 → 合并 PR                      |
+| 收口归档 | `/vibe-done`      | 关闭 issue → 运行 `vibe3 check --all --fix` 同步状态       |
 
 ### 有依赖时的处理
 
@@ -190,24 +192,26 @@ vibe3 flow update
 vibe3 flow bind 123 --role task
 ```
 
-
 ---
 
 ## 常见场景速查
 
 ### 查看项目进度
+
 ```bash
-vibe3 flow status        # 所有活跃 flow 一览
-vibe3 task show          # 当前任务 + milestone 进度
+vibe3 status             # 活跃 flow + orchestra 总览
+vibe3 flow show          # 当前 flow + task 绑定 + milestone 进度
 ```
 
 ### 调试问题
+
 ```bash
 vibe3 flow show --trace  # 追踪 flow show 调用链
 vibe3 inspect symbols src/vibe3/commands/flow.py  # 查看符号引用
 ```
 
 ### flow 卡住了怎么办
+
 ```bash
 # 如果 flow done 失败，可先切走
 git checkout main
@@ -228,7 +232,6 @@ vibe3 check
 3. **不再需要 flow done**：PR 合并后，`vibe3 check --all --fix` 会自动识别并关闭 flow
 4. **不需要 vibe-new 也可以 commit**：vibe-new 是 agent 流程入口，人工开发随时可以 commit
 5. **--trace 不影响功能**：任何命令加 `--trace` 只增加日志输出，不改变行为
-
 
 ---
 

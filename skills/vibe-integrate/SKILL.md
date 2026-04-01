@@ -100,7 +100,7 @@ uv run python src/vibe3/cli.py flow status
 
 ```bash
 uv run python src/vibe3/cli.py flow list
-uv run python src/vibe3/cli.py task list
+uv run python src/vibe3/cli.py status
 ```
 
 结合 `vibe3 handoff show` 输出，先确认：
@@ -137,18 +137,19 @@ uv run python src/vibe3/cli.py task list
 
 1. **优先：在线 Codex/Copilot review**
 
-    ```bash
-    uv run python src/vibe3/cli.py review pr [pr_number]
-    ```
+   ```bash
+   uv run python src/vibe3/cli.py review pr [pr_number]
+   ```
 
-    - 检查 PR 上是否有 Codex/Copilot 的 review comment
-    - 若无在线 review，在 PR 中添加 `@codex` comment 触发 review
-    - 等待 10 分钟后重新检查
+   - 检查 PR 上是否有 Codex/Copilot 的 review comment
+   - 若无在线 review，在 PR 中添加 `@codex` comment 触发 review
+   - 等待 10 分钟后重新检查
 
 2. **备选：本地 review**
-    ```bash
-    uv run python src/vibe3/cli.py review base
-    ```
+
+   ```bash
+   uv run python src/vibe3/cli.py review base
+   ```
 
    - 在线 review 不可用时使用
    - 将 review 结果回贴到 PR comment

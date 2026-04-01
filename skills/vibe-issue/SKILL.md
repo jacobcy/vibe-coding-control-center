@@ -18,7 +18,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ## 核心原则
 
-- **不重造轮子**：直接调用 `gh` CLI 和 `uv run python src/vibe3/cli.py task` 命令。
+- **不重造轮子**：直接调用 `gh` CLI 和 `uv run python src/vibe3/cli.py flow/status` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe3` 输出，再做编排判断。
 - **只做 intake，不做排期**：Issue 创建后是否进入规划、何时进入版本窗口，由 `vibe-roadmap` 决定。
@@ -43,7 +43,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 ### Step 3: 上下文检查
 
-- 必须先运行 `uv run python src/vibe3/cli.py task list` 检查是否已有相关的 task。
+- 必须先运行 `uv run python src/vibe3/cli.py status` 检查是否已有相关的活跃 flow / task 绑定。
 - 如果 Issue 标题与某个 Task 匹配，只记录上下文供后续参考。
 - task 只解释为执行记录，不把 issue 直接当作本地 task，也不在这里决定排期。
 
@@ -73,7 +73,7 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ## 对象边界
 
 - `repo issue`: 需求来源与讨论入口
-- `task`: 执行记录，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task` 管理
+- `task`: 执行记录语义，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py flow show`、`status` 等命令观察
 - `flow`: execution record 的运行时现场，通过 `uv run python src/vibe3/cli.py flow` 管理
 
 ## Failure Handling

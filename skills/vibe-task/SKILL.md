@@ -3,13 +3,13 @@ name: vibe-task
 description: Use when the user wants a cross-worktree flow/task overview, asks which existing flow or task context to resume next in the current repo, wants to inspect task registry health, needs flow/task status check and repair, or mentions "/vibe-task". Do not use for project-level roadmap prioritization or task-flow runtime repair.
 ---
 
-# /vibe-task - Cross-Worktree Task Overview & Task Audit
+# /vibe-task - Cross-Worktree Flow Overview & Task Audit
 
 查看当前仓库下各个 worktree 当前承载的 `flow / task` 现场总览，并给出下一步优先回到哪个 flow / task 现场的建议。同时也支持核对 task 注册完整性，以及修复相关数据质量问题。
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
-`vibe-task` 是 task-centered audit，不处理 runtime / recovery audit。
+`vibe-task` 处理以 task 为桥接语义的 flow 总览与 task 数据审计，不处理 runtime / recovery audit。
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
@@ -56,14 +56,14 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 **通用原则:**
 
-- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py task` 命令获取数据
+- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py status` / `flow show` 命令获取数据
 - Audit 模式必须通过 `uv run python src/vibe3/cli.py check` 命令进行核对和修复
 - 不得直接读取或修改 `registry.json`
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
 **Task Overview 模式:**
 
-- 必须先运行 `uv run python src/vibe3/cli.py task list`
+- 必须先运行 `uv run python src/vibe3/cli.py status`
 - 不得补充 CLI 未提供的字段
 - 不得补充 CLI 未提供的字段
 
@@ -92,14 +92,14 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 ### Step 1: 运行 CLI
 
 ```bash
-uv run python src/vibe3/cli.py task list
+uv run python src/vibe3/cli.py status
 uv run python src/vibe3/cli.py flow show
 ```
 
 目标：
 
-- 获取当前所有 worktree 的任务总览
-- 包含 Registry 任务信息
+- 获取当前所有活跃 flow 的总览
+- 必要时补当前 flow 的 task 绑定详情
 
 ### Step 2: 解析 CLI 输出
 
@@ -108,11 +108,10 @@ uv run python src/vibe3/cli.py flow show
 - worktree 名称
 - 路径
 - branch
-- state
-- current task
-- title
-- status
-- current subtask
+- flow state
+- current task issue
+- issue title
+- PR / worktree 状态
 - next step
 
 不得补充 CLI 未提供的字段。

@@ -23,7 +23,7 @@ related_docs:
 
 # 共享状态命令标准 (v3 Python 版)
 
-本文档是 Vibe 3.0 共享状态命令的唯一规范真源，定义 `vibe3 roadmap`、`vibe3 task`、`vibe3 flow`、`vibe3 check` 的最终命令模型。
+本文档是 Vibe 3.0 共享状态命令的唯一规范真源，定义 `vibe3 flow`、`vibe3 check`、`vibe3 status` 的最终命令模型，并约束 `roadmap` / `task` 作为概念层的使用边界。
 
 本文档只定义最终标准，不记录历史演进、迁移步骤、现状偏差或实现映射。
 
@@ -32,6 +32,12 @@ related_docs:
 `vibe3` CLI 的顶层定位是 capability layer，不是 workflow engine。
 
 在共享状态命令域中，CLI 只负责暴露原子、可组合、可验证的方法，并隔离 skill 与共享状态真源。
+
+补充原则：
+
+- 读优先：先确认现场，再决定是否需要任何写操作
+- 远端真源不落地：除本地运行时绑定外，不长期持久化 GitHub / GitHub Project 远端字段
+- 原生命令优先：若 git / gh 已能稳定表达该动作，不新增平行包装命令
 
 完整的 CLI 设计原则、职责边界与审查清单，见：
 
@@ -47,32 +53,37 @@ related_docs:
 
 ## 1. Scope
 
-本文档只覆盖四个共享状态命令域：
+本文档只覆盖两个共享状态命令域和一个统一总览入口：
 
-- `vibe3 roadmap`
-- `vibe3 task`
 - `vibe3 flow`
 - `vibe3 check`
+- `vibe3 status`
+
+`roadmap` 与 `task` 仍是正式概念，但不再默认对应独立公共顶层命令面。
 
 其他顶层命令不在本文档范围内。
 
 ## 1.1 Data Model Dependency
 
-四个命令域必须建立在共享状态数据库标准之上：
+两个命令域和统一总览入口必须建立在共享状态数据库标准之上：
 
-- `vibe3 roadmap` 以 SQLite `flow_state` 表中的 GitHub Project 关联字段为规划态真源
-- `vibe3 task` 以 SQLite `flow_issue_links` 表为 issue 关联真源，以 GitHub Project 为外部状态真源
 - `vibe3 flow` 以 branch 作为开放现场锚点，以 SQLite `flow_state` 表为核心真源
 - `vibe3 check` 以各层真源文件为审计对象，不自建独立业务真源
+- `vibe3 status` 聚合 orchestra 快照与 flow 视图，不新增独立业务真源
 
-**v3 架构核心**: 
+补充说明：
+
+- `task` 执行桥接语义以 SQLite `flow_issue_links` 表为 issue 关联真源，由 `flow bind`、`flow show`、`flow status`、`status` 暴露
+
+**v3 架构核心**:
 - SQLite 是本地缓存，GitHub 是真源
 - `branch` 是 PRIMARY KEY，`flow_slug` 是显示名称
 - 所有命令按 `branch` 查询，不支持按 `flow_slug` 查询
+- 本地只保留运行时必须的绑定事实，不持久化远端展示字段
 
 补充约束：
 
-- GitHub Project 当前只按规划层事实的 mirror / cache / projection / backup 理解，不承担 execution gate
+- GitHub Project 当前只按规划层事实的即时读取 / 投影视图理解，不承担 execution gate
 - SQLite 数据可以从 GitHub 重建，本地只保留运行时必要的状态
 
 命令标准不得覆盖或重述数据库级 schema；表字段以对应数据模型标准为准。
@@ -96,9 +107,8 @@ related_docs:
 
 结论：
 
-- `roadmap add` = 新增规划项
-- `task add` = 新增执行任务
 - `flow new` = 创建现场
+- 规划层新增 / 分类 / 标注优先使用 `gh` / GitHub 原生命令
 
 ### 2.3 Output Rules
 
@@ -128,20 +138,22 @@ related_docs:
 
 ## 3. Layer Mapping
 
-四个命令域的职责固定如下：
+两个命令域、一个总览入口与两个概念层的职责固定如下：
 
-- `vibe3 roadmap` = 规划层
-- `vibe3 task` = 执行层
 - `vibe3 flow` = 现场层
 - `vibe3 check` = 审计胶水层
+- `vibe3 status` = 总览层
+- `roadmap` = 规划层（优先使用 GitHub / gh 原生命令和 skill 编排）
+- `task` = 内部 execution bridge 语义
 
 禁止：
 
-- 用 `roadmap` 承担执行层职责
-- 用 `task` 承担规划层职责
+- 用 `roadmap` 承担执行层职责或重新膨胀出独立公共写命令面
+- 用 `task` 承担规划层职责或重新膨胀成独立公共 CLI
 - 用 `flow` 承担 task 生命周期或规划职责
 - 用 `check` 承担业务写入职责
 - 用 CLI 替 skill 承担工作流编排职责
+- 对 git / gh 已能稳定完成的远端写操作再包装一层自定义命令
 
 ## 3.1 Core Semantics
 
@@ -168,11 +180,11 @@ related_docs:
 - slash / workflow 只能调度这些对象，不得重新发明对象层级
 - GitHub 官方字段与 Vibe 扩展字段可以同时同步，但语义层级必须分离
 
-## 4. `vibe3 roadmap` Standard
+## 4. `roadmap` Planning Surface Standard
 
 ### 4.1 Responsibility
 
-`vibe3 roadmap` 只负责：
+`roadmap` 规划层只负责：
 
 - 管 roadmap item
 - 管规划优先级
@@ -181,68 +193,49 @@ related_docs:
 
 ### 4.2 Boundaries
 
-`vibe3 roadmap` 不负责：
+规划层不负责：
 
 - task 生命周期
 - worktree 与 branch 现场
 - PR 发布与归档
 - 当前版本号真源
+- 在本地长期存储远端 issue / project 展示字段
+- 为 GitHub / GitHub Project 写操作新增一套平行于 `gh` 的包装命令
 
-### 4.3 Standard Subcommands
+### 4.3 Preferred Surface
 
-- `status`
-- `list`
-- `show <roadmap-item-id>`
-- `add <title>`
-- `init [--force]`
-- `sync`
-- `assign <text>`
-- `classify <roadmap-item-id> --status <status>`
-- `audit`
-- `version <set-goal|clear-goal>`
+当前推荐调用面：
+
+- 远端规划读取：`gh issue list`、`gh issue view`、`gh project` 相关原生命令
+- 本地现场确认：`vibe3 status`、`vibe3 flow show`
+- 规划决策编排：skill / workflow
+
+新增公共 `roadmap` 写命令前，必须先证明：
+
+- `gh` / GitHub 原生命令无法稳定完成该动作
+- 该动作同时需要维护本地最小绑定真源
+- 不是单纯的便利包装
 
 ### 4.4 Query Rules
 
-- `status` 用于规划层概览
-- `list` 用于列出 roadmap item / mirrored GitHub Project item
-- `show` 用于查看单个规划项详情
-- 查询类子命令支持 `--json`
-
-`list` 支持：
-
-- `--status <p0|current|next|deferred|rejected>`
-- `--source <github|local>`
-- `--keywords <text>`
-- `--linked`
-- `--unlinked`
+- 规划层查询优先走 GitHub / `gh` 原生命令
+- 如需结合当前执行现场，使用 `vibe3 status`、`vibe3 flow show` 做本地补充确认
+- 查询类能力应以只读为默认，不因查询而回填本地缓存
 
 ### 4.5 Write Rules
 
-以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
+规划层写操作默认优先使用 `gh` / GitHub 原生命令直接完成，例如：
 
-- `add`
-- `sync`
-- `assign`
-- `classify`
-- `version set-goal`
-- `version clear-goal`
+- label 调整
+- milestone 调整
+- project item 字段修改
 
 写入边界：
 
-- `add` 新增的是 roadmap item，而不是 task / flow
-- `add` 必须先创建远端 GitHub Project item，再回填本地 SQLite
-- `init` 只创建共享真源骨架：`flow_state` 表、`flow_issue_links` 表以及必要目录
-- `init --force` 可以强制重建共享真源骨架，但只重建本地 SQLite 表
-- `sync` 只同步 GitHub Project 规划层事实，不自动创建 execution record
-- `sync` 不对全部 `repo issue` 做自动 intake；不是所有 `repo issue` 都自动进入 GitHub Project
-- `assign` / `classify` 只能修改 roadmap item 的规划层字段与关联
-- `sync` 不同步 `task` / `flow` / execution bridge 等本地执行字段
-- `sync` 不能改写 `content_type` 这类 GitHub 官方身份语义
-- `init` 不自动执行 `vibe3 roadmap sync`
-- `init` 不负责 task 历史恢复；task registry / task data 的人工补录是后续独立动作
-- CLI 不负责智能 intake gate；`repo issue` 是否纳入 roadmap item，属于上层 skill / workflow 的 triage 判断
-- `repo issue` 真源仍在 GitHub；规划层只消费 `repo issue intake 视图`，不维护本地长期 issue registry / cache
-- intake 视图应优先基于运行时查询与 roadmap mirror 对比；如需留痕，应保存 triage 决策快照而不是 issue 整池真源
+- 本地 CLI 不为这些远端写操作新增平行包装，除非存在明确缺口
+- skill 可以编排 `gh` 写操作，但不应把远端字段回填成长期本地缓存
+- 若动作本质上只是 git / gh 已有能力，优先直接使用原生命令
+- 本地持久化只允许保留最小运行时绑定事实，不为规划层写路径扩张真源
 
 ### 4.6 Status and Provider Rules
 
@@ -264,17 +257,13 @@ related_docs:
 provider 只允许：
 
 - `github`
-- `local`
 
 补充约束：
 
-- `sync` 的目标语义是对齐 local roadmap items 与 GitHub Project items
-- `roadmap sync` 只负责规划层 mirror 同步，不负责 execution record 注册或 task 拆分
-- shared-state 恢复路径固定为：先 `vibe3 roadmap init --force`，再按需执行 `vibe3 roadmap sync`
 - `feature` / `task` / `bug` 只作为 roadmap item 的 `type`
 - 若 roadmap item `type=feature`，应保持 `1 feature = 1 branch = 1 PR`
 - `milestone` 是规划窗口锚点，不是 flow 切换开关
-- `roadmap sync` 默认从当前 git 环境推导 repo，并从 GitHub Project 配置确定目标 project
+- roadmap 相关远端事实默认按需读取，不要求先做本地 mirror/sync
 - roadmap item 上的 `spec_standard` / `execution_record_id` / `spec_ref` / `linked_task_ids` 属于本地执行桥接字段，不写回 GitHub Project
 
 ### 4.7 Prohibited Semantics
@@ -283,8 +272,8 @@ provider 只允许：
 
 - 将 `openspec` 作为 roadmap provider
 - 将 roadmap item 直接当作 task 使用
-- 通过 `roadmap` 命令隐式创建 flow
-- 通过 `roadmap sync` 自动决定 task 拆分
+- 通过规划层命令隐式创建 flow
+- 通过本地 sync/mirror 自动决定 task 拆分
 - 持久化 `current_version`
 - 持久化 `branch` 作为历史索引
 - 持久化 `worktree` 作为历史索引
@@ -294,21 +283,21 @@ provider 只允许：
 - 将 `version complete`
   当作版本真源管理动作
 
-## 5. `vibe3 task` Standard
+## 5. `task` Execution Bridge Semantics
 
-### 5.1 Responsibility
+### 5.1 Positioning
 
-`vibe3 task` 只负责：
+`task` 仍然是执行层术语，但当前标准不再保留独立公共 `vibe3 task` 顶层命令。
 
-- 管 execution record 生命周期
-- 管 task 与 roadmap item / `repo issue` / pr 的关联
-- 管 task 的主闭环 issue 选择
-- 管 task 归档事实
-- 管 task 当前 runtime 绑定事实
+当前公共调用面统一收敛为：
+
+- `vibe3 flow bind <issue> --role task|related|dependency`：写入 task 绑定关系
+- `vibe3 flow show [--branch <branch>]`：查看当前 flow 绑定的 task issue、相关 issue、milestone 与执行上下文
+- `vibe3 flow status` / `vibe3 status`：查看总览，替代旧的 task list 视角
 
 ### 5.2 Boundaries
 
-`vibe3 task` 不负责：
+`task` 语义仍然不负责：
 
 - roadmap 排布
 - 规划优先级
@@ -317,123 +306,9 @@ provider 只允许：
 
 补充约束：
 
-- `task audit` 的目标语义是 execution record 审计 / 修复
-- `task audit` 可以核对 OpenSpec / plans / 分支证据，但不替 `roadmap sync` 承担规划层镜像同步
-- OpenSpec change / plan 文档只作为 execution spec 来源桥接，不自动变成 roadmap item
-
-### 5.3 Standard Subcommands
-
-- `list`
-- `show <task-id>`
-- `add <title>`
-- `update <task-id>`
-- `remove <task-id>`
-- `audit`
-- `link <issue>` (为当前 flow 添加 related/dependency issue)
-
-### 5.4 Query Rules
-
-- `list` 用于任务总览
-- `show` 用于查看单个 execution record 详情
-- 查询类子命令支持 `--json`
-
-`list` 支持：
-
-- `--status <todo|in_progress|blocked|completed|archived>`
-- `--source <issue|local|openspec>`
-- `--keywords <text>`
-- `--issue <issue>` (按 task issue 反查 flow)
-
-### 5.5 Write Rules
-
-以下子命令属于写操作，必须要求 `-y` 或 `--yes`：
-
-- `add`
-- `update`
-- `remove`
-
-`update` 只允许修改执行层事实，例如：
-
-- `--status`
-- `--next-step`
-- `--roadmap-item`
-- `--issue-ref`
-- `--primary-issue-ref`
-- `--pr`
-- `--bind-current`
-- `--unbind`
-
-`task add/update` 可以写入的桥接关系仅限：
-
-- `roadmap_item_ids`
-- `issue_refs`
-- `primary_issue_ref`
-- `pr_ref`
-- `spec_standard`
-- `spec_ref`
-- runtime 绑定事实
-
-补充约束：
-
-- `primary_issue_ref` 若存在，必须同时出现在 `issue_refs` 中
-- `primary_issue_ref` 只表达 task 的主闭环 issue，也就是 `task issue` 的显式落点
-- `task add/update` 不得把 `task issue` 扩展成新的平行实体类型
-
-`task add/update` 不得承担：
-
-- 创建 GitHub Project item
-- 决定 roadmap item `type`
-- 变更 milestone 或规划窗口
-- 改写 GitHub Project item 的官方来源类型
-
-### 5.6 Status and Source Rules
-
-执行层状态只允许：
-
-- `todo`
-- `in_progress`
-- `blocked`
-- `completed`
-- `archived`
-
-来源只允许：
-
-- `issue`
-- `local`
-- `openspec`
-
-其中：
-
-- `issue` source 表示该 execution record 来源于 `repo issue`
-- `local` 不得被解释为 roadmap item 的替代物
-- `openspec` 表示执行输入来源，不表示规划层 provider
-
-`spec_standard` 只允许：
-
-- `openspec`
-- `kiro`
-- `superpowers`
-- `supervisor`
-- `none`
-
-### 5.7 Runtime Binding Rules
-
-- task 可以记录当前绑定的 `branch`、`worktree`、`agent`
-- 这些字段只表示当前 runtime 绑定
-- task 完成后必须清空 runtime 绑定
-- task 归档后必须清空 runtime 绑定
-
-### 5.8 Prohibited Semantics
-
-禁止：
-
-- 使用 `in-progress`
-- 使用 `done`
-- 使用 `merged`
-- 使用 `skipped`
-- 用 `task` 承担 roadmap 规划职责
-- 将 roadmap item `type=task` 直接等同于本地 `task`
-- 用 `branch` 或 `worktree` 作为 task 历史索引
+- `task` 是 execution bridge，不是独立规划对象
+- `task issue` 仍表示当前 flow 的主闭环 issue 角色
+- 旧文档中的 `task show` / `task list` / `task status` 视为历史调用面，不再作为现行标准
 
 ## 6. `vibe3 flow` Standard
 
@@ -461,6 +336,7 @@ provider 只允许：
 - 跨 worktree 的分支同步编排
 - 将命名输入当作共享模型字段
 - 并行 worktree 的物理创建与目录进入编排
+- 对 git / gh 已能稳定完成的远端写操作做平行包装
 
 ### 6.3 Standard Subcommands
 
@@ -510,6 +386,11 @@ provider 只允许：
 - `done`
 - `blocked`
 - `aborted`
+
+补充约束：
+
+- `flow` 写操作只应覆盖本地 runtime scene 与最小绑定事实
+- 若动作本质是远端 git / gh 写操作，且不涉及本地绑定真源维护，应优先直接使用原生命令
 
 ### 6.6 Naming Rules
 

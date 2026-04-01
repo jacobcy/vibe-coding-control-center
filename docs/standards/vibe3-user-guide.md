@@ -664,26 +664,25 @@ vibe3 pr ready 123 --yes
 
 ## 命令语义说明
 
-### flow show vs task show
+### flow show vs status
 
-两个命令都显示 flow 信息，但视角不同：
+当前公共 CLI 已收敛为 `flow show` + `status`：`task` 仍是内部桥接概念，但不再作为独立顶层命令面。
 
 | 命令 | 视角 | 用户 | 数据源 | 核心关注点 |
 |------|------|------|--------|-----------|
-| `flow show` | 执行现场管理 | 开发者 | SQLite + GitHub Issues/PRs | 开发流程状态、文档引用、阻塞关系 |
-| `task show` | GitHub Project 管理 | 管理者 | SQLite + GitHub Project | Project 字段、绑定状态、数据一致性 |
+| `flow show` | 当前执行现场 | 开发者 | SQLite + GitHub Issues/PRs | 当前 flow、task 绑定、milestone、PR、阻塞关系 |
+| `status` | 全局总览 | 开发者 / 管理者 | Orchestra + SQLite + GitHub | 活跃 flow、issue 进度、worktree、orchestra 状态 |
 
-**flow show 独有功能**：
+**flow show**：
+- 显示 task issue、related/dependency issues
 - 显示 issue titles（从 GitHub Issues API）
 - 显示 PR 信息（从 GitHub PRs API）
-- 显示 plan/execute/review actors 和 refs
-- 支持 optional branch 参数（默认当前分支）
+- 显示 milestone、plan/execute/review refs
 
-**task show 独有功能**：
-- 显示 Project Item 绑定状态（bound/unbound）
-- 显示 Project 字段（Status, Priority, Assignees）
-- 检查 identity_drift（本地与远端一致性）
-- 显示 offline_mode 标识
+**status**：
+- 显示所有活跃 flow 与 task 绑定概览
+- 显示 orchestra issue 视图
+- 替代旧的 `task list` 总览入口
 
 ### 命令参数说明
 
@@ -692,12 +691,12 @@ vibe3 pr ready 123 --yes
 - `flow create <name> [--task <issue>] [--spec <spec-ref>] [--base <ref>]` — 创建分支并注册 flow
 - `flow show [branch]` — 参数是 branch name（可选，默认当前分支）
 - `flow bind <issue> [--role <role>] [--branch <branch>]` — 绑定 issue 到 flow（可选 branch，默认当前）
-- `task show <branch>` — 参数是 branch name（必需）
+- `status` — 显示当前仓库的全局 flow / orchestra 总览
 
 **重要**：
 - Task 不是独立实体，是 flow 的属性（有 task_issue_number 的 flow）
-- `vibe3 task show` 中的参数是 `branch name`，必须提供
-- 没有独立的 "task name"，只有关联的 issue number
+- 没有独立的 "task name"，只有关联的 issue number 和当前 flow 绑定关系
+- 当前查看 task 绑定与 milestone，请使用 `vibe3 flow show`
 
 ### flow bind 统一入口
 
@@ -725,14 +724,13 @@ vibe3 flow show
 **场景 2：管理者查看项目状态**
 
 ```bash
-vibe3 task show task/my-feature
-# 显示：Project 状态是什么（Status: In Progress）
-#        优先级（Priority: P1）
-#        谁负责（Assignees）
-#        绑定是否正常（bound/unbound）
+vibe3 status
+# 显示：有哪些活跃 flow
+#        每个 flow 绑定了哪个 task issue
+#        orchestra 当前跟踪的 issue 状态
 ```
 
-**推荐**：`task show` ✅
+**推荐**：`status` ✅
 
 ---
 
@@ -771,7 +769,7 @@ vibe3 flow bind 218 --role dependency
 
 ## 离线降级
 
-当 GitHub API 不可用时，`task show` 自动降级为 offline mode，只显示本地 bridge 字段：
+当 GitHub API 不可用时，`flow show` 仍会保留本地 bridge 字段，并对远端信息缺失做降级提示：
 
 ```
 Branch: task/reports-unified-storage
@@ -797,8 +795,8 @@ vibe3 flow list
 # 2. 确认 task / related / dependency 关系都已写入
 vibe3 flow show [<branch>]
 
-# 3. 确认 GitHub Project item 已绑定，远端字段可读
-vibe3 task show <branch>
+# 3. 确认当前 flow 已绑定 task，并读取 milestone / 远端字段
+vibe3 flow show --branch <branch>
 ```
 
 ### Flow 生命周期示例
@@ -866,22 +864,22 @@ gh project item-add 17 --owner jacobcy \
 
 原因：标准流程已收敛为 flow 驱动，远端状态应由 flow 生命周期自动联动。
 
-**Q: `task show` 显示 `[unbound]`**
+**Q: 为什么没有独立的 `task show`**
 
-原因：当前 branch 的 flow 未绑定 GitHub Project item。
+原因：标准流程已经收敛到 `flow show`（当前现场）和 `status`（全局总览）。`task` 继续保留为执行桥接概念，但不再保留独立公共顶层命令面。
+
+**Q: `flow show` 没看到远端信息**
+
+原因：当前 branch 的 flow 可能未绑定 task issue，或远端 API 暂时不可用。
 
 解决：
 ```bash
 vibe3 flow bind <task_issue_number> --role task
 ```
 
-**Q: flow show 和 task show 有什么区别**
+**Q: flow show 和 status 有什么区别**
 
-- `flow show`：执行现场视角，显示开发流程状态（plan/execute/review）、issue titles、PR 信息、阻塞关系
-- `task show`：项目管理视角，显示 GitHub Project 字段（Status/Priority/Assignees）、绑定状态、数据一致性
+- `flow show`：单个 flow 的执行现场，适合看当前任务、milestone、依赖、PR
+- `status`：全局总览，适合看所有活跃 flow 和 orchestra 跟踪状态
 
 详见"命令语义说明"章节。
-
-**Q: 为什么 `vibe3 task show task/temp` 中的参数叫 task/temp**
-
-参数实际是 `branch name`，不是 task 标识。Task 不是独立实体，是 flow 的属性（有 task_issue_number 的 flow）。没有独立的 "task name"，只有关联的 issue number。

@@ -59,7 +59,7 @@ uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
 
 ```bash
 uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py task list
+uv run python src/vibe3/cli.py status
 uv run python src/vibe3/cli.py handoff show
 ```
 

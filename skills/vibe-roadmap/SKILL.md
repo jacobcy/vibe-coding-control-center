@@ -7,14 +7,15 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护全景路线图，管理版本目标，对 task item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；`uv run python src/vibe3/cli.py task` 负责 shell 层读写数据。
+**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；shell 层通过 `uv run python src/vibe3/cli.py status`、`flow show`、`flow bind` 等命令暴露共享事实。
 
 **新增核心原则:** 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储，遵循 GitHub-as-truth 原则。
 
 **核心职责:**
+
 - 脏数据的清洗和标准化
 - 第一层审查：判断 issue 是否有效、是否需要关闭
-- 将有效 issue 转化为 vibe-task
+- 为有效 issue 做规划层 label / milestone 决策
 - 管理版本目标和优先级
 
 intake gate 约束：
@@ -23,7 +24,7 @@ intake gate 约束：
 - 只有经过 `vibe-roadmap` triage 的候选 `repo issue`，才应纳入 task item / GitHub Project。
 - shell 层不负责智能 intake gate；是否纳入 Project 属于 skill / workflow 的规划判断。
 - `vibe-roadmap` 消费的是 `repo issue intake 视图`，而不是本地长期 issue cache / registry。
-- intake 视图应来自运行时查询与 task 列表对比。
+- intake 视图应来自运行时查询与 flow/status 总览对比。
 - 若未来需要留痕，优先保存 triage 决策快照，而不是复制 issue 整池真源。
 
 对象约束：
@@ -38,7 +39,7 @@ intake gate 约束：
 
 **Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
 
-**命令自检:** 对 `uv run python src/vibe3/cli.py task` 的参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
+**命令自检:** 对 `uv run python src/vibe3/cli.py status`、`flow show`、`flow bind` 等参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
 
 ## Trigger Examples
 
@@ -56,9 +57,10 @@ intake gate 约束：
 ## Hard Boundary
 
 - 只负责规划层调度，不负责 `repo issue` 创建、task registry 修复或 runtime 修复
-- 必须先运行 `uv run python src/vibe3/cli.py task` 相关 shell 命令
+- 必须先运行 `uv run python src/vibe3/cli.py status` / `flow show` 等 shell 命令
 - 不得直接修改 `registry.json` 底层数据
-- 必须通过 Shell API 写入数据
+- 远端写操作优先通过 `gh` / GitHub 原生命令完成
+- 只有涉及本地 flow 绑定时才使用 `vibe3 flow bind`
 - 调度器无法判断优先级时，必须要求人类讨论
 - 若涉及主 issue / sub-issue，只承接 skill/workflow 已做出的范围判断，不在 shell 层发明 parent/sub-issue 运行时逻辑
 - 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储
@@ -76,24 +78,24 @@ intake gate 约束：
 
 根据 `docs/standards/github-labels-reference.md`，roadmap 管理主要使用以下标签：
 
-#### Priority 标签 (priority/*)
+#### Priority 标签 (priority/\*)
 
-| 标签名称 | 描述 | 使用场景 |
-|---------|------|----------|
-| `priority/high` | 高优先级 | 核心功能、关键 bug 修复 |
-| `priority/medium` | 中优先级 | 重要但非紧急的功能 |
-| `priority/low` | 低优先级 | 优化、改进等非关键任务 |
+| 标签名称          | 描述     | 使用场景                |
+| ----------------- | -------- | ----------------------- |
+| `priority/high`   | 高优先级 | 核心功能、关键 bug 修复 |
+| `priority/medium` | 中优先级 | 重要但非紧急的功能      |
+| `priority/low`    | 低优先级 | 优化、改进等非关键任务  |
 
-#### Roadmap 状态标签 (roadmap/*)
+#### Roadmap 状态标签 (roadmap/\*)
 
-| 标签名称 | 描述 | 使用场景 |
-|---------|------|----------|
-| `roadmap/p0` | 当前迭代必须完成 | 阻断性问题 |
-| `roadmap/p1` | 下个迭代优先完成 | 重要功能 |
-| `roadmap/p2` | 有容量时完成 | 一般功能 |
-| `roadmap/next` | 下个迭代规划中 | 待确认的功能 |
-| `roadmap/future` | 未来考虑 | 长期规划 |
-| `roadmap/rfc` | RFC/设计阶段 | 需要讨论设计的功能 |
+| 标签名称         | 描述             | 使用场景           |
+| ---------------- | ---------------- | ------------------ |
+| `roadmap/p0`     | 当前迭代必须完成 | 阻断性问题         |
+| `roadmap/p1`     | 下个迭代优先完成 | 重要功能           |
+| `roadmap/p2`     | 有容量时完成     | 一般功能           |
+| `roadmap/next`   | 下个迭代规划中   | 待确认的功能       |
+| `roadmap/future` | 未来考虑         | 长期规划           |
+| `roadmap/rfc`    | RFC/设计阶段     | 需要讨论设计的功能 |
 
 ### Milestone 管理
 
@@ -108,11 +110,11 @@ intake gate 约束：
 先运行获取当前版本目标状态；必要时再补充文本输出：
 
 ```bash
-# 列出所有 task
-uv run python src/vibe3/cli.py task list
+# 查看当前 flow / issue 总览
+uv run python src/vibe3/cli.py status
 
-# 显示指定分支的 task 详情（可选，<branch> 为分支名）
-uv run python src/vibe3/cli.py task show <branch>
+# 显示指定分支的 flow 详情（可选，<branch> 为分支名）
+uv run python src/vibe3/cli.py flow show --branch <branch>
 
 # 查看开放的 issues
 gh issue list
@@ -125,8 +127,8 @@ gh issue list -l "roadmap/p0"
 获取：
 
 - 当前版本目标是什么
-- 有哪些 `repo issue` / task item 等待分类
-- 各个分类下有多少 task item
+- 有哪些 `repo issue` 等待分类
+- 各个分类下有多少候选 issue
 - 现有 issues 的优先级和状态
 
 ### Step 2: 调度决策
@@ -141,7 +143,7 @@ gh issue list -l "roadmap/p0"
 
 **场景 B: 有版本目标但有新 `repo issue`**
 
-- 对新的 `repo issue` / task item 进行分类：
+- 对新的 `repo issue` 进行分类：
   1. 添加 priority 标签（`priority/high`、`priority/medium`、`priority/low`）
   2. 添加 roadmap 状态标签（`roadmap/p0`、`roadmap/p1`、`roadmap/p2` 等）
   3. 分配适当的 Milestone
@@ -204,16 +206,19 @@ gh issue edit <issue_number> --add-label "priority/high" --add-label "roadmap/p0
 
 - 检查是否有版本目标
 - 无目标 → 要求人类讨论确定
-- 有目标 → 提示当前规划窗口有哪些 task item 可供继续拆成 task
+- 有目标 → 提示当前规划窗口有哪些候选 issue 可继续进入执行现场
 - 是否拆 task、拆几个、绑定到哪个 flow，由上层 skill / agent 决定
 
-### Step 6: 同步到 GitHub Project
+### Step 6: 落地规划结果
 
-如需将 issue 绑定到 flow：
+规划层远端写操作优先直接使用 GitHub / `gh`：
 
 ```bash
-uv run python src/vibe3/cli.py flow bind <issue_number>
+gh issue edit <issue_number> --add-label "roadmap/p0"
+gh issue edit <issue_number> --milestone "Phase 1: 基础设施"
 ```
+
+如需把某个 issue 进入当前执行现场，再交给 `vibe-new` / `vibe3 flow bind` 处理本地绑定。
 
 ## Label 触发机制
 
@@ -235,7 +240,7 @@ Agent 应通过以下方式使用标签触发机制：
 
 ## Milestone 显示
 
-`vibe3 task show` 命令会显示 issue 关联的 Milestone 信息：
+`vibe3 flow show` 命令会显示当前 flow 绑定 issue 的 Milestone 信息：
 
 - 从 GitHub API 获取 Milestone 数据
 - 显示 Milestone 标题、进度和相关 issues

@@ -318,8 +318,8 @@ gh issue list --milestone "Phase 1: 基础设施"
 # 查看特定 milestone 的 issues
 gh issue list --milestone "Phase 1: 基础设施"
 
-# 查看 task show 中的 milestone 信息
-uv run python src/vibe3/cli.py task show <branch>
+# 查看当前 flow 中的 milestone 信息
+uv run python src/vibe3/cli.py flow show --branch <branch>
 ```
 
 ---

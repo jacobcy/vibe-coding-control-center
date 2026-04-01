@@ -25,7 +25,7 @@ description: Use when the user wants to save session context, says /vibe-save, o
 ## Command Boundary
 
 - `/vibe-save` 负责判断这次会话哪些内容值得保留。
-- `uv run python src/vibe3/cli.py task status` 之类的 Shell 命令只用于同步共享真源中的最小必要事实。
+- `uv run python src/vibe3/cli.py flow bind`、`handoff append` 之类的 Shell 命令只用于同步共享真源中的最小必要事实。
 - `git` / `gh` 可以用于读取当前 branch、dirty、PR 等现场事实。
 - 不得直接编辑 `.git/vibe/*.json`。
 - 不得假设 `.agent/governance.yaml` 中的 hook 已经自动执行。
@@ -64,7 +64,7 @@ description: Use when the user wants to save session context, says /vibe-save, o
 
 ```bash
 uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py task list
+uv run python src/vibe3/cli.py status
 ```
 
 ### Step 2: 写入 handoff

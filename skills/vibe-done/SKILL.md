@@ -38,8 +38,8 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
   │   ├─ uv run python src/vibe3/cli.py flow show
   │   └─ 确认 flow、branch、task、issue、pr
   │
-  ├─ Step 2: 更新 task 状态
-  │   └─ uv run python src/vibe3/cli.py task status "Done"
+  ├─ Step 2: 确认 task 收口事实
+  │   └─ 不再调用独立 task status；以 flow / issue closeout 为准
   │
   ├─ Step 3: 关闭 issue
   │   └─ gh issue close <issue-number-or-ref>
@@ -60,7 +60,7 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 ## 核心边界
 
-- 允许：读取 `uv run python src/vibe3/cli.py flow show`、更新 task 状态、关闭 issue、执行 `uv run python src/vibe3/cli.py flow done`、写入 handoff
+- 允许：读取 `uv run python src/vibe3/cli.py flow show`、关闭 issue、执行 `uv run python src/vibe3/cli.py flow done`、写入 handoff
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
 - `uv run python src/vibe3/cli.py flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
 - 若 PR 尚未 merged，但已满足 review gate，`flow done` 会先执行 merge，再继续 closeout
@@ -109,13 +109,9 @@ uv run python src/vibe3/cli.py flow show <branch>
 
 则立即停止，返回 `/vibe-integrate`，不要继续 Step 2 以后动作。
 
-### Step 2: 更新 task 状态
+### Step 2: 确认 task 收口事实
 
-若 `flow show` 返回 `current_task`，执行：
-
-```bash
-uv run python src/vibe3/cli.py task status "Done"
-```
+若 `flow show` 返回 `current_task`，只在 handoff / 总结中记录该 task 将随当前 flow 收口，不再调用独立的 `task status` 命令。
 
 禁止直接编辑 `registry.json`。
 

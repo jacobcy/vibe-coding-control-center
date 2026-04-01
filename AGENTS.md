@@ -12,7 +12,7 @@ Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
 
 该技能解释：
 - vibe2 shell 和 vibe3 python 各自负责什么
-- vibe3 的核心命令（`flow show/create/bind/done/blocked`、`task show`、`handoff` 等）
+- vibe3 的核心命令（`flow show/status/bind/done/blocked`、`handoff` 等）
 - 标准开发工作流（`/vibe-new` → 编码 → `/vibe-commit` → `/vibe-integrate` → `/vibe-done`）
 - 常见场景速查
 
@@ -49,7 +49,7 @@ This project has **two parallel implementations**:
 
 1. **查看项目导览**: 阅读 `skills/vibe-instruction/SKILL.md`
 2. **检查当前 flow**: 运行 `uv run python src/vibe3/cli.py flow show`
-3. **查看当前任务**: 运行 `uv run python src/vibe3/cli.py task show`
+3. **查看全局状态**: 运行 `uv run python src/vibe3/cli.py status`
 4. **了解执行规则**: 阅读 [.agent/rules/coding-standards.md](.agent/rules/coding-standards.md)
 
 ## 🤖 Protocol
