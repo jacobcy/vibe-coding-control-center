@@ -162,8 +162,8 @@ class TestManagerDispatchIntegration:
                     dispatcher, "_normalize_manager_command", return_value=["uv"]
                 ):
                     with patch.object(
-                        dispatcher,
-                        "_record_dispatch_event",
+                        dispatcher.result_handler,
+                        "record_dispatch_event",
                         return_value=None,
                     ) as mock_record_event:
                         with patch.object(
@@ -171,11 +171,14 @@ class TestManagerDispatchIntegration:
                             "get_pr_for_issue",
                             return_value=None,  # No PR for this test
                         ):
-                            with patch(
-                                "subprocess.run",
-                                return_value=CompletedProcess(returncode=0),
-                            ) as mock_run:
-                                result = dispatcher.dispatch_manager(issue)
+                            with patch.object(
+                                dispatcher.result_handler, "update_state_label"
+                            ):
+                                with patch(
+                                    "subprocess.run",
+                                    return_value=CompletedProcess(returncode=0),
+                                ) as mock_run:
+                                    result = dispatcher.dispatch_manager(issue)
 
         assert result is True
         mock_record_event.assert_called_once_with(

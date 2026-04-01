@@ -30,7 +30,7 @@ from vibe3.commands import (
 )
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
-from vibe3.orchestra import serve
+from vibe3.server import app as serve
 
 
 # -- Remove help panel borders, keep colors --

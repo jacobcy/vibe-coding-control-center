@@ -12,13 +12,14 @@ from vibe3.orchestra.config import (
     GovernanceConfig,
     OrchestraConfig,
     PRReviewDispatchConfig,
+    StateLabelDispatchConfig,
 )
-from vibe3.orchestra.serve import (
-    _build_server,
+from vibe3.server.app import (
     app,
 )
-from vibe3.orchestra.serve_utils import (
+from vibe3.server.registry import (
     _build_async_serve_command,
+    _build_server,
     _setup_tailscale_webhook,
     _validate_pid_file,
 )
@@ -31,7 +32,9 @@ def test_build_server_registers_only_enabled_services() -> None:
         pr_review_dispatch=PRReviewDispatchConfig(enabled=True),
     )
     heartbeat, _ = _build_server(cfg)
-    assert heartbeat.service_names == ["PRReviewDispatchService", "GovernanceService"]
+    assert "PRReviewDispatchService" in heartbeat.service_names
+    assert "GovernanceService" in heartbeat.service_names
+    assert "StateLabelDispatchService" in heartbeat.service_names
 
 
 def test_build_server_governance_disabled() -> None:
@@ -40,13 +43,14 @@ def test_build_server_governance_disabled() -> None:
         comment_reply=CommentReplyConfig(enabled=False),
         pr_review_dispatch=PRReviewDispatchConfig(enabled=False),
         governance=GovernanceConfig(enabled=False),
+        state_label_dispatch=StateLabelDispatchConfig(enabled=False),
     )
     heartbeat, _ = _build_server(cfg)
     assert heartbeat.service_names == []
 
 
 def test_start_exits_when_orchestra_disabled(monkeypatch) -> None:
-    import vibe3.orchestra.serve as serve_module
+    import vibe3.server.app as serve_module
 
     monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
     monkeypatch.setattr(
@@ -63,8 +67,8 @@ def test_start_exits_when_orchestra_disabled(monkeypatch) -> None:
 
 
 def test_start_async_spawns_tmux_session(monkeypatch) -> None:
-    import vibe3.orchestra.serve as serve_module
-    import vibe3.orchestra.serve_utils as utils_module
+    import vibe3.server.app as serve_module
+    import vibe3.server.registry as utils_module
 
     monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
     monkeypatch.setattr(
@@ -81,7 +85,7 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
     )
     monkeypatch.setattr(utils_module, "_validate_pid_file", lambda _: (None, False))
 
-    with patch("vibe3.orchestra.serve_utils.subprocess.run") as mock_run:
+    with patch("vibe3.server.registry.subprocess.run") as mock_run:
         runner = CliRunner()
         result = runner.invoke(app, ["start", "--async"])
 
@@ -95,8 +99,8 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
 
 
 def test_start_async_reports_duplicate_session(monkeypatch) -> None:
-    import vibe3.orchestra.serve as serve_module
-    import vibe3.orchestra.serve_utils as utils_module
+    import vibe3.server.app as serve_module
+    import vibe3.server.registry as utils_module
 
     monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
     monkeypatch.setattr(
@@ -111,7 +115,7 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
         cmd=["tmux"],
         stderr="duplicate session: vibe3-orchestra-serve",
     )
-    with patch("vibe3.orchestra.serve_utils.subprocess.run", side_effect=error):
+    with patch("vibe3.server.registry.subprocess.run", side_effect=error):
         runner = CliRunner()
         result = runner.invoke(app, ["start", "--async"])
 
@@ -162,7 +166,7 @@ def test_validate_pid_file_handles_read_errors(
 
 
 def test_setup_tailscale_webhook_runs_tsu_start_and_webhook(monkeypatch) -> None:
-    import vibe3.orchestra.serve_utils as utils_module
+    import vibe3.server.registry as utils_module
 
     monkeypatch.setattr(
         utils_module,
@@ -170,7 +174,7 @@ def test_setup_tailscale_webhook_runs_tsu_start_and_webhook(monkeypatch) -> None
         lambda: Path("/tmp/tsu.sh"),
     )
 
-    with patch("vibe3.orchestra.serve_utils.subprocess.run") as mock_run:
+    with patch("vibe3.server.registry.subprocess.run") as mock_run:
         mock_run.side_effect = [
             subprocess.CompletedProcess(args=["/tmp/tsu.sh", "start"], returncode=0),
             subprocess.CompletedProcess(
@@ -193,7 +197,7 @@ def test_setup_tailscale_webhook_runs_tsu_start_and_webhook(monkeypatch) -> None
 
 
 def test_setup_tailscale_webhook_returns_error_when_script_missing(monkeypatch) -> None:
-    import vibe3.orchestra.serve_utils as utils_module
+    import vibe3.server.registry as utils_module
 
     monkeypatch.setattr(utils_module, "_resolve_tsu_script", lambda: None)
 
@@ -203,7 +207,7 @@ def test_setup_tailscale_webhook_returns_error_when_script_missing(monkeypatch) 
 
 
 def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
-    import vibe3.orchestra.serve as serve_module
+    import vibe3.server.app as serve_module
 
     monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
     monkeypatch.setattr(
@@ -237,7 +241,7 @@ def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
 
 
 def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None:
-    import vibe3.orchestra.serve as serve_module
+    import vibe3.server.app as serve_module
 
     monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
     monkeypatch.setattr(

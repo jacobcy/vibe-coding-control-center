@@ -135,6 +135,12 @@ class GovernanceConfig(BaseModel):
     )
 
 
+class StateLabelDispatchConfig(BaseModel):
+    """Configuration for state/ready label-based manager dispatch."""
+
+    enabled: bool = True
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
@@ -158,6 +164,9 @@ class OrchestraConfig(BaseModel):
     comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
+    )
+    state_label_dispatch: StateLabelDispatchConfig = Field(
+        default_factory=StateLabelDispatchConfig
     )
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
@@ -251,6 +260,13 @@ class OrchestraConfig(BaseModel):
                 enabled=src.pr_review_dispatch.enabled,
                 async_mode=src.pr_review_dispatch.async_mode,
                 use_worktree=src.pr_review_dispatch.use_worktree,
+            ),
+            state_label_dispatch=StateLabelDispatchConfig(
+                enabled=(
+                    getattr(src, "state_label_dispatch", True)
+                    if not isinstance(getattr(src, "state_label_dispatch", True), bool)
+                    else getattr(src, "state_label_dispatch", True)
+                )
             ),
             circuit_breaker=circuit_breaker_config,
             governance=GovernanceConfig.model_validate(governance_defaults),
