@@ -81,14 +81,23 @@ class TestFlowOrchestrator:
                     orchestrator.flow_service,
                     "create_flow",
                     return_value=_Flow(),
-                ):
+                ) as mock_create_flow:
                     with patch.object(
                         orchestrator.task_service, "link_issue", return_value=None
-                    ):
+                    ) as mock_link_issue:
                         flow = orchestrator.create_flow_for_issue(issue)
 
         assert flow["branch"] == "task/issue-222"
         mock_create_ref.assert_called_once_with(
             "task/issue-222",
             start_ref="origin/main",
+        )
+        mock_create_flow.assert_called_once_with(
+            slug="issue-222",
+            branch="task/issue-222",
+            actor=None,
+            initiated_by="orchestra:dispatcher",
+        )
+        mock_link_issue.assert_called_once_with(
+            "task/issue-222", 222, "task", actor=None
         )
