@@ -19,22 +19,10 @@ from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_ready
 
 
-def _run_ready_gates(pr_number: int, yes: bool) -> None:
-    """Run command-scoped PR ready quality gates."""
-    from rich.console import Console
-
-    from vibe3.commands.pr_quality_gates import run_coverage_gate, run_risk_gate
-
-    console = Console()
-    run_coverage_gate(console, yes)
-    run_risk_gate(console, pr_number)
-
-
 def _build_pr_ready_usecase(pr_service: PRService | None = None) -> PrReadyUsecase:
     """Construct PR ready usecase with command-local dependencies."""
     return PrReadyUsecase(
         pr_service=pr_service or PRService(),
-        gate_runner=_run_ready_gates,
         confirmer=lambda pr_number: typer.confirm(
             "Mark PR #"
             f"{pr_number} as ready for review? (draft -> ready, irreversible)"
@@ -74,7 +62,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
     def ready(
         pr_number: Annotated[int | None, typer.Argument(help="PR number")] = None,
         yes: Annotated[
-            bool, typer.Option("-y", "--yes", help="绕过业务逻辑检查并自动确认")
+            bool, typer.Option("-y", "--yes", help="自动确认并发布 PR")
         ] = False,
         trace: Annotated[
             bool, typer.Option("--trace", help="启用调用链路追踪 + DEBUG 日志")
@@ -86,13 +74,10 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Mark PR as ready with quality gates.
+        """Mark PR as ready for review.
 
-        质量门禁检查:
-        - 覆盖率检查（分层覆盖率统计）
-        - 风险评分检查（来自 inspect pr）
-
-        使用 --yes 绕过业务逻辑检查（覆盖率不足等）并自动确认.
+        此操作会将 PR 从 draft 状态转换为 ready 状态，并触发 reviewer briefing 生成。
+        本地质量门禁已移至 pre-push 钩子。
         """
         if json_output and yaml_output:
             typer.echo("Error: Cannot use both --json and --yaml", err=True)

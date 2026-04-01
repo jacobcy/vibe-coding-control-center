@@ -19,12 +19,10 @@ class PrReadyUsecase:
     def __init__(
         self,
         pr_service: PRService,
-        gate_runner: Callable[[int, bool], None],
         confirmer: Callable[[int], bool] | None = None,
         label_service: LabelService | None = None,
     ) -> None:
         self.pr_service = pr_service
-        self.gate_runner = gate_runner
         self.confirmer = confirmer
         self.label_service = label_service or LabelService()
 
@@ -33,14 +31,13 @@ class PrReadyUsecase:
         pr_number: int,
         yes: bool,
     ) -> PRResponse:
-        """Run gates, enforce confirmation, then mark PR ready."""
+        """Enforce confirmation, then mark PR ready."""
         current_pr = self.pr_service.get_pr(pr_number)
         if current_pr is not None and not current_pr.draft:
             pr = self.pr_service.mark_ready(pr_number)
             self._sync_merge_ready_label(pr)
             return pr
 
-        self.gate_runner(pr_number, yes)
         if not yes and self.confirmer is not None and not self.confirmer(pr_number):
             raise PrReadyAbortedError("aborted by user")
         pr = self.pr_service.mark_ready(pr_number)
