@@ -48,7 +48,9 @@ class CommentReplyService(ServiceBase):
         if not issue_number or not self._mention_re.search(comment_body):
             return
 
-        # 1. Sentinel check: skip if comment contains our ack sentinel
+        # Sentinel check AFTER mention check to allow mentions within regular comments.
+        # This specifically catches comments containing our own 'received your message'
+        # acknowledgement that would otherwise re-trigger the bot.
         if "<!-- vibe-ack -->" in comment_body:
             return
 

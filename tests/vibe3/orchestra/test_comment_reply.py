@@ -106,6 +106,9 @@ async def test_ignores_bot_author() -> None:
 async def test_replies_to_valid_mention() -> None:
     svc = CommentReplyService(OrchestraConfig(polling_interval=900, dry_run=False))
     event = _event("created", "please check this @vibe-manager-agent")
-    with patch.object(svc, "_post_ack") as mock_post:
+    with patch.object(svc._github, "add_comment") as mock_add_comment:
+        mock_add_comment.return_value = True
         await svc.handle_event(event)
-        mock_post.assert_called_once_with(42)
+        mock_add_comment.assert_called_once()
+        args, kwargs = mock_add_comment.call_args
+        assert "<!-- vibe-ack -->" in kwargs["body"]

@@ -28,7 +28,7 @@ def _mock_review(verdict: str = "PASS"):
     return m
 
 
-def _mock_result(stdout: str = "## Review\nLooks good."):
+def _mock_result(stdout: str = "## Review\nLooks good.\nVERDICT: PASS"):
     return MagicMock(
         success=True,
         exit_code=0,
@@ -182,3 +182,13 @@ def test_review_parser_failure_returns_error_verdict(mock_pr_build):
 
     assert result.exit_code == 0
     assert "Verdict: ERROR" in result.output
+
+
+def test_review_pr_rejects_unknown_agent_param():
+    """review pr should reject --agent (not a valid option).
+
+    This test ensures the hook-CLI contract is enforced.
+    """
+    result = runner.invoke(app, ["pr", "42", "--agent", "code-reviewer"])
+    assert result.exit_code != 0
+    assert "no such option" in result.output.lower() or "error" in result.output.lower()
