@@ -294,20 +294,18 @@ vibe3 flow create my-feature --task 220
 vibe3 flow bind 219 --role related
 vibe3 flow bind 218 --role dependency
 
-# 3. 验证
-vibe3 task show task/my-feature
+# 3. 验证当前 flow 绑定
+vibe3 flow show --branch task/my-feature --snapshot
 ```
 
 输出示例：
 ```
-Branch: task/my-feature
-Project Item [bound]: PVTI_xxx
-Task Issue: #220 (role: task)
-Related Issue(s): #219
-Dependencies: (none)
-[remote] Title:    实现统一存储
-[remote] Status:   Todo
-[remote] Assignees: jacobcy
+task_issue: #220
+related_issues:
+  - #219
+dependencies:
+  - (none)
+milestone: Phase 1
 ```
 
 ---
@@ -399,7 +397,7 @@ vibe3 flow bind 218 --role dependency
 **选择建议**：
 - 绑定或更换 task issue → 用 `flow bind`
 - 补充 related/dependency → 用 `flow bind --role`
-- 需要指定非当前 flow → 用 `flow bind --branch`
+- 需要指定非当前 flow → 用 `flow bind --branch`（目标分支必须已注册为 flow，且不能是保护分支）
 
 ---
 
@@ -454,45 +452,45 @@ vibe3 handoff append "等待 #218 的 API 先完成" --kind blocker
 
 ## 查询命令
 
-### 查看所有 task
+### 查看项目总览
 
 ```bash
-vibe3 task list
+vibe3 status
 ```
 
 输出：
 ```
-  #220  task-bridge-github-project  active  branch=task/task-bridge-github-project
-  #221  reports-unified-storage     active  branch=task/reports-unified-storage
-  #222  pr-show-complete            active  branch=task/pr-show-complete
-  #223  reports-cleanup             active  branch=task/reports-cleanup
+Issue Progress:
+  #220  ready       实现统一存储...
+             flow: task/reports-unified-storage
+
+Active Worktrees & Flows:
+  task/reports-unified-storage  wt: wt-claude-v3  task: #220
 ```
 
-### 搜索 issue
+### 搜索 / 查看 issue
 
-`vibe3 task list` 只负责列出现有 flow/task 现场，不提供 issue 检索参数。
-
-如需搜索 GitHub issue，请使用：
+issue 详情和搜索直接使用 GitHub 原生命令，不再提供独立 `task` 命令包装：
 
 ```bash
 gh search issues "report"
+gh issue view 220
 ```
 
-### 查看单个 task 详情（含远端字段）
+### 查看单个 flow 详情（含 task 绑定与 milestone）
 
 ```bash
-vibe3 task show task/reports-unified-storage
+vibe3 flow show --branch task/reports-unified-storage --snapshot
 ```
 
 输出：
 ```
-Branch: task/reports-unified-storage
-Project Item [bound]: PVTI_lAHOAAGiOs4BRZJ8zgoAgV0
-Task Issue: #221
-Related Issue(s): #219
-[remote] Title:    feat(reports): coverage.json 和 review 结果统一存放
-[remote] Status:   In Progress
-[remote] Assignees: jacobcy
+task_issue: #220
+related_issues:
+  - #219
+dependencies:
+  - #218
+milestone: Phase 1: 基础设施
 ```
 
 ### 查看 flow 详情（含 issue 角色区分）
@@ -500,7 +498,7 @@ Related Issue(s): #219
 **前置条件**：当前分支（或指定分支）必须已在 `flow_state` 中。如果当前分支不在 flow_state 中，会报错 `Flow not found: <branch>`。
 
 ```bash
-vibe3 flow show task/reports-unified-storage
+vibe3 flow show --branch task/reports-unified-storage --snapshot
 ```
 
 输出：
@@ -689,8 +687,8 @@ vibe3 pr ready 123 --yes
 **参数语义**：
 - `flow add <name> [--task <issue>] [--spec <spec-ref>]` — 当前分支注册 flow
 - `flow create <name> [--task <issue>] [--spec <spec-ref>] [--base <ref>]` — 创建分支并注册 flow
-- `flow show [branch]` — 参数是 branch name（可选，默认当前分支）
-- `flow bind <issue> [--role <role>] [--branch <branch>]` — 绑定 issue 到 flow（可选 branch，默认当前）
+- `flow show [--branch <branch>]` — 可选用 `--branch` 指定 branch name，默认当前分支
+- `flow bind <issue> [--role <role>] [--branch <branch>]` — 绑定 issue 到 flow（可选 branch，默认当前；显式 branch 需已注册且非保护分支）
 - `status` — 显示当前仓库的全局 flow / orchestra 总览
 
 **重要**：
@@ -772,15 +770,16 @@ vibe3 flow bind 218 --role dependency
 当 GitHub API 不可用时，`flow show` 仍会保留本地 bridge 字段，并对远端信息缺失做降级提示：
 
 ```
-Branch: task/reports-unified-storage
-Project Item [bound]: PVTI_xxx
-Task Issue: #221
-Related Issue(s): #219
-[offline mode] 远端读取失败，仅显示本地 bridge 字段
+[red]✗[/] 网络故障，远端 issue/PR 信息不可用（本地数据仍显示）
+task/reports-unified-storage  (Flow: active)
+  task_issue: #221
+  related_issues:
+    - #219
+  dependencies:
+    - #218
 ```
 
 本地 bridge 字段（始终可用）：
-- `project_item_id` — GitHub Project item ID
 - `task_issue_number` — task issue number
 - `spec_ref` / `next_step` / `blocked_by` — 执行上下文
 

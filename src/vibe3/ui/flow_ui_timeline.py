@@ -148,7 +148,7 @@ def render_flow_timeline(
         progress = f"{closed_count}/{total} done" if total else "—"
         console.print(
             f"  [dim]milestone:[/] {ms_title}  [dim][{progress}][/]"
-            "  [dim]→ vibe3 task show[/]"
+            "  [dim]→ vibe3 flow show --snapshot[/]"
         )
 
     refs_shown = False

@@ -463,7 +463,7 @@ vibe3 flow bind <issue> [--role <role>] [--branch <branch>]
 
 - `issue`: Issue number (or URL)（必需）
 - `--role`: Issue role（可选，默认 "task"，可选 task/related/dependency）
-- `--branch`: Branch name（可选，默认当前分支）
+- `--branch`: Branch name（可选，默认当前分支；仅允许已注册的非保护 flow 分支）
 
 ### 6.10 Prohibited Semantics
 

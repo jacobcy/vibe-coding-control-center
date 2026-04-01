@@ -87,16 +87,15 @@ SQLite (本地缓存)                     GitHub (真源)
 | `flow create` | 创建新分支并注册 flow，可选绑定 task/spec | Flow 创建 | 开发者 |
 | `flow show` | 显示完整执行现场信息 | 执行现场管理 | 开发者 |
 | `flow bind` | 绑定 issue 到 flow（指定 role） | Flow 绑定 | 开发者 |
-| `task show` | 显示 GitHub Project 管理信息 | 项目管理 | 管理者 |
-| `task list` | 列出所有 task | Task 查询 | 所有用户 |
+| `status` | 显示项目特有的 flow + orchestra 总览 | 项目总览 | 所有用户 |
 | `snapshot build/show/diff` | 代码库结构基线与对比 | 结构治理 | 开发者 |
 | `pr create/show/ready` | PR 生命周期联动（读取/写入当前 flow） | PR 协作 | 开发者 |
 
 **兼容说明**：
 - `flow new` 为历史别名，标准入口为 `flow add`
-- `task status` 不再作为标准流程推荐（收敛到 flow 驱动）
+- `task` 命令面已退场；issue 查看直接使用 `gh issue`，项目总览使用 `vibe3 status`
 
-### 2.2 flow show vs task show
+### 2.2 flow show vs status
 
 **flow show** - 执行现场视角（完整）
 - ✅ 显示所有 issues（task, related, dependency）
@@ -109,11 +108,11 @@ SQLite (本地缓存)                     GitHub (真源)
 - `snapshot build/show/diff` 是结构与快照视角的标准入口
 - review / governance 语义以 `snapshot` 为准
 
-**task show** - GitHub Project 管理视角
-- ✅ 显示 Project 绑定状态（bound/unbound）
-- ✅ 显示 Project 字段（Status, Priority, Assignees）
-- ✅ 显示 task issue
-- ✅ 检查 identity_drift（数据一致性）
+**status** - 项目特有总览视角
+- ✅ 显示活跃 flow 与当前 task 绑定
+- ✅ 显示 orchestra 跟踪状态
+- ✅ 作为项目特有包装补全 worktree / flow 上下文
+- ❌ 不替代 `gh issue` 的远端 issue 详情查询
 
 ### 2.3 Issue 关联规则
 
@@ -138,47 +137,23 @@ vibe3 flow bind 218 --role dependency
 
 ---
 
-## 三、Task 搜索规则
+## 三、查询入口标准
 
-### 3.1 Task 定义
+### 3.1 项目特有查询
 
-| 类型 | 定义 | SQLite 记录 | vibe-task 标签 |
-|------|------|------------|----------------|
-| **正式 Task** | 纳入 flow 管理 | ✅ flow_issue_links 有记录 | ✅ 有 |
-| **计划中 Task** | 列入计划但未开始 | ❌ 无 | ✅ 有 |
-| **普通 Issue** | 未被管理 | ❌ 无 | ❌ 无 |
+- `vibe3 status`：项目特有总览，显示 flow / task 绑定 / orchestra 状态
+- `vibe3 flow show [--branch <branch>] [--snapshot]`：查看单个 flow 的现场、task 绑定、milestone、PR 上下文
 
-**SQLite 记录**:
-- `flow_issue_links` 表存储 **issue 和 flow 的关系**
-- `issue_role = task/related/dependency` 表示 issue 在 flow 中的角色
-- GitHub body / label 自动化若启用，也只能镜像这套关系
+### 3.2 远端 issue 查询
 
-### 3.2 搜索范围
+- GitHub issue 的搜索、详情、评论、远端字段读取，优先直接使用 `gh issue` / `gh search issues`
+- `vibe3` 不再为远端 issue 详情维护独立 `task show/list` 包装
 
-当前 `task list` 已实现的是：
+### 3.3 本地最小事实
 
-1. 默认列出有 `task_issue_number` 的 flow
-2. `--issue` 当前按 task issue 查询 flow
-3. 更广义的搜索/过滤属于后续扩展，不应在当前标准里当作已实现能力
-
-### 3.3 搜索实现
-
-**实现逻辑**:
-```python
-# 1. 搜索正式 task（SQLite 有记录）
-flows = store.get_all_flows()  # 从 flow_state
-tasks = [f for f in flows if f.task_issue_number]
-formal_tasks = filter_by_issue_search(tasks, keyword)  # 搜索 issue title/body
-
-# 2. 搜索计划中 task（只有 vibe-task 标签）
-planned_issues = github_client.search_issues(
-    label="vibe-task",
-    query=keyword
-)
-planned_tasks = [i for i in planned_issues if not in_sqlite(i.number)]
-
-# 3. 合并输出，明确区分
-```
+- 本地只保留 flow 与 issue 的最小绑定事实
+- `flow_issue_links` 表表达 `task/related/dependency` 角色
+- 不额外持久化远端 issue 详情作为长期真源
 
 ---
 
@@ -379,11 +354,11 @@ vibe3 flow aborted
 ### 4.7 flow show
 
 ```bash
-vibe3 flow show [branch]
+vibe3 flow show [--branch <branch>]
 ```
 
 **参数**:
-- `branch`: Branch name（可选，默认当前分支）
+- `--branch <branch>`: Branch name（可选，默认当前分支）
   - 类型: `str | None`
   - 帮助: "Branch name"
 
@@ -438,48 +413,14 @@ vibe3 flow bind 218 --role dependency
 vibe3 flow bind 220 --branch task/my-feature
 ```
 
-## 五、Task 命令参数规范
+## 五、task 历史调用面说明
 
-### 5.1 task show
-
-```bash
-vibe3 task show <branch>
-```
-
-**参数**:
-- `branch`: Branch name（必需）
-  - 类型: `str`
-  - 帮助: "Branch name"
-
-**行为**:
-- 显示 GitHub Project 管理信息
-- 包括 Project 字段、绑定状态
-
-### 5.2 task list
-
-```bash
-vibe3 task list [--issue <issue>]
-```
-
-**参数**:
-- 无（仅 `--trace` / `--json` 等通用输出参数）
-
-**行为**:
-- 列出所有 task（有 task_issue_number 的 flow）
-- 搜索和状态过滤属于后续扩展
-
-**示例**:
-```bash
-# 列出所有 task
-vibe3 task list
-```
-
-### 5.3 迁移与弃用
-
-标准流程收敛后，以下命令不再推荐：
-- `task status` → 目标由 flow 生命周期自动联动远端 Project 状态
-
-在兼容期内如果命令仍存在，视为历史兼容入口，不作为标准流程的一部分。
+- `task` 仍然是执行桥接术语，不再是公共 CLI 顶层命令
+- 旧的 `task show/list/status` 仅属于历史调用面，不再作为现行标准
+- 替代入口：
+  - 单个现场：`vibe3 flow show --branch <branch> --snapshot`
+  - 项目总览：`vibe3 status`
+  - 远端 issue 查询：`gh issue view <number>` / `gh search issues <query>`
 
 ---
 
