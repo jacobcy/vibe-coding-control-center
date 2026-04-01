@@ -153,12 +153,15 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
         slug: str,
         branch: str,
         actor: str | None = None,
+        initiated_by: str | None = None,
     ) -> FlowStatusResponse:
         """Create a new flow.
 
         Args:
             slug: Flow name/slug
             branch: Git branch name
+            actor: Optional actor name
+            initiated_by: Optional initiator identifier
 
         Returns:
             Created flow state
@@ -177,6 +180,7 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             action="create",
             slug=slug,
             branch=branch,
+            initiated_by=initiated_by,
         ).info("Creating flow")
         effective_actor = SignatureService.resolve_actor(explicit_actor=actor)
 
@@ -184,6 +188,7 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             branch,
             flow_slug=slug,
             latest_actor=effective_actor,
+            initiated_by=initiated_by,
         )
 
         self.store.add_event(
