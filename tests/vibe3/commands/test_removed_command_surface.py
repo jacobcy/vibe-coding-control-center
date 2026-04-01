@@ -42,12 +42,3 @@ def test_review_gate_command_removed() -> None:
     assert (
         "no such command" in result.output.lower() or "error" in result.output.lower()
     )
-
-
-def test_task_command_removed() -> None:
-    """task should not be part of the public top-level CLI surface."""
-    result = runner.invoke(app, ["task", "--help"])
-    assert result.exit_code != 0
-    assert (
-        "no such command" in result.output.lower() or "error" in result.output.lower()
-    )

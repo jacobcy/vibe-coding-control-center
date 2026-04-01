@@ -326,23 +326,24 @@ CREATE TABLE flow_events (
 
 允许写入 SQLite 的命令只有：
 
-**Flow 生命周期**：
-- `flow new` - 创建新 flow 并创建分支
-- `flow switch` - 切换到已存在的 flow
-- `flow bind` - 绑定 issue 到 flow
-- `flow done` - 关闭 flow 并删除分支
-- `flow blocked` - 标记 flow 为 blocked
-- `flow aborted` - 标记 flow 为 aborted 并删除分支
+**Flow 本地状态维护**：
+- `flow update` - 注册或更新当前 / 指定 branch 的本地 flow scene
+- `flow bind` - 绑定 issue 到已有 flow
+- `flow blocked` - 记录 blocked 状态与可选 dependency 关系
 
 **Handoff 记录**：
+- `handoff init` - 初始化当前 branch 的 handoff 文档
 - `handoff plan` - 记录 plan handoff
 - `handoff report` - 记录 report handoff
 - `handoff audit` - 记录 audit handoff
 - `handoff append` - 追加轻量更新到 current.md
 
-**PR 操作**：
-- `pr draft` - 创建 draft PR
-- `pr merge` - 合并 PR
+补充约束：
+
+- handoff store 只记录本地 execution context，不承担 branch / PR / issue 生命周期真源
+- branch 创建、切换、删除、merge 仍应直接由 `git` 承担
+- issue / PR / project 的常规远端写操作仍应优先直接由 `gh` 承担
+- 若兼容性命令触发本地 event 回写，这些 event 只是本地补充，不应反向定义远端业务事实
 
 **检查与修复**：
 - `vibe check --fix` - 自动修复问题

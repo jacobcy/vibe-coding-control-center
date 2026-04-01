@@ -31,7 +31,13 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 - Task overview: "我正在使用 vibe-task 技能来查看跨 worktree 的 flow/task 总览。"
 - Audit mode: "我正在使用 vibe-task 技能来核对任务注册完整性和数据质量。"
 
-## Trigger Examples
+## References
+
+- [docs/standards/glossary.md](../../docs/standards/glossary.md)
+- [docs/standards/action-verbs.md](../../docs/standards/action-verbs.md)
+- [docs/standards/v2/git-workflow-standard.md](../../docs/standards/v2/git-workflow-standard.md)
+- [docs/standards/v2/worktree-lifecycle-standard.md](../../docs/standards/v2/worktree-lifecycle-standard.md)
+
 
 ### Task Overview
 

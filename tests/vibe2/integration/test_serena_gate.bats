@@ -109,6 +109,8 @@ EOF
   package_dir="$fixture/pkg/serena"
   out_file="$fixture/project.txt"
   mkdir -p "$package_dir" "$fixture/subdir"
+  touch "$fixture/foo.sh"
+  touch "$package_dir/__init__.py"
 
   cat > "$package_dir/agent.py" <<'EOF'
 import os

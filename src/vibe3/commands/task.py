@@ -40,6 +40,39 @@ def _build_milestone_service() -> MilestoneService:
 
 
 @app.command()
+def add(
+    issue: Annotated[str, typer.Argument(help="Issue reference")],
+    role: Annotated[str, typer.Option("--role")] = "task",
+) -> None:
+    """[Compatibility] Bind an issue to a flow. (Moved to: vibe3 flow bind)"""
+    typer.echo("Note: 'task add' is deprecated. Redirecting to 'flow bind'...")
+    from vibe3.commands.flow import bind
+
+    bind(issue_refs=issue, role=role)  # type: ignore
+
+
+@app.command()
+def update() -> None:
+    """[Compatibility] Update task metadata. (Moved to: vibe3 flow bind)"""
+    typer.echo("Note: 'task update' is deprecated. Please use 'vibe3 flow bind'.")
+
+
+@app.command()
+def remove() -> None:
+    """[Compatibility] Remove task record. (Moved to: vibe3 flow aborted)"""
+    typer.echo("Note: 'task remove' is deprecated. Please use 'vibe3 flow aborted'.")
+
+
+@app.command()
+def audit(ctx: typer.Context) -> None:
+    """[Compatibility] Audit task consistency. (Moved to: vibe3 check)"""
+    typer.echo("Note: 'task audit' is deprecated. Redirecting to 'check'...")
+    from vibe3.commands.check import check
+
+    ctx.invoke(check)
+
+
+@app.command()
 def list(
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,

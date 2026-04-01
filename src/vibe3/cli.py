@@ -22,9 +22,11 @@ from vibe3.commands import (
     pr,
     prompt_check,
     review,
+    roadmap,
     run,
     snapshot,
     status,
+    task,
 )
 from vibe3.exceptions import SystemError, UserError
 from vibe3.observability import setup_logging
@@ -44,7 +46,7 @@ _ru.Panel = _NoBorderPanel  # type: ignore[misc]
 
 
 app = typer.Typer(
-    name="vibe3",
+    name="vibe",
     help="Vibe 3.0 - Development orchestration tool",
     add_completion=False,
     no_args_is_help=True,
@@ -53,6 +55,8 @@ app = typer.Typer(
 
 # Register subcommands
 app.add_typer(flow.app, name="flow")
+app.add_typer(task.app, name="task")
+app.add_typer(roadmap.app, name="roadmap")
 app.add_typer(plan.app, name="plan")
 app.add_typer(pr.app, name="pr")
 app.add_typer(inspect.app, name="inspect")
@@ -199,7 +203,7 @@ def main() -> None:
     sys.argv = ["--help" if a == "-h" else a for a in sys.argv]
 
     try:
-        app()
+        app(prog_name="vibe")
 
     except UserError as e:
         # User error: concise message

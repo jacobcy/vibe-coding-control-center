@@ -27,24 +27,30 @@ vibe doctor
 vibe check
 vibe tool
 vibe keys <list|set|get|init>
-vibe flow <start|review|pr|done|status|sync>
 
-# V3 Python CLI (新特性)
-uv run python src/vibe3/cli.py pr show --json     # JSON 格式输出
-uv run python src/vibe3/cli.py pr show --yaml     # YAML 格式输出
-uv run python src/vibe3/cli.py inspect commands pr show --tree  # ASCII 调用树
+# V3 Python CLI
+uv run python src/vibe3/cli.py flow update
+uv run python src/vibe3/cli.py flow show --snapshot
+uv run python src/vibe3/cli.py flow status
+uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py handoff show
 ```
 
 ## Flow Management
 
-Vibe3 automatically manages flows based on git branches. There's no need to
-manually create or delete flows:
+Vibe3 does not replace `git` / `gh`.
 
-- **Automatic Creation**: Running `vibe3 plan`, `run`, or `review` on a feature
-  branch automatically creates a flow if one doesn't exist.
-- **Main Branch Protection**: Flows cannot be created on main/master branches.
-- **Automatic Completion**: When a PR is merged or closed, `vibe3 check` marks
-  the flow as done.
+Use `git` for branch lifecycle and `gh` for issue / PR remote operations. Use
+`vibe3` to maintain local flow scene, issue bindings, events, and handoff.
+
+- **Local Scene Registration**: `vibe3 flow update` registers or updates the
+  current branch as a local flow scene.
+- **Local Binding**: `vibe3 flow bind` maintains the issue-to-flow relation in
+  local shared state.
+- **Read-First Inspection**: `vibe3 flow show`, `vibe3 flow status`, and
+  `vibe3 status` provide project-specific read views that `git` / `gh` do not.
+- **Handoff Augmentation**: `vibe3 handoff` stores local execution context for
+  agent collaboration.
 
 ### Protected Branches
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
 }
 
 @test "vibe-skill-audit audit passes on existing vibe-task skill" {

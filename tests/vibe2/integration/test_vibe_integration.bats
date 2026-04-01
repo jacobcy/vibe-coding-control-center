@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
   export PATH="$REPO_ROOT/bin:$PATH"
   export VIBE_ROOT="$REPO_ROOT"
   export VIBE_LIB="$VIBE_ROOT/lib"

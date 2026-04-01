@@ -39,7 +39,11 @@ EOF
 #!/usr/bin/env bash
 exit 0
 EOF
-  chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec"
+  cat > "$bin_dir/pre-commit" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec" "$bin_dir/pre-commit"
 
   run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
 
@@ -86,7 +90,11 @@ EOF
 #!/usr/bin/env bash
 exit 0
 EOF
-  chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec"
+  cat > "$bin_dir/pre-commit" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$bin_dir/git" "$bin_dir/npx" "$bin_dir/openspec" "$bin_dir/pre-commit"
 
   run env HOME="$home_dir" PATH="$bin_dir:$PATH" bash -c 'cd "'"$fixture"'" && bash "'"$VIBE_ROOT"'/scripts/init.sh"'
 

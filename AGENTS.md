@@ -12,7 +12,7 @@ Welcome, AI Agent. This file serves as your entry point to Vibe Center 2.0.
 
 该技能解释：
 - vibe2 shell 和 vibe3 python 各自负责什么
-- vibe3 的核心命令（`flow show/status/bind/done/blocked`、`handoff` 等）
+- vibe3 的核心命令（`flow update/show/status/bind/blocked`、`status`、`handoff` 等）
 - 标准开发工作流（`/vibe-new` → 编码 → `/vibe-commit` → `/vibe-integrate` → `/vibe-done`）
 - 常见场景速查
 
@@ -35,7 +35,7 @@ This project has **two parallel implementations**:
 1. **V2 (Shell)** — Zsh alias 和环境工具（`bin/`, `lib/`, `config/aliases.zsh`）
 2. **V3 (Python)** — issue/flow/PR 管理主系统（`src/vibe3/`, `tests/vibe3/`）
 
-> V2 的 `bin/vibe flow|task` 等命令已重定向到 V3，V2 主要提供 alias（`wtnew`、`vup`）和环境工具。
+> V2 主要提供 alias（`wtnew`、`vup`）和环境工具；branch 生命周期优先直接使用 `git`，issue / PR 远端操作优先直接使用 `gh`，`vibe3` 负责本地 flow scene、events 与 handoff 增强。
 
 ## 📍 Workspace Structure
 

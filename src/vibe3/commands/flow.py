@@ -20,7 +20,11 @@ BranchArg = Annotated[
     typer.Argument(help="Branch to update (defaults to current)"),
 ]
 IssueArg = Annotated[
-    str, typer.Argument(help="Issue reference to bind as task/related/dependency")
+    str,
+    typer.Argument(
+        metavar="<task-id>",
+        help="Issue reference or <task-id> to bind as task/related/dependency",
+    ),
 ]
 TaskTailArg = Annotated[
     List[str] | None,
@@ -163,7 +167,7 @@ def bind(
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Bind an issue to a flow branch."""
+    """Bind an issue to a flow branch. (Usage: vibe flow bind <task-id>)"""
     from vibe3.utils.issue_ref import parse_issue_number
 
     issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
