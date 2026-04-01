@@ -104,13 +104,18 @@ def render_flow_timeline(
         console.print(f"  [dim]next[/]        {state.next_step}")
 
     # Compact actor summary
-    if state.latest_actor:
-        actors = [
-            f"[dim]latest:[/] {state.latest_actor or '—'}",
-            f"[dim]plan:[/] {state.planner_actor or '—'}",
-            f"[dim]run:[/] {state.executor_actor or '—'}",
-            f"[dim]review:[/] {state.reviewer_actor or '—'}",
-        ]
+    if state.latest_actor or state.initiated_by:
+        actors = []
+        if state.initiated_by:
+            actors.append(f"[dim]init:[/] {state.initiated_by}")
+        actors.extend(
+            [
+                f"[dim]latest:[/] {state.latest_actor or '—'}",
+                f"[dim]plan:[/] {state.planner_actor or '—'}",
+                f"[dim]run:[/] {state.executor_actor or '—'}",
+                f"[dim]review:[/] {state.reviewer_actor or '—'}",
+            ]
+        )
         console.print(f"  [dim]actor[/]       {'  '.join(actors)}")
     console.print()
 
