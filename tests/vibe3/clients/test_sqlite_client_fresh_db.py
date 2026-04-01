@@ -1,8 +1,12 @@
 """Tests for SQLiteClient with a fresh database (schema verification)."""
 
 import sqlite3
+from pathlib import Path
+
+import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.exceptions import GitError
 
 
 def test_fresh_db_schema_no_deprecated_columns(tmp_path):
@@ -58,3 +62,37 @@ def test_get_flow_dependents_on_fresh_db(tmp_path):
 
     # ASSERT
     assert dependents == ["feature/B"]
+
+
+def test_default_db_path_uses_shared_git_common_dir(tmp_path, monkeypatch):
+    """Default DB path should live under the shared git common dir."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    shared_git_dir = tmp_path / "shared" / ".git"
+    shared_git_dir.mkdir(parents=True)
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        "vibe3.clients.sqlite_client.GitClient.get_git_common_dir",
+        lambda self: str(shared_git_dir),
+    )
+
+    client = SQLiteClient()
+
+    assert Path(client.db_path) == shared_git_dir / "vibe3" / "handoff.db"
+    assert not (repo_root / "vibe3").exists()
+
+
+def test_default_db_path_fails_fast_on_invalid_git_common_dir(tmp_path, monkeypatch):
+    """Invalid git common dir should not create a local worktree DB."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        "vibe3.clients.sqlite_client.GitClient.get_git_common_dir",
+        lambda self: "",
+    )
+
+    with pytest.raises(GitError, match="returned empty path"):
+        SQLiteClient()
+
+    assert not (repo_root / "vibe3").exists()

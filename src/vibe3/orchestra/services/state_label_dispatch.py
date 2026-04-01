@@ -46,6 +46,8 @@ class StateLabelDispatchService(ServiceBase):
         self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
         self._github = github or GitHubClient()
         self._dispatched_issues: set[int] = set()
+        self._in_flight_dispatches: set[int] = set()
+        self._dispatch_guard = asyncio.Lock()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to issues/labeled webhook event."""
@@ -134,25 +136,39 @@ class StateLabelDispatchService(ServiceBase):
             return []
 
     async def _dispatch_if_needed(self, issue: IssueInfo) -> None:
-        """Trigger dispatch if no flow exists and not already dispatched this tick."""
+        """Trigger dispatch if no flow exists and issue is not already in flight."""
         log = logger.bind(domain="orchestra", issue=issue.number)
 
-        # Skip if flow already exists
-        if self._has_flow(issue.number):
-            self._dispatched_issues.add(issue.number)
-            log.debug("Skip dispatch: flow already exists")
-            return
+        async with self._dispatch_guard:
+            if issue.number in self._in_flight_dispatches:
+                log.debug("Skip dispatch: issue already in flight")
+                return
+            if issue.number in self._dispatched_issues:
+                log.debug("Skip dispatch: issue already dispatched")
+                return
+            self._in_flight_dispatches.add(issue.number)
 
-        # Trigger dispatcher
-        log.info(f"Triggering manager dispatch for #{issue.number} (state/ready)")
-        loop = asyncio.get_running_loop()
-        dispatched = await loop.run_in_executor(
-            self._executor,
-            self._dispatcher.dispatch_manager,
-            issue,
-        )
-        if dispatched:
-            self._dispatched_issues.add(issue.number)
+        dispatched = False
+        try:
+            # Skip if flow already exists
+            if self._has_flow(issue.number):
+                log.debug("Skip dispatch: flow already exists")
+                dispatched = True
+                return
+
+            # Trigger dispatcher
+            log.info(f"Triggering manager dispatch for #{issue.number} (state/ready)")
+            loop = asyncio.get_running_loop()
+            dispatched = await loop.run_in_executor(
+                self._executor,
+                self._dispatcher.dispatch_manager,
+                issue,
+            )
+        finally:
+            async with self._dispatch_guard:
+                self._in_flight_dispatches.discard(issue.number)
+                if dispatched:
+                    self._dispatched_issues.add(issue.number)
 
     def _has_flow(self, issue_number: int) -> bool:
         """Check if a flow already exists for the issue."""

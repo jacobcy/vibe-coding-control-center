@@ -7,6 +7,8 @@ from typing import Callable
 
 from loguru import logger
 
+from vibe3.exceptions import GitError
+
 
 def get_current_branch(run: Callable[[list[str]], str]) -> str:
     """获取当前分支名.
@@ -55,11 +57,23 @@ def get_git_common_dir(run: Callable[[list[str]], str]) -> str:
     Raises:
         GitError: git command execution failed
     """
-    git_common_dir = run(["rev-parse", "--git-common-dir"])
+    git_common_dir = run(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+    if not git_common_dir:
+        raise GitError("rev-parse --git-common-dir", "returned empty path")
+
+    git_common_path = Path(git_common_dir)
+    if not git_common_path.is_absolute():
+        raise GitError(
+            "rev-parse --git-common-dir",
+            f"returned non-absolute path: {git_common_dir}",
+        )
+
     logger.bind(
-        domain="git", action="get_git_common_dir", git_common_dir=git_common_dir
+        domain="git",
+        action="get_git_common_dir",
+        git_common_dir=str(git_common_path),
     ).debug("Got git common directory")
-    return git_common_dir
+    return str(git_common_path)
 
 
 def get_worktree_root(run: Callable[[list[str]], str]) -> str:

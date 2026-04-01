@@ -53,6 +53,13 @@ GitHub 事件
                              → Dispatcher.dispatch_manager(issue)
                              → agent 执行
 
+  issues/labeled (label=state/ready)
+                           → webhook → Server.app.py
+                                      → StateLabelDispatchService.handle_event()
+                                      → Dispatcher.dispatch_manager(issue)
+                                      → dispatcher 先将标签改为 state/in-progress
+                                      → agent 执行
+
   pull_request/review_requested → webhook → Server.app.py
                                            → PRReviewDispatchService.on_event()
                                            → Dispatcher.dispatch_pr_review(pr)
@@ -63,22 +70,22 @@ GitHub 事件
 
 ```
 HeartbeatServer tick（每 15 分钟）
-  │
-  ├─── GovernanceService.on_tick()
-  │      运行 orchestra agent（AI 分析所有 issue）
-  │      orchestra agent 做决策，输出：
-  │        - issue #42 依赖解除 → 设置 state/ready 标签
-  │        - issue #17 卡住了   → 设置 state/blocked 标签
-  │        - issue #8 已完成    → 设置 state/done 标签
-  │      （orchestra agent 只改标签，不直接调用 dispatcher）
-  │
-  └─── [新增] StateLabelDispatchService.on_tick()
-         扫描所有 state/ready 且未在执行中（非 state/in-progress）的 issue
-         → Dispatcher.dispatch_manager(issue)
-         → dispatcher 先将标签改为 state/in-progress（声明占用，防重入）
-         → agent 执行任务
-         → 成功：state/in-progress → state/review
-         → 失败：state/in-progress → state/blocked
+  - GovernanceService.on_tick()
+      运行 orchestra agent（AI 分析所有 issue）
+      orchestra agent 做决策，输出：
+        - issue #42 依赖解除 → 设置 state/ready 标签
+        - issue #17 卡住了   → 设置 state/blocked 标签
+        - issue #8 已完成    → 设置 state/done 标签
+      （orchestra agent 只改标签，不直接调用 dispatcher）
+
+  - [新增] StateLabelDispatchService.on_tick()
+      作为 webhook 漏接时的 fallback，扫描所有
+      state/ready 且未在执行中（非 state/in-progress）的 issue
+      → Dispatcher.dispatch_manager(issue)
+      → dispatcher 先将标签改为 state/in-progress（声明占用，防重入）
+      → agent 执行任务
+      → 成功：state/in-progress → state/review
+      → 失败：state/in-progress → state/blocked
 ```
 
 ### 为什么用 state 标签触发，不用 assignee
@@ -240,14 +247,16 @@ class Dispatcher:
 class StateLabelDispatchService(ServiceBase):
     """检测 state/ready 标签，触发 dispatcher 执行。"""
 
-    subscribed_events = []  # 不订阅 webhook，只用 on_tick
+    event_types = ["issues"]  # 订阅 issues/labeled，实时触发
+
+    async def handle_event(self, event: GitHubEvent) -> None:
+        if event.action == "labeled" and event.payload["label"]["name"] == "state/ready":
+            await self._dispatch_if_needed(issue)
 
     async def on_tick(self) -> None:
-        issues = await self._get_ready_issues()  # state/ready 且非 state/in-progress
+        issues = await self._get_ready_issues()  # polling fallback
         for issue in issues:
-            if issue.number in self._dispatched:
-                continue
-            await self._dispatcher.dispatch_manager(issue)
+            await self._dispatch_if_needed(issue)
 
     async def _get_ready_issues(self) -> list[Issue]:
         # 查询有 state/ready 标签、无 state/in-progress 标签的 issue
@@ -258,8 +267,9 @@ class StateLabelDispatchService(ServiceBase):
 `state_label_dispatch.enabled` 配置项，默认开启。
 
 **验收**：
-- 手动给 issue 打 state/ready 标签，下个 tick 内自动触发 dispatch
-- 执行中的 issue 不会重复触发（state/in-progress 防重入）
+- 手动给 issue 打 state/ready 标签，可通过 webhook 实时触发 dispatch
+- webhook 不可用或漏接时，下个 tick 内可由 polling fallback 触发 dispatch
+- webhook 与 polling 重叠时，同一 issue 只会 dispatch 一次
 
 ---
 
