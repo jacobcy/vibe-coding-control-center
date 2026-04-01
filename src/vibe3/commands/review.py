@@ -22,7 +22,6 @@ from vibe3.commands.command_options import (
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_service import FlowService
-from vibe3.utils.git_helpers import get_current_branch
 from vibe3.utils.trace import enable_trace
 
 _ASYNC_OPT = Annotated[
@@ -93,8 +92,18 @@ def pr(
     log.info("Starting PR review")
     typer.echo(f"→ Review: PR #{pr_number}")
     usecase = _build_review_usecase()
-    request, issue_number = usecase.build_pr_review(pr_number)
-    branch = get_current_branch() if async_mode and not dry_run else None
+    request, issue_number, head_branch = usecase.build_pr_review(pr_number)
+
+    if async_mode and not dry_run:
+        if not head_branch:
+            typer.echo(
+                f"Error: Could not resolve head branch for PR #{pr_number}", err=True
+            )
+            raise typer.Exit(1)
+        branch = head_branch
+    else:
+        branch = None
+
     result = usecase.execute_review(
         request,
         dry_run,

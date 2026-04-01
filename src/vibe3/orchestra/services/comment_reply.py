@@ -40,10 +40,23 @@ class CommentReplyService(ServiceBase):
         if event.action not in ("created", "edited"):
             return
 
-        comment_body = (event.payload.get("comment") or {}).get("body", "")
+        comment = event.payload.get("comment") or {}
+        comment_body = comment.get("body", "")
+        author = (comment.get("user") or {}).get("login")
         issue_number = (event.payload.get("issue") or {}).get("number")
 
         if not issue_number or not self._mention_re.search(comment_body):
+            return
+
+        # 1. Sentinel check: skip if comment contains our ack sentinel
+        if "<!-- vibe-ack -->" in comment_body:
+            return
+
+        # 2. Author check: skip if comment was posted by the bot itself
+        if self.config.bot_username and author == self.config.bot_username:
+            logger.bind(domain="orchestra").debug(
+                f"Skipping self-mention by bot author {author}"
+            )
             return
 
         log = logger.bind(domain="orchestra", issue=issue_number)
@@ -61,7 +74,8 @@ class CommentReplyService(ServiceBase):
         usernames_str = ", ".join(f"`@{u}`" for u in self.config.manager_usernames)
         body = (
             f"> 👋 {usernames_str} received your message. "
-            "The orchestra server will process this shortly."
+            "The orchestra server will process this shortly.\n"
+            "<!-- vibe-ack -->"
         )
         success = self._github.add_comment(
             issue_number, body=body, repo=self.config.repo

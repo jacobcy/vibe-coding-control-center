@@ -16,12 +16,17 @@ def _svc() -> CommentReplyService:
     return CommentReplyService(OrchestraConfig(polling_interval=900, dry_run=True))
 
 
-def _event(action: str, body: str, issue_number: int = 42) -> GitHubEvent:
+def _event(
+    action: str, body: str, issue_number: int = 42, author: str = "someuser"
+) -> GitHubEvent:
     return GitHubEvent(
         event_type="issue_comment",
         action=action,
         payload={
-            "comment": {"body": body},
+            "comment": {
+                "body": body,
+                "user": {"login": author},
+            },
             "issue": {"number": issue_number},
         },
         source="webhook",
@@ -71,6 +76,36 @@ async def test_non_mention_comment_ignored() -> None:
 async def test_edited_comment_also_triggers() -> None:
     svc = CommentReplyService(OrchestraConfig(polling_interval=900, dry_run=False))
     event = _event("edited", "@vibe-manager-agent updated question")
+    with patch.object(svc, "_post_ack") as mock_post:
+        await svc.handle_event(event)
+        mock_post.assert_called_once_with(42)
+
+
+@pytest.mark.asyncio
+async def test_ignores_own_ack_by_sentinel() -> None:
+    svc = CommentReplyService(OrchestraConfig(polling_interval=900, dry_run=False))
+    event = _event("created", "@vibe-manager-agent fixed it <!-- vibe-ack -->")
+    with patch.object(svc, "_post_ack") as mock_post:
+        await svc.handle_event(event)
+        mock_post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ignores_bot_author() -> None:
+    config = OrchestraConfig(
+        polling_interval=900, dry_run=False, bot_username="vibe-bot"
+    )
+    svc = CommentReplyService(config)
+    event = _event("created", "hey @vibe-manager-agent", author="vibe-bot")
+    with patch.object(svc, "_post_ack") as mock_post:
+        await svc.handle_event(event)
+        mock_post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_replies_to_valid_mention() -> None:
+    svc = CommentReplyService(OrchestraConfig(polling_interval=900, dry_run=False))
+    event = _event("created", "please check this @vibe-manager-agent")
     with patch.object(svc, "_post_ack") as mock_post:
         await svc.handle_event(event)
         mock_post.assert_called_once_with(42)
