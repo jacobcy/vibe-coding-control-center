@@ -182,7 +182,17 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             branch=branch,
             initiated_by=initiated_by,
         ).info("Creating flow")
-        effective_actor = SignatureService.resolve_actor(explicit_actor=actor)
+        # Flow state actor: only set when explicitly provided.
+        # orchestra uses actor=None to signal "no agent has taken ownership yet".
+        effective_actor = (
+            SignatureService.resolve_actor(explicit_actor=actor)
+            if actor is not None
+            else None
+        )
+        # Event actor: audit log always needs attribution (NOT NULL in schema).
+        # Falls back to worktree identity when no explicit actor — this is an
+        # audit record, not an agent claim, so the distinction is fine.
+        event_actor = effective_actor or SignatureService.get_worktree_actor()
 
         self.store.update_flow_state(
             branch,
@@ -194,7 +204,7 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
         self.store.add_event(
             branch,
             "flow_created",
-            effective_actor,
+            event_actor,
             f"Flow '{slug}' created",
         )
 

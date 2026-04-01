@@ -29,6 +29,23 @@ def _kv(key: str, value: object, indent: int = 0) -> None:
     console.print(f"{pad}[dim]{key}:[/] {value}")
 
 
+def _display_actor(actor: str | None) -> tuple[str, bool]:
+    """Resolve actor for display.
+
+    Returns (display_value, is_worktree_fallback).
+    - If actor is set and meaningful → (actor, False)
+    - Else → (worktree git user.name, True)
+
+    Callers should render the fallback case with a visual hint so users
+    can distinguish a flow-level signature from a worktree default.
+    """
+    from vibe3.services.signature_service import SignatureService
+
+    if actor and not SignatureService._is_placeholder(actor):
+        return actor, False
+    return SignatureService.get_worktree_actor(), True
+
+
 def _render_flow_row(
     flow: FlowStatusResponse,
     title: str | None = None,
@@ -46,8 +63,10 @@ def _render_flow_row(
         _kv("worktree", worktree, 1)
     if flow.initiated_by:
         _kv("initiated_by", flow.initiated_by, 1)
-    if flow.latest_actor:
-        _kv("actor", flow.latest_actor, 1)
+    # Always show actor — fallback to worktree identity when flow has no signature
+    _actor, _fallback = _display_actor(flow.latest_actor)
+    _suffix = " [dim](worktree)[/]" if _fallback else ""
+    _kv("actor", f"{_actor}{_suffix}", 1)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()
@@ -139,15 +158,16 @@ def render_flow_status(
     if status.initiated_by:
         _kv("initiated_by", status.initiated_by, 1)
 
-    # Compact actor summary
-    if status.latest_actor:
-        actors = [
-            f"[dim]latest:[/] {status.latest_actor or '—'}",
-            f"[dim]plan:[/] {status.planner_actor or '—'}",
-            f"[dim]run:[/] {status.executor_actor or '—'}",
-            f"[dim]review:[/] {status.reviewer_actor or '—'}",
-        ]
-        console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
+    # Always show actor — fallback to worktree identity when flow has no signature
+    _actor, _fallback = _display_actor(status.latest_actor)
+    _suffix = " [dim](worktree)[/]" if _fallback else ""
+    actors = [
+        f"[dim]latest:[/] {_actor}{_suffix}",
+        f"[dim]plan:[/] {status.planner_actor or '—'}",
+        f"[dim]run:[/] {status.executor_actor or '—'}",
+        f"[dim]review:[/] {status.reviewer_actor or '—'}",
+    ]
+    console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
 
     if milestone_data:
         render_milestone(milestone_data, status.task_issue_number)

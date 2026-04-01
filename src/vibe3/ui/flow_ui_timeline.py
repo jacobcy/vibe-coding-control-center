@@ -106,15 +106,18 @@ def render_flow_timeline(
     if state.initiated_by:
         _kv("initiated_by", state.initiated_by, 1)
 
-    # Compact actor summary
-    if state.latest_actor:
-        actors = [
-            f"[dim]latest:[/] {state.latest_actor or '—'}",
-            f"[dim]plan:[/] {state.planner_actor or '—'}",
-            f"[dim]run:[/] {state.executor_actor or '—'}",
-            f"[dim]review:[/] {state.reviewer_actor or '—'}",
-        ]
-        console.print(f"  [dim]actor[/]       {'  '.join(actors)}")
+    # Always show actor — fallback to worktree identity when flow has no signature
+    from vibe3.ui.flow_ui import _display_actor
+
+    _actor, _fallback = _display_actor(state.latest_actor)
+    _suffix = " [dim](worktree)[/]" if _fallback else ""
+    actors = [
+        f"[dim]latest:[/] {_actor}{_suffix}",
+        f"[dim]plan:[/] {state.planner_actor or '—'}",
+        f"[dim]run:[/] {state.executor_actor or '—'}",
+        f"[dim]review:[/] {state.reviewer_actor or '—'}",
+    ]
+    console.print(f"  [dim]actor[/]       {'  '.join(actors)}")
     console.print()
 
     if not events:

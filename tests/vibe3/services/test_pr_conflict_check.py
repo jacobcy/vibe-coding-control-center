@@ -189,18 +189,23 @@ def test_merge_pr_success(pr_service: PRService, mock_github_client: MagicMock) 
 
     with patch.object(pr_service, "github_client", mock_github_client):
         with patch.object(pr_service, "store", mock_store):
-            pr = pr_service.merge_pr(123)
+            # Mock SignatureService so result is deterministic regardless of git config
+            with patch(
+                "vibe3.services.pr_service.SignatureService.resolve_for_branch",
+                return_value="test-actor",
+            ):
+                pr = pr_service.merge_pr(123)
 
             assert pr.state == PRState.MERGED
             mock_github_client.merge_pr.assert_called_once_with(123)
             mock_store.update_flow_state.assert_called_once_with(
                 "feature-branch",
                 flow_status="done",
-                latest_actor="workflow",
+                latest_actor="test-actor",
             )
             mock_store.add_event.assert_called_once_with(
                 "feature-branch",
                 "pr_merge",
-                "workflow",
+                "test-actor",
                 "PR #123 merged",
             )

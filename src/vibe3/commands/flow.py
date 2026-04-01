@@ -134,16 +134,20 @@ def update(
         # Register/Ensure flow
         flow = flow_service.ensure_flow_for_branch(branch=branch, slug=name)
 
-        # Update metadata if explicitly provided
+        # Update metadata if explicitly provided — keep name and actor separate
+        # to avoid silently writing worktree identity when only --name is given.
         if name or actor:
-            from vibe3.services.signature_service import SignatureService
+            updates: dict[str, object] = {}
+            if name:
+                updates["flow_slug"] = name
+            if actor:
+                from vibe3.services.signature_service import SignatureService
 
-            effective_actor = SignatureService.resolve_actor(explicit_actor=actor)
-            flow_service.store.update_flow_state(
-                branch,
-                flow_slug=name if name else flow.flow_slug,
-                latest_actor=effective_actor,
-            )
+                updates["latest_actor"] = SignatureService.resolve_actor(
+                    explicit_actor=actor
+                )
+            if updates:
+                flow_service.store.update_flow_state(branch, **updates)
             # Re-fetch flow state
             updated = flow_service.get_flow_status(branch)
             if updated:
