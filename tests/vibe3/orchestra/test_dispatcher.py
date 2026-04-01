@@ -38,11 +38,12 @@ class TestDispatcherReviewWorktreeResolution:
         with patch.object(
             dispatcher, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch(
-                "subprocess.run",
-                return_value=CompletedProcess(returncode=0),
-            ) as mock_run:
-                result = dispatcher.dispatch_pr_review(42)
+            with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch(
+                    "subprocess.run",
+                    return_value=CompletedProcess(returncode=0),
+                ) as mock_run:
+                    result = dispatcher.dispatch_pr_review(42)
 
         assert result is True
         mock_run.assert_called_once()
@@ -57,11 +58,12 @@ class TestDispatcherReviewWorktreeResolution:
         with patch.object(
             dispatcher, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch(
-                "subprocess.run",
-                return_value=CompletedProcess(returncode=0),
-            ) as mock_run:
-                result = dispatcher.dispatch_pr_review(42)
+            with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch(
+                    "subprocess.run",
+                    return_value=CompletedProcess(returncode=0),
+                ) as mock_run:
+                    result = dispatcher.dispatch_pr_review(42)
 
         assert result is True
         mock_run.assert_called_once()
@@ -98,8 +100,9 @@ class TestDispatcherReviewWorktreeResolution:
             dispatcher.orchestrator,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            with patch("subprocess.run") as mock_run:
-                result = dispatcher.dispatch_manager(issue)
+            with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch("subprocess.run") as mock_run:
+                    result = dispatcher.dispatch_manager(issue)
 
         assert result is True
         mock_create_flow.assert_not_called()

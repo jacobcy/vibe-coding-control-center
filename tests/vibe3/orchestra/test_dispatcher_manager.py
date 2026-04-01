@@ -26,9 +26,11 @@ class TestManagerCwdResolution:
         dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
 
         with patch.object(dispatcher, "_is_current_branch", return_value=True):
-            cwd = dispatcher._resolve_manager_cwd(88, "task/issue-88")
+            with patch.object(dispatcher, "can_dispatch", return_value=True):
+                cwd, is_temp = dispatcher._resolve_manager_cwd(88, "task/issue-88")
 
         assert cwd == Path("/tmp/repo")
+        assert is_temp is False
 
     def test_resolve_manager_cwd_uses_existing_branch_worktree(self):
         config = OrchestraConfig()
@@ -40,9 +42,10 @@ class TestManagerCwdResolution:
                 "_find_worktree_for_branch",
                 return_value=Path("/tmp/wt-issue-88"),
             ):
-                cwd = dispatcher._resolve_manager_cwd(88, "task/issue-88")
+                cwd, is_temp = dispatcher._resolve_manager_cwd(88, "task/issue-88")
 
         assert cwd == Path("/tmp/wt-issue-88")
+        assert is_temp is False
 
     def test_resolve_manager_cwd_creates_worktree_when_missing(self):
         config = OrchestraConfig()
@@ -57,11 +60,12 @@ class TestManagerCwdResolution:
                 with patch.object(
                     dispatcher,
                     "_ensure_manager_worktree",
-                    return_value=Path("/tmp/repo/.worktrees/issue-88"),
+                    return_value=(Path("/tmp/repo/.worktrees/issue-88"), True),
                 ):
-                    cwd = dispatcher._resolve_manager_cwd(88, "task/issue-88")
+                    cwd, is_temp = dispatcher._resolve_manager_cwd(88, "task/issue-88")
 
         assert cwd == Path("/tmp/repo/.worktrees/issue-88")
+        assert is_temp is True
 
     def test_ensure_manager_worktree_creates_new_worktree(self, tmp_path: Path):
         config = OrchestraConfig()
@@ -71,9 +75,10 @@ class TestManagerCwdResolution:
             "subprocess.run",
             return_value=CompletedProcess(returncode=0),
         ) as mock_run:
-            path = dispatcher._ensure_manager_worktree(77, "task/issue-77")
+            path, is_temp = dispatcher._ensure_manager_worktree(77, "task/issue-77")
 
         assert path == tmp_path / ".worktrees" / "issue-77"
+        assert is_temp is True
         assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
         assert mock_run.call_args.kwargs["cwd"] == tmp_path
 
@@ -84,9 +89,9 @@ class TestManagerCwdResolution:
         existing.mkdir(parents=True)
 
         with patch("subprocess.run") as mock_run:
-            path = dispatcher._ensure_manager_worktree(77, "task/issue-77")
+            result = dispatcher._ensure_manager_worktree(77, "task/issue-77")
 
-        assert path is None
+        assert result == (None, False)
         mock_run.assert_not_called()
 
 
@@ -156,29 +161,30 @@ class TestManagerDispatchIntegration:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-102"),
+                return_value=(Path("/tmp/wt-issue-102"), False),
             ):
                 with patch.object(
                     dispatcher, "_normalize_manager_command", return_value=["uv"]
                 ):
-                    with patch.object(
-                        dispatcher.result_handler,
-                        "record_dispatch_event",
-                        return_value=None,
-                    ) as mock_record_event:
+                    with patch.object(dispatcher, "can_dispatch", return_value=True):
                         with patch.object(
-                            dispatcher.orchestrator,
-                            "get_pr_for_issue",
-                            return_value=None,  # No PR for this test
-                        ):
+                            dispatcher.result_handler,
+                            "record_dispatch_event",
+                            return_value=None,
+                        ) as mock_record_event:
                             with patch.object(
-                                dispatcher.result_handler, "update_state_label"
+                                dispatcher.orchestrator,
+                                "get_pr_for_issue",
+                                return_value=None,  # No PR for this test
                             ):
-                                with patch(
-                                    "subprocess.run",
-                                    return_value=CompletedProcess(returncode=0),
-                                ) as mock_run:
-                                    result = dispatcher.dispatch_manager(issue)
+                                with patch.object(
+                                    dispatcher.result_handler, "update_state_label"
+                                ):
+                                    with patch(
+                                        "subprocess.run",
+                                        return_value=CompletedProcess(returncode=0),
+                                    ) as mock_run:
+                                        result = dispatcher.dispatch_manager(issue)
 
         assert result is True
         mock_record_event.assert_called_once_with(

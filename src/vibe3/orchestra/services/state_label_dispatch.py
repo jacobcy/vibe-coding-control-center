@@ -15,7 +15,7 @@ from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
-    pass
+    from vibe3.orchestra.services.status_service import OrchestraStatusService
 
 
 class StateLabelDispatchService(ServiceBase):
@@ -38,6 +38,7 @@ class StateLabelDispatchService(ServiceBase):
         dispatcher: Dispatcher | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
+        status_service: "OrchestraStatusService" | None = None,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
@@ -45,6 +46,7 @@ class StateLabelDispatchService(ServiceBase):
         )
         self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
         self._github = github or GitHubClient()
+        self._status_service = status_service
         self._dispatched_issues: set[int] = set()
         self._in_flight_dispatches: set[int] = set()
         self._dispatch_guard = asyncio.Lock()
@@ -150,6 +152,15 @@ class StateLabelDispatchService(ServiceBase):
 
         dispatched = False
         try:
+            # Global Capacity Check: don't start new work if system is already full.
+            # This is the primary guard against the "avalanche" of manager processes.
+            if self._status_service:
+                active_count = self._status_service.get_active_flow_count()
+                if active_count >= self.config.max_concurrent_flows:
+                    limit = self.config.max_concurrent_flows
+                    log.warning(f"Throttled: Capacity reached ({active_count}/{limit})")
+                    return
+
             # Skip if flow already exists
             if self._has_flow(issue.number):
                 log.debug("Skip dispatch: flow already exists")

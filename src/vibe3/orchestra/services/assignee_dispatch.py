@@ -13,6 +13,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
 from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
+from vibe3.orchestra.services.status_service import OrchestraStatusService
 
 _PRIORITY_MAP: dict[str, int] = {
     "priority/urgent": 0,
@@ -38,12 +39,16 @@ class AssigneeDispatchService(ServiceBase):
         dispatcher: Dispatcher | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
+        status_service: OrchestraStatusService | None = None,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
         self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
+        self._status_service = status_service or OrchestraStatusService(
+            config, orchestrator=self._dispatcher.orchestrator
+        )
         self._dep_checker = DependencyChecker(
             repo=config.repo,
             github=github,
@@ -161,6 +166,16 @@ class AssigneeDispatchService(ServiceBase):
         if not resolved:
             log.info(f"Deferred: blocked by {blockers}")
             return
+
+        # Global Capacity Check: verify system-wide concurrency limit
+        try:
+            active_count = self._status_service.get_active_flow_count()
+            capacity = self.config.max_concurrent_flows
+            if active_count >= capacity:
+                log.warning(f"Deferred: system at capacity ({active_count}/{capacity})")
+                return
+        except Exception as e:
+            log.error(f"Capacity check failed: {e}")
 
         loop = asyncio.get_running_loop()
         dispatched = await loop.run_in_executor(

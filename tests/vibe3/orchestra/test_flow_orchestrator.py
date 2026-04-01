@@ -73,19 +73,20 @@ class TestFlowOrchestrator:
             def model_dump(self):  # type: ignore[no-untyped-def]
                 return {"branch": "task/issue-222", "flow_slug": "issue-222"}
 
-        with patch.object(orchestrator.git, "branch_exists", return_value=False):
-            with patch.object(
-                orchestrator.git, "create_branch_ref", return_value=None
-            ) as mock_create_ref:
+        with patch.object(orchestrator, "get_active_flow_count", return_value=0):
+            with patch.object(orchestrator.git, "branch_exists", return_value=False):
                 with patch.object(
-                    orchestrator.flow_service,
-                    "create_flow",
-                    return_value=_Flow(),
-                ) as mock_create_flow:
+                    orchestrator.git, "create_branch_ref", return_value=None
+                ) as mock_create_ref:
                     with patch.object(
-                        orchestrator.task_service, "link_issue", return_value=None
-                    ) as mock_link_issue:
-                        flow = orchestrator.create_flow_for_issue(issue)
+                        orchestrator.flow_service,
+                        "create_flow",
+                        return_value=_Flow(),
+                    ) as mock_create_flow:
+                        with patch.object(
+                            orchestrator.task_service, "link_issue", return_value=None
+                        ) as mock_link_issue:
+                            flow = orchestrator.create_flow_for_issue(issue)
 
         assert flow["branch"] == "task/issue-222"
         mock_create_ref.assert_called_once_with(

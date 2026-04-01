@@ -194,6 +194,10 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
         # audit record, not an agent claim, so the distinction is fine.
         event_actor = effective_actor or SignatureService.get_worktree_actor()
 
+        # Resolve initiator if not explicitly provided (e.g. manual CLI create)
+        if initiated_by is None:
+            initiated_by = SignatureService.resolve_initiator(branch)
+
         self.store.update_flow_state(
             branch,
             flow_slug=slug,

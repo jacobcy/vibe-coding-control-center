@@ -202,6 +202,20 @@ class OrchestraStatusService:
             logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
             return {}
 
+    def get_active_flow_count(self) -> int:
+        """Get count of active flows directly from the local database."""
+        try:
+            from vibe3.clients import SQLiteClient
+
+            store = SQLiteClient()
+            count = store.get_active_flow_count()
+            return count
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to count active flows: {exc}"
+            )
+            return 0
+
     def _get_circuit_breaker_state(self) -> str:
         """Get current circuit breaker state."""
         if self._circuit_breaker:

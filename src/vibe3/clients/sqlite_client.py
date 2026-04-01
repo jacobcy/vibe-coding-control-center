@@ -248,6 +248,19 @@ class SQLiteClient:
             ).debug("Retrieved all flows")
             return flows
 
+    def get_active_flow_count(self) -> int:
+        """Get count of active flows."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM flow_state WHERE flow_status = 'active'"
+            )
+            count = cursor.fetchone()[0]
+            logger.bind(
+                external="sqlite", operation="get_active_flow_count", count=count
+            ).debug("Retrieved active flow count")
+            return int(count)
+
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get all flows linked to a given issue number."""
         with sqlite3.connect(self.db_path) as conn:

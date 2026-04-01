@@ -13,6 +13,7 @@ from vibe3.orchestra.dispatcher_worktree import WorktreeResolverMixin
 from vibe3.orchestra.executor import run_command
 from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.orchestra.result_handler import DispatchResultHandler
+from vibe3.orchestra.services.status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
     from vibe3.prompts.models import PromptRecipe, PromptRenderResult
@@ -33,11 +34,15 @@ class Dispatcher(WorktreeResolverMixin):
         orchestrator: FlowOrchestrator | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         prompts_path: Path | None = None,
+        status_service: OrchestraStatusService | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.repo_path = repo_path or Path.cwd()
         self.orchestrator = orchestrator or FlowOrchestrator(config)
+        self._status_service = status_service or OrchestraStatusService(
+            config, orchestrator=self.orchestrator
+        )
 
         # Components
         self.command_builder = CommandBuilder(config, prompts_path=prompts_path)
@@ -86,6 +91,13 @@ class Dispatcher(WorktreeResolverMixin):
             action="manager_dispatch",
             issue=issue.number,
         )
+
+        if not self.can_dispatch():
+            log.warning(
+                f"Dispatch skipped for #{issue.number}: system at capacity "
+                f"({self.config.max_concurrent_flows} flows)"
+            )
+            return False
 
         cmd = self.command_builder.build_manager_command(issue)
 
@@ -144,13 +156,14 @@ class Dispatcher(WorktreeResolverMixin):
             return success
         finally:
             if is_temporary and manager_cwd:
-                log.info(f"Recycling temporary worktree: {manager_cwd}")
-                try:
-                    from vibe3.clients.git_client import GitClient
-
-                    GitClient().remove_worktree(manager_cwd, force=True)
-                except Exception as e:
-                    log.warning(f"Failed to recycle worktree {manager_cwd}: {e}")
+                # Worktree recycling is now handled by GovernanceService based on
+                # Flow completion. We no longer delete worktrees immediately upon
+                # manager process exit to protect ongoing asynchronous tasks
+                # (e.g. vibe3 run --async) and preserve state.
+                log.info(
+                    f"Flow environment preserved at: {manager_cwd}. "
+                    "Recycling managed by governance policy."
+                )
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
         """Dispatch PR review command."""
@@ -159,6 +172,10 @@ class Dispatcher(WorktreeResolverMixin):
             action="review_dispatch",
             pr_number=pr_number,
         )
+
+        if not self.can_dispatch():
+            log.warning(f"Review dispatch skipped for #{pr_number}: system at capacity")
+            return False
 
         cmd = self.command_builder.build_pr_review_command(pr_number)
         review_cwd = self._resolve_review_cwd_for_dispatch(pr_number)
@@ -211,3 +228,39 @@ class Dispatcher(WorktreeResolverMixin):
     def _record_dispatch_event(self, *args: Any, **kwargs: Any) -> None:
         """Proxy for tests."""
         self.result_handler.record_dispatch_event(*args, **kwargs)
+
+    def _should_skip_cleanup(self, issue_number: int) -> bool:
+        """Helper to decide if we should skip recycling a worktree.
+
+        Returns True if the issue state label is still 'in-progress'.
+        """
+        try:
+            from vibe3.models.orchestration import IssueState
+            from vibe3.services.label_service import LabelService
+
+            state = LabelService(repo=self.config.repo).get_state(issue_number)
+            return state == IssueState.IN_PROGRESS
+        except Exception:
+            # On error, play it safe and skip cleanup
+            return True
+
+    def can_dispatch(self) -> bool:
+        """Unified check: is the system allowed to take on more work?
+
+        Checks global active flow count via status_service.
+        """
+        if not self._status_service:
+            return True
+
+        try:
+            active_count = self._status_service.get_active_flow_count()
+            capacity = self.config.max_concurrent_flows
+            if active_count >= capacity:
+                logger.bind(domain="orchestra").warning(
+                    f"Throttled: Capacity reached ({active_count}/{capacity})"
+                )
+                return False
+            return True
+        except Exception as e:
+            logger.bind(domain="orchestra").error(f"Capacity check failed: {e}")
+            return False

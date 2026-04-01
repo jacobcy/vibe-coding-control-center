@@ -35,24 +35,25 @@ class TestDispatcherFeedbackLoop:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-100"),
+                return_value=(Path("/tmp/wt-issue-100"), False),
             ):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ):
-                    with patch.object(
-                        dispatcher.orchestrator,
-                        "get_pr_for_issue",
-                        return_value=123,
+                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                    with patch(
+                        "subprocess.run",
+                        return_value=CompletedProcess(returncode=0),
                     ):
                         with patch.object(
-                            dispatcher.result_handler, "update_state_label"
-                        ) as mock_update:
+                            dispatcher.orchestrator,
+                            "get_pr_for_issue",
+                            return_value=123,
+                        ):
                             with patch.object(
-                                dispatcher.result_handler, "record_dispatch_event"
-                            ) as mock_record:
-                                result = dispatcher.dispatch_manager(issue)
+                                dispatcher.result_handler, "update_state_label"
+                            ) as mock_update:
+                                with patch.object(
+                                    dispatcher.result_handler, "record_dispatch_event"
+                                ) as mock_record:
+                                    result = dispatcher.dispatch_manager(issue)
 
         assert result is True
         # Should have called update_state_label with REVIEW (last call)
@@ -77,24 +78,25 @@ class TestDispatcherFeedbackLoop:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-101"),
+                return_value=(Path("/tmp/wt-issue-101"), False),
             ):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ):
-                    with patch.object(
-                        dispatcher.orchestrator,
-                        "get_pr_for_issue",
-                        return_value=None,  # No PR
+                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                    with patch(
+                        "subprocess.run",
+                        return_value=CompletedProcess(returncode=0),
                     ):
                         with patch.object(
-                            dispatcher.result_handler, "update_state_label"
-                        ) as mock_update:
+                            dispatcher.orchestrator,
+                            "get_pr_for_issue",
+                            return_value=None,  # No PR
+                        ):
                             with patch.object(
-                                dispatcher.result_handler, "record_dispatch_event"
-                            ):
-                                result = dispatcher.dispatch_manager(issue)
+                                dispatcher.result_handler, "update_state_label"
+                            ) as mock_update:
+                                with patch.object(
+                                    dispatcher.result_handler, "record_dispatch_event"
+                                ):
+                                    result = dispatcher.dispatch_manager(issue)
 
         assert result is True
         # Should have called update_state_label with IN_PROGRESS (before execution)
@@ -118,29 +120,31 @@ class TestDispatcherFeedbackLoop:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-102"),
+                return_value=(Path("/tmp/wt-issue-102"), False),
             ):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(
-                        returncode=1, stderr="Error: rate limit exceeded"
-                    ),
-                ):
-                    with patch.object(
-                        dispatcher.result_handler, "update_state_label"
-                    ) as mock_update:
+                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                    with patch(
+                        "subprocess.run",
+                        return_value=CompletedProcess(
+                            returncode=1, stderr="Error: rate limit exceeded"
+                        ),
+                    ):
                         with patch.object(
-                            dispatcher.result_handler, "post_failure_comment"
-                        ) as mock_comment:
+                            dispatcher.result_handler, "update_state_label"
+                        ) as mock_update:
                             with patch.object(
-                                dispatcher.orchestrator,
-                                "get_flow_for_issue",
-                                return_value={"branch": "task/issue-102"},
-                            ):
+                                dispatcher.result_handler, "post_failure_comment"
+                            ) as mock_comment:
                                 with patch.object(
-                                    dispatcher.result_handler, "record_dispatch_event"
+                                    dispatcher.orchestrator,
+                                    "get_flow_for_issue",
+                                    return_value={"branch": "task/issue-102"},
                                 ):
-                                    result = dispatcher.dispatch_manager(issue)
+                                    with patch.object(
+                                        dispatcher.result_handler,
+                                        "record_dispatch_event",
+                                    ):
+                                        result = dispatcher.dispatch_manager(issue)
 
         assert result is False
         # Should have set state to BLOCKED
@@ -168,27 +172,29 @@ class TestDispatcherFeedbackLoop:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-103"),
+                return_value=(Path("/tmp/wt-issue-103"), False),
             ):
-                with patch(
-                    "subprocess.run",
-                    side_effect=subprocess.TimeoutExpired(cmd=[], timeout=3600),
-                ):
-                    with patch.object(
-                        dispatcher.result_handler, "update_state_label"
-                    ) as mock_update:
+                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                    with patch(
+                        "subprocess.run",
+                        side_effect=subprocess.TimeoutExpired(cmd=[], timeout=3600),
+                    ):
                         with patch.object(
-                            dispatcher.result_handler, "post_failure_comment"
-                        ):
+                            dispatcher.result_handler, "update_state_label"
+                        ) as mock_update:
                             with patch.object(
-                                dispatcher.orchestrator,
-                                "get_flow_for_issue",
-                                return_value={"branch": "task/issue-103"},
+                                dispatcher.result_handler, "post_failure_comment"
                             ):
                                 with patch.object(
-                                    dispatcher.result_handler, "record_dispatch_event"
+                                    dispatcher.orchestrator,
+                                    "get_flow_for_issue",
+                                    return_value={"branch": "task/issue-103"},
                                 ):
-                                    result = dispatcher.dispatch_manager(issue)
+                                    with patch.object(
+                                        dispatcher.result_handler,
+                                        "record_dispatch_event",
+                                    ):
+                                        result = dispatcher.dispatch_manager(issue)
 
         assert result is False
         # Should have set state to BLOCKED
@@ -211,29 +217,31 @@ class TestDispatcherFeedbackLoop:
             with patch.object(
                 dispatcher,
                 "_resolve_manager_cwd",
-                return_value=Path("/tmp/wt-issue-104"),
+                return_value=(Path("/tmp/wt-issue-104"), False),
             ):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(
-                        returncode=1, stderr="Error: merge conflict in file.py"
-                    ),
-                ):
-                    with patch.object(
-                        dispatcher.result_handler, "update_state_label"
-                    ) as mock_update:
+                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                    with patch(
+                        "subprocess.run",
+                        return_value=CompletedProcess(
+                            returncode=1, stderr="Error: merge conflict in file.py"
+                        ),
+                    ):
                         with patch.object(
-                            dispatcher.result_handler, "post_failure_comment"
-                        ) as mock_comment:
+                            dispatcher.result_handler, "update_state_label"
+                        ) as mock_update:
                             with patch.object(
-                                dispatcher.orchestrator,
-                                "get_flow_for_issue",
-                                return_value={"branch": "task/issue-104"},
-                            ):
+                                dispatcher.result_handler, "post_failure_comment"
+                            ) as mock_comment:
                                 with patch.object(
-                                    dispatcher.result_handler, "record_dispatch_event"
+                                    dispatcher.orchestrator,
+                                    "get_flow_for_issue",
+                                    return_value={"branch": "task/issue-104"},
                                 ):
-                                    result = dispatcher.dispatch_manager(issue)
+                                    with patch.object(
+                                        dispatcher.result_handler,
+                                        "record_dispatch_event",
+                                    ):
+                                        result = dispatcher.dispatch_manager(issue)
 
         assert result is False
         # Should NOT have posted comment (business error)

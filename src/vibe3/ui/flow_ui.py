@@ -67,7 +67,7 @@ def _render_flow_row(
     # Always show actor — fallback to worktree identity when flow has no signature
     _actor, _fallback = _display_actor(flow.latest_actor)
     _suffix = " [dim](worktree)[/]" if _fallback else ""
-    _kv("actor", f"{_actor}{_suffix}", 1)
+    _kv("latest", f"{_actor}{_suffix}", 1)
     if pr_data:
         draft_tag = " [dim][draft][/]" if pr_data.get("draft") else ""
         state = str(pr_data.get("state", "")).lower()

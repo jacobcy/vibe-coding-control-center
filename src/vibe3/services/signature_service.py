@@ -7,6 +7,9 @@ from vibe3.clients.git_client import GitClient
 WORKFLOW_ACTOR = "workflow"
 AI_ASSISTANT_ACTORS = {"ai-assistant", "ai_assistant"}
 
+ORCHESTRA_DISPATCHER = "orchestra:dispatcher"
+MANUAL_INITIATOR = "manual"
+
 # Placeholder actors for FLOW OPERATIONS (resolve_actor / _is_placeholder).
 # These signal "no meaningful actor has claimed this operation."
 _PLACEHOLDER_ACTORS = {"", "unknown", "server", "system", "workflow"}
@@ -134,3 +137,16 @@ class SignatureService:
         flow_data = flow_data_raw if isinstance(flow_data_raw, dict) else {}
         flow_actor = flow_data.get("latest_actor")
         return cls.resolve_actor(explicit_actor, flow_actor)
+
+    @classmethod
+    def resolve_initiator(cls, branch: str) -> str:
+        """Resolve the primary initiator for a new flow.
+
+        Logic:
+        1. If branch follows orchestra managed pattern (task/issue-N)
+           -> orchestra:dispatcher
+        2. Else -> manual
+        """
+        if branch.startswith("task/issue-"):
+            return ORCHESTRA_DISPATCHER
+        return MANUAL_INITIATOR
