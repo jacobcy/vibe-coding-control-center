@@ -79,7 +79,8 @@ class FlowOrchestrator:
             flow_state = self.flow_service.create_flow(
                 slug=slug,
                 branch=branch,
-                actor="orchestra",
+                actor=None,
+                initiated_by="orchestra:dispatcher",
             )
         except Exception as exc:
             # Guard against race condition: re-check if flow was created concurrently
@@ -95,9 +96,7 @@ class FlowOrchestrator:
 
         # Bind issue via TaskService
         try:
-            self.task_service.link_issue(
-                branch, issue.number, "task", actor="orchestra"
-            )
+            self.task_service.link_issue(branch, issue.number, "task", actor=None)
         except Exception as exc:
             log.warning(f"Failed to link issue #{issue.number} to flow: {exc}")
 
