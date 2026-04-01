@@ -43,6 +43,12 @@ class OrchestraPRReviewDispatchSettings(BaseModel):
     use_worktree: bool = False
 
 
+class OrchestraStateLabelDispatchSettings(BaseModel):
+    """Settings for state/ready label-driven dispatch."""
+
+    enabled: bool = True
+
+
 class OrchestraCircuitBreakerSettings(BaseModel):
     """Circuit breaker settings for orchestra dispatch."""
 
@@ -82,6 +88,9 @@ class OrchestraSettings(BaseModel):
     )
     pr_review_dispatch: OrchestraPRReviewDispatchSettings = Field(
         default_factory=OrchestraPRReviewDispatchSettings
+    )
+    state_label_dispatch: OrchestraStateLabelDispatchSettings = Field(
+        default_factory=OrchestraStateLabelDispatchSettings
     )
     master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
     circuit_breaker: OrchestraCircuitBreakerSettings = Field(

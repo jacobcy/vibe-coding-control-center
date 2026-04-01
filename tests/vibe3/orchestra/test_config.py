@@ -24,6 +24,7 @@ def test_default_config():
     assert OrchestraConfig().pr_review_dispatch.enabled is True
     assert OrchestraConfig().pr_review_dispatch.async_mode is False
     assert OrchestraConfig().pr_review_dispatch.use_worktree is False
+    assert OrchestraConfig().state_label_dispatch.enabled is True
     pid_path = OrchestraConfig().pid_file.as_posix()
     assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
         ".git/vibe3/orchestra.pid"
@@ -96,6 +97,9 @@ def test_from_settings_loads_yaml_config():
                             "async_mode": True,
                             "use_worktree": True,
                         },
+                        "state_label_dispatch": {
+                            "enabled": False,
+                        },
                         "governance": {
                             "enabled": True,
                             "interval_ticks": 6,
@@ -130,6 +134,7 @@ def test_from_settings_loads_yaml_config():
             assert config.pr_review_dispatch.enabled is False
             assert config.pr_review_dispatch.async_mode is True
             assert config.pr_review_dispatch.use_worktree is True
+            assert config.state_label_dispatch.enabled is False
             assert config.governance.enabled is True
             assert config.governance.interval_ticks == 6
             assert config.governance.skill == "custom-skill"

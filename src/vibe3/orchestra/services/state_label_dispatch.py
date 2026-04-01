@@ -23,12 +23,14 @@ class StateLabelDispatchService(ServiceBase):
 
     This service implements the 'label-driven' orchestration flow:
     1. Orchestra agent (AI) or Human adds 'state/ready' label to an issue.
-    2. This service detects the label during its periodic on_tick() scan.
+    2. This service detects the label via:
+       - GitHub webhook `issues/labeled` event (real-time)
+       - Periodic on_tick() scan (polling fallback)
     3. It triggers Dispatcher.dispatch_manager(issue) if not already running.
     """
 
-    # We only use on_tick for scanning labels (pull model)
-    subscribed_events: list[str] = []
+    # Subscribe to issues events to catch label changes in real-time
+    event_types = ["issues"]
 
     def __init__(
         self,
@@ -44,6 +46,31 @@ class StateLabelDispatchService(ServiceBase):
         self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
         self._github = github or GitHubClient()
         self._dispatched_issues: set[int] = set()
+
+    async def handle_event(self, event: GitHubEvent) -> None:
+        """React to issues/labeled webhook event."""
+        if event.action != "labeled":
+            return
+
+        label_name = (event.payload.get("label") or {}).get("name", "")
+        if label_name != "state/ready":
+            return
+
+        issue_payload = event.payload.get("issue", {})
+        issue = IssueInfo.from_github_payload(issue_payload)
+        if issue is None:
+            return
+
+        # Double check: ensure it doesn't also have in-progress
+        # (webhook payload 'issue' reflects state AFTER the action)
+        labels = [lb.get("name", "") for lb in issue_payload.get("labels", [])]
+        if "state/in-progress" in labels:
+            return
+
+        log = logger.bind(domain="orchestra", issue=issue.number, source="webhook")
+        log.info(f"Webhook: #{issue.number} labeled with {label_name!r}")
+
+        await self._dispatch_if_needed(issue)
 
     async def on_tick(self) -> None:
         """Scan for issues with state/ready label and no state/in-progress."""
@@ -112,6 +139,7 @@ class StateLabelDispatchService(ServiceBase):
 
         # Skip if flow already exists
         if self._has_flow(issue.number):
+            self._dispatched_issues.add(issue.number)
             log.debug("Skip dispatch: flow already exists")
             return
 
@@ -136,7 +164,3 @@ class StateLabelDispatchService(ServiceBase):
                 f"Flow lookup failed for issue #{issue_number}: {exc}"
             )
             return False
-
-    async def handle_event(self, event: GitHubEvent) -> None:
-        """Not used as we don't subscribe to events."""
-        pass

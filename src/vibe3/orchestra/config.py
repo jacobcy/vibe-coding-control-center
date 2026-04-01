@@ -72,6 +72,12 @@ class PRReviewDispatchConfig(BaseModel):
     use_worktree: bool = False
 
 
+class StateLabelDispatchConfig(BaseModel):
+    """Configuration for state/ready label-based manager dispatch."""
+
+    enabled: bool = True
+
+
 class MasterAgentConfig(BaseModel):
     """Master agent configuration."""
 
@@ -133,12 +139,6 @@ class GovernanceConfig(BaseModel):
             "Run governance scan every N heartbeat ticks (~1h at default interval)"
         ),
     )
-
-
-class StateLabelDispatchConfig(BaseModel):
-    """Configuration for state/ready label-based manager dispatch."""
-
-    enabled: bool = True
 
 
 class OrchestraConfig(BaseModel):
@@ -262,10 +262,8 @@ class OrchestraConfig(BaseModel):
                 use_worktree=src.pr_review_dispatch.use_worktree,
             ),
             state_label_dispatch=StateLabelDispatchConfig(
-                enabled=(
-                    getattr(src, "state_label_dispatch", True)
-                    if not isinstance(getattr(src, "state_label_dispatch", True), bool)
-                    else getattr(src, "state_label_dispatch", True)
+                enabled=getattr(
+                    getattr(src, "state_label_dispatch", None), "enabled", True
                 )
             ),
             circuit_breaker=circuit_breaker_config,

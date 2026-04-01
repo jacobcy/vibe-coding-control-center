@@ -367,6 +367,10 @@ orchestra:
     # reviewer 默认复用 PR 对应已有 worktree；如需强制新 worktree 可开启
     use_worktree: false
 
+  # State label-driven dispatch
+  state_label_dispatch:
+    enabled: true
+
   # @mention auto-ack in issue comments
   comment_reply:
     enabled: false
