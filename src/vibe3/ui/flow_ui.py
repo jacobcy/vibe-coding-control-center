@@ -44,6 +44,8 @@ def _render_flow_row(
         _kv("title", title, 1)
     if worktree:
         _kv("worktree", worktree, 1)
+    if flow.initiated_by:
+        _kv("initiated_by", flow.initiated_by, 1)
     if flow.latest_actor:
         _kv("actor", flow.latest_actor, 1)
     if pr_data:
@@ -135,13 +137,18 @@ def render_flow_status(
         _kv("next_step", status.next_step, 1)
 
     # Compact actor summary
-    if status.latest_actor:
-        actors = [
-            f"[dim]latest:[/] {status.latest_actor or '—'}",
-            f"[dim]plan:[/] {status.planner_actor or '—'}",
-            f"[dim]run:[/] {status.executor_actor or '—'}",
-            f"[dim]review:[/] {status.reviewer_actor or '—'}",
-        ]
+    if status.latest_actor or status.initiated_by:
+        actors = []
+        if status.initiated_by:
+            actors.append(f"[dim]init:[/] {status.initiated_by}")
+        actors.extend(
+            [
+                f"[dim]latest:[/] {status.latest_actor or '—'}",
+                f"[dim]plan:[/] {status.planner_actor or '—'}",
+                f"[dim]run:[/] {status.executor_actor or '—'}",
+                f"[dim]review:[/] {status.reviewer_actor or '—'}",
+            ]
+        )
         console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
 
     if milestone_data:
