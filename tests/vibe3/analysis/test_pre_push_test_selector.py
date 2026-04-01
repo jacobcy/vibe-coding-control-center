@@ -4,17 +4,17 @@ from vibe3.analysis.pre_push_test_selector import select_pre_push_tests
 
 
 def test_selects_changed_test_files_incrementally() -> None:
-    selection = select_pre_push_tests(["tests/vibe3/services/test_pre_push_scope.py"])
+    selection = select_pre_push_tests(["tests/vibe3/analysis/test_pre_push_scope.py"])
 
     assert selection.mode == "incremental"
-    assert selection.tests == ["tests/vibe3/services/test_pre_push_scope.py"]
+    assert selection.tests == ["tests/vibe3/analysis/test_pre_push_scope.py"]
 
 
 def test_maps_source_file_to_related_tests() -> None:
-    selection = select_pre_push_tests(["src/vibe3/services/pre_push_scope.py"])
+    selection = select_pre_push_tests(["src/vibe3/analysis/pre_push_scope.py"])
 
     assert selection.mode == "incremental"
-    assert "tests/vibe3/services/test_pre_push_scope.py" in selection.tests
+    assert "tests/vibe3/analysis/test_pre_push_scope.py" in selection.tests
 
 
 def test_dag_resolves_tests_for_unmapped_source() -> None:
@@ -60,7 +60,7 @@ def test_uses_smoke_fallback_when_no_targets() -> None:
     selection = select_pre_push_tests(["docs/README.md"])
 
     assert selection.mode == "smoke"
-    assert "tests/vibe3/services/test_pre_push_scope.py" in selection.tests
+    assert "tests/vibe3/analysis/test_pre_push_scope.py" in selection.tests
 
 
 def test_skips_when_no_applicable_files() -> None:
