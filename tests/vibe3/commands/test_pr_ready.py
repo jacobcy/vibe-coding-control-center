@@ -1,5 +1,6 @@
 """Tests for PR ready command."""
 
+import re
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -8,6 +9,12 @@ from vibe3.commands.pr import app
 from vibe3.services.pr_ready_usecase import PrReadyAbortedError
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
@@ -62,10 +69,11 @@ def test_pr_ready_without_arg_and_no_current_pr_shows_error():
 def test_pr_ready_help():
     """pr ready --help shows usage."""
     result = runner.invoke(app, ["ready", "--help"])
+    output = _strip_ansi(result.output)
     assert result.exit_code == 0
-    assert "PR number" in result.output
-    assert "--yes" in result.output
-    assert "reviewer briefing" in result.output
+    assert "PR number" in output
+    assert "--yes" in output
+    assert "reviewer briefing" in output
 
 
 def test_pr_ready_user_abort_exits_zero():
