@@ -67,6 +67,31 @@ class TestGetCommitSubjects:
         )
 
 
+class TestGetGitCommonDir:
+    """get_git_common_dir 测试."""
+
+    def test_returns_absolute_git_common_dir(self) -> None:
+        client = GitClient()
+        with patch.object(client, "_run", return_value="/repo/.git") as mock_run:
+            assert client.get_git_common_dir() == "/repo/.git"
+
+        mock_run.assert_called_once_with(
+            ["rev-parse", "--path-format=absolute", "--git-common-dir"]
+        )
+
+    def test_raises_git_error_on_empty_git_common_dir(self) -> None:
+        client = GitClient()
+        with patch.object(client, "_run", return_value=""):
+            with pytest.raises(GitError, match="returned empty path"):
+                client.get_git_common_dir()
+
+    def test_raises_git_error_on_relative_git_common_dir(self) -> None:
+        client = GitClient()
+        with patch.object(client, "_run", return_value=".git"):
+            with pytest.raises(GitError, match="returned non-absolute path"):
+                client.get_git_common_dir()
+
+
 class TestGetChangedFiles:
     """get_changed_files 统一接口测试."""
 

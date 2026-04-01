@@ -72,6 +72,12 @@ class PRReviewDispatchConfig(BaseModel):
     use_worktree: bool = False
 
 
+class StateLabelDispatchConfig(BaseModel):
+    """Configuration for state/ready label-based manager dispatch."""
+
+    enabled: bool = True
+
+
 class MasterAgentConfig(BaseModel):
     """Master agent configuration."""
 
@@ -158,6 +164,9 @@ class OrchestraConfig(BaseModel):
     comment_reply: CommentReplyConfig = Field(default_factory=CommentReplyConfig)
     pr_review_dispatch: PRReviewDispatchConfig = Field(
         default_factory=PRReviewDispatchConfig
+    )
+    state_label_dispatch: StateLabelDispatchConfig = Field(
+        default_factory=StateLabelDispatchConfig
     )
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
@@ -251,6 +260,11 @@ class OrchestraConfig(BaseModel):
                 enabled=src.pr_review_dispatch.enabled,
                 async_mode=src.pr_review_dispatch.async_mode,
                 use_worktree=src.pr_review_dispatch.use_worktree,
+            ),
+            state_label_dispatch=StateLabelDispatchConfig(
+                enabled=getattr(
+                    getattr(src, "state_label_dispatch", None), "enabled", True
+                )
             ),
             circuit_breaker=circuit_breaker_config,
             governance=GovernanceConfig.model_validate(governance_defaults),
