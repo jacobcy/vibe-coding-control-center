@@ -1,8 +1,9 @@
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
 
+@runtime_checkable
 class AgentBackend(Protocol):
     """可替换的 agent 执行后端接口。"""
 

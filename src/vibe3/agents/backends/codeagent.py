@@ -9,7 +9,6 @@ from typing import Any, Final, cast
 
 from loguru import logger
 
-from vibe3.agents.base import AgentBackend
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -74,7 +73,7 @@ def extract_session_id(stdout: str) -> str | None:
     return match.group(1) if match else None
 
 
-class CodeagentBackend(AgentBackend):
+class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
     def run(
