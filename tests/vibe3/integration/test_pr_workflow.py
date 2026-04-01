@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add scripts to path
 scripts_path = Path(__file__).parent.parent.parent / "scripts" / "python"
 if str(scripts_path) not in sys.path:
@@ -24,12 +26,30 @@ if str(scripts_path) not in sys.path:
 from loguru import logger  # noqa: E402
 
 
+def _gh_authenticated() -> bool:
+    """Return True if gh CLI is available and authenticated."""
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"], capture_output=True, check=False
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+_requires_gh = pytest.mark.skipif(
+    not _gh_authenticated(),
+    reason="gh CLI not authenticated — skipped in CI",
+)
+
+
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run shell command."""
     logger.info(f"Running: {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, capture_output=True, text=True)
 
 
+@_requires_gh
 def test_gh_auth() -> None:
     """Test GitHub CLI authentication."""
     try:
@@ -74,6 +94,7 @@ def test_pr_draft_creation() -> None:
     assert True
 
 
+@_requires_gh
 def test_pr_workflow_integration() -> None:
     """Test complete PR workflow."""
     logger.info("Testing PR workflow integration...")
