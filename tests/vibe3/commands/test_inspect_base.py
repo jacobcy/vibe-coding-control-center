@@ -75,7 +75,7 @@ def test_inspect_base_with_core_files():
             with patch("vibe3.config.loader.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = ["src/api/"]
-                dag_mod = "vibe3.services.dag_service"
+                dag_mod = "vibe3.analysis.dag_service"
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
@@ -107,7 +107,7 @@ def test_inspect_base_json_output():
             with patch("vibe3.config.loader.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
-                dag_mod = "vibe3.services.dag_service"
+                dag_mod = "vibe3.analysis.dag_service"
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):
@@ -153,7 +153,7 @@ def test_inspect_base_json_custom_branch():
             with patch("vibe3.config.loader.get_config") as mock_config:
                 mock_config.return_value.review_scope.critical_paths = ["src/core/"]
                 mock_config.return_value.review_scope.public_api_paths = []
-                dag_mod = "vibe3.services.dag_service"
+                dag_mod = "vibe3.analysis.dag_service"
                 with patch(f"{dag_mod}.expand_impacted_modules") as mock_expand:
                     mock_expand.return_value = mock_dag
                     with patch("pathlib.Path.exists", return_value=True):

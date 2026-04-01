@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.agents.review_runner import sync_models_json
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.review_runner import sync_models_json
 
 
 class TestAgentOptions:
@@ -63,8 +63,8 @@ class TestResolveAgentOptions:
     """Tests for CodeagentExecutionService.resolve_agent_options."""
 
     def _make_service(self, agent=None, backend=None, model=None):
+        from vibe3.agents.runner import CodeagentExecutionService
         from vibe3.config.settings import AgentConfig, VibeConfig
-        from vibe3.services.codeagent_execution_service import CodeagentExecutionService
 
         cfg = MagicMock(spec=VibeConfig)
         section_cfg = MagicMock()
@@ -142,7 +142,7 @@ class TestSyncModelsJson:
         fake_models = tmp_path / "models.json"
         fake_models.write_text('{"default_backend": "old"}')
 
-        with patch("vibe3.services.review_runner.MODELS_JSON_PATH", fake_models):
+        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
             sync_models_json(AgentOptions(agent="code-reviewer"))
 
         # file unchanged
@@ -155,7 +155,7 @@ class TestSyncModelsJson:
             json.dumps({"default_backend": "old", "backends": {"old": {}}})
         )
 
-        with patch("vibe3.services.review_runner.MODELS_JSON_PATH", fake_models):
+        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
             sync_models_json(AgentOptions(backend="claude", model="claude-sonnet-4-5"))
 
         data = json.loads(fake_models.read_text())
@@ -170,7 +170,7 @@ class TestSyncModelsJson:
             json.dumps({"default_backend": "old", "default_model": "old-model"})
         )
 
-        with patch("vibe3.services.review_runner.MODELS_JSON_PATH", fake_models):
+        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
             sync_models_json(AgentOptions(backend="codex"))
 
         data = json.loads(fake_models.read_text())
@@ -181,7 +181,7 @@ class TestSyncModelsJson:
         """Creates models.json from scratch if it doesn't exist."""
         fake_models = tmp_path / "new" / "models.json"
 
-        with patch("vibe3.services.review_runner.MODELS_JSON_PATH", fake_models):
+        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
             sync_models_json(AgentOptions(backend="claude", model="claude-opus"))
 
         assert fake_models.exists()
@@ -194,7 +194,7 @@ class TestSyncModelsJson:
         fake_models = tmp_path / "models.json"
         fake_models.write_text("NOT JSON {{{{")
 
-        with patch("vibe3.services.review_runner.MODELS_JSON_PATH", fake_models):
+        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
             sync_models_json(AgentOptions(backend="claude", model="claude-opus"))
 
         data = json.loads(fake_models.read_text())

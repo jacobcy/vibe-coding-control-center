@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from vibe3.analysis.inspect_output_adapter import pr_analysis_summary
 from vibe3.models.pr import PRResponse
 from vibe3.services.flow_service import FlowService
-from vibe3.services.inspect_output_adapter import pr_analysis_summary
 from vibe3.services.pr_service import PRService
 
 

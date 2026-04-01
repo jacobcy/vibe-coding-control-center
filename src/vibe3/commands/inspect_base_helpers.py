@@ -4,17 +4,17 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.analysis import dag_service
+from vibe3.analysis.change_scope_service import (
+    collect_changed_symbols,
+    count_changed_lines,
+)
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.clients.git_client import GitClient
 from vibe3.config.loader import get_config
 from vibe3.exceptions import GitError, UserError
 from vibe3.models.change_source import BranchSource
-from vibe3.services import dag_service
-from vibe3.services.change_scope_service import (
-    collect_changed_symbols,
-    count_changed_lines,
-)
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
-from vibe3.services.serena_service import SerenaService
 
 
 def _code_paths() -> list[str]:

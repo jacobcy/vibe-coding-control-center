@@ -1,6 +1,6 @@
 """Tests for pre-push inspect summary normalization."""
 
-from vibe3.services.pre_push_inspect_summary import summarize_inspect_payload
+from vibe3.analysis.pre_push_inspect_summary import summarize_inspect_payload
 
 
 def test_sets_async_trigger_when_blocked() -> None:

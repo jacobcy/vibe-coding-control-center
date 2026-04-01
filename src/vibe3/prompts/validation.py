@@ -212,7 +212,7 @@ class PromptValidationService:
                 )
 
         if kind == VariableSourceKind.SKILL:
-            from vibe3.services.run_usecase import RunUsecase
+            from vibe3.agents.run_agent import RunUsecase
 
             skill_name = source.skill or ""
             skill_file = RunUsecase.find_skill_file(skill_name) if skill_name else None

@@ -6,6 +6,15 @@ from typing import Annotated, Callable, Optional
 import typer
 from loguru import logger
 
+from vibe3.agents.run_agent import RunUsecase
+from vibe3.agents.run_prompt import (
+    make_run_context_builder,
+    make_skill_context_builder,
+)
+from vibe3.agents.runner import (
+    CodeagentExecutionService,
+    create_codeagent_command,
+)
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -18,16 +27,7 @@ from vibe3.commands.command_options import (
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.services.codeagent_execution_service import (
-    CodeagentExecutionService,
-    create_codeagent_command,
-)
 from vibe3.services.label_service import LabelService
-from vibe3.services.run_context_builder import (
-    make_run_context_builder,
-    make_skill_context_builder,
-)
-from vibe3.services.run_usecase import RunUsecase
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(

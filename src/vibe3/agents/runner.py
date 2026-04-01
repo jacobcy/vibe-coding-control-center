@@ -1,0 +1,240 @@
+"""Unified codeagent execution service for plan/review/run commands.
+
+Migrated from vibe3.services.codeagent_execution_service.
+"""
+
+import os
+import sys
+from typing import Literal, Sequence
+
+from loguru import logger
+from typer import echo
+
+from vibe3.agents.models import (
+    CodeagentCommand,
+    CodeagentResult,
+    ExecutionRole,
+    create_codeagent_command,
+)
+from vibe3.agents.pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.config.settings import VibeConfig
+from vibe3.models.review_runner import AgentOptions
+
+# Re-export models for backward compatibility.
+__all__ = [
+    "ExecutionRole",
+    "CodeagentCommand",
+    "CodeagentResult",
+    "create_codeagent_command",
+    "CodeagentExecutionService",
+]
+
+
+class CodeagentExecutionService:
+    """Unified service for codeagent execution."""
+
+    def __init__(self, config: VibeConfig | None = None) -> None:
+        self.config = config or VibeConfig.get_defaults()
+
+    def resolve_agent_options(
+        self,
+        section: Literal["plan", "run", "review"],
+        agent: str | None = None,
+        backend: str | None = None,
+        model: str | None = None,
+        worktree: bool = False,
+    ) -> AgentOptions:
+        """Resolve agent options with CLI override support.
+
+        ``agent`` and ``backend`` are mutually exclusive entry points:
+
+        - agent mode  : pass ``--agent <preset>`` to codeagent-wrapper.
+                        The preset's backend/model are defined in models.json.
+                        ``model`` is irrelevant and ignored in this mode.
+        - backend mode: pass ``--backend <name>`` [``--model <name>``].
+                        ``model`` is optional — omitting it lets the backend
+                        use its own default from models.json.
+
+        Resolution priority (first match wins):
+
+        1. CLI ``--agent``   → agent mode,   model ignored
+        2. CLI ``--backend`` → backend mode, CLI ``--model`` used if given
+                               (config model is NOT inherited — be explicit)
+        3. Config ``agent``  → agent mode,   model ignored
+        4. Config ``backend``→ backend mode, config ``model`` used if present
+        """
+        target_config = getattr(self.config, section, None)
+        config_agent = None
+        config_backend = None
+        config_model = None
+
+        if target_config and hasattr(target_config, "agent_config"):
+            ac = target_config.agent_config
+            config_agent = getattr(ac, "agent", None)
+            config_backend = getattr(ac, "backend", None)
+            config_model = getattr(ac, "model", None)
+
+        # 1. CLI --agent: preset mode, model is managed by the preset itself
+        if agent:
+            return AgentOptions(agent=agent, worktree=worktree)
+
+        # 2. CLI --backend: backend mode, use CLI --model only (no config fallback)
+        #    Rationale: user explicitly chose a backend override; if they wanted
+        #    a specific model they would have passed --model too.
+        if backend:
+            return AgentOptions(backend=backend, model=model, worktree=worktree)
+
+        # 3. Config agent: preset mode
+        if config_agent:
+            return AgentOptions(agent=config_agent, worktree=worktree)
+
+        # 4. Config backend: backend mode, apply config model as the intended default
+        if config_backend:
+            return AgentOptions(
+                backend=config_backend, model=config_model, worktree=worktree
+            )
+
+        raise ValueError(
+            f"No agent configuration found for '{section}' command. "
+            f"Configure agent_config in settings.yaml or use CLI options."
+        )
+
+    def execute_sync(self, command: CodeagentCommand) -> CodeagentResult:
+        """Execute codeagent synchronously."""
+        log = logger.bind(
+            domain="codeagent",
+            role=command.role,
+            handoff_kind=command.handoff_kind,
+        )
+
+        role_to_section: dict[ExecutionRole, Literal["plan", "run", "review"]] = {
+            "planner": "plan",
+            "executor": "run",
+            "reviewer": "review",
+        }
+        options = self.resolve_agent_options(
+            section=role_to_section[command.role],
+            agent=command.agent,
+            backend=command.backend,
+            model=command.model,
+            worktree=command.worktree,
+        )
+
+        request = ExecutionRequest(
+            role=command.role,
+            context_builder=command.context_builder,
+            options_builder=lambda: options,
+            task=command.task,
+            dry_run=command.dry_run,
+            handoff_kind=command.handoff_kind,
+            handoff_metadata=command.handoff_metadata,
+        )
+
+        log.info("Starting sync execution")
+        echo(f"-> Executing with {options.agent or options.backend}...")
+
+        result = run_execution_pipeline(request)
+
+        return CodeagentResult(
+            success=result.agent_result.is_success(),
+            exit_code=result.agent_result.exit_code,
+            stdout=result.agent_result.stdout,
+            stderr=result.agent_result.stderr,
+            handoff_file=result.handoff_file,
+            session_id=result.session_id,
+        )
+
+    def execute_async(
+        self,
+        command: CodeagentCommand,
+        branch: str,
+    ) -> CodeagentResult:
+        """Execute codeagent asynchronously in background."""
+        from vibe3.services.async_execution_service import AsyncExecutionService
+
+        log = logger.bind(
+            domain="codeagent",
+            role=command.role,
+            branch=branch,
+        )
+
+        cli_command = self._build_cli_command(command)
+
+        async_svc = AsyncExecutionService()
+        # Mark child so run_execution_pipeline skips lifecycle recording
+        # (parent AsyncExecutionService owns lifecycle events).
+        child_env = {**os.environ, "VIBE3_ASYNC_CHILD": "1"}
+        pid = async_svc.start_async_execution(
+            command.role, cli_command, branch, env=child_env
+        )
+
+        log.info("Started async execution", pid=pid)
+        role_name = command.role.capitalize()
+        echo(f"[green]✓[/] {role_name} started in background (PID: {pid})")
+        echo("Use 'vibe3 flow show' to check status")
+
+        return CodeagentResult(
+            success=True,
+            pid=pid,
+        )
+
+    def execute(
+        self,
+        command: CodeagentCommand,
+        async_mode: bool = False,
+    ) -> CodeagentResult:
+        """Execute codeagent with automatic mode selection."""
+        if async_mode and not command.dry_run and command.branch:
+            return self.execute_async(command, command.branch)
+        return self.execute_sync(command)
+
+    def _build_cli_command(self, command: CodeagentCommand) -> list[str]:
+        """Build CLI command for async execution.
+
+        Priority:
+        1. Explicit CLI args from command builder
+        2. Current process argv (strip --async)
+        3. Fallback role-based defaults for non-CLI callers
+        """
+        if command.cli_args:
+            return self.build_self_invocation(command.cli_args)
+
+        current_argv = list(sys.argv[1:]) if len(sys.argv) > 1 else []
+        if current_argv:
+            return self.build_self_invocation(current_argv)
+
+        return self._build_fallback_cli_command(command)
+
+    @staticmethod
+    def build_self_invocation(args: Sequence[str]) -> list[str]:
+        """Build `uv run python src/vibe3/cli.py ...` invocation and strip --async."""
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+        for arg in args:
+            if arg == "--async":
+                continue
+            cmd.append(arg)
+        return cmd
+
+    @staticmethod
+    def _build_fallback_cli_command(command: CodeagentCommand) -> list[str]:
+        """Fallback async CLI command for non-CLI/internal call sites."""
+        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+
+        role_default_args: dict[ExecutionRole, list[str]] = {
+            "planner": ["plan", "task"],
+            "executor": ["run"],
+            "reviewer": ["review", "base"],
+        }
+        cmd.extend(role_default_args[command.role])
+
+        if command.agent:
+            cmd.extend(["--agent", command.agent])
+        if command.backend:
+            cmd.extend(["--backend", command.backend])
+        if command.model:
+            cmd.extend(["--model", command.model])
+        if command.worktree:
+            cmd.append("--worktree")
+        if command.task:
+            cmd.append(command.task)
+        return cmd

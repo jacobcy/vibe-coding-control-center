@@ -142,13 +142,13 @@ class TestPlanContextBuilderUsesAssembler:
         """make_plan_context_builder should invoke build_plan_prompt_body."""
         from unittest.mock import MagicMock, patch
 
+        from vibe3.agents.plan_prompt import make_plan_context_builder
         from vibe3.config.settings import VibeConfig
-        from vibe3.services.plan_context_builder import make_plan_context_builder
 
         config = VibeConfig.get_defaults()
         request = MagicMock()
         with patch(
-            "vibe3.services.plan_context_builder.build_plan_prompt_body",
+            "vibe3.agents.plan_prompt.build_plan_prompt_body",
             return_value="assembled plan body",
         ):
             cb = make_plan_context_builder(request, config)
@@ -160,7 +160,7 @@ class TestPlanContextBuilderUsesAssembler:
 
     def test_plan_context_builder_no_longer_exports_build_plan_context(self) -> None:
         """build_plan_context (old name) must not exist in plan_context_builder."""
-        import vibe3.services.plan_context_builder as mod
+        import vibe3.agents.plan_prompt as mod
 
         assert not hasattr(
             mod, "build_plan_context"

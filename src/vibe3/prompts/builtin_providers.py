@@ -8,10 +8,10 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.agents.run_agent import RunUsecase
 from vibe3.prompts.exceptions import ProviderNotFoundError
 from vibe3.prompts.models import PromptVariableSource, VariableSourceKind
 from vibe3.prompts.provider_registry import ProviderRegistry
-from vibe3.services.run_usecase import RunUsecase
 
 
 def find_skill_file(skill_name: str) -> Path | None:

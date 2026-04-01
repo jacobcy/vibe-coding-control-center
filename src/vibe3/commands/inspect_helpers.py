@@ -5,6 +5,13 @@ from typing import Union
 
 from loguru import logger
 
+from vibe3.analysis import dag_service
+from vibe3.analysis.change_scope_service import (
+    classify_changed_files,
+    collect_changed_symbols,
+    count_changed_lines,
+)
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.commands.inspect_pr_helpers import (
     _analyze_critical_files,
     _calculate_risk_score,
@@ -26,14 +33,7 @@ from vibe3.models.change_source import (
     PRSource,
     UncommittedSource,
 )
-from vibe3.services import dag_service
-from vibe3.services.change_scope_service import (
-    classify_changed_files,
-    collect_changed_symbols,
-    count_changed_lines,
-)
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
-from vibe3.services.serena_service import SerenaService
 
 __all__ = [
     "CriticalFileInfo",

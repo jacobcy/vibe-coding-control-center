@@ -5,6 +5,8 @@ from typing import cast
 
 from loguru import logger
 
+from vibe3.analysis import dag_service
+from vibe3.analysis.serena_service import SerenaService
 from vibe3.commands.inspect_types import (
     CommitInfo,
     CriticalFileInfo,
@@ -12,9 +14,7 @@ from vibe3.commands.inspect_types import (
 )
 from vibe3.config.loader import get_config
 from vibe3.models.change_source import PRSource
-from vibe3.services import dag_service
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
-from vibe3.services.serena_service import SerenaService
 
 
 def build_pr_analysis(pr_number: int, verbose: bool = False) -> PRCriticalAnalysis:

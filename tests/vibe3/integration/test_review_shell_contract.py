@@ -49,7 +49,7 @@ class TestPrePushContract:
         script_path = Path("scripts/hooks/pre-push.sh")
         content = script_path.read_text()
         assert "VIBE_PREPUSH_FULL" in content
-        assert "vibe3.services.pre_push_test_selector" in content
+        assert "vibe3.analysis.pre_push_test_selector" in content
 
     def test_pre_push_calls_review_base_directly(self) -> None:
         """Verify pre-push.sh calls review base directly when needed."""

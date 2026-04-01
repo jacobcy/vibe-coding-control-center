@@ -2,7 +2,7 @@
 
 import pytest
 
-from vibe3.services.structure_service import (
+from vibe3.analysis.structure_service import (
     StructureError,
     analyze_file,
     analyze_python_file,
