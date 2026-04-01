@@ -3,13 +3,13 @@ name: vibe-task
 description: Use when the user wants a cross-worktree flow/task overview, asks which existing flow or task context to resume next in the current repo, wants to inspect task registry health, needs flow/task status check and repair, or mentions "/vibe-task". Do not use for project-level roadmap prioritization or task-flow runtime repair.
 ---
 
-# /vibe-task - Cross-Worktree Flow Overview & Task Audit
+# /vibe-task - Cross-Worktree Flow Overview & Metadata Audit
 
-查看当前仓库下各个 worktree 当前承载的 `flow / task` 现场总览，并给出下一步优先回到哪个 flow / task 现场的建议。同时也支持核对 task 注册完整性，以及修复相关数据质量问题。
+查看当前仓库下各个 worktree 当前承载的 `flow / task` 现场总览，并给出下一步优先回到哪个 flow / task 现场的建议。同时也支持核对任务元数据完整性，以及修复相关数据质量问题。
 
 **核心原则:** Shell 层负责物理真源和确定性操作，Skill 层负责语义分析、智能判断和用户交互。
 
-`vibe-task` 处理以 task 为桥接语义的 flow 总览与 task 数据审计，不处理 runtime / recovery audit。
+`vibe-task` 处理以 task 为桥接语义的 flow 总览与任务元数据审计，不处理 runtime / recovery audit。
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 

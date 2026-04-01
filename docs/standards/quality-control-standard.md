@@ -269,11 +269,12 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 
 **阻断性**：
 - Pre-commit/Pre-push: 不检查
-- CI: ✅ 阻断（如配置）
+- **CI**: ✅ 阻断（最终合并前强制）
+- **pr ready**: ❌ 不再作为硬性门禁。`pr ready` 仅作为人类发起评审的信号，并自动生成 Reviewer Briefing 提供上下文。
 
 **配置**：`config/settings.yaml` → `coverage.threshold`
 
-**实现**：`vibe3 pr ready` 检查覆盖率
+**实现**：由 CI 执行或通过 `vibe3 review` 手动验证。
 
 ---
 
@@ -333,7 +334,7 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 | Test | - | ✅ | ✅ | `.pre-commit-config.yaml` |
 | LOC | - | ⚠️ | ✅ | `config/settings.yaml` |
 | Review | - | ✅ | - | `scripts/hooks/pre-push.sh` |
-| Coverage | - | - | ✅ | `config/settings.yaml` |
+| Coverage | - | - | ✅ | `CI / Manual` |
 
 ### 4.2 阈值调整
 

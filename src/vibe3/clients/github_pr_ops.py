@@ -320,3 +320,104 @@ class PRMixin:
         if pr is None:
             raise PRNotFoundError(pr_number)
         return cast(PRResponse, pr)
+
+    def list_pr_comments(self: Any, pr_number: int) -> list[dict[str, Any]]:
+        """List general comments on a PR."""
+        logger.bind(
+            external="github",
+            operation="list_pr_comments",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: list_pr_comments")
+
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    str(pr_number),
+                    "--json",
+                    "comments",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            data = json.loads(result.stdout)
+            return cast(list[dict[str, Any]], data.get("comments", []))
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to list PR comments: {e.stderr}")
+            return []
+
+    def create_pr_comment(self: Any, pr_number: int, body: str) -> str:
+        """Create a comment on a PR. Returns comment URL."""
+        logger.bind(
+            external="github",
+            operation="create_pr_comment",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: create_pr_comment")
+
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "comment",
+                    str(pr_number),
+                    "--body",
+                    body,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(e, "comment")
+            return ""
+
+    def update_pr_comment(self: Any, comment_id: str, body: str) -> str:
+        """Update an existing PR comment via GitHub API. Returns comment ID or URL."""
+        logger.bind(
+            external="github",
+            operation="update_pr_comment",
+            comment_id=comment_id,
+        ).debug("Calling GitHub API: update_pr_comment")
+
+        try:
+            # Get repo nameWithOwner
+            repo_result = subprocess.run(
+                ["gh", "repo", "view", "--json", "nameWithOwner"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            repo = json.loads(repo_result.stdout)["nameWithOwner"]
+
+            result = subprocess.run(
+                [
+                    "gh",
+                    "api",
+                    "-X",
+                    "PATCH",
+                    f"repos/{repo}/issues/comments/{comment_id}",
+                    "-f",
+                    f"body={body}",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            data = json.loads(result.stdout)
+            return cast(str, data.get("html_url", comment_id))
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(e, f"update comment {comment_id}")
+            return ""
+
+    def _extract_pr_number(self, pr_url: str) -> int:
+        """Extract PR number from URL."""
+        try:
+            return int(pr_url.split("/")[-1])
+        except (ValueError, IndexError):
+            logger.bind(pr_url=pr_url).error("Failed to extract PR number from URL")
+            return 0

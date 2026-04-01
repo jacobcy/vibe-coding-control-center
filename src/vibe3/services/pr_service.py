@@ -12,6 +12,7 @@ from vibe3.models.pr import (
     PRResponse,
     VersionBumpResponse,
 )
+from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
 from vibe3.services.pr_utils import (
     build_pr_body,
     check_upstream_conflicts,
@@ -36,6 +37,7 @@ class PRService:
         self.git_client = git_client or GitClient()
         self.store = store or SQLiteClient()
         self.version_service = version_service or VersionService()
+        self.briefing_service = PRReviewBriefingService(self.github_client)
 
     def create_draft_pr(
         self,
@@ -157,12 +159,14 @@ class PRService:
 
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=effective_actor)
+            self.briefing_service.publish_briefing(pr_number)
             logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
             return pr
 
         updated_pr = self.github_client.mark_ready(pr_number)
         branch = pr.head_branch
         self._sync_pr_flow_state(updated_pr, actor=effective_actor)
+        self.briefing_service.publish_briefing(pr_number)
         self.store.add_event(
             branch,
             "pr_ready",
