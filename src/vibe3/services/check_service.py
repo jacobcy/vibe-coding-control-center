@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Check service implementation for verifying handoff store consistency."""
 
 from dataclasses import dataclass, field
@@ -9,9 +10,9 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.models.flow import IssueLink
 from vibe3.models.pr import PRState
+from vibe3.services.check_remote import CheckRemote
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -52,7 +53,7 @@ class ExecuteCheckResult:
     details: dict = field(default_factory=dict)
 
 
-class CheckService:
+class CheckService(CheckRemote):
     """Service for verifying handoff store consistency and auto-fixing issues."""
 
     def __init__(
@@ -66,7 +67,7 @@ class CheckService:
         self.github_client = github_client or GitHubClient()
 
     # ------------------------------------------------------------------
-    # Unified Execution (Flattened from CheckExecuteMixin)
+    # Unified Execution
     # ------------------------------------------------------------------
 
     def execute_check(
@@ -74,15 +75,7 @@ class CheckService:
         mode: Literal["default", "init", "all", "fix", "fix_all"] = "default",
         branch: str | None = None,
     ) -> ExecuteCheckResult:
-        """Unified check execution with mode-based routing.
-
-        Args:
-            mode: Check mode (default, init, all, fix, fix_all)
-            branch: Branch name for single-branch check. If None, uses current branch.
-
-        Returns:
-            ExecuteCheckResult with mode, success, summary, and details
-        """
+        """Unified check execution with mode-based routing."""
         if mode == "init":
             return self._handle_init_mode()
         elif mode == "all":
@@ -97,13 +90,14 @@ class CheckService:
     def _handle_init_mode(self) -> ExecuteCheckResult:
         """Handle --init mode: scan merged PRs to back-fill task_issue_number."""
         result = self.init_remote_index()
+        summary = (
+            f"Done  total={result.total_flows}  "
+            f"updated={result.updated}  skipped={result.skipped}"
+        )
         return ExecuteCheckResult(
             mode="init",
             success=True,
-            summary=(
-                f"Done  total={result.total_flows}  "
-                f"updated={result.updated}  skipped={result.skipped}"
-            ),
+            summary=summary,
             details=(
                 {"unresolvable": result.unresolvable} if result.unresolvable else {}
             ),
@@ -147,22 +141,20 @@ class CheckService:
 
         total = len(invalid)
         if failed:
+            summary = f"Fixed {fixed_count}/{total}, {len(failed)} had unfixable issues"
             return ExecuteCheckResult(
                 mode="fix_all",
                 success=False,
-                summary=(
-                    f"Fixed {fixed_count}/{total}, "
-                    f"{len(failed)} had unfixable issues"
-                ),
+                summary=summary,
                 details={"fixed": fixed_count, "failed": failed},
             )
+        summary = (
+            f"All {fixed_count} fixable issues resolved across {len(results)} flows"
+        )
         return ExecuteCheckResult(
             mode="fix_all",
             success=True,
-            summary=(
-                f"All {fixed_count} fixable issues resolved "
-                f"across {len(results)} flows"
-            ),
+            summary=summary,
             details={"fixed": fixed_count},
         )
 
@@ -201,62 +193,6 @@ class CheckService:
         )
 
     # ------------------------------------------------------------------
-    # Remote Index Init (Flattened from CheckRemoteIndexMixin)
-    # ------------------------------------------------------------------
-
-    def init_remote_index(self, pr_limit: int = 50) -> InitResult:
-        """From remote sync flow state (mostly back-filling task_issue_number)."""
-        logger.bind(domain="check", pr_limit=pr_limit).info("Initializing remote index")
-
-        branch_issue_map: dict[str, list[int]] = {}
-
-        # Path A: merged PR body
-        for pr in self.github_client.list_merged_prs(limit=pr_limit):
-            branch_name = pr.get("headRefName", "")
-            if not branch_name:
-                continue
-            for n in parse_linked_issues(pr.get("body") or ""):
-                branch_issue_map.setdefault(branch_name, [])
-                if n not in branch_issue_map[branch_name]:
-                    branch_issue_map[branch_name].append(n)
-        logger.bind(
-            domain="check", path="pr_body", branches_resolved=len(branch_issue_map)
-        ).info("Remote index build done (Path A)")
-
-        all_flows = self.store.get_all_flows()
-        updated, skipped, unresolvable = 0, 0, []
-
-        for flow in all_flows:
-            branch = flow["branch"]
-            # Skip if already has task_issue_number resolved.
-            existing_links = self.store.get_issue_links(branch)
-
-            if IssueLink.resolve_task_number(existing_links):
-                skipped += 1
-                continue
-
-            # Resolve from map
-            issues = branch_issue_map.get(branch)
-            if not issues:
-                unresolvable.append(branch)
-                continue
-
-            # Update first one as task
-            from vibe3.services.task_service import TaskService
-
-            TaskService(store=self.store).link_issue(
-                branch, issues[0], "task", actor="check:init"
-            )
-            updated += 1
-
-        return InitResult(
-            total_flows=len(all_flows),
-            updated=updated,
-            skipped=skipped,
-            unresolvable=unresolvable,
-        )
-
-    # ------------------------------------------------------------------
     # Core Logic
     # ------------------------------------------------------------------
 
@@ -287,9 +223,8 @@ class CheckService:
                 from vibe3.services.flow_service import FlowService
 
                 if not branch.startswith(FlowService.SAFE_BRANCH_PREFIX):
-                    self._mark_flow_aborted(
-                        branch, f"Branch '{branch}' no longer exists locally"
-                    )
+                    reason = f"Branch '{branch}' no longer exists locally"
+                    self._mark_flow_aborted(branch, reason)
                     return CheckResult(is_valid=True, branch=branch, issues=[])
         except Exception as e:
             logger.bind(domain="check", branch=branch).warning(
@@ -442,16 +377,13 @@ class CheckService:
 
         unfixed = [i for i in issues if i not in fixed]
         if unfixed:
-            hint = (
-                "  Some issues cannot be auto-fixed. "
-                "Try 'vibe3 check --init' or check manually."
-            )
-            return FixResult(
-                success=False,
-                error="Could not auto-fix:\n"
+            hint = "  Some issues cannot be auto-fixed. Try 'vibe3 check --init' or check manually."
+            error = (
+                "Could not auto-fix:\n"
                 + "\n".join(f"  - {i}" for i in unfixed)
-                + f"\n{hint}",
+                + f"\n{hint}"
             )
+            return FixResult(success=False, error=error)
         return FixResult(success=True)
 
     def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
