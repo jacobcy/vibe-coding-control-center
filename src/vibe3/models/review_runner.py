@@ -1,11 +1,6 @@
 """Models for agent execution (used by plan/run/review commands)."""
 
-import subprocess
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass(frozen=True)
@@ -38,10 +33,6 @@ class AgentOptions:
     timeout_seconds: int = 600
 
 
-# Backward compatibility alias
-ReviewAgentOptions = AgentOptions
-
-
 @dataclass(frozen=True)
 class AgentResult:
     """Result from running a review agent.
@@ -59,25 +50,6 @@ class AgentResult:
     stderr: str
     session_id: str | None = None
 
-    @classmethod
-    def from_completed_process(
-        cls, cp: subprocess.CompletedProcess[str]
-    ) -> "AgentResult":
-        """Create result from a CompletedProcess."""
-        from vibe3.agents.review_runner import extract_session_id
-
-        stdout = cp.stdout or ""
-        return cls(
-            exit_code=cp.returncode,
-            stdout=stdout,
-            stderr=cp.stderr or "",
-            session_id=extract_session_id(stdout),
-        )
-
     def is_success(self) -> bool:
         """Check if the agent run was successful."""
         return self.exit_code == 0
-
-
-# Backward compatibility aliases
-ReviewAgentResult = AgentResult

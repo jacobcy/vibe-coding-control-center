@@ -27,24 +27,30 @@ vibe doctor
 vibe check
 vibe tool
 vibe keys <list|set|get|init>
-vibe flow <start|review|pr|done|status|sync>
 
-# V3 Python CLI (新特性)
-uv run python src/vibe3/cli.py pr show --json     # JSON 格式输出
-uv run python src/vibe3/cli.py pr show --yaml     # YAML 格式输出
-uv run python src/vibe3/cli.py inspect commands pr show --tree  # ASCII 调用树
+# V3 Python CLI
+uv run python src/vibe3/cli.py flow update
+uv run python src/vibe3/cli.py flow show --snapshot
+uv run python src/vibe3/cli.py flow status
+uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py handoff show
 ```
 
 ## Flow Management
 
-Vibe3 automatically manages flows based on git branches. There's no need to
-manually create or delete flows:
+Vibe3 does not replace `git` / `gh`.
 
-- **Automatic Creation**: Running `vibe3 plan`, `run`, or `review` on a feature
-  branch automatically creates a flow if one doesn't exist.
-- **Main Branch Protection**: Flows cannot be created on main/master branches.
-- **Automatic Completion**: When a PR is merged or closed, `vibe3 check` marks
-  the flow as done.
+Use `git` for branch lifecycle and `gh` for issue / PR remote operations. Use
+`vibe3` to maintain local flow scene, issue bindings, events, and handoff.
+
+- **Local Scene Registration**: `vibe3 flow update` registers or updates the
+  current branch as a local flow scene.
+- **Local Binding**: `vibe3 flow bind` maintains the issue-to-flow relation in
+  local shared state.
+- **Read-First Inspection**: `vibe3 flow show`, `vibe3 flow status`, and
+  `vibe3 status` provide project-specific read views that `git` / `gh` do not.
+- **Handoff Augmentation**: `vibe3 handoff` stores local execution context for
+  agent collaboration.
 
 ### Protected Branches
 
@@ -70,7 +76,7 @@ Vibe Center 3.0 推行了极其稳定的抽象分层模型：
 2. **Tier 2 (胶水层 & 智能辅助): Vibe Skills (Slash Commands)**
    - `skills/` 下的指令代理 (`/vibe-task`, `/vibe-save` 等)，纯靠只读与派发请求工作。它们包装了底层的复杂性，专门向 AI 提供上下文拼装能力。
 3. **Tier 1 (物理真源层 & 绝对执行): Shell Commands & Aliases**
-   - Vibe Shell 组 (`vibe flow`, `vibe task`) 和基于 Zsh 的 Alias 工具组 (`wtnew`)。只在这里进行数据源（`registry.json`）与分支的物理读写。
+  - Vibe Shell 组（以 `vibe flow`、`vibe status`、`vibe check` 为主；`task` 语义已收敛到 `flow/status`）和基于 Zsh 的 Alias 工具组 (`wtnew`)。只在这里进行数据源（`registry.json`）与分支的物理读写。
 
 ## 结构目录语义
 - `bin/` & `lib/` (Tier 1): CLI 和核心执行器（物理源）

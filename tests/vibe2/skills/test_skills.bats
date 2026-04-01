@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
-  export REPO_ROOT="$BATS_TEST_DIRNAME/../.."
+  export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
   export TMP_HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$TMP_HOME/.claude/plugins" "$TMP_HOME/.agents/skills" "$TMP_HOME/.trae/skills" "$TMP_HOME/.kiro/skills"
   mkdir -p "$TMP_HOME/.gemini/antigravity/skills"

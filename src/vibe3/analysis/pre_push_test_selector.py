@@ -11,7 +11,7 @@ from typing import Literal, Sequence
 from vibe3.analysis.change_scope_service import classify_changed_files
 
 SMOKE_TEST_TARGETS = (
-    "tests/vibe3/services/test_pre_push_scope.py",
+    "tests/vibe3/analysis/test_pre_push_scope.py",
     "tests/vibe3/integration/test_review_shell_contract.py",
 )
 

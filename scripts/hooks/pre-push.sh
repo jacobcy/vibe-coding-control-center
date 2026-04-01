@@ -82,7 +82,10 @@ import sys
 data = json.load(sys.stdin)
 print(data.get('reason', 'resolved by selector'))
 ")
-        mapfile -t TEST_TARGETS < <(
+        TEST_TARGETS=()
+        while IFS= read -r line; do
+            TEST_TARGETS+=("$line")
+        done < <(
             echo "$TEST_PLAN_JSON" | uv run python -c "
 import json
 import sys

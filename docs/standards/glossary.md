@@ -92,7 +92,7 @@ related_docs:
 
 - 正式术语：`task`
 - 别称：`执行任务`
-- 定义：写入 `registry.json` 的 execution record，必须可执行、可跟踪、可绑定当前 flow。
+- 定义：execution bridge 概念，用于表达当前 flow 绑定的主执行 issue 及相关执行语义。
 - 边界：
   - `task` 不是外部需求入口
   - `task` 不等于 PR
@@ -102,8 +102,9 @@ related_docs:
   - 文件字段见 [registry-json-standard.md](registry-json-standard.md)
 - 使用规则：
   - 讨论可执行、可拆分、可绑定 flow 的工作单元时使用 `task`
-  - 一个 `type=feature` 的 roadmap item 可以拆出多个本地 `task`
+  - 一个 `type=feature` 的 roadmap item 可以拆出多个执行层 `task` 语义
   - `task` 是 flow 建立后的 execution bridge，不是用户默认主链的第一锚点
+  - 当前公共 CLI 读路径已收敛到 `flow show` / `flow status` / `status`，不再默认要求独立 `vibe3 task` 命令
   - GitHub issue 可以被关联为一个或多个 `task`（在不同 flow 中）
 
 ### 3.3.1 task issue

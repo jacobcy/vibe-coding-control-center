@@ -2,13 +2,13 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from vibe3.agents.review_runner import run_review_agent
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.models.review_runner import AgentOptions
 
 
 @patch("vibe3.agents.backends.codeagent.subprocess.run")
 @patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
-def test_run_review_agent_resume_mode(mock_tempfile, mock_run):
+def test_codeagent_backend_resume_mode(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"
     mock_tempfile.return_value.__enter__.return_value = mock_file
@@ -22,8 +22,9 @@ def test_run_review_agent_resume_mode(mock_tempfile, mock_run):
     options = AgentOptions(agent="planner")
     session_id = "262f0fea-eacb-4223-b842-b5b5097f94e8"
 
-    result = run_review_agent(
-        prompt_file_content="context",
+    backend = CodeagentBackend()
+    result = backend.run(
+        prompt="context",
         options=options,
         task="continue work",
         session_id=session_id,
@@ -45,9 +46,9 @@ def test_run_review_agent_resume_mode(mock_tempfile, mock_run):
     assert result.exit_code == 0
 
 
-@patch("subprocess.run")
-@patch("tempfile.NamedTemporaryFile")
-def test_run_review_agent_new_session(mock_tempfile, mock_run):
+@patch("vibe3.agents.backends.codeagent.subprocess.run")
+@patch("vibe3.agents.backends.codeagent.tempfile.NamedTemporaryFile")
+def test_codeagent_backend_new_session(mock_tempfile, mock_run):
     mock_file = MagicMock()
     mock_file.name = "/Users/test/.codeagent/agents/fake-prompt.md"
     mock_tempfile.return_value.__enter__.return_value = mock_file
@@ -60,9 +61,8 @@ def test_run_review_agent_new_session(mock_tempfile, mock_run):
 
     options = AgentOptions(agent="planner")
 
-    result = run_review_agent(
-        prompt_file_content="context", options=options, task="start work"
-    )
+    backend = CodeagentBackend()
+    result = backend.run(prompt="context", options=options, task="start work")
 
     mock_tempfile.assert_called_once()
     called_dir = mock_tempfile.call_args[1].get("dir")

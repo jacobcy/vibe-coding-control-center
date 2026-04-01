@@ -53,8 +53,8 @@ manager 要做的不是“参与所有细节”，而是保证这条链不断：
 优先使用以下真源入口确认现场：
 
 ```bash
-vibe3 flow show      # flow 与 task 绑定状态
-vibe3 task show      # task 详情
+vibe3 flow show      # 当前 flow 与 task 绑定状态、milestone、依赖
+vibe3 status         # 全局 flow / issue 总览
 vibe3 handoff show   # agent 执行状态
 ```
 
@@ -224,6 +224,7 @@ PR 创建后，manager 不能立刻退出。
 - **沉淀为 issue**（需要跟踪修复时）：
 
   skill 描述错误（触发时机、命令格式、职责描述有误）
+
 - 命令行为异常（参数不对、错误提示不友好、产生虚假记录）
 - 流程不合理（阻塞用户、绕不开的强制依赖、缺少回退路径）
 - 当前范围外的新问题

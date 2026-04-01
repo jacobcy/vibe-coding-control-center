@@ -43,8 +43,8 @@ PR 创建后停止，输出：
   │   └─ 检查 issue、flow、branch、task、pr
   │
   ├─ Step 2: 运行提交前 metadata preflight
-  │   ├─ uv run python src/vibe3/cli.py task show <branch>
-  │   └─ 检查 task 的 issue_refs、spec_* 等元数据
+  │   ├─ uv run python src/vibe3/cli.py flow show --branch <branch>
+  │   └─ 检查 task 绑定、issue_refs、spec_* 等元数据
   │
   ├─ Step 3: 审计工作区
   │   ├─ git status --short
@@ -115,13 +115,13 @@ uv run python src/vibe3/cli.py flow list
 
 在做任何 commit 分类前，必须先检查当前 execution record 的最小完整性。
 
-若 `flow show` 返回了 `current_task`，继续读取：
+若 `flow show` 返回了 `current_task`，针对目标 branch 重新读取：
 
 ```bash
-uv run python src/vibe3/cli.py task show <branch>
+uv run python src/vibe3/cli.py flow show --branch <branch>
 ```
 
-> **参数说明**：`<branch>` 为当前分支名，用于查找该分支绑定的 task 信息。
+> **参数说明**：`<branch>` 为当前分支名，用于读取该分支绑定的 flow / task 详情。
 
 第一版规则：
 
@@ -175,6 +175,7 @@ git diff --cached --stat
 **执行步骤**：
 
 1. **运行格式化工具（对所有改动）**：
+
    ```bash
    # 格式化所有 Python 代码
    uv run black src tests/vibe3
@@ -184,6 +185,7 @@ git diff --cached --stat
    ```
 
 2. **检查是否有格式化修改**：
+
    ```bash
    # 查看哪些文件被修改
    git status --short
@@ -192,6 +194,7 @@ git diff --cached --stat
 
 3. **提交临时格式化 commit（如果有修改）**：
    - 若有文件被 black 或 ruff 修改：
+
      ```bash
      # 暂存所有格式化修改
      git add -A
@@ -201,6 +204,7 @@ git diff --cached --stat
      ```
 
 4. **撤销临时 commit（保留修改在工作区）**：
+
    ```bash
    # Soft reset：撤销 commit，但保留所有修改在工作区
    git reset HEAD~1
@@ -210,6 +214,7 @@ git diff --cached --stat
    ```
 
 5. **运行 pre-commit 验证**：
+
    ```bash
    # 对所有文件运行 pre-commit 检查
    pre-commit run --all-files
@@ -224,12 +229,14 @@ git diff --cached --stat
      - 修复后重新执行步骤 1-5，直到所有检查通过
 
 **关键点**：
+
 - 此时工作区包含：原始改动 + 格式化修改
 - 接下来的 Step 4 将按功能分组提交
 - 每个功能 commit 都会包含相应的格式化修改
 - 不会有单独的 "style: ..." commit 打乱历史
 
 **边界约束**：
+
 - 不允许使用 `--no-verify` 跳过 pre-commit
 - 不允许在有 pre-commit 错误的情况下继续分组提交
 - 不允许保留临时格式化 commit，必须 soft reset
@@ -289,6 +296,7 @@ uv run python src/vibe3/cli.py pr create --base <ref>
 PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standards/github-labels-standard.md`）：
 
 **类型标签（根据 PR 标题）**：
+
 - 标题以 `feat:` 或 `feature:` 开头 → 添加 `type/feature` → **触发 Codex AI 审查**
 - 标题以 `fix:` 或 `bugfix:` 开头 → 添加 `type/fix` → **触发 Copilot AI 审查**
 - 标题以 `refactor:` 开头 → 添加 `type/refactor` → **自动运行本地测试**
@@ -298,27 +306,30 @@ PR 创建成功后，根据以下规则自动应用标签（详见 `docs/standar
 
 **智能审查策略**：
 
-| 标签类型 | 审查方式 | 自动化程度 |
-|---------|---------|-----------|
-| `type/feat` | Codex AI 审查 | ✅ 全自动 - 在 PR 中评论 `@codex review` |
-| `type/fix` | Copilot AI 审查 | ✅ 全自动 - 请求 Copilot 作为审查者 |
-| `type/refactor` | 本地测试 | ✅ 全自动 - 运行 lint + pytest + bats |
-| `type/docs` | 人工审查 | ⏸️ 需要手动决定是否测试 |
-| `type/test` | 人工审查 | ⏸️ 需要手动决定是否测试 |
-| `type/chore` | 人工审查 | ⏸️ 需要手动决定是否测试 |
+| 标签类型        | 审查方式        | 自动化程度                               |
+| --------------- | --------------- | ---------------------------------------- |
+| `type/feat`     | Codex AI 审查   | ✅ 全自动 - 在 PR 中评论 `@codex review` |
+| `type/fix`      | Copilot AI 审查 | ✅ 全自动 - 请求 Copilot 作为审查者      |
+| `type/refactor` | 本地测试        | ✅ 全自动 - 运行 lint + pytest + bats    |
+| `type/docs`     | 人工审查        | ⏸️ 需要手动决定是否测试                  |
+| `type/test`     | 人工审查        | ⏸️ 需要手动决定是否测试                  |
+| `type/chore`    | 人工审查        | ⏸️ 需要手动决定是否测试                  |
 
 详见 `docs/standards/github-code-review-standard.md`。
 
 **范围标签（根据文件路径）**：
+
 - 包含 `src/vibe3/**/*.py` → 添加 `scope/python`
 - 包含 `lib/**/*.sh` 或 `scripts/**/*.sh` → 添加 `scope/shell-script`
 - 包含 `docs/**` 或 `*.md` → 添加 `scope/documentation`
 - 包含 `.github/**` 或 `.pre-commit-config.yaml` → 添加 `scope/infrastructure`
 
 **状态标签**：
+
 - PR 创建后 → 自动添加 `status/ready-for-review`
 
 **执行方式**：
+
 ```bash
 # 查看当前 PR
 gh pr view <pr-number>

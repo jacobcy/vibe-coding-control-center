@@ -20,7 +20,11 @@ BranchArg = Annotated[
     typer.Argument(help="Branch to update (defaults to current)"),
 ]
 IssueArg = Annotated[
-    str, typer.Argument(help="Issue reference to bind as task/related/dependency")
+    str,
+    typer.Argument(
+        metavar="<task-id>",
+        help="Issue reference or <task-id> to bind as task/related/dependency",
+    ),
 ]
 TaskTailArg = Annotated[
     List[str] | None,
@@ -57,6 +61,10 @@ BindRoleOption = Annotated[
     Literal["task", "related", "dependency"],
     typer.Option("--role", help="Issue role (task, related, or dependency)"),
 ]
+BindBranchOption = Annotated[
+    str | None,
+    typer.Option("--branch", help="Branch name (defaults to current branch)"),
+]
 
 app = typer.Typer(
     help="Manage logic flows.",
@@ -78,6 +86,34 @@ def _merge_issue_refs(
     if primary is None:
         raise ValueError(f"Additional issue refs require '{primary_hint}' prefix.")
     return [primary, *tail]
+
+
+def _resolve_bind_branch(flow_service: FlowService, branch: str | None) -> str:
+    """Resolve target branch for flow bind.
+
+    For explicit --branch, require an existing non-protected flow branch.
+    For implicit branch selection, preserve current behavior by using the
+    current branch directly.
+    """
+    if branch is None:
+        return flow_service.get_current_branch()
+
+    if flow_service._is_main_branch(branch):
+        typer.echo(
+            f"Error: 受保护分支 '{branch}' 不能直接绑定 issue",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if flow_service.get_flow_status(branch) is None:
+        typer.echo(
+            f"Error: 目标分支 '{branch}' 没有 flow\n"
+            "先运行 `vibe3 flow update <branch>` 注册 flow，或切换到该分支后再执行绑定",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    return branch
 
 
 @app.command(name="update")
@@ -126,30 +162,36 @@ def update(
 def bind(
     issue: IssueArg,
     issue_tail: TaskTailArg = None,
+    branch: BindBranchOption = None,
     role: BindRoleOption = "task",
     trace: TraceOption = False,
     json_output: JsonOption = False,
 ) -> None:
-    """Bind an issue to current flow."""
+    """Bind an issue to a flow branch. (Usage: vibe flow bind <task-id>)"""
     from vibe3.utils.issue_ref import parse_issue_number
 
     issue_refs = _merge_issue_refs(issue, issue_tail, primary_hint="<issue>")
     if issue_refs is None:  # pragma: no cover - defensive
         raise typer.BadParameter("Missing issue reference")
     refs: List[str] = [issue_refs] if isinstance(issue_refs, str) else issue_refs
-    with trace_scope(trace, "flow bind", issue=issue_refs, role=role):
-        logger.bind(command="flow bind", issue=issue_refs, role=role).info(
-            "Binding issue to flow"
-        )
+    with trace_scope(trace, "flow bind", issue=issue_refs, role=role, branch=branch):
+        logger.bind(
+            command="flow bind", issue=issue_refs, role=role, branch=branch
+        ).info("Binding issue to flow")
         try:
             flow_service = FlowService()
             task_service = TaskService()
-            branch = flow_service.get_current_branch()
+            target_branch = _resolve_bind_branch(flow_service, branch)
 
             links = []
             for ref in refs:
                 issue_number = parse_issue_number(ref)
-                link = task_service.link_issue(branch, issue_number, role, actor=None)
+                link = task_service.link_issue(
+                    target_branch,
+                    issue_number,
+                    role,
+                    actor=None,
+                )
                 links.append(link)
 
             if json_output:

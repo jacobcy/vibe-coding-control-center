@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add scripts to path
 scripts_path = Path(__file__).parent.parent.parent / "scripts" / "python"
 if str(scripts_path) not in sys.path:
@@ -24,59 +26,76 @@ if str(scripts_path) not in sys.path:
 from loguru import logger  # noqa: E402
 
 
+def _gh_authenticated() -> bool:
+    """Return True if gh CLI is available and authenticated."""
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"], capture_output=True, check=False
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+_requires_gh = pytest.mark.skipif(
+    not _gh_authenticated(),
+    reason="gh CLI not authenticated — skipped in CI",
+)
+
+
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run shell command."""
     logger.info(f"Running: {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, capture_output=True, text=True)
 
 
-def test_gh_auth() -> bool:
+@_requires_gh
+def test_gh_auth() -> None:
     """Test GitHub CLI authentication."""
     try:
         result = run_command(["gh", "auth", "status"], check=False)
-        if result.returncode == 0:
-            logger.success("✓ GitHub CLI authenticated")
-            return True
-        else:
-            logger.error("✗ GitHub CLI not authenticated")
-            logger.error("  Run: gh auth login")
-            return False
+        assert result.returncode == 0
+        logger.success("✓ GitHub CLI authenticated")
     except FileNotFoundError:
         logger.error("✗ GitHub CLI not found")
-        logger.error("  Install: brew install gh")
-        return False
+        assert False, "GitHub CLI not found"
+    except AssertionError:
+        logger.error("✗ GitHub CLI not authenticated")
+        logger.error("  Run: gh auth login")
+        assert False, "GitHub CLI not authenticated"
 
 
-def test_version_file() -> bool:
+def test_version_file() -> None:
     """Test VERSION file reading."""
     from vibe3.services.version_service import VersionService
 
-    version_file = Path(__file__).parent.parent.parent / "VERSION"
+    version_file = Path(__file__).parent.parent.parent.parent / "VERSION"
 
     try:
         service = VersionService(version_file=version_file)
         version = service.get_current_version()
+        assert version
         logger.success(f"✓ VERSION file found: {version}")
-        return True
     except FileNotFoundError:
         logger.error("✗ VERSION file not found")
-        return False
+        assert False, "VERSION file not found"
     except Exception as e:
         logger.error(f"✗ Failed to read VERSION: {e}")
-        return False
+        assert False, f"Failed to read VERSION: {e}"
 
 
-def test_pr_draft_creation() -> bool:
+def test_pr_draft_creation() -> None:
     """Test PR draft creation (requires test repo)."""
     logger.info("Testing PR draft creation...")
 
     # This is a placeholder - in real scenario, would create test repo
     logger.warning("  Skipping: Requires test repository setup")
     logger.info("  Manual test: python -m vibe3.commands.pr draft -t 'Test PR'")
-    return True
+    assert True
 
 
-def test_pr_workflow_integration() -> bool:
+@_requires_gh
+def test_pr_workflow_integration() -> None:
     """Test complete PR workflow."""
     logger.info("Testing PR workflow integration...")
 
@@ -91,7 +110,11 @@ def test_pr_workflow_integration() -> bool:
         logger.info(f"\n{'=' * 60}")
         logger.info(f"Test: {name}")
         logger.info("=" * 60)
-        result = test_func()
+        try:
+            test_func()
+            result = True
+        except (AssertionError, Exception):
+            result = False
         results.append((name, result))
 
     # Summary
@@ -107,7 +130,7 @@ def test_pr_workflow_integration() -> bool:
 
     logger.info(f"\nTotal: {passed}/{total} tests passed")
 
-    return passed == total
+    assert passed == total
 
 
 def main() -> int:
@@ -115,12 +138,11 @@ def main() -> int:
     logger.info("Vibe3 PR Integration Tests")
     logger.info("=" * 60)
 
-    success = test_pr_workflow_integration()
-
-    if success:
+    try:
+        test_pr_workflow_integration()
         logger.success("\n✓ All integration tests passed!")
         return 0
-    else:
+    except AssertionError:
         logger.error("\n✗ Some integration tests failed")
         return 1
 

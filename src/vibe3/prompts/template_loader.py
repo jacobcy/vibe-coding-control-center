@@ -9,6 +9,24 @@ import yaml
 from loguru import logger
 
 DEFAULT_PROMPTS_PATH = Path("config/prompts.yaml")
+
+
+def _resolve_prompts_path() -> Path:
+    """Resolve prompts.yaml path, preferring repo root over cwd."""
+    # 1. Explicitly check if we are in a repo structure by traversing up from __file__
+    # src/vibe3/prompts/template_loader.py -> parent x4 -> root
+    try:
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent
+        repo_path = repo_root / "config" / "prompts.yaml"
+        if repo_path.exists():
+            return repo_path
+    except Exception:  # pragma: no cover
+        pass
+
+    # 2. Fallback to CWD-relative path
+    return DEFAULT_PROMPTS_PATH
+
+
 DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
     "run": {
         "plan": "{run_prompt_body}",
@@ -63,7 +81,7 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 
 def load_prompt_templates(prompts_path: Path | None = None) -> dict[str, Any]:
     """Load prompt templates from config/prompts.yaml with defaults."""
-    path = prompts_path or DEFAULT_PROMPTS_PATH
+    path = prompts_path or _resolve_prompts_path()
     loaded: dict[str, Any] = {}
     if path.exists():
         try:
