@@ -24,6 +24,20 @@ class GitHubClientBase:
             ).error("Failed to check auth")
             return False
 
+    def get_current_user(self) -> str:
+        """Get current authenticated user login name."""
+        try:
+            result = subprocess.run(
+                ["gh", "api", "user", "-q", ".login"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+        except Exception:
+            logger.error("Failed to get current GitHub user")
+            return ""
+
     def _extract_pr_number(self, pr_url: str) -> int:
         """Extract PR number from URL.
 

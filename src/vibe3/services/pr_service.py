@@ -76,9 +76,9 @@ class PRService:
         existing_prs = self.github_client.list_prs_for_branch(head_branch)
         if existing_prs:
             existing = existing_prs[0]
-            hydrated_existing = self.github_client.get_pr(existing.number) or existing
-            self._sync_pr_flow_state(hydrated_existing, actor=effective_actor)
-            return hydrated_existing
+            hydrated = self.github_client.get_pr(existing.number) or existing
+            self._sync_pr_flow_state(hydrated, actor=effective_actor)
+            return hydrated
 
         try:
             self.git_client.push_branch(head_branch, set_upstream=True)
@@ -159,14 +159,22 @@ class PRService:
 
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=effective_actor)
-            self.briefing_service.publish_briefing(pr_number)
-            logger.bind(pr_number=pr_number).info("PR already ready; state confirmed")
+            try:
+                self.briefing_service.publish_briefing(pr_number)
+            except Exception as e:
+                logger.bind(pr_number=pr_number).warning(f"Briefing fail: {e}")
+            logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
             return pr
 
         updated_pr = self.github_client.mark_ready(pr_number)
         branch = pr.head_branch
         self._sync_pr_flow_state(updated_pr, actor=effective_actor)
-        self.briefing_service.publish_briefing(pr_number)
+
+        try:
+            self.briefing_service.publish_briefing(pr_number)
+        except Exception as e:
+            logger.bind(pr_number=pr_number).warning(f"Briefing fail: {e}")
+
         self.store.add_event(
             branch,
             "pr_ready",
@@ -243,12 +251,7 @@ class PRService:
         return self.version_service.calculate_bump(group)
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
-        """Persist PR linkage and readiness into flow cache.
-
-        Note: pr_number and pr_ready_for_review are now remote truth,
-        no longer persisted to local SQLite flow_state.
-        We only update latest_actor here to track activity.
-        """
+        """Persist activity to flow."""
         self.store.update_flow_state(
             pr.head_branch,
             latest_actor=actor,

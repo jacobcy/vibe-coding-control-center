@@ -12,6 +12,10 @@ class GitHubClientProtocol(Protocol):
         """Check if authenticated to GitHub."""
         ...
 
+    def get_current_user(self) -> str:
+        """Get current authenticated user login name."""
+        ...
+
     def create_pr(self, request: CreatePRRequest) -> PRResponse:
         """Create a pull request."""
         ...
