@@ -136,19 +136,17 @@ def render_flow_status(
     if status.next_step:
         _kv("next_step", status.next_step, 1)
 
+    if status.initiated_by:
+        _kv("initiated_by", status.initiated_by, 1)
+
     # Compact actor summary
-    if status.latest_actor or status.initiated_by:
-        actors = []
-        if status.initiated_by:
-            actors.append(f"[dim]init:[/] {status.initiated_by}")
-        actors.extend(
-            [
-                f"[dim]latest:[/] {status.latest_actor or '—'}",
-                f"[dim]plan:[/] {status.planner_actor or '—'}",
-                f"[dim]run:[/] {status.executor_actor or '—'}",
-                f"[dim]review:[/] {status.reviewer_actor or '—'}",
-            ]
-        )
+    if status.latest_actor:
+        actors = [
+            f"[dim]latest:[/] {status.latest_actor or '—'}",
+            f"[dim]plan:[/] {status.planner_actor or '—'}",
+            f"[dim]run:[/] {status.executor_actor or '—'}",
+            f"[dim]review:[/] {status.reviewer_actor or '—'}",
+        ]
         console.print(f"  [dim]actor:[/]      {'  '.join(actors)}")
 
     if milestone_data:

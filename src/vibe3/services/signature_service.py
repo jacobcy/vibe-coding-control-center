@@ -2,13 +2,15 @@
 
 from typing import Any
 
+from vibe3.clients.git_client import GitClient
+
 WORKFLOW_ACTOR = "workflow"
 AI_ASSISTANT_ACTORS = {"ai-assistant", "ai_assistant"}
-_PLACEHOLDER_ACTORS = {"", "unknown", "server", "system"}
+_PLACEHOLDER_ACTORS = {"", "unknown", "server", "system", "workflow"}
 
 
 class SignatureService:
-    """Resolve effective actor using explicit -> flow -> workflow precedence."""
+    """Resolve effective actor using explicit -> flow -> worktree precedence."""
 
     @staticmethod
     def is_ai_assistant(actor: str | None) -> bool:
@@ -27,37 +29,52 @@ class SignatureService:
             return "ai-assistant"
         return value
 
-    @staticmethod
-    def _is_placeholder(actor: str | None) -> bool:
+    @classmethod
+    def _is_placeholder(cls, actor: str | None) -> bool:
         if actor is None:
             return True
-        return actor.strip().lower() in _PLACEHOLDER_ACTORS
+        norm = cls._normalize(actor)
+        if norm is None:
+            return True
+        return norm.lower() in _PLACEHOLDER_ACTORS
+
+    @classmethod
+    def get_worktree_actor(cls) -> str:
+        """Get git user.name from current worktree as the final source of truth."""
+        try:
+            name = GitClient().get_config("user.name")
+            if name and not cls._is_placeholder(name):
+                return name
+        except Exception:
+            pass
+        return "human"
 
     @classmethod
     def resolve_actor(
         cls,
         explicit_actor: str | None = None,
         flow_actor: str | None = None,
-        workflow_actor: str = WORKFLOW_ACTOR,
     ) -> str:
         """Resolve actor.
 
-        Rules:
-        - ai-assistant is preserved as-is (special actor).
-        - explicit actor wins if it's non-placeholder.
-        - else use flow actor when available.
-        - else fallback to workflow actor.
+        Precedence (Single Source of Truth):
+        1. Explicit actor (CLI command argument)
+        2. Flow actor (latest_actor from storage)
+        3. Worktree actor (git config user.name)
         """
         explicit = cls._normalize(explicit_actor)
         flow = cls._normalize(flow_actor)
 
-        if cls.is_ai_assistant(explicit):
-            return "ai-assistant"
+        # 1. Command explicit wins if non-placeholder
         if explicit is not None and not cls._is_placeholder(explicit):
             return explicit
+
+        # 2. Flow actor wins if available and non-placeholder
         if flow is not None and not cls._is_placeholder(flow):
             return flow
-        return workflow_actor
+
+        # 3. Fallback to worktree identity (never None)
+        return cls.get_worktree_actor()
 
     @classmethod
     def resolve_for_branch(
@@ -65,10 +82,9 @@ class SignatureService:
         store: Any,
         branch: str,
         explicit_actor: str | None = None,
-        workflow_actor: str = WORKFLOW_ACTOR,
     ) -> str:
         """Resolve actor with branch flow context."""
         flow_data_raw = store.get_flow_state(branch)
         flow_data = flow_data_raw if isinstance(flow_data_raw, dict) else {}
         flow_actor = flow_data.get("latest_actor")
-        return cls.resolve_actor(explicit_actor, flow_actor, workflow_actor)
+        return cls.resolve_actor(explicit_actor, flow_actor)

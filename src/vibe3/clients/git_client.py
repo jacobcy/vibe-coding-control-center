@@ -268,3 +268,17 @@ class GitClient:
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
         """Dry-run merge to detect conflicts without modifying working tree."""
         return _check_merge_conflicts(self._run, target_ref)
+
+    def get_config(self, key: str) -> str | None:
+        """Get git config value.
+
+        Args:
+            key: Config key (e.g. 'user.name')
+
+        Returns:
+            Config value or None if not set
+        """
+        try:
+            return self._run(["config", "--get", key])
+        except GitError:
+            return None
