@@ -27,6 +27,7 @@ _CREATE_FLOW_STATE = """
         reviewer_actor TEXT,
         reviewer_session_id TEXT,
         latest_actor TEXT,
+        initiated_by TEXT,
         blocked_by TEXT,
         next_step TEXT,
         flow_status TEXT NOT NULL DEFAULT 'active',
@@ -89,6 +90,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
             logger.bind(external="sqlite", operation="migration").info(
                 f"Added {col} column to flow_state"
             )
+
+    # Migration: add initiated_by column if missing
+    if "initiated_by" not in existing:
+        cursor.execute("ALTER TABLE flow_state ADD COLUMN initiated_by TEXT")
+        logger.bind(external="sqlite", operation="migration").info(
+            "Added initiated_by column to flow_state"
+        )
 
     # Migration: add async execution tracking columns if missing
     async_columns = {

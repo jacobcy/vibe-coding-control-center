@@ -46,6 +46,7 @@ class FlowState(BaseModel):
     reviewer_actor: str | None = None
     reviewer_session_id: str | None = None
     latest_actor: str | None = None
+    initiated_by: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
     flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"] = (
@@ -141,6 +142,7 @@ class FlowStatusResponse(BaseModel):
     reviewer_actor: str | None = None
     reviewer_session_id: str | None = None
     latest_actor: str | None = None
+    initiated_by: str | None = None
     blocked_by: str | None = None
     next_step: str | None = None
     issues: list[IssueLink] = Field(default_factory=list)
@@ -194,6 +196,7 @@ class FlowStatusResponse(BaseModel):
             reviewer_actor=data.get("reviewer_actor"),
             reviewer_session_id=data.get("reviewer_session_id"),
             latest_actor=data.get("latest_actor"),
+            initiated_by=data.get("initiated_by"),
             blocked_by=data.get("blocked_by"),
             next_step=data.get("next_step"),
             issues=issues,

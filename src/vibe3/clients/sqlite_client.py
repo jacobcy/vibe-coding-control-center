@@ -31,6 +31,7 @@ class SQLiteClient:
         "reviewer_actor",
         "reviewer_session_id",
         "latest_actor",
+        "initiated_by",
         "blocked_by",
         "next_step",
         "flow_status",
