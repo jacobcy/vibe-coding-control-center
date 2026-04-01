@@ -1,12 +1,12 @@
-"""Tests for Dispatcher feedback loop - Phase 3."""
+"""Tests for ManagerExecutor feedback loop."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from tests.vibe3.orchestra.conftest import CompletedProcess
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -18,42 +18,42 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
     )
 
 
-class TestDispatcherFeedbackLoop:
-    """Tests for Phase 3 feedback loop."""
+class TestManagerFeedbackLoop:
+    """Tests for feedback loop in ManagerExecutor."""
 
     def test_dispatch_success_with_pr_advances_to_review(self):
         """Success + PR exists should advance issue to state/review."""
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=100)
 
         with patch.object(
-            dispatcher.orchestrator,
+            manager.flow_manager,
             "create_flow_for_issue",
             return_value={"branch": "task/issue-100"},
         ):
             with patch.object(
-                dispatcher,
+                manager,
                 "_resolve_manager_cwd",
                 return_value=(Path("/tmp/wt-issue-100"), False),
             ):
-                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch.object(manager, "can_dispatch", return_value=True):
                     with patch(
                         "subprocess.run",
                         return_value=CompletedProcess(returncode=0),
                     ):
                         with patch.object(
-                            dispatcher.orchestrator,
+                            manager.flow_manager,
                             "get_pr_for_issue",
                             return_value=123,
                         ):
                             with patch.object(
-                                dispatcher.result_handler, "update_state_label"
+                                manager.result_handler, "update_state_label"
                             ) as mock_update:
                                 with patch.object(
-                                    dispatcher.result_handler, "record_dispatch_event"
+                                    manager.result_handler, "record_dispatch_event"
                                 ) as mock_record:
-                                    result = dispatcher.dispatch_manager(issue)
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         # Should have called update_state_label with REVIEW (last call)
@@ -67,36 +67,36 @@ class TestDispatcherFeedbackLoop:
     def test_dispatch_success_without_pr_keeps_in_progress(self):
         """Success + no PR should keep issue in state/in-progress."""
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=101)
 
         with patch.object(
-            dispatcher.orchestrator,
+            manager.flow_manager,
             "create_flow_for_issue",
             return_value={"branch": "task/issue-101"},
         ):
             with patch.object(
-                dispatcher,
+                manager,
                 "_resolve_manager_cwd",
                 return_value=(Path("/tmp/wt-issue-101"), False),
             ):
-                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch.object(manager, "can_dispatch", return_value=True):
                     with patch(
                         "subprocess.run",
                         return_value=CompletedProcess(returncode=0),
                     ):
                         with patch.object(
-                            dispatcher.orchestrator,
+                            manager.flow_manager,
                             "get_pr_for_issue",
                             return_value=None,  # No PR
                         ):
                             with patch.object(
-                                dispatcher.result_handler, "update_state_label"
+                                manager.result_handler, "update_state_label"
                             ) as mock_update:
                                 with patch.object(
-                                    dispatcher.result_handler, "record_dispatch_event"
+                                    manager.result_handler, "record_dispatch_event"
                                 ):
-                                    result = dispatcher.dispatch_manager(issue)
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         # Should have called update_state_label with IN_PROGRESS (before execution)
@@ -109,20 +109,20 @@ class TestDispatcherFeedbackLoop:
     def test_dispatch_failure_api_error_sets_blocked_and_comments(self):
         """API error should set issue to blocked and post comment."""
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=102)
 
         with patch.object(
-            dispatcher.orchestrator,
+            manager.flow_manager,
             "create_flow_for_issue",
             return_value={"branch": "task/issue-102"},
         ):
             with patch.object(
-                dispatcher,
+                manager,
                 "_resolve_manager_cwd",
                 return_value=(Path("/tmp/wt-issue-102"), False),
             ):
-                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch.object(manager, "can_dispatch", return_value=True):
                     with patch(
                         "subprocess.run",
                         return_value=CompletedProcess(
@@ -130,21 +130,21 @@ class TestDispatcherFeedbackLoop:
                         ),
                     ):
                         with patch.object(
-                            dispatcher.result_handler, "update_state_label"
+                            manager.result_handler, "update_state_label"
                         ) as mock_update:
                             with patch.object(
-                                dispatcher.result_handler, "post_failure_comment"
+                                manager.result_handler, "post_failure_comment"
                             ) as mock_comment:
                                 with patch.object(
-                                    dispatcher.orchestrator,
+                                    manager.flow_manager,
                                     "get_flow_for_issue",
                                     return_value={"branch": "task/issue-102"},
                                 ):
                                     with patch.object(
-                                        dispatcher.result_handler,
+                                        manager.result_handler,
                                         "record_dispatch_event",
                                     ):
-                                        result = dispatcher.dispatch_manager(issue)
+                                        result = manager.dispatch_manager(issue)
 
         assert result is False
         # Should have set state to BLOCKED
@@ -161,40 +161,40 @@ class TestDispatcherFeedbackLoop:
         import subprocess
 
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=103)
 
         with patch.object(
-            dispatcher.orchestrator,
+            manager.flow_manager,
             "create_flow_for_issue",
             return_value={"branch": "task/issue-103"},
         ):
             with patch.object(
-                dispatcher,
+                manager,
                 "_resolve_manager_cwd",
                 return_value=(Path("/tmp/wt-issue-103"), False),
             ):
-                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch.object(manager, "can_dispatch", return_value=True):
                     with patch(
                         "subprocess.run",
                         side_effect=subprocess.TimeoutExpired(cmd=[], timeout=3600),
                     ):
                         with patch.object(
-                            dispatcher.result_handler, "update_state_label"
+                            manager.result_handler, "update_state_label"
                         ) as mock_update:
                             with patch.object(
-                                dispatcher.result_handler, "post_failure_comment"
+                                manager.result_handler, "post_failure_comment"
                             ):
                                 with patch.object(
-                                    dispatcher.orchestrator,
+                                    manager.flow_manager,
                                     "get_flow_for_issue",
                                     return_value={"branch": "task/issue-103"},
                                 ):
                                     with patch.object(
-                                        dispatcher.result_handler,
+                                        manager.result_handler,
                                         "record_dispatch_event",
                                     ):
-                                        result = dispatcher.dispatch_manager(issue)
+                                        result = manager.dispatch_manager(issue)
 
         assert result is False
         # Should have set state to BLOCKED
@@ -206,20 +206,20 @@ class TestDispatcherFeedbackLoop:
     def test_dispatch_failure_business_error_keeps_in_progress(self):
         """Business error should NOT auto-block, keep in-progress."""
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=104)
 
         with patch.object(
-            dispatcher.orchestrator,
+            manager.flow_manager,
             "create_flow_for_issue",
             return_value={"branch": "task/issue-104"},
         ):
             with patch.object(
-                dispatcher,
+                manager,
                 "_resolve_manager_cwd",
                 return_value=(Path("/tmp/wt-issue-104"), False),
             ):
-                with patch.object(dispatcher, "can_dispatch", return_value=True):
+                with patch.object(manager, "can_dispatch", return_value=True):
                     with patch(
                         "subprocess.run",
                         return_value=CompletedProcess(
@@ -227,21 +227,21 @@ class TestDispatcherFeedbackLoop:
                         ),
                     ):
                         with patch.object(
-                            dispatcher.result_handler, "update_state_label"
+                            manager.result_handler, "update_state_label"
                         ) as mock_update:
                             with patch.object(
-                                dispatcher.result_handler, "post_failure_comment"
+                                manager.result_handler, "post_failure_comment"
                             ) as mock_comment:
                                 with patch.object(
-                                    dispatcher.orchestrator,
+                                    manager.flow_manager,
                                     "get_flow_for_issue",
                                     return_value={"branch": "task/issue-104"},
                                 ):
                                     with patch.object(
-                                        dispatcher.result_handler,
+                                        manager.result_handler,
                                         "record_dispatch_event",
                                     ):
-                                        result = dispatcher.dispatch_manager(issue)
+                                        result = manager.dispatch_manager(issue)
 
         assert result is False
         # Should NOT have posted comment (business error)
@@ -255,31 +255,27 @@ class TestDispatcherFeedbackLoop:
     def test_record_dispatch_event_stores_in_flow_history(self):
         """Dispatch events should be recorded in flow event history."""
         config = OrchestraConfig()
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
-        # This test verifies the method exists and can be called
-        dispatcher.result_handler.record_dispatch_event(
+        # Verifies the method exists and can be called
+        manager.result_handler.record_dispatch_event(
             flow_branch="task/issue-100",
             success=True,
             issue_number=100,
             pr_number=123,
         )
 
-        # The method should exist and be callable
-        assert dispatcher.result_handler.record_dispatch_event is not None
+        assert manager.result_handler.record_dispatch_event is not None
 
     def test_post_failure_comment_creates_github_comment(self):
         """Failed dispatch should post comment on issue."""
         config = OrchestraConfig(repo="owner/repo")
-        dispatcher = Dispatcher(config, repo_path=Path("/tmp/repo"))
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
-        # Test that the method exists and can be called
-        # In actual implementation, it creates a GitHub comment
         with patch("vibe3.clients.github_client.GitHubClient") as mock_client_class:
             mock_github = MagicMock()
             mock_client_class.return_value = mock_github
 
-            dispatcher.result_handler.post_failure_comment(100, "Test failure reason")
+            manager.result_handler.post_failure_comment(100, "Test failure reason")
 
-            # Verify the method was called (not checking internal implementation)
-            assert dispatcher.result_handler.post_failure_comment is not None
+            assert manager.result_handler.post_failure_comment is not None

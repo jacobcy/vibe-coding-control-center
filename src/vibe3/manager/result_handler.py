@@ -1,4 +1,7 @@
-"""Dispatch result handler for Orchestra - handles post-execution state and feedback."""
+"""Dispatch result handler for Orchestra manager.
+
+Handles post-execution state and feedback.
+"""
 
 from typing import TYPE_CHECKING
 
@@ -7,9 +10,9 @@ from loguru import logger
 from vibe3.models.orchestration import IssueState
 
 if TYPE_CHECKING:
+    from vibe3.manager.flow_manager import FlowManager
     from vibe3.models.orchestration import IssueInfo
     from vibe3.orchestra.config import OrchestraConfig
-    from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 
 
 class DispatchResultHandler:
@@ -18,10 +21,10 @@ class DispatchResultHandler:
     def __init__(
         self,
         config: "OrchestraConfig",
-        orchestrator: "FlowOrchestrator",
+        flow_manager: "FlowManager",
     ):
         self.config = config
-        self.orchestrator = orchestrator
+        self.flow_manager = flow_manager
 
     def update_state_label(self, issue_number: int, state: IssueState) -> None:
         """Update issue state label (display only, does not drive logic)."""
@@ -53,7 +56,7 @@ class DispatchResultHandler:
         )
 
         # Check if PR exists
-        pr_number = self.orchestrator.get_pr_for_issue(issue.number)
+        pr_number = self.flow_manager.get_pr_for_issue(issue.number)
         if pr_number:
             # Update state to review
             self.update_state_label(issue.number, IssueState.REVIEW)
@@ -103,7 +106,7 @@ class DispatchResultHandler:
             log.warning(f"Issue blocked due to {category}")
 
             # Record event in flow history
-            flow = self.orchestrator.get_flow_for_issue(issue.number)
+            flow = self.flow_manager.get_flow_for_issue(issue.number)
             if flow and flow.get("branch"):
                 self.record_dispatch_event(
                     flow["branch"],
@@ -121,7 +124,7 @@ class DispatchResultHandler:
             log.warning("Business error, keeping state/in-progress")
 
             # Record event in flow history
-            flow = self.orchestrator.get_flow_for_issue(issue.number)
+            flow = self.flow_manager.get_flow_for_issue(issue.number)
             if flow and flow.get("branch"):
                 self.record_dispatch_event(
                     flow["branch"],

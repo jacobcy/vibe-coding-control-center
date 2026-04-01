@@ -12,9 +12,8 @@ from fastapi import FastAPI
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
@@ -36,27 +35,25 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     # Shared resources (reduces duplication)
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_github = GitHubClient()
-    shared_orchestrator = FlowOrchestrator(config)
-    shared_dispatcher = Dispatcher(
+    shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
-        orchestrator=shared_orchestrator,
     )
 
     # Status service for HTTP endpoint and CLI
-    # Pass circuit_breaker from dispatcher for status reporting
+    # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
-        orchestrator=shared_orchestrator,
-        circuit_breaker=shared_dispatcher._circuit_breaker,
+        orchestrator=shared_manager.flow_manager,
+        circuit_breaker=shared_manager._circuit_breaker,
     )
 
     if config.assignee_dispatch.enabled:
         heartbeat.register(
             AssigneeDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
             )
@@ -72,7 +69,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         heartbeat.register(
             PRReviewDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 executor=shared_executor,
             )
         )
@@ -80,7 +77,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         heartbeat.register(
             StateLabelDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
             )
@@ -91,7 +88,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             GovernanceService(
                 config,
                 status_service=status_service,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 executor=shared_executor,
             )
         )

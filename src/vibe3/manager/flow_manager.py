@@ -1,4 +1,4 @@
-"""Flow orchestration utilities for orchestra dispatcher."""
+"""Flow management utilities for orchestra manager."""
 
 from loguru import logger
 
@@ -11,7 +11,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 
 
-class FlowOrchestrator:
+class FlowManager:
     """Manages issue-to-flow mapping and command execution.
 
     Uses FlowService and TaskService for all state mutations so that

@@ -1,6 +1,6 @@
 """Tests for CircuitBreaker and error classification."""
 
-from vibe3.orchestra.circuit_breaker import (
+from vibe3.dispatcher.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
     classify_failure,

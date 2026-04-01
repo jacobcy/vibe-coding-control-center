@@ -1,4 +1,4 @@
-"""Worktree resolution mixin for Orchestra dispatcher."""
+"""Worktree management for Orchestra manager."""
 
 from __future__ import annotations
 
@@ -9,33 +9,36 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
+    from vibe3.manager.flow_manager import FlowManager
     from vibe3.orchestra.config import OrchestraConfig
 
 
-class WorktreeResolverMixin:
-    """Mixin providing worktree resolution utilities for dispatchers.
+class WorktreeManager:
+    """Manages worktrees for flow execution.
 
-    Requires the host class to provide:
-        - ``repo_path`` (Path): repository root path
-        - ``config`` (OrchestraConfig): orchestra configuration
+    Provides resolution, creation, and recycling of git worktrees.
     """
 
-    repo_path: Path
-    config: OrchestraConfig
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        repo_path: Path,
+        flow_manager: FlowManager | None = None,
+    ):
+        self.config = config
+        self.repo_path = repo_path
+        self.flow_manager = flow_manager
+
+    def resolve_manager_cwd(
+        self, issue_number: int, flow_branch: str
+    ) -> tuple[Path | None, bool]:
+        """Resolve stable cwd for manager execution on a flow branch."""
+        return self._resolve_manager_cwd(issue_number, flow_branch)
 
     def _resolve_manager_cwd(
         self, issue_number: int, flow_branch: str
     ) -> tuple[Path | None, bool]:
-        """Resolve stable cwd for manager execution on a flow branch.
-
-        Priority:
-        1. Current repo_path when already on flow branch
-        2. Existing worktree that has the flow branch checked out
-        3. Create a dedicated orchestra worktree for this issue branch
-
-        Returns:
-            (cwd_path, is_temporary)
-        """
+        """Internal resolve implementation."""
         if self._is_current_branch(flow_branch):
             return self.repo_path, False
 
@@ -45,12 +48,11 @@ class WorktreeResolverMixin:
 
         return self._ensure_manager_worktree(issue_number, flow_branch)
 
-    def _normalize_manager_command(self, cmd: list[str], cwd: Path) -> list[str]:
-        """Backwards-compatible manager command normalization.
+    def normalize_manager_command(self, cmd: list[str], cwd: Path) -> list[str]:
+        """Backwards-compatible manager command normalization."""
+        return self._normalize_manager_command(cmd, cwd)
 
-        Some target branches may not yet support `vibe3 run --worktree`.
-        In that case, drop the flag and continue execution to avoid hard fail.
-        """
+    def _normalize_manager_command(self, cmd: list[str], cwd: Path) -> list[str]:
         if "--worktree" not in cmd:
             return cmd
         if self._supports_run_worktree_option(cwd):
@@ -96,10 +98,15 @@ class WorktreeResolverMixin:
         stripped: str = result.stdout.strip()
         return stripped == branch
 
+    def ensure_manager_worktree(
+        self, issue_number: int, branch: str
+    ) -> tuple[Path | None, bool]:
+        """Create dedicated manager worktree for issue flow branch."""
+        return self._ensure_manager_worktree(issue_number, branch)
+
     def _ensure_manager_worktree(
         self, issue_number: int, branch: str
     ) -> tuple[Path | None, bool]:
-        """Create dedicated manager worktree for issue flow branch when missing."""
         target = self.repo_path / ".worktrees" / f"issue-{issue_number}"
 
         if target.exists():
@@ -158,18 +165,14 @@ class WorktreeResolverMixin:
         ).info("Created manager worktree for flow branch")
         return target, True
 
+    def resolve_review_cwd(self, pr_number: int) -> Path:
+        """Resolve best worktree cwd for PR review execution."""
+        return self._resolve_review_cwd(pr_number)
+
     def _resolve_review_cwd(self, pr_number: int) -> Path:
-        """Resolve best worktree cwd for PR review execution.
-
-        Priority:
-        1. Worktree that currently has PR head branch checked out
-        2. Dispatcher default repo_path
-
-        Uses the shared GitHubClient from the orchestrator when available,
-        falling back to a new instance otherwise.
-        """
         try:
-            github = getattr(getattr(self, "orchestrator", None), "github", None)
+            # Try to get GitHubClient from flow_manager if available
+            github = getattr(self.flow_manager, "github", None)
             if github is None:
                 from vibe3.clients.github_client import GitHubClient
 
@@ -235,3 +238,39 @@ class WorktreeResolverMixin:
 
         final: Path | None = matched()
         return final
+
+    def recycle(self, path: Path) -> bool:
+        """Remove a git worktree.
+
+        Args:
+            path: Path to the worktree to remove
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not path or not path.exists():
+            return False
+
+        log = logger.bind(domain="orchestra", worktree=str(path))
+        try:
+            # Check if it's actually a worktree
+            if not (path / ".git").exists():
+                log.warning("Path is not a valid git worktree (no .git file)")
+                return False
+
+            result = subprocess.run(
+                ["git", "worktree", "remove", str(path)],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                log.error(f"Failed to remove worktree: {result.stderr.strip()}")
+                return False
+
+            log.info("Worktree removed successfully")
+            return True
+        except Exception as exc:
+            log.error(f"Error removing worktree: {exc}")
+            return False

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -13,11 +13,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.circuit_breaker import CircuitBreaker
+    from vibe3.dispatcher.circuit_breaker import CircuitBreaker
 
 
 @dataclass(frozen=True)
@@ -54,13 +53,10 @@ class OrchestraSnapshot:
 class OrchestraStatusService:
     """Aggregate read-only status from multiple data sources.
 
-    Does not register as ServiceBase (no event handling needed).
-    Provides snapshot() for CLI and HTTP endpoint.
-
     Data sources:
     - GitHub Issues (via GitHubClient)
     - State labels (via LabelService)
-    - Flow state (via FlowOrchestrator)
+    - Flow state (via FlowManager)
     - Worktrees (via GitClient)
     - Circuit Breaker (via CircuitBreaker)
     """
@@ -69,21 +65,26 @@ class OrchestraStatusService:
         self,
         config: OrchestraConfig,
         github: GitHubClient | None = None,
-        orchestrator: FlowOrchestrator | None = None,
+        orchestrator: Any | None = None,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
-        self._orchestrator = orchestrator or FlowOrchestrator(config)
+
+        # Internal orchestrator (FlowManager)
+        if orchestrator is None:
+            from vibe3.manager.flow_manager import FlowManager
+
+            self._orchestrator = FlowManager(config)
+        else:
+            self._orchestrator = orchestrator
+
         self._circuit_breaker = circuit_breaker
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
 
     def snapshot(self) -> OrchestraSnapshot:
-        """Build current status snapshot.
-
-        Performs ~1-2 GitHub API calls (list issues + potentially get PRs).
-        """
+        """Build current status snapshot."""
         log = logger.bind(domain="orchestra", action="status_snapshot")
         log.debug("Building orchestra status snapshot")
 
@@ -147,7 +148,7 @@ class OrchestraStatusService:
 
         snapshot = OrchestraSnapshot(
             timestamp=time.time(),
-            server_running=True,  # If we're here, server is running
+            server_running=True,
             active_issues=tuple(entries),
             active_flows=active_flows,
             active_worktrees=len(worktrees),
@@ -163,11 +164,6 @@ class OrchestraStatusService:
         return snapshot
 
     def _get_manager_issues(self) -> list[dict]:
-        """Get open issues assigned to manager usernames.
-
-        Deduplicates issues by number to avoid counting the same issue
-        multiple times when assigned to multiple managers.
-        """
         seen_numbers: set[int] = set()
         issues: list[dict] = []
 
@@ -192,7 +188,6 @@ class OrchestraStatusService:
         return issues
 
     def _get_worktree_map(self) -> dict[str, str]:
-        """Get mapping of branch name -> worktree path."""
         try:
             worktrees = self._git.list_worktrees()
             return {
@@ -203,7 +198,6 @@ class OrchestraStatusService:
             return {}
 
     def get_active_flow_count(self) -> int:
-        """Get count of active flows directly from the local database."""
         try:
             from vibe3.clients import SQLiteClient
 
@@ -217,19 +211,16 @@ class OrchestraStatusService:
             return 0
 
     def _get_circuit_breaker_state(self) -> str:
-        """Get current circuit breaker state."""
         if self._circuit_breaker:
             return self._circuit_breaker.state_value
         return "disabled"
 
     def _get_circuit_breaker_failures(self) -> int:
-        """Get current circuit breaker failure count."""
         if self._circuit_breaker:
             return self._circuit_breaker.failure_count
         return 0
 
     def _get_circuit_breaker_last_failure(self) -> float | None:
-        """Get the last failure timestamp."""
         if self._circuit_breaker and getattr(
             self._circuit_breaker, "last_failure_timestamp", None
         ):

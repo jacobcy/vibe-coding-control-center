@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
@@ -19,37 +19,40 @@ if TYPE_CHECKING:
 
 
 class StateLabelDispatchService(ServiceBase):
-    """Detects issues with 'state/ready' label and triggers manager dispatch.
+    """Detects issues with 'state/ready' label and triggers manager dispatch."""
 
-    This service implements the 'label-driven' orchestration flow:
-    1. Orchestra agent (AI) or Human adds 'state/ready' label to an issue.
-    2. This service detects the label via:
-       - GitHub webhook `issues/labeled` event (real-time)
-       - Periodic on_tick() scan (polling fallback)
-    3. It triggers Dispatcher.dispatch_manager(issue) if not already running.
-    """
-
-    # Subscribe to issues events to catch label changes in real-time
     event_types = ["issues"]
 
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Dispatcher | None = None,
+        dispatcher: Any | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         status_service: "OrchestraStatusService" | None = None,
+        manager: ManagerExecutor | None = None,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
+        # Compatibility: prefer 'manager', fall back to 'dispatcher'
+        self._manager = (
+            manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
+        )
         self._github = github or GitHubClient()
         self._status_service = status_service
         self._dispatched_issues: set[int] = set()
         self._in_flight_dispatches: set[int] = set()
         self._dispatch_guard = asyncio.Lock()
+
+    @property
+    def _dispatcher(self) -> Any:
+        return self._manager
+
+    @_dispatcher.setter
+    def _dispatcher(self, value: Any) -> None:
+        self._manager = value
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to issues/labeled webhook event."""
@@ -65,8 +68,6 @@ class StateLabelDispatchService(ServiceBase):
         if issue is None:
             return
 
-        # Double check: ensure it doesn't also have in-progress
-        # (webhook payload 'issue' reflects state AFTER the action)
         labels = [lb.get("name", "") for lb in issue_payload.get("labels", [])]
         if "state/in-progress" in labels:
             return
@@ -80,9 +81,7 @@ class StateLabelDispatchService(ServiceBase):
         """Scan for issues with state/ready label and no state/in-progress."""
         log = logger.bind(domain="orchestra", service="StateLabelDispatch")
 
-        # Query issues with state/ready label
-        # Note: 'gh issue list --label state/ready'
-        raw = await asyncio.get_running_loop().run_in_executor(
+        raw = await asyncio.get_event_loop().run_in_executor(
             self._executor,
             self._list_ready_issues,
         )
@@ -97,7 +96,6 @@ class StateLabelDispatchService(ServiceBase):
                 continue
 
             labels = [lb.get("name", "") for lb in item.get("labels", [])]
-            # Skip if it's already in-progress (occupancy signal)
             if "state/in-progress" in labels:
                 continue
 
@@ -112,7 +110,6 @@ class StateLabelDispatchService(ServiceBase):
             await self._dispatch_if_needed(issue)
 
     def _list_ready_issues(self) -> list[dict[str, Any]]:
-        """Synchronous wrapper for gh issue list --label state/ready."""
         import json
         import subprocess
 
@@ -152,8 +149,6 @@ class StateLabelDispatchService(ServiceBase):
 
         dispatched = False
         try:
-            # Global Capacity Check: don't start new work if system is already full.
-            # This is the primary guard against the "avalanche" of manager processes.
             if self._status_service:
                 active_count = self._status_service.get_active_flow_count()
                 if active_count >= self.config.max_concurrent_flows:
@@ -161,18 +156,16 @@ class StateLabelDispatchService(ServiceBase):
                     log.warning(f"Throttled: Capacity reached ({active_count}/{limit})")
                     return
 
-            # Skip if flow already exists
             if self._has_flow(issue.number):
                 log.debug("Skip dispatch: flow already exists")
                 dispatched = True
                 return
 
-            # Trigger dispatcher
             log.info(f"Triggering manager dispatch for #{issue.number} (state/ready)")
-            loop = asyncio.get_running_loop()
+            loop = asyncio.get_event_loop()
             dispatched = await loop.run_in_executor(
                 self._executor,
-                self._dispatcher.dispatch_manager,
+                self._manager.dispatch_manager,
                 issue,
             )
         finally:
@@ -184,7 +177,7 @@ class StateLabelDispatchService(ServiceBase):
     def _has_flow(self, issue_number: int) -> bool:
         """Check if a flow already exists for the issue."""
         try:
-            flow = self._dispatcher.orchestrator.get_flow_for_issue(issue_number)
+            flow = self._manager.orchestrator.get_flow_for_issue(issue_number)
             return flow is not None
         except Exception as exc:
             logger.bind(domain="orchestra").warning(

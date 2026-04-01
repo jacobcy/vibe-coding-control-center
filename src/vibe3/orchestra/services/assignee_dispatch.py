@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
-from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 from vibe3.orchestra.services.status_service import OrchestraStatusService
 
@@ -25,29 +26,30 @@ _PRIORITY_DEFAULT = 2
 
 
 class AssigneeDispatchService(ServiceBase):
-    """Dispatch manager execution when an issue is assigned to a manager username.
-
-    Primary path: GitHub webhook `issues/assigned` event.
-    Fallback: polling tick scans all open issues for missed assignments.
-    """
+    """Dispatch manager execution when an issue is assigned to a manager username."""
 
     event_types = ["issues"]
 
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Dispatcher | None = None,
+        dispatcher: Any | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         status_service: OrchestraStatusService | None = None,
+        manager: ManagerExecutor | None = None,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
+        # Compatibility: prefer 'manager', fall back to 'dispatcher'
+        self._manager = (
+            manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
+        )
+
         self._status_service = status_service or OrchestraStatusService(
-            config, orchestrator=self._dispatcher.orchestrator
+            config, orchestrator=self._manager.flow_manager
         )
         self._dep_checker = DependencyChecker(
             repo=config.repo,
@@ -58,6 +60,14 @@ class AssigneeDispatchService(ServiceBase):
         self._cold_start = True
         self._dispatched_issues: set[int] = set()
         self._github = github or GitHubClient()
+
+    @property
+    def _dispatcher(self) -> Any:
+        return self._manager
+
+    @_dispatcher.setter
+    def _dispatcher(self, value: Any) -> None:
+        self._manager = value
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to issues/assigned webhook event."""
@@ -81,7 +91,7 @@ class AssigneeDispatchService(ServiceBase):
 
     async def on_tick(self) -> None:
         """Polling fallback: scan open issues for any missed assignments."""
-        raw = await asyncio.get_running_loop().run_in_executor(
+        raw = await asyncio.get_event_loop().run_in_executor(
             self._executor,
             lambda: self._github.list_issues_with_assignees(
                 limit=100, repo=self.config.repo
@@ -89,8 +99,6 @@ class AssigneeDispatchService(ServiceBase):
         )
 
         if self._cold_start:
-            # Warm-up pass: only record current assignees to avoid dispatching
-            # historical assignments after a server restart.
             self._assignee_cache = {
                 item["number"]: frozenset(a["login"] for a in item.get("assignees", []))
                 for item in raw
@@ -143,7 +151,6 @@ class AssigneeDispatchService(ServiceBase):
         for issue in self._sort_by_priority(ready):
             await self._dispatch_if_ready(issue, source="tick")
 
-        # Prune caches to only keep issues seen in current scan
         seen_numbers = {item["number"] for item in raw}
         self._assignee_cache = {
             k: v for k, v in self._assignee_cache.items() if k in seen_numbers
@@ -167,7 +174,6 @@ class AssigneeDispatchService(ServiceBase):
             log.info(f"Deferred: blocked by {blockers}")
             return
 
-        # Global Capacity Check: verify system-wide concurrency limit
         try:
             active_count = self._status_service.get_active_flow_count()
             capacity = self.config.max_concurrent_flows
@@ -177,16 +183,16 @@ class AssigneeDispatchService(ServiceBase):
         except Exception as e:
             log.error(f"Capacity check failed: {e}")
 
-        loop = asyncio.get_running_loop()
+        loop = asyncio.get_event_loop()
         dispatched = await loop.run_in_executor(
-            self._executor, self._dispatcher.dispatch_manager, issue
+            self._executor, self._manager.dispatch_manager, issue
         )
         if dispatched:
             self._dispatched_issues.add(issue.number)
 
     def _has_flow(self, issue_number: int) -> bool:
         try:
-            flow = self._dispatcher.orchestrator.get_flow_for_issue(issue_number)
+            flow = self._manager.orchestrator.get_flow_for_issue(issue_number)
             return flow is not None
         except Exception as exc:
             logger.bind(domain="orchestra").warning(
