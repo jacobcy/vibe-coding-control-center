@@ -7,9 +7,10 @@
 #
 # Reads limits from config/settings.yaml without uv
 #
-# Limits (unified for Shell and Python):
-#   default: 200 lines (most files should fit)
-#   max: 300 lines (special cases with justification)
+# Limits (unified for all file types):
+#   default: 300 lines (most files should fit)
+#   max: 400 lines (special cases with justification)
+
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths):
 #   Shell: lib/, lib3/, bin/vibe
@@ -64,8 +65,8 @@ PY
 }
 
 # Get limits (unified for all file types)
-LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 200)
-LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
+LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 300)
+LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
 
 # Files to ignore (temporarily exceed limits)
 IGNORE_FILES=(

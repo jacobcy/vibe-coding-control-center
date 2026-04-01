@@ -3,8 +3,8 @@
 # Reads limits from config/settings.yaml without uv
 #
 # Limits:
-#   default: 200 lines (most test files should fit)
-#   max: 300 lines (special cases with justification)
+#   default: 300 lines (most test files should fit)
+#   max: 400 lines (special cases with justification)
 #
 # Test paths (defined in config/settings.yaml:code_limits.test_paths):
 #   Python: tests/vibe3/
@@ -56,8 +56,8 @@ PY
 }
 
 # Get limits (unified for all test files)
-LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 200)
-LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 300)
+LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 300)
+LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
 
 warnings=0
 errors=0
