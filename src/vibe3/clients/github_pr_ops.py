@@ -330,21 +330,27 @@ class PRMixin:
         ).debug("Calling GitHub API: list_pr_comments")
 
         try:
+            # First get repo nameWithOwner
+            repo_result = subprocess.run(
+                ["gh", "repo", "view", "--json", "nameWithOwner"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            repo = json.loads(repo_result.stdout)["nameWithOwner"]
+
+            # Use gh api directly to get full comment objects
             result = subprocess.run(
                 [
                     "gh",
-                    "pr",
-                    "view",
-                    str(pr_number),
-                    "--json",
-                    "comments",
+                    "api",
+                    f"repos/{repo}/issues/{pr_number}/comments",
                 ],
                 capture_output=True,
                 text=True,
                 check=True,
             )
-            data = json.loads(result.stdout)
-            return cast(list[dict[str, Any]], data.get("comments", []))
+            return cast(list[dict[str, Any]], json.loads(result.stdout))
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to list PR comments: {e.stderr}")
             return []
@@ -377,7 +383,7 @@ class PRMixin:
             return ""
 
     def update_pr_comment(self: Any, comment_id: str, body: str) -> str:
-        """Update an existing PR comment via GitHub API. Returns comment ID or URL."""
+        """Update an existing PR comment via GitHub API."""
         logger.bind(
             external="github",
             operation="update_pr_comment",
@@ -394,6 +400,7 @@ class PRMixin:
             )
             repo = json.loads(repo_result.stdout)["nameWithOwner"]
 
+            # Standard REST path for updating a comment
             result = subprocess.run(
                 [
                     "gh",
@@ -401,9 +408,10 @@ class PRMixin:
                     "-X",
                     "PATCH",
                     f"repos/{repo}/issues/comments/{comment_id}",
-                    "-f",
-                    f"body={body}",
+                    "--input",
+                    "-",
                 ],
+                input=json.dumps({"body": body}),
                 capture_output=True,
                 text=True,
                 check=True,
