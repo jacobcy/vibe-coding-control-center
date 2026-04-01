@@ -6,36 +6,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-# Placeholder actors that should not appear in contributor signatures.
-_PLACEHOLDER_ACTORS = frozenset({"unknown", "system", "server", "ai_assistant", ""})
-
-# Legacy actor alias -> normalized backend identifier.
-_LEGACY_ALIAS_MAP: dict[str, str] = {
-    "agent-claude": "claude",
-    "claude-ai": "claude",
-    "agent-codex": "codex",
-    "openai-code-agent[bot]": "openai",
-    "openai-code-agent": "openai",
-}
-
-
-def normalize_actor(actor: str) -> str | None:
-    """Normalize an actor identifier to standard ``backend/model`` format.
-
-    Handles:
-    - Already standard format (``claude/sonnet-4.6``) -> pass through
-    - Legacy aliases (``Agent-Claude``) -> ``claude``
-    - Placeholder values -> ``None`` (filtered out)
-    - Empty string -> ``None``
-    """
-    if not actor or not actor.strip():
-        return None
-    key = actor.strip().lower()
-    if key in _PLACEHOLDER_ACTORS:
-        return None
-    if key in _LEGACY_ALIAS_MAP:
-        return _LEGACY_ALIAS_MAP[key]
-    return actor.strip()
+from vibe3.services.signature_service import SignatureService
 
 
 class PRState(str, Enum):
@@ -73,7 +44,7 @@ class PRMetadata(BaseModel):
         field_order: list[str] = []
 
         for raw in (self.planner, self.executor, self.reviewer, self.latest):
-            normalized = normalize_actor(raw) if raw else None
+            normalized = SignatureService.normalize_actor(raw) if raw else None
             if not normalized:
                 continue
             backend = normalized.split("/")[0]

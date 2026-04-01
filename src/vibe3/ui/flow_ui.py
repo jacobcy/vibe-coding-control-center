@@ -33,16 +33,17 @@ def _display_actor(actor: str | None) -> tuple[str, bool]:
     """Resolve actor for display.
 
     Returns (display_value, is_worktree_fallback).
-    - If actor is set and meaningful → (actor, False)
+    - If actor is set and normalizes to a meaningful value → (normalized, False)
     - Else → (worktree git user.name, True)
 
-    Callers should render the fallback case with a visual hint so users
-    can distinguish a flow-level signature from a worktree default.
+    Uses ``SignatureService.normalize_actor`` which maps legacy aliases and
+    filters placeholders, giving consistent output across PR body and UI.
     """
     from vibe3.services.signature_service import SignatureService
 
-    if actor and not SignatureService._is_placeholder(actor):
-        return actor, False
+    normalized = SignatureService.normalize_actor(actor)
+    if normalized is not None:
+        return normalized, False
     return SignatureService.get_worktree_actor(), True
 
 

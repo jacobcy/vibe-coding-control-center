@@ -1,11 +1,12 @@
 """Tests for PR utility functions."""
 
-from vibe3.models.pr import PRMetadata, normalize_actor
+from vibe3.models.pr import PRMetadata
 from vibe3.services.pr_utils import (
     _build_linked_section,
     _has_issue_linked,
     build_pr_body,
 )
+from vibe3.services.signature_service import SignatureService
 
 
 class TestHasIssueLinked:
@@ -73,43 +74,45 @@ class TestNormalizeActor:
     """Tests for normalize_actor."""
 
     def test_standard_format_passthrough(self) -> None:
-        assert normalize_actor("claude/sonnet-4.6") == "claude/sonnet-4.6"
+        assert (
+            SignatureService.normalize_actor("claude/sonnet-4.6") == "claude/sonnet-4.6"
+        )
 
     def test_placeholder_unknown(self) -> None:
-        assert normalize_actor("unknown") is None
+        assert SignatureService.normalize_actor("unknown") is None
 
     def test_placeholder_system(self) -> None:
-        assert normalize_actor("system") is None
+        assert SignatureService.normalize_actor("system") is None
 
     def test_placeholder_server(self) -> None:
-        assert normalize_actor("server") is None
+        assert SignatureService.normalize_actor("server") is None
 
     def test_placeholder_ai_assistant(self) -> None:
-        assert normalize_actor("ai_assistant") is None
+        assert SignatureService.normalize_actor("ai_assistant") is None
 
     def test_empty_string(self) -> None:
-        assert normalize_actor("") is None
+        assert SignatureService.normalize_actor("") is None
 
     def test_whitespace_only(self) -> None:
-        assert normalize_actor("  ") is None
+        assert SignatureService.normalize_actor("  ") is None
 
     def test_legacy_agent_claude(self) -> None:
-        assert normalize_actor("Agent-Claude") == "claude"
+        assert SignatureService.normalize_actor("Agent-Claude") == "claude"
 
     def test_legacy_agent_claude_lowercase(self) -> None:
-        assert normalize_actor("agent-claude") == "claude"
+        assert SignatureService.normalize_actor("agent-claude") == "claude"
 
     def test_legacy_agent_codex(self) -> None:
-        assert normalize_actor("Agent-Codex") == "codex"
+        assert SignatureService.normalize_actor("Agent-Codex") == "codex"
 
     def test_legacy_openai_bot(self) -> None:
-        assert normalize_actor("openai-code-agent[bot]") == "openai"
+        assert SignatureService.normalize_actor("openai-code-agent[bot]") == "openai"
 
     def test_backend_only_passthrough(self) -> None:
-        assert normalize_actor("claude") == "claude"
+        assert SignatureService.normalize_actor("claude") == "claude"
 
     def test_strips_whitespace(self) -> None:
-        assert normalize_actor("  claude/sonnet  ") == "claude/sonnet"
+        assert SignatureService.normalize_actor("  claude/sonnet  ") == "claude/sonnet"
 
 
 class TestContributors:
