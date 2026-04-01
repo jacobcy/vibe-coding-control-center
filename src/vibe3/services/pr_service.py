@@ -159,7 +159,12 @@ class PRService:
 
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=effective_actor)
-            self.briefing_service.publish_briefing(pr_number)
+            try:
+                self.briefing_service.publish_briefing(pr_number)
+            except Exception as e:
+                logger.bind(pr_number=pr_number).warning(
+                    f"Briefing update failed (PR still ready): {e}"
+                )
             logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
             return pr
 
@@ -167,8 +172,12 @@ class PRService:
         branch = pr.head_branch
         self._sync_pr_flow_state(updated_pr, actor=effective_actor)
 
-        # Let error bubble up transparently
-        self.briefing_service.publish_briefing(pr_number)
+        try:
+            self.briefing_service.publish_briefing(pr_number)
+        except Exception as e:
+            logger.bind(pr_number=pr_number).warning(
+                f"Briefing publication failed (PR marked ready): {e}"
+            )
 
         self.store.add_event(
             branch,

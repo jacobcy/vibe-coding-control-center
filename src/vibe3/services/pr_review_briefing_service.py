@@ -23,24 +23,20 @@ class PRReviewBriefingService:
         analysis = build_pr_analysis(pr_number)
         body = self._render_briefing(analysis)
 
-        current_user = self.github_client.get_current_user()
-        existing_comment = self._find_briefing_comment(pr_number, current_user)
+        # Sentinel is the singleton key. Update any existing briefing.
+        existing_comment = self._find_briefing_comment(pr_number)
         if existing_comment:
             comment_id = str(existing_comment["id"])
             return self.github_client.update_pr_comment(comment_id, body)
         else:
             return self.github_client.create_pr_comment(pr_number, body)
 
-    def _find_briefing_comment(
-        self, pr_number: int, author: str
-    ) -> dict[str, Any] | None:
-        """Find existing briefing comment by sentinel and author."""
+    def _find_briefing_comment(self, pr_number: int) -> dict[str, Any] | None:
+        """Find existing briefing comment by sentinel (singleton for PR)."""
         comments = self.github_client.list_pr_comments(pr_number)
         for comment in comments:
             body = comment.get("body", "")
-            comment_author = comment.get("author", {}).get("login", "")
-
-            if SENTINEL in body and (not author or comment_author == author):
+            if SENTINEL in body:
                 return comment
         return None
 

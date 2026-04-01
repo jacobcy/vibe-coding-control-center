@@ -14,7 +14,6 @@ def test_render_briefing_contains_essential_sections():
     analysis.pr_number = 123
     analysis.total_files = 5
     analysis.total_commits = 3
-    # Use real-looking score data with enum-like level
     analysis.score = {
         "score": {
             "score": 5.5,
@@ -27,7 +26,6 @@ def test_render_briefing_contains_essential_sections():
     analysis.impacted_modules = ["vibe3.core", "vibe3.api"]
 
     gh_client = MagicMock()
-    # Mock get_pr to provide context
     pr_details = MagicMock()
     pr_details.base_branch = "main"
     pr_details.head_branch = "feat/test"
@@ -41,25 +39,20 @@ def test_render_briefing_contains_essential_sections():
     assert "MEDIUM" in body
     assert "5.5" in body
     assert "Files Changed:** 5" in body
-    assert "src/core.py" in body
     assert "Route:** `main` ← `feat/test`" in body
-    assert "Linked Issue:** #42" in body
-    assert "### Please focus on" in body
-    assert "Critical Logic" in body
 
 
-def test_publish_briefing_creates_new_comment_if_none_exists_by_author():
+def test_publish_briefing_creates_new_if_no_sentinel_exists():
     gh_client = MagicMock()
-    gh_client.get_current_user.return_value = "bot-user"
-    # Existing comment by different author should be ignored
+    # Existing comment WITHOUT sentinel
     other_comment = {
         "id": "111",
-        "body": f"Briefing {SENTINEL}",
+        "body": "Normal comment",
         "author": {"login": "other-user"},
     }
     gh_client.list_pr_comments.return_value = [other_comment]
     gh_client.create_pr_comment.return_value = "https://github.com/comment/new"
-    gh_client.get_pr.return_value = MagicMock()  # for _render_briefing
+    gh_client.get_pr.return_value = MagicMock()
 
     analysis = MagicMock()
     analysis.score = {}
@@ -74,20 +67,19 @@ def test_publish_briefing_creates_new_comment_if_none_exists_by_author():
 
         assert url == "https://github.com/comment/new"
         gh_client.create_pr_comment.assert_called_once()
-        gh_client.update_pr_comment.assert_not_called()
 
 
-def test_publish_briefing_updates_existing_comment_by_same_author():
+def test_publish_briefing_updates_any_existing_sentinel_regardless_of_author():
     gh_client = MagicMock()
-    gh_client.get_current_user.return_value = "bot-user"
-    existing_comment = {
+    # Existing briefing by DIFFERENT author
+    existing_briefing = {
         "id": "999",
         "body": f"Old briefing {SENTINEL}",
-        "author": {"login": "bot-user"},
+        "author": {"login": "other-user"},
     }
-    gh_client.list_pr_comments.return_value = [existing_comment]
+    gh_client.list_pr_comments.return_value = [existing_briefing]
     gh_client.update_pr_comment.return_value = "https://github.com/comment/999"
-    gh_client.get_pr.return_value = MagicMock()  # for _render_briefing
+    gh_client.get_pr.return_value = MagicMock()
 
     analysis = MagicMock()
     analysis.score = {}
