@@ -152,6 +152,12 @@ class OrchestraConfig(BaseModel):
     pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
     webhook_secret: str | None = None
+    bot_username: str | None = Field(
+        default=None,
+        description=(
+            "The GitHub username of the bot itself, used to avoid self-triggering loops"
+        ),
+    )
     manager_usernames: list[str] = Field(
         default_factory=lambda: ["vibe-manager-agent"],
         description="GitHub usernames whose assignment signals manager dispatch",
@@ -231,6 +237,7 @@ class OrchestraConfig(BaseModel):
             max_concurrent_flows=src.max_concurrent_flows,
             port=src.port,
             webhook_secret=src.webhook_secret,
+            bot_username=getattr(src, "bot_username", None),
             manager_usernames=src.manager_usernames,
             master_agent=MasterAgentConfig(
                 enabled=src.master_agent.enabled,

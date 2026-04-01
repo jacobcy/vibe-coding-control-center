@@ -9,7 +9,11 @@ from typing import Any, Callable, cast
 import typer
 from loguru import logger
 
-from vibe3.agents.review_parser import ParsedReview, parse_codex_review
+from vibe3.agents.review_parser import (
+    ParsedReview,
+    ReviewParserError,
+    parse_codex_review,
+)
 from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.agents.review_prompt import make_review_context_builder
 from vibe3.agents.runner import (
@@ -65,16 +69,19 @@ class ReviewUsecase:
         self.execution_service_factory = execution_service_factory
         self.command_builder = command_builder
 
-    def build_pr_review(self, pr_number: int) -> tuple[ReviewRequest, int | None]:
+    def build_pr_review(
+        self, pr_number: int
+    ) -> tuple[ReviewRequest, int | None, str | None]:
         """Build request payload for PR review."""
         pr_data = self.github_client.get_pr(pr_number)
         linked_issues = parse_linked_issues(pr_data.body) if pr_data else []
         issue_number = linked_issues[0] if linked_issues else None
+        head_branch = pr_data.head_branch if pr_data else None
         request = ReviewRequest(
             scope=ReviewScope.for_pr(pr_number),
             changed_symbols=self._load_changed_symbols(["pr", str(pr_number)]),
         )
-        return request, issue_number
+        return request, issue_number, head_branch
 
     def build_base_review(
         self,
@@ -137,13 +144,21 @@ class ReviewUsecase:
                 issue_number=issue_number,
             )
 
-        review = self.review_parser(result.stdout)
-        self._transition_issue(issue_number)
-        return ReviewRunResult(
-            verdict=review.verdict,
-            handoff_file=str(result.handoff_file) if result.handoff_file else None,
-            issue_number=issue_number,
-        )
+        try:
+            review = self.review_parser(result.stdout)
+            self._transition_issue(issue_number)
+            return ReviewRunResult(
+                verdict=review.verdict,
+                handoff_file=str(result.handoff_file) if result.handoff_file else None,
+                issue_number=issue_number,
+            )
+        except ReviewParserError as err:
+            logger.bind(domain="review").error(f"Failed to parse review output: {err}")
+            return ReviewRunResult(
+                verdict="ERROR",
+                handoff_file=str(result.handoff_file) if result.handoff_file else None,
+                issue_number=issue_number,
+            )
 
     def _build_task(
         self,

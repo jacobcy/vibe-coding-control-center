@@ -76,6 +76,7 @@ class OrchestraSettings(BaseModel):
     polling_interval: int = 900
     port: int = 8080
     webhook_secret: str | None = None
+    bot_username: str | None = None
     manager_usernames: list[str] = Field(default_factory=lambda: ["vibe-manager-agent"])
     repo: str | None = None
     max_concurrent_flows: int = 3

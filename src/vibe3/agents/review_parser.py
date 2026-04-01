@@ -60,6 +60,9 @@ def parse_codex_review(raw: str) -> ParsedReview:
     log = logger.bind(domain="review_parser", action="parse_codex_review")
     log.info("Parsing review output")
 
+    if not raw.strip():
+        raise ReviewParserError("Empty or missing review output")
+
     comments = [
         ReviewComment(
             path=m.group(1), line=int(m.group(2)), severity=m.group(3), body=m.group(4)
@@ -68,7 +71,10 @@ def parse_codex_review(raw: str) -> ParsedReview:
     ]
 
     verdict_match = _VERDICT_RE.search(raw)
-    verdict = verdict_match.group(1).upper() if verdict_match else "PASS"
+    if not verdict_match:
+        raise ReviewParserError("No parseable VERDICT found in output")
+
+    verdict = verdict_match.group(1).upper()
 
     skipped = sum(
         1

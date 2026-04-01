@@ -1,11 +1,14 @@
-"""Tests for review_parser service.
+"""Tests for review_parser agent.
 
 Tests the parsing of codeagent-wrapper output.
 """
 
+import pytest
+
 from vibe3.agents.review_parser import (
     ParsedReview,
     ReviewComment,
+    ReviewParserError,
     convert_to_github_format,
     parse_codex_review,
     parse_review_output,
@@ -72,13 +75,22 @@ VERDICT: MAJOR
         assert parsed.verdict == "MAJOR"
         assert len(parsed.comments) == 1
 
-    def test_parse_review_default_pass(self) -> None:
-        """Parser should default to PASS when no VERDICT found."""
+    def test_empty_output_raises(self) -> None:
+        """Empty or whitespace-only raw should raise ReviewParserError."""
+        with pytest.raises(ReviewParserError, match="Empty or missing review output"):
+            parse_codex_review("")
+        with pytest.raises(ReviewParserError, match="Empty or missing review output"):
+            parse_codex_review("   \n  ")
+
+    def test_no_verdict_raises(self) -> None:
+        """Output with comments but no VERDICT should raise ReviewParserError."""
         raw = """
 src/baz.py:5 [MINOR] Code style issue
 """
-        parsed = parse_codex_review(raw)
-        assert parsed.verdict == "PASS"
+        with pytest.raises(
+            ReviewParserError, match="No parseable VERDICT found in output"
+        ):
+            parse_codex_review(raw)
 
     def test_parse_review_multiple_comments(self) -> None:
         """Parser should extract multiple comments."""
@@ -93,12 +105,6 @@ VERDICT: BLOCK
         assert parsed.comments[0].severity == "MAJOR"
         assert parsed.comments[1].severity == "CRITICAL"
         assert parsed.comments[2].severity == "MINOR"
-
-    def test_parse_review_empty_output(self) -> None:
-        """Parser should handle empty output."""
-        parsed = parse_codex_review("")
-        assert parsed.verdict == "PASS"
-        assert len(parsed.comments) == 0
 
     def test_parse_review_wrapper_logs(self) -> None:
         """Parser should ignore wrapper log lines."""
