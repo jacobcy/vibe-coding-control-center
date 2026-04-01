@@ -1,8 +1,41 @@
 """GitHub client base functionality."""
 
 import subprocess
+from typing import NoReturn
 
 from loguru import logger
+
+from vibe3.exceptions import GitHubError, UserError
+
+
+def raise_gh_pr_error(
+    error: subprocess.CalledProcessError,
+    operation: str,
+    user_tips: str | None = None,
+) -> NoReturn:
+    """Normalize gh pr command failure into unified error types."""
+    error_msg = (error.stderr or error.stdout or f"Failed to {operation}").strip()
+    lower_msg = error_msg.lower()
+
+    recoverable_patterns = (
+        "already exists",
+        "no commits between",
+        "must push the current branch",
+        "head sha can't be blank",
+        "already ready for review",
+        "is in draft mode",
+        "is not mergeable",
+        "checks are failing",
+        "no pull requests found",
+    )
+    if any(pattern in lower_msg for pattern in recoverable_patterns):
+        tips = f"\nTips:\n{user_tips}" if user_tips else ""
+        raise UserError(f"PR {operation} failed: {error_msg}{tips}") from error
+
+    raise GitHubError(
+        status_code=error.returncode,
+        message=f"gh pr {operation} failed: {error_msg}",
+    ) from error
 
 
 class GitHubClientBase:
@@ -35,8 +68,6 @@ class GitHubClientBase:
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
-            from vibe3.exceptions import GitHubError
-
             error_msg = (e.stderr or str(e)).strip()
             raise GitHubError(
                 status_code=e.returncode,
@@ -44,17 +75,7 @@ class GitHubClientBase:
             ) from e
 
     def _extract_pr_number(self, pr_url: str) -> int:
-        """Extract PR number from URL.
-
-        Args:
-            pr_url: GitHub PR URL
-
-        Returns:
-            PR number
-
-        Raises:
-            ValueError: If URL is invalid
-        """
+        """Extract PR number from URL."""
         # URL format: https://github.com/owner/repo/pull/123
         parts = pr_url.split("/")
         if len(parts) < 7 or parts[-2] != "pull":

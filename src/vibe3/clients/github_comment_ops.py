@@ -6,6 +6,8 @@ from typing import Any, cast
 
 from loguru import logger
 
+from vibe3.clients.github_client_base import raise_gh_pr_error
+
 
 class CommentMixin:
     """Mixin for GitHub issue/PR comment operations."""
@@ -47,8 +49,6 @@ class CommentMixin:
                 normalized.append(c)
             return cast(list[dict[str, Any]], normalized)
         except subprocess.CalledProcessError as e:
-            from vibe3.clients.github_pr_ops import raise_gh_pr_error
-
             raise_gh_pr_error(e, "list comments")
 
     def create_pr_comment(self: Any, pr_number: int, body: str) -> str:
@@ -75,8 +75,6 @@ class CommentMixin:
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
-            from vibe3.clients.github_pr_ops import raise_gh_pr_error
-
             raise_gh_pr_error(e, "comment")
 
     def update_pr_comment(self: Any, comment_id: str, body: str) -> str:
@@ -114,6 +112,4 @@ class CommentMixin:
             data = json.loads(result.stdout)
             return cast(str, data.get("html_url", comment_id))
         except subprocess.CalledProcessError as e:
-            from vibe3.clients.github_pr_ops import raise_gh_pr_error
-
             raise_gh_pr_error(e, f"update comment {comment_id}")
