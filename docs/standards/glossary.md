@@ -464,6 +464,29 @@ related_docs:
 - 使用规则：
   - 讨论底层谁在提交代码或初始化 Worktree 所记录的身份时，使用**“物理签名”**。
 
+### 7.3 `actor`
+
+- 正式术语：`actor`
+- 别称：无
+- 定义：执行具体操作的 Agent 或 Human 身份标识（格式通常为 `backend/model` 或用户标识）。
+- 边界：
+  - `actor` 回答“谁在做事”。
+  - `actor` 不应包含系统组件或发起源标识（如 `orchestra`）。
+- 落点：
+  - SQLite `flow_state` 中的 `latest_actor` 字段。
+  - `FlowEvent` 中的 `actor` 字段。
+
+### 7.4 `initiated_by`
+
+- 正式术语：`initiated_by`
+- 别称：无
+- 定义：Flow 或任务的发起源标识，说明是哪个系统组件或触发方式开启了该流程。
+- 示例值：`orchestra:dispatcher`、`manual`、`skill:vibe-new`。
+- 边界：
+  - `initiated_by` 回答“什么发起了流程”，与 `actor` 维度不同。
+- 落点：
+  - SQLite `flow_state` 中的 `initiated_by` 字段。
+
 ## 8. Common Confusions
 
 以下混用是高风险错误：
