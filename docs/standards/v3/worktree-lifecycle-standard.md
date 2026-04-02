@@ -9,7 +9,7 @@ authority:
   - worktree-cleanup
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-09
+last_updated: 2026-04-02
 related_docs:
   - SOUL.md
   - CLAUDE.md

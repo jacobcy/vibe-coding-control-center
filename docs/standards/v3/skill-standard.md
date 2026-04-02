@@ -9,7 +9,7 @@ authority:
   - python-skill-boundary
 author: GPT-5.4
 created: 2026-03-10
-last_updated: 2026-03-24
+last_updated: 2026-04-02
 related_docs:
   - SOUL.md
   - CLAUDE.md
