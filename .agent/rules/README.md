@@ -1,6 +1,11 @@
 # Agent Rules 目录
 
-本目录包含所有 Agent 必须遵循的规则和指南。
+本目录包含仓库长期生效的 Agent 规则、标准和实现指南。
+
+## 目录职责
+
+- `.agent/rules/`：仓库长期规则、硬约束、实现标准
+- `.agent/policies/`：按 `plan/run/review` mode 注入的策略材料与共享工具约束
 
 ## 规则文件说明
 
