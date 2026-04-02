@@ -72,9 +72,9 @@ class GovernanceService(ServiceBase):
         self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
         self._tick_count = 0
-        self._skill = config.governance.skill
+        self._supervisor_file = config.governance.supervisor_file
         self._prompt_template = config.governance.prompt_template
-        self._include_skill_content = config.governance.include_skill_content
+        self._include_supervisor_content = config.governance.include_supervisor_content
         self._dry_run = config.governance.dry_run
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self.last_render_result: PromptRenderResult | None = None
@@ -142,16 +142,19 @@ class GovernanceService(ServiceBase):
         return self._render_governance_plan(context)
 
     def _build_governance_recipe(self) -> PromptRecipe:
-        skill_content_source = (
-            PromptVariableSource(kind=VariableSourceKind.SKILL, skill=self._skill)
-            if self._include_skill_content
+        supervisor_content_source = (
+            PromptVariableSource(
+                kind=VariableSourceKind.FILE,
+                path=self._supervisor_file,
+            )
+            if self._include_supervisor_content
             else PromptVariableSource(kind=VariableSourceKind.LITERAL, value="")
         )
         variables: dict[str, PromptVariableSource] = {
-            "skill_name": PromptVariableSource(
-                kind=VariableSourceKind.LITERAL, value=self._skill
+            "supervisor_name": PromptVariableSource(
+                kind=VariableSourceKind.LITERAL, value=self._supervisor_file
             ),
-            "skill_content": skill_content_source,
+            "supervisor_content": supervisor_content_source,
         }
         for key in _GOVERNANCE_RUNTIME_VARS:
             variables[key] = PromptVariableSource(
@@ -202,8 +205,8 @@ class GovernanceService(ServiceBase):
             f"#{sources['prompt_template_key']}"
         )
         log.info(
-            f"Governance skill source: {sources['skill_name']} -> "
-            f"{sources['skill_file']}"
+            f"Governance supervisor source: {sources['supervisor_file']} -> "
+            f"{sources['supervisor_path']}"
         )
         if self.last_render_result:
             provider_keys = [
@@ -213,7 +216,7 @@ class GovernanceService(ServiceBase):
             ]
             log.info(f"Provider keys: {sorted(provider_keys)}")
         log.info(
-            f"Include skill content: {self._include_skill_content}; "
+            f"Include supervisor content: {self._include_supervisor_content}; "
             f"prompt vars={sorted(context.keys())}"
         )
         log.info(f"Dry run plan file: {plan_path}")
@@ -299,12 +302,14 @@ class GovernanceService(ServiceBase):
 
     def _build_material_source_summary(self) -> dict[str, str]:
         prompts_path = self._resolve_prompts_path()
-        skill_path = self._resolve_skill_path()
+        supervisor_path = self._resolve_supervisor_path()
         return {
             "prompt_template_key": self._prompt_template,
             "prompt_template_file": str(prompts_path),
-            "skill_name": self._skill,
-            "skill_file": str(skill_path) if skill_path is not None else "(not found)",
+            "supervisor_file": self._supervisor_file,
+            "supervisor_path": (
+                str(supervisor_path) if supervisor_path is not None else "(not found)"
+            ),
         }
 
     def _resolve_prompts_path(self) -> Path:
@@ -314,10 +319,13 @@ class GovernanceService(ServiceBase):
             else Path.cwd() / self._prompts_path
         )
 
-    def _resolve_skill_path(self) -> Path | None:
-        from vibe3.agents.run_agent import RunUsecase
-
-        return RunUsecase.find_skill_file(self._skill)
+    def _resolve_supervisor_path(self) -> Path | None:
+        path = Path(self._supervisor_file)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        if path.exists():
+            return path
+        return None
 
 
 def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:

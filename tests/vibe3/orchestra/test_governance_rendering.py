@@ -57,9 +57,9 @@ class TestGovernanceRecipeDrivenRendering:
             "orchestra:\n"
             "  governance:\n"
             "    plan: |\n"
-            "      Skill={skill_name}\n"
+            "      Supervisor={supervisor_name}\n"
             "      Status={server_status}\n"
-            "      Content={skill_content}\n"
+            "      Content={supervisor_content}\n"
             "      Running={running_issue_count}\n"
             "      Suggested={suggested_issue_count}\n"
             "      Flows={active_flows}\n"
@@ -79,7 +79,7 @@ class TestGovernanceRecipeDrivenRendering:
             config=OrchestraConfig(
                 governance=GovernanceConfig(
                     prompt_template="orchestra.governance.plan",
-                    include_skill_content=False,
+                    include_supervisor_content=False,
                 )
             ),
             status_service=MockStatusService(),
@@ -99,7 +99,7 @@ class TestGovernanceRecipeDrivenRendering:
         )
         context = service._build_prompt_context(snapshot)
         result_text = service._render_governance_plan(context)
-        assert "Skill=vibe-orchestra" in result_text
+        assert "Supervisor=supervisor/orchestra.md" in result_text
         assert "Status=running" in result_text
         assert "Flows=2" in result_text
 
@@ -110,9 +110,9 @@ class TestGovernanceRecipeDrivenRendering:
             "orchestra:\n"
             "  governance:\n"
             "    plan: |\n"
-            "      Skill={skill_name}\n"
+            "      Supervisor={supervisor_name}\n"
             "      Status={server_status}\n"
-            "      Content={skill_content}\n"
+            "      Content={supervisor_content}\n"
             "      Running={running_issue_count}\n"
             "      Suggested={suggested_issue_count}\n"
             "      Flows={active_flows}\n"
@@ -132,7 +132,7 @@ class TestGovernanceRecipeDrivenRendering:
             config=OrchestraConfig(
                 governance=GovernanceConfig(
                     prompt_template="orchestra.governance.plan",
-                    include_skill_content=False,
+                    include_supervisor_content=False,
                 )
             ),
             status_service=MockStatusService(),
@@ -157,11 +157,11 @@ class TestGovernanceRecipeDrivenRendering:
         assert render_result is not None
         assert render_result.recipe_key == "orchestra.governance.plan"
         prov_vars = {p.variable for p in render_result.provenance}
-        assert "skill_name" in prov_vars
+        assert "supervisor_name" in prov_vars
         assert "server_status" in prov_vars
 
-    def test_governance_recipe_uses_skill_source_for_skill_content(self, tmp_path):
-        """skill_content variable should come from SKILL source in the recipe."""
+    def test_governance_recipe_uses_file_source_for_supervisor_content(self, tmp_path):
+        """supervisor_content comes from FILE source (supervisor/) in the recipe."""
         from vibe3.prompts.models import VariableSourceKind
 
         prompts_path = tmp_path / "prompts.yaml"
@@ -169,9 +169,9 @@ class TestGovernanceRecipeDrivenRendering:
             "orchestra:\n"
             "  governance:\n"
             "    plan: |\n"
-            "      Skill={skill_name}\n"
+            "      Supervisor={supervisor_name}\n"
             "      Status={server_status}\n"
-            "      Content={skill_content}\n"
+            "      Content={supervisor_content}\n"
             "      Running={running_issue_count}\n"
             "      Suggested={suggested_issue_count}\n"
             "      Flows={active_flows}\n"
@@ -191,8 +191,8 @@ class TestGovernanceRecipeDrivenRendering:
             config=OrchestraConfig(
                 governance=GovernanceConfig(
                     prompt_template="orchestra.governance.plan",
-                    include_skill_content=True,
-                    skill="vibe-orchestra",
+                    include_supervisor_content=True,
+                    supervisor_file="supervisor/orchestra.md",
                 )
             ),
             status_service=MockStatusService(),
@@ -200,7 +200,7 @@ class TestGovernanceRecipeDrivenRendering:
             prompts_path=prompts_path,
         )
         recipe = service._build_governance_recipe()
-        skill_src = recipe.variables.get("skill_content")
-        assert skill_src is not None
-        assert skill_src.kind == VariableSourceKind.SKILL
-        assert skill_src.skill == "vibe-orchestra"
+        supervisor_src = recipe.variables.get("supervisor_content")
+        assert supervisor_src is not None
+        assert supervisor_src.kind == VariableSourceKind.FILE
+        assert supervisor_src.path == "supervisor/orchestra.md"

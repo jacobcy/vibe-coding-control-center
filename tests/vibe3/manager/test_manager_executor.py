@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import yaml
+
 from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -256,3 +258,40 @@ class TestManagerRecipeDrivenPrompt:
         assert "Implement issue #42: Dry run test" in (
             manager.last_manager_render_result.rendered_text
         )
+
+    def test_manager_recipe_uses_file_source_for_supervisor_content(self, tmp_path):
+        """include_supervisor_content=True: FILE source for supervisor/manager.md."""
+        from vibe3.orchestra.config import AssigneeDispatchConfig
+        from vibe3.prompts.models import VariableSourceKind
+
+        templates = {
+            "orchestra": {
+                "assignee_dispatch": {
+                    "manager": (
+                        "Implement issue #{issue_number}: {issue_title}"
+                        "\nSupervisor: {supervisor_content}"
+                    ),
+                }
+            }
+        }
+        prompts_path = tmp_path / "prompts.yaml"
+        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
+
+        config = OrchestraConfig(
+            assignee_dispatch=AssigneeDispatchConfig(
+                prompt_template="orchestra.assignee_dispatch.manager",
+                supervisor_file="supervisor/manager.md",
+                include_supervisor_content=True,
+            ),
+        )
+
+        manager = ManagerExecutor(
+            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
+        )
+        recipe = manager.command_builder.build_manager_recipe()
+
+        # Verify supervisor_content uses FILE source
+        supervisor_src = recipe.variables.get("supervisor_content")
+        assert supervisor_src is not None
+        assert supervisor_src.kind == VariableSourceKind.FILE
+        assert supervisor_src.path == "supervisor/manager.md"

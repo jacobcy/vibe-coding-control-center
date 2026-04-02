@@ -389,10 +389,10 @@ orchestra:
   governance:
     enabled: true
     interval_ticks: 1
-    # Skill body source: skills/<name>/SKILL.md
-    skill: "vibe-orchestra"
+    # Supervisor file source: supervisor/<name>.md
+    supervisor_file: "supervisor/orchestra.md"
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
-    # Whether to inline the skill body into the composed governance prompt
-    include_skill_content: true
+    # Whether to inline the supervisor file into the composed governance prompt
+    include_supervisor_content: true
     dry_run: true

@@ -31,8 +31,8 @@ class OrchestraAssigneeDispatchSettings(BaseModel):
     enabled: bool = True
     use_worktree: bool = True
     prompt_template: str = "orchestra.assignee_dispatch.manager"
-    skill: str | None = "vibe-manager"
-    include_skill_content: bool = False
+    supervisor_file: str | None = "supervisor/manager.md"
+    include_supervisor_content: bool = False
 
 
 class OrchestraPRReviewDispatchSettings(BaseModel):
@@ -63,9 +63,9 @@ class OrchestraGovernanceSettings(BaseModel):
 
     enabled: bool = True
     interval_ticks: int = 4
-    skill: str = "vibe-orchestra"
+    supervisor_file: str = "supervisor/orchestra.md"
     prompt_template: str = "orchestra.governance.plan"
-    include_skill_content: bool = True
+    include_supervisor_content: bool = True
     dry_run: bool = False
 
 

@@ -42,9 +42,9 @@ def build_manager_recipe(config: OrchestraConfig) -> PromptRecipe:
             kind=VariableSourceKind.PROVIDER, provider="manager.issue_title"
         ),
     }
-    if ad.include_skill_content and ad.skill:
-        variables["skill_content"] = PromptVariableSource(
-            kind=VariableSourceKind.SKILL, skill=ad.skill
+    if ad.include_supervisor_content and ad.supervisor_file:
+        variables["supervisor_content"] = PromptVariableSource(
+            kind=VariableSourceKind.FILE, path=ad.supervisor_file
         )
     return PromptRecipe(
         template_key=ad.prompt_template,
