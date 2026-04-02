@@ -22,10 +22,9 @@ description: Use when the user wants to review documentation changes, audit entr
 - source code diff、实现正确性与测试风险审查交给 `vibe-review-code`。
 
 When invoked to review documentation, your goal is to ensure clarity, consistency, and alignment with the Vibe Center architecture layout.
-
 ## 1. Context Gathering (Align Truth)
 
-- **Identify Intent**: Run `uv run python src/vibe3/cli.py review base` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
+- **Identify Intent**: Run `vibe3 review base` (Physical Tier 1) to determine the current state of documentation-heavy PRs.
 - **Identify Files**:
   - Use `gh pr diff --name-only` or `git diff main...HEAD --name-only` and filter for `\.md$`.
   - For local docs review, combine `git diff --name-only` and `git diff --cached --name-only`, then filter for `\.md$`.
@@ -37,17 +36,18 @@ Evaluate the documentation against the following checklist:
 
 1. **Completeness**: Are `docs/prds/` following standard conventions (Background, Goals, Acceptance Criteria)?
 2. **Language & Clarity**: Is the writing concise? Remove overly generic AI-speak ("In today's fast-paced digital world...").
-3. **Accuracy**: Do the documented CLI commands and architecture limits (e.g., 7000 LOC limit) match `CLAUDE.md` and `DEVELOPER.md`?
+3. **Accuracy**: Do the documented CLI commands and architecture match the current V3 state? (Check `vibe3 --help`).
 4. **Git Constraints**: Are we strictly distinguishing `.agents/` (disposable global tools directory) from `.agent/` (managed project-specific workflows)?
 
 ## 3. Output: The Doc Review Report
+...
+## 4. Handoff 记录
 
-Construct a structured report:
+完成审查后，更新 handoff：
 
-### 📄 Documentation Review Summary
-
-**Conclusion:** [Approved / Needs Revisions]
-
+```bash
+vibe3 handoff append "vibe-review-docs: Documentation review completed" --actor vibe-review-docs --kind milestone
+```
 ### 🔴 Required Edits (Blockers)
 
 - **[File:Line]** Detail what must be fixed (e.g. incorrect terminology, missing CHANGELOG entry).

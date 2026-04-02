@@ -1,6 +1,6 @@
 ---
 name: vibe-manager
-description: Use when the user wants a single issue-to-PR execution owner that dispatches agents, observes their progress, and drives to a merge-ready PR without writing code directly.
+description: Use when the user wants a single-flow execution owner that prepares the scene, chooses which agent or skill to dispatch next, observes progress, and drives toward a reviewable PR without writing code directly.
 ---
 
 # Vibe Manager
@@ -14,17 +14,30 @@ description: Use when the user wants a single issue-to-PR execution owner that d
 - `vibe-manager` 只管单个 `flow/task`，不负责多 flow 编排。
 - `vibe-manager` 负责推进执行链路，但不亲自写代码。
 - `vibe-manager` 不负责全局 labels 治理、跨 issue 排队和优先级；这些属于 `vibe-orchestra`。
+- `vibe-manager` 使用模块暴露的现场能力，不把这些能力偷换成固定 workflow。
 - `vibe-manager` 的终点不是“代码大概完成”，而是“PR 已经达到可审核、可合并状态”。
+
+相关标准以以下文件为准：
+
+- `docs/standards/glossary.md`
+- `docs/standards/action-verbs.md`
+- `docs/standards/v3/skill-standard.md`
+- `docs/standards/v3/command-standard.md`
+- `docs/standards/v3/python-capability-design.md`
+- `docs/standards/v3/git-workflow-standard.md`
+- `docs/standards/v3/worktree-lifecycle-standard.md`
 
 ## 角色定位
 
 `manager` 是单个 issue 在执行现场里的 owner。
 
+它先确认 scene，再决定调用什么能力或派发什么 agent。它不预设“必须先 plan，再 run，再 review”这种固定顺序。
+
 它的主链很简单：
 
 1. **Phase 0**：`vibe3 flow show` 确认 task 已绑定
 2. **对齐**：确认 flow / task / spec 三者对应同一 issue
-3. **派发**：用 `vibe3 run --skill X --async` 等把任务交给 agent
+3. **派发**：根据现场决定是 plan、run、review，还是交给其他 skill / agent
 4. **观察**：`vibe3 flow show` 轮询，发现问题即提 issue
 5. **推进**：agent 完成后持续推动直到形成 PR
 6. **收口**：跟到 CI 通过，PR 达到"可合并、等待最终审核"状态。
@@ -43,6 +56,7 @@ description: Use when the user wants a single issue-to-PR execution owner that d
 manager 要做的不是“参与所有细节”，而是保证这条链不断：
 
 - flow / task / spec 对齐
+- branch / worktree scene 可用
 - 执行入口明确
 - handoff 状态清楚
 - findings 有出口
@@ -119,7 +133,7 @@ vibe3 flow show       # 确认当前 flow 和 task 状态
 
 ### 2. 派发 Agent（必须使用 `--async`）
 
-基于 spec 选择派发方式，**始终使用 `--async` 让 agent 在后台执行**：
+基于 spec 和当前 scene 选择派发方式，**始终使用 `--async` 让 agent 在后台执行**：
 
 ```bash
 # 派发 skill agent（推荐，能复用 skill 就不重写 prompt）
@@ -130,6 +144,9 @@ vibe3 run "具体指令描述" --async
 
 # 派发 plan agent（有详细 plan 文件时）
 vibe3 run --plan <plan-file.md> --async
+
+# 若当前由 manager agent 直接创建 PR，可使用 gh 原生命令
+gh pr create --draft
 ```
 
 **团队工具**：
@@ -150,7 +167,8 @@ manager 可以根据任务复杂度选择合适的团队协作模式：
 
 - **必须** 加 `--async`，不得阻塞 manager 循环
 - 能复用 skill 就不重写 prompt
-- 目标是尽快把 issue 送入正确执行链，而不是重新设计流程
+- 目标是尽快把 issue 送入正确执行链，而不是把 workflow 写死在 manager 模块里
+- 是否先 plan、直接 run、先 review base，属于 manager 的编排判断，不属于底层模块默认行为
 
 ### 3. 观察循环
 
@@ -198,6 +216,14 @@ vibe3 handoff append "agent <name> 完成，但未写入 handoff，手动补充:
 manager 的执行责任不是“写代码”，而是推动执行链最终产出 PR。
 
 如果当前还没有 PR，就继续推动现场向 PR 收敛。
+
+这里的“推动”可以是：
+
+- 让 agent 补 plan / run / review
+- 让执行代理直接调用 `gh pr create --draft`
+- 让人类补最后的 PR 创建动作
+
+不要求 manager 模块自身包装 PR workflow。
 
 ### 6. 跟到 CI 通过
 
@@ -268,6 +294,7 @@ zsh scripts/github/create_issue.sh \
 - manager 派发 agent 时不加 `--async`（阻塞 manager 循环）
 - manager 越权处理多 flow 编排
 - manager 把 labels 治理当成自己的职责
+- manager 把 branch / worktree 清理能力误写成默认自动业务收口
 - manager 在 PR 未形成或 CI 未通过时就声称完成
 - manager 跳过 `handoff show` 凭感觉判断 agent 状态
 - manager 在 `run_aborted` 后不查原因就重复派发同一指令
@@ -275,6 +302,6 @@ zsh scripts/github/create_issue.sh \
 
 ## 与相邻 skill 的关系
 
-- `vibe-orchestra`：管多 issue / 多 flow 的 labels 治理，不管单 issue 到 PR 的闭环
+- `vibe-orchestra`：管多 issue / 多 flow 的事实观察、排队与非 state label 治理，不管单 issue 到 PR 的闭环
 - `vibe-issue`：负责 issue 治理入口
 - `vibe-redundancy-audit`：可作为专项代码质量审查器供 manager 选择调用

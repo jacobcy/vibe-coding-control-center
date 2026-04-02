@@ -7,7 +7,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护全景路线图，管理版本目标，对 task item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；shell 层通过 `uv run python src/vibe3/cli.py status`、`flow show`、`flow bind` 等命令暴露共享事实。
+**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；shell 层通过 `vibe3 status`、`vibe3 flow show`、`vibe3 flow bind` 等命令暴露共享事实。
 
 **新增核心原则:** 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储，遵循 GitHub-as-truth 原则。
 
@@ -39,7 +39,7 @@ intake gate 约束：
 
 **Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
 
-**命令自检:** 对 `uv run python src/vibe3/cli.py status`、`flow show`、`flow bind` 等参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
+**命令自检:** 对 `vibe3 status`、`vibe3 flow show`、`vibe3 flow bind` 等参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
 
 ## Trigger Examples
 
@@ -56,9 +56,9 @@ intake gate 约束：
 
 ## Hard Boundary
 
-- 只负责规划层调度，不负责 `repo issue` 创建、task registry 修复或 runtime 修复
-- 必须先运行 `uv run python src/vibe3/cli.py status` / `flow show` 等 shell 命令
-- 不得直接修改 `registry.json` 底层数据
+- 只负责规划层调度，不负责 `repo issue` 创建、flow 注册修复或 runtime 修复
+- 必须先运行 `vibe3 status` / `vibe3 flow show` 等 shell 命令
+- 不得直接修改 `.git/vibe3/handoff.db` 底层数据
 - 远端写操作优先通过 `gh` / GitHub 原生命令完成
 - 只有涉及本地 flow 绑定时才使用 `vibe3 flow bind`
 - 调度器无法判断优先级时，必须要求人类讨论
@@ -111,10 +111,10 @@ intake gate 约束：
 
 ```bash
 # 查看当前 flow / issue 总览
-uv run python src/vibe3/cli.py status
+vibe3 status
 
-# 显示指定分支的 flow 详情（可选，<branch> 为分支名）
-uv run python src/vibe3/cli.py flow show --branch <branch>
+# 显示当前分支的 flow 详情
+vibe3 flow show
 
 # 查看开放的 issues
 gh issue list
@@ -218,7 +218,7 @@ gh issue edit <issue_number> --add-label "roadmap/p0"
 gh issue edit <issue_number> --milestone "Phase 1: 基础设施"
 ```
 
-如需把某个 issue 进入当前执行现场，再交给 `vibe-new` / `vibe3 flow bind` 处理本地绑定。
+如需把某个 issue 进入当前执行现场，再交给 `/vibe-new` 或 `vibe3 flow bind` 处理本地绑定。
 
 ## Label 触发机制
 
@@ -252,13 +252,13 @@ Agent 应通过以下方式使用标签触发机制：
 
 - 直接展示 CLI 返回的阻塞原因
 - 明确告诉用户当前无法进行路线图管理
-- 不要自行 fallback 到直接修改 JSON
+- 不要自行 fallback 到直接修改数据库
 
 ## Reference Documents
 
 - [docs/standards/github-labels-reference.md](../../docs/standards/github-labels-reference.md) - 完整的标签定义参考
 - [docs/standards/roadmap-label-management.md](../../docs/standards/roadmap-label-management.md) - 详细的 roadmap 标签管理指南
-- [docs/standards/vibe3-state-sync-standard.md](../../docs/standards/vibe3-state-sync-standard.md) - 状态同步标准
+- [docs/standards/v3/command-standard.md](../../docs/standards/v3/command-standard.md) - V3 命令标准
 - [docs/standards/issue-standard.md](../../docs/standards/issue-standard.md) - Issue 标准
 
 ## Terminology Contract
@@ -268,7 +268,7 @@ Agent 应通过以下方式使用标签触发机制：
 - `repo issue`: 需求来源与讨论入口，不是 execution record
 - `Task Item`: GitHub Project item，规划层工作单元
 - `Task`: 执行层最小单元
-- `Flow`: task 的运行时容器，通常由一个 worktree / branch 承载
+- `Flow`: task 的运行时容器，通常由一个 branch 承载
 - `priority label`: 优先级标签，如 `priority/high`
 - `roadmap label`: 路线图状态标签，如 `roadmap/p0`
 - `Milestone`: 版本目标标识，如 "Phase 1: 基础设施"

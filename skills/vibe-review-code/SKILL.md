@@ -12,7 +12,7 @@ description: Use when the user wants a structured code review for local or PR-bo
 **使用场景**:
 
 1. **PR 前**: 在创建 PR 之前，进行深度静态分析
-2. **PR 后**: 根据 `uv run python src/vibe3/cli.py review pr` 的反馈修复代码
+2. **PR 后**: 根据 `vibe3 review pr` 的反馈修复代码
 
 语义边界：
 
@@ -43,7 +43,7 @@ When invoked as a code reviewer, you are a Senior Staff Engineer tasked with gua
 
 ```bash
 # 使用 vibe3 进行本地代码审查
-uv run python src/vibe3/cli.py review base
+vibe3 review base
 ```
 
 **优势**:
@@ -56,11 +56,11 @@ uv run python src/vibe3/cli.py review base
 
 直接在主会话中执行审查（不推荐，消耗大量 token）
 
-## 1. 与 `vibe-test-runner` 的关系（互补）
+## 1. 与验证流程的关系（互补）
 
-- `vibe-test-runner`：偏执行验证（Serena + Lint + Tests + Review Gate），通常在代码改完后自动跑。
-- `vibe-review-code`：偏人工审查结论，适合 PR 前人工把关、PR 后针对 review comment 复核。
-- 推荐顺序：先让 `vibe-test-runner` 跑出基础质量结果，再用本 skill 输出最终审查意见。
+- **自动验证**: 包含 Serena 分析、Lint、Tests。通常在代码改完后由 /vibe-commit 触发。
+- `vibe-review-code`: 偏人工审查结论，适合 PR 前人工把关、PR 后针对 review comment 复核。
+- 推荐顺序：先让自动验证跑出基础质量结果，再用本 skill 输出最终审查意见。
 
 ## 触发时机
 
@@ -71,7 +71,7 @@ uv run python src/vibe3/cli.py review base
 
 ## 1. Context Gathering (Align Truth)
 
-- **Identify Intent**: Run `uv run python src/vibe3/cli.py review base` (Physical Tier 1) to determine the current state of the PR and project health.
+- **Identify Intent**: Run `vibe3 review base` (Physical Tier 1) to determine the current state of the PR and project health.
 - **Fetch Diff**:
   - If a PR exists (opened): Use `gh pr diff` to fetch the source of truth for changes.
   - If local only: Use `git diff main...HEAD`.
@@ -86,8 +86,8 @@ Startup:
 
 - Prefer on-demand startup: `uvx --from git+https://github.com/oraios/serena@v0.1.4 serena start-mcp-server`
 - Preconditions: `uv/uvx` available and project has `.serena/project.yml`
-- Evidence command: `bash scripts/serena_gate.sh --base main...HEAD`
-- Required artifact: `.agent/reports/serena-impact.json`
+- Evidence command: `vibe3 inspect symbols` or `vibe3 inspect base`
+- Required artifact: `.agent/reports/` 中的分析结果
 
 Required checks:
 
@@ -101,15 +101,15 @@ If Serena is unavailable:
 - Continue review with `git diff` + targeted grep as fallback.
 - Add one `Major` finding: "AST impact analysis not completed".
 
-## 3. Review Standards (MSC Paradigm Gate)
+## 3. Review Standards (Vibe V3 Paradigm Gate)
 
-You **MUST** strictly evaluate the code against `CLAUDE.md` and `DEVELOPER.md`:
+You **MUST** strictly evaluate the code against `CLAUDE.md` and `.agent/rules/python-standards.md`:
 
-1. **LOC Hard Limits**: Are new functions blowing up the line count? (Threshold: bin/ + lib/ <= 7000 LOC, max 300 lines per file).
-2. **Zero Dead Code**: Does every added shell function have a clear caller? If not, FLAG IT as a blocking issue.
-3. **Safety & Robustness**: Are Zsh/Bash parameters properly quoted? Are error cases handled gracefully?
-4. **Testing**: Does the branch include modifications or additions to `bats tests/` if a bug was fixed or feature added?
-5. **Linting Check**: Has the user passed `bash scripts/hooks/lint.sh`? Run it if unsure.
+1. **LOC Hard Limits**: Are new functions blowing up the line count? (Max 300 lines per file).
+2. **Zero Dead Code**: Does every added function have a clear caller? If not, FLAG IT as a blocking issue.
+3. **Python Standards**: Does the code follow Pydantic models? Are type hints complete? (Refer to `.agent/rules/python-standards.md`).
+4. **Testing**: Does the branch include modifications or additions to `tests/vibe3/` if a bug was fixed or feature added?
+5. **Linting Check**: Run `uv run ruff check src` if unsure.
 
 ## 3.1 Document Governance Check
 
@@ -157,5 +157,5 @@ Each finding MUST include:
 完成审查后，更新 handoff：
 
 ```bash
-uv run python src/vibe3/cli.py handoff append "vibe-review-code: Code review completed" --actor vibe-review-code --kind milestone
+vibe3 handoff append "vibe-review-code: Code review completed" --actor vibe-review-code --kind milestone
 ```

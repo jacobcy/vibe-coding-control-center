@@ -22,7 +22,7 @@ Read [review-checklist.md](./references/review-checklist.md) before substantial 
 ## Hard Boundary
 
 - `skills/` 是 Vibe 自有 skill 定义的唯一源码；`.agent/skills/` 只是运行时链接层。见 `docs/standards/v3/skill-standard.md`。
-- 共享状态相关写入只能通过真实 `bin/vibe` 命令完成；不要在 skill 中直接改 `.git/vibe/*.json`。见 `docs/standards/v3/command-standard.md` 和 `docs/standards/v3/python-capability-design.md`。
+- 共享状态相关写入只能通过真实 `vibe3` 命令完成；不要在 skill 中直接改 `.git/vibe3/handoff.db`。见 `docs/standards/v3/command-standard.md` 和 `docs/standards/v3/python-capability-design.md`。
 - 术语定义与边界语义只引用真源，不在本 skill 中复述。术语见 `docs/standards/glossary.md`，动作词默认语义见 `docs/standards/action-verbs.md`。
 - 触发时机、合理介入范围与相邻 skill 冲突裁决以 `docs/standards/v3/skill-trigger-standard.md` 为准。
 - 如果需要的 Shell 能力不存在，结论应为 `Capability Gap`，而不是在 skill 文案中发明 workaround。
@@ -77,7 +77,7 @@ bash skills/vibe-skill-audit/scripts/audit-skill-references.sh skills/<target>/S
 Then inspect the target skill with this order:
 
 1. Check whether the skill cites the right standards for its semantic scope.
-2. Check whether it asks the agent to use real `bin/vibe` commands that exist today.
+2. Check whether it asks the agent to use real `vibe3` commands that exist today.
 3. Check whether it turns Shell audit commands into hidden repair commands.
 4. Check whether it paraphrases standards so loosely that `roadmap`, `task`, `flow`, `workflow`, `branch`, or `worktree` become ambiguous.
 5. Check whether a newer standards file likely invalidates part of the skill text.
@@ -88,7 +88,7 @@ Report findings in four buckets:
 
 - `Blocking`: direct truth-source violation or shared-state bypass
 - `Missing Reference`: a required standards citation is absent
-- `Capability Gap`: the skill depends on a `bin/vibe` command shape that does not exist
+- `Capability Gap`: the skill depends on a `vibe3` command shape that does not exist
 - `Drift Warning`: a cited standards file appears newer than the skill and may require review
 
 When there are no findings, say that explicitly and state which checks were run.
