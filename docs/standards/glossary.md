@@ -305,10 +305,12 @@ related_docs:
 
 - 正式术语：`Orchestra`
 - 别称：`Orchestrator`
-- 定义：本项目中的顶层编排与分诊中枢。负责多 issue / 多 flow 的心跳治理、活跃状态观察、启动顺序调度和 label 治理。
+- 定义：本项目中的顶层编排与分诊中枢。负责多 issue / 多 flow 的事实观察、心跳治理、assignee 触发调度、队列管理和非 state label 治理。
 - 边界：
   - `Orchestra` 不直接负责单个 flow 的执行逻辑
   - `Orchestra` 不直接写代码
+  - `Orchestra` 不替 manager agent 决定固定的 plan / run / review 顺序
+  - `Orchestra` 不把 `state label` 当作主触发源
 - 落点：
   - Python 模块：`src/vibe3/orchestra/`
   - Skill: `skills/vibe-orchestra/SKILL.md`
@@ -317,10 +319,12 @@ related_docs:
 
 - 正式术语：`Manager`
 - 别称：`Execution Proxy`, `执行负责人`
-- 定义：本项目中的单 flow 执行代理。负责将 issue 映射到 flow、构建并派发 agent 命令、观察 handoff 进度，并持续推动直到 PR ready。
+- 定义：本项目中的单 flow 现场能力与执行代理。负责将 issue 映射到 flow，提供 branch / worktree 现场创建、复用、清理和观察入口，并构建与派发 agent 命令。
 - 边界：
   - `Manager` 不负责多 issue 编排
   - `Manager` 不直接写代码
+  - `Manager` 不替 agent 决定是否进入 plan、run、review、gh pr create 或 closeout
+  - `Manager` 的清理能力不等于默认自动收口 workflow
 - 落点：
   - Python 模块：`src/vibe3/manager/`
   - Skill: `skills/vibe-manager/SKILL.md`

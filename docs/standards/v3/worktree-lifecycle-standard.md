@@ -40,6 +40,7 @@ related_docs:
 - `roadmap -> task -> flow -> pr` 的业务推进流程
 - Python CLI 自动化细节
 - 共享状态 schema
+- manager agent / orchestra agent 如何决定是否进入 plan、run、review 等步骤
 
 ## 2. Core Model
 
@@ -55,6 +56,12 @@ related_docs:
 - 当前开放 flow 的执行判断应优先围绕 `branch`，`worktree` 只提供目录 hint
 - 复用目录进入新的逻辑 `flow` 时，应通过 `git checkout` 切换分支，并运行 `vibe3 flow update` 注册现场，而不是靠目录名暗示
 - 已关闭 flow 的历史不保存在 `worktree` 目录内，而应保存在共享历史真源中
+
+补充边界：
+
+- `manager` 模块负责提供 worktree 的创建、查找、复用、回收能力
+- 是否调用这些能力，由 manager agent、orchestra agent 或其他 skill 根据现场决定
+- worktree 模块本身不应隐藏“发现异常就自动推进后续流程”的业务判断
 
 ## 3. Create and Reuse Rules
 
@@ -133,6 +140,7 @@ related_docs:
 - 不再提供 `vibe3 flow done` 等生命周期封装，流程收口由 `/vibe-done (skill)` 编排
 - flow 关闭后，目录可以被保留或复用，但不能继续代表旧 flow；同一目录可直接继续 `vibe3 flow update` 注册新分支现场，不要求切换物理 worktree
 - 即使 branch 被删除，已关闭 flow 的历史也必须保留
+- manager 模块可以提供 branch / worktree 回收入口，但是否在某一时刻回收，属于编排层判断
 
 ## 7. Ghost Worktree and Ghost Branch
 
@@ -147,6 +155,11 @@ related_docs:
 - 先判断目录是否仍有当前用途
 - 若仍有用途，则切到新的 `branch` 与新的 `flow` 语义
 - 若无用途，则清理目录
+
+补充要求：
+
+- worktree 脏现场、幽灵目录或异常 branch 的修复，应由 orchestrator、manager agent 或专门 skill 调用能力层完成
+- 不应要求 worktree 模块独自承担“自我诊断并自动恢复完整业务流程”的职责
 
 若 branch 已经产生过 PR 事实但 flow 尚未关闭：
 
