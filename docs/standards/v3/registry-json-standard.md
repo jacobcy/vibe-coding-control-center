@@ -39,8 +39,8 @@ This document serves as a migration guide and reference for understanding the le
 
 ### V3 (Current): SQLite Database
 ```
-.git/vibe/
-  └── vibedb.sqlite3         # Unified SQLite database
+.git/vibe3/
+  └── handoff.db         # Unified SQLite database
      └── flow_issue_links   # Task-issue mapping table
      └── flow_states        # Flow runtime states
      └── roadmap_items      # Roadmap persistence
@@ -318,7 +318,7 @@ In Vibe Center 3.0 (v3), the data persistence layer has been completely re-archi
 
 | Aspect | V2 (Legacy) | V3 (Current) |
 |--------|-------------|--------------|
-| **Storage** | JSON files in `.git/vibe/` | SQLite database `.git/vibe/vibedb.sqlite3` |
+| **Storage** | JSON files in `.git/vibe/` | SQLite database `.git/vibe3/handoff.db` |
 | **Task Records** | `registry.json` | `flow_issue_links` + `flow_states` tables |
 | **Roadmap** | `roadmap.json` | `roadmap_items` table |
 | **Worktrees** | `worktrees.json` | `worktrees` table |

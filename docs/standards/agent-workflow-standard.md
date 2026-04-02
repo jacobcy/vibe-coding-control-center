@@ -73,8 +73,8 @@ vibe3 plan spec --msg "Add dark mode support"
 # 使用现有 plan 执行
 vibe3 run --plan
 
-# 使用自定义 instructions 执行
-vibe3 run --instructions "Focus on test coverage"
+# 使用自定义指令执行
+vibe3 run "Focus on test coverage"
 
 # 使用指定 agent 执行
 vibe3 run --agent planner-pro --plan
@@ -138,11 +138,12 @@ codeagent-wrapper cleanup
 
 **推荐流程**：
 ```bash
-# 1. 创建 flow
-vibe3 flow new feature/api-v2
+# 1. 创建并注册 flow
+git checkout -b feature/api-v2
+vibe3 flow update
 
 # 2. 绑定 task issue
-vibe3 issue bind <issue_number>
+vibe3 flow bind <issue_number>
 
 # 3. 创建 plan
 vibe3 plan task
@@ -155,7 +156,7 @@ uv run pytest tests/vibe3
 vibe3 inspect base origin/main  # 查看改动影响
 
 # 6. 创建 PR
-vibe3 pr create
+gh pr create --draft  # 或者使用 vibe3 相关的 PR 命令（如果存在且非废弃）
 ```
 
 ---
@@ -164,14 +165,15 @@ vibe3 pr create
 
 **推荐流程**：
 ```bash
-# 1. 创建 flow
-vibe3 flow new fix/login-bug
+# 1. 创建并注册 flow
+git checkout -b fix/login-bug
+vibe3 flow update
 
 # 2. 绑定 bug issue
-vibe3 issue bind <bug_issue_number>
+vibe3 flow bind <bug_issue_number>
 
 # 3. 使用 instructions 直接描述问题
-vibe3 run --instructions "Fix the login timeout bug in auth.py"
+vibe3 run "Fix the login timeout bug in auth.py"
 
 # 4. 验证修复
 uv run pytest tests/vibe3/services/test_auth.py
@@ -186,11 +188,12 @@ git commit -am "fix: resolve login timeout issue"
 
 **推荐流程**：
 ```bash
-# 1. 创建 flow
-vibe3 flow new refactor/split-large-file
+# 1. 创建并注册 flow
+git checkout -b refactor/split-large-file
+vibe3 flow update
 
 # 2. 创建 plan（重构需要详细规划）
-vibe3 plan spec --file refactor_plan.md
+vibe3 plan spec --msg "Split large file into smaller modules"
 
 # 3. 执行 plan
 vibe3 run --plan

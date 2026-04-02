@@ -53,7 +53,7 @@ related_docs:
 - 复用同一目录承载新的 `flow` 是允许的
 - 但复用目录时，必须显式切换到新的 `branch`
 - 当前开放 flow 的执行判断应优先围绕 `branch`，`worktree` 只提供目录 hint
-- 复用目录进入新的逻辑 `flow` 时，应通过正式 flow 切换能力完成，而不是靠目录名暗示
+- 复用目录进入新的逻辑 `flow` 时，应通过 `git checkout` 切换分支，并运行 `vibe3 flow update` 注册现场，而不是靠目录名暗示
 - 已关闭 flow 的历史不保存在 `worktree` 目录内，而应保存在共享历史真源中
 
 ## 3. Create and Reuse Rules
@@ -81,14 +81,14 @@ related_docs:
 - 当前目录切到新的 `branch`
 - 新目录语义只服务一个新的当前交付目标
 - 当前目录的 flow runtime 记录已同步到新的 `branch` / `flow` 语义，且 `branch` 是主锚点
-- 若目标 flow 已有 PR 事实，不得通过目录复用继续 `switch`
+- 若目标 flow 已有 PR 事实，不得通过目录复用继续切换
 
 ## 4. Residual Changes
 
 当目录中仍有未提交改动时：
 
 - 若这些改动属于当前 `pr` 的 follow-up，可以保留在当前目录继续处理
-- 若这些改动属于新的交付目标，应在切换 `branch` 后继续处理；通过 `vibe3 flow switch (Python CLI)` 复用当前目录时，默认应安全带入这批未提交改动
+- 若这些改动属于新的交付目标，应在切换 `branch` 后继续处理；通过 `/vibe-new (skill)` 启动新 flow 时，默认应根据用户选择安全带入或暂存这批未提交改动
 
 禁止：
 
@@ -104,7 +104,7 @@ related_docs:
 - 复用同一个 `worktree`
 - 将当前未提交改动带入新的 `branch`
 - 让该目录开始承载新的 `flow`
-- 标准入口应是显式的 flow 切换命令；其中 `vibe3 flow switch (Python CLI)` 默认承担安全保存与恢复当前未提交改动的职责，游离脚本只能作为兼容包装存在
+- 标准入口应是 `git checkout -b <new-branch>` 后跟 `vibe3 flow update`；或者通过 `/vibe-new (skill)` 自动化流程
 - 只允许进入尚未关闭、且尚未发过 PR 的 flow
 
 该模式不是：
@@ -128,10 +128,10 @@ related_docs:
 
 补充规则：
 
-- `vibe3 flow done (Python CLI)` 负责关闭 flow 并删除本地/远端 branch
-- 若关闭的是当前 branch，`vibe3 flow done` 应先把当前目录落回安全的非 detached 基线分支：优先使用本地 `main`；若 `main` 受 `git worktree` 限制不可用，则切到当前 worktree 专用、指向 `origin/main` 的 safe branch
-- `vibe3 flow done` 不负责关闭 task / issue
-- flow 关闭后，目录可以被保留或复用，但不能继续代表旧 flow；同一目录可直接继续 `vibe3 flow new (Python CLI)`，不要求切换物理 worktree
+- `vibe3 flow update` 用于注册或更新活跃分支的现场事实
+- 若要关闭现场，应通过 `git branch -d` 删除分支
+- 不再提供 `vibe3 flow done` 等生命周期封装，流程收口由 `/vibe-done (skill)` 编排
+- flow 关闭后，目录可以被保留或复用，但不能继续代表旧 flow；同一目录可直接继续 `vibe3 flow update` 注册新分支现场，不要求切换物理 worktree
 - 即使 branch 被删除，已关闭 flow 的历史也必须保留
 
 ## 7. Ghost Worktree and Ghost Branch

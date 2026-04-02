@@ -21,7 +21,7 @@ related_docs:
 
 # 文档组织标准
 
-本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
 本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式完全对齐。
 

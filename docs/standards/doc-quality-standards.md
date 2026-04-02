@@ -20,7 +20,7 @@ related_docs:
 
 # Document Quality Standards
 
-本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
 ## 概述
 
@@ -63,7 +63,7 @@ related_docs:
 - 同段后续复用可省略后缀
 - 跨段再次出现同名或近似名称时，建议重新标注
 
-术语定义与边界以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+术语定义与边界以 [glossary.md](glossary.md) 为准。
 
 ## 文档类型分类
 

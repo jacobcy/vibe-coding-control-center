@@ -105,18 +105,18 @@ related_docs:
 
 ### Flow Create 准入规则
 
-| 当前 Flow 状态 | `flow create` 行为 | 说明 |
+| 当前 Flow 状态 | 动作 | 说明 |
 |---------------|-------------------|------|
-| `active` | **拒绝** | 提示使用 `vibe3 wtnew` 创建新 worktree |
-| `blocked` | **允许** | 从当前 branch 切出新 branch（下游修复流） |
-| `done/aborted/stale` | **允许** | 从 `origin/main` 开始新目标 |
-| 无 flow | **允许** | 从 `origin/main` 开始新目标 |
+| `active` | **拒绝新 flow** | 提示使用 `vibe3 wtnew` 创建新 worktree |
+| `blocked` | **允许切分支** | 从当前 branch 切出新 branch（下游修复流） |
+| `done/aborted/stale` | **允许新任务** | 从 `origin/main` 开始新目标 |
+| 无 flow | **允许新任务** | 从 `origin/main` 开始新目标 |
 
 ### 新 Feature 推荐路径
 
 1. **独立新 feature**: 使用 `vibe3 wtnew <name>` 创建新 worktree
-2. **下游修复流**: 先 `vibe3 flow blocked`，再 `vibe3 flow create <name>`
-3. **同 worktree 串行**: 先 `vibe3 flow done`，再 `vibe3 flow create <name>`
+2. **下游修复流**: 先 `vibe3 flow blocked`，再切换分支并 `vibe3 flow update`
+3. **同 worktree 串行**: 使用 `/vibe-done` 收口后，通过 `/vibe-new` 开启新目标
 
 ### Flow Done 落盘规则
 
@@ -127,7 +127,7 @@ related_docs:
 
 ### 禁止事项
 
-- 禁止在 `active` flow 的 worktree 中继续 `flow create`
+- 禁止在 `active` flow 的 worktree 中开启新分支而不同步注册
 - 禁止单 worktree 内并行维护多个活跃目标
 - 禁止通过 `--base current` 在活跃 flow 中开新独立目标
 
@@ -154,8 +154,8 @@ closeout 约束：
 
 1. 从 `repo issue` 确认来源层目标
 2. 创建、选择或同步对应的 `roadmap item`
-3. 通过 `vibe-new` 完成旧 flow 到新 flow 的转换，不创建 task
-4. 进入新 flow 后，通过 `vibe-start` 从 issue 落 task，并把 execution spec 交给对应执行体系
+3. 通过 `vibe-new` 确认/创建目标 issue、创建/注册 flow、绑定 issue 并创建 PR draft
+4. 进入新 flow 后，通过 `vibe-start` 确认并补齐 flow 环境（恢复开发场景）
 5. 让该 `flow` 绑定本轮要交付的 `task`
 6. 在该 `flow` 对应的 `branch` 上提交本地 commit
 7. 执行 `review`
@@ -170,7 +170,7 @@ closeout 约束：
 - `flow` 是用户主视角的默认执行锚点；roadmap item 与 task 继续保留为内部桥接对象
 - 同一 `flow` 内的 commit 应服务同一个当前交付目标
 - 若一组 commit 已经不再服务当前目标，应停止继续堆在该 `flow`
-- `done` 只应发生在当前交付目标已经完成或明确废弃之后
+- `done` 只应发生在当前交付目标已经完成或明确废弃之后，通过 `/vibe-done` 编排收口动作。
 
 ## 5. Flow Decision Rules
 
@@ -203,19 +203,19 @@ closeout 约束：
 - 保留上层 `roadmap item` / `repo issue`
 - 将新的交付切片切到新的 `branch`
 - 让新的 `flow` 对应新的当前 `pr` 目标
-- 若复用当前目录，使用 `vibe3 flow switch` 一类显式 flow 切换能力进入新 `flow`
+- 若复用当前目录，使用 `/vibe-new (skill)` 一类显式 flow 切换能力进入新 `flow`
 
 补充语义：
 
-- `vibe3 flow switch (Python)` 默认应安全携带当前目录的未提交改动进入目标 flow；这属于该命令的基础语义，而不是额外开关
-- `vibe3 flow new (Python)` 仍可保持更保守的默认值，由显式参数决定是否带入未提交改动
+- `/vibe-new (skill)` 默认应安全携带当前目录的未提交改动进入目标 flow；这属于该技能的基础语义，而不是额外开关
+- `vibe3 flow update` 用于注册或同步当前现场元数据
 
-`flow new` / `flow switch` 的准入规则：
+`vibe-new` 的准入规则：
 
-- 若同名 flow 当前存在，`new` 必须拒绝，并提示 `switch`
-- 若同名 flow 历史存在过且已关闭，`new` 必须直接报错
-- `switch` 只允许进入 `open + no_pr`
-- 已经 `had_pr` 但未关闭的 flow，不允许通过 `switch` 继续，应交给 skill 处理
+- 若同名 flow 当前存在且处于 active，建议用户确认是否覆盖或复用
+- 若同名 flow 历史存在过且已关闭，建议使用新分支
+- 不再区分 `new` 与 `switch` 命令，由 skill 统一编排现场切换
+- 已经 `had_pr` 但未关闭的 flow，不允许当作普通开发 flow 继续，应交给 skill 处理
 
 ## 6. Exception Paths
 
@@ -308,16 +308,16 @@ closeout 约束：
 
 针对"提交 -> 整合 -> 收口"的串行链路，职责固定如下：
 
-- `vibe3-commit`
+- `/vibe-commit (skill)`
   - 负责脏工作区分类、commit 分组、串行 PR 切片与 PR 草案
   - 不负责 merge、issue close、flow close
-- `vibe3-integrate`
+- `/vibe-integrate (skill)`
   - 负责检查 CI、review、堆叠顺序、merge eligibility
   - 负责处理 `open + had_pr` 的 flow
   - 不直接承担 task / issue 真源写入
-- `vibe3-done`
+- `/vibe-done (skill)`
   - 负责合并后的收口编排
-  - 通过 `vibe3 task update`、`gh issue close`、`vibe3 flow done` 完成 task / issue / flow handoff
+  - 通过 `gh issue close` 等动作完成 task / issue / flow handoff
 
 `.agent/context/task.md` 只作为 skill 之间的短期 handoff 记录，不是共享真源。
 
@@ -341,9 +341,9 @@ V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 ### Key V3 Components
 
 - **CLI Layer**: `src/vibe3/cli.py` - Typer-based command interface
-- **Git Operations**: `src/vibe3/git_client.py` - Pythonic git operations
-- **Flow Management**: `src/vibe3/flow_manager.py` - Flow state tracking
-- **Task Integration**: `src/vibe3/task_bridge.py` - Bridge to task system
+- **Git Operations**: `src/vibe3/clients/git_client.py` - Pythonic git operations
+- **Flow Management**: `src/vibe3/services/flow_service.py` - Flow state tracking
+- **Task Integration**: `src/vibe3/services/task_service.py` - Bridge to task system
 
 ### V3 vs V2 Differences
 
@@ -352,14 +352,14 @@ V3 使用 Python/Typer CLI，通过 `git_client.py` 进行 Git 操作：
 | CLI Framework | Zsh scripts | Typer (Python) |
 | Git Operations | Shell `git` commands | `git_client.py` (Pythonic) |
 | Flow State | JSON files | SQLite + Pydantic models |
-| Configuration | `.viberc` | `pyproject.toml` + `.vibe/` |
+| Configuration | `.viberc` | `config/settings.yaml` |
 | Command Prefix | `vibe` | `vibe3` |
 
 ### Migration Path
 
 V3 保持与 V2 相同的工作流语义，但使用 Python 实现：
-- `vibe3 flow new` → 创建新 flow
-- `vibe3 flow switch` → 切换 flow
-- `vibe3 commit` → 提交 PR 草案
-- `vibe3 integrate` → 整合流程
-- `vibe3 done` → 完成 flow
+- `git checkout -b` + `vibe3 flow update` → 替代 vibe2 `flow new`
+- `/vibe-new (skill)` → 替代手动 flow 切换流程
+- `/vibe-commit (skill)` → 提交 PR 草案
+- `/vibe-integrate (skill)` → 整合流程
+- `/vibe-done (skill)` → 完成 flow

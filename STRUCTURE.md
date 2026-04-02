@@ -294,14 +294,14 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 | 路径 | 职责 | 共享范围 | 版本 | 示例内容 |
 |------|------|---------|------|---------|
-| **`.git/vibe3/`** | **V3 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V3 | `flow.db`, `handoff/*/` |
+| **`.git/vibe3/`** | **V3 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V3 | `handoff.db`, `handoff/*/` |
 | **`.git/vibe/`** | **V2 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V2 | `registry.json`, `worktrees.json`, `tasks/*/` |
 | **`~/.vibe/`** | **用户级全局配置** | 当前用户跨仓库共享 | V2/V3 | loader、keys、skills 偏好 |
 | **`<worktree>/.vibe/`** | **历史本地缓存方案（已淘汰）** | 仅历史文档背景 | V2 | 不再作为当前运行时真源 |
 
 #### V3 数据存储（`.git/vibe3/`）
 
-**`.git/vibe3/flow.db`** - SQLite 数据库（跨项目共享）
+**`.git/vibe3/handoff.db`** - SQLite 数据库（跨项目共享）
 - 存储所有 flow 状态和事件
 - 包含 `flow_state` 和 `flow_events` 表
 - 所有 worktree 共享访问
@@ -320,7 +320,7 @@ uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py handoff show
 
 # 数据库路径
-$(git rev-parse --git-common-dir)/vibe3/flow.db
+$(git rev-parse --git-common-dir)/vibe3/handoff.db
 ```
 
 #### V2 数据存储（`.git/vibe/`）
@@ -522,7 +522,7 @@ uv run pytest tests/vibe3/ -k flow
 - [ ] 所有入口文件相互引用正确
 - [ ] `src/vibe3/` 遵循 Python 编码标准
 - [ ] `tests/vibe3/` 测试覆盖率 ≥ 80%
-- [ ] `.git/vibe3/flow.db` 结构与代码一致
+- [ ] `.git/vibe3/handoff.db` 结构与代码一致
 
 ## 📝 维护责任
 
