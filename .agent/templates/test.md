@@ -9,12 +9,13 @@ created: 2025-01-24
 last_updated: 2026-03-08
 related_docs:
   - docs/standards/doc-quality-standards.md
-  - docs/plans/2026-03-08-co-writers-frontmatter-plan.md
+  - .agent/plans/2026-03-08-co-writers-frontmatter-plan.md
 ---
 
 # Test Document: {{TASK_TITLE}}
 
 > 本文档定义 {{TASK_TITLE}} 的测试策略和测试用例。
+> 测试文档属于临时工作产物，若需要长期保留结论，请写入 issue comment。
 
 ## 测试策略
 

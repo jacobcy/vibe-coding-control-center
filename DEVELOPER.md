@@ -264,8 +264,10 @@ skills/                # 🟢 Vibe 自有技能（tracked，规范源）
 openspec/specs/
   cli-commands.yaml    # CLI 命令结构化 Spec（机器可读）
 docs/
-  plans/               # 实施计划（执行前必写）
   standards/           # 开发规范文档
+.agent/
+  plans/               # 临时实施计划（执行前可写）
+  reports/             # 临时验证报告
   model-spec-context.md # MSC 范式说明与自检
 tests/                 # bats-core 测试（≥20 个用例）
 ```

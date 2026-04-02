@@ -75,6 +75,8 @@ related_docs:
 | 技能文档 | `skill` | `.agent/skills/*/SKILL.md` | AI 技能定义 | AI |
 | 模板文档 | `template` | `.agent/templates/*.md` | 文档生成模板 | AI |
 | 工作流文档 | `workflow` | `.agent/workflows/*.md` | 工作流定义 | AI |
+| 临时计划 | `temporary-plan` | `.agent/plans/*.md` | Agent 临时计划 | AI |
+| 临时报告 | `temporary-report` | `.agent/reports/*.md` | Agent 临时报告 | AI |
 | PRD 文档 | `prd` | `docs/prds/*.md` | 产品需求文档 | Human + AI |
 | 任务文档 | `task-*` | `docs/tasks/{Task_ID}/*.md` | 任务文档 | Human + AI |
 | 标准文档 | `standard` | `docs/standards/*.md` | 标准和规范 | Human + AI |
@@ -87,6 +89,8 @@ related_docs:
 - 不同类型文档应使用各自语义稳定的 `status`
 - 不允许把某一类文档的状态枚举机械套用到所有文档
 - 标准文件不应继续使用 `approved` 作为长期状态
+- 临时计划和临时报告不应被描述为正式真源
+- 需要长期保留的结论应进入 issue comment 或 PR comment，而不是只留在临时文档
 
 推荐状态设计：
 

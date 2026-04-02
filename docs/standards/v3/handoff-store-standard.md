@@ -13,7 +13,7 @@ last_updated: 2026-03-23
 related_docs:
   - docs/prds/vibe-session-governance.md
   - docs/standards/v3/handoff-governance-standard.md
-  - docs/plans/2026-03-14-vibe3-data-model-design.md
+  - .agent/plans/2026-03-14-vibe3-data-model-design.md
 ---
 
 # Vibe3 Handoff Store Standard
@@ -27,6 +27,7 @@ related_docs:
 - `planner / executor / reviewer` 署名
 - 最小阻塞与下一步信息
 - 共享 handoff 中间态文件的位置约定
+- `plan / report / audit` 文档只作为临时工作产物，不承担长期语义真源职责
 
 它不负责：
 
@@ -314,7 +315,7 @@ CREATE TABLE flow_events (
 3. SQLite handoff store
 4. 共享 `current.md`
 5. `.agent/context/task.md` 本地草稿（可选）
-6. `plan / report / audit` 文档存在性
+6. `.agent/plans/` / `.agent/reports/` 文档存在性
 
 解释约束：
 
@@ -364,7 +365,7 @@ CREATE TABLE flow_events (
 - `flow_state.task_issue_number` 是否在远端仍存在
 - `flow_issue_links` 中是否只有一个 `task`
 - `flow_state.pr_number` 是否仍对应该 branch
-- `plan_ref / report_ref / audit_ref` 文件是否存在
+- `plan_ref / report_ref / audit_ref` 文件是否存在（通常位于 `.agent/plans/` 或 `.agent/reports/`）
 - `planner_actor / executor_actor / reviewer_actor` 是否与阶段交接物一致
 
 输出分级：
@@ -412,7 +413,7 @@ INSERT INTO flow_state (
   'vibe3-parallel-rebuild',
   157,
   169,
-  'docs/plans/2026-03-13-vibe3-parallel-rebuild-design.md',
+  '.agent/plans/2026-03-13-vibe3-parallel-rebuild-design.md',
   'docs/tasks/2026-03-14-vibe3-data-model/plan-v1.md',
   NULL,
   NULL,

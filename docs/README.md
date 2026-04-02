@@ -16,19 +16,10 @@ docs/
 │   └── ...                         # 其他全局 PRD
 ├── references/                     # 外部参考资料
 │   └── ...                         # 收集的外部文档、论文、资料等
-├── plans/                          # 正式计划文档
-│   └── ...                         # 被追踪的计划、设计与治理方案
-├── reports/                        # 正式报告文档
-│   └── ...                         # 审计、复盘与总结
-└── tasks/                          # 任务文档（按任务组织）
-    └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
-        ├── README.md               # 任务概述、状态和导航
-        ├── prd-v1-initial.md       # PRD 层文档
-        ├── spec-v1-initial.md      # Spec 层文档
-        ├── plan-v1-initial.md      # Plan 层文档
-        ├── test-strategy.md        # Test 层文档
-        ├── code-implementation.md  # Code 层文档
-        └── audit-2024-01-15.md     # Review 层文档（AI 审计）
+├── tasks/                          # 任务文档（按 issue 组织）
+│   └── {Task_ID}/                  # 任务镜像与导航
+├── archive/                        # 历史归档
+└── ...                             # 其他现行文档
 ```
 
 ## 🎯 文档分类
@@ -56,18 +47,25 @@ docs/
 
 **用途**：为项目决策和实现提供外部知识支持，不属于项目自身文档。
 
-### 正式计划 (`plans/`)
-存放被 git 追踪的正式计划、设计稿和治理方案。
-
-**用途**：记录当前或历史阶段采用过的正式执行方案，供审计和演进参考。
-
-### 正式报告 (`reports/`)
-存放被 git 追踪的正式报告、审计结果和总结文档。
-
-**用途**：沉淀检查结论、复盘结果和可回溯证据。
-
 ### 任务文档 (`tasks/`)
-每个任务一个子目录，包含该任务的完整 Vibe Guard 文档。
+每个任务一个子目录，按 GitHub issue 组织任务镜像。
+
+**原则**：
+- issue 是任务身份真源
+- task README 只做导航、状态和阶段记录
+- 需要长期保留的结论写到 issue comment 或 PR comment
+
+### 临时计划 (`.agent/plans/`)
+存放 Agent 生成的临时计划文档，不作为正式真源。
+
+**用途**：圈定上下文、拆分任务、记录短期执行方案。
+
+### 临时报告 (`.agent/reports/`)
+存放 Agent 生成的临时报告文档，不作为正式真源。
+
+**用途**：记录审计、分析、调试和验证过程中的工作证据。
+
+### 任务命名与文档命名
 
 **任务命名格式**：`YYYY-MM-DD-feature-name`（kebab-case）
 
@@ -75,6 +73,10 @@ docs/
 - PRD/Spec/Plan：`{layer}-v{version}-{description}.md`
 - Test/Code：`{layer}-{description}.md`
 - Audit：`audit-{YYYY-MM-DD}.md`
+
+**兼容说明**：
+- 旧任务目录里可能仍有 `plan-*` / `audit-*` 示例文件，它们只作为历史任务归档
+- 新的 plan / report 一律写入 `.agent/plans/` 和 `.agent/reports/`
 
 ## 🚪 Vibe Guard 流程
 
@@ -106,7 +108,7 @@ docs/
 
 3. 替换占位符并填写内容
 
-4. 按 Vibe Guard 流程逐步推进
+4. 按 Vibe Guard 流程逐步推进，长期结论写入 issue comment 或 PR comment
 
 ### 查看任务状态
 
@@ -121,14 +123,15 @@ docs/
 - **[CLAUDE.md](../CLAUDE.md)** - 项目上下文和硬性规则
 - **[SOUL.md](../SOUL.md)** - 项目宪法和核心原则
 - **[.agent/README.md](../.agent/README.md)** - AI 工作流和规则
+- **[agent-document-lifecycle-standard.md](standards/agent-document-lifecycle-standard.md)** - Agent 文档生命周期标准
 
 ## 📚 文档 vs AI 工作区
 
 **重要区分**：
-- **`docs/`** - 人类主权区，存放给人类阅读的文档
-- **`.agent/`** - AI 工作区，存放 AI 使用的模板、规则、工作流
+- **`docs/`** - 人类主权区，存放给人类阅读的正式规范、任务镜像和历史归档
+- **`.agent/`** - AI 工作区，存放 AI 使用的模板、规则、工作流和临时产物
 
-模板文件位于 `.agent/templates/`，而不是 `docs/templates/`。
+模板文件位于 `.agent/templates/`，临时计划与报告分别位于 `.agent/plans/` 和 `.agent/reports/`。
 
 ## 🆘 需要帮助？
 

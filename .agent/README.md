@@ -20,6 +20,8 @@
 - **`rules/`**: 具体的编码标准和项目规则。
   - `coding-standards.md`: 实现、边界、工具与交付细则
   - `patterns.md`: 执行模式、报告模式与渐进披露模式
+- **`plans/`**: 临时计划工作区。只放工作中的 plan，不作为长期真源。
+- **`reports/`**: 临时报告工作区。只放工作中的 report，不作为长期真源。
 - **`templates/`**: Commit, PR 等模板。
 - **`../skills/`**: **skill 层真源**。负责对象判断、shell 调用顺序、blocker / handoff 逻辑。
 
@@ -39,7 +41,8 @@
 2.  **遵循工作流**: 如果用户请求匹配下方的工作流，请**严格按步骤执行**。
 3.  **遵循约束**: 优先使用现有的能力（如 Skills），不要重新发明轮子。
 4.  **更新上下文**: 任务完成后，运行 `vibe3 handoff append` 记录状态，更新 `context/memory.md`。
-5.  **遇到歧义先查真源**: 名词看 `glossary.md`，动词看 `action-verbs.md`，执行细则看 `rules/`。
+5.  **留存到主链**: 需要长期保留的发现或决策，写入 issue comment 或 PR comment，而不是只留在临时 plan/report。
+6.  **遇到歧义先查真源**: 名词看 `glossary.md`，动词看 `action-verbs.md`，执行细则看 `rules/`。
 
 ---
 

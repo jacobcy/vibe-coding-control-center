@@ -111,6 +111,7 @@ wt-*/
 .vibe/
 .repomix/
 .hypothesis/
+.agent/plans/
 .agent/context/task.md
 .agent/reports/
 docs/audits/
