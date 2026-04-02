@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
 from unittest.mock import MagicMock
 
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 def _ready_issue_payload(labels: list[str] | None = None) -> dict[str, object]:
@@ -47,7 +45,7 @@ def service() -> tuple[StateLabelDispatchService, MagicMock]:
     executor = ThreadPoolExecutor(max_workers=2)
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
-        dispatcher=dispatcher,
+        manager=dispatcher,
         executor=executor,
     )
     try:
@@ -57,14 +55,16 @@ def service() -> tuple[StateLabelDispatchService, MagicMock]:
 
 
 @pytest.mark.asyncio
-async def test_handle_event_dispatches_on_state_ready_label(
+async def test_handle_event_observed_state_ready_label(
     service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
+    """StateLabelDispatch is now mirror-only and should NOT trigger dispatch."""
     svc, dispatcher = service
 
     await svc.handle_event(_ready_event())
 
-    dispatcher.dispatch_manager.assert_called_once()
+    # Should not dispatch anymore
+    dispatcher.dispatch_manager.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -79,41 +79,15 @@ async def test_handle_event_ignores_non_ready_label(
 
 
 @pytest.mark.asyncio
-async def test_on_tick_skips_issue_already_in_progress(
+async def test_on_tick_is_no_op(
     service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
+    """on_tick is now a no-op in mirror-only mode."""
     svc, dispatcher = service
     svc._list_ready_issues = MagicMock(
-        return_value=[_ready_issue_payload(["state/ready", "state/in-progress"])]
+        return_value=[_ready_issue_payload(["state/ready"])]
     )
 
     await svc.on_tick()
 
     dispatcher.dispatch_manager.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_webhook_and_polling_overlap_dispatch_only_once(
-    service: tuple[StateLabelDispatchService, MagicMock],
-) -> None:
-    svc, dispatcher = service
-    started = Event()
-    release = Event()
-
-    def blocking_dispatch(_issue):
-        started.set()
-        if not release.wait(timeout=1):
-            raise AssertionError("dispatch did not finish in time")
-        return True
-
-    dispatcher.dispatch_manager.side_effect = blocking_dispatch
-    svc._list_ready_issues = MagicMock(return_value=[_ready_issue_payload()])
-
-    webhook_task = asyncio.create_task(svc.handle_event(_ready_event()))
-    assert await asyncio.to_thread(started.wait, 1)
-
-    polling_task = asyncio.create_task(svc.on_tick())
-    release.set()
-    await asyncio.gather(webhook_task, polling_task)
-
-    assert dispatcher.dispatch_manager.call_count == 1

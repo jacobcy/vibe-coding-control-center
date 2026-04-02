@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 class _ImmediateLoop:
@@ -15,7 +15,11 @@ class _ImmediateLoop:
 
 
 def _svc() -> AssigneeDispatchService:
-    return AssigneeDispatchService(OrchestraConfig(polling_interval=900, dry_run=True))
+    svc = AssigneeDispatchService(OrchestraConfig(polling_interval=900, dry_run=True))
+    svc._status_service = MagicMock()
+    # Default to 0 active flows to allow dispatch
+    svc._status_service.get_active_flow_count.return_value = 0
+    return svc
 
 
 def _assigned_event(
@@ -45,7 +49,7 @@ async def test_handle_event_dispatches_when_assigned_to_manager() -> None:
     svc._dep_checker.check.return_value = (True, [])
     svc._dispatcher = MagicMock()
     svc._dispatcher.dispatch_manager.return_value = True
-    svc._dispatcher.orchestrator.get_flow_for_issue.return_value = None
+    svc._dispatcher.flow_manager.get_flow_for_issue.return_value = None
 
     with patch(
         "vibe3.orchestra.services.assignee_dispatch.asyncio.get_event_loop",
@@ -76,7 +80,7 @@ async def test_on_tick_dispatches_on_new_assignment_after_warmup() -> None:
     svc._dep_checker.check.return_value = (True, [])
     svc._dispatcher = MagicMock()
     svc._dispatcher.dispatch_manager.return_value = True
-    svc._dispatcher.orchestrator.get_flow_for_issue.return_value = None
+    svc._dispatcher.flow_manager.get_flow_for_issue.return_value = None
 
     with patch(
         "vibe3.orchestra.services.assignee_dispatch.asyncio.get_event_loop",
@@ -140,7 +144,7 @@ async def test_on_tick_prunes_assignee_cache() -> None:
     svc._dep_checker.check.return_value = (True, [])
     svc._dispatcher = MagicMock()
     svc._dispatcher.dispatch_manager.return_value = True
-    svc._dispatcher.orchestrator.get_flow_for_issue.return_value = None
+    svc._dispatcher.flow_manager.get_flow_for_issue.return_value = None
 
     # Prepopulate cache with extra issue
     svc._assignee_cache = {

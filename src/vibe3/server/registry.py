@@ -12,10 +12,8 @@ from fastapi import FastAPI
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
-from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.governance_service import GovernanceService
@@ -25,6 +23,7 @@ from vibe3.orchestra.services.status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
+from vibe3.runtime.heartbeat import HeartbeatServer
 
 
 def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
@@ -36,27 +35,25 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     # Shared resources (reduces duplication)
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_github = GitHubClient()
-    shared_orchestrator = FlowOrchestrator(config)
-    shared_dispatcher = Dispatcher(
+    shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
-        orchestrator=shared_orchestrator,
     )
 
     # Status service for HTTP endpoint and CLI
-    # Pass circuit_breaker from dispatcher for status reporting
+    # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
-        orchestrator=shared_orchestrator,
-        circuit_breaker=shared_dispatcher._circuit_breaker,
+        orchestrator=shared_manager.flow_manager,
+        circuit_breaker=shared_manager._circuit_breaker,
     )
 
     if config.assignee_dispatch.enabled:
         heartbeat.register(
             AssigneeDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
             )
@@ -72,15 +69,17 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         heartbeat.register(
             PRReviewDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 executor=shared_executor,
             )
         )
     if config.state_label_dispatch.enabled:
+        # NOTE: StateLabelDispatchService is a read-only mirror (no-op dispatch).
+        # It only logs label events for observability; disabled by default in config.
         heartbeat.register(
             StateLabelDispatchService(
                 config,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
             )
@@ -91,7 +90,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             GovernanceService(
                 config,
                 status_service=status_service,
-                dispatcher=shared_dispatcher,
+                manager=shared_manager,
                 executor=shared_executor,
             )
         )
@@ -105,13 +104,15 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     @fastapi_app.get("/status")
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot()
+        return status_service.snapshot(queued=shared_manager.queued_issues)
 
     # Mount MCP server (optional, gracefully degrades if mcp package not available)
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(status_service)
+        mcp = create_mcp_server(
+            status_service, get_queued=lambda: shared_manager.queued_issues
+        )
         # Mount SSE endpoint for MCP
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")

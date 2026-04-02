@@ -32,10 +32,12 @@ class MockStatusService:
         )
 
 
-def _make_dispatcher(run_result: bool = True) -> MagicMock:
+def _make_dispatcher(
+    run_result: bool = True, repo_path: Path | None = None
+) -> MagicMock:
     """Create a mock Dispatcher with repo_path and run_governance_command."""
     dispatcher = MagicMock()
-    dispatcher.repo_path = Path("/repo")
+    dispatcher.repo_path = repo_path or Path("/tmp/vibe-repo")
     dispatcher.run_governance_command.return_value = run_result
     return dispatcher
 
@@ -44,12 +46,13 @@ def _make_service(
     config: OrchestraConfig | None = None,
     snapshot: OrchestraSnapshot | None = None,
     run_result: bool = True,
+    repo_path: Path | None = None,
 ) -> GovernanceService:
     """Helper to create a GovernanceService with mocked dependencies."""
     return GovernanceService(
         config=config or OrchestraConfig(),
         status_service=MockStatusService(snapshot),
-        dispatcher=_make_dispatcher(run_result),
+        manager=_make_dispatcher(run_result, repo_path),
     )
 
 
@@ -84,7 +87,7 @@ class TestGovernanceService:
                 )
             ),
             status_service=MockStatusService(snapshot),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
 
@@ -114,7 +117,7 @@ class TestGovernanceService:
                 )
             ),
             status_service=MockStatusService(),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
 
@@ -137,16 +140,14 @@ class TestGovernanceService:
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
-        dispatcher = _make_dispatcher()
-        dispatcher.repo_path = tmp_path
         service = GovernanceService(
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
             status_service=MockStatusService(snapshot),
-            dispatcher=dispatcher,
+            manager=_make_dispatcher(repo_path=tmp_path),
         )
 
         await service._run_governance()
-        dispatcher.run_governance_command.assert_not_called()
+        service._manager.run_governance_command.assert_not_called()
 
         dry_run_files = sorted((tmp_path / "temp").glob("governance_dry_run_*.md"))
         assert len(dry_run_files) == 1

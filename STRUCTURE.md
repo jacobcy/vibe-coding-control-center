@@ -167,6 +167,9 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 **主要模块**：
 - `cli.py` - CLI 主入口
 - `commands/` - 命令实现（flow, handoff, plan, review, run 等）
+- `runtime/` - 运行时核心（事件循环、执行引擎、熔断器）
+- `server/` - 服务器逻辑（FastAPI, Webhook, MCP）
+- `manager/` - 编排管理（ManagerExecutor, Flow/Worktree 协同）
 - `services/` - 业务逻辑层
 - `clients/` - 外部客户端（git, sqlite, linear 等）
 - `models/` - 数据模型（FlowState, FlowEvent 等）

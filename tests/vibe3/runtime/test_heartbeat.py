@@ -3,8 +3,8 @@
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
-from vibe3.orchestra.heartbeat import HeartbeatServer
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.heartbeat import HeartbeatServer
 
 
 def _config() -> OrchestraConfig:

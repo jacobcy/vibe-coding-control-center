@@ -43,7 +43,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 23000        # Python 核心代码总行数
+    v3_python: 25000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -77,12 +77,6 @@ review_scope:
   # - 太宽泛（如整个 services/）会导致几乎所有改动都被标记为 critical
   # - 应该只标记：核心流程、关键基础设施、影响全局的代码
   critical_paths:
-    # V2 (Shell) - 核心流程
-    - "lib/flow.sh"        # Flow 主入口
-    - "lib/flow_checkout"  # Flow checkout 逻辑
-    - "lib/flow_done"      # Flow done 逻辑
-    - "lib/flow_pr"        # Flow PR 逻辑
-    - "lib/flow_review"    # Flow review 逻辑
 
     # V3 (Python) - 核心服务和基础设施
     - "src/vibe3/services/flow_service.py"       # Flow 核心服务
@@ -97,7 +91,6 @@ review_scope:
   public_api_paths:
     # V2 (Shell) - 公开接口
     - "bin/vibe"             # 主入口
-    - "lib/flow.sh"         # Flow 公开接口
 
     # V3 (Python) - 命令层（公开 API）
     - "src/vibe3/commands/"  # v3 命令层

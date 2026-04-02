@@ -1,4 +1,4 @@
-"""Flow orchestration utilities for orchestra dispatcher."""
+"""Flow management utilities for orchestra manager."""
 
 from loguru import logger
 
@@ -11,7 +11,7 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
 
 
-class FlowOrchestrator:
+class FlowManager:
     """Manages issue-to-flow mapping and command execution.
 
     Uses FlowService and TaskService for all state mutations so that
@@ -36,6 +36,10 @@ class FlowOrchestrator:
         flows = self.store.get_flows_by_issue(issue_number, role="task")
         return flows[0] if flows else None
 
+    def get_active_flow_count(self) -> int:
+        """Get count of active flows across the whole system."""
+        return self.store.get_active_flow_count()
+
     def create_flow_for_issue(self, issue: IssueInfo) -> dict:
         """Create (or reuse) a flow for an issue.
 
@@ -49,7 +53,7 @@ class FlowOrchestrator:
             Flow state dict
 
         Raises:
-            RuntimeError: If flow creation fails
+            RuntimeError: If flow creation fails or capacity is reached
         """
         log = logger.bind(
             domain="orchestra",
@@ -61,6 +65,15 @@ class FlowOrchestrator:
         if existing:
             log.info(f"Flow already exists for issue #{issue.number}")
             return existing
+
+        # Capacity Check: Before creating a NEW flow, verify global capacity
+        active_count = self.get_active_flow_count()
+        if active_count >= self.config.max_concurrent_flows:
+            limit = self.config.max_concurrent_flows
+            raise RuntimeError(
+                f"Global capacity reached ({active_count}/{limit}). "
+                "Deferred flow creation."
+            )
 
         slug = f"issue-{issue.number}"
         branch = f"task/{slug}"
@@ -75,11 +88,16 @@ class FlowOrchestrator:
                 ) from exc
 
         # Register flow via FlowService (lifecycle events, proper recording)
+        # Use orchestra tag only if it's a managed issue-specific branch
+        from vibe3.services.signature_service import SignatureService
+
+        initiator = SignatureService.resolve_initiator(branch)
         try:
             flow_state = self.flow_service.create_flow(
                 slug=slug,
                 branch=branch,
-                actor="orchestra",
+                actor=None,
+                initiated_by=initiator,
             )
         except Exception as exc:
             # Guard against race condition: re-check if flow was created concurrently
@@ -95,9 +113,7 @@ class FlowOrchestrator:
 
         # Bind issue via TaskService
         try:
-            self.task_service.link_issue(
-                branch, issue.number, "task", actor="orchestra"
-            )
+            self.task_service.link_issue(branch, issue.number, "task", actor=None)
         except Exception as exc:
             log.warning(f"Failed to link issue #{issue.number} to flow: {exc}")
 

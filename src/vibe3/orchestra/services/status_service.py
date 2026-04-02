@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
@@ -13,11 +13,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.flow_orchestrator import FlowOrchestrator
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.circuit_breaker import CircuitBreaker
+    from vibe3.runtime.circuit_breaker import CircuitBreaker
 
 
 @dataclass(frozen=True)
@@ -46,6 +45,7 @@ class OrchestraSnapshot:
     active_issues: tuple[IssueStatusEntry, ...]
     active_flows: int
     active_worktrees: int
+    queued_issues: tuple[int, ...] = ()
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
@@ -54,13 +54,10 @@ class OrchestraSnapshot:
 class OrchestraStatusService:
     """Aggregate read-only status from multiple data sources.
 
-    Does not register as ServiceBase (no event handling needed).
-    Provides snapshot() for CLI and HTTP endpoint.
-
     Data sources:
     - GitHub Issues (via GitHubClient)
     - State labels (via LabelService)
-    - Flow state (via FlowOrchestrator)
+    - Flow state (via FlowManager)
     - Worktrees (via GitClient)
     - Circuit Breaker (via CircuitBreaker)
     """
@@ -69,21 +66,65 @@ class OrchestraStatusService:
         self,
         config: OrchestraConfig,
         github: GitHubClient | None = None,
-        orchestrator: FlowOrchestrator | None = None,
+        orchestrator: Any | None = None,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
-        self._orchestrator = orchestrator or FlowOrchestrator(config)
+
+        # Internal orchestrator (FlowManager)
+        if orchestrator is None:
+            from vibe3.manager.flow_manager import FlowManager
+
+            self._orchestrator = FlowManager(config)
+        else:
+            self._orchestrator = orchestrator
+
         self._circuit_breaker = circuit_breaker
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
 
-    def snapshot(self) -> OrchestraSnapshot:
-        """Build current status snapshot.
+    @classmethod
+    def fetch_live_snapshot(cls, config: OrchestraConfig) -> OrchestraSnapshot | None:
+        """Attempt to fetch live snapshot from the running HTTP server."""
+        import json
+        import urllib.request
+        from urllib.error import URLError
 
-        Performs ~1-2 GitHub API calls (list issues + potentially get PRs).
-        """
+        url = f"http://127.0.0.1:{config.port}/status"
+        try:
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=1.0) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    # Reconstruct frozen dataclass
+                    entries = [
+                        IssueStatusEntry(**item)
+                        for item in data.get("active_issues", [])
+                    ]
+                    return OrchestraSnapshot(
+                        timestamp=data.get("timestamp", 0.0),
+                        server_running=data.get("server_running", True),
+                        active_issues=tuple(entries),
+                        active_flows=data.get("active_flows", 0),
+                        active_worktrees=data.get("active_worktrees", 0),
+                        queued_issues=tuple(data.get("queued_issues", [])),
+                        circuit_breaker_state=data.get(
+                            "circuit_breaker_state", "closed"
+                        ),
+                        circuit_breaker_failures=data.get(
+                            "circuit_breaker_failures", 0
+                        ),
+                        circuit_breaker_last_failure=data.get(
+                            "circuit_breaker_last_failure"
+                        ),
+                    )
+                return None
+        except (URLError, ConnectionError, Exception):
+            return None
+
+    def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
+        """Build current status snapshot."""
         log = logger.bind(domain="orchestra", action="status_snapshot")
         log.debug("Building orchestra status snapshot")
 
@@ -147,10 +188,11 @@ class OrchestraStatusService:
 
         snapshot = OrchestraSnapshot(
             timestamp=time.time(),
-            server_running=True,  # If we're here, server is running
+            server_running=True,
             active_issues=tuple(entries),
             active_flows=active_flows,
             active_worktrees=len(worktrees),
+            queued_issues=tuple(queued) if queued else (),
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
             circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),
@@ -163,11 +205,6 @@ class OrchestraStatusService:
         return snapshot
 
     def _get_manager_issues(self) -> list[dict]:
-        """Get open issues assigned to manager usernames.
-
-        Deduplicates issues by number to avoid counting the same issue
-        multiple times when assigned to multiple managers.
-        """
         seen_numbers: set[int] = set()
         issues: list[dict] = []
 
@@ -192,7 +229,6 @@ class OrchestraStatusService:
         return issues
 
     def _get_worktree_map(self) -> dict[str, str]:
-        """Get mapping of branch name -> worktree path."""
         try:
             worktrees = self._git.list_worktrees()
             return {
@@ -202,20 +238,30 @@ class OrchestraStatusService:
             logger.bind(domain="orchestra").warning(f"Failed to list worktrees: {exc}")
             return {}
 
+    def get_active_flow_count(self) -> int:
+        try:
+            from vibe3.clients import SQLiteClient
+
+            store = SQLiteClient()
+            count = store.get_active_flow_count()
+            return count
+        except Exception as exc:
+            logger.bind(domain="orchestra").warning(
+                f"Failed to count active flows: {exc}"
+            )
+            return 0
+
     def _get_circuit_breaker_state(self) -> str:
-        """Get current circuit breaker state."""
         if self._circuit_breaker:
             return self._circuit_breaker.state_value
         return "disabled"
 
     def _get_circuit_breaker_failures(self) -> int:
-        """Get current circuit breaker failure count."""
         if self._circuit_breaker:
             return self._circuit_breaker.failure_count
         return 0
 
     def _get_circuit_breaker_last_failure(self) -> float | None:
-        """Get the last failure timestamp."""
         if self._circuit_breaker and getattr(
             self._circuit_breaker, "last_failure_timestamp", None
         ):

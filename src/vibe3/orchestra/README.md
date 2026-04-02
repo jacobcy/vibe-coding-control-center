@@ -43,8 +43,8 @@ vibe3 serve start --port 8080
 ## 注册自定义 Service
 
 ```python
-from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
-from vibe3.orchestra.heartbeat import HeartbeatServer
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.heartbeat import HeartbeatServer
 
 class MyService(ServiceBase):
     event_types = ["pull_request"]

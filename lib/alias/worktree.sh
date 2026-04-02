@@ -81,8 +81,22 @@ wt() {
 # @featured
 wtnew() {
   local git_cmd; git_cmd="$(vibe_find_cmd git)" || { vibe_die "git not found"; return 1; }
-  local branch="$1" base="${2:-origin/main}"
-  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=origin/main]"
+  local branch="" base="origin/main" actor=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --actor)   actor="$2"; shift 2 ;;
+      --actor=*) actor="${1#--actor=}"; shift ;;
+      -*)        vibe_die "Unknown flag: $1" ;;
+      *)
+        if [[ -z "$branch" ]]; then branch="$1"
+        elif [[ "$base" == "origin/main" ]]; then base="$1"
+        fi
+        shift ;;
+    esac
+  done
+
+  [[ -z "$branch" ]] && vibe_die "usage: wtnew <branch> [base=origin/main] [--actor <name>]"
 
   # Find main repo root: use git-common-dir to handle worktrees correctly
   local git_common_dir
@@ -111,6 +125,12 @@ wtnew() {
   fi
 
   cd "$path" || return
+
+  if [[ -n "$actor" ]]; then
+    $git_cmd config extensions.worktreeConfig true
+    $git_cmd config --worktree user.name "$actor"
+    echo "👤 Set worktree actor -> $actor"
+  fi
 
   # Run init script to setup environment (git hooks, skills, etc.)
   if [[ -f "$repo_root/scripts/init.sh" ]]; then
@@ -213,14 +233,16 @@ wtrm() {
     local result=""
     # Wildcard path match (glob) goes through inline matcher.
     if [[ "$target" == *'*'* || "$target" == *'?'* ]]; then
-      local safe_pattern="${target//\[/\\[}"; safe_pattern="${safe_pattern//\]/\\]}"
       local wp
       local -a glob_matches=()
       while IFS= read -r wp; do
         [[ "$wp" == "$main_dir" ]] && continue
-        [[ "${wp##*/}" == $~safe_pattern ]] && glob_matches+=("$wp")
+        # Robust glob matching via case
+        case "${wp##*/}" in
+          $target) glob_matches+=("$wp") ;;
+        esac
       done < <($git_cmd -C "$main_dir" worktree list --porcelain | $awk_cmd '/^worktree /{print substr($0,10)}')
-      result="${(pj:\n:)glob_matches}"
+      result="${(j:\n:)glob_matches}"
     else
       # Default smart finder: exact/suffix/substring.
       result=$(_wt_find "$target")
@@ -235,12 +257,17 @@ wtrm() {
         _wtrm_one "${found_paths[1]}"
         ;;
       *)
-        echo "🔍 Multiple worktrees match '${target}':"
-        for p in "${found_paths[@]}"; do
-          echo "  • ${p##*/}   ($p)"
-        done
-        echo "📌 Rerun wtrm with a more specific name or path."
-        return 1
+        if [[ "$assume_yes" == true ]]; then
+          echo "🗑️  Removing ${#found_paths[@]} matching worktree(s)..."
+          for p in "${found_paths[@]}"; do _wtrm_one "$p"; done
+        else
+          echo "🔍 Multiple worktrees match '${target}':"
+          for p in "${found_paths[@]}"; do
+            echo "  • ${p##*/}   ($p)"
+          done
+          echo "📌 Rerun wtrm with the --yes flag to delete all, or provide a specific name."
+          return 1
+        fi
         ;;
     esac
   fi

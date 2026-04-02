@@ -8,13 +8,11 @@ Primary entry point: HeartbeatServer (vibe3 serve start)
 
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
 from vibe3.orchestra.master import TriageDecision, run_master_agent
 
 __all__ = [
     "MasterAgentConfig",
     "OrchestraConfig",
-    "Dispatcher",
     "IssueInfo",
     "TriageDecision",
     "run_master_agent",

@@ -27,8 +27,15 @@ def status(
     with trace_scope(trace, "status", domain="status"):
         # 1. Orchestra State (Issues & Managers)
         config = OrchestraConfig.from_settings()
-        orch_service = OrchestraStatusService(config)
-        orch_snapshot = orch_service.snapshot()
+        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+
+        if not orch_snapshot:
+            # Fallback if server is not running
+            from dataclasses import replace
+
+            orch_service = OrchestraStatusService(config)
+            local_snap = orch_service.snapshot()
+            orch_snapshot = replace(local_snap, server_running=False)
 
         if json_output:
             service = FlowService()
@@ -52,7 +59,16 @@ def status(
             "%Y-%m-%d %H:%M:%S"
         )
         console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
-        console.print("Server: [green]running[/]")
+
+        if orch_snapshot.server_running:
+            console.print("Server: [green]running[/]")
+        else:
+            console.print("Server: [dim]stopped[/]")
+
+        if orch_snapshot.queued_issues:
+            console.print(
+                f"Queue: [yellow]{len(orch_snapshot.queued_issues)} issues waiting[/]"
+            )
         console.print()
 
         # 2. Issue Tracking (The Core View)
@@ -62,6 +78,7 @@ def status(
 
         # Map task issue numbers to flows for easy lookup
         issue_to_flow = {f.task_issue_number: f for f in flows if f.task_issue_number}
+        queued_set = set(orch_snapshot.queued_issues)
 
         console.print("[bold cyan]Issue Progress:[/]")
 
@@ -69,19 +86,28 @@ def status(
         if orch_snapshot.active_issues:
             for issue in orch_snapshot.active_issues:
                 flow = issue_to_flow.get(issue.number)
-                flow_info = (
-                    f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
-                    if flow
-                    else "  [dim]flow:[/] [yellow](none)[/]"
-                )
-                state_val = (
-                    issue.state.value
-                    if issue.state and hasattr(issue.state, "value")
-                    else (issue.state or "unknown")
-                )
-                status_color = "green" if state_val == "ready" else "yellow"
+                is_queued = issue.number in queued_set
+
+                if is_queued:
+                    status_str = "QUEUED"
+                    status_color = "yellow"
+                    flow_info = "  [dim]flow:[/] [yellow](waiting)[/]"
+                elif flow:
+                    status_str = "RUNNING"
+                    status_color = "green"
+                    flow_info = f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
+                else:
+                    state_val = (
+                        issue.state.value
+                        if issue.state and hasattr(issue.state, "value")
+                        else (issue.state or "unknown")
+                    )
+                    status_str = state_val.upper()
+                    status_color = "dim"
+                    flow_info = "  [dim]flow:[/] [dim](none)[/]"
+
                 console.print(
-                    f"  #{issue.number}  [{status_color}]{state_val:10}[/]  "
+                    f"  #{issue.number:4}  [{status_color}]{status_str:10}[/]  "
                     f"{issue.title[:40]}..."
                 )
                 console.print(f"             {flow_info}")

@@ -1,7 +1,7 @@
 """MCP Server for Orchestra - exposes orchestra state to external AI agents."""
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
@@ -21,6 +21,7 @@ def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:
         "server_running": snapshot.server_running,
         "active_flows": snapshot.active_flows,
         "active_worktrees": snapshot.active_worktrees,
+        "queued_issues": list(snapshot.queued_issues),
         "circuit_breaker_state": snapshot.circuit_breaker_state,
         "circuit_breaker_failures": snapshot.circuit_breaker_failures,
         "circuit_breaker_last_failure": snapshot.circuit_breaker_last_failure,
@@ -51,6 +52,7 @@ def format_snapshot_for_mcp(snapshot: "OrchestraSnapshot") -> str:
         f"- **Server**: {'Running' if snapshot.server_running else 'Stopped'}",
         f"- **Active Flows**: {snapshot.active_flows}",
         f"- **Active Worktrees**: {snapshot.active_worktrees}",
+        f"- **Queued Issues**: {len(snapshot.queued_issues)}",
         f"- **Circuit Breaker**: {snapshot.circuit_breaker_state}",
         f"  - Failures: {snapshot.circuit_breaker_failures}",
         "",
@@ -76,11 +78,13 @@ def format_snapshot_for_mcp(snapshot: "OrchestraSnapshot") -> str:
 
 def create_mcp_server(
     status_service: "OrchestraStatusService",
+    get_queued: "Callable[[], set[int]] | None" = None,
 ) -> "FastMCP":
     """Create MCP server for Orchestra.
 
     Args:
         status_service: OrchestraStatusService instance
+        get_queued: Optional callable returning a set of queued issue numbers
 
     Returns:
         FastMCP server instance
@@ -100,13 +104,15 @@ def create_mcp_server(
     @mcp.resource("orchestra://status")
     def get_status_resource() -> str:
         """Get current orchestra status as JSON."""
-        snapshot = status_service.snapshot()
+        queued = get_queued() if get_queued else None
+        snapshot = status_service.snapshot(queued=queued)
         return json.dumps(_serialize_snapshot(snapshot), indent=2)
 
     @mcp.resource("orchestra://issues")
     def get_issues_resource() -> str:
         """Get list of managed issues with their states."""
-        snapshot = status_service.snapshot()
+        queued = get_queued() if get_queued else None
+        snapshot = status_service.snapshot(queued=queued)
         issues_data = [
             {
                 "number": entry.number,
@@ -125,7 +131,8 @@ def create_mcp_server(
     @mcp.resource("orchestra://circuit-breaker")
     def get_circuit_breaker_resource() -> str:
         """Get circuit breaker state."""
-        snapshot = snapshot = status_service.snapshot()
+        queued = get_queued() if get_queued else None
+        snapshot = status_service.snapshot(queued=queued)
         cb_data = {
             "state": snapshot.circuit_breaker_state,
             "failures": snapshot.circuit_breaker_failures,
@@ -143,7 +150,8 @@ def create_mcp_server(
         - Circuit breaker state
         - Active issues with their states
         """
-        snapshot = status_service.snapshot()
+        queued = get_queued() if get_queued else None
+        snapshot = status_service.snapshot(queued=queued)
         return format_snapshot_for_mcp(snapshot)
 
     @mcp.tool()
@@ -156,7 +164,8 @@ def create_mcp_server(
         Returns:
             JSON-formatted issue details including flow, worktree, and PR status
         """
-        snapshot = status_service.snapshot()
+        queued = get_queued() if get_queued else None
+        snapshot = status_service.snapshot(queued=queued)
         for entry in snapshot.active_issues:
             if entry.number == issue_number:
                 return json.dumps(

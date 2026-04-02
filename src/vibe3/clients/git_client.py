@@ -73,6 +73,9 @@ from vibe3.clients.git_worktree_ops import (
 from vibe3.clients.git_worktree_ops import (
     is_branch_occupied_by_worktree as _is_branch_occupied_by_worktree,
 )
+from vibe3.clients.git_worktree_ops import (
+    remove_worktree as _remove_worktree,
+)
 from vibe3.exceptions import GitError
 from vibe3.models.change_source import ChangeSource
 
@@ -173,6 +176,15 @@ class GitClient:
         output = self._run(["worktree", "list", "--porcelain"])
         return _parse_worktree_list(output)
 
+    def remove_worktree(self, wt_path: Path | str, force: bool = False) -> None:
+        """Remove a worktree.
+
+        Args:
+            wt_path: Path to the worktree
+            force: Force removal even if dirty
+        """
+        _remove_worktree(Path(wt_path), force=force)
+
     def get_changed_files(self, source: ChangeSource) -> list[str]:
         """统一接口：获取改动文件列表."""
         return _get_changed_files(self._run, source, self._github_client)
@@ -268,3 +280,17 @@ class GitClient:
     def check_merge_conflicts(self, target_ref: str = "origin/main") -> bool:
         """Dry-run merge to detect conflicts without modifying working tree."""
         return _check_merge_conflicts(self._run, target_ref)
+
+    def get_config(self, key: str) -> str | None:
+        """Get git config value.
+
+        Args:
+            key: Config key (e.g. 'user.name')
+
+        Returns:
+            Config value or None if not set
+        """
+        try:
+            return self._run(["config", "--get", key])
+        except GitError:
+            return None

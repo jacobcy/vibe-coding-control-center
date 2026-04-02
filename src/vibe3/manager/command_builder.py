@@ -1,14 +1,14 @@
-"""Command builder for Orchestra - constructs executable agent commands."""
+"""Command builder for Orchestra manager - constructs executable agent commands."""
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.prompts import (
+from vibe3.manager.prompts import (
     build_manager_command,
     build_manager_recipe,
     render_manager_prompt,
 )
+from vibe3.orchestra.config import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo

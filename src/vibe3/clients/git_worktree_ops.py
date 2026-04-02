@@ -265,7 +265,7 @@ def _is_worktree_clean(wt_path: Path) -> bool:
         return False
 
 
-def _remove_worktree(wt_path: Path, force: bool = False) -> None:
+def remove_worktree(wt_path: Path, force: bool = False) -> None:
     """Remove a worktree.
 
     Args:

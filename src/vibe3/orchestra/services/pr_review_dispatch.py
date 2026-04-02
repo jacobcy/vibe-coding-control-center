@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from loguru import logger
 
+from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.dispatcher import Dispatcher
-from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 
 class PRReviewDispatchService(ServiceBase):
@@ -20,14 +21,22 @@ class PRReviewDispatchService(ServiceBase):
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Dispatcher | None = None,
         executor: ThreadPoolExecutor | None = None,
+        manager: ManagerExecutor | None = None,
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._dispatcher = dispatcher or Dispatcher(config, dry_run=config.dry_run)
+        self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
+
+    @property
+    def _dispatcher(self) -> Any:
+        return self._manager
+
+    @_dispatcher.setter
+    def _dispatcher(self, value: Any) -> None:
+        self._manager = value
 
     async def handle_event(self, event: GitHubEvent) -> None:
         action = event.action
@@ -50,10 +59,10 @@ class PRReviewDispatchService(ServiceBase):
         logger.bind(domain="orchestra", pr=pr_number).info(
             f"PR review dispatch triggered ({reason})"
         )
-        loop = asyncio.get_running_loop()
+        loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             self._executor,
-            self._dispatcher.dispatch_pr_review,
+            self._manager.dispatch_pr_review,
             pr_number,
         )
 
