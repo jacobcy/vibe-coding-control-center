@@ -42,12 +42,6 @@ class SignatureService:
     """
 
     @staticmethod
-    def is_ai_assistant(actor: str | None) -> bool:
-        if actor is None:
-            return False
-        return actor.strip().lower() in AI_ASSISTANT_ACTORS
-
-    @staticmethod
     def _normalize(actor: str | None) -> str | None:
         """Internal normalizer for flow-operation comparisons."""
         if actor is None:

@@ -195,7 +195,7 @@ class DispatchResultHandler:
             store.add_event(
                 branch=flow_branch,
                 event_type="dispatch_result",
-                actor="orchestra:dispatcher",
+                actor="orchestra:manager",
                 detail="success" if success else f"failed:{category}",
                 refs=event_data,
             )
