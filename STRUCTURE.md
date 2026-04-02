@@ -165,16 +165,23 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - 详细标准见 [.agent/rules/python-standards.md](.agent/rules/python-standards.md)
 
 **主要模块**：
-- `cli.py` - CLI 主入口
-- `commands/` - 命令实现（flow, handoff, plan, review, run 等）
-- `runtime/` - 运行时核心（事件循环、执行引擎、熔断器）
-- `server/` - 服务器逻辑（FastAPI, Webhook, MCP）
-- `manager/` - 编排管理（ManagerExecutor, Flow/Worktree 协同）
-- `services/` - 业务逻辑层
-- `clients/` - 外部客户端（git, sqlite, linear 等）
-- `models/` - 数据模型（FlowState, FlowEvent 等）
-- `utils/` - 工具函数
-- `observability/` - 可观测性（logger, trace）
+- `cli.py` - CLI 主入口（Typer 路由分发）
+- `agents/` - AI Agent 调用层（plan/review/run pipeline + backends）
+- `analysis/` - 代码智能（symbol 分析、结构快照、变更范围）
+- `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
+- `commands/` - CLI 子命令实现
+- `config/` - 配置加载与 Pydantic schema 验证
+- `exceptions/` - 统一异常层级
+- `manager/` - Orchestra 执行代理（flow 映射、命令构建、worktree）
+- `models/` - Pydantic 领域数据模型
+- `observability/` - 日志、链路追踪、审计
+- `orchestra/` - 编排中枢（issue 分诊、事件调度）
+- `prompts/` - Prompt 模板组装与变量解析
+- `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
+- `server/` - HTTP 服务层（webhook, MCP, health check）
+- `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
+- `ui/` - CLI 输出格式化（Rich 渲染）
+- `utils/` - 通用工具函数
 
 **常用命令**：
 ```bash
