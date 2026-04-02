@@ -33,6 +33,7 @@ class ManagerExecutor:
         dry_run: bool = False,
         prompts_path: Path | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        dispatcher: Any | None = None,  # shim
     ):
         self.config = config
         self.repo_path = repo_path or Path.cwd()
@@ -59,6 +60,7 @@ class ManagerExecutor:
             )
 
         self._last_error_category: str | None = None
+        self._queued_issues: set[int] = set()
 
     @property
     def flow_manager(self) -> Any:
@@ -79,23 +81,22 @@ class ManagerExecutor:
         self._flow_manager = value
 
     @property
+    def queued_issues(self) -> set[int]:
+        """Issues waiting for capacity."""
+        return self._queued_issues
+
+    @property
     def last_manager_render_result(self) -> "PromptRenderResult | None":
         """Proxy for CommandBuilder.last_manager_render_result."""
         return self.command_builder.last_manager_render_result
 
     def can_dispatch(self) -> bool:
-        """Check if the system has capacity for more flows."""
+        """Shim for backward compatibility in tests."""
         try:
             active_count = self.status_service.get_active_flow_count()
             capacity = self.config.max_concurrent_flows
-            if active_count >= capacity:
-                logger.bind(domain="orchestra").warning(
-                    f"Throttled: Capacity reached ({active_count}/{capacity})"
-                )
-                return False
-            return True
-        except Exception as e:
-            logger.bind(domain="orchestra").error(f"Capacity check failed: {e}")
+            return active_count < capacity
+        except Exception:
             return False
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
@@ -107,16 +108,26 @@ class ManagerExecutor:
         return success
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
-        """Complete lifecycle for manager dispatch."""
+        """Complete lifecycle for manager dispatch with queuing."""
         log = logger.bind(
             domain="orchestra",
             action="manager_dispatch",
             issue=issue.number,
         )
 
-        if not self.can_dispatch():
-            log.warning(f"Dispatch skipped for #{issue.number}: at capacity")
+        active_count = self.status_service.get_active_flow_count()
+        capacity = self.config.max_concurrent_flows
+
+        if active_count >= capacity:
+            log.warning(
+                f"Throttled: Capacity reached ({active_count}/{capacity}). "
+                f"Queueing #{issue.number}"
+            )
+            self._queued_issues.add(issue.number)
             return False
+
+        # If it was in queue, remove it now that we are dispatching
+        self._queued_issues.discard(issue.number)
 
         cmd = self.command_builder.build_manager_command(issue)
 
@@ -176,16 +187,26 @@ class ManagerExecutor:
                     )
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
-        """Complete lifecycle for PR review dispatch."""
+        """Complete lifecycle for PR review dispatch with queuing."""
         log = logger.bind(
             domain="orchestra",
             action="review_dispatch",
             pr_number=pr_number,
         )
 
-        if not self.can_dispatch():
-            log.warning(f"Review dispatch skipped for #{pr_number}: at capacity")
+        active_count = self.status_service.get_active_flow_count()
+        capacity = self.config.max_concurrent_flows
+
+        if active_count >= capacity:
+            log.warning(
+                f"Throttled: Capacity reached ({active_count}/{capacity}). "
+                f"Queueing review for #{pr_number}"
+            )
+            # Use negative numbers for PRs in queue
+            self._queued_issues.add(-pr_number)
             return False
+
+        self._queued_issues.discard(-pr_number)
 
         cmd = self.command_builder.build_pr_review_command(pr_number)
 

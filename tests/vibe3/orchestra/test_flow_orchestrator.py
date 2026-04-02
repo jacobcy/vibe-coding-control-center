@@ -97,7 +97,7 @@ class TestFlowManager:
             slug="issue-222",
             branch="task/issue-222",
             actor=None,
-            initiated_by="orchestra:dispatcher",
+            initiated_by="orchestra:manager",
         )
         mock_link_issue.assert_called_once_with(
             "task/issue-222", 222, "task", actor=None

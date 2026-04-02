@@ -39,6 +39,7 @@ _GOVERNANCE_RUNTIME_VARS = (
     "active_flows",
     "active_worktrees",
     "running_issue_count",
+    "queued_issue_count",
     "suggested_issue_count",
     "circuit_breaker_state",
     "circuit_breaker_failures",
@@ -62,14 +63,13 @@ class GovernanceService(ServiceBase):
         self,
         config: OrchestraConfig,
         status_service: OrchestraStatusService,
-        dispatcher: Any | None = None,
+        manager: ManagerExecutor | None = None,
         executor: ThreadPoolExecutor | None = None,
         prompts_path: Path | None = None,
-        manager: ManagerExecutor | None = None,
+        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._status_service = status_service
-        # Compatibility: prefer 'manager', fall back to 'dispatcher'
         self._manager = (
             manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
         )
@@ -271,6 +271,7 @@ class GovernanceService(ServiceBase):
             "active_flows": snapshot.active_flows,
             "active_worktrees": snapshot.active_worktrees,
             "running_issue_count": len(running_entries),
+            "queued_issue_count": len(snapshot.queued_issues),
             "suggested_issue_count": len(suggested_entries),
             "circuit_breaker_state": snapshot.circuit_breaker_state,
             "circuit_breaker_failures": snapshot.circuit_breaker_failures,

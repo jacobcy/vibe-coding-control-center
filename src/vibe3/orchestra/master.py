@@ -18,7 +18,7 @@ class TriageDecision:
 
     Actions:
     - close: Close the issue as not needed
-    - triage: Add state/ready label for state machine processing
+    - triage: Valid feature/bug, ready for assignment
     - comment: Add comment requesting more information
     """
 
@@ -38,7 +38,7 @@ def parse_triage_response(output: str) -> TriageDecision:
     {
         "action": "close|triage|comment|none",
         "reason": "explanation",
-        "labels_to_add": ["state/ready"],  # optional
+        "labels_to_add": ["status/triaged"],  # optional
         "comment_body": "text"  # optional
     }
     """
@@ -59,7 +59,7 @@ def build_master_prompt(issue: dict, repo: str) -> str:
     body = issue.get("body", "(no description)")
     return f"""# Issue Triage Task
 
-Analyze this GitHub issue and decide: close, triage (add state/ready), or comment.
+Analyze this GitHub issue and decide: close, triage, or comment.
 
 ## Issue #{issue["number"]}: {issue["title"]}
 
@@ -68,7 +68,7 @@ Analyze this GitHub issue and decide: close, triage (add state/ready), or commen
 ## Decision Options
 
 - **close**: Invalid, duplicate, or not relevant
-- **triage**: Valid feature/bug, add state/ready label
+- **triage**: Valid feature/bug, ready for development
 - **comment**: Need more information
 - **none**: Cannot determine, skip
 

@@ -26,17 +26,16 @@ class StateLabelDispatchService(ServiceBase):
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Any | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         status_service: "OrchestraStatusService" | None = None,
         manager: ManagerExecutor | None = None,
+        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        # Compatibility: prefer 'manager', fall back to 'dispatcher'
         self._manager = (
             manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
         )
@@ -55,7 +54,7 @@ class StateLabelDispatchService(ServiceBase):
         self._manager = value
 
     async def handle_event(self, event: GitHubEvent) -> None:
-        """React to issues/labeled webhook event."""
+        """Mirror state/ready label events (no-op dispatch)."""
         if event.action != "labeled":
             return
 
@@ -68,46 +67,14 @@ class StateLabelDispatchService(ServiceBase):
         if issue is None:
             return
 
-        labels = [lb.get("name", "") for lb in issue_payload.get("labels", [])]
-        if "state/in-progress" in labels:
-            return
-
-        log = logger.bind(domain="orchestra", issue=issue.number, source="webhook")
-        log.info(f"Webhook: #{issue.number} labeled with {label_name!r}")
-
-        await self._dispatch_if_needed(issue)
-
-    async def on_tick(self) -> None:
-        """Scan for issues with state/ready label and no state/in-progress."""
-        log = logger.bind(domain="orchestra", service="StateLabelDispatch")
-
-        raw = await asyncio.get_event_loop().run_in_executor(
-            self._executor,
-            self._list_ready_issues,
+        logger.bind(domain="orchestra", issue=issue.number).info(
+            f"Observed state/ready label on #{issue.number} "
+            "(triggering is now assignee-only)"
         )
 
-        if not raw:
-            return
-
-        ready_issues: list[IssueInfo] = []
-        for item in raw:
-            issue_number = item.get("number")
-            if not issue_number:
-                continue
-
-            labels = [lb.get("name", "") for lb in item.get("labels", [])]
-            if "state/in-progress" in labels:
-                continue
-
-            issue = IssueInfo.from_github_payload(item)
-            if issue:
-                ready_issues.append(issue)
-
-        if ready_issues:
-            log.info(f"Found {len(ready_issues)} issues ready for dispatch")
-
-        for issue in ready_issues:
-            await self._dispatch_if_needed(issue)
+    async def on_tick(self) -> None:
+        """Periodic scan (no-op dispatch)."""
+        pass
 
     def _list_ready_issues(self) -> list[dict[str, Any]]:
         import json

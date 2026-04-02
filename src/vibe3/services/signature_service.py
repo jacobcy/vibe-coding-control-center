@@ -7,7 +7,7 @@ from vibe3.clients.git_client import GitClient
 WORKFLOW_ACTOR = "workflow"
 AI_ASSISTANT_ACTORS = {"ai-assistant", "ai_assistant"}
 
-ORCHESTRA_DISPATCHER = "orchestra:dispatcher"
+ORCHESTRA_MANAGER = "orchestra:manager"
 MANUAL_INITIATOR = "manual"
 
 # Placeholder actors for FLOW OPERATIONS (resolve_actor / _is_placeholder).
@@ -144,9 +144,9 @@ class SignatureService:
 
         Logic:
         1. If branch follows orchestra managed pattern (task/issue-N)
-           -> orchestra:dispatcher
+           -> orchestra:manager
         2. Else -> manual
         """
         if branch.startswith("task/issue-"):
-            return ORCHESTRA_DISPATCHER
+            return ORCHESTRA_MANAGER
         return MANUAL_INITIATOR

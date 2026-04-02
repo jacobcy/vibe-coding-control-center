@@ -21,15 +21,14 @@ class PRReviewDispatchService(ServiceBase):
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Any | None = None,
         executor: ThreadPoolExecutor | None = None,
         manager: ManagerExecutor | None = None,
+        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        # Compatibility: prefer 'manager', fall back to 'dispatcher'
         self._manager = (
             manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
         )

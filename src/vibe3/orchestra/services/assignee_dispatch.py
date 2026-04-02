@@ -33,17 +33,16 @@ class AssigneeDispatchService(ServiceBase):
     def __init__(
         self,
         config: OrchestraConfig,
-        dispatcher: Any | None = None,
+        manager: ManagerExecutor | None = None,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         status_service: OrchestraStatusService | None = None,
-        manager: ManagerExecutor | None = None,
+        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        # Compatibility: prefer 'manager', fall back to 'dispatcher'
         self._manager = (
             manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
         )
@@ -174,15 +173,7 @@ class AssigneeDispatchService(ServiceBase):
             log.info(f"Deferred: blocked by {blockers}")
             return
 
-        try:
-            active_count = self._status_service.get_active_flow_count()
-            capacity = self.config.max_concurrent_flows
-            if active_count >= capacity:
-                log.warning(f"Deferred: system at capacity ({active_count}/{capacity})")
-                return
-        except Exception as e:
-            log.error(f"Capacity check failed: {e}")
-
+        # ManagerExecutor handles its own capacity check and queuing
         loop = asyncio.get_event_loop()
         dispatched = await loop.run_in_executor(
             self._executor, self._manager.dispatch_manager, issue
@@ -192,7 +183,7 @@ class AssigneeDispatchService(ServiceBase):
 
     def _has_flow(self, issue_number: int) -> bool:
         try:
-            flow = self._manager.orchestrator.get_flow_for_issue(issue_number)
+            flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
             return flow is not None
         except Exception as exc:
             logger.bind(domain="orchestra").warning(

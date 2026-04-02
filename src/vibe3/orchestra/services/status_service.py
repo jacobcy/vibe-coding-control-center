@@ -45,6 +45,7 @@ class OrchestraSnapshot:
     active_issues: tuple[IssueStatusEntry, ...]
     active_flows: int
     active_worktrees: int
+    queued_issues: tuple[int, ...] = ()
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
@@ -83,7 +84,7 @@ class OrchestraStatusService:
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
 
-    def snapshot(self) -> OrchestraSnapshot:
+    def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
         """Build current status snapshot."""
         log = logger.bind(domain="orchestra", action="status_snapshot")
         log.debug("Building orchestra status snapshot")
@@ -152,6 +153,7 @@ class OrchestraStatusService:
             active_issues=tuple(entries),
             active_flows=active_flows,
             active_worktrees=len(worktrees),
+            queued_issues=tuple(queued) if queued else (),
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
             circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),

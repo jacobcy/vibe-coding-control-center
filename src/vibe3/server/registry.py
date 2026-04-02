@@ -102,7 +102,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     @fastapi_app.get("/status")
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot()
+        return status_service.snapshot(queued=shared_manager.queued_issues)
 
     # Mount MCP server (optional, gracefully degrades if mcp package not available)
     try:
