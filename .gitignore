@@ -115,6 +115,7 @@ wt-*/
 .agent/context/task.md
 .agent/reports/
 docs/audits/
+docs/plans/
 
 # Tool-specific directories (symlinks only, see DEVELOPER.md)
 .agent/skills/

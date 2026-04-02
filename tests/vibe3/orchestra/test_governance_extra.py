@@ -59,15 +59,15 @@ def _make_service(
 class TestGovernanceService:
     """Tests for GovernanceService."""
 
-    def test_build_governance_plan_can_disable_skill_content(self, tmp_path):
-        """Governance prompt template should allow omitting skill body."""
+    def test_build_governance_plan_can_disable_supervisor_content(self, tmp_path):
+        """Governance prompt template should allow omitting supervisor body."""
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(
             "orchestra:\n"
             "  governance:\n"
             "    plan: |\n"
-            "      Skill={skill_name}\n"
-            "      Content={skill_content}\n"
+            "      Supervisor={supervisor_name}\n"
+            "      Content={supervisor_content}\n"
         )
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
@@ -83,7 +83,7 @@ class TestGovernanceService:
                 governance=GovernanceConfig(
                     dry_run=True,
                     prompt_template="orchestra.governance.plan",
-                    include_skill_content=False,
+                    include_supervisor_content=False,
                 )
             ),
             status_service=MockStatusService(snapshot),
@@ -92,27 +92,28 @@ class TestGovernanceService:
         )
 
         plan = service._build_governance_plan(snapshot)
-        assert "Skill=vibe-orchestra" in plan
+        assert "Supervisor=supervisor/orchestra.md" in plan
         assert "Content=" in plan
-        assert "# Vibe Orchestra" not in plan
+        assert "自动化治理材料" not in plan
 
     def test_build_material_source_summary_reports_configured_sources(
         self, tmp_path, monkeypatch
     ):
-        """Dry run metadata should point to the configured prompt and skill sources."""
+        """Dry run metadata points to configured prompt and supervisor sources."""
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(
             "orchestra:\n" "  governance:\n" "    plan: |\n" "      Prompt body\n"
         )
-        skill_path = tmp_path / "skills" / "demo" / "SKILL.md"
-        skill_path.parent.mkdir(parents=True)
-        skill_path.write_text("# Demo Skill\n", encoding="utf-8")
+        supervisor_dir = tmp_path / "supervisor"
+        supervisor_dir.mkdir()
+        supervisor_path = supervisor_dir / "demo.md"
+        supervisor_path.write_text("# Demo Supervisor\n", encoding="utf-8")
         monkeypatch.chdir(tmp_path)
 
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(
-                    skill="demo",
+                    supervisor_file="supervisor/demo.md",
                     prompt_template="orchestra.governance.plan",
                 )
             ),
@@ -125,8 +126,8 @@ class TestGovernanceService:
 
         assert summary["prompt_template_key"] == "orchestra.governance.plan"
         assert summary["prompt_template_file"] == str(prompts_path)
-        assert summary["skill_name"] == "demo"
-        assert summary["skill_file"] == str(skill_path)
+        assert summary["supervisor_file"] == "supervisor/demo.md"
+        assert summary["supervisor_path"] == str(supervisor_path)
 
     @pytest.mark.asyncio
     async def test_run_governance_honors_governance_dry_run(self, tmp_path):

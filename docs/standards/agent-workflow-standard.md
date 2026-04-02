@@ -31,8 +31,8 @@ Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 
 **settings.yaml 配置示例**：
 ```yaml
 run:
-  policy_file: ".agent/rules/run-policy.md"
-  common_rules: ".agent/rules/common.md"
+  policy_file: ".agent/policies/run.md"
+  common_rules: ".agent/policies/common.md"
   agent_config:
     agent: "develop"  # 默认 agent preset
     timeout_seconds: 600  # 默认超时（秒）
@@ -412,7 +412,7 @@ vibe3 run --plan --timeout 1800  # 30 分钟
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
 - [error-handling.md](./error-handling.md) - 错误处理规范
-- [.agent/rules/run-policy.md](../.agent/rules/run-policy.md) - Run 命令策略
+- [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
 
 ---
 

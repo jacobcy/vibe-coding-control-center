@@ -174,10 +174,10 @@ pr_scoring:
 # - Command line: Task guidance (--message option)
 review:
   # Static: Path to review policy markdown file
-  policy_file: ".agent/rules/review-policy.md"
+  policy_file: ".agent/policies/review.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/rules/common.md"
+  common_rules: ".agent/policies/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
@@ -220,10 +220,10 @@ review:
 # Similar structure to review for consistency
 plan:
   # Static: Path to plan policy markdown file
-  policy_file: ".agent/rules/plan-policy.md"
+  policy_file: ".agent/policies/plan.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/rules/common.md"
+  common_rules: ".agent/policies/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
@@ -271,10 +271,10 @@ plan:
 # Similar structure to review for consistency
 run:
   # Static: Path to run policy markdown file
-  policy_file: ".agent/rules/run-policy.md"
+  policy_file: ".agent/policies/run.md"
 
   # Static: Path to tools guide markdown file
-  common_rules: ".agent/rules/common.md"
+  common_rules: ".agent/policies/common.md"
 
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
@@ -389,10 +389,10 @@ orchestra:
   governance:
     enabled: true
     interval_ticks: 1
-    # Skill body source: skills/<name>/SKILL.md
-    skill: "vibe-orchestra"
+    # Supervisor file source: supervisor/<name>.md
+    supervisor_file: "supervisor/orchestra.md"
     # Template selector: config/prompts.yaml under this dotted key
     prompt_template: "orchestra.governance.plan"
-    # Whether to inline the skill body into the composed governance prompt
-    include_skill_content: true
+    # Whether to inline the supervisor file into the composed governance prompt
+    include_supervisor_content: true
     dry_run: true

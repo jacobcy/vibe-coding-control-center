@@ -113,8 +113,8 @@ orchestra:
   governance:
     # Selected by config/settings.yaml -> orchestra.governance.prompt_template
     # Available template variables:
-    # - {skill_name}
-    # - {skill_content}
+    # - {supervisor_name}
+    # - {supervisor_content}
     # - {server_status}
     # - {running_issue_count}
     # - {suggested_issue_count}
@@ -131,9 +131,9 @@ orchestra:
       # Orchestra Governance Scan
 
       ## Governance Material
-      - Skill: {skill_name}
+      - Supervisor: {supervisor_name}
 
-      {skill_content}
+      {supervisor_content}
 
       ## Runtime Summary
       - Server: {server_status}

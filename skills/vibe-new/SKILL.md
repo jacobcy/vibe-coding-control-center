@@ -5,7 +5,7 @@ description: Use when starting a new development task. Handles the full setup fr
 
 # /vibe-new - 开始新任务
 
-`/vibe-new` 是任务启动的全流程入口，覆盖从 issue 确认到 PR draft 创建的完整准备阶段。
+从 issue 确认到 PR draft 创建的完整准备阶段。
 
 **完成后状态**：flow 已创建、issue 已绑定、PR draft 已发出，可直接开始编写代码。
 
@@ -99,8 +99,8 @@ gh issue view <number>
 **场景 A：当前在 main/无关分支，需要新建分支开发**
 
 ```bash
-# 1. 创建新分支 (建议用 task/issue-<N> 格式)
-git checkout -b task/issue-123
+# 1. 创建新分支 (人机协作用 dev/ 前缀，参见 development-flow-semantic-standard)
+git checkout -b dev/issue-123
 
 # 2. 注册当前分支为 flow
 vibe3 flow update

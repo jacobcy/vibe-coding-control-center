@@ -5,14 +5,7 @@ description: Use when you have switched to an existing branch (via git checkout)
 
 # /vibe-start - 恢复执行环境
 
-`/vibe-start` 用于**切换到已有分支后**，快速确认并补齐执行环境。
-
-**使用场景**：
-- `git checkout <existing-branch>` 切到某个分支后，发现 flow 环境不完整
-- 某个 flow 之前被标记为 `blocked`，依赖已解除，需要恢复开发
-- 接手他人的分支，需要了解当前状态
-
-> **新任务请使用 `/vibe-new`**。vibe-start 只处理**已有 flow** 的恢复场景。
+`/vibe-start` 切换到已有分支后，快速确认并补齐执行环境。
 
 ---
 

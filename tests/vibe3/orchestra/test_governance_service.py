@@ -190,24 +190,24 @@ class TestGovernanceService:
         plan = service._build_governance_plan(snapshot)
         assert "half_open" in plan
 
-    def test_build_governance_plan_uses_template_and_skill_content(self, tmp_path):
-        """Governance plan should render configured template with skill content."""
+    def test_build_governance_plan_uses_template_and_supervisor_content(self, tmp_path):
+        """Governance plan should render configured template with supervisor content."""
         prompts_path = tmp_path / "prompts.yaml"
         prompts_path.write_text(textwrap.dedent("""
                 orchestra:
                   governance:
                     plan: |
-                      Skill: {skill_name}
+                      Supervisor: {supervisor_name}
                       Count: {active_count}
                       Issues:
                       {issue_list}
                       Skill Content:
-                      {skill_content}
+                      {supervisor_content}
                 """).strip())
         config = OrchestraConfig(
             governance=GovernanceConfig(
                 prompt_template="orchestra.governance.plan",
-                include_skill_content=True,
+                include_supervisor_content=True,
             )
         )
         service = GovernanceService(
@@ -239,10 +239,10 @@ class TestGovernanceService:
             circuit_breaker_failures=0,
         )
         plan = service._build_governance_plan(snapshot)
-        assert "Skill: vibe-orchestra" in plan
+        assert "Supervisor: supervisor/orchestra.md" in plan
         assert "Count: 1" in plan
         assert "#42: Test issue" in plan
-        assert "# Vibe Orchestra" in plan
+        assert "# Orchestra" in plan or "治理材料" in plan
 
     def test_delegates_to_dispatcher(self):
         """Execution uses manager."""

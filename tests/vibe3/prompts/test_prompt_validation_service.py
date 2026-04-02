@@ -79,8 +79,8 @@ class TestPromptValidationServiceTemplateKey:
         svc = PromptValidationService()
         result = svc.validate_template_key("orchestra.governance.plan")
         assert result.is_valid
-        assert "skill_name" in result.required_variables
-        assert "skill_content" in result.required_variables
+        assert "supervisor_name" in result.required_variables
+        assert "supervisor_content" in result.required_variables
 
 
 class TestPromptValidationServiceRenderSample:
