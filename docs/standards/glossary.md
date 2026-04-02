@@ -481,7 +481,7 @@ related_docs:
 - 正式术语：`initiated_by`
 - 别称：无
 - 定义：Flow 或任务的发起源标识，说明是哪个系统组件或触发方式开启了该流程。
-- 示例值：`orchestra:dispatcher`、`manual`、`skill:vibe-new`。
+- 示例值：`orchestra:manager`、`manual`、`skill:vibe-new`。
 - 边界：
   - `initiated_by` 回答“什么发起了流程”，与 `actor` 维度不同。
 - 落点：

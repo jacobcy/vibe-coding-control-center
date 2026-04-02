@@ -74,6 +74,8 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             )
         )
     if config.state_label_dispatch.enabled:
+        # NOTE: StateLabelDispatchService is a read-only mirror (no-op dispatch).
+        # It only logs label events for observability; disabled by default in config.
         heartbeat.register(
             StateLabelDispatchService(
                 config,

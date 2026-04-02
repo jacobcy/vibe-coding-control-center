@@ -73,7 +73,10 @@ class ManagerExecutor:
 
     @property
     def orchestrator(self) -> Any:
-        """Shim for backward compatibility with older Dispatcher interface."""
+        """Shim for backward compatibility with older Dispatcher interface.
+
+        TODO: Remove after all call-sites migrate to flow_manager.
+        """
         return self._flow_manager
 
     @orchestrator.setter

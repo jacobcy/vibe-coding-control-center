@@ -28,6 +28,8 @@ class WorktreeManager:
         self.config = config
         self.repo_path = repo_path
         self.flow_manager = flow_manager
+        # Cache per-cwd capability detection to avoid repeated --help subprocess calls
+        self._capability_cache: dict[Path, bool] = {}
 
     def resolve_manager_cwd(
         self, issue_number: int, flow_branch: str
@@ -65,7 +67,14 @@ class WorktreeManager:
         return [arg for arg in cmd if arg != "--worktree"]
 
     def _supports_run_worktree_option(self, cwd: Path) -> bool:
-        """Check whether `vibe3 run` in target cwd supports `--worktree`."""
+        """Check whether `vibe3 run` in target cwd supports `--worktree`.
+
+        Result is cached per cwd to avoid repeated subprocess calls on
+        every dispatch.
+        """
+        if cwd in self._capability_cache:
+            return self._capability_cache[cwd]
+
         try:
             result = subprocess.run(
                 ["uv", "run", "python", "-m", "vibe3", "run", "--help"],
@@ -75,11 +84,12 @@ class WorktreeManager:
                 timeout=20,
             )
         except Exception:
+            self._capability_cache[cwd] = False
             return False
 
-        if result.returncode != 0:
-            return False
-        return "--worktree" in result.stdout
+        supported = result.returncode == 0 and "--worktree" in result.stdout
+        self._capability_cache[cwd] = supported
+        return supported
 
     def _is_current_branch(self, branch: str) -> bool:
         """Check whether dispatcher repo_path currently points at the target branch."""
