@@ -1,4 +1,4 @@
-"""Shared fixtures for orchestra tests."""
+"""Shared fixtures for Vibe3 tests."""
 
 from __future__ import annotations
 

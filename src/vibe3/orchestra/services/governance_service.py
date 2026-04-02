@@ -11,9 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.dispatcher.executor import run_command
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
 from vibe3.orchestra.services.status_service import (
     IssueStatusEntry,
     OrchestraSnapshot,
@@ -28,6 +26,8 @@ from vibe3.prompts.models import (
 )
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.executor import run_command
 
 if TYPE_CHECKING:
     from vibe3.manager.manager_executor import ManagerExecutor

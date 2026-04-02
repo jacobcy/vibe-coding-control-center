@@ -12,7 +12,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.status_service import OrchestraStatusService

@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.vibe3.orchestra.conftest import CompletedProcess
+from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.orchestra.config import CircuitBreakerConfig, OrchestraConfig
 

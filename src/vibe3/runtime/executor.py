@@ -5,7 +5,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from vibe3.dispatcher.circuit_breaker import CircuitBreaker, classify_failure
+from vibe3.runtime.circuit_breaker import CircuitBreaker, classify_failure
 
 _DISPATCH_TIMEOUT = 3600
 

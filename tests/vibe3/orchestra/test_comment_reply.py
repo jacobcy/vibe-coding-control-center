@@ -5,11 +5,11 @@ from unittest.mock import patch
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
 from vibe3.orchestra.services.comment_reply import (
     CommentReplyService,
     _build_mention_pattern,
 )
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 def _svc() -> CommentReplyService:

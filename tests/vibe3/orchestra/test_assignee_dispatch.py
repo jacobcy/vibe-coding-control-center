@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 class _ImmediateLoop:

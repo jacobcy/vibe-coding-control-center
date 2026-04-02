@@ -6,7 +6,6 @@ Primary entry point: HeartbeatServer (vibe3 serve start)
   - Polling fallback every 15 min via on_tick()
 """
 
-from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
 from vibe3.orchestra.master import TriageDecision, run_master_agent
@@ -14,7 +13,6 @@ from vibe3.orchestra.master import TriageDecision, run_master_agent
 __all__ = [
     "MasterAgentConfig",
     "OrchestraConfig",
-    "ManagerExecutor",
     "IssueInfo",
     "TriageDecision",
     "run_master_agent",

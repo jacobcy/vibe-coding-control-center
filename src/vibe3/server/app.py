@@ -16,8 +16,8 @@ from loguru import logger
 
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
-from vibe3.orchestra.heartbeat import HeartbeatServer
+from vibe3.runtime.event_bus import GitHubEvent
+from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
     _build_server,
     _setup_tailscale_webhook,

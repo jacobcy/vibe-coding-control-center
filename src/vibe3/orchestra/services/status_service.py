@@ -16,7 +16,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
-    from vibe3.dispatcher.circuit_breaker import CircuitBreaker
+    from vibe3.runtime.circuit_breaker import CircuitBreaker
 
 
 @dataclass(frozen=True)

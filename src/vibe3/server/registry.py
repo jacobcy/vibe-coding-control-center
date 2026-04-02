@@ -14,7 +14,6 @@ from loguru import logger
 from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.heartbeat import HeartbeatServer
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.governance_service import GovernanceService
@@ -24,6 +23,7 @@ from vibe3.orchestra.services.status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
+from vibe3.runtime.heartbeat import HeartbeatServer
 
 
 def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:

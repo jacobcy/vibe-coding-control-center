@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.dispatcher.circuit_breaker import CircuitBreaker
-from vibe3.dispatcher.executor import run_command
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
@@ -14,6 +12,8 @@ from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.runtime.circuit_breaker import CircuitBreaker
+from vibe3.runtime.executor import run_command
 
 if TYPE_CHECKING:
     from vibe3.prompts.models import PromptRenderResult

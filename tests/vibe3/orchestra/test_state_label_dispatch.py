@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.event_bus import GitHubEvent
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 def _ready_issue_payload(labels: list[str] | None = None) -> dict[str, object]:
