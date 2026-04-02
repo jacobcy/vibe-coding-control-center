@@ -301,6 +301,30 @@ related_docs:
   - 文档中优先使用 `Skill 层`
   - `胶水层` 作为历史叫法保留
 
+### 5.4.1 `Orchestra`
+
+- 正式术语：`Orchestra`
+- 别称：`Orchestrator`
+- 定义：本项目中的顶层编排与分诊中枢。负责多 issue / 多 flow 的心跳治理、活跃状态观察、启动顺序调度和 label 治理。
+- 边界：
+  - `Orchestra` 不直接负责单个 flow 的执行逻辑
+  - `Orchestra` 不直接写代码
+- 落点：
+  - Python 模块：`src/vibe3/orchestra/`
+  - Skill: `skills/vibe-orchestra/SKILL.md`
+
+### 5.4.2 `Manager`
+
+- 正式术语：`Manager`
+- 别称：`Execution Proxy`, `执行负责人`
+- 定义：本项目中的单 flow 执行代理。负责将 issue 映射到 flow、构建并派发 agent 命令、观察 handoff 进度，并持续推动直到 PR ready。
+- 边界：
+  - `Manager` 不负责多 issue 编排
+  - `Manager` 不直接写代码
+- 落点：
+  - Python 模块：`src/vibe3/manager/`
+  - Skill: `skills/vibe-manager/SKILL.md`
+
 ### 5.5 `Shell 能力层`
 
 - 正式术语：`Shell 能力层`

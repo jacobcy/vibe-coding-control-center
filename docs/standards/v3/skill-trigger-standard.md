@@ -101,7 +101,12 @@ related_docs:
 - 目标是 repo 内 `skills/vibe-*` 的创建、审查、收敛：优先 `vibe-skill-audit`。
 - 目标是已安装 skill 的同步、inventory、推荐、删除：优先 `vibe-skills-manager`。
 
-### 4.5 `vibe-review-code` vs `vibe-review-docs`
+### 4.5 `vibe-orchestra` vs `vibe-manager`
+
+- 视角是"大盘有什么""接下来该让谁动"：优先 `vibe-orchestra`。
+- 视角是"我正在管这一个 issue，我要派发它、盯它到 PR 结束"：优先 `vibe-manager`。
+
+### 4.6 `vibe-review-code` vs `vibe-review-docs`
 
 - 审查对象是 source code diff、实现正确性、调用影响、测试回归与 review feedback：优先 `vibe-review-code`。
 - 审查对象是 docs、standards、entry docs、changelog、术语与概念漂移：优先 `vibe-review-docs`。
