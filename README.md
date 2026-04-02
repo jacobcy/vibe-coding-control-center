@@ -1,96 +1,132 @@
 # Vibe Center 2.0
 
-Vibe Center 是面向 AI 协作开发的轻量编排工具：统一工具安装、密钥管理、工作流流转与规则治理。
+Vibe Center 是一个面向 AI 协作开发的编排工具箱。它保留 V2 Shell 能力层，也提供 V3 Python 运行时，目标不是替代 `git` 和 `gh`，而是把本地 execution scene、agent handoff、runtime observation 和 skill governance 收敛到一套清晰边界里。
 
-## 能力
-- 工具管理：`vibe tool`
-- 环境诊断：`vibe check`
-- 密钥管理：`vibe keys`
-- 研发流程：`vibe flow`
-- Agent 规则与上下文：`.agent/`
+## 当前语义
+
+- `git` 负责 branch 生命周期
+- `gh` 负责 issue / PR 的常规远端操作
+- `vibe3` 负责本地 flow scene、issue 绑定、handoff、runtime observation
+- `skills/` 与 workflows 负责编排，不负责重新发明共享状态模型
+- Python 模块只提供现场创建、清理、复用、观察与必需能力，不默认推进业务 workflow
+
+一句话：模块给能力，agent / skill 做判断。
+
+## 双栈结构
+
+### V2 Shell
+
+V2 保留环境工具和基础 shell 能力：
+
+- `vibe tool`
+- `vibe check`
+- `vibe keys`
+- `wtnew` 等 worktree / alias 辅助能力
+
+### V3 Python
+
+V3 是当前的本地运行时与协作主系统，核心能力包括：
+
+- `flow update` / `flow bind` / `flow show` / `flow status`
+- `status` 全局总览
+- `handoff` 本地协作增强
+- `plan` / `run` / `review` agent 执行入口
+- `serve` / orchestra / manager 运行时能力
 
 ## 快速开始
+
 ```bash
-# 1. 全局安装 (将核心分发至 ~/.vibe)
+# 1. 安装依赖
 zsh scripts/install.sh
 
-# 2. 重载 Shell (或重启终端)
-source ~/.zshrc
+# 2. 同步 Python 依赖
+uv sync --dev
 
-# 3. 基础依赖与环境诊断
-vibe tool deps
-vibe doctor
-```
-
-## 命令
-```bash
+# 3. 基础检查
 vibe check
-vibe tool
-vibe keys <list|set|get|init>
-
-# V3 Python CLI
-uv run python src/vibe3/cli.py flow update
-uv run python src/vibe3/cli.py flow show --snapshot
-uv run python src/vibe3/cli.py flow status
 uv run python src/vibe3/cli.py status
-uv run python src/vibe3/cli.py handoff show
 ```
 
-## Flow Management
+## 推荐工作方式
 
-Vibe3 does not replace `git` / `gh`.
+```bash
+# 新分支
+git checkout -b feature/example
 
-Use `git` for branch lifecycle and `gh` for issue / PR remote operations. Use
-`vibe3` to maintain local flow scene, issue bindings, events, and handoff.
+# 注册当前现场
+uv run python src/vibe3/cli.py flow update
 
-- **Local Scene Registration**: `vibe3 flow update` registers or updates the
-  current branch as a local flow scene.
-- **Local Binding**: `vibe3 flow bind` maintains the issue-to-flow relation in
-  local shared state.
-- **Read-First Inspection**: `vibe3 flow show`, `vibe3 flow status`, and
-  `vibe3 status` provide project-specific read views that `git` / `gh` do not.
-- **Handoff Augmentation**: `vibe3 handoff` stores local execution context for
-  agent collaboration.
+# 绑定 issue
+uv run python src/vibe3/cli.py flow bind 123
 
-### Protected Branches
+# 查看当前现场
+uv run python src/vibe3/cli.py flow show
 
-By default, the following branches are protected:
-- `main`
-- `master`
-- `develop`
-
-Configure via `config/settings.yaml`:
-```yaml
-flow:
-  protected_branches:
-    - "main"
-    - "master"
-    - "production"
+# 执行 agent
+uv run python src/vibe3/cli.py run --skill vibe-manager --async
 ```
 
-## 架构分层 (三层解耦)
-Vibe Center 3.0 推行了极其稳定的抽象分层模型：
+## 架构边界
 
-1. **Tier 3 (认知层 & 流程编排): Supervisor (Vibe Gate)**
-   - 开发流程式的宪法，如 OpenSpec 与 Vibe Gate，决定需求的进入和交付规范。
-2. **Tier 2 (胶水层 & 智能辅助): Vibe Skills (Slash Commands)**
-   - `skills/` 下的指令代理 (`/vibe-task`, `/vibe-save` 等)，纯靠只读与派发请求工作。它们包装了底层的复杂性，专门向 AI 提供上下文拼装能力。
-3. **Tier 1 (物理真源层 & 绝对执行): Shell Commands & Aliases**
-  - Vibe Shell 组（以 `vibe flow`、`vibe status`、`vibe check` 为主；`task` 语义已收敛到 `flow/status`）和基于 Zsh 的 Alias 工具组 (`wtnew`)。只在这里进行数据源（`registry.json`）与分支的物理读写。
+### Tier 3: Supervisor / Standards
 
-## 结构目录语义
-- `bin/` & `lib/` (Tier 1): CLI 和核心执行器（物理源）
-- `config/` (Tier 1): Alias 定义及配置文件
-- `skills/` (Tier 2): Vibe Agent Slash 技能库所在处
-- `.agent/`: (Tier 3): 流程、规则和智能上下文（含跨团队共识 `memory.md`；handoff 通过 `vibe3 handoff show/append` 访问）
+- `SOUL.md`
+- `CLAUDE.md`
+- `.agent/`
+- `docs/standards/`
 
-## 文档
+这一层定义规则、术语、流程边界和治理原则。
 
-> **单一事实原则**：每个文档有明确的职责边界，详见 [SOUL.md](SOUL.md) §0
+### Tier 2: Skills / Workflows
 
-- **[SOUL.md](SOUL.md)**：项目宪法和核心原则（权威）
-- **[STRUCTURE.md](STRUCTURE.md)**：项目结构定义（权威）
-- **[CLAUDE.md](CLAUDE.md)**：项目上下文与硬规则（AI 必读）
-- **[AGENTS.md](AGENTS.md)**：AI Agent 入口指南
-- **[DEVELOPER.md](DEVELOPER.md)**：开发者指南（开发流程权威）
-- **[docs/](docs/)**：人类文档区（详见 [docs/README.md](docs/README.md)）
+- `skills/`
+- `.agent/workflows/`
+
+这一层负责理解上下文、决定下一步、编排能力调用顺序。
+
+### Tier 1: Capability Layer
+
+- V2: `bin/`, `lib/`, `config/`
+- V3: `src/vibe3/`
+
+这一层只负责能力，不负责隐藏 workflow。
+
+## V3 关键模块
+
+- `agents/`: plan / run / review agent pipeline
+- `analysis/`: symbol、snapshot、change scope
+- `clients/`: Git、GitHub、SQLite、AI 客户端
+- `commands/`: CLI 子命令
+- `manager/`: 单 flow scene 能力与执行代理
+- `orchestra/`: 多 issue / 多 flow 的事实观察、排队与调度入口
+- `prompts/`: prompt 组装与 provenance
+- `runtime/`: heartbeat、event bus、executor
+- `server/`: webhook、MCP、health check
+- `services/`: flow / PR / task / handoff 业务服务
+- `ui/`: Rich 输出
+
+## 关键原则
+
+- assignee 是 orchestration 启动事实源
+- `state/*` label 只反映 flow 实际状态，不做主驱动
+- branch / worktree 清理能力属于 manager 模块，但何时清理由 agent / skill 判断
+- 常驻 server 和定时巡检只是运行模式差异，不改变模块职责
+
+## 目录速览
+
+- `bin/`, `lib/`: V2 Shell 入口与实现
+- `src/vibe3/`: V3 Python 主系统
+- `skills/`: repo-local Vibe skills
+- `.agent/`: rules、workflows、上下文
+- `docs/`: 规范、计划、报告和参考文档
+- `tests/`: V2 bats 与 V3 pytest 测试
+
+## 文档入口
+
+- [SOUL.md](SOUL.md): 项目宪法
+- [STRUCTURE.md](STRUCTURE.md): 仓库结构与模块职责
+- [CLAUDE.md](CLAUDE.md): AI 上下文与硬规则
+- [AGENTS.md](AGENTS.md): agent 入口指南
+- [DEVELOPER.md](DEVELOPER.md): 开发者工作流
+- [docs/README.md](docs/README.md): 文档总览
+- [docs/standards/glossary.md](docs/standards/glossary.md): 术语真源

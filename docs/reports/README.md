@@ -1,19 +1,22 @@
 # Reports 目录
 
-本目录用于存放正式的报告文档，会被 git 追踪。
+本目录保留历史报告样例和旧链接兼容说明，不再作为新的正式报告落点。
+
+新的 Agent 报告应统一写入 `.agent/reports/`。
 
 ## 目录用途
 
 | 目录 | 用途 | Git 追踪 |
 |------|------|----------|
-| `docs/reports/` | 正式报告文档 | ✅ 是 |
-| `docs/plans/` | 正式计划文档 | ✅ 是 |
+| `docs/reports/` | 历史报告样例 / 旧链接兼容 | ✅ 是 |
+| `docs/plans/` | 历史计划样例 / 旧链接兼容 | ✅ 是 |
 | `.agent/reports/` | Agent 生成的临时报告 | ❌ 否 |
+| `.agent/plans/` | Agent 生成的临时计划 | ❌ 否 |
 | `temp/` | 临时测试文件和脚本 | ❌ 否 |
 
 ## 文档类型示例
 
-### docs/reports/（正式报告）
+### docs/reports/（历史报告样例）
 
 - 项目分析报告
 - 技术调研报告
@@ -37,7 +40,7 @@
 
 ## 参考规则
 
-详见 [CLAUDE.md](../../CLAUDE.md) 第 12 条硬规则。
+详见 [agent-document-lifecycle-standard.md](../standards/agent-document-lifecycle-standard.md)。
 
 ## 版本历史
 

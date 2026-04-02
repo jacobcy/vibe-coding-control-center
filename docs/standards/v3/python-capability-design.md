@@ -8,7 +8,7 @@ authority:
   - python-capability-review
 author: Codex GPT-5
 created: 2026-03-08
-last_updated: 2026-03-10
+last_updated: 2026-04-02
 related_docs:
   - SOUL.md
   - CLAUDE.md
@@ -44,6 +44,13 @@ Python CLI 不是：
 - scheduler
 - 业务决策器
 
+补充原则：
+
+- Python 模块与 CLI 负责创建、清理、复用和观察当前 execution scene
+- Python 模块与 CLI 负责暴露必要的 `git` / `gh` / worktree / SQLite 原子能力
+- Python 模块与 CLI 不负责替 agent 决定 plan / run / review / pr 的执行顺序
+- Python 模块与 CLI 不负责把 assignee、label、现场事实自动扩写成完整业务流程
+
 ## 2. Three-Layer Contract
 
 ### 2.1 Data Layer
@@ -77,7 +84,28 @@ Python CLI Layer 不提供：
 - 优先级判断
 - 版本路线图语义推理
 
-### 2.2.1 What Python CLI Must Not Decide
+### 2.2.1 Scene Capability Rule
+
+Python CLI 与其背后的 Python 模块，围绕 `flow` / `branch` / `worktree` / PR / issue 现场只负责两类事情：
+
+- 提供现场创建、清理、复用、回收、状态读取入口
+- 提供让 skill / agent 能完成编排所需的必需能力
+
+典型允许职责：
+
+- 为当前 issue 建立或查询 flow
+- 为当前 branch 建立、查找、清理 worktree
+- 读取当前 assignee、label、PR、handoff、queue 等现场事实
+- 执行一个显式要求的 `git` / `gh` / `vibe3` 原子动作
+
+典型禁止职责：
+
+- 自动决定接下来要不要 plan、run、review
+- 自动决定 PR 应由人创建还是由 agent 调用 `gh pr create`
+- 自动决定现场异常要直接修复、延后修复还是转交给哪个 skill
+- 自动把观测到的多个事实拼接成隐式 workflow
+
+### 2.2.2 What Python CLI Must Not Decide
 
 "Python CLI 不做逻辑判断"的准确含义是：
 
@@ -98,11 +126,21 @@ Skill Layer 负责：
 - 决定关联哪个 roadmap item / issue
 - 决定是否开新 flow
 - 决定一个 flow 承载一个还是多个 task
+- 决定 plan / run / review / pr / merge / closeout 的执行顺序
+- 决定何时调用 manager / orchestra / check / handoff 等能力入口
 
 一句话：
 
 - Python CLI 提供工具
 - Skill 使用工具完成业务逻辑
+
+若 manager agent、orchestra agent 或其他 skill 需要：
+
+- 补捞已分配 assignee 但尚未进入调度的 issue
+- 决定是否清理 worktree / branch
+- 决定当前现场转入 plan、run、review 还是等待人工操作
+
+这些都属于编排判断，不应下沉回 Python CLI 命令默认行为。
 
 ### 2.4 Semantic Dependency
 

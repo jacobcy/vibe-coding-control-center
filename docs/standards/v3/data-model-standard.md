@@ -35,7 +35,7 @@ related_docs:
 
 本文档覆盖两类共享状态存储：
 
-1. **SQLite 本地缓存**（`~/.vibe/vibe.db`）
+1. **SQLite 本地共享状态**（`.git/vibe3/handoff.db`）
    - `flow_state` 表：当前开放 flow 的运行时状态
    - `flow_issue_links` 表：flow 与 GitHub issue 的关联关系
    - `flow_worktrees` 表：worktree 与 flow 的绑定关系（兼容期）

@@ -16,6 +16,7 @@ Each Kiro spec MUST have a corresponding Vibe task directory:
 - Create task directory: `docs/tasks/{YYYY-MM-DD-feature-name}/`
 - Create task README: `docs/tasks/{YYYY-MM-DD-feature-name}/README.md`
 - Link Kiro spec in README's "文档导航" section
+- The issue body is the canonical task description; task README is only the mirror/navigation surface
 
 ## Task Lifecycle
 
@@ -31,6 +32,7 @@ Keep Kiro spec and Vibe task status in sync:
 - Kiro spec execution → Update `vibe task` status
 - Task completion → Update both `.kiro/specs/` and `docs/tasks/` README
 - Use frontmatter `status` field as single source of truth in task README
+- Long-lived findings should be recorded in the linked GitHub issue comment or PR comment
 
 ## Documentation Standards
 

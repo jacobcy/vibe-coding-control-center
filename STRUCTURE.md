@@ -165,16 +165,23 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - 详细标准见 [.agent/rules/python-standards.md](.agent/rules/python-standards.md)
 
 **主要模块**：
-- `cli.py` - CLI 主入口
-- `commands/` - 命令实现（flow, handoff, plan, review, run 等）
-- `runtime/` - 运行时核心（事件循环、执行引擎、熔断器）
-- `server/` - 服务器逻辑（FastAPI, Webhook, MCP）
-- `manager/` - 编排管理（ManagerExecutor, Flow/Worktree 协同）
-- `services/` - 业务逻辑层
-- `clients/` - 外部客户端（git, sqlite, linear 等）
-- `models/` - 数据模型（FlowState, FlowEvent 等）
-- `utils/` - 工具函数
-- `observability/` - 可观测性（logger, trace）
+- `cli.py` - CLI 主入口（Typer 路由分发）
+- `agents/` - AI Agent 调用层（plan/review/run pipeline + backends）
+- `analysis/` - 代码智能（symbol 分析、结构快照、变更范围）
+- `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
+- `commands/` - CLI 子命令实现
+- `config/` - 配置加载与 Pydantic schema 验证
+- `exceptions/` - 统一异常层级
+- `manager/` - Orchestra 执行代理（flow 映射、命令构建、worktree）
+- `models/` - Pydantic 领域数据模型
+- `observability/` - 日志、链路追踪、审计
+- `orchestra/` - 编排中枢（issue 分诊、事件调度）
+- `prompts/` - Prompt 模板组装与变量解析
+- `runtime/` - 事件驱动运行时（EventBus, Heartbeat）
+- `server/` - HTTP 服务层（webhook, MCP, health check）
+- `services/` - 核心业务逻辑（flow/PR/task/handoff/check）
+- `ui/` - CLI 输出格式化（Rich 渲染）
+- `utils/` - 通用工具函数
 
 **常用命令**：
 ```bash
@@ -287,14 +294,14 @@ vibe3 inspect commit <sha>                # 改动影响范围
 
 | 路径 | 职责 | 共享范围 | 版本 | 示例内容 |
 |------|------|---------|------|---------|
-| **`.git/vibe3/`** | **V3 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V3 | `flow.db`, `handoff/*/` |
+| **`.git/vibe3/`** | **V3 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V3 | `handoff.db`, `handoff/*/` |
 | **`.git/vibe/`** | **V2 运行时共享真源**（主仓库） | 所有 worktrees 共享 | V2 | `registry.json`, `worktrees.json`, `tasks/*/` |
 | **`~/.vibe/`** | **用户级全局配置** | 当前用户跨仓库共享 | V2/V3 | loader、keys、skills 偏好 |
 | **`<worktree>/.vibe/`** | **历史本地缓存方案（已淘汰）** | 仅历史文档背景 | V2 | 不再作为当前运行时真源 |
 
 #### V3 数据存储（`.git/vibe3/`）
 
-**`.git/vibe3/flow.db`** - SQLite 数据库（跨项目共享）
+**`.git/vibe3/handoff.db`** - SQLite 数据库（跨项目共享）
 - 存储所有 flow 状态和事件
 - 包含 `flow_state` 和 `flow_events` 表
 - 所有 worktree 共享访问
@@ -313,7 +320,7 @@ uv run python src/vibe3/cli.py flow show
 uv run python src/vibe3/cli.py handoff show
 
 # 数据库路径
-$(git rev-parse --git-common-dir)/vibe3/flow.db
+$(git rev-parse --git-common-dir)/vibe3/handoff.db
 ```
 
 #### V2 数据存储（`.git/vibe/`）
@@ -515,7 +522,7 @@ uv run pytest tests/vibe3/ -k flow
 - [ ] 所有入口文件相互引用正确
 - [ ] `src/vibe3/` 遵循 Python 编码标准
 - [ ] `tests/vibe3/` 测试覆盖率 ≥ 80%
-- [ ] `.git/vibe3/flow.db` 结构与代码一致
+- [ ] `.git/vibe3/handoff.db` 结构与代码一致
 
 ## 📝 维护责任
 

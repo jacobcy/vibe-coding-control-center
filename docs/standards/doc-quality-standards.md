@@ -20,7 +20,7 @@ related_docs:
 
 # Document Quality Standards
 
-本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档只定义文档质量、frontmatter 和文档类型 schema。若涉及 `workflow`、`task`、`规范层`、`执行计划层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
 ## 概述
 
@@ -63,7 +63,7 @@ related_docs:
 - 同段后续复用可省略后缀
 - 跨段再次出现同名或近似名称时，建议重新标注
 
-术语定义与边界以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+术语定义与边界以 [glossary.md](glossary.md) 为准。
 
 ## 文档类型分类
 
@@ -75,6 +75,8 @@ related_docs:
 | 技能文档 | `skill` | `.agent/skills/*/SKILL.md` | AI 技能定义 | AI |
 | 模板文档 | `template` | `.agent/templates/*.md` | 文档生成模板 | AI |
 | 工作流文档 | `workflow` | `.agent/workflows/*.md` | 工作流定义 | AI |
+| 临时计划 | `temporary-plan` | `.agent/plans/*.md` | Agent 临时计划 | AI |
+| 临时报告 | `temporary-report` | `.agent/reports/*.md` | Agent 临时报告 | AI |
 | PRD 文档 | `prd` | `docs/prds/*.md` | 产品需求文档 | Human + AI |
 | 任务文档 | `task-*` | `docs/tasks/{Task_ID}/*.md` | 任务文档 | Human + AI |
 | 标准文档 | `standard` | `docs/standards/*.md` | 标准和规范 | Human + AI |
@@ -87,6 +89,8 @@ related_docs:
 - 不同类型文档应使用各自语义稳定的 `status`
 - 不允许把某一类文档的状态枚举机械套用到所有文档
 - 标准文件不应继续使用 `approved` 作为长期状态
+- 临时计划和临时报告不应被描述为正式真源
+- 需要长期保留的结论应进入 issue comment 或 PR comment，而不是只留在临时文档
 
 推荐状态设计：
 

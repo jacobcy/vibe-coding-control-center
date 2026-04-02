@@ -13,6 +13,7 @@ created: 2025-01-20
 last_updated: 2025-01-24
 related_docs:
   - docs/README.md
+  - docs/standards/agent-document-lifecycle-standard.md
   - docs/standards/glossary.md
   - docs/standards/doc-quality-standards.md
   - docs/prds/vibe-workflow-paradigm.md
@@ -21,9 +22,11 @@ related_docs:
 
 # 文档组织标准
 
-本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](/Users/jacobcy/src/vibe-center/wt-claude-refactor/docs/standards/glossary.md) 为准。
+本文档只定义目录结构、命名规范和文档落位。若涉及 `task`、`workflow`、`规范层`、`执行计划层`、`代码实现层`、`AI审计层` 等项目术语，其正式语义以 [glossary.md](glossary.md) 为准。
 
 本文档定义 Vibe Center 2.0 的文档组织标准，与 Vibe Workflow Paradigm 的 Vibe Guard 范式完全对齐。
+任务身份以 GitHub issue 为准；需要长期留存的结论写入 issue comment 或 PR comment。
+旧任务目录里残留的 `plan-*` / `audit-*` 文件只作为历史归档，不改变新 plan / report 的默认落点。
 
 ## 核心原则
 
@@ -45,7 +48,7 @@ docs/
 │   └── ...                         # 其他全局 PRD
 ├── archive/                        # 历史文档归档
 │   └── ...                         # 已退役设计与历史任务文档
-└── tasks/                          # 任务文档（按任务组织）
+└── tasks/                          # 任务文档（按 issue 组织）
     └── {Task_ID}/                  # 格式: YYYY-MM-DD-feature-name
         ├── README.md               # 任务概述、状态和导航
         ├── prd-v1-initial.md       # PRD 层文档
@@ -55,14 +58,19 @@ docs/
         ├── code-implementation.md  # Code 层文档
         └── audit-2024-01-15.md     # Review 层文档（AI 审计）
 
-.agent/templates/                    # AI 工作模板（不在 docs/ 下）
-├── prd.md                          # PRD 模板
-├── tech-spec.md                    # Spec 模板
-├── plan.md                         # Plan 模板
-├── test.md                         # Test 模板
-├── code.md                         # Code 模板
-├── audit.md                        # Audit 模板
-└── task-readme.md                  # Task README 模板
+AI 工作区中的临时产物与模板：
+- `.agent/plans/` - AI 临时计划
+- `.agent/reports/` - AI 临时报告
+- `.agent/templates/` - AI 工作模板
+
+`.agent/templates/` 下的模板文件：
+- `prd.md` - PRD 模板
+- `tech-spec.md` - Spec 模板
+- `plan.md` - Plan 模板
+- `test.md` - Test 模板
+- `code.md` - Code 模板
+- `audit.md` - Audit 模板
+- `task-readme.md` - Task README 模板
 ```
 
 ## 命名规范
@@ -150,6 +158,8 @@ audit-{YYYY-MM-DD}.md
    ```
 
 5. **按 Vibe Guard 流程逐步创建其他文档**
+   - 计划和报告优先落到 `.agent/plans/`、`.agent/reports/`
+   - 长期结论写入 issue comment 或 PR comment
 
 ### 更新任务状态
 
@@ -177,7 +187,7 @@ gates:
 
 这是因为：
 - `docs/` - 人类阅读的文档（PRD、Spec、任务文档等）
-- `.agent/` - AI 使用的工具（模板、规则、工作流等）
+- `.agent/` - AI 使用的工具（模板、规则、工作流、临时 plan/report 等）
 
 模板是 AI 用来生成文档的工具，应该放在 AI 工作区。
 

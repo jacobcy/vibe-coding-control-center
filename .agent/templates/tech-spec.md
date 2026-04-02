@@ -9,7 +9,7 @@ created: 2025-01-24
 last_updated: 2026-03-08
 related_docs:
   - docs/standards/doc-quality-standards.md
-  - docs/plans/2026-03-08-co-writers-frontmatter-plan.md
+  - .agent/plans/2026-03-08-co-writers-frontmatter-plan.md
 ---
 
 # Spec: {{TASK_TITLE}}

@@ -8,13 +8,14 @@ co_writers:
 created: 2025-01-24
 last_updated: 2026-03-08
 related_docs:
-  - docs/plans/2026-03-08-co-writers-frontmatter-plan.md
+  - .agent/plans/2026-03-08-co-writers-frontmatter-plan.md
   - docs/standards/doc-quality-standards.md
 ---
 
 # Execution Plan: {{TASK_TITLE}}
 
 > 本文档定义 {{TASK_TITLE}} 的执行计划。
+> 计划属于临时文档，应存放在 `.agent/plans/`。
 
 ## 上下文圈定
 
