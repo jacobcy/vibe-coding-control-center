@@ -84,6 +84,45 @@ class OrchestraStatusService:
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
 
+    @classmethod
+    def fetch_live_snapshot(cls, config: OrchestraConfig) -> OrchestraSnapshot | None:
+        """Attempt to fetch live snapshot from the running HTTP server."""
+        import json
+        import urllib.request
+        from urllib.error import URLError
+
+        url = f"http://127.0.0.1:{config.port}/status"
+        try:
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=1.0) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    # Reconstruct frozen dataclass
+                    entries = [
+                        IssueStatusEntry(**item)
+                        for item in data.get("active_issues", [])
+                    ]
+                    return OrchestraSnapshot(
+                        timestamp=data.get("timestamp", 0.0),
+                        server_running=data.get("server_running", True),
+                        active_issues=tuple(entries),
+                        active_flows=data.get("active_flows", 0),
+                        active_worktrees=data.get("active_worktrees", 0),
+                        queued_issues=tuple(data.get("queued_issues", [])),
+                        circuit_breaker_state=data.get(
+                            "circuit_breaker_state", "closed"
+                        ),
+                        circuit_breaker_failures=data.get(
+                            "circuit_breaker_failures", 0
+                        ),
+                        circuit_breaker_last_failure=data.get(
+                            "circuit_breaker_last_failure"
+                        ),
+                    )
+                return None
+        except (URLError, ConnectionError, Exception):
+            return None
+
     def snapshot(self, queued: set[int] | None = None) -> OrchestraSnapshot:
         """Build current status snapshot."""
         log = logger.bind(domain="orchestra", action="status_snapshot")

@@ -83,7 +83,7 @@ class TestGovernanceRecipeDrivenRendering:
                 )
             ),
             status_service=MockStatusService(),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
         # Verify _render_governance_plan uses assembler internally
@@ -136,7 +136,7 @@ class TestGovernanceRecipeDrivenRendering:
                 )
             ),
             status_service=MockStatusService(),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
         snapshot = OrchestraSnapshot(
@@ -196,7 +196,7 @@ class TestGovernanceRecipeDrivenRendering:
                 )
             ),
             status_service=MockStatusService(),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
         recipe = service._build_governance_recipe()

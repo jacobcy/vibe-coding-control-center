@@ -46,8 +46,8 @@ def _pr_event(
 @pytest.mark.asyncio
 async def test_review_requested_dispatches_for_manager_reviewer() -> None:
     svc = _svc()
-    svc._dispatcher = MagicMock()
-    svc._dispatcher.dispatch_pr_review.return_value = True
+    svc._manager = MagicMock()
+    svc._manager.dispatch_pr_review.return_value = True
 
     with patch(
         "vibe3.orchestra.services.pr_review_dispatch.asyncio.get_event_loop",
@@ -57,7 +57,7 @@ async def test_review_requested_dispatches_for_manager_reviewer() -> None:
             _pr_event("review_requested", requested_reviewer="vibe-manager-agent")
         )
 
-    svc._dispatcher.dispatch_pr_review.assert_called_once_with(347)
+    svc._manager.dispatch_pr_review.assert_called_once_with(347)
 
 
 @pytest.mark.asyncio
@@ -73,14 +73,14 @@ async def test_review_requested_ignores_non_manager_reviewer() -> None:
             _pr_event("review_requested", requested_reviewer="someone-else")
         )
 
-    svc._dispatcher.dispatch_pr_review.assert_not_called()
+    svc._manager.dispatch_pr_review.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_ready_for_review_dispatches_when_manager_requested() -> None:
     svc = _svc()
-    svc._dispatcher = MagicMock()
-    svc._dispatcher.dispatch_pr_review.return_value = True
+    svc._manager = MagicMock()
+    svc._manager.dispatch_pr_review.return_value = True
 
     with patch(
         "vibe3.orchestra.services.pr_review_dispatch.asyncio.get_event_loop",
@@ -93,7 +93,7 @@ async def test_ready_for_review_dispatches_when_manager_requested() -> None:
             )
         )
 
-    svc._dispatcher.dispatch_pr_review.assert_called_once_with(347)
+    svc._manager.dispatch_pr_review.assert_called_once_with(347)
 
 
 @pytest.mark.asyncio
@@ -101,8 +101,8 @@ async def test_review_requested_dispatches_when_manager_in_requested_reviewers()
     None
 ):
     svc = _svc()
-    svc._dispatcher = MagicMock()
-    svc._dispatcher.dispatch_pr_review.return_value = True
+    svc._manager = MagicMock()
+    svc._manager.dispatch_pr_review.return_value = True
 
     with patch(
         "vibe3.orchestra.services.pr_review_dispatch.asyncio.get_event_loop",
@@ -116,4 +116,4 @@ async def test_review_requested_dispatches_when_manager_in_requested_reviewers()
             )
         )
 
-    svc._dispatcher.dispatch_pr_review.assert_called_once_with(347)
+        svc._manager.dispatch_pr_review.assert_called_once_with(347)

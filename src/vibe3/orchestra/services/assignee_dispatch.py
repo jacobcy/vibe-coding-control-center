@@ -37,15 +37,12 @@ class AssigneeDispatchService(ServiceBase):
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         status_service: OrchestraStatusService | None = None,
-        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._manager = (
-            manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
-        )
+        self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
 
         self._status_service = status_service or OrchestraStatusService(
             config, orchestrator=self._manager.flow_manager

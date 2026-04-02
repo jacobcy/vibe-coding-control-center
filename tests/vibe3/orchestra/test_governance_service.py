@@ -51,7 +51,7 @@ def _make_service(
     return GovernanceService(
         config=config or OrchestraConfig(),
         status_service=MockStatusService(snapshot),
-        dispatcher=_make_dispatcher(run_result),
+        manager=_make_dispatcher(run_result),
     )
 
 
@@ -213,7 +213,7 @@ class TestGovernanceService:
         service = GovernanceService(
             config=config,
             status_service=MockStatusService(),
-            dispatcher=_make_dispatcher(),
+            manager=_make_dispatcher(),
             prompts_path=prompts_path,
         )
         issue = IssueStatusEntry(
@@ -245,13 +245,15 @@ class TestGovernanceService:
         assert "# Vibe Orchestra" in plan
 
     def test_delegates_to_dispatcher(self):
-        """Execution uses dispatcher.run_governance_command."""
+        """Execution uses manager."""
         service = _make_service()
         # Verify the service has no _execute_command attribute
         assert not hasattr(service, "_execute_command")
-        # Verify it holds a dispatcher
-        assert service._dispatcher is not None
-        assert hasattr(service._dispatcher, "run_governance_command")
+        # Verify it holds a manager
+        assert service._manager is not None
+        assert hasattr(service._manager, "dispatch_manager") or hasattr(
+            service._manager, "_run_command"
+        )
 
     @pytest.mark.asyncio
     async def test_skip_when_circuit_breaker_open(self):
@@ -271,7 +273,7 @@ class TestGovernanceService:
                 governance=GovernanceConfig(dry_run=True, interval_ticks=1)
             ),
             status_service=MockStatusService(snapshot),
-            dispatcher=dispatcher,
+            manager=dispatcher,
         )
 
         await service._run_governance()
@@ -295,7 +297,7 @@ class TestGovernanceService:
                 governance=GovernanceConfig(interval_ticks=2, dry_run=True)
             ),
             status_service=MockStatusService(snapshot),
-            dispatcher=dispatcher,
+            manager=dispatcher,
         )
         # Force tick boundary
         service._tick_count = 1

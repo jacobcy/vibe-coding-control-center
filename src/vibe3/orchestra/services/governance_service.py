@@ -66,13 +66,10 @@ class GovernanceService(ServiceBase):
         manager: ManagerExecutor | None = None,
         executor: ThreadPoolExecutor | None = None,
         prompts_path: Path | None = None,
-        dispatcher: Any | None = None,  # shim
     ) -> None:
         self.config = config
         self._status_service = status_service
-        self._manager = (
-            manager or dispatcher or ManagerExecutor(config, dry_run=config.dry_run)
-        )
+        self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
         self._tick_count = 0
         self._skill = config.governance.skill
@@ -81,14 +78,6 @@ class GovernanceService(ServiceBase):
         self._dry_run = config.governance.dry_run
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self.last_render_result: PromptRenderResult | None = None
-
-    @property
-    def _dispatcher(self) -> Any:
-        return self._manager
-
-    @_dispatcher.setter
-    def _dispatcher(self, value: Any) -> None:
-        self._manager = value
 
     async def handle_event(self, event: GitHubEvent) -> None:
         pass

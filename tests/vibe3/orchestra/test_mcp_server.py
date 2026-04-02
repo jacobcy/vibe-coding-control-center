@@ -30,6 +30,7 @@ class MockOrchestraSnapshot:
     active_issues: tuple[Any, ...]
     active_flows: int
     active_worktrees: int
+    queued_issues: tuple[int, ...] = ()
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None

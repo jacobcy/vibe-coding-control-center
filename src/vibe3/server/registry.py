@@ -108,7 +108,9 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(status_service)
+        mcp = create_mcp_server(
+            status_service, get_queued=lambda: shared_manager.queued_issues
+        )
         # Mount SSE endpoint for MCP
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")

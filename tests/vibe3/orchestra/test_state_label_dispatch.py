@@ -45,7 +45,7 @@ def service() -> tuple[StateLabelDispatchService, MagicMock]:
     executor = ThreadPoolExecutor(max_workers=2)
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
-        dispatcher=dispatcher,
+        manager=dispatcher,
         executor=executor,
     )
     try:

@@ -38,6 +38,7 @@ def _format_snapshot(snapshot: OrchestraSnapshot) -> str:
     lines = [
         f"Orchestra Status ({ts})",
         f"Server: {'running' if snapshot.server_running else 'stopped'}",
+        f"Queued Issues: {len(snapshot.queued_issues)}",
         "",
         "Active Issues:",
     ]

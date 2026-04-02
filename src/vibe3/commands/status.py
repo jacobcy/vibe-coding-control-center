@@ -27,8 +27,15 @@ def status(
     with trace_scope(trace, "status", domain="status"):
         # 1. Orchestra State (Issues & Managers)
         config = OrchestraConfig.from_settings()
-        orch_service = OrchestraStatusService(config)
-        orch_snapshot = orch_service.snapshot()
+        orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+
+        if not orch_snapshot:
+            # Fallback if server is not running
+            from dataclasses import replace
+
+            orch_service = OrchestraStatusService(config)
+            local_snap = orch_service.snapshot()
+            orch_snapshot = replace(local_snap, server_running=False)
 
         if json_output:
             service = FlowService()
@@ -52,7 +59,12 @@ def status(
             "%Y-%m-%d %H:%M:%S"
         )
         console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
-        console.print("Server: [green]running[/]")
+
+        if orch_snapshot.server_running:
+            console.print("Server: [green]running[/]")
+        else:
+            console.print("Server: [dim]stopped[/]")
+
         if orch_snapshot.queued_issues:
             console.print(
                 f"Queue: [yellow]{len(orch_snapshot.queued_issues)} issues waiting[/]"
