@@ -90,7 +90,7 @@ def test_review_base_pass():
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base", "origin/develop"])
+        result = runner.invoke(app, ["base", "origin/develop", "--sync"])
     assert result.exit_code == 0
 
 
@@ -118,7 +118,7 @@ def test_review_base_uses_shared_resolution_when_base_omitted():
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base"])
+        result = runner.invoke(app, ["base", "--sync"])
 
     assert result.exit_code == 0
     mock_resolve.assert_called_once_with(None, current_branch="feature/test")

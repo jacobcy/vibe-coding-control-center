@@ -164,7 +164,7 @@ def test_run_skill_uses_shared_agent_options_with_run_context() -> None:
 
         with patch("vibe3.commands.run._find_skill_file", return_value=skill_file):
             with patch(
-                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                "vibe3.commands.run.CodeagentExecutionService.execute",
                 return_value=MagicMock(success=True),
             ) as mock_execute:
                 with patch(
@@ -191,7 +191,7 @@ def test_run_skill_records_with_unified_recorder() -> None:
 
         with patch("vibe3.commands.run._find_skill_file", return_value=skill_file):
             with patch(
-                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                "vibe3.commands.run.CodeagentExecutionService.execute",
                 return_value=MagicMock(success=True),
             ) as mock_execute:
                 with patch(

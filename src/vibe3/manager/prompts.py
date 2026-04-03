@@ -59,6 +59,7 @@ def build_manager_command(
 ) -> list[str]:
     """Build executable manager command for an issue."""
     cmd = ["uv", "run", "python", "-m", "vibe3", "run"]
+    cmd.append("--async")
     if config.assignee_dispatch.use_worktree:
         cmd.append("--worktree")
     cmd.append(rendered_text)

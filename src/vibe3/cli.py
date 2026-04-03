@@ -116,6 +116,20 @@ def run_command(
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
+    supervisor: Annotated[
+        Optional[str],
+        typer.Option(
+            "--supervisor",
+            help="Run a supervisor markdown file as one-shot governance input",
+        ),
+    ] = None,
+    issue: Annotated[
+        Optional[int],
+        typer.Option(
+            "--issue",
+            help="Process a governance issue using the default supervisor/apply flow",
+        ),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
     ] = False,
@@ -124,8 +138,12 @@ def run_command(
         typer.Option("--dry-run", help="Print command and prompt without executing"),
     ] = False,
     async_mode: Annotated[
-        bool, typer.Option("--async", help="Run asynchronously in background")
-    ] = False,
+        bool,
+        typer.Option(
+            "--async/--sync",
+            help="Run asynchronously in background (default: async)",
+        ),
+    ] = True,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -157,6 +175,8 @@ def run_command(
         instructions=instructions,
         plan=resolved_plan,
         skill=skill,
+        supervisor=supervisor,
+        issue=issue,
         trace=trace,
         dry_run=dry_run,
         async_mode=async_mode,

@@ -77,7 +77,7 @@ def test_review_pr_pass(mock_pr_build):
             return_value=_mock_review("PASS"),
         ),
     ):
-        result = runner.invoke(app, ["pr", "42"])
+        result = runner.invoke(app, ["pr", "42", "--sync"])
     assert result.exit_code == 0
     assert "PASS" in result.output
     mock_pr_build.assert_called_once_with(42)
@@ -94,7 +94,7 @@ def test_review_pr_block_exits_1(mock_pr_build):
             return_value=_mock_review("BLOCK"),
         ),
     ):
-        result = runner.invoke(app, ["pr", "42"])
+        result = runner.invoke(app, ["pr", "42", "--sync"])
     assert result.exit_code == 1
 
 
@@ -126,7 +126,7 @@ def test_review_pr_is_local_only(mock_pr_build):
             return_value=_mock_review("PASS"),
         ),
     ):
-        result = runner.invoke(app, ["pr", "42"])
+        result = runner.invoke(app, ["pr", "42", "--sync"])
 
     assert result.exit_code == 0
 
@@ -178,7 +178,7 @@ def test_review_parser_failure_returns_error_verdict(mock_pr_build):
             side_effect=ReviewParserError("Missing verdict"),
         ),
     ):
-        result = runner.invoke(app, ["pr", "42"])
+        result = runner.invoke(app, ["pr", "42", "--sync"])
 
     assert result.exit_code == 0
     assert "Verdict: ERROR" in result.output

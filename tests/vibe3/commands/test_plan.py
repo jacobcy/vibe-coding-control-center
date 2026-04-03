@@ -21,8 +21,8 @@ def test_plan_help_shows_subcommands() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "task" in stdout
-    assert "spec" in stdout
+    assert "--issue" in stdout
+    assert "--spec" in stdout
 
 
 def test_main_cli_registers_plan_command() -> None:
@@ -30,30 +30,31 @@ def test_main_cli_registers_plan_command() -> None:
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "task" in stdout
-    assert "spec" in stdout
+    assert "--issue" in stdout
+    assert "--spec" in stdout
 
 
-def test_plan_task_help_shows_issue_argument() -> None:
-    result = runner.invoke(plan_app, ["task", "--help"])
+def test_plan_issue_option_shows_in_help() -> None:
+    result = runner.invoke(plan_app, ["--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
-    assert "ISSUE" in stdout or "issue" in stdout.lower()
+    assert "--issue" in stdout
 
 
 def test_plan_spec_help_shows_options() -> None:
-    result = runner.invoke(plan_app, ["spec", "--help"])
+    result = runner.invoke(plan_app, ["--help"])
     stdout = strip_ansi(result.stdout)
 
     assert result.exit_code == 0
     assert "--file" in stdout or "-f" in stdout
     assert "--msg" in stdout
+    assert "--spec" in stdout
     assert "--message" not in stdout
 
 
-def test_plan_task_dry_run_shows_command() -> None:
-    result = runner.invoke(plan_app, ["task", "42", "--dry-run"])
+def test_plan_issue_dry_run_shows_command() -> None:
+    result = runner.invoke(plan_app, ["--issue", "42", "--dry-run"])
 
     assert result.exit_code == 0
     assert "codeagent-wrapper" in result.stdout
@@ -61,9 +62,9 @@ def test_plan_task_dry_run_shows_command() -> None:
     assert "--backend" in result.stdout or "--agent" in result.stdout
 
 
-def test_plan_task_with_agent_override() -> None:
+def test_plan_issue_with_agent_override() -> None:
     result = runner.invoke(
-        plan_app, ["task", "42", "--agent", "planner-pro", "--dry-run"]
+        plan_app, ["--issue", "42", "--agent", "planner-pro", "--dry-run"]
     )
 
     assert result.exit_code == 0
@@ -71,37 +72,30 @@ def test_plan_task_with_agent_override() -> None:
     assert "--agent planner-pro" in result.stdout
 
 
-def test_plan_task_with_instructions() -> None:
-    result = runner.invoke(plan_app, ["task", "42", "Focus on security", "--dry-run"])
-
-    assert result.exit_code == 0
-    assert "Focus on security" in result.stdout
-
-
 def test_plan_spec_msg_dry_run() -> None:
-    result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode", "--dry-run"])
+    result = runner.invoke(plan_app, ["--spec", "--msg", "Add dark mode", "--dry-run"])
 
     assert result.exit_code == 0
     assert "codeagent-wrapper" in result.stdout
 
 
 def test_plan_spec_requires_file_or_msg() -> None:
-    result = runner.invoke(plan_app, ["spec"])
+    result = runner.invoke(plan_app, ["--spec"])
 
     assert result.exit_code != 0
 
 
 def test_plan_spec_file_not_found() -> None:
-    result = runner.invoke(plan_app, ["spec", "--file", "nonexistent.md"])
+    result = runner.invoke(plan_app, ["--spec", "--file", "nonexistent.md"])
 
     assert result.exit_code != 0
 
 
 @patch("vibe3.services.spec_ref_service.SpecRefService._fetch_issue_data")
-@patch("vibe3.commands.plan.CodeagentExecutionService.execute_sync")
+@patch("vibe3.commands.plan.CodeagentExecutionService.execute")
 @patch("vibe3.commands.plan.FlowService")
 @patch("vibe3.commands.plan.ensure_flow_for_current_branch")
-def test_plan_task_includes_issue_and_spec_context(
+def test_plan_issue_includes_issue_and_spec_context(
     mock_ensure, mock_flow_service_cls, mock_execute, mock_fetch_issue
 ) -> None:
     flow_service = MagicMock()
@@ -124,7 +118,7 @@ def test_plan_task_includes_issue_and_spec_context(
 
     with patch("vibe3.commands.plan.GitHubClient", return_value=issue_client):
         mock_execute.return_value = MagicMock(success=True)
-        result = runner.invoke(plan_app, ["task"])
+        result = runner.invoke(plan_app, ["--issue", "42"])
 
     assert result.exit_code == 0
     command = mock_execute.call_args.args[0]
@@ -133,6 +127,34 @@ def test_plan_task_includes_issue_and_spec_context(
     assert "Task body" in context
     assert "Spec title" in context
     assert "Spec body" in context
+
+
+def test_plan_task_alias_still_works() -> None:
+    result = runner.invoke(plan_app, ["task", "42", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "codeagent-wrapper" in result.stdout
+
+
+def test_plan_spec_alias_still_works() -> None:
+    result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "codeagent-wrapper" in result.stdout
+
+
+def test_plan_rejects_issue_and_spec_together() -> None:
+    result = runner.invoke(plan_app, ["--issue", "42", "--spec"])
+
+    assert result.exit_code != 0
+    assert "--issue and --spec are mutually exclusive" in result.stderr
+
+
+def test_plan_rejects_file_without_spec() -> None:
+    result = runner.invoke(plan_app, ["--file", "demo.md"])
+
+    assert result.exit_code != 0
+    assert "--file/--msg require --spec" in result.stderr
 
 
 class TestPlanContextBuilderUsesAssembler:

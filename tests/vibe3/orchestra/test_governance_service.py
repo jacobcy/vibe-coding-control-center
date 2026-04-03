@@ -35,10 +35,9 @@ class MockStatusService:
 
 
 def _make_dispatcher(run_result: bool = True) -> MagicMock:
-    """Create a mock Dispatcher with repo_path and run_governance_command."""
+    """Create a mock manager-like dependency with repo_path."""
     dispatcher = MagicMock()
     dispatcher.repo_path = Path("/repo")
-    dispatcher.run_governance_command.return_value = run_result
     return dispatcher
 
 
@@ -244,16 +243,12 @@ class TestGovernanceService:
         assert "#42: Test issue" in plan
         assert "# Orchestra" in plan or "治理材料" in plan
 
-    def test_delegates_to_dispatcher(self):
-        """Execution uses manager."""
+    def test_keeps_manager_for_repo_context(self):
+        """Governance keeps manager-like dependency for repo-local context."""
         service = _make_service()
-        # Verify the service has no _execute_command attribute
         assert not hasattr(service, "_execute_command")
-        # Verify it holds a manager
         assert service._manager is not None
-        assert hasattr(service._manager, "dispatch_manager") or hasattr(
-            service._manager, "_run_command"
-        )
+        assert service._manager.repo_path == Path("/repo")
 
     @pytest.mark.asyncio
     async def test_skip_when_circuit_breaker_open(self):
@@ -277,7 +272,7 @@ class TestGovernanceService:
         )
 
         await service._run_governance()
-        dispatcher.run_governance_command.assert_not_called()
+        assert dispatcher.method_calls == []
 
     @pytest.mark.asyncio
     async def test_on_tick_runs_on_interval_and_respects_dry_run(self, monkeypatch):

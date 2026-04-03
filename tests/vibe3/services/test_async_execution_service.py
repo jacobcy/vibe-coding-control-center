@@ -1,9 +1,11 @@
 """Tests for async execution service."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.async_execution_service import (
     AsyncExecutionService,
@@ -19,26 +21,42 @@ class TestAsyncExecutionService:
         return MagicMock()
 
     @pytest.fixture
-    def service(self, mock_store):
+    def mock_backend(self):
+        backend = MagicMock()
+        backend.start_async_command.return_value = AsyncExecutionHandle(
+            tmux_session="vibe3-reviewer-feature-test",
+            log_path=Path("temp/logs/vibe3-reviewer-feature-test.async.log"),
+            prompt_file_path=Path(""),
+        )
+        return backend
+
+    @pytest.fixture
+    def service(self, mock_store, mock_backend):
         """Create service with mock store."""
-        return AsyncExecutionService(store=mock_store)
+        return AsyncExecutionService(store=mock_store, backend=mock_backend)
 
-    def test_start_async_execution_updates_status(self, service, mock_store):
-        """Starting execution should update flow state via tmux."""
-        with patch("subprocess.run") as mock_run:
-            service.start_async_execution(
-                role="reviewer",
-                command=["vibe3", "review", "base"],
-                branch="feature/test",
-            )
+    def test_start_async_execution_updates_status(
+        self, service, mock_store, mock_backend
+    ):
+        """Starting execution should persist the lower-level async handle."""
+        service.start_async_execution(
+            role="reviewer",
+            command=["vibe3", "review", "base"],
+            branch="feature/test",
+        )
 
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args
-        cmd = call_args[0][0]
-        assert cmd[0] == "tmux"
-        assert cmd[1] == "new-session"
-        assert call_args[1]["check"] is True
+        mock_backend.start_async_command.assert_called_once_with(
+            ["vibe3", "review", "base"],
+            execution_name="vibe3-reviewer-feature/test",
+            env=None,
+        )
         assert mock_store.update_flow_state.called
+        assert mock_store.add_event.called
+        refs = mock_store.add_event.call_args.kwargs["refs"]
+        assert refs["tmux_session"] == "vibe3-reviewer-feature-test"
+        assert refs["log_path"].endswith(
+            "temp/logs/vibe3-reviewer-feature-test.async.log"
+        )
 
     def test_check_execution_status_running(self, service):
         """Check status returns running for active process."""
@@ -84,25 +102,34 @@ class TestAsyncExecutionService:
         """Starting execution should persist running state in SQLite store."""
         db_path = tmp_path / "handoff.db"
         store = SQLiteClient(db_path=str(db_path))
-        service = AsyncExecutionService(store=store)
+        backend = MagicMock()
+        backend.start_async_command.return_value = AsyncExecutionHandle(
+            tmux_session="vibe3-reviewer-feature-test",
+            log_path=Path("temp/logs/vibe3-reviewer-feature-test.async.log"),
+            prompt_file_path=Path(""),
+        )
+        service = AsyncExecutionService(store=store, backend=backend)
 
-        with patch("subprocess.run") as mock_run:
-            pid = service.start_async_execution(
-                role="reviewer",
-                command=[
-                    "uv",
-                    "run",
-                    "python",
-                    "src/vibe3/cli.py",
-                    "review",
-                    "base",
-                ],
-                branch="feature/test",
-            )
+        pid = service.start_async_execution(
+            role="reviewer",
+            command=[
+                "uv",
+                "run",
+                "python",
+                "src/vibe3/cli.py",
+                "review",
+                "base",
+            ],
+            branch="feature/test",
+        )
 
         assert pid == 0
-        mock_run.assert_called_once()
+        backend.start_async_command.assert_called_once()
         state = store.get_flow_state("feature/test")
         assert state["reviewer_status"] == "running"
         events = store.get_events("feature/test")
         assert events[0]["event_type"] == "review_started"
+        assert events[0]["refs"]["tmux_session"] == "vibe3-reviewer-feature-test"
+        assert events[0]["refs"]["log_path"].endswith(
+            "temp/logs/vibe3-reviewer-feature-test.async.log"
+        )

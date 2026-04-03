@@ -111,7 +111,7 @@ You no longer need to run `vibe3 flow new` explicitly. Instead:
 
 ```bash
 # On a feature branch, just run your commands
-vibe3 plan task  # Flow is automatically created if needed
+vibe3 plan --issue  # Flow is automatically created if needed
 vibe3 run execute
 vibe3 review base
 

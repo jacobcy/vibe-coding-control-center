@@ -35,10 +35,9 @@ class MockStatusService:
 def _make_dispatcher(
     run_result: bool = True, repo_path: Path | None = None
 ) -> MagicMock:
-    """Create a mock Dispatcher with repo_path and run_governance_command."""
+    """Create a mock manager-like dependency with repo_path."""
     dispatcher = MagicMock()
     dispatcher.repo_path = repo_path or Path("/tmp/vibe-repo")
-    dispatcher.run_governance_command.return_value = run_result
     return dispatcher
 
 
@@ -145,10 +144,11 @@ class TestGovernanceService:
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
+            backend=MagicMock(),
         )
 
         await service._run_governance()
-        service._manager.run_governance_command.assert_not_called()
+        service._backend.run.assert_not_called()
 
         dry_run_files = sorted((tmp_path / "temp").glob("governance_dry_run_*.md"))
         assert len(dry_run_files) == 1

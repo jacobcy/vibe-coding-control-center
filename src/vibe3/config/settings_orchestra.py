@@ -69,6 +69,15 @@ class OrchestraGovernanceSettings(BaseModel):
     dry_run: bool = False
 
 
+class OrchestraSupervisorHandoffSettings(BaseModel):
+    """Supervisor handoff issue consumer settings."""
+
+    enabled: bool = True
+    issue_label: str = "supervisor"
+    handoff_state_label: str = "state/handoff"
+    supervisor_file: str = "supervisor/apply.md"
+
+
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
@@ -99,4 +108,7 @@ class OrchestraSettings(BaseModel):
     )
     governance: OrchestraGovernanceSettings = Field(
         default_factory=OrchestraGovernanceSettings
+    )
+    supervisor_handoff: OrchestraSupervisorHandoffSettings = Field(
+        default_factory=OrchestraSupervisorHandoffSettings
     )

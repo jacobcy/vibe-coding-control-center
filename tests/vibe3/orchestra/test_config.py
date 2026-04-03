@@ -19,6 +19,10 @@ def test_default_config():
     assert OrchestraConfig().governance.prompt_template == "orchestra.governance.plan"
     assert OrchestraConfig().governance.include_supervisor_content is True
     assert OrchestraConfig().governance.dry_run is False
+    assert OrchestraConfig().supervisor_handoff.enabled is True
+    assert OrchestraConfig().supervisor_handoff.issue_label == "supervisor"
+    assert OrchestraConfig().supervisor_handoff.handoff_state_label == "state/handoff"
+    assert OrchestraConfig().supervisor_handoff.supervisor_file == "supervisor/apply.md"
     assert OrchestraConfig().assignee_dispatch.enabled is True
     assert OrchestraConfig().assignee_dispatch.use_worktree is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
@@ -108,6 +112,12 @@ def test_from_settings_loads_yaml_config():
                             "include_supervisor_content": False,
                             "dry_run": True,
                         },
+                        "supervisor_handoff": {
+                            "enabled": True,
+                            "issue_label": "supervisor",
+                            "handoff_state_label": "state/handoff",
+                            "supervisor_file": "supervisor/custom-apply.md",
+                        },
                     }
                 }
             )
@@ -141,6 +151,13 @@ def test_from_settings_loads_yaml_config():
             assert config.governance.prompt_template == "orchestra.governance.custom"
             assert config.governance.include_supervisor_content is False
             assert config.governance.dry_run is True
+            assert config.supervisor_handoff.enabled is True
+            assert config.supervisor_handoff.issue_label == "supervisor"
+            assert config.supervisor_handoff.handoff_state_label == "state/handoff"
+            assert (
+                config.supervisor_handoff.supervisor_file
+                == "supervisor/custom-apply.md"
+            )
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults
 

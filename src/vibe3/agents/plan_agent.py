@@ -61,7 +61,8 @@ class PlanUsecase:
             if not flow or not flow.task_issue_number:
                 raise ValueError(
                     "No issue number provided and current flow has no task issue.\n"
-                    "Use 'vibe3 plan task <issue>' or bind a task to the current flow."
+                    "Use 'vibe3 plan --issue <issue>' or bind a task to the "
+                    "current flow."
                 )
             issue_number = flow.task_issue_number
             used_flow_issue = True
