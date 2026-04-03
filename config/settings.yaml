@@ -255,7 +255,7 @@ plan:
     - Risk 2 and mitigation
 
   # Static: Default plan task guidance
-  # Can be overridden via CLI: vibe plan task 42 --message "Focus on performance"
+  # Can be overridden via CLI: vibe3 plan --issue 42
   plan_task: |
     Analyze requirements and identify affected files using inspect tools.
     Design minimal changes with clear implementation steps.
@@ -396,3 +396,9 @@ orchestra:
     # Whether to inline the supervisor file into the composed governance prompt
     include_supervisor_content: true
     dry_run: true
+
+  supervisor_handoff:
+    enabled: true
+    issue_label: "supervisor"
+    handoff_state_label: "state/handoff"
+    supervisor_file: "supervisor/apply.md"

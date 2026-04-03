@@ -25,7 +25,11 @@ from vibe3.services.flow_service import FlowService
 from vibe3.utils.trace import enable_trace
 
 _ASYNC_OPT = Annotated[
-    bool, typer.Option("--async", help="Run asynchronously in background")
+    bool,
+    typer.Option(
+        "--async/--sync",
+        help="Run asynchronously in background (default: async)",
+    ),
 ]
 
 app = typer.Typer(
@@ -71,7 +75,7 @@ def pr(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
@@ -133,7 +137,7 @@ def base(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).

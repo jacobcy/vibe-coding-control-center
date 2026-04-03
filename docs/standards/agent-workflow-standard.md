@@ -58,13 +58,13 @@ Plan → Run → Review → Commit
 
 ```bash
 # 从 issue 创建 plan
-vibe3 plan task <issue_number>
+vibe3 plan --issue <issue_number>
 
 # 从 spec 文件创建 plan
-vibe3 plan spec --file spec.md
+vibe3 plan --spec --file spec.md
 
 # 从 spec message 创建 plan
-vibe3 plan spec --msg "Add dark mode support"
+vibe3 plan --spec --msg "Add dark mode support"
 ```
 
 **Step 2: 执行 Plan（使用 Agent）**
@@ -146,7 +146,7 @@ vibe3 flow update
 vibe3 flow bind <issue_number>
 
 # 3. 创建 plan
-vibe3 plan task
+vibe3 plan --issue
 
 # 4. 执行 plan（agent 实现）
 vibe3 run --plan
@@ -193,7 +193,7 @@ git checkout -b refactor/split-large-file
 vibe3 flow update
 
 # 2. 创建 plan（重构需要详细规划）
-vibe3 plan spec --msg "Split large file into smaller modules"
+vibe3 plan --spec --msg "Split large file into smaller modules"
 
 # 3. 执行 plan
 vibe3 run --plan

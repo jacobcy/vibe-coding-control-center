@@ -81,6 +81,7 @@ class TestManagerReviewWorktreeResolution:
         cmd = manager.command_builder.build_manager_command(issue)
 
         assert cmd[:6] == ["uv", "run", "python", "-m", "vibe3", "run"]
+        assert "--async" in cmd
         assert "--worktree" in cmd
         assert cmd[-1] == "Implement issue #88: Improve parser"
 
@@ -92,6 +93,7 @@ class TestManagerReviewWorktreeResolution:
 
         cmd = manager.command_builder.build_manager_command(issue)
 
+        assert "--async" in cmd
         assert "--worktree" not in cmd
         assert cmd[-1] == "Implement issue #89: Run in current flow"
 

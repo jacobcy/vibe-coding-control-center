@@ -35,7 +35,8 @@ from vibe3.utils.trace import enable_trace
 app = typer.Typer(
     name="plan",
     help="Create implementation plans using codeagent-wrapper",
-    no_args_is_help=True,
+    no_args_is_help=False,
+    invoke_without_command=True,
     rich_markup_mode="rich",
 )
 
@@ -80,8 +81,7 @@ def _execute_plan_command(
     CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
 
-@app.command()
-def task(
+def _plan_issue_impl(
     issue: Annotated[
         int | None,
         typer.Argument(help="Issue number (default: current flow's task issue)"),
@@ -92,7 +92,7 @@ def task(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -141,8 +141,37 @@ def task(
             )
 
 
-@app.command()
-def spec(
+def _invoke_plan_issue(
+    issue: Annotated[
+        int | None,
+        typer.Option(
+            "--issue",
+            help="Issue number (default: current flow's task issue)",
+        ),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    """Create implementation plan for an issue."""
+    _plan_issue_impl(
+        issue=issue,
+        instructions=None,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
+def _plan_spec_impl(
     file: Annotated[
         Optional[Path],
         typer.Option("--file", "-f", help="Path to spec file"),
@@ -157,7 +186,7 @@ def spec(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -204,6 +233,175 @@ def spec(
         branch=branch,
         request=spec_input.request,
         instructions=instructions,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
+@app.callback()
+def default(
+    ctx: typer.Context,
+    issue: Annotated[
+        int | None,
+        typer.Option(
+            "--issue",
+            help="Issue number (default: current flow's task issue)",
+        ),
+    ] = None,
+    spec: Annotated[
+        bool,
+        typer.Option(
+            "--spec",
+            help="Create implementation plan from a specification",
+        ),
+    ] = False,
+    file: Annotated[
+        Optional[Path],
+        typer.Option("--file", "-f", help="Path to spec file"),
+    ] = None,
+    msg: Annotated[
+        Optional[str],
+        typer.Option("--msg", help="Spec description"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+    if issue is not None and spec:
+        typer.echo("Error: --issue and --spec are mutually exclusive.", err=True)
+        raise typer.Exit(1)
+    if issue is not None:
+        _invoke_plan_issue(
+            issue=issue,
+            trace=trace,
+            dry_run=dry_run,
+            async_mode=async_mode,
+            agent=agent,
+            backend=backend,
+            model=model,
+            worktree=worktree,
+        )
+        return
+    if spec:
+        _plan_spec_impl(
+            file=file,
+            msg=msg,
+            instructions=None,
+            trace=trace,
+            dry_run=dry_run,
+            async_mode=async_mode,
+            agent=agent,
+            backend=backend,
+            model=model,
+            worktree=worktree,
+        )
+        return
+    if file is not None or msg is not None:
+        typer.echo("Error: --file/--msg require --spec.", err=True)
+        raise typer.Exit(1)
+    typer.echo(ctx.get_help())
+    raise typer.Exit()
+
+
+@app.command(name="issue", hidden=True)
+def issue_command(
+    issue: Annotated[
+        int | None,
+        typer.Argument(help="Issue number (default: current flow's task issue)"),
+    ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    _plan_issue_impl(
+        issue=issue,
+        instructions=instructions,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
+@app.command(name="task", hidden=True)
+def task_command(
+    issue: Annotated[
+        int | None,
+        typer.Argument(help="Issue number (default: current flow's task issue)"),
+    ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    _plan_issue_impl(
+        issue=issue,
+        instructions=instructions,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
+@app.command(hidden=True)
+def spec(
+    file: Annotated[
+        Optional[Path],
+        typer.Option("--file", "-f", help="Path to spec file"),
+    ] = None,
+    msg: Annotated[
+        Optional[str],
+        typer.Option("--msg", help="Spec description"),
+    ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    _plan_spec_impl(
+        file=file,
+        msg=msg,
+        instructions=instructions,
+        trace=trace,
         dry_run=dry_run,
         async_mode=async_mode,
         agent=agent,

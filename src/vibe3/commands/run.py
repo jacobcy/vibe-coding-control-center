@@ -1,11 +1,13 @@
 """Run command."""
 
+import os
 from pathlib import Path
 from typing import Annotated, Callable, Optional
 
 import typer
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.run_agent import RunUsecase
 from vibe3.agents.run_prompt import (
     make_run_context_builder,
@@ -15,6 +17,7 @@ from vibe3.agents.runner import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
+from vibe3.clients.github_client import GitHubClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -27,6 +30,9 @@ from vibe3.commands.command_options import (
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.services.governance_service import GovernanceService
+from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.services.label_service import LabelService
 from vibe3.utils.trace import enable_trace
 
@@ -84,6 +90,92 @@ def _ensure_plan_file_exists(plan_file: str | None) -> None:
     raise FileNotFoundError(f"Plan file not found: {plan_file}")
 
 
+def _run_supervisor_mode(
+    *,
+    supervisor_file: str,
+    issue_number: int | None,
+    dry_run: bool,
+    async_mode: bool,
+) -> None:
+    config = OrchestraConfig.from_settings()
+    governance_cfg = config.governance.model_copy(
+        update={
+            "supervisor_file": supervisor_file,
+            "include_supervisor_content": True,
+            "dry_run": dry_run,
+        }
+    )
+    config = config.model_copy(update={"governance": governance_cfg})
+    service = GovernanceService(
+        config=config,
+        status_service=OrchestraStatusService(config),
+    )
+    plan_text = service.render_current_plan()
+
+    if dry_run:
+        typer.echo(f"-> Supervisor dry run: {supervisor_file}")
+        typer.echo(plan_text)
+        return
+
+    runtime_config = VibeConfig.get_defaults()
+    options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
+    run_task = _build_supervisor_task(
+        config=config,
+        issue_number=issue_number,
+    ) or (runtime_config.run.run_prompt or "Execute governance supervisor task")
+    backend = CodeagentBackend()
+
+    typer.echo(f"-> Supervisor run: {supervisor_file}")
+    if async_mode:
+        safe_name = Path(supervisor_file).stem.replace("/", "-")
+        handle = backend.start_async(
+            prompt=plan_text,
+            options=options,
+            task=run_task,
+            execution_name=f"vibe3-supervisor-{safe_name}",
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+        )
+        typer.echo(f"Tmux session: {handle.tmux_session}")
+        typer.echo(f"Session log: {handle.log_path}")
+        return
+
+    result = backend.run(
+        prompt=plan_text,
+        options=options,
+        task=run_task,
+        dry_run=False,
+    )
+    if not result.is_success():
+        raise typer.Exit(1)
+
+
+def _build_supervisor_task(
+    *,
+    config: OrchestraConfig,
+    issue_number: int | None,
+) -> str | None:
+    if issue_number is None:
+        return None
+    repo_hint = f" in repo {config.repo}" if config.repo else ""
+    issue_title = f"issue #{issue_number}"
+    issue = GitHubClient().view_issue(issue_number, repo=config.repo)
+    if isinstance(issue, dict):
+        raw_title = issue.get("title")
+        if isinstance(raw_title, str) and raw_title.strip():
+            issue_title = raw_title.strip()
+    return (
+        f"Process governance issue #{issue_number}{repo_hint}: {issue_title}\n"
+        "This issue has already been handed to the current supervisor explicitly.\n"
+        "Read the issue directly, verify the findings, perform the allowed actions, "
+        "comment the outcome on the same issue, and close it when complete."
+    )
+
+
+def _resolve_issue_supervisor_file() -> str:
+    """Resolve the configured supervisor file for governance issue execution."""
+    return OrchestraConfig.from_settings().supervisor_handoff.supervisor_file
+
+
 def run_command(
     instructions: Annotated[
         Optional[str],
@@ -99,9 +191,26 @@ def run_command(
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
+    supervisor: Annotated[
+        Optional[str],
+        typer.Option(
+            "--supervisor",
+            help="Run a supervisor markdown file as one-shot governance input",
+        ),
+    ] = None,
+    issue: Annotated[
+        Optional[int],
+        typer.Option(
+            "--issue",
+            help=(
+                "Process a governance issue using the configured "
+                "supervisor handoff prompt"
+            ),
+        ),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -110,6 +219,33 @@ def run_command(
     """Execute implementation plan or skill."""
     if trace:
         enable_trace()
+
+    if issue is not None and any(
+        value is not None for value in (plan, skill, supervisor)
+    ):
+        typer.echo(
+            "Error: --issue cannot be combined with --plan, --skill, or --supervisor.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if issue is not None:
+        _run_supervisor_mode(
+            supervisor_file=_resolve_issue_supervisor_file(),
+            issue_number=issue,
+            dry_run=dry_run,
+            async_mode=async_mode,
+        )
+        return
+
+    if supervisor:
+        _run_supervisor_mode(
+            supervisor_file=supervisor,
+            issue_number=issue,
+            dry_run=dry_run,
+            async_mode=async_mode,
+        )
+        return
 
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
@@ -216,9 +352,23 @@ def default(
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
+    supervisor: Annotated[
+        Optional[str],
+        typer.Option(
+            "--supervisor",
+            help="Run a supervisor markdown file as one-shot governance input",
+        ),
+    ] = None,
+    issue: Annotated[
+        Optional[int],
+        typer.Option(
+            "--issue",
+            help="Pass a specific governance issue number to the supervisor task",
+        ),
+    ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -231,6 +381,8 @@ def default(
         instructions,
         plan,
         skill,
+        supervisor,
+        issue,
         trace,
         dry_run,
         async_mode,

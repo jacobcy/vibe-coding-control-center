@@ -166,9 +166,6 @@ def run_execution_pipeline(
             echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
 
         if branch and store:
-            refs = {"status": "completed"}
-            if handoff_file:
-                refs["ref"] = str(handoff_file)
             persist_execution_lifecycle_event(
                 store,
                 branch,
@@ -177,7 +174,7 @@ def run_execution_pipeline(
                 actor,
                 "Run completed (status: completed)",
                 session_id=effective_session_id,
-                refs=refs,
+                refs={"status": "completed"},
             )
 
         return ExecutionResult(

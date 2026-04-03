@@ -141,6 +141,15 @@ class GovernanceConfig(BaseModel):
     )
 
 
+class SupervisorHandoffConfig(BaseModel):
+    """Configuration for supervisor handoff issue consumption."""
+
+    enabled: bool = True
+    issue_label: str = "supervisor"
+    handoff_state_label: str = "state/handoff"
+    supervisor_file: str = "supervisor/apply.md"
+
+
 class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
@@ -176,6 +185,9 @@ class OrchestraConfig(BaseModel):
     )
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
+    supervisor_handoff: SupervisorHandoffConfig = Field(
+        default_factory=SupervisorHandoffConfig
+    )
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -234,6 +246,36 @@ class OrchestraConfig(BaseModel):
                     }
                 )
 
+        supervisor_handoff_defaults: dict[str, bool | str] = {
+            "enabled": True,
+            "issue_label": "supervisor",
+            "handoff_state_label": "state/handoff",
+            "supervisor_file": "supervisor/apply.md",
+        }
+        supervisor_handoff_src = getattr(src, "supervisor_handoff", None)
+        if supervisor_handoff_src is not None:
+            if isinstance(supervisor_handoff_src, dict):
+                supervisor_handoff_defaults.update(supervisor_handoff_src)
+            else:
+                supervisor_handoff_defaults.update(
+                    {
+                        "enabled": getattr(supervisor_handoff_src, "enabled", True),
+                        "issue_label": getattr(
+                            supervisor_handoff_src, "issue_label", "supervisor"
+                        ),
+                        "handoff_state_label": getattr(
+                            supervisor_handoff_src,
+                            "handoff_state_label",
+                            "state/handoff",
+                        ),
+                        "supervisor_file": getattr(
+                            supervisor_handoff_src,
+                            "supervisor_file",
+                            "supervisor/apply.md",
+                        ),
+                    }
+                )
+
         return cls(
             enabled=src.enabled,
             polling_interval=src.polling_interval,
@@ -281,4 +323,7 @@ class OrchestraConfig(BaseModel):
             ),
             circuit_breaker=circuit_breaker_config,
             governance=GovernanceConfig.model_validate(governance_defaults),
+            supervisor_handoff=SupervisorHandoffConfig.model_validate(
+                supervisor_handoff_defaults
+            ),
         )
