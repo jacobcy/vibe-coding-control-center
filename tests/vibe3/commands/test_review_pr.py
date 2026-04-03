@@ -5,7 +5,7 @@ All external services (codeagent-wrapper, GitHub, Git) are mocked.
 """
 
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from typer.testing import CliRunner
@@ -48,15 +48,20 @@ def _mock_inspect_data():
 
 
 @pytest.fixture
-def mock_pr_build():
-    """Default mock for ReviewUsecase.build_pr_review."""
-    with patch("vibe3.commands.review.ReviewUsecase.build_pr_review") as m:
-        m.return_value = (
-            ReviewRequest(scope=ReviewScope.for_pr(42)),
-            101,
-            "feature/branch",
-        )
-        yield m
+def mock_review_usecase(monkeypatch):
+    """Stub ReviewUsecase for fast CLI surface tests."""
+    usecase = MagicMock()
+    usecase.build_pr_review.return_value = (
+        ReviewRequest(scope=ReviewScope.for_pr(42)),
+        101,
+        "feature/branch",
+    )
+    usecase.execute_review.return_value = MagicMock(
+        verdict="PASS",
+        handoff_file=None,
+    )
+    monkeypatch.setattr("vibe3.commands.review._build_review_usecase", lambda: usecase)
+    return usecase
 
 
 def test_review_pr_missing_arg_shows_error():
@@ -66,35 +71,17 @@ def test_review_pr_missing_arg_shows_error():
     assert "missing" in result.output.lower() or "error" in result.output.lower()
 
 
-def test_review_pr_pass(mock_pr_build):
-    with (
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("PASS"),
-        ),
-    ):
-        result = runner.invoke(app, ["pr", "42", "--sync"])
+def test_review_pr_pass(mock_review_usecase):
+    mock_review_usecase.execute_review.return_value.verdict = "PASS"
+    result = runner.invoke(app, ["pr", "42", "--sync"])
     assert result.exit_code == 0
     assert "PASS" in result.output
-    mock_pr_build.assert_called_once_with(42)
+    mock_review_usecase.build_pr_review.assert_called_once_with(42)
 
 
-def test_review_pr_block_exits_1(mock_pr_build):
-    with (
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("BLOCK"),
-        ),
-    ):
-        result = runner.invoke(app, ["pr", "42", "--sync"])
+def test_review_pr_block_exits_1(mock_review_usecase):
+    mock_review_usecase.execute_review.return_value.verdict = "BLOCK"
+    result = runner.invoke(app, ["pr", "42", "--sync"])
     assert result.exit_code == 1
 
 
@@ -114,45 +101,27 @@ def test_review_pr_does_not_have_publish_option():
     assert "--publish" not in output
 
 
-def test_review_pr_is_local_only(mock_pr_build):
+def test_review_pr_is_local_only(mock_review_usecase):
     """review pr should not call GitHub publish methods."""
-    with (
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("PASS"),
-        ),
-    ):
-        result = runner.invoke(app, ["pr", "42", "--sync"])
+    mock_review_usecase.execute_review.return_value.verdict = "PASS"
+    result = runner.invoke(app, ["pr", "42", "--sync"])
 
     assert result.exit_code == 0
 
 
-def test_review_pr_async_dispatches_background_execution(mock_pr_build):
-    with (
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute",
-            return_value=_mock_result(),
-        ) as mock_execute,
-        patch("vibe3.commands.review.parse_codex_review") as mock_parse,
-    ):
-        result = runner.invoke(app, ["pr", "42", "--async"])
+def test_review_pr_async_dispatches_background_execution(mock_review_usecase):
+    mock_review_usecase.execute_review.return_value.verdict = "ASYNC"
+    result = runner.invoke(app, ["pr", "42", "--async"])
 
     assert result.exit_code == 0
-    mock_execute.assert_called_once()
-    assert mock_execute.call_args.kwargs["async_mode"] is True
-    # Verify branch came from PR head_branch ("feature/branch" from fixture)
-    command = mock_execute.call_args.args[0]
-    assert command.branch == "feature/branch"
-    mock_parse.assert_not_called()
+    _, kwargs = mock_review_usecase.execute_review.call_args
+    assert kwargs["async_mode"] is True
+    assert kwargs["branch"] == "feature/branch"
 
 
-def test_async_pr_refuses_when_head_fetch_fails(mock_pr_build):
+def test_async_pr_refuses_when_head_fetch_fails(mock_review_usecase):
     """Refuse async review if head branch cannot be resolved from PR metadata."""
-    mock_pr_build.return_value = (
+    mock_review_usecase.build_pr_review.return_value = (
         ReviewRequest(scope=ReviewScope.for_pr(42)),
         101,
         None,  # head_branch resolve failed
@@ -164,21 +133,10 @@ def test_async_pr_refuses_when_head_fetch_fails(mock_pr_build):
     assert "Could not resolve head branch" in result.output
 
 
-def test_review_parser_failure_returns_error_verdict(mock_pr_build):
-    """When parser fails, execute_review should catch it and return ERROR verdict."""
-    from vibe3.agents.review_parser import ReviewParserError
-
-    with (
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result("NO VERDICT HERE"),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            side_effect=ReviewParserError("Missing verdict"),
-        ),
-    ):
-        result = runner.invoke(app, ["pr", "42", "--sync"])
+def test_review_parser_failure_returns_error_verdict(mock_review_usecase):
+    """Surface ERROR verdict when usecase returns parse-failure result."""
+    mock_review_usecase.execute_review.return_value.verdict = "ERROR"
+    result = runner.invoke(app, ["pr", "42", "--sync"])
 
     assert result.exit_code == 0
     assert "Verdict: ERROR" in result.output

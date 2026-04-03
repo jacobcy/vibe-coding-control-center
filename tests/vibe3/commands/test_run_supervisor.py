@@ -18,6 +18,52 @@ def strip_ansi(text: str) -> str:
     return ansi_escape.sub("", text)
 
 
+def _patch_supervisor_runtime(
+    monkeypatch,
+    *,
+    plan_text: str = (
+        "# Orchestra Governance Scan\n\n"
+        "## Issue Cleanup\n\n"
+        "Use `vibe3 task status` to inspect the current queue.\n"
+    ),
+    repo: str | None = None,
+) -> None:
+    orchestra_config = run_module.OrchestraConfig(
+        repo=repo,
+        pid_file=Path(".git/vibe3/orchestra.pid"),
+    )
+
+    monkeypatch.setattr(
+        run_module.OrchestraConfig,
+        "from_settings",
+        classmethod(lambda cls: orchestra_config),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "OrchestraStatusService",
+        lambda config: MagicMock(),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "GovernanceService",
+        lambda config, status_service: MagicMock(render_current_plan=lambda: plan_text),
+    )
+    monkeypatch.setattr(
+        run_module.VibeConfig,
+        "get_defaults",
+        classmethod(
+            lambda cls: MagicMock(
+                run=MagicMock(run_prompt="Execute governance supervisor task")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "CodeagentExecutionService",
+        lambda config: MagicMock(resolve_agent_options=lambda role: MagicMock()),
+    )
+
+
 class TestRunSupervisorOption:
     def test_help_shows_supervisor_option(self) -> None:
         result = runner.invoke(cli_app, ["run", "--help"])
@@ -26,7 +72,9 @@ class TestRunSupervisorOption:
         assert "supervisor" in output
         assert "governance input" in output
 
-    def test_dry_run_outputs_rendered_governance_plan(self) -> None:
+    def test_dry_run_outputs_rendered_governance_plan(self, monkeypatch) -> None:
+        _patch_supervisor_runtime(monkeypatch)
+
         result = runner.invoke(
             cli_app,
             [
@@ -43,6 +91,7 @@ class TestRunSupervisorOption:
         assert "vibe3 task status" in result.output
 
     def test_non_dry_run_prints_async_session_and_log(self, monkeypatch) -> None:
+        _patch_supervisor_runtime(monkeypatch)
         backend = MagicMock()
         backend.start_async.return_value = AsyncExecutionHandle(
             tmux_session="vibe3-supervisor-issue-cleanup",
@@ -70,6 +119,7 @@ class TestRunSupervisorOption:
         backend.start_async.assert_called_once()
 
     def test_issue_mode_defaults_to_supervisor_apply(self, monkeypatch) -> None:
+        _patch_supervisor_runtime(monkeypatch, repo="owner/repo")
         backend = MagicMock()
         backend.start_async.return_value = AsyncExecutionHandle(
             tmux_session="vibe3-supervisor-apply-issue-426",
@@ -104,6 +154,7 @@ class TestRunSupervisorOption:
         assert "comment the outcome on the same issue" in task
 
     def test_issue_mode_uses_configured_supervisor_file(self, monkeypatch) -> None:
+        _patch_supervisor_runtime(monkeypatch, repo="owner/repo")
         backend = MagicMock()
         backend.start_async.return_value = AsyncExecutionHandle(
             tmux_session="vibe3-supervisor-governance-apply-issue-426",

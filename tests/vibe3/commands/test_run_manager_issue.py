@@ -32,13 +32,25 @@ def _make_github():
     return github
 
 
-def _patch_basic(monkeypatch, backend, github, sqlite=None):
+def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=False):
     monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
     monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
     monkeypatch.setattr(run_module, "SQLiteClient", lambda: sqlite or MagicMock())
     monkeypatch.setattr(
         run_module.GitClient, "get_current_branch", lambda self: "dev/issue-430"
     )
+    monkeypatch.setattr(run_module, "load_session_id", lambda role, branch=None: None)
+    monkeypatch.setattr(
+        run_module,
+        "render_manager_prompt",
+        lambda config, issue: MagicMock(rendered_text="# Manager 自动化执行材料\n"),
+    )
+    if not poll_session_id:
+        monkeypatch.setattr(
+            run_module,
+            "_wait_for_async_session_id",
+            lambda log_path, timeout_seconds=3.0: None,
+        )
 
 
 class TestRunManagerIssueMode:
@@ -53,7 +65,10 @@ class TestRunManagerIssueMode:
             "from_settings",
             staticmethod(
                 lambda: run_module.OrchestraConfig.model_validate(
-                    {"assignee_dispatch": {"agent": "manager-orchestrator"}}
+                    {
+                        "pid_file": ".git/vibe3/orchestra.pid",
+                        "assignee_dispatch": {"agent": "manager-orchestrator"},
+                    }
                 )
             ),
         )
@@ -118,7 +133,7 @@ class TestRunManagerIssueMode:
         github = _make_github()
         sqlite = MagicMock()
 
-        _patch_basic(monkeypatch, backend, github, sqlite)
+        _patch_basic(monkeypatch, backend, github, sqlite, poll_session_id=True)
         monkeypatch.setattr(
             run_module, "load_session_id", lambda role, branch=None: None
         )
@@ -149,7 +164,7 @@ class TestRunManagerIssueMode:
         github = _make_github()
         sqlite = MagicMock()
 
-        _patch_basic(monkeypatch, backend, github, sqlite)
+        _patch_basic(monkeypatch, backend, github, sqlite, poll_session_id=True)
         monkeypatch.setattr(
             run_module, "load_session_id", lambda role, branch=None: None
         )

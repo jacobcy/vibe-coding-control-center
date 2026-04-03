@@ -9,34 +9,34 @@ from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
 
 
 def test_default_config():
-    assert OrchestraConfig().enabled is True
-    assert OrchestraConfig().polling_interval == 900
-    assert OrchestraConfig().dry_run is False
-    assert OrchestraConfig().polling.enabled is True
-    assert OrchestraConfig().governance.enabled is True
-    assert OrchestraConfig().governance.interval_ticks == 4
-    assert OrchestraConfig().governance.supervisor_file == "supervisor/orchestra.md"
-    assert OrchestraConfig().governance.prompt_template == "orchestra.governance.plan"
-    assert OrchestraConfig().governance.include_supervisor_content is True
-    assert OrchestraConfig().governance.dry_run is False
-    assert OrchestraConfig().supervisor_handoff.enabled is True
-    assert OrchestraConfig().supervisor_handoff.issue_label == "supervisor"
-    assert OrchestraConfig().supervisor_handoff.handoff_state_label == "state/handoff"
-    assert OrchestraConfig().supervisor_handoff.supervisor_file == "supervisor/apply.md"
-    assert OrchestraConfig().assignee_dispatch.enabled is True
-    assert OrchestraConfig().assignee_dispatch.use_worktree is True
-    assert OrchestraConfig().assignee_dispatch.agent == "develop"
-    assert OrchestraConfig().assignee_dispatch.backend is None
-    assert OrchestraConfig().assignee_dispatch.model is None
-    assert (
-        OrchestraConfig().assignee_dispatch.supervisor_file == "supervisor/manager.md"
-    )
-    assert OrchestraConfig().assignee_dispatch.include_supervisor_content is True
-    assert OrchestraConfig().pr_review_dispatch.enabled is True
-    assert OrchestraConfig().pr_review_dispatch.async_mode is False
-    assert OrchestraConfig().pr_review_dispatch.use_worktree is False
-    assert OrchestraConfig().state_label_dispatch.enabled is True
-    pid_path = OrchestraConfig().pid_file.as_posix()
+    config = OrchestraConfig()
+
+    assert config.enabled is True
+    assert config.polling_interval == 900
+    assert config.dry_run is False
+    assert config.polling.enabled is True
+    assert config.governance.enabled is True
+    assert config.governance.interval_ticks == 4
+    assert config.governance.supervisor_file == "supervisor/orchestra.md"
+    assert config.governance.prompt_template == "orchestra.governance.plan"
+    assert config.governance.include_supervisor_content is True
+    assert config.governance.dry_run is False
+    assert config.supervisor_handoff.enabled is True
+    assert config.supervisor_handoff.issue_label == "supervisor"
+    assert config.supervisor_handoff.handoff_state_label == "state/handoff"
+    assert config.supervisor_handoff.supervisor_file == "supervisor/apply.md"
+    assert config.assignee_dispatch.enabled is True
+    assert config.assignee_dispatch.use_worktree is True
+    assert config.assignee_dispatch.agent == "develop"
+    assert config.assignee_dispatch.backend is None
+    assert config.assignee_dispatch.model is None
+    assert config.assignee_dispatch.supervisor_file == "supervisor/manager.md"
+    assert config.assignee_dispatch.include_supervisor_content is True
+    assert config.pr_review_dispatch.enabled is True
+    assert config.pr_review_dispatch.async_mode is False
+    assert config.pr_review_dispatch.use_worktree is False
+    assert config.state_label_dispatch.enabled is True
+    pid_path = config.pid_file.as_posix()
     assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
         ".git/vibe3/orchestra.pid"
     )

@@ -1,9 +1,10 @@
 """Tests for orchestra manager cwd resolution and worktree management."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests.vibe3.conftest import CompletedProcess
+from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -18,11 +19,15 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
     )
 
 
+def make_config() -> OrchestraConfig:
+    return OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"))
+
+
 class TestManagerCwdResolution:
     """Tests for ManagerExecutor worktree management methods."""
 
     def test_resolve_manager_cwd_uses_current_branch(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
         with patch.object(
@@ -34,7 +39,7 @@ class TestManagerCwdResolution:
         assert is_temp is False
 
     def test_resolve_manager_cwd_uses_existing_branch_worktree(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
         with patch.object(
@@ -51,7 +56,7 @@ class TestManagerCwdResolution:
         assert is_temp is False
 
     def test_resolve_manager_cwd_creates_worktree_when_missing(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
         with patch.object(
@@ -73,7 +78,7 @@ class TestManagerCwdResolution:
         assert is_temp is True
 
     def test_ensure_manager_worktree_creates_new_worktree(self, tmp_path: Path):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=tmp_path)
 
         with patch(
@@ -88,7 +93,7 @@ class TestManagerCwdResolution:
         assert mock_run.call_args.kwargs["cwd"] == tmp_path
 
     def test_ensure_manager_worktree_skips_when_path_exists(self, tmp_path: Path):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=tmp_path)
         existing = tmp_path / ".worktrees" / "issue-77"
         existing.mkdir(parents=True)
@@ -104,7 +109,7 @@ class TestManagerCommandNormalization:
     """Tests for ManagerExecutor command normalization."""
 
     def test_normalize_manager_command_strips_unsupported_worktree(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         cmd = [
             "uv",
@@ -127,7 +132,7 @@ class TestManagerCommandNormalization:
         assert "--worktree" not in normalized
 
     def test_normalize_manager_command_keeps_supported_worktree(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         cmd = [
             "uv",
@@ -154,7 +159,7 @@ class TestManagerDispatchIntegration:
     """Integration tests for full manager dispatch flow with ManagerExecutor."""
 
     def test_dispatch_manager_executes_in_resolved_manager_cwd(self):
-        config = OrchestraConfig()
+        config = make_config()
         manager = ManagerExecutor(config, dry_run=False, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=102, title="Manager real dispatch")
 
@@ -171,7 +176,11 @@ class TestManagerDispatchIntegration:
                 with patch.object(
                     manager, "_normalize_manager_command", return_value=["uv"]
                 ):
-                    with patch.object(manager, "can_dispatch", return_value=True):
+                    with patch.object(
+                        manager.status_service,
+                        "get_active_flow_count",
+                        return_value=0,
+                    ):
                         with patch.object(
                             manager.result_handler,
                             "record_dispatch_event",
@@ -185,11 +194,20 @@ class TestManagerDispatchIntegration:
                                 with patch.object(
                                     manager.result_handler, "update_state_label"
                                 ):
-                                    with patch(
-                                        "subprocess.run",
-                                        return_value=CompletedProcess(returncode=0),
-                                    ) as mock_run:
-                                        result = manager.dispatch_manager(issue)
+                                    handle = AsyncExecutionHandle(
+                                        tmux_session="vibe3-manager-102",
+                                        log_path=Path(
+                                            "temp/logs/vibe3-manager-102.async.log"
+                                        ),
+                                        prompt_file_path=Path("/tmp/prompt.md"),
+                                    )
+                                    mock_backend = MagicMock()
+                                    start_async_command = (
+                                        mock_backend.start_async_command
+                                    )
+                                    start_async_command.return_value = handle
+                                    manager._backend = mock_backend
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_record_event.assert_called_once_with(
@@ -198,6 +216,7 @@ class TestManagerDispatchIntegration:
             issue_number=102,
             pr_number=None,
         )
-        cwd_calls = [c for c in mock_run.call_args_list if c[1].get("cwd") is not None]
-        # ManagerExecutor calls run_command which calls subprocess.run
-        assert any(c[1]["cwd"] == Path("/tmp/wt-issue-102") for c in cwd_calls)
+        mock_backend.start_async_command.assert_called_once()
+        assert mock_backend.start_async_command.call_args.kwargs["cwd"] == Path(
+            "/tmp/wt-issue-102"
+        )

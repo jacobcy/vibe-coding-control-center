@@ -71,7 +71,18 @@ class TestPRCreateCommandAI:
 
     def test_pr_create_without_ai(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create without --ai flag works normally."""
-        with patch("vibe3.commands.pr_create.PRService") as mock_service:
+        with (
+            patch(
+                "vibe3.commands.pr_create.FlowService.get_current_branch",
+                return_value="task/demo",
+            ),
+            patch(
+                "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_pr_create_base",
+                return_value="main",
+            ),
+            patch("vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"),
+            patch("vibe3.commands.pr_create.PRService") as mock_service,
+        ):
             mock_service.return_value.get_pr.return_value = None
             mock_service.return_value.create_draft_pr.return_value = MagicMock(
                 number=123,
@@ -80,13 +91,13 @@ class TestPRCreateCommandAI:
                 model_dump=lambda: {"number": 123, "title": "Test PR"},
             )
             result = runner.invoke(app, ["pr", "create", "-t", "Test PR", "--yes"])
-            assert result.exit_code == 0
-            mock_service.return_value.create_draft_pr.assert_called_once_with(
-                title="Test PR",
-                body="",
-                base_branch="main",
-                actor=None,
-            )
+        assert result.exit_code == 0
+        mock_service.return_value.create_draft_pr.assert_called_once_with(
+            title="Test PR",
+            body="",
+            base_branch="main",
+            actor=None,
+        )
 
     def test_pr_create_ai_disabled(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create with --ai when AI is disabled."""
@@ -137,9 +148,14 @@ class TestPRCreateCommandAI:
                                 "feat: ai title",
                                 "Summary\n\n- change",
                             )
-                            with patch(
-                                "vibe3.commands.pr_create.PRService"
-                            ) as mock_service:
+                            with (
+                                patch(
+                                    "vibe3.services.pr_create_usecase.PRCreateUsecase.check_flow_task"
+                                ),
+                                patch(
+                                    "vibe3.commands.pr_create.PRService"
+                                ) as mock_service,
+                            ):
                                 mock_service.return_value.get_pr.return_value = None
                                 mock_pr = MagicMock(
                                     number=123,

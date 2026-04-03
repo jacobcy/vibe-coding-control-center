@@ -12,14 +12,24 @@ from vibe3.services.pr_service import PRService
 @pytest.fixture
 def pr_service() -> PRService:
     """Create PR service fixture."""
-    return PRService()
+    github_client = MagicMock()
+    git_client = MagicMock()
+    store = MagicMock()
+    version_service = MagicMock()
+    service = PRService(
+        github_client=github_client,
+        git_client=git_client,
+        store=store,
+        version_service=version_service,
+    )
+    service.briefing_service = MagicMock()
+    return service
 
 
 @pytest.fixture
 def mock_github_client() -> MagicMock:
     """Mock GitHub client."""
-    with patch("vibe3.services.pr_service.GitHubClient") as mock:
-        yield mock
+    return MagicMock()
 
 
 def test_create_draft_pr_blocks_on_conflict(

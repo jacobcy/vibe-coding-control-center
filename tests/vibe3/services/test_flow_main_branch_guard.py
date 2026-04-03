@@ -3,8 +3,22 @@
 import pytest
 
 from vibe3.clients import SQLiteClient
+from vibe3.config.settings import FlowConfig, VibeConfig
 from vibe3.models.flow import MainBranchProtectedError
 from vibe3.services.flow_service import FlowService
+
+
+@pytest.fixture(autouse=True)
+def stable_worktree_actor(monkeypatch):
+    """Avoid real git identity lookups during flow creation tests."""
+    monkeypatch.setattr(
+        "vibe3.services.flow_service.SignatureService.get_worktree_actor",
+        lambda: "test-actor",
+    )
+    monkeypatch.setattr(
+        "vibe3.services.flow_query_mixin.GitHubClient.get_pr",
+        lambda self, pr_number=None, branch=None: None,
+    )
 
 
 class TestMainBranchGuard:
@@ -60,18 +74,21 @@ class TestMainBranchGuard:
             service.create_flow(slug="test", branch="main")
 
     def test_custom_main_branches_from_config(self, tmp_path):
-        """Should read main branches from config."""
-        # ARRANGE: Create config with custom main branches
+        """Should honor protected branches from injected config."""
+        store = SQLiteClient(db_path=tmp_path / "test.db")
+        config = VibeConfig(
+            flow=FlowConfig(protected_branches=["production", "staging"])
+        )
+        service = FlowService(store=store, config=config)
 
-        import yaml
+        with pytest.raises(MainBranchProtectedError):
+            service.ensure_flow_for_branch("production")
 
-        config_path = tmp_path / "settings.yaml"
-        config_data = {"flow": {"protected_branches": ["production", "staging"]}}
-        with open(config_path, "w") as f:
-            yaml.dump(config_data, f)
+        with pytest.raises(MainBranchProtectedError):
+            service.ensure_flow_for_branch("origin/staging")
 
-        # TODO: Load config and test
-        # For now, this test documents the requirement
+        flow = service.ensure_flow_for_branch("main")
+        assert flow.branch == "main"
 
     def test_feature_branch_allowed(self, tmp_path):
         """Should allow flow creation on feature branches."""
