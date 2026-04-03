@@ -143,7 +143,11 @@ def _find_tests_via_dag(src_files: list[str], root: Path) -> set[str]:
         return set()
 
     try:
-        impact = expand_impacted_modules(list(src_files))
+        impact = expand_impacted_modules(
+            list(src_files),
+            max_depth=2,
+            hub_fanout_threshold=15,
+        )
         affected = set(impact.impacted_modules)
         if not affected:
             return set()
