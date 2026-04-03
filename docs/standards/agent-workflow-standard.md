@@ -4,6 +4,8 @@
 > **适用范围**：所有需要 AI 辅助的开发工作
 > **权威性**：本标准为 agent 工作流的权威依据
 
+相关调试方法见 [agent-debugging-standard.md](agent-debugging-standard.md)。
+
 ---
 
 ## 概述
