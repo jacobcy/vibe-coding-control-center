@@ -50,6 +50,9 @@ class AssigneeDispatchConfig(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
+    agent: str = "develop"
+    backend: str | None = None
+    model: str | None = None
     prompt_template: str = Field(
         default="orchestra.assignee_dispatch.manager",
         description="Dotted prompts.yaml path used to render the manager task prompt",
@@ -59,7 +62,7 @@ class AssigneeDispatchConfig(BaseModel):
         description="Supervisor file to include in manager prompt (None disables)",
     )
     include_supervisor_content: bool = Field(
-        default=False,
+        default=True,
         description="Whether to include supervisor file content in the manager prompt",
     )
 
@@ -296,6 +299,9 @@ class OrchestraConfig(BaseModel):
             assignee_dispatch=AssigneeDispatchConfig(
                 enabled=src.assignee_dispatch.enabled,
                 use_worktree=src.assignee_dispatch.use_worktree,
+                agent=getattr(src.assignee_dispatch, "agent", "develop"),
+                backend=getattr(src.assignee_dispatch, "backend", None),
+                model=getattr(src.assignee_dispatch, "model", None),
                 prompt_template=getattr(
                     src.assignee_dispatch,
                     "prompt_template",
@@ -305,7 +311,7 @@ class OrchestraConfig(BaseModel):
                     src.assignee_dispatch, "supervisor_file", "supervisor/manager.md"
                 ),
                 include_supervisor_content=getattr(
-                    src.assignee_dispatch, "include_supervisor_content", False
+                    src.assignee_dispatch, "include_supervisor_content", True
                 ),
             ),
             comment_reply=CommentReplyConfig(

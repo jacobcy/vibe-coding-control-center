@@ -30,9 +30,12 @@ class OrchestraAssigneeDispatchSettings(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
+    agent: str = "develop"
+    backend: str | None = None
+    model: str | None = None
     prompt_template: str = "orchestra.assignee_dispatch.manager"
     supervisor_file: str | None = "supervisor/manager.md"
-    include_supervisor_content: bool = False
+    include_supervisor_content: bool = True
 
 
 class OrchestraPRReviewDispatchSettings(BaseModel):

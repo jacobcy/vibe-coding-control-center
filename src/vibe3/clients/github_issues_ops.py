@@ -1,6 +1,7 @@
 """GitHub client issues operations."""
 
 import json
+import os
 import re
 import subprocess
 from typing import Any
@@ -180,7 +181,19 @@ class IssuesMixin(IssueAdminMixin):
         ]
         if repo:
             cmd.extend(["--repo", repo])
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env={**os.environ, "GH_PAGER": "cat"},
+            )
+        except subprocess.TimeoutExpired:
+            logger.bind(external="github", issue_number=issue_number).warning(
+                f"Timed out fetching issue #{issue_number}"
+            )
+            return "network_error"
         if result.returncode != 0:
             stderr = result.stderr or ""
             stderr_lower = stderr.lower()

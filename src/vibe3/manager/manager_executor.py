@@ -1,10 +1,12 @@
 """Unified execution management for Orchestra."""
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
@@ -49,6 +51,7 @@ class ManagerExecutor:
         self.status_service = OrchestraStatusService(
             config, orchestrator=self._flow_manager
         )
+        self._backend = CodeagentBackend()
 
         # Execution protection
         self._circuit_breaker = circuit_breaker
@@ -132,9 +135,8 @@ class ManagerExecutor:
         # If it was in queue, remove it now that we are dispatching
         self._queued_issues.discard(issue.number)
 
-        cmd = self.command_builder.build_manager_command(issue)
-
         if self.dry_run:
+            cmd = self.command_builder.build_manager_command(issue)
             log.info(f"Dry run: skipping flow/worktree/execution. Cmd: {' '.join(cmd)}")
             return True
 
@@ -160,14 +162,44 @@ class ManagerExecutor:
 
         try:
             # 3. Label update
-            self.result_handler.update_state_label(issue.number, IssueState.IN_PROGRESS)
+            self.result_handler.update_state_label(issue.number, IssueState.CLAIMED)
 
             # 4. Command execution
-            # Use private method so subclasses can override
-            cmd = self._normalize_manager_command(cmd, manager_cwd)
-            log.info(f"Executing: {' '.join(cmd)}")
-
-            success = self._run_command(cmd, manager_cwd, "Manager execution")
+            cmd = [
+                "uv",
+                "run",
+                "python",
+                "src/vibe3/cli.py",
+                "run",
+                "--manager-issue",
+                str(issue.number),
+                "--sync",
+            ]
+            handle = self._backend.start_async_command(
+                cmd,
+                execution_name=f"vibe3-manager-{issue.number}",
+                cwd=manager_cwd,
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            )
+            log.info(
+                f"Started manager async session: {handle.tmux_session} "
+                f"(log: {handle.log_path})"
+            )
+            self._flow_manager.store.add_event(
+                flow_branch,
+                "manager_started",
+                "system",
+                detail=(
+                    f"Started async manager in tmux session: {handle.tmux_session}\n"
+                    f"Log: {handle.log_path}"
+                ),
+                refs={
+                    "tmux_session": handle.tmux_session,
+                    "log_path": str(handle.log_path),
+                    "issue": str(issue.number),
+                },
+            )
+            success = True
 
             # 5. Result handling
             if success:
@@ -237,7 +269,13 @@ class ManagerExecutor:
             from vibe3.services.label_service import LabelService
 
             state = LabelService(repo=self.config.repo).get_state(issue_number)
-            return state != IssueState.IN_PROGRESS
+            return state not in {
+                IssueState.CLAIMED,
+                IssueState.IN_PROGRESS,
+                IssueState.HANDOFF,
+                IssueState.REVIEW,
+                IssueState.MERGE_READY,
+            }
         except Exception:
             return False
 

@@ -7,6 +7,11 @@ import pytest
 from typer.testing import CliRunner
 
 from vibe3.cli import app
+from vibe3.commands.handoff_read import (
+    UPDATE_LOG_MESSAGE_PREVIEW_LIMIT,
+    _preview_update_message,
+    _render_updates_log,
+)
 from vibe3.models.flow import FlowState
 
 runner = CliRunner()
@@ -60,6 +65,60 @@ class TestHandoffCommands:
         assert "Handoff" in result.output
         mock_service.get_flow_state.assert_called_once()
         mock_service.get_handoff_events.assert_called_once()
+
+    def test_handoff_update_log_truncates_messages_by_default(self):
+        """Test Update Log preview truncates long messages to 80 chars."""
+        message = "x" * (UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + 25)
+
+        assert (
+            _preview_update_message(message, truncate=True)
+            == "x" * UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + "..."
+        )
+
+        with patch("vibe3.commands.handoff_read.console.print") as mock_print:
+            _render_updates_log(
+                [
+                    {
+                        "timestamp": "2026-03-26T11:00:00",
+                        "actor": "planner",
+                        "kind": "finding",
+                        "message": message,
+                    }
+                ]
+            )
+
+        printed_lines = [
+            call.args[0] for call in mock_print.call_args_list if call.args
+        ]
+        assert any(
+            "x" * UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + "..." in line
+            for line in printed_lines
+        )
+        assert all(message not in line for line in printed_lines)
+
+    def test_handoff_update_log_shows_full_message_with_all(self):
+        """Test Update Log renders the full message when truncation is disabled."""
+        message = "y" * (UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + 25)
+
+        assert _preview_update_message(message, truncate=False) == message
+
+        with patch("vibe3.commands.handoff_read.console.print") as mock_print:
+            _render_updates_log(
+                [
+                    {
+                        "timestamp": "2026-03-26T11:00:00",
+                        "actor": "planner",
+                        "kind": "finding",
+                        "message": message,
+                    }
+                ],
+                truncate=False,
+            )
+
+        printed_lines = [
+            call.args[0] for call in mock_print.call_args_list if call.args
+        ]
+        assert any(message in line for line in printed_lines)
 
     @patch("vibe3.commands.handoff_read.render_handoff_summary")
     @patch("vibe3.commands.handoff_read.render_handoff_list")

@@ -1,6 +1,7 @@
 """Tests for Orchestra ManagerExecutor - review dispatch and manager commands."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import yaml
@@ -83,7 +84,10 @@ class TestManagerReviewWorktreeResolution:
         assert cmd[:6] == ["uv", "run", "python", "-m", "vibe3", "run"]
         assert "--async" in cmd
         assert "--worktree" in cmd
-        assert cmd[-1] == "Implement issue #88: Improve parser"
+        assert "Manage issue #88: Improve parser" in cmd[-1]
+        assert "## Role" in cmd[-1]
+        assert "状态控制器" in cmd[-1]
+        assert "不是实现 agent" in cmd[-1]
 
     def test_build_manager_command_can_disable_worktree_mode(self):
         config = OrchestraConfig()
@@ -95,7 +99,8 @@ class TestManagerReviewWorktreeResolution:
 
         assert "--async" in cmd
         assert "--worktree" not in cmd
-        assert cmd[-1] == "Implement issue #89: Run in current flow"
+        assert "Manage issue #89: Run in current flow" in cmd[-1]
+        assert "comment、写 handoff、修改 labels" in cmd[-1]
 
     def test_dispatch_manager_dry_run_skips_flow_creation_and_execution(self):
         config = OrchestraConfig(dry_run=True)
@@ -117,6 +122,89 @@ class TestManagerReviewWorktreeResolution:
         # However, ManagerExecutor doesn't call run_command in dry_run mode.
         exec_calls = [c for c in mock_run.call_args_list if "vibe3" in str(c[0][0])]
         assert len(exec_calls) == 0
+
+    def test_dispatch_manager_starts_internal_manager_run_in_target_worktree(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=102, title="Manager session test")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-102"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-102"), False),
+                ):
+                    with patch.object(manager.result_handler, "update_state_label"):
+                        with patch.object(
+                            manager.result_handler, "on_dispatch_success"
+                        ) as mock_success:
+                            with patch.object(
+                                manager._backend,
+                                "start_async_command",
+                                return_value=SimpleNamespace(
+                                    tmux_session="vibe3-manager-102",
+                                    log_path=Path(
+                                        "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                    ),
+                                ),
+                            ) as mock_start:
+                                result = manager.dispatch_manager(issue)
+
+        assert result is True
+        mock_start.assert_called_once()
+        call = mock_start.call_args
+        cmd = call.args[0]
+        assert cmd[:5] == ["uv", "run", "python", "src/vibe3/cli.py", "run"]
+        assert "--manager-issue" in cmd
+        assert "--sync" in cmd
+        assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
+        mock_success.assert_called_once_with(issue, "task/issue-102")
+
+    def test_dispatch_manager_marks_issue_claimed_before_launch(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=103, title="Claim before manager run")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-103"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-103"), False),
+                ):
+                    with patch.object(
+                        manager.result_handler, "update_state_label"
+                    ) as mock_update:
+                        with patch.object(
+                            manager.result_handler, "on_dispatch_success"
+                        ):
+                            with patch.object(
+                                manager._backend,
+                                "start_async_command",
+                                return_value=SimpleNamespace(
+                                    tmux_session="vibe3-manager-103",
+                                    log_path=Path(
+                                        "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
+                                    ),
+                                ),
+                            ):
+                                result = manager.dispatch_manager(issue)
+
+        assert result is True
+        mock_update.assert_called_once_with(issue.number, IssueState.CLAIMED)
 
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()

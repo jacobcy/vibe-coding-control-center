@@ -25,6 +25,13 @@ def test_default_config():
     assert OrchestraConfig().supervisor_handoff.supervisor_file == "supervisor/apply.md"
     assert OrchestraConfig().assignee_dispatch.enabled is True
     assert OrchestraConfig().assignee_dispatch.use_worktree is True
+    assert OrchestraConfig().assignee_dispatch.agent == "develop"
+    assert OrchestraConfig().assignee_dispatch.backend is None
+    assert OrchestraConfig().assignee_dispatch.model is None
+    assert (
+        OrchestraConfig().assignee_dispatch.supervisor_file == "supervisor/manager.md"
+    )
+    assert OrchestraConfig().assignee_dispatch.include_supervisor_content is True
     assert OrchestraConfig().pr_review_dispatch.enabled is True
     assert OrchestraConfig().pr_review_dispatch.async_mode is False
     assert OrchestraConfig().pr_review_dispatch.use_worktree is False
@@ -95,6 +102,9 @@ def test_from_settings_loads_yaml_config():
                         "assignee_dispatch": {
                             "enabled": False,
                             "use_worktree": False,
+                            "agent": "orchestra-manager",
+                            "backend": "opencode",
+                            "model": "custom/manager-model",
                         },
                         "pr_review_dispatch": {
                             "enabled": False,
@@ -141,6 +151,9 @@ def test_from_settings_loads_yaml_config():
             assert config.polling.enabled is False
             assert config.assignee_dispatch.enabled is False
             assert config.assignee_dispatch.use_worktree is False
+            assert config.assignee_dispatch.agent == "orchestra-manager"
+            assert config.assignee_dispatch.backend == "opencode"
+            assert config.assignee_dispatch.model == "custom/manager-model"
             assert config.pr_review_dispatch.enabled is False
             assert config.pr_review_dispatch.async_mode is True
             assert config.pr_review_dispatch.use_worktree is True

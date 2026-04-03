@@ -72,6 +72,17 @@ class TestRefs:
         event = FlowEvent(**events_data[0])
         assert event.refs == refs
 
+    def test_refs_in_flow_event_model_coerces_legacy_scalar_types(self, db):
+        refs = {"success": False, "issue": 372, "files": ["a.py", 3]}
+        db.add_event("br", "dispatch_result", "codex", refs=refs)
+        events_data = db.get_events("br")
+        event = FlowEvent(**events_data[0])
+        assert event.refs == {
+            "success": "False",
+            "issue": "372",
+            "files": ["a.py", "3"],
+        }
+
 
 class TestFlowTimeline:
     def test_timeline_with_state_and_events(self, service, db):

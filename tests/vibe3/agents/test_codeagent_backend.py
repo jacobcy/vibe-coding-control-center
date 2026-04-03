@@ -18,14 +18,23 @@ from vibe3.models.review_runner import (
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
-    def test_run_uses_codeagent_wrapper_with_agent_and_model(self) -> None:
-        """Runner should call codeagent-wrapper with correct arguments."""
+    def test_run_uses_repo_models_mapping_for_agent_preset(
+        self, tmp_path: Path
+    ) -> None:
+        """Agent preset should resolve through repo-local config/models.json."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text(
+            '{"agents":{"code-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
+        )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+        ):
             mock_run.return_value = mock_result
             options = AgentOptions(
                 agent="code-reviewer",
@@ -36,21 +45,52 @@ class TestCodeagentBackend:
         assert result.exit_code == 0
         assert "VERDICT: PASS" in result.stdout
 
-        # Verify command structure
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "codeagent-wrapper" in command[0]
-        assert "--agent" in command
-        assert "code-reviewer" in command
+        assert "--agent" not in command
+        assert "--backend" in command
+        assert "claude" in command
+        assert "--model" in command
+        assert "claude-sonnet-4-6" in command
 
-    def test_run_without_model(self) -> None:
-        """Runner should work without model override."""
+    def test_run_falls_back_to_agent_flag_when_repo_mapping_missing(
+        self, tmp_path: Path
+    ) -> None:
+        """Unknown repo-local preset mapping should fall back to raw --agent mode."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text('{"agents":{"other":{"backend":"claude"}}}')
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+        ):
+            mock_run.return_value = mock_result
+            backend = CodeagentBackend()
+            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+
+        assert result.exit_code == 0
+        command = mock_run.call_args[0][0]
+        assert "--agent" in command
+        assert "code-reviewer" in command
+
+    def test_run_without_model_when_repo_mapping_missing(self, tmp_path: Path) -> None:
+        """Fallback agent mode should omit --model when repo mapping is absent."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text("{}")
+
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+        ):
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
             backend = CodeagentBackend()
@@ -62,6 +102,24 @@ class TestCodeagentBackend:
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "--model" not in command
+
+    def test_run_uses_explicit_cwd_when_provided(self) -> None:
+        """Runner should execute in the provided cwd when specified."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            backend = CodeagentBackend()
+            backend.run(
+                "prompt body",
+                AgentOptions(agent="code-reviewer"),
+                cwd=Path("/tmp/worktree-430"),
+            )
+
+        assert mock_run.call_args.kwargs["cwd"] == "/tmp/worktree-430"
 
     def test_run_non_zero_exit_raises_error(self) -> None:
         """Runner should raise error on non-zero exit code."""
@@ -191,6 +249,84 @@ class TestCodeagentBackend:
 
         command = mock_run.call_args[0][0]
         assert "--worktree" not in command
+
+    def test_extract_session_id_supports_modern_wrapper_format(self) -> None:
+        from vibe3.agents.backends.codeagent import extract_session_id
+
+        output = "some text\nSESSION_ID: ses_2aea4d6b6ffexDUssWC9tEP4Nh\nmore text\n"
+
+        assert extract_session_id(output) == "ses_2aea4d6b6ffexDUssWC9tEP4Nh"
+
+    def test_extract_session_id_supports_wrapper_json_event(self) -> None:
+        from vibe3.agents.backends.codeagent import extract_session_id
+
+        output = '{"type":"step_start","sessionID":"ses_2ae4422c7ffeYDHGar7ZxRsnTC"}'
+
+        assert extract_session_id(output) == "ses_2ae4422c7ffeYDHGar7ZxRsnTC"
+
+    def test_extract_session_id_supports_escaped_wrapper_json_event(self) -> None:
+        from vibe3.agents.backends.codeagent import extract_session_id
+
+        output = (
+            '{"message":"{\\"type\\":\\"step_start\\",'
+            '\\"sessionID\\":\\"ses_2ae0c24f2ffehx2ejWE21YTtHi\\"}"}'
+        )
+
+        assert extract_session_id(output) == "ses_2ae0c24f2ffehx2ejWE21YTtHi"
+
+    def test_start_async_command_clears_existing_repo_log(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+        stale_log = log_dir / "vibe3-manager-issue-372.async.log"
+        stale_log.write_text("SESSION_ID: stale_session\n")
+
+        monkeypatch.setattr(
+            backend,
+            "_default_log_dir",
+            lambda: log_dir,
+        )
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            backend.start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-manager-issue-372",
+            )
+
+        assert not stale_log.exists()
+        assert mock_run.called
+
+    def test_start_async_command_uses_unique_tmux_session_when_name_exists(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                target = cmd[3]
+                result = MagicMock()
+                result.returncode = 0 if target == "vibe3-manager-issue-372" else 1
+                return result
+            result = MagicMock()
+            result.returncode = 0
+            return result
+
+        with patch(
+            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+        ):
+            handle = backend.start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-manager-issue-372",
+            )
+
+        assert handle.tmux_session == "vibe3-manager-issue-372-2"
+        assert handle.log_path == log_dir / "vibe3-manager-issue-372-2.async.log"
 
     def test_run_streams_output_while_capturing(self, capsys) -> None:
         """Runner should stream wrapper output to console and capture it."""
