@@ -4,12 +4,12 @@
 
 只回答一个问题：
 
-- 当前 `vibe3 status` 暴露出来的 issue / flow / worktree 现场里，哪些看起来像调试残留、陈旧现场或需要人工确认的 cleanup 候选
+- 当前 `vibe3 task status` 暴露出来的 issue / flow / worktree 现场里，哪些看起来像调试残留、陈旧现场或需要人工确认的 cleanup 候选
 
 ## What It Reads
 
 - governance prompt 里的最小 runtime summary
-- `vibe3 status`
+- `vibe3 task status`
 - 必要时 `vibe3 flow show`
 - 必要时 `gh issue view <number>`
 - 发布治理 issue 前，必须先检查现有 open 的 `supervisor` + `state/handoff` issue，避免重复发布
@@ -34,7 +34,7 @@
 ## Execution Pattern
 
 1. 先识别明显健康的 running issues，避免误伤
-2. 必须先运行 `vibe3 status`，把真实的 active flows / worktrees / issue progress 当作主要观察面
+2. 必须先运行 `vibe3 task status`，把真实的 active flows / worktrees / issue progress 当作主要观察面
 3. 如有必要，再运行 `vibe3 flow show` 或 `gh issue view <number>` 补充单个现场事实
 4. 再识别疑似残留现场，例如：
    - 有 flow 记录但没有 worktree，且看起来不是当前活跃实现
@@ -81,7 +81,7 @@
 ## Command Guidance
 
 - dry-run 时：
-  - 先执行 `vibe3 status`
+  - 先执行 `vibe3 task status`
   - 必要时执行 `vibe3 flow show`
   - 先输出查重结果，再输出 findings 与 issue 预览，不直接写入
 - apply 时：

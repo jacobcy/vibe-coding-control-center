@@ -352,6 +352,15 @@ orchestra:
     enabled: true
     # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
     use_worktree: true
+    # manager 是开发 scene owner，默认 agent preset 从仓库内 config/models.json 解析
+    agent: "code-explorer"
+    # backend/model 留空时，使用 config/models.json 中该 agent 的映射
+    # 仅在需要临时覆盖 preset 映射时填写
+    backend:
+    model:
+    # manager 角色材料真源，由 prompt 组装时内联
+    supervisor_file: "supervisor/manager.md"
+    include_supervisor_content: true
 
   # PR reviewer-triggered review execution
   pr_review_dispatch:

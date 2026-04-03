@@ -24,5 +24,5 @@
 - branch 创建、切换、merge、删除：直接使用 `git`
 - issue / PR / project 的远端读取与写入：直接使用 `gh`
 - 本地 flow 注册与绑定：使用 `vibe3 flow update`、`vibe3 flow bind`
-- 本地现场读取：使用 `vibe3 flow show`、`vibe3 flow status`、`vibe3 status`
+- 本地现场读取：使用 `vibe3 flow show`、`vibe3 flow status`、`vibe3 task status`
 - 本地协作增强：使用 `vibe3 handoff`

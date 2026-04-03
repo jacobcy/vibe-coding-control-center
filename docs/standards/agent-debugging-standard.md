@@ -35,7 +35,7 @@
   - findings 类型路由
   - 治理动作判断
   - comment / close 决策
-  - 是否查询 `vibe3 status` / `vibe3 flow show`
+  - 是否查询 `vibe3 task status` / `vibe3 flow show`
 
 业务逻辑必须留在：
 
@@ -63,6 +63,19 @@ agent 调试默认使用 async/tmux：
 - 通过 `vibe3 flow show` 或 GitHub issue 查看外部结果
 
 调试时必须优先保证“能看见发生了什么”，而不是追求链路一步到位自动化。
+
+### 2.4 角色默认模型必须显式配置
+
+- `plan`、`run`、`review`、`manager`、`supervisor` 是不同角色，不应因为实现方便而隐式共用同一个默认 agent preset
+- 尤其是 `manager`，它承担 scene 判断、状态迁移、后续 agent 派发，不应默认继承 `run.agent_config.agent`
+- 如果某个角色长期表现出“执行型过强、治理型过弱”或“过度自由探索”，优先检查该角色是否错误继承了别的默认 agent/model
+- 调试时要同时核查两层真源：
+  - 仓库配置真源：`config/settings.yaml`
+  - codeagent preset 真源：`~/.codeagent/models.json`
+- 原则上：
+  - 仓库只决定“这个角色默认用哪个 agent/backend/model”
+  - `models.json` 决定该 preset 的具体底层映射
+  - prompt 不负责偷偷补偿模型选择错误
 
 ---
 
@@ -131,7 +144,7 @@ vibe3 run --supervisor supervisor/issue-cleanup.md --dry-run
 检查点：
 
 - prompt 是否使用了正确的 supervisor 文件
-- 是否明确要求 agent 自己运行 `vibe3 status`、`vibe3 flow show`、`gh issue view`
+- 是否明确要求 agent 自己运行 `vibe3 task status`、`vibe3 flow show`、`gh issue view`
 - 是否避免把过多业务判断下沉到底层
 
 #### 第二步：手动创建治理 issue
@@ -180,7 +193,7 @@ vibe3 run --issue <governance_issue_number>
 - 治理链通过 issue 交接，不通过 branch handoff 交接
 - `run --issue` 是治理 issue 的统一 apply 入口
 - async/tmux 与 session log 属于底层 codeagent 适配层，不属于上层 orchestration
-- 底层只负责触发；是否检查 `vibe3 status`、是否创建 issue、是否 comment / close，全部由 supervisor prompt 决定
+- 底层只负责触发；是否检查 `vibe3 task status`、是否创建 issue、是否 comment / close，全部由 supervisor prompt 决定
 
 ---
 
@@ -208,6 +221,18 @@ manager 链与治理链的差异只在真源：
 - 当前 branch / worktree / flow 是否一致
 - manager 是否只负责 scene 推进，而没有吞掉上层业务编排
 - plan/run/review 的 mode policy 是否正确注入
+- manager 使用的默认 agent/model 是否来自独立配置，而不是隐式继承 `run`
+
+### 5.1 Manager 角色与模型
+
+- `manager` 是开发链 owner，不是普通执行 agent
+- `manager` 的默认 agent/model 应单独配置在 orchestra/manager 侧，而不是沿用 `run.agent_config`
+- 调试 manager 异常时，优先区分三类问题：
+  - prompt 材料不对
+  - scene/worktree/session 不对
+  - manager 角色模型不对
+
+如果 manager 的行为明显更像“直接实现代码”而不是“检查现场、迁移状态、决定下一步”，优先检查 manager 的默认 agent preset 是否选错
 
 ---
 

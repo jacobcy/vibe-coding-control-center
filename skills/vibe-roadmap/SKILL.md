@@ -7,7 +7,7 @@ description: Use when the user wants project-level roadmap planning, version goa
 
 维护全景路线图，管理版本目标，对 task item 进行分类，决定规划窗口纳入什么。
 
-**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；shell 层通过 `vibe3 status`、`vibe3 flow show`、`vibe3 flow bind` 等命令暴露共享事实。
+**核心原则:** `/vibe-roadmap` 是规划层的 dispatch brain，负责调度决策；shell 层通过 `vibe3 task status`、`vibe3 flow show`、`vibe3 flow bind` 等命令暴露共享事实。
 
 **新增核心原则:** 所有 roadmap 管理通过 GitHub issue labels 触发，不在本地实现数据存储，遵循 GitHub-as-truth 原则。
 
@@ -39,7 +39,7 @@ intake gate 约束：
 
 **Announce at start:** "我正在使用 /vibe-roadmap 技能来管理版本路线图。"
 
-**命令自检:** 对 `vibe3 status`、`vibe3 flow show`、`vibe3 flow bind` 等参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
+**命令自检:** 对 `vibe3 task status`、`vibe3 flow show`、`vibe3 flow bind` 等参数、子命令或 flag 有任何不确定时，先运行 `--help`。shell 命令是 agent 的工具入口，不是面向用户的命令教学清单。
 
 ## Trigger Examples
 
@@ -57,7 +57,7 @@ intake gate 约束：
 ## Hard Boundary
 
 - 只负责规划层调度，不负责 `repo issue` 创建、flow 注册修复或 runtime 修复
-- 必须先运行 `vibe3 status` / `vibe3 flow show` 等 shell 命令
+- 必须先运行 `vibe3 task status` / `vibe3 flow show` 等 shell 命令
 - 不得直接修改 `.git/vibe3/handoff.db` 底层数据
 - 远端写操作优先通过 `gh` / GitHub 原生命令完成
 - 只有涉及本地 flow 绑定时才使用 `vibe3 flow bind`
@@ -111,7 +111,7 @@ intake gate 约束：
 
 ```bash
 # 查看当前 flow / issue 总览
-vibe3 status
+vibe3 task status
 
 # 显示当前分支的 flow 详情
 vibe3 flow show

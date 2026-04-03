@@ -151,7 +151,7 @@ WHERE issue_role = 'repo';
 
 ```bash
 # 查看所有活跃 flow（总览入口）
-vibe3 status
+vibe3 task status
 
 # 查看 flow 完整信息
 vibe3 flow show --branch task/my-feature
