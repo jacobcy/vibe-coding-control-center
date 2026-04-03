@@ -5,8 +5,10 @@ Migrated from vibe3.services.review_runner.
 
 from vibe3.agents.backends.codeagent import (
     DEFAULT_WRAPPER_PATH,
-    MODELS_JSON_PATH,
     extract_session_id,
+)
+from vibe3.agents.backends.codeagent_config import (
+    MODELS_JSON_PATH,
     sync_models_json,
 )
 from vibe3.models.review_runner import AgentOptions

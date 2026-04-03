@@ -33,7 +33,10 @@ class TestCodeagentBackend:
 
         with (
             patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
-            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
         ):
             mock_run.return_value = mock_result
             options = AgentOptions(
@@ -67,7 +70,10 @@ class TestCodeagentBackend:
 
         with (
             patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
-            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
         ):
             mock_run.return_value = mock_result
             backend = CodeagentBackend()
@@ -89,7 +95,10 @@ class TestCodeagentBackend:
 
         with (
             patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
-            patch("vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH", repo_models),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
         ):
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")

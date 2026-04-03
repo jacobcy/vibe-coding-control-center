@@ -145,9 +145,11 @@ class TestSyncModelsJson:
         fake_repo_models.write_text("{}")
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
@@ -166,9 +168,11 @@ class TestSyncModelsJson:
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
@@ -189,9 +193,11 @@ class TestSyncModelsJson:
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
@@ -208,9 +214,11 @@ class TestSyncModelsJson:
         fake_repo_models.write_text("{}")
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
@@ -229,9 +237,11 @@ class TestSyncModelsJson:
         fake_models.write_text("NOT JSON {{{{")
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
@@ -259,9 +269,11 @@ class TestSyncModelsJson:
         )
 
         with (
-            patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models),
             patch(
-                "vibe3.agents.backends.codeagent.REPO_MODELS_JSON_PATH",
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
                 fake_repo_models,
             ),
         ):
