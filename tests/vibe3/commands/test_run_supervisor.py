@@ -26,7 +26,6 @@ class TestRunSupervisorOption:
         assert "supervisor" in output
         assert "governance input" in output
 
-
     def test_dry_run_outputs_rendered_governance_plan(self) -> None:
         result = runner.invoke(
             cli_app,
