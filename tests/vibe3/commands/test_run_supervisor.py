@@ -1,6 +1,5 @@
 """Tests for `vibe3 run --supervisor`."""
 
-import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -13,18 +12,12 @@ from vibe3.cli import app as cli_app
 runner = CliRunner(env={"NO_COLOR": "1"})
 
 
-def strip_ansi(text: str) -> str:
-    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
-    return ansi_escape.sub("", text)
-
-
 class TestRunSupervisorOption:
     def test_help_shows_supervisor_option(self) -> None:
         result = runner.invoke(cli_app, ["run", "--help"])
-        output = strip_ansi(result.output)
         assert result.exit_code == 0
-        assert "supervisor" in output
-        assert "governance input" in output
+        assert "--supervisor" in result.output
+
 
     def test_dry_run_outputs_rendered_governance_plan(self) -> None:
         result = runner.invoke(

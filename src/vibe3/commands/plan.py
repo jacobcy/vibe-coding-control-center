@@ -141,6 +141,36 @@ def _plan_issue_impl(
             )
 
 
+def _invoke_plan_issue(
+    issue: Annotated[
+        int | None,
+        typer.Option(
+            "--issue",
+            help="Issue number (default: current flow's task issue)",
+        ),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    """Create implementation plan for an issue."""
+    _plan_issue_impl(
+        issue=issue,
+        instructions=None,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
 def _plan_spec_impl(
     file: Annotated[
         Optional[Path],
@@ -251,9 +281,8 @@ def default(
         typer.echo("Error: --issue and --spec are mutually exclusive.", err=True)
         raise typer.Exit(1)
     if issue is not None:
-        _plan_issue_impl(
+        _invoke_plan_issue(
             issue=issue,
-            instructions=None,
             trace=trace,
             dry_run=dry_run,
             async_mode=async_mode,
@@ -285,8 +314,38 @@ def default(
 
 
 @app.command(name="issue", hidden=True)
-@app.command(name="task", hidden=True)
 def issue_command(
+    issue: Annotated[
+        int | None,
+        typer.Argument(help="Issue number (default: current flow's task issue)"),
+    ] = None,
+    instructions: Annotated[
+        Optional[str],
+        typer.Argument(help="Additional task guidance"),
+    ] = None,
+    trace: _TRACE_OPT = False,
+    dry_run: _DRY_RUN_OPT = False,
+    async_mode: _ASYNC_OPT = True,
+    agent: _AGENT_OPT = None,
+    backend: _BACKEND_OPT = None,
+    model: _MODEL_OPT = None,
+    worktree: _WORKTREE_OPT = False,
+) -> None:
+    _plan_issue_impl(
+        issue=issue,
+        instructions=instructions,
+        trace=trace,
+        dry_run=dry_run,
+        async_mode=async_mode,
+        agent=agent,
+        backend=backend,
+        model=model,
+        worktree=worktree,
+    )
+
+
+@app.command(name="task", hidden=True)
+def task_command(
     issue: Annotated[
         int | None,
         typer.Argument(help="Issue number (default: current flow's task issue)"),
