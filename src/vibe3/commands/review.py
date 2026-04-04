@@ -185,9 +185,15 @@ def base(
         # Parent only schedules tmux async run; child re-enters CLI and computes
         # inspect/snapshot context once. Avoid duplicate precomputation here.
         config = VibeConfig.get_defaults()
+        review_task = (
+            instructions
+            or (config.review.review_prompt if config.review else None)
+            or f"Review changes on {current_branch} vs {resolved_base.base_branch}"
+        )
         command = create_codeagent_command(
             role="reviewer",
             context_builder=lambda: "",
+            task=review_task,
             dry_run=False,
             handoff_kind="review",
             config=config,
