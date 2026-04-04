@@ -79,9 +79,7 @@ class TestFlowManager:
                 {"branch": "dev/issue-435", "flow_status": "active"},
             ],
         ):
-            with patch.object(
-                manager.store, "get_issue_links", return_value=[]
-            ):
+            with patch.object(manager.store, "get_issue_links", return_value=[]):
                 with patch.object(
                     manager.label_service,
                     "get_state",

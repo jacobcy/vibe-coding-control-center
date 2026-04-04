@@ -5,8 +5,8 @@ from typing import Annotated, cast
 
 import typer
 
-from vibe3.commands.common import trace_scope
 from vibe3.clients.github_client import GitHubClient
+from vibe3.commands.common import trace_scope
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -287,19 +287,18 @@ def status(
             auto_flows = [
                 flow
                 for flow in flows
-                if _is_auto_task_branch(flow.branch)
-                and flow.branch in worktree_map
+                if _is_auto_task_branch(flow.branch) and flow.branch in worktree_map
             ]
-            manual_flows = [flow for flow in flows if not _is_auto_task_branch(flow.branch)]
+            manual_flows = [
+                flow for flow in flows if not _is_auto_task_branch(flow.branch)
+            ]
 
             console.print("\n[bold cyan]Auto Task Scenes:[/]")
             if auto_flows:
                 for flow in auto_flows:
                     wt = worktree_map.get(flow.branch, "(no worktree)")
                     if _is_canonical_task_branch(flow.branch, flow.task_issue_number):
-                        console.print(
-                            f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}"
-                        )
+                        console.print(f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}")
                     else:
                         task = (
                             f"#{flow.task_issue_number}"

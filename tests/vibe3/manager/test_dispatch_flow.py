@@ -222,7 +222,9 @@ class TestManagerDispatchIntegration:
                             "get_active_flow_count",
                             return_value=0,
                         ):
-                            with patch.object(manager.result_handler, "update_state_label"):
+                            with patch.object(
+                                manager.result_handler, "update_state_label"
+                            ):
                                 with patch.object(
                                     manager.flow_manager.store,
                                     "add_event",
@@ -236,7 +238,9 @@ class TestManagerDispatchIntegration:
                                         prompt_file_path=Path("/tmp/prompt.md"),
                                     )
                                     mock_backend = MagicMock()
-                                    start_async_command = mock_backend.start_async_command
+                                    start_async_command = (
+                                        mock_backend.start_async_command
+                                    )
                                     start_async_command.return_value = handle
                                     manager._backend = mock_backend
                                     result = manager.dispatch_manager(issue)

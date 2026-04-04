@@ -7,8 +7,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.models.orchestration import IssueInfo
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.label_service import LabelService
@@ -45,7 +44,9 @@ class FlowManager:
     def _canonical_task_branch(issue_number: int) -> str:
         return f"task/issue-{issue_number}"
 
-    def _is_reusable_auto_flow(self, flow: dict[str, object], issue_number: int) -> bool:
+    def _is_reusable_auto_flow(
+        self, flow: dict[str, object], issue_number: int
+    ) -> bool:
         branch = str(flow.get("branch") or "").strip()
         if branch != self._canonical_task_branch(issue_number):
             return False
@@ -55,7 +56,9 @@ class FlowManager:
             "stale",
         }
 
-    def _reactivate_canonical_flow(self, issue: IssueInfo, branch: str, slug: str) -> dict:
+    def _reactivate_canonical_flow(
+        self, issue: IssueInfo, branch: str, slug: str
+    ) -> dict:
         from vibe3.services.signature_service import SignatureService
 
         initiator = SignatureService.resolve_initiator(branch)
@@ -129,7 +132,10 @@ class FlowManager:
             return task_issue
         issue_links = self.store.get_issue_links(branch)
         for link in issue_links:
-            if link.get("issue_role") == "task" and link.get("issue_number") is not None:
+            if (
+                link.get("issue_role") == "task"
+                and link.get("issue_number") is not None
+            ):
                 return int(link["issue_number"])
         match = re.fullmatch(r"task/issue-(\d+)", branch)
         if match:

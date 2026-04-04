@@ -174,7 +174,10 @@ class TestGovernanceService:
         backend = MagicMock()
         backend.start_async.return_value = AsyncExecutionHandle(
             tmux_session="vibe3-governance-scan-20260404-140000-t1",
-            log_path=tmp_path / "temp" / "logs" / "vibe3-governance-scan-20260404-140000-t1.async.log",
+            log_path=tmp_path
+            / "temp"
+            / "logs"
+            / "vibe3-governance-scan-20260404-140000-t1.async.log",
             prompt_file_path=tmp_path / "prompt.md",
         )
         service = GovernanceService(
@@ -208,7 +211,9 @@ class TestGovernanceService:
         )
         backend = MagicMock()
         service = GovernanceService(
-            config=OrchestraConfig(governance=GovernanceConfig(interval_ticks=1, dry_run=False)),
+            config=OrchestraConfig(
+                governance=GovernanceConfig(interval_ticks=1, dry_run=False)
+            ),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
             backend=backend,

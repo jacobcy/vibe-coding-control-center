@@ -10,6 +10,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
+from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -184,7 +185,7 @@ class ManagerExecutor:
             try:
                 handle = self._backend.start_async_command(
                     cmd,
-                    execution_name=f"vibe3-manager-{issue.number}",
+                    execution_name=get_manager_session_name(issue.number),
                     cwd=manager_cwd,
                     env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
                 )

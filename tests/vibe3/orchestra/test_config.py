@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
+from vibe3.orchestra.config import OrchestraConfig
 
 
 def test_default_config():
@@ -24,10 +24,16 @@ def test_default_config():
     assert config.governance.prompt_template == "orchestra.governance.plan"
     assert config.governance.include_supervisor_content is True
     assert config.governance.dry_run is False
+    assert config.governance.agent == "explore"
+    assert config.governance.backend is None
+    assert config.governance.model is None
     assert config.supervisor_handoff.enabled is True
     assert config.supervisor_handoff.issue_label == "supervisor"
     assert config.supervisor_handoff.handoff_state_label == "state/handoff"
     assert config.supervisor_handoff.supervisor_file == "supervisor/apply.md"
+    assert config.supervisor_handoff.agent == "explore"
+    assert config.supervisor_handoff.backend is None
+    assert config.supervisor_handoff.model is None
     assert config.assignee_dispatch.enabled is True
     assert config.assignee_dispatch.use_worktree is True
     assert config.assignee_dispatch.agent == "develop"
@@ -51,39 +57,6 @@ def test_config_validation():
     assert config.max_concurrent_flows == 5
 
 
-def test_master_agent_config():
-    config = MasterAgentConfig()
-    assert config.enabled is True
-    assert config.agent == "master-controller"
-    assert config.timeout_seconds == 300
-
-    config_custom = MasterAgentConfig(
-        enabled=False,
-        agent="custom-agent",
-        backend="claude",
-        model="claude-sonnet-4-5",
-        timeout_seconds=600,
-    )
-    assert config_custom.enabled is False
-    assert config_custom.agent == "custom-agent"
-    assert config_custom.backend == "claude"
-    assert config_custom.model == "claude-sonnet-4-5"
-    assert config_custom.timeout_seconds == 600
-
-
-def test_orchestra_config_with_master_agent():
-    master = MasterAgentConfig(enabled=False, agent="test-agent")
-    config = OrchestraConfig(
-        polling_interval=120,
-        max_concurrent_flows=2,
-        master_agent=master,
-    )
-    assert config.polling_interval == 120
-    assert config.max_concurrent_flows == 2
-    assert config.master_agent.enabled is False
-    assert config.master_agent.agent == "test-agent"
-
-
 def test_from_settings_loads_yaml_config():
     with tempfile.TemporaryDirectory() as tmpdir:
         settings_path = Path(tmpdir) / "settings.yaml"
@@ -96,11 +69,6 @@ def test_from_settings_loads_yaml_config():
                         "debug_polling_interval": 45,
                         "scene_base_ref": "feature/debug-base",
                         "max_concurrent_flows": 5,
-                        "master_agent": {
-                            "enabled": True,
-                            "agent": "test-controller",
-                            "timeout_seconds": 600,
-                        },
                         "polling": {
                             "enabled": False,
                         },
@@ -126,12 +94,18 @@ def test_from_settings_loads_yaml_config():
                             "prompt_template": "orchestra.governance.custom",
                             "include_supervisor_content": False,
                             "dry_run": True,
+                            "agent": "custom-governance",
+                            "backend": "claude",
+                            "model": "claude-opus-4-5",
                         },
                         "supervisor_handoff": {
                             "enabled": True,
                             "issue_label": "supervisor",
                             "handoff_state_label": "state/handoff",
                             "supervisor_file": "supervisor/custom-apply.md",
+                            "agent": "custom-supervisor",
+                            "backend": "gemini",
+                            "model": "gemini-3-flash-preview",
                         },
                     }
                 }
@@ -153,8 +127,6 @@ def test_from_settings_loads_yaml_config():
             assert config.debug_polling_interval == 45
             assert config.scene_base_ref == "feature/debug-base"
             assert config.max_concurrent_flows == 5
-            assert config.master_agent.agent == "test-controller"
-            assert config.master_agent.timeout_seconds == 600
             assert config.polling.enabled is False
             assert config.assignee_dispatch.enabled is False
             assert config.assignee_dispatch.use_worktree is False
@@ -171,6 +143,9 @@ def test_from_settings_loads_yaml_config():
             assert config.governance.prompt_template == "orchestra.governance.custom"
             assert config.governance.include_supervisor_content is False
             assert config.governance.dry_run is True
+            assert config.governance.agent == "custom-governance"
+            assert config.governance.backend == "claude"
+            assert config.governance.model == "claude-opus-4-5"
             assert config.supervisor_handoff.enabled is True
             assert config.supervisor_handoff.issue_label == "supervisor"
             assert config.supervisor_handoff.handoff_state_label == "state/handoff"
@@ -178,6 +153,9 @@ def test_from_settings_loads_yaml_config():
                 config.supervisor_handoff.supervisor_file
                 == "supervisor/custom-apply.md"
             )
+            assert config.supervisor_handoff.agent == "custom-supervisor"
+            assert config.supervisor_handoff.backend == "gemini"
+            assert config.supervisor_handoff.model == "gemini-3-flash-preview"
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults
 

@@ -243,7 +243,9 @@ class TestVerifyCurrentFlow:
         result = check_service.verify_current_flow()
 
         assert result.is_valid
-        assert not any("Shared handoff file not found" in issue for issue in result.issues)
+        assert not any(
+            "Shared handoff file not found" in issue for issue in result.issues
+        )
 
     def test_merged_pr_returns_valid(
         self, check_service, mock_store, mock_github_client
@@ -306,7 +308,9 @@ class TestVerifyCurrentFlow:
         }
         mock_github_client.list_prs_for_branch.return_value = []
         with patch.object(
-            check_service.git_client, "get_current_branch", return_value="task/issue-431"
+            check_service.git_client,
+            "get_current_branch",
+            return_value="task/issue-431",
         ):
             with patch.object(
                 check_service.git_client,

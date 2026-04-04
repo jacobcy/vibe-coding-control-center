@@ -202,7 +202,9 @@ def test_start_debug_overrides_interval_and_scene_base(monkeypatch) -> None:
             )
         ),
     )
-    monkeypatch.setattr(serve_module.GitClient, "get_current_branch", lambda self: "dev/post-437-debug")
+    monkeypatch.setattr(
+        serve_module.GitClient, "get_current_branch", lambda self: "dev/post-437-debug"
+    )
     monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
     monkeypatch.setattr(serve_module, "_run", _fake_run)
 

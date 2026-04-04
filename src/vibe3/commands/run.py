@@ -33,6 +33,7 @@ from vibe3.commands.command_options import (
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.manager.prompts import render_manager_prompt
+from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review_runner import AgentOptions
@@ -555,7 +556,7 @@ def _run_manager_issue_mode(
                 options=options,
                 task=manager_task,
                 session_id=session_id,
-                execution_name=f"vibe3-manager-issue-{issue_number}",
+                execution_name=get_manager_session_name(issue_number),
                 cwd=launch_cwd,
                 env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             )

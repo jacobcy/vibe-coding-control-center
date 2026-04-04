@@ -14,6 +14,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
@@ -25,7 +26,6 @@ from vibe3.server.registry import (
     _start_async_serve,
     _validate_pid_file,
 )
-from vibe3.clients.git_client import GitClient
 
 app = typer.Typer(
     help="Orchestra server: GitHub webhook receiver + heartbeat polling",

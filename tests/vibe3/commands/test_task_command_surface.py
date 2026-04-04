@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.cli import app
-from vibe3.orchestra.services.status_service import OrchestraSnapshot
 from vibe3.models.flow import FlowStatusResponse
+from vibe3.orchestra.services.status_service import OrchestraSnapshot
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -161,7 +161,11 @@ def test_task_status_groups_orchestration_issues_and_manual_scenes(
     assert "Active:" in result.stdout
     assert "Ready Queue:" in result.stdout
     assert "200" not in result.stdout
-    assert result.stdout.index("278") < result.stdout.index("320") < result.stdout.index("372")
+    assert (
+        result.stdout.index("278")
+        < result.stdout.index("320")
+        < result.stdout.index("372")
+    )
     assert "320" in result.stdout
     assert "READY" in result.stdout
     assert "Blocked Issues:" in result.stdout

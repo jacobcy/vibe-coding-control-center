@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 import os
 import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import AsyncExecutionHandle
-from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
 from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.config.settings import VibeConfig
+from vibe3.orchestra.agent_resolver import resolve_governance_agent_options
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,
@@ -108,7 +108,9 @@ class GovernanceService(ServiceBase):
         log = logger.bind(domain="orchestra", action="governance")
         if not self._dry_run and (self._in_flight or self._has_live_dispatch()):
             self._in_flight = True
-            log.info(f"Governance tick #{self._tick_count}: existing session still running")
+            log.info(
+                f"Governance tick #{self._tick_count}: existing session still running"
+            )
             append_governance_event(
                 f"tick #{self._tick_count} skipped: existing session still running",
                 repo_root=self._manager.repo_path,
@@ -258,8 +260,8 @@ class GovernanceService(ServiceBase):
         log.info(f"\n{plan_content}")
 
     def _dispatch_governance_prompt(self, prompt: str) -> AsyncExecutionHandle:
+        options = resolve_governance_agent_options(self.config)
         runtime_config = VibeConfig.get_defaults()
-        options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
         task = runtime_config.run.run_prompt or "Execute governance supervisor task"
         return self._backend.start_async(
             prompt=prompt,

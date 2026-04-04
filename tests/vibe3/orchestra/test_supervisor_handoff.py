@@ -168,7 +168,9 @@ async def test_on_tick_skips_issue_with_existing_tmux_session(
         }
     ]
     svc._render_supervisor_prompt = MagicMock(return_value="# plan")  # type: ignore[method-assign]
-    monkeypatch.setattr(svc, "_has_live_dispatch", lambda issue_number: issue_number == 428)
+    monkeypatch.setattr(
+        svc, "_has_live_dispatch", lambda issue_number: issue_number == 428
+    )
 
     await svc.on_tick()
 

@@ -58,7 +58,9 @@ class WorktreeManager:
         if not flow_branch.startswith("task/issue-"):
             return True
 
-        base_ref = str(getattr(self.config, "scene_base_ref", "origin/main") or "").strip()
+        base_ref = str(
+            getattr(self.config, "scene_base_ref", "origin/main") or ""
+        ).strip()
         if not base_ref:
             return True
 

@@ -394,9 +394,19 @@ orchestra:
     # Whether to inline the supervisor file into the composed governance prompt
     include_supervisor_content: true
     dry_run: false
+    # Governance agent configuration (independent from run/manager)
+    agent: "explore"  # Maps to gemini-3.1-pro-preview in config/models.json
+    # backend/model override (leave empty to use config/models.json preset)
+    backend:
+    model:
 
   supervisor_handoff:
     enabled: true
     issue_label: "supervisor"
     handoff_state_label: "state/handoff"
     supervisor_file: "supervisor/apply.md"
+    # Supervisor handoff agent configuration (independent from run/manager/governance)
+    agent: "explore"  # Maps to gemini-3.1-pro-preview in config/models.json
+    # backend/model override (leave empty to use config/models.json preset)
+    backend:
+    model:

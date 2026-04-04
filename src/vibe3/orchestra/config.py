@@ -122,6 +122,18 @@ class GovernanceConfig(BaseModel):
             "Run governance scan every N heartbeat ticks (~1h at default interval)"
         ),
     )
+    agent: str = Field(
+        default="explore",
+        description="Agent preset name for governance execution",
+    )
+    backend: str | None = Field(
+        default=None,
+        description="Backend override (leave empty to use config/models.json preset)",
+    )
+    model: str | None = Field(
+        default=None,
+        description="Model override (leave empty to use config/models.json preset)",
+    )
 
 
 class SupervisorHandoffConfig(BaseModel):
@@ -131,6 +143,18 @@ class SupervisorHandoffConfig(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    agent: str = Field(
+        default="explore",
+        description="Agent preset name for supervisor handoff execution",
+    )
+    backend: str | None = Field(
+        default=None,
+        description="Backend override (leave empty to use config/models.json preset)",
+    )
+    model: str | None = Field(
+        default=None,
+        description="Model override (leave empty to use config/models.json preset)",
+    )
 
 
 class OrchestraConfig(BaseModel):
@@ -197,19 +221,23 @@ class OrchestraConfig(BaseModel):
                 half_open_max_tests=getattr(cb, "half_open_max_tests", 1),
             )
 
-        governance_defaults: dict[str, bool | str | int] = {
+        governance_defaults: dict[str, bool | str | int | None] = {
             "enabled": True,
             "supervisor_file": "supervisor/orchestra.md",
             "prompt_template": "orchestra.governance.plan",
             "include_supervisor_content": True,
             "dry_run": False,
             "interval_ticks": 4,
+            "agent": "explore",
+            "backend": None,
+            "model": None,
         }
         governance_src = getattr(src, "governance", None)
         if governance_src is not None:
             if isinstance(governance_src, dict):
                 governance_defaults.update(governance_src)
-            else:
+            elif hasattr(governance_src, "__dict__"):
+                # It's a settings object with attributes
                 governance_defaults.update(
                     {
                         "enabled": getattr(governance_src, "enabled", True),
@@ -228,20 +256,27 @@ class OrchestraConfig(BaseModel):
                         ),
                         "dry_run": getattr(governance_src, "dry_run", False),
                         "interval_ticks": getattr(governance_src, "interval_ticks", 4),
+                        "agent": getattr(governance_src, "agent", "explore"),
+                        "backend": getattr(governance_src, "backend", None),
+                        "model": getattr(governance_src, "model", None),
                     }
                 )
 
-        supervisor_handoff_defaults: dict[str, bool | str] = {
+        supervisor_handoff_defaults: dict[str, bool | str | None] = {
             "enabled": True,
             "issue_label": "supervisor",
             "handoff_state_label": "state/handoff",
             "supervisor_file": "supervisor/apply.md",
+            "agent": "explore",
+            "backend": None,
+            "model": None,
         }
         supervisor_handoff_src = getattr(src, "supervisor_handoff", None)
         if supervisor_handoff_src is not None:
             if isinstance(supervisor_handoff_src, dict):
                 supervisor_handoff_defaults.update(supervisor_handoff_src)
-            else:
+            elif hasattr(supervisor_handoff_src, "__dict__"):
+                # It's a settings object with attributes
                 supervisor_handoff_defaults.update(
                     {
                         "enabled": getattr(supervisor_handoff_src, "enabled", True),
@@ -258,6 +293,9 @@ class OrchestraConfig(BaseModel):
                             "supervisor_file",
                             "supervisor/apply.md",
                         ),
+                        "agent": getattr(supervisor_handoff_src, "agent", "explore"),
+                        "backend": getattr(supervisor_handoff_src, "backend", None),
+                        "model": getattr(supervisor_handoff_src, "model", None),
                     }
                 )
 

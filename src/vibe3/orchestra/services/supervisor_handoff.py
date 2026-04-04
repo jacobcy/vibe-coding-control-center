@@ -15,6 +15,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.settings import VibeConfig
+from vibe3.orchestra.agent_resolver import resolve_supervisor_agent_options
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -169,8 +170,7 @@ class SupervisorHandoffService(ServiceBase):
         issue: SupervisorHandoffIssue,
         prompt: str,
     ) -> None:
-        runtime_config = VibeConfig.get_defaults()
-        options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
+        options = resolve_supervisor_agent_options(self.config)
         self._backend.start_async(
             prompt=prompt,
             options=options,

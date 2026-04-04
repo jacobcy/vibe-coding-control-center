@@ -19,6 +19,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.manager.session_naming import get_trigger_session_prefix
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review_runner import AgentOptions
@@ -379,7 +380,7 @@ class StateLabelDispatchService(ServiceBase):
             ).error(f"Failed to auto-block manager noop: {exc}")
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
-        session_prefix = f"vibe3-{self.trigger_name}-issue-{issue_number}"
+        session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
         try:
             result = subprocess.run(
                 ["tmux", "ls"],

@@ -1,6 +1,7 @@
 """Tests for HeartbeatServer."""
 
 from pathlib import Path
+
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
@@ -83,9 +84,9 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
 
 
 def test_run_separator_writes_header(tmp_path: Path) -> None:
-    from vibe3.orchestra.logging import append_orchestra_run_separator
-
     import os
+
+    from vibe3.orchestra.logging import append_orchestra_run_separator
 
     os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
     log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
@@ -99,7 +100,9 @@ def test_run_separator_writes_header(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
-    server = HeartbeatServer(OrchestraConfig(polling_interval=1, max_concurrent_flows=3))
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+    )
     svc = _MockService()
     server.register(svc)
 

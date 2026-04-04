@@ -238,9 +238,9 @@ class CheckService(CheckRemote):
         flow_data: dict[str, object],
         issue_links: list[dict[str, object]],
     ) -> int | None:
-        task_issue = flow_data.get("task_issue_number") or IssueLink.resolve_task_number(
-            issue_links
-        )
+        task_issue = flow_data.get(
+            "task_issue_number"
+        ) or IssueLink.resolve_task_number(issue_links)
         if task_issue:
             return int(task_issue)
 
