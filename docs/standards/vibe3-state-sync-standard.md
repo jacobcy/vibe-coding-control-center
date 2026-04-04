@@ -280,6 +280,11 @@ plan agent 完成后：
 
 ### 6.3 blocked 判断
 
+**当前 manager mainline**:
+- manager 是 flow owner，负责推进 issue
+- 如果 manager session 结束且没有任何可观察的状态变化，自动迁移到 `state/blocked`
+- blocked follow-up（如 doctor/aborted 处理）明确在当前 mainline 之外，未来扩展
+
 manager 可以把 issue 调整到 `state/blocked`，但必须满足：
 
 - blocker 来源于当前 labels、最新评论、当前 scene、或当前 refs
