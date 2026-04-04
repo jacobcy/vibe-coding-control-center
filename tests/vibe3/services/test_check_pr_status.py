@@ -1,9 +1,6 @@
 """Tests for PR status detection and flow auto-completion."""
 
-import os
 from unittest.mock import MagicMock
-
-import pytest
 
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
@@ -14,10 +11,6 @@ from vibe3.services.check_service import CheckService
 class TestPRStatusDetection:
     """Test PR status detection and flow auto-completion."""
 
-    @pytest.mark.skipif(
-        os.environ.get("CI") == "true",
-        reason="CI environment lacks gh authentication for this test",
-    )
     def test_check_marks_flow_done_when_merged(self, tmp_path):
         """Should mark flow as done when PR is merged."""
         # ARRANGE: Flow with merged PR
@@ -166,7 +159,6 @@ class TestPRStatusDetection:
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "active"
 
-    @pytest.mark.skip(reason="Requires gh authentication which is not available in CI")
     def test_check_handles_no_pr_gracefully(self, tmp_path):
         """Should not fail when flow has no PR."""
         # ARRANGE: Flow without PR
@@ -200,12 +192,6 @@ class TestPRStatusDetection:
         )
         service.verify_current_flow()
 
-        # ASSERT: Flow should remain active
-        flow = store.get_flow_state("task/my-feature")
-        assert flow["flow_status"] == "active"
-        service = CheckService(store=store, git_client=git_client)
-        service.verify_current_flow()
-
-        # ASSERT: Should not crash, flow remains active
+        # ASSERT: Flow should remain active and no exception should be raised
         flow = store.get_flow_state("task/my-feature")
         assert flow["flow_status"] == "active"

@@ -1,10 +1,12 @@
 """Unified execution management for Orchestra."""
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
@@ -49,6 +51,7 @@ class ManagerExecutor:
         self.status_service = OrchestraStatusService(
             config, orchestrator=self._flow_manager
         )
+        self._backend = CodeagentBackend()
 
         # Execution protection
         self._circuit_breaker = circuit_breaker
@@ -132,9 +135,8 @@ class ManagerExecutor:
         # If it was in queue, remove it now that we are dispatching
         self._queued_issues.discard(issue.number)
 
-        cmd = self.command_builder.build_manager_command(issue)
-
         if self.dry_run:
+            cmd = self.command_builder.build_manager_command(issue)
             log.info(f"Dry run: skipping flow/worktree/execution. Cmd: {' '.join(cmd)}")
             return True
 
@@ -160,24 +162,50 @@ class ManagerExecutor:
 
         try:
             # 3. Label update
-            self.result_handler.update_state_label(issue.number, IssueState.IN_PROGRESS)
+            self.result_handler.update_state_label(issue.number, IssueState.CLAIMED)
 
             # 4. Command execution
-            # Use private method so subclasses can override
-            cmd = self._normalize_manager_command(cmd, manager_cwd)
-            log.info(f"Executing: {' '.join(cmd)}")
-
-            success = self._run_command(cmd, manager_cwd, "Manager execution")
-
-            # 5. Result handling
-            if success:
-                self.result_handler.on_dispatch_success(issue, flow_branch)
-            else:
-                self.result_handler.on_dispatch_failure(
-                    issue, self._last_error_category or "unknown"
-                )
-
-            return success
+            cmd = [
+                "uv",
+                "run",
+                "python",
+                "src/vibe3/cli.py",
+                "run",
+                "--manager-issue",
+                str(issue.number),
+                "--sync",
+            ]
+            handle = self._backend.start_async_command(
+                cmd,
+                execution_name=f"vibe3-manager-{issue.number}",
+                cwd=manager_cwd,
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            )
+            log.info(
+                f"Started manager async session: {handle.tmux_session} "
+                f"(log: {handle.log_path})"
+            )
+            self._flow_manager.store.add_event(
+                flow_branch,
+                "manager_dispatched",
+                "system",
+                detail=(
+                    f"Dispatched manager to tmux session: {handle.tmux_session}\n"
+                    f"Log: {handle.log_path}"
+                ),
+                refs={
+                    "tmux_session": handle.tmux_session,
+                    "log_path": str(handle.log_path),
+                    "issue": str(issue.number),
+                },
+            )
+            # Async dispatch: only record launch here.
+            # The child process records its own manager_started/completed/aborted
+            # lifecycle events via pipeline.py, and run.py:_run_manager_issue_mode
+            # handles final result handling.  Calling on_dispatch_success here
+            # would prematurely mark the dispatch as successful before the child
+            # has even started its work.
+            return True
         finally:
             # 6. Maybe recycle
             if is_temporary and manager_cwd:
@@ -237,7 +265,13 @@ class ManagerExecutor:
             from vibe3.services.label_service import LabelService
 
             state = LabelService(repo=self.config.repo).get_state(issue_number)
-            return state != IssueState.IN_PROGRESS
+            return state not in {
+                IssueState.CLAIMED,
+                IssueState.IN_PROGRESS,
+                IssueState.HANDOFF,
+                IssueState.REVIEW,
+                IssueState.MERGE_READY,
+            }
         except Exception:
             return False
 

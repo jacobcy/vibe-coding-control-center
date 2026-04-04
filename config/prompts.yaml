@@ -153,7 +153,7 @@ orchestra:
       你的动作边界由上面的 Supervisor 材料决定。
 
       ### 执行要求（必须遵守）：
-      1. 先基于 runtime summary 理解当前现场，再按 Supervisor 材料决定是否需要额外调用 `vibe3 status`、`vibe3 flow show`、`gh issue view` 等命令核查。
+      1. 先基于 runtime summary 理解当前现场，再按 Supervisor 材料决定是否需要额外调用 `vibe3 task status`、`vibe3 flow show`、`gh issue view` 等命令核查。
       2. 只执行 Supervisor 材料明确允许的动作；不要扩大动作范围。
       3. 如果是 dry-run，就输出计划、建议或 issue 预览，不直接写入。
       4. 如果不是 dry-run，就执行 Supervisor 材料要求的最小动作，并在完成后停止。
@@ -168,7 +168,15 @@ orchestra:
     # Available template variables:
     # - {issue_number}
     # - {issue_title}
-    manager: "Implement issue #{issue_number}: {issue_title}"
+    # - {supervisor_content}
+    manager: |
+      {supervisor_content}
+
+      ## Manager Target
+      Manage issue #{issue_number}: {issue_title}
+
+      你当前是 manager 状态控制器，不是实现 agent。
+      你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
 
 run:
   # Template for plan/flow_plan/lightweight execution mode.

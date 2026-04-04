@@ -1,5 +1,3 @@
-import json
-import os
 import re
 import shlex
 import subprocess
@@ -7,10 +5,12 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, cast
+from typing import Final, cast
 
-from loguru import logger
-
+from vibe3.agents.backends.codeagent_config import (
+    resolve_effective_agent_options,
+    sync_models_json,
+)
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -19,8 +19,20 @@ DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
 )
 
-# Path to codeagent models config
-MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
+KNOWN_CODEX_STATE_DB_WARNINGS: Final[tuple[str, ...]] = (
+    r"failed to open state db at .*migration .*missing in the resolved migrations",
+    r"failed to initialize state runtime at .*migration "
+    r".*missing in the resolved migrations",  # noqa: E501
+    r"state db discrepancy during "
+    r"find_thread_path_by_id_str_in_subdir: falling_back",  # noqa: E501
+)
+KNOWN_CODEX_SNAPSHOT_WARNING: Final[str] = (
+    r'Failed to delete shell snapshot at ".*": Os \{ code: 2, kind: NotFound, '
+    r'message: "No such file or directory" \}'
+)
+KNOWN_CODEX_ANALYTICS_WARNING: Final[str] = (
+    r"analytics_client: events failed with status 403 Forbidden:"
+)
 
 
 @dataclass(frozen=True)
@@ -32,46 +44,6 @@ class AsyncExecutionHandle:
     prompt_file_path: Path
 
 
-def sync_models_json(options: AgentOptions) -> None:
-    """Sync effective backend/model to ~/.codeagent/models.json.
-
-    In backend mode: updates default_backend (and default_model if specified),
-    so codeagent-wrapper uses vibe3's config instead of whatever is in the file.
-
-    In agent preset mode: no-op — codeagent manages the preset's backend/model
-    from its own config.
-    """
-    if not options.backend:
-        return  # agent preset mode — codeagent reads preset config itself
-
-    try:
-        existing: dict[str, Any] = {}
-        if MODELS_JSON_PATH.exists():
-            existing = json.loads(MODELS_JSON_PATH.read_text())
-    except Exception as exc:
-        logger.bind(domain="review_runner").warning(
-            f"Failed to read models.json, will overwrite: {exc}"
-        )
-        existing = {}
-
-    existing["default_backend"] = options.backend
-    if options.model:
-        existing["default_model"] = options.model
-
-    try:
-        MODELS_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MODELS_JSON_PATH.write_text(json.dumps(existing, indent=2))
-        logger.bind(
-            domain="review_runner",
-            backend=options.backend,
-            model=options.model,
-        ).debug("Synced models.json")
-    except Exception as exc:
-        logger.bind(domain="review_runner").warning(
-            f"Failed to write models.json: {exc}"
-        )
-
-
 def extract_session_id(stdout: str) -> str | None:
     """Extract session ID from codeagent-wrapper output.
 
@@ -80,12 +52,86 @@ def extract_session_id(stdout: str) -> str | None:
     """
     if not stdout:
         return None
-    match = re.search(r"SESSION_ID:\s*([a-f0-9-]{36})", stdout)
+    match = re.search(r"SESSION_ID:\s*([A-Za-z0-9_-]+)", stdout)
+    if not match:
+        match = re.search(r'"sessionID":"([A-Za-z0-9_-]+)"', stdout)
+    if not match:
+        match = re.search(r'\\"sessionID\\":\\"([A-Za-z0-9_-]+)\\"', stdout)
     return match.group(1) if match else None
 
 
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
+
+    @staticmethod
+    def _build_async_log_filter() -> list[str]:
+        """Return an awk command that strips known Codex runtime noise.
+
+        These warnings come from the upstream Codex runtime under ``~/.codex`` and
+        are not actionable within vibe3. We keep the repo-local async log focused
+        on wrapper progress and task output, while still emitting a summary line so
+        the suppression is visible.
+        """
+        state_patterns = " || ".join(
+            f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
+        )
+        script = (
+            f"({state_patterns}) {{ state_db++; next }}\n"
+            f"$0 ~ /{KNOWN_CODEX_SNAPSHOT_WARNING}/ "
+            f"{{ shell_snapshot++; next }}\n"
+            f"$0 ~ /{KNOWN_CODEX_ANALYTICS_WARNING}/ "
+            f"{{ analytics++; skip_html=1; next }}\n"
+            "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
+            "{ print }\n"
+            "END {\n"
+            '  if (state_db > 0) print "[vibe3 async] suppressed " '
+            'state_db " codex state-db warning line(s)"\n'
+            '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '
+            'shell_snapshot " codex shell-snapshot cleanup warning line(s)"\n'
+            '  if (analytics > 0) print "[vibe3 async] suppressed " '
+            'analytics " codex analytics 403 warning block(s)"\n'
+            "}\n"
+        )
+        return ["awk", script]
+
+    @classmethod
+    def _build_async_shell_command(
+        cls,
+        command: list[str],
+        *,
+        log_path: Path,
+        keep_alive_seconds: int,
+    ) -> str:
+        filter_command = shlex.join(cls._build_async_log_filter())
+        cmd_str = shlex.join(command)
+        log_str = shlex.quote(str(log_path))
+        return (
+            f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
+            "status=${PIPESTATUS[0]:-$?}; "
+            "echo; "
+            'echo "[vibe3 async] command exited with status: ${status}"; '
+            f'echo "[vibe3 async] keeping tmux session alive for '
+            f'{keep_alive_seconds}s for inspection..."; '
+            f"sleep {keep_alive_seconds}; "
+            "exit ${status}"
+        )
+
+    @staticmethod
+    def _allocate_tmux_session_name(base_name: str) -> str:
+        """Return a tmux session name that does not collide with an existing one."""
+        candidate = base_name
+        counter = 2
+        while True:
+            probe = subprocess.run(
+                ["tmux", "has-session", "-t", candidate],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if probe.returncode != 0:
+                return candidate
+            candidate = f"{base_name}-{counter}"
+            counter += 1
 
     @staticmethod
     def _prepare_prompt_file(prompt: str) -> Path:
@@ -104,6 +150,7 @@ class CodeagentBackend:
         task: str | None = None,
         session_id: str | None = None,
     ) -> list[str]:
+        options = resolve_effective_agent_options(options)
         command: list[str] = [str(DEFAULT_WRAPPER_PATH)]
 
         if options.agent:
@@ -141,23 +188,22 @@ class CodeagentBackend:
         command: list[str],
         *,
         execution_name: str,
+        cwd: Path | None = None,
         env: dict[str, str] | None = None,
         keep_alive_seconds: int = 60,
     ) -> AsyncExecutionHandle:
-        project_root = Path.cwd()
-        safe_name = execution_name.replace("/", "-")[:50]
+        project_root = cwd or Path.cwd()
+        base_name = execution_name.replace("/", "-")[:50]
+        safe_name = self._allocate_tmux_session_name(base_name)
         log_dir = self._default_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"{safe_name}.async.log"
-        shell_command = (
-            f"{shlex.join(command)} 2>&1 | tee {shlex.quote(str(log_path))}; "
-            "status=${PIPESTATUS[0]:-$?}; "
-            "echo; "
-            'echo "[vibe3 async] command exited with status: ${status}"; '
-            f'echo "[vibe3 async] keeping tmux session alive for '
-            f'{keep_alive_seconds}s for inspection..."; '
-            f"sleep {keep_alive_seconds}; "
-            "exit ${status}"
+        if log_path.exists():
+            log_path.unlink()
+        shell_command = self._build_async_shell_command(
+            command,
+            log_path=log_path,
+            keep_alive_seconds=keep_alive_seconds,
         )
 
         subprocess.run(
@@ -178,6 +224,7 @@ class CodeagentBackend:
         command: list[str],
         *,
         execution_name: str,
+        cwd: Path | None = None,
         env: dict[str, str] | None = None,
         keep_alive_seconds: int = 60,
     ) -> AsyncExecutionHandle:
@@ -185,6 +232,7 @@ class CodeagentBackend:
         return self._spawn_tmux_command(
             command,
             execution_name=execution_name,
+            cwd=cwd,
             env=env,
             keep_alive_seconds=keep_alive_seconds,
         )
@@ -197,6 +245,7 @@ class CodeagentBackend:
         task: str | None = None,
         session_id: str | None = None,
         execution_name: str,
+        cwd: Path | None = None,
         env: dict[str, str] | None = None,
         keep_alive_seconds: int = 60,
     ) -> AsyncExecutionHandle:
@@ -213,6 +262,7 @@ class CodeagentBackend:
         handle = self._spawn_tmux_command(
             command,
             execution_name=execution_name,
+            cwd=cwd,
             env=env,
             keep_alive_seconds=keep_alive_seconds,
         )
@@ -229,12 +279,13 @@ class CodeagentBackend:
         task: str | None = None,
         dry_run: bool = False,
         session_id: str | None = None,
+        cwd: Path | None = None,
     ) -> AgentResult:
         """运行 codeagent-wrapper。"""
         # Ensure codeagent uses vibe3's backend/model config
         sync_models_json(options)
 
-        project_root = os.getcwd()
+        project_root = str(cwd or Path.cwd())
         prompt_file_path = str(self._prepare_prompt_file(prompt))
 
         try:

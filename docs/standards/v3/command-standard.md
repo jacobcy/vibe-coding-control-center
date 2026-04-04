@@ -53,7 +53,7 @@ related_docs:
 本文档只覆盖共享状态域的现行公共调用面：
 
 - `vibe3 flow`
-- `vibe3 status`
+- `vibe3 task status`
 - `vibe3 check`
 - `vibe3 handoff`
 
@@ -102,7 +102,7 @@ related_docs:
 - `task list`
 - `task status`
 
-### 3.2 `vibe3 status`
+### 3.2 `vibe3 task status`
 
 `status` 是项目特有的总览入口，用于：
 
@@ -184,7 +184,7 @@ related_docs:
 
 ## 5. `status` 与 `gh` 的分工
 
-`vibe3 status` 保留的原因是它提供了 `gh` 没有的项目内聚合视图。
+`vibe3 task status` 保留的原因是它提供了 `gh` 没有的项目内聚合视图。
 
 它负责：
 
@@ -268,7 +268,7 @@ vibe3 flow status [--all] [--json]
 ### 7.6 `status`
 
 ```bash
-vibe3 status [--all] [--json]
+vibe3 task status [--all] [--json]
 ```
 
 ## 8. 禁止语义

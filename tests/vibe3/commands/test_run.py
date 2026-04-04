@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from vibe3.agents.run_agent import RunUsecase
 from vibe3.cli import app as cli_app
+from vibe3.config.settings import VibeConfig
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -15,6 +16,18 @@ runner = CliRunner(env={"NO_COLOR": "1"})
 def strip_ansi(text: str) -> str:
     ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
     return ansi_escape.sub("", text)
+
+
+def _patch_fast_run_runtime(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "vibe3.commands.run.ensure_flow_for_current_branch",
+        lambda: (MagicMock(), "task/test-branch"),
+    )
+    monkeypatch.setattr(
+        VibeConfig,
+        "get_defaults",
+        classmethod(lambda cls: VibeConfig()),
+    )
 
 
 def test_run_help_shows_direct_instruction_usage() -> None:
@@ -71,7 +84,8 @@ def test_find_skill_file_prefers_current_worktree(tmp_path, monkeypatch) -> None
     )
 
 
-def test_run_dry_run_shows_command() -> None:
+def test_run_dry_run_shows_command(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
             "vibe3.commands.run.CodeagentExecutionService.execute_sync",
@@ -86,7 +100,8 @@ def test_run_dry_run_shows_command() -> None:
     assert command.dry_run is True
 
 
-def test_run_with_agent_override() -> None:
+def test_run_with_agent_override(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
             "vibe3.commands.run.CodeagentExecutionService.execute_sync",
@@ -110,7 +125,8 @@ def test_run_with_agent_override() -> None:
     assert command.agent == "executor-pro"
 
 
-def test_run_with_backend_override() -> None:
+def test_run_with_backend_override(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
             "vibe3.commands.run.CodeagentExecutionService.execute_sync",
@@ -138,7 +154,8 @@ def test_run_with_backend_override() -> None:
     assert command.model == "claude-3-opus"
 
 
-def test_run_uses_shared_agent_options_with_run_context() -> None:
+def test_run_uses_shared_agent_options_with_run_context(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
             "vibe3.commands.run.CodeagentExecutionService.execute_sync",

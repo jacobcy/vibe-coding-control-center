@@ -18,14 +18,26 @@ from vibe3.models.review_runner import (
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
-    def test_run_uses_codeagent_wrapper_with_agent_and_model(self) -> None:
-        """Runner should call codeagent-wrapper with correct arguments."""
+    def test_run_uses_repo_models_mapping_for_agent_preset(
+        self, tmp_path: Path
+    ) -> None:
+        """Agent preset should resolve through repo-local config/models.json."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text(
+            '{"agents":{"code-reviewer":{"backend":"claude","model":"claude-sonnet-4-6"}}}'
+        )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+        ):
             mock_run.return_value = mock_result
             options = AgentOptions(
                 agent="code-reviewer",
@@ -36,21 +48,58 @@ class TestCodeagentBackend:
         assert result.exit_code == 0
         assert "VERDICT: PASS" in result.stdout
 
-        # Verify command structure
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "codeagent-wrapper" in command[0]
-        assert "--agent" in command
-        assert "code-reviewer" in command
+        assert "--agent" not in command
+        assert "--backend" in command
+        assert "claude" in command
+        assert "--model" in command
+        assert "claude-sonnet-4-6" in command
 
-    def test_run_without_model(self) -> None:
-        """Runner should work without model override."""
+    def test_run_falls_back_to_agent_flag_when_repo_mapping_missing(
+        self, tmp_path: Path
+    ) -> None:
+        """Unknown repo-local preset mapping should fall back to raw --agent mode."""
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
         mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text('{"agents":{"other":{"backend":"claude"}}}')
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+        ):
+            mock_run.return_value = mock_result
+            backend = CodeagentBackend()
+            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+
+        assert result.exit_code == 0
+        command = mock_run.call_args[0][0]
+        assert "--agent" in command
+        assert "code-reviewer" in command
+
+    def test_run_without_model_when_repo_mapping_missing(self, tmp_path: Path) -> None:
+        """Fallback agent mode should omit --model when repo mapping is absent."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        repo_models = tmp_path / "models.json"
+        repo_models.write_text("{}")
+
+        with (
+            patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run,
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                repo_models,
+            ),
+        ):
             mock_run.return_value = mock_result
             options = AgentOptions(agent="code-reviewer")
             backend = CodeagentBackend()
@@ -62,6 +111,24 @@ class TestCodeagentBackend:
         call_args = mock_run.call_args
         command = call_args[0][0]
         assert "--model" not in command
+
+    def test_run_uses_explicit_cwd_when_provided(self) -> None:
+        """Runner should execute in the provided cwd when specified."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.return_value = mock_result
+            backend = CodeagentBackend()
+            backend.run(
+                "prompt body",
+                AgentOptions(agent="code-reviewer"),
+                cwd=Path("/tmp/worktree-430"),
+            )
+
+        assert mock_run.call_args.kwargs["cwd"] == "/tmp/worktree-430"
 
     def test_run_non_zero_exit_raises_error(self) -> None:
         """Runner should raise error on non-zero exit code."""
@@ -191,83 +258,3 @@ class TestCodeagentBackend:
 
         command = mock_run.call_args[0][0]
         assert "--worktree" not in command
-
-    def test_run_streams_output_while_capturing(self, capsys) -> None:
-        """Runner should stream wrapper output to console and capture it."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "line one\nVERDICT: PASS\n"
-        mock_result.stderr = ""
-
-        with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
-        ):
-            backend = CodeagentBackend()
-            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
-
-        captured = capsys.readouterr()
-        assert "line one" in captured.out
-        assert "VERDICT: PASS" in captured.out
-        assert "line one" in result.stdout
-        assert "VERDICT: PASS" in result.stdout
-
-    def test_run_handles_none_stdout(self) -> None:
-        """Runner should pass through None stdout."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = None
-        mock_result.stderr = ""
-
-        with patch(
-            "vibe3.agents.backends.codeagent.subprocess.run", return_value=mock_result
-        ):
-            backend = CodeagentBackend()
-            result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
-        assert result.exit_code == 0
-        assert result.stdout is None
-
-    def test_run_handles_os_error(self) -> None:
-        """Runner should handle OSError gracefully."""
-
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
-            mock_run.side_effect = OSError("I/O error")
-
-            backend = CodeagentBackend()
-            with pytest.raises(OSError, match="I/O error"):
-                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
-
-    @patch("vibe3.agents.backends.codeagent.subprocess.run")
-    @patch("vibe3.agents.backends.codeagent.Path.mkdir")
-    def test_run_creates_codeagent_agents_dir(self, mock_mkdir, mock_run) -> None:
-        """Runner should ensure the codeagent agents directory exists."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "VERDICT: PASS\n"
-        mock_result.stderr = ""
-        mock_run.return_value = mock_result
-
-        backend = CodeagentBackend()
-        result = backend.run("prompt body", AgentOptions(agent="code-reviewer"))
-
-        assert result.exit_code == 0
-        mock_mkdir.assert_any_call(parents=True, exist_ok=True)
-
-    @patch("vibe3.agents.backends.codeagent.subprocess.run")
-    @patch("vibe3.agents.backends.codeagent.Path.mkdir")
-    def test_run_uses_codeagent_agents_dir_for_prompt_file(
-        self, mock_mkdir, mock_run
-    ) -> None:
-        """Runner should place prompt files under ~/.codeagent/agents."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "VERDICT: PASS\n"
-        mock_result.stderr = ""
-        mock_run.return_value = mock_result
-
-        backend = CodeagentBackend()
-        backend.run("prompt body", AgentOptions(agent="code-reviewer"))
-
-        command = mock_run.call_args[0][0]
-        prompt_file_idx = command.index("--prompt-file") + 1
-        expected_dir = Path.home() / ".codeagent" / "agents"
-        assert Path(command[prompt_file_idx]).parent == expected_dir

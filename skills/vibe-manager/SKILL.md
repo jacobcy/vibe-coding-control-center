@@ -68,7 +68,7 @@ manager 要做的不是“参与所有细节”，而是保证这条链不断：
 
 ```bash
 vibe3 flow show      # 当前 flow 与 task 绑定状态、milestone、依赖
-vibe3 status         # 全局 flow / issue 总览
+vibe3 task status         # 全局 flow / issue 总览
 vibe3 handoff show   # agent 执行状态
 ```
 

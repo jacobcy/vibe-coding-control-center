@@ -18,6 +18,8 @@ from vibe3.ui.handoff_ui import (
 )
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
+UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
+
 
 def _render_agent_chain(state: FlowState) -> None:
     console.print("[bold]═══ Agent Chain ═══[/]")
@@ -95,7 +97,13 @@ def _parse_updates_section(content: str) -> list[dict[str, str]]:
     return updates
 
 
-def _render_updates_log(updates: list[dict[str, str]]) -> None:
+def _preview_update_message(message: str, truncate: bool) -> str:
+    if not truncate or len(message) <= UPDATE_LOG_MESSAGE_PREVIEW_LIMIT:
+        return message
+    return message[:UPDATE_LOG_MESSAGE_PREVIEW_LIMIT] + "..."
+
+
+def _render_updates_log(updates: list[dict[str, str]], truncate: bool = True) -> None:
     """Render updates in log format."""
     if not updates:
         console.print("[dim]  no updates yet[/]")
@@ -111,7 +119,7 @@ def _render_updates_log(updates: list[dict[str, str]]) -> None:
         time_str = timestamp[:19].replace("T", " ")
         console.print(f"[dim]{time_str}[/]  [{kind_color}]{kind}[/]  [dim]{actor}[/]")
         if message:
-            for msg_line in message.split("\n"):
+            for msg_line in _preview_update_message(message, truncate).split("\n"):
                 console.print(f"  {msg_line}")
         console.print()
 
@@ -174,7 +182,7 @@ def list_handoffs(
 
 
 def show(
-    flow_name: Annotated[str | None, typer.Argument(help="Flow to show")] = None,
+    branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     artifact: Annotated[
         Path | None,
         typer.Option("--artifact", help="Display a handoff artifact file"),
@@ -201,20 +209,20 @@ def show(
                 raise typer.Exit(1)
             return
 
-        logger.bind(command="handoff show", flow_name=flow_name).info(
+        logger.bind(command="handoff show", branch=branch).info(
             "Showing handoff details"
         )
 
         service = FlowService()
-        branch = flow_name if flow_name else service.get_current_branch()
+        target_branch = branch if branch else service.get_current_branch()
 
-        state = service.get_flow_state(branch)
+        state = service.get_flow_state(target_branch)
         if not state:
-            logger.error(f"Flow not found: {branch}")
+            logger.error(f"Flow not found: {target_branch}")
             raise typer.Exit(1)
 
         limit = None if show_all else 5
-        handoff_events = service.get_handoff_events(branch, limit=limit)
+        handoff_events = service.get_handoff_events(target_branch, limit=limit)
 
         if json_output:
             output = {
@@ -250,7 +258,7 @@ def show(
 
         # Show current.md updates in log format
         git_dir = service.get_git_common_dir()
-        handoff_dir = get_branch_handoff_dir(git_dir, branch)
+        handoff_dir = get_branch_handoff_dir(git_dir, target_branch)
         current_md = handoff_dir / "current.md"
 
         console.print("[bold]═══ Update Log (current.md) ═══[/]")
@@ -260,7 +268,7 @@ def show(
         if current_md.exists():
             content = current_md.read_text(encoding="utf-8")
             updates = _parse_updates_section(content)
-            _render_updates_log(updates)
+            _render_updates_log(updates, truncate=not show_all)
 
             # Show full content hint
             console.print("[dim]---[/]")

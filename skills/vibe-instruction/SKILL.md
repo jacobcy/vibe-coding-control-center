@@ -64,8 +64,8 @@ uv run python src/vibe3/cli.py <command>
 #### status - 全局看板 (主入口)
 
 ```bash
-vibe3 status             # 查看所有活跃 flow、Orchestra 追踪进度及环境状态
-vibe3 status --all       # 含已完成/中止的历史记录
+vibe3 task status             # 查看所有活跃 flow、Orchestra 追踪进度及环境状态
+vibe3 task status --all       # 含已完成/中止的历史记录
 ```
 
 #### flow - 逻辑现场管理
@@ -151,7 +151,7 @@ vibe3 handoff show               # 阅读 agent 留下的 Findings
 2. **真源在 `.git/vibe3/handoff.db`**：所有 worktree 共享该 SQLite 数据库，由主仓库的 `git common dir` 承载。
 3. **不再有 flow new**：V3 倡导“以分支为锚点”，使用 `flow update` 注册现有分支即可。
 4. **handoff 不是数据库**：`.git/vibe3/handoff/` 存储的是 Markdown 交接文件，用于人机协作；状态流转以 SQLite 库为准。
-5. **Orchestra 是后台服务**：`vibe3 serve` 启动心跳轮询，自动处理 Webhook 事件，`vibe3 status` 是它的展示面。
+5. **Orchestra 是后台服务**：`vibe3 serve` 启动心跳轮询，自动处理 Webhook 事件，`vibe3 task status` 是它的展示面。
 
 ---
 

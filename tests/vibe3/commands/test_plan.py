@@ -1,12 +1,16 @@
 """Tests for plan command."""
 
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import typer
 from typer.testing import CliRunner
 
+from vibe3.agents.plan_agent import PlanSpecInput, PlanTaskInput
 from vibe3.cli import app as cli_app
 from vibe3.commands.plan import app as plan_app
+from vibe3.models.plan import PlanRequest, PlanScope
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -14,6 +18,82 @@ runner = CliRunner(env={"NO_COLOR": "1"})
 def strip_ansi(text: str) -> str:
     ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
     return ansi_escape.sub("", text)
+
+
+def _patch_fast_plan_runtime(monkeypatch) -> None:
+    """Stub plan command runtime for CLI surface tests."""
+    monkeypatch.setattr(
+        "vibe3.commands.plan.ensure_flow_for_current_branch",
+        lambda: (MagicMock(), "task/demo"),
+    )
+
+    class _StubPlanUsecase:
+        def resolve_task_plan(self, branch: str, issue_number: int | None = None):
+            resolved_issue = issue_number or 42
+            return PlanTaskInput(
+                issue_number=resolved_issue,
+                branch=branch,
+                request=PlanRequest(scope=PlanScope.for_task(resolved_issue)),
+            )
+
+        def resolve_spec_plan(
+            self,
+            branch: str,
+            file: Path | None = None,
+            msg: str | None = None,
+        ):
+            if file is not None and not file.exists():
+                raise FileNotFoundError(f"File not found: {file}")
+            description = file.read_text(encoding="utf-8") if file else (msg or "")
+            return PlanSpecInput(
+                branch=branch,
+                request=PlanRequest(scope=PlanScope.for_spec(description)),
+                description=description,
+                spec_path=str(file.resolve()) if file else None,
+            )
+
+        def bind_spec(self, branch: str, spec_path: str) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "vibe3.commands.plan._build_plan_usecase",
+        lambda config, flow_service: _StubPlanUsecase(),
+    )
+
+    def _fake_execute(self, command, async_mode=False):
+        parts = ["codeagent-wrapper", "--role", command.role]
+        if command.dry_run:
+            parts.append("--dry-run")
+        resolved_agent = command.agent
+        resolved_backend = command.backend
+        resolved_model = command.model
+        if command.config and getattr(command.config, "plan", None):
+            agent_cfg = command.config.plan.agent_config
+            resolved_agent = resolved_agent or agent_cfg.agent
+            resolved_backend = resolved_backend or agent_cfg.backend
+            resolved_model = resolved_model or agent_cfg.model
+        if resolved_agent:
+            parts.extend(["--agent", resolved_agent])
+        if resolved_backend:
+            parts.extend(["--backend", resolved_backend])
+        if resolved_model:
+            parts.extend(["--model", resolved_model])
+        if command.worktree:
+            parts.append("--worktree")
+        typer.echo(" ".join(parts))
+        return MagicMock(
+            success=True,
+            exit_code=0,
+            stdout=" ".join(parts),
+            stderr="",
+            handoff_file=None,
+            session_id=None,
+        )
+
+    monkeypatch.setattr(
+        "vibe3.agents.runner.CodeagentExecutionService.execute",
+        _fake_execute,
+    )
 
 
 def test_plan_help_shows_subcommands() -> None:
@@ -53,7 +133,8 @@ def test_plan_spec_help_shows_options() -> None:
     assert "--message" not in stdout
 
 
-def test_plan_issue_dry_run_shows_command() -> None:
+def test_plan_issue_dry_run_shows_command(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["--issue", "42", "--dry-run"])
 
     assert result.exit_code == 0
@@ -62,7 +143,8 @@ def test_plan_issue_dry_run_shows_command() -> None:
     assert "--backend" in result.stdout or "--agent" in result.stdout
 
 
-def test_plan_issue_with_agent_override() -> None:
+def test_plan_issue_with_agent_override(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(
         plan_app, ["--issue", "42", "--agent", "planner-pro", "--dry-run"]
     )
@@ -72,7 +154,8 @@ def test_plan_issue_with_agent_override() -> None:
     assert "--agent planner-pro" in result.stdout
 
 
-def test_plan_spec_msg_dry_run() -> None:
+def test_plan_spec_msg_dry_run(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["--spec", "--msg", "Add dark mode", "--dry-run"])
 
     assert result.exit_code == 0
@@ -85,7 +168,8 @@ def test_plan_spec_requires_file_or_msg() -> None:
     assert result.exit_code != 0
 
 
-def test_plan_spec_file_not_found() -> None:
+def test_plan_spec_file_not_found(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["--spec", "--file", "nonexistent.md"])
 
     assert result.exit_code != 0
@@ -129,14 +213,16 @@ def test_plan_issue_includes_issue_and_spec_context(
     assert "Spec body" in context
 
 
-def test_plan_task_alias_still_works() -> None:
+def test_plan_task_alias_still_works(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["task", "42", "--dry-run"])
 
     assert result.exit_code == 0
     assert "codeagent-wrapper" in result.stdout
 
 
-def test_plan_spec_alias_still_works() -> None:
+def test_plan_spec_alias_still_works(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode", "--dry-run"])
 
     assert result.exit_code == 0

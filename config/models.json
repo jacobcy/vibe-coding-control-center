@@ -1,0 +1,54 @@
+{
+  "default_backend": "opencode",
+  "default_model": "gpt-5.4-mini",
+  "backends": {
+    "codex": {},
+    "claude": {},
+    "gemini": {},
+    "opencode": {}
+  },
+  "agents": {
+    "oracle": {
+      "backend": "codex",
+      "model": "gpt-5.3-codex",
+      "yolo": true
+    },
+    "librarian": {
+      "backend": "gemini",
+      "model": "gemini-3-flash-preview",
+      "yolo": true
+    },
+    "explore": {
+      "backend": "opencode",
+      "model": "volcengine/kimi-k2.5"
+    },
+    "develop": {
+      "backend": "opencode",
+      "model": "alibaba-coding-plan-cn/glm-5",
+      "yolo": true
+    },
+    "frontend-ui-ux-engineer": {
+      "backend": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "yolo": true
+    },
+    "document-writer": {
+      "backend": "gemini",
+      "model": "gemini-3-flash-preview",
+      "yolo": true
+    },
+    "code-explorer": {
+      "backend": "gemini",
+      "model": "gemini-3-flash-preview"
+    },
+    "code-architect": {
+      "backend": "codex",
+      "model": "gpt-5.4-mini",
+      "yolo": true
+    },
+    "code-reviewer": {
+      "backend": "claude",
+      "model": "claude-sonnet-4-6"
+    }
+  }
+}

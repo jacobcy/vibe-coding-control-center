@@ -1,7 +1,22 @@
 """Tests for flow auto-ensure functionality."""
 
+import pytest
+
 from vibe3.clients import SQLiteClient
 from vibe3.services.flow_service import FlowService
+
+
+@pytest.fixture(autouse=True)
+def stable_worktree_actor(monkeypatch):
+    """Avoid real git identity lookups during flow creation tests."""
+    monkeypatch.setattr(
+        "vibe3.services.flow_service.SignatureService.get_worktree_actor",
+        lambda: "test-actor",
+    )
+    monkeypatch.setattr(
+        "vibe3.services.flow_query_mixin.GitHubClient.get_pr",
+        lambda self, pr_number=None, branch=None: None,
+    )
 
 
 class TestEnsureFlowForBranch:

@@ -104,7 +104,7 @@ if [ "$TEST_MODE" = "skip" ] || [ "${#TEST_TARGETS[@]}" -eq 0 ]; then
     echo "     (no local targets determined; CI runs full suite)"
 else
     echo "  -> Running test suite ($TEST_MODE): ${TEST_REASON}"
-    uv run pytest "${TEST_TARGETS[@]}" -n auto -q --tb=short || {
+    uv run pytest "${TEST_TARGETS[@]}" -q --tb=short || {
         echo "ERROR: Tests failed"
         exit 1
     }

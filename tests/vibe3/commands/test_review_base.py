@@ -39,21 +39,27 @@ def _mock_inspect_data():
     }
 
 
-def test_review_base_defaults_to_origin_main():
+def _patch_review_base_usecase(monkeypatch, verdict: str = "PASS"):
+    mock_usecase = MagicMock()
+    mock_usecase.build_base_review.return_value = (
+        MagicMock(),
+        101,
+    )
+    mock_usecase.execute_review.return_value = MagicMock(
+        verdict=verdict,
+        handoff_file=None,
+    )
+    monkeypatch.setattr(
+        "vibe3.commands.review._build_review_usecase",
+        lambda flow_service=None: mock_usecase,
+    )
+    return mock_usecase
+
+
+def test_review_base_defaults_to_origin_main(monkeypatch):
     """Test that review base works with AST analysis."""
+    mock_usecase = _patch_review_base_usecase(monkeypatch)
     with (
-        patch(
-            "vibe3.commands.review.run_inspect_json",
-            return_value=_mock_inspect_data(),
-        ),
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("PASS"),
-        ),
         patch(
             "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/main", auto_detected=True),
@@ -64,23 +70,13 @@ def test_review_base_defaults_to_origin_main():
         ),
     ):
         result = runner.invoke(app, ["base"])
-        assert result.exit_code == 0
+    assert result.exit_code == 0
+    mock_usecase.build_base_review.assert_not_called()
 
 
-def test_review_base_pass():
+def test_review_base_pass(monkeypatch):
+    mock_usecase = _patch_review_base_usecase(monkeypatch)
     with (
-        patch(
-            "vibe3.commands.review.run_inspect_json",
-            return_value=_mock_inspect_data(),
-        ),
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("PASS"),
-        ),
         patch(
             "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/develop", auto_detected=False),
@@ -92,23 +88,13 @@ def test_review_base_pass():
     ):
         result = runner.invoke(app, ["base", "origin/develop", "--sync"])
     assert result.exit_code == 0
+    mock_usecase.execute_review.assert_called_once()
 
 
-def test_review_base_uses_shared_resolution_when_base_omitted():
+def test_review_base_uses_shared_resolution_when_base_omitted(monkeypatch):
     """Review base should delegate omitted base handling to the shared resolver."""
+    _patch_review_base_usecase(monkeypatch)
     with (
-        patch(
-            "vibe3.commands.review.run_inspect_json",
-            return_value=_mock_inspect_data(),
-        ),
-        patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute_sync",
-            return_value=_mock_result(),
-        ),
-        patch(
-            "vibe3.commands.review.parse_codex_review",
-            return_value=_mock_review("PASS"),
-        ),
         patch(
             "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
             return_value=MagicMock(base_branch="origin/main", auto_detected=True),

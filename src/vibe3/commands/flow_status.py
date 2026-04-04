@@ -34,7 +34,7 @@ TraceOption = Annotated[bool, typer.Option("--trace")]
 def show(
     branch: Annotated[
         str | None,
-        typer.Option("--branch", "-b", help="Branch name (defaults to current branch)"),
+        typer.Argument(help="Branch name"),
     ] = None,
     snapshot: StatusOption = False,
     trace: TraceOption = False,

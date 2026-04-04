@@ -1,6 +1,7 @@
 """DAG service - 分析模块依赖图，确认改动影响范围."""
 
 import ast
+from collections import deque
 from pathlib import Path
 
 from loguru import logger
@@ -126,12 +127,19 @@ def build_module_graph(src_root: str = "src/vibe3") -> dict[str, ModuleNode]:
 def expand_impacted_modules(
     seed_files: list[str],
     graph: dict[str, ModuleNode] | None = None,
+    max_depth: int | None = None,
+    hub_fanout_threshold: int | None = None,
 ) -> ImpactGraph:
     """从 seed 文件扩展影响范围（向上游传播）.
 
     Args:
         seed_files: 改动的文件列表
         graph: 预构建的模块图（None 则自动构建）
+        max_depth: BFS 最大跳数（None 表示无限制）。
+            用于 pre-push 测试选择，防止从 hub 模块爆开到全量。
+        hub_fanout_threshold: 反向依赖数超过此阈值的模块视为 hub，
+            不再向上扩展（None 表示不限制）。
+            典型值 15：防止 cli.py、__init__.py 等 hub 拉入全量模块。
 
     Returns:
         影响范围图
@@ -163,15 +171,27 @@ def expand_impacted_modules(
                 if dep in reverse:
                     reverse[dep].append(module)
 
-        # BFS 向上扩展
+        # BFS 向上扩展（带深度限制和 hub 豁免）
         impacted: set[str] = set(seeds)
-        queue = list(seeds)
+        queue: deque[tuple[str, int]] = deque((s, 0) for s in seeds)
         while queue:
-            current = queue.pop(0)
+            current, depth = queue.popleft()
+
+            # Hub 豁免：高 fanout 节点不向上扩展
+            if (
+                hub_fanout_threshold is not None
+                and len(reverse.get(current, [])) > hub_fanout_threshold
+            ):
+                continue
+
+            # 深度限制检查
+            if max_depth is not None and depth >= max_depth:
+                continue
+
             for upstream in reverse.get(current, []):
                 if upstream not in impacted:
                     impacted.add(upstream)
-                    queue.append(upstream)
+                    queue.append((upstream, depth + 1))
 
         result = ImpactGraph(
             seed_modules=seeds,
