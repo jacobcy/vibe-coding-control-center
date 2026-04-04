@@ -168,12 +168,22 @@ class TestRunManagerWorktree:
         backend = _make_backend()
         github = _make_github()
         sqlite = MagicMock()
+        worktree_manager = MagicMock()
+        worktree_manager.resolve_manager_cwd.return_value = (
+            Path("/Users/jacobcy/src/vibe-center/main/.worktrees/issue-372"),
+            False,
+        )
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
             run_module.GitClient,
             "get_git_common_dir",
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
+        )
+        monkeypatch.setattr(
+            run_module,
+            "WorktreeManager",
+            lambda config, repo_root: worktree_manager,
         )
         monkeypatch.setattr(
             run_module, "load_session_id", lambda role, branch=None: None

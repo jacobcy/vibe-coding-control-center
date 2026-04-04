@@ -18,6 +18,7 @@ from vibe3.agents.models import (
     create_codeagent_command,
 )
 from vibe3.agents.pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.agents.review_runner import format_agent_actor
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
@@ -186,7 +187,7 @@ class CodeagentExecutionService:
             branch,
             command.role,
             "started",
-            "system",
+            format_agent_actor(options),
             detail=(
                 f"Started async {command.role} in tmux session: {handle.tmux_session}\n"
                 f"Log: {handle.log_path}"
