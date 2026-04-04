@@ -242,7 +242,7 @@ class CheckService(CheckRemote):
             "task_issue_number"
         ) or IssueLink.resolve_task_number(issue_links)
         if task_issue:
-            return int(task_issue)
+            return int(str(task_issue))
 
         match = re.fullmatch(r"task/issue-(\d+)", branch)
         if match:

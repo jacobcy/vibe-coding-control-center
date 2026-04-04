@@ -11,7 +11,7 @@ from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.server.registry import _validate_pid_file
-from vibe3.services.flow_service import FlowService
+from vibe3.services.flow_service import FlowService, FlowStatusResponse
 from vibe3.ui.console import console
 
 AllOption = Annotated[
@@ -207,7 +207,7 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     state = cast(IssueState, item["state"])
-                    flow = item["flow"]
+                    flow = cast(FlowStatusResponse | None, item["flow"])
                     is_queued = cast(bool, item["queued"])
 
                     status_str = "QUEUED" if is_queued else state.value.upper()
@@ -218,7 +218,8 @@ def status(
                         else "  [dim]flow:[/] [dim](none)[/]"
                     )
                     console.print(
-                        f"  #{number:4}  [{status_color}]{status_str:10}[/]  {title[:48]}..."
+                        f"  #{number:4}  [{status_color}]{status_str:10}[/]"
+                        f"  {title[:48]}..."
                     )
                     console.print(f"             {flow_info}")
             else:
@@ -229,7 +230,7 @@ def status(
                 for item in ready_items:
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
-                    flow = item["flow"]
+                    flow = cast(FlowStatusResponse | None, item["flow"])
                     flow_info = (
                         f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
                         if flow
@@ -256,7 +257,7 @@ def status(
             for item in blocked_items:
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
-                flow = item["flow"]
+                flow = cast(FlowStatusResponse | None, item["flow"])
                 flow_info = (
                     f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
                 )
@@ -306,7 +307,8 @@ def status(
                             else "(no task)"
                         )
                         console.print(
-                            f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                            f"  [cyan]{flow.branch:30}[/] "
+                            f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
                         )
 
             else:
@@ -322,7 +324,8 @@ def status(
                         else "(no task)"
                     )
                     console.print(
-                        f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                        f"  [cyan]{flow.branch:30}[/] "
+                        f"[dim]wt:[/] {wt:15} [dim]task:[/] {task}"
                     )
             else:
                 console.print("  [dim](none)[/]")

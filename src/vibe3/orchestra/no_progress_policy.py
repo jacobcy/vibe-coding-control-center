@@ -19,6 +19,110 @@ from vibe3.models.orchestration import IssueState
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
+    from vibe3.clients.sqlite_client import SQLiteClient
+
+
+def _extract_issue_state_label(issue_payload: dict[str, object]) -> str | None:
+    """Extract state label from GitHub issue payload."""
+    labels = issue_payload.get("labels")
+    if not isinstance(labels, list):
+        return None
+    for label in labels:
+        if not isinstance(label, dict):
+            continue
+        name = label.get("name")
+        if isinstance(name, str) and name.startswith("state/"):
+            return name
+    return None
+
+
+def _comment_count(issue_payload: dict[str, object]) -> int:
+    """Return comment count from GitHub issue payload."""
+    comments = issue_payload.get("comments")
+    return len(comments) if isinstance(comments, list) else 0
+
+
+def snapshot_progress(
+    *,
+    issue_number: int,
+    branch: str,
+    store: SQLiteClient,
+    github: GitHubClient,
+    repo: str | None = None,
+) -> dict[str, object]:
+    """Capture a snapshot of observable progress signals.
+
+    This is the shared progress contract used by both async runtime
+    and sync manager execution paths.
+
+    Args:
+        issue_number: GitHub issue number
+        branch: Flow branch name
+        store: SQLite client for flow state
+        github: GitHub client for issue data
+        repo: Optional repository (owner/repo format)
+
+    Returns:
+        Dict with progress signal values for comparison
+    """
+    # Get issue payload
+    issue_payload = github.view_issue(issue_number, repo=repo)
+    if not isinstance(issue_payload, dict):
+        issue_payload = {}
+
+    from vibe3.clients.git_client import GitClient
+    from vibe3.utils.git_helpers import get_branch_handoff_dir
+
+    # Get flow state refs
+    flow_state = store.get_flow_state(branch) if branch else {}
+    state_dict = flow_state or {}
+    refs = (
+        state_dict.get("spec_ref"),
+        state_dict.get("plan_ref"),
+        state_dict.get("report_ref"),
+        state_dict.get("audit_ref"),
+        state_dict.get("next_step"),
+        state_dict.get("blocked_by"),
+    )
+
+    try:
+        git_dir = GitClient().get_git_common_dir()
+        handoff_dir = get_branch_handoff_dir(git_dir, branch) if git_dir else None
+    except Exception:
+        handoff_dir = None
+
+    handoff_sig = None
+    if handoff_dir:
+        handoff_file = handoff_dir / "current.md"
+        if handoff_file.exists():
+            stat = handoff_file.stat()
+            handoff_sig = (True, int(stat.st_mtime_ns), int(stat.st_size))
+
+    return {
+        "state_label": _extract_issue_state_label(issue_payload),
+        "comment_count": _comment_count(issue_payload),
+        "handoff": handoff_sig,
+        "refs": refs,
+    }
+
+
+def has_progress_changed(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> bool:
+    """Check if any progress signal changed between snapshots.
+
+    Args:
+        before: Previous progress snapshot
+        after: Current progress snapshot
+
+    Returns:
+        True if any signal changed (progress was made)
+    """
+    return any(
+        before[key] != after[key]
+        for key in ("state_label", "comment_count", "handoff", "refs")
+    )
 
 
 def should_auto_block(
@@ -77,9 +181,7 @@ def execute_auto_block(
         logger.bind(
             domain="orchestra",
             issue=issue_number,
-        ).debug(
-            "Issue already blocked, skipping auto-block"
-        )
+        ).debug("Issue already blocked, skipping auto-block")
         return
 
     logger.bind(

@@ -218,7 +218,7 @@ class FlowManager:
             )
         except Exception as exc:
             # Guard against race condition: re-check if flow was created concurrently
-            existing = self.store.get_flow_state(branch)
+            existing = self.store.get_flow_state(branch) or {}
             if existing:
                 log.warning(
                     f"Flow created concurrently for #{issue.number}, using existing"
