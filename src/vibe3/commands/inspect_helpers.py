@@ -12,26 +12,26 @@ from vibe3.analysis.change_scope_service import (
     count_changed_lines,
 )
 from vibe3.analysis.serena_service import SerenaService
-from vibe3.commands.inspect_pr_helpers import (
-    _analyze_critical_files,
-    _calculate_risk_score,
-    _filter_critical_files,
-    _get_pr_changed_files,
-    _get_pr_commit_count,
-    _get_recent_commits,
-    build_pr_analysis,
-)
-from vibe3.commands.inspect_types import (
-    CommitInfo,
-    CriticalFileInfo,
-    PRCriticalAnalysis,
-)
+from vibe3.commands.inspect_pr_helpers import build_pr_analysis
 from vibe3.config.loader import get_config
 from vibe3.models.change_source import (
     BranchSource,
     CommitSource,
     PRSource,
     UncommittedSource,
+)
+from vibe3.models.pr_analysis import (
+    CommitInfo,
+    CriticalFileInfo,
+    PRCriticalAnalysis,
+)
+from vibe3.services.pr_analysis_service import (  # Re-export for backward compatibility
+    _analyze_critical_files,
+    _calculate_risk_score,
+    _filter_critical_files,
+    _get_pr_changed_files,
+    _get_pr_commit_count,
+    _get_recent_commits,
 )
 from vibe3.services.pr_scoring_service import PRDimensions, generate_score_report
 

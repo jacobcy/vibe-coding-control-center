@@ -17,7 +17,7 @@ from vibe3.commands.inspect_helpers import (
 @pytest.fixture
 def mock_config():
     """Mock get_config to return test configuration."""
-    with patch("vibe3.commands.inspect_pr_helpers.get_config") as mock:
+    with patch("vibe3.services.pr_analysis_service.get_config") as mock:
         config = MagicMock()
         config.review_scope.critical_paths = ["src/vibe3/config/", "src/vibe3/clients/"]
         config.review_scope.public_api_paths = ["src/vibe3/api/"]
@@ -110,7 +110,7 @@ def test_filter_critical_files_both_tags(mock_config):
 @pytest.fixture
 def mock_generate_score():
     """Mock generate_score_report."""
-    with patch("vibe3.commands.inspect_pr_helpers.generate_score_report") as mock:
+    with patch("vibe3.services.pr_analysis_service.generate_score_report") as mock:
         mock.return_value = {
             "score": 6,
             "level": "MEDIUM",
