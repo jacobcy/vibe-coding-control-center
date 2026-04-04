@@ -174,3 +174,87 @@ async def test_on_tick_skips_when_live_tmux_session_exists(
     await svc.on_tick()
 
     svc._backend.start_async_command.assert_not_called()
+
+
+# === Manager no-progress blocking tests ===
+
+
+@pytest.mark.asyncio
+async def test_manager_no_progress_does_not_block_when_session_alive(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Manager session still alive -> do not block."""
+    svc, manager = manager_service
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
+    svc._has_live_dispatch = MagicMock(return_value=True)
+    # Simulate manager dispatch was in-flight
+    svc._in_flight_dispatches.add(42)
+
+    await svc.on_tick()
+
+    # Should not auto-block because session is alive
+    svc._github.add_comment.assert_not_called()
+    # Should not call dispatch again because already in-flight
+    manager.dispatch_manager.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_manager_no_progress_blocks_when_session_ended(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Manager session ended and no observable progress -> block."""
+    svc, manager = manager_service
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
+    svc._has_live_dispatch = MagicMock(return_value=False)
+    # Simulate manager dispatch was in-flight but session ended
+    svc._in_flight_dispatches.add(42)
+    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+
+    await svc.on_tick()
+
+    # Should auto-block because session ended and state unchanged
+    svc._github.add_comment.assert_called_once()
+    comment = svc._github.add_comment.call_args[0][1]
+    assert "[dispatcher]" in comment
+    assert "Manager 执行完成但未改变状态" in comment
+
+
+@pytest.mark.asyncio
+async def test_manager_no_progress_skips_already_blocked_issue(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Already blocked issue -> do not duplicate block comment."""
+    svc, manager = manager_service
+    # Issue has both ready and blocked labels
+    svc._github.list_issues.return_value = [
+        _issue_payload(labels=["state/ready", "state/blocked"])
+    ]
+    svc._has_live_dispatch = MagicMock(return_value=False)
+    # Simulate manager dispatch was in-flight but session ended
+    svc._in_flight_dispatches.add(42)
+    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+
+    await svc.on_tick()
+
+    # Should not add duplicate comment because already blocked
+    svc._github.add_comment.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_manager_state_changed_does_not_auto_block(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Manager changed state label -> do not auto-block."""
+    svc, manager = manager_service
+    # Issue no longer has state/ready (manager changed it to state/claimed)
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    svc._has_live_dispatch = MagicMock(return_value=False)
+    # Simulate manager dispatch was in-flight
+    svc._in_flight_dispatches.add(42)
+
+    await svc.on_tick()
+
+    # Should not auto-block because state changed (no longer ready)
+    svc._github.add_comment.assert_not_called()
+    # Should clean up from in-flight without blocking
+    assert 42 not in svc._in_flight_dispatches
