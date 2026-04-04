@@ -220,10 +220,6 @@ def _resolve_issue_supervisor_file() -> str:
 
 
 def _resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:
-    """On first --worktree run, launch from main repo root.
-
-    So wrapper worktrees land under shared .worktrees/.
-    """
     if not use_worktree or session_id:
         return Path.cwd()
     git_common_dir = Path(GitClient().get_git_common_dir())
