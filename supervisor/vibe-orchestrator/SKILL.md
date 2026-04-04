@@ -73,7 +73,7 @@ input_examples:
 
 **历史 Pattern 匹配：**
 
-- 运行 `vibe3 handoff show`
+- 运行 `uv run python src/vibe3/cli.py handoff show`
 - 查找相似特征的已完成任务：
   - 相同类型 + 相似复杂度 → 高置信度
   - 相同模块 + 相似范围 → 中置信度
@@ -128,7 +128,7 @@ input_examples:
   - 若为 `/vibe-new <feature>`，则 `vibe task add "<feature>"`
   - 若为自然语言需求，则根据 AI 分析的标题 `vibe task add <title>`
 - 记录完成后，通过 `vibe task update <task_id> --next-step "Entry: Gate 1 Scope Gate"` 标记进度。
-- 框架选择通过 `vibe3 handoff append` 记录，格式：`- <feature> (framework: <superpower|openspec>)`。
+- 框架选择通过 `uv run python src/vibe3/cli.py handoff append` 记录，格式：`- <feature> (framework: <superpower|openspec>)`。
 - 同时记录需求特征，用于 future pattern 匹配。
   **选择提示模板（仅在需要询问时使用）：**
 
