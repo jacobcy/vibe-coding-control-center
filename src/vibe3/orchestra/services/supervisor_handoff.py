@@ -12,9 +12,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.settings import VibeConfig
 from vibe3.orchestra.agent_resolver import resolve_supervisor_agent_options
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService

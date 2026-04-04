@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.config.settings import VibeConfig
 from vibe3.orchestra.agent_resolver import resolve_governance_agent_options
 from vibe3.orchestra.config import OrchestraConfig
