@@ -39,6 +39,7 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    manager_session_id: str | None = None
     planner_actor: str | None = None
     planner_session_id: str | None = None
     executor_actor: str | None = None
@@ -121,6 +122,29 @@ class FlowEvent(BaseModel):
     refs: dict[str, str | list[str]] | None = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+    @field_validator("refs", mode="before")
+    @classmethod
+    def normalize_refs(
+        cls, v: dict[str, object] | None
+    ) -> dict[str, str | list[str]] | None:
+        """Normalize legacy event refs loaded from SQLite.
+
+        Older events may store bool/int values. Timeline rendering only needs
+        display-safe strings (or lists of strings), so coerce scalars here
+        instead of failing on historical data.
+        """
+        if v is None:
+            return None
+        normalized: dict[str, str | list[str]] = {}
+        for key, value in v.items():
+            if isinstance(value, list):
+                normalized[key] = [str(item) for item in value]
+            elif value is None:
+                continue
+            else:
+                normalized[key] = str(value)
+        return normalized
+
 
 class FlowStatusResponse(BaseModel):
     """Response model for flow status."""
@@ -135,6 +159,7 @@ class FlowStatusResponse(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    manager_session_id: str | None = None
     planner_actor: str | None = None
     planner_session_id: str | None = None
     executor_actor: str | None = None
@@ -189,6 +214,7 @@ class FlowStatusResponse(BaseModel):
             plan_ref=data.get("plan_ref"),
             report_ref=data.get("report_ref"),
             audit_ref=data.get("audit_ref"),
+            manager_session_id=data.get("manager_session_id"),
             planner_actor=data.get("planner_actor"),
             planner_session_id=data.get("planner_session_id"),
             executor_actor=data.get("executor_actor"),

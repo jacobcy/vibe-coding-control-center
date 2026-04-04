@@ -42,6 +42,8 @@ class CodeagentResult:
     handoff_file: Path | None = None
     session_id: str | None = None
     pid: int | None = None
+    tmux_session: str | None = None
+    log_path: Path | None = None
 
 
 def create_codeagent_command(

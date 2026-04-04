@@ -23,6 +23,7 @@ from vibe3.orchestra.services.status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
+from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
 from vibe3.runtime.heartbeat import HeartbeatServer
 
 
@@ -89,6 +90,16 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         heartbeat.register(
             GovernanceService(
                 config,
+                status_service=status_service,
+                manager=shared_manager,
+                executor=shared_executor,
+            )
+        )
+    if config.supervisor_handoff.enabled:
+        heartbeat.register(
+            SupervisorHandoffService(
+                config,
+                github=shared_github,
                 status_service=status_service,
                 manager=shared_manager,
                 executor=shared_executor,

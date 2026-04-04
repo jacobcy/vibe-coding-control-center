@@ -65,7 +65,17 @@ def _make_flow_state(
 
 
 @patch("vibe3.commands.flow_status.FlowService")
-def test_flow_status_default_filters_active(mock_service_class) -> None:
+@patch("vibe3.commands.flow_status.render_flows_status_dashboard")
+@patch("vibe3.commands.flow_status.FlowProjectionService")
+@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.clients.git_client.GitClient")
+def test_flow_status_default_filters_active(
+    _mock_git_client,
+    _mock_check_service,
+    mock_projection_service_class,
+    _render_dashboard,
+    mock_service_class,
+) -> None:
     """flow status without --all only shows active flows."""
     mock_service = MagicMock()
     mock_service.list_flows.return_value = [
@@ -74,6 +84,9 @@ def test_flow_status_default_filters_active(mock_service_class) -> None:
         _make_flow_state("task/done-1", status="done"),
     ]
     mock_service_class.return_value = mock_service
+    mock_projection_service = MagicMock()
+    mock_projection_service.get_issue_titles.return_value = ({}, False)
+    mock_projection_service_class.return_value = mock_projection_service
 
     result = runner.invoke(app, ["flow", "status"])
 
@@ -83,10 +96,23 @@ def test_flow_status_default_filters_active(mock_service_class) -> None:
 
 
 @patch("vibe3.commands.flow_status.FlowService")
-def test_flow_status_all_includes_terminal_states(mock_service_class) -> None:
+@patch("vibe3.commands.flow_status.render_flows_status_dashboard")
+@patch("vibe3.commands.flow_status.FlowProjectionService")
+@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.clients.git_client.GitClient")
+def test_flow_status_all_includes_terminal_states(
+    _mock_git_client,
+    _mock_check_service,
+    mock_projection_service_class,
+    _render_dashboard,
+    mock_service_class,
+) -> None:
     """flow status --all includes flows in terminal states (done, aborted)."""
     mock_service = MagicMock()
     mock_service_class.return_value = mock_service
+    mock_projection_service = MagicMock()
+    mock_projection_service.get_issue_titles.return_value = ({}, False)
+    mock_projection_service_class.return_value = mock_projection_service
 
     runner.invoke(app, ["flow", "status", "--all"])
 

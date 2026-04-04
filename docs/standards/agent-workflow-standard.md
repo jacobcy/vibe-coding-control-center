@@ -4,6 +4,8 @@
 > **适用范围**：所有需要 AI 辅助的开发工作
 > **权威性**：本标准为 agent 工作流的权威依据
 
+相关调试方法见 [agent-debugging-standard.md](agent-debugging-standard.md)。
+
 ---
 
 ## 概述
@@ -31,8 +33,8 @@ Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 
 **settings.yaml 配置示例**：
 ```yaml
 run:
-  policy_file: ".agent/rules/run-policy.md"
-  common_rules: ".agent/rules/common.md"
+  policy_file: ".agent/policies/run.md"
+  common_rules: ".agent/policies/common.md"
   agent_config:
     agent: "develop"  # 默认 agent preset
     timeout_seconds: 600  # 默认超时（秒）
@@ -58,13 +60,13 @@ Plan → Run → Review → Commit
 
 ```bash
 # 从 issue 创建 plan
-vibe3 plan task <issue_number>
+vibe3 plan --issue <issue_number>
 
 # 从 spec 文件创建 plan
-vibe3 plan spec --file spec.md
+vibe3 plan --spec --file spec.md
 
 # 从 spec message 创建 plan
-vibe3 plan spec --msg "Add dark mode support"
+vibe3 plan --spec --msg "Add dark mode support"
 ```
 
 **Step 2: 执行 Plan（使用 Agent）**
@@ -146,7 +148,7 @@ vibe3 flow update
 vibe3 flow bind <issue_number>
 
 # 3. 创建 plan
-vibe3 plan task
+vibe3 plan --issue
 
 # 4. 执行 plan（agent 实现）
 vibe3 run --plan
@@ -193,7 +195,7 @@ git checkout -b refactor/split-large-file
 vibe3 flow update
 
 # 2. 创建 plan（重构需要详细规划）
-vibe3 plan spec --msg "Split large file into smaller modules"
+vibe3 plan --spec --msg "Split large file into smaller modules"
 
 # 3. 执行 plan
 vibe3 run --plan
@@ -412,7 +414,7 @@ vibe3 run --plan --timeout 1800  # 30 分钟
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [quality-control-standard.md](./quality-control-standard.md) - 质量检查标准
 - [error-handling.md](./error-handling.md) - 错误处理规范
-- [.agent/rules/run-policy.md](../.agent/rules/run-policy.md) - Run 命令策略
+- [.agent/policies/run.md](../../.agent/policies/run.md) - Run 命令策略
 
 ---
 

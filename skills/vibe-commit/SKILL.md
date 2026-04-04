@@ -5,9 +5,11 @@ description: Use when the user wants to classify dirty changes, create serial co
 
 # /vibe-commit - 提交代码与创建 PR
 
-## 核心职责
+编排提交与创建 PR，不负责 merge、关 issue、关 task、关 flow。
 
-`/vibe-commit` 只负责编排提交与创建 PR，不负责 merge、关 issue、关 task、关 flow。
+---
+
+## 核心职责
 
 **核心职责**：
 

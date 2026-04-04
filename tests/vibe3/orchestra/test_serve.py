@@ -13,6 +13,7 @@ from vibe3.orchestra.config import (
     OrchestraConfig,
     PRReviewDispatchConfig,
     StateLabelDispatchConfig,
+    SupervisorHandoffConfig,
 )
 from vibe3.server.app import (
     app,
@@ -35,6 +36,7 @@ def test_build_server_registers_only_enabled_services() -> None:
     assert "PRReviewDispatchService" in heartbeat.service_names
     assert "GovernanceService" in heartbeat.service_names
     assert "StateLabelDispatchService" in heartbeat.service_names
+    assert "SupervisorHandoffService" in heartbeat.service_names
 
 
 def test_build_server_governance_disabled() -> None:
@@ -44,6 +46,7 @@ def test_build_server_governance_disabled() -> None:
         pr_review_dispatch=PRReviewDispatchConfig(enabled=False),
         governance=GovernanceConfig(enabled=False),
         state_label_dispatch=StateLabelDispatchConfig(enabled=False),
+        supervisor_handoff=SupervisorHandoffConfig(enabled=False),
     )
     heartbeat, _ = _build_server(cfg)
     assert heartbeat.service_names == []

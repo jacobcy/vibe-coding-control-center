@@ -25,7 +25,11 @@ from vibe3.services.flow_service import FlowService
 from vibe3.utils.trace import enable_trace
 
 _ASYNC_OPT = Annotated[
-    bool, typer.Option("--async", help="Run asynchronously in background")
+    bool,
+    typer.Option(
+        "--async/--sync",
+        help="Run asynchronously in background (default: async)",
+    ),
 ]
 
 app = typer.Typer(
@@ -71,7 +75,7 @@ def pr(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
@@ -133,7 +137,7 @@ def base(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = False,
+    async_mode: _ASYNC_OPT = True,
     worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
@@ -181,9 +185,15 @@ def base(
         # Parent only schedules tmux async run; child re-enters CLI and computes
         # inspect/snapshot context once. Avoid duplicate precomputation here.
         config = VibeConfig.get_defaults()
+        review_task = (
+            instructions
+            or (config.review.review_prompt if config.review else None)
+            or f"Review changes on {current_branch} vs {resolved_base.base_branch}"
+        )
         command = create_codeagent_command(
             role="reviewer",
             context_builder=lambda: "",
+            task=review_task,
             dry_run=False,
             handoff_kind="review",
             config=config,

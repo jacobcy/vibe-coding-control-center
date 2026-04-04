@@ -201,4 +201,4 @@ vibe review base origin/main
 
 - [配置文件](../../config/settings.yaml) - 查看具体配置值
 - [GitHub 智能代码审查系统](./github-code-review-standard.md)
-- [Common Rules And Tools](../../.agent/rules/common.md)
+- [Common Rules And Tools](../../.agent/policies/common.md)

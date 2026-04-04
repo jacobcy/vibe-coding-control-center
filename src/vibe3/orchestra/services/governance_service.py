@@ -11,6 +11,9 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.runner import CodeagentExecutionService
+from vibe3.config.settings import VibeConfig
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import (
     IssueStatusEntry,
@@ -27,7 +30,6 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
-from vibe3.runtime.executor import run_command
 
 if TYPE_CHECKING:
     from vibe3.manager.manager_executor import ManagerExecutor
@@ -66,17 +68,25 @@ class GovernanceService(ServiceBase):
         manager: ManagerExecutor | None = None,
         executor: ThreadPoolExecutor | None = None,
         prompts_path: Path | None = None,
+        backend: CodeagentBackend | None = None,
     ) -> None:
         self.config = config
         self._status_service = status_service
-        self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
+        if manager is None:
+            from vibe3.manager.manager_executor import (
+                ManagerExecutor as _ManagerExecutor,
+            )
+
+            manager = _ManagerExecutor(config, dry_run=config.dry_run)
+        self._manager = manager
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
         self._tick_count = 0
-        self._skill = config.governance.skill
+        self._supervisor_file = config.governance.supervisor_file
         self._prompt_template = config.governance.prompt_template
-        self._include_skill_content = config.governance.include_skill_content
+        self._include_supervisor_content = config.governance.include_supervisor_content
         self._dry_run = config.governance.dry_run
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
+        self._backend = backend or CodeagentBackend()
         self.last_render_result: PromptRenderResult | None = None
 
     async def handle_event(self, event: GitHubEvent) -> None:
@@ -93,6 +103,15 @@ class GovernanceService(ServiceBase):
         except Exception as exc:
             log.error(f"Governance scan failed: {exc}")
 
+    async def run_once(self) -> None:
+        """Run governance exactly once for manual debugging."""
+        await self._run_governance()
+
+    def render_current_plan(self) -> str:
+        """Render governance plan from the current live snapshot."""
+        snapshot = self._status_service.snapshot()
+        return self._build_governance_plan(snapshot)
+
     async def _run_governance(self) -> None:
         loop = asyncio.get_event_loop()
         log = logger.bind(domain="orchestra", action="governance")
@@ -106,52 +125,45 @@ class GovernanceService(ServiceBase):
         plan_content = self._render_governance_plan(context)
         if self._dry_run:
             dry_run_plan_path = self._write_dry_run_plan(plan_content)
-            cmd = self._build_governance_command(dry_run_plan_path)
-            self._log_dry_run_preview(
-                log, context, dry_run_plan_path, cmd, plan_content
-            )
+            self._log_dry_run_preview(log, context, dry_run_plan_path, plan_content)
             return
-        plan_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".md", prefix="governance_plan_", delete=False
-            ) as handle:
-                handle.write(plan_content)
-                plan_path = Path(handle.name)
-            cmd = self._build_governance_command(plan_path)
-            log.info(f"Executing governance: {' '.join(cmd)}")
-            success, _ = await loop.run_in_executor(
-                self._executor,
-                lambda: run_command(
-                    cmd,
-                    self._manager.repo_path,
-                    "Governance scan",
-                    circuit_breaker=self._manager._circuit_breaker,
+        result = await loop.run_in_executor(
+            self._executor,
+            lambda: self._backend.run(
+                prompt=plan_content,
+                options=CodeagentExecutionService(
+                    VibeConfig.get_defaults()
+                ).resolve_agent_options("run"),
+                task=(
+                    VibeConfig.get_defaults().run.run_prompt
+                    or "Execute governance supervisor task"
                 ),
-            )
-            if success:
-                log.info("Governance scan completed successfully")
-            else:
-                log.warning("Governance scan returned non-zero exit code")
-        finally:
-            if plan_path:
-                plan_path.unlink(missing_ok=True)
+                dry_run=False,
+            ),
+        )
+        if result.is_success():
+            log.info("Governance scan completed successfully")
+        else:
+            log.warning("Governance scan returned non-zero exit code")
 
     def _build_governance_plan(self, snapshot: OrchestraSnapshot) -> str:
         context = self._build_prompt_context(snapshot)
         return self._render_governance_plan(context)
 
     def _build_governance_recipe(self) -> PromptRecipe:
-        skill_content_source = (
-            PromptVariableSource(kind=VariableSourceKind.SKILL, skill=self._skill)
-            if self._include_skill_content
+        supervisor_content_source = (
+            PromptVariableSource(
+                kind=VariableSourceKind.FILE,
+                path=self._supervisor_file,
+            )
+            if self._include_supervisor_content
             else PromptVariableSource(kind=VariableSourceKind.LITERAL, value="")
         )
         variables: dict[str, PromptVariableSource] = {
-            "skill_name": PromptVariableSource(
-                kind=VariableSourceKind.LITERAL, value=self._skill
+            "supervisor_name": PromptVariableSource(
+                kind=VariableSourceKind.LITERAL, value=self._supervisor_file
             ),
-            "skill_content": skill_content_source,
+            "supervisor_content": supervisor_content_source,
         }
         for key in _GOVERNANCE_RUNTIME_VARS:
             variables[key] = PromptVariableSource(
@@ -171,9 +183,6 @@ class GovernanceService(ServiceBase):
         self.last_render_result = result
         return result.rendered_text
 
-    def _build_governance_command(self, plan_path: Path) -> list[str]:
-        return ["uv", "run", "python", "-m", "vibe3", "run", "--plan", str(plan_path)]
-
     def _write_dry_run_plan(self, plan_content: str) -> Path:
         output_dir = self._manager.repo_path / "temp"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +201,6 @@ class GovernanceService(ServiceBase):
         log: Any,
         context: dict[str, Any],
         plan_path: Path,
-        cmd: list[str],
         plan_content: str,
     ) -> None:
         sources = self._build_material_source_summary()
@@ -202,8 +210,8 @@ class GovernanceService(ServiceBase):
             f"#{sources['prompt_template_key']}"
         )
         log.info(
-            f"Governance skill source: {sources['skill_name']} -> "
-            f"{sources['skill_file']}"
+            f"Governance supervisor source: {sources['supervisor_file']} -> "
+            f"{sources['supervisor_path']}"
         )
         if self.last_render_result:
             provider_keys = [
@@ -213,11 +221,10 @@ class GovernanceService(ServiceBase):
             ]
             log.info(f"Provider keys: {sorted(provider_keys)}")
         log.info(
-            f"Include skill content: {self._include_skill_content}; "
+            f"Include supervisor content: {self._include_supervisor_content}; "
             f"prompt vars={sorted(context.keys())}"
         )
         log.info(f"Dry run plan file: {plan_path}")
-        log.info(f"Dry run command: {' '.join(cmd)}")
         log.info("Dry run rendered governance plan:")
         log.info(f"\n{plan_content}")
 
@@ -299,12 +306,14 @@ class GovernanceService(ServiceBase):
 
     def _build_material_source_summary(self) -> dict[str, str]:
         prompts_path = self._resolve_prompts_path()
-        skill_path = self._resolve_skill_path()
+        supervisor_path = self._resolve_supervisor_path()
         return {
             "prompt_template_key": self._prompt_template,
             "prompt_template_file": str(prompts_path),
-            "skill_name": self._skill,
-            "skill_file": str(skill_path) if skill_path is not None else "(not found)",
+            "supervisor_file": self._supervisor_file,
+            "supervisor_path": (
+                str(supervisor_path) if supervisor_path is not None else "(not found)"
+            ),
         }
 
     def _resolve_prompts_path(self) -> Path:
@@ -314,10 +323,13 @@ class GovernanceService(ServiceBase):
             else Path.cwd() / self._prompts_path
         )
 
-    def _resolve_skill_path(self) -> Path | None:
-        from vibe3.agents.run_agent import RunUsecase
-
-        return RunUsecase.find_skill_file(self._skill)
+    def _resolve_supervisor_path(self) -> Path | None:
+        path = Path(self._supervisor_file)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        if path.exists():
+            return path
+        return None
 
 
 def _build_runtime_registry(context: dict[str, Any]) -> ProviderRegistry:

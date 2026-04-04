@@ -24,6 +24,7 @@ class SQLiteClient:
         "plan_ref",
         "report_ref",
         "audit_ref",
+        "manager_session_id",
         "planner_actor",
         "planner_session_id",
         "executor_actor",

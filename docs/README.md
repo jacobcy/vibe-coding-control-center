@@ -30,6 +30,7 @@ docs/
 **必读文档**：
 - **[glossary.md](standards/glossary.md)** - 项目术语真源，统一概念定义与别称边界
 - **[action-verbs.md](standards/action-verbs.md)** - 高频动作词真源，统一默认含义与执行提醒
+- **[agent-debugging-standard.md](standards/agent-debugging-standard.md)** - Agent 调试标准，统一 supervisor 与 manager 链调试方法
 - **[doc-organization.md](standards/doc-organization.md)** - 文档组织标准，定义命名规范和使用指南
 - **[cognition-spec-dominion.md](standards/cognition-spec-dominion.md)** - 宪法大纲，定义 Vibe Guard 流程
 ### 全局 PRD (`prds/`)

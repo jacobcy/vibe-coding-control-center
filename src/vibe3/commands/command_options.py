@@ -14,7 +14,11 @@ _DRY_RUN_OPT = Annotated[
     bool, typer.Option("--dry-run", help="Print command without executing")
 ]
 _ASYNC_OPT = Annotated[
-    bool, typer.Option("--async", help="Run asynchronously in background")
+    bool,
+    typer.Option(
+        "--async/--sync",
+        help="Run asynchronously in background (default: async)",
+    ),
 ]
 _AGENT_OPT = Annotated[
     Optional[str], typer.Option("--agent", help="Override agent preset")

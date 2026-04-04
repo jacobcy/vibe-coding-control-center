@@ -141,8 +141,18 @@ class TestSyncModelsJson:
         """In agent preset mode, models.json is not touched."""
         fake_models = tmp_path / "models.json"
         fake_models.write_text('{"default_backend": "old"}')
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text("{}")
 
-        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
             sync_models_json(AgentOptions(agent="code-reviewer"))
 
         # file unchanged
@@ -151,11 +161,21 @@ class TestSyncModelsJson:
     def test_updates_default_backend_and_model(self, tmp_path: Path) -> None:
         """Backend mode: updates default_backend and default_model."""
         fake_models = tmp_path / "models.json"
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text("{}")
         fake_models.write_text(
             json.dumps({"default_backend": "old", "backends": {"old": {}}})
         )
 
-        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
             sync_models_json(AgentOptions(backend="claude", model="claude-sonnet-4-5"))
 
         data = json.loads(fake_models.read_text())
@@ -166,11 +186,21 @@ class TestSyncModelsJson:
     def test_updates_backend_without_model(self, tmp_path: Path) -> None:
         """Backend without model: only default_backend is updated."""
         fake_models = tmp_path / "models.json"
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text("{}")
         fake_models.write_text(
             json.dumps({"default_backend": "old", "default_model": "old-model"})
         )
 
-        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
             sync_models_json(AgentOptions(backend="codex"))
 
         data = json.loads(fake_models.read_text())
@@ -180,8 +210,18 @@ class TestSyncModelsJson:
     def test_creates_file_if_missing(self, tmp_path: Path) -> None:
         """Creates models.json from scratch if it doesn't exist."""
         fake_models = tmp_path / "new" / "models.json"
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text("{}")
 
-        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
             sync_models_json(AgentOptions(backend="claude", model="claude-opus"))
 
         assert fake_models.exists()
@@ -192,10 +232,53 @@ class TestSyncModelsJson:
     def test_tolerates_corrupt_existing_file(self, tmp_path: Path) -> None:
         """Corrupt models.json is replaced cleanly."""
         fake_models = tmp_path / "models.json"
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text("{}")
         fake_models.write_text("NOT JSON {{{{")
 
-        with patch("vibe3.agents.backends.codeagent.MODELS_JSON_PATH", fake_models):
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
             sync_models_json(AgentOptions(backend="claude", model="claude-opus"))
 
         data = json.loads(fake_models.read_text())
         assert data["default_backend"] == "claude"
+
+    def test_agent_mode_uses_repo_local_models_mapping(self, tmp_path: Path) -> None:
+        """Agent preset mode should sync from repo-local mapping when available."""
+        fake_models = tmp_path / "models.json"
+        fake_models.write_text('{"default_backend": "old"}')
+        fake_repo_models = tmp_path / "repo-models.json"
+        fake_repo_models.write_text(
+            json.dumps(
+                {
+                    "agents": {
+                        "code-architect": {
+                            "backend": "codex",
+                            "model": "gpt-5.4-mini",
+                        }
+                    }
+                }
+            )
+        )
+
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH", fake_models
+            ),
+            patch(
+                "vibe3.agents.backends.codeagent_config.REPO_MODELS_JSON_PATH",
+                fake_repo_models,
+            ),
+        ):
+            sync_models_json(AgentOptions(agent="code-architect"))
+
+        data = json.loads(fake_models.read_text())
+        assert data["default_backend"] == "codex"
+        assert data["default_model"] == "gpt-5.4-mini"

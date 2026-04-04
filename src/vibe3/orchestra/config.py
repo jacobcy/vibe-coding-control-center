@@ -50,17 +50,20 @@ class AssigneeDispatchConfig(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
+    agent: str = "develop"
+    backend: str | None = None
+    model: str | None = None
     prompt_template: str = Field(
         default="orchestra.assignee_dispatch.manager",
         description="Dotted prompts.yaml path used to render the manager task prompt",
     )
-    skill: str | None = Field(
-        default="vibe-manager",
-        description="Skill to include in manager prompt (None disables skill content)",
+    supervisor_file: str | None = Field(
+        default="supervisor/manager.md",
+        description="Supervisor file to include in manager prompt (None disables)",
     )
-    include_skill_content: bool = Field(
-        default=False,
-        description="Whether to inline the skill body into the manager prompt",
+    include_supervisor_content: bool = Field(
+        default=True,
+        description="Whether to include supervisor file content in the manager prompt",
     )
 
 
@@ -119,17 +122,17 @@ class GovernanceConfig(BaseModel):
     """Configuration for periodic governance scan service."""
 
     enabled: bool = True
-    skill: str = Field(
-        default="vibe-orchestra",
-        description="Governance skill material to include in the composed prompt",
+    supervisor_file: str = Field(
+        default="supervisor/orchestra.md",
+        description="Supervisor file to include in the composed governance prompt",
     )
     prompt_template: str = Field(
         default="orchestra.governance.plan",
         description="Dotted prompts.yaml path used to render governance prompt",
     )
-    include_skill_content: bool = Field(
+    include_supervisor_content: bool = Field(
         default=True,
-        description="Whether to inline the governance skill body into the prompt",
+        description="Whether to inline the supervisor file content into the prompt",
     )
     dry_run: bool = False
     interval_ticks: int = Field(
@@ -139,6 +142,15 @@ class GovernanceConfig(BaseModel):
             "Run governance scan every N heartbeat ticks (~1h at default interval)"
         ),
     )
+
+
+class SupervisorHandoffConfig(BaseModel):
+    """Configuration for supervisor handoff issue consumption."""
+
+    enabled: bool = True
+    issue_label: str = "supervisor"
+    handoff_state_label: str = "state/handoff"
+    supervisor_file: str = "supervisor/apply.md"
 
 
 class OrchestraConfig(BaseModel):
@@ -176,6 +188,9 @@ class OrchestraConfig(BaseModel):
     )
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     governance: GovernanceConfig = Field(default_factory=GovernanceConfig)
+    supervisor_handoff: SupervisorHandoffConfig = Field(
+        default_factory=SupervisorHandoffConfig
+    )
 
     @classmethod
     def from_settings(cls) -> "OrchestraConfig":
@@ -202,9 +217,9 @@ class OrchestraConfig(BaseModel):
 
         governance_defaults: dict[str, bool | str | int] = {
             "enabled": True,
-            "skill": "vibe-orchestra",
+            "supervisor_file": "supervisor/orchestra.md",
             "prompt_template": "orchestra.governance.plan",
-            "include_skill_content": True,
+            "include_supervisor_content": True,
             "dry_run": False,
             "interval_ticks": 4,
         }
@@ -216,17 +231,51 @@ class OrchestraConfig(BaseModel):
                 governance_defaults.update(
                     {
                         "enabled": getattr(governance_src, "enabled", True),
-                        "skill": getattr(governance_src, "skill", "vibe-orchestra"),
+                        "supervisor_file": getattr(
+                            governance_src,
+                            "supervisor_file",
+                            "supervisor/orchestra.md",
+                        ),
                         "prompt_template": getattr(
                             governance_src,
                             "prompt_template",
                             "orchestra.governance.plan",
                         ),
-                        "include_skill_content": getattr(
-                            governance_src, "include_skill_content", True
+                        "include_supervisor_content": getattr(
+                            governance_src, "include_supervisor_content", True
                         ),
                         "dry_run": getattr(governance_src, "dry_run", False),
                         "interval_ticks": getattr(governance_src, "interval_ticks", 4),
+                    }
+                )
+
+        supervisor_handoff_defaults: dict[str, bool | str] = {
+            "enabled": True,
+            "issue_label": "supervisor",
+            "handoff_state_label": "state/handoff",
+            "supervisor_file": "supervisor/apply.md",
+        }
+        supervisor_handoff_src = getattr(src, "supervisor_handoff", None)
+        if supervisor_handoff_src is not None:
+            if isinstance(supervisor_handoff_src, dict):
+                supervisor_handoff_defaults.update(supervisor_handoff_src)
+            else:
+                supervisor_handoff_defaults.update(
+                    {
+                        "enabled": getattr(supervisor_handoff_src, "enabled", True),
+                        "issue_label": getattr(
+                            supervisor_handoff_src, "issue_label", "supervisor"
+                        ),
+                        "handoff_state_label": getattr(
+                            supervisor_handoff_src,
+                            "handoff_state_label",
+                            "state/handoff",
+                        ),
+                        "supervisor_file": getattr(
+                            supervisor_handoff_src,
+                            "supervisor_file",
+                            "supervisor/apply.md",
+                        ),
                     }
                 )
 
@@ -250,14 +299,19 @@ class OrchestraConfig(BaseModel):
             assignee_dispatch=AssigneeDispatchConfig(
                 enabled=src.assignee_dispatch.enabled,
                 use_worktree=src.assignee_dispatch.use_worktree,
+                agent=getattr(src.assignee_dispatch, "agent", "develop"),
+                backend=getattr(src.assignee_dispatch, "backend", None),
+                model=getattr(src.assignee_dispatch, "model", None),
                 prompt_template=getattr(
                     src.assignee_dispatch,
                     "prompt_template",
                     "orchestra.assignee_dispatch.manager",
                 ),
-                skill=getattr(src.assignee_dispatch, "skill", "vibe-manager"),
-                include_skill_content=getattr(
-                    src.assignee_dispatch, "include_skill_content", False
+                supervisor_file=getattr(
+                    src.assignee_dispatch, "supervisor_file", "supervisor/manager.md"
+                ),
+                include_supervisor_content=getattr(
+                    src.assignee_dispatch, "include_supervisor_content", True
                 ),
             ),
             comment_reply=CommentReplyConfig(
@@ -275,4 +329,7 @@ class OrchestraConfig(BaseModel):
             ),
             circuit_breaker=circuit_breaker_config,
             governance=GovernanceConfig.model_validate(governance_defaults),
+            supervisor_handoff=SupervisorHandoffConfig.model_validate(
+                supervisor_handoff_defaults
+            ),
         )

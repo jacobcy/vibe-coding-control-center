@@ -273,7 +273,7 @@ class ManagerExecutor:
 2. **Phase 2 验证**：`uv run pytest tests/vibe3/orchestra/ -v`（全部 orchestra 测试通过 shim 兼容） + `uv run mypy src/vibe3/manager/`
 3. **Phase 3 验证**：`uv run pytest tests/vibe3/ -v`（全量） + `uv run mypy src/vibe3/`
 4. **Phase 4 验证**：`uv run pytest tests/vibe3/ -v` + 确认 `grep -r "from vibe3.orchestra.executor" src/` 无结果（shim 已删）
-5. **全流程验证**：`vibe3 serve start --dry-run` 正常启动，`vibe3 status` 正常显示
+5. **全流程验证**：`vibe3 serve start --dry-run` 正常启动，`vibe3 task status` 正常显示
 
 ---
 

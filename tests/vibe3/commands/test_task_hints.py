@@ -11,9 +11,10 @@ runner = CliRunner()
 
 
 @patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
 @patch("vibe3.commands.flow_status.FlowService")
 def test_flow_show_warns_when_task_issue_missing(
-    mock_service_cls, _render_timeline
+    mock_service_cls, _find_parent_branch, _render_timeline
 ) -> None:
     """flow show should suggest binding a task when none is present."""
     mock_service = MagicMock()

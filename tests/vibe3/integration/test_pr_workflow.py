@@ -15,8 +15,7 @@ Requirements:
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 # Add scripts to path
 scripts_path = Path(__file__).parent.parent.parent / "scripts" / "python"
@@ -37,32 +36,41 @@ def _gh_authenticated() -> bool:
         return False
 
 
-_requires_gh = pytest.mark.skipif(
-    not _gh_authenticated(),
-    reason="gh CLI not authenticated — skipped in CI",
-)
-
-
 def run_command(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run shell command."""
     logger.info(f"Running: {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, capture_output=True, text=True)
 
 
-@_requires_gh
 def test_gh_auth() -> None:
-    """Test GitHub CLI authentication."""
-    try:
+    """_gh_authenticated returns True when gh auth succeeds."""
+    mock_result = MagicMock(returncode=0)
+    with patch("subprocess.run", return_value=mock_result) as mock_run:
+        assert _gh_authenticated() is True
+    mock_run.assert_called_once_with(
+        ["gh", "auth", "status"], capture_output=True, check=False
+    )
+
+
+def test_gh_auth_returns_false_when_command_missing() -> None:
+    """_gh_authenticated returns False when gh CLI is unavailable."""
+    with patch("subprocess.run", side_effect=FileNotFoundError):
+        assert _gh_authenticated() is False
+
+
+def test_run_command_passes_expected_subprocess_options() -> None:
+    """run_command should forward check/capture/text options."""
+    mock_result = MagicMock()
+    with patch("subprocess.run", return_value=mock_result) as mock_run:
         result = run_command(["gh", "auth", "status"], check=False)
-        assert result.returncode == 0
-        logger.success("✓ GitHub CLI authenticated")
-    except FileNotFoundError:
-        logger.error("✗ GitHub CLI not found")
-        assert False, "GitHub CLI not found"
-    except AssertionError:
-        logger.error("✗ GitHub CLI not authenticated")
-        logger.error("  Run: gh auth login")
-        assert False, "GitHub CLI not authenticated"
+
+    assert result is mock_result
+    mock_run.assert_called_once_with(
+        ["gh", "auth", "status"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_version_file() -> None:
@@ -84,62 +92,14 @@ def test_version_file() -> None:
         assert False, f"Failed to read VERSION: {e}"
 
 
-def test_pr_draft_creation() -> None:
-    """Test PR draft creation (requires test repo)."""
-    logger.info("Testing PR draft creation...")
-
-    # This is a placeholder - in real scenario, would create test repo
-    logger.warning("  Skipping: Requires test repository setup")
-    logger.info("  Manual test: python -m vibe3.commands.pr draft -t 'Test PR'")
-    assert True
-
-
-@_requires_gh
-def test_pr_workflow_integration() -> None:
-    """Test complete PR workflow."""
-    logger.info("Testing PR workflow integration...")
-
-    tests = [
-        ("GitHub CLI Auth", test_gh_auth),
-        ("VERSION File", test_version_file),
-        ("PR Draft Creation", test_pr_draft_creation),
-    ]
-
-    results = []
-    for name, test_func in tests:
-        logger.info(f"\n{'=' * 60}")
-        logger.info(f"Test: {name}")
-        logger.info("=" * 60)
-        try:
-            test_func()
-            result = True
-        except (AssertionError, Exception):
-            result = False
-        results.append((name, result))
-
-    # Summary
-    logger.info(f"\n{'=' * 60}")
-    logger.info("Test Summary")
-    logger.info("=" * 60)
-    passed = sum(1 for _, r in results if r)
-    total = len(results)
-
-    for name, result in results:
-        status = "✓ PASS" if result else "✗ FAIL"
-        logger.info(f"{status}: {name}")
-
-    logger.info(f"\nTotal: {passed}/{total} tests passed")
-
-    assert passed == total
-
-
 def main() -> int:
     """Run integration tests."""
     logger.info("Vibe3 PR Integration Tests")
     logger.info("=" * 60)
 
     try:
-        test_pr_workflow_integration()
+        test_gh_auth()
+        test_version_file()
         logger.success("\n✓ All integration tests passed!")
         return 0
     except AssertionError:

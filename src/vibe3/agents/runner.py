@@ -10,6 +10,7 @@ from typing import Literal, Sequence
 from loguru import logger
 from typer import echo
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.models import (
     CodeagentCommand,
     CodeagentResult,
@@ -17,8 +18,11 @@ from vibe3.agents.models import (
     create_codeagent_command,
 )
 from vibe3.agents.pipeline import ExecutionRequest, run_execution_pipeline
+from vibe3.agents.review_runner import format_agent_actor
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
+from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 # Re-export models for backward compatibility.
 __all__ = [
@@ -149,32 +153,67 @@ class CodeagentExecutionService:
         branch: str,
     ) -> CodeagentResult:
         """Execute codeagent asynchronously in background."""
-        from vibe3.services.async_execution_service import AsyncExecutionService
-
         log = logger.bind(
             domain="codeagent",
             role=command.role,
             branch=branch,
         )
 
-        cli_command = self._build_cli_command(command)
-
-        async_svc = AsyncExecutionService()
-        # Mark child so run_execution_pipeline skips lifecycle recording
-        # (parent AsyncExecutionService owns lifecycle events).
-        child_env = {**os.environ, "VIBE3_ASYNC_CHILD": "1"}
-        pid = async_svc.start_async_execution(
-            command.role, cli_command, branch, env=child_env
+        role_to_section: dict[ExecutionRole, Literal["plan", "run", "review"]] = {
+            "planner": "plan",
+            "executor": "run",
+            "reviewer": "review",
+        }
+        options = self.resolve_agent_options(
+            section=role_to_section[command.role],
+            agent=command.agent,
+            backend=command.backend,
+            model=command.model,
+            worktree=command.worktree,
+        )
+        prompt = command.context_builder()
+        backend = CodeagentBackend()
+        handle = backend.start_async(
+            prompt=prompt,
+            options=options,
+            task=command.task,
+            execution_name=f"vibe3-{command.role}-{branch}",
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
 
-        log.info("Started async execution", pid=pid)
+        store = SQLiteClient()
+        persist_execution_lifecycle_event(
+            store,
+            branch,
+            command.role,
+            "started",
+            format_agent_actor(options),
+            detail=(
+                f"Started async {command.role} in tmux session: {handle.tmux_session}\n"
+                f"Log: {handle.log_path}"
+            ),
+            refs={
+                "tmux_session": handle.tmux_session,
+                "log_path": str(handle.log_path),
+            },
+        )
+
+        log.info(
+            "Started async execution",
+            tmux_session=handle.tmux_session,
+            log_path=str(handle.log_path),
+        )
         role_name = command.role.capitalize()
-        echo(f"[green]✓[/] {role_name} started in background (PID: {pid})")
+        echo(f"[green]✓[/] {role_name} started in background (PID: 0)")
+        echo(f"Tmux session: {handle.tmux_session}")
+        echo(f"Session log: {handle.log_path}")
         echo("Use 'vibe3 flow show' to check status")
 
         return CodeagentResult(
             success=True,
-            pid=pid,
+            pid=0,
+            tmux_session=handle.tmux_session,
+            log_path=handle.log_path,
         )
 
     def execute(
@@ -216,12 +255,22 @@ class CodeagentExecutionService:
 
     @staticmethod
     def build_self_invocation(args: Sequence[str]) -> list[str]:
-        """Build `uv run python src/vibe3/cli.py ...` invocation and strip --async."""
+        """Build `uv run python src/vibe3/cli.py ...` invocation for tmux child.
+
+        The child process must execute synchronously inside tmux; otherwise
+        default-async command modes would recursively try to spawn more tmux
+        sessions.
+        """
         cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+        saw_sync_flag = False
         for arg in args:
             if arg == "--async":
                 continue
+            if arg == "--sync":
+                saw_sync_flag = True
             cmd.append(arg)
+        if not saw_sync_flag:
+            cmd.append("--sync")
         return cmd
 
     @staticmethod

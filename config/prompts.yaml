@@ -113,8 +113,8 @@ orchestra:
   governance:
     # Selected by config/settings.yaml -> orchestra.governance.prompt_template
     # Available template variables:
-    # - {skill_name}
-    # - {skill_content}
+    # - {supervisor_name}
+    # - {supervisor_content}
     # - {server_status}
     # - {running_issue_count}
     # - {suggested_issue_count}
@@ -131,9 +131,9 @@ orchestra:
       # Orchestra Governance Scan
 
       ## Governance Material
-      - Skill: {skill_name}
+      - Supervisor: {supervisor_name}
 
-      {skill_content}
+      {supervisor_content}
 
       ## Runtime Summary
       - Server: {server_status}
@@ -150,25 +150,33 @@ orchestra:
       {suggested_issue_details}
 
       ## 指令
-      请通过修改 GitHub Issue 标签来表达治理决策。你的决策将由 Dispatcher 异步执行。
+      你的动作边界由上面的 Supervisor 材料决定。
 
-      ### 决策输出规范（必须遵守）：
-      1. **推进 Issue**：如果一个 Issue 依赖已解除且准备好被执行，请在 GitHub Issue 上设置 `state/ready` 标签。
-      2. **标记阻塞**：如果一个 Issue 因为依赖或其他原因无法推进，请设置 `state/blocked` 标签，并发表评论说明原因。
-      3. **标记完成**：如果一个 Issue 对应的 PR 已合并或任务已确认完成，请设置 `state/done` 标签。
-      4. **无需操作**：对于已经在 `state/in-progress` 或 `state/review` 状态且运行正常的 Issue，保持现状。
+      ### 执行要求（必须遵守）：
+      1. 先基于 runtime summary 理解当前现场，再按 Supervisor 材料决定是否需要额外调用 `vibe3 task status`、`vibe3 flow show`、`gh issue view` 等命令核查。
+      2. 只执行 Supervisor 材料明确允许的动作；不要扩大动作范围。
+      3. 如果是 dry-run，就输出计划、建议或 issue 预览，不直接写入。
+      4. 如果不是 dry-run，就执行 Supervisor 材料要求的最小动作，并在完成后停止。
 
       **注意**：
-      - 不要直接修改 Assignee。
-      - 不要尝试直接调用执行命令或创建 Flow。
-      - 你的唯一输出手段是变更 GitHub Label。
+      - 不要直接修改 Assignee，除非 Supervisor 材料明确要求。
+      - 不要擅自创建 Flow、Worktree 或进入 manager 场景，除非 Supervisor 材料明确要求。
+
 
   assignee_dispatch:
     # Template for the manager task instructions.
     # Available template variables:
     # - {issue_number}
     # - {issue_title}
-    manager: "Implement issue #{issue_number}: {issue_title}"
+    # - {supervisor_content}
+    manager: |
+      {supervisor_content}
+
+      ## Manager Target
+      Manage issue #{issue_number}: {issue_title}
+
+      你当前是 manager 状态控制器，不是实现 agent。
+      你的工作是检查 state、scene、issue comments、handoff refs，然后决定是否 comment、写 handoff、修改 labels，或停止。
 
 run:
   # Template for plan/flow_plan/lightweight execution mode.

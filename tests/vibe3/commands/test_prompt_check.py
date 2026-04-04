@@ -46,7 +46,9 @@ class TestPromptCheckCommand:
             cli_app, ["prompt", "check", "orchestra.governance.plan"]
         )
         assert result.exit_code == 0
-        assert "skill_name" in result.output or "skill_content" in result.output
+        assert (
+            "supervisor_name" in result.output or "supervisor_content" in result.output
+        )
 
     def test_manager_template_key(self) -> None:
         result = runner.invoke(

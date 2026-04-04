@@ -46,9 +46,9 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 
 ## Governance Material
 
-- Skill: {skill_name}
+- Supervisor: {supervisor_name}
 
-{skill_content}
+{supervisor_content}
 
 ## Runtime Summary
 

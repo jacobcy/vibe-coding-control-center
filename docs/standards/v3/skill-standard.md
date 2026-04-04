@@ -18,6 +18,7 @@ related_docs:
   - docs/standards/glossary.md
   - docs/standards/action-verbs.md
   - docs/standards/v3/command-standard.md
+  - docs/standards/v3/development-flow-semantic-standard.md
   - docs/standards/v3/python-capability-design.md
   - docs/standards/v3/skill-trigger-standard.md
 ---

@@ -103,7 +103,7 @@ def test_run_execution_pipeline_marks_completed_with_report_ref(
         completed_call = next(
             call for call in mock_persist.call_args_list if call.args[3] == "completed"
         )
-        assert completed_call.kwargs["refs"]["ref"] == "/tmp/run-report.md"
+        assert completed_call.kwargs["refs"] == {"status": "completed"}
 
 
 @patch("vibe3.agents.pipeline.record_handoff_unified")

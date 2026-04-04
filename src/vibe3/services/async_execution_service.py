@@ -1,15 +1,16 @@
-"""Async execution service for plan/review/run commands.
+"""Compatibility wrapper for async execution lifecycle persistence.
 
-This module provides functionality for running agent commands asynchronously
-in background processes, with status tracking in flow state.
+Async tmux/session/log mechanics now live in the codeagent wrapper adapter.
+This service remains as a thin compatibility layer for callers/tests that
+expect branch-scoped lifecycle persistence.
 """
 
 import os
-import subprocess
 from typing import Literal
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.execution_lifecycle import (
     ExecutionLifecycleEvent,
@@ -21,15 +22,15 @@ ExecutionStatus = Literal["pending", "running", "done", "crashed"]
 
 
 class AsyncExecutionService:
-    """Service for managing async execution of agent commands."""
+    """Compatibility service for managing async execution lifecycle."""
 
-    def __init__(self, store: SQLiteClient | None = None) -> None:
-        """Initialize async execution service.
-
-        Args:
-            store: SQLiteClient instance for persistence
-        """
+    def __init__(
+        self,
+        store: SQLiteClient | None = None,
+        backend: CodeagentBackend | None = None,
+    ) -> None:
         self.store = store or SQLiteClient()
+        self._backend = backend or CodeagentBackend()
 
     def start_async_execution(
         self,
@@ -38,22 +39,12 @@ class AsyncExecutionService:
         branch: str,
         env: dict[str, str] | None = None,
     ) -> int:
-        """Start background execution of a command in a tmux session.
-
-        Args:
-            role: Execution role (planner/executor/reviewer)
-            command: Command to execute
-            branch: Current branch name
-            env: Environment variables (ignored, tmux inherits parent env)
-
-        Returns:
-            Always returns 0 (tmux session name is the meaningful identifier).
-        """
-        session_name = f"vibe3-{role}-{branch}"[:50].replace("/", "-")
-
-        subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_name, "--"] + command,
-            check=True,
+        """Start background execution via the lower-level wrapper adapter."""
+        execution_name = f"vibe3-{role}-{branch}"
+        handle = self._backend.start_async_command(
+            command,
+            execution_name=execution_name,
+            env=env,
         )
 
         persist_execution_lifecycle_event(
@@ -62,27 +53,27 @@ class AsyncExecutionService:
             role,
             "started",
             "system",
-            detail=f"Started async {role} in tmux session: {session_name}",
+            detail=(
+                f"Started async {role} in tmux session: {handle.tmux_session}\n"
+                f"Log: {handle.log_path}"
+            ),
+            refs={
+                "tmux_session": handle.tmux_session,
+                "log_path": str(handle.log_path),
+            },
         )
 
         logger.bind(
             domain="async_execution",
             role=role,
             branch=branch,
-            session=session_name,
+            session=handle.tmux_session,
+            log_path=str(handle.log_path),
         ).info(f"Started async {role} in tmux")
 
         return 0
 
     def check_execution_status(self, pid: int) -> ExecutionStatus:
-        """Check if a background process is still running.
-
-        Args:
-            pid: Process ID to check
-
-        Returns:
-            Execution status (running/done/crashed)
-        """
         try:
             os.kill(pid, 0)
             return "running"
@@ -95,13 +86,6 @@ class AsyncExecutionService:
         branch: str,
         success: bool = True,
     ) -> None:
-        """Mark execution as complete.
-
-        Args:
-            role: Execution role
-            branch: Branch name
-            success: Whether execution succeeded
-        """
         lifecycle: ExecutionLifecycleEvent = "completed" if success else "aborted"
         status: ExecutionStatus = "done" if success else "crashed"
         persist_execution_lifecycle_event(

@@ -9,23 +9,34 @@ from vibe3.orchestra.config import MasterAgentConfig, OrchestraConfig
 
 
 def test_default_config():
-    assert OrchestraConfig().enabled is True
-    assert OrchestraConfig().polling_interval == 900
-    assert OrchestraConfig().dry_run is False
-    assert OrchestraConfig().polling.enabled is True
-    assert OrchestraConfig().governance.enabled is True
-    assert OrchestraConfig().governance.interval_ticks == 4
-    assert OrchestraConfig().governance.skill == "vibe-orchestra"
-    assert OrchestraConfig().governance.prompt_template == "orchestra.governance.plan"
-    assert OrchestraConfig().governance.include_skill_content is True
-    assert OrchestraConfig().governance.dry_run is False
-    assert OrchestraConfig().assignee_dispatch.enabled is True
-    assert OrchestraConfig().assignee_dispatch.use_worktree is True
-    assert OrchestraConfig().pr_review_dispatch.enabled is True
-    assert OrchestraConfig().pr_review_dispatch.async_mode is False
-    assert OrchestraConfig().pr_review_dispatch.use_worktree is False
-    assert OrchestraConfig().state_label_dispatch.enabled is True
-    pid_path = OrchestraConfig().pid_file.as_posix()
+    config = OrchestraConfig()
+
+    assert config.enabled is True
+    assert config.polling_interval == 900
+    assert config.dry_run is False
+    assert config.polling.enabled is True
+    assert config.governance.enabled is True
+    assert config.governance.interval_ticks == 4
+    assert config.governance.supervisor_file == "supervisor/orchestra.md"
+    assert config.governance.prompt_template == "orchestra.governance.plan"
+    assert config.governance.include_supervisor_content is True
+    assert config.governance.dry_run is False
+    assert config.supervisor_handoff.enabled is True
+    assert config.supervisor_handoff.issue_label == "supervisor"
+    assert config.supervisor_handoff.handoff_state_label == "state/handoff"
+    assert config.supervisor_handoff.supervisor_file == "supervisor/apply.md"
+    assert config.assignee_dispatch.enabled is True
+    assert config.assignee_dispatch.use_worktree is True
+    assert config.assignee_dispatch.agent == "develop"
+    assert config.assignee_dispatch.backend is None
+    assert config.assignee_dispatch.model is None
+    assert config.assignee_dispatch.supervisor_file == "supervisor/manager.md"
+    assert config.assignee_dispatch.include_supervisor_content is True
+    assert config.pr_review_dispatch.enabled is True
+    assert config.pr_review_dispatch.async_mode is False
+    assert config.pr_review_dispatch.use_worktree is False
+    assert config.state_label_dispatch.enabled is True
+    pid_path = config.pid_file.as_posix()
     assert pid_path.endswith("/vibe3/orchestra.pid") or pid_path.endswith(
         ".git/vibe3/orchestra.pid"
     )
@@ -91,6 +102,9 @@ def test_from_settings_loads_yaml_config():
                         "assignee_dispatch": {
                             "enabled": False,
                             "use_worktree": False,
+                            "agent": "orchestra-manager",
+                            "backend": "opencode",
+                            "model": "custom/manager-model",
                         },
                         "pr_review_dispatch": {
                             "enabled": False,
@@ -103,10 +117,16 @@ def test_from_settings_loads_yaml_config():
                         "governance": {
                             "enabled": True,
                             "interval_ticks": 6,
-                            "skill": "custom-skill",
+                            "supervisor_file": "supervisor/custom.md",
                             "prompt_template": "orchestra.governance.custom",
-                            "include_skill_content": False,
+                            "include_supervisor_content": False,
                             "dry_run": True,
+                        },
+                        "supervisor_handoff": {
+                            "enabled": True,
+                            "issue_label": "supervisor",
+                            "handoff_state_label": "state/handoff",
+                            "supervisor_file": "supervisor/custom-apply.md",
                         },
                     }
                 }
@@ -131,16 +151,26 @@ def test_from_settings_loads_yaml_config():
             assert config.polling.enabled is False
             assert config.assignee_dispatch.enabled is False
             assert config.assignee_dispatch.use_worktree is False
+            assert config.assignee_dispatch.agent == "orchestra-manager"
+            assert config.assignee_dispatch.backend == "opencode"
+            assert config.assignee_dispatch.model == "custom/manager-model"
             assert config.pr_review_dispatch.enabled is False
             assert config.pr_review_dispatch.async_mode is True
             assert config.pr_review_dispatch.use_worktree is True
             assert config.state_label_dispatch.enabled is False
             assert config.governance.enabled is True
             assert config.governance.interval_ticks == 6
-            assert config.governance.skill == "custom-skill"
+            assert config.governance.supervisor_file == "supervisor/custom.md"
             assert config.governance.prompt_template == "orchestra.governance.custom"
-            assert config.governance.include_skill_content is False
+            assert config.governance.include_supervisor_content is False
             assert config.governance.dry_run is True
+            assert config.supervisor_handoff.enabled is True
+            assert config.supervisor_handoff.issue_label == "supervisor"
+            assert config.supervisor_handoff.handoff_state_label == "state/handoff"
+            assert (
+                config.supervisor_handoff.supervisor_file
+                == "supervisor/custom-apply.md"
+            )
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults
 

@@ -1,7 +1,22 @@
 """Tests for TaskService with a fresh database."""
 
+import pytest
+
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.services.task_service import TaskService
+
+
+@pytest.fixture(autouse=True)
+def stable_flow_actor(monkeypatch):
+    """Avoid real git identity lookups during issue-link tests."""
+    monkeypatch.setattr(
+        "vibe3.services.task_service.SignatureService.resolve_for_branch",
+        lambda store, branch, explicit_actor=None: explicit_actor or "test-actor",
+    )
+    monkeypatch.setattr(
+        "vibe3.services.flow_query_mixin.GitHubClient.get_pr",
+        lambda self, pr_number=None, branch=None: None,
+    )
 
 
 def test_link_issue_task_on_fresh_db(tmp_path):

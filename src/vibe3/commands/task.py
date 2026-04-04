@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Task command handlers."""
 
+import json
 from contextlib import contextmanager
-from typing import Annotated, Iterator
+from typing import Annotated, Any, Iterator
 
 import typer
 
+from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -39,66 +41,51 @@ def _build_milestone_service() -> MilestoneService:
     return MilestoneService()
 
 
-@app.command()
-def add(
-    issue: Annotated[str, typer.Argument(help="Issue reference")],
-    role: Annotated[str, typer.Option("--role")] = "task",
-) -> None:
-    """[Compatibility] Bind an issue to a flow. (Moved to: vibe3 flow bind)"""
-    typer.echo("Note: 'task add' is deprecated. Redirecting to 'flow bind'...")
-    from vibe3.commands.flow import bind
-
-    bind(issue_refs=issue, role=role)  # type: ignore
+def _is_human_comment(comment: dict[str, Any]) -> bool:
+    author = comment.get("author") or {}
+    login = str(author.get("login") or "").strip().lower()
+    if not login:
+        return True
+    if login == "linear" or login.endswith("[bot]"):
+        return False
+    return True
 
 
-@app.command()
-def update() -> None:
-    """[Compatibility] Update task metadata. (Moved to: vibe3 flow bind)"""
-    typer.echo("Note: 'task update' is deprecated. Please use 'vibe3 flow bind'.")
+def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict:
+    comments = issue.get("comments") or []
+    latest_comment = comments[-1] if comments else None
+    latest_human = next(
+        (comment for comment in reversed(comments) if _is_human_comment(comment)),
+        None,
+    )
 
-
-@app.command()
-def remove() -> None:
-    """[Compatibility] Remove task record. (Moved to: vibe3 flow aborted)"""
-    typer.echo("Note: 'task remove' is deprecated. Please use 'vibe3 flow aborted'.")
-
-
-@app.command()
-def audit(ctx: typer.Context) -> None:
-    """[Compatibility] Audit task consistency. (Moved to: vibe3 check)"""
-    typer.echo("Note: 'task audit' is deprecated. Redirecting to 'check'...")
-    from vibe3.commands.check import check
-
-    ctx.invoke(check)
-
-
-@app.command()
-def list(
-    trace: Annotated[bool, typer.Option("--trace")] = False,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
-) -> None:
-    """List all tasks (flows with task issue bound)."""
-    import json
-
-    if trace:
-        setup_logging(verbose=2)
-
-    usecase = _build_task_usecase()
-
-    task_rows = usecase.list_task_rows()
-    if not task_rows:
-        typer.echo("No tasks found")
-        return
     if json_output:
-        typer.echo(
-            json.dumps([row.__dict__ for row in task_rows], indent=2, default=str)
-        )
-        return
-    for task_flow in task_rows:
-        typer.echo(
-            f"  #{task_flow.task_issue_number}  {task_flow.flow_slug}  "
-            f"{task_flow.flow_status}  branch={task_flow.branch}"
-        )
+        return {
+            "issue": issue.get("number"),
+            "title": issue.get("title"),
+            "state": issue.get("state"),
+            "labels": [label.get("name") for label in issue.get("labels", [])],
+            "latest_comment": latest_comment,
+            "latest_human_comment": latest_human,
+        }
+
+    typer.echo("\nLatest Comment:")
+    if latest_comment:
+        author = (latest_comment.get("author") or {}).get("login") or "unknown"
+        typer.echo(f"  author  {author}")
+        typer.echo(f"  body    {str(latest_comment.get('body') or '').strip()}")
+    else:
+        typer.echo("  (no comments)")
+
+    typer.echo("\nLatest Human Instruction:")
+    if latest_human:
+        author = (latest_human.get("author") or {}).get("login") or "unknown"
+        typer.echo(f"  author  {author}")
+        typer.echo(f"  body    {str(latest_human.get('body') or '').strip()}")
+    else:
+        typer.echo("  (no human comments)")
+
+    return None
 
 
 @app.command()
@@ -106,6 +93,9 @@ def show(
     branch: Annotated[str | None, typer.Argument(help="Branch name")] = None,
     trace: Annotated[bool, typer.Option("--trace")] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    comments: Annotated[
+        bool, typer.Option("--comments", help="Include latest issue comments context")
+    ] = False,
 ) -> None:
     """Show task details."""
     usecase = _build_task_usecase()
@@ -139,3 +129,43 @@ def show(
 
         # Delegate rendering to UI layer
         render_task_show_with_milestone(task_result, milestone_ctx, json_output)
+
+        if comments and issue_number:
+            issue = GitHubClient().view_issue(issue_number)
+            if issue == "network_error":
+                typer.echo("\nIssue comments unavailable: network/auth error")
+            elif issue is None:
+                typer.echo(
+                    f"\nIssue comments unavailable: issue #{issue_number} not found"
+                )
+            else:
+                assert isinstance(issue, dict)
+                comments_data = _render_comments(issue, json_output)
+                if json_output and comments_data and task_result.local_task:
+                    # Merge comments into a single JSON with task data
+                    combined = task_result.local_task.model_dump()
+                    combined["comments"] = comments_data
+                    typer.echo(json.dumps(combined, indent=2, default=str))
+                elif not json_output:
+                    pass  # _render_comments already printed text
+                elif task_result.local_task:
+                    pass  # task JSON already printed; comments_data is just info
+
+
+@app.command()
+def status(
+    all_flows: Annotated[
+        bool,
+        typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）"),
+    ] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+    trace: Annotated[bool, typer.Option("--trace")] = False,
+) -> None:
+    """Show task-oriented global status dashboard."""
+    from vibe3.commands import status as status_command
+
+    status_command.status(
+        all_flows=all_flows,
+        json_output=json_output,
+        trace=trace,
+    )

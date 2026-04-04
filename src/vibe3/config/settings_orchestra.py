@@ -30,9 +30,12 @@ class OrchestraAssigneeDispatchSettings(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
+    agent: str = "develop"
+    backend: str | None = None
+    model: str | None = None
     prompt_template: str = "orchestra.assignee_dispatch.manager"
-    skill: str | None = "vibe-manager"
-    include_skill_content: bool = False
+    supervisor_file: str | None = "supervisor/manager.md"
+    include_supervisor_content: bool = True
 
 
 class OrchestraPRReviewDispatchSettings(BaseModel):
@@ -63,10 +66,19 @@ class OrchestraGovernanceSettings(BaseModel):
 
     enabled: bool = True
     interval_ticks: int = 4
-    skill: str = "vibe-orchestra"
+    supervisor_file: str = "supervisor/orchestra.md"
     prompt_template: str = "orchestra.governance.plan"
-    include_skill_content: bool = True
+    include_supervisor_content: bool = True
     dry_run: bool = False
+
+
+class OrchestraSupervisorHandoffSettings(BaseModel):
+    """Supervisor handoff issue consumer settings."""
+
+    enabled: bool = True
+    issue_label: str = "supervisor"
+    handoff_state_label: str = "state/handoff"
+    supervisor_file: str = "supervisor/apply.md"
 
 
 class OrchestraSettings(BaseModel):
@@ -99,4 +111,7 @@ class OrchestraSettings(BaseModel):
     )
     governance: OrchestraGovernanceSettings = Field(
         default_factory=OrchestraGovernanceSettings
+    )
+    supervisor_handoff: OrchestraSupervisorHandoffSettings = Field(
+        default_factory=OrchestraSupervisorHandoffSettings
     )

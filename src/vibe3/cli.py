@@ -68,14 +68,14 @@ app.add_typer(serve.app, name="serve")
 app.add_typer(prompt_check.app, name="prompt")
 
 
-@app.command(name="status")
+@app.command(name="status", hidden=True)
 def status_command(
     all_flows: status.AllOption = False,
     json_output: status.JsonOption = False,
     trace: status.TraceOption = False,
 ) -> None:
-    """Show dashboard of all active flows and orchestra status."""
-    status.status(all_flows=all_flows, json_output=json_output, trace=trace)
+    """[Compatibility] Redirect to task status."""
+    task.status(all_flows=all_flows, json_output=json_output, trace=trace)
 
 
 @app.callback()
@@ -116,6 +116,24 @@ def run_command(
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
+    supervisor: Annotated[
+        Optional[str],
+        typer.Option(
+            "--supervisor",
+            help="Run a supervisor markdown file as one-shot governance input",
+        ),
+    ] = None,
+    issue: Annotated[
+        Optional[int],
+        typer.Option(
+            "--issue",
+            help="Process a governance issue using the default supervisor/apply flow",
+        ),
+    ] = None,
+    manager_issue: Annotated[
+        Optional[int],
+        typer.Option("--manager-issue", hidden=True),
+    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
     ] = False,
@@ -124,8 +142,12 @@ def run_command(
         typer.Option("--dry-run", help="Print command and prompt without executing"),
     ] = False,
     async_mode: Annotated[
-        bool, typer.Option("--async", help="Run asynchronously in background")
-    ] = False,
+        bool,
+        typer.Option(
+            "--async/--sync",
+            help="Run asynchronously in background (default: async)",
+        ),
+    ] = True,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -150,6 +172,13 @@ def run_command(
             ),
         ),
     ] = False,
+    fresh_session: Annotated[
+        bool,
+        typer.Option(
+            "--fresh-session",
+            help="Skip session resume and start a fresh agent session",
+        ),
+    ] = False,
 ) -> None:
     """Execute implementation plan or skill using codeagent-wrapper."""
     resolved_plan = plan or file
@@ -157,6 +186,9 @@ def run_command(
         instructions=instructions,
         plan=resolved_plan,
         skill=skill,
+        supervisor=supervisor,
+        issue=issue,
+        manager_issue=manager_issue,
         trace=trace,
         dry_run=dry_run,
         async_mode=async_mode,
@@ -164,6 +196,7 @@ def run_command(
         backend=backend,
         model=model,
         worktree=worktree,
+        fresh_session=fresh_session,
     )
 
 
