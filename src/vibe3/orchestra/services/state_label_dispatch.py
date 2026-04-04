@@ -24,6 +24,10 @@ from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.models.review_runner import AgentOptions
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.no_progress_policy import (
+    execute_auto_block,
+    should_auto_block,
+)
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
@@ -149,10 +153,21 @@ class StateLabelDispatchService(ServiceBase):
             flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
             if self.trigger_name == "manager":
                 if not labels or self.trigger_state.to_label() not in labels:
+                    # State changed (manager made progress)
                     stale.add(issue_number)
-                elif not self._has_live_dispatch(issue_number):
-                    # Manager session ended but state unchanged → auto-block
-                    self._auto_block_manager_noop(issue_number, labels)
+                elif should_auto_block(
+                    issue_number=issue_number,
+                    current_labels=labels,
+                    has_live_session=self._has_live_dispatch(issue_number),
+                    state_changed=False,  # Already checked above
+                ):
+                    # Manager session ended without progress → auto-block
+                    execute_auto_block(
+                        issue_number=issue_number,
+                        current_labels=labels,
+                        github=self._github,
+                        repo=self.config.repo,
+                    )
                     stale.add(issue_number)
                 continue
             if not flow:
@@ -328,56 +343,6 @@ class StateLabelDispatchService(ServiceBase):
             "run": "executor_session_id",
             "review": "reviewer_session_id",
         }[self.trigger_name]
-
-    def _auto_block_manager_noop(
-        self, issue_number: int, current_labels: list[str]
-    ) -> None:
-        """Auto-block issue when manager session ended without state change."""
-        logger.bind(
-            domain="orchestra",
-            trigger=self.trigger_name,
-            issue=issue_number,
-        ).warning(
-            f"Manager session ended without state change, "
-            f"auto-blocking issue #{issue_number}"
-        )
-        try:
-            # Check if already blocked to avoid duplicate comments
-            if IssueState.BLOCKED.to_label() in current_labels:
-                return
-
-            # Add block comment
-            reason = (
-                "Manager 执行完成但未改变状态。可能原因：\n"
-                "- Scene 不健康或无法恢复\n"
-                "- 缺少必要的前置条件（如 spec_ref）\n"
-                "- 需要人工决策或额外信息\n\n"
-                "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
-            )
-            self._github.add_comment(issue_number, f"[dispatcher] {reason}")
-
-            # Update labels: remove ready, add blocked
-            import subprocess
-
-            cmd = [
-                "gh",
-                "issue",
-                "edit",
-                str(issue_number),
-                "--add-label",
-                IssueState.BLOCKED.to_label(),
-                "--remove-label",
-                IssueState.READY.to_label(),
-            ]
-            if self.config.repo:
-                cmd.extend(["--repo", self.config.repo])
-            subprocess.run(cmd, capture_output=True, text=True, timeout=15, check=False)
-        except Exception as exc:
-            logger.bind(
-                domain="orchestra",
-                trigger=self.trigger_name,
-                issue=issue_number,
-            ).error(f"Failed to auto-block manager noop: {exc}")
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
