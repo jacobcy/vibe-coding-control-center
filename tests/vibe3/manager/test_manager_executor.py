@@ -143,8 +143,9 @@ class TestManagerReviewWorktreeResolution:
                 ):
                     with patch.object(manager.result_handler, "update_state_label"):
                         with patch.object(
-                            manager.result_handler, "on_dispatch_success"
-                        ) as mock_success:
+                            manager.flow_manager.store,
+                            "add_event",
+                        ) as mock_add_event:
                             with patch.object(
                                 manager._backend,
                                 "start_async_command",
@@ -165,7 +166,9 @@ class TestManagerReviewWorktreeResolution:
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
-        mock_success.assert_called_once_with(issue, "task/issue-102")
+        # Async dispatch records "dispatched" event, not success
+        mock_add_event.assert_called_once()
+        assert mock_add_event.call_args.args[1] == "manager_dispatched"
 
     def test_dispatch_manager_marks_issue_claimed_before_launch(self):
         config = OrchestraConfig()
