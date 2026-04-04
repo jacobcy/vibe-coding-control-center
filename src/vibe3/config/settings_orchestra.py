@@ -60,6 +60,9 @@ class OrchestraGovernanceSettings(BaseModel):
     prompt_template: str = "orchestra.governance.plan"
     include_supervisor_content: bool = True
     dry_run: bool = False
+    agent: str = "explore"
+    backend: str | None = None
+    model: str | None = None
 
 
 class OrchestraSupervisorHandoffSettings(BaseModel):
@@ -69,6 +72,9 @@ class OrchestraSupervisorHandoffSettings(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    agent: str = "explore"
+    backend: str | None = None
+    model: str | None = None
 
 
 class OrchestraSettings(BaseModel):
