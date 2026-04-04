@@ -181,41 +181,29 @@ class TestManagerDispatchIntegration:
                         "get_active_flow_count",
                         return_value=0,
                     ):
-                        with patch.object(
-                            manager.result_handler,
-                            "record_dispatch_event",
-                            return_value=None,
-                        ) as mock_record_event:
+                        with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
-                                manager.flow_manager,
-                                "get_pr_for_issue",
+                                manager.flow_manager.store,
+                                "add_event",
                                 return_value=None,
-                            ):
-                                with patch.object(
-                                    manager.result_handler, "update_state_label"
-                                ):
-                                    handle = AsyncExecutionHandle(
-                                        tmux_session="vibe3-manager-102",
-                                        log_path=Path(
-                                            "temp/logs/vibe3-manager-102.async.log"
-                                        ),
-                                        prompt_file_path=Path("/tmp/prompt.md"),
-                                    )
-                                    mock_backend = MagicMock()
-                                    start_async_command = (
-                                        mock_backend.start_async_command
-                                    )
-                                    start_async_command.return_value = handle
-                                    manager._backend = mock_backend
-                                    result = manager.dispatch_manager(issue)
+                            ) as mock_add_event:
+                                handle = AsyncExecutionHandle(
+                                    tmux_session="vibe3-manager-102",
+                                    log_path=Path(
+                                        "temp/logs/vibe3-manager-102.async.log"
+                                    ),
+                                    prompt_file_path=Path("/tmp/prompt.md"),
+                                )
+                                mock_backend = MagicMock()
+                                start_async_command = mock_backend.start_async_command
+                                start_async_command.return_value = handle
+                                manager._backend = mock_backend
+                                result = manager.dispatch_manager(issue)
 
         assert result is True
-        mock_record_event.assert_called_once_with(
-            "task/issue-102",
-            success=True,
-            issue_number=102,
-            pr_number=None,
-        )
+        # Async dispatch only records "dispatched" event, not success/failure
+        mock_add_event.assert_called_once()
+        assert mock_add_event.call_args.args[1] == "manager_dispatched"
         mock_backend.start_async_command.assert_called_once()
         assert mock_backend.start_async_command.call_args.kwargs["cwd"] == Path(
             "/tmp/wt-issue-102"

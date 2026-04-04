@@ -187,10 +187,10 @@ class ManagerExecutor:
             )
             self._flow_manager.store.add_event(
                 flow_branch,
-                "manager_started",
+                "manager_dispatched",
                 "system",
                 detail=(
-                    f"Started async manager in tmux session: {handle.tmux_session}\n"
+                    f"Dispatched manager to tmux session: {handle.tmux_session}\n"
                     f"Log: {handle.log_path}"
                 ),
                 refs={
@@ -199,17 +199,13 @@ class ManagerExecutor:
                     "issue": str(issue.number),
                 },
             )
-            success = True
-
-            # 5. Result handling
-            if success:
-                self.result_handler.on_dispatch_success(issue, flow_branch)
-            else:
-                self.result_handler.on_dispatch_failure(
-                    issue, self._last_error_category or "unknown"
-                )
-
-            return success
+            # Async dispatch: only record launch here.
+            # The child process records its own manager_started/completed/aborted
+            # lifecycle events via pipeline.py, and run.py:_run_manager_issue_mode
+            # handles final result handling.  Calling on_dispatch_success here
+            # would prematurely mark the dispatch as successful before the child
+            # has even started its work.
+            return True
         finally:
             # 6. Maybe recycle
             if is_temporary and manager_cwd:

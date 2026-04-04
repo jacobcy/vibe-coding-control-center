@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Task command handlers."""
 
+import json
 from contextlib import contextmanager
 from typing import Annotated, Any, Iterator
 
@@ -50,9 +51,7 @@ def _is_human_comment(comment: dict[str, Any]) -> bool:
     return True
 
 
-def _render_comments(issue: dict[str, Any], json_output: bool) -> None:
-    import json
-
+def _render_comments(issue: dict[str, Any], json_output: bool) -> None | dict:
     comments = issue.get("comments") or []
     latest_comment = comments[-1] if comments else None
     latest_human = next(
@@ -61,21 +60,14 @@ def _render_comments(issue: dict[str, Any], json_output: bool) -> None:
     )
 
     if json_output:
-        typer.echo(
-            json.dumps(
-                {
-                    "issue": issue.get("number"),
-                    "title": issue.get("title"),
-                    "state": issue.get("state"),
-                    "labels": [label.get("name") for label in issue.get("labels", [])],
-                    "latest_comment": latest_comment,
-                    "latest_human_comment": latest_human,
-                },
-                indent=2,
-                default=str,
-            )
-        )
-        return
+        return {
+            "issue": issue.get("number"),
+            "title": issue.get("title"),
+            "state": issue.get("state"),
+            "labels": [label.get("name") for label in issue.get("labels", [])],
+            "latest_comment": latest_comment,
+            "latest_human_comment": latest_human,
+        }
 
     typer.echo("\nLatest Comment:")
     if latest_comment:
@@ -92,6 +84,8 @@ def _render_comments(issue: dict[str, Any], json_output: bool) -> None:
         typer.echo(f"  body    {str(latest_human.get('body') or '').strip()}")
     else:
         typer.echo("  (no human comments)")
+
+    return None
 
 
 @app.command()
@@ -146,7 +140,16 @@ def show(
                 )
             else:
                 assert isinstance(issue, dict)
-                _render_comments(issue, json_output)
+                comments_data = _render_comments(issue, json_output)
+                if json_output and comments_data and task_result.local_task:
+                    # Merge comments into a single JSON with task data
+                    combined = task_result.local_task.model_dump()
+                    combined["comments"] = comments_data
+                    typer.echo(json.dumps(combined, indent=2, default=str))
+                elif not json_output:
+                    pass  # _render_comments already printed text
+                elif task_result.local_task:
+                    pass  # task JSON already printed; comments_data is just info
 
 
 @app.command()
