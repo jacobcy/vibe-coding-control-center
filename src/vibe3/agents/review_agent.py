@@ -154,6 +154,7 @@ class ReviewUsecase:
             )
         except ReviewParserError as err:
             logger.bind(domain="review").error(f"Failed to parse review output: {err}")
+            self._fail_issue(issue_number, f"review parse failed: {err}")
             return ReviewRunResult(
                 verdict="ERROR",
                 handoff_file=str(result.handoff_file) if result.handoff_file else None,
@@ -192,12 +193,12 @@ class ReviewUsecase:
 
     @staticmethod
     def _transition_issue(issue_number: int | None) -> None:
-        """Move linked issue into review state when possible."""
+        """Move linked issue back to handoff when review completes."""
         if issue_number is None:
             return
         label_result = LabelService().confirm_issue_state(
             issue_number,
-            to_state=IssueState.REVIEW,
+            to_state=IssueState.HANDOFF,
             actor="agent:review",
         )
         if label_result == "blocked":
@@ -205,6 +206,22 @@ class ReviewUsecase:
                 "Warning: Failed to transition issue state: state_transition_blocked",
                 err=True,
             )
+
+    @staticmethod
+    def _fail_issue(issue_number: int | None, reason: str) -> None:
+        """Mark the linked issue as failed and explain the execution error."""
+        if issue_number is None:
+            return
+        GitHubClient().add_comment(
+            issue_number,
+            f"[review] 审查执行报错，已切换为 state/failed。\n\n原因：{reason}",
+        )
+        LabelService().confirm_issue_state(
+            issue_number,
+            to_state=IssueState.FAILED,
+            actor="agent:review",
+            force=True,
+        )
 
     def _load_changed_symbols(
         self, inspect_args: list[str]

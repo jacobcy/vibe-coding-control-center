@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
@@ -33,7 +34,6 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
 
     heartbeat = HeartbeatServer(config)
 
-    # Shared resources (reduces duplication)
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
     shared_github = GitHubClient()
     shared_manager = ManagerExecutor(
@@ -41,7 +41,6 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         dry_run=config.dry_run,
     )
 
-    # Status service for HTTP endpoint and CLI
     # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
@@ -75,11 +74,31 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             )
         )
     if config.state_label_dispatch.enabled:
-        # NOTE: StateLabelDispatchService is a read-only mirror (no-op dispatch).
-        # It only logs label events for observability; disabled by default in config.
         heartbeat.register(
             StateLabelDispatchService(
                 config,
+                trigger_state=IssueState.CLAIMED,
+                trigger_name="plan",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.IN_PROGRESS,
+                trigger_name="run",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.REVIEW,
+                trigger_name="review",
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -117,14 +136,13 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         """Get current orchestra status snapshot."""
         return status_service.snapshot(queued=shared_manager.queued_issues)
 
-    # Mount MCP server (optional, gracefully degrades if mcp package not available)
+    # Mount MCP server (gracefully degrades if not available)
     try:
         from vibe3.server.mcp import create_mcp_server
 
         mcp = create_mcp_server(
             status_service, get_queued=lambda: shared_manager.queued_issues
         )
-        # Mount SSE endpoint for MCP
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
     except ImportError as exc:
@@ -234,11 +252,7 @@ def _is_orchestra_process(pid: int) -> bool:
 
 
 def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
-    """Validate PID file and check if process is running.
-
-    Returns:
-        Tuple of (pid, is_valid_orchestra_process)
-    """
+    """Validate PID file and check if process is an orchestra instance."""
     if not pid_file.exists():
         return None, False
 
@@ -281,11 +295,7 @@ def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[st
 
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
-    """Start serve command in tmux session.
-
-    Returns:
-        (success, message)
-    """
+    """Start serve command in tmux session."""
     session_name = "vibe3-orchestra-serve"
     cmd = _build_async_serve_command(config, verbose)
     try:

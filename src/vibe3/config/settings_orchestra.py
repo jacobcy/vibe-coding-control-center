@@ -85,7 +85,7 @@ class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
     enabled: bool = True
-    polling_interval: int = 900
+    polling_interval: int = 30
     port: int = 8080
     webhook_secret: str | None = None
     bot_username: str | None = None

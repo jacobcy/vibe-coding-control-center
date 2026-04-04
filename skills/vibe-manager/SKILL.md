@@ -35,10 +35,10 @@ description: Use when the user wants a single-flow execution owner that prepares
 
 它的主链很简单：
 
-1. **Phase 0**：`vibe3 flow show` 确认 task 已绑定
+1. **Phase 0**：`uv run python src/vibe3/cli.py flow show` 确认 task 已绑定
 2. **对齐**：确认 flow / task / spec 三者对应同一 issue
 3. **派发**：根据现场决定是 plan、run、review，还是交给其他 skill / agent
-4. **观察**：`vibe3 flow show` 轮询，发现问题即提 issue
+4. **观察**：`uv run python src/vibe3/cli.py flow show` 轮询，发现问题即提 issue
 5. **推进**：agent 完成后持续推动直到形成 PR
 6. **收口**：跟到 CI 通过，PR 达到"可合并、等待最终审核"状态。
 
@@ -67,9 +67,9 @@ manager 要做的不是“参与所有细节”，而是保证这条链不断：
 优先使用以下真源入口确认现场：
 
 ```bash
-vibe3 flow show      # 当前 flow 与 task 绑定状态、milestone、依赖
-vibe3 task status         # 全局 flow / issue 总览
-vibe3 handoff show   # agent 执行状态
+uv run python src/vibe3/cli.py flow show      # 当前 flow 与 task 绑定状态、milestone、依赖
+uv run python src/vibe3/cli.py task status    # 全局 flow / issue 总览
+uv run python src/vibe3/cli.py handoff show   # agent 执行状态
 ```
 
 需要沉淀 findings 为 issue 时，走以下入口：
@@ -105,7 +105,7 @@ zsh scripts/github/create_issue.sh --title "..." --body "..." --dry-run
 **进入任何派发动作前，必须先完成此阶段，不得跳过。**
 
 ```bash
-vibe3 flow show       # 确认当前 flow 和 task 状态
+uv run python src/vibe3/cli.py flow show      # 确认当前 flow 和 task 状态
 ```
 
 检查输出中的 `task` 行：
@@ -113,11 +113,11 @@ vibe3 flow show       # 确认当前 flow 和 task 状态
 - 若显示 `not bound`，必须先执行绑定：
 
   ```bash
-  vibe3 flow bind <issue-number> --role task
+  uv run python src/vibe3/cli.py flow bind <issue-number> --role task
   ```
 
 - 若 task 已绑定，继续 Phase 1。
-- 若当前分支无 flow，先执行 `vibe3 flow update --name <name>`。
+- 若当前分支无 flow，先执行 `uv run python src/vibe3/cli.py flow update --name <name>`。
 
 **前置检查未通过，manager 不得进入派发阶段。**
 
@@ -137,13 +137,13 @@ vibe3 flow show       # 确认当前 flow 和 task 状态
 
 ```bash
 # 派发 skill agent（推荐，能复用 skill 就不重写 prompt）
-vibe3 run --skill <skill-name> --async
+uv run python src/vibe3/cli.py run --skill <skill-name> --async
 
 # 派发自定义指令 agent（没有合适 skill 时）
-vibe3 run "具体指令描述" --async
+uv run python src/vibe3/cli.py run "具体指令描述" --async
 
 # 派发 plan agent（有详细 plan 文件时）
-vibe3 run --plan <plan-file.md> --async
+uv run python src/vibe3/cli.py run --plan <plan-file.md> --async
 
 # 若当前由 manager agent 直接创建 PR，可使用 gh 原生命令
 gh pr create --draft
@@ -155,13 +155,13 @@ manager 可以根据任务复杂度选择合适的团队协作模式：
 
 - **Sub-agent（Agent 工具）**：适合并行派发多个独立审计/分析任务，各 agent 互不依赖，结果汇总后由 manager 统一决策。例如同时派出 3 个 Explore agent 分别审查 commands / services / usecases 层。
 - **Agent Team（TeamCreate + SendMessage）**：适合需要多 agent 协作、有依赖关系的任务链。例如一个 agent 做分析、另一个 agent 基于分析结果写 spec、第三个 agent 执行修复。
-- **直接 `vibe3 run --async`**：适合单一明确的执行任务，不需要并行或协作。
+- **直接 `uv run python src/vibe3/cli.py run --async`**：适合单一明确的执行任务，不需要并行或协作。
 
 选择原则：
 
 - 任务之间**无依赖** → sub-agent 并行
 - 任务之间**有依赖** → agent team 串行协作
-- 任务**单一明确** → `vibe3 run --async`
+- 任务**单一明确** → `uv run python src/vibe3/cli.py run --async`
 
 原则：
 
@@ -175,8 +175,8 @@ manager 可以根据任务复杂度选择合适的团队协作模式：
 派发 agent 后，manager 进入观察循环，**不得写代码，不得直接修改文件**。
 
 ```bash
-vibe3 flow show       # 查看 Timeline，观察 run_started / run_done / run_aborted
-vibe3 handoff show    # 查看 agent chain 和 handoff events
+uv run python src/vibe3/cli.py flow show      # 查看 Timeline，观察 run_started / run_done / run_aborted
+uv run python src/vibe3/cli.py handoff show   # 查看 agent chain 和 handoff events
 ```
 
 观察要点：
@@ -193,7 +193,7 @@ vibe3 handoff show    # 查看 agent chain 和 handoff events
 **manager 不得凭记忆或感觉判断 agent 状态，必须通过 handoff 确认。**
 
 ```bash
-vibe3 handoff show    # 查看 agent chain 和 handoff events
+uv run python src/vibe3/cli.py handoff show   # 查看 agent chain 和 handoff events
 ```
 
 检查要点：
@@ -207,7 +207,7 @@ vibe3 handoff show    # 查看 agent chain 和 handoff events
 **如果 agent 完成但 handoff 无记录**：manager 应记录此为 finding，并手动补充：
 
 ```bash
-vibe3 handoff append "agent <name> 完成，但未写入 handoff，手动补充: ..." \
+uv run python src/vibe3/cli.py handoff append "agent <name> 完成，但未写入 handoff，手动补充: ..." \
   --actor "<manager标识>" --kind finding
 ```
 
@@ -244,7 +244,7 @@ PR 创建后，manager 不能立刻退出。
 - **沉淀到 handoff**（每次发现都必须）：
 
   ```bash
-  vibe3 handoff append "发现: <具体描述>" --actor "<manager标识>" --kind finding
+  uv run python src/vibe3/cli.py handoff append "发现: <具体描述>" --actor "<manager标识>" --kind finding
   ```
 
 - **沉淀为 issue**（需要跟踪修复时）：
@@ -298,7 +298,7 @@ zsh scripts/github/create_issue.sh \
 - manager 在 PR 未形成或 CI 未通过时就声称完成
 - manager 跳过 `handoff show` 凭感觉判断 agent 状态
 - manager 在 `run_aborted` 后不查原因就重复派发同一指令
-- manager 在发现 findings 后不写 handoff（必须用 `vibe3 handoff append --kind finding`）
+- manager 在发现 findings 后不写 handoff（必须用 `uv run python src/vibe3/cli.py handoff append --kind finding`）
 
 ## 与相邻 skill 的关系
 

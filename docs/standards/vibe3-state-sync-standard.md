@@ -80,6 +80,8 @@ handoff 不代替 issue comment。
 
 - 如果 manager 发现当前无法推进，必须先检查最新评论里是否已经说明原因
 - 若最新评论没有明确原因，manager 必须写一条 issue comment 解释本轮为什么停止
+- 如果 manager 进入 `state/blocked`，必须先检查已有 comments 是否已经覆盖同一 blocker
+- 只有出现新的 blocker 时，manager 才应追加新的 issue comment
 - 不允许在“无法推进”时静默退出，避免黑箱
 
 ### 3.4 每轮只处理当前 state
@@ -175,6 +177,20 @@ handoff 不代替 issue comment。
 - 如有必要，补充 handoff
 - 等待人类或上游条件变化
 
+### `state/failed`
+
+含义：
+
+- `plan / run / review` 执行过程中发生了真实报错
+- 当前问题属于执行器、代码、环境或触发链故障
+- 这是 bug / error 语义，不是 manager 的业务阻塞语义
+
+典型动作：
+
+- 记录失败 comment
+- 暂停新的自动任务进入
+- 由人类或修复任务先处理该错误，再决定恢复到对应阶段
+
 ### `state/merge-ready`
 
 含义：
@@ -212,6 +228,8 @@ handoff 不代替 issue comment。
 
 - agent 执行结束后，只写 handoff，不直接推进到下一状态
 - 下一状态统一由 manager 决定
+- manager 无法推进时使用 `state/blocked`
+- `plan / run / review` 执行报错时使用 `state/failed`
 
 ## 6. manager 判定规则
 
@@ -221,13 +239,21 @@ manager 只有在以下条件都满足时，才应迁移：
 
 - 当前 labels 真源显示 `state/ready`
 - scene 健康或可恢复
-- 最新人类 comment 明确要求继续推进，或没有相反指示
+- 最新人类 comment 没有明确要求暂停、等待或阻止推进
 
 迁移后必须再次读取 labels 确认：
 
 - `state/claimed` 已生效
 
 在确认前，不得假设当前已经进入下一阶段。
+
+补充硬规则：
+
+- 在 `state/ready` 阶段，本轮必须落下明确状态结果
+- 允许的结束结果只有：
+  - `state/claimed`
+  - `state/blocked`
+- 不允许保持 `state/ready` 后直接停止
 
 ### 6.2 `claimed` 是 plan 启动标志
 
@@ -271,7 +297,29 @@ manager 不应：
 - 若没有，则写 issue comment 说明：
   - 当前卡点
   - 依据的真源
-  - 需要谁提供什么信息或决策
+- 需要谁提供什么信息或决策
+
+### 6.3.1 blocked 与 failed 的边界
+
+`state/blocked` 只用于 manager 的业务判断：
+
+- 依赖未满足
+- 最新人类 comment 明确要求暂停
+- 当前 scene 不健康，无法安全继续
+- refs/证据不足，需要人类或上游补信息
+
+`state/failed` 只用于执行器错误：
+
+- plan agent 报错
+- run agent 报错
+- review agent 报错
+- 触发链、环境、代码或解析错误导致当前阶段无法完成
+
+规则：
+
+- manager 不因为执行报错把 issue 标成 `blocked`
+- `plan / run / review` 不因为业务阻塞把 issue 标成 `failed`
+- server 看到 open 的 `state/failed` 时，应暂停新的自动任务进入，直到失败解除
 
 ### 6.4 `handoff` 下的准备类 refs 修复顺序
 
@@ -280,7 +328,7 @@ manager 不应：
 1. 如果缺少 `spec_ref`
 - 当前轮不进入 `run` / `review`
 - 先补齐 spec 真源，例如执行：
-  - `vibe3 flow update --spec <...>`
+  - `uv run python src/vibe3/cli.py flow update --spec <...>`
 - 写 issue comment 说明当前缺失的是 spec 真源
 - 必要时写 handoff
 - `exit()`
@@ -354,10 +402,10 @@ manager 只负责在 `state/handoff` 读完 handoff/refs 后，决定是否将 i
 manager / supervisor / 人机调试时，优先使用：
 
 ```bash
-vibe3 task show
-vibe3 task show --comments
-vibe3 task status
-vibe3 handoff show
+uv run python src/vibe3/cli.py task show
+uv run python src/vibe3/cli.py task show --comments
+uv run python src/vibe3/cli.py task status
+uv run python src/vibe3/cli.py handoff show
 gh issue view <issue-number> --json labels,state
 ```
 

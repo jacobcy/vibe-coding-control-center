@@ -63,7 +63,7 @@ def _execute_plan_command(
     backend: str | None,
     model: str | None,
     worktree: bool,
-) -> None:
+) -> object:
     plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
     command = create_codeagent_command(
         role="planner",
@@ -78,7 +78,26 @@ def _execute_plan_command(
         config=config,
         branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+    return CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
+def _comment_and_fail_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str,
+) -> None:
+    """Record planner failure and move the issue into failed."""
+    GitHubClient().add_comment(
+        issue_number,
+        f"[plan] 规划执行报错，已切换为 state/failed。\n\n原因：{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
 
 
 def _plan_issue_impl(
@@ -115,7 +134,7 @@ def _plan_issue_impl(
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
     typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    _execute_plan_command(
+    result = _execute_plan_command(
         config=config,
         branch=branch,
         request=task_input.request,
@@ -128,17 +147,30 @@ def _plan_issue_impl(
         worktree=worktree,
     )
 
-    if not dry_run:
-        result = LabelService().confirm_issue_state(
-            task_input.issue_number,
-            IssueState.CLAIMED,
-            actor="agent:plan",
-        )
-        if result == "blocked":
+    if not dry_run and not async_mode:
+        if getattr(result, "success", False):
+            transition = LabelService().confirm_issue_state(
+                task_input.issue_number,
+                IssueState.HANDOFF,
+                actor="agent:plan",
+            )
+            if transition == "blocked":
+                typer.echo(
+                    "Warning: Failed to transition issue state: "
+                    "state_transition_blocked",
+                    err=True,
+                )
+        else:
+            _comment_and_fail_issue(
+                issue_number=task_input.issue_number,
+                reason=getattr(result, "stderr", "") or "planner exited with failure",
+                actor="agent:plan",
+            )
             typer.echo(
-                "Warning: Failed to transition issue state: state_transition_blocked",
+                "Error: Planner execution failed; issue moved to state/failed",
                 err=True,
             )
+            raise typer.Exit(1)
 
 
 def _plan_spec_impl(
@@ -198,7 +230,7 @@ def _plan_spec_impl(
         except Exception:
             pass
 
-    _execute_plan_command(
+    result = _execute_plan_command(
         config=config,
         branch=branch,
         request=spec_input.request,
@@ -210,6 +242,10 @@ def _plan_spec_impl(
         model=model,
         worktree=worktree,
     )
+
+    if not dry_run and not async_mode and not getattr(result, "success", False):
+        typer.echo("Error: Planner execution failed for spec mode", err=True)
+        raise typer.Exit(1)
 
 
 @app.callback()

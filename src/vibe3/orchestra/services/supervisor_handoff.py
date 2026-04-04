@@ -80,7 +80,11 @@ class SupervisorHandoffService(ServiceBase):
             self._list_handoff_issues,
         )
         if not candidates:
+            self._in_flight.clear()
             return
+
+        active_issue_numbers = {issue.number for issue in candidates}
+        self._in_flight.intersection_update(active_issue_numbers)
 
         for issue in candidates:
             if issue.number in self._in_flight:
@@ -92,8 +96,9 @@ class SupervisorHandoffService(ServiceBase):
                     self._process_issue,
                     issue,
                 )
-            finally:
+            except Exception:
                 self._in_flight.discard(issue.number)
+                raise
 
     def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
         raw = self._github.list_issues(limit=100, state="open", assignee=None)

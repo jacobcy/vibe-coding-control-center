@@ -53,10 +53,10 @@ V3 是当前的业务编排层，负责 issue → flow → PR 的全生命周期
 **运行方式**：
 
 ```bash
-# 推荐使用 alias
-vibe3 <command>
-# 或显式运行
+# 推荐给 agent / tmux / server 子进程使用仓库真源入口
 uv run python src/vibe3/cli.py <command>
+# 人类本地交互可以继续使用 alias
+vibe3 <command>
 ```
 
 ### 核心命令组
@@ -64,42 +64,42 @@ uv run python src/vibe3/cli.py <command>
 #### status - 全局看板 (主入口)
 
 ```bash
-vibe3 task status             # 查看所有活跃 flow、Orchestra 追踪进度及环境状态
-vibe3 task status --all       # 含已完成/中止的历史记录
+uv run python src/vibe3/cli.py task status             # 查看所有活跃 flow、Orchestra 追踪进度及环境状态
+uv run python src/vibe3/cli.py task status --all       # 含已完成/中止的历史记录
 ```
 
 #### flow - 逻辑现场管理
 
 ```bash
-vibe3 flow show          # [高频] 查看当前分支绑定的 task、PR、milestone 及 Timeline
-vibe3 flow status        # 仅查看活跃 flow 列表
-vibe3 flow update        # [高频] 注册当前分支为 flow，或更新其 metadata
-vibe3 flow bind <issue>  # [高频] 绑定 issue 到当前 flow (role: task/related/dependency)
-vibe3 flow blocked       # 标记当前 flow 为阻塞，并记录原因
+uv run python src/vibe3/cli.py flow show          # [高频] 查看当前分支绑定的 task、PR、milestone 及 Timeline
+uv run python src/vibe3/cli.py flow status        # 仅查看活跃 flow 列表
+uv run python src/vibe3/cli.py flow update        # [高频] 注册当前分支为 flow，或更新其 metadata
+uv run python src/vibe3/cli.py flow bind <issue>  # [高频] 绑定 issue 到当前 flow (role: task/related/dependency)
+uv run python src/vibe3/cli.py flow blocked       # 标记当前 flow 为阻塞，并记录原因
 ```
 
 #### run - Agent 执行引擎
 
 ```bash
-vibe3 run --skill <name> # 派发特定 skill 执行 (推荐使用 --async 后台运行)
-vibe3 run "指令描述"      # 派发自定义指令执行
-vibe3 run --plan <file>  # 执行指定的实现计划
-vibe3 run --worktree     # 在隔离的临时 worktree 中执行 (防止污染当前环境)
+uv run python src/vibe3/cli.py run --skill <name> # 派发特定 skill 执行 (推荐使用 --async 后台运行)
+uv run python src/vibe3/cli.py run "指令描述"      # 派发自定义指令执行
+uv run python src/vibe3/cli.py run --plan <file>  # 执行指定的实现计划
+uv run python src/vibe3/cli.py run --worktree     # 在隔离的临时 worktree 中执行 (防止污染当前环境)
 ```
 
 #### plan - 计划生成
 
 ```bash
-vibe3 plan --issue <issue>  # 基于 issue 内容生成实现计划
-vibe3 plan --spec --msg "内容" # 基于语义描述生成实现计划
+uv run python src/vibe3/cli.py plan --issue <issue>     # 基于 issue 内容生成实现计划
+uv run python src/vibe3/cli.py plan --spec --msg "内容" # 基于语义描述生成实现计划
 ```
 
 #### handoff - 协作交接记录
 
 ```bash
-vibe3 handoff show       # 查看当前分支的 agent 交接链 (Chain of Thought)
-vibe3 handoff append "..." --kind milestone # 记录关键发现或里程碑
-vibe3 handoff plan/report/audit # 记录标准阶段交接
+uv run python src/vibe3/cli.py handoff show       # 查看当前分支的 agent 交接链 (Chain of Thought)
+uv run python src/vibe3/cli.py handoff append "..." --kind milestone # 记录关键发现或里程碑
+uv run python src/vibe3/cli.py handoff plan/report/audit # 记录标准阶段交接
 ```
 
 #### inspect - 代码智能分析
@@ -122,17 +122,17 @@ vibe3 inspect files <path>            # 统计文件 LOC、方法数与内部依
 
 # 或手动启动
 git checkout -b task/issue-123
-vibe3 flow update
-vibe3 flow bind 123
+uv run python src/vibe3/cli.py flow update
+uv run python src/vibe3/cli.py flow bind 123
 ```
 
 ### 2. 执行与观察
 
 ```bash
-vibe3 plan --issue 123           # 生成计划
-vibe3 run --plan --async         # 派发执行
-vibe3 flow show                  # 轮询 Timeline 观察进度
-vibe3 handoff show               # 阅读 agent 留下的 Findings
+uv run python src/vibe3/cli.py plan --issue 123   # 生成计划
+uv run python src/vibe3/cli.py run --plan --async # 派发执行
+uv run python src/vibe3/cli.py flow show          # 轮询 Timeline 观察进度
+uv run python src/vibe3/cli.py handoff show       # 阅读 agent 留下的 Findings
 ```
 
 ### 3. 提交与收口

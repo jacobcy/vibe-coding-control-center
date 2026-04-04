@@ -109,3 +109,23 @@ def test_process_issue_uses_configured_apply_supervisor(
     )
 
     svc._render_supervisor_prompt.assert_called_once_with("supervisor/apply.md")
+
+
+@pytest.mark.asyncio
+async def test_on_tick_does_not_redispatch_same_open_handoff_issue(
+    service: tuple[SupervisorHandoffService, MagicMock, MagicMock],
+) -> None:
+    svc, github, backend = service
+    github.list_issues.return_value = [
+        {
+            "number": 101,
+            "title": "cleanup: stale flows",
+            "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+        }
+    ]
+    svc._render_supervisor_prompt = MagicMock(return_value="# plan")  # type: ignore[method-assign]
+
+    await svc.on_tick()
+    await svc.on_tick()
+
+    backend.start_async.assert_called_once()

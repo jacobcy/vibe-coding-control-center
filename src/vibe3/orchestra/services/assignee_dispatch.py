@@ -160,6 +160,10 @@ class AssigneeDispatchService(ServiceBase):
     async def _dispatch_if_ready(self, issue: IssueInfo, source: str) -> None:
         log = logger.bind(domain="orchestra", issue=issue.number, source=source)
 
+        if self._has_open_failed_issue():
+            log.warning("Skip dispatch: open state/failed issue exists")
+            return
+
         if self._has_flow(issue.number):
             self._dispatched_issues.add(issue.number)
             log.debug("Skip dispatch: flow already exists")
@@ -177,6 +181,14 @@ class AssigneeDispatchService(ServiceBase):
         )
         if dispatched:
             self._dispatched_issues.add(issue.number)
+
+    def _has_open_failed_issue(self) -> bool:
+        raw = self._github.list_issues(limit=100, state="open", assignee=None)
+        for item in raw:
+            labels = [label.get("name", "") for label in item.get("labels", [])]
+            if "state/failed" in labels:
+                return True
+        return False
 
     def _has_flow(self, issue_number: int) -> bool:
         try:

@@ -162,3 +162,30 @@ async def test_on_tick_prunes_assignee_cache() -> None:
     # Cache should be pruned to only issues seen in scan
     assert list(svc._assignee_cache.keys()) == [42, 43]
     assert 999 not in svc._assignee_cache
+
+
+@pytest.mark.asyncio
+async def test_dispatch_skips_when_failed_issue_exists() -> None:
+    svc = _svc()
+    svc._dep_checker = MagicMock()
+    svc._dep_checker.check.return_value = (True, [])
+    svc._dispatcher = MagicMock()
+    svc._dispatcher.dispatch_manager.return_value = True
+    svc._dispatcher.flow_manager.get_flow_for_issue.return_value = None
+    svc._github = MagicMock()
+    svc._github.list_issues.return_value = [
+        {
+            "number": 999,
+            "title": "failed",
+            "labels": [{"name": "state/failed"}],
+            "assignees": [],
+        }
+    ]
+
+    with patch(
+        "vibe3.orchestra.services.assignee_dispatch.asyncio.get_event_loop",
+        return_value=_ImmediateLoop(),
+    ):
+        await svc.handle_event(_assigned_event())
+
+    svc._dispatcher.dispatch_manager.assert_not_called()

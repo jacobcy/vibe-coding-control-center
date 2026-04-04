@@ -11,8 +11,8 @@
 - 当前治理 issue 的 title / body / comments
 - issue 中已有的 findings、建议动作、禁止动作
 - 必要时 `gh issue view <number>`
-- 必要时 `vibe3 task status`
-- 必要时 `vibe3 flow show`
+- 必要时 `uv run python src/vibe3/cli.py task status`
+- 必要时 `uv run python src/vibe3/cli.py flow show`
 
 ## What It Produces
 

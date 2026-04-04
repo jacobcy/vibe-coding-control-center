@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from vibe3.agents.run_agent import RunUsecase
 from vibe3.cli import app as cli_app
 from vibe3.config.settings import VibeConfig
+from vibe3.models.orchestration import IssueState
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -223,6 +224,51 @@ def test_run_skill_records_with_unified_recorder() -> None:
     assert result.exit_code == 0
     command = mock_execute.call_args.args[0]
     assert command.task == "Execute skill: demo"
+
+
+def test_run_success_transitions_issue_to_handoff(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
+    with (
+        patch("vibe3.commands.run._ensure_plan_file_exists"),
+        patch(
+            "vibe3.commands.run.CodeagentExecutionService.execute",
+            return_value=MagicMock(success=True),
+        ),
+        patch.object(RunUsecase, "transition_issue", return_value=42),
+        patch("vibe3.commands.run.LabelService") as mock_labels,
+    ):
+        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+
+    assert result.exit_code == 0
+    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
+        42,
+        IssueState.HANDOFF,
+        actor="agent:run",
+    )
+
+
+def test_run_failure_fails_issue_and_comments(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
+    with (
+        patch("vibe3.commands.run._ensure_plan_file_exists"),
+        patch(
+            "vibe3.commands.run.CodeagentExecutionService.execute",
+            return_value=MagicMock(success=False, stderr="executor failed"),
+        ),
+        patch.object(RunUsecase, "transition_issue", return_value=42),
+        patch("vibe3.commands.run.GitHubClient") as mock_github,
+        patch("vibe3.commands.run.LabelService") as mock_labels,
+    ):
+        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+
+    assert result.exit_code != 0
+    mock_github.return_value.add_comment.assert_called_once()
+    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
+        42,
+        IssueState.FAILED,
+        actor="agent:run",
+        force=True,
+    )
 
 
 class TestRunContextBuilderUsesAssembler:

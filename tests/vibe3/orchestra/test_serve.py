@@ -35,7 +35,7 @@ def test_build_server_registers_only_enabled_services() -> None:
     heartbeat, _ = _build_server(cfg)
     assert "PRReviewDispatchService" in heartbeat.service_names
     assert "GovernanceService" in heartbeat.service_names
-    assert "StateLabelDispatchService" in heartbeat.service_names
+    assert heartbeat.service_names.count("StateLabelDispatchService") == 3
     assert "SupervisorHandoffService" in heartbeat.service_names
 
 

@@ -68,7 +68,7 @@ def _execute_run_command(
     model: str | None,
     worktree: bool,
     handoff_metadata: dict[str, object] | None,
-) -> None:
+) -> object:
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
     command = create_codeagent_command(
         role="executor",
@@ -84,11 +84,46 @@ def _execute_run_command(
         config=config,
         branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+    return CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
+def _comment_and_fail_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str,
+) -> None:
+    GitHubClient().add_comment(
+        issue_number,
+        f"[run] 执行报错，已切换为 state/failed。\n\n原因：{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
+
+
+def _comment_and_fail_manager_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:manager",
+) -> None:
+    GitHubClient().add_comment(
+        issue_number,
+        f"[manager] 管理执行报错，已切换为 state/failed。\n\n原因：{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
 
 
 def _ensure_plan_file_exists(plan_file: str | None) -> None:
-    """Fail fast when plan file is missing to avoid noisy run lifecycle writes."""
     if not plan_file:
         return
     if Path(plan_file).exists():
@@ -181,18 +216,10 @@ def _build_supervisor_task(
 
 
 def _resolve_issue_supervisor_file() -> str:
-    """Resolve the configured supervisor file for governance issue execution."""
     return OrchestraConfig.from_settings().supervisor_handoff.supervisor_file
 
 
 def _resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:
-    """Resolve launch cwd for manager execution.
-
-    On the first manager run with ``--worktree``, launch from the main repo root
-    so wrapper-created worktrees land under the shared repository `.worktrees/`
-    instead of nesting under the current human worktree. Once a session exists,
-    keep using the current cwd and let resume semantics control the scene.
-    """
     if not use_worktree or session_id:
         return Path.cwd()
     git_common_dir = Path(GitClient().get_git_common_dir())
@@ -205,12 +232,7 @@ def _resolve_manager_branch(
     issue_number: int,
     current_branch: str,
 ) -> str:
-    """Resolve the branch whose manager session/state should be used.
-
-    Prefer the target issue's own task flow when one exists. When no task flow
-    exists yet, use the canonical target task branch instead of the current
-    human branch to avoid cross-issue session reuse.
-    """
+    """Prefer target issue's task flow branch; fall back to canonical task branch."""
     flows = store.get_flows_by_issue(issue_number, role="task")
     if not isinstance(flows, list) or not flows:
         return f"task/issue-{issue_number}"
@@ -238,11 +260,7 @@ def _resolve_manager_agent_options(
     runtime_config: VibeConfig,
     worktree: bool,
 ) -> AgentOptions:
-    """Resolve manager agent options from orchestra assignee dispatch config.
-
-    Manager is a scene owner role and should not silently inherit the generic
-    run agent preset when a manager-specific default is configured.
-    """
+    """Resolve agent options from orchestra assignee dispatch config."""
     ad = orchestra_config.assignee_dispatch
     if ad.agent:
         return AgentOptions(
@@ -259,12 +277,7 @@ def _resolve_manager_agent_options(
 def _wait_for_async_session_id(
     log_path: Path, *, timeout_seconds: float = 3.0
 ) -> str | None:
-    """Best-effort poll of async output for a session id.
-
-    The repo-local async log only contains the wrapper header and the path to the
-    wrapper's own temp log. The real `sessionID` event typically appears later in
-    that wrapper log, so we poll both sources.
-    """
+    """Best-effort poll async output and wrapper log for session id."""
     wrapper_log_path: Path | None = None
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -306,16 +319,7 @@ def _resolve_manager_execution_cwd(
     use_worktree: bool,
     session_id: str | None,
 ) -> tuple[Path, bool]:
-    """Resolve the cwd where manager should execute.
-
-    Priority:
-    1. If a manager session already exists, reuse the current scene and never
-       request a new wrapper worktree.
-    2. If the target issue already has a stable worktree/scene, execute inside
-       that cwd and do not pass ``--worktree`` again.
-    3. Only when no reusable scene exists and caller explicitly requested
-       ``--worktree`` do we fall back to wrapper-created worktree mode.
-    """
+    """Resolve cwd: reuse existing scene if available, otherwise wrapper worktree."""
     if session_id:
         return (
             _resolve_manager_launch_cwd(
@@ -359,11 +363,7 @@ def _run_manager_issue_mode(
     worktree: bool,
     fresh_session: bool = False,
 ) -> None:
-    """Internal manager execution entrypoint.
-
-    Runs inside the target manager worktree and persists `manager_session_id`
-    on the current flow branch.
-    """
+    """Internal manager execution entrypoint."""
     orchestra_config = OrchestraConfig.from_settings()
     issue_payload = GitHubClient().view_issue(issue_number, repo=orchestra_config.repo)
     if not isinstance(issue_payload, dict):
@@ -426,15 +426,29 @@ def _run_manager_issue_mode(
     )
 
     if async_mode and not dry_run:
-        handle = backend.start_async(
-            prompt=prompt,
-            options=options,
-            task=manager_task,
-            session_id=session_id,
-            execution_name=f"vibe3-manager-issue-{issue_number}",
-            cwd=launch_cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
+        try:
+            handle = backend.start_async(
+                prompt=prompt,
+                options=options,
+                task=manager_task,
+                session_id=session_id,
+                execution_name=f"vibe3-manager-issue-{issue_number}",
+                cwd=launch_cwd,
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            )
+        except BaseException as exc:
+            store.add_event(
+                branch,
+                "manager_failed",
+                actor,
+                detail=f"Manager execution failed for issue #{issue_number}: {exc}",
+                refs={"issue": str(issue_number), "reason": str(exc)},
+            )
+            _comment_and_fail_manager_issue(
+                issue_number=issue_number,
+                reason=f"manager async start failed: {exc}",
+            )
+            raise typer.Exit(1) from exc
         updates: dict[str, object] = {"latest_actor": actor}
         effective_session_id = session_id or _wait_for_async_session_id(
             handle.log_path,
@@ -471,10 +485,14 @@ def _run_manager_issue_mode(
     except BaseException as exc:
         store.add_event(
             branch,
-            "manager_aborted",
+            "manager_failed",
             actor,
-            detail=f"Manager execution aborted for issue #{issue_number}: {exc}",
+            detail=f"Manager execution failed for issue #{issue_number}: {exc}",
             refs={"issue": str(issue_number), "reason": str(exc)},
+        )
+        _comment_and_fail_manager_issue(
+            issue_number=issue_number,
+            reason=f"manager sync execution failed: {exc}",
         )
         raise
 
@@ -483,6 +501,20 @@ def _run_manager_issue_mode(
     if effective_session_id:
         sync_updates["manager_session_id"] = effective_session_id
     store.update_flow_state(branch, **sync_updates)
+    if not result.is_success():
+        store.add_event(
+            branch,
+            "manager_failed",
+            actor,
+            detail=f"Manager execution failed for issue #{issue_number}",
+            refs={"issue": str(issue_number), "status": "failed"},
+        )
+        _comment_and_fail_manager_issue(
+            issue_number=issue_number,
+            reason=getattr(result, "stderr", "") or "manager exited with failure",
+        )
+        raise typer.Exit(1)
+
     store.add_event(
         branch,
         "manager_completed",
@@ -490,9 +522,6 @@ def _run_manager_issue_mode(
         detail=f"Manager execution completed for issue #{issue_number}",
         refs={"issue": str(issue_number), "status": "completed"},
     )
-
-    if not result.is_success():
-        raise typer.Exit(1)
 
 
 def run_command(
@@ -647,7 +676,7 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    _execute_run_command(
+    result = _execute_run_command(
         config=config,
         branch=branch,
         instructions=instructions,
@@ -662,17 +691,30 @@ def run_command(
     )
 
     issue_number = usecase.transition_issue(branch)
-    if not dry_run and issue_number:
-        result = LabelService().confirm_issue_state(
-            int(issue_number),
-            IssueState.IN_PROGRESS,
-            actor="agent:run",
-        )
-        if result == "blocked":
+    if not dry_run and not async_mode and issue_number:
+        if getattr(result, "success", False):
+            transition = LabelService().confirm_issue_state(
+                int(issue_number),
+                IssueState.HANDOFF,
+                actor="agent:run",
+            )
+            if transition == "blocked":
+                typer.echo(
+                    "Warning: Failed to transition issue state: "
+                    "state_transition_blocked",
+                    err=True,
+                )
+        else:
+            _comment_and_fail_issue(
+                issue_number=int(issue_number),
+                reason=getattr(result, "stderr", "") or "executor exited with failure",
+                actor="agent:run",
+            )
             typer.echo(
-                "Warning: Failed to transition issue state: state_transition_blocked",
+                "Error: Executor failed; issue moved to state/failed",
                 err=True,
             )
+            raise typer.Exit(1)
 
 
 @app.callback(invoke_without_command=True)
