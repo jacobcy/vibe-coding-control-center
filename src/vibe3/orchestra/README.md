@@ -31,7 +31,13 @@ vibe3 serve start --port 8080
 4. 依赖全部 closed → dispatch manager（受 Semaphore 限制）
 5. Manager 执行完后更新 `state/in-progress` label（仅展示用）
 
-**Labels 职责降级**：不再触发任何执行逻辑，只作状态展示。
+**Labels 职责**：
+
+- `state/claimed` 触发 plan
+- `state/in-progress` 触发 run
+- `state/review` 触发 review
+- `state/blocked` 表示 manager 判断当前无法推进
+- `state/failed` 表示执行器报错，并暂停新的自动任务进入
 
 ## 内置 Service
 
@@ -39,6 +45,9 @@ vibe3 serve start --port 8080
 |---------|-------------|------|
 | `AssigneeDispatchService` | `issues` | assignee 变化 → 检查依赖 → dispatch manager |
 | `CommentReplyService` | `issue_comment` | `@vibe-manager` 提及 → 自动 ACK 回复 |
+| `StateLabelDispatchService(plan)` | heartbeat tick | `state/claimed` → plan |
+| `StateLabelDispatchService(run)` | heartbeat tick | `state/in-progress` → run |
+| `StateLabelDispatchService(review)` | heartbeat tick | `state/review` → review |
 
 ## 注册自定义 Service
 
@@ -82,7 +91,7 @@ tmux new -d -s orchestra 'vibe3 serve start --port 8080'
 ```yaml
 orchestra:
   enabled: true
-  polling_interval: 900        # 心跳间隔（秒），最小 60
+  polling_interval: 30         # 心跳间隔（秒），调试默认 30
   port: 8080
   repo: owner/repo             # 留空则用当前 repo
   max_concurrent_flows: 3

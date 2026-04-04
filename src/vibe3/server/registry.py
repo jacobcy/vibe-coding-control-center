@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
@@ -75,11 +76,31 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             )
         )
     if config.state_label_dispatch.enabled:
-        # NOTE: StateLabelDispatchService is a read-only mirror (no-op dispatch).
-        # It only logs label events for observability; disabled by default in config.
         heartbeat.register(
             StateLabelDispatchService(
                 config,
+                trigger_state=IssueState.CLAIMED,
+                trigger_name="plan",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.IN_PROGRESS,
+                trigger_name="run",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.REVIEW,
+                trigger_name="review",
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,

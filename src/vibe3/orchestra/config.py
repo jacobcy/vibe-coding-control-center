@@ -157,7 +157,7 @@ class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
     enabled: bool = True
-    polling_interval: int = Field(default=900, ge=60)
+    polling_interval: int = Field(default=30, ge=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
     dry_run: bool = False

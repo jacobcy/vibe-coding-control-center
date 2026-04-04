@@ -68,7 +68,7 @@ def _execute_run_command(
     model: str | None,
     worktree: bool,
     handoff_metadata: dict[str, object] | None,
-) -> None:
+) -> object:
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
     command = create_codeagent_command(
         role="executor",
@@ -84,7 +84,45 @@ def _execute_run_command(
         config=config,
         branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+    return CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
+def _comment_and_fail_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str,
+) -> None:
+    """Record executor failure and move the issue into failed."""
+    GitHubClient().add_comment(
+        issue_number,
+        f"[run] 执行报错，已切换为 state/failed。\n\n原因：{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
+
+
+def _comment_and_fail_manager_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:manager",
+) -> None:
+    """Record manager execution failure and move the issue into failed."""
+    GitHubClient().add_comment(
+        issue_number,
+        f"[manager] 管理执行报错，已切换为 state/failed。\n\n原因：{reason}",
+    )
+    LabelService().confirm_issue_state(
+        issue_number,
+        IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
 
 
 def _ensure_plan_file_exists(plan_file: str | None) -> None:
@@ -426,15 +464,29 @@ def _run_manager_issue_mode(
     )
 
     if async_mode and not dry_run:
-        handle = backend.start_async(
-            prompt=prompt,
-            options=options,
-            task=manager_task,
-            session_id=session_id,
-            execution_name=f"vibe3-manager-issue-{issue_number}",
-            cwd=launch_cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
+        try:
+            handle = backend.start_async(
+                prompt=prompt,
+                options=options,
+                task=manager_task,
+                session_id=session_id,
+                execution_name=f"vibe3-manager-issue-{issue_number}",
+                cwd=launch_cwd,
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            )
+        except BaseException as exc:
+            store.add_event(
+                branch,
+                "manager_failed",
+                actor,
+                detail=f"Manager execution failed for issue #{issue_number}: {exc}",
+                refs={"issue": str(issue_number), "reason": str(exc)},
+            )
+            _comment_and_fail_manager_issue(
+                issue_number=issue_number,
+                reason=f"manager async start failed: {exc}",
+            )
+            raise typer.Exit(1) from exc
         updates: dict[str, object] = {"latest_actor": actor}
         effective_session_id = session_id or _wait_for_async_session_id(
             handle.log_path,
@@ -471,10 +523,14 @@ def _run_manager_issue_mode(
     except BaseException as exc:
         store.add_event(
             branch,
-            "manager_aborted",
+            "manager_failed",
             actor,
-            detail=f"Manager execution aborted for issue #{issue_number}: {exc}",
+            detail=f"Manager execution failed for issue #{issue_number}: {exc}",
             refs={"issue": str(issue_number), "reason": str(exc)},
+        )
+        _comment_and_fail_manager_issue(
+            issue_number=issue_number,
+            reason=f"manager sync execution failed: {exc}",
         )
         raise
 
@@ -483,6 +539,20 @@ def _run_manager_issue_mode(
     if effective_session_id:
         sync_updates["manager_session_id"] = effective_session_id
     store.update_flow_state(branch, **sync_updates)
+    if not result.is_success():
+        store.add_event(
+            branch,
+            "manager_failed",
+            actor,
+            detail=f"Manager execution failed for issue #{issue_number}",
+            refs={"issue": str(issue_number), "status": "failed"},
+        )
+        _comment_and_fail_manager_issue(
+            issue_number=issue_number,
+            reason=getattr(result, "stderr", "") or "manager exited with failure",
+        )
+        raise typer.Exit(1)
+
     store.add_event(
         branch,
         "manager_completed",
@@ -490,9 +560,6 @@ def _run_manager_issue_mode(
         detail=f"Manager execution completed for issue #{issue_number}",
         refs={"issue": str(issue_number), "status": "completed"},
     )
-
-    if not result.is_success():
-        raise typer.Exit(1)
 
 
 def run_command(
@@ -647,7 +714,7 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
 
-    _execute_run_command(
+    result = _execute_run_command(
         config=config,
         branch=branch,
         instructions=instructions,
@@ -662,17 +729,30 @@ def run_command(
     )
 
     issue_number = usecase.transition_issue(branch)
-    if not dry_run and issue_number:
-        result = LabelService().confirm_issue_state(
-            int(issue_number),
-            IssueState.IN_PROGRESS,
-            actor="agent:run",
-        )
-        if result == "blocked":
+    if not dry_run and not async_mode and issue_number:
+        if getattr(result, "success", False):
+            transition = LabelService().confirm_issue_state(
+                int(issue_number),
+                IssueState.HANDOFF,
+                actor="agent:run",
+            )
+            if transition == "blocked":
+                typer.echo(
+                    "Warning: Failed to transition issue state: "
+                    "state_transition_blocked",
+                    err=True,
+                )
+        else:
+            _comment_and_fail_issue(
+                issue_number=int(issue_number),
+                reason=getattr(result, "stderr", "") or "executor exited with failure",
+                actor="agent:run",
+            )
             typer.echo(
-                "Warning: Failed to transition issue state: state_transition_blocked",
+                "Error: Executor failed; issue moved to state/failed",
                 err=True,
             )
+            raise typer.Exit(1)
 
 
 @app.callback(invoke_without_command=True)

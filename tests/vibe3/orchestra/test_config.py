@@ -12,7 +12,7 @@ def test_default_config():
     config = OrchestraConfig()
 
     assert config.enabled is True
-    assert config.polling_interval == 900
+    assert config.polling_interval == 30
     assert config.dry_run is False
     assert config.polling.enabled is True
     assert config.governance.enabled is True

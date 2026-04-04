@@ -113,6 +113,14 @@ class ManagerExecutor:
         self._last_error_category = category
         return success
 
+    def _mark_manager_start_failed(self, issue: IssueInfo, reason: str) -> None:
+        """Record a manager startup failure as state/failed."""
+        self.result_handler.post_failure_comment(
+            issue.number,
+            f"Manager 启动失败，已切换为 state/failed。\n\n原因：{reason}",
+        )
+        self.result_handler.update_state_label(issue.number, IssueState.FAILED)
+
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Complete lifecycle for manager dispatch with queuing."""
         log = logger.bind(
@@ -146,9 +154,11 @@ class ManagerExecutor:
             flow_branch = str(flow.get("branch") or "").strip()
             if not flow_branch:
                 log.error("Flow branch missing")
+                self._mark_manager_start_failed(issue, "flow branch missing")
                 return False
         except Exception as e:
             log.error(f"Flow creation failed: {e}")
+            self._mark_manager_start_failed(issue, f"flow creation failed: {e}")
             return False
 
         # 2. Worktree preparation
@@ -156,15 +166,13 @@ class ManagerExecutor:
         manager_cwd, is_temporary = self._resolve_manager_cwd(issue.number, flow_branch)
         if not manager_cwd:
             log.error("Unable to resolve worktree")
+            self._mark_manager_start_failed(issue, "unable to resolve worktree")
             return False
 
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
         try:
-            # 3. Label update
-            self.result_handler.update_state_label(issue.number, IssueState.CLAIMED)
-
-            # 4. Command execution
+            # 3. Command execution
             cmd = [
                 "uv",
                 "run",
@@ -175,12 +183,20 @@ class ManagerExecutor:
                 str(issue.number),
                 "--sync",
             ]
-            handle = self._backend.start_async_command(
-                cmd,
-                execution_name=f"vibe3-manager-{issue.number}",
-                cwd=manager_cwd,
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            )
+            try:
+                handle = self._backend.start_async_command(
+                    cmd,
+                    execution_name=f"vibe3-manager-{issue.number}",
+                    cwd=manager_cwd,
+                    env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                )
+            except Exception as exc:
+                log.error(f"Manager async start failed: {exc}")
+                self._mark_manager_start_failed(
+                    issue,
+                    f"manager async start failed: {exc}",
+                )
+                return False
             log.info(
                 f"Started manager async session: {handle.tmux_session} "
                 f"(log: {handle.log_path})"

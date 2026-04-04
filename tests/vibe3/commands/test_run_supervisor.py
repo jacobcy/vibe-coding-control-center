@@ -201,3 +201,80 @@ class TestRunSupervisorOption:
         output = strip_ansi(result.output)
         assert result.exit_code == 0
         assert "fresh-session" in output
+
+    def test_manager_issue_sync_failure_marks_issue_failed(self, monkeypatch) -> None:
+        orchestra_config = run_module.OrchestraConfig(
+            repo="owner/repo",
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+        )
+        monkeypatch.setattr(
+            run_module.OrchestraConfig,
+            "from_settings",
+            classmethod(lambda cls: orchestra_config),
+        )
+        monkeypatch.setattr(
+            run_module.VibeConfig,
+            "get_defaults",
+            classmethod(lambda cls: MagicMock()),
+        )
+        monkeypatch.setattr(run_module, "SQLiteClient", lambda: MagicMock())
+        monkeypatch.setattr(
+            run_module, "load_session_id", lambda role, branch=None: "ses_manager"
+        )
+        monkeypatch.setattr(
+            run_module, "_resolve_manager_branch", lambda **kwargs: "task/issue-278"
+        )
+        monkeypatch.setattr(
+            run_module,
+            "_resolve_manager_execution_cwd",
+            lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
+        )
+        monkeypatch.setattr(
+            run_module,
+            "_resolve_manager_agent_options",
+            lambda **kwargs: MagicMock(),
+        )
+        monkeypatch.setattr(
+            run_module,
+            "render_manager_prompt",
+            lambda config, issue: MagicMock(rendered_text="manager prompt"),
+        )
+        monkeypatch.setattr(
+            run_module.GitClient,
+            "get_current_branch",
+            staticmethod(lambda: "dev/issue-435"),
+        )
+
+        github = MagicMock()
+        github.view_issue.return_value = {
+            "number": 278,
+            "title": "test manager issue",
+            "labels": [{"name": "state/claimed"}],
+            "assignees": [],
+        }
+        monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
+
+        backend = MagicMock()
+        backend.run.return_value = MagicMock(
+            is_success=lambda: False,
+            stderr="manager failed",
+            session_id="ses_manager",
+        )
+        monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
+
+        labels = MagicMock()
+        monkeypatch.setattr(run_module, "LabelService", lambda: labels)
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "278", "--sync"],
+        )
+
+        assert result.exit_code != 0
+        github.add_comment.assert_called_once()
+        labels.confirm_issue_state.assert_called_once_with(
+            278,
+            run_module.IssueState.FAILED,
+            actor="agent:manager",
+            force=True,
+        )

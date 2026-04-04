@@ -170,7 +170,7 @@ class TestManagerReviewWorktreeResolution:
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"
 
-    def test_dispatch_manager_marks_issue_claimed_before_launch(self):
+    def test_dispatch_manager_does_not_preclaim_before_launch(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=103, title="Claim before manager run")
@@ -207,7 +207,42 @@ class TestManagerReviewWorktreeResolution:
                                 result = manager.dispatch_manager(issue)
 
         assert result is True
-        mock_update.assert_called_once_with(issue.number, IssueState.CLAIMED)
+        mock_update.assert_not_called()
+
+    def test_dispatch_manager_start_failure_marks_issue_failed(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=104, title="Manager startup failure")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-104"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-104"), False),
+                ):
+                    with patch.object(
+                        manager.result_handler, "update_state_label"
+                    ) as mock_update:
+                        with patch.object(
+                            manager.result_handler, "post_failure_comment"
+                        ) as mock_comment:
+                            with patch.object(
+                                manager._backend,
+                                "start_async_command",
+                                side_effect=RuntimeError("tmux unavailable"),
+                            ):
+                                result = manager.dispatch_manager(issue)
+
+        assert result is False
+        assert mock_update.call_args_list[-1].args == (issue.number, IssueState.FAILED)
+        mock_comment.assert_called_once()
 
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()
