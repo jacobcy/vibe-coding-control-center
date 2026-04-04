@@ -42,8 +42,8 @@ code_limits:
     max: 400              # 单文件最大限制（所有类型）
 
   total_file_loc:
-    v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 25000        # Python 核心代码总行数
+    v2_shell: 4000         # Shell 核心代码总行数
+    v3_python: 26000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -228,7 +228,7 @@ plan:
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
-    agent: "code-architect"
+    agent: "code-explorer"
 
     # Actual backend/model for database recording
     # TODO: Fill in actual values before merge
@@ -325,7 +325,13 @@ orchestra:
   enabled: true
 
   # Polling interval in seconds (effective only when polling.enabled=true)
-  polling_interval: 30
+  polling_interval: 900
+
+  # Debug mode heartbeat interval (used by `serve --debug` when no explicit --interval is given)
+  debug_polling_interval: 60
+
+  # Base ref for auto task scenes in normal mode
+  scene_base_ref: "origin/main"
 
   # Polling fallback (for missed webhook events)
   polling:
@@ -353,7 +359,7 @@ orchestra:
     # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
     use_worktree: true
     # manager 是开发 scene owner，默认 agent preset 从仓库内 config/models.json 解析
-    agent: "code-architect"
+    agent: "explore"
     # backend/model 留空时，使用 config/models.json 中该 agent 的映射
     # 仅在需要临时覆盖 preset 映射时填写
     backend:
@@ -377,23 +383,6 @@ orchestra:
   comment_reply:
     enabled: false
 
-  # Master agent for issue triage (disabled in reviewer-only mode)
-  master_agent:
-    # Enable master agent for new issue triage
-    enabled: false
-
-    # Agent preset name (passed to codeagent-wranipper)
-    agent: "oracle"
-
-    # Backend for direct execution
-    # backend: "claude"
-
-    # Model for direct execution
-    # model: "claude-sonnet-4-5"
-
-    # Timeout in seconds
-    timeout_seconds: 300
-
   # Governance prompt composition
   governance:
     enabled: true
@@ -404,7 +393,7 @@ orchestra:
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt
     include_supervisor_content: true
-    dry_run: true
+    dry_run: false
 
   supervisor_handoff:
     enabled: true

@@ -6,8 +6,6 @@ from pathlib import Path
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from vibe3.models.review_runner import AgentOptions
-
 
 def _default_pid_file() -> Path:
     """Resolve PID path under shared git common dir when available."""
@@ -81,24 +79,6 @@ class StateLabelDispatchConfig(BaseModel):
     enabled: bool = True
 
 
-class MasterAgentConfig(BaseModel):
-    """Master agent configuration."""
-
-    enabled: bool = True
-    agent: str = "master-controller"
-    backend: str | None = None
-    model: str | None = None
-    timeout_seconds: int = 300
-
-    def to_agent_options(self) -> AgentOptions:
-        return AgentOptions(
-            agent=self.agent,
-            backend=self.backend,
-            model=self.model,
-            timeout_seconds=self.timeout_seconds,
-        )
-
-
 class CircuitBreakerConfig(BaseModel):
     """Configuration for dispatch-level circuit breaker."""
 
@@ -157,7 +137,10 @@ class OrchestraConfig(BaseModel):
     """Orchestra daemon configuration."""
 
     enabled: bool = True
-    polling_interval: int = Field(default=30, ge=1)
+    polling_interval: int = Field(default=900, ge=1)
+    debug_polling_interval: int = Field(default=60, ge=1)
+    debug: bool = False
+    scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
     dry_run: bool = False
@@ -174,7 +157,6 @@ class OrchestraConfig(BaseModel):
         default_factory=lambda: ["vibe-manager-agent"],
         description="GitHub usernames whose assignment signals manager dispatch",
     )
-    master_agent: MasterAgentConfig = Field(default_factory=MasterAgentConfig)
     polling: PollingConfig = Field(default_factory=PollingConfig)
     assignee_dispatch: AssigneeDispatchConfig = Field(
         default_factory=AssigneeDispatchConfig
@@ -282,19 +264,15 @@ class OrchestraConfig(BaseModel):
         return cls(
             enabled=src.enabled,
             polling_interval=src.polling_interval,
+            debug_polling_interval=getattr(src, "debug_polling_interval", 60),
+            debug=False,
+            scene_base_ref=getattr(src, "scene_base_ref", "origin/main"),
             repo=repo,
             max_concurrent_flows=src.max_concurrent_flows,
             port=src.port,
             webhook_secret=src.webhook_secret,
             bot_username=getattr(src, "bot_username", None),
             manager_usernames=src.manager_usernames,
-            master_agent=MasterAgentConfig(
-                enabled=src.master_agent.enabled,
-                agent=src.master_agent.agent,
-                backend=src.master_agent.backend,
-                model=src.master_agent.model,
-                timeout_seconds=src.master_agent.timeout_seconds,
-            ),
             polling=PollingConfig(enabled=src.polling.enabled),
             assignee_dispatch=AssigneeDispatchConfig(
                 enabled=src.assignee_dispatch.enabled,

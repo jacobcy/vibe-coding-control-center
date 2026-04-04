@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -87,7 +88,8 @@ class SupervisorHandoffService(ServiceBase):
         self._in_flight.intersection_update(active_issue_numbers)
 
         for issue in candidates:
-            if issue.number in self._in_flight:
+            if issue.number in self._in_flight or self._has_live_dispatch(issue.number):
+                self._in_flight.add(issue.number)
                 continue
             self._in_flight.add(issue.number)
             try:
@@ -176,6 +178,30 @@ class SupervisorHandoffService(ServiceBase):
             execution_name=f"vibe3-supervisor-issue-{issue.number}",
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
+
+    def _has_live_dispatch(self, issue_number: int) -> bool:
+        session_prefix = f"vibe3-supervisor-issue-{issue_number}"
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
+        if result.returncode != 0:
+            return False
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if session_name == session_prefix or session_name.startswith(
+                f"{session_prefix}-"
+            ):
+                return True
+        return False
 
     def _build_issue_task(self, issue: SupervisorHandoffIssue) -> str:
         repo_hint = f" in repo {self.config.repo}" if self.config.repo else ""

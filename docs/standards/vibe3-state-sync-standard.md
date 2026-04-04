@@ -20,6 +20,8 @@
 
 这些分别以其他标准为准。
 
+调试方法与日志规范见 [agent-debugging-standard.md](agent-debugging-standard.md)。
+
 ## 2. 真源分层
 
 状态同步只允许使用以下真源：
@@ -402,18 +404,26 @@ manager 只负责在 `state/handoff` 读完 handoff/refs 后，决定是否将 i
 manager / supervisor / 人机调试时，优先使用：
 
 ```bash
-uv run python src/vibe3/cli.py task show
-uv run python src/vibe3/cli.py task show --comments
+uv run python src/vibe3/cli.py task show <target-branch>
+uv run python src/vibe3/cli.py task show <target-branch> --comments
 uv run python src/vibe3/cli.py task status
-uv run python src/vibe3/cli.py handoff show
+uv run python src/vibe3/cli.py handoff show <target-branch>
 gh issue view <issue-number> --json labels,state
 ```
 
 其中：
 
-- `task show`：单 task-scene 真源
-- `task show --comments`：最新评论与最新人类指示
-- `task status`：全局任务/队列状态
+- `task show <target-branch>`：单 task-scene 真源
+- `task show <target-branch> --comments`：最新评论与最新人类指示
+- `task status`：全局任务/队列状态（不是单个 `ready` issue 的健康真源）
+- `handoff show <target-branch>`：当前交接材料
+
+补充规则：
+
+- `state/ready` 阶段的 scene 健康判断，优先使用 `task show <target-branch>`、
+  `handoff show <target-branch>`、`pwd`、`git branch --show-current`
+- 全局 `task status` 中的 `Server: stopped/unreachable`、或“当前没有 active issues”
+  这类信号，不能单独作为把当前 `ready` issue 调整为 `blocked` 的依据
 
 ## 10. 禁止事项
 
@@ -432,4 +442,5 @@ gh issue view <issue-number> --json labels,state
 - manager prompt / supervisor prompt
 - task / status / flow 命令文案
 - GitHub Project 视图说明
-- 调试标准
+- 调试标准（见 [agent-debugging-standard.md](agent-debugging-standard.md)）
+- orchestra 运行时标准（见 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)）

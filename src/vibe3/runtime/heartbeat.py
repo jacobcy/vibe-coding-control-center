@@ -2,10 +2,15 @@
 
 import asyncio
 import os
+import time
 
 from loguru import logger
 
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.logging import (
+    append_orchestra_event,
+    append_orchestra_run_separator,
+)
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 
@@ -24,10 +29,15 @@ class HeartbeatServer:
         self._semaphore = asyncio.Semaphore(config.max_concurrent_flows)
         self._running = False
         self._pending_tasks: set[asyncio.Task[None]] = set()
+        self._tick_count = 0
 
     def register(self, service: ServiceBase) -> None:
         """Register a service to receive events and tick callbacks."""
         self._services.append(service)
+        append_orchestra_event(
+            "server",
+            f"registered service: {type(service).__name__}",
+        )
         logger.bind(domain="orchestra").info(
             f"Registered service: {type(service).__name__}"
         )
@@ -55,6 +65,16 @@ class HeartbeatServer:
         self._running = True
         self._write_pid()
         log = logger.bind(domain="orchestra", action="start")
+        append_orchestra_run_separator()
+        append_orchestra_event(
+            "server",
+            (
+                f"start tick_interval={self.config.polling_interval}s "
+                f"polling_enabled={self.config.polling.enabled} "
+                f"max_concurrent={self.config.max_concurrent_flows} "
+                f"services={','.join(self.service_names)}"
+            ),
+        )
         log.info(
             f"HeartbeatServer started (tick_interval={self.config.polling_interval}s, "
             f"polling_enabled={self.config.polling.enabled}, "
@@ -68,6 +88,7 @@ class HeartbeatServer:
                 tg.create_task(self._event_loop())
         except* Exception as eg:
             for exc in eg.exceptions:
+                append_orchestra_event("server", f"error: {exc}")
                 log.error(f"HeartbeatServer error: {exc}")
         finally:
             self._cleanup()
@@ -84,15 +105,28 @@ class HeartbeatServer:
             await asyncio.sleep(self.config.polling_interval)
             if not self._running:
                 break
+            self._tick_count += 1
+            tick_number = self._tick_count
+            started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
+            append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
             tasks = [self._tick_service(svc) for svc in self._services]
             await asyncio.gather(*tasks, return_exceptions=True)
+            duration = time.perf_counter() - started_at
+            append_orchestra_event(
+                "server",
+                f"heartbeat tick #{tick_number} completed in {duration:.2f}s",
+            )
 
     async def _tick_service(self, service: ServiceBase) -> None:
         async with self._semaphore:
             try:
                 await service.on_tick()
             except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"tick error in {type(service).__name__}: {exc}",
+                )
                 logger.bind(domain="orchestra").error(
                     f"Tick error in {type(service).__name__}: {exc}"
                 )
@@ -113,6 +147,10 @@ class HeartbeatServer:
             svc for svc in self._services if event.event_type in svc.event_types
         ]
         if not matching:
+            append_orchestra_event(
+                "server",
+                f"no handler for event_type={event.event_type}",
+            )
             logger.bind(domain="orchestra").debug(
                 f"No handler for event_type={event.event_type!r}"
             )
@@ -127,6 +165,10 @@ class HeartbeatServer:
             try:
                 await service.handle_event(event)
             except Exception as exc:
+                append_orchestra_event(
+                    "server",
+                    f"event error in {type(service).__name__}: {exc}",
+                )
                 logger.bind(domain="orchestra").error(
                     f"Event error in {type(service).__name__}: {exc}"
                 )
@@ -139,5 +181,6 @@ class HeartbeatServer:
         pid_file.write_text(str(os.getpid()))
 
     def _cleanup(self) -> None:
+        append_orchestra_event("server", "stop")
         if self.config.pid_file.exists():
             self.config.pid_file.unlink(missing_ok=True)

@@ -1,13 +1,16 @@
 """Status command - unified dashboard for flows and orchestra."""
 
 import json
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 
 from vibe3.commands.common import trace_scope
+from vibe3.clients.github_client import GitHubClient
+from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.server.registry import _validate_pid_file
 from vibe3.services.flow_service import FlowService
 from vibe3.ui.console import console
 
@@ -18,16 +21,81 @@ JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
+def _state_from_labels(raw_labels: object) -> IssueState | None:
+    if not isinstance(raw_labels, list):
+        return None
+    for item in raw_labels:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if not isinstance(name, str):
+            continue
+        parsed = IssueState.from_label(name)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _is_auto_task_branch(branch: str) -> bool:
+    return branch.startswith("task/issue-")
+
+
+def _is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
+    return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
+
+
+def _issue_priority(state: IssueState) -> tuple[int, str]:
+    """Sort orchestration issues by operational urgency."""
+    if state in {
+        IssueState.IN_PROGRESS,
+        IssueState.REVIEW,
+        IssueState.HANDOFF,
+        IssueState.CLAIMED,
+    }:
+        return (0, state.value)
+    if state == IssueState.READY:
+        return (1, state.value)
+    if state == IssueState.BLOCKED:
+        return (2, state.value)
+    if state == IssueState.FAILED:
+        return (3, state.value)
+    return (4, state.value)
+
+
+def _resolve_server_label(
+    config: OrchestraConfig, snapshot_found: bool, server_running: bool
+) -> str:
+    if snapshot_found and server_running:
+        return "[green]running[/]"
+    pid, is_valid = _validate_pid_file(config.pid_file)
+    if is_valid and pid is not None:
+        return "[yellow]unreachable[/]"
+    return "[dim]stopped[/]"
+
+
 def status(
     all_flows: AllOption = False,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+    ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
 ) -> None:
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
     with trace_scope(trace, "status", domain="status"):
+        if check:
+            from vibe3.services.check_service import CheckService
+
+            try:
+                CheckService().verify_all_flows()
+            except Exception:
+                pass  # check failure should not block status display
+
         # 1. Orchestra State (Issues & Managers)
         config = OrchestraConfig.from_settings()
         orch_snapshot = OrchestraStatusService.fetch_live_snapshot(config)
+        snapshot_found = orch_snapshot is not None
 
         if not orch_snapshot:
             # Fallback if server is not running
@@ -59,11 +127,12 @@ def status(
             "%Y-%m-%d %H:%M:%S"
         )
         console.print(f"[bold]Orchestra Status[/] [dim]({ts_str})[/]")
-
-        if orch_snapshot.server_running:
-            console.print("Server: [green]running[/]")
-        else:
-            console.print("Server: [dim]stopped[/]")
+        console.print(
+            "Server: "
+            + _resolve_server_label(
+                config, snapshot_found, orch_snapshot.server_running
+            )
+        )
 
         if orch_snapshot.queued_issues:
             console.print(
@@ -71,52 +140,131 @@ def status(
             )
         console.print()
 
-        # 2. Issue Tracking (The Core View)
-        # Combine Orchestra issues with Flow information
+        # 2. Issue Tracking (state truth + local scene)
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
 
-        # Map task issue numbers to flows for easy lookup
         issue_to_flow = {f.task_issue_number: f for f in flows if f.task_issue_number}
         queued_set = set(orch_snapshot.queued_issues)
+        github = GitHubClient()
+
+        orchestrated_issues: list[dict[str, object]] = []
+        try:
+            raw_issues = github.list_issues(limit=100, state="open", assignee=None)
+        except Exception:
+            raw_issues = []
+
+        for item in raw_issues:
+            number = item.get("number")
+            if not isinstance(number, int):
+                continue
+            state = _state_from_labels(item.get("labels"))
+            if state is None:
+                continue
+            if state == IssueState.DONE:
+                continue
+            flow = issue_to_flow.get(number)
+            orchestrated_issues.append(
+                {
+                    "number": number,
+                    "title": str(item.get("title") or ""),
+                    "state": state,
+                    "flow": flow,
+                    "queued": number in queued_set,
+                }
+            )
+
+        orchestrated_issues.sort(
+            key=lambda item: (
+                *_issue_priority(cast(IssueState, item["state"])),
+                cast(int, item["number"]),
+            )
+        )
 
         console.print("[bold cyan]Issue Progress:[/]")
 
-        # Active Issues from Orchestra
-        if orch_snapshot.active_issues:
-            for issue in orch_snapshot.active_issues:
-                flow = issue_to_flow.get(issue.number)
-                is_queued = issue.number in queued_set
+        if orchestrated_issues:
+            active_items = [
+                item
+                for item in orchestrated_issues
+                if cast(IssueState, item["state"])
+                in {
+                    IssueState.CLAIMED,
+                    IssueState.HANDOFF,
+                    IssueState.IN_PROGRESS,
+                    IssueState.REVIEW,
+                }
+            ]
+            ready_items = [
+                item
+                for item in orchestrated_issues
+                if cast(IssueState, item["state"]) == IssueState.READY
+            ]
 
-                if is_queued:
-                    status_str = "QUEUED"
-                    status_color = "yellow"
-                    flow_info = "  [dim]flow:[/] [yellow](waiting)[/]"
-                elif flow:
-                    status_str = "RUNNING"
-                    status_color = "green"
-                    flow_info = f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
-                else:
-                    state_val = (
-                        issue.state.value
-                        if issue.state and hasattr(issue.state, "value")
-                        else (issue.state or "unknown")
+            console.print("  [bold]Active:[/]")
+            if active_items:
+                for item in active_items:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    state = cast(IssueState, item["state"])
+                    flow = item["flow"]
+                    is_queued = cast(bool, item["queued"])
+
+                    status_str = "QUEUED" if is_queued else state.value.upper()
+                    status_color = "yellow" if is_queued else "green"
+                    flow_info = (
+                        f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
+                        if flow
+                        else "  [dim]flow:[/] [dim](none)[/]"
                     )
-                    status_str = state_val.upper()
-                    status_color = "dim"
-                    flow_info = "  [dim]flow:[/] [dim](none)[/]"
+                    console.print(
+                        f"  #{number:4}  [{status_color}]{status_str:10}[/]  {title[:48]}..."
+                    )
+                    console.print(f"             {flow_info}")
+            else:
+                console.print("  [dim](none)[/]")
 
-                console.print(
-                    f"  #{issue.number:4}  [{status_color}]{status_str:10}[/]  "
-                    f"{issue.title[:40]}..."
-                )
-                console.print(f"             {flow_info}")
+            console.print("\n  [bold]Ready Queue:[/]")
+            if ready_items:
+                for item in ready_items:
+                    number = cast(int, item["number"])
+                    title = cast(str, item["title"])
+                    flow = item["flow"]
+                    flow_info = (
+                        f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
+                        if flow
+                        else "  [dim]flow:[/] [dim](none)[/]"
+                    )
+                    console.print(
+                        f"  #{number:4}  [cyan]READY     [/]  {title[:48]}..."
+                    )
+                    console.print(f"             {flow_info}")
+            else:
+                console.print("  [dim](none)[/]")
         else:
-            console.print("  [dim]No active issues tracked by orchestra.[/]")
+            console.print("  [dim]No orchestration-tracked issues.[/]")
 
         console.print()
 
-        # 4. Worktree context (from Flow Status logic)
+        blocked_items = [
+            item
+            for item in orchestrated_issues
+            if cast(IssueState, item["state"]) == IssueState.BLOCKED
+        ]
+        console.print("[bold cyan]Blocked Issues:[/]")
+        if blocked_items:
+            for item in blocked_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                flow = item["flow"]
+                flow_info = (
+                    f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
+                )
+                console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+        else:
+            console.print("  [dim](none)[/]")
+
+        # 3. Local scene context (tracked flows + worktrees)
         worktree_map: dict[str, str] = {}
         try:
             from vibe3.clients.git_client import GitClient
@@ -136,15 +284,46 @@ def status(
             pass
 
         if flows:
-            console.print("\n[bold cyan]Active Worktrees & Flows:[/]")
-            for flow in flows:
-                wt = worktree_map.get(flow.branch, "(no worktree)")
-                task = (
-                    f"#{flow.task_issue_number}"
-                    if flow.task_issue_number
-                    else "(no task)"
-                )
-                console.print(
-                    f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt:15} "
-                    f"[dim]task:[/] {task}"
-                )
+            auto_flows = [
+                flow
+                for flow in flows
+                if _is_auto_task_branch(flow.branch)
+                and flow.branch in worktree_map
+            ]
+            manual_flows = [flow for flow in flows if not _is_auto_task_branch(flow.branch)]
+
+            console.print("\n[bold cyan]Auto Task Scenes:[/]")
+            if auto_flows:
+                for flow in auto_flows:
+                    wt = worktree_map.get(flow.branch, "(no worktree)")
+                    if _is_canonical_task_branch(flow.branch, flow.task_issue_number):
+                        console.print(
+                            f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}"
+                        )
+                    else:
+                        task = (
+                            f"#{flow.task_issue_number}"
+                            if flow.task_issue_number
+                            else "(no task)"
+                        )
+                        console.print(
+                            f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                        )
+
+            else:
+                console.print("  [dim](none)[/]")
+
+            console.print("\n[bold cyan]Manual Scenes:[/]")
+            if manual_flows:
+                for flow in manual_flows:
+                    wt = worktree_map.get(flow.branch, "(no worktree)")
+                    task = (
+                        f"#{flow.task_issue_number}"
+                        if flow.task_issue_number
+                        else "(no task)"
+                    )
+                    console.print(
+                        f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt:15} [dim]task:[/] {task}"
+                    )
+            else:
+                console.print("  [dim](none)[/]")

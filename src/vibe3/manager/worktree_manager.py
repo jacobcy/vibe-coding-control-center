@@ -37,6 +37,10 @@ class WorktreeManager:
         """Resolve stable cwd for manager execution on a flow branch."""
         return self._resolve_manager_cwd(issue_number, flow_branch)
 
+    def align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
+        """Reset a canonical auto scene to the configured base ref."""
+        return self._align_auto_scene_to_base(cwd, flow_branch)
+
     def _resolve_manager_cwd(
         self, issue_number: int, flow_branch: str
     ) -> tuple[Path | None, bool]:
@@ -49,6 +53,57 @@ class WorktreeManager:
             return existing, False
 
         return self._ensure_manager_worktree(issue_number, flow_branch)
+
+    def _align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
+        if not flow_branch.startswith("task/issue-"):
+            return True
+
+        base_ref = str(getattr(self.config, "scene_base_ref", "origin/main") or "").strip()
+        if not base_ref:
+            return True
+
+        commands = [
+            ["git", "fetch", "--all", "--prune"],
+            ["git", "checkout", flow_branch],
+            ["git", "reset", "--hard", base_ref],
+            ["git", "clean", "-fd"],
+        ]
+        for cmd in commands:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+            except Exception as exc:
+                logger.bind(
+                    domain="orchestra",
+                    branch=flow_branch,
+                    cwd=str(cwd),
+                    base_ref=base_ref,
+                ).warning(f"Failed to align auto scene: {exc}")
+                return False
+            if result.returncode != 0:
+                logger.bind(
+                    domain="orchestra",
+                    branch=flow_branch,
+                    cwd=str(cwd),
+                    base_ref=base_ref,
+                ).warning(
+                    "Failed to align auto scene to base ref: "
+                    f"{(result.stderr or result.stdout).strip()}"
+                )
+                return False
+
+        logger.bind(
+            domain="orchestra",
+            branch=flow_branch,
+            cwd=str(cwd),
+            base_ref=base_ref,
+        ).info("Aligned auto scene to configured base ref")
+        return True
 
     def normalize_manager_command(self, cmd: list[str], cwd: Path) -> list[str]:
         """Backwards-compatible manager command normalization."""

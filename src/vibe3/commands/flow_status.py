@@ -195,6 +195,10 @@ def show(
 
 def status(
     all_flows: AllOption = False,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+    ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
 ) -> None:
@@ -205,11 +209,11 @@ def status(
     with trace_scope(trace, "flow status", domain="flow"):
         from vibe3.services.check_service import CheckService
 
-        # Auto-mark merged flows before listing
-        try:
-            CheckService().verify_all_flows()
-        except Exception:
-            pass  # check failure should not block status display
+        if check:
+            try:
+                CheckService().verify_all_flows()
+            except Exception:
+                pass  # check failure should not block status display
 
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")

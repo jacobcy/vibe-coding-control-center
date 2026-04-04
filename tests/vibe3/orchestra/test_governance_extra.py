@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.orchestra.config import GovernanceConfig, OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.status_service import (
@@ -149,7 +150,71 @@ class TestGovernanceService:
 
         await service._run_governance()
         service._backend.run.assert_not_called()
+        service._backend.start_async.assert_not_called()
 
-        dry_run_files = sorted((tmp_path / "temp").glob("governance_dry_run_*.md"))
+        dry_run_files = sorted(
+            (tmp_path / "temp" / "logs" / "orchestra" / "governance" / "dry-run").glob(
+                "governance_dry_run_*.md"
+            )
+        )
         assert len(dry_run_files) == 1
         assert "# Orchestra Governance Scan" in dry_run_files[0].read_text()
+
+    @pytest.mark.asyncio
+    async def test_run_governance_dispatches_async_when_not_dry_run(self, tmp_path):
+        snapshot = OrchestraSnapshot(
+            timestamp=0.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            circuit_breaker_state="closed",
+            circuit_breaker_failures=0,
+        )
+        backend = MagicMock()
+        backend.start_async.return_value = AsyncExecutionHandle(
+            tmux_session="vibe3-governance-scan-20260404-140000-t1",
+            log_path=tmp_path / "temp" / "logs" / "vibe3-governance-scan-20260404-140000-t1.async.log",
+            prompt_file_path=tmp_path / "prompt.md",
+        )
+        service = GovernanceService(
+            config=OrchestraConfig(governance=GovernanceConfig(dry_run=False)),
+            status_service=MockStatusService(snapshot),
+            manager=_make_dispatcher(repo_path=tmp_path),
+            backend=backend,
+        )
+
+        await service._run_governance()
+
+        backend.start_async.assert_called_once()
+        backend.run.assert_not_called()
+        assert backend.start_async.call_args.kwargs["keep_alive_seconds"] == 10
+        assert backend.start_async.call_args.kwargs["execution_name"].startswith(
+            "vibe3-governance-scan-"
+        )
+
+    @pytest.mark.asyncio
+    async def test_on_tick_skips_when_existing_governance_session(
+        self, tmp_path, monkeypatch
+    ):
+        snapshot = OrchestraSnapshot(
+            timestamp=0.0,
+            server_running=True,
+            active_issues=(),
+            active_flows=0,
+            active_worktrees=0,
+            circuit_breaker_state="closed",
+            circuit_breaker_failures=0,
+        )
+        backend = MagicMock()
+        service = GovernanceService(
+            config=OrchestraConfig(governance=GovernanceConfig(interval_ticks=1, dry_run=False)),
+            status_service=MockStatusService(snapshot),
+            manager=_make_dispatcher(repo_path=tmp_path),
+            backend=backend,
+        )
+        monkeypatch.setattr(service, "_has_live_dispatch", lambda: True)
+
+        await service.on_tick()
+
+        backend.start_async.assert_not_called()

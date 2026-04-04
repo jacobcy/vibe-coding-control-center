@@ -104,8 +104,8 @@ gh issue view <issue-number> --comments
 gh issue view <issue-number> --json labels,state
 pwd
 git branch --show-current
-uv run python src/vibe3/cli.py handoff show
-uv run python src/vibe3/cli.py task status
+uv run python src/vibe3/cli.py handoff show <target-branch>
+uv run python src/vibe3/cli.py task show <target-branch> --comments
 ```
 
 不要：
@@ -115,6 +115,7 @@ uv run python src/vibe3/cli.py task status
 - 在当前阶段执行 `uv run python src/vibe3/cli.py flow show`
 - 在已有 target scene 上重复 `flow update`
 - 用关联 issue 是否 open 机械覆盖最新人类指示
+- 用全局 `task status` / server 可达性直接判定当前 `ready` issue 不健康
 
 ## Pseudo Functions
 
@@ -197,6 +198,9 @@ Hard rule:
 - 本轮结束前，必须出现以下二选一结果：
   - `state/claimed`
   - `state/blocked`
+- `state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene**
+  判断；全局 `task status`、server `stopped/unreachable`、或“当前没有 active issues”
+  这些全局信号本身都**不能单独构成 blocker**
 
 ### `handle_claimed()`
 

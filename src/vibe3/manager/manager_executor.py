@@ -155,14 +155,27 @@ class ManagerExecutor:
             self._mark_manager_start_failed(issue, "unable to resolve worktree")
             return False
 
+        if not self.worktree_manager.align_auto_scene_to_base(manager_cwd, flow_branch):
+            log.error("Unable to align auto scene to configured base ref")
+            self._mark_manager_start_failed(
+                issue,
+                (
+                    "unable to align auto scene to configured base ref "
+                    f"({self.config.scene_base_ref})"
+                ),
+            )
+            return False
+
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
+        launched = False
         try:
             cmd = [
                 "uv",
                 "run",
                 "python",
-                "src/vibe3/cli.py",
+                "-I",
+                str(self._resolve_cli_entry()),
                 "run",
                 "--manager-issue",
                 str(issue.number),
@@ -186,6 +199,7 @@ class ManagerExecutor:
                 f"Started manager async session: {handle.tmux_session} "
                 f"(log: {handle.log_path})"
             )
+            launched = True
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",
@@ -204,7 +218,11 @@ class ManagerExecutor:
             return True
         finally:
             if is_temporary and manager_cwd:
-                if self._should_recycle(issue.number):
+                if launched:
+                    log.info(
+                        f"Preserving newly dispatched manager worktree at {manager_cwd}"
+                    )
+                elif self._should_recycle(issue.number):
                     self.worktree_manager.recycle(manager_cwd)
                 else:
                     log.info(
@@ -251,6 +269,10 @@ class ManagerExecutor:
         if self.config.pr_review_dispatch.use_worktree:
             return self.repo_path
         return self._resolve_review_cwd(pr_number)
+
+    def _resolve_cli_entry(self) -> Path:
+        """Return the canonical CLI entry in the current baseline worktree."""
+        return (self.repo_path / "src" / "vibe3" / "cli.py").resolve()
 
     def _should_recycle(self, issue_number: int) -> bool:
         """Decide if we should recycle the worktree now."""

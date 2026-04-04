@@ -40,6 +40,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.services.label_service import LabelService
+from vibe3.utils.git_helpers import get_branch_handoff_dir
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -118,6 +119,110 @@ def _comment_and_fail_manager_issue(
     LabelService().confirm_issue_state(
         issue_number,
         IssueState.FAILED,
+        actor=actor,
+        force=True,
+    )
+
+
+def _extract_issue_state_label(issue_payload: dict[str, object]) -> str | None:
+    labels = issue_payload.get("labels")
+    if not isinstance(labels, list):
+        return None
+    for label in labels:
+        if not isinstance(label, dict):
+            continue
+        name = label.get("name")
+        if isinstance(name, str) and name.startswith("state/"):
+            return name
+    return None
+
+
+def _comment_count(issue_payload: dict[str, object]) -> int:
+    comments = issue_payload.get("comments")
+    return len(comments) if isinstance(comments, list) else 0
+
+
+def _handoff_signature(branch: str) -> tuple[bool, int, int] | None:
+    git_dir = GitClient().get_git_common_dir()
+    handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
+    if not handoff_path.exists():
+        return None
+    stat = handoff_path.stat()
+    return (True, int(stat.st_mtime_ns), int(stat.st_size))
+
+
+def _refs_signature(store: SQLiteClient, branch: str) -> tuple[object, ...]:
+    flow_state = store.get_flow_state(branch) or {}
+    return (
+        flow_state.get("spec_ref"),
+        flow_state.get("plan_ref"),
+        flow_state.get("report_ref"),
+        flow_state.get("audit_ref"),
+        flow_state.get("next_step"),
+        flow_state.get("blocked_by"),
+    )
+
+
+def _snapshot_manager_effects(
+    *,
+    issue_number: int,
+    branch: str,
+    store: SQLiteClient,
+    repo: str,
+) -> dict[str, object]:
+    issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
+    if not isinstance(issue_payload, dict):
+        issue_payload = {}
+    return {
+        "state_label": _extract_issue_state_label(issue_payload),
+        "comment_count": _comment_count(issue_payload),
+        "handoff": _handoff_signature(branch),
+        "refs": _refs_signature(store, branch),
+    }
+
+
+def _manager_made_effective_progress(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> bool:
+    return any(
+        before[key] != after[key]
+        for key in ("state_label", "comment_count", "handoff", "refs")
+    )
+
+
+def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -> bool:
+    comments = issue_payload.get("comments")
+    if not isinstance(comments, list):
+        return False
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        body = comment.get("body")
+        if isinstance(body, str) and reason in body:
+            return True
+    return False
+
+
+def _block_manager_noop_issue(
+    *,
+    issue_number: int,
+    repo: str,
+    reason: str,
+    actor: str,
+) -> None:
+    issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
+    if isinstance(issue_payload, dict) and not _has_matching_block_comment(
+        issue_payload, reason
+    ):
+        GitHubClient().add_comment(
+            issue_number,
+            "[manager] 无法推进，已切换为 state/blocked。\n\n" f"原因：{reason}",
+            repo=repo,
+        )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.BLOCKED,
         actor=actor,
         force=True,
     )
@@ -261,17 +366,29 @@ def _resolve_manager_agent_options(
     worktree: bool,
 ) -> AgentOptions:
     """Resolve agent options from orchestra assignee dispatch config."""
+    from vibe3.agents.backends.codeagent_config import (
+        resolve_effective_agent_options,
+        sync_models_json,
+    )
+
     ad = orchestra_config.assignee_dispatch
+    raw_options: AgentOptions
     if ad.agent:
-        return AgentOptions(
+        raw_options = AgentOptions(
             agent=ad.agent,
             backend=ad.backend,
             model=ad.model,
             worktree=worktree,
         )
-    return CodeagentExecutionService(runtime_config).resolve_agent_options(
-        "run", worktree=worktree
-    )
+    else:
+        raw_options = CodeagentExecutionService(runtime_config).resolve_agent_options(
+            "run", worktree=worktree
+        )
+
+    # Resolve preset mapping from config/models.json and sync to ~/.codeagent
+    effective = resolve_effective_agent_options(raw_options)
+    sync_models_json(effective)
+    return effective
 
 
 def _wait_for_async_session_id(
@@ -418,6 +535,12 @@ def _run_manager_issue_mode(
     backend = CodeagentBackend()
     rendered = render_manager_prompt(orchestra_config, issue)
     prompt = rendered.rendered_text
+    before_snapshot = _snapshot_manager_effects(
+        issue_number=issue_number,
+        branch=branch,
+        store=store,
+        repo=orchestra_config.repo,
+    )
     manager_task = (
         f"Manage issue #{issue_number}: {issue.title}\n"
         "Act as the manager state controller for this issue. "
@@ -522,6 +645,30 @@ def _run_manager_issue_mode(
         detail=f"Manager execution completed for issue #{issue_number}",
         refs={"issue": str(issue_number), "status": "completed"},
     )
+    after_snapshot = _snapshot_manager_effects(
+        issue_number=issue_number,
+        branch=branch,
+        store=store,
+        repo=orchestra_config.repo,
+    )
+    if not _manager_made_effective_progress(before_snapshot, after_snapshot):
+        reason = (
+            "manager 本轮未产生任何有效动作（无状态变化、无新 comment、"
+            "无 handoff/refs 更新）"
+        )
+        store.add_event(
+            branch,
+            "manager_noop_blocked",
+            actor,
+            detail=f"Manager auto-blocked issue #{issue_number}: {reason}",
+            refs={"issue": str(issue_number), "reason": reason},
+        )
+        _block_manager_noop_issue(
+            issue_number=issue_number,
+            repo=orchestra_config.repo,
+            reason=reason,
+            actor=actor,
+        )
 
 
 def run_command(

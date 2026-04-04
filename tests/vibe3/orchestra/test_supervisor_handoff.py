@@ -111,6 +111,29 @@ def test_process_issue_uses_configured_apply_supervisor(
     svc._render_supervisor_prompt.assert_called_once_with("supervisor/apply.md")
 
 
+def test_has_live_dispatch_matches_exact_and_suffix_sessions(
+    service: tuple[SupervisorHandoffService, MagicMock, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, _github, _backend = service
+
+    class _Result:
+        returncode = 0
+        stdout = (
+            "vibe3-supervisor-issue-428: 1 windows (created)\n"
+            "vibe3-supervisor-issue-101-2: 1 windows (created)\n"
+        )
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.supervisor_handoff.subprocess.run",
+        lambda *args, **kwargs: _Result(),
+    )
+
+    assert svc._has_live_dispatch(428) is True
+    assert svc._has_live_dispatch(101) is True
+    assert svc._has_live_dispatch(999) is False
+
+
 @pytest.mark.asyncio
 async def test_on_tick_does_not_redispatch_same_open_handoff_issue(
     service: tuple[SupervisorHandoffService, MagicMock, MagicMock],
@@ -129,3 +152,24 @@ async def test_on_tick_does_not_redispatch_same_open_handoff_issue(
     await svc.on_tick()
 
     backend.start_async.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_skips_issue_with_existing_tmux_session(
+    service: tuple[SupervisorHandoffService, MagicMock, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, github, backend = service
+    github.list_issues.return_value = [
+        {
+            "number": 428,
+            "title": "cleanup: stale flows",
+            "labels": [{"name": "supervisor"}, {"name": "state/handoff"}],
+        }
+    ]
+    svc._render_supervisor_prompt = MagicMock(return_value="# plan")  # type: ignore[method-assign]
+    monkeypatch.setattr(svc, "_has_live_dispatch", lambda issue_number: issue_number == 428)
+
+    await svc.on_tick()
+
+    backend.start_async.assert_not_called()

@@ -139,28 +139,35 @@ class TestManagerReviewWorktreeResolution:
                     "_resolve_manager_cwd",
                     return_value=(Path("/tmp/repo/.worktrees/issue-102"), False),
                 ):
-                    with patch.object(manager.result_handler, "update_state_label"):
-                        with patch.object(
-                            manager.flow_manager.store,
-                            "add_event",
-                        ) as mock_add_event:
+                    with patch.object(
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
+                        with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
-                                manager._backend,
-                                "start_async_command",
-                                return_value=SimpleNamespace(
-                                    tmux_session="vibe3-manager-102",
-                                    log_path=Path(
-                                        "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                manager.flow_manager.store,
+                                "add_event",
+                            ) as mock_add_event:
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    return_value=SimpleNamespace(
+                                        tmux_session="vibe3-manager-102",
+                                        log_path=Path(
+                                            "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                        ),
                                     ),
-                                ),
-                            ) as mock_start:
-                                result = manager.dispatch_manager(issue)
+                                ) as mock_start:
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_start.assert_called_once()
         call = mock_start.call_args
         cmd = call.args[0]
-        assert cmd[:5] == ["uv", "run", "python", "src/vibe3/cli.py", "run"]
+        assert cmd[:4] == ["uv", "run", "python", "-I"]
+        assert cmd[4] == str(Path("/tmp/repo/src/vibe3/cli.py").resolve())
+        assert cmd[5] == "run"
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
@@ -187,22 +194,27 @@ class TestManagerReviewWorktreeResolution:
                     return_value=(Path("/tmp/repo/.worktrees/issue-103"), False),
                 ):
                     with patch.object(
-                        manager.result_handler, "update_state_label"
-                    ) as mock_update:
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
                         with patch.object(
-                            manager.result_handler, "on_dispatch_success"
-                        ):
+                            manager.result_handler, "update_state_label"
+                        ) as mock_update:
                             with patch.object(
-                                manager._backend,
-                                "start_async_command",
-                                return_value=SimpleNamespace(
-                                    tmux_session="vibe3-manager-103",
-                                    log_path=Path(
-                                        "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
-                                    ),
-                                ),
+                                manager.result_handler, "on_dispatch_success"
                             ):
-                                result = manager.dispatch_manager(issue)
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    return_value=SimpleNamespace(
+                                        tmux_session="vibe3-manager-103",
+                                        log_path=Path(
+                                            "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
+                                        ),
+                                    ),
+                                ):
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_update.assert_not_called()
@@ -226,21 +238,67 @@ class TestManagerReviewWorktreeResolution:
                     return_value=(Path("/tmp/repo/.worktrees/issue-104"), False),
                 ):
                     with patch.object(
-                        manager.result_handler, "update_state_label"
-                    ) as mock_update:
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
                         with patch.object(
-                            manager.result_handler, "post_failure_comment"
-                        ) as mock_comment:
+                            manager.result_handler, "update_state_label"
+                        ) as mock_update:
                             with patch.object(
-                                manager._backend,
-                                "start_async_command",
-                                side_effect=RuntimeError("tmux unavailable"),
-                            ):
-                                result = manager.dispatch_manager(issue)
+                                manager.result_handler, "post_failure_comment"
+                            ) as mock_comment:
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    side_effect=RuntimeError("tmux unavailable"),
+                                ):
+                                    result = manager.dispatch_manager(issue)
 
         assert result is False
         assert mock_update.call_args_list[-1].args == (issue.number, IssueState.FAILED)
         mock_comment.assert_called_once()
+
+    def test_dispatch_manager_preserves_temporary_worktree_after_async_launch(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=105, title="Preserve launched worktree")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-105"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-105"), True),
+                ):
+                    with patch.object(
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
+                        with patch.object(
+                            manager.worktree_manager, "recycle"
+                        ) as mock_recycle:
+                            with patch.object(
+                                manager._backend,
+                                "start_async_command",
+                                return_value=SimpleNamespace(
+                                    tmux_session="vibe3-manager-105",
+                                    log_path=Path(
+                                        "/tmp/repo/temp/logs/vibe3-manager-105.async.log"
+                                    ),
+                                ),
+                            ):
+                                result = manager.dispatch_manager(issue)
+
+        assert result is True
+        mock_recycle.assert_not_called()
 
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()

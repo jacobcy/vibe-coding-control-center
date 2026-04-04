@@ -278,3 +278,88 @@ class TestRunSupervisorOption:
             actor="agent:manager",
             force=True,
         )
+
+    def test_manager_issue_sync_noop_auto_blocks(self, monkeypatch) -> None:
+        orchestra_config = run_module.OrchestraConfig(
+            repo="owner/repo",
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+        )
+        monkeypatch.setattr(
+            run_module.OrchestraConfig,
+            "from_settings",
+            classmethod(lambda cls: orchestra_config),
+        )
+        monkeypatch.setattr(
+            run_module.VibeConfig,
+            "get_defaults",
+            classmethod(lambda cls: MagicMock()),
+        )
+        sqlite = MagicMock()
+        monkeypatch.setattr(run_module, "SQLiteClient", lambda: sqlite)
+        monkeypatch.setattr(
+            run_module, "load_session_id", lambda role, branch=None: "ses_manager"
+        )
+        monkeypatch.setattr(
+            run_module, "_resolve_manager_branch", lambda **kwargs: "task/issue-278"
+        )
+        monkeypatch.setattr(
+            run_module,
+            "_resolve_manager_execution_cwd",
+            lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
+        )
+        monkeypatch.setattr(
+            run_module,
+            "_resolve_manager_agent_options",
+            lambda **kwargs: MagicMock(),
+        )
+        monkeypatch.setattr(
+            run_module,
+            "render_manager_prompt",
+            lambda config, issue: MagicMock(rendered_text="manager prompt"),
+        )
+        monkeypatch.setattr(
+            run_module.GitClient,
+            "get_current_branch",
+            staticmethod(lambda: "dev/post-437-debug"),
+        )
+        monkeypatch.setattr(
+            run_module,
+            "_snapshot_manager_effects",
+            lambda **kwargs: {
+                "state_label": "state/ready",
+                "comment_count": 1,
+                "handoff": None,
+                "refs": (None, None, None, None, None, None),
+            },
+        )
+        block_noop = MagicMock()
+        monkeypatch.setattr(run_module, "_block_manager_noop_issue", block_noop)
+
+        github = MagicMock()
+        github.view_issue.return_value = {
+            "number": 278,
+            "title": "test manager issue",
+            "labels": [{"name": "state/ready"}],
+            "assignees": [],
+        }
+        monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
+
+        backend = MagicMock()
+        backend.run.return_value = MagicMock(
+            is_success=lambda: True,
+            stderr="",
+            session_id="ses_manager",
+        )
+        monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "278", "--sync"],
+        )
+
+        assert result.exit_code == 0
+        block_noop.assert_called_once()
+        assert any(
+            call.args[1] == "manager_noop_blocked"
+            for call in sqlite.add_event.call_args_list
+        )

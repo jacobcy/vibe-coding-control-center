@@ -12,7 +12,10 @@ def test_default_config():
     config = OrchestraConfig()
 
     assert config.enabled is True
-    assert config.polling_interval == 30
+    assert config.polling_interval == 900
+    assert config.debug_polling_interval == 60
+    assert config.debug is False
+    assert config.scene_base_ref == "origin/main"
     assert config.dry_run is False
     assert config.polling.enabled is True
     assert config.governance.enabled is True
@@ -90,6 +93,8 @@ def test_from_settings_loads_yaml_config():
                     "orchestra": {
                         "enabled": True,
                         "polling_interval": 120,
+                        "debug_polling_interval": 45,
+                        "scene_base_ref": "feature/debug-base",
                         "max_concurrent_flows": 5,
                         "master_agent": {
                             "enabled": True,
@@ -145,6 +150,8 @@ def test_from_settings_loads_yaml_config():
         try:
             config = OrchestraConfig.from_settings()
             assert config.polling_interval == 120
+            assert config.debug_polling_interval == 45
+            assert config.scene_base_ref == "feature/debug-base"
             assert config.max_concurrent_flows == 5
             assert config.master_agent.agent == "test-controller"
             assert config.master_agent.timeout_seconds == 600

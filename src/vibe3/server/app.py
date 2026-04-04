@@ -16,6 +16,7 @@ from loguru import logger
 
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
@@ -24,6 +25,7 @@ from vibe3.server.registry import (
     _start_async_serve,
     _validate_pid_file,
 )
+from vibe3.clients.git_client import GitClient
 
 app = typer.Typer(
     help="Orchestra server: GitHub webhook receiver + heartbeat polling",
@@ -176,6 +178,13 @@ def start(
         bool,
         typer.Option("--dry-run", help="Log actions without executing"),
     ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Debug mode: use current branch as auto scene base and 60s heartbeat by default",
+        ),
+    ] = False,
     async_mode: Annotated[
         bool,
         typer.Option("--async", help="Run in tmux background session"),
@@ -207,6 +216,12 @@ def start(
         raise typer.Exit(1)
 
     overrides: dict[str, object] = {}
+    if debug:
+        current_branch = GitClient().get_current_branch()
+        overrides["debug"] = True
+        overrides["scene_base_ref"] = current_branch
+        if interval is None:
+            overrides["polling_interval"] = config.debug_polling_interval
     if interval is not None:
         overrides["polling_interval"] = interval
     if port is not None:
@@ -248,12 +263,16 @@ def start(
     typer.echo(
         f"Starting Orchestra server on port {config.port} "
         f"(tick interval: {config.polling_interval}s, "
-        f"max_concurrent: {config.max_concurrent_flows})"
+        f"max_concurrent: {config.max_concurrent_flows}, "
+        f"scene_base: {config.scene_base_ref})"
     )
+    typer.echo(f"Main log: {orchestra_events_log_path()}")
+    typer.echo(f"Log dir: {orchestra_log_dir()}")
     typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
     try:
+        os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")

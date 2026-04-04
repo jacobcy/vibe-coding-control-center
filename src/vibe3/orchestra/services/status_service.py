@@ -240,11 +240,7 @@ class OrchestraStatusService:
 
     def get_active_flow_count(self) -> int:
         try:
-            from vibe3.clients import SQLiteClient
-
-            store = SQLiteClient()
-            count = store.get_active_flow_count()
-            return count
+            return self._orchestrator.get_active_flow_count()
         except Exception as exc:
             logger.bind(domain="orchestra").warning(
                 f"Failed to count active flows: {exc}"

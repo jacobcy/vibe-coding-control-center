@@ -158,6 +158,9 @@ def status(
         bool,
         typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）"),
     ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="显示前先运行 flow 一致性校验")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
@@ -166,6 +169,7 @@ def status(
 
     status_command.status(
         all_flows=all_flows,
+        check=check,
         json_output=json_output,
         trace=trace,
     )

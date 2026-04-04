@@ -1,6 +1,10 @@
 # Orchestra 模块
 
-`vibe3 serve` 的核心：基于 GitHub assignee 信号驱动 manager agent 执行任务，以 labels 为纯展示态。
+`vibe3 serve` 的核心是一个长期运行的 driver / 调度器。
+
+统一 runtime 语义以
+[docs/standards/vibe3-orchestra-runtime-standard.md](/Users/jacobcy/src/vibe-center/main/.worktrees/wt-openai-review/docs/standards/vibe3-orchestra-runtime-standard.md)
+为准。
 
 ## 架构
 
@@ -23,31 +27,42 @@ vibe3 serve start --port 8080
 
 ## 触发机制
 
-**主信号：GitHub Assignee**
+当前应按两层理解：
 
-1. 将 issue 指派给 `vibe-manager`（或 `config.manager_usernames` 中的账号）
-2. Orchestra 检测到 `issues/assigned` 事件
-3. 检查依赖：解析 issue body 中的 `blocked by #N` / `depends on #N`
-4. 依赖全部 closed → dispatch manager（受 Semaphore 限制）
-5. Manager 执行完后更新 `state/in-progress` label（仅展示用）
+### 1. Governance / Supervisor 决定 ready
 
-**Labels 职责**：
+以下角色负责把 issue 推进到 `state/ready`：
 
-- `state/claimed` 触发 plan
-- `state/in-progress` 触发 run
-- `state/review` 触发 review
-- `state/blocked` 表示 manager 判断当前无法推进
-- `state/failed` 表示执行器报错，并暂停新的自动任务进入
+- governance
+- supervisor / triage agent
+- 人工治理
+
+### 2. State Trigger 消费已有状态
+
+driver 在 heartbeat tick 中消费已有 `state/*`：
+
+- `state/ready` -> manager
+- `state/claimed` -> plan
+- `state/in-progress` -> run
+- `state/review` -> review
+
+补充：
+
+- `state/blocked` 表示 manager 业务上无法推进
+- `state/failed` 表示执行器/运行时报错，并暂停新的自动任务进入
 
 ## 内置 Service
 
 | Service | event_types | 功能 |
 |---------|-------------|------|
-| `AssigneeDispatchService` | `issues` | assignee 变化 → 检查依赖 → dispatch manager |
+| `AssigneeDispatchService` | `issues` | assignee 变化的兼容入口 |
 | `CommentReplyService` | `issue_comment` | `@vibe-manager` 提及 → 自动 ACK 回复 |
+| `StateLabelDispatchService(manager)` | heartbeat tick | `state/ready` -> manager |
 | `StateLabelDispatchService(plan)` | heartbeat tick | `state/claimed` → plan |
 | `StateLabelDispatchService(run)` | heartbeat tick | `state/in-progress` → run |
 | `StateLabelDispatchService(review)` | heartbeat tick | `state/review` → review |
+| `GovernanceService` | heartbeat tick | 周期性治理扫描；可决定 ready 候选 |
+| `SupervisorHandoffService` | heartbeat tick | 消费治理 handoff issue |
 
 ## 注册自定义 Service
 
@@ -91,7 +106,8 @@ tmux new -d -s orchestra 'vibe3 serve start --port 8080'
 ```yaml
 orchestra:
   enabled: true
-  polling_interval: 30         # 心跳间隔（秒），调试默认 30
+  polling_interval: 900        # 正常模式默认 15 分钟
+  debug_polling_interval: 60   # debug 模式默认 1 分钟
   port: 8080
   repo: owner/repo             # 留空则用当前 repo
   max_concurrent_flows: 3
