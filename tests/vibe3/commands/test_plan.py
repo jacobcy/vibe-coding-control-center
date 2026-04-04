@@ -10,7 +10,6 @@ from typer.testing import CliRunner
 from vibe3.agents.plan_agent import PlanSpecInput, PlanTaskInput
 from vibe3.cli import app as cli_app
 from vibe3.commands.plan import app as plan_app
-from vibe3.models.orchestration import IssueState
 from vibe3.models.plan import PlanRequest, PlanScope
 
 runner = CliRunner(env={"NO_COLOR": "1"})
@@ -201,7 +200,7 @@ def test_plan_issue_includes_issue_and_spec_context(
         "body": "Spec body",
     }
 
-    with patch("vibe3.commands.plan.GitHubClient", return_value=issue_client):
+    with patch("vibe3.agents.plan_agent.GitHubClient", return_value=issue_client):
         mock_execute.return_value = MagicMock(success=True)
         result = runner.invoke(plan_app, ["--issue", "42"])
 
@@ -223,14 +222,13 @@ def test_plan_task_alias_still_works(monkeypatch) -> None:
 
 def test_plan_success_transitions_issue_to_handoff(monkeypatch) -> None:
     _patch_fast_plan_runtime(monkeypatch)
-    with patch("vibe3.commands.plan.LabelService") as mock_labels:
-        mock_labels.return_value.confirm_issue_state.return_value = "advanced"
+    with patch("vibe3.commands.plan._svc_confirm_handoff") as mock_handoff:
+        mock_handoff.return_value = "advanced"
         result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
 
     assert result.exit_code == 0
-    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
-        42,
-        IssueState.HANDOFF,
+    mock_handoff.assert_called_once_with(
+        issue_number=42,
         actor="agent:plan",
     )
 
@@ -246,19 +244,14 @@ def test_plan_failure_fails_issue_and_comments(monkeypatch) -> None:
         _failed_execute,
     )
 
-    with (
-        patch("vibe3.commands.plan.GitHubClient") as mock_github,
-        patch("vibe3.commands.plan.LabelService") as mock_labels,
-    ):
+    with patch("vibe3.commands.plan._svc_fail_planner") as mock_fail:
         result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
 
     assert result.exit_code != 0
-    mock_github.return_value.add_comment.assert_called_once()
-    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
-        42,
-        IssueState.FAILED,
+    mock_fail.assert_called_once_with(
+        issue_number=42,
+        reason="planner failed",
         actor="agent:plan",
-        force=True,
     )
     assert "state/failed" in result.stderr
 
