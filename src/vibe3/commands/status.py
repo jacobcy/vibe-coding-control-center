@@ -5,13 +5,17 @@ from typing import Annotated, cast
 
 import typer
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.commands.common import trace_scope
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.server.registry import _validate_pid_file
 from vibe3.services.flow_service import FlowService, FlowStatusResponse
+from vibe3.services.status_query_service import (
+    StatusQueryService,
+    is_auto_task_branch,
+    is_canonical_task_branch,
+)
 from vibe3.ui.console import console
 
 AllOption = Annotated[
@@ -19,47 +23,6 @@ AllOption = Annotated[
 ]
 JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
-
-
-def _state_from_labels(raw_labels: object) -> IssueState | None:
-    if not isinstance(raw_labels, list):
-        return None
-    for item in raw_labels:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        if not isinstance(name, str):
-            continue
-        parsed = IssueState.from_label(name)
-        if parsed is not None:
-            return parsed
-    return None
-
-
-def _is_auto_task_branch(branch: str) -> bool:
-    return branch.startswith("task/issue-")
-
-
-def _is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
-    return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
-
-
-def _issue_priority(state: IssueState) -> tuple[int, str]:
-    """Sort orchestration issues by operational urgency."""
-    if state in {
-        IssueState.IN_PROGRESS,
-        IssueState.REVIEW,
-        IssueState.HANDOFF,
-        IssueState.CLAIMED,
-    }:
-        return (0, state.value)
-    if state == IssueState.READY:
-        return (1, state.value)
-    if state == IssueState.BLOCKED:
-        return (2, state.value)
-    if state == IssueState.FAILED:
-        return (3, state.value)
-    return (4, state.value)
 
 
 def _resolve_server_label(
@@ -144,42 +107,9 @@ def status(
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
 
-        issue_to_flow = {f.task_issue_number: f for f in flows if f.task_issue_number}
         queued_set = set(orch_snapshot.queued_issues)
-        github = GitHubClient()
-
-        orchestrated_issues: list[dict[str, object]] = []
-        try:
-            raw_issues = github.list_issues(limit=100, state="open", assignee=None)
-        except Exception:
-            raw_issues = []
-
-        for item in raw_issues:
-            number = item.get("number")
-            if not isinstance(number, int):
-                continue
-            state = _state_from_labels(item.get("labels"))
-            if state is None:
-                continue
-            if state == IssueState.DONE:
-                continue
-            flow = issue_to_flow.get(number)
-            orchestrated_issues.append(
-                {
-                    "number": number,
-                    "title": str(item.get("title") or ""),
-                    "state": state,
-                    "flow": flow,
-                    "queued": number in queued_set,
-                }
-            )
-
-        orchestrated_issues.sort(
-            key=lambda item: (
-                *_issue_priority(cast(IssueState, item["state"])),
-                cast(int, item["number"]),
-            )
-        )
+        query_service = StatusQueryService()
+        orchestrated_issues = query_service.fetch_orchestrated_issues(flows, queued_set)
 
         console.print("[bold cyan]Issue Progress:[/]")
 
@@ -266,39 +196,23 @@ def status(
             console.print("  [dim](none)[/]")
 
         # 3. Local scene context (tracked flows + worktrees)
-        worktree_map: dict[str, str] = {}
-        try:
-            from vibe3.clients.git_client import GitClient
-
-            git = GitClient()
-            worktree_output = git._run(["worktree", "list", "--porcelain"])
-            current_worktree = ""
-            for line in worktree_output.splitlines():
-                line = line.strip()
-                if line.startswith("worktree "):
-                    current_worktree = line.split(" ", 1)[1]
-                elif line.startswith("branch ") and current_worktree:
-                    branch_ref = line.split(" ", 1)[1]
-                    branch = branch_ref.removeprefix("refs/heads/")
-                    worktree_map[branch] = current_worktree.split("/")[-1]
-        except Exception:
-            pass
+        worktree_map = query_service.fetch_worktree_map()
 
         if flows:
             auto_flows = [
                 flow
                 for flow in flows
-                if _is_auto_task_branch(flow.branch) and flow.branch in worktree_map
+                if is_auto_task_branch(flow.branch) and flow.branch in worktree_map
             ]
             manual_flows = [
-                flow for flow in flows if not _is_auto_task_branch(flow.branch)
+                flow for flow in flows if not is_auto_task_branch(flow.branch)
             ]
 
             console.print("\n[bold cyan]Auto Task Scenes:[/]")
             if auto_flows:
                 for flow in auto_flows:
                     wt = worktree_map.get(flow.branch, "(no worktree)")
-                    if _is_canonical_task_branch(flow.branch, flow.task_issue_number):
+                    if is_canonical_task_branch(flow.branch, flow.task_issue_number):
                         console.print(f"  [cyan]{flow.branch:30}[/] [dim]wt:[/] {wt}")
                     else:
                         task = (
