@@ -7,7 +7,6 @@ from typing import Annotated, Any, Iterator
 
 import typer
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -131,7 +130,8 @@ def show(
         render_task_show_with_milestone(task_result, milestone_ctx, json_output)
 
         if comments and issue_number:
-            issue = GitHubClient().view_issue(issue_number)
+            task_svc = TaskService()
+            issue = task_svc.fetch_issue_with_comments(issue_number)
             if issue == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
             elif issue is None:
