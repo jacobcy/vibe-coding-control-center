@@ -31,9 +31,6 @@ app = typer.Typer(
 )
 
 
-# --- Webhook Handler Logic ---
-
-
 def _verify_signature(body: bytes, secret: str, header: str) -> bool:
     """Return True if the HMAC-SHA256 signature matches."""
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -198,26 +195,9 @@ def start(
         typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
     ] = 0,
 ) -> None:
-    """Start Orchestra server (HTTP webhook receiver + heartbeat polling).
+    """Start Orchestra server (webhook receiver + heartbeat polling).
 
-    Listens for GitHub webhook events on POST /webhook/github and
-    dispatches manager agents based on issue assignee changes.
-
-    Polling fallback runs every --interval seconds to catch any events
-    missed by the webhook (e.g. during downtime).
-
-    By default, port/repo come from config/settings.yaml:
-    - orchestra.port
-    - orchestra.repo (if unset, gh resolves current repository by working directory)
-
-    Configure GitHub to send webhook events to:
-        http://<your-server>:<port>/webhook/github
-
-    Examples:
-        vibe3 serve start
-        vibe3 serve start --port 9000 --interval 900
-        vibe3 serve start --repo owner/repo --dry-run
-        vibe3 serve start --async --ts
+    Defaults from config/settings.yaml; repo defaults to current repository.
     """
     setup_logging(verbose=verbose)
 
@@ -301,10 +281,7 @@ def status() -> None:
 
 @app.command()
 def stop() -> None:
-    """Stop Orchestra server.
-
-    Sends SIGTERM to the server process. Use 'vibe3 serve status' to verify.
-    """
+    """Stop Orchestra server via SIGTERM."""
     config = OrchestraConfig.from_settings()
     pid_file = config.pid_file
     pid, is_valid = _validate_pid_file(pid_file)

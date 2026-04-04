@@ -22,11 +22,7 @@ if TYPE_CHECKING:
 
 
 class ManagerExecutor:
-    """Unified manager for execution context.
-
-    Handles flow creation, worktree preparation, agent launch,
-    result handling, and recycling.
-    """
+    """Unified manager for execution context (flow, worktree, agent, results)."""
 
     def __init__(
         self,
@@ -41,7 +37,6 @@ class ManagerExecutor:
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
 
-        # Core Components
         self._flow_manager = FlowManager(config)
         self.worktree_manager = WorktreeManager(
             config, self.repo_path, self._flow_manager
@@ -53,7 +48,6 @@ class ManagerExecutor:
         )
         self._backend = CodeagentBackend()
 
-        # Execution protection
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
             self._circuit_breaker = CircuitBreaker(
@@ -67,7 +61,6 @@ class ManagerExecutor:
 
     @property
     def flow_manager(self) -> Any:
-        """Core flow management component."""
         return self._flow_manager
 
     @flow_manager.setter
@@ -76,10 +69,7 @@ class ManagerExecutor:
 
     @property
     def orchestrator(self) -> Any:
-        """Shim for backward compatibility with older Dispatcher interface.
-
-        TODO: Remove after all call-sites migrate to flow_manager.
-        """
+        """Backward compatibility shim for Dispatcher interface."""
         return self._flow_manager
 
     @orchestrator.setter
@@ -88,12 +78,10 @@ class ManagerExecutor:
 
     @property
     def queued_issues(self) -> set[int]:
-        """Issues waiting for capacity."""
         return self._queued_issues
 
     @property
     def last_manager_render_result(self) -> "PromptRenderResult | None":
-        """Proxy for CommandBuilder.last_manager_render_result."""
         return self.command_builder.last_manager_render_result
 
     def can_dispatch(self) -> bool:
@@ -148,7 +136,6 @@ class ManagerExecutor:
             log.info(f"Dry run: skipping flow/worktree/execution. Cmd: {' '.join(cmd)}")
             return True
 
-        # 1. Flow creation
         try:
             flow = self._flow_manager.create_flow_for_issue(issue)
             flow_branch = str(flow.get("branch") or "").strip()
@@ -161,8 +148,7 @@ class ManagerExecutor:
             self._mark_manager_start_failed(issue, f"flow creation failed: {e}")
             return False
 
-        # 2. Worktree preparation
-        # Use private method so subclasses can override for mock compatibility
+        # Worktree preparation
         manager_cwd, is_temporary = self._resolve_manager_cwd(issue.number, flow_branch)
         if not manager_cwd:
             log.error("Unable to resolve worktree")
@@ -172,7 +158,6 @@ class ManagerExecutor:
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
         try:
-            # 3. Command execution
             cmd = [
                 "uv",
                 "run",
@@ -215,15 +200,9 @@ class ManagerExecutor:
                     "issue": str(issue.number),
                 },
             )
-            # Async dispatch: only record launch here.
-            # The child process records its own manager_started/completed/aborted
-            # lifecycle events via pipeline.py, and run.py:_run_manager_issue_mode
-            # handles final result handling.  Calling on_dispatch_success here
-            # would prematurely mark the dispatch as successful before the child
-            # has even started its work.
+            # Only record launch; child records its own lifecycle events
             return True
         finally:
-            # 6. Maybe recycle
             if is_temporary and manager_cwd:
                 if self._should_recycle(issue.number):
                     self.worktree_manager.recycle(manager_cwd)
@@ -257,8 +236,6 @@ class ManagerExecutor:
 
         cmd = self.command_builder.build_pr_review_command(pr_number)
 
-        # Resolve CWD
-        # Use private method so subclasses can override
         review_cwd = self._resolve_review_cwd_for_dispatch(pr_number)
 
         log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")

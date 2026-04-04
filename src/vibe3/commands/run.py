@@ -93,7 +93,6 @@ def _comment_and_fail_issue(
     reason: str,
     actor: str,
 ) -> None:
-    """Record executor failure and move the issue into failed."""
     GitHubClient().add_comment(
         issue_number,
         f"[run] 执行报错，已切换为 state/failed。\n\n原因：{reason}",
@@ -112,7 +111,6 @@ def _comment_and_fail_manager_issue(
     reason: str,
     actor: str = "agent:manager",
 ) -> None:
-    """Record manager execution failure and move the issue into failed."""
     GitHubClient().add_comment(
         issue_number,
         f"[manager] 管理执行报错，已切换为 state/failed。\n\n原因：{reason}",
@@ -126,7 +124,6 @@ def _comment_and_fail_manager_issue(
 
 
 def _ensure_plan_file_exists(plan_file: str | None) -> None:
-    """Fail fast when plan file is missing to avoid noisy run lifecycle writes."""
     if not plan_file:
         return
     if Path(plan_file).exists():
@@ -219,17 +216,13 @@ def _build_supervisor_task(
 
 
 def _resolve_issue_supervisor_file() -> str:
-    """Resolve the configured supervisor file for governance issue execution."""
     return OrchestraConfig.from_settings().supervisor_handoff.supervisor_file
 
 
 def _resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:
-    """Resolve launch cwd for manager execution.
+    """On first --worktree run, launch from main repo root.
 
-    On the first manager run with ``--worktree``, launch from the main repo root
-    so wrapper-created worktrees land under the shared repository `.worktrees/`
-    instead of nesting under the current human worktree. Once a session exists,
-    keep using the current cwd and let resume semantics control the scene.
+    So wrapper worktrees land under shared .worktrees/.
     """
     if not use_worktree or session_id:
         return Path.cwd()
@@ -243,12 +236,7 @@ def _resolve_manager_branch(
     issue_number: int,
     current_branch: str,
 ) -> str:
-    """Resolve the branch whose manager session/state should be used.
-
-    Prefer the target issue's own task flow when one exists. When no task flow
-    exists yet, use the canonical target task branch instead of the current
-    human branch to avoid cross-issue session reuse.
-    """
+    """Prefer target issue's task flow branch; fall back to canonical task branch."""
     flows = store.get_flows_by_issue(issue_number, role="task")
     if not isinstance(flows, list) or not flows:
         return f"task/issue-{issue_number}"
@@ -276,11 +264,7 @@ def _resolve_manager_agent_options(
     runtime_config: VibeConfig,
     worktree: bool,
 ) -> AgentOptions:
-    """Resolve manager agent options from orchestra assignee dispatch config.
-
-    Manager is a scene owner role and should not silently inherit the generic
-    run agent preset when a manager-specific default is configured.
-    """
+    """Resolve agent options from orchestra assignee dispatch config."""
     ad = orchestra_config.assignee_dispatch
     if ad.agent:
         return AgentOptions(
@@ -297,12 +281,7 @@ def _resolve_manager_agent_options(
 def _wait_for_async_session_id(
     log_path: Path, *, timeout_seconds: float = 3.0
 ) -> str | None:
-    """Best-effort poll of async output for a session id.
-
-    The repo-local async log only contains the wrapper header and the path to the
-    wrapper's own temp log. The real `sessionID` event typically appears later in
-    that wrapper log, so we poll both sources.
-    """
+    """Best-effort poll async output and wrapper log for session id."""
     wrapper_log_path: Path | None = None
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -344,16 +323,7 @@ def _resolve_manager_execution_cwd(
     use_worktree: bool,
     session_id: str | None,
 ) -> tuple[Path, bool]:
-    """Resolve the cwd where manager should execute.
-
-    Priority:
-    1. If a manager session already exists, reuse the current scene and never
-       request a new wrapper worktree.
-    2. If the target issue already has a stable worktree/scene, execute inside
-       that cwd and do not pass ``--worktree`` again.
-    3. Only when no reusable scene exists and caller explicitly requested
-       ``--worktree`` do we fall back to wrapper-created worktree mode.
-    """
+    """Resolve cwd: reuse existing scene if available, otherwise wrapper worktree."""
     if session_id:
         return (
             _resolve_manager_launch_cwd(
@@ -397,11 +367,7 @@ def _run_manager_issue_mode(
     worktree: bool,
     fresh_session: bool = False,
 ) -> None:
-    """Internal manager execution entrypoint.
-
-    Runs inside the target manager worktree and persists `manager_session_id`
-    on the current flow branch.
-    """
+    """Internal manager execution entrypoint."""
     orchestra_config = OrchestraConfig.from_settings()
     issue_payload = GitHubClient().view_issue(issue_number, repo=orchestra_config.repo)
     if not isinstance(issue_payload, dict):
