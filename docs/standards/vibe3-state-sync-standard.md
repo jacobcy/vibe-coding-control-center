@@ -213,23 +213,32 @@ handoff 不代替 issue comment。
 4. plan agent 启动
 5. plan 完成并写 handoff
 6. `state/handoff`
-7. manager 读取 refs 后决定是否进入 `state/in-progress`
+7. **manager 自动恢复**，读取 refs 后决定是否进入 `state/in-progress`
 8. `state/in-progress`
 9. run agent 启动
 10. run 完成并写 handoff
 11. `state/handoff`
-12. manager 读取 refs 后决定是否进入 `state/review`
+12. **manager 自动恢复**，读取 refs 后决定是否进入 `state/review`
 13. `state/review`
 14. review agent 启动
 15. review 完成并写 handoff
 16. `state/handoff`
-17. manager 最终判断
+17. **manager 自动恢复**，最终判断
 18. `state/merge-ready`
+
+**Manager Handoff Resume**：
+
+当 issue 处于 `state/handoff` 时，manager 会自动恢复执行（无需人工干预）。这个 resume 路径确保：
+
+- Manager 始终是状态决策者
+- 每次阶段完成后，manager 都有机会判断下一步
+- Issue 不会卡在 `state/handoff` 等待人工触发
 
 关键规则：
 
 - agent 执行结束后，只写 handoff，不直接推进到下一状态
 - 下一状态统一由 manager 决定
+- manager 在 `state/handoff` 自动恢复（自动触发）
 - manager 无法推进时使用 `state/blocked`
 - `plan / run / review` 执行报错时使用 `state/failed`
 
@@ -277,8 +286,31 @@ plan agent 完成后：
 
 - 写 handoff
 - 将 issue 调整为 `state/handoff`
+- **Manager 自动恢复**，读取 refs 并决定下一步
 
-### 6.3 blocked 判断
+### 6.3 `handoff` 触发 manager 自动恢复
+
+当 issue 进入 `state/handoff` 时，orchestra 会自动触发 manager resume：
+
+**触发条件**：
+- Issue 有 canonical task flow（`task/issue-*` 分支）
+- Flow state 有有效 refs（如 `plan_ref`）
+- 没有活动的 manager session
+
+**去重机制**：
+- 如果已有 live manager session，不会重复 dispatch
+- 如果 session 结束且无进展，会 auto-block
+
+**Progress Detection**：
+Manager 在判断是否有进展时，观察以下维度：
+- `state/*` label 变化
+- 新的 issue comment
+- 新的 handoff 文件
+- Flow refs 更新
+
+Async runtime 和 sync CLI 执行使用相同的 progress 判断标准。
+
+### 6.4 blocked 判断
 
 **当前 manager mainline**:
 - manager 是 flow owner，负责推进 issue

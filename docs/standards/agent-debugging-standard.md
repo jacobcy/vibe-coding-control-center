@@ -392,6 +392,8 @@ manager 链与治理链的差异只在真源：
 
 - `manager` 是开发链 owner，不是普通执行 agent
 - `manager` 的默认 agent/model 应单独配置在 orchestra/manager 侧（`config/settings.yaml` 的 `orchestra.assignee_dispatch`），而不是沿用 `run.agent_config`
+- `manager` 当前主线语义是：**能推进就推进，不能推进且本轮没有任何可观察进展时，进入 `state/blocked`**
+- `state/blocked` 之后的 follow-up（例如 doctor 修复、人工恢复、或 aborted 收尾）明确不属于当前 manager 主线，而是后续链路
 - 调试 manager 异常时，优先区分三类问题：
   - prompt 材料不对
   - scene/worktree/session 不对
@@ -417,11 +419,51 @@ HeartbeatServer._tick_loop()
 | 触发状态 | 触发角色 | 入口命令 |
 |---|---|---|
 | `state/ready` | manager | `vibe3 run --manager-issue {n} --sync` |
+| `state/handoff` | manager (resume) | `vibe3 run --manager-issue {n} --sync` |
 | `state/claimed` | plan | `vibe3 plan --issue {n} --sync` |
 | `state/in-progress` | run | `vibe3 run --sync` |
 | `state/review` | review | `vibe3 review base --sync` |
 
+**Manager Handoff Resume**：
+
+当 issue 处于 `state/handoff` 且满足以下条件时，manager 会自动恢复执行：
+
+1. Issue 有 canonical task flow（`task/issue-*` 分支）
+2. Flow state 有有效 refs（如 `plan_ref`）
+3. 没有活动的 manager session
+
+这个 resume 路径使用与 `state/ready` 相同的去重机制：
+- 如果已有 live session，不会重复 dispatch
+- 如果 session 结束且无进展，会 auto-block
+
 详细的状态迁移语义见 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)。
+
+### 6.3 Manager 主线结束条件
+
+当前 manager 主线只关心两类结果：
+
+- 本轮推进成功，产生明确状态变化或交接产物
+- 本轮无法推进，且 manager session 结束后没有任何可观察进展，此时进入 `state/blocked`
+
+这里的”可观察进展”包括以下任一项：
+
+- `state/*` label 变化
+- 新的 issue comment
+- 新的 handoff 文件
+- Flow refs 更新（plan_ref, report_ref, audit_ref）
+
+**Progress Detection Parity**：
+
+Manager 的 progress 判断在 async runtime 和 sync CLI 执行中保持一致，使用共享的 progress snapshot contract。无论通过哪种路径执行，progress 判断都基于相同的观察维度。
+
+**Session ID Re-entry**：
+
+当 planner/executor/reviewer 执行到达 terminal state（completed/aborted）时，其 session_id 会被清除，允许后续合法的 re-entry。这确保：
+
+- Actor 和 event history 保留，维持 observability
+- Stale session_id 不会阻止正常的 re-plan/re-run/re-review
+
+因此，调试 manager 时不要把”no-progress -> blocked”当作异常补丁；在当前架构里，这是刻意保留的主线收口规则，用来让 manager 聚焦推进 flow，而把 blocked 后的处置留给后续链路。
 
 ---
 
