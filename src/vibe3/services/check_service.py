@@ -1,7 +1,6 @@
 # ruff: noqa: E501
 """Check service implementation for verifying handoff store consistency."""
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -11,11 +10,14 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.flow import IssueLink
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
 from vibe3.services.check_remote import (
     CheckRemote,
+    is_empty_auto_scene,
+    issue_state_from_payload,
+    requires_handoff,
+    resolve_task_issue_number,
 )
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
@@ -197,69 +199,6 @@ class CheckService(CheckRemote):
         branch = self.git_client.get_current_branch()
         return self._check_branch(branch)
 
-    @staticmethod
-    def _issue_state_from_payload(issue: object) -> IssueState | None:
-        if not isinstance(issue, dict):
-            return None
-        labels = issue.get("labels")
-        if not isinstance(labels, list):
-            return None
-        for item in labels:
-            if not isinstance(item, dict):
-                continue
-            name = item.get("name")
-            if not isinstance(name, str):
-                continue
-            parsed = IssueState.from_label(name)
-            if parsed is not None:
-                return parsed
-        return None
-
-    @staticmethod
-    def _requires_handoff(issue_state: IssueState | None) -> bool:
-        return issue_state in {
-            IssueState.CLAIMED,
-            IssueState.HANDOFF,
-            IssueState.IN_PROGRESS,
-            IssueState.REVIEW,
-        }
-
-    @staticmethod
-    def _resolve_task_issue_number(
-        branch: str,
-        flow_data: dict[str, object],
-        issue_links: list[dict[str, object]],
-    ) -> int | None:
-        task_issue = flow_data.get(
-            "task_issue_number"
-        ) or IssueLink.resolve_task_number(issue_links)
-        if task_issue:
-            return int(str(task_issue))
-
-        match = re.fullmatch(r"task/issue-(\d+)", branch)
-        if match:
-            return int(match.group(1))
-        return None
-
-    @staticmethod
-    def _is_empty_auto_scene(flow_data: dict[str, object]) -> bool:
-        markers = (
-            "manager_session_id",
-            "planner_session_id",
-            "executor_session_id",
-            "reviewer_session_id",
-            "plan_ref",
-            "report_ref",
-            "audit_ref",
-            "planner_status",
-            "executor_status",
-            "reviewer_status",
-            "execution_pid",
-            "execution_started_at",
-            "execution_completed_at",
-        )
-        return not any(flow_data.get(marker) for marker in markers)
-
     def _has_worktree(self, branch: str) -> bool:
         try:
             return self.git_client.find_worktree_path_for_branch(branch) is not None
@@ -297,7 +236,7 @@ class CheckService(CheckRemote):
 
         # task issue exists and is open on GitHub
         issue_links = self.store.get_issue_links(branch)
-        task_issue = self._resolve_task_issue_number(branch, flow_data, issue_links)
+        task_issue = resolve_task_issue_number(branch, flow_data, issue_links)
         task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
 
         task_issue_closed = False
@@ -311,7 +250,7 @@ class CheckService(CheckRemote):
             elif not issue:
                 issues.append(f"Task issue #{task_issue} not found on GitHub")
             elif isinstance(issue, dict):
-                orchestration_state = self._issue_state_from_payload(issue)
+                orchestration_state = issue_state_from_payload(issue)
                 if str(issue.get("state", "")).upper() == "CLOSED":
                     task_issue_closed = True
 
@@ -362,7 +301,7 @@ class CheckService(CheckRemote):
             flow_data.get("flow_status", "active") == "active"
             and branch.startswith("task/issue-")
             and orchestration_state == IssueState.READY
-            and self._is_empty_auto_scene(flow_data)
+            and is_empty_auto_scene(flow_data)
             and not self._has_worktree(branch)
         ):
             self._mark_flow_stale(
@@ -380,7 +319,7 @@ class CheckService(CheckRemote):
                     issues.append(f"{ref_field} file not found: {ref_value}")
 
         # shared current.md
-        if flow_status not in ("done", "aborted", "stale") and self._requires_handoff(
+        if flow_status not in ("done", "aborted", "stale") and requires_handoff(
             orchestration_state
         ):
             git_dir = self.git_client.get_git_common_dir()
