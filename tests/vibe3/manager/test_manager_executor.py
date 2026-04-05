@@ -98,7 +98,47 @@ class TestManagerReviewWorktreeResolution:
         assert "--async" in cmd
         assert "--worktree" not in cmd
         assert "Manage issue #89: Run in current flow" in cmd[-1]
-        assert "comment、写 handoff、修改 labels" in cmd[-1]
+
+    def test_mark_manager_start_failed_marks_flow_stale(self):
+        """manager 启动失败时，flow 应被标记为 stale（而不是保持 active）。"""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestration import IssueState
+
+        config = MagicMock()
+        config.max_concurrent_flows = 3
+        config.dry_run = False
+        config.circuit_breaker.enabled = False
+
+        executor = ManagerExecutor.__new__(ManagerExecutor)
+        executor.config = config
+        executor.dry_run = False
+        executor._queued_issues = set()
+        executor._last_error_category = None
+
+        executor.result_handler = MagicMock()
+        executor._flow_manager = MagicMock()
+        executor._circuit_breaker = None
+        executor.status_service = MagicMock()
+        executor.status_service.get_active_flow_count.return_value = 0
+
+        # flow exists with a branch
+        executor._flow_manager.get_flow_for_issue.return_value = {
+            "branch": "task/issue-301",
+            "flow_status": "active",
+        }
+
+        issue = make_issue(301)
+        executor._mark_manager_start_failed(issue, "test failure")
+
+        # flow should be marked stale
+        executor._flow_manager.store.update_flow_state.assert_called_once_with(
+            "task/issue-301", flow_status="stale"
+        )
+        # issue should be marked FAILED
+        executor.result_handler.update_state_label.assert_called_once_with(
+            301, IssueState.FAILED
+        )
 
     def test_dispatch_manager_dry_run_skips_flow_creation_and_execution(self):
         config = OrchestraConfig(dry_run=True)

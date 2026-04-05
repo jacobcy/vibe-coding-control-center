@@ -103,12 +103,27 @@ class ManagerExecutor:
         return success
 
     def _mark_manager_start_failed(self, issue: IssueInfo, reason: str) -> None:
-        """Record a manager startup failure as state/failed."""
+        """Record a manager startup failure as state/failed.
+
+        Also marks the flow as stale so the issue can be re-dispatched
+        after the failure is resolved.
+        """
         self.result_handler.post_failure_comment(
             issue.number,
             f"Manager 启动失败，已切换为 state/failed。\n\n原因：{reason}",
         )
         self.result_handler.update_state_label(issue.number, IssueState.FAILED)
+        # Release the flow lock so issue can be re-dispatched after recovery
+        try:
+            flow = self._flow_manager.get_flow_for_issue(issue.number)
+            if flow and flow.get("branch"):
+                self._flow_manager.store.update_flow_state(
+                    str(flow["branch"]), flow_status="stale"
+                )
+        except Exception as exc:
+            logger.bind(domain="orchestra", issue=issue.number).warning(
+                f"Failed to mark flow stale after start failure: {exc}"
+            )
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Complete lifecycle for manager dispatch with queuing."""
