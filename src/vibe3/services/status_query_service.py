@@ -54,12 +54,18 @@ def issue_priority(state: IssueState) -> tuple[int, str]:
 
 
 def is_auto_task_branch(branch: str) -> bool:
-    """Check if branch follows auto-managed task naming convention."""
+    """Check if branch follows auto-managed task naming convention.
+
+    Pure string check without SQLite I/O side effects.
+    """
     return branch.startswith("task/issue-")
 
 
 def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
-    """Check if branch matches the canonical task/issue-N pattern."""
+    """Check if branch matches the canonical task/issue-N pattern.
+
+    Pure string check without SQLite I/O side effects.
+    """
     return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
 
 
