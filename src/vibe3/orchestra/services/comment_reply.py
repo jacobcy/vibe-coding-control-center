@@ -27,6 +27,11 @@ class CommentReplyService(ServiceBase):
 
     event_types = ["issue_comment"]
 
+    @property
+    def is_dispatch_service(self) -> bool:
+        """Comment replies do not initiate new automated work flows."""
+        return False
+
     def __init__(
         self,
         config: OrchestraConfig,

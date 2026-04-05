@@ -48,7 +48,7 @@ class AssigneeDispatchConfig(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
-    agent: str = "develop"
+    agent: str | None = None
     backend: str | None = None
     model: str | None = None
     prompt_template: str = Field(
@@ -122,8 +122,8 @@ class GovernanceConfig(BaseModel):
             "Run governance scan every N heartbeat ticks (~1h at default interval)"
         ),
     )
-    agent: str = Field(
-        default="explore",
+    agent: str | None = Field(
+        default=None,
         description="Agent preset name for governance execution",
     )
     backend: str | None = Field(
@@ -143,8 +143,8 @@ class SupervisorHandoffConfig(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
-    agent: str = Field(
-        default="explore",
+    agent: str | None = Field(
+        default=None,
         description="Agent preset name for supervisor handoff execution",
     )
     backend: str | None = Field(
@@ -228,7 +228,7 @@ class OrchestraConfig(BaseModel):
             "include_supervisor_content": True,
             "dry_run": False,
             "interval_ticks": 4,
-            "agent": "explore",
+            "agent": None,
             "backend": None,
             "model": None,
         }
@@ -256,7 +256,7 @@ class OrchestraConfig(BaseModel):
                         ),
                         "dry_run": getattr(governance_src, "dry_run", False),
                         "interval_ticks": getattr(governance_src, "interval_ticks", 4),
-                        "agent": getattr(governance_src, "agent", "explore"),
+                        "agent": getattr(governance_src, "agent", None),
                         "backend": getattr(governance_src, "backend", None),
                         "model": getattr(governance_src, "model", None),
                     }
@@ -267,7 +267,7 @@ class OrchestraConfig(BaseModel):
             "issue_label": "supervisor",
             "handoff_state_label": "state/handoff",
             "supervisor_file": "supervisor/apply.md",
-            "agent": "explore",
+            "agent": None,
             "backend": None,
             "model": None,
         }
@@ -293,7 +293,7 @@ class OrchestraConfig(BaseModel):
                             "supervisor_file",
                             "supervisor/apply.md",
                         ),
-                        "agent": getattr(supervisor_handoff_src, "agent", "explore"),
+                        "agent": getattr(supervisor_handoff_src, "agent", None),
                         "backend": getattr(supervisor_handoff_src, "backend", None),
                         "model": getattr(supervisor_handoff_src, "model", None),
                     }
@@ -315,7 +315,7 @@ class OrchestraConfig(BaseModel):
             assignee_dispatch=AssigneeDispatchConfig(
                 enabled=src.assignee_dispatch.enabled,
                 use_worktree=src.assignee_dispatch.use_worktree,
-                agent=getattr(src.assignee_dispatch, "agent", "develop"),
+                agent=getattr(src.assignee_dispatch, "agent", None),
                 backend=getattr(src.assignee_dispatch, "backend", None),
                 model=getattr(src.assignee_dispatch, "model", None),
                 prompt_template=getattr(

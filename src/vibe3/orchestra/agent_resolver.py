@@ -75,6 +75,17 @@ def resolve_manager_agent_options(
     This is the shared source of truth for manager role resolution,
     used by both async runtime and sync CLI execution.
 
+    Resolution order:
+    1. assignee_dispatch.agent          -> preset mode
+    2. assignee_dispatch.backend/model  -> backend direct mode
+    3. run.agent_config                 -> generic fallback
+
+    If assignee_dispatch contains both ``agent`` and ``backend/model``,
+    manager execution intentionally prefers ``agent`` as the primary entry.
+    After that, ``resolve_effective_agent_options`` may resolve the preset into an
+    explicit backend/model, so an additional ``model`` value can still influence
+    the final model selection even when ``agent`` is present.
+
     Args:
         config: Orchestra configuration with assignee dispatch settings
         runtime_config: Vibe runtime config for fallback defaults
@@ -85,8 +96,9 @@ def resolve_manager_agent_options(
     """
     ad = config.assignee_dispatch
     raw_options: AgentOptions
-    if ad.agent:
-        # Use orchestra-specific config if provided
+    if ad.agent or ad.backend:
+        # Use orchestra-specific config when a preset or explicit backend override
+        # is configured for the manager role.
         raw_options = AgentOptions(
             agent=ad.agent,
             backend=ad.backend,

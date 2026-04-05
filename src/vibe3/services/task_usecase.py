@@ -6,6 +6,7 @@ from vibe3.exceptions import GitError
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_service import TaskService
+from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 
 @dataclass
@@ -59,7 +60,7 @@ class TaskUsecase:
     def resolve_branch(self, branch: str | None = None) -> str:
         """Resolve explicit or current branch for task commands."""
         if branch:
-            return branch
+            return resolve_issue_branch_input(branch, self.flow_service) or branch
         try:
             return self.flow_service.get_current_branch()
         except GitError as exc:

@@ -76,6 +76,7 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.IN_PROGRESS, IssueState.FAILED),
     (IssueState.REVIEW, IssueState.FAILED),
     (IssueState.FAILED, IssueState.CLAIMED),
+    (IssueState.FAILED, IssueState.HANDOFF),
     (IssueState.FAILED, IssueState.IN_PROGRESS),
     (IssueState.FAILED, IssueState.REVIEW),
 }

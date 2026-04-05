@@ -182,7 +182,10 @@ def start(
         bool,
         typer.Option(
             "--debug",
-            help="Debug mode: use current branch as auto scene base and 60s heartbeat by default",
+            help=(
+                "Debug mode: use current branch as auto scene base "
+                "and 60s heartbeat by default"
+            ),
         ),
     ] = False,
     async_mode: Annotated[
@@ -241,6 +244,24 @@ def start(
     elif pid is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
+
+    # Phase 1: FailedGate Preflight
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    gate = FailedGate(repo=config.repo)
+    result = gate.check()
+    if result.blocked:
+        typer.echo("\nOrchestra start blocked by open state/failed issue\n")
+        typer.echo(f"issue:  #{result.issue_number}")
+        typer.echo(f"title:  {result.issue_title}")
+        typer.echo(f"reason: {result.reason}")
+        if result.comment_url:
+            typer.echo(f"url:    {result.comment_url}")
+        typer.echo(
+            "\nResolve the failed issue manually, transition it back to state/handoff, "
+            "then retry serve start."
+        )
+        raise typer.Exit(1)
 
     if async_mode:
         ok, msg = _start_async_serve(config, verbose)

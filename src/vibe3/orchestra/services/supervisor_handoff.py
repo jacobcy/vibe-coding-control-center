@@ -102,7 +102,12 @@ class SupervisorHandoffService(ServiceBase):
                 raise
 
     def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
-        raw = self._github.list_issues(limit=100, state="open", assignee=None)
+        raw = self._github.list_issues(
+            limit=100,
+            state="open",
+            assignee=None,
+            repo=self.config.repo,
+        )
         issue_label = self.config.supervisor_handoff.issue_label
         handoff_label = self.config.supervisor_handoff.handoff_state_label
 

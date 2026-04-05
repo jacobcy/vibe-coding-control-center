@@ -27,6 +27,16 @@ class IssueLabelPort(Protocol):
         """Remove one label from issue."""
         ...
 
+    def ensure_label_exists(
+        self,
+        label: str,
+        *,
+        color: str,
+        description: str,
+    ) -> bool:
+        """Ensure a repository label exists."""
+        ...
+
 
 class PrStatePort(Protocol):
     """Port for PR fact confirmation and transition operations."""
@@ -119,6 +129,36 @@ class GhIssueLabelPort:
             logger.bind(
                 external="github", issue_number=issue_number, label=label
             ).warning("gh command not found")
+            return False
+        return result.returncode == 0
+
+    def ensure_label_exists(
+        self,
+        label: str,
+        *,
+        color: str,
+        description: str,
+    ) -> bool:
+        try:
+            result = subprocess.run(
+                self._build_cmd(
+                    [
+                        "gh",
+                        "label",
+                        "create",
+                        label,
+                        "--color",
+                        color,
+                        "--description",
+                        description,
+                        "--force",
+                    ]
+                ),
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.bind(external="github", label=label).warning("gh command not found")
             return False
         return result.returncode == 0
 

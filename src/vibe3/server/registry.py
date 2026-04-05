@@ -16,6 +16,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
@@ -51,10 +52,12 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
     from vibe3.server.app import make_webhook_router
 
-    heartbeat = HeartbeatServer(config)
+    shared_github = GitHubClient()
+    failed_gate = FailedGate(github=shared_github, repo=config.repo)
+
+    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_github = GitHubClient()
     shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
@@ -67,6 +70,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         github=shared_github,
         orchestrator=shared_manager.flow_manager,
         circuit_breaker=shared_manager._circuit_breaker,
+        failed_gate=failed_gate,
     )
 
     if config.assignee_dispatch.enabled:
@@ -98,6 +102,16 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             StateLabelDispatchService(
                 config,
                 trigger_state=IssueState.READY,
+                trigger_name="manager",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.HANDOFF,
                 trigger_name="manager",
                 manager=shared_manager,
                 github=shared_github,

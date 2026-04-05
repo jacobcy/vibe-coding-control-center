@@ -178,25 +178,27 @@ def run_manager_issue_mode(
             cwd=launch_cwd,
         )
     except BaseException as exc:
-        store.add_event(
-            branch,
-            "manager_failed",
-            actor,
-            detail=f"Manager execution failed for issue #{issue_number}: {exc}",
-            refs={"issue": str(issue_number), "reason": str(exc)},
-        )
-        fail_manager_issue(
-            issue_number=issue_number,
-            reason=f"manager sync execution failed: {exc}",
-        )
+        if not dry_run:
+            store.add_event(
+                branch,
+                "manager_failed",
+                actor,
+                detail=f"Manager execution failed for issue #{issue_number}: {exc}",
+                refs={"issue": str(issue_number), "reason": str(exc)},
+            )
+            fail_manager_issue(
+                issue_number=issue_number,
+                reason=f"manager sync execution failed: {exc}",
+            )
         raise
 
-    effective_session_id = result.session_id or session_id
-    sync_updates: dict[str, object] = {"latest_actor": actor}
-    if effective_session_id:
-        sync_updates["manager_session_id"] = effective_session_id
-    store.update_flow_state(branch, **sync_updates)
     if not result.is_success():
+        if not dry_run:
+            store.update_flow_state(
+                branch,
+                latest_actor=actor,
+                manager_session_id=None,
+            )
         store.add_event(
             branch,
             "manager_failed",
@@ -209,6 +211,16 @@ def run_manager_issue_mode(
             reason=getattr(result, "stderr", "") or "manager exited with failure",
         )
         raise typer.Exit(1)
+
+    if dry_run:
+        typer.echo(f"-> Manager run: issue #{issue_number} (dry-run)")
+        return
+
+    store.update_flow_state(
+        branch,
+        latest_actor=actor,
+        manager_session_id=None,
+    )
 
     store.add_event(
         branch,
