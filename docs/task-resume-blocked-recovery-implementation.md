@@ -2,7 +2,7 @@
 
 ## 实现目标
 
-将 `vibe3 task resume` 从 failed 专用升级为统一恢复入口，支持 failed 和 blocked 两条内部语义路径。
+将 `vibe3 task resume` 从 failed 专用升级为统一恢复入口，支持 failed 和 blocked 两条**独立**的恢复路径。
 
 ## 架构设计
 
@@ -29,12 +29,31 @@
   - 内部转发到新的统一 usecase
   - 转换结果格式以匹配旧 API
 
-### CLI 层 (Task #2)
+### CLI 层 (Task #2 + 改进)
 - **修改**: `task resume` 命令
   - 使用 `TaskResumeUsecase` 而非 `TaskFailedResumeUsecase`
-  - `--all` 调用 `fetch_resume_candidates()` 而非 `fetch_failed_resume_candidates()`
-  - 输出改为 `resumable issue(s)` 而非 `failed issue(s)`
+  - **取消 `--all` 选项，改为两个独立选项**:
+    - `--failed`: 恢复所有 failed issue
+    - `--blocked`: 恢复所有 stale blocked issue
+  - 支持显式指定 issue 列表
+  - 输出明确显示恢复的 issue 类型
   - dry-run 输出区分 failed vs blocked 候选
+
+## CLI 使用示例
+
+```bash
+# 恢复所有 failed issue (dry-run)
+vibe3 task resume --failed --reason "quota resumed"
+
+# 恢复所有 stale blocked issue (dry-run)
+vibe3 task resume --blocked --reason "dependency available"
+
+# 恢复指定的 issue (dry-run)
+vibe3 task resume 340 410 --reason "manual recovery"
+
+# 实际执行恢复
+vibe3 task resume --failed --reason "quota resumed" --yes
+```
 
 ## 测试覆盖 (Task #3)
 
@@ -58,12 +77,20 @@
 - **blocked**: 仅 `state/blocked` + `flow_status == "stale"` 可恢复
   - **设计理由**: stale 表示"已检测到异常，等待恢复"；非 stale blocked 说明阻塞原因可能还在处理中
 
-### 2. 向后兼容策略
+### 2. CLI 设计改进
+- **取消 `--all`**: 避免用户意外恢复所有候选（包括不想要的 blocked）
+- **独立选项**: `--failed` 和 `--blocked` 提供明确控制
+- **设计理由**:
+  - 用户可能只想恢复特定类型
+  - 避免"恢复所有"时的意外操作
+  - 符合"最小惊讶原则"
+
+### 3. 向后兼容策略
 - 保留 `TaskFailedResumeUsecase` 作为薄包装层
 - 保留 `fetch_failed_resume_candidates()` API
 - 旧测试暂时保留，新的统一测试已覆盖所有功能
 
-### 3. 状态迁移规则
+### 4. 状态迁移规则
 - **failed + plan_ref** → `state/handoff` (manager triage)
 - **failed (no plan)** → `state/ready` (fresh entry)
 - **blocked** → `state/ready` (resume execution)
@@ -81,10 +108,12 @@
 3. `edab686c` - refactor: generalize task resume usecase
 4. `de16da8b` - feat: support blocked recovery in task resume
 5. `3623d649` - test: cover blocked stale task resume flow
+6. `17008402` - refactor: split --all into --failed and --blocked flags
 
 ## 验证结果
 
 - ✅ 39/43 核心测试通过
+- ✅ 6/6 CLI 测试通过 (包含新增的参数校验测试)
 - ✅ 6/6 command-surface 测试通过
 - ✅ 所有新功能测试通过
 - ⚠️ 4 个旧的 `TaskFailedResumeUsecase` 测试失败
