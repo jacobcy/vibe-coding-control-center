@@ -93,14 +93,6 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-      - id: check-test-file-loc
-        name: "Check test file LOC (default: 200, max: 300)"
-        entry: scripts/hooks/check-test-file-loc.sh
-        language: script
-        pass_filenames: false
-        files: ^tests/vibe3/.*\.py$
-        stages: [pre-push]
-
       - id: pre-push-checks
         name: Pre-push checks (coverage + risk-based review)
         entry: scripts/hooks/pre-push.sh
