@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
+
+from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_failed_issue_to_handoff,
@@ -26,6 +29,7 @@ class TaskResumeUsecase:
     def __init__(self) -> None:
         self.status_service = StatusQueryService()
         self.label_service = LabelService()
+        self.flow_service = FlowService()
 
     def resume_issues(
         self,
@@ -120,6 +124,11 @@ class TaskResumeUsecase:
                         reason=reason,
                     )
 
+                    # Clean up stale flow metadata
+                    flow = candidate.get("flow")
+                    if flow and hasattr(flow, "branch"):
+                        self._cleanup_stale_flow(flow.branch)
+
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
                 )
@@ -156,3 +165,26 @@ class TaskResumeUsecase:
             return current_state.value == "blocked"
 
         return False
+
+    def _cleanup_stale_flow(self, branch: str) -> None:
+        """Clean up stale flow metadata after blocked resume.
+
+        Args:
+            branch: Branch name for the flow to clean up
+        """
+        try:
+            logger.bind(
+                domain="resume",
+                action="cleanup_stale_flow",
+                branch=branch,
+            ).info("Cleaning up stale flow")
+
+            # Reactivate the stale flow (change status from "stale" to "active")
+            self.flow_service.reactivate_flow(branch)
+        except Exception as exc:
+            # Log but don't fail the resume operation
+            logger.bind(
+                domain="resume",
+                action="cleanup_stale_flow",
+                branch=branch,
+            ).warning(f"Failed to clean up stale flow: {exc}")

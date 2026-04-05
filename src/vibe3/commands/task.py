@@ -236,10 +236,16 @@ def resume(
     # Build issue list
     target_issues: list[int] | None
     if has_flag:
-        # Fetch resumable candidates based on flag
+        # Fetch resumable candidates with real flow data
         usecase = _build_resume_usecase()
+
+        # Get real flows and stale flows
+        flow_service = FlowService()
+        active_flows = flow_service.list_flows(status="active")
+        stale_flows = flow_service.list_flows(status="stale")
+
         candidates = usecase.status_service.fetch_resume_candidates(
-            flows=[], stale_flows=[]
+            flows=active_flows, stale_flows=stale_flows
         )
 
         # Filter by flag
@@ -266,12 +272,18 @@ def resume(
         assert issue_numbers is not None
         target_issues = list(issue_numbers)
 
-    # Execute resume
+    # Execute resume with real flow data
     usecase = _build_resume_usecase()
+    flow_service = FlowService()
+    active_flows = flow_service.list_flows(status="active")
+    stale_flows = flow_service.list_flows(status="stale")
+
     result = usecase.resume_issues(
         issue_numbers=target_issues,
         reason=reason,
         dry_run=not yes,
+        flows=active_flows,
+        stale_flows=stale_flows,
     )
 
     if json_output:

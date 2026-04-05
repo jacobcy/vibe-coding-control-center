@@ -51,10 +51,18 @@ class TestTaskResumeCommand:
             },
         ]
 
-        with patch(
-            "vibe3.commands.task._build_resume_usecase",
-            return_value=mock_usecase,
+        # Mock FlowService to return empty lists
+        with (
+            patch(
+                "vibe3.commands.task._build_resume_usecase",
+                return_value=mock_usecase,
+            ),
+            patch("vibe3.commands.task.FlowService") as mock_flow_service,
         ):
+            mock_flow_service_instance = MagicMock()
+            mock_flow_service.return_value = mock_flow_service_instance
+            mock_flow_service_instance.list_flows.return_value = []
+
             result = runner.invoke(
                 app,
                 [
@@ -71,12 +79,14 @@ class TestTaskResumeCommand:
             assert "441" in result.stdout
             assert "dry-run" in result.stdout.lower()
 
-            # dry-run 模式不调用 apply
-            mock_usecase.resume_issues.assert_called_once_with(
-                issue_numbers=[439, 441],
-                reason="quota resumed",
-                dry_run=True,
-            )
+            # Verify resume_issues was called with flows parameter
+            mock_usecase.resume_issues.assert_called_once()
+            call_kwargs = mock_usecase.resume_issues.call_args[1]
+            assert call_kwargs["issue_numbers"] == [439, 441]
+            assert call_kwargs["reason"] == "quota resumed"
+            assert call_kwargs["dry_run"] is True
+            assert "flows" in call_kwargs
+            assert "stale_flows" in call_kwargs
 
     def test_task_resume_dry_run_with_blocked_flag(self) -> None:
         """vibe3 task resume --blocked --reason "dependency available" 走 dry-run。"""
@@ -104,10 +114,17 @@ class TestTaskResumeCommand:
             },
         ]
 
-        with patch(
-            "vibe3.commands.task._build_resume_usecase",
-            return_value=mock_usecase,
+        with (
+            patch(
+                "vibe3.commands.task._build_resume_usecase",
+                return_value=mock_usecase,
+            ),
+            patch("vibe3.commands.task.FlowService") as mock_flow_service,
         ):
+            mock_flow_service_instance = MagicMock()
+            mock_flow_service.return_value = mock_flow_service_instance
+            mock_flow_service_instance.list_flows.return_value = []
+
             result = runner.invoke(
                 app,
                 [
@@ -123,12 +140,14 @@ class TestTaskResumeCommand:
             assert "301" in result.stdout
             assert "dry-run" in result.stdout.lower()
 
-            # dry-run 模式不调用 apply
-            mock_usecase.resume_issues.assert_called_once_with(
-                issue_numbers=[301],
-                reason="dependency available",
-                dry_run=True,
-            )
+            # Verify resume_issues was called with flows parameter
+            mock_usecase.resume_issues.assert_called_once()
+            call_kwargs = mock_usecase.resume_issues.call_args[1]
+            assert call_kwargs["issue_numbers"] == [301]
+            assert call_kwargs["reason"] == "dependency available"
+            assert call_kwargs["dry_run"] is True
+            assert "flows" in call_kwargs
+            assert "stale_flows" in call_kwargs
 
     def test_task_resume_apply_with_explicit_issue_numbers(self) -> None:
         """vibe3 task resume 340 410 --yes --reason "quota resumed" 会执行恢复。"""
@@ -142,10 +161,17 @@ class TestTaskResumeCommand:
             "requested": [340, 410],
         }
 
-        with patch(
-            "vibe3.commands.task._build_resume_usecase",
-            return_value=mock_usecase,
+        with (
+            patch(
+                "vibe3.commands.task._build_resume_usecase",
+                return_value=mock_usecase,
+            ),
+            patch("vibe3.commands.task.FlowService") as mock_flow_service,
         ):
+            mock_flow_service_instance = MagicMock()
+            mock_flow_service.return_value = mock_flow_service_instance
+            mock_flow_service_instance.list_flows.return_value = []
+
             result = runner.invoke(
                 app,
                 [
@@ -162,11 +188,14 @@ class TestTaskResumeCommand:
             assert result.exit_code == 0
             assert "resumed" in result.stdout.lower()
 
-            mock_usecase.resume_issues.assert_called_once_with(
-                issue_numbers=[340, 410],
-                reason="quota resumed",
-                dry_run=False,
-            )
+            # Verify resume_issues was called with flows parameter
+            mock_usecase.resume_issues.assert_called_once()
+            call_kwargs = mock_usecase.resume_issues.call_args[1]
+            assert call_kwargs["issue_numbers"] == [340, 410]
+            assert call_kwargs["reason"] == "quota resumed"
+            assert call_kwargs["dry_run"] is False
+            assert "flows" in call_kwargs
+            assert "stale_flows" in call_kwargs
 
     def test_task_resume_requires_all_or_issue_list(self) -> None:
         """没有 --failed/--blocked 且没有 issue 列表时，命令报错退出。"""
