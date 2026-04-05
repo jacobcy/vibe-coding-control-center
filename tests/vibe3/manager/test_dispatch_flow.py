@@ -105,13 +105,21 @@ class TestManagerCwdResolution:
         mock_run.assert_not_called()
 
     def test_align_auto_scene_to_base_resets_canonical_task_scene(self, tmp_path: Path):
+        """Test alignment for fresh branch (no commits) - should reset."""
         config = make_config()
         config.scene_base_ref = "origin/main"
         manager = ManagerExecutor(config, repo_path=tmp_path)
 
+        # Mock git log to return no commits (fresh branch)
+        def mock_run_fresh(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "log", "--oneline"]:
+                # Fresh branch - log command fails
+                return CompletedProcess(returncode=128, stdout="", stderr="error")
+            return CompletedProcess(returncode=0)
+
         with patch(
             "subprocess.run",
-            return_value=CompletedProcess(returncode=0),
+            side_effect=mock_run_fresh,
         ) as mock_run:
             ok = manager.worktree_manager.align_auto_scene_to_base(
                 tmp_path / ".worktrees" / "issue-77",
@@ -120,11 +128,45 @@ class TestManagerCwdResolution:
 
         assert ok is True
         calls = [call.args[0] for call in mock_run.call_args_list]
+        # For fresh branch: fetch + full reset
         assert calls == [
+            ["git", "log", "--oneline", "-n", "1", "task/issue-77"],
             ["git", "fetch", "--all", "--prune"],
             ["git", "checkout", "task/issue-77"],
             ["git", "reset", "--hard", "origin/main"],
             ["git", "clean", "-fd"],
+        ]
+
+    def test_align_auto_scene_preserves_existing_task_branch(self, tmp_path: Path):
+        """Test alignment for existing branch with commits - should NOT reset."""
+        config = make_config()
+        config.scene_base_ref = "origin/main"
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        # Mock git log to show branch has commits
+        def mock_run_existing(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "log", "--oneline"]:
+                # Existing branch with commits
+                return CompletedProcess(
+                    returncode=0, stdout="abc123 Previous commit\n", stderr=""
+                )
+            return CompletedProcess(returncode=0)
+
+        with patch(
+            "subprocess.run",
+            side_effect=mock_run_existing,
+        ) as mock_run:
+            ok = manager.worktree_manager.align_auto_scene_to_base(
+                tmp_path / ".worktrees" / "issue-77",
+                "task/issue-77",
+            )
+
+        assert ok is True
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        # For existing branch: only fetch, no destructive operations
+        assert calls == [
+            ["git", "log", "--oneline", "-n", "1", "task/issue-77"],
+            ["git", "fetch", "--all", "--prune"],
         ]
 
     def test_align_auto_scene_to_base_skips_manual_scene(self, tmp_path: Path):

@@ -36,9 +36,37 @@ class FlowManager:
         self.label_service = LabelService(repo=config.repo)
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
-        """Get flow linked to an issue."""
+        """Get flow linked to an issue with deterministic selection.
+
+        Priority order:
+        1. Active canonical flow (task/issue-N)
+        2. Active non-canonical flow
+        3. First available flow (fallback)
+
+        This ensures deterministic selection when multiple flows exist
+        for the same issue.
+        """
         flows = self.store.get_flows_by_issue(issue_number, role="task")
-        return flows[0] if flows else None
+        if not flows:
+            return None
+
+        canonical_branch = self._canonical_task_branch(issue_number)
+
+        # Priority 1: Active canonical flow
+        for flow in flows:
+            branch = str(flow.get("branch") or "").strip()
+            status = str(flow.get("flow_status") or "active")
+            if branch == canonical_branch and status == "active":
+                return flow
+
+        # Priority 2: Active non-canonical flow
+        for flow in flows:
+            status = str(flow.get("flow_status") or "active")
+            if status == "active":
+                return flow
+
+        # Priority 3: First available (fallback)
+        return flows[0]
 
     @staticmethod
     def _canonical_task_branch(issue_number: int) -> str:

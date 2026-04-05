@@ -55,6 +55,12 @@ class WorktreeManager:
         return self._ensure_manager_worktree(issue_number, flow_branch)
 
     def _align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
+        """Align auto scene to base, but skip destructive operations.
+
+        For existing task branches with commits, we only perform
+        non-destructive operations (fetch) to avoid wiping out valid
+        implementation work.
+        """
         if not flow_branch.startswith("task/issue-"):
             return True
 
@@ -64,12 +70,40 @@ class WorktreeManager:
         if not base_ref:
             return True
 
-        commands = [
-            ["git", "fetch", "--all", "--prune"],
-            ["git", "checkout", flow_branch],
-            ["git", "reset", "--hard", base_ref],
-            ["git", "clean", "-fd"],
-        ]
+        # Check if branch already has commits (not a fresh branch)
+        try:
+            result = subprocess.run(
+                ["git", "log", "--oneline", "-n", "1", flow_branch],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            has_commits = result.returncode == 0 and result.stdout.strip()
+        except Exception:
+            has_commits = False
+
+        if has_commits:
+            # Existing branch with commits - only fetch, don't reset/clean
+            logger.bind(
+                domain="orchestra",
+                branch=flow_branch,
+                cwd=str(cwd),
+            ).info(
+                "Skipping destructive alignment for existing task branch with commits"
+            )
+            commands = [
+                ["git", "fetch", "--all", "--prune"],
+            ]
+        else:
+            # Fresh branch - safe to align
+            commands = [
+                ["git", "fetch", "--all", "--prune"],
+                ["git", "checkout", flow_branch],
+                ["git", "reset", "--hard", base_ref],
+                ["git", "clean", "-fd"],
+            ]
+
         for cmd in commands:
             try:
                 result = subprocess.run(

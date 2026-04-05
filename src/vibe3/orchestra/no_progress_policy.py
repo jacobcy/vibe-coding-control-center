@@ -201,7 +201,8 @@ def execute_auto_block(
         "- 需要人工决策或额外信息\n\n"
         "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
     )
-    github.add_comment(issue_number, f"[dispatcher] {reason}")
+    # Use same repo for comment and labels to avoid split audit trail
+    github.add_comment(issue_number, f"[dispatcher] {reason}", repo=repo)
 
     # Update labels: remove current trigger state, add blocked
     cmd = [
