@@ -177,7 +177,12 @@ class StatusQueryService:
                 continue
 
             body_lower = body.lower()
-            if "[recovery]" in body_lower or "恢复到 state/handoff" in body:
+            if (
+                "[resume]" in body_lower
+                or "[recovery]" in body_lower
+                or "继续到 state/handoff" in body
+                or "恢复到 state/handoff" in body
+            ):
                 continue
 
             match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)

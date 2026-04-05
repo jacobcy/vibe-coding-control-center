@@ -382,6 +382,45 @@ class TestStatusQueryService:
 
         assert len(result) == 0
 
+    def test_status_ignores_resume_comment_for_failed_reason(
+        self,
+    ) -> None:
+        """status 快照不把 resume comment 当作新的 failed reason。"""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 439,
+                "title": "Manager backend regression",
+                "labels": [{"name": "state/failed"}],
+            }
+        ]
+        github.view_issue.return_value = {
+            "comments": [
+                {
+                    "body": (
+                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
+                        "原因:quota exhausted"
+                    ),
+                },
+                {
+                    "body": (
+                        "[resume] 已从 state/failed 继续到 state/handoff。\n\n"
+                        "manager 将重新判断现场并决定下一步。\n\n"
+                        "原因:quota resumed"
+                    ),
+                },
+            ]
+        }
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        # Should extract "quota exhausted", not "quota resumed"
+        assert result[0]["failed_reason"] == "quota exhausted"
+
 
 class TestIssuePriority:
     """Tests for issue priority sorting."""
