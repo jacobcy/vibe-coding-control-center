@@ -84,7 +84,7 @@ class TestStartAsyncCommand:
             if cmd[:3] == ["tmux", "has-session", "-t"]:
                 target = cmd[3]
                 result = MagicMock()
-                # First call: session exists, second: doesn't exist
+                # 1st call: exists (0), 2nd call: doesn't exist (1)
                 result.returncode = 0 if target == "vibe3-manager-issue-372" else 1
                 return result
             # For tmux new-session, return success
@@ -117,7 +117,7 @@ class TestStartAsyncCommand:
         # Mock subprocess.run to break _allocate_tmux_session_name loop
         def fake_run(*args, **kwargs):
             result = MagicMock()
-            # Simulate "tmux has-session" failing
+            # Simulate "tmux has-session" failing (no session exists)
             result.returncode = 1
             return result
 
