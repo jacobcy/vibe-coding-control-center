@@ -67,6 +67,10 @@ def test_reactivate_flow_resets_all_sessions():
             planner_session_id="old-planner-session",
             executor_session_id="old-executor-session",
             reviewer_session_id="old-reviewer-session",
+            planner_actor="old-planner",
+            executor_actor="old-executor",
+            reviewer_actor="old-reviewer",
+            latest_actor="old-latest",
             plan_ref="plans/old-plan.md",
             report_ref="reports/old-report.md",
             audit_ref="audits/old-audit.md",
@@ -78,6 +82,10 @@ def test_reactivate_flow_resets_all_sessions():
         # Verify all sessions cleared
         state = store.get_flow_state(branch)
         assert state is not None
+        assert state.get("latest_actor") is None
+        assert state.get("planner_actor") is None
+        assert state.get("executor_actor") is None
+        assert state.get("reviewer_actor") is None
         assert state.get("manager_session_id") is None
         assert state.get("planner_session_id") is None
         assert state.get("executor_session_id") is None
