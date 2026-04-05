@@ -147,7 +147,7 @@ def update(
                     explicit_actor=actor
                 )
             if updates:
-                flow_service.store.update_flow_state(branch, **updates)
+                flow_service.update_flow_metadata(branch, **updates)
             # Re-fetch flow state
             updated = flow_service.get_flow_status(branch)
             if updated:

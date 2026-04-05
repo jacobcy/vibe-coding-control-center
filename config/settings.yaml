@@ -42,8 +42,8 @@ code_limits:
     max: 400              # 单文件最大限制（所有类型）
 
   total_file_loc:
-    v2_shell: 7000         # Shell 核心代码总行数
-    v3_python: 25000        # Python 核心代码总行数
+    v2_shell: 4000         # Shell 核心代码总行数
+    v3_python: 28000        # Python 核心代码总行数
 
   # 统计口径（路径定义）
   code_paths:
@@ -182,10 +182,14 @@ review:
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
+    # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
+    # 典型用途：保留 preset 作为实际执行入口，同时把 backend/model 写出来用于显式说明或记录。
     agent: "code-reviewer"
 
-    # Actual backend/model for database recording
-    # TODO: Fill in actual values before merge
+    # Backend/model direct mode.
+    # - 只配置 backend/model，不配置 agent：走 backend 直连模式
+    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - model 只有在 backend 已配置时才有意义
     backend: "claude"  # e.g., "claude", "opencode", "gemini"
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
@@ -228,10 +232,13 @@ plan:
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
-    agent: "code-architect"
+    # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
+    agent: "code-explorer"
 
-    # Actual backend/model for database recording
-    # TODO: Fill in actual values before merge
+    # Backend/model direct mode.
+    # - 只配置 backend/model，不配置 agent：走 backend 直连模式
+    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - model 只有在 backend 已配置时才有意义
     backend: "codex"  # e.g., "claude", "opencode", "gemini"
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
@@ -279,10 +286,13 @@ run:
   # Static: Agent configuration for codeagent-wrapper
   agent_config:
     # Agent preset name (passed to codeagent-wrapper)
+    # 允许与 backend/model 同时存在；如果同时配置，执行时 agent 优先。
     agent: "develop"
 
-    # Actual backend/model for database recording
-    # TODO: Fill in actual values before merge
+    # Backend/model direct mode.
+    # - 只配置 backend/model，不配置 agent：走 backend 直连模式
+    # - 同时配置 agent 和 backend/model：仍然允许，但执行时 agent 优先
+    # - model 只有在 backend 已配置时才有意义
     backend: "opencode"  # e.g., "claude", "opencode", "gemini"
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
 
@@ -327,6 +337,12 @@ orchestra:
   # Polling interval in seconds (effective only when polling.enabled=true)
   polling_interval: 900
 
+  # Debug mode heartbeat interval (used by `serve --debug` when no explicit --interval is given)
+  debug_polling_interval: 60
+
+  # Base ref for auto task scenes in normal mode
+  scene_base_ref: "origin/main"
+
   # Polling fallback (for missed webhook events)
   polling:
     enabled: true
@@ -352,10 +368,16 @@ orchestra:
     enabled: true
     # manager 默认在独立临时 worktree 中执行（codeagent-wrapper --worktree）
     use_worktree: true
-    # manager 是开发 scene owner，默认 agent preset 从仓库内 config/models.json 解析
-    agent: "code-explorer"
-    # backend/model 留空时，使用 config/models.json 中该 agent 的映射
-    # 仅在需要临时覆盖 preset 映射时填写
+    # manager 支持两种写法：
+    # - 配置 agent：走 preset 模式，preset 从 config/models.json 解析
+    # - 只配置 backend/model：走 backend 直连模式
+    # 如果同时配置 agent 和 backend/model，manager 执行时 agent 优先。
+    agent: "explore"
+    # backend/model 仅在以下场景生效：
+    # - 未配置 agent，显式走 backend 直连模式
+    # - 同时配置 agent 时，agent 仍是主入口；但 manager resolver 会先把 agent
+    #   preset 解析成 backend/model，所以额外填写 model 仍可能影响最终模型
+    #   选择，backend/model 不只是注释字段。
     backend:
     model:
     # manager 角色材料真源，由 prompt 组装时内联
@@ -377,23 +399,6 @@ orchestra:
   comment_reply:
     enabled: false
 
-  # Master agent for issue triage (disabled in reviewer-only mode)
-  master_agent:
-    # Enable master agent for new issue triage
-    enabled: false
-
-    # Agent preset name (passed to codeagent-wranipper)
-    agent: "oracle"
-
-    # Backend for direct execution
-    # backend: "claude"
-
-    # Model for direct execution
-    # model: "claude-sonnet-4-5"
-
-    # Timeout in seconds
-    timeout_seconds: 300
-
   # Governance prompt composition
   governance:
     enabled: true
@@ -404,10 +409,28 @@ orchestra:
     prompt_template: "orchestra.governance.plan"
     # Whether to inline the supervisor file into the composed governance prompt
     include_supervisor_content: true
-    dry_run: true
+    dry_run: false
+    # Governance agent configuration (independent from run/manager)
+    # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
+    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    # backend/model 支持两种用途：
+    # - 只写 backend/model：直连 backend
+    # - 同时写 agent 和 model：governance resolver 会先解析 preset，再允许 model
+    #   覆盖最终模型；但执行入口仍以 agent 优先
+    backend:
+    model:
 
   supervisor_handoff:
     enabled: true
     issue_label: "supervisor"
     handoff_state_label: "state/handoff"
     supervisor_file: "supervisor/apply.md"
+    # Supervisor handoff agent configuration (independent from run/manager/governance)
+    # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
+    agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json
+    # backend/model 支持两种用途：
+    # - 只写 backend/model：直连 backend
+    # - 同时写 agent 和 model：supervisor resolver 会先解析 preset，再允许 model
+    #   覆盖最终模型；但执行入口仍以 agent 优先
+    backend:
+    model:

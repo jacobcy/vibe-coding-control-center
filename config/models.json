@@ -19,8 +19,8 @@
       "yolo": true
     },
     "explore": {
-      "backend": "opencode",
-      "model": "volcengine/kimi-k2.5"
+      "backend": "gemini",
+      "model": "gemini-3-flash-preview"
     },
     "develop": {
       "backend": "opencode",

@@ -110,10 +110,11 @@ class IssuesMixin(IssueAdminMixin):
         return json.loads(result.stdout)  # type: ignore[no-any-return]
 
     def list_issues(
-        self: Any,
+        self,
         limit: int = 30,
         state: str = "open",
         assignee: str | None = None,
+        repo: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -142,6 +143,8 @@ class IssuesMixin(IssueAdminMixin):
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
+        if repo:
+            cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.bind(external="github", error=result.stderr).error(

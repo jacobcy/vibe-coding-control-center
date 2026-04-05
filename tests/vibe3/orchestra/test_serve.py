@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.orchestra.config import (
@@ -15,15 +16,24 @@ from vibe3.orchestra.config import (
     StateLabelDispatchConfig,
     SupervisorHandoffConfig,
 )
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.server.app import (
     app,
 )
 from vibe3.server.registry import (
     _build_async_serve_command,
     _build_server,
+    _resolve_orchestra_repo_root,
     _setup_tailscale_webhook,
     _validate_pid_file,
 )
+
+
+@pytest.fixture(autouse=True)
+def mock_failed_gate():
+    with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
+        mock_check.return_value = GateResult.open()
+        yield mock_check
 
 
 def test_build_server_registers_only_enabled_services() -> None:
@@ -35,8 +45,24 @@ def test_build_server_registers_only_enabled_services() -> None:
     heartbeat, _ = _build_server(cfg)
     assert "PRReviewDispatchService" in heartbeat.service_names
     assert "GovernanceService" in heartbeat.service_names
-    assert "StateLabelDispatchService" in heartbeat.service_names
+    assert "StateLabelDispatchService(manager:ready)" in heartbeat.service_names
+    assert "StateLabelDispatchService(manager:handoff)" in heartbeat.service_names
+    assert "StateLabelDispatchService(plan:claimed)" in heartbeat.service_names
+    assert "StateLabelDispatchService(run:in-progress)" in heartbeat.service_names
+    assert "StateLabelDispatchService(review:review)" in heartbeat.service_names
     assert "SupervisorHandoffService" in heartbeat.service_names
+
+
+def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent(monkeypatch) -> None:
+    import vibe3.server.registry as registry_module
+
+    monkeypatch.setattr(
+        registry_module.GitClient,
+        "get_git_common_dir",
+        lambda self: "/repo/.git",
+    )
+
+    assert _resolve_orchestra_repo_root() == Path("/repo")
 
 
 def test_build_server_governance_disabled() -> None:
@@ -143,6 +169,19 @@ def test_build_async_command_uses_config_port_and_skips_repo_when_none() -> None
     assert "--repo" not in cmd
 
 
+def test_build_async_command_includes_debug_flag() -> None:
+    cfg = OrchestraConfig(
+        enabled=True,
+        polling_interval=60,
+        port=8080,
+        debug=True,
+    )
+
+    cmd = _build_async_serve_command(cfg, verbose=0)
+
+    assert "--debug" in cmd
+
+
 def test_start_help_mentions_config_port_and_current_repo_defaults() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["start", "--help"])
@@ -150,6 +189,49 @@ def test_start_help_mentions_config_port_and_current_repo_defaults() -> None:
     assert result.exit_code == 0
     assert "config/settings.yaml" in result.stdout
     assert "current repository" in result.stdout.lower()
+
+
+def test_start_debug_overrides_interval_and_scene_base(monkeypatch) -> None:
+    import vibe3.server.app as serve_module
+
+    captured = {}
+
+    async def _fake_run(config, port):
+        captured["config"] = config
+        captured["port"] = port
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
+    monkeypatch.setattr(
+        serve_module.OrchestraConfig,
+        "from_settings",
+        classmethod(
+            lambda cls: OrchestraConfig(
+                enabled=True,
+                polling_interval=900,
+                debug_polling_interval=60,
+                port=8080,
+                scene_base_ref="origin/main",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        serve_module.GitClient, "get_current_branch", lambda self: "dev/post-437-debug"
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(serve_module, "_run", _fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["start", "--debug"])
+
+    assert result.exit_code == 0
+    config = captured["config"]
+    assert config.debug is True
+    assert config.polling_interval == 60
+    assert config.scene_base_ref == "dev/post-437-debug"
+    assert "scene_base: dev/post-437-debug" in result.stdout
+    assert "Main log:" in result.stdout
+    assert "Log dir:" in result.stdout
 
 
 def test_validate_pid_file_handles_read_errors(

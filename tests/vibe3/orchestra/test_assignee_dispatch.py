@@ -161,4 +161,4 @@ async def test_on_tick_prunes_assignee_cache() -> None:
 
     # Cache should be pruned to only issues seen in scan
     assert list(svc._assignee_cache.keys()) == [42, 43]
-    assert 999 not in svc._assignee_cache
+    svc._dispatcher.dispatch_manager.assert_not_called()

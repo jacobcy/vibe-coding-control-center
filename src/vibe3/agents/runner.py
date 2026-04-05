@@ -50,7 +50,8 @@ class CodeagentExecutionService:
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
-        ``agent`` and ``backend`` are mutually exclusive entry points:
+        ``agent`` and ``backend`` are both supported configuration entry points.
+        If both are present, ``agent`` wins.
 
         - agent mode  : pass ``--agent <preset>`` to codeagent-wrapper.
                         The preset's backend/model are defined in models.json.
@@ -64,8 +65,14 @@ class CodeagentExecutionService:
         1. CLI ``--agent``   → agent mode,   model ignored
         2. CLI ``--backend`` → backend mode, CLI ``--model`` used if given
                                (config model is NOT inherited — be explicit)
-        3. Config ``agent``  → agent mode,   model ignored
-        4. Config ``backend``→ backend mode, config ``model`` used if present
+                3. Config ``agent``  → agent mode,   model ignored
+                4. Config ``backend``→ backend mode, config ``model`` used if present
+
+                Important:
+                - Backend-only configuration is valid.
+                - ``model`` only matters when ``backend`` is configured.
+                - When config contains both ``agent`` and ``backend/model``, this method
+                    intentionally keeps ``agent`` as the execution source of truth.
         """
         target_config = getattr(self.config, section, None)
         config_agent = None
@@ -164,6 +171,7 @@ class CodeagentExecutionService:
             "executor": "run",
             "reviewer": "review",
         }
+        backend = CodeagentBackend()
         options = self.resolve_agent_options(
             section=role_to_section[command.role],
             agent=command.agent,
@@ -171,12 +179,9 @@ class CodeagentExecutionService:
             model=command.model,
             worktree=command.worktree,
         )
-        prompt = command.context_builder()
-        backend = CodeagentBackend()
-        handle = backend.start_async(
-            prompt=prompt,
-            options=options,
-            task=command.task,
+        cli_command = self._build_cli_command(command)
+        handle = backend.start_async_command(
+            cli_command,
             execution_name=f"vibe3-{command.role}-{branch}",
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
@@ -295,4 +300,5 @@ class CodeagentExecutionService:
             cmd.append("--worktree")
         if command.task:
             cmd.append(command.task)
+        cmd.append("--sync")
         return cmd

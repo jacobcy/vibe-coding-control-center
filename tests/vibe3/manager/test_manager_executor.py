@@ -4,8 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import yaml
-
 from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -43,12 +41,12 @@ class TestManagerReviewWorktreeResolution:
         with patch.object(
             manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ) as mock_run:
-                    result = manager.dispatch_pr_review(42)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch(
+                "subprocess.run",
+                return_value=CompletedProcess(returncode=0),
+            ) as mock_run:
+                result = manager.dispatch_pr_review(42)
 
         assert result is True
         # ManagerExecutor calls run_command which calls subprocess.run
@@ -63,12 +61,12 @@ class TestManagerReviewWorktreeResolution:
         with patch.object(
             manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ) as mock_run:
-                    result = manager.dispatch_pr_review(42)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch(
+                "subprocess.run",
+                return_value=CompletedProcess(returncode=0),
+            ) as mock_run:
+                result = manager.dispatch_pr_review(42)
 
         assert result is True
         async_calls = [c for c in mock_run.call_args_list if "--async" in c[0][0]]
@@ -100,7 +98,47 @@ class TestManagerReviewWorktreeResolution:
         assert "--async" in cmd
         assert "--worktree" not in cmd
         assert "Manage issue #89: Run in current flow" in cmd[-1]
-        assert "comment、写 handoff、修改 labels" in cmd[-1]
+
+    def test_mark_manager_start_failed_marks_flow_stale(self):
+        """manager 启动失败时，flow 应被标记为 stale（而不是保持 active）。"""
+        from unittest.mock import MagicMock
+
+        from vibe3.models.orchestration import IssueState
+
+        config = MagicMock()
+        config.max_concurrent_flows = 3
+        config.dry_run = False
+        config.circuit_breaker.enabled = False
+
+        executor = ManagerExecutor.__new__(ManagerExecutor)
+        executor.config = config
+        executor.dry_run = False
+        executor._queued_issues = set()
+        executor._last_error_category = None
+
+        executor.result_handler = MagicMock()
+        executor._flow_manager = MagicMock()
+        executor._circuit_breaker = None
+        executor.status_service = MagicMock()
+        executor.status_service.get_active_flow_count.return_value = 0
+
+        # flow exists with a branch
+        executor._flow_manager.get_flow_for_issue.return_value = {
+            "branch": "task/issue-301",
+            "flow_status": "active",
+        }
+
+        issue = make_issue(301)
+        executor._mark_manager_start_failed(issue, "test failure")
+
+        # flow should be marked stale
+        executor._flow_manager.store.update_flow_state.assert_called_once_with(
+            "task/issue-301", flow_status="stale"
+        )
+        # issue should be marked FAILED
+        executor.result_handler.update_state_label.assert_called_once_with(
+            301, IssueState.FAILED
+        )
 
     def test_dispatch_manager_dry_run_skips_flow_creation_and_execution(self):
         config = OrchestraConfig(dry_run=True)
@@ -111,9 +149,9 @@ class TestManagerReviewWorktreeResolution:
             manager.flow_manager,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch("subprocess.run") as mock_run:
-                    result = manager.dispatch_manager(issue)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch("subprocess.run") as mock_run:
+                result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_create_flow.assert_not_called()
@@ -141,28 +179,35 @@ class TestManagerReviewWorktreeResolution:
                     "_resolve_manager_cwd",
                     return_value=(Path("/tmp/repo/.worktrees/issue-102"), False),
                 ):
-                    with patch.object(manager.result_handler, "update_state_label"):
-                        with patch.object(
-                            manager.flow_manager.store,
-                            "add_event",
-                        ) as mock_add_event:
+                    with patch.object(
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
+                        with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
-                                manager._backend,
-                                "start_async_command",
-                                return_value=SimpleNamespace(
-                                    tmux_session="vibe3-manager-102",
-                                    log_path=Path(
-                                        "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                manager.flow_manager.store,
+                                "add_event",
+                            ) as mock_add_event:
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    return_value=SimpleNamespace(
+                                        tmux_session="vibe3-manager-102",
+                                        log_path=Path(
+                                            "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                        ),
                                     ),
-                                ),
-                            ) as mock_start:
-                                result = manager.dispatch_manager(issue)
+                                ) as mock_start:
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_start.assert_called_once()
         call = mock_start.call_args
         cmd = call.args[0]
-        assert cmd[:5] == ["uv", "run", "python", "src/vibe3/cli.py", "run"]
+        assert cmd[:4] == ["uv", "run", "python", "-I"]
+        assert cmd[4] == str(Path("/tmp/repo/src/vibe3/cli.py").resolve())
+        assert cmd[5] == "run"
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
@@ -170,7 +215,7 @@ class TestManagerReviewWorktreeResolution:
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"
 
-    def test_dispatch_manager_marks_issue_claimed_before_launch(self):
+    def test_dispatch_manager_does_not_preclaim_before_launch(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=103, title="Claim before manager run")
@@ -189,25 +234,111 @@ class TestManagerReviewWorktreeResolution:
                     return_value=(Path("/tmp/repo/.worktrees/issue-103"), False),
                 ):
                     with patch.object(
-                        manager.result_handler, "update_state_label"
-                    ) as mock_update:
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
                         with patch.object(
-                            manager.result_handler, "on_dispatch_success"
-                        ):
+                            manager.result_handler, "update_state_label"
+                        ) as mock_update:
+                            with patch.object(
+                                manager.result_handler, "on_dispatch_success"
+                            ):
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    return_value=SimpleNamespace(
+                                        tmux_session="vibe3-manager-103",
+                                        log_path=Path(
+                                            "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
+                                        ),
+                                    ),
+                                ):
+                                    result = manager.dispatch_manager(issue)
+
+        assert result is True
+        mock_update.assert_not_called()
+
+    def test_dispatch_manager_start_failure_marks_issue_failed(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=104, title="Manager startup failure")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-104"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-104"), False),
+                ):
+                    with patch.object(
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
+                        with patch.object(
+                            manager.result_handler, "update_state_label"
+                        ) as mock_update:
+                            with patch.object(
+                                manager.result_handler, "post_failure_comment"
+                            ) as mock_comment:
+                                with patch.object(
+                                    manager._backend,
+                                    "start_async_command",
+                                    side_effect=RuntimeError("tmux unavailable"),
+                                ):
+                                    result = manager.dispatch_manager(issue)
+
+        assert result is False
+        assert mock_update.call_args_list[-1].args == (issue.number, IssueState.FAILED)
+        mock_comment.assert_called_once()
+
+    def test_dispatch_manager_preserves_temporary_worktree_after_async_launch(self):
+        config = OrchestraConfig()
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=105, title="Preserve launched worktree")
+
+        with patch.object(
+            manager.flow_manager,
+            "create_flow_for_issue",
+            return_value={"branch": "task/issue-105"},
+        ):
+            with patch.object(
+                manager.status_service, "get_active_flow_count", return_value=0
+            ):
+                with patch.object(
+                    manager,
+                    "_resolve_manager_cwd",
+                    return_value=(Path("/tmp/repo/.worktrees/issue-105"), True),
+                ):
+                    with patch.object(
+                        manager.worktree_manager,
+                        "align_auto_scene_to_base",
+                        return_value=True,
+                    ):
+                        with patch.object(
+                            manager.worktree_manager, "recycle"
+                        ) as mock_recycle:
                             with patch.object(
                                 manager._backend,
                                 "start_async_command",
                                 return_value=SimpleNamespace(
-                                    tmux_session="vibe3-manager-103",
+                                    tmux_session="vibe3-manager-105",
                                     log_path=Path(
-                                        "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
+                                        "/tmp/repo/temp/logs/vibe3-manager-105.async.log"
                                     ),
                                 ),
                             ):
                                 result = manager.dispatch_manager(issue)
 
         assert result is True
-        mock_update.assert_called_once_with(issue.number, IssueState.CLAIMED)
+        mock_recycle.assert_not_called()
 
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()
@@ -265,126 +396,3 @@ class TestManagerReviewWorktreeResolution:
         mock_resolve.assert_not_called()
         assert "--worktree" in cmd
         assert cwd == Path("/tmp/repo")
-
-
-class TestManagerRecipeDrivenPrompt:
-    """Assert manager dispatch uses recipe-driven prompt assembly."""
-
-    def test_build_manager_recipe_returns_prompt_recipe(self):
-        """ManagerExecutor should expose recipe building via CommandBuilder."""
-        from vibe3.prompts.models import PromptRecipe
-
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        recipe = manager.command_builder.build_manager_recipe()
-        assert isinstance(recipe, PromptRecipe)
-
-    def test_build_manager_recipe_uses_configured_template_key(self):
-        """Recipe template_key should come from config."""
-        from vibe3.orchestra.config import AssigneeDispatchConfig
-
-        config = OrchestraConfig(
-            assignee_dispatch=AssigneeDispatchConfig(
-                prompt_template="orchestra.assignee_dispatch.manager"
-            )
-        )
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        recipe = manager.command_builder.build_manager_recipe()
-        assert recipe.template_key == "orchestra.assignee_dispatch.manager"
-
-    def test_build_manager_command_still_produces_correct_last_arg(self, tmp_path):
-        """Default template should produce same text as the old hardcoded format."""
-        import yaml
-
-        from vibe3.orchestra.config import AssigneeDispatchConfig
-
-        templates = {
-            "orchestra": {
-                "assignee_dispatch": {
-                    "manager": "Implement issue #{issue_number}: {issue_title}"
-                }
-            }
-        }
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
-
-        config = OrchestraConfig(
-            assignee_dispatch=AssigneeDispatchConfig(
-                prompt_template="orchestra.assignee_dispatch.manager"
-            )
-        )
-        manager = ManagerExecutor(
-            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
-        issue = make_issue(number=88, title="Improve parser")
-        cmd = manager.command_builder.build_manager_command(issue)
-        assert cmd[-1] == "Implement issue #88: Improve parser"
-
-    def test_dispatch_manager_dry_run_logs_rendered_prompt(self, tmp_path):
-        """Dry run should be able to show rendered prompt."""
-        import yaml
-
-        from vibe3.orchestra.config import AssigneeDispatchConfig
-
-        templates = {
-            "orchestra": {
-                "assignee_dispatch": {
-                    "manager": "Implement issue #{issue_number}: {issue_title}"
-                }
-            }
-        }
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
-
-        config = OrchestraConfig(
-            dry_run=True,
-            assignee_dispatch=AssigneeDispatchConfig(
-                prompt_template="orchestra.assignee_dispatch.manager"
-            ),
-        )
-        manager = ManagerExecutor(
-            config, dry_run=True, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
-        issue = make_issue(number=42, title="Dry run test")
-        manager.command_builder.build_manager_command(issue)
-        assert manager.last_manager_render_result is not None
-        assert "Implement issue #42: Dry run test" in (
-            manager.last_manager_render_result.rendered_text
-        )
-
-    def test_manager_recipe_uses_file_source_for_supervisor_content(self, tmp_path):
-        """include_supervisor_content=True: FILE source for supervisor/manager.md."""
-        from vibe3.orchestra.config import AssigneeDispatchConfig
-        from vibe3.prompts.models import VariableSourceKind
-
-        templates = {
-            "orchestra": {
-                "assignee_dispatch": {
-                    "manager": (
-                        "Implement issue #{issue_number}: {issue_title}"
-                        "\nSupervisor: {supervisor_content}"
-                    ),
-                }
-            }
-        }
-        prompts_path = tmp_path / "prompts.yaml"
-        prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
-
-        config = OrchestraConfig(
-            assignee_dispatch=AssigneeDispatchConfig(
-                prompt_template="orchestra.assignee_dispatch.manager",
-                supervisor_file="supervisor/manager.md",
-                include_supervisor_content=True,
-            ),
-        )
-
-        manager = ManagerExecutor(
-            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
-        recipe = manager.command_builder.build_manager_recipe()
-
-        # Verify supervisor_content uses FILE source
-        supervisor_src = recipe.variables.get("supervisor_content")
-        assert supervisor_src is not None
-        assert supervisor_src.kind == VariableSourceKind.FILE
-        assert supervisor_src.path == "supervisor/manager.md"

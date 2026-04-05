@@ -104,6 +104,84 @@ class TestManagerCwdResolution:
         assert result == (None, False)
         mock_run.assert_not_called()
 
+    def test_align_auto_scene_to_base_resets_canonical_task_scene(self, tmp_path: Path):
+        """Test alignment for fresh branch (no commits) - should reset."""
+        config = make_config()
+        config.scene_base_ref = "origin/main"
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        # Mock git log to return no commits (fresh branch)
+        def mock_run_fresh(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "log", "--oneline"]:
+                # Fresh branch - log command fails
+                return CompletedProcess(returncode=128, stdout="", stderr="error")
+            return CompletedProcess(returncode=0)
+
+        with patch(
+            "subprocess.run",
+            side_effect=mock_run_fresh,
+        ) as mock_run:
+            ok = manager.worktree_manager.align_auto_scene_to_base(
+                tmp_path / ".worktrees" / "issue-77",
+                "task/issue-77",
+            )
+
+        assert ok is True
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        # For fresh branch: fetch + full reset
+        assert calls == [
+            ["git", "log", "--oneline", "-n", "1", "task/issue-77"],
+            ["git", "fetch", "--all", "--prune"],
+            ["git", "checkout", "task/issue-77"],
+            ["git", "reset", "--hard", "origin/main"],
+            ["git", "clean", "-fd"],
+        ]
+
+    def test_align_auto_scene_preserves_existing_task_branch(self, tmp_path: Path):
+        """Test alignment for existing branch with commits - should NOT reset."""
+        config = make_config()
+        config.scene_base_ref = "origin/main"
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        # Mock git log to show branch has commits
+        def mock_run_existing(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "log", "--oneline"]:
+                # Existing branch with commits
+                return CompletedProcess(
+                    returncode=0, stdout="abc123 Previous commit\n", stderr=""
+                )
+            return CompletedProcess(returncode=0)
+
+        with patch(
+            "subprocess.run",
+            side_effect=mock_run_existing,
+        ) as mock_run:
+            ok = manager.worktree_manager.align_auto_scene_to_base(
+                tmp_path / ".worktrees" / "issue-77",
+                "task/issue-77",
+            )
+
+        assert ok is True
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        # For existing branch: only fetch, no destructive operations
+        assert calls == [
+            ["git", "log", "--oneline", "-n", "1", "task/issue-77"],
+            ["git", "fetch", "--all", "--prune"],
+        ]
+
+    def test_align_auto_scene_to_base_skips_manual_scene(self, tmp_path: Path):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        with patch("subprocess.run") as mock_run:
+            ok = manager.worktree_manager.align_auto_scene_to_base(
+                tmp_path / ".worktrees" / "manual",
+                "dev/issue-999",
+            )
+
+        assert ok is True
+        mock_run.assert_not_called()
+
 
 class TestManagerCommandNormalization:
     """Tests for ManagerExecutor command normalization."""
@@ -174,31 +252,40 @@ class TestManagerDispatchIntegration:
                 return_value=(Path("/tmp/wt-issue-102"), False),
             ):
                 with patch.object(
-                    manager, "_normalize_manager_command", return_value=["uv"]
+                    manager.worktree_manager,
+                    "align_auto_scene_to_base",
+                    return_value=True,
                 ):
                     with patch.object(
-                        manager.status_service,
-                        "get_active_flow_count",
-                        return_value=0,
+                        manager, "_normalize_manager_command", return_value=["uv"]
                     ):
-                        with patch.object(manager.result_handler, "update_state_label"):
+                        with patch.object(
+                            manager.status_service,
+                            "get_active_flow_count",
+                            return_value=0,
+                        ):
                             with patch.object(
-                                manager.flow_manager.store,
-                                "add_event",
-                                return_value=None,
-                            ) as mock_add_event:
-                                handle = AsyncExecutionHandle(
-                                    tmux_session="vibe3-manager-102",
-                                    log_path=Path(
-                                        "temp/logs/vibe3-manager-102.async.log"
-                                    ),
-                                    prompt_file_path=Path("/tmp/prompt.md"),
-                                )
-                                mock_backend = MagicMock()
-                                start_async_command = mock_backend.start_async_command
-                                start_async_command.return_value = handle
-                                manager._backend = mock_backend
-                                result = manager.dispatch_manager(issue)
+                                manager.result_handler, "update_state_label"
+                            ):
+                                with patch.object(
+                                    manager.flow_manager.store,
+                                    "add_event",
+                                    return_value=None,
+                                ) as mock_add_event:
+                                    handle = AsyncExecutionHandle(
+                                        tmux_session="vibe3-manager-102",
+                                        log_path=Path(
+                                            "temp/logs/vibe3-manager-102.async.log"
+                                        ),
+                                        prompt_file_path=Path("/tmp/prompt.md"),
+                                    )
+                                    mock_backend = MagicMock()
+                                    start_async_command = (
+                                        mock_backend.start_async_command
+                                    )
+                                    start_async_command.return_value = handle
+                                    manager._backend = mock_backend
+                                    result = manager.dispatch_manager(issue)
 
         assert result is True
         # Async dispatch only records "dispatched" event, not success/failure

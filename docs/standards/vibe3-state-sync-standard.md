@@ -20,6 +20,8 @@
 
 这些分别以其他标准为准。
 
+调试方法与日志规范见 [agent-debugging-standard.md](agent-debugging-standard.md)。
+
 ## 2. 真源分层
 
 状态同步只允许使用以下真源：
@@ -80,6 +82,8 @@ handoff 不代替 issue comment。
 
 - 如果 manager 发现当前无法推进，必须先检查最新评论里是否已经说明原因
 - 若最新评论没有明确原因，manager 必须写一条 issue comment 解释本轮为什么停止
+- 如果 manager 进入 `state/blocked`，必须先检查已有 comments 是否已经覆盖同一 blocker
+- 只有出现新的 blocker 时，manager 才应追加新的 issue comment
 - 不允许在“无法推进”时静默退出，避免黑箱
 
 ### 3.4 每轮只处理当前 state
@@ -175,6 +179,20 @@ handoff 不代替 issue comment。
 - 如有必要，补充 handoff
 - 等待人类或上游条件变化
 
+### `state/failed`
+
+含义：
+
+- `plan / run / review` 执行过程中发生了真实报错
+- 当前问题属于执行器、代码、环境或触发链故障
+- 这是 bug / error 语义，不是 manager 的业务阻塞语义
+
+典型动作：
+
+- 记录失败 comment
+- 暂停新的自动任务进入
+- 由人类或修复任务先处理该错误，再决定恢复到对应阶段
+
 ### `state/merge-ready`
 
 含义：
@@ -195,23 +213,34 @@ handoff 不代替 issue comment。
 4. plan agent 启动
 5. plan 完成并写 handoff
 6. `state/handoff`
-7. manager 读取 refs 后决定是否进入 `state/in-progress`
+7. **manager 自动恢复**，读取 refs 后决定是否进入 `state/in-progress`
 8. `state/in-progress`
 9. run agent 启动
 10. run 完成并写 handoff
 11. `state/handoff`
-12. manager 读取 refs 后决定是否进入 `state/review`
+12. **manager 自动恢复**，读取 refs 后决定是否进入 `state/review`
 13. `state/review`
 14. review agent 启动
 15. review 完成并写 handoff
 16. `state/handoff`
-17. manager 最终判断
+17. **manager 自动恢复**，最终判断
 18. `state/merge-ready`
+
+**Manager Handoff Resume**：
+
+当 issue 处于 `state/handoff` 时，manager 会自动恢复执行（无需人工干预）。这个 resume 路径确保：
+
+- Manager 始终是状态决策者
+- 每次阶段完成后，manager 都有机会判断下一步
+- Issue 不会卡在 `state/handoff` 等待人工触发
 
 关键规则：
 
 - agent 执行结束后，只写 handoff，不直接推进到下一状态
 - 下一状态统一由 manager 决定
+- manager 在 `state/handoff` 自动恢复（自动触发）
+- manager 无法推进时使用 `state/blocked`
+- `plan / run / review` 执行报错时使用 `state/failed`
 
 ## 6. manager 判定规则
 
@@ -221,13 +250,21 @@ manager 只有在以下条件都满足时，才应迁移：
 
 - 当前 labels 真源显示 `state/ready`
 - scene 健康或可恢复
-- 最新人类 comment 明确要求继续推进，或没有相反指示
+- 最新人类 comment 没有明确要求暂停、等待或阻止推进
 
 迁移后必须再次读取 labels 确认：
 
 - `state/claimed` 已生效
 
 在确认前，不得假设当前已经进入下一阶段。
+
+补充硬规则：
+
+- 在 `state/ready` 阶段，本轮必须落下明确状态结果
+- 允许的结束结果只有：
+  - `state/claimed`
+  - `state/blocked`
+- 不允许保持 `state/ready` 后直接停止
 
 ### 6.2 `claimed` 是 plan 启动标志
 
@@ -249,8 +286,36 @@ plan agent 完成后：
 
 - 写 handoff
 - 将 issue 调整为 `state/handoff`
+- **Manager 自动恢复**，读取 refs 并决定下一步
 
-### 6.3 blocked 判断
+### 6.3 `handoff` 触发 manager 自动恢复
+
+当 issue 进入 `state/handoff` 时，orchestra 会自动触发 manager resume：
+
+**触发条件**：
+- Issue 有 canonical task flow（`task/issue-*` 分支）
+- Flow state 有有效 refs（如 `plan_ref`）
+- 没有活动的 manager session
+
+**去重机制**：
+- 如果已有 live manager session，不会重复 dispatch
+- 如果 session 结束且无进展，会 auto-block
+
+**Progress Detection**：
+Manager 在判断是否有进展时，观察以下维度：
+- `state/*` label 变化
+- 新的 issue comment
+- 新的 handoff 文件
+- Flow refs 更新
+
+Async runtime 和 sync CLI 执行使用相同的 progress 判断标准。
+
+### 6.4 blocked 判断
+
+**当前 manager mainline**:
+- manager 是 flow owner，负责推进 issue
+- 如果 manager session 结束且没有任何可观察的状态变化，自动迁移到 `state/blocked`
+- blocked follow-up（如 doctor/aborted 处理）明确在当前 mainline 之外，未来扩展
 
 manager 可以把 issue 调整到 `state/blocked`，但必须满足：
 
@@ -271,7 +336,29 @@ manager 不应：
 - 若没有，则写 issue comment 说明：
   - 当前卡点
   - 依据的真源
-  - 需要谁提供什么信息或决策
+- 需要谁提供什么信息或决策
+
+### 6.3.1 blocked 与 failed 的边界
+
+`state/blocked` 只用于 manager 的业务判断：
+
+- 依赖未满足
+- 最新人类 comment 明确要求暂停
+- 当前 scene 不健康，无法安全继续
+- refs/证据不足，需要人类或上游补信息
+
+`state/failed` 只用于执行器错误：
+
+- plan agent 报错
+- run agent 报错
+- review agent 报错
+- 触发链、环境、代码或解析错误导致当前阶段无法完成
+
+规则：
+
+- manager 不因为执行报错把 issue 标成 `blocked`
+- `plan / run / review` 不因为业务阻塞把 issue 标成 `failed`
+- server 看到 open 的 `state/failed` 时，应暂停新的自动任务进入，直到失败解除
 
 ### 6.4 `handoff` 下的准备类 refs 修复顺序
 
@@ -280,7 +367,7 @@ manager 不应：
 1. 如果缺少 `spec_ref`
 - 当前轮不进入 `run` / `review`
 - 先补齐 spec 真源，例如执行：
-  - `vibe3 flow update --spec <...>`
+  - `uv run python src/vibe3/cli.py flow update --spec <...>`
 - 写 issue comment 说明当前缺失的是 spec 真源
 - 必要时写 handoff
 - `exit()`
@@ -354,18 +441,26 @@ manager 只负责在 `state/handoff` 读完 handoff/refs 后，决定是否将 i
 manager / supervisor / 人机调试时，优先使用：
 
 ```bash
-vibe3 task show
-vibe3 task show --comments
-vibe3 task status
-vibe3 handoff show
+uv run python src/vibe3/cli.py task show <target-branch>
+uv run python src/vibe3/cli.py task show <target-branch> --comments
+uv run python src/vibe3/cli.py task status
+uv run python src/vibe3/cli.py handoff show <target-branch>
 gh issue view <issue-number> --json labels,state
 ```
 
 其中：
 
-- `task show`：单 task-scene 真源
-- `task show --comments`：最新评论与最新人类指示
-- `task status`：全局任务/队列状态
+- `task show <target-branch>`：单 task-scene 真源
+- `task show <target-branch> --comments`：最新评论与最新人类指示
+- `task status`：全局任务/队列状态（不是单个 `ready` issue 的健康真源）
+- `handoff show <target-branch>`：当前交接材料
+
+补充规则：
+
+- `state/ready` 阶段的 scene 健康判断，优先使用 `task show <target-branch>`、
+  `handoff show <target-branch>`、`pwd`、`git branch --show-current`
+- 全局 `task status` 中的 `Server: stopped/unreachable`、或“当前没有 active issues”
+  这类信号，不能单独作为把当前 `ready` issue 调整为 `blocked` 的依据
 
 ## 10. 禁止事项
 
@@ -384,4 +479,5 @@ gh issue view <issue-number> --json labels,state
 - manager prompt / supervisor prompt
 - task / status / flow 命令文案
 - GitHub Project 视图说明
-- 调试标准
+- 调试标准（见 [agent-debugging-standard.md](agent-debugging-standard.md)）
+- orchestra 运行时标准（见 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md)）

@@ -1,14 +1,14 @@
 # Agent 调试标准
 
-> **文档定位**：定义 `vibe3` agent 链路的标准调试方法，先以 supervisor / orchestra 治理链为基线，再作为调试 manager 链的统一方法
-> **适用范围**：所有使用 `vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试
-> **权威性**：本标准是 agent 调试流程的权威依据；具体业务语义仍以对应的 `skills/`、`supervisor/`、`.agent/policies/` 为准
+> **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
+> **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
 
 ---
 
 ## 一、目标
 
-调试 agent 链路时，目标不是“尽快跑通一次”，而是：
+调试 agent 链路时，目标不是"尽快跑通一次"，而是：
 
 - 确认 prompt 材料是否正确装配
 - 确认底层触发是否只做最小能力提供
@@ -62,24 +62,180 @@ agent 调试默认使用 async/tmux：
 - 通过 tmux session 和 session log 观察运行过程
 - 通过 `vibe3 flow show` 或 GitHub issue 查看外部结果
 
-调试时必须优先保证“能看见发生了什么”，而不是追求链路一步到位自动化。
+调试时必须优先保证"能看见发生了什么"，而不是追求链路一步到位自动化。
 
 ### 2.4 角色默认模型必须显式配置
 
 - `plan`、`run`、`review`、`manager`、`supervisor` 是不同角色，不应因为实现方便而隐式共用同一个默认 agent preset
 - 尤其是 `manager`，它承担 scene 判断、状态迁移、后续 agent 派发，不应默认继承 `run.agent_config.agent`
-- 如果某个角色长期表现出“执行型过强、治理型过弱”或“过度自由探索”，优先检查该角色是否错误继承了别的默认 agent/model
+- 如果某个角色长期表现出"执行型过强、治理型过弱"或"过度自由探索"，优先检查该角色是否错误继承了别的默认 agent/model
 - 调试时要同时核查两层真源：
   - 仓库配置真源：`config/settings.yaml`
   - codeagent preset 真源：`~/.codeagent/models.json`
 - 原则上：
-  - 仓库只决定“这个角色默认用哪个 agent/backend/model”
+  - 仓库只决定"这个角色默认用哪个 agent/backend/model"
   - `models.json` 决定该 preset 的具体底层映射
   - prompt 不负责偷偷补偿模型选择错误
 
 ---
 
-## 三、标准调试循环
+## 三、日志规范
+
+### 3.1 日志分层
+
+Vibe3 的日志体系分三层，各有明确用途：
+
+| 层 | 路径 | 用途 | 持久性 |
+|---|---|---|---|
+| Orchestra 运行时日志 | `temp/logs/orchestra/` | server 生命周期、service 调度、governance 事件 | 跨 serve 运行 |
+| Agent 会话日志 | `temp/logs/*.async.log` | 单次 agent 执行的完整输出 | 60s keep-alive 后回收 |
+| 控制台日志 | stderr (loguru) | 开发者实时观察 | 不持久化 |
+
+所有日志统一写入仓库 `temp/logs/`，不写入 `.git/vibe3/` 或其他共享状态目录。`temp/` 在 `.gitignore` 中排除。
+
+### 3.2 Orchestra 运行时日志
+
+**主事件日志**：
+
+```text
+temp/logs/orchestra/events.log
+```
+
+记录内容：
+
+- server 启停（含 tick_interval、polling_enabled、max_concurrent、services 列表）
+- service 注册
+- heartbeat tick 开始/完成
+- governance dispatch / skip / fail
+- state trigger dispatch / skip
+- runtime 错误
+
+格式：
+
+```text
+[2026-04-04T14:23:31] [server] start tick_interval=60s polling_enabled=True max_concurrent=3
+[2026-04-04T14:23:31] [server] registered service: GovernanceService
+[2026-04-04T14:24:35] [governance] tick #1 dispatched: tmux=vibe3-governance-scan-... log=temp/logs/...
+[2026-04-04T14:25:35] [server] heartbeat tick #1 completed in 0.12s
+```
+
+启用条件：`VIBE3_ORCHESTRA_EVENT_LOG=1`（`vibe3 serve start` 自动设置）。
+
+每次 `serve start` 会覆盖 `events.log`（写入 run separator），不会跨运行追加。
+
+**Governance 日志**：
+
+```text
+temp/logs/orchestra/governance/governance.log
+```
+
+记录 governance service 的所有事件，同时写入 `events.log`。格式同上。
+
+**Governance dry-run 输出**：
+
+```text
+temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
+```
+
+`serve start --dry-run` 时 governance prompt 组装结果写入此目录，用于检查 prompt 是否正确装配。
+
+### 3.3 Agent 会话日志
+
+每次 agent 异步执行都会产生一个会话日志：
+
+```text
+temp/logs/vibe3-{role}-{target}.async.log
+```
+
+角色与命名规则：
+
+| 角色 | 文件名模式 | 示例 |
+|---|---|---|
+| manager | `vibe3-manager-issue-{n}.async.log` | `vibe3-manager-issue-372.async.log` |
+| plan | `vibe3-plan-issue-{n}.async.log` | `vibe3-plan-issue-420.async.log` |
+| run | `vibe3-run-issue-{n}.async.log` | `vibe3-run-issue-420.async.log` |
+| review | `vibe3-review-issue-{n}.async.log` | `vibe3-review-issue-420.async.log` |
+| governance | `vibe3-governance-scan-{ts}-t{n}.async.log` | `vibe3-governance-scan-20260404-142351-t3.async.log` |
+| supervisor | `vibe3-supervisor-issue-{n}.async.log` | `vibe3-supervisor-issue-435.async.log` |
+
+会话日志特性：
+
+- 通过 tmux `tee` 捕获完整 stdout/stderr
+- 内置 awk 过滤器：自动抑制 Codex runtime noise（state-db warning、shell-snapshot cleanup、analytics 403）
+- 执行结束后 tmux session 保持 60s（keep-alive），方便检查尾部输出
+- CLI 输出会直接显示 `Session log: temp/logs/...` 路径
+
+### 3.4 控制台日志
+
+基于 loguru 的结构化控制台输出（stderr），不写入文件。
+
+配置：
+
+- `vibe3 serve start` — 默认 INFO 级别
+- `vibe3 serve start -v` — DEBUG 级别，含 file:line:function
+- `vibe3 serve start -vv` — TRACE 级别
+
+代码中使用语义化 context binding：
+
+```python
+logger.bind(domain="orchestra", action="governance").info("Governance scan dispatched")
+```
+
+### 3.5 日志读取方法
+
+**查看 orchestra 运行状态**：
+
+```bash
+# 实时跟踪主事件日志
+tail -f temp/logs/orchestra/events.log
+
+# 查看 governance 事件
+cat temp/logs/orchestra/governance/governance.log
+
+# 查看 dry-run prompt 组装结果
+cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
+```
+
+**查看 agent 执行日志**：
+
+```bash
+# 查看最新 manager 执行
+ls -lt temp/logs/vibe3-manager-*.async.log | head -1
+tail -100 temp/logs/vibe3-manager-issue-XXX.async.log
+
+# 实时跟踪正在运行的 agent
+tail -f temp/logs/vibe3-plan-issue-XXX.async.log
+
+# 列出所有活跃 tmux session
+tmux ls | grep vibe3
+
+# 查看特定 tmux session
+tmux capture-pane -t vibe3-manager-issue-XXX -p
+```
+
+**查看完整执行现场**：
+
+```bash
+# 真源三件套
+uv run python src/vibe3/cli.py task show <target-branch> --comments
+uv run python src/vibe3/cli.py handoff show <target-branch>
+gh issue view <issue-number> --json labels,state
+
+# 验证 flow lifecycle integrity（状态变更事件记录）
+uv run python src/vibe3/cli.py flow show <target-branch>
+```
+
+### 3.6 日志标准要求
+
+- agent 执行必须通过 async/tmux，CLI 输出必须显示 `Session log: temp/logs/...`
+- 新增 service 必须在 `on_tick()` 中调用 `append_orchestra_event()` 记录关键事件
+- 日志文件不进入 git（`temp/` 在 `.gitignore` 中）
+- 不要在 `events.log` 中混入 unit test 的假 server run
+- 会话日志不挂在上层 handoff 语义里；handoff 是交接材料，日志是调试材料
+
+---
+
+## 四、标准调试循环
 
 每条 agent 链路都应遵循同一套调试循环：
 
@@ -90,10 +246,11 @@ agent 调试默认使用 async/tmux：
    - 先确认 `skills/`、`supervisor/`、`.agent/policies/` 是否在正确层级
 3. **dry-run 验证**
    - 确认建议、计划或目标 issue 是否正确
+   - 查看 `temp/logs/orchestra/governance/dry-run/` 输出
 4. **最小真实执行**
    - 只放开最小动作，不一次启用所有副作用
 5. **观察执行现场**
-   - 记录 tmux session、session log、CLI 输出、issue/flow 变化
+   - 记录 tmux session、session log（`temp/logs/*.async.log`）、CLI 输出、issue/flow 变化
 6. **停下来读结果**
    - 先确认结果与 comment / issue 线程一致，再进入下一步
 7. **只收当前尾巴**
@@ -101,24 +258,33 @@ agent 调试默认使用 async/tmux：
 
 ---
 
-## 四、Supervisor / Orchestra 治理链调试标准
+## 五、Orchestra 治理链调试
 
-### 4.1 链路语义
+### 5.1 链路语义
 
-治理链的标准形态是：
+治理链涉及两条运行时路径：
+
+**路径 A — Governance 周期扫描**：
 
 ```text
-supervisor suggest -> governance issue -> run --issue -> apply -> comment -> close
+GovernanceService.on_tick() -> PromptRecipe 组装 -> codeagent dispatch -> 治理 issue 创建/处理
 ```
 
-约束如下：
+- 由 `GovernanceService` 按配置的 `interval_ticks` 周期性触发
+- 通过 `PromptRecipe` / `PromptAssembler` 组装 prompt，使用 `supervisor/orchestra.md` 作为角色材料
+- 日志：`temp/logs/orchestra/governance/governance.log`
 
-- `supervisor/issue-cleanup.md` 负责发现问题并创建治理 issue
-- `supervisor/apply.md` 负责读取指定治理 issue，核查、执行、comment、close
-- `vibe3 run --issue <number>` 默认读取配置中的 apply supervisor
-- 治理 issue 是交接真源；不要为治理链引入 branch handoff
+**路径 B — Supervisor Handoff 消费**：
 
-### 4.2 治理 issue 约定
+```text
+SupervisorHandoffService.on_tick() -> 查找 supervisor+state/handoff issue -> dispatch -> apply -> comment -> close
+```
+
+- 消费带有 `supervisor` + `state/handoff` labels 的 issue
+- 使用 `supervisor/apply.md` 作为角色材料
+- 日志：`temp/logs/vibe3-supervisor-issue-{n}.async.log`
+
+### 5.2 治理 issue 约定
 
 治理 issue 的最小约定：
 
@@ -133,24 +299,27 @@ supervisor suggest -> governance issue -> run --issue -> apply -> comment -> clo
   - 禁止动作
   - 核查方式
 
-### 4.3 调试步骤
+### 5.3 调试步骤
 
-#### 第一步：检查 prompt 装配
+#### 第一步：检查 governance prompt 装配
 
 ```bash
-vibe3 run --supervisor supervisor/issue-cleanup.md --dry-run
+# 启动 dry-run 模式，prompt 写入文件但不实际执行
+uv run python src/vibe3/cli.py serve start --dry-run
+# 检查输出
+cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 ```
 
 检查点：
 
-- prompt 是否使用了正确的 supervisor 文件
-- 是否明确要求 agent 自己运行 `vibe3 task status`、`vibe3 flow show`、`gh issue view`
+- prompt 是否使用了正确的 supervisor 文件（`supervisor/orchestra.md`）
+- runtime vars 是否正确注入（active_count、issue_list 等）
 - 是否避免把过多业务判断下沉到底层
 
-#### 第二步：手动创建治理 issue
+#### 第二步：手动触发 supervisor suggest
 
 ```bash
-vibe3 run --supervisor supervisor/issue-cleanup.md
+uv run python src/vibe3/cli.py run --supervisor supervisor/issue-cleanup.md
 ```
 
 检查点：
@@ -162,7 +331,7 @@ vibe3 run --supervisor supervisor/issue-cleanup.md
 #### 第三步：手动触发 apply
 
 ```bash
-vibe3 run --issue <governance_issue_number>
+uv run python src/vibe3/cli.py run --issue <governance_issue_number>
 ```
 
 检查点：
@@ -170,13 +339,14 @@ vibe3 run --issue <governance_issue_number>
 - 是否默认使用配置中的 apply supervisor
 - 是否进入 async/tmux
 - 是否正确读取指定 issue，而不是自行重新查找一批 issue
+- CLI 是否显示了 `Session log: temp/logs/vibe3-supervisor-issue-...`
 
 #### 第四步：观察结果
 
 观察顺序：
 
-1. 终端输出的 tmux session
-2. 终端输出的 session log
+1. `temp/logs/vibe3-supervisor-issue-{n}.async.log` — 执行日志
+2. tmux session（如仍存活）
 3. GitHub issue comment
 4. GitHub issue close 状态
 
@@ -186,9 +356,7 @@ vibe3 run --issue <governance_issue_number>
 - comment 与实际执行结果一致
 - issue 被关闭
 
-### 4.4 治理链调试结论
-
-本次 supervisor / orchestra 调试沉淀出以下固定规则：
+### 5.4 治理链调试结论
 
 - 治理链通过 issue 交接，不通过 branch handoff 交接
 - `run --issue` 是治理 issue 的统一 apply 入口
@@ -197,7 +365,7 @@ vibe3 run --issue <governance_issue_number>
 
 ---
 
-## 五、Manager 链调试标准
+## 六、Manager 链调试标准
 
 manager 链不复用治理 issue 交接模型，而是保留 scene 模型：
 
@@ -221,24 +389,92 @@ manager 链与治理链的差异只在真源：
 - 当前 branch / worktree / flow 是否一致
 - manager 是否只负责 scene 推进，而没有吞掉上层业务编排
 - plan/run/review 的 mode policy 是否正确注入
-- manager 使用的默认 agent/model 是否来自独立配置，而不是隐式继承 `run`
+- manager 使用的默认 agent/model 是否来自独立配置（`config/settings.yaml` 的 `orchestra.assignee_dispatch`），而不是隐式继承 `run.agent_config`
 
-### 5.1 Manager 角色与模型
+### 6.1 Manager 角色与模型
 
 - `manager` 是开发链 owner，不是普通执行 agent
-- `manager` 的默认 agent/model 应单独配置在 orchestra/manager 侧，而不是沿用 `run.agent_config`
+- `manager` 的默认 agent/model 应单独配置在 orchestra/manager 侧（`config/settings.yaml` 的 `orchestra.assignee_dispatch`），而不是沿用 `run.agent_config`
+- `manager` 当前主线语义是：**能推进就推进，不能推进且本轮没有任何可观察进展时，进入 `state/blocked`**
+- `state/blocked` 之后的 follow-up（例如 doctor 修复、人工恢复、或 aborted 收尾）明确不属于当前 manager 主线，而是后续链路
 - 调试 manager 异常时，优先区分三类问题：
   - prompt 材料不对
   - scene/worktree/session 不对
   - manager 角色模型不对
 
-如果 manager 的行为明显更像“直接实现代码”而不是“检查现场、迁移状态、决定下一步”，优先检查 manager 的默认 agent preset 是否选错
+如果 manager 的行为明显更像"直接实现代码"而不是"检查现场、迁移状态、决定下一步"，优先检查 manager 的默认 agent preset 是否选错
+
+### 6.2 Manager 链运行时架构
+
+manager 链在 `vibe3 serve` 中的调度路径：
+
+```text
+HeartbeatServer._tick_loop()
+  -> StateLabelDispatchService.on_tick()  (trigger_state=READY, trigger_name="manager")
+    -> ManagerExecutor.dispatch_manager(issue)
+      -> CodeagentBackend.start_async_command()
+        -> tmux session: vibe3-manager-issue-{n}
+        -> log: temp/logs/vibe3-manager-issue-{n}.async.log
+```
+
+状态迁移由 `StateLabelDispatchService` 按 `state/*` labels 触发：
+
+| 触发状态 | 触发角色 | 调度方式 | 调试方法 |
+|---|---|---|---|
+| `state/ready` | manager | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
+| `state/handoff` | manager (resume) | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
+| `state/claimed` | plan | 手动触发 | `vibe3 plan --issue {n}` |
+| `state/in-progress` | run | 手动触发 | `vibe3 run` |
+| `state/review` | review | 手动触发 | `vibe3 review base` |
+
+**注意**：Manager 的调度是自动的，由 `StateLabelDispatchService.on_tick()` 周期性扫描 `state/ready` 和 `state/handoff` labels 的 issue 并自动 dispatch。不需要手动 CLI 命令触发。调试时应通过观察日志和 tmux session 来监控执行过程。
+
+**Manager Handoff Resume**：
+
+当 issue 处于 `state/handoff` 且满足以下条件时，manager 会自动恢复执行：
+
+1. Issue 有 canonical task flow（`task/issue-*` 分支）
+2. Flow state 有有效 refs（如 `plan_ref`）
+3. 没有活动的 manager session
+
+这个 resume 路径使用与 `state/ready` 相同的去重机制：
+- 如果已有 live session，不会重复 dispatch
+- 如果 session 结束且无进展，会 auto-block
+
+详细的状态迁移语义见 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md)。
+
+### 6.3 Manager 主线结束条件
+
+当前 manager 主线只关心两类结果：
+
+- 本轮推进成功，产生明确状态变化或交接产物
+- 本轮无法推进，且 manager session 结束后没有任何可观察进展，此时进入 `state/blocked`
+
+这里的”可观察进展”包括以下任一项：
+
+- `state/*` label 变化
+- 新的 issue comment
+- 新的 handoff 文件
+- Flow refs 更新（plan_ref, report_ref, audit_ref）
+
+**Progress Detection Parity**：
+
+Manager 的 progress 判断在 async runtime 和 sync CLI 执行中保持一致，使用共享的 progress snapshot contract。无论通过哪种路径执行，progress 判断都基于相同的观察维度。
+
+**Session ID Re-entry**：
+
+当 planner/executor/reviewer 执行到达 terminal state（completed/aborted）时，其 session_id 会被清除，允许后续合法的 re-entry。这确保：
+
+- Actor 和 event history 保留，维持 observability
+- Stale session_id 不会阻止正常的 re-plan/re-run/re-review
+
+因此，调试 manager 时不要把”no-progress -> blocked”当作异常补丁；在当前架构里，这是刻意保留的主线收口规则，用来让 manager 聚焦推进 flow，而把 blocked 后的处置留给后续链路。
 
 ---
 
-## 六、观测标准
+## 七、观测标准
 
-### 6.1 默认观测入口
+### 7.1 默认观测入口
 
 CLI 输出必须直接给出：
 
@@ -247,24 +483,54 @@ CLI 输出必须直接给出：
 
 调试者优先看：
 
-1. tmux session
-2. `temp/logs/...`
-3. `vibe3 flow show`
-4. GitHub issue / PR / comment
+1. `temp/logs/*.async.log` — agent 执行日志
+2. `temp/logs/orchestra/events.log` — 运行时事件
+3. tmux session（如仍存活）
+4. `vibe3 flow show` / `vibe3 task show`
+5. GitHub issue / PR / comment
 
-### 6.2 日志位置
+### 7.2 运行时观测
 
-session log 统一写入：
+**serve 运行中**：
 
-```text
-temp/logs/
+```bash
+# 跟踪主事件
+tail -f temp/logs/orchestra/events.log
+
+# 跟踪 governance
+tail -f temp/logs/orchestra/governance/governance.log
+
+# HTTP 状态端点
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/status
 ```
 
-不要把调试期的 session/log 继续挂在上层 handoff 语义里。
+**agent 执行中**：
+
+```bash
+# 实时跟踪 agent 日志
+tail -f temp/logs/vibe3-manager-issue-372.async.log
+
+# 查看 tmux session
+tmux attach -t vibe3-manager-issue-372  # 或 tmux capture-pane
+```
+
+### 7.3 事后复盘
+
+```bash
+# 查看 serve 运行记录
+cat temp/logs/orchestra/events.log
+
+# 查看最近 agent 执行
+ls -lt temp/logs/*.async.log | head -10
+
+# 查看特定 issue 的所有执行日志
+ls temp/logs/*issue-420*.async.log
+```
 
 ---
 
-## 七、反模式
+## 八、反模式
 
 以下做法属于反模式：
 
@@ -274,10 +540,31 @@ temp/logs/
 - 治理链依赖 branch/worktree handoff
 - 一次调试同时打开 dry-run、heartbeat、自动 apply、自动回收
 - 看不到 tmux/session log 就继续盲跑下一轮
+- 在 `events.log` 中混入 unit test 的假 server run
+- 把 session log 路径硬编码到 handoff 内容中
+- 只看 GitHub issue 不看 session log（或反过来）
 
 ---
 
-## 八、落地检查清单
+## 九、相关标准索引
+
+调试 agent 时，以下文档可能需要交叉引用：
+
+| 文档 | 用途 |
+|---|---|
+| [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) | Orchestra 运行时架构：driver、heartbeat、service 分层、governance 语义 |
+| [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) | `state/*` labels 语义、状态迁移规则、manager 判定规则、真源分层 |
+| `supervisor/manager.md` | Manager 角色材料：Permission Contract、Pseudo Functions、Stop Conditions |
+| `supervisor/orchestra.md` | Orchestra governance 角色材料 |
+| `supervisor/apply.md` | Governance issue apply 角色材料 |
+| `.agent/policies/plan.md` | Plan mode policy |
+| `.agent/policies/run.md` | Run mode policy |
+| `.agent/policies/review.md` | Review mode policy |
+| `config/settings.yaml` | 运行时配置：agent preset、interval、governance、state_label_dispatch |
+
+---
+
+## 十、落地检查清单
 
 开始调试一条新链路前，先检查：
 
@@ -285,7 +572,8 @@ temp/logs/
 - 是否已经明确业务逻辑留在 skill/supervisor，而不是底层
 - 是否已经有 dry-run 入口
 - 是否默认 async/tmux
-- 是否能直接看到 session log 路径
+- 是否能直接看到 session log 路径（`temp/logs/*.async.log`）
+- 是否知道去哪里看运行时事件（`temp/logs/orchestra/events.log`）
 - 是否有最小真实执行入口
 - 是否规定了执行后停下来检查结果
 

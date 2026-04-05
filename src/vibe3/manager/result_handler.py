@@ -98,12 +98,15 @@ class DispatchResultHandler:
             category=category,
         )
 
-        # For api_error and timeout, block the issue
+        # System/launch errors should fail the issue, not block it.
         if category in ("api_error", "timeout", "circuit_breaker"):
-            self.update_state_label(issue.number, IssueState.BLOCKED)
-            reason = f"Orchestra dispatch 失败（{category}），已暂停调度，等待恢复"
+            self.update_state_label(issue.number, IssueState.FAILED)
+            reason = (
+                f"Orchestra dispatch 报错（{category}），"
+                "已切换为 state/failed，等待修复"
+            )
             self.post_failure_comment(issue.number, reason)
-            log.warning(f"Issue blocked due to {category}")
+            log.warning(f"Issue failed due to {category}")
 
             # Record event in flow history
             flow = self.flow_manager.get_flow_for_issue(issue.number)

@@ -15,6 +15,17 @@ from vibe3.models.orchestration import (
 from vibe3.services.state_sync_ports import GhIssueLabelPort, IssueLabelPort
 
 VIBE_TASK_LABEL = "vibe-task"
+STATE_LABEL_META: dict[IssueState, tuple[str, str]] = {
+    IssueState.READY: ("0E8A16", "Ready for manager dispatch"),
+    IssueState.CLAIMED: ("1D76DB", "Claimed and waiting for planning"),
+    IssueState.IN_PROGRESS: ("FBCA04", "Execution in progress"),
+    IssueState.BLOCKED: ("D93F0B", "Blocked and waiting for follow-up"),
+    IssueState.FAILED: ("B60205", "Execution failed and needs recovery"),
+    IssueState.HANDOFF: ("5319E7", "Waiting for manager handoff decision"),
+    IssueState.REVIEW: ("0052CC", "Waiting for review execution"),
+    IssueState.MERGE_READY: ("0E8A16", "Ready to merge"),
+    IssueState.DONE: ("6A737D", "Flow completed"),
+}
 
 
 class LabelService:
@@ -136,15 +147,20 @@ class LabelService:
             issue_number: GitHub issue number
             state: Target state
         """
+        self._ensure_state_label_exists(state)
+
         # Get current state labels
         current_labels = self._get_all_state_labels(issue_number)
 
+        # Add new state label first so a mid-transition failure does not leave
+        # the issue without any state label.
+        self._add_label(issue_number, state.to_label())
+
         # Remove old state labels
         for label in current_labels:
+            if label == state.to_label():
+                continue
             self._remove_label(issue_number, label)
-
-        # Add new state label
-        self._add_label(issue_number, state.to_label())
 
     def _get_all_state_labels(self, issue_number: int) -> list[str]:
         """Get all state/* labels of an issue."""
@@ -197,3 +213,13 @@ class LabelService:
             raise RuntimeError(
                 f"Failed to remove label '{label}' on issue #{issue_number}"
             )
+
+    def _ensure_state_label_exists(self, state: IssueState) -> None:
+        color, description = STATE_LABEL_META[state]
+        ok = self.issue_port.ensure_label_exists(
+            state.to_label(),
+            color=color,
+            description=description,
+        )
+        if not ok:
+            raise RuntimeError(f"Failed to ensure label '{state.to_label()}' exists")

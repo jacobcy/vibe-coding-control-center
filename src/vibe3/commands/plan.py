@@ -13,7 +13,6 @@ from vibe3.agents.runner import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
-from vibe3.clients.github_client import GitHubClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -25,11 +24,14 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.models.plan import PlanRequest
 from vibe3.services.flow_service import FlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.spec_ref_service import SpecRefService
+from vibe3.services.issue_failure_service import (
+    confirm_plan_handoff as _svc_confirm_handoff,
+)
+from vibe3.services.issue_failure_service import (
+    fail_planner_issue as _svc_fail_planner,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -46,8 +48,6 @@ def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUs
     return PlanUsecase(
         config=config,
         flow_service=flow_service,
-        github_client=GitHubClient(),
-        spec_ref_service=SpecRefService(),
     )
 
 
@@ -63,7 +63,7 @@ def _execute_plan_command(
     backend: str | None,
     model: str | None,
     worktree: bool,
-) -> None:
+) -> object:
     plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
     command = create_codeagent_command(
         role="planner",
@@ -78,7 +78,21 @@ def _execute_plan_command(
         config=config,
         branch=branch,
     )
-    CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+    return CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+
+
+def _comment_and_fail_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str,
+) -> None:
+    """Record planner failure and move the issue into failed."""
+    _svc_fail_planner(
+        issue_number=issue_number,
+        reason=reason,
+        actor=actor,
+    )
 
 
 def _plan_issue_impl(
@@ -115,7 +129,7 @@ def _plan_issue_impl(
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
     typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    _execute_plan_command(
+    result = _execute_plan_command(
         config=config,
         branch=branch,
         request=task_input.request,
@@ -128,17 +142,29 @@ def _plan_issue_impl(
         worktree=worktree,
     )
 
-    if not dry_run:
-        result = LabelService().confirm_issue_state(
-            task_input.issue_number,
-            IssueState.CLAIMED,
-            actor="agent:plan",
-        )
-        if result == "blocked":
+    if not dry_run and not async_mode:
+        if getattr(result, "success", False):
+            transition = _svc_confirm_handoff(
+                issue_number=task_input.issue_number,
+                actor="agent:plan",
+            )
+            if transition == "blocked":
+                typer.echo(
+                    "Warning: Failed to transition issue state: "
+                    "state_transition_blocked",
+                    err=True,
+                )
+        else:
+            _comment_and_fail_issue(
+                issue_number=task_input.issue_number,
+                reason=getattr(result, "stderr", "") or "planner exited with failure",
+                actor="agent:plan",
+            )
             typer.echo(
-                "Warning: Failed to transition issue state: state_transition_blocked",
+                "Error: Planner execution failed; issue moved to state/failed",
                 err=True,
             )
+            raise typer.Exit(1)
 
 
 def _plan_spec_impl(
@@ -198,7 +224,7 @@ def _plan_spec_impl(
         except Exception:
             pass
 
-    _execute_plan_command(
+    result = _execute_plan_command(
         config=config,
         branch=branch,
         request=spec_input.request,
@@ -210,6 +236,10 @@ def _plan_spec_impl(
         model=model,
         worktree=worktree,
     )
+
+    if not dry_run and not async_mode and not getattr(result, "success", False):
+        typer.echo("Error: Planner execution failed for spec mode", err=True)
+        raise typer.Exit(1)
 
 
 @app.callback()

@@ -1,5 +1,7 @@
 """Tests for HeartbeatServer."""
 
+from pathlib import Path
+
 import pytest
 
 from vibe3.orchestra.config import OrchestraConfig
@@ -79,3 +81,52 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
 
     assert svc1.ticks == 1
     assert svc2.ticks == 1
+
+
+def test_run_separator_writes_header(tmp_path: Path) -> None:
+    import os
+
+    from vibe3.orchestra.logging import append_orchestra_run_separator
+
+    os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+    log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("old event\n", encoding="utf-8")
+    append_orchestra_run_separator(repo_root=tmp_path, title="server run start")
+    text = log_path.read_text()
+    assert "old event" not in text
+    assert "========== server run start @" in text
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            server.stop()
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    server._running = True
+
+    await server._tick_loop()
+
+    assert any("server:heartbeat tick #1 start" == item for item in events)
+    assert any(
+        f"server:heartbeat tick #1 services: {svc.service_name}" == item
+        for item in events
+    )
+    assert any("server:heartbeat tick #1 completed in " in item for item in events)

@@ -45,6 +45,7 @@ Forbidden:
 - 如果需要交给后续 agent，写 **handoff**
 - handoff 不代替 issue comment
 - 如果无法推进，先检查最新评论是否已经说明原因；若没有，就必须写 comment 说明后再停止
+- 如果进入 `state/blocked`，先检查已有 comments 是否已经覆盖同一 blocker；只有出现新的 blocker 才追加新 comment
 
 ## Truth Sources
 
@@ -63,6 +64,12 @@ Forbidden:
 
 如果历史记录与当前 labels 冲突，以当前 labels 为准，并把冲突记录为 finding。
 
+补充边界：
+
+- `state/blocked` = manager 的业务阻塞 / 依赖阻塞 / 人类阻塞
+- `state/failed` = `plan / run / review` 执行报错
+- 你不把执行错误写成 `blocked`
+
 ## Core Rules
 
 1. 先读最新评论，再判断现场  
@@ -72,6 +79,8 @@ Forbidden:
 5. 不得因为历史文字描述就假设当前已经 `in-progress`  
 6. 如果需要停止，就 `exit()`  
 7. `state/claimed` 就表示可以进入 plan；你在 claimed 后必须停止本轮判断
+8. `state/blocked` 只用于你无法推进；执行器报错由对应 agent 标记为 `state/failed`
+9. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`
 
 ## `exit()` 语义
 
@@ -95,17 +104,18 @@ gh issue view <issue-number> --comments
 gh issue view <issue-number> --json labels,state
 pwd
 git branch --show-current
-vibe3 handoff show
-vibe3 status
+uv run python src/vibe3/cli.py handoff show <target-branch>
+uv run python src/vibe3/cli.py task show <target-branch> --comments
 ```
 
 不要：
 
-- 调用 `vibe3 orchestra ...`
+- 调用 `uv run python src/vibe3/cli.py serve ...`
 - 直接探查 `.git/vibe3`
-- 在当前阶段执行 `vibe3 flow show`
+- 在当前阶段执行 `uv run python src/vibe3/cli.py flow show`
 - 在已有 target scene 上重复 `flow update`
 - 用关联 issue 是否 open 机械覆盖最新人类指示
+- 用全局 `task status` / server 可达性直接判定当前 `ready` issue 不健康
 
 ## Pseudo Functions
 
@@ -154,17 +164,18 @@ Steps:
 
 1. 调用 `read_context()`
 2. 确认 scene 是否健康
-3. 确认最新评论是否明确要求继续推进
+3. 确认最新评论中没有明确的暂停/阻止指示
 4. 如果 scene 不健康：
-   - 先检查最新评论里是否已经说明当前无法推进的原因
-   - comment 当前 issue
-   - 必要时转 `state/blocked`
+   - 先检查已有 comments 是否已经覆盖同一 blocker
+   - 将当前 issue 调整为 `state/blocked`
+   - 只有当 blocker 是新的、comments 尚未解释时，才追加 comment
    - `exit()`
-5. 如果最新评论不支持继续推进：
-   - 如最新评论已经说明原因，复述并遵循
-   - comment 当前 issue
+5. 如果最新评论明确要求暂停、等待或阻止推进：
+   - 将当前 issue 调整为 `state/blocked`
+   - 如最新评论已经说明原因，不重复 comment
+   - 只有当 blocker 是新的、comments 尚未解释时，才追加 comment
    - `exit()`
-6. 如果 scene 健康且最新评论明确要求继续推进：
+6. 如果 scene 健康且最新评论中没有明确阻止推进的指示：
    - 执行：
 
    ```bash
@@ -173,12 +184,23 @@ Steps:
 
 7. 再次读取当前 labels/state
 8. 如果 `state/claimed` 未生效：
-   - comment 当前 issue说明迁移失败
+   - 将当前 issue 调整为 `state/blocked`
+   - comment 当前 issue说明 claim 迁移失败
    - `exit()`
 9. 如果 `state/claimed` 已生效：
    - 写 issue comment：已认领、当前风险、下一阶段为 plan
    - 写 handoff，明确当前已进入 claimed，等待 plan agent
    - `exit()`
+
+Hard rule:
+
+- 在 `state/ready` 阶段，本轮不得保持 `state/ready` 后直接 `exit()`
+- 本轮结束前，必须出现以下二选一结果：
+  - `state/claimed`
+  - `state/blocked`
+- `state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene**
+  判断；全局 `task status`、server `stopped/unreachable`、或“当前没有 active issues”
+  这些全局信号本身都**不能单独构成 blocker**
 
 ### `handle_claimed()`
 
@@ -233,14 +255,15 @@ Steps:
 3. 根据 refs 决定当前 issue 应进入哪一步
 4. 如果当前无法推进：
    - 先检查最新评论里是否已经解释原因
-   - 若无解释，写一条 issue comment 说明卡点、依据和下一步需要谁介入
+   - 若无解释，再检查已有 comments 是否已经覆盖同一 blocker
+   - 只有在 blocker 是新的、现有 comments 没有覆盖时，才写新的 issue comment
    - `exit()`
 
 Decision sketch:
 
 - 无 `spec_ref`：
   - comment 当前 issue，指出缺少 spec 真源
-  - 如需修复，先执行 `vibe3 flow update --spec <...>`
+  - 如需修复，先执行 `uv run python src/vibe3/cli.py flow update --spec <...>`
   - 必要时写 handoff
   - `exit()`
 - 已有 `plan_ref`，无 `report_ref`：
@@ -358,8 +381,8 @@ Steps:
    - comment 当前 issue
    - `exit()`
 5. 若 blocker 未解除：
-   - 先检查最新评论是否已经解释 blocker
-   - 若没有，再 comment 当前 issue
+   - 先检查最新评论和已有 comments 是否已经解释同一 blocker
+   - 只有在 blocker 是新的时，才追加新的 issue comment
    - 不重复刷同类长 comment
    - `exit()`
 
@@ -394,7 +417,7 @@ Steps:
 
 - 若无新增事实，不重复发布几乎相同的长 comment
 - 若最新评论已给出明确方向，不再输出 `Option A/B/C`
-- 若当前 state 是 `ready` 且满足继续推进条件，本轮 comment 应写“已认领、当前风险、下一阶段 handoff”
+- 若当前 state 是 `ready` 且无明确阻止推进的指示，本轮 comment 应写“已认领、当前风险、下一阶段 handoff”
 
 ## Handoff Contract
 

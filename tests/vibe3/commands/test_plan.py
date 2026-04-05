@@ -200,7 +200,7 @@ def test_plan_issue_includes_issue_and_spec_context(
         "body": "Spec body",
     }
 
-    with patch("vibe3.commands.plan.GitHubClient", return_value=issue_client):
+    with patch("vibe3.agents.plan_agent.GitHubClient", return_value=issue_client):
         mock_execute.return_value = MagicMock(success=True)
         result = runner.invoke(plan_app, ["--issue", "42"])
 
@@ -218,7 +218,42 @@ def test_plan_task_alias_still_works(monkeypatch) -> None:
     result = runner.invoke(plan_app, ["task", "42", "--dry-run"])
 
     assert result.exit_code == 0
-    assert "codeagent-wrapper" in result.stdout
+
+
+def test_plan_success_transitions_issue_to_handoff(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
+    with patch("vibe3.commands.plan._svc_confirm_handoff") as mock_handoff:
+        mock_handoff.return_value = "advanced"
+        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+
+    assert result.exit_code == 0
+    mock_handoff.assert_called_once_with(
+        issue_number=42,
+        actor="agent:plan",
+    )
+
+
+def test_plan_failure_fails_issue_and_comments(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
+
+    def _failed_execute(self, command, async_mode=False):
+        return MagicMock(success=False, stderr="planner failed")
+
+    monkeypatch.setattr(
+        "vibe3.agents.runner.CodeagentExecutionService.execute",
+        _failed_execute,
+    )
+
+    with patch("vibe3.commands.plan._svc_fail_planner") as mock_fail:
+        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+
+    assert result.exit_code != 0
+    mock_fail.assert_called_once_with(
+        issue_number=42,
+        reason="planner failed",
+        actor="agent:plan",
+    )
+    assert "state/failed" in result.stderr
 
 
 def test_plan_spec_alias_still_works(monkeypatch) -> None:

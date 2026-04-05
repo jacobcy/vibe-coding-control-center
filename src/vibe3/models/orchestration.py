@@ -20,6 +20,7 @@ class IssueState(str, Enum):
     CLAIMED = "claimed"
     IN_PROGRESS = "in-progress"
     BLOCKED = "blocked"
+    FAILED = "failed"
     HANDOFF = "handoff"
     REVIEW = "review"
     MERGE_READY = "merge-ready"
@@ -55,16 +56,29 @@ class StateTransition(BaseModel):
 ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     # Main chain
     (IssueState.READY, IssueState.CLAIMED),
-    (IssueState.CLAIMED, IssueState.IN_PROGRESS),
-    (IssueState.IN_PROGRESS, IssueState.REVIEW),
-    (IssueState.REVIEW, IssueState.MERGE_READY),
+    (IssueState.CLAIMED, IssueState.HANDOFF),
+    (IssueState.HANDOFF, IssueState.IN_PROGRESS),
+    (IssueState.IN_PROGRESS, IssueState.HANDOFF),
+    (IssueState.HANDOFF, IssueState.REVIEW),
+    (IssueState.REVIEW, IssueState.HANDOFF),
+    (IssueState.HANDOFF, IssueState.MERGE_READY),
     (IssueState.MERGE_READY, IssueState.DONE),
     # Side paths
+    (IssueState.CLAIMED, IssueState.BLOCKED),
+    (IssueState.HANDOFF, IssueState.BLOCKED),
     (IssueState.IN_PROGRESS, IssueState.BLOCKED),
-    (IssueState.BLOCKED, IssueState.IN_PROGRESS),
-    (IssueState.IN_PROGRESS, IssueState.HANDOFF),
-    (IssueState.HANDOFF, IssueState.IN_PROGRESS),
-    (IssueState.REVIEW, IssueState.IN_PROGRESS),
+    (IssueState.REVIEW, IssueState.BLOCKED),
+    (IssueState.MERGE_READY, IssueState.BLOCKED),
+    (IssueState.BLOCKED, IssueState.CLAIMED),
+    (IssueState.BLOCKED, IssueState.HANDOFF),
+    # Execution failures
+    (IssueState.CLAIMED, IssueState.FAILED),
+    (IssueState.IN_PROGRESS, IssueState.FAILED),
+    (IssueState.REVIEW, IssueState.FAILED),
+    (IssueState.FAILED, IssueState.CLAIMED),
+    (IssueState.FAILED, IssueState.HANDOFF),
+    (IssueState.FAILED, IssueState.IN_PROGRESS),
+    (IssueState.FAILED, IssueState.REVIEW),
 }
 
 # Forbidden transitions (require force=True)
@@ -72,6 +86,7 @@ FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.READY, IssueState.DONE),
     (IssueState.CLAIMED, IssueState.DONE),
     (IssueState.BLOCKED, IssueState.DONE),
+    (IssueState.FAILED, IssueState.DONE),
     (IssueState.HANDOFF, IssueState.DONE),
 }
 

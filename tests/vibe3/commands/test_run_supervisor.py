@@ -9,6 +9,11 @@ from typer.testing import CliRunner
 import vibe3.commands.run as run_module
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.cli import app as cli_app
+from vibe3.config.settings import VibeConfig
+from vibe3.manager import manager_run_service
+from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.config import OrchestraConfig
+from vibe3.services import issue_failure_service
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -28,28 +33,31 @@ def _patch_supervisor_runtime(
     ),
     repo: str | None = None,
 ) -> None:
-    orchestra_config = run_module.OrchestraConfig(
+    orchestra_config = OrchestraConfig(
         repo=repo,
         pid_file=Path(".git/vibe3/orchestra.pid"),
     )
 
     monkeypatch.setattr(
-        run_module.OrchestraConfig,
+        OrchestraConfig,
         "from_settings",
         classmethod(lambda cls: orchestra_config),
     )
+    # Patch both command module and service module imports
+    from vibe3.orchestra import supervisor_run_service
+
     monkeypatch.setattr(
-        run_module,
+        supervisor_run_service,
         "OrchestraStatusService",
-        lambda config: MagicMock(),
+        lambda config, orchestrator: MagicMock(),
     )
     monkeypatch.setattr(
-        run_module,
+        supervisor_run_service,
         "GovernanceService",
         lambda config, status_service: MagicMock(render_current_plan=lambda: plan_text),
     )
     monkeypatch.setattr(
-        run_module.VibeConfig,
+        supervisor_run_service.VibeConfig,
         "get_defaults",
         classmethod(
             lambda cls: MagicMock(
@@ -58,7 +66,7 @@ def _patch_supervisor_runtime(
         ),
     )
     monkeypatch.setattr(
-        run_module,
+        supervisor_run_service,
         "CodeagentExecutionService",
         lambda config: MagicMock(resolve_agent_options=lambda role: MagicMock()),
     )
@@ -98,7 +106,9 @@ class TestRunSupervisorOption:
             log_path=Path("temp/logs/vibe3-supervisor-issue-cleanup.async.log"),
             prompt_file_path=Path("/tmp/prompt.md"),
         )
-        monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
+        from vibe3.orchestra import supervisor_run_service
+
+        monkeypatch.setattr(supervisor_run_service, "CodeagentBackend", lambda: backend)
 
         result = runner.invoke(
             cli_app,
@@ -131,11 +141,12 @@ class TestRunSupervisorOption:
             "number": 426,
             "title": "cleanup: orchestra smoke test residuals (issues #369, #370)",
         }
-        monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
-        monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
+        from vibe3.orchestra import supervisor_run_service
+
+        monkeypatch.setattr(supervisor_run_service, "CodeagentBackend", lambda: backend)
+        monkeypatch.setattr(supervisor_run_service, "GitHubClient", lambda: github)
         monkeypatch.setattr(
-            run_module,
-            "_resolve_issue_supervisor_file",
+            "vibe3.orchestra.supervisor_run_service.resolve_issue_supervisor_file",
             lambda: "supervisor/apply.md",
         )
 
@@ -168,18 +179,20 @@ class TestRunSupervisorOption:
             "number": 426,
             "title": "cleanup: orchestra smoke test residuals (issues #369, #370)",
         }
-        monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
-        monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
+        from vibe3.orchestra import supervisor_run_service
+
+        monkeypatch.setattr(supervisor_run_service, "CodeagentBackend", lambda: backend)
+        monkeypatch.setattr(supervisor_run_service, "GitHubClient", lambda: github)
         monkeypatch.setattr(
             run_module,
-            "_resolve_issue_supervisor_file",
+            "_svc_resolve_supervisor_file",
             lambda: "supervisor/governance-apply.md",
         )
 
         result = runner.invoke(cli_app, ["run", "--issue", "426"])
 
         assert result.exit_code == 0
-        assert "Supervisor run: supervisor/governance-apply.md" in result.output
+        assert "supervisor/governance-apply.md" in result.output
         assert (
             "Tmux session: vibe3-supervisor-governance-apply-issue-426" in result.output
         )
@@ -201,3 +214,175 @@ class TestRunSupervisorOption:
         output = strip_ansi(result.output)
         assert result.exit_code == 0
         assert "fresh-session" in output
+
+    def test_manager_issue_sync_failure_marks_issue_failed(self, monkeypatch) -> None:
+        orchestra_config = OrchestraConfig(
+            repo="owner/repo",
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+        )
+        monkeypatch.setattr(
+            OrchestraConfig,
+            "from_settings",
+            classmethod(lambda cls: orchestra_config),
+        )
+        monkeypatch.setattr(
+            VibeConfig,
+            "get_defaults",
+            classmethod(lambda cls: MagicMock()),
+        )
+        monkeypatch.setattr(manager_run_service, "SQLiteClient", lambda: MagicMock())
+        monkeypatch.setattr(
+            manager_run_service,
+            "load_session_id",
+            lambda role, branch=None: "ses_manager",
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "resolve_manager_branch",
+            lambda **kwargs: "task/issue-278",
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "resolve_manager_execution_cwd",
+            lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
+        )
+        monkeypatch.setattr(
+            "vibe3.orchestra.agent_resolver.resolve_manager_agent_options",
+            lambda *args, **kwargs: MagicMock(),
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "render_manager_prompt",
+            lambda config, issue: MagicMock(rendered_text="manager prompt"),
+        )
+        monkeypatch.setattr(
+            manager_run_service.GitClient,
+            "get_current_branch",
+            lambda self: "dev/issue-435",
+        )
+
+        github = MagicMock()
+        github.view_issue.return_value = {
+            "number": 278,
+            "title": "test manager issue",
+            "labels": [{"name": "state/claimed"}],
+            "assignees": [],
+        }
+        monkeypatch.setattr(manager_run_service, "GitHubClient", lambda: github)
+        monkeypatch.setattr(issue_failure_service, "GitHubClient", lambda: github)
+
+        backend = MagicMock()
+        backend.run.return_value = MagicMock(
+            is_success=lambda: False,
+            stderr="manager failed",
+            session_id="ses_manager",
+        )
+        monkeypatch.setattr(manager_run_service, "CodeagentBackend", lambda: backend)
+
+        labels = MagicMock()
+        monkeypatch.setattr(issue_failure_service, "LabelService", lambda: labels)
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "278", "--sync"],
+        )
+
+        assert result.exit_code != 0
+        github.add_comment.assert_called_once()
+        labels.confirm_issue_state.assert_called_once_with(
+            278,
+            IssueState.FAILED,
+            actor="agent:manager",
+            force=True,
+        )
+
+    def test_manager_issue_sync_noop_auto_blocks(self, monkeypatch) -> None:
+        orchestra_config = OrchestraConfig(
+            repo="owner/repo",
+            pid_file=Path(".git/vibe3/orchestra.pid"),
+        )
+        monkeypatch.setattr(
+            OrchestraConfig,
+            "from_settings",
+            classmethod(lambda cls: orchestra_config),
+        )
+        monkeypatch.setattr(
+            VibeConfig,
+            "get_defaults",
+            classmethod(lambda cls: MagicMock()),
+        )
+        sqlite = MagicMock()
+        monkeypatch.setattr(manager_run_service, "SQLiteClient", lambda: sqlite)
+        monkeypatch.setattr(
+            manager_run_service,
+            "load_session_id",
+            lambda role, branch=None: "ses_manager",
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "resolve_manager_branch",
+            lambda **kwargs: "task/issue-278",
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "resolve_manager_execution_cwd",
+            lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
+        )
+        monkeypatch.setattr(
+            "vibe3.orchestra.agent_resolver.resolve_manager_agent_options",
+            lambda *args, **kwargs: MagicMock(),
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "render_manager_prompt",
+            lambda config, issue: MagicMock(rendered_text="manager prompt"),
+        )
+        monkeypatch.setattr(
+            manager_run_service.GitClient,
+            "get_current_branch",
+            lambda self: "dev/post-437-debug",
+        )
+        monkeypatch.setattr(
+            "vibe3.orchestra.no_progress_policy.snapshot_progress",
+            lambda **kwargs: {
+                "state_label": "state/ready",
+                "comment_count": 1,
+                "handoff": None,
+                "refs": (None, None, None, None, None, None),
+            },
+        )
+        block_noop = MagicMock()
+        monkeypatch.setattr(
+            manager_run_service,
+            "block_manager_noop_issue",
+            block_noop,
+        )
+
+        github = MagicMock()
+        github.view_issue.return_value = {
+            "number": 278,
+            "title": "test manager issue",
+            "labels": [{"name": "state/ready"}],
+            "assignees": [],
+        }
+        monkeypatch.setattr(manager_run_service, "GitHubClient", lambda: github)
+
+        backend = MagicMock()
+        backend.run.return_value = MagicMock(
+            is_success=lambda: True,
+            stderr="",
+            session_id="ses_manager",
+        )
+        monkeypatch.setattr(manager_run_service, "CodeagentBackend", lambda: backend)
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "278", "--sync"],
+        )
+
+        assert result.exit_code == 0
+        block_noop.assert_called_once()
+        assert any(
+            call.args[1] == "manager_noop_blocked"
+            for call in sqlite.add_event.call_args_list
+        )

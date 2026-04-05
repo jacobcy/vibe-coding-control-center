@@ -79,8 +79,8 @@ class TestManagerFeedbackLoop:
             pr_number=None,
         )
 
-    def test_dispatch_failure_api_error_sets_blocked_and_comments(self):
-        """API error should set issue to blocked and post comment."""
+    def test_dispatch_failure_api_error_sets_failed_and_comments(self):
+        """API error should set issue to failed and post comment."""
         config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=102)
@@ -100,16 +100,16 @@ class TestManagerFeedbackLoop:
         ):
             manager.result_handler.on_dispatch_failure(issue, "api_error")
 
-        blocked_calls = [
-            c for c in mock_update.call_args_list if c[0][1] == IssueState.BLOCKED
+        failed_calls = [
+            c for c in mock_update.call_args_list if c[0][1] == IssueState.FAILED
         ]
-        assert len(blocked_calls) >= 1
+        assert len(failed_calls) >= 1
         mock_comment.assert_called_once()
         assert "api_error" in mock_comment.call_args[0][1]
         mock_record.assert_called_once()
 
-    def test_dispatch_failure_timeout_sets_blocked(self):
-        """Timeout should set issue to blocked."""
+    def test_dispatch_failure_timeout_sets_failed(self):
+        """Timeout should set issue to failed."""
         config = make_config()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=103)
@@ -125,10 +125,10 @@ class TestManagerFeedbackLoop:
         ):
             manager.result_handler.on_dispatch_failure(issue, "timeout")
 
-        blocked_calls = [
-            c for c in mock_update.call_args_list if c[0][1] == IssueState.BLOCKED
+        failed_calls = [
+            c for c in mock_update.call_args_list if c[0][1] == IssueState.FAILED
         ]
-        assert len(blocked_calls) >= 1
+        assert len(failed_calls) >= 1
 
     def test_dispatch_failure_business_error_keeps_in_progress(self):
         """Business error should NOT auto-block, keep in-progress."""

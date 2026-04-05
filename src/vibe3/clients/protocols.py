@@ -47,6 +47,7 @@ class GitHubClientProtocol(Protocol):
         limit: int = 30,
         state: str = "open",
         assignee: str | None = None,
+        repo: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 

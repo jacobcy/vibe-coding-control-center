@@ -275,7 +275,9 @@ class TestGovernanceService:
         assert dispatcher.method_calls == []
 
     @pytest.mark.asyncio
-    async def test_on_tick_runs_on_interval_and_respects_dry_run(self, monkeypatch):
+    async def test_on_tick_runs_on_interval_and_respects_dry_run(
+        self, monkeypatch, tmp_path
+    ):
         """Governance runs on interval and uses governance.dry_run."""
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
@@ -286,14 +288,14 @@ class TestGovernanceService:
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
-        dispatcher = _make_dispatcher()
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(interval_ticks=2, dry_run=True)
             ),
             status_service=MockStatusService(snapshot),
-            manager=dispatcher,
+            manager=_make_dispatcher(),
         )
+        service._manager.repo_path = tmp_path
         # Force tick boundary
         service._tick_count = 1
 

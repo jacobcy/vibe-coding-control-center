@@ -41,8 +41,8 @@ class TestStartAsyncCommand:
     ) -> None:
         backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
-        log_dir.mkdir(parents=True)
-        stale_log = log_dir / "vibe3-manager-issue-372.async.log"
+        stale_log = log_dir / "issues" / "issue-372" / "manager.async.log"
+        stale_log.parent.mkdir(parents=True)
         stale_log.write_text("SESSION_ID: stale_session\n")
 
         monkeypatch.setattr(
@@ -51,14 +51,24 @@ class TestStartAsyncCommand:
             lambda: log_dir,
         )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        # Mock subprocess.run - must return returncode != 0
+        # to break _allocate_tmux_session_name loop
+        def fake_run(*args, **kwargs):
+            result = MagicMock()
+            result.returncode = (
+                1  # Simulate "tmux has-session" failing (no session exists)
+            )
+            return result
+
+        with patch(
+            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+        ):
             backend.start_async_command(
                 ["echo", "hello"],
                 execution_name="vibe3-manager-issue-372",
             )
 
         assert not stale_log.exists()
-        assert mock_run.called
 
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path
@@ -69,12 +79,15 @@ class TestStartAsyncCommand:
 
         monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
 
+        # Mock subprocess.run to simulate session name collision
         def fake_run(cmd, *args, **kwargs):
             if cmd[:3] == ["tmux", "has-session", "-t"]:
                 target = cmd[3]
                 result = MagicMock()
+                # 1st call: exists (0), 2nd call: doesn't exist (1)
                 result.returncode = 0 if target == "vibe3-manager-issue-372" else 1
                 return result
+            # For tmux new-session, return success
             result = MagicMock()
             result.returncode = 0
             return result
@@ -88,7 +101,37 @@ class TestStartAsyncCommand:
             )
 
         assert handle.tmux_session == "vibe3-manager-issue-372-2"
-        assert handle.log_path == log_dir / "vibe3-manager-issue-372-2.async.log"
+        assert (
+            handle.log_path == log_dir / "issues" / "issue-372" / "manager-2.async.log"
+        )
+
+    def test_start_async_command_places_governance_logs_under_governance_dir(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+
+        # Mock subprocess.run to break _allocate_tmux_session_name loop
+        def fake_run(*args, **kwargs):
+            result = MagicMock()
+            # Simulate "tmux has-session" failing (no session exists)
+            result.returncode = 1
+            return result
+
+        with patch(
+            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+        ):
+            handle = backend.start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-governance-scan-20260405-114913-t1",
+            )
+
+        assert handle.log_path == (
+            log_dir / "orchestra" / "governance" / "scan-20260405-114913-t1.async.log"
+        )
 
 
 class TestRunStreamingAndEdgeCases:

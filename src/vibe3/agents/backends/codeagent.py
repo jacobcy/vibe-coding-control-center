@@ -14,7 +14,6 @@ from vibe3.agents.backends.codeagent_config import (
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
-# Default wrapper path
 DEFAULT_WRAPPER_PATH: Final[Path] = (
     Path.home() / ".claude" / "bin" / "codeagent-wrapper"
 )
@@ -65,13 +64,7 @@ class CodeagentBackend:
 
     @staticmethod
     def _build_async_log_filter() -> list[str]:
-        """Return an awk command that strips known Codex runtime noise.
-
-        These warnings come from the upstream Codex runtime under ``~/.codex`` and
-        are not actionable within vibe3. We keep the repo-local async log focused
-        on wrapper progress and task output, while still emitting a summary line so
-        the suppression is visible.
-        """
+        """Return awk filter that strips known Codex runtime noise from async logs."""
         state_patterns = " || ".join(
             f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
         )
@@ -118,7 +111,7 @@ class CodeagentBackend:
 
     @staticmethod
     def _allocate_tmux_session_name(base_name: str) -> str:
-        """Return a tmux session name that does not collide with an existing one."""
+        """Return a non-colliding tmux session name."""
         candidate = base_name
         counter = 2
         while True:
@@ -139,9 +132,9 @@ class CodeagentBackend:
         prompt_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, dir=prompt_dir
-        ) as prompt_file:
-            prompt_file.write(prompt)
-            return Path(prompt_file.name)
+        ) as f:
+            f.write(prompt)
+            return Path(f.name)
 
     @staticmethod
     def _build_command(
@@ -183,6 +176,52 @@ class CodeagentBackend:
     def _default_log_dir() -> Path:
         return Path(__file__).resolve().parents[4] / "temp" / "logs"
 
+    @classmethod
+    def _resolve_async_log_path(cls, log_dir: Path, execution_name: str) -> Path:
+        issue_match = re.match(
+            r"^vibe3-(manager|planner|executor|reviewer|supervisor)(?:-[^-]+)?-(?:task|dev)-issue-(\d+)(?:-(\d+))?$",
+            execution_name,
+        )
+        if issue_match:
+            role, issue_number, suffix = issue_match.groups()
+            role_name = {
+                "manager": "manager",
+                "planner": "plan",
+                "executor": "run",
+                "reviewer": "review",
+                "supervisor": "supervisor",
+            }[role]
+            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
+            return (
+                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
+            )
+
+        manager_issue_match = re.match(
+            r"^vibe3-(manager|supervisor)(?:-[^-]+)?-issue-(\d+)(?:-(\d+))?$",
+            execution_name,
+        )
+        if manager_issue_match:
+            role, issue_number, suffix = manager_issue_match.groups()
+            role_name = "manager" if role == "manager" else "supervisor"
+            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
+            return (
+                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
+            )
+
+        governance_match = re.match(
+            r"^vibe3-governance-(.+)$",
+            execution_name,
+        )
+        if governance_match:
+            return (
+                log_dir
+                / "orchestra"
+                / "governance"
+                / f"{governance_match.group(1)}.async.log"
+            )
+
+        return log_dir / f"{execution_name}.async.log"
+
     def _spawn_tmux_command(
         self,
         command: list[str],
@@ -197,7 +236,8 @@ class CodeagentBackend:
         safe_name = self._allocate_tmux_session_name(base_name)
         log_dir = self._default_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"{safe_name}.async.log"
+        log_path = self._resolve_async_log_path(log_dir, safe_name)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
         shell_command = self._build_async_shell_command(
@@ -281,8 +321,7 @@ class CodeagentBackend:
         session_id: str | None = None,
         cwd: Path | None = None,
     ) -> AgentResult:
-        """运行 codeagent-wrapper。"""
-        # Ensure codeagent uses vibe3's backend/model config
+        """Run codeagent-wrapper synchronously."""
         sync_models_json(options)
 
         project_root = str(cwd or Path.cwd())
@@ -296,7 +335,6 @@ class CodeagentBackend:
                 session_id=session_id,
             )
 
-            # Dry-run mode: print command and prompt
             if dry_run:
                 print("=== Command ===")
                 print(" ".join(command))
@@ -306,11 +344,9 @@ class CodeagentBackend:
                 if task:
                     print(f"\n=== Task ===\n{task}")
                 print("\n=== End ===")
-                # Return a mock success result
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             try:
-                # Run wrapper and capture output for parsing and persistence.
                 result = subprocess.run(
                     command,
                     cwd=project_root,
@@ -331,7 +367,6 @@ class CodeagentBackend:
                     "Consider increasing the timeout or splitting the review scope."
                 ) from None
 
-            # Print output for visibility
             if result.stdout:
                 print(result.stdout, end="", flush=True)
             if result.stderr:
@@ -359,6 +394,5 @@ class CodeagentBackend:
 
             return agent_result
         finally:
-            # Clean up temporary file
             if prompt_file_path:
                 Path(prompt_file_path).unlink(missing_ok=True)

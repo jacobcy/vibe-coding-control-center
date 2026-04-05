@@ -10,9 +10,15 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.flow import IssueLink
+from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
-from vibe3.services.check_remote import CheckRemote
+from vibe3.services.check_remote import (
+    CheckRemote,
+    is_empty_auto_scene,
+    issue_state_from_payload,
+    requires_handoff,
+    resolve_task_issue_number,
+)
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
@@ -31,16 +37,7 @@ class FixResult:
 
     success: bool
     error: str | None = None
-
-
-@dataclass
-class InitResult:
-    """Result of remote index initialization."""
-
-    total_flows: int
-    updated: int
-    skipped: int
-    unresolvable: list[str] = field(default_factory=list)
+    applied: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -202,6 +199,12 @@ class CheckService(CheckRemote):
         branch = self.git_client.get_current_branch()
         return self._check_branch(branch)
 
+    def _has_worktree(self, branch: str) -> bool:
+        try:
+            return self.git_client.find_worktree_path_for_branch(branch) is not None
+        except Exception:
+            return False
+
     def _check_branch(self, branch: str) -> CheckResult:
         """Run all consistency checks for a single branch."""
         issues: list[str] = []
@@ -233,10 +236,11 @@ class CheckService(CheckRemote):
 
         # task issue exists and is open on GitHub
         issue_links = self.store.get_issue_links(branch)
-        task_issue = IssueLink.resolve_task_number(issue_links)
+        task_issue = resolve_task_issue_number(branch, flow_data, issue_links)
         task_issues = [lnk for lnk in issue_links if lnk["issue_role"] == "task"]
 
         task_issue_closed = False
+        orchestration_state: IssueState | None = None
         if task_issue:
             issue = self.github_client.view_issue(task_issue)
             if issue == "network_error":
@@ -245,11 +249,10 @@ class CheckService(CheckRemote):
                 )
             elif not issue:
                 issues.append(f"Task issue #{task_issue} not found on GitHub")
-            elif (
-                isinstance(issue, dict)
-                and str(issue.get("state", "")).upper() == "CLOSED"
-            ):
-                task_issue_closed = True
+            elif isinstance(issue, dict):
+                orchestration_state = issue_state_from_payload(issue)
+                if str(issue.get("state", "")).upper() == "CLOSED":
+                    task_issue_closed = True
 
         # only one task issue per branch
         if len(task_issues) > 1:
@@ -294,6 +297,19 @@ class CheckService(CheckRemote):
                     f"Failed to check for open PRs after task issue closed: {e}"
                 )
 
+        if (
+            flow_data.get("flow_status", "active") == "active"
+            and branch.startswith("task/issue-")
+            and orchestration_state == IssueState.READY
+            and is_empty_auto_scene(flow_data)
+            and not self._has_worktree(branch)
+        ):
+            self._mark_flow_stale(
+                branch,
+                f"Issue #{task_issue} remains state/ready with no active scene",
+            )
+            return CheckResult(is_valid=True, branch=branch, issues=[])
+
         # ref files exist
         flow_status = flow_data.get("flow_status", "active")
         if flow_status not in ("done", "aborted", "stale"):
@@ -303,14 +319,16 @@ class CheckService(CheckRemote):
                     issues.append(f"{ref_field} file not found: {ref_value}")
 
         # shared current.md
-        if flow_status not in ("done", "aborted", "stale"):
+        if flow_status not in ("done", "aborted", "stale") and requires_handoff(
+            orchestration_state
+        ):
             git_dir = self.git_client.get_git_common_dir()
             handoff_path = get_branch_handoff_dir(git_dir, branch) / "current.md"
             if not handoff_path.exists():
                 issues.append(f"Shared handoff file not found: {handoff_path}")
 
         is_valid = len(issues) == 0
-        logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).info(
+        logger.bind(branch=branch, is_valid=is_valid, issues_count=len(issues)).debug(
             "Check completed"
         )
         return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
@@ -345,6 +363,21 @@ class CheckService(CheckRemote):
             f"Flow auto-aborted: {reason}",
         )
 
+    def _mark_flow_stale(self, branch: str, reason: str) -> None:
+        """Mark an empty active flow as stale and record the event."""
+        logger.bind(
+            domain="check",
+            action="auto_stale_flow",
+            branch=branch,
+        ).info(f"Auto-staling flow: {reason}")
+        self.store.update_flow_state(branch, flow_status="stale")
+        self.store.add_event(
+            branch,
+            "flow_auto_staled",
+            "system",
+            f"Flow auto-staled: {reason}",
+        )
+
     def verify_all_flows(
         self, status: str | list[str] | None = "active"
     ) -> list[CheckResult]:
@@ -371,7 +404,7 @@ class CheckService(CheckRemote):
                 handoff_path.parent.mkdir(parents=True, exist_ok=True)
                 handoff_path.write_text(f"# {branch}\n", encoding="utf-8")
                 fixed.append(issue)
-                logger.bind(domain="check", action="fix", branch=branch).info(
+                logger.bind(domain="check", action="fix", branch=branch).debug(
                     f"Created missing handoff file: {handoff_path}"
                 )
 
@@ -384,7 +417,7 @@ class CheckService(CheckRemote):
                 + f"\n{hint}"
             )
             return FixResult(success=False, error=error)
-        return FixResult(success=True)
+        return FixResult(success=True, applied=fixed)
 
     def auto_fix_branch(self, branch: str, issues: list[str]) -> FixResult:
         """Auto-fix issues for a specific branch."""

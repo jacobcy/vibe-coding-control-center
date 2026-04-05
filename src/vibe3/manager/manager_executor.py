@@ -10,6 +10,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
+from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -22,11 +23,7 @@ if TYPE_CHECKING:
 
 
 class ManagerExecutor:
-    """Unified manager for execution context.
-
-    Handles flow creation, worktree preparation, agent launch,
-    result handling, and recycling.
-    """
+    """Unified manager for execution context (flow, worktree, agent, results)."""
 
     def __init__(
         self,
@@ -35,13 +32,11 @@ class ManagerExecutor:
         dry_run: bool = False,
         prompts_path: Path | None = None,
         circuit_breaker: CircuitBreaker | None = None,
-        dispatcher: Any | None = None,  # shim
     ):
         self.config = config
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
 
-        # Core Components
         self._flow_manager = FlowManager(config)
         self.worktree_manager = WorktreeManager(
             config, self.repo_path, self._flow_manager
@@ -53,7 +48,6 @@ class ManagerExecutor:
         )
         self._backend = CodeagentBackend()
 
-        # Execution protection
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
             self._circuit_breaker = CircuitBreaker(
@@ -67,7 +61,6 @@ class ManagerExecutor:
 
     @property
     def flow_manager(self) -> Any:
-        """Core flow management component."""
         return self._flow_manager
 
     @flow_manager.setter
@@ -75,35 +68,12 @@ class ManagerExecutor:
         self._flow_manager = value
 
     @property
-    def orchestrator(self) -> Any:
-        """Shim for backward compatibility with older Dispatcher interface.
-
-        TODO: Remove after all call-sites migrate to flow_manager.
-        """
-        return self._flow_manager
-
-    @orchestrator.setter
-    def orchestrator(self, value: Any) -> None:
-        self._flow_manager = value
-
-    @property
     def queued_issues(self) -> set[int]:
-        """Issues waiting for capacity."""
         return self._queued_issues
 
     @property
     def last_manager_render_result(self) -> "PromptRenderResult | None":
-        """Proxy for CommandBuilder.last_manager_render_result."""
         return self.command_builder.last_manager_render_result
-
-    def can_dispatch(self) -> bool:
-        """Shim for backward compatibility in tests."""
-        try:
-            active_count = self.status_service.get_active_flow_count()
-            capacity = self.config.max_concurrent_flows
-            return active_count < capacity
-        except Exception:
-            return False
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a command via the dispatcher machinery."""
@@ -112,6 +82,29 @@ class ManagerExecutor:
         )
         self._last_error_category = category
         return success
+
+    def _mark_manager_start_failed(self, issue: IssueInfo, reason: str) -> None:
+        """Record a manager startup failure as state/failed.
+
+        Also marks the flow as stale so the issue can be re-dispatched
+        after the failure is resolved.
+        """
+        self.result_handler.post_failure_comment(
+            issue.number,
+            f"Manager 启动失败，已切换为 state/failed。\n\n原因：{reason}",
+        )
+        self.result_handler.update_state_label(issue.number, IssueState.FAILED)
+        # Release the flow lock so issue can be re-dispatched after recovery
+        try:
+            flow = self._flow_manager.get_flow_for_issue(issue.number)
+            if flow and flow.get("branch"):
+                self._flow_manager.store.update_flow_state(
+                    str(flow["branch"]), flow_status="stale"
+                )
+        except Exception as exc:
+            logger.bind(domain="orchestra", issue=issue.number).warning(
+                f"Failed to mark flow stale after start failure: {exc}"
+            )
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Complete lifecycle for manager dispatch with queuing."""
@@ -140,51 +133,89 @@ class ManagerExecutor:
             log.info(f"Dry run: skipping flow/worktree/execution. Cmd: {' '.join(cmd)}")
             return True
 
-        # 1. Flow creation
         try:
             flow = self._flow_manager.create_flow_for_issue(issue)
             flow_branch = str(flow.get("branch") or "").strip()
             if not flow_branch:
                 log.error("Flow branch missing")
+                self._mark_manager_start_failed(issue, "flow branch missing")
                 return False
         except Exception as e:
             log.error(f"Flow creation failed: {e}")
+            self._mark_manager_start_failed(issue, f"flow creation failed: {e}")
             return False
 
-        # 2. Worktree preparation
-        # Use private method so subclasses can override for mock compatibility
+        # Worktree preparation
         manager_cwd, is_temporary = self._resolve_manager_cwd(issue.number, flow_branch)
         if not manager_cwd:
             log.error("Unable to resolve worktree")
+            self._mark_manager_start_failed(issue, "unable to resolve worktree")
+            return False
+
+        if not self.worktree_manager.align_auto_scene_to_base(manager_cwd, flow_branch):
+            log.error("Unable to align auto scene to configured base ref")
+            self._mark_manager_start_failed(
+                issue,
+                (
+                    "unable to align auto scene to configured base ref "
+                    f"({self.config.scene_base_ref})"
+                ),
+            )
             return False
 
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
-        try:
-            # 3. Label update
-            self.result_handler.update_state_label(issue.number, IssueState.CLAIMED)
+        # Resolve agent options in dispatcher context (correct worktree/config)
+        # and pass to subprocess via env vars to override task-branch config
+        from vibe3.config.settings import VibeConfig
+        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
 
-            # 4. Command execution
+        _manager_options = resolve_manager_agent_options(
+            self.config,
+            VibeConfig.get_defaults(),
+            worktree=is_temporary,
+        )
+        _manager_env = {
+            **os.environ,
+            "VIBE3_ASYNC_CHILD": "1",
+        }
+        if _manager_options.backend:
+            _manager_env["VIBE3_MANAGER_BACKEND"] = _manager_options.backend
+        if _manager_options.model:
+            _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
+
+        launched = False
+        try:
             cmd = [
                 "uv",
                 "run",
                 "python",
-                "src/vibe3/cli.py",
+                "-I",
+                str(self._resolve_cli_entry()),
                 "run",
                 "--manager-issue",
                 str(issue.number),
                 "--sync",
             ]
-            handle = self._backend.start_async_command(
-                cmd,
-                execution_name=f"vibe3-manager-{issue.number}",
-                cwd=manager_cwd,
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            )
+            try:
+                handle = self._backend.start_async_command(
+                    cmd,
+                    execution_name=get_manager_session_name(issue.number),
+                    cwd=manager_cwd,
+                    env=_manager_env,
+                )
+            except Exception as exc:
+                log.error(f"Manager async start failed: {exc}")
+                self._mark_manager_start_failed(
+                    issue,
+                    f"manager async start failed: {exc}",
+                )
+                return False
             log.info(
                 f"Started manager async session: {handle.tmux_session} "
                 f"(log: {handle.log_path})"
             )
+            launched = True
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",
@@ -199,17 +230,15 @@ class ManagerExecutor:
                     "issue": str(issue.number),
                 },
             )
-            # Async dispatch: only record launch here.
-            # The child process records its own manager_started/completed/aborted
-            # lifecycle events via pipeline.py, and run.py:_run_manager_issue_mode
-            # handles final result handling.  Calling on_dispatch_success here
-            # would prematurely mark the dispatch as successful before the child
-            # has even started its work.
+            # Only record launch; child records its own lifecycle events
             return True
         finally:
-            # 6. Maybe recycle
             if is_temporary and manager_cwd:
-                if self._should_recycle(issue.number):
+                if launched:
+                    log.info(
+                        f"Preserving newly dispatched manager worktree at {manager_cwd}"
+                    )
+                elif self._should_recycle(issue.number):
                     self.worktree_manager.recycle(manager_cwd)
                 else:
                     log.info(
@@ -241,8 +270,6 @@ class ManagerExecutor:
 
         cmd = self.command_builder.build_pr_review_command(pr_number)
 
-        # Resolve CWD
-        # Use private method so subclasses can override
         review_cwd = self._resolve_review_cwd_for_dispatch(pr_number)
 
         log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")
@@ -258,6 +285,10 @@ class ManagerExecutor:
         if self.config.pr_review_dispatch.use_worktree:
             return self.repo_path
         return self._resolve_review_cwd(pr_number)
+
+    def _resolve_cli_entry(self) -> Path:
+        """Return the canonical CLI entry in the current baseline worktree."""
+        return (self.repo_path / "src" / "vibe3" / "cli.py").resolve()
 
     def _should_recycle(self, issue_number: int) -> bool:
         """Decide if we should recycle the worktree now."""

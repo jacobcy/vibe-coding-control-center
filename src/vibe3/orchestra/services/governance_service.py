@@ -3,22 +3,31 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
+from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
 from vibe3.config.settings import VibeConfig
+from vibe3.orchestra.agent_resolver import resolve_governance_agent_options
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.logging import (
+    append_governance_event,
+    governance_dry_run_dir,
+)
 from vibe3.orchestra.services.status_service import (
-    IssueStatusEntry,
     OrchestraSnapshot,
     OrchestraStatusService,
+    format_issue_runtime_line,
+    format_issue_summary_line,
+    is_running_issue,
 )
 from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.models import (
@@ -88,6 +97,7 @@ class GovernanceService(ServiceBase):
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self._backend = backend or CodeagentBackend()
         self.last_render_result: PromptRenderResult | None = None
+        self._in_flight = False
 
     async def handle_event(self, event: GitHubEvent) -> None:
         pass
@@ -97,11 +107,30 @@ class GovernanceService(ServiceBase):
         if self._tick_count % self.config.governance.interval_ticks != 0:
             return
         log = logger.bind(domain="orchestra", action="governance")
-        log.info(f"Running governance scan (tick #{self._tick_count})")
+        if not self._dry_run and (self._in_flight or self._has_live_dispatch()):
+            self._in_flight = True
+            log.info(
+                f"Governance tick #{self._tick_count}: existing session still running"
+            )
+            append_governance_event(
+                f"tick #{self._tick_count} skipped: existing session still running",
+                repo_root=self._manager.repo_path,
+            )
+            return
+        log.info(f"Governance tick #{self._tick_count}: dispatching")
+        append_governance_event(
+            f"tick #{self._tick_count} dispatching",
+            repo_root=self._manager.repo_path,
+        )
         try:
             await self._run_governance()
         except Exception as exc:
+            self._in_flight = False
             log.error(f"Governance scan failed: {exc}")
+            append_governance_event(
+                f"tick #{self._tick_count} failed: {exc}",
+                repo_root=self._manager.repo_path,
+            )
 
     async def run_once(self) -> None:
         """Run governance exactly once for manual debugging."""
@@ -127,24 +156,24 @@ class GovernanceService(ServiceBase):
             dry_run_plan_path = self._write_dry_run_plan(plan_content)
             self._log_dry_run_preview(log, context, dry_run_plan_path, plan_content)
             return
-        result = await loop.run_in_executor(
+        handle = await loop.run_in_executor(
             self._executor,
-            lambda: self._backend.run(
-                prompt=plan_content,
-                options=CodeagentExecutionService(
-                    VibeConfig.get_defaults()
-                ).resolve_agent_options("run"),
-                task=(
-                    VibeConfig.get_defaults().run.run_prompt
-                    or "Execute governance supervisor task"
-                ),
-                dry_run=False,
-            ),
+            self._dispatch_governance_prompt,
+            plan_content,
         )
-        if result.is_success():
-            log.info("Governance scan completed successfully")
-        else:
-            log.warning("Governance scan returned non-zero exit code")
+        self._in_flight = True
+        log.info(
+            "Governance scan dispatched",
+            tmux_session=handle.tmux_session,
+            log_path=str(handle.log_path),
+        )
+        append_governance_event(
+            (
+                f"tick #{self._tick_count} dispatched: "
+                f"tmux={handle.tmux_session} log={handle.log_path}"
+            ),
+            repo_root=self._manager.repo_path,
+        )
 
     def _build_governance_plan(self, snapshot: OrchestraSnapshot) -> str:
         context = self._build_prompt_context(snapshot)
@@ -184,8 +213,7 @@ class GovernanceService(ServiceBase):
         return result.rendered_text
 
     def _write_dry_run_plan(self, plan_content: str) -> Path:
-        output_dir = self._manager.repo_path / "temp"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = governance_dry_run_dir(self._manager.repo_path)
         with tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".md",
@@ -225,34 +253,77 @@ class GovernanceService(ServiceBase):
             f"prompt vars={sorted(context.keys())}"
         )
         log.info(f"Dry run plan file: {plan_path}")
+        append_governance_event(
+            f"dry-run plan written: {plan_path}",
+            repo_root=self._manager.repo_path,
+        )
         log.info("Dry run rendered governance plan:")
         log.info(f"\n{plan_content}")
+
+    def _dispatch_governance_prompt(self, prompt: str) -> AsyncExecutionHandle:
+        options = resolve_governance_agent_options(self.config)
+        runtime_config = VibeConfig.get_defaults()
+        task = runtime_config.run.run_prompt or "Execute governance supervisor task"
+        return self._backend.start_async(
+            prompt=prompt,
+            options=options,
+            task=task,
+            execution_name=self._governance_execution_name(),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            keep_alive_seconds=10,
+        )
+
+    def _governance_execution_name(self) -> str:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        return f"vibe3-governance-scan-{timestamp}-t{self._tick_count}"
+
+    def _has_live_dispatch(self) -> bool:
+        session_prefix = "vibe3-governance-scan"
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
+        if result.returncode != 0:
+            return False
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if session_name == session_prefix or session_name.startswith(
+                f"{session_prefix}-"
+            ):
+                return True
+        self._in_flight = False
+        return False
 
     def _build_prompt_context(self, snapshot: OrchestraSnapshot) -> dict[str, Any]:
         active_entries = snapshot.active_issues
         active_count = len(active_entries)
         running_entries = tuple(
-            entry for entry in active_entries if self._is_running_issue(entry)
+            entry for entry in active_entries if is_running_issue(entry)
         )
         suggested_entries = tuple(
-            entry for entry in active_entries if not self._is_running_issue(entry)
+            entry for entry in active_entries if not is_running_issue(entry)
         )
         issue_list = (
-            "\n".join(
-                self._format_issue_summary_line(entry) for entry in active_entries[:20]
-            )
+            "\n".join(format_issue_summary_line(entry) for entry in active_entries[:20])
             or "(无活跃 issue)"
         )
         running_issue_details = (
             "\n".join(
-                self._format_issue_runtime_line(entry) for entry in running_entries[:20]
+                format_issue_runtime_line(entry) for entry in running_entries[:20]
             )
             or "(无 running issues)"
         )
         suggested_issue_details = (
             "\n".join(
-                self._format_issue_runtime_line(entry)
-                for entry in suggested_entries[:20]
+                format_issue_runtime_line(entry) for entry in suggested_entries[:20]
             )
             or "(无建议 issue)"
         )
@@ -276,33 +347,6 @@ class GovernanceService(ServiceBase):
             "suggested_issue_details": suggested_issue_details,
             "truncated_note": truncated_note,
         }
-
-    def _is_running_issue(self, entry: IssueStatusEntry) -> bool:
-        return entry.has_flow or entry.has_worktree or entry.has_pr
-
-    def _format_issue_summary_line(self, entry: IssueStatusEntry) -> str:
-        state_label = entry.state.to_label() if entry.state else "state/unknown"
-        blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
-        blocked = f" [blocked_by={blocked_by}]" if entry.blocked_by else ""
-        return f"- #{entry.number}: {entry.title[:60]} | {state_label}{blocked}"
-
-    def _format_issue_runtime_line(self, entry: IssueStatusEntry) -> str:
-        state_label = entry.state.to_label() if entry.state else "state/unknown"
-        flow_value = entry.flow_branch or "(not started)"
-        worktree_value = entry.worktree_path or "(none)"
-        pr_value = f"#{entry.pr_number}" if entry.pr_number is not None else "(none)"
-        parts = [
-            f"- #{entry.number}: {entry.title[:60]}",
-            state_label,
-            f"assignee={entry.assignee or '(unassigned)'}",
-            f"flow={flow_value}",
-            f"worktree={worktree_value}",
-            f"pr={pr_value}",
-        ]
-        if entry.blocked_by:
-            blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
-            parts.append(f"blocked_by={blocked_by}")
-        return " | ".join(parts)
 
     def _build_material_source_summary(self) -> dict[str, str]:
         prompts_path = self._resolve_prompts_path()
