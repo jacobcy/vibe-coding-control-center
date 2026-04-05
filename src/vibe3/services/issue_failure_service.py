@@ -66,24 +66,24 @@ def fail_manager_issue(
     )
 
 
-def recover_failed_issue_to_handoff(
+def resume_failed_issue_to_handoff(
     *,
     issue_number: int,
     repo: str | None,
     reason: str,
-    actor: str = "human:recovery",
+    actor: str = "human:resume",
 ) -> None:
-    """Recover a failed issue back to handoff for manager triage.
+    """Resume a failed issue back to handoff for manager triage.
 
     Args:
         issue_number: GitHub issue number
         repo: Repository (owner/repo format, optional)
-        reason: Recovery reason to include in comment
-        actor: Actor performing the recovery
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
     """
     GitHubClient().add_comment(
         issue_number,
-        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
+        "[resume] 已从 state/failed 继续到 state/handoff。\n\n"
         "manager 将重新判断现场并决定下一步。\n\n"
         f"原因:{reason}",
         repo=repo,
@@ -91,6 +91,40 @@ def recover_failed_issue_to_handoff(
     LabelService(repo=repo).confirm_issue_state(
         issue_number,
         IssueState.HANDOFF,
+        actor=actor,
+        force=False,
+    )
+
+
+# Backward compatibility alias
+recover_failed_issue_to_handoff = resume_failed_issue_to_handoff
+
+
+def resume_failed_issue_to_ready(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:resume",
+) -> None:
+    """Resume a failed issue back to ready for fresh manager entry.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
+    """
+    GitHubClient().add_comment(
+        issue_number,
+        "[resume] 已从 state/failed 继续到 state/ready。\n\n"
+        "将重新进入 manager 标准入口。\n\n"
+        f"原因:{reason}",
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.READY,
         actor=actor,
         force=False,
     )
