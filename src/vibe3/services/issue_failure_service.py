@@ -126,7 +126,7 @@ def resume_failed_issue_to_ready(
         issue_number,
         IssueState.READY,
         actor=actor,
-        force=False,
+        force=True,  # Force transition from FAILED to READY
     )
 
 
