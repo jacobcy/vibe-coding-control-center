@@ -187,8 +187,11 @@ def resume(
         list[int] | None,
         typer.Argument(help="Issue numbers to resume"),
     ] = None,
-    all_issues: Annotated[
-        bool, typer.Option("--all", help="Resume all open failed issues")
+    failed: Annotated[
+        bool, typer.Option("--failed", help="Resume all failed issues")
+    ] = False,
+    blocked: Annotated[
+        bool, typer.Option("--blocked", help="Resume all stale blocked issues")
     ] = False,
     reason: Annotated[str, typer.Option("--reason", help="Reason for resume")] = "",
     yes: Annotated[
@@ -199,15 +202,26 @@ def resume(
 ) -> None:
     """Resume failed or blocked issues to ready or handoff.
 
+    Use --failed to resume all failed issues, or --blocked to resume all
+    stale blocked issues. Or specify issue numbers directly.
+
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
     if trace:
         setup_logging(verbose=2)
 
     # Validate arguments
-    if not all_issues and not issue_numbers:
+    has_flag = failed or blocked
+    if not has_flag and not issue_numbers:
         typer.echo(
-            "Error: Must specify either --all or provide issue numbers",
+            "Error: Must specify --failed, --blocked, or provide issue numbers",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if failed and blocked:
+        typer.echo(
+            "Error: Cannot specify both --failed and --blocked",
             err=True,
         )
         raise typer.Exit(1)
@@ -221,14 +235,22 @@ def resume(
 
     # Build issue list
     target_issues: list[int] | None
-    if all_issues:
-        # Fetch all resumable candidates (failed + stale blocked)
+    if has_flag:
+        # Fetch resumable candidates based on flag
         usecase = _build_resume_usecase()
         candidates = usecase.status_service.fetch_resume_candidates(
             flows=[], stale_flows=[]
         )
+
+        # Filter by flag
+        if failed:
+            candidates = [c for c in candidates if c.get("resume_kind") == "failed"]
+        elif blocked:
+            candidates = [c for c in candidates if c.get("resume_kind") == "blocked"]
+
         if not candidates:
-            typer.echo("No resumable issues found.")
+            kind = "failed" if failed else "stale blocked"
+            typer.echo(f"No {kind} issues found.")
             return
 
         target_issues = []
@@ -237,13 +259,9 @@ def resume(
             if isinstance(num, int):
                 target_issues.append(num)
 
-        # Report candidates with type breakdown
-        failed_count = sum(1 for c in candidates if c.get("resume_kind") == "failed")
-        blocked_count = sum(1 for c in candidates if c.get("resume_kind") == "blocked")
-        typer.echo(
-            f"Found {len(target_issues)} resumable issue(s): "
-            f"{failed_count} failed, {blocked_count} blocked"
-        )
+        # Report candidates
+        kind = "failed" if failed else "stale blocked"
+        typer.echo(f"Found {len(target_issues)} {kind} issue(s)")
     else:
         assert issue_numbers is not None
         target_issues = list(issue_numbers)

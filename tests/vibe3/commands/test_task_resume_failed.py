@@ -12,8 +12,8 @@ runner = CliRunner()
 class TestTaskResumeCommand:
     """Tests for task resume CLI command."""
 
-    def test_task_resume_dry_run_with_all(self) -> None:
-        """vibe3 task resume --all --reason "quota resumed" 走 dry-run。"""
+    def test_task_resume_dry_run_with_failed_flag(self) -> None:
+        """vibe3 task resume --failed --reason "quota resumed" 走 dry-run。"""
         mock_usecase = MagicMock()
         mock_usecase.resume_issues.return_value = {
             "resumed": [],
@@ -60,7 +60,7 @@ class TestTaskResumeCommand:
                 [
                     "task",
                     "resume",
-                    "--all",
+                    "--failed",
                     "--reason",
                     "quota resumed",
                 ],
@@ -75,6 +75,58 @@ class TestTaskResumeCommand:
             mock_usecase.resume_issues.assert_called_once_with(
                 issue_numbers=[439, 441],
                 reason="quota resumed",
+                dry_run=True,
+            )
+
+    def test_task_resume_dry_run_with_blocked_flag(self) -> None:
+        """vibe3 task resume --blocked --reason "dependency available" 走 dry-run。"""
+        mock_usecase = MagicMock()
+        mock_usecase.resume_issues.return_value = {
+            "resumed": [],
+            "skipped": [],
+            "requested": [301],
+            "candidates": [
+                {
+                    "number": 301,
+                    "title": "Dependency available",
+                    "state": "blocked",
+                    "resume_kind": "blocked",
+                },
+            ],
+        }
+
+        # Mock fetch_resume_candidates
+        mock_usecase.status_service.fetch_resume_candidates.return_value = [
+            {
+                "number": 301,
+                "title": "Dependency available",
+                "resume_kind": "blocked",
+            },
+        ]
+
+        with patch(
+            "vibe3.commands.task._build_resume_usecase",
+            return_value=mock_usecase,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "task",
+                    "resume",
+                    "--blocked",
+                    "--reason",
+                    "dependency available",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert "301" in result.stdout
+            assert "dry-run" in result.stdout.lower()
+
+            # dry-run 模式不调用 apply
+            mock_usecase.resume_issues.assert_called_once_with(
+                issue_numbers=[301],
+                reason="dependency available",
                 dry_run=True,
             )
 
@@ -117,7 +169,7 @@ class TestTaskResumeCommand:
             )
 
     def test_task_resume_requires_all_or_issue_list(self) -> None:
-        """没有 --all 且没有 issue 列表时，命令报错退出。"""
+        """没有 --failed/--blocked 且没有 issue 列表时，命令报错退出。"""
         result = runner.invoke(
             app,
             [
@@ -139,8 +191,25 @@ class TestTaskResumeCommand:
             [
                 "task",
                 "resume",
-                "--all",
+                "--failed",
             ],
         )
 
         assert result.exit_code != 0
+
+    def test_task_resume_cannot_specify_both_failed_and_blocked(self) -> None:
+        """不能同时指定 --failed 和 --blocked。"""
+        result = runner.invoke(
+            app,
+            [
+                "task",
+                "resume",
+                "--failed",
+                "--blocked",
+                "--reason",
+                "test",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "both" in result.output.lower() or "cannot" in result.output.lower()
