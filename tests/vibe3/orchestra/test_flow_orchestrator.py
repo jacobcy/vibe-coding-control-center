@@ -185,13 +185,18 @@ class TestFlowManager:
                     {
                         "branch": "task/issue-431",
                         "flow_status": "stale",
+                        "flow_slug": "issue-431",
                     }
                 ],
             ):
                 with patch.object(
                     manager.store,
                     "get_flow_state",
-                    return_value={"branch": "task/issue-431", "flow_status": "active"},
+                    return_value={
+                        "branch": "task/issue-431",
+                        "flow_status": "active",
+                        "flow_slug": "issue-431",
+                    },
                 ):
                     with patch.object(
                         manager.store, "update_flow_state", return_value=None

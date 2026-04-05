@@ -264,10 +264,12 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
 
         # Resolve flow_slug if not explicitly provided
         if flow_slug is None:
-            existing_state = self.get_flow_status(branch)
+            existing_state = self.store.get_flow_state(branch)
             if not existing_state:
                 raise RuntimeError(f"Flow not found for branch {branch}")
-            flow_slug = existing_state.flow_slug
+            flow_slug = existing_state.get("flow_slug")
+            if not flow_slug:
+                raise RuntimeError(f"Flow for branch {branch} has no flow_slug set")
 
         # Resolve initiator if not explicitly provided
         if initiator is None:

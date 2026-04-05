@@ -14,6 +14,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.services.issue_flow_service import IssueFlowService
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowStatusResponse
@@ -55,12 +56,12 @@ def issue_priority(state: IssueState) -> tuple[int, str]:
 
 def is_auto_task_branch(branch: str) -> bool:
     """Check if branch follows auto-managed task naming convention."""
-    return branch.startswith("task/issue-")
+    return IssueFlowService().is_task_branch(branch)
 
 
 def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool:
     """Check if branch matches the canonical task/issue-N pattern."""
-    return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
+    return IssueFlowService().is_canonical_task_branch(branch, task_issue_number)
 
 
 class StatusQueryService:

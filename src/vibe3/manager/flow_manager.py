@@ -1,7 +1,5 @@
 """Flow management utilities for orchestra manager."""
 
-import re
-
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
@@ -10,6 +8,7 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.task_service import TaskService
 
@@ -34,6 +33,7 @@ class FlowManager:
         self.task_service = TaskService(store=self.store)
         self.github = GitHubClient()
         self.label_service = LabelService(repo=config.repo)
+        self.issue_flow_service = IssueFlowService(store=self.store)
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
         """Get flow linked to an issue with deterministic selection.
@@ -46,37 +46,14 @@ class FlowManager:
         This ensures deterministic selection when multiple flows exist
         for the same issue.
         """
-        flows = self.store.get_flows_by_issue(issue_number, role="task")
-        if not flows:
-            return None
-
-        canonical_branch = self._canonical_task_branch(issue_number)
-
-        # Priority 1: Active canonical flow
-        for flow in flows:
-            branch = str(flow.get("branch") or "").strip()
-            status = str(flow.get("flow_status") or "active")
-            if branch == canonical_branch and status == "active":
-                return flow
-
-        # Priority 2: Active non-canonical flow
-        for flow in flows:
-            status = str(flow.get("flow_status") or "active")
-            if status == "active":
-                return flow
-
-        # Priority 3: First available (fallback)
-        return flows[0]
-
-    @staticmethod
-    def _canonical_task_branch(issue_number: int) -> str:
-        return f"task/issue-{issue_number}"
+        return self.issue_flow_service.find_active_flow(issue_number)
 
     def _is_reusable_auto_flow(
         self, flow: dict[str, object], issue_number: int
     ) -> bool:
         branch = str(flow.get("branch") or "").strip()
-        if branch != self._canonical_task_branch(issue_number):
+        canonical_branch = self.issue_flow_service.canonical_branch_name(issue_number)
+        if branch != canonical_branch:
             return False
         return str(flow.get("flow_status") or "active") not in {
             "done",
@@ -112,7 +89,7 @@ class FlowManager:
             if flow.get("flow_status") != "active":
                 continue
             branch = str(flow.get("branch") or "").strip()
-            if not branch.startswith("task/issue-"):
+            if not self.issue_flow_service.is_task_branch(branch):
                 continue
             issue_number = self._resolve_task_issue_number(branch, flow)
             if issue_number is None:
@@ -140,10 +117,7 @@ class FlowManager:
                 and link.get("issue_number") is not None
             ):
                 return int(link["issue_number"])
-        match = re.fullmatch(r"task/issue-(\d+)", branch)
-        if match:
-            return int(match.group(1))
-        return None
+        return self.issue_flow_service.parse_issue_number(branch)
 
     def create_flow_for_issue(self, issue: IssueInfo) -> dict:
         """Create (or reuse) a flow for an issue.
