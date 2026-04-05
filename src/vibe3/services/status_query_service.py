@@ -212,3 +212,22 @@ class StatusQueryService:
         except Exception:
             pass
         return worktree_map
+
+    def fetch_failed_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+    ) -> list[dict[str, object]]:
+        """Fetch open issues with state/failed label for resume candidates.
+
+        Reuses fetch_orchestrated_issues() and filters for FAILED state only.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+
+        Returns:
+            List of failed issue dicts with number, title, state, flow, failed_reason
+        """
+        all_issues = self.fetch_orchestrated_issues(flows, queued_set=set())
+        return [
+            issue for issue in all_issues if issue.get("state") == IssueState.FAILED
+        ]
