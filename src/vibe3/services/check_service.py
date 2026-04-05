@@ -14,7 +14,9 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import IssueLink
 from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRState
-from vibe3.services.check_remote import CheckRemote
+from vibe3.services.check_remote import (
+    CheckRemote,
+)
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
