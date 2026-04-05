@@ -285,3 +285,38 @@ class TestFlowManager:
 
         mock_create_ref.assert_called_once()
         assert flow["branch"] == "task/issue-888"
+
+    def test_create_flow_for_issue_does_not_delete_preexisting_branch_on_failure(
+        self,
+    ):
+        """Test that pre-existing branch is not deleted on flow creation failure."""
+        config = OrchestraConfig()
+        manager = FlowManager(config)
+        issue = make_issue(number=777, title="Pre-existing branch failure")
+
+        with patch.object(manager, "get_active_flow_count", return_value=0):
+            with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
+                with patch.object(manager.git, "branch_exists", return_value=True):
+                    with patch.object(
+                        manager.git, "create_branch_ref", return_value=None
+                    ) as mock_create_ref:
+                        with patch.object(
+                            manager.flow_service,
+                            "create_flow",
+                            side_effect=RuntimeError("Flow creation failed"),
+                        ):
+                            with patch.object(
+                                manager.store,
+                                "get_flow_state",
+                                return_value=None,
+                            ):
+                                with patch.object(
+                                    manager.git,
+                                    "delete_branch",
+                                    return_value=None,
+                                ) as mock_delete:
+                                    with pytest.raises(RuntimeError):
+                                        manager.create_flow_for_issue(issue)
+
+        mock_create_ref.assert_not_called()
+        mock_delete.assert_not_called()
