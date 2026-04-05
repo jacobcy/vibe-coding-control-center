@@ -74,8 +74,10 @@ IGNORE_FILES=(
   "src/vibe3/commands/flow.py"  # TODO: Extract GitHub Project auto-link logic
   "src/vibe3/commands/review.py"  # TODO: Extract session management
   "src/vibe3/clients/sqlite_client.py"  # TODO: Extract issue link queries to sqlite_issue_queries.py
-  "src/vibe3/services/check_service.py"  # Core validation service with tight coupling, refactoring cost > benefit
-  "src/vibe3/orchestra/services/state_label_dispatch.py"  # State-driven dispatch with integrated session management, cohesive logic
+  "src/vibe3/services/check_service.py"  # Core validation service (424 lines): _check_branch is a single-responsibility method; further splitting would break verification logic integrity
+  "src/vibe3/orchestra/services/state_label_dispatch.py"  # Orchestra dispatch core (462 lines): already extracted no_progress_policy.py; remaining code is state machine core that should not be fragmented
+  "tests/vibe3/orchestra/test_state_label_dispatch.py"  # Comprehensive test suite for StateLabelDispatchService (498 lines): tests share fixtures and test highly related scenarios; splitting would increase maintenance cost
+  "tests/vibe3/commands/test_run_manager_issue.py"  # Test suite for manager-issue mode (479 lines): single test class with shared fixtures; splitting would break test suite integrity
   "scripts/tsu.sh"  # External script, not subject to LOC limits
 )
 

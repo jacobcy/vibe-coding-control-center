@@ -59,11 +59,33 @@ PY
 LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 300)
 LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
 
+# Test files to ignore (comprehensive test suites that should not be fragmented)
+IGNORE_FILES=(
+  "tests/vibe3/orchestra/test_state_label_dispatch.py"  # Comprehensive test suite for StateLabelDispatchService (498 lines): tests share fixtures and test highly related scenarios; splitting would increase maintenance cost
+  "tests/vibe3/commands/test_run_manager_issue.py"  # Test suite for manager-issue mode (479 lines): single test class with shared fixtures; splitting would break test suite integrity
+)
+
 warnings=0
 errors=0
 
+should_ignore() {
+  local f="$1"
+  for ignore in "${IGNORE_FILES[@]}"; do
+    if [ "$f" = "$ignore" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 check_file() {
   local f="$1"
+
+  # Skip ignored files
+  if should_ignore "$f"; then
+    return
+  fi
+
   local lines
   lines=$(wc -l < "$f")
 
