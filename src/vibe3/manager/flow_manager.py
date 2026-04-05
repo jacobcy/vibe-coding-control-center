@@ -170,12 +170,14 @@ class FlowManager:
             return self._reactivate_canonical_flow(issue, branch, slug)
 
         # Ensure branch exists (create_branch_ref: no checkout, no worktree mutation)
+        branch_created = False
         if not self.git.branch_exists(branch):
             try:
                 self.git.create_branch_ref(
                     branch,
                     start_ref=self.config.scene_base_ref,
                 )
+                branch_created = True
             except Exception as exc:
                 raise RuntimeError(
                     f"Failed to create branch '{branch}': {exc}"
@@ -201,6 +203,19 @@ class FlowManager:
                     f"Flow created concurrently for #{issue.number}, using existing"
                 )
                 return existing
+            # Clean up orphan branch if we created it and flow registration failed
+            if branch_created:
+                try:
+                    self.git.delete_branch(branch, skip_if_worktree=True)
+                    log.info(
+                        f"Cleaned up orphan branch '{branch}' "
+                        "after flow creation failure"
+                    )
+                except Exception as cleanup_exc:
+                    log.warning(
+                        f"Failed to clean up branch '{branch}' "
+                        f"after flow creation failure: {cleanup_exc}"
+                    )
             raise RuntimeError(
                 f"Failed to create flow for issue #{issue.number}: {exc}"
             ) from exc

@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -213,3 +215,73 @@ class TestFlowManager:
         mock_update.assert_called_once()
         assert mock_event.call_args.args[1] == "flow_reactivated"
         mock_link.assert_called_once_with("task/issue-431", 431, "task", actor=None)
+
+    def test_create_flow_for_issue_deletes_new_branch_when_flow_creation_fails(self):
+        """Test that newly created branch is cleaned up when flow creation fails."""
+        config = OrchestraConfig()
+        manager = FlowManager(config)
+        issue = make_issue(number=999, title="Failed flow creation")
+
+        with patch.object(manager, "get_active_flow_count", return_value=0):
+            with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
+                with patch.object(manager.git, "branch_exists", return_value=False):
+                    with patch.object(
+                        manager.git, "create_branch_ref", return_value=None
+                    ) as mock_create_ref:
+                        with patch.object(
+                            manager.flow_service,
+                            "create_flow",
+                            side_effect=RuntimeError("Flow creation failed"),
+                        ):
+                            with patch.object(
+                                manager.store,
+                                "get_flow_state",
+                                return_value=None,
+                            ):
+                                with patch.object(
+                                    manager.git,
+                                    "delete_branch",
+                                    return_value=None,
+                                ) as mock_delete:
+                                    with pytest.raises(RuntimeError):
+                                        manager.create_flow_for_issue(issue)
+
+        mock_create_ref.assert_called_once()
+        mock_delete.assert_called_once_with("task/issue-999", skip_if_worktree=True)
+
+    def test_create_flow_for_issue_keeps_branch_when_flow_already_created_concurrently(
+        self,
+    ):
+        """Test that branch is not deleted if flow was created concurrently."""
+        config = OrchestraConfig()
+        manager = FlowManager(config)
+        issue = make_issue(number=888, title="Concurrent flow creation")
+
+        class _Flow:
+            def model_dump(self):  # type: ignore[no-untyped-def]
+                return {"branch": "task/issue-888", "flow_slug": "issue-888"}
+
+        with patch.object(manager, "get_active_flow_count", return_value=0):
+            with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
+                with patch.object(manager.git, "branch_exists", return_value=False):
+                    with patch.object(
+                        manager.git, "create_branch_ref", return_value=None
+                    ) as mock_create_ref:
+                        with patch.object(
+                            manager.flow_service,
+                            "create_flow",
+                            side_effect=RuntimeError("Concurrent creation"),
+                        ):
+                            with patch.object(
+                                manager.store,
+                                "get_flow_state",
+                                return_value={
+                                    "branch": "task/issue-888",
+                                    "flow_status": "active",
+                                    "flow_slug": "issue-888",
+                                },
+                            ):
+                                flow = manager.create_flow_for_issue(issue)
+
+        mock_create_ref.assert_called_once()
+        assert flow["branch"] == "task/issue-888"
