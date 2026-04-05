@@ -1,20 +1,26 @@
-"""Task failed resume usecase - bulk resume operations for failed issues."""
+"""Task failed resume usecase - bulk resume operations for failed issues.
+
+DEPRECATED: Use TaskResumeUsecase instead.
+
+This module is kept for backward compatibility and forwards to
+the unified TaskResumeUsecase internally.
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from vibe3.services.issue_failure_service import (
-    resume_failed_issue_to_handoff,
-    resume_failed_issue_to_ready,
-)
+from vibe3.services.task_resume_usecase import TaskResumeUsecase
 
 if TYPE_CHECKING:
     from vibe3.services.status_query_service import StatusQueryService
 
 
 class TaskFailedResumeUsecase:
-    """Orchestrates bulk resume operations for failed issues."""
+    """Orchestrates bulk resume operations for failed issues.
+
+    DEPRECATED: Use TaskResumeUsecase instead.
+    """
 
     def __init__(
         self,
@@ -23,12 +29,15 @@ class TaskFailedResumeUsecase:
     ) -> None:
         """Initialize with required services.
 
+        DEPRECATED: Use TaskResumeUsecase instead.
+
         Args:
             status_service: Service for querying issue status
-            failure_service: Service for issue state transitions
+            failure_service: Service for issue state transitions (unused)
         """
         self.status_service = status_service
         self.failure_service = failure_service
+        self._unified_usecase = TaskResumeUsecase()
 
     def resume_failed_issues(
         self,
@@ -37,6 +46,8 @@ class TaskFailedResumeUsecase:
         dry_run: bool = True,
     ) -> dict[str, Any]:
         """Resume failed issues to ready or handoff based on plan_ref.
+
+        DEPRECATED: Use TaskResumeUsecase.resume_issues() instead.
 
         Args:
             issue_numbers: List of issue numbers to resume
@@ -50,86 +61,23 @@ class TaskFailedResumeUsecase:
                 - requested: Total number of issues requested
                 - candidates: List of candidate issues (dry-run only)
         """
-        # Fetch candidates
-        candidates = self.status_service.fetch_failed_resume_candidates(flows=[])
+        result = self._unified_usecase.resume_issues(
+            issue_numbers=issue_numbers,
+            reason=reason,
+            dry_run=dry_run,
+        )
 
-        # Build candidate lookup
-        candidate_map = {c["number"]: c for c in candidates}
-
-        result: dict[str, Any] = {
-            "resumed": [],
-            "skipped": [],
-            "requested": len(issue_numbers),
+        # Convert result format to match old API
+        converted: dict[str, Any] = {
+            "resumed": [r["number"] for r in result.get("resumed", [])],
+            "skipped": [
+                {"issue_number": s["number"], "reason": s["reason"]}
+                for s in result.get("skipped", [])
+            ],
+            "requested": len(issue_numbers),  # Old API: count of requested issues
         }
 
         if dry_run:
-            result["candidates"] = []
+            converted["candidates"] = result.get("candidates", [])
 
-        for issue_number in issue_numbers:
-            # Check if issue is in candidates
-            if issue_number not in candidate_map:
-                result["skipped"].append(
-                    {
-                        "issue_number": issue_number,
-                        "reason": f"Issue #{issue_number} not in failed state",
-                    }
-                )
-                continue
-
-            candidate = candidate_map[issue_number]
-
-            if dry_run:
-                result["candidates"].append(candidate)
-                continue
-
-            # Defensive check: verify issue is still open + failed
-            github_client = getattr(self.status_service, "github", None)
-            if github_client:
-                issue = github_client.view_issue(issue_number)
-                if not isinstance(issue, dict):
-                    result["skipped"].append(
-                        {
-                            "issue_number": issue_number,
-                            "reason": "Failed to verify issue state",
-                        }
-                    )
-                    continue
-
-                # Check labels
-                labels = issue.get("labels", [])
-                if not any(
-                    isinstance(label, dict) and label.get("name") == "state/failed"
-                    for label in labels
-                ):
-                    result["skipped"].append(
-                        {
-                            "issue_number": issue_number,
-                            "reason": "Issue no longer in failed state",
-                        }
-                    )
-                    continue
-
-            # Route based on plan_ref
-            flow = candidate.get("flow")
-            plan_ref = getattr(flow, "plan_ref", None) if flow else None
-
-            if plan_ref:
-                # Has plan_ref -> resume to handoff
-                resume_failed_issue_to_handoff(
-                    issue_number=issue_number,
-                    repo=None,
-                    reason=reason,
-                    actor="human:resume",
-                )
-            else:
-                # No plan_ref -> resume to ready
-                resume_failed_issue_to_ready(
-                    issue_number=issue_number,
-                    repo=None,
-                    reason=reason,
-                    actor="human:resume",
-                )
-
-            result["resumed"].append(issue_number)
-
-        return result
+        return converted
