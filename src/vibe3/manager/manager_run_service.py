@@ -368,17 +368,21 @@ def resolve_manager_execution_cwd(
 
     # Use WorktreeManager for foreign branch execution
     repo_root = Path(GitClient().get_git_common_dir()).parent
-    manager_cwd, _ = WorktreeManager(orchestra_config, repo_root).resolve_manager_cwd(
+    manager_cwd, is_new_worktree = WorktreeManager(
+        orchestra_config, repo_root
+    ).resolve_manager_cwd(
         issue_number,
         target_branch,
     )
     if manager_cwd is not None:
-        return manager_cwd, True
+        # Return the resolved CWD and the worktree creation flag
+        return manager_cwd, is_new_worktree
 
+    # Fallback: use launch cwd resolver, preserve user's worktree flag
     return (
         resolve_manager_launch_cwd(
             use_worktree=use_worktree,
             session_id=session_id,
         ),
-        False,
+        use_worktree,
     )
