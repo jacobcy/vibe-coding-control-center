@@ -97,6 +97,17 @@ def status(
             )
         )
 
+        # 1.5 Dispatch blocking (FailedGate)
+        if orch_snapshot.dispatch_blocked:
+            console.print(
+                "Dispatch: [bold red]FROZEN[/] "
+                f"[dim]({orch_snapshot.blocked_reason})[/]"
+            )
+            console.print(f"  [red]Issue:   #{orch_snapshot.blocked_issue_number}[/]")
+            console.print(f"  [red]Reason:  {orch_snapshot.blocked_issue_reason}[/]")
+        else:
+            console.print("Dispatch: [green]active[/]")
+
         if orch_snapshot.queued_issues:
             console.print(
                 f"Queue: [yellow]{len(orch_snapshot.queued_issues)} issues waiting[/]"
@@ -108,7 +119,7 @@ def status(
         flows = service.list_flows(status=None if all_flows else "active")
 
         queued_set = set(orch_snapshot.queued_issues)
-        query_service = StatusQueryService()
+        query_service = StatusQueryService(repo=config.repo)
         orchestrated_issues = query_service.fetch_orchestrated_issues(flows, queued_set)
 
         console.print("[bold cyan]Issue Progress:[/]")
@@ -192,6 +203,27 @@ def status(
                     f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
                 )
                 console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+        else:
+            console.print("  [dim](none)[/]")
+
+        failed_items = [
+            item
+            for item in orchestrated_issues
+            if cast(IssueState, item["state"]) == IssueState.FAILED
+        ]
+        console.print("\n[bold cyan]Failed Issues:[/]")
+        if failed_items:
+            for item in failed_items:
+                number = cast(int, item["number"])
+                title = cast(str, item["title"])
+                flow = cast(FlowStatusResponse | None, item["flow"])
+                reason = cast(str | None, item.get("failed_reason"))
+                flow_info = (
+                    f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
+                )
+                console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
+                if reason:
+                    console.print(f"         [red]reason:[/] {reason}")
         else:
             console.print("  [dim](none)[/]")
 

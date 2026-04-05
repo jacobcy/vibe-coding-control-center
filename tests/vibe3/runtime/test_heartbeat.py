@@ -125,4 +125,8 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
     await server._tick_loop()
 
     assert any("server:heartbeat tick #1 start" == item for item in events)
+    assert any(
+        f"server:heartbeat tick #1 services: {svc.service_name}" == item
+        for item in events
+    )
     assert any("server:heartbeat tick #1 completed in " in item for item in events)

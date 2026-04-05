@@ -32,6 +32,20 @@ class ServiceBase(ABC):
     event_types: list[str] = []
     """GitHub event types this service subscribes to."""
 
+    @property
+    def service_name(self) -> str:
+        """Human-readable service name for orchestration logs."""
+        return type(self).__name__
+
+    @property
+    def is_dispatch_service(self) -> bool:
+        """Whether this service initiates automated flow/task actions.
+
+        True for dispatchers that push the flow forward (manager/run/review).
+        False for non-dispatching services like comment replies.
+        """
+        return True
+
     @abstractmethod
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event."""

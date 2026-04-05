@@ -162,6 +162,7 @@ def execute_auto_block(
     issue_number: int,
     current_labels: list[str],
     github: GitHubClient,
+    source_state_label: str = IssueState.READY.to_label(),
     repo: str | None = None,
 ) -> None:
     """Execute the auto-block action.
@@ -202,7 +203,7 @@ def execute_auto_block(
     )
     github.add_comment(issue_number, f"[dispatcher] {reason}")
 
-    # Update labels: remove ready, add blocked
+    # Update labels: remove current trigger state, add blocked
     cmd = [
         "gh",
         "issue",
@@ -211,7 +212,7 @@ def execute_auto_block(
         "--add-label",
         IssueState.BLOCKED.to_label(),
         "--remove-label",
-        IssueState.READY.to_label(),
+        source_state_label,
     ]
     if repo:
         cmd.extend(["--repo", repo])

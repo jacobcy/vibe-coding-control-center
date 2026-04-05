@@ -1,17 +1,24 @@
 """HeartbeatServer: event loop with service registry and polling fallback."""
 
+from __future__ import annotations
+
 import asyncio
 import os
 import time
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+
+if TYPE_CHECKING:
+    from vibe3.orchestra.failed_gate import FailedGate
 
 
 class HeartbeatServer:
@@ -22,8 +29,13 @@ class HeartbeatServer:
     - Polling tick (fallback): calls service.on_tick() every polling_interval s
     """
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        failed_gate: FailedGate | None = None,
+    ) -> None:
         self.config = config
+        self._failed_gate = failed_gate
         self._services: list[ServiceBase] = []
         self._event_queue: asyncio.Queue[GitHubEvent] = asyncio.Queue()
         self._semaphore = asyncio.Semaphore(config.max_concurrent_flows)
@@ -36,15 +48,15 @@ class HeartbeatServer:
         self._services.append(service)
         append_orchestra_event(
             "server",
-            f"registered service: {type(service).__name__}",
+            f"registered service: {service.service_name}",
         )
         logger.bind(domain="orchestra").info(
-            f"Registered service: {type(service).__name__}"
+            f"Registered service: {service.service_name}"
         )
 
     @property
     def service_names(self) -> list[str]:
-        return [type(s).__name__ for s in self._services]
+        return [s.service_name for s in self._services]
 
     @property
     def queue_size(self) -> int:
@@ -74,6 +86,26 @@ class HeartbeatServer:
                 f"max_concurrent={self.config.max_concurrent_flows} "
                 f"services={','.join(self.service_names)}"
             ),
+        )
+        dispatch_services = [
+            service.service_name
+            for service in self._services
+            if service.is_dispatch_service
+        ]
+        observer_services = [
+            service.service_name
+            for service in self._services
+            if not service.is_dispatch_service
+        ]
+        append_orchestra_event(
+            "server",
+            "dispatchers: "
+            + (", ".join(dispatch_services) if dispatch_services else "(none)"),
+        )
+        append_orchestra_event(
+            "server",
+            "observers: "
+            + (", ".join(observer_services) if observer_services else "(none)"),
         )
         log.info(
             f"HeartbeatServer started (tick_interval={self.config.polling_interval}s, "
@@ -105,13 +137,52 @@ class HeartbeatServer:
             await asyncio.sleep(self.config.polling_interval)
             if not self._running:
                 break
+
+            # Failed gate check for dispatchers
+            gate_result = GateResult.open()
+            if self._failed_gate:
+                gate_result = self._failed_gate.check()
+
             self._tick_count += 1
             tick_number = self._tick_count
             started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
             append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
-            tasks = [self._tick_service(svc) for svc in self._services]
-            await asyncio.gather(*tasks, return_exceptions=True)
+
+            tasks = []
+            tick_services: list[str] = []
+            blocked_services: list[str] = []
+            for svc in self._services:
+                if gate_result.blocked and svc.is_dispatch_service:
+                    blocked_services.append(svc.service_name)
+                    logger.bind(
+                        domain="orchestra",
+                        action="tick_blocked",
+                        service=type(svc).__name__,
+                    ).debug("Skip tick: dispatch blocked")
+                    continue
+                tick_services.append(svc.service_name)
+                tasks.append(self._tick_service(svc))
+
+            append_orchestra_event(
+                "server",
+                "heartbeat tick #"
+                + str(tick_number)
+                + " services: "
+                + (", ".join(tick_services) if tick_services else "(none)"),
+            )
+            if blocked_services:
+                append_orchestra_event(
+                    "server",
+                    "heartbeat tick #"
+                    + str(tick_number)
+                    + " blocked dispatchers: "
+                    + ", ".join(blocked_services),
+                )
+
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
             duration = time.perf_counter() - started_at
             append_orchestra_event(
                 "server",
@@ -143,9 +214,15 @@ class HeartbeatServer:
             task.add_done_callback(self._pending_tasks.discard)
 
     async def _dispatch_event(self, event: GitHubEvent) -> None:
+        # Check for failed gate to determine if we block dispatch services
+        gate_result = GateResult.open()
+        if self._failed_gate:
+            gate_result = self._failed_gate.check()
+
         matching = [
             svc for svc in self._services if event.event_type in svc.event_types
         ]
+
         if not matching:
             append_orchestra_event(
                 "server",
@@ -155,8 +232,28 @@ class HeartbeatServer:
                 f"No handler for event_type={event.event_type!r}"
             )
             return
-        tasks = [self._handle_with_semaphore(svc, event) for svc in matching]
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        tasks = []
+        for svc in matching:
+            if gate_result.blocked and svc.is_dispatch_service:
+                logger.bind(
+                    domain="orchestra",
+                    action="event_blocked",
+                    service=type(svc).__name__,
+                ).warning(
+                    f"Event {event.event_type} dispatch frozen for "
+                    f"{type(svc).__name__} by failed issue #{gate_result.issue_number}"
+                )
+                append_orchestra_event(
+                    "server",
+                    f"event {event.event_type} blocked for "
+                    f"{type(svc).__name__} by failed issue",
+                )
+                continue
+            tasks.append(self._handle_with_semaphore(svc, event))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _handle_with_semaphore(
         self, service: ServiceBase, event: GitHubEvent

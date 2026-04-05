@@ -6,6 +6,7 @@ a thin rendering layer.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -73,9 +74,11 @@ class StatusQueryService:
         self,
         github_client: GitHubClient | None = None,
         git_client: GitClient | None = None,
+        repo: str | None = None,
     ) -> None:
         self.github = github_client or GitHubClient()
         self.git = git_client or GitClient()
+        self.repo = repo
 
     def fetch_orchestrated_issues(
         self,
@@ -97,7 +100,12 @@ class StatusQueryService:
 
         orchestrated_issues: list[dict[str, object]] = []
         try:
-            raw_issues = self.github.list_issues(limit=100, state="open", assignee=None)
+            raw_issues = self.github.list_issues(
+                limit=100,
+                state="open",
+                assignee=None,
+                repo=self.repo,
+            )
         except Exception as exc:
             logger.bind(domain="status").warning(f"Failed to fetch issues: {exc}")
             raw_issues = []
@@ -112,6 +120,11 @@ class StatusQueryService:
             if state == IssueState.DONE:
                 continue
             flow = issue_to_flow.get(number)
+            failed_reason = (
+                self._extract_failed_reason(number)
+                if state == IssueState.FAILED
+                else None
+            )
             orchestrated_issues.append(
                 {
                     "number": number,
@@ -119,6 +132,7 @@ class StatusQueryService:
                     "state": state,
                     "flow": flow,
                     "queued": number in queued_set,
+                    "failed_reason": failed_reason,
                 }
             )
 
@@ -129,6 +143,38 @@ class StatusQueryService:
             )
         )
         return orchestrated_issues
+
+    def _extract_failed_reason(self, issue_number: int) -> str | None:
+        """Extract a compact failure reason from issue comments."""
+        issue = self.github.view_issue(issue_number, repo=self.repo)
+        if not isinstance(issue, dict):
+            return None
+
+        comments = issue.get("comments")
+        if not isinstance(comments, list):
+            return None
+
+        for comment in reversed(comments):
+            if not isinstance(comment, dict):
+                continue
+            body = comment.get("body")
+            if not isinstance(body, str):
+                continue
+
+            body_lower = body.lower()
+            if "[recovery]" in body_lower or "恢复到 state/handoff" in body:
+                continue
+
+            match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
+            if match:
+                reason = match.group(1).strip()
+                if reason:
+                    return reason.split("\n")[0].strip()
+
+            if "failed" in body_lower or "error" in body_lower:
+                return body.strip().split("\n")[0][:100]
+
+        return None
 
     def fetch_worktree_map(self) -> dict[str, str]:
         """Get worktree branch-to-directory mapping.

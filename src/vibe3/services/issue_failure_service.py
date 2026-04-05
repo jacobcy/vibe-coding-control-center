@@ -66,6 +66,36 @@ def fail_manager_issue(
     )
 
 
+def recover_failed_issue_to_handoff(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:recovery",
+) -> None:
+    """Recover a failed issue back to handoff for manager triage.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Recovery reason to include in comment
+        actor: Actor performing the recovery
+    """
+    GitHubClient().add_comment(
+        issue_number,
+        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
+        "manager 将重新判断现场并决定下一步。\n\n"
+        f"原因:{reason}",
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.HANDOFF,
+        actor=actor,
+        force=False,
+    )
+
+
 def block_manager_noop_issue(
     *,
     issue_number: int,

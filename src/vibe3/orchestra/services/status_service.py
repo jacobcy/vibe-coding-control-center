@@ -49,6 +49,10 @@ class OrchestraSnapshot:
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
+    dispatch_blocked: bool = False
+    blocked_reason: str | None = None
+    blocked_issue_number: int | None = None
+    blocked_issue_reason: str | None = None
 
 
 class OrchestraStatusService:
@@ -68,6 +72,7 @@ class OrchestraStatusService:
         github: GitHubClient | None = None,
         orchestrator: Any | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        failed_gate: Any | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
@@ -83,6 +88,7 @@ class OrchestraStatusService:
         self._circuit_breaker = circuit_breaker
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
+        self._failed_gate = failed_gate
 
     @classmethod
     def fetch_live_snapshot(cls, config: OrchestraConfig) -> OrchestraSnapshot | None:
@@ -118,6 +124,10 @@ class OrchestraStatusService:
                         circuit_breaker_last_failure=data.get(
                             "circuit_breaker_last_failure"
                         ),
+                        dispatch_blocked=data.get("dispatch_blocked", False),
+                        blocked_reason=data.get("blocked_reason"),
+                        blocked_issue_number=data.get("blocked_issue_number"),
+                        blocked_issue_reason=data.get("blocked_issue_reason"),
                     )
                 return None
         except (URLError, ConnectionError, Exception):
@@ -186,6 +196,19 @@ class OrchestraStatusService:
                 )
             )
 
+        # Check failed gate
+        dispatch_blocked = False
+        blocked_reason = None
+        blocked_issue_number = None
+        blocked_issue_reason = None
+        if self._failed_gate:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                dispatch_blocked = True
+                blocked_reason = "state/failed"
+                blocked_issue_number = gate_result.issue_number
+                blocked_issue_reason = gate_result.reason
+
         snapshot = OrchestraSnapshot(
             timestamp=time.time(),
             server_running=True,
@@ -196,6 +219,10 @@ class OrchestraStatusService:
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
             circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),
+            dispatch_blocked=dispatch_blocked,
+            blocked_reason=blocked_reason,
+            blocked_issue_number=blocked_issue_number,
+            blocked_issue_reason=blocked_issue_reason,
         )
 
         log.debug(
@@ -214,6 +241,7 @@ class OrchestraStatusService:
                     state="open",
                     assignee=username,
                     limit=50,
+                    repo=self.config.repo,
                 )
                 if not result:
                     continue

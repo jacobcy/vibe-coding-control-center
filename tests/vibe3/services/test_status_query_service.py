@@ -100,6 +100,101 @@ class TestStatusQueryService:
 
         assert result == []
 
+    def test_fetch_orchestrated_issues_does_not_require_config_attr(self) -> None:
+        """Service should not depend on a missing self.config attribute."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 439,
+                "title": "Recovered handoff",
+                "labels": [{"name": "state/handoff"}],
+            }
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        github.list_issues.assert_called_once_with(
+            limit=100,
+            state="open",
+            assignee=None,
+            repo=None,
+        )
+        assert len(result) == 1
+        assert result[0]["number"] == 439
+        assert result[0]["state"] == IssueState.HANDOFF
+
+    def test_fetch_orchestrated_issues_extracts_failed_reason(self) -> None:
+        """FAILED issues should carry a human-readable error reason."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 439,
+                "title": "Manager backend regression",
+                "labels": [{"name": "state/failed"}],
+            }
+        ]
+        github.view_issue.return_value = {
+            "comments": [
+                {
+                    "body": (
+                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
+                        "原因:quota exhausted"
+                    ),
+                }
+            ]
+        }
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        assert len(result) == 1
+        assert result[0]["state"] == IssueState.FAILED
+        assert result[0]["failed_reason"] == "quota exhausted"
+
+    def test_fetch_orchestrated_issues_ignores_recovery_comments_for_failed_reason(
+        self,
+    ) -> None:
+        """FAILED reason ignores recovery comments, prefers failure reports."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 439,
+                "title": "Manager backend regression",
+                "labels": [{"name": "state/failed"}],
+            }
+        ]
+        github.view_issue.return_value = {
+            "comments": [
+                {
+                    "body": (
+                        "[manager] 管理执行报错,已切换为 state/failed。\n\n"
+                        "原因:quota exhausted"
+                    ),
+                },
+                {
+                    "body": (
+                        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
+                        "原因:manual relabel"
+                    ),
+                },
+            ]
+        }
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        result = service.fetch_orchestrated_issues([], queued_set=set())
+
+        assert result[0]["failed_reason"] == "quota exhausted"
+
     def test_fetch_worktree_map_parses_porcelain_output(self) -> None:
         """Service should parse git worktree list --porcelain output."""
         github = MagicMock()
