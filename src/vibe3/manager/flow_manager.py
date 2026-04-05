@@ -25,13 +25,20 @@ class FlowManager:
     guard that is inappropriate for a background server context.
     """
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        *,
+        store: SQLiteClient | None = None,
+        git: GitClient | None = None,
+        github: GitHubClient | None = None,
+    ) -> None:
         self.config = config
-        self.store = SQLiteClient()
-        self.git = GitClient()
+        self.store = store or SQLiteClient()
+        self.git = git or GitClient()
         self.flow_service = FlowService(store=self.store, git_client=self.git)
         self.task_service = TaskService(store=self.store)
-        self.github = GitHubClient()
+        self.github = github or GitHubClient()
         self.label_service = LabelService(repo=config.repo)
         self.issue_flow_service = IssueFlowService(store=self.store)
 

@@ -320,3 +320,24 @@ class TestFlowManager:
 
         mock_create_ref.assert_not_called()
         mock_delete.assert_not_called()
+
+    def test_flow_manager_accepts_injected_clients(self):
+        """Test that FlowManager can accept injected client instances."""
+        from vibe3.clients.git_client import GitClient
+        from vibe3.clients.github_client import GitHubClient
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        config = OrchestraConfig()
+        store = SQLiteClient()
+        git = GitClient()
+        github = GitHubClient()
+
+        manager = FlowManager(config, store=store, git=git, github=github)
+
+        assert manager.store is store
+        assert manager.git is git
+        assert manager.github is github
+        # Verify services share the same store instance
+        assert manager.flow_service.store is store
+        assert manager.task_service.store is store
+        assert manager.issue_flow_service.store is store
