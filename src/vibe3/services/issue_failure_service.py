@@ -130,6 +130,36 @@ def resume_failed_issue_to_ready(
     )
 
 
+def resume_blocked_issue_to_ready(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:resume",
+) -> None:
+    """Resume a blocked issue back to ready after blockage resolved.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
+    """
+    GitHubClient().add_comment(
+        issue_number,
+        "[resume] 已从 state/blocked 恢复到 state/ready。\n\n"
+        "阻塞已解除,准备继续执行。\n\n"
+        f"原因:{reason}",
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.READY,
+        actor=actor,
+        force=True,  # Force transition from BLOCKED to READY
+    )
+
+
 def block_manager_noop_issue(
     *,
     issue_number: int,
