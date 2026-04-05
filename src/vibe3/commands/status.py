@@ -64,7 +64,11 @@ def status(
             # Fallback if server is not running
             from dataclasses import replace
 
-            orch_service = OrchestraStatusService(config)
+            from vibe3.manager.flow_manager import FlowManager
+
+            orch_service = OrchestraStatusService(
+                config, orchestrator=FlowManager(config)
+            )
             local_snap = orch_service.snapshot()
             orch_snapshot = replace(local_snap, server_running=False)
 
