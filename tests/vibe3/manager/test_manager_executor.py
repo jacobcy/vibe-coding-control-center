@@ -41,12 +41,12 @@ class TestManagerReviewWorktreeResolution:
         with patch.object(
             manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ) as mock_run:
-                    result = manager.dispatch_pr_review(42)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch(
+                "subprocess.run",
+                return_value=CompletedProcess(returncode=0),
+            ) as mock_run:
+                result = manager.dispatch_pr_review(42)
 
         assert result is True
         # ManagerExecutor calls run_command which calls subprocess.run
@@ -61,12 +61,12 @@ class TestManagerReviewWorktreeResolution:
         with patch.object(
             manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
         ):
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch(
-                    "subprocess.run",
-                    return_value=CompletedProcess(returncode=0),
-                ) as mock_run:
-                    result = manager.dispatch_pr_review(42)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch(
+                "subprocess.run",
+                return_value=CompletedProcess(returncode=0),
+            ) as mock_run:
+                result = manager.dispatch_pr_review(42)
 
         assert result is True
         async_calls = [c for c in mock_run.call_args_list if "--async" in c[0][0]]
@@ -149,9 +149,9 @@ class TestManagerReviewWorktreeResolution:
             manager.flow_manager,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            with patch.object(manager, "can_dispatch", return_value=True):
-                with patch("subprocess.run") as mock_run:
-                    result = manager.dispatch_manager(issue)
+            manager.status_service.get_active_flow_count = lambda: 0
+            with patch("subprocess.run") as mock_run:
+                result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_create_flow.assert_not_called()

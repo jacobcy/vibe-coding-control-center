@@ -32,7 +32,6 @@ class ManagerExecutor:
         dry_run: bool = False,
         prompts_path: Path | None = None,
         circuit_breaker: CircuitBreaker | None = None,
-        dispatcher: Any | None = None,  # shim
     ):
         self.config = config
         self.repo_path = repo_path or Path.cwd()
@@ -69,30 +68,12 @@ class ManagerExecutor:
         self._flow_manager = value
 
     @property
-    def orchestrator(self) -> Any:
-        """Backward compatibility shim for Dispatcher interface."""
-        return self._flow_manager
-
-    @orchestrator.setter
-    def orchestrator(self, value: Any) -> None:
-        self._flow_manager = value
-
-    @property
     def queued_issues(self) -> set[int]:
         return self._queued_issues
 
     @property
     def last_manager_render_result(self) -> "PromptRenderResult | None":
         return self.command_builder.last_manager_render_result
-
-    def can_dispatch(self) -> bool:
-        """Shim for backward compatibility in tests."""
-        try:
-            active_count = self.status_service.get_active_flow_count()
-            capacity = self.config.max_concurrent_flows
-            return active_count < capacity
-        except Exception:
-            return False
 
     def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
         """Execute a command via the dispatcher machinery."""
