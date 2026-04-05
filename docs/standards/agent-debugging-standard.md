@@ -220,6 +220,9 @@ tmux capture-pane -t vibe3-manager-issue-XXX -p
 uv run python src/vibe3/cli.py task show <target-branch> --comments
 uv run python src/vibe3/cli.py handoff show <target-branch>
 gh issue view <issue-number> --json labels,state
+
+# 验证 flow lifecycle integrity（状态变更事件记录）
+uv run python src/vibe3/cli.py flow show <target-branch>
 ```
 
 ### 3.6 日志标准要求
@@ -416,13 +419,15 @@ HeartbeatServer._tick_loop()
 
 状态迁移由 `StateLabelDispatchService` 按 `state/*` labels 触发：
 
-| 触发状态 | 触发角色 | 入口命令 |
-|---|---|---|
-| `state/ready` | manager | `vibe3 run --manager-issue {n} --sync` |
-| `state/handoff` | manager (resume) | `vibe3 run --manager-issue {n} --sync` |
-| `state/claimed` | plan | `vibe3 plan --issue {n} --sync` |
-| `state/in-progress` | run | `vibe3 run --sync` |
-| `state/review` | review | `vibe3 review base --sync` |
+| 触发状态 | 触发角色 | 调度方式 | 调试方法 |
+|---|---|---|---|
+| `state/ready` | manager | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
+| `state/handoff` | manager (resume) | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
+| `state/claimed` | plan | 手动触发 | `vibe3 plan --issue {n}` |
+| `state/in-progress` | run | 手动触发 | `vibe3 run` |
+| `state/review` | review | 手动触发 | `vibe3 review base` |
+
+**注意**：Manager 的调度是自动的，由 `StateLabelDispatchService.on_tick()` 周期性扫描 `state/ready` 和 `state/handoff` labels 的 issue 并自动 dispatch。不需要手动 CLI 命令触发。调试时应通过观察日志和 tmux session 来监控执行过程。
 
 **Manager Handoff Resume**：
 
