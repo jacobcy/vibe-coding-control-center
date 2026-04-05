@@ -117,10 +117,13 @@ def status(
         # 2. Issue Tracking (state truth + local scene)
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")
+        stale_flows = service.list_flows(status="stale") if not all_flows else []
 
         queued_set = set(orch_snapshot.queued_issues)
         query_service = StatusQueryService(repo=config.repo)
-        orchestrated_issues = query_service.fetch_orchestrated_issues(flows, queued_set)
+        orchestrated_issues = query_service.fetch_orchestrated_issues(
+            flows, queued_set, stale_flows=stale_flows
+        )
 
         console.print("[bold cyan]Issue Progress:[/]")
 
@@ -199,9 +202,12 @@ def status(
                 number = cast(int, item["number"])
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse | None, item["flow"])
-                flow_info = (
-                    f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
-                )
+                if flow is None:
+                    flow_info = "[dim](no flow scene)[/]"
+                elif getattr(flow, "flow_status", "active") == "stale":
+                    flow_info = f"[dim]{flow.branch} (stale)[/]"
+                else:
+                    flow_info = f"[cyan]{flow.branch}[/]"
                 console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
         else:
             console.print("  [dim](none)[/]")
@@ -218,9 +224,12 @@ def status(
                 title = cast(str, item["title"])
                 flow = cast(FlowStatusResponse | None, item["flow"])
                 reason = cast(str | None, item.get("failed_reason"))
-                flow_info = (
-                    f"[cyan]{flow.branch}[/]" if flow else "[dim](no flow scene)[/]"
-                )
+                if flow is None:
+                    flow_info = "[dim](no flow scene)[/]"
+                elif getattr(flow, "flow_status", "active") == "stale":
+                    flow_info = f"[dim]{flow.branch} (stale)[/]"
+                else:
+                    flow_info = f"[cyan]{flow.branch}[/]"
                 console.print(f"  #{number:4}  {title[:56]}...  [dim]{flow_info}[/]")
                 if reason:
                     console.print(f"         [red]reason:[/] {reason}")

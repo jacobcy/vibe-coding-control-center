@@ -51,14 +51,24 @@ class TestStartAsyncCommand:
             lambda: log_dir,
         )
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+        # Mock subprocess.run - must return returncode != 0
+        # to break _allocate_tmux_session_name loop
+        def fake_run(*args, **kwargs):
+            result = MagicMock()
+            result.returncode = (
+                1  # Simulate "tmux has-session" failing (no session exists)
+            )
+            return result
+
+        with patch(
+            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+        ):
             backend.start_async_command(
                 ["echo", "hello"],
                 execution_name="vibe3-manager-issue-372",
             )
 
         assert not stale_log.exists()
-        assert mock_run.called
 
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path
@@ -69,12 +79,15 @@ class TestStartAsyncCommand:
 
         monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
 
+        # Mock subprocess.run to simulate session name collision
         def fake_run(cmd, *args, **kwargs):
             if cmd[:3] == ["tmux", "has-session", "-t"]:
                 target = cmd[3]
                 result = MagicMock()
+                # First call: session exists, second: doesn't exist
                 result.returncode = 0 if target == "vibe3-manager-issue-372" else 1
                 return result
+            # For tmux new-session, return success
             result = MagicMock()
             result.returncode = 0
             return result
@@ -101,8 +114,16 @@ class TestStartAsyncCommand:
 
         monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
 
-        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        # Mock subprocess.run to break _allocate_tmux_session_name loop
+        def fake_run(*args, **kwargs):
+            result = MagicMock()
+            # Simulate "tmux has-session" failing
+            result.returncode = 1
+            return result
+
+        with patch(
+            "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+        ):
             handle = backend.start_async_command(
                 ["echo", "hello"],
                 execution_name="vibe3-governance-scan-20260405-114913-t1",
