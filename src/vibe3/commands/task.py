@@ -170,7 +170,7 @@ def status(
         typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）"),
     ] = False,
     check: Annotated[
-        bool, typer.Option("--check", help="显示前先运行 flow 一致性校验")
+        bool, typer.Option("--check", help="显示前先运行完整 vibe3 check")
     ] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,

@@ -174,10 +174,10 @@ class TestFlowManager:
             start_ref="origin/main",
         )
 
-    def test_create_flow_for_issue_reactivates_stale_canonical_flow(self):
+    def test_create_flow_for_issue_rebuilds_stale_canonical_flow(self):
         config = OrchestraConfig()
         manager = FlowManager(config)
-        issue = make_issue(number=431, title="Reactivate stale flow")
+        issue = make_issue(number=431, title="Rebuild stale flow")
 
         with patch.object(manager, "get_active_flow_count", return_value=0):
             with patch.object(
@@ -192,28 +192,69 @@ class TestFlowManager:
                 ],
             ):
                 with patch.object(
-                    manager.store,
-                    "get_flow_state",
-                    return_value={
-                        "branch": "task/issue-431",
-                        "flow_status": "active",
-                        "flow_slug": "issue-431",
-                    },
-                ):
+                    manager.git,
+                    "branch_exists",
+                    side_effect=[True, False],
+                ) as mock_branch_exists:
                     with patch.object(
-                        manager.store, "update_flow_state", return_value=None
-                    ) as mock_update:
+                        manager.git,
+                        "find_worktree_path_for_branch",
+                        return_value="/tmp/issue-431",
+                    ) as mock_find_worktree:
                         with patch.object(
-                            manager.store, "add_event", return_value=None
-                        ) as mock_event:
+                            manager.git,
+                            "remove_worktree",
+                            return_value=None,
+                        ) as mock_remove_worktree:
                             with patch.object(
-                                manager.task_service, "link_issue", return_value=None
-                            ) as mock_link:
-                                flow = manager.create_flow_for_issue(issue)
+                                manager.git,
+                                "delete_branch",
+                                return_value=None,
+                            ) as mock_delete_branch:
+                                with patch.object(
+                                    manager.git,
+                                    "create_branch_ref",
+                                    return_value=None,
+                                ) as mock_create_ref:
+                                    with patch.object(
+                                        manager.flow_service,
+                                        "reactivate_flow",
+                                        return_value=MagicMock(
+                                            model_dump=lambda: {
+                                                "branch": "task/issue-431",
+                                                "flow_slug": "issue-431",
+                                                "flow_status": "active",
+                                            }
+                                        ),
+                                    ) as mock_reactivate:
+                                        with patch(
+                                            "vibe3.manager.worktree_manager.WorktreeManager.ensure_manager_worktree",
+                                            return_value=("/tmp/issue-431", True),
+                                        ) as mock_ensure_worktree:
+                                            with patch.object(
+                                                manager.task_service,
+                                                "link_issue",
+                                                return_value=None,
+                                            ) as mock_link:
+                                                flow = manager.create_flow_for_issue(
+                                                    issue
+                                                )
 
         assert flow["branch"] == "task/issue-431"
-        mock_update.assert_called_once()
-        assert mock_event.call_args.args[1] == "flow_reactivated"
+        assert mock_branch_exists.call_count == 2
+        mock_find_worktree.assert_called_once_with("task/issue-431")
+        mock_remove_worktree.assert_called_once_with("/tmp/issue-431", force=True)
+        mock_delete_branch.assert_called_once_with(
+            "task/issue-431",
+            force=True,
+            skip_if_worktree=True,
+        )
+        mock_create_ref.assert_called_once_with(
+            "task/issue-431",
+            start_ref="origin/main",
+        )
+        mock_ensure_worktree.assert_called_once_with(431, "task/issue-431")
+        mock_reactivate.assert_called_once()
         mock_link.assert_called_once_with("task/issue-431", 431, "task", actor=None)
 
     def test_create_flow_for_issue_deletes_new_branch_when_flow_creation_fails(self):
