@@ -55,3 +55,53 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
     assert not captured_options.get(
         "called"
     ), "resolve_manager_agent_options was called even though env vars were set"
+
+
+@patch("vibe3.manager.worktree_manager.WorktreeManager")
+def test_resolve_manager_execution_cwd_marks_worktree_when_resolved(
+    mock_manager, tmp_path
+):
+    """When WorktreeManager returns a dedicated cwd, worktree flag should be True."""
+    mock_manager.return_value.resolve_manager_cwd.return_value = (tmp_path, True)
+
+    from vibe3.manager.manager_run_service import resolve_manager_execution_cwd
+
+    cwd, worktree = resolve_manager_execution_cwd(
+        orchestra_config=MagicMock(),
+        issue_number=42,
+        target_branch="task/issue-42",
+        current_branch="main",
+        use_worktree=True,
+        session_id=None,
+    )
+
+    assert cwd == tmp_path
+    assert worktree is True
+    mock_manager.return_value.resolve_manager_cwd.assert_called_once_with(
+        42, "task/issue-42"
+    )
+
+
+@patch("vibe3.manager.manager_run_service.resolve_manager_launch_cwd")
+@patch("vibe3.manager.worktree_manager.WorktreeManager")
+def test_resolve_manager_execution_cwd_falls_back_without_worktree(
+    mock_manager, mock_launch
+):
+    """If WorktreeManager cannot resolve, fall back without worktree flag."""
+    mock_manager.return_value.resolve_manager_cwd.return_value = (None, False)
+    mock_launch.return_value = MagicMock()
+
+    from vibe3.manager.manager_run_service import resolve_manager_execution_cwd
+
+    cwd, worktree = resolve_manager_execution_cwd(
+        orchestra_config=MagicMock(),
+        issue_number=99,
+        target_branch="feature/99",
+        current_branch="main",
+        use_worktree=True,
+        session_id=None,
+    )
+
+    assert cwd == mock_launch.return_value
+    assert worktree is False
+    mock_launch.assert_called_once()

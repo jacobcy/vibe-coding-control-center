@@ -373,12 +373,12 @@ def resolve_manager_execution_cwd(
         target_branch,
     )
     if manager_cwd is not None:
-        return manager_cwd, False
+        return manager_cwd, True
 
     return (
         resolve_manager_launch_cwd(
             use_worktree=use_worktree,
             session_id=session_id,
         ),
-        True,
+        False,
     )
