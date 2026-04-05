@@ -496,3 +496,41 @@ async def test_manager_async_no_progress_block_fires_for_truly_no_change(
     comment = svc._github.add_comment.call_args[0][1]
     assert "[dispatcher]" in comment
     assert "Manager 执行完成但未改变状态" in comment
+
+
+# === Dispatch deduplication tests ===
+
+
+@pytest.mark.asyncio
+async def test_on_tick_does_not_dispatch_when_issue_already_in_flight(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Issue already in _in_flight_dispatches should not be dispatched again."""
+    svc, manager = manager_service
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
+    # Simulate issue already in-flight with live session
+    svc._in_flight_dispatches.add(42)
+    svc._has_live_dispatch = MagicMock(return_value=True)
+    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+
+    await svc.on_tick()
+
+    # Should not dispatch again because already in-flight
+    manager.dispatch_manager.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_does_not_dispatch_when_live_dispatch_exists(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Issue with live dispatch should not be dispatched again."""
+    svc, _ = service
+    svc._github = MagicMock()
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    # Simulate live dispatch exists
+    svc._has_live_dispatch.return_value = True
+
+    await svc.on_tick()
+
+    # Should not dispatch because live session exists
+    svc._backend.start_async_command.assert_not_called()
