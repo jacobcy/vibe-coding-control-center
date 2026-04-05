@@ -11,8 +11,7 @@ from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
 from vibe3.services.milestone_service import MilestoneService
-from vibe3.services.status_query_service import StatusQueryService
-from vibe3.services.task_failed_resume_usecase import TaskFailedResumeUsecase
+from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
 from vibe3.services.task_usecase import TaskUsecase
 from vibe3.ui.task_ui import (
@@ -42,13 +41,9 @@ def _build_milestone_service() -> MilestoneService:
     return MilestoneService()
 
 
-def _build_resume_usecase() -> TaskFailedResumeUsecase:
-    """Construct a resume usecase with required services."""
-    status_service = StatusQueryService()
-    return TaskFailedResumeUsecase(
-        status_service=status_service,
-        failure_service=None,  # Not used directly
-    )
+def _build_resume_usecase() -> TaskResumeUsecase:
+    """Construct a unified resume usecase."""
+    return TaskResumeUsecase()
 
 
 def _is_human_comment(comment: dict[str, Any]) -> bool:
@@ -202,7 +197,7 @@ def resume(
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
-    """Resume failed issues to ready or handoff.
+    """Resume failed or blocked issues to ready or handoff.
 
     By default, runs in dry-run mode. Use --yes to execute the resume.
     """
@@ -225,13 +220,15 @@ def resume(
         raise typer.Exit(1)
 
     # Build issue list
-    target_issues: list[int]
+    target_issues: list[int] | None
     if all_issues:
-        # Fetch all failed candidates
+        # Fetch all resumable candidates (failed + stale blocked)
         usecase = _build_resume_usecase()
-        candidates = usecase.status_service.fetch_failed_resume_candidates(flows=[])
+        candidates = usecase.status_service.fetch_resume_candidates(
+            flows=[], stale_flows=[]
+        )
         if not candidates:
-            typer.echo("No open failed issues found.")
+            typer.echo("No resumable issues found.")
             return
 
         target_issues = []
@@ -239,14 +236,21 @@ def resume(
             num = c.get("number")
             if isinstance(num, int):
                 target_issues.append(num)
-        typer.echo(f"Found {len(target_issues)} failed issue(s)")
+
+        # Report candidates with type breakdown
+        failed_count = sum(1 for c in candidates if c.get("resume_kind") == "failed")
+        blocked_count = sum(1 for c in candidates if c.get("resume_kind") == "blocked")
+        typer.echo(
+            f"Found {len(target_issues)} resumable issue(s): "
+            f"{failed_count} failed, {blocked_count} blocked"
+        )
     else:
         assert issue_numbers is not None
         target_issues = list(issue_numbers)
 
     # Execute resume
     usecase = _build_resume_usecase()
-    result = usecase.resume_failed_issues(
+    result = usecase.resume_issues(
         issue_numbers=target_issues,
         reason=reason,
         dry_run=not yes,
@@ -262,30 +266,48 @@ def resume(
                 for candidate in result["candidates"]:
                     num = candidate.get("number")
                     title = candidate.get("title", "")
-                    typer.echo(f"  #{num}: {title}")
+                    resume_kind = candidate.get("resume_kind", "unknown")
+                    # Show resume kind for each candidate
+                    kind_label = f" ({resume_kind})"
+                    if resume_kind == "blocked":
+                        flow = candidate.get("flow")
+                        if flow and hasattr(flow, "flow_status"):
+                            kind_label += f", {flow.flow_status}"
+                    typer.echo(f"  #{num}: {title}{kind_label}")
         else:
             typer.echo("\nResume completed:")
 
         # Show statistics
         resumed = result.get("resumed", [])
         skipped = result.get("skipped", [])
-        requested = result.get("requested", 0)
+        requested = result.get("requested", [])
 
-        typer.echo(f"\n  Requested: {requested}")
+        typer.echo(
+            f"\n  Requested: "
+            f"{len(requested) if isinstance(requested, list) else requested}"
+        )
         typer.echo(f"  Resumed: {len(resumed)}")
         if resumed:
-            typer.echo(f"    Issues: {', '.join(f'#{n}' for n in resumed)}")
+            resumed_numbers = [
+                r["number"] if isinstance(r, dict) else r for r in resumed
+            ]
+            typer.echo(f"    Issues: {', '.join(f'#{n}' for n in resumed_numbers)}")
 
         if skipped:
             typer.echo(f"  Skipped: {len(skipped)}")
             for item in skipped:
-                num = item.get("issue_number")
+                num = (
+                    item.get("number")
+                    if isinstance(item, dict)
+                    else item.get("issue_number")
+                )
                 reason_text = item.get("reason", "")
                 typer.echo(f"    #{num}: {reason_text}")
 
         if yes and not result.get("resumed"):
             typer.echo(
-                "\nTip: No issues were resumed. Check if issues are in failed state."
+                "\nTip: No issues were resumed. "
+                "Check if issues are in failed or blocked state."
             )
         elif yes:
             typer.echo(
