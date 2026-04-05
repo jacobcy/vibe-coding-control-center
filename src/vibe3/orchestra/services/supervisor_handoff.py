@@ -61,8 +61,10 @@ class SupervisorHandoffService(ServiceBase):
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
+        from vibe3.manager.flow_manager import FlowManager
+
         self._status_service = status_service or OrchestraStatusService(
-            config, github=self._github
+            config, github=self._github, orchestrator=FlowManager(config)
         )
         self._manager = manager
         self._executor = executor or ThreadPoolExecutor(

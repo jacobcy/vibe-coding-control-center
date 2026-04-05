@@ -21,6 +21,13 @@ if TYPE_CHECKING:
     from vibe3.orchestra.config import OrchestraConfig
 
 
+def _resolve_and_sync(raw_options: AgentOptions) -> AgentOptions:
+    """Resolve preset and sync to ~/.codeagent/models.json."""
+    effective = resolve_effective_agent_options(raw_options)
+    sync_models_json(effective)
+    return effective
+
+
 def resolve_governance_agent_options(config: OrchestraConfig) -> AgentOptions:
     """Resolve agent options from governance-specific config.
 
@@ -38,9 +45,7 @@ def resolve_governance_agent_options(config: OrchestraConfig) -> AgentOptions:
         worktree=True,  # Governance runs in temporary worktree
     )
 
-    effective = resolve_effective_agent_options(raw_options)
-    sync_models_json(effective)
-    return effective
+    return _resolve_and_sync(raw_options)
 
 
 def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
@@ -60,9 +65,7 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
         worktree=True,  # Supervisor runs in temporary worktree
     )
 
-    effective = resolve_effective_agent_options(raw_options)
-    sync_models_json(effective)
-    return effective
+    return _resolve_and_sync(raw_options)
 
 
 def resolve_manager_agent_options(
@@ -112,6 +115,4 @@ def resolve_manager_agent_options(
         )
 
     # Resolve preset mapping from config/models.json and sync to ~/.codeagent
-    effective = resolve_effective_agent_options(raw_options)
-    sync_models_json(effective)
-    return effective
+    return _resolve_and_sync(raw_options)

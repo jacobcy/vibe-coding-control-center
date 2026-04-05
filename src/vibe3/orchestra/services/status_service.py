@@ -13,6 +13,7 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
 
 if TYPE_CHECKING:
@@ -103,7 +104,7 @@ class OrchestraStatusService:
         self,
         config: OrchestraConfig,
         github: GitHubClient | None = None,
-        orchestrator: Any | None = None,
+        orchestrator: FlowReader | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         failed_gate: Any | None = None,
     ) -> None:
@@ -112,11 +113,11 @@ class OrchestraStatusService:
 
         # Internal orchestrator (FlowManager)
         if orchestrator is None:
-            from vibe3.manager.flow_manager import FlowManager
-
-            self._orchestrator = FlowManager(config)
-        else:
-            self._orchestrator = orchestrator
+            raise ValueError(
+                "orchestrator must be provided; "
+                "pass a FlowReader-compatible object (e.g. FlowManager)"
+            )
+        self._orchestrator = orchestrator
 
         self._circuit_breaker = circuit_breaker
         self._git = GitClient()

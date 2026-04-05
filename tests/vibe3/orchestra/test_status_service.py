@@ -27,7 +27,12 @@ class TestOrchestraStatusService:
     def test_snapshot_empty(self) -> None:
         """Snapshot with no issues returns empty list."""
         config = _make_config()
-        service = OrchestraStatusService(config)
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = None
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
 
         with (
             patch.object(service._github, "list_issues", return_value=[]) as mock_list,
@@ -44,7 +49,12 @@ class TestOrchestraStatusService:
     def test_snapshot_with_issue(self) -> None:
         """Snapshot includes issue with flow and worktree."""
         config = _make_config()
-        service = OrchestraStatusService(config)
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+        mock_orchestrator.get_active_flow_count.return_value = 1
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
 
         mock_issue = {
             "number": 42,
@@ -87,7 +97,12 @@ class TestOrchestraStatusService:
             repo="test/repo",
             manager_usernames=["manager-1", "manager-2"],
         )
-        service = OrchestraStatusService(config)
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = None
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
 
         with (
             patch.object(
@@ -116,7 +131,12 @@ class TestOrchestraStatusService:
             repo="test/repo",
             manager_usernames=["manager-1", "manager-2"],
         )
-        service = OrchestraStatusService(config)
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = None
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
 
         # Same issue returned by both managers
         shared_issue = {
@@ -198,7 +218,14 @@ class TestOrchestraStatusService:
                 "last_failure_timestamp": 123.0,
             },
         )()
-        service = OrchestraStatusService(config, circuit_breaker=mock_cb)
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = None
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(
+            config, orchestrator=mock_orchestrator, circuit_breaker=mock_cb
+        )
 
         with (
             patch.object(service._github, "list_issues", return_value=[]),

@@ -48,9 +48,11 @@ def run_supervisor_mode(
         }
     )
     config = config.model_copy(update={"governance": governance_cfg})
+    from vibe3.manager.flow_manager import FlowManager
+
     service = GovernanceService(
         config=config,
-        status_service=OrchestraStatusService(config),
+        status_service=OrchestraStatusService(config, orchestrator=FlowManager(config)),
     )
     plan_text = service.render_current_plan()
 

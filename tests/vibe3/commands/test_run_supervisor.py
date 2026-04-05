@@ -49,7 +49,7 @@ def _patch_supervisor_runtime(
     monkeypatch.setattr(
         supervisor_run_service,
         "OrchestraStatusService",
-        lambda config: MagicMock(),
+        lambda config, orchestrator: MagicMock(),
     )
     monkeypatch.setattr(
         supervisor_run_service,
