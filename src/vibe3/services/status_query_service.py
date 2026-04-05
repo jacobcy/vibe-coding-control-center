@@ -84,19 +84,28 @@ class StatusQueryService:
         self,
         flows: list[FlowStatusResponse],
         queued_set: set[int],
+        stale_flows: list[FlowStatusResponse] | None = None,
     ) -> list[dict[str, object]]:
         """Fetch GitHub issues and cross-reference with flow state.
 
         Args:
             flows: Active flow status responses
             queued_set: Set of issue numbers in the queue
+            stale_flows: Stale flow status responses
 
         Returns:
             Sorted list of issue dicts with number, title, state, flow, queued
         """
         from typing import cast
 
-        issue_to_flow = {f.task_issue_number: f for f in flows if f.task_issue_number}
+        # stale flows first, active flows overwrite (active priority)
+        issue_to_flow: dict[int, FlowStatusResponse] = {}
+        for f in stale_flows or []:
+            if f.task_issue_number:
+                issue_to_flow[f.task_issue_number] = f
+        for f in flows:
+            if f.task_issue_number:
+                issue_to_flow[f.task_issue_number] = f
 
         orchestrated_issues: list[dict[str, object]] = []
         try:

@@ -223,6 +223,72 @@ class TestStatusQueryService:
 
         assert result == {}
 
+    def test_stale_flow_associated_with_blocked_issue(self) -> None:
+        """stale flow 应出现在 blocked issue 的 flow 字段，而不是 None。"""
+
+        def _make_flow(branch: str, issue_number: int, flow_status: str = "active"):
+            f = MagicMock(spec=FlowStatusResponse)
+            f.branch = branch
+            f.task_issue_number = issue_number
+            f.flow_status = flow_status
+            return f
+
+        active_flows = []
+        stale_flows = [_make_flow("task/issue-301", 301, "stale")]
+
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {"number": 301, "title": "feat", "labels": [{"name": "state/blocked"}]}
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+
+        # We need to bypass __init__ or ensure it doesn't fail.
+        # The original code uses: svc = StatusQueryService.__new__(StatusQueryService)
+        # But here we can just use the regular constructor since we mocked clients.
+
+        result = service.fetch_orchestrated_issues(
+            active_flows, queued_set=set(), stale_flows=stale_flows
+        )
+
+        assert len(result) == 1
+        item = result[0]
+        assert item["flow"] is not None
+        assert item["flow"].branch == "task/issue-301"
+        assert item["flow"].flow_status == "stale"
+
+    def test_active_flow_takes_precedence_over_stale(self) -> None:
+        """同一 issue 同时有 active 和 stale flow 时，active 优先。"""
+
+        def _make_flow(branch: str, issue_number: int, flow_status: str = "active"):
+            f = MagicMock(spec=FlowStatusResponse)
+            f.branch = branch
+            f.task_issue_number = issue_number
+            f.flow_status = flow_status
+            return f
+
+        active_flow = _make_flow("task/issue-301", 301, "active")
+        stale_flow = _make_flow("task/issue-301-old", 301, "stale")
+
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {"number": 301, "title": "feat", "labels": [{"name": "state/blocked"}]}
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+
+        result = service.fetch_orchestrated_issues(
+            [active_flow], queued_set=set(), stale_flows=[stale_flow]
+        )
+
+        assert result[0]["flow"].flow_status == "active"
+
 
 class TestIssuePriority:
     """Tests for issue priority sorting."""
