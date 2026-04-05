@@ -275,7 +275,7 @@ def test_resume_failed_issue_to_ready_adds_comment_and_transitions_state() -> No
             456,
             IssueState.READY,
             actor="human:resume",
-            force=False,
+            force=True,  # Force transition from FAILED to READY
         )
 
 
@@ -298,5 +298,5 @@ def test_resume_failed_issue_to_ready_uses_default_actor() -> None:
             789,
             IssueState.READY,
             actor="human:resume",
-            force=False,
+            force=True,  # Force transition from FAILED to READY
         )
