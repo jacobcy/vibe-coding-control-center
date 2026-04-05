@@ -184,6 +184,25 @@ class ManagerExecutor:
 
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
+        # Resolve agent options in dispatcher context (correct worktree/config)
+        # and pass to subprocess via env vars to override task-branch config
+        from vibe3.config.settings import VibeConfig
+        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+
+        _manager_options = resolve_manager_agent_options(
+            self.config,
+            VibeConfig.get_defaults(),
+            worktree=is_temporary,
+        )
+        _manager_env = {
+            **os.environ,
+            "VIBE3_ASYNC_CHILD": "1",
+        }
+        if _manager_options.backend:
+            _manager_env["VIBE3_MANAGER_BACKEND"] = _manager_options.backend
+        if _manager_options.model:
+            _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
+
         launched = False
         try:
             cmd = [
@@ -202,7 +221,7 @@ class ManagerExecutor:
                     cmd,
                     execution_name=get_manager_session_name(issue.number),
                     cwd=manager_cwd,
-                    env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                    env=_manager_env,
                 )
             except Exception as exc:
                 log.error(f"Manager async start failed: {exc}")

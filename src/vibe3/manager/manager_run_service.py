@@ -95,13 +95,27 @@ def run_manager_issue_mode(
         use_worktree=worktree,
         session_id=session_id,
     )
-    from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+    # Prefer dispatcher-injected backend/model over local config resolution.
+    # This ensures task worktrees use the dispatcher's resolved config regardless
+    # of which branch the task worktree is on.
+    _backend_override = os.environ.get("VIBE3_MANAGER_BACKEND")
+    _model_override = os.environ.get("VIBE3_MANAGER_MODEL") or None
+    if _backend_override:
+        from vibe3.models.review_runner import AgentOptions
 
-    options = resolve_manager_agent_options(
-        orchestra_config,
-        runtime_config,
-        worktree=effective_worktree,
-    )
+        options = AgentOptions(
+            backend=_backend_override,
+            model=_model_override,
+            worktree=effective_worktree,
+        )
+    else:
+        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+
+        options = resolve_manager_agent_options(
+            orchestra_config,
+            runtime_config,
+            worktree=effective_worktree,
+        )
     actor = format_agent_actor(options)
     backend = CodeagentBackend()
     rendered = render_manager_prompt(orchestra_config, issue)
