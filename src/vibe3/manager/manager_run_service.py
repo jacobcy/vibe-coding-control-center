@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from vibe3.agents.backends.codeagent import CodeagentBackend, extract_session_id
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.review_runner import format_agent_actor
 from vibe3.agents.session_service import load_session_id
 from vibe3.clients.git_client import GitClient
@@ -20,7 +20,10 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.manager.prompts import render_manager_prompt
-from vibe3.manager.session_naming import get_manager_session_name
+from vibe3.manager.session_naming import (
+    get_manager_session_name,
+    wait_for_async_session_id,
+)
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.no_progress_policy import has_progress_changed, snapshot_progress
@@ -323,53 +326,6 @@ def resolve_manager_branch(
     )
     branch = str(prioritized[0].get("branch") or "").strip()
     return branch or current_branch
-
-
-def wait_for_async_session_id(
-    log_path: Path, *, timeout_seconds: float = 3.0
-) -> str | None:
-    """Best-effort poll async output and wrapper log for session id.
-
-    Args:
-        log_path: Path to async log file
-        timeout_seconds: Maximum time to wait
-
-    Returns:
-        Session ID if found, None otherwise
-    """
-    import re
-    import time
-
-    wrapper_log_path: Path | None = None
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        if log_path.exists():
-            try:
-                repo_log_text = log_path.read_text()
-            except OSError:
-                repo_log_text = ""
-            session_id = extract_session_id(repo_log_text)
-            if session_id:
-                return session_id
-
-            if wrapper_log_path is None:
-                match = re.search(
-                    r"Log:\s*(\S+codeagent-wrapper-\d+\.log)",
-                    repo_log_text,
-                )
-                if match:
-                    wrapper_log_path = Path(match.group(1))
-
-        if wrapper_log_path and wrapper_log_path.exists():
-            try:
-                wrapper_log_text = wrapper_log_path.read_text()
-            except OSError:
-                wrapper_log_text = ""
-            session_id = extract_session_id(wrapper_log_text)
-            if session_id:
-                return session_id
-        time.sleep(0.1)
-    return None
 
 
 def resolve_manager_execution_cwd(

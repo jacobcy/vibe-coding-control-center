@@ -1,5 +1,6 @@
 """Remote index synchronization for check service."""
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
@@ -7,17 +8,26 @@ from loguru import logger
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.models.flow import IssueLink
 
+
+@dataclass
+class InitResult:
+    """Result of remote index initialization."""
+
+    total_flows: int
+    updated: int
+    skipped: int
+    unresolvable: list[str] = field(default_factory=list)
+
+
 if TYPE_CHECKING:
-    from vibe3.services.check_service import InitResult
+    pass
 
 
 class CheckRemote:
     """Mixin for remote index initialization operations."""
 
-    def init_remote_index(self, pr_limit: int = 50) -> "InitResult":
+    def init_remote_index(self, pr_limit: int = 50) -> InitResult:
         """From remote sync flow state (mostly back-filling task_issue_number)."""
-        from vibe3.services.check_service import InitResult
-
         logger.bind(domain="check", pr_limit=pr_limit).info("Initializing remote index")
 
         branch_issue_map: dict[str, list[int]] = {}

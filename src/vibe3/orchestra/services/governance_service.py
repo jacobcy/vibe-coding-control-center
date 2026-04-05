@@ -23,9 +23,11 @@ from vibe3.orchestra.logging import (
     governance_dry_run_dir,
 )
 from vibe3.orchestra.services.status_service import (
-    IssueStatusEntry,
     OrchestraSnapshot,
     OrchestraStatusService,
+    format_issue_runtime_line,
+    format_issue_summary_line,
+    is_running_issue,
 )
 from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.models import (
@@ -304,27 +306,24 @@ class GovernanceService(ServiceBase):
         active_entries = snapshot.active_issues
         active_count = len(active_entries)
         running_entries = tuple(
-            entry for entry in active_entries if self._is_running_issue(entry)
+            entry for entry in active_entries if is_running_issue(entry)
         )
         suggested_entries = tuple(
-            entry for entry in active_entries if not self._is_running_issue(entry)
+            entry for entry in active_entries if not is_running_issue(entry)
         )
         issue_list = (
-            "\n".join(
-                self._format_issue_summary_line(entry) for entry in active_entries[:20]
-            )
+            "\n".join(format_issue_summary_line(entry) for entry in active_entries[:20])
             or "(无活跃 issue)"
         )
         running_issue_details = (
             "\n".join(
-                self._format_issue_runtime_line(entry) for entry in running_entries[:20]
+                format_issue_runtime_line(entry) for entry in running_entries[:20]
             )
             or "(无 running issues)"
         )
         suggested_issue_details = (
             "\n".join(
-                self._format_issue_runtime_line(entry)
-                for entry in suggested_entries[:20]
+                format_issue_runtime_line(entry) for entry in suggested_entries[:20]
             )
             or "(无建议 issue)"
         )
@@ -348,33 +347,6 @@ class GovernanceService(ServiceBase):
             "suggested_issue_details": suggested_issue_details,
             "truncated_note": truncated_note,
         }
-
-    def _is_running_issue(self, entry: IssueStatusEntry) -> bool:
-        return entry.has_flow or entry.has_worktree or entry.has_pr
-
-    def _format_issue_summary_line(self, entry: IssueStatusEntry) -> str:
-        state_label = entry.state.to_label() if entry.state else "state/unknown"
-        blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
-        blocked = f" [blocked_by={blocked_by}]" if entry.blocked_by else ""
-        return f"- #{entry.number}: {entry.title[:60]} | {state_label}{blocked}"
-
-    def _format_issue_runtime_line(self, entry: IssueStatusEntry) -> str:
-        state_label = entry.state.to_label() if entry.state else "state/unknown"
-        flow_value = entry.flow_branch or "(not started)"
-        worktree_value = entry.worktree_path or "(none)"
-        pr_value = f"#{entry.pr_number}" if entry.pr_number is not None else "(none)"
-        parts = [
-            f"- #{entry.number}: {entry.title[:60]}",
-            state_label,
-            f"assignee={entry.assignee or '(unassigned)'}",
-            f"flow={flow_value}",
-            f"worktree={worktree_value}",
-            f"pr={pr_value}",
-        ]
-        if entry.blocked_by:
-            blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
-            parts.append(f"blocked_by={blocked_by}")
-        return " | ".join(parts)
 
     def _build_material_source_summary(self) -> dict[str, str]:
         prompts_path = self._resolve_prompts_path()

@@ -55,6 +55,39 @@ class OrchestraSnapshot:
     blocked_issue_reason: str | None = None
 
 
+def format_issue_summary_line(entry: IssueStatusEntry) -> str:
+    """Format issue summary line for governance reports."""
+    state_label = entry.state.to_label() if entry.state else "state/unknown"
+    blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
+    blocked = f" [blocked_by={blocked_by}]" if entry.blocked_by else ""
+    return f"- #{entry.number}: {entry.title[:60]} | {state_label}{blocked}"
+
+
+def format_issue_runtime_line(entry: IssueStatusEntry) -> str:
+    """Format issue runtime line for governance detailed reports."""
+    state_label = entry.state.to_label() if entry.state else "state/unknown"
+    flow_value = entry.flow_branch or "(not started)"
+    worktree_value = entry.worktree_path or "(none)"
+    pr_value = f"#{entry.pr_number}" if entry.pr_number is not None else "(none)"
+    parts = [
+        f"- #{entry.number}: {entry.title[:60]}",
+        state_label,
+        f"assignee={entry.assignee or '(unassigned)'}",
+        f"flow={flow_value}",
+        f"worktree={worktree_value}",
+        f"pr={pr_value}",
+    ]
+    if entry.blocked_by:
+        blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
+        parts.append(f"blocked_by={blocked_by}")
+    return " | ".join(parts)
+
+
+def is_running_issue(entry: IssueStatusEntry) -> bool:
+    """Check if issue has active runtime resources."""
+    return entry.has_flow or entry.has_worktree or entry.has_pr
+
+
 class OrchestraStatusService:
     """Aggregate read-only status from multiple data sources.
 

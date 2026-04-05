@@ -37,16 +37,6 @@ class FixResult:
 
 
 @dataclass
-class InitResult:
-    """Result of remote index initialization."""
-
-    total_flows: int
-    updated: int
-    skipped: int
-    unresolvable: list[str] = field(default_factory=list)
-
-
-@dataclass
 class ExecuteCheckResult:
     """Result of unified check execution."""
 
