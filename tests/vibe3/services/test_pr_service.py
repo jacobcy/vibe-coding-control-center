@@ -133,3 +133,28 @@ def test_mark_ready_briefing_failure_still_records_event(
             # Both flow sync and event should happen
             mock_store.update_flow_state.assert_called()
             mock_store.add_event.assert_called_once()
+
+
+def test_pr_service_preserves_falsey_injected_dependencies() -> None:
+    """Injected PR collaborators should be preserved even if they are falsey."""
+    github_client = MagicMock()
+    github_client.__bool__.return_value = False
+    git_client = MagicMock()
+    git_client.__bool__.return_value = False
+    store = MagicMock()
+    store.__bool__.return_value = False
+    version_service = MagicMock()
+    version_service.__bool__.return_value = False
+
+    service = PRService(
+        github_client=github_client,
+        git_client=git_client,
+        store=store,
+        version_service=version_service,
+    )
+
+    assert service.github_client is github_client
+    assert service.git_client is git_client
+    assert service.store is store
+    assert service.version_service is version_service
+    assert service.briefing_service.github_client is github_client

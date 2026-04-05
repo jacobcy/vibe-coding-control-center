@@ -33,10 +33,12 @@ class PRService:
         version_service: VersionService | None = None,
     ) -> None:
         """Initialize PR service."""
-        self.github_client = github_client or GitHubClient()
-        self.git_client = git_client or GitClient()
-        self.store = store or SQLiteClient()
-        self.version_service = version_service or VersionService()
+        self.github_client = GitHubClient() if github_client is None else github_client
+        self.git_client = GitClient() if git_client is None else git_client
+        self.store = SQLiteClient() if store is None else store
+        self.version_service = (
+            VersionService() if version_service is None else version_service
+        )
         self.briefing_service = PRReviewBriefingService(self.github_client)
 
     def create_draft_pr(

@@ -1,6 +1,6 @@
 """Tests for Orchestra FlowManager."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -341,3 +341,70 @@ class TestFlowManager:
         assert manager.flow_service.store is store
         assert manager.task_service.store is store
         assert manager.issue_flow_service.store is store
+
+    def test_flow_manager_preserves_falsey_injected_clients(self):
+        """Injected collaborators should be preserved even if they are falsey."""
+        config = OrchestraConfig()
+        store = MagicMock()
+        store.__bool__.return_value = False
+        git = MagicMock()
+        git.__bool__.return_value = False
+        github = MagicMock()
+        github.__bool__.return_value = False
+
+        manager = FlowManager(config, store=store, git=git, github=github)
+
+        assert manager.store is store
+        assert manager.git is git
+        assert manager.github is github
+        assert manager.flow_service.store is store
+        assert manager.flow_service.git_client is git
+        assert manager.task_service.store is store
+        assert manager.issue_flow_service.store is store
+
+    def test_create_flow_for_issue_logs_cleanup_failure_but_raises_original_error(
+        self,
+    ):
+        """Rollback cleanup failures should not mask the original flow error."""
+        config = OrchestraConfig()
+        manager = FlowManager(config)
+        issue = make_issue(number=666, title="Cleanup failure")
+        mock_log = MagicMock()
+
+        with patch("vibe3.manager.flow_manager.logger.bind", return_value=mock_log):
+            with patch.object(manager, "get_active_flow_count", return_value=0):
+                with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
+                    with patch.object(manager.git, "branch_exists", return_value=False):
+                        with patch.object(
+                            manager.git, "create_branch_ref", return_value=None
+                        ):
+                            with patch.object(
+                                manager.flow_service,
+                                "create_flow",
+                                side_effect=RuntimeError("Flow creation failed"),
+                            ):
+                                with patch.object(
+                                    manager.store,
+                                    "get_flow_state",
+                                    return_value=None,
+                                ):
+                                    with patch.object(
+                                        manager.git,
+                                        "delete_branch",
+                                        side_effect=RuntimeError("Cleanup failed"),
+                                    ):
+                                        with pytest.raises(
+                                            RuntimeError,
+                                            match=(
+                                                "Failed to create flow for issue #666"
+                                            ),
+                                        ) as exc_info:
+                                            manager.create_flow_for_issue(issue)
+
+        assert "Flow creation failed" in str(exc_info.value)
+        warning_messages = [call.args[0] for call in mock_log.warning.call_args_list]
+        assert any(
+            "Failed to clean up branch 'task/issue-666'" in message
+            and "Cleanup failed" in message
+            for message in warning_messages
+        )

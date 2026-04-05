@@ -34,11 +34,11 @@ class FlowManager:
         github: GitHubClient | None = None,
     ) -> None:
         self.config = config
-        self.store = store or SQLiteClient()
-        self.git = git or GitClient()
+        self.store = SQLiteClient() if store is None else store
+        self.git = GitClient() if git is None else git
         self.flow_service = FlowService(store=self.store, git_client=self.git)
         self.task_service = TaskService(store=self.store)
-        self.github = github or GitHubClient()
+        self.github = GitHubClient() if github is None else github
         self.label_service = LabelService(repo=config.repo)
         self.issue_flow_service = IssueFlowService(store=self.store)
 
