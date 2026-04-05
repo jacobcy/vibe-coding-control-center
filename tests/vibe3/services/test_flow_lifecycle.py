@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibe3.services.flow_service import FlowService
 
 
@@ -145,3 +147,23 @@ def test_flow_manager_uses_service_for_reactivation():
 
     # Verify result is dict (from model_dump())
     assert result["branch"] == "task/issue-999"
+
+
+def test_reactivate_flow_rejects_nonexistent_flow():
+    """Reactivate should fail if flow doesn't exist."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        from vibe3.clients.sqlite_client import SQLiteClient
+
+        db_path = Path(tmpdir) / "test.db"
+        store = SQLiteClient(db_path=str(db_path))
+
+        service = FlowService(store=store)
+
+        # Try to reactivate a flow that was never created
+        branch = "task/issue-999"
+        with pytest.raises(RuntimeError, match="Flow not found"):
+            service.reactivate_flow(branch, flow_slug="issue-999")
+
+        # Also test with no flow_slug provided
+        with pytest.raises(RuntimeError, match="Flow not found"):
+            service.reactivate_flow(branch)

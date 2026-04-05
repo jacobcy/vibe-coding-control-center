@@ -262,14 +262,27 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             initiator=initiator,
         ).info("Reactivating flow")
 
-        # Resolve flow_slug if not explicitly provided
+        # Verify flow exists before reactivation
+        existing_state = self.store.get_flow_state(branch)
+        if not existing_state:
+            raise RuntimeError(f"Flow not found for branch {branch}")
+
+        # Resolve flow_slug: use explicit value or extract from existing state
         if flow_slug is None:
-            existing_state = self.store.get_flow_state(branch)
-            if not existing_state:
-                raise RuntimeError(f"Flow not found for branch {branch}")
             flow_slug = existing_state.get("flow_slug")
             if not flow_slug:
                 raise RuntimeError(f"Flow for branch {branch} has no flow_slug set")
+        else:
+            # Validate provided flow_slug matches existing state
+            existing_slug = existing_state.get("flow_slug")
+            if existing_slug and flow_slug != existing_slug:
+                logger.bind(
+                    domain="flow",
+                    action="reactivate",
+                    branch=branch,
+                    provided_slug=flow_slug,
+                    existing_slug=existing_slug,
+                ).warning("flow_slug mismatch, using provided value")
 
         # Resolve initiator if not explicitly provided
         if initiator is None:
