@@ -229,3 +229,86 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             **updates: Keyword args passed to store.update_flow_state
         """
         self.store.update_flow_state(branch, **updates)
+
+    def reactivate_flow(
+        self,
+        branch: str,
+        *,
+        flow_slug: str | None = None,
+        initiator: str | None = None,
+    ) -> FlowStatusResponse:
+        """Reactivate a flow, recording a 'flow_reactivated' event.
+
+        Used when a canonical task flow is being reused for a new issue
+        iteration. Resets all agent session IDs and clears execution state
+        while preserving the branch and flow structure.
+
+        Args:
+            branch: Flow branch to reactivate
+            flow_slug: Optional new slug (defaults to existing)
+            initiator: Who initiated reactivation (defaults to worktree identity)
+
+        Returns:
+            Updated flow state
+
+        Raises:
+            RuntimeError: If flow state cannot be retrieved after reactivation
+        """
+        logger.bind(
+            domain="flow",
+            action="reactivate",
+            branch=branch,
+            flow_slug=flow_slug,
+            initiator=initiator,
+        ).info("Reactivating flow")
+
+        # Resolve flow_slug if not explicitly provided
+        if flow_slug is None:
+            existing_state = self.get_flow_status(branch)
+            if not existing_state:
+                raise RuntimeError(f"Flow not found for branch {branch}")
+            flow_slug = existing_state.flow_slug
+
+        # Resolve initiator if not explicitly provided
+        if initiator is None:
+            initiator = SignatureService.resolve_initiator(branch)
+
+        # Event actor: audit log requires attribution
+        event_actor = SignatureService.get_worktree_actor()
+
+        # Reset all agent sessions and execution state
+        self.store.update_flow_state(
+            branch,
+            flow_slug=flow_slug,
+            flow_status="active",
+            latest_actor=None,
+            manager_session_id=None,
+            planner_session_id=None,
+            executor_session_id=None,
+            reviewer_session_id=None,
+            plan_ref=None,
+            report_ref=None,
+            audit_ref=None,
+            planner_status=None,
+            executor_status=None,
+            reviewer_status=None,
+            execution_pid=None,
+            execution_started_at=None,
+            execution_completed_at=None,
+            blocked_by=None,
+            next_step=None,
+            initiated_by=initiator,
+        )
+
+        self.store.add_event(
+            branch,
+            "flow_reactivated",
+            event_actor,
+            "Flow reactivated",
+        )
+
+        status = self.get_flow_status(branch)
+        if not status:
+            raise RuntimeError(f"Failed to reactivate flow for branch {branch}")
+
+        return status

@@ -90,34 +90,12 @@ class FlowManager:
         from vibe3.services.signature_service import SignatureService
 
         initiator = SignatureService.resolve_initiator(branch)
-        self.store.update_flow_state(
+        flow_state = self.flow_service.reactivate_flow(
             branch,
             flow_slug=slug,
-            flow_status="active",
-            latest_actor=None,
-            manager_session_id=None,
-            planner_session_id=None,
-            executor_session_id=None,
-            reviewer_session_id=None,
-            plan_ref=None,
-            report_ref=None,
-            audit_ref=None,
-            planner_status=None,
-            executor_status=None,
-            reviewer_status=None,
-            execution_pid=None,
-            execution_started_at=None,
-            execution_completed_at=None,
-            blocked_by=None,
-            next_step=None,
-            initiated_by=initiator,
+            initiator=initiator,
         )
-        self.store.add_event(
-            branch,
-            "flow_reactivated",
-            "system",
-            f"Flow reactivated for issue #{issue.number}",
-        )
+
         try:
             self.task_service.link_issue(branch, issue.number, "task", actor=None)
         except Exception as exc:
@@ -125,10 +103,7 @@ class FlowManager:
                 f"Failed to relink issue #{issue.number} to flow: {exc}"
             )
 
-        flow_state = self.store.get_flow_state(branch)
-        if not flow_state:
-            raise RuntimeError(f"Failed to reactivate flow for issue #{issue.number}")
-        return flow_state
+        return flow_state.model_dump()
 
     def get_active_flow_count(self) -> int:
         """Get count of active auto-managed flows across the system."""
