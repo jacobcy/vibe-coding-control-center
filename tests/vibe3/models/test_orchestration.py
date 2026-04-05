@@ -87,7 +87,7 @@ class TestTransitionRules:
 
     def test_allowed_transitions_count(self):
         """Test that we have expected number of allowed transitions."""
-        assert len(ALLOWED_TRANSITIONS) == 21
+        assert len(ALLOWED_TRANSITIONS) == 22
 
     def test_main_chain_transitions_allowed(self):
         """Test that main chain transitions are allowed."""
@@ -113,6 +113,7 @@ class TestTransitionRules:
         assert (IssueState.IN_PROGRESS, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.REVIEW, IssueState.FAILED) in ALLOWED_TRANSITIONS
         assert (IssueState.FAILED, IssueState.CLAIMED) in ALLOWED_TRANSITIONS
+        assert (IssueState.FAILED, IssueState.HANDOFF) in ALLOWED_TRANSITIONS
         assert (IssueState.FAILED, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
         assert (IssueState.FAILED, IssueState.REVIEW) in ALLOWED_TRANSITIONS
 

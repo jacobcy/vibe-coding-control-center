@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from vibe3.config.settings import AgentConfig, RunConfig, VibeConfig
+from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
 from vibe3.orchestra.config import OrchestraConfig
 
 
@@ -24,19 +26,19 @@ def test_default_config():
     assert config.governance.prompt_template == "orchestra.governance.plan"
     assert config.governance.include_supervisor_content is True
     assert config.governance.dry_run is False
-    assert config.governance.agent == "explore"
+    assert config.governance.agent is None
     assert config.governance.backend is None
     assert config.governance.model is None
     assert config.supervisor_handoff.enabled is True
     assert config.supervisor_handoff.issue_label == "supervisor"
     assert config.supervisor_handoff.handoff_state_label == "state/handoff"
     assert config.supervisor_handoff.supervisor_file == "supervisor/apply.md"
-    assert config.supervisor_handoff.agent == "explore"
+    assert config.supervisor_handoff.agent is None
     assert config.supervisor_handoff.backend is None
     assert config.supervisor_handoff.model is None
     assert config.assignee_dispatch.enabled is True
     assert config.assignee_dispatch.use_worktree is True
-    assert config.assignee_dispatch.agent == "develop"
+    assert config.assignee_dispatch.agent is None
     assert config.assignee_dispatch.backend is None
     assert config.assignee_dispatch.model is None
     assert config.assignee_dispatch.supervisor_file == "supervisor/manager.md"
@@ -188,3 +190,97 @@ def test_from_settings_normalizes_empty_repo_to_none():
             assert config.repo is None
         finally:
             settings_module.VibeConfig.get_defaults = original_get_defaults
+
+
+def test_from_settings_does_not_invent_agent_presets_when_yaml_omits_them():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        settings_path = Path(tmpdir) / "settings.yaml"
+        settings_path.write_text(
+            yaml.dump(
+                {
+                    "orchestra": {
+                        "enabled": True,
+                        "assignee_dispatch": {
+                            "enabled": True,
+                            "use_worktree": True,
+                        },
+                        "governance": {
+                            "enabled": True,
+                        },
+                        "supervisor_handoff": {
+                            "enabled": True,
+                        },
+                    }
+                }
+            )
+        )
+
+        import vibe3.config.settings as settings_module
+
+        original_get_defaults = settings_module.VibeConfig.get_defaults
+
+        def mock_get_defaults():
+            return settings_module.VibeConfig.from_yaml(settings_path)
+
+        settings_module.VibeConfig.get_defaults = staticmethod(mock_get_defaults)
+
+        try:
+            config = OrchestraConfig.from_settings()
+            assert config.assignee_dispatch.agent is None
+            assert config.governance.agent is None
+            assert config.supervisor_handoff.agent is None
+        finally:
+            settings_module.VibeConfig.get_defaults = original_get_defaults
+
+
+def test_manager_agent_resolution_falls_back_to_run_config(monkeypatch):
+    monkeypatch.setattr(
+        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        lambda options: options,
+    )
+    monkeypatch.setattr(
+        "vibe3.orchestra.agent_resolver.sync_models_json",
+        lambda options: None,
+    )
+
+    runtime = VibeConfig(
+        run=RunConfig(agent_config=AgentConfig(agent="develop")),
+    )
+    config = OrchestraConfig()
+
+    options = resolve_manager_agent_options(config, runtime, worktree=True)
+
+    assert options.agent == "develop"
+    assert options.backend is None
+    assert options.model is None
+    assert options.worktree is True
+
+
+def test_manager_agent_resolution_supports_backend_only_override(monkeypatch):
+    monkeypatch.setattr(
+        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        lambda options: options,
+    )
+    monkeypatch.setattr(
+        "vibe3.orchestra.agent_resolver.sync_models_json",
+        lambda options: None,
+    )
+
+    runtime = VibeConfig(
+        run=RunConfig(agent_config=AgentConfig(agent="develop")),
+    )
+    config = OrchestraConfig.model_validate(
+        {
+            "assignee_dispatch": {
+                "backend": "opencode",
+                "model": "alibaba-coding-plan-cn/glm-5",
+            }
+        }
+    )
+
+    options = resolve_manager_agent_options(config, runtime, worktree=True)
+
+    assert options.agent is None
+    assert options.backend == "opencode"
+    assert options.model == "alibaba-coding-plan-cn/glm-5"
+    assert options.worktree is True

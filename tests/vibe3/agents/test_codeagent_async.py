@@ -41,8 +41,8 @@ class TestStartAsyncCommand:
     ) -> None:
         backend = CodeagentBackend()
         log_dir = tmp_path / "temp" / "logs"
-        log_dir.mkdir(parents=True)
-        stale_log = log_dir / "vibe3-manager-issue-372.async.log"
+        stale_log = log_dir / "issues" / "issue-372" / "manager.async.log"
+        stale_log.parent.mkdir(parents=True)
         stale_log.write_text("SESSION_ID: stale_session\n")
 
         monkeypatch.setattr(
@@ -88,7 +88,29 @@ class TestStartAsyncCommand:
             )
 
         assert handle.tmux_session == "vibe3-manager-issue-372-2"
-        assert handle.log_path == log_dir / "vibe3-manager-issue-372-2.async.log"
+        assert (
+            handle.log_path == log_dir / "issues" / "issue-372" / "manager-2.async.log"
+        )
+
+    def test_start_async_command_places_governance_logs_under_governance_dir(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            handle = backend.start_async_command(
+                ["echo", "hello"],
+                execution_name="vibe3-governance-scan-20260405-114913-t1",
+            )
+
+        assert handle.log_path == (
+            log_dir / "orchestra" / "governance" / "scan-20260405-114913-t1.async.log"
+        )
 
 
 class TestRunStreamingAndEdgeCases:

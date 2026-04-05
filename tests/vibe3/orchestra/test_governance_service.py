@@ -288,7 +288,6 @@ class TestGovernanceService:
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
-        dispatcher = _make_dispatcher()
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(interval_ticks=2, dry_run=True)

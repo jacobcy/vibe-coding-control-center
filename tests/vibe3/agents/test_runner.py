@@ -29,10 +29,10 @@ class TestCodeagentExecutionService:
     def test_execute_async_prints_tmux_session_and_log(self, monkeypatch) -> None:
         service = CodeagentExecutionService(VibeConfig.get_defaults())
         backend = MagicMock()
-        backend.start_async.return_value = AsyncExecutionHandle(
+        backend.start_async_command.return_value = AsyncExecutionHandle(
             tmux_session="vibe3-executor-dev-issue-424",
-            log_path=Path("temp/logs/vibe3-executor-dev-issue-424.async.log"),
-            prompt_file_path=Path("/tmp/prompt.md"),
+            log_path=Path("temp/logs/issues/issue-424/run.async.log"),
+            prompt_file_path=Path(""),
         )
         echo_messages: list[str] = []
 
@@ -58,13 +58,60 @@ class TestCodeagentExecutionService:
             branch="dev/issue-424",
         )
 
+        monkeypatch.setattr("vibe3.agents.runner.sys.argv", ["pytest"])
+
         result = service.execute_async(command, "dev/issue-424")
 
         assert result.tmux_session == "vibe3-executor-dev-issue-424"
-        assert result.log_path == Path(
-            "temp/logs/vibe3-executor-dev-issue-424.async.log"
-        )
+        assert result.log_path == Path("temp/logs/issues/issue-424/run.async.log")
+        backend.start_async_command.assert_called_once()
+        called_command = backend.start_async_command.call_args.args[0]
+        assert called_command[:4] == ["uv", "run", "python", "src/vibe3/cli.py"]
+        assert "--sync" in called_command
+        backend.start_async.assert_not_called()
         expected_tmux = "Tmux session: vibe3-executor-dev-issue-424"
-        expected_log = "Session log: temp/logs/vibe3-executor-dev-issue-424.async.log"
+        expected_log = "Session log: temp/logs/issues/issue-424/run.async.log"
         assert any(expected_tmux in message for message in echo_messages)
         assert any(expected_log in message for message in echo_messages)
+
+    def test_execute_async_prefers_explicit_cli_args(self, monkeypatch) -> None:
+        service = CodeagentExecutionService(VibeConfig.get_defaults())
+        backend = MagicMock()
+        backend.start_async_command.return_value = AsyncExecutionHandle(
+            tmux_session="vibe3-planner-task-issue-42",
+            log_path=Path("temp/logs/issues/issue-42/plan.async.log"),
+            prompt_file_path=Path(""),
+        )
+
+        monkeypatch.setattr("vibe3.agents.runner.CodeagentBackend", lambda: backend)
+        monkeypatch.setattr(
+            "vibe3.agents.runner.persist_execution_lifecycle_event",
+            lambda *args, **kwargs: None,
+        )
+        monkeypatch.setattr(
+            "vibe3.agents.runner.SQLiteClient",
+            lambda: MagicMock(),
+        )
+
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=lambda: "prompt",
+            task="extra guidance",
+            config=service.config,
+            branch="task/issue-42",
+            cli_args=["plan", "--issue", "42", "--async"],
+        )
+
+        service.execute_async(command, "task/issue-42")
+
+        called_command = backend.start_async_command.call_args.args[0]
+        assert called_command == [
+            "uv",
+            "run",
+            "python",
+            "src/vibe3/cli.py",
+            "plan",
+            "--issue",
+            "42",
+            "--sync",
+        ]

@@ -233,6 +233,102 @@ class TestRunManagerIssueMode:
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] is None
 
+    def test_sync_completion_clears_manager_session_id(self, monkeypatch) -> None:
+        backend = _make_backend()
+        backend.run.return_value = MagicMock(
+            session_id="ses_manager372",
+            is_success=MagicMock(return_value=True),
+        )
+        github = _make_github()
+        sqlite = MagicMock()
+
+        _patch_basic(monkeypatch, backend, github, sqlite)
+        monkeypatch.setattr(
+            manager_run_service.OrchestraConfig,
+            "from_settings",
+            staticmethod(
+                lambda: manager_run_service.OrchestraConfig.model_validate(
+                    {
+                        "pid_file": ".git/vibe3/orchestra.pid",
+                        "assignee_dispatch": {"agent": "manager-orchestrator"},
+                    }
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            manager_run_service,
+            "has_progress_changed",
+            lambda before, after: True,
+        )
+
+        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
+
+        assert result.exit_code == 0
+        assert (
+            sqlite.update_flow_state.call_args_list[-1].kwargs.get("manager_session_id")
+            is None
+        )
+
+    def test_sync_dry_run_preserves_manager_session_id(self, monkeypatch) -> None:
+        backend = _make_backend()
+        backend.run.return_value = MagicMock(
+            session_id="ses_manager372",
+            is_success=MagicMock(return_value=True),
+        )
+        github = _make_github()
+        sqlite = MagicMock()
+
+        _patch_basic(monkeypatch, backend, github, sqlite)
+        monkeypatch.setattr(
+            manager_run_service.OrchestraConfig,
+            "from_settings",
+            staticmethod(
+                lambda: manager_run_service.OrchestraConfig.model_validate(
+                    {
+                        "pid_file": ".git/vibe3/orchestra.pid",
+                        "assignee_dispatch": {"agent": "manager-orchestrator"},
+                    }
+                )
+            ),
+        )
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "372", "--sync", "--dry-run"],
+        )
+
+        assert result.exit_code == 0
+        assert not sqlite.update_flow_state.called
+
+    def test_sync_dry_run_failure_does_not_fail_issue(self, monkeypatch) -> None:
+        backend = _make_backend()
+        backend.run.side_effect = RuntimeError("dry-run backend failed")
+        github = _make_github()
+        sqlite = MagicMock()
+
+        _patch_basic(monkeypatch, backend, github, sqlite)
+        monkeypatch.setattr(
+            manager_run_service.OrchestraConfig,
+            "from_settings",
+            staticmethod(
+                lambda: manager_run_service.OrchestraConfig.model_validate(
+                    {
+                        "pid_file": ".git/vibe3/orchestra.pid",
+                        "assignee_dispatch": {"agent": "manager-orchestrator"},
+                    }
+                )
+            ),
+        )
+
+        result = runner.invoke(
+            cli_app,
+            ["run", "--manager-issue", "372", "--sync", "--dry-run"],
+        )
+
+        assert result.exit_code != 0
+        assert not sqlite.add_event.called
+        github.add_comment.assert_not_called()
+
     # === No-progress parity tests ===
 
     def test_sync_path_treats_comment_changes_as_progress(self, monkeypatch) -> None:

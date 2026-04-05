@@ -148,9 +148,23 @@ def test_task_status_groups_orchestration_issues_and_manual_scenes(
             "flow": None,
             "queued": False,
         },
+        {
+            "number": 439,
+            "title": "Manager backend regression",
+            "state": IssueState.FAILED,
+            "flow": FlowStatusResponse(
+                branch="task/issue-439",
+                flow_slug="issue-439",
+                flow_status="active",
+                task_issue_number=439,
+            ),
+            "queued": False,
+            "failed_reason": "quota exhausted",
+        },
     ]
     query_svc.fetch_worktree_map.return_value = {
         "task/issue-320": "issue-320",
+        "task/issue-439": "issue-439",
         "openai-review": "wt-openai-review",
     }
     mock_query_service_cls.return_value = query_svc
@@ -181,6 +195,9 @@ def test_task_status_groups_orchestration_issues_and_manual_scenes(
     assert "READY" in result.stdout
     assert "Blocked Issues:" in result.stdout
     assert "372" in result.stdout
+    assert "Failed Issues:" in result.stdout
+    assert "439" in result.stdout
+    assert "quota exhausted" in result.stdout
     assert "Auto Task Scenes:" in result.stdout
     assert "task/issue-320" in result.stdout
     assert "task/issue-320                 wt: issue-320" in result.stdout

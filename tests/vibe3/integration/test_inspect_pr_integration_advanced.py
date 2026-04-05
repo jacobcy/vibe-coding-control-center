@@ -116,7 +116,9 @@ def test_build_pr_analysis_dag_integration(mock_all_dependencies):
 
 def test_build_pr_analysis_error_handling():
     """Test error handling in build_pr_analysis."""
-    with patch("vibe3.services.pr_analysis_service._get_pr_changed_files") as mock_files:
+    with patch(
+        "vibe3.services.pr_analysis_service._get_pr_changed_files"
+    ) as mock_files:
         # Simulate error getting files
         mock_files.side_effect = Exception("GitHub API error")
 
@@ -156,7 +158,9 @@ def test_build_pr_analysis_dataclass_fields():
             "vibe3.services.pr_analysis_service._calculate_risk_score",
             return_value={"score": 1},
         ),
-        patch("vibe3.services.pr_analysis_service._get_pr_commit_count", return_value=1),
+        patch(
+            "vibe3.services.pr_analysis_service._get_pr_commit_count", return_value=1
+        ),
         patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
     ):
         mock_dag_result = MagicMock()

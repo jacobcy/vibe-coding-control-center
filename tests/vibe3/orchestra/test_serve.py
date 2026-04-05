@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from vibe3.orchestra.config import (
@@ -15,6 +16,7 @@ from vibe3.orchestra.config import (
     StateLabelDispatchConfig,
     SupervisorHandoffConfig,
 )
+from vibe3.orchestra.failed_gate import GateResult
 from vibe3.server.app import (
     app,
 )
@@ -27,6 +29,13 @@ from vibe3.server.registry import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_failed_gate():
+    with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
+        mock_check.return_value = GateResult.open()
+        yield mock_check
+
+
 def test_build_server_registers_only_enabled_services() -> None:
     cfg = OrchestraConfig(
         assignee_dispatch=AssigneeDispatchConfig(enabled=False),
@@ -36,7 +45,11 @@ def test_build_server_registers_only_enabled_services() -> None:
     heartbeat, _ = _build_server(cfg)
     assert "PRReviewDispatchService" in heartbeat.service_names
     assert "GovernanceService" in heartbeat.service_names
-    assert heartbeat.service_names.count("StateLabelDispatchService") == 4
+    assert "StateLabelDispatchService(manager:ready)" in heartbeat.service_names
+    assert "StateLabelDispatchService(manager:handoff)" in heartbeat.service_names
+    assert "StateLabelDispatchService(plan:claimed)" in heartbeat.service_names
+    assert "StateLabelDispatchService(run:in-progress)" in heartbeat.service_names
+    assert "StateLabelDispatchService(review:review)" in heartbeat.service_names
     assert "SupervisorHandoffService" in heartbeat.service_names
 
 

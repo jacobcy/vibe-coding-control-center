@@ -256,8 +256,8 @@ def test_run_failure_fails_issue_and_comments(monkeypatch) -> None:
             return_value=MagicMock(success=False, stderr="executor failed"),
         ),
         patch.object(RunUsecase, "transition_issue", return_value=42),
-        patch("vibe3.commands.run.GitHubClient") as mock_github,
-        patch("vibe3.commands.run.LabelService") as mock_labels,
+        patch("vibe3.services.issue_failure_service.GitHubClient") as mock_github,
+        patch("vibe3.services.issue_failure_service.LabelService") as mock_labels,
     ):
         result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
 

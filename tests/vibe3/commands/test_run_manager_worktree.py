@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
-import vibe3.commands.run as run_module
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.cli import app as cli_app
+from vibe3.manager import manager_run_service
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -33,11 +33,28 @@ def _make_github():
 
 
 def _patch_basic(monkeypatch, backend, github, sqlite=None):
-    monkeypatch.setattr(run_module, "CodeagentBackend", lambda: backend)
-    monkeypatch.setattr(run_module, "GitHubClient", lambda: github)
-    monkeypatch.setattr(run_module, "SQLiteClient", lambda: sqlite or MagicMock())
+    from vibe3.services import issue_failure_service
+
+    monkeypatch.setattr(manager_run_service, "CodeagentBackend", lambda: backend)
+    monkeypatch.setattr(manager_run_service, "GitHubClient", lambda: github)
+    monkeypatch.setattr(issue_failure_service, "GitHubClient", lambda: github)
     monkeypatch.setattr(
-        run_module.GitClient, "get_current_branch", lambda self: "dev/issue-430"
+        manager_run_service, "SQLiteClient", lambda: sqlite or MagicMock()
+    )
+    monkeypatch.setattr(
+        manager_run_service.GitClient,
+        "get_current_branch",
+        lambda self: "dev/issue-430",
+    )
+    monkeypatch.setattr(
+        manager_run_service,
+        "render_manager_prompt",
+        lambda config, issue: MagicMock(rendered_text="# Manager prompt\n"),
+    )
+    monkeypatch.setattr(
+        manager_run_service,
+        "wait_for_async_session_id",
+        lambda log_path, timeout_seconds=3.0: None,
     )
 
 
@@ -56,7 +73,9 @@ class TestRunManagerFlowResolution:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: "ses_target"
+            manager_run_service,
+            "load_session_id",
+            lambda role, branch=None: "ses_target",
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
@@ -93,7 +112,7 @@ class TestRunManagerFlowResolution:
             return None
 
         _patch_basic(monkeypatch, backend, github, sqlite)
-        monkeypatch.setattr(run_module, "load_session_id", load_session)
+        monkeypatch.setattr(manager_run_service, "load_session_id", load_session)
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
 
@@ -111,7 +130,7 @@ class TestRunManagerFlowResolution:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: None
+            manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
@@ -142,17 +161,16 @@ class TestRunManagerWorktree:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module.GitClient,
+            manager_run_service.GitClient,
             "get_git_common_dir",
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            run_module,
-            "WorktreeManager",
+            "vibe3.manager.worktree_manager.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: None
+            manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
@@ -176,17 +194,16 @@ class TestRunManagerWorktree:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module.GitClient,
+            manager_run_service.GitClient,
             "get_git_common_dir",
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            run_module,
-            "WorktreeManager",
+            "vibe3.manager.worktree_manager.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: None
+            manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
@@ -216,16 +233,15 @@ class TestRunManagerWorktree:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module.GitClient,
+            manager_run_service.GitClient,
             "get_git_common_dir",
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: None
+            manager_run_service, "load_session_id", lambda role, branch=None: None
         )
         monkeypatch.setattr(
-            run_module,
-            "WorktreeManager",
+            "vibe3.manager.worktree_manager.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
 
@@ -255,16 +271,15 @@ class TestRunManagerWorktree:
 
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
-            run_module.GitClient,
+            manager_run_service.GitClient,
             "get_git_common_dir",
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            run_module, "load_session_id", lambda role, branch=None: None
+            manager_run_service, "load_session_id", lambda role, branch=None: None
         )
         monkeypatch.setattr(
-            run_module,
-            "WorktreeManager",
+            "vibe3.manager.worktree_manager.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
 
