@@ -290,5 +290,6 @@ class TestRunManagerWorktree:
             "/Users/jacobcy/src/vibe-center/main"
         )
         options = backend.start_async.call_args.kwargs["options"]
-        assert options.worktree is True
+        # WorktreeManager failed to create worktree, so worktree flag is dropped
+        assert options.worktree is False
         worktree_manager.resolve_manager_cwd.assert_called_once()

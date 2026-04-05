@@ -378,11 +378,13 @@ def resolve_manager_execution_cwd(
         # Return the resolved CWD and the worktree creation flag
         return manager_cwd, is_new_worktree
 
-    # Fallback: use launch cwd resolver, preserve user's worktree flag
+    # Fallback: use launch cwd resolver, but drop worktree flag
+    # WorktreeManager failed to create/resolve worktree, so we cannot
+    # honor the user's --worktree request
     return (
         resolve_manager_launch_cwd(
             use_worktree=use_worktree,
             session_id=session_id,
         ),
-        use_worktree,
+        False,
     )
