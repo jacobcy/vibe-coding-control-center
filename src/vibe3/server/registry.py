@@ -11,10 +11,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.failed_gate import FailedGate
+from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.governance_service import GovernanceService
@@ -28,17 +31,37 @@ from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
 from vibe3.runtime.heartbeat import HeartbeatServer
 
 
+def _resolve_orchestra_repo_root() -> Path:
+    """Resolve the shared repo root for orchestra-managed auto scenes.
+
+    We intentionally anchor orchestra to the git common-dir parent (the main
+    repository root), not the caller's current worktree cwd. This keeps auto
+    task scenes under ``<repo>/.worktrees/`` instead of nesting them under the
+    current debug/manual worktree.
+    """
+    try:
+        git_common_dir = GitClient().get_git_common_dir()
+        if git_common_dir:
+            return Path(git_common_dir).parent
+    except Exception:
+        pass
+    return Path.cwd()
+
+
 def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
     from vibe3.server.app import make_webhook_router
 
-    heartbeat = HeartbeatServer(config)
+    shared_github = GitHubClient()
+    failed_gate = FailedGate(github=shared_github, repo=config.repo)
+
+    heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_github = GitHubClient()
     shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
+        repo_path=_resolve_orchestra_repo_root(),
     )
 
     # Pass circuit_breaker from manager for status reporting
@@ -47,6 +70,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
         github=shared_github,
         orchestrator=shared_manager.flow_manager,
         circuit_breaker=shared_manager._circuit_breaker,
+        failed_gate=failed_gate,
     )
 
     if config.assignee_dispatch.enabled:
@@ -74,6 +98,26 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
             )
         )
     if config.state_label_dispatch.enabled:
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.READY,
+                trigger_name="manager",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
+        heartbeat.register(
+            StateLabelDispatchService(
+                config,
+                trigger_state=IssueState.HANDOFF,
+                trigger_name="manager",
+                manager=shared_manager,
+                github=shared_github,
+                executor=shared_executor,
+            )
+        )
         heartbeat.register(
             StateLabelDispatchService(
                 config,
@@ -274,6 +318,8 @@ def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
 def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[str]:
     """Build self-invocation command for async tmux startup."""
     cmd = [
+        "env",
+        "VIBE3_ORCHESTRA_EVENT_LOG=1",
         "uv",
         "run",
         "python",
@@ -289,6 +335,8 @@ def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[st
         cmd.extend(["--repo", config.repo])
     if config.dry_run:
         cmd.append("--dry-run")
+    if config.debug:
+        cmd.append("--debug")
     for _ in range(verbose):
         cmd.append("-v")
     return cmd
@@ -320,5 +368,8 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
     return (
         True,
         f"Started Orchestra server in tmux session: {session_name}\n"
-        "Use `vibe3 serve status` or `tmux attach -t vibe3-orchestra-serve` to inspect",
+        f"Main log: {orchestra_events_log_path()}\n"
+        f"Log dir: {orchestra_log_dir()}\n"
+        "Use `uv run python src/vibe3/cli.py serve status` or "
+        "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )

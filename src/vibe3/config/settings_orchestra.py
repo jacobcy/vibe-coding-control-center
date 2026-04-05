@@ -3,16 +3,6 @@
 from pydantic import BaseModel, Field
 
 
-class MasterAgentSettings(BaseModel):
-    """Master agent settings for issue triage."""
-
-    enabled: bool = True
-    agent: str = "master-controller"
-    backend: str | None = None
-    model: str | None = None
-    timeout_seconds: int = 300
-
-
 class OrchestraCommentReplySettings(BaseModel):
     """Comment reply settings for orchestra."""
 
@@ -30,7 +20,7 @@ class OrchestraAssigneeDispatchSettings(BaseModel):
 
     enabled: bool = True
     use_worktree: bool = True
-    agent: str = "develop"
+    agent: str | None = None
     backend: str | None = None
     model: str | None = None
     prompt_template: str = "orchestra.assignee_dispatch.manager"
@@ -70,6 +60,9 @@ class OrchestraGovernanceSettings(BaseModel):
     prompt_template: str = "orchestra.governance.plan"
     include_supervisor_content: bool = True
     dry_run: bool = False
+    agent: str | None = None
+    backend: str | None = None
+    model: str | None = None
 
 
 class OrchestraSupervisorHandoffSettings(BaseModel):
@@ -79,13 +72,18 @@ class OrchestraSupervisorHandoffSettings(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    agent: str | None = None
+    backend: str | None = None
+    model: str | None = None
 
 
 class OrchestraSettings(BaseModel):
     """Orchestra daemon settings."""
 
     enabled: bool = True
-    polling_interval: int = 30
+    polling_interval: int = 900
+    debug_polling_interval: int = 60
+    scene_base_ref: str = "origin/main"
     port: int = 8080
     webhook_secret: str | None = None
     bot_username: str | None = None
@@ -105,7 +103,6 @@ class OrchestraSettings(BaseModel):
     state_label_dispatch: OrchestraStateLabelDispatchSettings = Field(
         default_factory=OrchestraStateLabelDispatchSettings
     )
-    master_agent: MasterAgentSettings = Field(default_factory=MasterAgentSettings)
     circuit_breaker: OrchestraCircuitBreakerSettings = Field(
         default_factory=OrchestraCircuitBreakerSettings
     )

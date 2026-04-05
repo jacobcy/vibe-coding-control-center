@@ -176,6 +176,52 @@ class CodeagentBackend:
     def _default_log_dir() -> Path:
         return Path(__file__).resolve().parents[4] / "temp" / "logs"
 
+    @classmethod
+    def _resolve_async_log_path(cls, log_dir: Path, execution_name: str) -> Path:
+        issue_match = re.match(
+            r"^vibe3-(manager|planner|executor|reviewer|supervisor)(?:-[^-]+)?-(?:task|dev)-issue-(\d+)(?:-(\d+))?$",
+            execution_name,
+        )
+        if issue_match:
+            role, issue_number, suffix = issue_match.groups()
+            role_name = {
+                "manager": "manager",
+                "planner": "plan",
+                "executor": "run",
+                "reviewer": "review",
+                "supervisor": "supervisor",
+            }[role]
+            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
+            return (
+                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
+            )
+
+        manager_issue_match = re.match(
+            r"^vibe3-(manager|supervisor)(?:-[^-]+)?-issue-(\d+)(?:-(\d+))?$",
+            execution_name,
+        )
+        if manager_issue_match:
+            role, issue_number, suffix = manager_issue_match.groups()
+            role_name = "manager" if role == "manager" else "supervisor"
+            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
+            return (
+                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
+            )
+
+        governance_match = re.match(
+            r"^vibe3-governance-(.+)$",
+            execution_name,
+        )
+        if governance_match:
+            return (
+                log_dir
+                / "orchestra"
+                / "governance"
+                / f"{governance_match.group(1)}.async.log"
+            )
+
+        return log_dir / f"{execution_name}.async.log"
+
     def _spawn_tmux_command(
         self,
         command: list[str],
@@ -190,7 +236,8 @@ class CodeagentBackend:
         safe_name = self._allocate_tmux_session_name(base_name)
         log_dir = self._default_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"{safe_name}.async.log"
+        log_path = self._resolve_async_log_path(log_dir, safe_name)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
         shell_command = self._build_async_shell_command(

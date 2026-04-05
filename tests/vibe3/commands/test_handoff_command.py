@@ -66,6 +66,32 @@ class TestHandoffCommands:
         mock_service.get_flow_state.assert_called_once()
         mock_service.get_handoff_events.assert_called_once()
 
+    @patch("vibe3.commands.handoff_read.FlowService")
+    def test_handoff_show_numeric_issue_resolves_branch(self, mock_service_class):
+        """handoff show 436 should resolve to task/dev issue branch."""
+        mock_service = MagicMock()
+        mock_service.get_flow_state.side_effect = lambda branch: (
+            FlowState(branch=branch, flow_slug="issue-436", flow_status="active")
+            if branch == "task/issue-436"
+            else None
+        )
+        mock_service.get_handoff_events.return_value = []
+        mock_service.get_git_common_dir.return_value = "/path/to/.git"
+        mock_service_class.return_value = mock_service
+
+        with patch(
+            "vibe3.commands.handoff_read.get_branch_handoff_dir"
+        ) as mock_get_dir:
+            mock_get_dir.return_value = Path("/path/to/handoff")
+            with patch.object(Path, "exists", return_value=False):
+                result = runner.invoke(app, ["handoff", "show", "436"])
+
+        assert result.exit_code == 0
+        mock_service.get_flow_state.assert_any_call("task/issue-436")
+        mock_service.get_handoff_events.assert_called_once_with(
+            "task/issue-436", limit=5
+        )
+
     def test_handoff_update_log_truncates_messages_by_default(self):
         """Test Update Log preview truncates long messages to 80 chars."""
         message = "x" * (UPDATE_LOG_MESSAGE_PREVIEW_LIMIT + 25)

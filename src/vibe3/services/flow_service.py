@@ -217,3 +217,15 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             raise RuntimeError(f"Failed to create flow for branch {branch}")
 
         return status
+
+    def update_flow_metadata(self, branch: str, **updates: object) -> None:
+        """Update flow metadata fields (slug, actor, etc.).
+
+        Encapsulates store.update_flow_state so commands don't need
+        direct store access.
+
+        Args:
+            branch: Flow branch name
+            **updates: Keyword args passed to store.update_flow_state
+        """
+        self.store.update_flow_state(branch, **updates)

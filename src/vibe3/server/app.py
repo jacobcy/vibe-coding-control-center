@@ -14,8 +14,10 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from vibe3.clients.git_client import GitClient
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
@@ -176,6 +178,16 @@ def start(
         bool,
         typer.Option("--dry-run", help="Log actions without executing"),
     ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help=(
+                "Debug mode: use current branch as auto scene base "
+                "and 60s heartbeat by default"
+            ),
+        ),
+    ] = False,
     async_mode: Annotated[
         bool,
         typer.Option("--async", help="Run in tmux background session"),
@@ -207,6 +219,12 @@ def start(
         raise typer.Exit(1)
 
     overrides: dict[str, object] = {}
+    if debug:
+        current_branch = GitClient().get_current_branch()
+        overrides["debug"] = True
+        overrides["scene_base_ref"] = current_branch
+        if interval is None:
+            overrides["polling_interval"] = config.debug_polling_interval
     if interval is not None:
         overrides["polling_interval"] = interval
     if port is not None:
@@ -226,6 +244,24 @@ def start(
     elif pid is not None:
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
+
+    # Phase 1: FailedGate Preflight
+    from vibe3.orchestra.failed_gate import FailedGate
+
+    gate = FailedGate(repo=config.repo)
+    result = gate.check()
+    if result.blocked:
+        typer.echo("\nOrchestra start blocked by open state/failed issue\n")
+        typer.echo(f"issue:  #{result.issue_number}")
+        typer.echo(f"title:  {result.issue_title}")
+        typer.echo(f"reason: {result.reason}")
+        if result.comment_url:
+            typer.echo(f"url:    {result.comment_url}")
+        typer.echo(
+            "\nResolve the failed issue manually, transition it back to state/handoff, "
+            "then retry serve start."
+        )
+        raise typer.Exit(1)
 
     if async_mode:
         ok, msg = _start_async_serve(config, verbose)
@@ -248,12 +284,16 @@ def start(
     typer.echo(
         f"Starting Orchestra server on port {config.port} "
         f"(tick interval: {config.polling_interval}s, "
-        f"max_concurrent: {config.max_concurrent_flows})"
+        f"max_concurrent: {config.max_concurrent_flows}, "
+        f"scene_base: {config.scene_base_ref})"
     )
+    typer.echo(f"Main log: {orchestra_events_log_path()}")
+    typer.echo(f"Log dir: {orchestra_log_dir()}")
     typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
     try:
+        os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")

@@ -10,6 +10,7 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
+from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -102,12 +103,27 @@ class ManagerExecutor:
         return success
 
     def _mark_manager_start_failed(self, issue: IssueInfo, reason: str) -> None:
-        """Record a manager startup failure as state/failed."""
+        """Record a manager startup failure as state/failed.
+
+        Also marks the flow as stale so the issue can be re-dispatched
+        after the failure is resolved.
+        """
         self.result_handler.post_failure_comment(
             issue.number,
             f"Manager 启动失败，已切换为 state/failed。\n\n原因：{reason}",
         )
         self.result_handler.update_state_label(issue.number, IssueState.FAILED)
+        # Release the flow lock so issue can be re-dispatched after recovery
+        try:
+            flow = self._flow_manager.get_flow_for_issue(issue.number)
+            if flow and flow.get("branch"):
+                self._flow_manager.store.update_flow_state(
+                    str(flow["branch"]), flow_status="stale"
+                )
+        except Exception as exc:
+            logger.bind(domain="orchestra", issue=issue.number).warning(
+                f"Failed to mark flow stale after start failure: {exc}"
+            )
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Complete lifecycle for manager dispatch with queuing."""
@@ -155,14 +171,46 @@ class ManagerExecutor:
             self._mark_manager_start_failed(issue, "unable to resolve worktree")
             return False
 
+        if not self.worktree_manager.align_auto_scene_to_base(manager_cwd, flow_branch):
+            log.error("Unable to align auto scene to configured base ref")
+            self._mark_manager_start_failed(
+                issue,
+                (
+                    "unable to align auto scene to configured base ref "
+                    f"({self.config.scene_base_ref})"
+                ),
+            )
+            return False
+
         log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
+        # Resolve agent options in dispatcher context (correct worktree/config)
+        # and pass to subprocess via env vars to override task-branch config
+        from vibe3.config.settings import VibeConfig
+        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+
+        _manager_options = resolve_manager_agent_options(
+            self.config,
+            VibeConfig.get_defaults(),
+            worktree=is_temporary,
+        )
+        _manager_env = {
+            **os.environ,
+            "VIBE3_ASYNC_CHILD": "1",
+        }
+        if _manager_options.backend:
+            _manager_env["VIBE3_MANAGER_BACKEND"] = _manager_options.backend
+        if _manager_options.model:
+            _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
+
+        launched = False
         try:
             cmd = [
                 "uv",
                 "run",
                 "python",
-                "src/vibe3/cli.py",
+                "-I",
+                str(self._resolve_cli_entry()),
                 "run",
                 "--manager-issue",
                 str(issue.number),
@@ -171,9 +219,9 @@ class ManagerExecutor:
             try:
                 handle = self._backend.start_async_command(
                     cmd,
-                    execution_name=f"vibe3-manager-{issue.number}",
+                    execution_name=get_manager_session_name(issue.number),
                     cwd=manager_cwd,
-                    env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                    env=_manager_env,
                 )
             except Exception as exc:
                 log.error(f"Manager async start failed: {exc}")
@@ -186,6 +234,7 @@ class ManagerExecutor:
                 f"Started manager async session: {handle.tmux_session} "
                 f"(log: {handle.log_path})"
             )
+            launched = True
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",
@@ -204,7 +253,11 @@ class ManagerExecutor:
             return True
         finally:
             if is_temporary and manager_cwd:
-                if self._should_recycle(issue.number):
+                if launched:
+                    log.info(
+                        f"Preserving newly dispatched manager worktree at {manager_cwd}"
+                    )
+                elif self._should_recycle(issue.number):
                     self.worktree_manager.recycle(manager_cwd)
                 else:
                     log.info(
@@ -251,6 +304,10 @@ class ManagerExecutor:
         if self.config.pr_review_dispatch.use_worktree:
             return self.repo_path
         return self._resolve_review_cwd(pr_number)
+
+    def _resolve_cli_entry(self) -> Path:
+        """Return the canonical CLI entry in the current baseline worktree."""
+        return (self.repo_path / "src" / "vibe3" / "cli.py").resolve()
 
     def _should_recycle(self, issue_number: int) -> bool:
         """Decide if we should recycle the worktree now."""

@@ -5,6 +5,7 @@ from typing import Literal
 from loguru import logger
 
 from vibe3.clients import SQLiteClient
+from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowStatusResponse, IssueLink
 from vibe3.services.flow_query_mixin import FlowQueryMixin
 from vibe3.services.signature_service import SignatureService
@@ -72,3 +73,16 @@ class TaskService(FlowQueryMixin):
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
         return self.get_flow_status(branch)
+
+    def fetch_issue_with_comments(
+        self, issue_number: int
+    ) -> dict[str, object] | str | None:
+        """Fetch issue data including comments from GitHub.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            Issue dict, "network_error" string, or None if not found
+        """
+        return GitHubClient().view_issue(issue_number)

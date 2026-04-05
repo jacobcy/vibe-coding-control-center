@@ -49,6 +49,43 @@ class OrchestraSnapshot:
     circuit_breaker_state: str = "closed"
     circuit_breaker_failures: int = 0
     circuit_breaker_last_failure: float | None = None
+    dispatch_blocked: bool = False
+    blocked_reason: str | None = None
+    blocked_issue_number: int | None = None
+    blocked_issue_reason: str | None = None
+
+
+def format_issue_summary_line(entry: IssueStatusEntry) -> str:
+    """Format issue summary line for governance reports."""
+    state_label = entry.state.to_label() if entry.state else "state/unknown"
+    blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
+    blocked = f" [blocked_by={blocked_by}]" if entry.blocked_by else ""
+    return f"- #{entry.number}: {entry.title[:60]} | {state_label}{blocked}"
+
+
+def format_issue_runtime_line(entry: IssueStatusEntry) -> str:
+    """Format issue runtime line for governance detailed reports."""
+    state_label = entry.state.to_label() if entry.state else "state/unknown"
+    flow_value = entry.flow_branch or "(not started)"
+    worktree_value = entry.worktree_path or "(none)"
+    pr_value = f"#{entry.pr_number}" if entry.pr_number is not None else "(none)"
+    parts = [
+        f"- #{entry.number}: {entry.title[:60]}",
+        state_label,
+        f"assignee={entry.assignee or '(unassigned)'}",
+        f"flow={flow_value}",
+        f"worktree={worktree_value}",
+        f"pr={pr_value}",
+    ]
+    if entry.blocked_by:
+        blocked_by = ", ".join(f"#{number}" for number in entry.blocked_by)
+        parts.append(f"blocked_by={blocked_by}")
+    return " | ".join(parts)
+
+
+def is_running_issue(entry: IssueStatusEntry) -> bool:
+    """Check if issue has active runtime resources."""
+    return entry.has_flow or entry.has_worktree or entry.has_pr
 
 
 class OrchestraStatusService:
@@ -68,6 +105,7 @@ class OrchestraStatusService:
         github: GitHubClient | None = None,
         orchestrator: Any | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        failed_gate: Any | None = None,
     ) -> None:
         self.config = config
         self._github = github or GitHubClient()
@@ -83,6 +121,7 @@ class OrchestraStatusService:
         self._circuit_breaker = circuit_breaker
         self._git = GitClient()
         self._label_service = LabelService(repo=config.repo)
+        self._failed_gate = failed_gate
 
     @classmethod
     def fetch_live_snapshot(cls, config: OrchestraConfig) -> OrchestraSnapshot | None:
@@ -118,6 +157,10 @@ class OrchestraStatusService:
                         circuit_breaker_last_failure=data.get(
                             "circuit_breaker_last_failure"
                         ),
+                        dispatch_blocked=data.get("dispatch_blocked", False),
+                        blocked_reason=data.get("blocked_reason"),
+                        blocked_issue_number=data.get("blocked_issue_number"),
+                        blocked_issue_reason=data.get("blocked_issue_reason"),
                     )
                 return None
         except (URLError, ConnectionError, Exception):
@@ -186,6 +229,19 @@ class OrchestraStatusService:
                 )
             )
 
+        # Check failed gate
+        dispatch_blocked = False
+        blocked_reason = None
+        blocked_issue_number = None
+        blocked_issue_reason = None
+        if self._failed_gate:
+            gate_result = self._failed_gate.check()
+            if gate_result.blocked:
+                dispatch_blocked = True
+                blocked_reason = "state/failed"
+                blocked_issue_number = gate_result.issue_number
+                blocked_issue_reason = gate_result.reason
+
         snapshot = OrchestraSnapshot(
             timestamp=time.time(),
             server_running=True,
@@ -196,6 +252,10 @@ class OrchestraStatusService:
             circuit_breaker_state=self._get_circuit_breaker_state(),
             circuit_breaker_failures=self._get_circuit_breaker_failures(),
             circuit_breaker_last_failure=self._get_circuit_breaker_last_failure(),
+            dispatch_blocked=dispatch_blocked,
+            blocked_reason=blocked_reason,
+            blocked_issue_number=blocked_issue_number,
+            blocked_issue_reason=blocked_issue_reason,
         )
 
         log.debug(
@@ -214,6 +274,7 @@ class OrchestraStatusService:
                     state="open",
                     assignee=username,
                     limit=50,
+                    repo=self.config.repo,
                 )
                 if not result:
                     continue
@@ -240,11 +301,7 @@ class OrchestraStatusService:
 
     def get_active_flow_count(self) -> int:
         try:
-            from vibe3.clients import SQLiteClient
-
-            store = SQLiteClient()
-            count = store.get_active_flow_count()
-            return count
+            return self._orchestrator.get_active_flow_count()
         except Exception as exc:
             logger.bind(domain="orchestra").warning(
                 f"Failed to count active flows: {exc}"

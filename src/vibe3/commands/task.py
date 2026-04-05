@@ -7,7 +7,6 @@ from typing import Annotated, Any, Iterator
 
 import typer
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
 from vibe3.services.flow_service import FlowService
@@ -131,7 +130,8 @@ def show(
         render_task_show_with_milestone(task_result, milestone_ctx, json_output)
 
         if comments and issue_number:
-            issue = GitHubClient().view_issue(issue_number)
+            task_svc = TaskService()
+            issue = task_svc.fetch_issue_with_comments(issue_number)
             if issue == "network_error":
                 typer.echo("\nIssue comments unavailable: network/auth error")
             elif issue is None:
@@ -158,6 +158,9 @@ def status(
         bool,
         typer.Option("--all", help="显示所有状态的 flow（含 done/aborted/stale）"),
     ] = False,
+    check: Annotated[
+        bool, typer.Option("--check", help="显示前先运行 flow 一致性校验")
+    ] = False,
     json_output: Annotated[bool, typer.Option("--json")] = False,
     trace: Annotated[bool, typer.Option("--trace")] = False,
 ) -> None:
@@ -166,6 +169,7 @@ def status(
 
     status_command.status(
         all_flows=all_flows,
+        check=check,
         json_output=json_output,
         trace=trace,
     )

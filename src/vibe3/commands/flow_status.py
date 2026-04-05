@@ -18,6 +18,7 @@ from vibe3.ui.flow_ui import (
     render_flows_status_dashboard,
 )
 from vibe3.utils.branch_utils import find_parent_branch
+from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 if TYPE_CHECKING:
     pass
@@ -44,7 +45,11 @@ def show(
     with trace_scope(trace, "flow show", domain="flow"):
         service = FlowService()
         if branch:
-            target_branch = branch
+            try:
+                target_branch = resolve_issue_branch_input(branch, service) or branch
+            except RuntimeError as error:
+                typer.echo(f"Error: {error}", err=True)
+                raise typer.Exit(1) from error
         else:
             target_branch = service.get_current_branch()
 
@@ -195,6 +200,10 @@ def show(
 
 def status(
     all_flows: AllOption = False,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+    ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
 ) -> None:
@@ -205,11 +214,11 @@ def status(
     with trace_scope(trace, "flow status", domain="flow"):
         from vibe3.services.check_service import CheckService
 
-        # Auto-mark merged flows before listing
-        try:
-            CheckService().verify_all_flows()
-        except Exception:
-            pass  # check failure should not block status display
+        if check:
+            try:
+                CheckService().verify_all_flows()
+            except Exception:
+                pass  # check failure should not block status display
 
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")

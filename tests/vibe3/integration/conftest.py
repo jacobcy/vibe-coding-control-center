@@ -9,17 +9,17 @@ import pytest
 def mock_all_dependencies():
     """Mock all external dependencies for PR analysis."""
     with (
-        patch("vibe3.commands.inspect_pr_helpers._get_pr_changed_files") as mock_files,
+        patch("vibe3.services.pr_analysis_service._get_pr_changed_files") as mock_files,
         patch(
-            "vibe3.commands.inspect_pr_helpers._filter_critical_files"
+            "vibe3.services.pr_analysis_service._filter_critical_files"
         ) as mock_filter,
         patch(
-            "vibe3.commands.inspect_pr_helpers._analyze_critical_files"
+            "vibe3.services.pr_analysis_service._analyze_critical_files"
         ) as mock_analyze,
-        patch("vibe3.commands.inspect_pr_helpers._calculate_risk_score") as mock_score,
-        patch("vibe3.commands.inspect_pr_helpers._get_recent_commits") as mock_commits,
-        patch("vibe3.commands.inspect_pr_helpers._get_pr_commit_count") as mock_count,
-        patch("vibe3.commands.inspect_pr_helpers.dag_service") as mock_dag,
+        patch("vibe3.services.pr_analysis_service._calculate_risk_score") as mock_score,
+        patch("vibe3.services.pr_analysis_service._get_recent_commits") as mock_commits,
+        patch("vibe3.services.pr_analysis_service._get_pr_commit_count") as mock_count,
+        patch("vibe3.services.pr_analysis_service.dag_service") as mock_dag,
         patch("vibe3.clients.git_client.GitClient") as mock_git_client_class,
     ):
         # Setup default returns

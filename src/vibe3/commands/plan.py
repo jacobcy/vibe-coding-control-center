@@ -13,7 +13,6 @@ from vibe3.agents.runner import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
-from vibe3.clients.github_client import GitHubClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -25,11 +24,14 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.models.plan import PlanRequest
 from vibe3.services.flow_service import FlowService
-from vibe3.services.label_service import LabelService
-from vibe3.services.spec_ref_service import SpecRefService
+from vibe3.services.issue_failure_service import (
+    confirm_plan_handoff as _svc_confirm_handoff,
+)
+from vibe3.services.issue_failure_service import (
+    fail_planner_issue as _svc_fail_planner,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -46,8 +48,6 @@ def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUs
     return PlanUsecase(
         config=config,
         flow_service=flow_service,
-        github_client=GitHubClient(),
-        spec_ref_service=SpecRefService(),
     )
 
 
@@ -88,15 +88,10 @@ def _comment_and_fail_issue(
     actor: str,
 ) -> None:
     """Record planner failure and move the issue into failed."""
-    GitHubClient().add_comment(
-        issue_number,
-        f"[plan] 规划执行报错，已切换为 state/failed。\n\n原因：{reason}",
-    )
-    LabelService().confirm_issue_state(
-        issue_number,
-        IssueState.FAILED,
+    _svc_fail_planner(
+        issue_number=issue_number,
+        reason=reason,
         actor=actor,
-        force=True,
     )
 
 
@@ -149,9 +144,8 @@ def _plan_issue_impl(
 
     if not dry_run and not async_mode:
         if getattr(result, "success", False):
-            transition = LabelService().confirm_issue_state(
-                task_input.issue_number,
-                IssueState.HANDOFF,
+            transition = _svc_confirm_handoff(
+                issue_number=task_input.issue_number,
                 actor="agent:plan",
             )
             if transition == "blocked":

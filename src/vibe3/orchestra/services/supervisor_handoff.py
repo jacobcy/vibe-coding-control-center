@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -11,9 +12,8 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.settings import VibeConfig
+from vibe3.orchestra.agent_resolver import resolve_supervisor_agent_options
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -87,7 +87,8 @@ class SupervisorHandoffService(ServiceBase):
         self._in_flight.intersection_update(active_issue_numbers)
 
         for issue in candidates:
-            if issue.number in self._in_flight:
+            if issue.number in self._in_flight or self._has_live_dispatch(issue.number):
+                self._in_flight.add(issue.number)
                 continue
             self._in_flight.add(issue.number)
             try:
@@ -101,7 +102,12 @@ class SupervisorHandoffService(ServiceBase):
                 raise
 
     def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
-        raw = self._github.list_issues(limit=100, state="open", assignee=None)
+        raw = self._github.list_issues(
+            limit=100,
+            state="open",
+            assignee=None,
+            repo=self.config.repo,
+        )
         issue_label = self.config.supervisor_handoff.issue_label
         handoff_label = self.config.supervisor_handoff.handoff_state_label
 
@@ -167,8 +173,7 @@ class SupervisorHandoffService(ServiceBase):
         issue: SupervisorHandoffIssue,
         prompt: str,
     ) -> None:
-        runtime_config = VibeConfig.get_defaults()
-        options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
+        options = resolve_supervisor_agent_options(self.config)
         self._backend.start_async(
             prompt=prompt,
             options=options,
@@ -176,6 +181,30 @@ class SupervisorHandoffService(ServiceBase):
             execution_name=f"vibe3-supervisor-issue-{issue.number}",
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
+
+    def _has_live_dispatch(self, issue_number: int) -> bool:
+        session_prefix = f"vibe3-supervisor-issue-{issue_number}"
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
+        if result.returncode != 0:
+            return False
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if session_name == session_prefix or session_name.startswith(
+                f"{session_prefix}-"
+            ):
+                return True
+        return False
 
     def _build_issue_task(self, issue: SupervisorHandoffIssue) -> str:
         repo_hint = f" in repo {self.config.repo}" if self.config.repo else ""

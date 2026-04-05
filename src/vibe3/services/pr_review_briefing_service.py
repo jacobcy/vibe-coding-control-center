@@ -18,7 +18,7 @@ class PRReviewBriefingService:
         Generate and publish/update the briefing comment on a PR.
         Returns the comment URL or ID.
         """
-        from vibe3.commands.inspect_pr_helpers import build_pr_analysis
+        from vibe3.services.pr_analysis_service import build_pr_analysis
 
         analysis = build_pr_analysis(pr_number)
         body = self._render_briefing(analysis)

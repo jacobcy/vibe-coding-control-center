@@ -17,6 +17,7 @@ from vibe3.ui.handoff_ui import (
     render_handoff_summary,
 )
 from vibe3.utils.git_helpers import get_branch_handoff_dir
+from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
@@ -214,7 +215,14 @@ def show(
         )
 
         service = FlowService()
-        target_branch = branch if branch else service.get_current_branch()
+        if branch:
+            try:
+                target_branch = resolve_issue_branch_input(branch, service) or branch
+            except RuntimeError as error:
+                typer.echo(f"Error: {error}", err=True)
+                raise typer.Exit(1) from error
+        else:
+            target_branch = service.get_current_branch()
 
         state = service.get_flow_state(target_branch)
         if not state:

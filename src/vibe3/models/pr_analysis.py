@@ -1,4 +1,4 @@
-"""Type definitions for inspect command."""
+"""Type definitions for PR analysis."""
 
 from dataclasses import dataclass
 from typing import TypedDict

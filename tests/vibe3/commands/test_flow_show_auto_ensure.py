@@ -53,3 +53,42 @@ def test_flow_show_timeline_when_registered(
 
     assert result.exit_code == 0
     mock_service.get_flow_timeline.assert_called_once_with(branch)
+
+
+@patch("vibe3.commands.flow_status.render_flow_timeline")
+@patch("vibe3.commands.flow_status.find_parent_branch", return_value=None)
+@patch("vibe3.commands.flow_status.FlowService")
+def test_flow_show_numeric_issue_resolves_branch(
+    mock_service_cls, _find_parent_branch, _render_timeline
+) -> None:
+    """flow show 436 should resolve to task/dev issue branch."""
+    mock_service = MagicMock()
+
+    flow_status = FlowStatusResponse(
+        branch="task/issue-436",
+        flow_slug="issue-436",
+        flow_status="active",
+    )
+
+    def get_flow_state(branch: str):
+        if branch == "task/issue-436":
+            return {"branch": branch}
+        return None
+
+    def get_flow_status(branch: str):
+        if branch == "task/issue-436":
+            return flow_status
+        return None
+
+    mock_service.get_flow_state.side_effect = get_flow_state
+    mock_service.get_flow_status.side_effect = get_flow_status
+    mock_service.get_flow_timeline.return_value = {
+        "state": flow_status,
+        "events": [],
+    }
+    mock_service_cls.return_value = mock_service
+
+    result = runner.invoke(app, ["flow", "show", "436"])
+
+    assert result.exit_code == 0
+    mock_service.get_flow_timeline.assert_called_once_with("task/issue-436")

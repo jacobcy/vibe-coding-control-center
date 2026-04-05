@@ -4,7 +4,10 @@ from typing import Annotated
 
 import typer
 
-from vibe3.commands.inspect_helpers import build_change_analysis, validate_pr_number
+from vibe3.analysis.inspect_query_service import (
+    build_change_analysis,
+    validate_pr_number,
+)
 from vibe3.utils.trace import enable_trace
 
 

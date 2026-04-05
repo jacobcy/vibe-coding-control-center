@@ -69,9 +69,9 @@ def test_review_base_defaults_to_origin_main(monkeypatch):
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base"])
+        result = runner.invoke(app, ["base", "--sync"])
     assert result.exit_code == 0
-    mock_usecase.build_base_review.assert_not_called()
+    mock_usecase.execute_review.assert_called_once()
 
 
 def test_review_base_pass(monkeypatch):
