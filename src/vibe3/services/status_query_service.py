@@ -218,13 +218,53 @@ class StatusQueryService:
             pass
         return worktree_map
 
+    def fetch_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse] | None = None,
+    ) -> list[dict[str, object]]:
+        """Fetch resumable issue candidates (failed + stale blocked).
+
+        Reuses fetch_orchestrated_issues() and filters for resumable states.
+        Adds resume_kind field to distinguish failed vs blocked recovery.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+            stale_flows: Stale flow status responses for blocked recovery
+
+        Returns:
+            List of resumable issue dicts with number, title, state, flow,
+            failed_reason (if applicable), and resume_kind ("failed" or "blocked")
+        """
+        all_issues = self.fetch_orchestrated_issues(
+            flows, queued_set=set(), stale_flows=stale_flows
+        )
+
+        resumable: list[dict[str, object]] = []
+        for issue in all_issues:
+            state = issue.get("state")
+            if state == IssueState.FAILED:
+                # Failed issues are always resumable
+                resumable.append({**issue, "resume_kind": "failed"})
+            elif state == IssueState.BLOCKED:
+                # Blocked issues are resumable only if flow is stale
+                flow = issue.get("flow")
+                if flow is not None and hasattr(flow, "flow_status"):
+                    if flow.flow_status == "stale":
+                        resumable.append({**issue, "resume_kind": "blocked"})
+
+        return resumable
+
     def fetch_failed_resume_candidates(
         self,
         flows: list[FlowStatusResponse],
     ) -> list[dict[str, object]]:
         """Fetch open issues with state/failed label for resume candidates.
 
-        Reuses fetch_orchestrated_issues() and filters for FAILED state only.
+        DEPRECATED: Use fetch_resume_candidates() instead.
+
+        This method is kept for backward compatibility and filters
+        fetch_resume_candidates() results for FAILED state only.
 
         Args:
             flows: Active flow status responses to cross-reference
@@ -232,7 +272,9 @@ class StatusQueryService:
         Returns:
             List of failed issue dicts with number, title, state, flow, failed_reason
         """
-        all_issues = self.fetch_orchestrated_issues(flows, queued_set=set())
+        candidates = self.fetch_resume_candidates(flows, stale_flows=[])
         return [
-            issue for issue in all_issues if issue.get("state") == IssueState.FAILED
+            candidate
+            for candidate in candidates
+            if candidate.get("resume_kind") == "failed"
         ]
