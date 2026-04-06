@@ -1,4 +1,10 @@
-"""Ready-close service for closing issues in state/ready."""
+"""Issue close service - low-level GitHub issue close primitive.
+
+This service provides the basic issue close operation used by
+AbandonFlowService for flow abandonment. It is a narrow primitive
+without state-specific policy - the orchestration layer (AbandonFlowService)
+enforces state requirements.
+"""
 
 from __future__ import annotations
 
@@ -10,19 +16,19 @@ if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
 
 
-class ReadyCloseService:
-    """Service for closing GitHub issues that should not be executed.
+class IssueCloseService:
+    """Service for closing GitHub issues.
 
-    This service provides a controlled path for managers to close issues
-    in state/ready when the task is determined to be invalid, deprecated,
-    or otherwise unsuitable for execution.
+    This is a low-level primitive for closing issues via GitHub API.
+    It does not enforce state-specific policy - orchestration services
+    like AbandonFlowService handle state validation and semantic meaning.
 
-    The close operation is only legal for issues in state/ready.
-    state/done is reserved for normal delivery completion flows.
+    The close operation handles the "already closed" case gracefully
+    to support abandonment flows where the issue may already be closed.
     """
 
     def __init__(self, github: GitHubClient, repo: str | None = None):
-        """Initialize ready-close service.
+        """Initialize issue close service.
 
         Args:
             github: GitHub client for API operations
@@ -31,13 +37,13 @@ class ReadyCloseService:
         self._github = github
         self._repo = repo
 
-    def close_ready_issue(
+    def close_issue(
         self,
         issue_number: int,
         closing_comment: str | None = None,
         issue_payload: dict[str, object] | None = None,
     ) -> str:
-        """Close a GitHub issue that is in state/ready.
+        """Close a GitHub issue.
 
         Args:
             issue_number: Issue number to close
@@ -50,9 +56,9 @@ class ReadyCloseService:
         """
         logger.bind(
             domain="orchestra",
-            operation="close_ready_issue",
+            operation="close_issue",
             issue_number=issue_number,
-        ).info("Closing ready issue")
+        ).info("Closing issue")
 
         # Check if already closed (avoid unnecessary API call)
         if issue_payload is None:
@@ -78,11 +84,11 @@ class ReadyCloseService:
             logger.bind(
                 domain="orchestra",
                 issue_number=issue_number,
-            ).info("Ready issue closed successfully")
+            ).info("Issue closed successfully")
             return "closed"
         else:
             logger.bind(
                 domain="orchestra",
                 issue_number=issue_number,
-            ).error("Failed to close ready issue")
+            ).error("Failed to close issue")
             return "failed"

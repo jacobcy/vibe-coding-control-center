@@ -16,15 +16,15 @@ from vibe3.models.orchestration import IssueState
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowService
+    from vibe3.services.issue_close_service import IssueCloseService
     from vibe3.services.pr_service import PRService
-    from vibe3.services.ready_close_service import ReadyCloseService
 
 
 class AbandonFlowService:
     """Orchestrates complete flow abandonment.
 
     This service coordinates multiple operations for abandoning a flow:
-    1. Close the GitHub issue via ReadyCloseService
+    1. Close the GitHub issue via IssueCloseService
     2. Close any open PR for the branch via PRService
     3. Mark the flow as aborted via FlowService
 
@@ -32,29 +32,29 @@ class AbandonFlowService:
     but the process continues to attempt remaining steps.
     """
 
-    _ready_close: ReadyCloseService
+    _issue_close: IssueCloseService
     _pr_service: PRService
     _flow_service: FlowService
 
     def __init__(
         self,
-        ready_close: ReadyCloseService | None = None,
+        issue_close: IssueCloseService | None = None,
         pr_service: PRService | None = None,
         flow_service: FlowService | None = None,
     ) -> None:
         """Initialize abandon flow service.
 
         Args:
-            ready_close: Service for closing issues
+            issue_close: Service for closing issues
             pr_service: Service for managing PRs
             flow_service: Service for flow lifecycle
         """
         # Lazy load if not provided
-        if ready_close is None:
+        if issue_close is None:
             from vibe3.clients.github_client import GitHubClient
-            from vibe3.services.ready_close_service import ReadyCloseService
+            from vibe3.services.issue_close_service import IssueCloseService
 
-            ready_close = ReadyCloseService(github=GitHubClient())
+            issue_close = IssueCloseService(github=GitHubClient())
 
         if pr_service is None:
             from vibe3.services.pr_service import PRService
@@ -66,7 +66,7 @@ class AbandonFlowService:
 
             flow_service = FlowService()
 
-        self._ready_close = ready_close
+        self._issue_close = issue_close
         self._pr_service = pr_service
         self._flow_service = flow_service
 
@@ -77,6 +77,8 @@ class AbandonFlowService:
         source_state: IssueState,
         reason: str,
         actor: str = "agent:manager",
+        issue_already_closed: bool = False,
+        flow_already_aborted: bool = False,
     ) -> dict[str, str | int | None]:
         """Execute complete flow abandonment.
 
@@ -86,6 +88,8 @@ class AbandonFlowService:
             source_state: Current issue state (READY or HANDOFF)
             reason: Reason for abandonment
             actor: Actor performing the abandonment
+            issue_already_closed: If True, skip the issue close API call
+            flow_already_aborted: If True, skip writing another abort event
 
         Returns:
             Dict with results for each step:
@@ -105,16 +109,19 @@ class AbandonFlowService:
 
         # Step 1: Close issue
         closing_comment = f"[manager] 任务放弃。\n\n原因:{reason}"
-        try:
-            results["issue"] = self._ready_close.close_ready_issue(
-                issue_number, closing_comment=closing_comment
-            )
-        except Exception as e:
-            logger.bind(
-                domain="abandon",
-                issue_number=issue_number,
-            ).error(f"Failed to close issue: {e}")
-            results["issue"] = "failed"
+        if issue_already_closed:
+            results["issue"] = "closed"
+        else:
+            try:
+                results["issue"] = self._issue_close.close_issue(
+                    issue_number, closing_comment=closing_comment
+                )
+            except Exception as e:
+                logger.bind(
+                    domain="abandon",
+                    issue_number=issue_number,
+                ).error(f"Failed to close issue: {e}")
+                results["issue"] = "failed"
 
         # Step 2: Close PR if exists
         try:
@@ -131,15 +138,18 @@ class AbandonFlowService:
             results["pr"] = None
 
         # Step 3: Abort flow
-        try:
-            self._flow_service.abort_flow(branch=branch, reason=reason, actor=actor)
+        if flow_already_aborted:
             results["flow"] = "aborted"
-        except Exception as e:
-            logger.bind(
-                domain="abandon",
-                branch=branch,
-            ).error(f"Failed to abort flow: {e}")
-            results["flow"] = "failed"
+        else:
+            try:
+                self._flow_service.abort_flow(branch=branch, reason=reason, actor=actor)
+                results["flow"] = "aborted"
+            except Exception as e:
+                logger.bind(
+                    domain="abandon",
+                    branch=branch,
+                ).error(f"Failed to abort flow: {e}")
+                results["flow"] = "failed"
 
         logger.bind(
             domain="abandon",
