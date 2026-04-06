@@ -18,7 +18,7 @@ class TaskService:
         self,
         store: SQLiteClient | None = None,
     ) -> None:
-        self.store = store or SQLiteClient()
+        self.store = SQLiteClient() if store is None else store
         self._flow_service = FlowService(store=self.store)
 
     # ------------------------------------------------------------------
