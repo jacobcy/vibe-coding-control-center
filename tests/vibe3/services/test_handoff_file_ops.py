@@ -196,3 +196,86 @@ class TestGetHandoffDir:
 
         # Should use 'default' prefix with hash suffix
         assert "default" in str(handoff_dir)
+
+
+class TestHandoffRecordAPIs:
+    """Tests for record_plan, record_report, and record_audit methods."""
+
+    def test_record_plan_persists_plan_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_plan persists plan ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        plan_ref = "docs/plans/feature-x.md"
+
+        handoff_path = handoff_service.record_plan(
+            plan_ref=plan_ref,
+            next_step="Implement core logic",
+            blocked_by=None,
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert plan_ref in content
+        assert "Implement core logic" in content
+        assert "test-actor" in content
+        assert "plan" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch", plan_ref=plan_ref
+        )
+
+    def test_record_report_persists_report_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_report persists report ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        report_ref = ".agent/reports/test-report.md"
+
+        handoff_path = handoff_service.record_report(
+            report_ref=report_ref,
+            next_step="Review findings",
+            blocked_by="Missing data",
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert report_ref in content
+        assert "Review findings" in content
+        assert "Missing data" in content
+        assert "test-actor" in content
+        assert "report" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch", report_ref=report_ref
+        )
+
+    def test_record_audit_persists_audit_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_audit persists audit ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        audit_ref = ".agent/reports/audit-result.md"
+
+        handoff_path = handoff_service.record_audit(
+            audit_ref=audit_ref,
+            next_step="Finalize PR",
+            blocked_by=None,
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert audit_ref in content
+        assert "Finalize PR" in content
+        assert "test-actor" in content
+        assert "audit" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch", audit_ref=audit_ref
+        )
