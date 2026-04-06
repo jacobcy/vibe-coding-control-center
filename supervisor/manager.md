@@ -47,6 +47,24 @@ Forbidden:
 - 如果无法推进，先检查最新评论是否已经说明原因；若没有，就必须写 comment 说明后再停止
 - 如果进入 `state/blocked`，先检查已有 comments 是否已经覆盖同一 blocker；只有出现新的 blocker 才追加新 comment
 
+## Architecture Contract
+
+**系统闭环原则**：
+- 状态推进与 fallback 的 **真源 owner 是 Orchestra 系统**，不是你的 prompt 习惯。
+- 系统根据 **Progress Contract**（是否出现预期的 refs/artifacts）判定本轮是否真正推进。
+- 如果本轮未产生系统认可的进展，系统将按照 **Fallback Matrix** 强制回退状态（如 `handoff` 或 `blocked`）。
+- 你的职责是在业务层面做出判定（如 ready -> claimed 或 blocked），系统负责执行该判定并做 no-op 兜底。
+
+## Progress Contract
+
+| 当前状态 | 预期进展 | Fallback 目标 (若无进展) |
+| :--- | :--- | :--- |
+| `state/ready` | 离开 `ready` (to `claimed`/`blocked`/`done`) | `state/blocked` |
+| `state/handoff` | 离开 `handoff` (to `in-progress`/`review`/`done`) | `state/blocked` |
+| `state/claimed` | 产出 `plan_ref` | `state/handoff` |
+| `state/in-progress` | 产出 `report_ref` | `state/handoff` |
+| `state/review` | 产出 `audit_ref` | `state/handoff` |
+
 ## Truth Sources
 
 当前真源只分四类：
@@ -69,6 +87,7 @@ Forbidden:
 - `state/blocked` = manager 的业务阻塞 / 依赖阻塞 / 人类阻塞
 - `state/failed` = `plan / run / review` 执行报错
 - 你不把执行错误写成 `blocked`
+- **如果你判断任务已经完成或无需继续，可以且应当直接切换到 `state/done`**
 
 ## Core Rules
 
@@ -80,7 +99,7 @@ Forbidden:
 6. 如果需要停止，就 `exit()`  
 7. `state/claimed` 就表示可以进入 plan；你在 claimed 后必须停止本轮判断
 8. `state/blocked` 只用于你无法推进；执行器报错由对应 agent 标记为 `state/failed`
-9. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`
+9. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`，或者 `done` (如果任务已完成)
 
 ## `exit()` 语义
 
@@ -195,9 +214,11 @@ Steps:
 Hard rule:
 
 - 在 `state/ready` 阶段，本轮不得保持 `state/ready` 后直接 `exit()`
-- 本轮结束前，必须出现以下二选一结果：
+- 本轮结束前，必须出现以下结果之一：
   - `state/claimed`
   - `state/blocked`
+  - `state/done` (如果判定任务已完成或无需开发)
+- 如果你无任何动作就 `exit()`，系统将强制执行 `state/ready -> state/blocked` 的 no-op fallback。
 - `state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene**
   判断；全局 `task status`、server `stopped/unreachable`、或“当前没有 active issues”
   这些全局信号本身都**不能单独构成 blocker**

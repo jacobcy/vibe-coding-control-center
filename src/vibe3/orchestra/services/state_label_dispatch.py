@@ -21,13 +21,16 @@ from vibe3.config.settings import VibeConfig
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.manager.session_naming import get_trigger_session_prefix
 from vibe3.manager.worktree_manager import WorktreeManager
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.orchestration import (
+    STATE_PROGRESS_CONTRACT,
+    IssueInfo,
+    IssueState,
+)
 from vibe3.models.review_runner import AgentOptions
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.no_progress_policy import (
-    execute_auto_block,
+    execute_state_fallback,
     has_progress_changed,
-    should_auto_block,
     snapshot_progress,
 )
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
@@ -188,77 +191,52 @@ class StateLabelDispatchService(ServiceBase):
             labels = states_by_issue.get(issue_number, [])
             if self.trigger_state.to_label() not in labels:
                 stale.add(issue_number)
+                self._progress_snapshots.pop(issue_number, None)
                 continue
+
             flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
-            if self.trigger_name == "manager":
-                if not labels or self.trigger_state.to_label() not in labels:
-                    # State changed (manager made progress)
-                    stale.add(issue_number)
-                    # Clean up snapshot
-                    self._progress_snapshots.pop(issue_number, None)
-                else:
-                    # Check full progress snapshot
-                    before_snapshot = self._progress_snapshots.get(issue_number)
-                    if before_snapshot:
-                        # Has snapshot, compare with current state
-                        branch = str(flow.get("branch") or "").strip() if flow else ""
-                        after_snapshot = snapshot_progress(
-                            issue_number=issue_number,
-                            branch=branch,
-                            store=self._store,
-                            github=self._github,
-                            repo=self.config.repo,
-                        )
-                        has_progress = has_progress_changed(
-                            before_snapshot, after_snapshot
-                        )
-                        if has_progress:
-                            # Progress made, clean up
-                            stale.add(issue_number)
-                            self._progress_snapshots.pop(issue_number, None)
-                        elif should_auto_block(
-                            issue_number=issue_number,
-                            current_labels=labels,
-                            has_live_session=self._has_live_dispatch(issue_number),
-                            state_changed=False,  # Already checked above
-                        ):
-                            # No progress and session ended → auto-block
-                            execute_auto_block(
-                                issue_number=issue_number,
-                                current_labels=labels,
-                                github=self._github,
-                                source_state_label=self.trigger_state.to_label(),
-                                repo=self.config.repo,
-                            )
-                            stale.add(issue_number)
-                            self._progress_snapshots.pop(issue_number, None)
-                    else:
-                        # No snapshot, use legacy state-only check
-                        if should_auto_block(
-                            issue_number=issue_number,
-                            current_labels=labels,
-                            has_live_session=self._has_live_dispatch(issue_number),
-                            state_changed=False,
-                        ):
-                            execute_auto_block(
-                                issue_number=issue_number,
-                                current_labels=labels,
-                                github=self._github,
-                                source_state_label=self.trigger_state.to_label(),
-                                repo=self.config.repo,
-                            )
-                            stale.add(issue_number)
-                continue
             if not flow:
                 stale.add(issue_number)
+                self._progress_snapshots.pop(issue_number, None)
                 continue
+
             branch = str(flow.get("branch") or "").strip()
-            flow_state = self._store.get_flow_state(branch) if branch else None
+            before_snapshot = self._progress_snapshots.get(issue_number)
+
             if not self._has_live_dispatch(issue_number):
+                # Session ended, check for progress
+                if before_snapshot:
+                    after_snapshot = snapshot_progress(
+                        issue_number=issue_number,
+                        branch=branch,
+                        store=self._store,
+                        github=self._github,
+                        repo=self.config.repo,
+                    )
+                    # Use state-specific progress contract to verify execution
+                    expected_ref = STATE_PROGRESS_CONTRACT.get(self.trigger_state)
+                    has_progress = has_progress_changed(
+                        before_snapshot,
+                        after_snapshot,
+                        expected_ref=expected_ref,
+                    )
+                    if not has_progress:
+                        execute_state_fallback(
+                            issue_number=issue_number,
+                            current_labels=labels,
+                            github=self._github,
+                            source_state=self.trigger_state,
+                            repo=self.config.repo,
+                        )
                 stale.add(issue_number)
+                self._progress_snapshots.pop(issue_number, None)
                 continue
-            if not flow_state or not self._should_dispatch_from_state(flow_state):
+
+            # If still alive, check if state changed externally (though unlikely)
+            if self.trigger_state.to_label() not in labels:
                 stale.add(issue_number)
+                self._progress_snapshots.pop(issue_number, None)
+
         self._in_flight_dispatches.difference_update(stale)
 
     def _select_ready_issues(
@@ -329,12 +307,9 @@ class StateLabelDispatchService(ServiceBase):
     def _should_dispatch_from_state(self, flow_state: dict[str, object]) -> bool:
         if self.trigger_name == "manager":
             # For state/ready: dispatch if no manager session
-            # For state/handoff: dispatch if no manager session AND has valid refs
-            if self.trigger_state == IssueState.HANDOFF:
-                # Handoff resume requires valid refs (e.g., plan_ref) to proceed
-                has_valid_refs = bool(flow_state.get("plan_ref"))
-                return not flow_state.get("manager_session_id") and has_valid_refs
-            # state/ready: standard entry, no session required
+            # For state/handoff: dispatch if no manager session.
+            # We allow manager to re-triage even if refs (like plan_ref) are missing
+            # (e.g. after a no-op fallback from planner/executor).
             return not flow_state.get("manager_session_id")
         if self.trigger_name == "plan":
             return not flow_state.get("plan_ref") and not flow_state.get(
@@ -353,29 +328,27 @@ class StateLabelDispatchService(ServiceBase):
         )
 
     def _dispatch_issue(self, issue: IssueInfo) -> None:
-        if self.trigger_name == "manager":
-            # Capture before snapshot for progress detection
-            flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
-            branch = str(flow.get("branch") or "").strip() if flow else ""
-            before_snapshot = snapshot_progress(
-                issue_number=issue.number,
-                branch=branch,
-                store=self._store,
-                github=self._github,
-                repo=self.config.repo,
-            )
-            self._progress_snapshots[issue.number] = before_snapshot
+        # Capture before snapshot for progress detection (unified for all triggers)
+        flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
+        branch = str(flow.get("branch") or "").strip() if flow else ""
+        before_snapshot = snapshot_progress(
+            issue_number=issue.number,
+            branch=branch,
+            store=self._store,
+            github=self._github,
+            repo=self.config.repo,
+        )
+        self._progress_snapshots[issue.number] = before_snapshot
 
+        if self.trigger_name == "manager":
             dispatched = self._manager.dispatch_manager(issue)
             if not dispatched:
                 self._in_flight_dispatches.discard(issue.number)
                 self._progress_snapshots.pop(issue.number, None)
             return
 
-        flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
         if not flow:
             raise RuntimeError(f"No task flow for issue #{issue.number}")
-        branch = str(flow.get("branch") or "").strip()
         if not branch:
             raise RuntimeError(f"Flow branch missing for issue #{issue.number}")
         if self.trigger_name != "manager" and not _is_auto_task_branch(branch):

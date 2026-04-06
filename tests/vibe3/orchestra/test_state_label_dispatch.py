@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -214,7 +214,20 @@ async def test_manager_no_progress_blocks_when_session_ended(
     svc._in_flight_dispatches.add(42)
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
 
-    await svc.on_tick()
+    # Set up matching snapshots (no progress)
+    before = {
+        "state_label": "state/ready",
+        "comment_count": 0,
+        "handoff": None,
+        "refs": {},
+    }
+    svc._progress_snapshots[42] = before
+
+    with patch(
+        "vibe3.orchestra.services.state_label_dispatch.snapshot_progress",
+        return_value=before,
+    ):
+        await svc.on_tick()
 
     # Should auto-block because session ended and state unchanged
     svc._github.add_comment.assert_called_once()
@@ -403,18 +416,30 @@ async def test_manager_async_path_treats_comment_changes_as_progress(
     svc._has_live_dispatch = MagicMock(return_value=False)
     svc._in_flight_dispatches.add(42)
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+
     # Comment count increased (manager made progress)
-    # TODO: This test will FAIL until async path uses full progress snapshot
+    before = {
+        "state_label": "state/ready",
+        "comment_count": 0,
+        "handoff": None,
+        "refs": {},
+    }
+    after = {
+        "state_label": "state/ready",
+        "comment_count": 1,
+        "handoff": None,
+        "refs": {},
+    }
+    svc._progress_snapshots[42] = before
 
-    # For now, verify that current async path only checks state_changed
-    # This test documents the gap that Task 3 will fix
-    await svc.on_tick()
+    with patch(
+        "vibe3.orchestra.services.state_label_dispatch.snapshot_progress",
+        return_value=after,
+    ):
+        await svc.on_tick()
 
-    # Current behavior: async path only checks state label, not comment count
-    # So it WILL auto-block even if comment count changed (parity gap)
-    # After Task 3 fix: should NOT auto-block when comment count changed
-    # For now, we expect auto-block (this documents the bug)
-    svc._github.add_comment.assert_called_once()
+    # Should NOT auto-block because comment count changed (Task 3 fix)
+    svc._github.add_comment.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -489,7 +514,20 @@ async def test_manager_async_no_progress_block_fires_for_truly_no_change(
     svc._in_flight_dispatches.add(42)
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
 
-    await svc.on_tick()
+    # Identical snapshots
+    before = {
+        "state_label": "state/ready",
+        "comment_count": 0,
+        "handoff": None,
+        "refs": {},
+    }
+    svc._progress_snapshots[42] = before
+
+    with patch(
+        "vibe3.orchestra.services.state_label_dispatch.snapshot_progress",
+        return_value=before,
+    ):
+        await svc.on_tick()
 
     # Should auto-block because session ended and no change at all
     svc._github.add_comment.assert_called_once()

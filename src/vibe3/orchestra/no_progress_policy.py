@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import STATE_FALLBACK_MATRIX, IssueState
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -76,14 +76,16 @@ def snapshot_progress(
     # Get flow state refs
     flow_state = store.get_flow_state(branch) if branch else {}
     state_dict = flow_state or {}
-    refs = (
-        state_dict.get("spec_ref"),
-        state_dict.get("plan_ref"),
-        state_dict.get("report_ref"),
-        state_dict.get("audit_ref"),
-        state_dict.get("next_step"),
-        state_dict.get("blocked_by"),
-    )
+
+    # Capture major refs in a dict for flexible comparison
+    refs = {
+        "spec_ref": state_dict.get("spec_ref"),
+        "plan_ref": state_dict.get("plan_ref"),
+        "report_ref": state_dict.get("report_ref"),
+        "audit_ref": state_dict.get("audit_ref"),
+        "next_step": state_dict.get("next_step"),
+        "blocked_by": state_dict.get("blocked_by"),
+    }
 
     try:
         git_dir = GitClient().get_git_common_dir()
@@ -109,19 +111,34 @@ def snapshot_progress(
 def has_progress_changed(
     before: dict[str, object],
     after: dict[str, object],
+    expected_ref: str | None = None,
 ) -> bool:
     """Check if any progress signal changed between snapshots.
 
     Args:
         before: Previous progress snapshot
         after: Current progress snapshot
+        expected_ref: Optional specific ref key that MUST change to count as progress
 
     Returns:
-        True if any signal changed (progress was made)
+        True if progress was made (signals changed as expected)
     """
+    # If state label changed, it's definitely a transition (considered progress)
+    if before["state_label"] != after["state_label"]:
+        return True
+
+    # If a specific ref was expected (strict progress contract)
+    if expected_ref:
+        before_refs = before.get("refs")
+        after_refs = after.get("refs")
+        if not isinstance(before_refs, dict) or not isinstance(after_refs, dict):
+            return False
+        # Check if the specific expected ref changed
+        return before_refs.get(expected_ref) != after_refs.get(expected_ref)
+
+    # General heuristic progress check (for manager/loose states)
     return any(
-        before[key] != after[key]
-        for key in ("state_label", "comment_count", "handoff", "refs")
+        before[key] != after[key] for key in ("comment_count", "handoff", "refs")
     )
 
 
@@ -158,62 +175,70 @@ def should_auto_block(
     return True
 
 
-def execute_auto_block(
+def execute_state_fallback(
     issue_number: int,
     current_labels: list[str],
     github: GitHubClient,
-    source_state_label: str = IssueState.READY.to_label(),
+    source_state: IssueState,
     repo: str | None = None,
 ) -> None:
-    """Execute the auto-block action.
-
-    Adds block comment and transitions issue from ready to blocked state.
+    """Execute the auto-fallback/block action based on the state machine contract.
 
     Args:
         issue_number: GitHub issue number
         current_labels: Current issue labels (used for skip check)
         github: GitHub client for API calls
+        source_state: The current issue state that failed to progress
         repo: Optional repository (owner/repo format)
     """
     import subprocess
 
-    # Double-check: skip if already blocked
-    if IssueState.BLOCKED.to_label() in current_labels:
-        logger.bind(
-            domain="orchestra",
-            issue=issue_number,
-        ).debug("Issue already blocked, skipping auto-block")
+    target_state = STATE_FALLBACK_MATRIX.get(source_state, IssueState.BLOCKED)
+    target_label = target_state.to_label()
+    source_label = source_state.to_label()
+
+    # Double-check: skip if already transitioned or in target state
+    if source_label not in current_labels:
+        return
+    if target_label in current_labels:
         return
 
     logger.bind(
         domain="orchestra",
         issue=issue_number,
     ).warning(
-        f"Manager session ended without state change, "
-        f"auto-blocking issue #{issue_number}"
+        f"Session ({source_label}) ended without progress artifacts, "
+        f"auto-transitioning issue #{issue_number} to {target_label}"
     )
 
-    # Add block comment
-    reason = (
-        "Manager 执行完成但未改变状态。可能原因：\n"
-        "- Scene 不健康或无法恢复\n"
-        "- 缺少必要的前置条件（如 spec_ref）\n"
-        "- 需要人工决策或额外信息\n\n"
-        "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
-    )
-    # Use same repo for comment and labels to avoid split audit trail
+    # Determine reason message based on target state
+    if target_state == IssueState.BLOCKED:
+        reason = (
+            "Manager 执行完成但未改变状态（no-progress）。可能原因：\n"
+            "- Scene 不健康或无法恢复\n"
+            "- 缺少必要的前置条件（如 spec_ref）\n"
+            "- 需要人工决策或额外信息\n\n"
+            "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
+        )
+    else:
+        reason = (
+            "执行结束但未产出预期产物（no-progress）。"
+            f"已由系统自动回退到 {target_label} 以便重新进入判定环节。\n"
+            f"原因：本阶段（{source_label}）未产生有效的 refs / artifacts 变化。"
+        )
+
+    # Add comment and update labels
     github.add_comment(issue_number, f"[dispatcher] {reason}", repo=repo)
 
-    # Update labels: remove current trigger state, add blocked
     cmd = [
         "gh",
         "issue",
         "edit",
         str(issue_number),
         "--add-label",
-        IssueState.BLOCKED.to_label(),
+        target_label,
         "--remove-label",
-        source_state_label,
+        source_label,
     ]
     if repo:
         cmd.extend(["--repo", repo])
