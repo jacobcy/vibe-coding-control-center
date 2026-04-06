@@ -19,6 +19,11 @@ class MockIssueStatusEntry:
     has_pr: bool = False
     pr_number: int | None = None
     blocked_by: tuple[int, ...] = ()
+    # Queue metadata fields
+    milestone: str | None = None
+    roadmap: str | None = None
+    priority: int = 0
+    queue_rank: int | None = None
 
 
 @dataclass
@@ -135,6 +140,36 @@ class TestMCPResources:
         assert "**#100**: Test issue" in result
         assert "State: `in-progress`" in result
         assert "PR: #123" in result
+
+    def test_format_snapshot_includes_queue_metadata_for_ready_issues(self):
+        """READY issues should show queue metadata in MCP output."""
+        from vibe3.server.mcp import format_snapshot_for_mcp
+
+        mock_ready_state = MockIssueState("ready")
+        mock_ready_entry = MockIssueStatusEntry(
+            number=200,
+            title="Ready issue with queue metadata",
+            state=mock_ready_state,
+            milestone="v0.1",
+            roadmap="p0",
+            priority=9,
+            queue_rank=1,
+        )
+        mock_snapshot = MockOrchestraSnapshot(
+            timestamp=1234567890.0,
+            server_running=True,
+            active_issues=(mock_ready_entry,),
+            active_flows=1,
+            active_worktrees=1,
+        )
+
+        result = format_snapshot_for_mcp(mock_snapshot)
+
+        # Should show queue metadata for READY issue
+        assert "Queue Rank: #1" in result
+        assert "milestone=v0.1" in result
+        assert "roadmap/p0" in result
+        assert "priority/9" in result
 
 
 class TestMCPTools:
@@ -286,3 +321,38 @@ class TestMCPServerIntegration:
         assert fastapi_app.title == "vibe3 Orchestra"
         # Status endpoint should be registered
         assert any(route.path == "/status" for route in fastapi_app.routes)
+
+    def test_serialize_snapshot_includes_queue_metadata(self):
+        """MCP serialization includes queue metadata for ready issues."""
+        from vibe3.server.mcp import _serialize_snapshot
+
+        # Create a ready issue with queue metadata
+        ready_issue = MockIssueStatusEntry(
+            number=42,
+            title="Ready issue",
+            state=MockIssueState("ready"),
+            milestone="v0.1",
+            roadmap="p0",
+            priority=9,
+            queue_rank=1,
+        )
+
+        snapshot = MockOrchestraSnapshot(
+            timestamp=1700000000.0,
+            server_running=True,
+            active_issues=(ready_issue,),
+            active_flows=0,
+            active_worktrees=0,
+        )
+
+        serialized = _serialize_snapshot(snapshot)
+
+        # Verify queue metadata is in serialization
+        assert "active_issues" in serialized
+        assert len(serialized["active_issues"]) == 1
+        issue_data = serialized["active_issues"][0]
+        assert issue_data["number"] == 42
+        assert issue_data["milestone"] == "v0.1"
+        assert issue_data["roadmap"] == "p0"
+        assert issue_data["priority"] == 9
+        assert issue_data["queue_rank"] == 1

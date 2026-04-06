@@ -187,15 +187,34 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
+
+                    # Queue metadata
+                    milestone = cast(str | None, item.get("milestone"))
+                    roadmap = cast(str | None, item.get("roadmap"))
+                    priority = cast(int, item.get("priority", 0))
+                    queue_rank = cast(int | None, item.get("queue_rank"))
+
                     flow_info = (
                         f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
                         if flow
                         else "  [dim]flow:[/] [dim](none)[/]"
                     )
+
+                    # Format queue metadata
+                    metadata_parts = []
+                    if queue_rank is not None:
+                        metadata_parts.append(f"rank={queue_rank}")
+                    if milestone:
+                        metadata_parts.append(f"milestone={milestone}")
+                    if roadmap:
+                        metadata_parts.append(f"roadmap/{roadmap}")
+                    metadata_parts.append(f"priority/{priority}")
+                    metadata_str = "  ".join(metadata_parts)
+
                     console.print(
                         f"  #{number:4}  [cyan]READY     [/]  {title[:48]}..."
                     )
-                    console.print(f"             {flow_info}")
+                    console.print(f"             {flow_info}  [dim]{metadata_str}[/]")
             else:
                 console.print("  [dim](none)[/]")
         else:

@@ -128,6 +128,7 @@ class IssueInfo(BaseModel):
     labels: list[str] = Field(default_factory=list)
     assignees: list[str] = Field(default_factory=list)  # GitHub login names
     url: str | None = None
+    milestone: str | None = None  # GitHub milestone title
 
     @property
     def slug(self) -> str:
@@ -156,6 +157,12 @@ class IssueInfo(BaseModel):
                     state = parsed
                     break
 
+            # Parse GitHub milestone
+            milestone = None
+            milestone_data = payload.get("milestone")
+            if isinstance(milestone_data, dict) and "title" in milestone_data:
+                milestone = milestone_data["title"]
+
             return cls(
                 number=int(payload["number"]),
                 title=str(payload.get("title", "")),
@@ -163,6 +170,7 @@ class IssueInfo(BaseModel):
                 labels=labels,
                 assignees=[a["login"] for a in payload.get("assignees", [])],
                 url=payload.get("html_url") or payload.get("url"),
+                milestone=milestone,
             )
         except (KeyError, ValueError) as exc:
             logger.bind(domain="orchestra").warning(

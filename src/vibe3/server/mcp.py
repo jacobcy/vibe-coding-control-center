@@ -38,6 +38,11 @@ def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:
                 "has_pr": entry.has_pr,
                 "pr_number": entry.pr_number,
                 "blocked_by": list(entry.blocked_by),
+                # Queue metadata
+                "milestone": entry.milestone,
+                "roadmap": entry.roadmap,
+                "priority": entry.priority,
+                "queue_rank": entry.queue_rank,
             }
             for entry in snapshot.active_issues
         ],
@@ -64,6 +69,21 @@ def format_snapshot_for_mcp(snapshot: "OrchestraSnapshot") -> str:
         state_str = entry.state.value if entry.state else "unknown"
         lines.append(f"- **#{entry.number}**: {entry.title}")
         lines.append(f"  - State: `{state_str}`")
+
+        # Show queue metadata for READY issues
+        if (
+            entry.state
+            and entry.state.value == "ready"
+            and entry.queue_rank is not None
+        ):
+            queue_info = f"  - Queue Rank: #{entry.queue_rank}"
+            if entry.milestone:
+                queue_info += f" | milestone={entry.milestone}"
+            if entry.roadmap:
+                queue_info += f" | roadmap/{entry.roadmap}"
+            queue_info += f" | priority/{entry.priority}"
+            lines.append(queue_info)
+
         if entry.assignee:
             lines.append(f"  - Assignee: {entry.assignee}")
         if entry.has_pr and entry.pr_number:

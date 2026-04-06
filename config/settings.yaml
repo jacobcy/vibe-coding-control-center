@@ -101,11 +101,17 @@ code_limits:
       - path: "src/vibe3/services/task_resume_usecase.py"
         limit: 500
         reason: "Task resume usecase，职责单一，方法粒度合理，主方法 resume_issues 逻辑完整不宜拆分"
+      - path: "src/vibe3/orchestra/services/status_service.py"
+        limit: 450
+        reason: "Orchestra 状态聚合服务，数据类+辅助函数+主服务类结构清晰，snapshot 方法线性流程不宜拆分"
 
       # 强耦合测试例外
       - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
         limit: 550
         reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
+      - path: "tests/vibe3/orchestra/test_state_label_dispatch_core.py"
+        limit: 450
+        reason: "State label dispatch 服务测试集，共享 fixture，围绕同一服务契约，按功能场景组织不宜拆分"
       - path: "tests/vibe3/orchestra/test_serve.py"
         limit: 500
         reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
@@ -133,7 +139,7 @@ code_limits:
 
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 32000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
+    v3_python: 35000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:

@@ -338,3 +338,100 @@ def test_build_command_uses_baseline_project_root(
     assert command[4:7] == ["python", "-I", command[6]]
     assert command[5] == "-I"
     assert command[6].endswith("/src/vibe3/cli.py")
+
+
+@pytest.mark.asyncio
+async def test_manager_dispatch_respects_queue_ordering(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that manager dispatches ready issues in queue order."""
+    svc, manager = manager_service
+
+    # Create issues with different queue metadata
+    # Issue 100: v0.3, roadmap/p1, priority/7 (should be 4th)
+    # Issue 200: v0.3, roadmap/p0, priority/7 (should be 3rd)
+    # Issue 300: v0.1, roadmap/p1, priority/5 (should be 2nd)
+    # Issue 400: v0.1, roadmap/p0, priority/9 (should be 1st)
+    raw_issues = [
+        {
+            "number": 100,
+            "title": "A",
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "roadmap/p1"},
+                {"name": "priority/7"},
+            ],
+            "assignees": [],
+            "milestone": {"title": "v0.3", "number": 3},
+        },
+        {
+            "number": 200,
+            "title": "B",
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "roadmap/p0"},
+                {"name": "priority/7"},
+            ],
+            "assignees": [],
+            "milestone": {"title": "v0.3", "number": 3},
+        },
+        {
+            "number": 300,
+            "title": "C",
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "roadmap/p1"},
+                {"name": "priority/5"},
+            ],
+            "assignees": [],
+            "milestone": {"title": "v0.1", "number": 1},
+        },
+        {
+            "number": 400,
+            "title": "D",
+            "labels": [
+                {"name": "state/ready"},
+                {"name": "roadmap/p0"},
+                {"name": "priority/9"},
+            ],
+            "assignees": [],
+            "milestone": {"title": "v0.1", "number": 1},
+        },
+    ]
+
+    svc._github.list_issues.return_value = raw_issues
+    manager.dispatch_manager.return_value = True
+
+    events: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    # Verify manager.dispatch_manager was called in queue order
+    # Capacity=2, so should dispatch 2 highest priority issues
+    assert manager.dispatch_manager.call_count == 2
+
+    # Get the issue numbers from dispatch calls
+    # dispatch_manager receives IssueInfo objects
+    first_call_issue = manager.dispatch_manager.call_args_list[0][0][0]
+    second_call_issue = manager.dispatch_manager.call_args_list[1][0][0]
+
+    # Should dispatch in queue order: #400 first, #300 second
+    assert first_call_issue.number == 400
+    assert second_call_issue.number == 300
+
+    # Verify event log shows ready queue in correct order
+    tick_events = [msg for _, msg in events if "tick ready issues" in msg]
+    assert len(tick_events) == 1
+    # Ready queue should list issues in order: 400, 300, 200, 100
+    ready_queue_msg = tick_events[0]
+    assert "#400" in ready_queue_msg
+    # The message should show all ready issues in sorted order
+    # Format: "tick ready issues: #400, #300, #200, #100"
+    assert ready_queue_msg.index("#400") < ready_queue_msg.index("#300")
+    assert ready_queue_msg.index("#300") < ready_queue_msg.index("#200")
+    assert ready_queue_msg.index("#200") < ready_queue_msg.index("#100")

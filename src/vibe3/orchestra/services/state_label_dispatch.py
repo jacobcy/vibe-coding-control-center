@@ -34,6 +34,7 @@ from vibe3.orchestra.no_progress_policy import (
     has_progress_changed,
     snapshot_progress,
 )
+from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
@@ -376,7 +377,9 @@ class StateLabelDispatchService(ServiceBase):
             if not self._should_dispatch_from_state(issue.number, flow_state):
                 continue
             selected.append(issue)
-        return selected
+        # Sort selected issues by queue ordering rules
+        # (milestone -> roadmap -> priority)
+        return sort_ready_issues(selected)
 
     def _should_dispatch_from_state(
         self,

@@ -10,19 +10,21 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 语义边界：
 
 - `vibe-issue` 负责 Issue intake、模板补全、查重、标签与创建。
-- `vibe-issue` 不决定 roadmap 排期，也不创建 task。
-- `vibe-roadmap` 负责 Issue 已存在之后的版本规划与优先级归类。
+- `vibe-issue` 不决定 roadmap 排期，不负责判断“下一个做哪个 issue”，也不创建 flow / task 现场。
+- `vibe-roadmap` 负责 Issue 已存在之后的版本规划与版本窗口归类。
+- `vibe-orchestra` 负责在运行中根据当前现场建议“下一个值得处理的 issue”。
 - `vibe-task` 与 `vibe-check` 不负责 Issue 创建治理。
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
 ## 核心原则
 
-- **不重造轮子**：直接调用 `gh` CLI 以及最小必要的 `vibe3 flow` / `vibe3 task status` 命令。
+- **不重造轮子**：直接调用 `gh` CLI 以及最小必要的 `vibe3 task status` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
 - **先读 shell 输出**：先读取 `gh` / `vibe3` 输出，再做编排判断。
 - **只做 intake，不做排期**：Issue 创建后是否进入规划、何时进入版本窗口，由 `vibe-roadmap` 决定。
-- **候选资格需要显式同步**：`vibe-task` 表示该 issue 具备进入流程的候选资格；创建后通过 `uv run python src/vibe3/cli.py flow bind <issue>` 绑定到 flow。
+- **自动队列只解释，不在此决策**：若用户追问“它之后会不会被自动处理、排在什么位置”，可以读取 `uv run python src/vibe3/cli.py task status` 解释当前 ready queue 事实，但不在 `vibe-issue` 中决定顺位。
+- **进入执行现场属于后续阶段**：创建完成后，若要做版本规划转给 `vibe-roadmap`；若用户已明确要人工开工，则转给 `vibe-new`。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 
 ## 使用逻辑
@@ -51,8 +53,8 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - 引导用户补充模板中缺失的关键信息。
 - 基于 AI 建议合适的 Labels。
-- 为保证后续 intake 链路可识别该 Issue，创建时必须包含 `vibe-task`；`bug`、`enhancement` 等业务标签可按模板追加。
-- 附加 `vibe-task` 不等于已完成 roadmap placement；是否推入 GitHub Project、何时纳入版本窗口，仍由 `vibe-roadmap` 决定。
+- 为保证后续 intake 链路可识别该 Issue，按当前仓库约定补充最小必要标签；`bug`、`enhancement`、`vibe-task` 等标签按模板和场景决定。
+- intake 标签不等于已完成 roadmap placement；是否进入版本窗口、如何排序，仍由 `vibe-roadmap` / `vibe-orchestra` 在后续阶段处理。
 
 ### Step 4.5: 判断是否继续挂在现有主 issue 下
 
@@ -67,14 +69,17 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 ### Step 5: 提交与收口
 
 - 执行 `gh issue create --title "<标题>" --body "<润色后的内容>" --label "<labels>"`。
-- 创建成功后，输出 Issue 链接与建议下一步；若需要进入 roadmap 规划，交给 `vibe-roadmap` 继续处理。
+- 创建成功后，输出 Issue 链接与建议下一步。
+- 若需要进入版本规划，交给 `vibe-roadmap` 继续处理。
+- 若用户已经明确要人工接手当前 issue，则转给 `vibe-new` 进入执行现场。
+- 若用户只是在问自动治理下它将如何被消费，可以补充读取 `uv run python src/vibe3/cli.py task status` 来解释当前 queue 事实，但不在这里决定最终顺位。
 - 输出成功提示及 Issue 链接。
 
 ## 对象边界
 
 - `repo issue`: 需求来源与讨论入口
-- `task`: 执行记录语义，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py flow show`、`uv run python src/vibe3/cli.py task status --all --check` 等命令观察
-- `flow`: execution record 的运行时现场，通过 `uv run python src/vibe3/cli.py flow` 管理
+- `task`: 执行记录语义，由 `vibe-task` / shell 流程负责，通过 `uv run python src/vibe3/cli.py task status --all --check` 等命令观察
+- `flow`: execution record 的运行时现场，不属于 `vibe-issue` 直接管理范围
 
 ## Failure Handling
 
