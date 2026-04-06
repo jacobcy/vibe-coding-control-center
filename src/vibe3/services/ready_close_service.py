@@ -35,12 +35,15 @@ class ReadyCloseService:
         self,
         issue_number: int,
         closing_comment: str | None = None,
+        issue_payload: dict[str, object] | None = None,
     ) -> str:
         """Close a GitHub issue that is in state/ready.
 
         Args:
             issue_number: Issue number to close
             closing_comment: Optional comment explaining why the issue is closed
+            issue_payload: Optional pre-fetched issue payload (avoids
+                duplicate API call)
 
         Returns:
             Result string: "closed", "already_closed", or "failed"
@@ -50,6 +53,19 @@ class ReadyCloseService:
             operation="close_ready_issue",
             issue_number=issue_number,
         ).info("Closing ready issue")
+
+        # Check if already closed (avoid unnecessary API call)
+        if issue_payload is None:
+            issue_payload_raw = self._github.view_issue(issue_number, repo=self._repo)
+            if isinstance(issue_payload_raw, dict):
+                issue_payload = issue_payload_raw
+
+        if isinstance(issue_payload, dict) and issue_payload.get("state") == "closed":
+            logger.bind(
+                domain="orchestra",
+                issue_number=issue_number,
+            ).info("Issue already closed")
+            return "already_closed"
 
         # Call GitHub close API
         success = self._github.close_issue(

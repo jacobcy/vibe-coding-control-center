@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from loguru import logger
+
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
 from vibe3.services.label_service import LabelService
+from vibe3.services.ready_close_service import ReadyCloseService
 
 if TYPE_CHECKING:
     pass
@@ -261,3 +264,80 @@ def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -
         if isinstance(body, str) and reason in body:
             return True
     return False
+
+
+def close_ready_issue(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "agent:manager",
+) -> str:
+    """Close a ready issue when task should not be executed.
+
+    This is the controlled path for managers to close issues
+    in state/ready. Only works when issue is in state/ready.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Reason for closing the issue
+        actor: Actor performing the close (defaults to "agent:manager")
+
+    Returns:
+        Result string: "closed", "already_closed", or "failed"
+    """
+    # Validate current state
+    issue_payload = GitHubClient().view_issue(issue_number, repo=repo)
+    if not isinstance(issue_payload, dict):
+        logger.bind(
+            domain="orchestra",
+            issue_number=issue_number,
+        ).error("Cannot close issue: failed to fetch issue payload")
+        return "failed"
+
+    labels = issue_payload.get("labels", [])
+    if not isinstance(labels, list):
+        labels = []
+
+    label_names = [lb.get("name", "") for lb in labels if isinstance(lb, dict)]
+
+    # Enforce state/ready requirement
+    if IssueState.READY.to_label() not in label_names:
+        logger.bind(
+            domain="orchestra",
+            issue_number=issue_number,
+            current_labels=label_names,
+        ).error(
+            "Cannot close issue: not in state/ready. "
+            "Close is only allowed for ready-state issues."
+        )
+        return "failed"
+
+    # Check if already closed
+    if issue_payload.get("state") == "closed":
+        logger.bind(
+            domain="orchestra",
+            issue_number=issue_number,
+        ).info("Issue already closed")
+        return "already_closed"
+
+    # Close the issue via ReadyCloseService
+    close_svc = ReadyCloseService(github=GitHubClient(), repo=repo)
+    result = close_svc.close_ready_issue(
+        issue_number=issue_number,
+        closing_comment=f"[manager] 任务关闭。\n\n原因:{reason}",
+    )
+
+    if result == "closed":
+        logger.bind(
+            domain="orchestra",
+            issue_number=issue_number,
+        ).info("Issue closed successfully")
+    else:
+        logger.bind(
+            domain="orchestra",
+            issue_number=issue_number,
+        ).error("Failed to close issue")
+
+    return result
