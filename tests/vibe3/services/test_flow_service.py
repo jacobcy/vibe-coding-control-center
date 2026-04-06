@@ -46,3 +46,60 @@ class TestFlowServiceCreate:
         args, kwargs = mock_store.update_flow_state.call_args
         assert kwargs["initiated_by"] == "manual"
         assert kwargs["flow_slug"] == "test-flow"
+
+
+class TestFlowServiceAbort:
+    """Tests for abort_flow."""
+
+    def test_abort_flow_marks_flow_status_aborted(self, mock_store, mock_git):
+        """Test abort_flow sets flow_status to aborted."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        service.abort_flow(
+            branch="task/issue-123",
+            reason="Task no longer needed",
+            actor="agent:manager",
+        )
+
+        mock_store.update_flow_state.assert_called_once()
+        args, kwargs = mock_store.update_flow_state.call_args
+        assert kwargs["flow_status"] == "aborted"
+
+    def test_abort_flow_records_flow_aborted_event(self, mock_store, mock_git):
+        """Test abort_flow records flow_aborted event."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        service.abort_flow(
+            branch="task/issue-456",
+            reason="Invalid task",
+            actor="agent:manager",
+        )
+
+        mock_store.add_event.assert_called_once()
+        args, kwargs = mock_store.add_event.call_args
+        assert args[0] == "task/issue-456"
+        assert args[1] == "flow_aborted"
+        assert args[2] == "agent:manager"
+        assert "Invalid task" in args[3]
+
+    def test_aborted_flow_can_be_reactivated_later(self, mock_store, mock_git):
+        """Test aborted flow can be reactivated."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        # Mock an aborted flow with flow_slug
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-789",
+            "flow_status": "aborted",
+            "flow_slug": "issue-789",
+        }
+
+        # Reactivate should work
+        service.reactivate_flow("task/issue-789")
+
+        # Verify flow_status is updated to active
+        update_calls = mock_store.update_flow_state.call_args_list
+        assert len(update_calls) > 0
+        # Check the last update_flow_state call
+        last_update = update_calls[-1]
+        _, kwargs = last_update
+        assert kwargs.get("flow_status") == "active"
