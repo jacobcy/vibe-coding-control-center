@@ -224,7 +224,7 @@ class TestHandoffRecordAPIs:
 
         # Verify flow state update
         mock_store.update_flow_state.assert_called_with(
-            "feature/test-branch", plan_ref=plan_ref
+            "feature/test-branch", plan_ref=plan_ref, next_step="Implement core logic"
         )
 
     def test_record_report_persists_report_ref_and_update_block(
@@ -251,7 +251,10 @@ class TestHandoffRecordAPIs:
 
         # Verify flow state update
         mock_store.update_flow_state.assert_called_with(
-            "feature/test-branch", report_ref=report_ref
+            "feature/test-branch",
+            report_ref=report_ref,
+            next_step="Review findings",
+            blocked_by="Missing data",
         )
 
     def test_record_audit_persists_audit_ref_and_update_block(
@@ -277,5 +280,5 @@ class TestHandoffRecordAPIs:
 
         # Verify flow state update
         mock_store.update_flow_state.assert_called_with(
-            "feature/test-branch", audit_ref=audit_ref
+            "feature/test-branch", audit_ref=audit_ref, next_step="Finalize PR"
         )
