@@ -112,6 +112,9 @@ code_limits:
       - path: "tests/vibe3/services/test_issue_failure_service.py"
         limit: 420
         reason: "Issue failure/resume 测试集，围绕同一服务契约，拆分收益低"
+      - path: "tests/vibe3/commands/test_task_resume_failed.py"
+        limit: 430
+        reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
       - path: "tests/vibe3/commands/test_run_manager_issue.py"
         limit: 500
         reason: "manager issue 模式回归矩阵集中在单入口，拆分会削弱可读性"
