@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from typing import Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,7 +27,9 @@ def _issue_payload(
 
 
 @pytest.fixture
-def manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
+def manager_service() -> (
+    Generator[tuple[StateLabelDispatchService, MagicMock], None, None]
+):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
     svc = StateLabelDispatchService(
@@ -47,7 +50,9 @@ def manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
 
 
 @pytest.fixture
-def handoff_manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
+def handoff_manager_service() -> (
+    Generator[tuple[StateLabelDispatchService, MagicMock], None, None]
+):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
     svc = StateLabelDispatchService(

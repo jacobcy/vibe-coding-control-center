@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,7 +38,7 @@ def _event() -> GitHubEvent:
 
 
 @pytest.fixture
-def service() -> tuple[StateLabelDispatchService, MagicMock]:
+def service() -> Generator[tuple[StateLabelDispatchService, MagicMock], None, None]:
     manager = MagicMock()
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
     executor = ThreadPoolExecutor(max_workers=2)
@@ -63,7 +64,9 @@ def service() -> tuple[StateLabelDispatchService, MagicMock]:
 
 
 @pytest.fixture
-def manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
+def manager_service() -> (
+    Generator[tuple[StateLabelDispatchService, MagicMock], None, None]
+):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
     svc = StateLabelDispatchService(
