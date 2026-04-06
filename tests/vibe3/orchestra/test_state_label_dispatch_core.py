@@ -114,6 +114,28 @@ async def test_on_tick_dispatches_matching_state(
 
 
 @pytest.mark.asyncio
+async def test_on_tick_appends_dispatcher_events(
+    service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, _ = service
+    svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    assert any("tick ready issues" in message for _, message in events)
+    assert any("dispatching #42" in message for _, message in events)
+
+
+@pytest.mark.asyncio
 async def test_on_tick_skips_when_plan_ref_already_exists(
     service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:

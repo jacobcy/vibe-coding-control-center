@@ -23,6 +23,8 @@ from vibe3.server.app import (
 from vibe3.server.registry import (
     _build_async_serve_command,
     _build_server,
+    _resolve_dispatcher_models_root,
+    _resolve_orchestra_log_dir,
     _resolve_orchestra_repo_root,
     _setup_tailscale_webhook,
     _validate_pid_file,
@@ -63,6 +65,31 @@ def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent(monkeypatch) 
     )
 
     assert _resolve_orchestra_repo_root() == Path("/repo")
+
+
+def test_resolve_dispatcher_models_root_prefers_main_repo_when_not_debug(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_repo_root",
+        lambda: Path("/main-repo"),
+    )
+
+    assert _resolve_dispatcher_models_root(
+        OrchestraConfig(debug=False),
+        launch_cwd=Path("/debug-wt"),
+    ) == Path("/main-repo")
+
+
+def test_resolve_dispatcher_models_root_uses_launch_cwd_in_debug() -> None:
+    assert _resolve_dispatcher_models_root(
+        OrchestraConfig(debug=True),
+        launch_cwd=Path("/debug-wt"),
+    ) == Path("/debug-wt")
+
+
+def test_resolve_orchestra_log_dir_uses_launch_cwd() -> None:
+    assert _resolve_orchestra_log_dir(Path("/debug-wt")) == Path("/debug-wt/temp/logs")
 
 
 def test_build_server_governance_disabled() -> None:
@@ -167,6 +194,26 @@ def test_build_async_command_uses_config_port_and_skips_repo_when_none() -> None
     assert "--interval" in cmd
     assert "75" in cmd
     assert "--repo" not in cmd
+
+
+def test_build_async_command_exports_models_root_and_log_dir(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_dispatcher_models_root",
+        lambda _config, launch_cwd: Path("/main-repo"),
+    )
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_log_dir",
+        lambda launch_cwd: Path("/debug-wt/temp/logs"),
+    )
+
+    cmd = _build_async_serve_command(
+        OrchestraConfig(enabled=True, polling_interval=75, port=9090),
+        verbose=0,
+        launch_cwd=Path("/debug-wt"),
+    )
+
+    assert "VIBE3_REPO_MODELS_ROOT=/main-repo" in cmd
+    assert "VIBE3_ASYNC_LOG_DIR=/debug-wt/temp/logs" in cmd
 
 
 def test_build_async_command_includes_debug_flag() -> None:

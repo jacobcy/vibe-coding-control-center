@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import signal
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -22,6 +23,8 @@ from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
     _build_server,
+    _resolve_dispatcher_models_root,
+    _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
     _start_async_serve,
     _validate_pid_file,
@@ -294,6 +297,10 @@ def start(
 
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
+        os.environ["VIBE3_REPO_MODELS_ROOT"] = str(
+            _resolve_dispatcher_models_root(config, Path.cwd())
+        )
+        os.environ["VIBE3_ASYNC_LOG_DIR"] = str(_resolve_orchestra_log_dir(Path.cwd()))
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")

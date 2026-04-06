@@ -135,8 +135,8 @@ def test_blocked_resume_does_not_affect_failed_resume_path() -> None:
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_handoff"
-        ) as mock_to_handoff,
+            task_resume_usecase, "resume_failed_issue_to_ready"
+        ) as mock_failed_to_ready,
         patch.object(
             task_resume_usecase, "resume_blocked_issue_to_ready"
         ) as mock_blocked_to_ready,
@@ -146,7 +146,7 @@ def test_blocked_resume_does_not_affect_failed_resume_path() -> None:
         mock_label_instance = MagicMock()
         mock_label_service.return_value = mock_label_instance
 
-        def mock_get_state(issue_num: int) -> IssueState:
+        def mock_get_state(issue_num: int) -> IssueState | None:
             if issue_num == 439:
                 return IssueState.FAILED
             elif issue_num == 301:
@@ -159,8 +159,8 @@ def test_blocked_resume_does_not_affect_failed_resume_path() -> None:
         result = usecase.resume_issues(reason="manual recovery", dry_run=False)
 
         # failed 恢复路径应正常工作
-        mock_to_handoff.assert_called_once()
-        assert mock_to_handoff.call_args[1]["issue_number"] == 439
+        mock_failed_to_ready.assert_called_once()
+        assert mock_failed_to_ready.call_args[1]["issue_number"] == 439
 
         # blocked 恢复路径应正常工作
         mock_blocked_to_ready.assert_called_once()

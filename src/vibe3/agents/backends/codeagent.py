@@ -1,3 +1,4 @@
+import os
 import re
 import shlex
 import subprocess
@@ -184,12 +185,15 @@ class CodeagentBackend:
 
     @staticmethod
     def _default_log_dir() -> Path:
+        override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
+        if override_dir:
+            return Path(override_dir).expanduser().resolve()
         return Path(__file__).resolve().parents[4] / "temp" / "logs"
 
     @classmethod
     def _resolve_async_log_path(cls, log_dir: Path, execution_name: str) -> Path:
         issue_match = re.match(
-            r"^vibe3-(manager|planner|executor|reviewer|supervisor)(?:-[^-]+)?-(?:task|dev)-issue-(\d+)(?:-(\d+))?$",
+            r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
             execution_name,
         )
         if issue_match:
@@ -200,19 +204,10 @@ class CodeagentBackend:
                 "executor": "run",
                 "reviewer": "review",
                 "supervisor": "supervisor",
+                "plan": "plan",
+                "run": "run",
+                "review": "review",
             }[role]
-            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
-            return (
-                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
-            )
-
-        manager_issue_match = re.match(
-            r"^vibe3-(manager|supervisor)(?:-[^-]+)?-issue-(\d+)(?:-(\d+))?$",
-            execution_name,
-        )
-        if manager_issue_match:
-            role, issue_number, suffix = manager_issue_match.groups()
-            role_name = "manager" if role == "manager" else "supervisor"
             file_name = role_name if suffix is None else f"{role_name}-{suffix}"
             return (
                 log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"

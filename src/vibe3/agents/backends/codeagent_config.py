@@ -5,6 +5,7 @@ backend/model settings to ``~/.codeagent/models.json``.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Final
 
@@ -17,6 +18,14 @@ MODELS_JSON_PATH: Final[Path] = Path.home() / ".codeagent" / "models.json"
 REPO_MODELS_JSON_PATH: Final[Path] = (
     Path(__file__).resolve().parents[4] / "config" / "models.json"
 )
+
+
+def repo_models_json_path() -> Path:
+    """Resolve repo-local models.json with optional orchestra root override."""
+    override_root = os.environ.get("VIBE3_REPO_MODELS_ROOT", "").strip()
+    if override_root:
+        return Path(override_root).expanduser().resolve() / "config" / "models.json"
+    return REPO_MODELS_JSON_PATH
 
 
 def _read_models_json(path: Path) -> dict[str, Any]:
@@ -41,7 +50,7 @@ def resolve_repo_agent_preset(
     Returns:
         (backend, model) when repo-local mapping exists, otherwise None.
     """
-    data = _read_models_json(REPO_MODELS_JSON_PATH)
+    data = _read_models_json(repo_models_json_path())
     agents = data.get("agents")
     if not isinstance(agents, dict):
         return None

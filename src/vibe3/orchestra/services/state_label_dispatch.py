@@ -28,6 +28,7 @@ from vibe3.models.orchestration import (
 )
 from vibe3.models.review_runner import AgentOptions
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.no_progress_policy import (
     execute_state_fallback,
     has_progress_changed,
@@ -116,6 +117,11 @@ class StateLabelDispatchService(ServiceBase):
 
             self._prune_in_flight(raw_issues)
             ready = self._select_ready_issues(raw_issues)
+            ready_numbers = ", ".join(f"#{issue.number}" for issue in ready) or "(none)"
+            append_orchestra_event(
+                "dispatcher",
+                f"{self.service_name} tick ready issues: {ready_numbers}",
+            )
 
         # Apply capacity limit for manager trigger
         if self.trigger_name == "manager" and ready:
@@ -167,12 +173,20 @@ class StateLabelDispatchService(ServiceBase):
                 continue
             self._in_flight_dispatches.add(issue.number)
             try:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} dispatching #{issue.number}",
+                )
                 await asyncio.get_event_loop().run_in_executor(
                     self._executor,
                     self._dispatch_issue,
                     issue,
                 )
             except Exception as exc:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} dispatch failed for #{issue.number}: {exc}",
+                )
                 logger.bind(
                     domain="orchestra",
                     trigger=self.trigger_name,
@@ -419,6 +433,13 @@ class StateLabelDispatchService(ServiceBase):
                 f"from {self.trigger_state.to_label()}"
             ),
             refs=refs,
+        )
+        append_orchestra_event(
+            "dispatcher",
+            (
+                f"{self.service_name} started #{issue.number} "
+                f"(session={handle.tmux_session}, log={handle.log_path})"
+            ),
         )
 
     def _resolve_cwd(self, issue_number: int, branch: str) -> Path:

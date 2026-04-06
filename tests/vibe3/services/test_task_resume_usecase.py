@@ -42,12 +42,9 @@ def test_resume_issues_dry_run_reports_failed_and_blocked_candidates_without_mut
         assert result["resumed"] == []
         assert result["skipped"] == []
 
-        # 不应调用 resume 函数
-        # (这些函数不在 usecase 中，而是通过 service module 调用)
-
 
 def test_resume_issues_apply_routes_failed_by_plan_ref_and_blocked_to_ready() -> None:
-    """resume_kind == failed 时按 plan_ref 路由，blocked 时固定到 ready。"""
+    """failed/blocked 恢复都会清理 task worktree 并回到 ready。"""
     mock_status_service = MagicMock()
     mock_status_service.fetch_resume_candidates.return_value = [
         {
@@ -55,21 +52,23 @@ def test_resume_issues_apply_routes_failed_by_plan_ref_and_blocked_to_ready() ->
             "title": "Manager backend regression",
             "state": IssueState.FAILED,
             "resume_kind": "failed",
-            "flow": MagicMock(plan_ref="docs/plans/issue-439.md"),
+            "flow": MagicMock(
+                plan_ref="docs/plans/issue-439.md", branch="task/issue-439"
+            ),
         },
         {
             "number": 441,
             "title": "API timeout",
             "state": IssueState.FAILED,
             "resume_kind": "failed",
-            "flow": MagicMock(plan_ref=None),
+            "flow": MagicMock(plan_ref=None, branch="task/issue-441"),
         },
         {
             "number": 301,
             "title": "Dependency available",
             "state": IssueState.BLOCKED,
             "resume_kind": "blocked",
-            "flow": MagicMock(plan_ref=None),
+            "flow": MagicMock(plan_ref=None, branch="task/issue-301"),
         },
     ]
 
@@ -78,15 +77,14 @@ def test_resume_issues_apply_routes_failed_by_plan_ref_and_blocked_to_ready() ->
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_handoff"
-        ) as mock_to_handoff,
-        patch.object(
             task_resume_usecase, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(
             task_resume_usecase, "resume_blocked_issue_to_ready"
         ) as mock_blocked_to_ready,
         patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
     ):
         # Mock label service to verify state matches resume_kind
         mock_label_instance = MagicMock()
@@ -97,22 +95,40 @@ def test_resume_issues_apply_routes_failed_by_plan_ref_and_blocked_to_ready() ->
             441: IssueState.FAILED,
             301: IssueState.BLOCKED,
         }.get(num)
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.side_effect = [
+            "/tmp/issue-439",
+            "/tmp/issue-441",
+            "/tmp/issue-301",
+        ]
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
 
         usecase = task_resume_usecase.TaskResumeUsecase()
         result = usecase.resume_issues(dry_run=False)
 
-        # 应调用正确的恢复函数
-        # 439: failed + plan_ref -> handoff
-        mock_to_handoff.assert_called_once()
-        assert mock_to_handoff.call_args[1]["issue_number"] == 439
-
-        # 441: failed + no plan_ref -> ready
-        mock_failed_to_ready.assert_called_once()
-        assert mock_failed_to_ready.call_args[1]["issue_number"] == 441
+        # failed 无论有无 plan_ref 都回到 ready
+        assert mock_failed_to_ready.call_count == 2
+        failed_calls = [
+            call.kwargs["issue_number"] for call in mock_failed_to_ready.call_args_list
+        ]
+        assert failed_calls == [439, 441]
 
         # 301: blocked -> ready
         mock_blocked_to_ready.assert_called_once()
         assert mock_blocked_to_ready.call_args[1]["issue_number"] == 301
+
+        # task worktree 应被删除，flow 应被重新激活清空 refs/session
+        assert mock_git_instance.remove_worktree.call_count == 3
+        reactivated = [
+            call.args[0] for call in mock_flow_instance.reactivate_flow.call_args_list
+        ]
+        assert reactivated == [
+            mock_status_service.fetch_resume_candidates.return_value[0]["flow"].branch,
+            mock_status_service.fetch_resume_candidates.return_value[1]["flow"].branch,
+            mock_status_service.fetch_resume_candidates.return_value[2]["flow"].branch,
+        ]
 
         # 结果应包含恢复的 issue
         assert len(result["resumed"]) == 3
@@ -139,8 +155,8 @@ def test_resume_issues_skips_issue_when_current_state_no_longer_matches_resume_k
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_handoff"
-        ) as mock_to_handoff,
+            task_resume_usecase, "resume_failed_issue_to_ready"
+        ) as mock_failed_to_ready,
         patch.object(task_resume_usecase, "LabelService") as mock_label_service,
     ):
         # Mock label service to return mismatched state
@@ -153,7 +169,7 @@ def test_resume_issues_skips_issue_when_current_state_no_longer_matches_resume_k
         result = usecase.resume_issues(dry_run=False)
 
         # 不应调用 resume 函数
-        mock_to_handoff.assert_not_called()
+        mock_failed_to_ready.assert_not_called()
 
         # 应被跳过
         assert len(result["skipped"]) == 1
@@ -161,3 +177,105 @@ def test_resume_issues_skips_issue_when_current_state_no_longer_matches_resume_k
         # skipped reason 要明确说明是"不再处于 failed/blocked 状态"
         assert "不再处于" in result["skipped"][0]["reason"]
         assert result["resumed"] == []
+
+
+def test_resume_issues_with_empty_issue_list_does_not_fall_back_to_all_candidates() -> (
+    None
+):
+    """显式传入空 issue 列表时，不应退化成恢复所有候选。"""
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_resume_candidates.return_value = [
+        {
+            "number": 301,
+            "title": "Dependency available",
+            "state": IssueState.BLOCKED,
+            "resume_kind": "blocked",
+            "flow": MagicMock(branch="task/issue-301"),
+        },
+    ]
+
+    with patch.object(
+        task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+    ):
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        result = usecase.resume_issues(issue_numbers=[], dry_run=True)
+
+        assert result["candidates"] == []
+        assert result["requested"] == []
+        assert result["resumed"] == []
+        assert result["skipped"] == []
+
+
+def test_resume_issues_all_task_mode_resets_any_task_issue_to_ready() -> None:
+    """--all 模式会重置所有 task/issue-* flow 到 ready，但不处理 do 分支。"""
+    flow_340 = MagicMock(branch="task/issue-340", task_issue_number=340)
+    flow_410 = MagicMock(branch="task/issue-410", task_issue_number=410)
+    flow_do = MagicMock(branch="do/20260406-32b564", task_issue_number=None)
+
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 340,
+            "title": "Reset claimed flow",
+            "state": IssueState.CLAIMED,
+            "flow": flow_340,
+        },
+        {
+            "number": 410,
+            "title": "Reset failed flow",
+            "state": IssueState.FAILED,
+            "flow": flow_410,
+        },
+        {
+            "number": 999,
+            "title": "Ignore do flow",
+            "state": IssueState.IN_PROGRESS,
+            "flow": flow_do,
+        },
+    ]
+
+    with (
+        patch.object(
+            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+        ),
+        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
+        patch.object(task_resume_usecase, "GitHubClient") as mock_github_client,
+    ):
+        mock_label_instance = MagicMock()
+        mock_label_service.return_value = mock_label_instance
+        mock_label_instance.get_state.side_effect = lambda num: {
+            340: IssueState.CLAIMED,
+            410: IssueState.FAILED,
+        }.get(num)
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.side_effect = [
+            "/tmp/issue-340",
+            "/tmp/issue-410",
+        ]
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
+        mock_github_instance = MagicMock()
+        mock_github_client.return_value = mock_github_instance
+
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        result = usecase.resume_issues(
+            dry_run=False,
+            candidate_mode="all_task",
+            flows=[flow_340, flow_410, flow_do],
+        )
+
+        assert [item["number"] for item in result["resumed"]] == [340, 410]
+        assert result["requested"] == [340, 410]
+        assert mock_git_instance.remove_worktree.call_count == 2
+        reactivated = [
+            call.args[0] for call in mock_flow_instance.reactivate_flow.call_args_list
+        ]
+        assert reactivated == ["task/issue-340", "task/issue-410"]
+        confirmed = [
+            call.args[1]
+            for call in mock_label_instance.confirm_issue_state.call_args_list
+        ]
+        assert confirmed == [IssueState.READY, IssueState.READY]

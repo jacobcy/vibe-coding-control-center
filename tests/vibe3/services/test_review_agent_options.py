@@ -11,6 +11,39 @@ from vibe3.agents.review_runner import sync_models_json
 from vibe3.models.review_runner import AgentOptions
 
 
+def test_agent_preset_uses_models_root_env_override(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Dispatcher should be able to pin models lookup to a control repo root."""
+    control_root = tmp_path / "main"
+    models_path = control_root / "config" / "models.json"
+    models_path.parent.mkdir(parents=True)
+    models_path.write_text(
+        json.dumps(
+            {
+                "agents": {
+                    "code-reviewer": {
+                        "backend": "claude",
+                        "model": "claude-sonnet-4-6",
+                    }
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("VIBE3_REPO_MODELS_ROOT", str(control_root))
+
+    with patch(
+        "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH",
+        tmp_path / ".codeagent-models.json",
+    ):
+        sync_models_json(AgentOptions(agent="code-reviewer"))
+
+    synced = json.loads((tmp_path / ".codeagent-models.json").read_text())
+    assert synced["default_backend"] == "claude"
+    assert synced["default_model"] == "claude-sonnet-4-6"
+
+
 class TestAgentOptions:
     """Tests for AgentOptions dataclass - immutable configuration."""
 

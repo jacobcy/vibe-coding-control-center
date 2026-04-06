@@ -18,6 +18,23 @@ from vibe3.models.review_runner import (
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
 
+    def test_default_log_dir_uses_env_override(self, monkeypatch) -> None:
+        """Async log dir should honor orchestra-provided override."""
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", "/tmp/orchestra-logs")
+
+        assert (
+            CodeagentBackend._default_log_dir() == Path("/tmp/orchestra-logs").resolve()
+        )
+
+    def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
+        """Plan issue async logs should live under temp/logs/issues/issue-N."""
+        log_path = CodeagentBackend._resolve_async_log_path(
+            Path("/tmp/logs"),
+            "vibe3-plan-issue-419",
+        )
+
+        assert log_path == Path("/tmp/logs/issues/issue-419/plan.async.log")
+
     def test_run_uses_repo_models_mapping_for_agent_preset(
         self, tmp_path: Path
     ) -> None:
