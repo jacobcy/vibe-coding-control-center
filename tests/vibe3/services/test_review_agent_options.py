@@ -54,7 +54,7 @@ class TestAgentOptions:
         assert options.model is None
         assert options.backend is None
         assert options.worktree is False
-        assert options.timeout_seconds == 600
+        assert options.timeout_seconds == 1800
 
     def test_custom_options_with_agent(self) -> None:
         """Agent preset mode: model and backend are None."""
@@ -102,12 +102,19 @@ class TestResolveAgentOptions:
         cfg = MagicMock(spec=VibeConfig)
         section_cfg = MagicMock()
         section_cfg.agent_config = AgentConfig(
-            agent=agent, backend=backend, model=model
+            agent=agent,
+            backend=backend,
+            model=model,
         )
         cfg.run = section_cfg
         cfg.plan = section_cfg
         cfg.review = section_cfg
         return CodeagentExecutionService(config=cfg)
+
+    def test_timeout_inherited_from_config(self) -> None:
+        svc = self._make_service(agent="code-reviewer")
+        opts = svc.resolve_agent_options("run")
+        assert opts.timeout_seconds == 1800
 
     def test_cli_agent_wins_over_all(self) -> None:
         """CLI --agent has highest priority; model is irrelevant."""

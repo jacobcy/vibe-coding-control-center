@@ -189,6 +189,8 @@ class ManagerExecutor:
             cmd = [
                 "uv",
                 "run",
+                "--project",
+                str(self.repo_path),
                 "python",
                 "-I",
                 str(self._resolve_cli_entry()),

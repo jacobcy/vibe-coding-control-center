@@ -282,6 +282,7 @@ review:
     # - model 只有在 backend 已配置时才有意义
     backend: "claude"  # e.g., "claude", "opencode", "gemini"
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements (VERDICT contract)
   output_format: |
@@ -331,6 +332,7 @@ plan:
     # - model 只有在 backend 已配置时才有意义
     backend: "codex"  # e.g., "claude", "opencode", "gemini"
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements
   output_format: |
@@ -385,6 +387,7 @@ run:
     # - model 只有在 backend 已配置时才有意义
     backend: "opencode"  # e.g., "claude", "opencode", "gemini"
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements
   output_format: |

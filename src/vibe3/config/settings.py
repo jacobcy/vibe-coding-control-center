@@ -133,6 +133,7 @@ class AgentConfig(BaseModel):
     agent: str | None = Field(default=None)
     backend: str | None = Field(default=None)
     model: str | None = Field(default=None)
+    timeout_seconds: int = Field(default=1800, ge=1)
 
 
 class ReviewConfig(BaseModel):

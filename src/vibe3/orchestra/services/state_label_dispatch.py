@@ -35,11 +35,29 @@ from vibe3.orchestra.no_progress_policy import (
     snapshot_progress,
 )
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.status_service import OrchestraStatusService
 
 TriggerName = Literal["manager", "plan", "run", "review"]
+
+_TRIGGER_STATUS_FIELD: dict[TriggerName, str | None] = {
+    "manager": None,
+    "plan": "planner_status",
+    "run": "executor_status",
+    "review": "reviewer_status",
+}
+
+_TRIGGER_EXECUTION_ROLE: dict[
+    TriggerName,
+    Literal["planner", "executor", "reviewer"] | None,
+] = {
+    "manager": None,
+    "plan": "planner",
+    "run": "executor",
+    "review": "reviewer",
+}
 
 
 def _normalize_labels(raw_labels: object) -> list[str]:
@@ -61,6 +79,11 @@ def _is_auto_task_branch(branch: str) -> bool:
 def _current_cli_entry() -> str:
     """Return the canonical CLI entry from the current baseline worktree."""
     return str(Path(__file__).resolve().parents[4] / "src" / "vibe3" / "cli.py")
+
+
+def _current_repo_root() -> str:
+    """Return the canonical repository root for uv project resolution."""
+    return str(Path(__file__).resolve().parents[4])
 
 
 class StateLabelDispatchService(ServiceBase):
@@ -336,7 +359,7 @@ class StateLabelDispatchService(ServiceBase):
                         continue
                     if not flow_state:
                         continue
-                    if not self._should_dispatch_from_state(flow_state):
+                    if not self._should_dispatch_from_state(issue.number, flow_state):
                         continue
                 # For state/ready: no flow check required (manager can start fresh)
                 selected.append(issue)
@@ -350,12 +373,20 @@ class StateLabelDispatchService(ServiceBase):
             flow_state = self._store.get_flow_state(branch) if branch else None
             if not flow_state:
                 continue
-            if not self._should_dispatch_from_state(flow_state):
+            if not self._should_dispatch_from_state(issue.number, flow_state):
                 continue
             selected.append(issue)
         return selected
 
-    def _should_dispatch_from_state(self, flow_state: dict[str, object]) -> bool:
+    def _should_dispatch_from_state(
+        self,
+        issue_number: int,
+        flow_state: dict[str, object],
+    ) -> bool:
+        status_field = _TRIGGER_STATUS_FIELD[self.trigger_name]
+        is_running = bool(status_field and flow_state.get(status_field) == "running")
+        has_live_session = is_running and self._has_live_dispatch(issue_number)
+
         if self.trigger_name == "manager":
             # For state/ready: dispatch if no manager session
             # For state/handoff: dispatch if no manager session.
@@ -363,19 +394,23 @@ class StateLabelDispatchService(ServiceBase):
             # (e.g. after a no-op fallback from planner/executor).
             return not flow_state.get("manager_session_id")
         if self.trigger_name == "plan":
-            return not flow_state.get("plan_ref") and not flow_state.get(
-                "planner_session_id"
+            return (
+                not flow_state.get("plan_ref")
+                and not flow_state.get("planner_session_id")
+                and not has_live_session
             )
         if self.trigger_name == "run":
             return (
                 bool(flow_state.get("plan_ref"))
                 and not flow_state.get("report_ref")
                 and not flow_state.get("executor_session_id")
+                and not has_live_session
             )
         return (
             bool(flow_state.get("report_ref"))
             and not flow_state.get("audit_ref")
             and not flow_state.get("reviewer_session_id")
+            and not has_live_session
         )
 
     def _dispatch_issue(self, issue: IssueInfo) -> None:
@@ -396,6 +431,11 @@ class StateLabelDispatchService(ServiceBase):
             if not dispatched:
                 self._in_flight_dispatches.discard(issue.number)
                 self._progress_snapshots.pop(issue.number, None)
+            else:
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} started #{issue.number}",
+                )
             return
 
         if not flow:
@@ -420,20 +460,35 @@ class StateLabelDispatchService(ServiceBase):
             "log_path": str(handle.log_path),
             "state": self.trigger_state.value,
         }
-        updates: dict[str, object] = {
-            "latest_actor": format_agent_actor(self._resolve_agent_options()),
-        }
-        self._store.update_flow_state(branch, **updates)
-        self._store.add_event(
-            branch,
-            f"{self.trigger_name}_dispatched",
-            "orchestra:state-trigger",
-            detail=(
-                f"Triggered {self.trigger_name} for issue #{issue.number} "
-                f"from {self.trigger_state.to_label()}"
-            ),
-            refs=refs,
-        )
+        actor = format_agent_actor(self._resolve_agent_options())
+        execution_role = _TRIGGER_EXECUTION_ROLE[self.trigger_name]
+        if execution_role is not None:
+            persist_execution_lifecycle_event(
+                self._store,
+                branch,
+                execution_role,
+                "started",
+                actor,
+                detail=(
+                    f"Started async {self.trigger_name} for issue #{issue.number} "
+                    f"in tmux session: {handle.tmux_session}"
+                ),
+                refs=refs,
+                extra_state_updates={"latest_actor": actor},
+            )
+        else:
+            self._store.update_flow_state(branch, latest_actor=actor)
+        if execution_role is None:
+            self._store.add_event(
+                branch,
+                f"{self.trigger_name}_dispatched",
+                "orchestra:state-trigger",
+                detail=(
+                    f"Triggered {self.trigger_name} for issue #{issue.number} "
+                    f"from {self.trigger_state.to_label()}"
+                ),
+                refs=refs,
+            )
         append_orchestra_event(
             "dispatcher",
             (
@@ -458,6 +513,8 @@ class StateLabelDispatchService(ServiceBase):
             return [
                 "uv",
                 "run",
+                "--project",
+                _current_repo_root(),
                 "python",
                 "-I",
                 cli_entry,
@@ -470,6 +527,8 @@ class StateLabelDispatchService(ServiceBase):
             return [
                 "uv",
                 "run",
+                "--project",
+                _current_repo_root(),
                 "python",
                 "-I",
                 cli_entry,
@@ -482,6 +541,8 @@ class StateLabelDispatchService(ServiceBase):
             return [
                 "uv",
                 "run",
+                "--project",
+                _current_repo_root(),
                 "python",
                 "-I",
                 cli_entry,
@@ -491,6 +552,8 @@ class StateLabelDispatchService(ServiceBase):
         return [
             "uv",
             "run",
+            "--project",
+            _current_repo_root(),
             "python",
             "-I",
             cli_entry,
