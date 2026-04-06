@@ -116,9 +116,40 @@ class TaskResumeUsecase:
         for candidate in candidates:
             issue_number = candidate.get("number")
             resume_kind = candidate.get("resume_kind")
+            flow = cast("FlowStatusResponse | None", candidate.get("flow"))
+            branch = getattr(flow, "branch", None) if flow else None
+            worktree_path: str | None = None
 
             if not isinstance(issue_number, int) or not isinstance(resume_kind, str):
                 continue
+
+            logger.bind(
+                domain="resume",
+                action="candidate",
+                issue_number=issue_number,
+                resume_kind=resume_kind,
+                branch=branch,
+            ).info("Processing resume candidate")
+
+            if resume_kind == "all":
+                if isinstance(branch, str):
+                    resolved_path = self.git_client.find_worktree_path_for_branch(
+                        branch
+                    )
+                    worktree_path = (
+                        str(resolved_path) if resolved_path is not None else None
+                    )
+                skip_reason = self._maybe_skip_all_task_candidate(
+                    issue_number=issue_number,
+                    flow=flow,
+                    candidate_state=candidate.get("state"),
+                    worktree_path=worktree_path,
+                )
+                if skip_reason is not None:
+                    result["skipped"].append(
+                        {"number": issue_number, "reason": skip_reason}
+                    )
+                    continue
 
             # Defensive check: verify current state matches resume_kind
             if not self._verify_issue_state_for_resume(issue_number, resume_kind, repo):
@@ -132,13 +163,13 @@ class TaskResumeUsecase:
 
             try:
                 if resume_kind in {"failed", "blocked", "all"}:
-                    flow = cast("FlowStatusResponse | None", candidate.get("flow"))
                     self._reset_issue_to_ready(
                         issue_number=issue_number,
                         resume_kind=resume_kind,
                         flow=flow,
                         repo=repo,
                         reason=reason,
+                        worktree_path=worktree_path,
                     )
 
                 elif resume_kind == "aborted":
@@ -157,6 +188,31 @@ class TaskResumeUsecase:
                 )
 
         return result
+
+    def _maybe_skip_all_task_candidate(
+        self,
+        *,
+        issue_number: int,
+        flow: FlowStatusResponse | None,
+        candidate_state: object,
+        worktree_path: str | None,
+    ) -> str | None:
+        """Skip noop all-task candidates that no longer have a task scene to reset."""
+        branch = getattr(flow, "branch", None) if flow else None
+        if not isinstance(branch, str):
+            return None
+
+        if candidate_state == IssueState.READY and worktree_path is None:
+            logger.bind(
+                domain="resume",
+                action="skip_noop_all_task",
+                issue_number=issue_number,
+                branch=branch,
+                worktree_path=None,
+                state="ready",
+            ).info("Skipping ready candidate without task scene")
+            return "已是 state/ready 且无 task scene，跳过恢复"
+        return None
 
     def _verify_issue_state_for_resume(
         self, issue_number: int, resume_kind: str, repo: str | None
@@ -265,6 +321,7 @@ class TaskResumeUsecase:
         flow: FlowStatusResponse | None,
         repo: str | None,
         reason: str,
+        worktree_path: str | None = None,
     ) -> None:
         """Reset an issue to ready after clearing stale task scene state."""
         branch = getattr(flow, "branch", None) if flow else None
@@ -292,7 +349,7 @@ class TaskResumeUsecase:
 
         if isinstance(branch, str):
             try:
-                self._reset_task_scene(branch)
+                self._reset_task_scene(branch, worktree_path=worktree_path)
             except Exception as exc:
                 self._restore_issue_state(
                     issue_number=issue_number,
@@ -309,14 +366,23 @@ class TaskResumeUsecase:
                 reason=reason,
             )
 
-    def _reset_task_scene(self, branch: str) -> None:
+    def _reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
         """Delete stale task worktree and clear flow runtime state."""
         if not self.issue_flow_service.is_task_branch(branch):
             return
 
-        worktree_path = self.git_client.find_worktree_path_for_branch(branch)
-        if worktree_path is not None:
-            self.git_client.remove_worktree(worktree_path, force=True)
+        resolved_path = worktree_path
+        if resolved_path is None:
+            found_path = self.git_client.find_worktree_path_for_branch(branch)
+            resolved_path = str(found_path) if found_path is not None else None
+        logger.bind(
+            domain="resume",
+            action="reset_task_scene",
+            branch=branch,
+            worktree_path=resolved_path,
+        ).info("Resetting task scene")
+        if resolved_path is not None:
+            self.git_client.remove_worktree(resolved_path, force=True)
         self.flow_service.reactivate_flow(branch)
 
     def _restore_issue_state(

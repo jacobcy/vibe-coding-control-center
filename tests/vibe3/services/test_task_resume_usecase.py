@@ -442,3 +442,53 @@ def test_resume_issues_all_task_mode_resets_scene_without_state_label() -> None:
             "/tmp/issue-409", force=True
         )
         mock_flow_instance.reactivate_flow.assert_called_once_with("task/issue-409")
+
+
+def test_resume_issues_all_task_mode_skips_ready_scene_without_worktree() -> None:
+    """--all 遇到已是 ready 且无 worktree 的 scene 应直接跳过。"""
+    flow_415 = MagicMock(branch="task/issue-415", task_issue_number=415)
+
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 415,
+            "title": "Already ready without task scene",
+            "state": IssueState.READY,
+            "flow": flow_415,
+        }
+    ]
+
+    with (
+        patch.object(
+            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+        ),
+        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
+        patch.object(task_resume_usecase, "GitHubClient") as mock_github_client,
+    ):
+        mock_label_instance = MagicMock()
+        mock_label_service.return_value = mock_label_instance
+        mock_label_instance.get_state.return_value = IssueState.READY
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.return_value = None
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
+        mock_github_instance = MagicMock()
+        mock_github_client.return_value = mock_github_instance
+
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        result = usecase.resume_issues(
+            dry_run=False,
+            candidate_mode="all_task",
+            flows=[flow_415],
+            reason="",
+        )
+
+        assert result["resumed"] == []
+        assert result["skipped"] == [
+            {"number": 415, "reason": "已是 state/ready 且无 task scene，跳过恢复"}
+        ]
+        mock_git_instance.remove_worktree.assert_not_called()
+        mock_flow_instance.reactivate_flow.assert_not_called()

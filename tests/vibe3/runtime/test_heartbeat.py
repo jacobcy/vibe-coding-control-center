@@ -83,11 +83,16 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
     assert svc2.ticks == 1
 
 
-def test_run_separator_appends_instead_of_truncating(tmp_path: Path) -> None:
+def test_run_separator_appends_instead_of_truncating(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Run separator should append to existing events.log, not overwrite it."""
     import os
 
     from vibe3.orchestra.logging import append_orchestra_run_separator
+
+    # Clear any environment variables that might affect log directory
+    monkeypatch.delenv("VIBE3_ASYNC_LOG_DIR", raising=False)
 
     os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
     log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
