@@ -79,6 +79,9 @@ code_limits:
       - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
         limit: 550
         reason: "标签分发决策树"
+      - path: "src/vibe3/server/registry.py"
+        limit: 450
+        reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
