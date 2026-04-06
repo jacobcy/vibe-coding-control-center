@@ -109,6 +109,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
         limit: 550
         reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
+      - path: "tests/vibe3/orchestra/test_state_label_dispatch_core.py"
+        limit: 450
+        reason: "State label dispatch 服务测试集，共享 fixture，围绕同一服务契约，按功能场景组织不宜拆分"
       - path: "tests/vibe3/orchestra/test_serve.py"
         limit: 500
         reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
