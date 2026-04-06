@@ -99,8 +99,8 @@ code_limits:
         limit: 450
         reason: "Codeagent execution backend"
       - path: "src/vibe3/services/task_resume_usecase.py"
-        limit: 450
-        reason: "Task resume usecase，职责单一，方法粒度合理"
+        limit: 500
+        reason: "Task resume usecase，职责单一，方法粒度合理，主方法 resume_issues 逻辑完整不宜拆分"
 
       # 强耦合测试例外
       - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
