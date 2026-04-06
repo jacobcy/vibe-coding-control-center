@@ -17,6 +17,7 @@ from vibe3.models.pr import (
     VersionBumpResponse,
 )
 from vibe3.services.pr_review_briefing_service import PRReviewBriefingService
+from vibe3.services.pr_review_request_service import PRReviewRequestService
 from vibe3.services.pr_utils import (
     build_pr_body,
     check_upstream_conflicts,
@@ -54,6 +55,7 @@ class PRService:
             VersionService() if version_service is None else version_service
         )
         self.briefing_service = PRReviewBriefingService(self.github_client)
+        self.review_request_service = PRReviewRequestService(self.github_client)
 
     def create_draft_pr(
         self,
@@ -147,10 +149,19 @@ class PRService:
             pr.review_comments = self.github_client.list_pr_review_comments(pr.number)
         return pr
 
-    def mark_ready(self, pr_number: int, actor: str | None = None) -> PRResponse:
-        """Mark PR as ready for review."""
+    def mark_ready(
+        self,
+        pr_number: int,
+        actor: str | None = None,
+        requested_reviewers: list[str] | None = None,
+    ) -> PRResponse:
+        """Mark PR as ready for review with optional AI review request."""
         logger.bind(
-            domain="pr", action="mark_ready", pr_number=pr_number, actor=actor
+            domain="pr",
+            action="mark_ready",
+            pr_number=pr_number,
+            actor=actor,
+            requested_reviewers=requested_reviewers,
         ).info("Marking PR as ready")
 
         if not self.github_client.check_auth():
@@ -176,11 +187,23 @@ class PRService:
         if not pr.draft:
             self._sync_pr_flow_state(pr, actor=effective_actor)
             try:
-                self.briefing_service.publish_briefing(pr_number)
+                self.briefing_service.publish_briefing(
+                    pr_number, requested_reviewers=requested_reviewers
+                )
             except Exception as e:
                 logger.bind(pr_number=pr_number).warning(
                     f"Briefing update failed (PR still ready): {e}"
                 )
+            # Request AI review if specified
+            if requested_reviewers:
+                try:
+                    self.review_request_service.request_review(
+                        pr_number, requested_reviewers
+                    )
+                except Exception as e:
+                    logger.bind(pr_number=pr_number).warning(
+                        f"Review request failed (PR still ready): {e}"
+                    )
             logger.bind(pr_number=pr_number).info("PR already ready; confirmed")
             return pr
 
@@ -189,11 +212,24 @@ class PRService:
         self._sync_pr_flow_state(updated_pr, actor=effective_actor)
 
         try:
-            self.briefing_service.publish_briefing(pr_number)
+            self.briefing_service.publish_briefing(
+                pr_number, requested_reviewers=requested_reviewers
+            )
         except Exception as e:
             logger.bind(pr_number=pr_number).warning(
                 f"Briefing publication failed (PR marked ready): {e}"
             )
+
+        # Request AI review if specified
+        if requested_reviewers:
+            try:
+                self.review_request_service.request_review(
+                    pr_number, requested_reviewers
+                )
+            except Exception as e:
+                logger.bind(pr_number=pr_number).warning(
+                    f"Review request failed (PR marked ready): {e}"
+                )
 
         self.store.add_event(
             branch,

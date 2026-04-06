@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push hook - Local review gate, catch issues before push
+# pre-push hook - Local quality gate, catch issues before push
 set -euo pipefail
 
 echo "Running pre-push checks..."
@@ -111,54 +111,11 @@ else
 fi
 
 # 4. LOC checks (fast, <2s) - WARNING ONLY in pre-push
-echo "  -> LOC checks (warning only)..."
+echo "  -> Loc checks (warning only)..."
 bash scripts/hooks/check-python-loc.sh
 # Note: Script now exits 0 with warning (doesn't block push)
 bash scripts/hooks/check-shell-loc.sh
 # Note: Script now exits 0 with warning (doesn't block push)
-
-# 5. Inspect-based risk assessment (fast, <10s)
-echo "  -> Risk assessment (inspect)..."
-echo "  Review scope: $REVIEW_SCOPE_SUMMARY"
-INSPECT_JSON=$(uv run python src/vibe3/cli.py inspect base "$REVIEW_BASE" --json) || {
-    echo "ERROR: Inspect failed - cannot assess risk"
-    exit 1
-}
-
-echo "$INSPECT_JSON" | uv run python -m vibe3.analysis.pre_push_inspect_summary --render
-REVIEW_TRIGGER=$(
-    echo "$INSPECT_JSON" | uv run python -m vibe3.analysis.pre_push_inspect_summary --field review_trigger
-)
-
-# 6. Trigger async local review when inspect score reaches block threshold
-# NOTE: Review runs asynchronously and does NOT block push.
-# High-risk changes are flagged but push proceeds - review results available later.
-if [ "$REVIEW_TRIGGER" = "yes-async" ]; then
-    echo "  Review triggered: yes (async)"
-    echo ""
-    echo "  ⚠️  WARNING: Blocking risk detected!"
-    echo "  Starting async review in background..."
-    echo ""
-
-    # Start async review (non-blocking)
-    uv run python src/vibe3/cli.py review base "$REVIEW_BASE" --async 2>/dev/null || {
-        echo "  [yellow]Note:[/] Failed to start async review (continuing push)"
-    }
-
-    echo "  [green]✓[/] Review started in background"
-    echo ""
-    echo "  [dim]Commands:[/]"
-    echo "    vibe3 flow show              # Check review status"
-    echo "    vibe3 handoff show           # View review result (when done)"
-    echo ""
-elif [ "$REVIEW_TRIGGER" = "recommended-manual" ]; then
-    echo "  Review triggered: recommended-manual"
-    echo ""
-    echo "  ⚠️  WARNING: Elevated risk detected, but below blocking threshold."
-    echo "  Recommendation: run 'vibe3 review base \"$REVIEW_BASE\"' before push if you want extra confidence."
-else
-    echo "  Review triggered: no"
-fi
 
 echo ""
 echo "OK: All pre-push checks passed"

@@ -97,8 +97,15 @@ def render_pr_details(pr: PRResponse) -> None:
             console.print(f"    {body}")
 
 
-def render_pr_ready(pr: PRResponse) -> None:
+def render_pr_ready(
+    pr: PRResponse, requested_reviewers: list[str] | None = None
+) -> None:
+    """Render PR ready result with optional AI review request."""
     console.print(f"[green]✓[/] PR #{pr.number} marked as ready for review")
+    console.print("[blue]📝[/] Reviewer briefing updated")
+    if requested_reviewers:
+        reviewers_str = ", ".join(requested_reviewers)
+        console.print(f"[yellow]🤖[/] AI review requested: {reviewers_str}")
     console.print(f"[dim]{pr.url}[/]")
 
 
