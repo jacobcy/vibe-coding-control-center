@@ -108,6 +108,7 @@ def snapshot_progress(
         "issue_state": issue_payload.get(
             "state", "open"
         ),  # GitHub issue state: open/closed
+        "flow_status": state_dict.get("flow_status"),  # Flow status: active/aborted/etc
     }
 
 
@@ -125,8 +126,8 @@ def has_progress_changed(
         after: Current progress snapshot
         expected_ref: Optional specific ref key that MUST change to count as progress
         require_state_transition: If True, only state label change counts as progress
-        allow_close_as_progress: If True, open->closed counts as progress
-            (ready-manager only)
+        allow_close_as_progress: If True, explicit abandon (flow_status=aborted)
+            counts as progress. This applies to READY and HANDOFF manager paths.
 
     Returns:
         True if progress was made (signals changed as expected)
@@ -135,12 +136,13 @@ def has_progress_changed(
     if before["state_label"] != after["state_label"]:
         return True
 
-    # Ready-manager close path: if issue went from open to closed, it counts as progress
-    # This is scoped to ready-manager only and does not affect other states
+    # Explicit abandon detection: flow_status changed to "aborted"
+    # This is the key signal that manager intentionally abandoned the flow,
+    # distinguishing it from incidental external closure.
     if allow_close_as_progress:
-        before_state = before.get("issue_state", "open")
-        after_state = after.get("issue_state", "open")
-        if before_state == "open" and after_state == "closed":
+        before_flow_status = before.get("flow_status")
+        after_flow_status = after.get("flow_status")
+        if before_flow_status != "aborted" and after_flow_status == "aborted":
             return True
 
     # For states like READY/HANDOFF, we MUST transition to another state.

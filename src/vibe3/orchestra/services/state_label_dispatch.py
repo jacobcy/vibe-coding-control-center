@@ -221,12 +221,16 @@ class StateLabelDispatchService(ServiceBase):
                         IssueState.READY,
                         IssueState.HANDOFF,
                     }
-                    # For ready-manager path, closing the issue also counts as valid
-                    # progress. This is scoped to ready only and does not apply to
-                    # handoff.
+                    # For ready-manager and handoff-manager paths, closing the issue via
+                    # explicit abandon (flow_status=aborted) also counts as valid
+                    # progress. This is scoped to manager paths only.
                     allow_close = (
-                        self.trigger_state == IssueState.READY
-                        and self.trigger_name == "manager"
+                        self.trigger_name == "manager"
+                        and self.trigger_state
+                        in {
+                            IssueState.READY,
+                            IssueState.HANDOFF,
+                        }
                     )
                     has_progress = has_progress_changed(
                         before_snapshot,
