@@ -2,6 +2,11 @@
 
 This module handles manager mode execution for issue processing
 and orchestration.
+
+Note: Repository-local async logs (temp/logs/issues/*/manager.async.log) are
+runtime execution logs, not prompt provenance storage. Full agent prompts are
+filtered from these logs by the CodeagentBackend async log filter to prevent
+sensitive information from appearing in repository logs.
 """
 
 from __future__ import annotations
