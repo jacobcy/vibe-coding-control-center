@@ -36,9 +36,9 @@ class FlowService(FlowLifecycleMixin, FlowQueryMixin):
             git_client: GitClient instance for git operations
             config: VibeConfig instance for configuration
         """
-        self.store = store or SQLiteClient()
-        self.git_client = git_client or GitClient()
-        self.config = config or VibeConfig.get_defaults()
+        self.store = SQLiteClient() if store is None else store
+        self.git_client = GitClient() if git_client is None else git_client
+        self.config = VibeConfig.get_defaults() if config is None else config
 
     def get_current_branch(self) -> str:
         """Get current git branch.

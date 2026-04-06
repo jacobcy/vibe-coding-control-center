@@ -177,7 +177,12 @@ class StatusQueryService:
                 continue
 
             body_lower = body.lower()
-            if "[recovery]" in body_lower or "恢复到 state/handoff" in body:
+            if (
+                "[resume]" in body_lower
+                or "[recovery]" in body_lower
+                or "继续到 state/handoff" in body
+                or "恢复到 state/handoff" in body
+            ):
                 continue
 
             match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
@@ -212,3 +217,71 @@ class StatusQueryService:
         except Exception:
             pass
         return worktree_map
+
+    def fetch_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse] | None = None,
+    ) -> list[dict[str, object]]:
+        """Fetch resumable issue candidates (failed + stale blocked + aborted).
+
+        Reuses fetch_orchestrated_issues() and filters for resumable states.
+        Adds resume_kind field to distinguish failed vs blocked vs aborted recovery.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+            stale_flows: Stale flow status responses for blocked recovery
+
+        Returns:
+            List of resumable issue dicts with number, title, state, flow,
+            failed_reason (if applicable), and resume_kind ("failed",
+            "blocked", or "aborted")
+        """
+        all_issues = self.fetch_orchestrated_issues(
+            flows, queued_set=set(), stale_flows=stale_flows
+        )
+
+        resumable: list[dict[str, object]] = []
+        for issue in all_issues:
+            state = issue.get("state")
+            flow = issue.get("flow")
+
+            if state == IssueState.FAILED:
+                # Failed issues are always resumable
+                resumable.append({**issue, "resume_kind": "failed"})
+            elif state == IssueState.BLOCKED:
+                # Blocked issues are resumable only if flow is stale
+                if flow is not None and hasattr(flow, "flow_status"):
+                    if flow.flow_status == "stale":
+                        resumable.append({**issue, "resume_kind": "blocked"})
+            else:
+                # For other states (READY, HANDOFF), check if flow is aborted
+                if flow is not None and hasattr(flow, "flow_status"):
+                    if flow.flow_status == "aborted":
+                        resumable.append({**issue, "resume_kind": "aborted"})
+
+        return resumable
+
+    def fetch_failed_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+    ) -> list[dict[str, object]]:
+        """Fetch open issues with state/failed label for resume candidates.
+
+        DEPRECATED: Use fetch_resume_candidates() instead.
+
+        This method is kept for backward compatibility and filters
+        fetch_resume_candidates() results for FAILED state only.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+
+        Returns:
+            List of failed issue dicts with number, title, state, flow, failed_reason
+        """
+        candidates = self.fetch_resume_candidates(flows, stale_flows=[])
+        return [
+            candidate
+            for candidate in candidates
+            if candidate.get("resume_kind") == "failed"
+        ]

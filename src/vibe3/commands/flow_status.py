@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from loguru import logger
 
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.services.flow_projection_service import FlowProjectionService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.task_binding_guard import build_bind_task_hint
@@ -202,7 +202,7 @@ def status(
     all_flows: AllOption = False,
     check: Annotated[
         bool,
-        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+        typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
@@ -212,13 +212,8 @@ def status(
     By default only shows active flows. Use --all to include done/aborted/stale.
     """
     with trace_scope(trace, "flow status", domain="flow"):
-        from vibe3.services.check_service import CheckService
-
         if check:
-            try:
-                CheckService().verify_all_flows()
-            except Exception:
-                pass  # check failure should not block status display
+            run_full_check_shortcut()
 
         service = FlowService()
         flows = service.list_flows(status=None if all_flows else "active")

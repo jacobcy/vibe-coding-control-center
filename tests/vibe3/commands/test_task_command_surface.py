@@ -73,6 +73,17 @@ def test_task_status_delegates_to_status_command(mock_status) -> None:
 
 
 @patch("vibe3.commands.status.status")
+def test_task_status_check_delegates_check_flag(mock_status) -> None:
+    """task status --check should forward the full check shortcut flag."""
+    result = runner.invoke(app, ["task", "status", "--check"])
+
+    assert result.exit_code == 0
+    mock_status.assert_called_once_with(
+        all_flows=False, check=True, json_output=False, trace=False
+    )
+
+
+@patch("vibe3.commands.status.status")
 def test_top_level_status_is_hidden_compat_alias(mock_status) -> None:
     """top-level status should still delegate for compatibility."""
     result = runner.invoke(app, ["status"])
@@ -80,6 +91,17 @@ def test_top_level_status_is_hidden_compat_alias(mock_status) -> None:
     assert result.exit_code == 0
     mock_status.assert_called_once_with(
         all_flows=False, check=False, json_output=False, trace=False
+    )
+
+
+@patch("vibe3.commands.status.status")
+def test_top_level_status_check_is_forwarded(mock_status) -> None:
+    """top-level compatibility status should accept and forward --check."""
+    result = runner.invoke(app, ["status", "--check"])
+
+    assert result.exit_code == 0
+    mock_status.assert_called_once_with(
+        all_flows=False, check=True, json_output=False, trace=False
     )
 
 

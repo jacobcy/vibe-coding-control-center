@@ -213,3 +213,160 @@ def test_block_manager_noop_issue_handles_none_repo() -> None:
         mock_github.view_issue.assert_called_once_with(777, repo=None)
         mock_github.add_comment.assert_called_once()
         mock_labels.confirm_issue_state.assert_called_once()
+
+
+def test_resume_failed_issue_to_handoff_adds_comment_and_transitions_state() -> None:
+    """Test that failed resume returns to HANDOFF for manager triage."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_handoff(
+            issue_number=321,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="manager backend mapping fixed",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 321
+        assert "state/handoff" in call_args[0][1]
+        assert "manager" in call_args[0][1]
+        assert "manager backend mapping fixed" in call_args[0][1]
+        assert call_args[1].get("repo") == "owner/repo"
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            321,
+            IssueState.HANDOFF,
+            actor="human:resume",
+            force=False,
+        )
+
+
+def test_resume_failed_issue_to_ready_adds_comment_and_transitions_state() -> None:
+    """Test that failed resume returns to READY for fresh manager entry."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_ready(
+            issue_number=456,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="quota resumed",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 456
+        assert "state/ready" in call_args[0][1]
+        assert "重新进入 manager" in call_args[0][1]
+        assert "quota resumed" in call_args[0][1]
+        assert call_args[1].get("repo") == "owner/repo"
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            456,
+            IssueState.READY,
+            actor="human:resume",
+            force=True,  # Force transition from FAILED to READY
+        )
+
+
+def test_resume_failed_issue_to_ready_uses_default_actor() -> None:
+    """Test that resume_failed_issue_to_ready defaults actor to human:resume."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_ready(
+            issue_number=789,
+            repo=None,
+            reason="manual resume",
+        )
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            789,
+            IssueState.READY,
+            actor="human:resume",
+            force=True,  # Force transition from FAILED to READY
+        )
+
+
+def test_resume_failed_issue_to_ready_adds_failed_specific_comment() -> None:
+    """验证 failed resume 使用'从 state/failed 继续'文案。"""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_ready(
+            issue_number=123,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="quota restored",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 123
+        comment_body = call_args[0][1]
+
+        # 明确写出"已从 state/failed 继续到 state/ready"
+        assert "已从 state/failed 继续到 state/ready" in comment_body
+        assert "quota restored" in comment_body
+        assert call_args[1].get("repo") == "owner/repo"
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            123,
+            IssueState.READY,
+            actor="human:resume",
+            force=True,
+        )
+
+
+def test_resume_blocked_issue_to_ready_adds_blocked_specific_comment() -> None:
+    """验证 blocked resume 使用'从 state/blocked 恢复'文案。"""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_blocked_issue_to_ready(
+            issue_number=456,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="dependency available",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 456
+        comment_body = call_args[0][1]
+
+        # 明确写出"已从 state/blocked 恢复到 state/ready"
+        assert "已从 state/blocked 恢复到 state/ready" in comment_body
+        assert "dependency available" in comment_body
+        # 不使用 failed 文案
+        assert "state/failed" not in comment_body
+        assert call_args[1].get("repo") == "owner/repo"
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            456,
+            IssueState.READY,
+            actor="human:resume",
+            force=True,
+        )

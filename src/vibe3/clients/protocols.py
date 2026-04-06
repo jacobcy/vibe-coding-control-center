@@ -38,6 +38,18 @@ class GitHubClientProtocol(Protocol):
         """Merge a pull request."""
         ...
 
+    def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
+        """Close a pull request.
+
+        Args:
+            pr_number: PR number to close
+            comment: Optional comment to add before closing
+
+        Returns:
+            True if PR was closed successfully
+        """
+        ...
+
     def get_pr_diff(self, pr_number: int) -> str:
         """Get PR diff."""
         ...

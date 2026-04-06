@@ -40,8 +40,10 @@ class PRCreateUsecase:
         flow_service: FlowService | None = None,
         base_resolver: BaseResolver | None = None,
     ) -> None:
-        self._flow_service = flow_service or FlowService()
-        self._base_resolver = base_resolver or BaseResolutionUsecase()
+        self._flow_service = FlowService() if flow_service is None else flow_service
+        self._base_resolver = (
+            BaseResolutionUsecase() if base_resolver is None else base_resolver
+        )
 
     def check_flow_task(self, branch: str, *, yes: bool = False) -> None:
         """Require current flow to have task bound unless bypassed by --yes."""

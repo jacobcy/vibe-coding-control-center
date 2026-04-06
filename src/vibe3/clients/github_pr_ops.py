@@ -212,3 +212,56 @@ class PRMixin:
         if pr is None:
             raise PRNotFoundError(pr_number)
         return cast(PRResponse, pr)
+
+    def close_pr(self: Any, pr_number: int, comment: str | None = None) -> bool:
+        """Close a pull request.
+
+        Args:
+            pr_number: PR number to close
+            comment: Optional comment to add before closing
+
+        Returns:
+            True if PR was closed successfully
+        """
+        logger.bind(
+            external="github",
+            operation="close_pr",
+            pr_number=pr_number,
+        ).debug("Calling GitHub API: close_pull_request")
+
+        # Add comment if provided
+        if comment:
+            try:
+                subprocess.run(
+                    ["gh", "pr", "comment", str(pr_number), "--body", comment],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            except subprocess.CalledProcessError as e:
+                # Log warning but continue with close
+                logger.bind(
+                    external="github",
+                    operation="close_pr",
+                    pr_number=pr_number,
+                ).warning(f"Failed to add comment before closing: {e.stderr}")
+
+        # Close the PR
+        try:
+            subprocess.run(
+                ["gh", "pr", "close", str(pr_number)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise_gh_pr_error(
+                e,
+                "close",
+                user_tips=(
+                    f"  1. Confirm PR #{pr_number} exists\n"
+                    f"  2. Verify current branch/repo has permission to close it"
+                ),
+            )
+
+        return True

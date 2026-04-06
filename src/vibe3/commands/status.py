@@ -5,7 +5,7 @@ from typing import Annotated, cast
 
 import typer
 
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -40,7 +40,7 @@ def status(
     all_flows: AllOption = False,
     check: Annotated[
         bool,
-        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+        typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
@@ -48,12 +48,7 @@ def status(
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
     with trace_scope(trace, "status", domain="status"):
         if check:
-            from vibe3.services.check_service import CheckService
-
-            try:
-                CheckService().verify_all_flows()
-            except Exception:
-                pass  # check failure should not block status display
+            run_full_check_shortcut()
 
         # 1. Orchestra State (Issues & Managers)
         config = OrchestraConfig.from_settings()

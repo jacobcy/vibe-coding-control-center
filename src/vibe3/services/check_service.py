@@ -117,7 +117,7 @@ class CheckService(CheckRemote):
 
     def _handle_fix_all_mode(self) -> ExecuteCheckResult:
         """Handle --fix --all mode: check active flows and auto-fix fixable issues."""
-        results = self.verify_all_flows(status="active")
+        results = self.verify_all_flows(status=["active", "stale"])
         invalid = [r for r in results if not r.is_valid]
         if not invalid:
             return ExecuteCheckResult(
@@ -218,6 +218,7 @@ class CheckService(CheckRemote):
             )
 
         # Check if local branch still exists
+        branch_missing = False
         try:
             # Use git branch --list to check only local branches
             output = self.git_client._run(["branch", "--list", branch])
@@ -226,9 +227,7 @@ class CheckService(CheckRemote):
                 from vibe3.services.flow_service import FlowService
 
                 if not branch.startswith(FlowService.SAFE_BRANCH_PREFIX):
-                    reason = f"Branch '{branch}' no longer exists locally"
-                    self._mark_flow_aborted(branch, reason)
-                    return CheckResult(is_valid=True, branch=branch, issues=[])
+                    branch_missing = True
         except Exception as e:
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to verify local branch existence: {e}"
@@ -241,6 +240,7 @@ class CheckService(CheckRemote):
 
         task_issue_closed = False
         orchestration_state: IssueState | None = None
+        issue_payload: dict | None = None
         if task_issue:
             issue = self.github_client.view_issue(task_issue)
             if issue == "network_error":
@@ -250,6 +250,7 @@ class CheckService(CheckRemote):
             elif not issue:
                 issues.append(f"Task issue #{task_issue} not found on GitHub")
             elif isinstance(issue, dict):
+                issue_payload = issue
                 orchestration_state = issue_state_from_payload(issue)
                 if str(issue.get("state", "")).upper() == "CLOSED":
                     task_issue_closed = True
@@ -273,6 +274,7 @@ class CheckService(CheckRemote):
                     self._mark_flow_done(
                         branch,
                         f"PR #{pr.number} is {pr.state.value} (detected from GitHub)",
+                        cleanup_local_scene=not branch_missing,
                     )
                     return CheckResult(is_valid=True, branch=branch, issues=[])
         except Exception as e:
@@ -290,6 +292,7 @@ class CheckService(CheckRemote):
                     self._mark_flow_done(
                         branch,
                         f"Task issue #{task_issue} is CLOSED (no open PR found)",
+                        cleanup_local_scene=not branch_missing,
                     )
                     return CheckResult(is_valid=True, branch=branch, issues=[])
             except Exception as e:
@@ -297,8 +300,26 @@ class CheckService(CheckRemote):
                     f"Failed to check for open PRs after task issue closed: {e}"
                 )
 
+        flow_status = flow_data.get("flow_status", "active")
         if (
-            flow_data.get("flow_status", "active") == "active"
+            flow_status == "stale"
+            and branch.startswith("task/issue-")
+            and orchestration_state == IssueState.READY
+        ):
+            if self._rebuild_stale_ready_flow(
+                branch,
+                task_issue=task_issue,
+                issue_payload=issue_payload,
+            ):
+                return CheckResult(is_valid=True, branch=branch, issues=[])
+
+        if branch_missing:
+            reason = f"Branch '{branch}' no longer exists locally"
+            self._mark_flow_aborted(branch, reason)
+            return CheckResult(is_valid=True, branch=branch, issues=[])
+
+        if (
+            flow_status == "active"
             and branch.startswith("task/issue-")
             and orchestration_state == IssueState.READY
             and is_empty_auto_scene(flow_data)
@@ -311,7 +332,6 @@ class CheckService(CheckRemote):
             return CheckResult(is_valid=True, branch=branch, issues=[])
 
         # ref files exist
-        flow_status = flow_data.get("flow_status", "active")
         if flow_status not in ("done", "aborted", "stale"):
             for ref_field in ["plan_ref", "report_ref", "audit_ref"]:
                 ref_value = flow_data.get(ref_field)
@@ -333,7 +353,68 @@ class CheckService(CheckRemote):
         )
         return CheckResult(is_valid=is_valid, issues=issues, branch=branch)
 
-    def _mark_flow_done(self, branch: str, reason: str) -> None:
+    def _cleanup_local_scene(self, branch: str, *, force_delete: bool) -> None:
+        """Best-effort cleanup of worktree and local branch for a converged flow."""
+        worktree_path = self.git_client.find_worktree_path_for_branch(branch)
+        if worktree_path is not None:
+            try:
+                self.git_client.remove_worktree(worktree_path, force=True)
+            except Exception as exc:
+                logger.bind(domain="check", branch=branch).warning(
+                    f"Failed to remove worktree during local scene cleanup: {exc}"
+                )
+        try:
+            self.git_client.delete_branch(
+                branch,
+                force=force_delete,
+                skip_if_worktree=True,
+            )
+        except Exception as exc:
+            logger.bind(domain="check", branch=branch).warning(
+                f"Failed to delete branch during local scene cleanup: {exc}"
+            )
+
+    def _rebuild_stale_ready_flow(
+        self,
+        branch: str,
+        *,
+        task_issue: int | None,
+        issue_payload: dict | None,
+    ) -> bool:
+        """Rebuild stale canonical ready flow as a fresh registered task flow."""
+        issue_number = task_issue
+        if issue_number is None:
+            try:
+                issue_number = int(branch.removeprefix("task/issue-"))
+            except ValueError:
+                return False
+
+        from vibe3.manager.flow_manager import FlowManager
+        from vibe3.models.orchestration import IssueInfo
+        from vibe3.orchestra.config import OrchestraConfig
+
+        issue = IssueInfo(
+            number=issue_number,
+            title=str((issue_payload or {}).get("title") or f"Issue {issue_number}"),
+            state=IssueState.READY,
+            labels=[IssueState.READY.to_label()],
+        )
+        manager = FlowManager(
+            OrchestraConfig.from_settings(),
+            store=self.store,
+            git=self.git_client,
+            github=self.github_client,
+        )
+        manager.create_flow_for_issue(issue)
+        return True
+
+    def _mark_flow_done(
+        self,
+        branch: str,
+        reason: str,
+        *,
+        cleanup_local_scene: bool = True,
+    ) -> None:
         """Mark a flow as done and record the event."""
         logger.bind(
             domain="check",
@@ -347,6 +428,8 @@ class CheckService(CheckRemote):
             "system",
             f"Flow auto-completed: {reason}",
         )
+        if cleanup_local_scene:
+            self._cleanup_local_scene(branch, force_delete=True)
 
     def _mark_flow_aborted(self, branch: str, reason: str) -> None:
         """Mark a flow as aborted and record the event."""

@@ -51,6 +51,11 @@ class AssigneeDispatchConfig(BaseModel):
     agent: str | None = None
     backend: str | None = None
     model: str | None = None
+    timeout_seconds: int = Field(
+        default=1800,
+        ge=60,
+        description="Manager execution timeout in seconds (default 30 minutes)",
+    )
     prompt_template: str = Field(
         default="orchestra.assignee_dispatch.manager",
         description="Dotted prompts.yaml path used to render the manager task prompt",
@@ -163,6 +168,7 @@ class OrchestraConfig(BaseModel):
     enabled: bool = True
     polling_interval: int = Field(default=900, ge=1)
     debug_polling_interval: int = Field(default=60, ge=1)
+    debug_max_ticks: int = Field(default=10, ge=1)
     debug: bool = False
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
@@ -303,6 +309,7 @@ class OrchestraConfig(BaseModel):
             enabled=src.enabled,
             polling_interval=src.polling_interval,
             debug_polling_interval=getattr(src, "debug_polling_interval", 60),
+            debug_max_ticks=getattr(src, "debug_max_ticks", 10),
             debug=False,
             scene_base_ref=getattr(src, "scene_base_ref", "origin/main"),
             repo=repo,

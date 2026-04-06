@@ -107,11 +107,20 @@ def resolve_manager_agent_options(
             backend=ad.backend,
             model=ad.model,
             worktree=worktree,
+            timeout_seconds=ad.timeout_seconds,
         )
     else:
         # Fall back to generic run defaults
         raw_options = CodeagentExecutionService(runtime_config).resolve_agent_options(
             "run", worktree=worktree
+        )
+        # Override timeout with manager-specific value
+        raw_options = AgentOptions(
+            agent=raw_options.agent,
+            backend=raw_options.backend,
+            model=raw_options.model,
+            worktree=raw_options.worktree,
+            timeout_seconds=ad.timeout_seconds,
         )
 
     # Resolve preset mapping from config/models.json and sync to ~/.codeagent

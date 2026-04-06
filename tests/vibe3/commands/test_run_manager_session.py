@@ -1,4 +1,4 @@
-"""Tests for `vibe3 run --manager-issue` basic and session behavior."""
+"""Tests for `vibe3 run --manager-issue` session behavior."""
 
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -65,7 +65,9 @@ def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=F
         )
 
 
-class TestRunManagerIssueMode:
+class TestRunManagerIssueSession:
+    """Tests for async session creation, reuse, and sync completion."""
+
     def test_prints_async_session_and_log(self, monkeypatch) -> None:
         backend = _make_backend()
         github = _make_github()
@@ -255,10 +257,13 @@ class TestRunManagerIssueMode:
                 )
             ),
         )
+        # Mock the coordinator's has_progress_changed check
+        from vibe3.manager import manager_run_coordinator
+
         monkeypatch.setattr(
-            manager_run_service,
+            manager_run_coordinator,
             "has_progress_changed",
-            lambda before, after: True,
+            lambda before, after, **kwargs: True,
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
@@ -328,152 +333,3 @@ class TestRunManagerIssueMode:
         assert result.exit_code != 0
         assert not sqlite.add_event.called
         github.add_comment.assert_not_called()
-
-    # === No-progress parity tests ===
-
-    def test_sync_path_treats_comment_changes_as_progress(self, monkeypatch) -> None:
-        """Sync manager path should treat comment count changes as progress."""
-        backend = _make_backend()
-        github = _make_github()
-        sqlite = MagicMock()
-
-        _patch_basic(monkeypatch, backend, github, sqlite)
-        monkeypatch.setattr(
-            manager_run_service.OrchestraConfig,
-            "from_settings",
-            staticmethod(
-                lambda: manager_run_service.OrchestraConfig.model_validate(
-                    {
-                        "pid_file": ".git/vibe3/orchestra.pid",
-                        "assignee_dispatch": {"agent": "manager-orchestrator"},
-                    }
-                )
-            ),
-        )
-
-        # Mock progress detection
-        before_snapshot = {
-            "state_label": "state/ready",
-            "comment_count": 5,
-            "handoff": "handoff_sig_before",
-            "refs": {"plan_ref": "/tmp/plan.md"},
-        }
-        after_snapshot = {
-            "state_label": "state/ready",  # State unchanged
-            "comment_count": 6,  # Comment count increased
-            "handoff": "handoff_sig_before",
-            "refs": {"plan_ref": "/tmp/plan.md"},
-        }
-
-        snapshot_calls = 0
-
-        def mock_snapshot(*args, **kwargs):
-            nonlocal snapshot_calls
-            snapshot_calls += 1
-            return after_snapshot if snapshot_calls > 1 else before_snapshot
-
-        # Mock the shared snapshot_progress function
-        monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
-
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
-
-        assert result.exit_code == 0
-        # Should NOT block because comment count changed (progress made)
-        # Verify no block comment was added
-        github.add_comment.assert_not_called()
-
-    def test_sync_path_treats_handoff_changes_as_progress(self, monkeypatch) -> None:
-        """Sync manager path should treat handoff changes as progress."""
-        backend = _make_backend()
-        github = _make_github()
-        sqlite = MagicMock()
-
-        _patch_basic(monkeypatch, backend, github, sqlite)
-        monkeypatch.setattr(
-            manager_run_service.OrchestraConfig,
-            "from_settings",
-            staticmethod(
-                lambda: manager_run_service.OrchestraConfig.model_validate(
-                    {
-                        "pid_file": ".git/vibe3/orchestra.pid",
-                        "assignee_dispatch": {"agent": "manager-orchestrator"},
-                    }
-                )
-            ),
-        )
-
-        before_snapshot = {
-            "state_label": "state/ready",
-            "comment_count": 5,
-            "handoff": "handoff_sig_before",
-            "refs": {"plan_ref": "/tmp/plan.md"},
-        }
-        after_snapshot = {
-            "state_label": "state/ready",  # State unchanged
-            "comment_count": 5,
-            "handoff": "handoff_sig_after",  # Handoff changed
-            "refs": {"plan_ref": "/tmp/plan.md"},
-        }
-
-        snapshot_calls = 0
-
-        def mock_snapshot(*args, **kwargs):
-            nonlocal snapshot_calls
-            snapshot_calls += 1
-            return after_snapshot if snapshot_calls > 1 else before_snapshot
-
-        monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
-
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
-
-        assert result.exit_code == 0
-        # Should NOT block because handoff changed (progress made)
-        github.add_comment.assert_not_called()
-
-    def test_sync_no_progress_block_fires_for_truly_no_change(
-        self, monkeypatch
-    ) -> None:
-        """No-progress block should fire when truly no observable change."""
-        backend = _make_backend()
-        github = _make_github()
-        sqlite = MagicMock()
-
-        _patch_basic(monkeypatch, backend, github, sqlite)
-        monkeypatch.setattr(
-            manager_run_service.OrchestraConfig,
-            "from_settings",
-            staticmethod(
-                lambda: manager_run_service.OrchestraConfig.model_validate(
-                    {
-                        "pid_file": ".git/vibe3/orchestra.pid",
-                        "assignee_dispatch": {"agent": "manager-orchestrator"},
-                    }
-                )
-            ),
-        )
-
-        before_snapshot = {
-            "state_label": "state/ready",
-            "comment_count": 5,
-            "handoff": "handoff_sig",
-            "refs": {"plan_ref": "/tmp/plan.md"},
-        }
-        after_snapshot = before_snapshot.copy()  # No change at all
-
-        snapshot_calls = 0
-
-        def mock_snapshot(*args, **kwargs):
-            nonlocal snapshot_calls
-            snapshot_calls += 1
-            return after_snapshot if snapshot_calls > 1 else before_snapshot
-
-        monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
-
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
-
-        assert result.exit_code == 0
-        # Should block because no change at all
-        github.add_comment.assert_called_once()
-        comment = github.add_comment.call_args[0][1]
-        assert "[manager]" in comment
-        assert "未产生任何有效动作" in comment

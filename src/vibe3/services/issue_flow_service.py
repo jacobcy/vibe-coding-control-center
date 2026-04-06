@@ -27,7 +27,7 @@ class IssueFlowService:
         Args:
             store: SQLiteClient instance for flow queries
         """
-        self.store = store or SQLiteClient()
+        self.store = SQLiteClient() if store is None else store
 
     def canonical_branch_name(self, issue_number: int) -> str:
         """Return canonical task branch name.

@@ -1,4 +1,4 @@
-"""Tests for CheckService."""
+"""Tests for CheckService verify flow functionality."""
 
 import tempfile
 from pathlib import Path
@@ -9,7 +9,6 @@ import pytest
 from vibe3.clients import SQLiteClient
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
 from vibe3.models.pr import PRResponse, PRState
 from vibe3.services.check_service import CheckService
 
@@ -246,116 +245,3 @@ class TestVerifyCurrentFlow:
         assert not any(
             "Shared handoff file not found" in issue for issue in result.issues
         )
-
-    def test_merged_pr_returns_valid(
-        self, check_service, mock_store, mock_github_client
-    ):
-        """Merged PR flow is auto-completed and returns is_valid=True."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "feature/test-branch",
-        }
-        mock_store.get_issue_links.return_value = []
-        pr = PRResponse(
-            number=456,
-            title="Test PR",
-            body="",
-            state=PRState.MERGED,
-            head_branch="feature/test-branch",
-            base_branch="main",
-            url="https://github.com/test/pr/456",
-            draft=False,
-            merged_at="2026-03-29T00:00:00Z",
-        )
-        mock_github_client.list_prs_for_branch.return_value = [pr]
-
-        result = check_service.verify_current_flow()
-
-        assert result.is_valid
-        assert len(result.issues) == 0
-        mock_store.update_flow_state.assert_called_once_with(
-            "feature/test-branch", flow_status="done"
-        )
-        mock_store.add_event.assert_called_once()
-        assert mock_store.add_event.call_args[0][1] == "flow_auto_completed"
-
-    def test_ready_empty_auto_scene_is_marked_stale(
-        self, check_service, mock_store, mock_github_client
-    ):
-        """Canonical ready flow with no session/ref/worktree should be auto-staled."""
-        mock_store.get_flow_state.return_value = {
-            "branch": "task/issue-431",
-            "flow_status": "active",
-            "task_issue_number": None,
-            "manager_session_id": None,
-            "planner_session_id": None,
-            "executor_session_id": None,
-            "reviewer_session_id": None,
-            "plan_ref": None,
-            "report_ref": None,
-            "audit_ref": None,
-            "planner_status": None,
-            "executor_status": None,
-            "reviewer_status": None,
-            "execution_pid": None,
-            "execution_started_at": None,
-            "execution_completed_at": None,
-        }
-        mock_store.get_issue_links.return_value = []
-        mock_github_client.view_issue.return_value = {
-            "number": 431,
-            "state": "OPEN",
-            "labels": [{"name": IssueState.READY.to_label()}],
-        }
-        mock_github_client.list_prs_for_branch.return_value = []
-        with patch.object(
-            check_service.git_client,
-            "get_current_branch",
-            return_value="task/issue-431",
-        ):
-            with patch.object(
-                check_service.git_client,
-                "find_worktree_path_for_branch",
-                return_value=None,
-            ):
-                result = check_service.verify_current_flow()
-
-        assert result.is_valid
-        mock_store.update_flow_state.assert_called_once_with(
-            "task/issue-431", flow_status="stale"
-        )
-        mock_store.add_event.assert_called_once()
-        assert mock_store.add_event.call_args[0][1] == "flow_auto_staled"
-
-
-class TestAutoFix:
-    """Tests for auto_fix method."""
-
-    def test_auto_fix_creates_handoff_file(self, check_service, mock_git_client):
-        """Test that auto_fix creates missing handoff file."""
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            git_dir = Path(tmpdir) / ".git"
-            git_dir.mkdir()
-
-            with patch.object(
-                check_service.git_client,
-                "get_git_common_dir",
-                return_value=str(git_dir),
-            ):
-                result = check_service.auto_fix(
-                    [
-                        f"Shared handoff file not found: "
-                        f"{git_dir}/vibe3/handoff/x/current.md"
-                    ]
-                )
-
-        assert result.success
-
-    def test_auto_fix_unfixable_returns_hint(self, check_service):
-        """Test that unfixable issues return error with --init hint."""
-        result = check_service.auto_fix(["Task issue #123 not found on GitHub"])
-
-        assert not result.success
-        assert result.error is not None
-        assert "--init" in result.error

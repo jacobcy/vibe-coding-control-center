@@ -97,12 +97,75 @@ class TestManagerCwdResolution:
         manager = ManagerExecutor(config, repo_path=tmp_path)
         existing = tmp_path / ".worktrees" / "issue-77"
         existing.mkdir(parents=True)
+        (existing / ".git").write_text("gitdir: /tmp/mock")
 
-        with patch("subprocess.run") as mock_run:
-            result = manager._ensure_manager_worktree(77, "task/issue-77")
+        with patch.object(
+            manager.worktree_manager,
+            "_find_worktree_for_branch",
+            return_value=existing,
+        ):
+            with patch("subprocess.run") as mock_run:
+                result = manager._ensure_manager_worktree(77, "task/issue-77")
 
-        assert result == (None, False)
+        assert result == (existing, False)
         mock_run.assert_not_called()
+
+    def test_ensure_manager_worktree_recycles_orphan_path(self, tmp_path: Path):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+        orphan = tmp_path / ".worktrees" / "issue-77"
+        orphan.mkdir(parents=True)
+        (orphan / "stale.txt").write_text("orphan")
+
+        def mock_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "worktree", "remove"]:
+                import shutil
+
+                shutil.rmtree(orphan)
+            return CompletedProcess(returncode=0)
+
+        with patch(
+            "subprocess.run",
+            side_effect=mock_run,
+        ) as mock_run:
+            path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path == orphan
+        assert is_temp is True
+        assert not (orphan / "stale.txt").exists()
+        assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
+
+    def test_ensure_manager_worktree_recycles_mismatched_git_path(self, tmp_path: Path):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+        target = tmp_path / ".worktrees" / "issue-77"
+        target.mkdir(parents=True)
+        (target / ".git").write_text("gitdir: /tmp/mock")
+        (target / "wrong.txt").write_text("bad scene")
+
+        with patch.object(
+            manager.worktree_manager,
+            "_find_worktree_for_branch",
+            return_value=tmp_path / ".worktrees" / "other-77",
+        ):
+
+            def mock_run(cmd, *args, **kwargs):
+                if cmd[:3] == ["git", "worktree", "remove"]:
+                    import shutil
+
+                    shutil.rmtree(target)
+                return CompletedProcess(returncode=0)
+
+            with patch(
+                "subprocess.run",
+                side_effect=mock_run,
+            ) as mock_run:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path == target
+        assert is_temp is True
+        assert not (target / "wrong.txt").exists()
+        assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
 
     def test_align_auto_scene_to_base_resets_canonical_task_scene(self, tmp_path: Path):
         """Test alignment for fresh branch (no commits) - should reset."""

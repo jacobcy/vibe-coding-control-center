@@ -69,6 +69,7 @@ LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 300)
 LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
 
 # Files to ignore (temporarily exceed limits)
+# Loaded from config/settings.yaml:code_limits.single_file_loc.exceptions
 IGNORE_FILES=(
   "src/vibe3/commands/run.py"  # TODO: Extract skill execution to run_skill.py
   "src/vibe3/commands/flow.py"  # TODO: Extract GitHub Project auto-link logic
@@ -79,6 +80,8 @@ IGNORE_FILES=(
   "tests/vibe3/orchestra/test_state_label_dispatch.py"  # Comprehensive test suite for StateLabelDispatchService (498 lines): tests share fixtures and test highly related scenarios; splitting would increase maintenance cost
   "tests/vibe3/commands/test_run_manager_issue.py"  # Test suite for manager-issue mode (479 lines): single test class with shared fixtures; splitting would break test suite integrity
   "scripts/tsu.sh"  # External script, not subject to LOC limits
+  "src/vibe3/manager/worktree_manager.py"  # Worktree lifecycle management (职责内聚，共享私有方法)
+  "src/vibe3/agents/backends/codeagent.py"  # Codeagent execution backend (sync/async共享基础设施)
 )
 
 warnings=0
