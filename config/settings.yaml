@@ -41,7 +41,7 @@ code_limits:
     default: 300           # 单文件默认限制（所有类型）
     max: 400              # 单文件最大限制（所有类型）
 
-# LOC例外：核心聚合文件与基础设施
+# 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
     # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
     exceptions:
       # 核心业务聚合 —— 允许 600
@@ -52,8 +52,8 @@ code_limits:
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"
-        limit: 600
-        reason: "已 507，继续容纳检查规则"
+        limit: 450
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/task_service.py"
         limit: 550
         reason: "任务生命周期聚合"
@@ -77,7 +77,15 @@ code_limits:
         limit: 550
         reason: "标签分发决策树"
 
-      # 基础设施核心模块（职责内聚，不适合进一步拆分）
+      # Shell / 脚本兼容入口
+      - path: "lib/alias/worktree.sh"
+        limit: 450
+        reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
+      - path: "scripts/tsu.sh"
+        limit: 900
+        reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+
+      # 基础设施核心模块
       - path: "src/vibe3/manager/worktree_manager.py"
         limit: 450
         reason: "Worktree lifecycle management"
@@ -85,9 +93,32 @@ code_limits:
         limit: 450
         reason: "Codeagent execution backend"
 
+      # 强耦合测试例外
+      - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
+        limit: 550
+        reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
+      - path: "tests/vibe3/commands/test_run_manager_issue.py"
+        limit: 500
+        reason: "manager issue 模式回归矩阵集中在单入口，拆分会削弱可读性"
+      - path: "tests/vibe3/manager/test_manager_executor.py"
+        limit: 400
+        reason: "manager executor 容量与调度回归共享构造，维持单文件更稳"
+      - path: "tests/vibe3/commands/test_run_supervisor.py"
+        limit: 400
+        reason: "supervisor 运行契约测试共享大量上下文，拆分收益低"
+      - path: "tests/vibe3/commands/test_handoff_command.py"
+        limit: 400
+        reason: "handoff 命令回归围绕同一 CLI 面展开，拆分会放大重复夹具"
+      - path: "tests/vibe3/services/test_check_service.py"
+        limit: 400
+        reason: "check service 回归按同一服务契约组织，当前维持集中更清晰"
+      - path: "tests/vibe3/orchestra/test_serve.py"
+        limit: 400
+        reason: "serve 生命周期测试共享服务装配，暂不值得拆分"
+
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 32000        # Python 核心代码总行数（治理触发器）
+    v3_python: 32000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:

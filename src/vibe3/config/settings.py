@@ -8,7 +8,7 @@
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from vibe3.config.settings_orchestra import OrchestraSettings
 from vibe3.config.settings_pr import (
@@ -56,15 +56,33 @@ __all__ = ["AIConfig", "FlowConfig", "PRScoringConfig", "MergeGateConfig",
 class SingleFileLocConfig(BaseModel):
     """单文件行数限制."""
 
-    default: int = Field(default=200)
-    max: int = Field(default=300)
+    default: int = Field(default=300)
+    max: int = Field(default=400)
+    exceptions: list["LocExceptionConfig"] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_unique_exception_paths(self) -> "SingleFileLocConfig":
+        seen_paths: set[str] = set()
+        for entry in self.exceptions:
+            if entry.path in seen_paths:
+                raise ValueError(f"Duplicate LOC exception path: {entry.path}")
+            seen_paths.add(entry.path)
+        return self
+
+
+class LocExceptionConfig(BaseModel):
+    """单文件 LOC 例外配置."""
+
+    path: str
+    limit: int = Field(default=400, ge=1)
+    reason: str = Field(default="")
 
 
 class TotalFileLocConfig(BaseModel):
     """总行数限制."""
 
-    v2_shell: int = Field(default=7000)
-    v3_python: int = Field(default=9000)
+    v2_shell: int = Field(default=4000)
+    v3_python: int = Field(default=32000)
 
 
 class CodePathsConfig(BaseModel):

@@ -15,114 +15,72 @@
 
 set -e
 
-get_limit() {
-  python3 - "$1" "${2:-}" <<'PY'
-import re
-import sys
+result=$(python3 - <<'PY'
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("scripts/hooks").resolve()))
+
+from loc_settings import find_exception, iter_files, load_loc_settings
 
 
-def parse_config(path: str) -> dict[str, str]:
-  values: dict[str, str] = {}
-  stack: list[tuple[int, str]] = []
+config = load_loc_settings()
+warnings = 0
+errors = 0
 
-  for raw_line in Path(path).read_text().splitlines():
-    stripped = raw_line.strip()
-    if not stripped or stripped.startswith("#"):
-      continue
+for file_path in iter_files(config.test_paths_v3_python, suffixes=(".py",), test_only=True):
+    rel_path = file_path.as_posix()
+    lines = sum(1 for _ in file_path.open())
+    exception = find_exception(config.exceptions, rel_path)
+    limit = exception.limit if exception else config.single_file_max
 
-    indent = len(raw_line) - len(raw_line.lstrip(" "))
-    while stack and stack[-1][0] >= indent:
-      stack.pop()
+    if lines > limit:
+        label = f"custom: {limit}" if exception else f"max: {config.single_file_max}"
+        print(f"❌ ERROR: {rel_path} has {lines} lines ({label})")
+        errors += 1
+    elif exception is None and lines > config.single_file_default:
+        print(
+            f"⚠️  WARNING: {rel_path} has {lines} lines "
+            f"(default: {config.single_file_default}, max: {config.single_file_max})"
+        )
+        warnings += 1
 
-    match = re.match(r"([A-Za-z0-9_]+):(?:\s*(.*))?$", stripped)
-    if not match:
-      continue
-
-    key, value = match.groups()
-    if not value:
-      stack.append((indent, key))
-      continue
-
-    path_key = ".".join([item[1] for item in stack] + [key])
-    values[path_key] = value.split("#", 1)[0].strip().strip('"').strip("'")
-
-  return values
-
-
-config = parse_config("config/settings.yaml")
-print(config.get(sys.argv[1], sys.argv[2]))
+print()
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("Test file LOC check results:")
+print(f"  - Default limit: {config.single_file_default} lines")
+print(f"  - Max limit: {config.single_file_max} lines")
+print(f"  - Warnings: {warnings} files (default → max)")
+print(f"  - Errors: {errors} files (exceed max)")
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print(f"COUNTS {warnings} {errors} {config.single_file_default} {config.single_file_max}")
 PY
-}
-
-# Get limits (unified for all test files)
-LIMIT_DEFAULT=$(get_limit "code_limits.single_file_loc.default" 300)
-LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
-
-# Test files to ignore (comprehensive test suites that should not be fragmented)
-IGNORE_FILES=(
-  "tests/vibe3/orchestra/test_state_label_dispatch.py"  # Comprehensive test suite for StateLabelDispatchService (498 lines): tests share fixtures and test highly related scenarios; splitting would increase maintenance cost
-  "tests/vibe3/commands/test_run_manager_issue.py"  # Test suite for manager-issue mode (479 lines): single test class with shared fixtures; splitting would break test suite integrity
-  "tests/vibe3/manager/test_manager_executor.py"  # Manager executor test suite (415 lines): comprehensive tests for async/sync execution flows
-  "tests/vibe3/orchestra/test_flow_orchestrator.py"  # Flow orchestrator test suite (451 lines): integration tests with shared fixtures
-  "tests/vibe3/services/test_check_service.py"  # Check service test suite (475 lines): comprehensive validation tests
-  "tests/vibe3/services/test_status_query_service.py"  # Status query test suite (599 lines): complex integration tests with mocking
 )
 
-warnings=0
-errors=0
+echo "$result" | sed '$d'
 
-should_ignore() {
-  local f="$1"
-  for ignore in "${IGNORE_FILES[@]}"; do
-    if [ "$f" = "$ignore" ]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-check_file() {
-  local f="$1"
-
-  # Skip ignored files
-  if should_ignore "$f"; then
-    return
-  fi
-
-  local lines
-  lines=$(wc -l < "$f")
-
-  # Check max limit (error)
-  if [ "$lines" -gt "$LIMIT_MAX" ]; then
-    echo "❌ ERROR: $f has $lines lines (max: $LIMIT_MAX)"
-    errors=$((errors + 1))
-  # Check default limit (warning)
-  elif [ "$lines" -gt "$LIMIT_DEFAULT" ]; then
-    echo "⚠️  WARNING: $f has $lines lines (default: $LIMIT_DEFAULT, max: $LIMIT_MAX)"
-    warnings=$((warnings + 1))
-  fi
-}
-
-# Check Python test files (paths defined in config: code_limits.test_paths.v3_python)
-for f in $(find tests/vibe3 -name "test_*.py" 2>/dev/null); do
-  check_file "$f"
-done
-
-# Report results
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Test file LOC check results:"
-echo "  - Default limit: $LIMIT_DEFAULT lines"
-echo "  - Max limit: $LIMIT_MAX lines"
-echo "  - Warnings: $warnings files (default → max)"
-echo "  - Errors: $errors files (exceed max)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+COUNTS_LINE=$(echo "$result" | tail -n 1)
+warnings=$(echo "$COUNTS_LINE" | awk '{print $2}')
+errors=$(echo "$COUNTS_LINE" | awk '{print $3}')
+LIMIT_DEFAULT=$(echo "$COUNTS_LINE" | awk '{print $4}')
+LIMIT_MAX=$(echo "$COUNTS_LINE" | awk '{print $5}')
 
 if [ "$errors" -gt 0 ]; then
   echo ""
+  echo "⚠️  WARNING: $errors test files exceed max limit ($LIMIT_MAX lines)"
+  echo "   This is a soft constraint in local development"
+  echo ""
   echo "💡 Tip: Split large test files into smaller, focused modules"
-  exit 1
+
+  if [ "${ENFORCE_LOC_LIMITS:-false}" = "true" ]; then
+    echo ""
+    echo "❌ CI ENFORCEMENT: Test files exceed max LOC limit - blocking pipeline"
+    exit 1
+  else
+    echo ""
+    echo "   Push allowed (local development)"
+    exit 0
+  fi
 elif [ "$warnings" -gt 0 ]; then
   echo ""
   echo "💡 Tip: Consider refactoring files exceeding default limit"

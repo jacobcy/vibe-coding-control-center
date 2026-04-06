@@ -8,7 +8,7 @@
 # Uses only the Python standard library so it can run before uv sync.
 #
 # Code paths (defined in config/settings.yaml:code_limits.code_paths.v3_python):
-#   - src/vibe3/ (excluding plugin modules such as src/vibe3/orchestra/)
+#   - src/vibe3/ (including orchestra modules)
 #
 # Note: scripts/ NOT included in total LOC (checked separately for single-file limits only)
 
@@ -16,47 +16,19 @@ set -e
 
 result=$(python3 - <<'PY'
 from pathlib import Path
-import re
+import sys
+
+sys.path.insert(0, str(Path("scripts/hooks").resolve()))
+
+from loc_settings import iter_files, load_loc_settings
 
 
-def parse_config(path: str) -> dict[str, str]:
-  values: dict[str, str] = {}
-  stack: list[tuple[int, str]] = []
-
-  for raw_line in Path(path).read_text().splitlines():
-    stripped = raw_line.strip()
-    if not stripped or stripped.startswith("#"):
-      continue
-
-    indent = len(raw_line) - len(raw_line.lstrip(" "))
-    while stack and stack[-1][0] >= indent:
-      stack.pop()
-
-    match = re.match(r"([A-Za-z0-9_]+):(?:\s*(.*))?$", stripped)
-    if not match:
-      continue
-
-    key, value = match.groups()
-    if not value:
-      stack.append((indent, key))
-      continue
-
-    path_key = ".".join([item[1] for item in stack] + [key])
-    values[path_key] = value.split("#", 1)[0].strip().strip('"').strip("'")
-
-  return values
-
-
-config = parse_config("config/settings.yaml")
-limit_total = int(config["code_limits.total_file_loc.v3_python"])
+config = load_loc_settings()
+limit_total = config.total_v3_python
 
 total_loc = 0
-excluded_prefixes = ("src/vibe3/orchestra/",)
-for path in Path("src/vibe3").rglob("*.py"):
-  posix_path = path.as_posix()
-  if "__pycache__" in path.parts or path.name == "__init__.py":
-    continue
-  if any(posix_path.startswith(prefix) for prefix in excluded_prefixes):
+for path in iter_files(config.code_paths_v3_python, suffixes=(".py",)):
+  if path.name == "__init__.py":
     continue
   total_loc += sum(1 for _ in path.open())
 
