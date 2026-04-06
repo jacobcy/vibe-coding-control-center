@@ -141,6 +141,36 @@ class TestMCPResources:
         assert "State: `in-progress`" in result
         assert "PR: #123" in result
 
+    def test_format_snapshot_includes_queue_metadata_for_ready_issues(self):
+        """READY issues should show queue metadata in MCP output."""
+        from vibe3.server.mcp import format_snapshot_for_mcp
+
+        mock_ready_state = MockIssueState("ready")
+        mock_ready_entry = MockIssueStatusEntry(
+            number=200,
+            title="Ready issue with queue metadata",
+            state=mock_ready_state,
+            milestone="v0.1",
+            roadmap="p0",
+            priority=9,
+            queue_rank=1,
+        )
+        mock_snapshot = MockOrchestraSnapshot(
+            timestamp=1234567890.0,
+            server_running=True,
+            active_issues=(mock_ready_entry,),
+            active_flows=1,
+            active_worktrees=1,
+        )
+
+        result = format_snapshot_for_mcp(mock_snapshot)
+
+        # Should show queue metadata for READY issue
+        assert "Queue Rank: #1" in result
+        assert "milestone=v0.1" in result
+        assert "roadmap/p0" in result
+        assert "priority/9" in result
+
 
 class TestMCPTools:
     """Tests for MCP tools."""

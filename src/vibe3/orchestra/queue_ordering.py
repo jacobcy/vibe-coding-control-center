@@ -127,8 +127,11 @@ def sort_ready_issues(issues: list[IssueInfo]) -> list[IssueInfo]:
     # Parse milestone from labels for each issue
     # (Simplified approach; real implementation may get milestone from GitHub API)
 
-    def get_sort_key(issue: IssueInfo) -> tuple[int, int, int]:
-        """Compute sort key for an issue: (milestone_rank, roadmap_rank, priority)."""
+    def get_sort_key(issue: IssueInfo) -> tuple[int, int, int, int]:
+        """Compute sort key for an issue.
+
+        Returns: (milestone_rank, roadmap_rank, priority, number)
+        """
         # Use IssueInfo.milestone (from GitHub milestone field)
         milestone_dict: dict[str, Any] | None = None
         if issue.milestone:
@@ -142,7 +145,8 @@ def sort_ready_issues(issues: list[IssueInfo]) -> list[IssueInfo]:
         # - Milestone: lower version number (v0.1) comes first (ascending order)
         # - Roadmap: lower rank (p0) comes first (ascending order)
         # - Priority: higher priority (9) comes first (negate for descending)
-        return (milestone_rank, roadmap_rank, -priority)
+        # - Issue number: stable tie-break (ascending)
+        return (milestone_rank, roadmap_rank, -priority, issue.number)
 
     # Sort by key
     return sorted(issues, key=get_sort_key)

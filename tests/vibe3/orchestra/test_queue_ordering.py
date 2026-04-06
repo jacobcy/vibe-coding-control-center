@@ -288,3 +288,36 @@ class TestSortReadyIssues:
         assert sorted_issues[1].number == 300  # v0.1, p1, priority/5
         assert sorted_issues[2].number == 200  # v0.3, p0, priority/7
         assert sorted_issues[3].number == 100  # v0.3, p1, priority/7
+
+    def test_issue_number_is_stable_tie_break(self) -> None:
+        """When two issues have identical milestone/roadmap/priority, sort by number."""
+        issues = [
+            # Same milestone, roadmap, priority — should sort by number ascending
+            IssueInfo(
+                number=300,
+                title="Issue 300",
+                state=None,
+                labels=["roadmap/p1", "priority/7", "state/ready"],
+                milestone="v0.3",
+            ),
+            IssueInfo(
+                number=100,
+                title="Issue 100",
+                state=None,
+                labels=["roadmap/p1", "priority/7", "state/ready"],
+                milestone="v0.3",
+            ),
+            IssueInfo(
+                number=200,
+                title="Issue 200",
+                state=None,
+                labels=["roadmap/p1", "priority/7", "state/ready"],
+                milestone="v0.3",
+            ),
+        ]
+        sorted_issues = sort_ready_issues(issues)
+        # All three have same milestone/roadmap/priority
+        # Should sort by issue number ascending: 100, 200, 300
+        assert sorted_issues[0].number == 100
+        assert sorted_issues[1].number == 200
+        assert sorted_issues[2].number == 300
