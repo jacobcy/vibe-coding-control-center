@@ -20,6 +20,7 @@ from vibe3.orchestra.queue_ordering import (
 )
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
+from vibe3.services.status_query_service import issue_priority
 
 if TYPE_CHECKING:
     from vibe3.runtime.circuit_breaker import CircuitBreaker
@@ -294,6 +295,17 @@ class OrchestraStatusService:
             if matching_data:
                 matching_data["queue_rank"] = rank
                 sorted_ready_data.append(matching_data)
+
+        other_issues_data.sort(
+            key=lambda item: (
+                *(
+                    issue_priority(item["state"])
+                    if isinstance(item["state"], IssueState)
+                    else (4, "unknown")
+                ),
+                item["number"],
+            )
+        )
 
         # Combine: ready issues first (sorted with real ranks), then others
         all_issues_data = sorted_ready_data + other_issues_data

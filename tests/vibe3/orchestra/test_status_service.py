@@ -317,3 +317,61 @@ class TestOrchestraSnapshot:
         # Queue rank should be computed for ready issues
         assert entry.queue_rank is not None
         assert isinstance(entry.queue_rank, int)
+
+    def test_snapshot_keeps_non_ready_operational_order_after_ready_queue_sort(
+        self,
+    ) -> None:
+        """Ready queue ordering must not scramble non-ready issue urgency order."""
+        config = _make_config()
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = None
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
+
+        issues = [
+            {
+                "number": 52,
+                "title": "Blocked issue",
+                "assignees": [],
+                "labels": [{"name": "state/blocked"}],
+            },
+            {
+                "number": 51,
+                "title": "In-progress issue",
+                "assignees": [],
+                "labels": [{"name": "state/in-progress"}],
+            },
+            {
+                "number": 99,
+                "title": "Ready issue",
+                "assignees": [],
+                "labels": [
+                    {"name": "state/ready"},
+                    {"name": "roadmap/p0"},
+                    {"name": "priority/9"},
+                ],
+                "milestone": {"title": "v0.1", "number": 1},
+            },
+        ]
+
+        def get_state(issue_number: int) -> IssueState:
+            if issue_number == 51:
+                return IssueState.IN_PROGRESS
+            if issue_number == 52:
+                return IssueState.BLOCKED
+            return IssueState.READY
+
+        with (
+            patch.object(service._github, "list_issues", return_value=issues),
+            patch.object(service._label_service, "get_state", side_effect=get_state),
+            patch.object(
+                service._orchestrator, "get_flow_for_issue", return_value=None
+            ),
+            patch.object(service._git, "list_worktrees", return_value=[]),
+        ):
+            snapshot = service.snapshot()
+
+        numbers = [entry.number for entry in snapshot.active_issues]
+        assert numbers == [99, 51, 52]
