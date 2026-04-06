@@ -7,18 +7,19 @@ from loguru import logger
 from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowStatusResponse, IssueLink
-from vibe3.services.flow_query_mixin import FlowQueryMixin
+from vibe3.services.flow_service import FlowService
 from vibe3.services.signature_service import SignatureService
 
 
-class TaskService(FlowQueryMixin):
+class TaskService:
     """Service for managing task state."""
 
     def __init__(
         self,
         store: SQLiteClient | None = None,
     ) -> None:
-        self.store = SQLiteClient() if store is None else store
+        self.store = store or SQLiteClient()
+        self._flow_service = FlowService(store=self.store)
 
     # ------------------------------------------------------------------
     # Core task operations
@@ -72,7 +73,7 @@ class TaskService(FlowQueryMixin):
     def get_task(self, branch: str) -> FlowStatusResponse | None:
         """Get task (flow) details."""
         logger.bind(domain="task", action="get", branch=branch).debug("Getting task")
-        return self.get_flow_status(branch)
+        return self._flow_service.get_flow_status(branch)
 
     def fetch_issue_with_comments(
         self, issue_number: int
