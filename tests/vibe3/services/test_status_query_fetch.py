@@ -49,14 +49,15 @@ class TestStatusQueryServiceFetch:
 
         assert len(result) == 3
 
-        # Should sort by priority: handoff (0) < ready (1) < blocked (2)
-        assert result[0]["number"] == 278
-        assert result[0]["state"] == IssueState.HANDOFF
-        assert result[0]["flow"] is None
+        # New sorting: READY issues first, then others by operational urgency
+        # READY 320 comes first, then HANDOFF 278, then BLOCKED 372
+        assert result[0]["number"] == 320
+        assert result[0]["state"] == IssueState.READY
+        assert result[0]["flow"] is not None
 
-        assert result[1]["number"] == 320
-        assert result[1]["state"] == IssueState.READY
-        assert result[1]["flow"] is not None
+        assert result[1]["number"] == 278
+        assert result[1]["state"] == IssueState.HANDOFF
+        assert result[1]["flow"] is None
 
         assert result[2]["number"] == 372
         assert result[2]["state"] == IssueState.BLOCKED
