@@ -41,6 +41,13 @@ code_limits:
     default: 300           # 单文件默认限制（所有类型）
     max: 400              # 单文件最大限制（所有类型）
 
+    # LOC例外：职责内聚但不适合进一步拆分的核心基础设施文件
+    exceptions:
+      - path: "src/vibe3/manager/worktree_manager.py"
+        limit: 420        # Worktree lifecycle management (职责内聚，共享私有方法)
+      - path: "src/vibe3/agents/backends/codeagent.py"
+        limit: 420        # Codeagent execution backend (sync/async共享基础设施)
+
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
     v3_python: 28000        # Python 核心代码总行数
