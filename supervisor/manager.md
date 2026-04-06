@@ -60,7 +60,7 @@ Forbidden:
 | 当前状态 | 预期进展 | Fallback 目标 (若无进展) |
 | :--- | :--- | :--- |
 | `state/ready` | 离开 `ready` (to `claimed` or `blocked`) | `state/blocked` |
-| `state/handoff` | 离开 `handoff` (to `in-progress`/`review`/`done`) | `state/blocked` |
+| `state/handoff` | 离开 `handoff` (to `in-progress` or `review`) | `state/blocked` |
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
 | `state/in-progress` | 产出 `report_ref` | `state/handoff` |
 | `state/review` | 产出 `audit_ref` | `state/handoff` |
