@@ -22,7 +22,7 @@ from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
-    _build_server,
+    _build_server_with_launch_cwd,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
@@ -123,7 +123,7 @@ def make_webhook_router(
 
 async def _run(config: OrchestraConfig, port: int) -> None:
     """Run heartbeat + HTTP server concurrently."""
-    heartbeat, fastapi_app = _build_server(config)
+    heartbeat, fastapi_app = _build_server_with_launch_cwd(config, Path.cwd())
 
     uv_config = uvicorn.Config(
         fastapi_app,
@@ -222,7 +222,8 @@ def start(
         raise typer.Exit(1)
 
     overrides: dict[str, object] = {}
-    if debug:
+    effective_debug = debug or config.debug
+    if effective_debug:
         current_branch = GitClient().get_current_branch()
         overrides["debug"] = True
         overrides["scene_base_ref"] = current_branch

@@ -5,7 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Generator
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -226,3 +226,26 @@ async def test_on_tick_does_not_dispatch_when_live_dispatch_exists(
 
     # Should not dispatch because live session exists
     svc._backend.start_async_command.assert_not_called()
+
+
+def test_resolve_cwd_uses_manager_repo_path_in_debug(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, manager = service
+    svc.config = OrchestraConfig(debug=True)
+    manager.repo_path = Path("/debug-wt")
+
+    with patch(
+        "vibe3.orchestra.services.state_label_dispatch.WorktreeManager"
+    ) as mock_worktree_manager:
+        mock_instance = MagicMock()
+        mock_instance.resolve_manager_cwd.return_value = (
+            Path("/debug-wt/.worktrees/issue-42"),
+            False,
+        )
+        mock_worktree_manager.return_value = mock_instance
+
+        resolved = svc._resolve_cwd(42, "task/issue-42")
+
+    assert resolved == Path("/debug-wt/.worktrees/issue-42")
+    mock_worktree_manager.assert_called_once_with(svc.config, Path("/debug-wt"))

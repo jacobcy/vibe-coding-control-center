@@ -48,6 +48,16 @@ def _resolve_orchestra_repo_root() -> Path:
     return Path.cwd()
 
 
+def _resolve_dispatcher_repo_root(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> Path:
+    """Resolve the worktree root used for dispatcher-managed auto scenes."""
+    _ = config
+    _ = launch_cwd
+    return _resolve_orchestra_repo_root().resolve()
+
+
 def _resolve_dispatcher_models_root(
     config: OrchestraConfig,
     launch_cwd: Path | None = None,
@@ -66,6 +76,14 @@ def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
 
 def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
+    return _build_server_with_launch_cwd(config)
+
+
+def _build_server_with_launch_cwd(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> tuple[HeartbeatServer, FastAPI]:
+    """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
     from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
@@ -77,7 +95,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
-        repo_path=_resolve_orchestra_repo_root(),
+        repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
     )
 
     # Pass circuit_breaker from manager for status reporting

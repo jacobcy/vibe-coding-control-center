@@ -23,6 +23,7 @@ from vibe3.server.app import (
 from vibe3.server.registry import (
     _build_async_serve_command,
     _build_server,
+    _build_server_with_launch_cwd,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _resolve_orchestra_repo_root,
@@ -86,6 +87,25 @@ def test_resolve_dispatcher_models_root_uses_launch_cwd_in_debug() -> None:
         OrchestraConfig(debug=True),
         launch_cwd=Path("/debug-wt"),
     ) == Path("/debug-wt")
+
+
+def test_build_server_keeps_main_repo_root_in_debug(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_repo_root",
+        lambda: Path("/main-repo"),
+    )
+
+    heartbeat, _ = _build_server_with_launch_cwd(
+        OrchestraConfig(debug=True),
+        launch_cwd=Path("/debug-wt"),
+    )
+
+    manager_service = next(
+        service
+        for service in heartbeat._services
+        if getattr(service, "trigger_name", None) == "manager"
+    )
+    assert manager_service._manager.repo_path == Path("/main-repo")
 
 
 def test_resolve_orchestra_log_dir_uses_launch_cwd() -> None:
@@ -279,6 +299,48 @@ def test_start_debug_overrides_interval_and_scene_base(monkeypatch) -> None:
     assert "scene_base: dev/post-437-debug" in result.stdout
     assert "Main log:" in result.stdout
     assert "Log dir:" in result.stdout
+
+
+def test_start_honors_settings_debug_for_scene_base_and_interval(monkeypatch) -> None:
+    import vibe3.server.app as serve_module
+
+    captured = {}
+
+    async def _fake_run(config, port):
+        captured["config"] = config
+        captured["port"] = port
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
+    monkeypatch.setattr(
+        serve_module.OrchestraConfig,
+        "from_settings",
+        classmethod(
+            lambda cls: OrchestraConfig(
+                enabled=True,
+                debug=True,
+                polling_interval=900,
+                debug_polling_interval=60,
+                port=8080,
+                scene_base_ref="origin/main",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        serve_module.GitClient, "get_current_branch", lambda self: "dev/issue-501"
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(serve_module, "_run", _fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["start"])
+
+    assert result.exit_code == 0
+    config = captured["config"]
+    assert config.debug is True
+    assert config.polling_interval == 60
+    assert config.scene_base_ref == "dev/issue-501"
+    assert "scene_base: dev/issue-501" in result.stdout
 
 
 def test_validate_pid_file_handles_read_errors(

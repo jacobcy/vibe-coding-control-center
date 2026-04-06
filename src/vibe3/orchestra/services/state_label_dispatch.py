@@ -443,7 +443,9 @@ class StateLabelDispatchService(ServiceBase):
         )
 
     def _resolve_cwd(self, issue_number: int, branch: str) -> Path:
-        repo_root = Path(GitClient().get_git_common_dir()).parent
+        repo_root = getattr(self._manager, "repo_path", None)
+        if not isinstance(repo_root, Path):
+            repo_root = Path(GitClient().get_git_common_dir()).parent
         cwd, _ = WorktreeManager(self.config, repo_root).resolve_manager_cwd(
             issue_number,
             branch,
