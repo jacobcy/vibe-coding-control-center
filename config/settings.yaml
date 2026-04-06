@@ -103,6 +103,9 @@ code_limits:
       - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
         limit: 550
         reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
+      - path: "tests/vibe3/orchestra/test_serve.py"
+        limit: 500
+        reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
       - path: "tests/vibe3/commands/test_run_manager_issue.py"
         limit: 500
         reason: "manager issue 模式回归矩阵集中在单入口，拆分会削弱可读性"
@@ -118,9 +121,6 @@ code_limits:
       - path: "tests/vibe3/services/test_check_service.py"
         limit: 400
         reason: "check service 回归按同一服务契约组织，当前维持集中更清晰"
-      - path: "tests/vibe3/orchestra/test_serve.py"
-        limit: 400
-        reason: "serve 生命周期测试共享服务装配，暂不值得拆分"
 
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
