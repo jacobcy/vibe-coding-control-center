@@ -99,12 +99,13 @@ def sync_models_json(options: AgentOptions) -> None:
     In backend mode: updates default_backend (and default_model if specified),
     so codeagent-wrapper uses vibe3's config instead of whatever is in the file.
 
-    In agent preset mode: no-op — codeagent manages the preset's backend/model
-    from its own config.
+    In unmapped agent preset mode: no-op — codeagent manages the preset's
+    backend/model from its own config. If a repo-local preset resolves to an
+    explicit backend/model, this function syncs the resolved values.
     """
     effective = resolve_effective_agent_options(options)
     if not effective.backend:
-        return  # agent preset mode — codeagent reads preset config itself
+        return  # no repo-local backend mapping available
 
     try:
         existing: dict[str, Any] = {}

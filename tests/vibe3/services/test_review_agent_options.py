@@ -170,13 +170,13 @@ class TestResolveAgentOptions:
 class TestSyncModelsJson:
     """Tests for sync_models_json."""
 
-    @pytest.mark.skip(reason="已知偶发问题，暂时跳过")
-    def test_no_op_in_agent_mode(self, tmp_path: Path) -> None:
-        """In agent preset mode, models.json is not touched."""
+    def test_unmapped_agent_preset_is_no_op(self, tmp_path: Path) -> None:
+        """Agent preset with no repo-local mapping should not touch models.json."""
         fake_models = tmp_path / "models.json"
         fake_models.write_text('{"default_backend": "old"}')
         fake_repo_models = tmp_path / "repo-models.json"
         fake_repo_models.write_text("{}")
+        before = fake_models.read_text()
 
         with (
             patch(
@@ -187,10 +187,9 @@ class TestSyncModelsJson:
                 fake_repo_models,
             ),
         ):
-            sync_models_json(AgentOptions(agent="code-reviewer"))
+            sync_models_json(AgentOptions(agent="missing-preset"))
 
-        # file unchanged
-        assert json.loads(fake_models.read_text())["default_backend"] == "old"
+        assert fake_models.read_text() == before
 
     def test_updates_default_backend_and_model(self, tmp_path: Path) -> None:
         """Backend mode: updates default_backend and default_model."""
