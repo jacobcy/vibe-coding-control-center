@@ -74,6 +74,8 @@ def manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
         executor=executor,
     )
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
         yield svc, manager
@@ -93,6 +95,8 @@ def handoff_manager_service() -> tuple[StateLabelDispatchService, MagicMock]:
         executor=executor,
     )
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
         yield svc, manager
@@ -117,6 +121,7 @@ async def test_on_tick_dispatches_matching_state(
 ) -> None:
     svc, _ = service
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
 
     await svc.on_tick()
@@ -132,6 +137,7 @@ async def test_on_tick_skips_when_plan_ref_already_exists(
 ) -> None:
     svc, _ = service
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
     svc._store.get_flow_state.return_value = {"plan_ref": "/tmp/plan.md"}
 
@@ -146,6 +152,7 @@ async def test_on_tick_skips_noncanonical_manual_flow_for_plan(
 ) -> None:
     svc, manager = service
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "dev/issue-435"}
 
@@ -172,6 +179,7 @@ async def test_on_tick_skips_when_live_tmux_session_exists(
 ) -> None:
     svc, _ = service
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
     svc._has_live_dispatch.return_value = True
 
@@ -406,10 +414,11 @@ async def test_manager_handoff_blocked_issue_is_not_redispatched(
 
 
 @pytest.mark.asyncio
-async def test_manager_async_path_treats_comment_changes_as_progress(
+async def test_manager_async_path_blocks_on_comment_only_change_for_ready(
     manager_service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
-    """Async runtime path should treat comment count changes as progress."""
+    """READY state requires state transition; side effects like comments
+    are NOT enough."""
     svc, manager = manager_service
     # Issue still has state/ready but comment count changed
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
@@ -417,7 +426,7 @@ async def test_manager_async_path_treats_comment_changes_as_progress(
     svc._in_flight_dispatches.add(42)
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
 
-    # Comment count increased (manager made progress)
+    # Comment count increased but state unchanged
     before = {
         "state_label": "state/ready",
         "comment_count": 0,
@@ -438,8 +447,10 @@ async def test_manager_async_path_treats_comment_changes_as_progress(
     ):
         await svc.on_tick()
 
-    # Should NOT auto-block because comment count changed (Task 3 fix)
-    svc._github.add_comment.assert_not_called()
+    # Should auto-block because state unchanged (Task 1 fix in Batch 2)
+    svc._github.add_comment.assert_called_once()
+    comment = svc._github.add_comment.call_args[0][1]
+    assert "Manager 执行完成但未改变状态" in comment
 
 
 @pytest.mark.asyncio
@@ -497,8 +508,8 @@ async def test_manager_async_path_treats_handoff_changes_as_progress(
         # Second tick: check for progress
         await svc.on_tick()
 
-        # Should NOT auto-block because handoff changed (progress made)
-        svc._github.add_comment.assert_not_called()
+        # Should STILL auto-block because state unchanged (even if handoff changed)
+        svc._github.add_comment.assert_called_once()
     finally:
         dispatch_module.snapshot_progress = original_snapshot
 
@@ -564,6 +575,7 @@ async def test_on_tick_does_not_dispatch_when_live_dispatch_exists(
     """Issue with live dispatch should not be dispatched again."""
     svc, _ = service
     svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
     # Simulate live dispatch exists
     svc._has_live_dispatch.return_value = True

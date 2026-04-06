@@ -258,11 +258,17 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    if not has_progress_changed(before_snapshot, after_snapshot):
-        reason = (
-            "manager 本轮未产生任何有效动作(无状态变化、无新 comment、"
-            "无 handoff/refs 更新)"
-        )
+    # Manager must leave READY or HANDOFF state to count as progress
+    # For ready-manager path, closing the issue also counts as valid progress
+    current_state_label = before_snapshot.get("state_label", "")
+    allow_close = current_state_label == "state/ready"
+    if not has_progress_changed(
+        before_snapshot,
+        after_snapshot,
+        require_state_transition=True,
+        allow_close_as_progress=allow_close,
+    ):
+        reason = "manager 本轮未产生状态迁移（must leave READY/HANDOFF per contract）"
         store.add_event(
             branch,
             "manager_noop_blocked",

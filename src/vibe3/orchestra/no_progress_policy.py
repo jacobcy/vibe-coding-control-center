@@ -105,6 +105,9 @@ def snapshot_progress(
         "comment_count": _comment_count(issue_payload),
         "handoff": handoff_sig,
         "refs": refs,
+        "issue_state": issue_payload.get(
+            "state", "open"
+        ),  # GitHub issue state: open/closed
     }
 
 
@@ -112,6 +115,8 @@ def has_progress_changed(
     before: dict[str, object],
     after: dict[str, object],
     expected_ref: str | None = None,
+    require_state_transition: bool = False,
+    allow_close_as_progress: bool = False,
 ) -> bool:
     """Check if any progress signal changed between snapshots.
 
@@ -119,6 +124,9 @@ def has_progress_changed(
         before: Previous progress snapshot
         after: Current progress snapshot
         expected_ref: Optional specific ref key that MUST change to count as progress
+        require_state_transition: If True, only state label change counts as progress
+        allow_close_as_progress: If True, open->closed counts as progress
+            (ready-manager only)
 
     Returns:
         True if progress was made (signals changed as expected)
@@ -127,7 +135,21 @@ def has_progress_changed(
     if before["state_label"] != after["state_label"]:
         return True
 
-    # If a specific ref was expected (strict progress contract)
+    # Ready-manager close path: if issue went from open to closed, it counts as progress
+    # This is scoped to ready-manager only and does not affect other states
+    if allow_close_as_progress:
+        before_state = before.get("issue_state", "open")
+        after_state = after.get("issue_state", "open")
+        if before_state == "open" and after_state == "closed":
+            return True
+
+    # For states like READY/HANDOFF, we MUST transition to another state.
+    # Simple side effects (comments/handoff) do not count as "progress"
+    # for these states.
+    if require_state_transition:
+        return False
+
+    # If a specific ref was expected (strict progress contract for plan/run/review)
     if expected_ref:
         before_refs = before.get("refs")
         after_refs = after.get("refs")
@@ -136,7 +158,7 @@ def has_progress_changed(
         # Check if the specific expected ref changed
         return before_refs.get(expected_ref) != after_refs.get(expected_ref)
 
-    # General heuristic progress check (for manager/loose states)
+    # General heuristic progress check (for loose states if any)
     return any(
         before[key] != after[key] for key in ("comment_count", "handoff", "refs")
     )
@@ -191,7 +213,6 @@ def execute_state_fallback(
         source_state: The current issue state that failed to progress
         repo: Optional repository (owner/repo format)
     """
-    import subprocess
 
     target_state = STATE_FALLBACK_MATRIX.get(source_state, IssueState.BLOCKED)
     target_label = target_state.to_label()
@@ -227,27 +248,53 @@ def execute_state_fallback(
             f"原因：本阶段（{source_label}）未产生有效的 refs / artifacts 变化。"
         )
 
-    # Add comment and update labels
-    github.add_comment(issue_number, f"[dispatcher] {reason}", repo=repo)
+    # Add comment (with deduplication to avoid spam during retries)
+    full_comment = f"[dispatcher] {reason}"
+    issue_payload = github.view_issue(issue_number, repo=repo)
+    if isinstance(issue_payload, dict) and not _has_matching_comment(
+        issue_payload, full_comment
+    ):
+        github.add_comment(issue_number, full_comment, repo=repo)
 
-    cmd = [
-        "gh",
-        "issue",
-        "edit",
-        str(issue_number),
-        "--add-label",
-        target_label,
-        "--remove-label",
-        source_label,
-    ]
-    if repo:
-        cmd.extend(["--repo", repo])
+    # Use LabelService for atomic state transition with validation
+    from vibe3.services.label_service import LabelService
 
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=15, check=False)
+        result = LabelService(repo=repo).confirm_issue_state(
+            issue_number,
+            target_state,
+            actor="orchestra:fallback",
+            force=True,  # Force if needed, but matrix should already allow this
+        )
+        if result == "blocked":
+            raise RuntimeError(
+                f"State transition to {target_state.value} was blocked by state machine"
+            )
     except Exception as exc:
         logger.bind(
             domain="orchestra",
             issue=issue_number,
-        ).error(f"Failed to update labels: {exc}")
+        ).error(f"Failed to update labels during fallback: {exc}")
         raise
+
+
+def _has_matching_comment(issue_payload: dict[str, object], comment_text: str) -> bool:
+    """Check if issue already has an identical comment.
+
+    Args:
+        issue_payload: GitHub issue payload
+        comment_text: Comment text to search for
+
+    Returns:
+        True if matching comment exists
+    """
+    comments = issue_payload.get("comments")
+    if not isinstance(comments, list):
+        return False
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        body = comment.get("body")
+        if isinstance(body, str) and comment_text.strip() == body.strip():
+            return True
+    return False

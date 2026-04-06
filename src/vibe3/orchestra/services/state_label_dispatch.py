@@ -215,19 +215,42 @@ class StateLabelDispatchService(ServiceBase):
                     )
                     # Use state-specific progress contract to verify execution
                     expected_ref = STATE_PROGRESS_CONTRACT.get(self.trigger_state)
+                    # For READY and HANDOFF, we require leaving the state (transition)
+                    # to consider it "progressed", per manager.md contract.
+                    require_transition = self.trigger_state in {
+                        IssueState.READY,
+                        IssueState.HANDOFF,
+                    }
+                    # For ready-manager path, closing the issue also counts as valid
+                    # progress. This is scoped to ready only and does not apply to
+                    # handoff.
+                    allow_close = (
+                        self.trigger_state == IssueState.READY
+                        and self.trigger_name == "manager"
+                    )
                     has_progress = has_progress_changed(
                         before_snapshot,
                         after_snapshot,
                         expected_ref=expected_ref,
+                        require_state_transition=require_transition,
+                        allow_close_as_progress=allow_close,
                     )
                     if not has_progress:
-                        execute_state_fallback(
-                            issue_number=issue_number,
-                            current_labels=labels,
-                            github=self._github,
-                            source_state=self.trigger_state,
-                            repo=self.config.repo,
-                        )
+                        try:
+                            execute_state_fallback(
+                                issue_number=issue_number,
+                                current_labels=labels,
+                                github=self._github,
+                                source_state=self.trigger_state,
+                                repo=self.config.repo,
+                            )
+                        except Exception as fallback_exc:
+                            logger.bind(
+                                domain="orchestra",
+                                issue=issue_number,
+                            ).error(f"Fallback execution failed: {fallback_exc}")
+                            # Do not add to stale, let it retry or remain in-flight
+                            continue
                 stale.add(issue_number)
                 self._progress_snapshots.pop(issue_number, None)
                 continue
