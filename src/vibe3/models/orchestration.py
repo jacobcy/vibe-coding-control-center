@@ -81,8 +81,6 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.FAILED, IssueState.IN_PROGRESS),
     (IssueState.FAILED, IssueState.REVIEW),
     # Closure paths
-    (IssueState.READY, IssueState.DONE),
-    (IssueState.HANDOFF, IssueState.DONE),
     (IssueState.MERGE_READY, IssueState.DONE),
 }
 
@@ -90,7 +88,7 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
 # (the artifact that must be created to consider it "progressed")
 # Format: State -> Field in handoff/refs
 STATE_PROGRESS_CONTRACT: dict[IssueState, str | None] = {
-    IssueState.READY: None,  # System enforces MUST transition (claimed/blocked/done)
+    IssueState.READY: None,  # System enforces MUST transition (claimed/blocked only)
     IssueState.HANDOFF: None,  # System enforces MUST transition
     IssueState.CLAIMED: "plan_ref",
     IssueState.IN_PROGRESS: "report_ref",
@@ -108,9 +106,11 @@ STATE_FALLBACK_MATRIX: dict[IssueState, IssueState] = {
 
 # Forbidden transitions (require force=True)
 FORBIDDEN_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
+    (IssueState.READY, IssueState.DONE),
     (IssueState.CLAIMED, IssueState.DONE),
     (IssueState.BLOCKED, IssueState.DONE),
     (IssueState.FAILED, IssueState.DONE),
+    (IssueState.HANDOFF, IssueState.DONE),
 }
 
 

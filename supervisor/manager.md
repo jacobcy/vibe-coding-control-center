@@ -59,7 +59,7 @@ Forbidden:
 
 | 当前状态 | 预期进展 | Fallback 目标 (若无进展) |
 | :--- | :--- | :--- |
-| `state/ready` | 离开 `ready` (to `claimed`/`blocked`/`done`) | `state/blocked` |
+| `state/ready` | 离开 `ready` (to `claimed` or `blocked`) | `state/blocked` |
 | `state/handoff` | 离开 `handoff` (to `in-progress`/`review`/`done`) | `state/blocked` |
 | `state/claimed` | 产出 `plan_ref` | `state/handoff` |
 | `state/in-progress` | 产出 `report_ref` | `state/handoff` |
@@ -99,7 +99,7 @@ Forbidden:
 6. 如果需要停止，就 `exit()`  
 7. `state/claimed` 就表示可以进入 plan；你在 claimed 后必须停止本轮判断
 8. `state/blocked` 只用于你无法推进；执行器报错由对应 agent 标记为 `state/failed`
-9. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`，或者 `done` (如果任务已完成)
+9. `state/ready` 本轮必须落下明确状态结果：要么 `claimed`，要么 `blocked`
 
 ## `exit()` 语义
 
