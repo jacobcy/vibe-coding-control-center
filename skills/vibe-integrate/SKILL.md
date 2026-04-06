@@ -26,6 +26,24 @@ description: Use when the user wants to assess, unblock, and merge one or more P
   - 优先：在线 Codex/Copilot review
   - 备选：`uv run python src/vibe3/cli.py review base` 本地 review
 
+### 总量/单文件超限场景（额外质量门）
+
+满足以下任一条件时，除了 review evidence，还必须再做一轮代码质量复查：
+
+- 当前分支会让核心代码总量超过 `config/settings.yaml` 中的总量阈值
+- 某个单文件超过默认 LOC 限制或 max 限制
+
+这轮复查的目标不是机械阻断，而是确认：
+
+- 是否存在明显可回收的坏味道
+- 是否有业务逻辑越界或职责漂移
+- 是否只是因为合理聚合导致总量上升
+
+真源约束：
+
+- 所有总量阈值、单文件阈值、exception 都以 `config/settings.yaml` 为准。
+- `/vibe-integrate` 不自行发明阈值，也不凭口头结论接受超限。
+
 ## 停止点
 
 - PR 已合并 → 进入 `/vibe-done`
@@ -59,11 +77,13 @@ description: Use when the user wants to assess, unblock, and merge one or more P
   ├─ Step 3: 审核合并条件
   │   ├─ CI 是否通过
   │   ├─ review evidence 是否存在（复杂场景）
+   │   ├─ 是否触发总量 / 单文件 LOC 超限
   │   ├─ 阻塞性 review threads 是否已处理
   │   └─ merge base / stack 顺序是否正确
   │
   ├─ Step 4: 处理阻塞项
   │   ├─ 修复 CI 或 review 阻塞问题
+   │   ├─ 处理 LOC 超限后的质量收口
   │   ├─ 推送并重新检查状态
   │   └─ 只修当前 PR 的 follow-up
   │
@@ -168,6 +188,7 @@ uv run python src/vibe3/cli.py task status --all --check
 
 - CI 是否通过
 - review evidence 是否存在
+- 是否触发代码总量或单文件 LOC 超限
 - 是否还有阻塞性的 unresolved review threads
 - merge base / stack 顺序是否正确
 - 当前分支是否还需要 review follow-up patch
@@ -180,6 +201,22 @@ gh pr checks <pr>
 uv run python src/vibe3/cli.py review pr <pr>
 ```
 
+LOC / 代码质量证据入口：
+
+```bash
+cat config/settings.yaml
+bash scripts/hooks/check-python-loc.sh
+bash scripts/hooks/check-per-file-loc.sh
+uv run python src/vibe3/cli.py review base
+```
+
+判断原则：
+
+- **总量超限**：先开展一轮代码质量复查。若复查没有明显问题，包括没有业务逻辑越界、没有明显可拆分的脏聚合、没有无调用死代码，则允许提升代码总量。
+- **单文件超限**：先判断是否值得拆分。若值得拆分，应优先拆分后再 merge；若不值得拆分，且职责仍单一、边界清楚、拆分只会放大耦合，则把该文件加入 `config/settings.yaml` 的 exception 处理，并写明 reason。
+- **不要**为了压 LOC 机械拆分单一职责但强耦合的聚合文件。
+- **例外处理必须落配置**：无论是提升总量阈值还是单文件例外，只要结论是“允许超限”，都必须把对应配置与 reason 一起落到 `config/settings.yaml`，不能只在 PR comment 或 handoff 里口头说明。
+
 ### Step 4: 处理阻塞项
 
 若发现 CI 或 review 阻塞：
@@ -187,6 +224,24 @@ uv run python src/vibe3/cli.py review pr <pr>
 - 在对应分支上修复阻塞问题
 - 运行受影响的本地验证命令
 - 推送并重新检查远端 CI / review 状态
+
+若发现 LOC 超限：
+
+- 先做一轮质量复查，而不是立刻机械压行数
+- 记录是否存在明显问题：
+  - 业务逻辑越界
+  - 单文件承担多个不相关职责
+  - 大量可提取但未提取的重复逻辑
+  - 兼容层/过时路径未清理
+- 若没有明显问题，再决定：
+  - 总量超限：允许提升总量阈值
+  - 单文件超限：评估是否拆分；不值得拆分则进入 `config/settings.yaml` 例外
+
+执行细则：
+
+- 总量提升前，必须明确说明为什么当前增长是合理聚合而不是失控膨胀。
+- 单文件例外前，必须明确说明为什么拆分收益低，且不会降低边界清晰度。
+- 如果复查发现明显业务逻辑越界、职责漂移或坏味道，则优先要求修正，而不是直接提升阈值或加 exception。
 
 限制：
 
@@ -202,6 +257,7 @@ uv run python src/vibe3/cli.py review pr <pr>
 
 - CI 通过
 - 已存在 review evidence
+- 若命中 LOC 超限，已完成额外代码质量复查且结论允许 merge
 - 阻塞性 review 已处理完成（`APPROVED` 或所有 unresolved thread 已 resolve）
 - 堆叠上游已先合并
 - 当前 PR 已达到可合并状态
@@ -254,4 +310,8 @@ uv run python src/vibe3/cli.py handoff append "vibe-integrate: PR review complet
 - 不得在 review 尚未完成（无 review threads、decision 为 PENDING）的情况下声称"无阻塞"
 - 不得跳过 stack 顺序
 - 不得直接关闭 task 或 issue
+- 不得因为总量超限就机械要求压行；必须先做质量复查
+- 不得因为单文件超限就机械拆分；必须先判断是否值得拆分
+- 不得在需要进 `config/settings.yaml` 例外时只口头说明，必须把 exception 和 reason 一起落到配置
+- 不得在发现明显业务逻辑越界时，仍以“允许提升总量/允许例外”为结论继续 merge
 - 若 PR 尚未达到合并条件，必须停在整合阶段并说明阻塞项

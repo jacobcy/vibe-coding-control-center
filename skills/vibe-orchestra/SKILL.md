@@ -7,9 +7,12 @@ description: Use when the user wants heartbeat-style governance over the issue p
 
 > 项目命令参考见 `skills/vibe-instruction/SKILL.md`
 
-`vibe-orchestra` 负责 orchestra 心跳层的 issue pool 治理。它关心的是现在有哪些 issue 正在运行、哪些已满足 assignee 触发条件但尚未进入调度，以及接下来哪个 issue 值得建议启动。它不负责单 flow 执行。
+`vibe-orchestra` 负责 orchestra 心跳层的 issue pool 治理。它关心的是现在有哪些 issue 正在运行、哪些已满足 assignee 触发条件但尚未进入调度，以及在人机协作环节接下来哪个 issue 值得优先处理。它不负责单 flow 执行。
+
+优先级判断口径必须对齐 `supervisor/orchestra.md`。可以把 `vibe-orchestra` 视为自动治理 supervisor 在人机协作环节的落地判断器：它不发明另一套优先级规则，只读取当前现场并按 supervisor 已定义的排序模型，指导人类如何找到下一个需要处理的 issue。
 
 术语、对象边界与触发分流以以下标准为准：
+
 - `docs/standards/glossary.md`
 - `docs/standards/action-verbs.md`
 - `docs/standards/v3/skill-standard.md`
@@ -21,31 +24,38 @@ description: Use when the user wants heartbeat-style governance over the issue p
 ## Scope
 
 `vibe-orchestra` 只回答两类问题：
-- 现在有哪些 issue 正在运行
-- 接下来哪个 issue 值得建议启动
 
-这里的“建议 issue”只是参考，不是强制调度结果；最终仍需结合 flow / worktree / PR 现场判断。
+- 现在有哪些 issue 正在运行
+- 在当前现场下，接下来哪个 issue 值得建议优先处理
+
+这里的“建议 issue”只是参考，不是强制调度结果；最终仍需结合 flow / PR / 人类当前上下文判断。
 
 补充说明：
 
 - assignee 是启动事实源
 - `state/*` label 只反映 flow 实际状态，不是主触发源
 - 常驻 server 与定时巡检只是运行模式差异，不改变本 skill 的职责边界
+- 自动 ready queue 的建议顺序按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解
+- 人机协作时，若某个 issue 已被人类明确接手、已有活跃 PR、或当前上下文要求先收口 follow-up，可临时覆盖自动顺序，但必须说明理由
 
 ## What It Reads
 
 - running issues
 - 尚未启动但可被考虑的候选 issues
+- `uv run python src/vibe3/cli.py task status` 中的 active / ready / blocked 现场与 ready queue rank
+- 当前是否已有人工明确接手的 issue / PR follow-up / review 收口上下文
 - assignee 与 queue / flow 现场事实
 - issue state labels
 - dependency information such as blocked_by
 - orchestra heartbeat status 与相关文档
+- `supervisor/orchestra.md` 中的 queue guidance 与治理边界
 
 ## What It Produces
 
 - running issues summary
 - backfill candidates summary
-- suggested issues list
+- next-issue recommendation
+- ready queue ordering judgment
 - 最小 non-state label actions 或 routing suggestions
 - start / wait / defer recommendations with short reasons
 
@@ -59,6 +69,7 @@ description: Use when the user wants heartbeat-style governance over the issue p
 - 不负责决定单个 issue 一定要先 plan、run、review 还是直接人工操作
 - 不负责把 `state/*` label 当作启动执行的主驱动
 - 不负责写代码
+- 不负责替代人类做最终业务优先级拍板；它只给出基于 supervisor 语义和当前现场的建议
 
 当请求跨出这些边界时，按 `docs/standards/v3/skill-trigger-standard.md` 分流，不在本 skill 中重写职责矩阵。
 
@@ -67,16 +78,19 @@ description: Use when the user wants heartbeat-style governance over the issue p
 1. 查看当前 running issues 与 queue / flow 现场
 2. 补捞已满足 assignee 条件但尚未进入调度的候选 issue
 3. 判断是否已经存在足够明确的执行现场
-4. 对未运行 issue 给出建议顺序
-5. 如有必要，提出最小 non-state label 调整建议
-6. 在治理结论处停止
+4. 参考 `supervisor/orchestra.md`，按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 对自动 ready queue 做人机治理判断
+5. 结合当前人工上下文，识别哪些 issue 虽然不在自动顺位最前，但更适合现在先处理
+6. 如有必要，提出最小 non-state label 调整建议
+7. 在治理结论处停止
 
 ## Output Contract
 
 输出至少包含：
+
 - `Running issues`
 - `Backfill candidates`
-- `Suggested issues`
+- `Next issue`
+- `Why this one now`
 - `Label actions`
 - `Why`
 
