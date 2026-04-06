@@ -48,7 +48,7 @@ bin/vibe keys <list|set|get|init>  # 密钥管理
 
 ## V3 Python 部分（vibe3）
 
-V3 是当前的业务编排层，负责 issue → flow → PR 的全生命周期管理。
+V3 是当前的人机协作编排层，负责 issue / branch / PR 的创联与本地 flow / handoff 协作增强。
 
 **运行方式**：
 
@@ -117,13 +117,14 @@ vibe3 inspect files <path>            # 统计文件 LOC、方法数与内部依
 ### 1. 启动任务
 
 ```bash
-# 使用 skill 自动化 (推荐)
-/vibe-new <feature-description>  # 选 issue -> 切分支 -> 注册 flow -> 绑 issue -> 提 PR draft
+# 使用 skill 自动化（推荐）
+/vibe-new <feature-description>  # 选/建 issue -> 切到 dev/issue-<id> -> flow update/bind -> 按需创联 PR
 
-# 或手动启动
-git checkout -b task/issue-123
+# 或手动启动人机协作流
+git checkout -b dev/issue-123
 uv run python src/vibe3/cli.py flow update
-uv run python src/vibe3/cli.py flow bind 123
+uv run python src/vibe3/cli.py flow bind 123 --role task
+uv run python src/vibe3/cli.py pr create --base main --yes   # 按需
 ```
 
 ### 2. 执行与观察
@@ -140,18 +141,19 @@ uv run python src/vibe3/cli.py handoff show       # 阅读 agent 留下的 Findi
 ```bash
 /vibe-commit                     # 整理变更并推送到 PR
 /vibe-integrate                  # 等待 CI 与 Review，直到 merge-ready
-/vibe-done                       # 合并、关闭 issue 并清理现场
+/vibe-done                       # PR 进入终态后做 issue / handoff / 现场收口
 ```
 
 ---
 
 ## 核心边界与误区
 
-1. **flow ≠ branch**：flow 是绑定在 branch 上的逻辑上下文。删除分支前，应确保 flow 已同步或 `done`。
+1. **flow ≠ branch**：flow 是绑定在 branch 上的逻辑上下文；branch 生命周期优先由 git / gh 管理。
 2. **真源在 `.git/vibe3/handoff.db`**：所有 worktree 共享该 SQLite 数据库，由主仓库的 `git common dir` 承载。
-3. **不再有 flow new**：V3 倡导“以分支为锚点”，使用 `flow update` 注册现有分支即可。
+3. **不再有 flow new / flow done / 顶层 status**：V3 只保留最小共享状态入口；branch / issue / PR 常规生命周期优先直接使用 git / gh。
 4. **handoff 不是数据库**：`.git/vibe3/handoff/` 存储的是 Markdown 交接文件，用于人机协作；状态流转以 SQLite 库为准。
-5. **Orchestra 是后台服务**：`vibe3 serve` 启动心跳轮询，自动处理 Webhook 事件，`vibe3 task status` 是它的展示面。
+5. **恢复已有 branch 统一用 `/vibe-continue`**：`/vibe-start` 已不再作为现行入口。
+6. **Orchestra 是后台服务**：`vibe3 serve` 启动心跳轮询，自动处理 Webhook 事件，`vibe3 task status` 是它的展示面。
 
 ---
 

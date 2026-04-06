@@ -1,6 +1,6 @@
 ---
 name: vibe-continue
-description: Use when the user wants to resume previous work, says "/vibe-continue", or starts a new session and wants to load saved context. Restore from shared task facts first, then use vibe3 handoff show as context source.
+description: Use when the user wants to resume work on an existing branch or reload the current flow context in a new session. This is the current resume entry for human-collaboration branches, replacing the old vibe-start path.
 ---
 
 # /vibe-continue - Resume Current Flow
@@ -41,8 +41,8 @@ uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
 `/vibe-continue` 默认按以下顺序恢复：
 
 1. 当前 `git` 现场（`git branch --show-current`、`git status --short`、必要时 `gh pr view`）
-2. `$(git rev-parse --git-common-dir)/vibe/registry.json`
-3. `$(git rev-parse --git-common-dir)/vibe/tasks/<task-id>/task.json`
+2. `vibe3 flow show`
+3. `vibe3 task status --all --check`
 4. `vibe3 handoff show`（当前 flow 的 handoff 记录）
 
 必要时再补充：
@@ -55,11 +55,11 @@ uv run python src/vibe3/cli.py handoff show # 查看 handoff 记录
 
 ### Step 1: 识别当前目录承载的 flow 对应 task
 
-优先从 `git` 现场、共享 `registry.json` 与 task detail 识别：
+优先从 `git` 现场、当前 flow scene 与全局 task status 识别：
 
 ```bash
 uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py task status --all --check
 uv run python src/vibe3/cli.py handoff show
 ```
 
