@@ -233,13 +233,6 @@ def resume(
         )
         raise typer.Exit(1)
 
-    if not reason:
-        typer.echo(
-            "Error: --reason is required",
-            err=True,
-        )
-        raise typer.Exit(1)
-
     target_issues: list[int] | None
     candidate_mode = "resumable"
     if has_flag:

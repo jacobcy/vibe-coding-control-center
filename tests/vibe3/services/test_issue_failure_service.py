@@ -247,38 +247,6 @@ def test_resume_failed_issue_to_handoff_adds_comment_and_transitions_state() -> 
         )
 
 
-def test_resume_failed_issue_to_ready_adds_comment_and_transitions_state() -> None:
-    """Test that failed resume returns to READY for fresh manager entry."""
-    mock_github = MagicMock()
-    mock_labels = MagicMock()
-
-    with (
-        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
-        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
-    ):
-        issue_failure_service.resume_failed_issue_to_ready(
-            issue_number=456,
-            repo="owner/repo",
-            actor="human:resume",
-            reason="quota resumed",
-        )
-
-        mock_github.add_comment.assert_called_once()
-        call_args = mock_github.add_comment.call_args
-        assert call_args[0][0] == 456
-        assert "state/ready" in call_args[0][1]
-        assert "重新进入 manager" in call_args[0][1]
-        assert "quota resumed" in call_args[0][1]
-        assert call_args[1].get("repo") == "owner/repo"
-
-        mock_labels.confirm_issue_state.assert_called_once_with(
-            456,
-            IssueState.READY,
-            actor="human:resume",
-            force=True,  # Force transition from FAILED to READY
-        )
-
-
 def test_resume_failed_issue_to_ready_uses_default_actor() -> None:
     """Test that resume_failed_issue_to_ready defaults actor to human:resume."""
     mock_github = MagicMock()
@@ -370,3 +338,67 @@ def test_resume_blocked_issue_to_ready_adds_blocked_specific_comment() -> None:
             actor="human:resume",
             force=True,
         )
+
+
+def test_resume_failed_issue_to_ready_omits_empty_reason_and_dedups_comment() -> None:
+    """空 reason 时使用稳定文案，若 comment 已存在则不重复发。"""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+    existing_comment = {
+        "comments": [
+            {
+                "body": "[resume] 已从 state/failed 继续到 state/ready。\n\n"
+                "将重新进入 manager 标准入口。"
+            }
+        ]
+    }
+    mock_github.view_issue.return_value = existing_comment
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_ready(
+            issue_number=456,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="",
+        )
+
+        mock_github.add_comment.assert_not_called()
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            456,
+            IssueState.READY,
+            actor="human:resume",
+            force=True,
+        )
+
+
+def test_resume_failed_issue_to_ready_does_not_dedup_non_latest_matching_comment() -> (
+    None
+):
+    """只有最新一条 comment 重复时才跳过，历史旧 comment 不能吞掉新的恢复记录。"""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+    mock_github.view_issue.return_value = {
+        "comments": [
+            {
+                "body": "[resume] 已从 state/failed 继续到 state/ready。\n\n"
+                "将重新进入 manager 标准入口。"
+            },
+            {"body": "some newer unrelated comment"},
+        ]
+    }
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.resume_failed_issue_to_ready(
+            issue_number=457,
+            repo="owner/repo",
+            actor="human:resume",
+            reason="",
+        )
+
+        mock_github.add_comment.assert_called_once()

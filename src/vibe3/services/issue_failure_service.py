@@ -81,11 +81,15 @@ def resume_failed_issue_to_handoff(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    GitHubClient().add_comment(
-        issue_number,
-        "[resume] 已从 state/failed 继续到 state/handoff。\n\n"
-        "manager 将重新判断现场并决定下一步。\n\n"
-        f"原因:{reason}",
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/failed 继续到 state/handoff。",
+            detail="manager 将重新判断现场并决定下一步。",
+            reason=reason,
+        ),
         repo=repo,
     )
     LabelService(repo=repo).confirm_issue_state(
@@ -115,11 +119,15 @@ def resume_failed_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    GitHubClient().add_comment(
-        issue_number,
-        "[resume] 已从 state/failed 继续到 state/ready。\n\n"
-        "将重新进入 manager 标准入口。\n\n"
-        f"原因:{reason}",
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/failed 继续到 state/ready。",
+            detail="将重新进入 manager 标准入口。",
+            reason=reason,
+        ),
         repo=repo,
     )
     LabelService(repo=repo).confirm_issue_state(
@@ -145,11 +153,15 @@ def resume_blocked_issue_to_ready(
         reason: Resume reason to include in comment
         actor: Actor performing the resume
     """
-    GitHubClient().add_comment(
-        issue_number,
-        "[resume] 已从 state/blocked 恢复到 state/ready。\n\n"
-        "阻塞已解除,准备继续执行。\n\n"
-        f"原因:{reason}",
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/blocked 恢复到 state/ready。",
+            detail="阻塞已解除,准备继续执行。",
+            reason=reason,
+        ),
         repo=repo,
     )
     LabelService(repo=repo).confirm_issue_state(
@@ -260,4 +272,47 @@ def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -
         body = comment.get("body")
         if isinstance(body, str) and reason in body:
             return True
+    return False
+
+
+def _build_resume_comment(*, header: str, detail: str, reason: str) -> str:
+    """Build a stable resume comment body.
+
+    When reason is empty, omit the reason section so repeated manual retries can be
+    deduplicated using the exact same comment body.
+    """
+    body = f"{header}\n\n{detail}"
+    normalized_reason = reason.strip()
+    if normalized_reason:
+        body += f"\n\n原因:{normalized_reason}"
+    return body
+
+
+def _add_comment_if_missing(
+    *,
+    github: GitHubClient,
+    issue_number: int,
+    body: str,
+    repo: str | None,
+) -> None:
+    """Add a GitHub comment unless the latest comment already has the same body."""
+    issue_payload = github.view_issue(issue_number, repo=repo)
+    if isinstance(issue_payload, dict) and _latest_comment_matches(issue_payload, body):
+        return
+    github.add_comment(issue_number, body, repo=repo)
+
+
+def _latest_comment_matches(
+    issue_payload: dict[str, object], comment_text: str
+) -> bool:
+    """Return True when the latest issue comment has the same body."""
+    comments = issue_payload.get("comments")
+    if not isinstance(comments, list):
+        return False
+    normalized_comment = comment_text.strip()
+    for comment in reversed(comments):
+        if not isinstance(comment, dict):
+            continue
+        body = comment.get("body")
+        return isinstance(body, str) and body.strip() == normalized_comment
     return False

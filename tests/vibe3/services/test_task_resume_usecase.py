@@ -279,3 +279,115 @@ def test_resume_issues_all_task_mode_resets_any_task_issue_to_ready() -> None:
             for call in mock_label_instance.confirm_issue_state.call_args_list
         ]
         assert confirmed == [IssueState.READY, IssueState.READY]
+
+
+def test_resume_issues_all_task_mode_skips_duplicate_comment_when_reason_empty() -> (
+    None
+):
+    """--all 且空 reason 时，如 comment 已存在则不重复发。"""
+    flow_340 = MagicMock(branch="task/issue-340", task_issue_number=340)
+
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 340,
+            "title": "Reset claimed flow",
+            "state": IssueState.CLAIMED,
+            "flow": flow_340,
+        }
+    ]
+
+    with (
+        patch.object(
+            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+        ),
+        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
+        patch.object(task_resume_usecase, "GitHubClient") as mock_github_client,
+    ):
+        mock_label_instance = MagicMock()
+        mock_label_service.return_value = mock_label_instance
+        mock_label_instance.get_state.return_value = IssueState.CLAIMED
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.return_value = "/tmp/issue-340"
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
+        mock_github_instance = MagicMock()
+        mock_github_client.return_value = mock_github_instance
+        mock_github_instance.view_issue.return_value = {
+            "comments": [
+                {
+                    "body": "[resume] 已重置 task scene，回到 state/ready。\n\n"
+                    "后续会按标准 dispatcher/manager 路径重新创建 worktree 并执行。"
+                }
+            ]
+        }
+
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        result = usecase.resume_issues(
+            dry_run=False,
+            candidate_mode="all_task",
+            flows=[flow_340],
+            reason="",
+        )
+
+        assert [item["number"] for item in result["resumed"]] == [340]
+        mock_github_instance.add_comment.assert_not_called()
+
+
+def test_resume_issues_all_task_mode_does_not_skip_when_duplicate_is_not_latest() -> (
+    None
+):
+    """--all 只压掉相邻重复 comment，历史旧 comment 不应阻止新的恢复记录。"""
+    flow_340 = MagicMock(branch="task/issue-340", task_issue_number=340)
+
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 340,
+            "title": "Reset claimed flow",
+            "state": IssueState.CLAIMED,
+            "flow": flow_340,
+        }
+    ]
+
+    with (
+        patch.object(
+            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+        ),
+        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
+        patch.object(task_resume_usecase, "GitHubClient") as mock_github_client,
+    ):
+        mock_label_instance = MagicMock()
+        mock_label_service.return_value = mock_label_instance
+        mock_label_instance.get_state.return_value = IssueState.CLAIMED
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.return_value = "/tmp/issue-340"
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
+        mock_github_instance = MagicMock()
+        mock_github_client.return_value = mock_github_instance
+        mock_github_instance.view_issue.return_value = {
+            "comments": [
+                {
+                    "body": "[resume] 已重置 task scene，回到 state/ready。\n\n"
+                    "后续会按标准 dispatcher/manager 路径重新创建 worktree 并执行。"
+                },
+                {"body": "some newer unrelated comment"},
+            ]
+        }
+
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        usecase.resume_issues(
+            dry_run=False,
+            candidate_mode="all_task",
+            flows=[flow_340],
+            reason="",
+        )
+
+        mock_github_instance.add_comment.assert_called_once()

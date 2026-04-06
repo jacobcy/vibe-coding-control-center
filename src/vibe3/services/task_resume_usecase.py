@@ -360,11 +360,23 @@ class TaskResumeUsecase:
     ) -> None:
         """Record all-mode reset success without affecting command outcome."""
         try:
+            comment_body = (
+                "[resume] 已重置 task scene，回到 state/ready。\n\n"
+                "后续会按标准 dispatcher/manager 路径重新创建 worktree 并执行。"
+            )
+            normalized_reason = reason.strip()
+            if normalized_reason:
+                comment_body += f"\n\n原因:{normalized_reason}"
+
+            issue_payload = self.github_client.view_issue(issue_number, repo=repo)
+            if isinstance(issue_payload, dict) and self._latest_comment_matches(
+                issue_payload, comment_body
+            ):
+                return
+
             self.github_client.add_comment(
                 issue_number,
-                "[resume] 已重置 task scene，回到 state/ready。\n\n"
-                "后续会按标准 dispatcher/manager 路径重新创建 worktree 并执行。\n\n"
-                f"原因:{reason}",
+                comment_body,
                 repo=repo,
             )
         except Exception as exc:
@@ -373,6 +385,23 @@ class TaskResumeUsecase:
                 action="comment_all_resume_success",
                 issue_number=issue_number,
             ).warning(f"Failed to add all-mode resume comment: {exc}")
+
+    def _latest_comment_matches(
+        self,
+        issue_payload: dict[str, object],
+        comment_body: str,
+    ) -> bool:
+        """Return True when the latest issue comment is the same comment."""
+        comments = issue_payload.get("comments")
+        if not isinstance(comments, list):
+            return False
+        normalized_comment = comment_body.strip()
+        for comment in reversed(comments):
+            if not isinstance(comment, dict):
+                continue
+            body = comment.get("body")
+            return isinstance(body, str) and body.strip() == normalized_comment
+        return False
 
     def _reactivate_aborted_flow(self, branch: str) -> None:
         """Reactivate an aborted flow.

@@ -269,18 +269,54 @@ class TestTaskResumeCommand:
         # Typer exits with code 2 and error message
         assert result.exit_code == 2 or "error" in result.output.lower()
 
-    def test_task_resume_requires_reason(self) -> None:
-        """没有 --reason 时，命令报错退出。"""
-        result = runner.invoke(
-            app,
-            [
-                "task",
-                "resume",
-                "--failed",
+    def test_task_resume_allows_empty_reason(self) -> None:
+        """没有 --reason 时也应允许执行，reason 以空字符串传入 usecase。"""
+        mock_usecase = MagicMock()
+        mock_usecase.resume_issues.return_value = {
+            "resumed": [],
+            "skipped": [],
+            "requested": [439],
+            "candidates": [
+                {
+                    "number": 439,
+                    "title": "Manager backend regression",
+                    "state": "failed",
+                    "resume_kind": "failed",
+                }
             ],
-        )
+        }
+        mock_usecase.status_service.fetch_resume_candidates.return_value = [
+            {
+                "number": 439,
+                "title": "Manager backend regression",
+                "resume_kind": "failed",
+            }
+        ]
 
-        assert result.exit_code != 0
+        with (
+            patch(
+                "vibe3.commands.task._build_resume_usecase",
+                return_value=mock_usecase,
+            ),
+            patch("vibe3.commands.task.FlowService") as mock_flow_service,
+        ):
+            mock_flow_service_instance = MagicMock()
+            mock_flow_service.return_value = mock_flow_service_instance
+            mock_flow_service_instance.list_flows.return_value = []
+
+            result = runner.invoke(
+                app,
+                [
+                    "task",
+                    "resume",
+                    "--failed",
+                ],
+            )
+
+            assert result.exit_code == 0
+            mock_usecase.resume_issues.assert_called_once()
+            call_kwargs = mock_usecase.resume_issues.call_args[1]
+            assert call_kwargs["reason"] == ""
 
     def test_task_resume_cannot_specify_both_failed_and_blocked(self) -> None:
         """不能同时指定 --failed 和 --blocked。"""
