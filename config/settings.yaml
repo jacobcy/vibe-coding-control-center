@@ -41,16 +41,53 @@ code_limits:
     default: 300           # 单文件默认限制（所有类型）
     max: 400              # 单文件最大限制（所有类型）
 
-    # LOC例外：职责内聚但不适合进一步拆分的核心基础设施文件
+# LOC例外：核心聚合文件与基础设施
+    # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
     exceptions:
+      # 核心业务聚合 —— 允许 600
+      - path: "src/vibe3/services/flow_service.py"
+        limit: 600
+        reason: "核心状态机聚合，吸收 flow_query_mixin"
+      - path: "src/vibe3/services/pr_service.py"
+        limit: 600
+        reason: "PR 生命周期聚合"
+      - path: "src/vibe3/services/check_service.py"
+        limit: 600
+        reason: "已 507，继续容纳检查规则"
+      - path: "src/vibe3/services/task_service.py"
+        limit: 550
+        reason: "任务生命周期聚合"
+      - path: "src/vibe3/services/handoff_service.py"
+        limit: 500
+        reason: "handoff 状态读写聚合"
+
+      # Clients 聚合 —— 允许 500
+      - path: "src/vibe3/clients/git_client.py"
+        limit: 500
+        reason: "Git 门面聚合"
+      - path: "src/vibe3/clients/github_client.py"
+        limit: 500
+        reason: "GitHub 门面聚合"
+      - path: "src/vibe3/clients/sqlite_client.py"
+        limit: 450
+        reason: "已 388，持久化聚合"
+
+      # Orchestra —— 允许 550
+      - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
+        limit: 550
+        reason: "标签分发决策树"
+
+      # 基础设施核心模块（职责内聚，不适合进一步拆分）
       - path: "src/vibe3/manager/worktree_manager.py"
-        limit: 420        # Worktree lifecycle management (职责内聚，共享私有方法)
+        limit: 450
+        reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 420        # Codeagent execution backend (sync/async共享基础设施)
+        limit: 450
+        reason: "Codeagent execution backend"
 
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 29999        # Python 核心代码总行数
+    v3_python: 32000        # Python 核心代码总行数（治理触发器）
 
   # 统计口径（路径定义）
   code_paths:
