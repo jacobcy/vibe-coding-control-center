@@ -63,21 +63,26 @@ def test_blocked_stale_issue_resume_posts_blocked_comment_and_returns_to_ready()
         },
     ]
 
-    with (
-        patch.object(
-            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
-        ),
-        patch.object(
-            task_resume_usecase, "resume_blocked_issue_to_ready"
-        ) as mock_blocked_to_ready,
-        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
-    ):
-        # Mock label service to confirm state is BLOCKED
-        mock_label_instance = MagicMock()
-        mock_label_service.return_value = mock_label_instance
-        mock_label_instance.get_state.return_value = IssueState.BLOCKED
+    # Mock all dependencies to avoid real GitHub API calls
+    mock_label_service = MagicMock()
+    mock_label_service.get_state.return_value = IssueState.BLOCKED
 
-        usecase = task_resume_usecase.TaskResumeUsecase()
+    mock_git_client = MagicMock()
+    mock_git_client.find_worktree_path_for_branch.return_value = None
+
+    mock_flow_service = MagicMock()
+    mock_github_client = MagicMock()
+
+    with patch.object(
+        task_resume_usecase, "resume_blocked_issue_to_ready"
+    ) as mock_blocked_to_ready:
+        usecase = task_resume_usecase.TaskResumeUsecase(
+            status_service=mock_status_service,
+            label_service=mock_label_service,
+            git_client=mock_git_client,
+            flow_service=mock_flow_service,
+            github_client=mock_github_client,
+        )
         result = usecase.resume_issues(reason="dependency available", dry_run=False)
 
         # 应调用 blocked 恢复函数
@@ -130,32 +135,39 @@ def test_blocked_resume_does_not_affect_failed_resume_path() -> None:
         },
     ]
 
+    # Mock all dependencies to avoid real GitHub API calls
+    mock_label_service = MagicMock()
+
+    def mock_get_state(issue_num: int) -> IssueState | None:
+        if issue_num == 439:
+            return IssueState.FAILED
+        elif issue_num == 301:
+            return IssueState.BLOCKED
+        return None
+
+    mock_label_service.get_state.side_effect = mock_get_state
+
+    mock_git_client = MagicMock()
+    mock_git_client.find_worktree_path_for_branch.return_value = None
+
+    mock_flow_service = MagicMock()
+    mock_github_client = MagicMock()
+
     with (
-        patch.object(
-            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
-        ),
         patch.object(
             task_resume_usecase, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(
             task_resume_usecase, "resume_blocked_issue_to_ready"
         ) as mock_blocked_to_ready,
-        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
     ):
-        # Mock label service
-        mock_label_instance = MagicMock()
-        mock_label_service.return_value = mock_label_instance
-
-        def mock_get_state(issue_num: int) -> IssueState | None:
-            if issue_num == 439:
-                return IssueState.FAILED
-            elif issue_num == 301:
-                return IssueState.BLOCKED
-            return None
-
-        mock_label_instance.get_state.side_effect = mock_get_state
-
-        usecase = task_resume_usecase.TaskResumeUsecase()
+        usecase = task_resume_usecase.TaskResumeUsecase(
+            status_service=mock_status_service,
+            label_service=mock_label_service,
+            git_client=mock_git_client,
+            flow_service=mock_flow_service,
+            github_client=mock_github_client,
+        )
         result = usecase.resume_issues(reason="manual recovery", dry_run=False)
 
         # failed 恢复路径应正常工作
