@@ -25,20 +25,8 @@ from vibe3.commands.pr_helpers import noop_context
 from vibe3.models.trace import TraceOutput
 from vibe3.observability.logger import setup_logging
 from vibe3.observability.trace import trace_context
-from vibe3.services.flow_service import FlowService
-from vibe3.services.pr_query_usecase import PrQueryUsecase
 from vibe3.services.pr_service import PRService
 from vibe3.ui.pr_ui import render_pr_details
-
-
-def _build_pr_query_usecase() -> PrQueryUsecase:
-    """Construct PR query usecase with command-local dependencies."""
-    service = PRService()
-    return PrQueryUsecase(
-        pr_service=service,
-        flow_service=FlowService(),
-        inspect_runner=run_inspect_json,
-    )
 
 
 def register_query_commands(app: typer.Typer) -> None:
@@ -89,8 +77,8 @@ def register_query_commands(app: typer.Typer) -> None:
                     message="Fetching PR details",
                 )
 
-            usecase = _build_pr_query_usecase()
-            target = usecase.resolve_target(pr_number, branch)
+            pr_svc = PRService()
+            target = pr_svc.resolve_pr_target(pr_number, branch)
             pr_number = target.pr_number
             branch = target.branch
             if target.from_flow and target.current_branch is not None:
@@ -100,14 +88,14 @@ def register_query_commands(app: typer.Typer) -> None:
                 ).debug("Found PR number in flow state")
 
             try:
-                pr = usecase.fetch_pr(
+                pr = pr_svc.fetch_pr_or_raise(
                     pr_number,
                     branch,
                     current_branch=target.current_branch,
                 )
             except LookupError:
                 typer.echo(
-                    usecase.build_missing_pr_message(
+                    pr_svc.build_missing_pr_message(
                         pr_number=pr_number,
                         branch=branch,
                         current_branch=target.current_branch,
@@ -118,11 +106,13 @@ def register_query_commands(app: typer.Typer) -> None:
 
             analysis_summary = None
             if pr_number:
-                analysis_summary = usecase.load_analysis_summary(pr_number)
+                analysis_summary = pr_svc.load_pr_analysis_summary(
+                    pr_number, run_inspect_json
+                )
                 logger.debug("Successfully retrieved change analysis")
 
             if trace_output or json_output or yaml_output:
-                result = usecase.build_output_payload(pr, analysis_summary)
+                result = pr_svc.build_pr_output_payload(pr, analysis_summary)
                 output_result(
                     result=result,
                     trace_output=trace_output,

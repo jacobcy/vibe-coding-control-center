@@ -13,7 +13,6 @@ from vibe3.services.flow_service import FlowService
 from vibe3.services.milestone_service import MilestoneService
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 from vibe3.services.task_service import TaskService
-from vibe3.services.task_usecase import TaskUsecase
 from vibe3.ui.task_ui import (
     render_task_show_with_milestone,
 )
@@ -26,14 +25,6 @@ app = typer.Typer(
 @contextmanager
 def _noop() -> Iterator[None]:
     yield
-
-
-def _build_task_usecase() -> TaskUsecase:
-    """Construct a task usecase with command-local service wiring."""
-    return TaskUsecase(
-        flow_service=FlowService(),
-        task_service=TaskService(),
-    )
 
 
 def _build_milestone_service() -> MilestoneService:
@@ -103,11 +94,11 @@ def show(
     ] = False,
 ) -> None:
     """Show task details."""
-    usecase = _build_task_usecase()
+    task_svc = TaskService()
     milestone_svc = _build_milestone_service()
 
     try:
-        target_branch = usecase.resolve_branch(branch)
+        target_branch = task_svc.resolve_branch(branch)
     except RuntimeError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -121,7 +112,7 @@ def show(
         else _noop()
     )
     with ctx:
-        task_result = usecase.show_task(target_branch)
+        task_result = task_svc.show_task(target_branch)
 
         # Fetch milestone context if task has an issue number
         milestone_ctx = None

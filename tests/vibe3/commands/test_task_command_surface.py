@@ -14,18 +14,16 @@ runner = CliRunner(env={"NO_COLOR": "1"})
 
 @patch("vibe3.commands.task.TaskService")
 @patch("vibe3.commands.task.render_task_show_with_milestone")
-@patch("vibe3.commands.task.TaskUsecase")
 @patch("vibe3.commands.task.MilestoneService")
 def test_task_show_comments_outputs_latest_human_instruction(
     mock_milestone_service_cls,
-    mock_task_usecase_cls,
     _render_task_show,
     mock_task_service_cls,
 ) -> None:
     """task show --comments should print latest comment and latest human comment."""
-    usecase = MagicMock()
-    usecase.resolve_branch.return_value = "task/issue-372"
-    usecase.show_task.return_value = MagicMock(
+    task_svc = MagicMock()
+    task_svc.resolve_branch.return_value = "task/issue-372"
+    task_svc.show_task.return_value = MagicMock(
         local_task=FlowStatusResponse(
             branch="task/issue-372",
             flow_slug="issue-372",
@@ -33,13 +31,6 @@ def test_task_show_comments_outputs_latest_human_instruction(
             task_issue_number=372,
         )
     )
-    mock_task_usecase_cls.return_value = usecase
-
-    milestone_svc = MagicMock()
-    milestone_svc.get_milestone_context.return_value = None
-    mock_milestone_service_cls.return_value = milestone_svc
-
-    task_svc = MagicMock()
     task_svc.fetch_issue_with_comments.return_value = {
         "number": 372,
         "title": "Task 372",
@@ -51,6 +42,10 @@ def test_task_show_comments_outputs_latest_human_instruction(
         ],
     }
     mock_task_service_cls.return_value = task_svc
+
+    milestone_svc = MagicMock()
+    milestone_svc.get_milestone_context.return_value = None
+    mock_milestone_service_cls.return_value = milestone_svc
 
     result = runner.invoke(app, ["task", "show", "--comments"])
 
