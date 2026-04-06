@@ -534,3 +534,75 @@ async def test_on_tick_does_not_dispatch_when_live_dispatch_exists(
 
     # Should not dispatch because live session exists
     svc._backend.start_async_command.assert_not_called()
+
+
+# === Manager capacity limit tests ===
+
+
+@pytest.mark.asyncio
+async def test_manager_tick_dispatches_at_most_remaining_capacity(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """Manager tick should respect remaining capacity and not over-dispatch."""
+    svc, manager = manager_service
+    # Set up 6 ready issues but max_concurrent_flows=2 (from fixture)
+    # No active flows currently
+    ready_issues = [
+        _issue_payload(number=i, labels=["state/ready"])
+        for i in [410, 417, 418, 419, 431, 436]
+    ]
+    svc._github.list_issues.return_value = ready_issues
+    svc._has_live_dispatch = MagicMock(return_value=False)
+    # No active flows and no in-flight dispatches
+    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-410"}
+
+    await svc.on_tick()
+
+    # Should dispatch at most 2 (max_concurrent_flows) issues in this tick
+    # Not all 6 ready issues
+    assert manager.dispatch_manager.call_count <= 2
+    # Verify that we dispatched at least one (capacity not zero)
+    assert manager.dispatch_manager.call_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_manager_tick_logs_throttled_issue_numbers_when_capacity_exhausted(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Throttled issues should be logged with their issue numbers."""
+
+    from loguru import logger
+
+    # Set up loguru to propagate to standard logging for caplog
+    handler_id = logger.add(
+        caplog.handler,  # Use pytest's caplog handler
+        format="{message}",
+        level="INFO",
+    )
+
+    try:
+        svc, manager = manager_service
+        # Set up 6 ready issues but max_concurrent_flows=2
+        ready_issues = [
+            _issue_payload(number=i, labels=["state/ready"])
+            for i in [410, 417, 418, 419, 431, 436]
+        ]
+        svc._github.list_issues.return_value = ready_issues
+        svc._has_live_dispatch = MagicMock(return_value=False)
+        manager.flow_manager.get_flow_for_issue.return_value = {
+            "branch": "task/issue-410"
+        }
+
+        await svc.on_tick()
+
+        # Should log throttled issues
+        # At least some issues should be throttled (capacity < ready count)
+        log_messages = [record.message for record in caplog.records]
+        # Look for evidence of throttling in logs
+        assert any(
+            "throttle" in msg.lower() or "capacity" in msg.lower()
+            for msg in log_messages
+        ), f"Expected throttle log, got: {log_messages}"
+    finally:
+        logger.remove(handler_id)

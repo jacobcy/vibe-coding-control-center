@@ -113,6 +113,38 @@ class StateLabelDispatchService(ServiceBase):
 
             self._prune_in_flight(raw_issues)
             ready = self._select_ready_issues(raw_issues)
+
+        # Apply capacity limit for manager trigger
+        if self.trigger_name == "manager" and ready:
+            # Calculate effective remaining capacity
+            active_count = (
+                self._status_service.get_active_flow_count()
+                if self._status_service
+                else 0
+            )
+            in_flight_count = len(self._in_flight_dispatches)
+            remaining_capacity = max(
+                0, self.config.max_concurrent_flows - active_count - in_flight_count
+            )
+
+            # Dispatch only up to remaining capacity
+            to_dispatch = ready[:remaining_capacity]
+            throttled = ready[remaining_capacity:]
+
+            if throttled:
+                throttled_numbers = [f"#{issue.number}" for issue in throttled]
+                logger.bind(
+                    domain="orchestra",
+                    trigger=self.trigger_name,
+                ).info(
+                    f"Throttled {len(throttled)} issues due to capacity limit "
+                    f"(active={active_count}, in_flight={in_flight_count}, "
+                    f"max={self.config.max_concurrent_flows}, "
+                    f"remaining={remaining_capacity}): {', '.join(throttled_numbers)}"
+                )
+
+            ready = to_dispatch
+
         for issue in ready:
             if issue.number in self._in_flight_dispatches or self._has_live_dispatch(
                 issue.number

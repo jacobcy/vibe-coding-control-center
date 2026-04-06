@@ -396,3 +396,20 @@ class TestManagerReviewWorktreeResolution:
         mock_resolve.assert_not_called()
         assert "--worktree" in cmd
         assert cwd == Path("/tmp/repo")
+
+    def test_dispatch_manager_refuses_launch_when_effective_capacity_is_full(
+        self,
+    ):
+        """dispatch_manager refuses launch when capacity is exhausted."""
+        config = OrchestraConfig(max_concurrent_flows=3)
+        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        issue = make_issue(number=42, title="Capacity test")
+
+        with patch.object(
+            manager.status_service, "get_active_flow_count", return_value=3
+        ):
+            # Effective capacity = max(0, 3 - 3 - 0) = 0
+            # Should refuse dispatch
+            result = manager.dispatch_manager(issue)
+
+        assert result is False
