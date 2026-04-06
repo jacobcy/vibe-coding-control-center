@@ -83,7 +83,8 @@ async def test_tick_calls_on_tick_for_all_services() -> None:
     assert svc2.ticks == 1
 
 
-def test_run_separator_writes_header(tmp_path: Path) -> None:
+def test_run_separator_appends_instead_of_truncating(tmp_path: Path) -> None:
+    """Run separator should append to existing events.log, not overwrite it."""
     import os
 
     from vibe3.orchestra.logging import append_orchestra_run_separator
@@ -91,11 +92,49 @@ def test_run_separator_writes_header(tmp_path: Path) -> None:
     os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
     log_path = tmp_path / "temp" / "logs" / "orchestra" / "events.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_text("old event\n", encoding="utf-8")
+    log_path.write_text("old event from previous run\n", encoding="utf-8")
     append_orchestra_run_separator(repo_root=tmp_path, title="server run start")
     text = log_path.read_text()
-    assert "old event" not in text
+    # Old event should still be present
+    assert "old event from previous run" in text
+    # New run separator should be appended
     assert "========== server run start @" in text
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_writes_tick_separator_lines(monkeypatch) -> None:
+    """Each tick should have a clear separator line for readability."""
+    server = HeartbeatServer(
+        OrchestraConfig(polling_interval=1, max_concurrent_flows=3)
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str) -> None:
+        events.append(f"{domain}:{message}")
+
+    calls = {"count": 0}
+
+    async def _sleep_once(_seconds: float) -> None:
+        calls["count"] += 1
+        if calls["count"] >= 3:  # Run at least 2 ticks before stopping
+            server.stop()
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _sleep_once)
+    server._running = True
+
+    await server._tick_loop()
+
+    # Should have tick separator lines
+    assert any(
+        "---------- heartbeat tick #1 ----------" in item for item in events
+    ), f"Expected tick separator, got: {events}"
+    # Note: We may not get tick #2 if server stopped early,
+    # but we should at least see tick #1 separator
+    assert len(events) >= 4, f"Expected at least 4 events, got: {events}"
 
 
 @pytest.mark.asyncio
@@ -130,3 +169,39 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
         for item in events
     )
     assert any("server:heartbeat tick #1 completed in " in item for item in events)
+
+
+@pytest.mark.asyncio
+async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
+    server = HeartbeatServer(
+        OrchestraConfig(
+            polling_interval=60,
+            max_concurrent_flows=3,
+            debug=True,
+            debug_max_ticks=2,
+        )
+    )
+    svc = _MockService()
+    server.register(svc)
+
+    events: list[str] = []
+
+    def _capture(domain: str, message: str) -> None:
+        events.append(f"{domain}:{message}")
+
+    async def _no_wait(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("vibe3.runtime.heartbeat.append_orchestra_event", _capture)
+    monkeypatch.setattr("vibe3.runtime.heartbeat.asyncio.sleep", _no_wait)
+    server._running = True
+
+    await server._tick_loop()
+
+    assert server.running is False
+    assert svc.ticks == 2
+    assert any("server:heartbeat tick #2 start" == item for item in events)
+    assert any(
+        "server:debug tick limit reached (2), stopping server" == item
+        for item in events
+    )

@@ -143,6 +143,17 @@ class StateLabelDispatchService(ServiceBase):
                     f"remaining={remaining_capacity}): {', '.join(throttled_numbers)}"
                 )
 
+            # Log selected issues before dispatch
+            if to_dispatch:
+                selected_numbers = [f"#{issue.number}" for issue in to_dispatch]
+                logger.bind(
+                    domain="orchestra",
+                    trigger=self.trigger_name,
+                ).info(
+                    f"Selected {len(to_dispatch)} issues for dispatch: "
+                    f"{', '.join(selected_numbers)}"
+                )
+
             ready = to_dispatch
 
         for issue in ready:

@@ -606,3 +606,45 @@ async def test_manager_tick_logs_throttled_issue_numbers_when_capacity_exhausted
         ), f"Expected throttle log, got: {log_messages}"
     finally:
         logger.remove(handler_id)
+
+
+# === Tick logging detail tests ===
+
+
+@pytest.mark.asyncio
+async def test_manager_tick_logs_selected_dispatched_and_throttled_issues(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Manager tick should log which issues were selected, dispatched, and throttled."""
+    from loguru import logger
+
+    handler_id = logger.add(caplog.handler, format="{message}", level="INFO")
+
+    try:
+        svc, manager = manager_service
+        # Set up 6 ready issues but max_concurrent_flows=2
+        ready_issues = [
+            _issue_payload(number=i, labels=["state/ready"])
+            for i in [410, 417, 418, 419, 431, 436]
+        ]
+        svc._github.list_issues.return_value = ready_issues
+        svc._has_live_dispatch = MagicMock(return_value=False)
+        manager.flow_manager.get_flow_for_issue.return_value = {
+            "branch": "task/issue-410"
+        }
+
+        await svc.on_tick()
+
+        log_messages = [record.message for record in caplog.records]
+        # Should log selected issues
+        assert any(
+            "410" in msg and "417" in msg for msg in log_messages
+        ), f"Expected selected issues log, got: {log_messages}"
+        # Should log throttled issues
+        assert any(
+            "418" in msg or "419" in msg or "431" in msg or "436" in msg
+            for msg in log_messages
+        ), f"Expected throttled issues log, got: {log_messages}"
+    finally:
+        logger.remove(handler_id)

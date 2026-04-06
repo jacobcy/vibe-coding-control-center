@@ -147,6 +147,11 @@ class HeartbeatServer:
             tick_number = self._tick_count
             started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
+
+            # Write tick separator for readability
+            append_orchestra_event(
+                "server", f"---------- heartbeat tick #{tick_number} ----------"
+            )
             append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
 
             tasks = []
@@ -188,6 +193,16 @@ class HeartbeatServer:
                 "server",
                 f"heartbeat tick #{tick_number} completed in {duration:.2f}s",
             )
+
+            if self.config.debug and tick_number >= self.config.debug_max_ticks:
+                append_orchestra_event(
+                    "server",
+                    (
+                        "debug tick limit reached "
+                        f"({self.config.debug_max_ticks}), stopping server"
+                    ),
+                )
+                self.stop()
 
     async def _tick_service(self, service: ServiceBase) -> None:
         async with self._semaphore:
