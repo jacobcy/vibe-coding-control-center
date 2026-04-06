@@ -235,22 +235,32 @@ class StateLabelDispatchService(ServiceBase):
                         require_state_transition=require_transition,
                         allow_close_as_progress=allow_close,
                     )
-                    if not has_progress:
-                        try:
-                            execute_state_fallback(
-                                issue_number=issue_number,
-                                current_labels=labels,
-                                github=self._github,
-                                source_state=self.trigger_state,
-                                repo=self.config.repo,
-                            )
-                        except Exception as fallback_exc:
-                            logger.bind(
-                                domain="orchestra",
-                                issue=issue_number,
-                            ).error(f"Fallback execution failed: {fallback_exc}")
-                            # Do not add to stale, let it retry or remain in-flight
-                            continue
+                    if has_progress:
+                        # Progress made (including close-as-progress).
+                        # If issue was closed, prune from in-flight (no further
+                        # processing needed). Otherwise keep in-flight for next
+                        # round.
+                        if after_snapshot.get("issue_state") == "closed":
+                            stale.add(issue_number)
+                        self._progress_snapshots.pop(issue_number, None)
+                        continue
+                    # No progress: execute fallback and add to stale
+                    try:
+                        execute_state_fallback(
+                            issue_number=issue_number,
+                            current_labels=labels,
+                            github=self._github,
+                            source_state=self.trigger_state,
+                            repo=self.config.repo,
+                        )
+                    except Exception as fallback_exc:
+                        logger.bind(
+                            domain="orchestra",
+                            issue=issue_number,
+                        ).error(f"Fallback execution failed: {fallback_exc}")
+                        # Do not add to stale, let it retry or remain in-flight
+                        continue
+                # No before_snapshot or no progress after fallback: add to stale
                 stale.add(issue_number)
                 self._progress_snapshots.pop(issue_number, None)
                 continue

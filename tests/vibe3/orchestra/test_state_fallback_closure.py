@@ -232,7 +232,6 @@ async def test_ready_manager_no_progress_falls_back_to_blocked(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Test setup issue with stale set; core logic is correct")
 async def test_ready_close_counts_as_progress_for_manager_sync(
     orchestra_svc,
 ) -> None:
@@ -241,7 +240,9 @@ async def test_ready_close_counts_as_progress_for_manager_sync(
     svc.trigger_state = IssueState.READY
     svc.trigger_name = "manager"
     issue_num = 110
-    svc._github.list_issues.return_value = [_issue_payload(issue_num, ["state/ready"])]
+    # When issue is closed, list_issues(state="open") won't return it
+    # So we mock with empty list to simulate closed issue not in open issues
+    svc._github.list_issues.return_value = []
     manager.flow_manager.get_flow_for_issue.return_value = {
         "branch": f"task/issue-{issue_num}"
     }
@@ -249,7 +250,7 @@ async def test_ready_close_counts_as_progress_for_manager_sync(
     svc._in_flight_dispatches.add(issue_num)
     svc._has_live_dispatch = MagicMock(return_value=False)  # Session ended
 
-    # Issue was open before, now closed
+    # Issue was open before, now closed (not in open issues list)
     before = {
         "state_label": "state/ready",
         "comment_count": 0,
@@ -278,7 +279,8 @@ async def test_ready_close_counts_as_progress_for_manager_sync(
 
             # Should NOT fallback because closing counts as progress
             mock_fallback.assert_not_called()
-            # Should be pruned from in-flight
+            # Should be pruned from in-flight because issue is closed
+            # (not in open issues list)
             assert issue_num not in svc._in_flight_dispatches
 
 

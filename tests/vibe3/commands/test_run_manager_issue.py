@@ -331,8 +331,10 @@ class TestRunManagerIssueMode:
 
     # === No-progress parity tests ===
 
-    def test_sync_path_treats_comment_changes_as_progress(self, monkeypatch) -> None:
-        """Sync manager path should treat comment count changes as progress."""
+    def test_sync_path_blocks_on_comment_only_change_for_ready(
+        self, monkeypatch
+    ) -> None:
+        """READY state requires state transition; comments alone are NOT progress."""
         backend = _make_backend()
         github = _make_github()
         sqlite = MagicMock()
@@ -357,12 +359,14 @@ class TestRunManagerIssueMode:
             "comment_count": 5,
             "handoff": "handoff_sig_before",
             "refs": {"plan_ref": "/tmp/plan.md"},
+            "issue_state": "open",
         }
         after_snapshot = {
             "state_label": "state/ready",  # State unchanged
             "comment_count": 6,  # Comment count increased
             "handoff": "handoff_sig_before",
             "refs": {"plan_ref": "/tmp/plan.md"},
+            "issue_state": "open",
         }
 
         snapshot_calls = 0
@@ -378,12 +382,16 @@ class TestRunManagerIssueMode:
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
 
         assert result.exit_code == 0
-        # Should NOT block because comment count changed (progress made)
-        # Verify no block comment was added
-        github.add_comment.assert_not_called()
+        # SHOULD block because state unchanged (READY requires transition)
+        github.add_comment.assert_called_once()
+        comment = github.add_comment.call_args[0][1]
+        assert "未产生状态迁移" in comment
 
-    def test_sync_path_treats_handoff_changes_as_progress(self, monkeypatch) -> None:
-        """Sync manager path should treat handoff changes as progress."""
+    def test_sync_path_blocks_on_handoff_only_change_for_ready(
+        self, monkeypatch
+    ) -> None:
+        """READY state requires state transition; handoff change alone is NOT
+        progress."""
         backend = _make_backend()
         github = _make_github()
         sqlite = MagicMock()
@@ -407,12 +415,14 @@ class TestRunManagerIssueMode:
             "comment_count": 5,
             "handoff": "handoff_sig_before",
             "refs": {"plan_ref": "/tmp/plan.md"},
+            "issue_state": "open",
         }
         after_snapshot = {
             "state_label": "state/ready",  # State unchanged
             "comment_count": 5,
             "handoff": "handoff_sig_after",  # Handoff changed
             "refs": {"plan_ref": "/tmp/plan.md"},
+            "issue_state": "open",
         }
 
         snapshot_calls = 0
@@ -427,8 +437,10 @@ class TestRunManagerIssueMode:
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
 
         assert result.exit_code == 0
-        # Should NOT block because handoff changed (progress made)
-        github.add_comment.assert_not_called()
+        # SHOULD block because state unchanged (READY requires transition)
+        github.add_comment.assert_called_once()
+        comment = github.add_comment.call_args[0][1]
+        assert "未产生状态迁移" in comment
 
     def test_sync_no_progress_block_fires_for_truly_no_change(
         self, monkeypatch
