@@ -365,3 +365,65 @@ class TestHandoffCommands:
             "API key needed",
             "claude/sonnet-4.6",
         )
+
+    def test_handoff_audit_command_real_service_path(self, tmp_path, monkeypatch):
+        """Test the real service path for handoff audit command with minimal mocking."""
+        # Setup temporary directories for git and sqlite
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        (git_dir / "vibe3").mkdir()
+
+        # Patch GitClient to return our temp paths
+        from vibe3.clients.git_client import GitClient
+
+        monkeypatch.setattr(GitClient, "get_git_common_dir", lambda self: str(git_dir))
+        monkeypatch.setattr(GitClient, "get_current_branch", lambda self: "main")
+
+        # Use real SQLiteClient with our temp git dir
+        from vibe3.clients import SQLiteClient
+
+        real_store = SQLiteClient()
+
+        # Pre-seed flow state if needed, though record_audit should handle it
+        audit_ref = ".agent/reports/audit-result.md"
+
+        # Run the command
+        result = runner.invoke(
+            app,
+            [
+                "handoff",
+                "audit",
+                audit_ref,
+                "--next-step",
+                "Finalize PR",
+                "--actor",
+                "test-actor",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Audit handoff recorded" in result.output
+
+        # Verify side effects on filesystem
+        # Find the handoff directory (it has a hash suffix)
+        handoff_root = git_dir / "vibe3" / "handoff"
+        assert handoff_root.exists()
+        handoff_dirs = list(handoff_root.iterdir())
+        assert len(handoff_dirs) == 1
+        handoff_file = handoff_dirs[0] / "current.md"
+        assert handoff_file.exists()
+        content = handoff_file.read_text()
+        assert audit_ref in content
+        assert "Finalize PR" in content
+        assert "test-actor" in content
+
+        # Verify side effects in database
+        flow_state = real_store.get_flow_state("main")
+        assert flow_state["audit_ref"] == audit_ref
+        assert flow_state["next_step"] == "Finalize PR"
+
+        # Verify event was recorded
+        events = real_store.get_events(branch="main", event_type="handoff_audit")
+        assert len(events) == 1
+        assert events[0]["actor"] == "test-actor"
+        assert events[0]["refs"]["ref"] == audit_ref
