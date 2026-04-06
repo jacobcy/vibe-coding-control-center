@@ -103,3 +103,32 @@ class TestFlowServiceAbort:
         last_update = update_calls[-1]
         _, kwargs = last_update
         assert kwargs.get("flow_status") == "active"
+
+    def test_aborted_flow_reactivation_preserves_refs(self, mock_store, mock_git):
+        """Test reactivating aborted flow preserves refs and events."""
+        service = FlowService(store=mock_store, git_client=mock_git)
+
+        # Mock an aborted flow with historical refs
+        mock_store.get_flow_state.return_value = {
+            "branch": "task/issue-999",
+            "flow_status": "aborted",
+            "flow_slug": "issue-999",
+            "plan_ref": "docs/plans/old-plan.md",  # Historical ref
+            "spec_ref": "docs/specs/old-spec.md",  # Should be preserved
+        }
+
+        service.reactivate_flow("task/issue-999")
+
+        # Verify update_flow_state was called
+        assert mock_store.update_flow_state.called
+
+        # Verify flow_status is updated to active
+        update_calls = mock_store.update_flow_state.call_args_list
+        last_update = update_calls[-1]
+        _, kwargs = last_update
+        assert kwargs.get("flow_status") == "active"
+
+        # Verify event was recorded
+        assert mock_store.add_event.called
+        event_call = mock_store.add_event.call_args
+        assert event_call[0][1] == "flow_reactivated"

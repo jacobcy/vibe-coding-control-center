@@ -146,6 +146,12 @@ class TaskResumeUsecase:
                     if flow and hasattr(flow, "branch"):
                         self._cleanup_stale_flow(flow.branch)
 
+                elif resume_kind == "aborted":
+                    # Aborted flow -> reactivate
+                    flow = candidate.get("flow")
+                    if flow and hasattr(flow, "branch"):
+                        self._reactivate_aborted_flow(flow.branch)
+
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
                 )
@@ -165,7 +171,7 @@ class TaskResumeUsecase:
 
         Args:
             issue_number: GitHub issue number
-            resume_kind: Expected resume kind ("failed" or "blocked")
+            resume_kind: Expected resume kind ("failed", "blocked", or "aborted")
             repo: Repository (owner/repo format, optional)
 
         Returns:
@@ -180,6 +186,10 @@ class TaskResumeUsecase:
             return current_state.value == "failed"
         elif resume_kind == "blocked":
             return current_state.value == "blocked"
+        elif resume_kind == "aborted":
+            # Aborted flows can be resumed from any state (READY/HANDOFF)
+            # as long as the flow_status is "aborted"
+            return True
 
         return False
 
@@ -205,3 +215,26 @@ class TaskResumeUsecase:
                 action="cleanup_stale_flow",
                 branch=branch,
             ).warning(f"Failed to clean up stale flow: {exc}")
+
+    def _reactivate_aborted_flow(self, branch: str) -> None:
+        """Reactivate an aborted flow.
+
+        Args:
+            branch: Branch name for the aborted flow
+        """
+        try:
+            logger.bind(
+                domain="resume",
+                action="reactivate_aborted",
+                branch=branch,
+            ).info("Reactivating aborted flow")
+
+            # Reactivate the aborted flow (change status from "aborted" to "active")
+            self.flow_service.reactivate_flow(branch)
+        except Exception as exc:
+            # Log but don't fail the resume operation
+            logger.bind(
+                domain="resume",
+                action="reactivate_aborted",
+                branch=branch,
+            ).warning(f"Failed to reactivate aborted flow: {exc}")
