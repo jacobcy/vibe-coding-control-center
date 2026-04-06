@@ -20,7 +20,10 @@ from vibe3.orchestra.queue_ordering import (
 )
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
-from vibe3.services.status_query_service import issue_priority
+from vibe3.services.status_query_service import (
+    is_orchestra_managed_flow_branch,
+    issue_priority,
+)
 
 if TYPE_CHECKING:
     from vibe3.runtime.circuit_breaker import CircuitBreaker
@@ -209,6 +212,8 @@ class OrchestraStatusService:
 
             # Check flow
             flow = self._orchestrator.get_flow_for_issue(number)
+            if flow and not is_orchestra_managed_flow_branch(flow.get("branch")):
+                continue
             has_flow = flow is not None
             flow_branch = flow.get("branch") if flow else None
             if has_flow:

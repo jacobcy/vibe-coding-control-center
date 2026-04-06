@@ -284,3 +284,67 @@ class TestStatusQueryServiceFetch:
         )
 
         assert result[0]["flow"].flow_status == "active"
+
+    def test_fetch_orchestrated_issues_excludes_manual_flow_issue(self) -> None:
+        """Manual flow branches must not be treated as orchestra issues."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 443,
+                "title": "Manual debug scene",
+                "labels": [{"name": "state/in-progress"}],
+            }
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        flows = [
+            FlowStatusResponse(
+                branch="debug/service-gap-analysis",
+                flow_slug="service-gap-analysis",
+                flow_status="done",
+                task_issue_number=443,
+            ),
+        ]
+
+        result = service.fetch_orchestrated_issues(flows, queued_set=set())
+
+        assert result == []
+
+    def test_fetch_orchestrated_issues_prefers_task_flow_over_manual_flow(self) -> None:
+        """Canonical task flow must win over manual flow for the same issue."""
+        github = MagicMock()
+        github.list_issues.return_value = [
+            {
+                "number": 443,
+                "title": "Canonical task should remain visible",
+                "labels": [{"name": "state/in-progress"}],
+            }
+        ]
+
+        git = MagicMock()
+        git._run.return_value = ""
+
+        service = StatusQueryService(github_client=github, git_client=git)
+        flows = [
+            FlowStatusResponse(
+                branch="debug/service-gap-analysis",
+                flow_slug="service-gap-analysis",
+                flow_status="active",
+                task_issue_number=443,
+            ),
+            FlowStatusResponse(
+                branch="task/issue-443",
+                flow_slug="issue-443",
+                flow_status="active",
+                task_issue_number=443,
+            ),
+        ]
+
+        result = service.fetch_orchestrated_issues(flows, queued_set=set())
+
+        assert len(result) == 1
+        assert result[0]["flow"] is not None
+        assert result[0]["flow"].branch == "task/issue-443"

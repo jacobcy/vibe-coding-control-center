@@ -73,6 +73,38 @@ def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool
     return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
 
 
+def is_orchestra_managed_flow_branch(branch: str | None) -> bool:
+    """Whether a flow branch belongs to orchestra-managed auto task scenes."""
+    return isinstance(branch, str) and is_auto_task_branch(branch)
+
+
+def _select_preferred_issue_flow(
+    existing: FlowStatusResponse | None,
+    candidate: FlowStatusResponse,
+) -> FlowStatusResponse:
+    """Choose the preferred flow for issue aggregation.
+
+    Priority order:
+    1. Orchestra-managed flow over manual flow
+    2. Active flow over stale/done flow
+    3. Keep existing on ties to preserve first-seen stability
+    """
+    if existing is None:
+        return candidate
+
+    existing_managed = is_orchestra_managed_flow_branch(existing.branch)
+    candidate_managed = is_orchestra_managed_flow_branch(candidate.branch)
+    if candidate_managed != existing_managed:
+        return candidate if candidate_managed else existing
+
+    existing_active = existing.flow_status == "active"
+    candidate_active = candidate.flow_status == "active"
+    if candidate_active != existing_active:
+        return candidate if candidate_active else existing
+
+    return existing
+
+
 class StatusQueryService:
     """Aggregates GitHub/Git data for the status dashboard.
 
@@ -111,10 +143,16 @@ class StatusQueryService:
         issue_to_flow: dict[int, FlowStatusResponse] = {}
         for f in stale_flows or []:
             if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = f
+                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
+                    issue_to_flow.get(f.task_issue_number),
+                    f,
+                )
         for f in flows:
             if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = f
+                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
+                    issue_to_flow.get(f.task_issue_number),
+                    f,
+                )
 
         orchestrated_issues: list[dict[str, object]] = []
         try:
@@ -138,6 +176,8 @@ class StatusQueryService:
             if state == IssueState.DONE:
                 continue
             flow = issue_to_flow.get(number)
+            if flow and not is_orchestra_managed_flow_branch(flow.branch):
+                continue
             failed_reason = (
                 self._extract_failed_reason(number)
                 if state == IssueState.FAILED

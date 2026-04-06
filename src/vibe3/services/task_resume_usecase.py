@@ -81,6 +81,14 @@ class TaskResumeUsecase:
                 flows=flows or [], stale_flows=stale_flows or []
             )
 
+        if issue_numbers is not None and candidate_mode != "all_task":
+            candidates = self._merge_explicit_issue_candidates(
+                issue_numbers=issue_numbers,
+                candidates=candidates,
+                flows=flows or [],
+                stale_flows=stale_flows or [],
+            )
+
         # Filter by requested issue numbers if provided
         if issue_numbers is not None:
             candidates = [c for c in candidates if c.get("number") in issue_numbers]
@@ -190,6 +198,72 @@ class TaskResumeUsecase:
                 )
 
         return result
+
+    def _merge_explicit_issue_candidates(
+        self,
+        *,
+        issue_numbers: list[int],
+        candidates: list[dict[str, Any]],
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse],
+    ) -> list[dict[str, Any]]:
+        """补充显式点名恢复的 issue，避免被治理候选集误过滤。"""
+        existing_numbers = {
+            number
+            for candidate in candidates
+            if isinstance((number := candidate.get("number")), int)
+        }
+
+        for issue_number in issue_numbers:
+            if issue_number in existing_numbers:
+                continue
+            direct_candidate = self._build_explicit_issue_candidate(
+                issue_number=issue_number,
+                flows=flows,
+                stale_flows=stale_flows,
+            )
+            if direct_candidate is None:
+                continue
+            candidates.append(direct_candidate)
+            existing_numbers.add(issue_number)
+
+        return candidates
+
+    def _build_explicit_issue_candidate(
+        self,
+        *,
+        issue_number: int,
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse],
+    ) -> dict[str, Any] | None:
+        """为显式指定的 issue 直接构造恢复候选。"""
+        current_state = self.label_service.get_state(issue_number)
+        if current_state == IssueState.FAILED:
+            resume_kind = "failed"
+        elif current_state == IssueState.BLOCKED:
+            resume_kind = "blocked"
+        else:
+            return None
+
+        return {
+            "number": issue_number,
+            "title": "",
+            "state": current_state,
+            "resume_kind": resume_kind,
+            "flow": self._find_resume_flow(issue_number, flows, stale_flows),
+        }
+
+    def _find_resume_flow(
+        self,
+        issue_number: int,
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse],
+    ) -> FlowStatusResponse | None:
+        """从已加载 flow 列表中为恢复操作关联现场。"""
+        for flow in [*stale_flows, *flows]:
+            if flow.task_issue_number == issue_number:
+                return flow
+        return None
 
     def _maybe_skip_all_task_candidate(
         self,

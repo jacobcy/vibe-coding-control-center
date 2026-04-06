@@ -104,12 +104,12 @@ class StateLabelDispatchService(ServiceBase):
         trigger_name: TriggerName,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
-        status_service: "OrchestraStatusService" | None = None,
+        status_service: OrchestraStatusService | None = None,
         manager: ManagerExecutor | None = None,
     ) -> None:
         self.config = config
         self.trigger_state = trigger_state
-        self.trigger_name = trigger_name
+        self.trigger_name: TriggerName = trigger_name
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )

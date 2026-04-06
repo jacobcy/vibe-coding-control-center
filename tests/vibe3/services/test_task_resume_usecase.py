@@ -180,6 +180,44 @@ def test_resume_issues_skips_issue_when_current_state_no_longer_matches_resume_k
         assert result["resumed"] == []
 
 
+def test_resume_issues_with_explicit_issue_bypasses_orchestra_candidate_filter() -> (
+    None
+):
+    """显式点名恢复时，不应因非 orchestra 候选而被拦截。"""
+    mock_status_service = MagicMock()
+    mock_status_service.fetch_resume_candidates.return_value = []
+    mock_label_service = MagicMock()
+    mock_label_service.get_state.return_value = IssueState.FAILED
+
+    with patch.object(
+        task_resume_usecase,
+        "resume_failed_issue_to_ready",
+    ) as mock_failed_to_ready:
+        usecase = task_resume_usecase.TaskResumeUsecase(
+            status_service=mock_status_service,
+            label_service=mock_label_service,
+            flow_service=MagicMock(),
+            git_client=MagicMock(),
+            github_client=MagicMock(),
+            issue_flow_service=MagicMock(),
+        )
+
+        result = usecase.resume_issues(
+            issue_numbers=[320],
+            dry_run=False,
+            flows=[],
+            stale_flows=[],
+        )
+
+        assert result["resumed"] == [{"number": 320, "resume_kind": "failed"}]
+        assert result["skipped"] == []
+        mock_failed_to_ready.assert_called_once_with(
+            issue_number=320,
+            repo=None,
+            reason="",
+        )
+
+
 def test_resume_issues_with_empty_issue_list_does_not_fall_back_to_all_candidates() -> (
     None
 ):
