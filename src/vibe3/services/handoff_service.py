@@ -216,28 +216,29 @@ class HandoffService:
         # 1. Ensure current.md exists (idempotent)
         handoff_path = self.ensure_current_handoff()
 
-        # 2. Update flow state in SQLite
+        # 2. Build flow state updates, but defer persistence until file/event
+        #    writes succeed.
         ref_field = f"{ref_kind.lower()}_ref"
         flow_updates = {ref_field: ref_value}
+        actor_field_by_kind = {
+            "plan": "planner_actor",
+            "report": "executor_actor",
+            "audit": "reviewer_actor",
+        }
+        actor_field = actor_field_by_kind.get(ref_kind.lower())
+        if actor_field:
+            flow_updates[actor_field] = effective_actor
         if next_step:
             flow_updates["next_step"] = next_step
         if blocked_by:
             flow_updates["blocked_by"] = blocked_by
 
-        self.store.update_flow_state(branch, **flow_updates)
-
-        # 3. Append update block to handoff file
+        # 3. Build the update block content.
         message = f"Recorded {ref_kind} reference: {ref_value}"
         if next_step:
             message += f"\nNext Step: {next_step}"
         if blocked_by:
             message += f"\nBlocked By: {blocked_by}"
-
-        self.append_current_handoff(
-            message=message,
-            actor=effective_actor,
-            kind=ref_kind.lower(),
-        )
 
         # 4. Record event in SQLite
         self.store.add_event(
@@ -252,6 +253,26 @@ class HandoffService:
                 "blocked_by": blocked_by,
             },
         )
+
+        # 5. Persist flow state after event persistence succeeds.
+        self.store.update_flow_state(branch, **flow_updates)
+
+        # 6. Append update block to handoff file only after authoritative writes
+        #    succeed.
+        try:
+            self.append_current_handoff(
+                message=message,
+                actor=effective_actor,
+                kind=ref_kind.lower(),
+            )
+        except (OSError, PermissionError) as exc:
+            logger.bind(
+                domain="handoff",
+                action="append_current_handoff_best_effort",
+                branch=branch,
+                ref_kind=ref_kind.lower(),
+                handoff_path=str(handoff_path),
+            ).warning(f"Skipping non-authoritative handoff file append: {exc}")
 
         return handoff_path
 
