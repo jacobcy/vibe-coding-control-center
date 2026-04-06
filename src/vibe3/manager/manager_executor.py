@@ -218,6 +218,10 @@ class ManagerExecutor:
                 f"(log: {handle.log_path})"
             )
             launched = True
+            self._flow_manager.store.update_flow_state(
+                flow_branch,
+                manager_session_id=handle.tmux_session,
+            )
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",

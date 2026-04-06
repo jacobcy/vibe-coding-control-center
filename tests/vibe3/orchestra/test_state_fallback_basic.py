@@ -7,6 +7,7 @@ import pytest
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.no_progress_policy import execute_state_fallback
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 
 
@@ -229,3 +230,20 @@ async def test_ready_manager_no_progress_falls_back_to_blocked(
             mock_fallback.assert_called_once()
             kwargs = mock_fallback.call_args[1]
             assert kwargs["source_state"] == IssueState.READY
+
+
+def test_execute_state_fallback_skips_when_issue_already_failed() -> None:
+    github = MagicMock()
+
+    with patch("vibe3.services.label_service.LabelService") as mock_label_service:
+        execute_state_fallback(
+            issue_number=320,
+            current_labels=["state/ready", "state/failed"],
+            github=github,
+            source_state=IssueState.READY,
+            repo="jacobcy/vibe-coding-control-center",
+        )
+
+    github.view_issue.assert_not_called()
+    github.add_comment.assert_not_called()
+    mock_label_service.assert_not_called()

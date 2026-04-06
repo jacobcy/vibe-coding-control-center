@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from vibe3.orchestra.logging import append_orchestra_event
+
 if TYPE_CHECKING:
     from vibe3.manager.flow_manager import FlowManager
     from vibe3.orchestra.config import OrchestraConfig
@@ -274,6 +276,11 @@ class WorktreeManager:
             branch=branch,
             worktree=str(target),
         ).info("Created manager worktree for flow branch")
+        append_orchestra_event(
+            "worktree",
+            (f"created issue #{issue_number} branch={branch} " f"path={target}"),
+            repo_root=self.repo_path,
+        )
         return target, True
 
     def _recycle_worktree_path(self, target: Path) -> None:

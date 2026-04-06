@@ -105,19 +105,23 @@ class TestManagerDispatch:
                         with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
                                 manager.flow_manager.store,
-                                "add_event",
-                            ) as mock_add_event:
+                                "update_flow_state",
+                            ) as mock_update_flow_state:
                                 with patch.object(
-                                    manager._backend,
-                                    "start_async_command",
-                                    return_value=SimpleNamespace(
-                                        tmux_session="vibe3-manager-102",
-                                        log_path=Path(
-                                            "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                    manager.flow_manager.store,
+                                    "add_event",
+                                ) as mock_add_event:
+                                    with patch.object(
+                                        manager._backend,
+                                        "start_async_command",
+                                        return_value=SimpleNamespace(
+                                            tmux_session="vibe3-manager-102",
+                                            log_path=Path(
+                                                "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                            ),
                                         ),
-                                    ),
-                                ) as mock_start:
-                                    result = manager.dispatch_manager(issue)
+                                    ) as mock_start:
+                                        result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_start.assert_called_once()
@@ -133,6 +137,10 @@ class TestManagerDispatch:
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
+        mock_update_flow_state.assert_called_once_with(
+            "task/issue-102",
+            manager_session_id="vibe3-manager-102",
+        )
         # Async dispatch records "dispatched" event, not success
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"

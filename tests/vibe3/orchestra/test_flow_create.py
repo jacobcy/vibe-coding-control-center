@@ -153,18 +153,12 @@ class TestFlowCreate:
                                             }
                                         ),
                                     ) as mock_reactivate:
-                                        with patch(
-                                            "vibe3.manager.worktree_manager.WorktreeManager.ensure_manager_worktree",
-                                            return_value=("/tmp/issue-431", True),
-                                        ) as mock_ensure_worktree:
-                                            with patch.object(
-                                                manager.task_service,
-                                                "link_issue",
-                                                return_value=None,
-                                            ) as mock_link:
-                                                flow = manager.create_flow_for_issue(
-                                                    issue
-                                                )
+                                        with patch.object(
+                                            manager.task_service,
+                                            "link_issue",
+                                            return_value=None,
+                                        ) as mock_link:
+                                            flow = manager.create_flow_for_issue(issue)
 
         assert flow["branch"] == "task/issue-431"
         assert mock_branch_exists.call_count == 2
@@ -179,7 +173,6 @@ class TestFlowCreate:
             "task/issue-431",
             start_ref="origin/main",
         )
-        mock_ensure_worktree.assert_called_once_with(431, "task/issue-431")
         mock_reactivate.assert_called_once()
         mock_link.assert_called_once_with("task/issue-431", 431, "task", actor=None)
 

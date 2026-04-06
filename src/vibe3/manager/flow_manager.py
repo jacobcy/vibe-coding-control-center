@@ -1,7 +1,5 @@
 """Flow management utilities for orchestra manager."""
 
-from pathlib import Path
-
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
@@ -94,8 +92,11 @@ class FlowManager:
     def _rebuild_stale_canonical_flow(
         self, issue: IssueInfo, branch: str, slug: str
     ) -> dict:
-        """Hard-reset stale canonical flow by removing scene residue first."""
-        from vibe3.manager.worktree_manager import WorktreeManager
+        """Hard-reset stale canonical flow by removing scene residue first.
+
+        This repair step must stay metadata-only. Worktrees are created only when
+        manager dispatch actually begins, not while rebuilding a stale ready scene.
+        """
 
         worktree_path = self.git.find_worktree_path_for_branch(branch)
         if worktree_path is not None:
@@ -113,18 +114,6 @@ class FlowManager:
                 branch,
                 start_ref=self.config.scene_base_ref,
             )
-
-        manager_worktree = WorktreeManager(
-            self.config,
-            Path(self.git.get_worktree_root()),
-            flow_manager=self,
-        )
-        resolved_worktree, _ = manager_worktree.ensure_manager_worktree(
-            issue.number,
-            branch,
-        )
-        if resolved_worktree is None:
-            raise RuntimeError(f"Failed to create manager worktree for '{branch}'")
 
         return self._reactivate_canonical_flow(issue, branch, slug)
 

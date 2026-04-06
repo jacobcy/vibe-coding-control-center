@@ -1,5 +1,6 @@
 """Tests for TaskResumeUsecase."""
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueState
@@ -204,3 +205,93 @@ def test_resume_issues_with_empty_issue_list_does_not_fall_back_to_all_candidate
         assert result["requested"] == []
         assert result["resumed"] == []
         assert result["skipped"] == []
+
+
+def test_resume_issues_clears_existing_tmux_sessions_before_reactivate() -> None:
+    """恢复 task scene 前应先清理 issue 对应的旧 tmux session。"""
+    mock_status_service = MagicMock()
+    flow = MagicMock(
+        branch="task/issue-320",
+        plan_ref=None,
+        manager_session_id="stale-backend-session",
+        planner_session_id=None,
+        executor_session_id=None,
+        reviewer_session_id=None,
+    )
+    mock_status_service.fetch_resume_candidates.return_value = [
+        {
+            "number": 320,
+            "title": "Manager backend regression",
+            "state": IssueState.FAILED,
+            "resume_kind": "failed",
+            "flow": flow,
+        },
+    ]
+
+    with (
+        patch.object(
+            task_resume_usecase, "StatusQueryService", return_value=mock_status_service
+        ),
+        patch.object(
+            task_resume_usecase, "resume_failed_issue_to_ready"
+        ) as mock_failed_to_ready,
+        patch.object(task_resume_usecase, "LabelService") as mock_label_service,
+        patch.object(task_resume_usecase, "GitClient") as mock_git_client,
+        patch.object(task_resume_usecase, "FlowService") as mock_flow_service,
+        patch.object(
+            task_resume_usecase, "IssueFlowService"
+        ) as mock_issue_flow_service,
+        patch("vibe3.services.task_resume_usecase.subprocess.run") as mock_run,
+    ):
+        mock_label_instance = MagicMock()
+        mock_label_service.return_value = mock_label_instance
+        mock_label_instance.get_state.return_value = IssueState.FAILED
+        mock_git_instance = MagicMock()
+        mock_git_client.return_value = mock_git_instance
+        mock_git_instance.find_worktree_path_for_branch.return_value = None
+        mock_flow_instance = MagicMock()
+        mock_flow_service.return_value = mock_flow_instance
+        mock_issue_flow_service.return_value.parse_issue_number.return_value = 320
+        mock_run.side_effect = [
+            subprocess.CompletedProcess(
+                args=["tmux", "ls"],
+                returncode=0,
+                stdout=(
+                    "vibe3-manager-issue-320: 1 windows\n"
+                    "vibe3-manager-issue-320-2: 1 windows\n"
+                    "vibe3-plan-issue-320: 1 windows\n"
+                ),
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["tmux", "kill-session", "-t", "vibe3-manager-issue-320"],
+                returncode=0,
+                stdout="",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["tmux", "kill-session", "-t", "vibe3-manager-issue-320-2"],
+                returncode=0,
+                stdout="",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["tmux", "kill-session", "-t", "vibe3-plan-issue-320"],
+                returncode=0,
+                stdout="",
+                stderr="",
+            ),
+        ]
+
+        usecase = task_resume_usecase.TaskResumeUsecase()
+        result = usecase.resume_issues(dry_run=False)
+
+        assert result["resumed"] == [{"number": 320, "resume_kind": "failed"}]
+        mock_failed_to_ready.assert_called_once()
+        mock_flow_instance.reactivate_flow.assert_called_once_with("task/issue-320")
+        kill_calls = [call.args[0] for call in mock_run.call_args_list[1:]]
+        assert kill_calls == [
+            ["tmux", "kill-session", "-t", "vibe3-manager-issue-320"],
+            ["tmux", "kill-session", "-t", "vibe3-manager-issue-320-2"],
+            ["tmux", "kill-session", "-t", "vibe3-plan-issue-320"],
+        ]

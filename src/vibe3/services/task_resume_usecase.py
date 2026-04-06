@@ -6,12 +6,14 @@ whether they are in failed or blocked state.
 
 from __future__ import annotations
 
+import subprocess
 from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_failure_service import (
@@ -202,7 +204,24 @@ class TaskResumeUsecase:
         if not isinstance(branch, str):
             return None
 
-        if candidate_state == IssueState.READY and worktree_path is None:
+        has_runtime_sessions = bool(
+            flow
+            and any(
+                getattr(flow, field, None)
+                for field in (
+                    "manager_session_id",
+                    "planner_session_id",
+                    "executor_session_id",
+                    "reviewer_session_id",
+                )
+            )
+        )
+
+        if (
+            candidate_state == IssueState.READY
+            and worktree_path is None
+            and not has_runtime_sessions
+        ):
             logger.bind(
                 domain="resume",
                 action="skip_noop_all_task",
@@ -371,6 +390,8 @@ class TaskResumeUsecase:
         if not self.issue_flow_service.is_task_branch(branch):
             return
 
+        self._terminate_task_sessions(branch)
+
         resolved_path = worktree_path
         if resolved_path is None:
             found_path = self.git_client.find_worktree_path_for_branch(branch)
@@ -384,6 +405,58 @@ class TaskResumeUsecase:
         if resolved_path is not None:
             self.git_client.remove_worktree(resolved_path, force=True)
         self.flow_service.reactivate_flow(branch)
+
+    def _terminate_task_sessions(self, branch: str) -> None:
+        """Kill lingering tmux sessions for a task issue before resume."""
+        issue_number = self.issue_flow_service.parse_issue_number(branch)
+        if issue_number is None:
+            return
+
+        prefixes = (
+            get_manager_session_name(issue_number),
+            f"vibe3-plan-issue-{issue_number}",
+            f"vibe3-run-issue-{issue_number}",
+            f"vibe3-review-issue-{issue_number}",
+        )
+
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return
+        except Exception as exc:
+            logger.bind(
+                domain="resume",
+                action="terminate_task_sessions",
+                branch=branch,
+            ).warning(f"Failed to inspect tmux sessions: {exc}")
+            return
+
+        if result.returncode != 0:
+            return
+
+        active_sessions: list[str] = []
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if any(
+                session_name == prefix or session_name.startswith(f"{prefix}-")
+                for prefix in prefixes
+            ):
+                active_sessions.append(session_name)
+
+        for session_name in active_sessions:
+            subprocess.run(
+                ["tmux", "kill-session", "-t", session_name],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
 
     def _restore_issue_state(
         self,
