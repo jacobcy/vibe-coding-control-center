@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestration import IssueState
-from vibe3.services import task_failed_resume_usecase
+from vibe3.services import task_resume_usecase
 from vibe3.services.task_failed_resume_usecase import TaskFailedResumeUsecase
 
 
@@ -16,13 +16,16 @@ class TestTaskFailedResumeUsecase:
     ) -> None:
         """dry-run 只返回计划执行结果，不调用恢复原语。"""
         status_svc = MagicMock()
-        status_svc.fetch_failed_resume_candidates.return_value = [
+        # Mock the unified fetch_resume_candidates
+        # (not deprecated fetch_failed_resume_candidates)
+        status_svc.fetch_resume_candidates.return_value = [
             {
                 "number": 439,
                 "title": "Manager backend regression",
                 "state": IssueState.FAILED,
                 "failed_reason": "quota exhausted",
                 "flow": None,
+                "resume_kind": "failed",
             },
             {
                 "number": 441,
@@ -30,6 +33,7 @@ class TestTaskFailedResumeUsecase:
                 "state": IssueState.FAILED,
                 "failed_reason": "network error",
                 "flow": None,
+                "resume_kind": "failed",
             },
         ]
 
@@ -73,13 +77,15 @@ class TestTaskFailedResumeUsecase:
         flow_441.task_issue_number = 441
 
         status_svc = MagicMock()
-        status_svc.fetch_failed_resume_candidates.return_value = [
+        # Mock the unified fetch_resume_candidates
+        status_svc.fetch_resume_candidates.return_value = [
             {
                 "number": 439,
                 "title": "Manager backend regression",
                 "state": IssueState.FAILED,
                 "failed_reason": "quota exhausted",
                 "flow": flow_439,
+                "resume_kind": "failed",
             },
             {
                 "number": 441,
@@ -87,27 +93,26 @@ class TestTaskFailedResumeUsecase:
                 "state": IssueState.FAILED,
                 "failed_reason": "network error",
                 "flow": flow_441,
+                "resume_kind": "failed",
             },
         ]
-
-        # Mock view_issue for defensive check
-        status_svc.github.view_issue.return_value = {
-            "labels": [{"name": "state/failed"}],
-            "state": "open",
-        }
 
         failure_svc = MagicMock()
 
         with (
             patch.object(
-                task_failed_resume_usecase,
+                task_resume_usecase,
                 "resume_failed_issue_to_handoff",
             ) as mock_handoff,
             patch.object(
-                task_failed_resume_usecase,
+                task_resume_usecase,
                 "resume_failed_issue_to_ready",
             ) as mock_ready,
+            patch("vibe3.services.task_resume_usecase.LabelService") as mock_label_svc,
         ):
+            # Mock LabelService to return FAILED state
+            mock_label_svc.return_value.get_state.return_value = IssueState.FAILED
+
             usecase = TaskFailedResumeUsecase(
                 status_service=status_svc,
                 failure_service=failure_svc,
@@ -124,7 +129,6 @@ class TestTaskFailedResumeUsecase:
                 issue_number=439,
                 repo=None,
                 reason="quota resumed",
-                actor="human:resume",
             )
 
             # 441 无 plan_ref -> ready
@@ -132,7 +136,6 @@ class TestTaskFailedResumeUsecase:
                 issue_number=441,
                 repo=None,
                 reason="quota resumed",
-                actor="human:resume",
             )
 
         assert result["resumed"] == [439, 441]
@@ -144,27 +147,30 @@ class TestTaskFailedResumeUsecase:
     ) -> None:
         """无 flow 的 failed issue 恢复到 ready（保守策略）。"""
         status_svc = MagicMock()
-        status_svc.fetch_failed_resume_candidates.return_value = [
+        # Mock the unified fetch_resume_candidates
+        status_svc.fetch_resume_candidates.return_value = [
             {
                 "number": 439,
                 "title": "Orphan failed issue",
                 "state": IssueState.FAILED,
                 "failed_reason": "unknown error",
                 "flow": None,  # No flow
+                "resume_kind": "failed",
             },
         ]
 
-        status_svc.github.view_issue.return_value = {
-            "labels": [{"name": "state/failed"}],
-            "state": "open",
-        }
-
         failure_svc = MagicMock()
 
-        with patch.object(
-            task_failed_resume_usecase,
-            "resume_failed_issue_to_ready",
-        ) as mock_ready:
+        with (
+            patch.object(
+                task_resume_usecase,
+                "resume_failed_issue_to_ready",
+            ) as mock_ready,
+            patch("vibe3.services.task_resume_usecase.LabelService") as mock_label_svc,
+        ):
+            # Mock LabelService to return FAILED state
+            mock_label_svc.return_value.get_state.return_value = IssueState.FAILED
+
             usecase = TaskFailedResumeUsecase(
                 status_service=status_svc,
                 failure_service=failure_svc,
@@ -181,7 +187,6 @@ class TestTaskFailedResumeUsecase:
                 issue_number=439,
                 repo=None,
                 reason="manual resume",
-                actor="human:resume",
             )
 
         assert result["resumed"] == [439]
@@ -191,7 +196,8 @@ class TestTaskFailedResumeUsecase:
     ) -> None:
         """对不满足条件的 issue 返回 skipped + reason。"""
         status_svc = MagicMock()
-        status_svc.fetch_failed_resume_candidates.return_value = []  # No candidates
+        # Mock the unified fetch_resume_candidates (returns empty for no candidates)
+        status_svc.fetch_resume_candidates.return_value = []  # No candidates
 
         failure_svc = MagicMock()
 
@@ -210,7 +216,7 @@ class TestTaskFailedResumeUsecase:
         assert result["resumed"] == []
         assert len(result["skipped"]) == 1
         assert result["skipped"][0]["issue_number"] == 439
-        assert "not in failed state" in result["skipped"][0]["reason"].lower()
+        assert "failed" in result["skipped"][0]["reason"].lower()
 
         failure_svc.resume_failed_issue_to_handoff.assert_not_called()
         failure_svc.resume_failed_issue_to_ready.assert_not_called()

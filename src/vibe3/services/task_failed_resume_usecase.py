@@ -37,7 +37,8 @@ class TaskFailedResumeUsecase:
         """
         self.status_service = status_service
         self.failure_service = failure_service
-        self._unified_usecase = TaskResumeUsecase()
+        # Pass injected status_service to unified usecase for proper mocking
+        self._unified_usecase = TaskResumeUsecase(status_service=status_service)
 
     def resume_failed_issues(
         self,

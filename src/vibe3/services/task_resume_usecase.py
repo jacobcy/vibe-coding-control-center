@@ -26,10 +26,15 @@ if TYPE_CHECKING:
 class TaskResumeUsecase:
     """Unified usecase for resuming failed or blocked tasks."""
 
-    def __init__(self) -> None:
-        self.status_service = StatusQueryService()
-        self.label_service = LabelService()
-        self.flow_service = FlowService()
+    def __init__(
+        self,
+        status_service: StatusQueryService | None = None,
+        label_service: LabelService | None = None,
+        flow_service: FlowService | None = None,
+    ) -> None:
+        self.status_service = status_service or StatusQueryService()
+        self.label_service = label_service or LabelService()
+        self.flow_service = flow_service or FlowService()
 
     def resume_issues(
         self,
@@ -71,6 +76,18 @@ class TaskResumeUsecase:
             "skipped": [],
             "requested": issue_numbers if issue_numbers else [],
         }
+
+        # Add skipped for requested issues not in candidates
+        if issue_numbers:
+            candidate_numbers = {c.get("number") for c in candidates}
+            for issue_num in issue_numbers:
+                if issue_num not in candidate_numbers:
+                    result["skipped"].append(
+                        {
+                            "number": issue_num,
+                            "reason": "不在 failed 或 blocked 状态，跳过恢复",
+                        }
+                    )
 
         # Dry-run: return candidates without mutation
         if dry_run:
