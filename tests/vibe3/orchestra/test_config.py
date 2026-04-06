@@ -16,6 +16,7 @@ def test_default_config():
     assert config.enabled is True
     assert config.polling_interval == 900
     assert config.debug_polling_interval == 60
+    assert config.debug_max_ticks == 10
     assert config.debug is False
     assert config.scene_base_ref == "origin/main"
     assert config.dry_run is False
@@ -69,6 +70,7 @@ def test_from_settings_loads_yaml_config():
                         "enabled": True,
                         "polling_interval": 120,
                         "debug_polling_interval": 45,
+                        "debug_max_ticks": 6,
                         "scene_base_ref": "feature/debug-base",
                         "max_concurrent_flows": 5,
                         "polling": {
@@ -127,6 +129,7 @@ def test_from_settings_loads_yaml_config():
             config = OrchestraConfig.from_settings()
             assert config.polling_interval == 120
             assert config.debug_polling_interval == 45
+            assert config.debug_max_ticks == 6
             assert config.scene_base_ref == "feature/debug-base"
             assert config.max_concurrent_flows == 5
             assert config.polling.enabled is False
@@ -284,3 +287,22 @@ def test_manager_agent_resolution_supports_backend_only_override(monkeypatch):
     assert options.backend == "opencode"
     assert options.model == "alibaba-coding-plan-cn/glm-5"
     assert options.worktree is True
+
+
+def test_manager_timeout_defaults_to_1800_seconds():
+    """Manager should have a longer default timeout for long-running tasks."""
+    config = OrchestraConfig()
+
+    assert config.assignee_dispatch.timeout_seconds == 1800
+
+
+def test_resolve_manager_agent_options_uses_orchestra_timeout_override():
+    """Manager agent options should use orchestra config timeout."""
+    config = OrchestraConfig()
+    runtime = VibeConfig(
+        run=RunConfig(agent_config=AgentConfig(agent="develop")),
+    )
+
+    options = resolve_manager_agent_options(config, runtime, worktree=True)
+
+    assert options.timeout_seconds == 1800
