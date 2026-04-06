@@ -48,8 +48,42 @@ def _resolve_orchestra_repo_root() -> Path:
     return Path.cwd()
 
 
+def _resolve_dispatcher_repo_root(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> Path:
+    """Resolve the worktree root used for dispatcher-managed auto scenes."""
+    _ = config
+    _ = launch_cwd
+    return _resolve_orchestra_repo_root().resolve()
+
+
+def _resolve_dispatcher_models_root(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> Path:
+    """Resolve control-plane models root for dispatcher-managed execution."""
+    resolved_cwd = (launch_cwd or Path.cwd()).resolve()
+    if config.debug:
+        return resolved_cwd
+    return _resolve_orchestra_repo_root().resolve()
+
+
+def _resolve_orchestra_log_dir(launch_cwd: Path | None = None) -> Path:
+    """Resolve the shared orchestra log root anchored to the launch cwd."""
+    return (launch_cwd or Path.cwd()).resolve() / "temp" / "logs"
+
+
 def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with registered services."""
+    return _build_server_with_launch_cwd(config)
+
+
+def _build_server_with_launch_cwd(
+    config: OrchestraConfig,
+    launch_cwd: Path | None = None,
+) -> tuple[HeartbeatServer, FastAPI]:
+    """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
     from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
@@ -61,7 +95,7 @@ def _build_server(config: OrchestraConfig) -> tuple[HeartbeatServer, FastAPI]:
     shared_manager = ManagerExecutor(
         config,
         dry_run=config.dry_run,
-        repo_path=_resolve_orchestra_repo_root(),
+        repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
     )
 
     # Pass circuit_breaker from manager for status reporting
@@ -315,11 +349,19 @@ def _validate_pid_file(pid_file: Path) -> tuple[int | None, bool]:
     return pid, _is_orchestra_process(pid)
 
 
-def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[str]:
+def _build_async_serve_command(
+    config: OrchestraConfig,
+    verbose: int,
+    launch_cwd: Path | None = None,
+) -> list[str]:
     """Build self-invocation command for async tmux startup."""
+    models_root = _resolve_dispatcher_models_root(config, launch_cwd)
+    log_dir = _resolve_orchestra_log_dir(launch_cwd)
     cmd = [
         "env",
         "VIBE3_ORCHESTRA_EVENT_LOG=1",
+        f"VIBE3_REPO_MODELS_ROOT={models_root}",
+        f"VIBE3_ASYNC_LOG_DIR={log_dir}",
         "uv",
         "run",
         "python",
@@ -345,7 +387,8 @@ def _build_async_serve_command(config: OrchestraConfig, verbose: int) -> list[st
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session."""
     session_name = "vibe3-orchestra-serve"
-    cmd = _build_async_serve_command(config, verbose)
+    launch_cwd = Path.cwd()
+    cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
     try:
         subprocess.run(
             ["tmux", "new-session", "-d", "-s", session_name, "--"] + cmd,
@@ -368,8 +411,8 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
     return (
         True,
         f"Started Orchestra server in tmux session: {session_name}\n"
-        f"Main log: {orchestra_events_log_path()}\n"
-        f"Log dir: {orchestra_log_dir()}\n"
+        f"Main log: {orchestra_events_log_path(launch_cwd)}\n"
+        f"Log dir: {orchestra_log_dir(launch_cwd)}\n"
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )

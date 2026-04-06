@@ -23,6 +23,9 @@ from vibe3.server.app import (
 from vibe3.server.registry import (
     _build_async_serve_command,
     _build_server,
+    _build_server_with_launch_cwd,
+    _resolve_dispatcher_models_root,
+    _resolve_orchestra_log_dir,
     _resolve_orchestra_repo_root,
     _setup_tailscale_webhook,
     _validate_pid_file,
@@ -63,6 +66,50 @@ def test_resolve_orchestra_repo_root_prefers_git_common_dir_parent(monkeypatch) 
     )
 
     assert _resolve_orchestra_repo_root() == Path("/repo")
+
+
+def test_resolve_dispatcher_models_root_prefers_main_repo_when_not_debug(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_repo_root",
+        lambda: Path("/main-repo"),
+    )
+
+    assert _resolve_dispatcher_models_root(
+        OrchestraConfig(debug=False),
+        launch_cwd=Path("/debug-wt"),
+    ) == Path("/main-repo")
+
+
+def test_resolve_dispatcher_models_root_uses_launch_cwd_in_debug() -> None:
+    assert _resolve_dispatcher_models_root(
+        OrchestraConfig(debug=True),
+        launch_cwd=Path("/debug-wt"),
+    ) == Path("/debug-wt")
+
+
+def test_build_server_keeps_main_repo_root_in_debug(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_repo_root",
+        lambda: Path("/main-repo"),
+    )
+
+    heartbeat, _ = _build_server_with_launch_cwd(
+        OrchestraConfig(debug=True),
+        launch_cwd=Path("/debug-wt"),
+    )
+
+    manager_service = next(
+        service
+        for service in heartbeat._services
+        if getattr(service, "trigger_name", None) == "manager"
+    )
+    assert manager_service._manager.repo_path == Path("/main-repo")
+
+
+def test_resolve_orchestra_log_dir_uses_launch_cwd() -> None:
+    assert _resolve_orchestra_log_dir(Path("/debug-wt")) == Path("/debug-wt/temp/logs")
 
 
 def test_build_server_governance_disabled() -> None:
@@ -169,6 +216,26 @@ def test_build_async_command_uses_config_port_and_skips_repo_when_none() -> None
     assert "--repo" not in cmd
 
 
+def test_build_async_command_exports_models_root_and_log_dir(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_dispatcher_models_root",
+        lambda _config, launch_cwd: Path("/main-repo"),
+    )
+    monkeypatch.setattr(
+        "vibe3.server.registry._resolve_orchestra_log_dir",
+        lambda launch_cwd: Path("/debug-wt/temp/logs"),
+    )
+
+    cmd = _build_async_serve_command(
+        OrchestraConfig(enabled=True, polling_interval=75, port=9090),
+        verbose=0,
+        launch_cwd=Path("/debug-wt"),
+    )
+
+    assert "VIBE3_REPO_MODELS_ROOT=/main-repo" in cmd
+    assert "VIBE3_ASYNC_LOG_DIR=/debug-wt/temp/logs" in cmd
+
+
 def test_build_async_command_includes_debug_flag() -> None:
     cfg = OrchestraConfig(
         enabled=True,
@@ -232,6 +299,48 @@ def test_start_debug_overrides_interval_and_scene_base(monkeypatch) -> None:
     assert "scene_base: dev/post-437-debug" in result.stdout
     assert "Main log:" in result.stdout
     assert "Log dir:" in result.stdout
+
+
+def test_start_honors_settings_debug_for_scene_base_and_interval(monkeypatch) -> None:
+    import vibe3.server.app as serve_module
+
+    captured = {}
+
+    async def _fake_run(config, port):
+        captured["config"] = config
+        captured["port"] = port
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(serve_module, "setup_logging", lambda verbose=0: None)
+    monkeypatch.setattr(
+        serve_module.OrchestraConfig,
+        "from_settings",
+        classmethod(
+            lambda cls: OrchestraConfig(
+                enabled=True,
+                debug=True,
+                polling_interval=900,
+                debug_polling_interval=60,
+                port=8080,
+                scene_base_ref="origin/main",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        serve_module.GitClient, "get_current_branch", lambda self: "dev/issue-501"
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(serve_module, "_run", _fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["start"])
+
+    assert result.exit_code == 0
+    config = captured["config"]
+    assert config.debug is True
+    assert config.polling_interval == 60
+    assert config.scene_base_ref == "dev/issue-501"
+    assert "scene_base: dev/issue-501" in result.stdout
 
 
 def test_validate_pid_file_handles_read_errors(

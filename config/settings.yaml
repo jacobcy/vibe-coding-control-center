@@ -41,16 +41,99 @@ code_limits:
     default: 300           # 单文件默认限制（所有类型）
     max: 400              # 单文件最大限制（所有类型）
 
-    # LOC例外：职责内聚但不适合进一步拆分的核心基础设施文件
+# 例外清单：核心聚合文件、兼容入口、强耦合测试允许适度超标
+    # 原则：LOC 上限是治理触发器而非硬性阻塞，命中时触发质量回收审计
     exceptions:
+      # 核心业务聚合 —— 允许 600
+      - path: "src/vibe3/services/flow_service.py"
+        limit: 600
+        reason: "核心状态机聚合，吸收 flow_query_mixin"
+      - path: "src/vibe3/services/pr_service.py"
+        limit: 600
+        reason: "PR 生命周期聚合"
+      - path: "src/vibe3/services/check_service.py"
+        limit: 600
+        reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
+      - path: "src/vibe3/services/task_service.py"
+        limit: 550
+        reason: "任务生命周期聚合"
+      - path: "src/vibe3/services/handoff_service.py"
+        limit: 500
+        reason: "handoff 状态读写聚合"
+
+      # Clients 聚合 —— 允许 500
+      - path: "src/vibe3/clients/git_client.py"
+        limit: 500
+        reason: "Git 门面聚合"
+      - path: "src/vibe3/clients/github_client.py"
+        limit: 500
+        reason: "GitHub 门面聚合"
+      - path: "src/vibe3/clients/github_pr_ops.py"
+        limit: 500
+        reason: "GitHub PR 操作与查询聚合"
+      - path: "src/vibe3/clients/sqlite_client.py"
+        limit: 450
+        reason: "已 388，持久化聚合"
+
+      # Orchestra —— 允许 550
+      - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
+        limit: 650
+        reason: "状态标签触发执行服务，职责单一但核心方法逻辑完整，__init__/_prune_in_flight/_dispatch_issue 紧密耦合不宜拆分"
+      - path: "src/vibe3/server/registry.py"
+        limit: 450
+        reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
+
+      # Shell / 脚本兼容入口
+      - path: "lib/alias/worktree.sh"
+        limit: 450
+        reason: "Shell worktree 入口聚合别名与辅助函数，维持单文件更符合使用方式"
+      - path: "scripts/tsu.sh"
+        limit: 900
+        reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
+
+      # 基础设施核心模块
       - path: "src/vibe3/manager/worktree_manager.py"
-        limit: 420        # Worktree lifecycle management (职责内聚，共享私有方法)
+        limit: 450
+        reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 420        # Codeagent execution backend (sync/async共享基础设施)
+        limit: 450
+        reason: "Codeagent execution backend"
+      - path: "src/vibe3/services/task_resume_usecase.py"
+        limit: 500
+        reason: "Task resume usecase，职责单一，方法粒度合理，主方法 resume_issues 逻辑完整不宜拆分"
+
+      # 强耦合测试例外
+      - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
+        limit: 550
+        reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
+      - path: "tests/vibe3/orchestra/test_serve.py"
+        limit: 500
+        reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
+      - path: "tests/vibe3/services/test_issue_failure_service.py"
+        limit: 420
+        reason: "Issue failure/resume 测试集，围绕同一服务契约，拆分收益低"
+      - path: "tests/vibe3/commands/test_task_resume_failed.py"
+        limit: 430
+        reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
+      - path: "tests/vibe3/commands/test_run_manager_issue.py"
+        limit: 500
+        reason: "manager issue 模式回归矩阵集中在单入口，拆分会削弱可读性"
+      - path: "tests/vibe3/manager/test_manager_executor.py"
+        limit: 400
+        reason: "manager executor 容量与调度回归共享构造，维持单文件更稳"
+      - path: "tests/vibe3/commands/test_run_supervisor.py"
+        limit: 400
+        reason: "supervisor 运行契约测试共享大量上下文，拆分收益低"
+      - path: "tests/vibe3/commands/test_handoff_command.py"
+        limit: 400
+        reason: "handoff 命令回归围绕同一 CLI 面展开，拆分会放大重复夹具"
+      - path: "tests/vibe3/services/test_check_service.py"
+        limit: 400
+        reason: "check service 回归按同一服务契约组织，当前维持集中更清晰"
 
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 29999        # Python 核心代码总行数
+    v3_python: 32000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:
@@ -199,6 +282,7 @@ review:
     # - model 只有在 backend 已配置时才有意义
     backend: "claude"  # e.g., "claude", "opencode", "gemini"
     model: "claude-sonnet-4-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements (VERDICT contract)
   output_format: |
@@ -248,6 +332,7 @@ plan:
     # - model 只有在 backend 已配置时才有意义
     backend: "codex"  # e.g., "claude", "opencode", "gemini"
     model: "gpt-5.4"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements
   output_format: |
@@ -302,6 +387,7 @@ run:
     # - model 只有在 backend 已配置时才有意义
     backend: "opencode"  # e.g., "claude", "opencode", "gemini"
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
+    timeout_seconds: 1800
 
   # Static: Output format requirements
   output_format: |

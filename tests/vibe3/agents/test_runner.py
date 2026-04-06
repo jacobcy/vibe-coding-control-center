@@ -15,7 +15,8 @@ class TestCodeagentExecutionService:
             ["run", "--plan", "/tmp/demo.md"]
         )
 
-        assert cmd[:4] == ["uv", "run", "python", "src/vibe3/cli.py"]
+        assert cmd[:3] == ["uv", "run", "--project"]
+        assert cmd[4:6] == ["python", str(CodeagentExecutionService._cli_entry())]
         assert "--sync" in cmd
 
     def test_build_self_invocation_drops_async_and_keeps_sync_single(self) -> None:
@@ -66,7 +67,11 @@ class TestCodeagentExecutionService:
         assert result.log_path == Path("temp/logs/issues/issue-424/run.async.log")
         backend.start_async_command.assert_called_once()
         called_command = backend.start_async_command.call_args.args[0]
-        assert called_command[:4] == ["uv", "run", "python", "src/vibe3/cli.py"]
+        assert called_command[:3] == ["uv", "run", "--project"]
+        assert called_command[4:6] == [
+            "python",
+            str(CodeagentExecutionService._cli_entry()),
+        ]
         assert "--sync" in called_command
         backend.start_async.assert_not_called()
         expected_tmux = "Tmux session: vibe3-executor-dev-issue-424"
@@ -108,8 +113,10 @@ class TestCodeagentExecutionService:
         assert called_command == [
             "uv",
             "run",
+            "--project",
+            str(CodeagentExecutionService._repo_root()),
             "python",
-            "src/vibe3/cli.py",
+            str(CodeagentExecutionService._cli_entry()),
             "plan",
             "--issue",
             "42",

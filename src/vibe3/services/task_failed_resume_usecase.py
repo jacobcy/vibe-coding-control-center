@@ -13,6 +13,11 @@ from typing import TYPE_CHECKING, Any
 from vibe3.services.task_resume_usecase import TaskResumeUsecase
 
 if TYPE_CHECKING:
+    from vibe3.clients.git_client import GitClient
+    from vibe3.clients.github_client import GitHubClient
+    from vibe3.services.flow_service import FlowService
+    from vibe3.services.issue_flow_service import IssueFlowService
+    from vibe3.services.label_service import LabelService
     from vibe3.services.status_query_service import StatusQueryService
 
 
@@ -26,6 +31,11 @@ class TaskFailedResumeUsecase:
         self,
         status_service: "StatusQueryService",
         failure_service: object,
+        label_service: "LabelService | None" = None,
+        flow_service: "FlowService | None" = None,
+        git_client: "GitClient | None" = None,
+        github_client: "GitHubClient | None" = None,
+        issue_flow_service: "IssueFlowService | None" = None,
     ) -> None:
         """Initialize with required services.
 
@@ -34,11 +44,23 @@ class TaskFailedResumeUsecase:
         Args:
             status_service: Service for querying issue status
             failure_service: Service for issue state transitions (unused)
+            label_service: Service for label operations (optional)
+            flow_service: Service for flow operations (optional)
+            git_client: Git client for worktree operations (optional)
+            github_client: GitHub client for API operations (optional)
+            issue_flow_service: Service for issue-flow mapping (optional)
         """
         self.status_service = status_service
         self.failure_service = failure_service
-        # Pass injected status_service to unified usecase for proper mocking
-        self._unified_usecase = TaskResumeUsecase(status_service=status_service)
+        # Pass all dependencies to unified usecase for proper mocking
+        self._unified_usecase = TaskResumeUsecase(
+            status_service=status_service,
+            label_service=label_service,
+            flow_service=flow_service,
+            git_client=git_client,
+            github_client=github_client,
+            issue_flow_service=issue_flow_service,
+        )
 
     def resume_failed_issues(
         self,

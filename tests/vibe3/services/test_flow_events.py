@@ -17,7 +17,7 @@ def stable_worktree_actor(monkeypatch):
         lambda: "test-actor",
     )
     monkeypatch.setattr(
-        "vibe3.services.flow_query_mixin.GitHubClient.get_pr",
+        "vibe3.services.flow_service.GitHubClient.get_pr",
         lambda self, pr_number=None, branch=None: None,
     )
 

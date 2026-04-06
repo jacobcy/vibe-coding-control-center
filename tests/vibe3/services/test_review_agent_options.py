@@ -11,6 +11,39 @@ from vibe3.agents.review_runner import sync_models_json
 from vibe3.models.review_runner import AgentOptions
 
 
+def test_agent_preset_uses_models_root_env_override(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Dispatcher should be able to pin models lookup to a control repo root."""
+    control_root = tmp_path / "main"
+    models_path = control_root / "config" / "models.json"
+    models_path.parent.mkdir(parents=True)
+    models_path.write_text(
+        json.dumps(
+            {
+                "agents": {
+                    "code-reviewer": {
+                        "backend": "claude",
+                        "model": "claude-sonnet-4-6",
+                    }
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("VIBE3_REPO_MODELS_ROOT", str(control_root))
+
+    with patch(
+        "vibe3.agents.backends.codeagent_config.MODELS_JSON_PATH",
+        tmp_path / ".codeagent-models.json",
+    ):
+        sync_models_json(AgentOptions(agent="code-reviewer"))
+
+    synced = json.loads((tmp_path / ".codeagent-models.json").read_text())
+    assert synced["default_backend"] == "claude"
+    assert synced["default_model"] == "claude-sonnet-4-6"
+
+
 class TestAgentOptions:
     """Tests for AgentOptions dataclass - immutable configuration."""
 
@@ -21,7 +54,7 @@ class TestAgentOptions:
         assert options.model is None
         assert options.backend is None
         assert options.worktree is False
-        assert options.timeout_seconds == 600
+        assert options.timeout_seconds == 1800
 
     def test_custom_options_with_agent(self) -> None:
         """Agent preset mode: model and backend are None."""
@@ -69,12 +102,19 @@ class TestResolveAgentOptions:
         cfg = MagicMock(spec=VibeConfig)
         section_cfg = MagicMock()
         section_cfg.agent_config = AgentConfig(
-            agent=agent, backend=backend, model=model
+            agent=agent,
+            backend=backend,
+            model=model,
         )
         cfg.run = section_cfg
         cfg.plan = section_cfg
         cfg.review = section_cfg
         return CodeagentExecutionService(config=cfg)
+
+    def test_timeout_inherited_from_config(self) -> None:
+        svc = self._make_service(agent="code-reviewer")
+        opts = svc.resolve_agent_options("run")
+        assert opts.timeout_seconds == 1800
 
     def test_cli_agent_wins_over_all(self) -> None:
         """CLI --agent has highest priority; model is irrelevant."""
@@ -137,12 +177,13 @@ class TestResolveAgentOptions:
 class TestSyncModelsJson:
     """Tests for sync_models_json."""
 
-    def test_no_op_in_agent_mode(self, tmp_path: Path) -> None:
-        """In agent preset mode, models.json is not touched."""
+    def test_unmapped_agent_preset_is_no_op(self, tmp_path: Path) -> None:
+        """Agent preset with no repo-local mapping should not touch models.json."""
         fake_models = tmp_path / "models.json"
         fake_models.write_text('{"default_backend": "old"}')
         fake_repo_models = tmp_path / "repo-models.json"
         fake_repo_models.write_text("{}")
+        before = fake_models.read_text()
 
         with (
             patch(
@@ -153,10 +194,9 @@ class TestSyncModelsJson:
                 fake_repo_models,
             ),
         ):
-            sync_models_json(AgentOptions(agent="code-reviewer"))
+            sync_models_json(AgentOptions(agent="missing-preset"))
 
-        # file unchanged
-        assert json.loads(fake_models.read_text())["default_backend"] == "old"
+        assert fake_models.read_text() == before
 
     def test_updates_default_backend_and_model(self, tmp_path: Path) -> None:
         """Backend mode: updates default_backend and default_model."""

@@ -93,7 +93,9 @@ def test_mark_ready_success(pr_service: PRService, no_conflict_git: MagicMock) -
 
             assert pr.number == 123
             gh_instance.mark_ready.assert_called_once_with(123)
-            pr_service.briefing_service.publish_briefing.assert_called_once_with(123)
+            pr_service.briefing_service.publish_briefing.assert_called_once_with(
+                123, requested_reviewers=None
+            )
             mock_store.add_event.assert_called_once()
 
 

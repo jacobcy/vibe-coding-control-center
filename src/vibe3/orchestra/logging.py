@@ -12,8 +12,12 @@ def _repo_root() -> Path:
 
 
 def orchestra_log_dir(repo_root: Path | None = None) -> Path:
-    root = repo_root or _repo_root()
-    path = root / "temp" / "logs" / "orchestra"
+    override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
+    if override_dir:
+        path = Path(override_dir).expanduser().resolve() / "orchestra"
+    else:
+        root = repo_root or _repo_root()
+        path = root / "temp" / "logs" / "orchestra"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

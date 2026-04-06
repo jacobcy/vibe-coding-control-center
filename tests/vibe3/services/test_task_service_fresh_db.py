@@ -14,7 +14,7 @@ def stable_flow_actor(monkeypatch):
         lambda store, branch, explicit_actor=None: explicit_actor or "test-actor",
     )
     monkeypatch.setattr(
-        "vibe3.services.flow_query_mixin.GitHubClient.get_pr",
+        "vibe3.services.flow_service.GitHubClient.get_pr",
         lambda self, pr_number=None, branch=None: None,
     )
 
@@ -40,5 +40,5 @@ def test_link_issue_task_on_fresh_db(tmp_path):
     )
 
     # Hydrate should find it
-    status = service.get_flow_status("task/test")
+    status = service._flow_service.get_flow_status("task/test")
     assert status.task_issue_number == 220

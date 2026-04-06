@@ -12,16 +12,16 @@ runner = CliRunner()
 
 
 @pytest.fixture
-def stub_pr_show_usecase(monkeypatch):
+def stub_pr_show_service(monkeypatch):
     """Keep pr show output tests focused on formatting, not remote lookups."""
-    mock_usecase = MagicMock()
-    mock_usecase.resolve_target.return_value = SimpleNamespace(
+    mock_service = MagicMock()
+    mock_service.resolve_pr_target.return_value = SimpleNamespace(
         pr_number=123,
         branch=None,
         current_branch="task/test",
         from_flow=False,
     )
-    mock_usecase.fetch_pr.return_value = SimpleNamespace(
+    mock_service.fetch_pr_or_raise.return_value = SimpleNamespace(
         model_dump=lambda: {
             "number": 123,
             "title": "Test PR",
@@ -33,38 +33,38 @@ def stub_pr_show_usecase(monkeypatch):
             "draft": True,
         }
     )
-    mock_usecase.load_analysis_summary.return_value = {
+    mock_service.load_pr_analysis_summary.return_value = {
         "raw": {},
         "score": {"level": "LOW", "score": 1},
     }
-    mock_usecase.build_output_payload.return_value = {
+    mock_service.build_pr_output_payload.return_value = {
         "number": 123,
         "title": "Test PR",
         "trace": {"command": "pr show"},
     }
     monkeypatch.setattr(
-        "vibe3.commands.pr_query._build_pr_query_usecase",
-        lambda: mock_usecase,
+        "vibe3.commands.pr_query.PRService",
+        lambda: mock_service,
     )
-    return mock_usecase
+    return mock_service
 
 
 class TestTraceOutputIntegration:
     """Integration tests for --trace output formats."""
 
-    def test_pr_show_trace_default_format(self, stub_pr_show_usecase) -> None:
+    def test_pr_show_trace_default_format(self, stub_pr_show_service) -> None:
         """Test pr show --trace with default format."""
         result = runner.invoke(app, ["pr", "show", "--trace"])
         assert result.exit_code == 0
         assert "[TRACE]" in result.output
 
-    def test_pr_show_trace_json_format(self, stub_pr_show_usecase) -> None:
+    def test_pr_show_trace_json_format(self, stub_pr_show_service) -> None:
         """Test pr show --trace --json outputs JSON with trace info."""
         result = runner.invoke(app, ["pr", "show", "--trace", "--json"])
         assert result.exit_code == 0
         assert '"trace"' in result.output or '"command"' in result.output
 
-    def test_pr_show_trace_yaml_format(self, stub_pr_show_usecase) -> None:
+    def test_pr_show_trace_yaml_format(self, stub_pr_show_service) -> None:
         """Test pr show --trace --yaml outputs YAML with trace info."""
         result = runner.invoke(app, ["pr", "show", "--trace", "--yaml"])
         assert result.exit_code == 0

@@ -5,7 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Generator
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -114,6 +114,68 @@ async def test_on_tick_dispatches_matching_state(
 
 
 @pytest.mark.asyncio
+async def test_on_tick_appends_dispatcher_events(
+    service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, _ = service
+    svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    assert any("tick ready issues" in message for _, message in events)
+    assert any("dispatching #42" in message for _, message in events)
+
+
+@pytest.mark.asyncio
+async def test_on_tick_skips_plan_when_live_execution_status_running(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, _ = service
+    svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    svc._store.get_flow_state.return_value = {
+        "planner_status": "running",
+        "planner_session_id": None,
+        "plan_ref": None,
+    }
+    svc._has_live_dispatch.return_value = True
+
+    await svc.on_tick()
+
+    svc._backend.start_async_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_dispatches_plan_when_running_status_is_stale(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, _ = service
+    svc._github = MagicMock()
+    svc._github.view_issue.return_value = {"number": 42, "comments": []}
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/claimed"])]
+    svc._store.get_flow_state.return_value = {
+        "planner_status": "running",
+        "planner_session_id": None,
+        "plan_ref": None,
+    }
+    svc._has_live_dispatch.return_value = False
+
+    await svc.on_tick()
+
+    svc._backend.start_async_command.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_on_tick_skips_when_plan_ref_already_exists(
     service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
@@ -153,6 +215,42 @@ async def test_on_tick_dispatches_manager_for_ready_issue(
     await svc.on_tick()
 
     manager.dispatch_manager.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_dispatches_manager_for_handoff_issue(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, manager = manager_service
+    svc.trigger_state = IssueState.HANDOFF
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/handoff"])]
+    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
+    svc._store.get_flow_state.return_value = {"manager_session_id": None}
+
+    await svc.on_tick()
+
+    manager.dispatch_manager.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_appends_manager_started_event(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, manager = manager_service
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
+    manager.dispatch_manager.return_value = True
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    assert any("dispatching #42" in message for _, message in events)
+    assert any("started #42" in message for _, message in events)
 
 
 @pytest.mark.asyncio
@@ -204,3 +302,39 @@ async def test_on_tick_does_not_dispatch_when_live_dispatch_exists(
 
     # Should not dispatch because live session exists
     svc._backend.start_async_command.assert_not_called()
+
+
+def test_resolve_cwd_uses_manager_repo_path_in_debug(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, manager = service
+    svc.config = OrchestraConfig(debug=True)
+    manager.repo_path = Path("/debug-wt")
+
+    with patch(
+        "vibe3.orchestra.services.state_label_dispatch.WorktreeManager"
+    ) as mock_worktree_manager:
+        mock_instance = MagicMock()
+        mock_instance.resolve_manager_cwd.return_value = (
+            Path("/debug-wt/.worktrees/issue-42"),
+            False,
+        )
+        mock_worktree_manager.return_value = mock_instance
+
+        resolved = svc._resolve_cwd(42, "task/issue-42")
+
+    assert resolved == Path("/debug-wt/.worktrees/issue-42")
+    mock_worktree_manager.assert_called_once_with(svc.config, Path("/debug-wt"))
+
+
+def test_build_command_uses_baseline_project_root(
+    service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    svc, _ = service
+
+    command = svc._build_command(42)
+
+    assert command[:3] == ["uv", "run", "--project"]
+    assert command[4:7] == ["python", "-I", command[6]]
+    assert command[5] == "-I"
+    assert command[6].endswith("/src/vibe3/cli.py")

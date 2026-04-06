@@ -123,9 +123,13 @@ class TestManagerDispatch:
         mock_start.assert_called_once()
         call = mock_start.call_args
         cmd = call.args[0]
-        assert cmd[:4] == ["uv", "run", "python", "-I"]
-        assert cmd[4] == str(Path("/tmp/repo/src/vibe3/cli.py").resolve())
-        assert cmd[5] == "run"
+        assert cmd[:4] == ["uv", "run", "--project", "/tmp/repo"]
+        assert cmd[4:7] == [
+            "python",
+            "-I",
+            str(Path("/tmp/repo/src/vibe3/cli.py").resolve()),
+        ]
+        assert cmd[7] == "run"
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")

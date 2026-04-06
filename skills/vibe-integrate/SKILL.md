@@ -99,8 +99,7 @@ uv run python src/vibe3/cli.py flow status
 必要时再看：
 
 ```bash
-uv run python src/vibe3/cli.py flow list
-uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py task status --all --check
 ```
 
 结合 `vibe3 handoff show` 输出，先确认：
@@ -158,10 +157,10 @@ uv run python src/vibe3/cli.py status
 
 - 不可在 Codex/Copilot 的 review 尚未出现在 PR 上时就断言”无阻塞”
 - 若 review decision 是 `PENDING` 且没有 review threads，说明 reviewer 尚未完成，**必须等待或告知用户让其确认**
-- 默认按异步场景处理：若用户当前不在线或没有急迫性，可先等待 10 分钟，再重新运行一次 `vibe flow review [pr]` 检查是否已有新的在线 review evidence
+- 默认按异步场景处理：若用户当前不在线或没有急迫性，可先等待 10 分钟，再重新运行一次 `uv run python src/vibe3/cli.py review pr <pr>` 检查是否已有新的在线 review evidence
 - 若等待一段时间后仍没有 Codex 在线 comment / review thread，默认由 agent 自动在 PR 中补一条 `@codex` comment 触发评论，再继续停留在 `/vibe-integrate`
 - 若 review decision 是 `CHANGES_REQUESTED`，必须先处理 follow-up，不可直接提 merge
-- 若再次等待后仍没有任何线上 review，不要把”作者自己看过”当成 review evidence；应优先使用 `vibe flow review --local` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
+- 若再次等待后仍没有任何线上 review，不要把”作者自己看过”当成 review evidence；应优先使用 `uv run python src/vibe3/cli.py review base` 或 browser/subagent 生成外部审查结果，再把结果回贴到 PR comment
 
 ### Step 3: 审核合并条件
 
@@ -211,14 +210,10 @@ uv run python src/vibe3/cli.py review pr <pr>
 
 ### Step 5.5: 交接到 `/vibe-done`
 
-只有出现以下两类结果之一，才允许把下一步交给 `/vibe-done`：
+只有当前 PR 已进入终态，才允许把下一步交给 `/vibe-done`：
 
 1. 当前 PR 已经 merged
-2. 当前 PR 尚未 merged，但已经满足：
-   - review evidence 存在
-   - CI 通过
-   - 无阻塞性 review
-   - 当前 PR 已达到可 merge 状态
+2. 或当前 PR 已被明确 close / abort，且用户要做终态记录与 issue closeout
 
 若还不满足，`next` 必须继续留在 `/vibe-integrate`，并明确写出阻塞项。
 

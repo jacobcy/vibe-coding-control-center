@@ -64,7 +64,7 @@ description: Use when the user wants to save session context, says /vibe-save, o
 
 ```bash
 uv run python src/vibe3/cli.py flow show
-uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py task status --all --check
 ```
 
 ### Step 2: 写入 handoff

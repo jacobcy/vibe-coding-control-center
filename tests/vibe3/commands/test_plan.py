@@ -256,6 +256,29 @@ def test_plan_failure_fails_issue_and_comments(monkeypatch) -> None:
     assert "state/failed" in result.stderr
 
 
+def test_plan_timeout_exception_fails_issue_and_comments(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
+
+    def _raise_timeout(self, command, async_mode=False):
+        raise RuntimeError("codeagent-wrapper timed out after 600s")
+
+    monkeypatch.setattr(
+        "vibe3.agents.runner.CodeagentExecutionService.execute",
+        _raise_timeout,
+    )
+
+    with patch("vibe3.commands.plan._svc_fail_planner") as mock_fail:
+        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+
+    assert result.exit_code != 0
+    mock_fail.assert_called_once_with(
+        issue_number=42,
+        reason="codeagent-wrapper timed out after 600s",
+        actor="agent:plan",
+    )
+    assert "state/failed" in result.stderr
+
+
 def test_plan_spec_alias_still_works(monkeypatch) -> None:
     _patch_fast_plan_runtime(monkeypatch)
     result = runner.invoke(plan_app, ["spec", "--msg", "Add dark mode", "--dry-run"])

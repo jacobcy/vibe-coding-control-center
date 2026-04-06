@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -106,12 +106,11 @@ def test_get_changed_functions_missing_file(temp_dir):
     # Test with non-existing file
     from vibe3.models.change_source import CommitSource
 
-    # Mock get_diff_hunk_ranges function
-    with patch("vibe3.analysis.serena_service.get_diff_hunk_ranges") as mock_get_ranges:
-        mock_get_ranges.return_value = [(1, 10)]
-        result = service.get_changed_functions(
-            str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")
-        )
+    # Mock get_diff_hunk_ranges method on git_client
+    mock_git_client.get_diff_hunk_ranges.return_value = [(1, 10)]
+    result = service.get_changed_functions(
+        str(temp_dir / "deleted.py"), source=CommitSource(sha="abc123")
+    )
 
     # Should return empty list for missing file
     assert result == []
@@ -124,10 +123,13 @@ def test_get_changed_functions_untracked_file(temp_dir):
         "def alpha():\n" "    return 1\n\n" "def beta():\n" "    return 2\n"
     )
 
-    mock_git_client = MagicMock()
-    mock_git_client.get_untracked_files.return_value = [str(new_file)]
+    # Use real GitClient but mock its get_untracked_files method
+    from vibe3.clients.git_client import GitClient
 
-    service = SerenaService(git_client=mock_git_client)
+    git_client = GitClient()
+    git_client.get_untracked_files = lambda: [str(new_file)]
+
+    service = SerenaService(git_client=git_client)
 
     result = service.get_changed_functions(str(new_file), source=UncommittedSource())
 

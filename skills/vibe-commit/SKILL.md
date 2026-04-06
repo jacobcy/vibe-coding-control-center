@@ -85,7 +85,7 @@ PR 创建后停止，输出：
 ## 核心边界
 
 - 允许：分类脏改动、整理 commit、决定单 PR / 多 PR、创建或切换 flow、调用 `uv run python src/vibe3/cli.py pr create`
-- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接调用 `uv run python src/vibe3/cli.py flow done` 做收口
+- 不允许：直接 merge PR、直接关闭 issue、直接关闭 task、直接做收口动作；收口统一交给 `/vibe-done`
 - 若当前 flow 已有 `pr_ref`，只能处理该 PR 的 follow-up；若用户要开始下一个 PR，必须切到新 flow
 
 ## Workflow
@@ -102,7 +102,7 @@ uv run python src/vibe3/cli.py flow show
 
 ```bash
 uv run python src/vibe3/cli.py flow status
-uv run python src/vibe3/cli.py flow list
+uv run python src/vibe3/cli.py task status --all --check
 ```
 
 检查点：

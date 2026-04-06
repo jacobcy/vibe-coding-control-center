@@ -27,12 +27,18 @@ class PrReadyUsecase:
         self,
         pr_number: int,
         yes: bool,
+        requested_reviewers: list[str] | None = None,
     ) -> PRResponse:
-        """Enforce confirmation, then mark PR ready."""
+        """Enforce confirmation, then mark PR ready with optional AI review request."""
         current_pr = self.pr_service.get_pr(pr_number)
         if current_pr is not None and not current_pr.draft:
-            return self.pr_service.mark_ready(pr_number)
+            # Already ready, update briefing and request review
+            return self.pr_service.mark_ready(
+                pr_number, requested_reviewers=requested_reviewers
+            )
 
         if not yes and self.confirmer is not None and not self.confirmer(pr_number):
             raise PrReadyAbortedError("aborted by user")
-        return self.pr_service.mark_ready(pr_number)
+        return self.pr_service.mark_ready(
+            pr_number, requested_reviewers=requested_reviewers
+        )

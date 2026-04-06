@@ -129,18 +129,32 @@ def _plan_issue_impl(
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
     typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    result = _execute_plan_command(
-        config=config,
-        branch=branch,
-        request=task_input.request,
-        instructions=instructions,
-        dry_run=dry_run,
-        async_mode=async_mode,
-        agent=agent,
-        backend=backend,
-        model=model,
-        worktree=worktree,
-    )
+    try:
+        result = _execute_plan_command(
+            config=config,
+            branch=branch,
+            request=task_input.request,
+            instructions=instructions,
+            dry_run=dry_run,
+            async_mode=async_mode,
+            agent=agent,
+            backend=backend,
+            model=model,
+            worktree=worktree,
+        )
+    except BaseException as error:
+        if dry_run or async_mode:
+            raise
+        _comment_and_fail_issue(
+            issue_number=task_input.issue_number,
+            reason=str(error) or "planner execution raised an unexpected error",
+            actor="agent:plan",
+        )
+        typer.echo(
+            "Error: Planner execution failed; issue moved to state/failed",
+            err=True,
+        )
+        raise typer.Exit(1) from error
 
     if not dry_run and not async_mode:
         if getattr(result, "success", False):

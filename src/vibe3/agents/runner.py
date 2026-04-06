@@ -5,6 +5,7 @@ Migrated from vibe3.services.codeagent_execution_service.
 
 import os
 import sys
+from pathlib import Path
 from typing import Literal, Sequence
 
 from loguru import logger
@@ -78,31 +79,49 @@ class CodeagentExecutionService:
         config_agent = None
         config_backend = None
         config_model = None
+        config_timeout = 1800
 
         if target_config and hasattr(target_config, "agent_config"):
             ac = target_config.agent_config
             config_agent = getattr(ac, "agent", None)
             config_backend = getattr(ac, "backend", None)
             config_model = getattr(ac, "model", None)
+            config_timeout = getattr(ac, "timeout_seconds", 1800)
 
         # 1. CLI --agent: preset mode, model is managed by the preset itself
         if agent:
-            return AgentOptions(agent=agent, worktree=worktree)
+            return AgentOptions(
+                agent=agent,
+                worktree=worktree,
+                timeout_seconds=config_timeout,
+            )
 
         # 2. CLI --backend: backend mode, use CLI --model only (no config fallback)
         #    Rationale: user explicitly chose a backend override; if they wanted
         #    a specific model they would have passed --model too.
         if backend:
-            return AgentOptions(backend=backend, model=model, worktree=worktree)
+            return AgentOptions(
+                backend=backend,
+                model=model,
+                worktree=worktree,
+                timeout_seconds=config_timeout,
+            )
 
         # 3. Config agent: preset mode
         if config_agent:
-            return AgentOptions(agent=config_agent, worktree=worktree)
+            return AgentOptions(
+                agent=config_agent,
+                worktree=worktree,
+                timeout_seconds=config_timeout,
+            )
 
         # 4. Config backend: backend mode, apply config model as the intended default
         if config_backend:
             return AgentOptions(
-                backend=config_backend, model=config_model, worktree=worktree
+                backend=config_backend,
+                model=config_model,
+                worktree=worktree,
+                timeout_seconds=config_timeout,
             )
 
         raise ValueError(
@@ -259,14 +278,29 @@ class CodeagentExecutionService:
         return self._build_fallback_cli_command(command)
 
     @staticmethod
-    def build_self_invocation(args: Sequence[str]) -> list[str]:
-        """Build `uv run python src/vibe3/cli.py ...` invocation for tmux child.
+    def _repo_root() -> Path:
+        return Path(__file__).resolve().parents[3]
+
+    @classmethod
+    def _cli_entry(cls) -> str:
+        return str(cls._repo_root() / "src" / "vibe3" / "cli.py")
+
+    @classmethod
+    def build_self_invocation(cls, args: Sequence[str]) -> list[str]:
+        """Build baseline-project self-invocation for tmux child.
 
         The child process must execute synchronously inside tmux; otherwise
         default-async command modes would recursively try to spawn more tmux
         sessions.
         """
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+        cmd = [
+            "uv",
+            "run",
+            "--project",
+            str(cls._repo_root()),
+            "python",
+            cls._cli_entry(),
+        ]
         saw_sync_flag = False
         for arg in args:
             if arg == "--async":
@@ -278,10 +312,17 @@ class CodeagentExecutionService:
             cmd.append("--sync")
         return cmd
 
-    @staticmethod
-    def _build_fallback_cli_command(command: CodeagentCommand) -> list[str]:
+    @classmethod
+    def _build_fallback_cli_command(cls, command: CodeagentCommand) -> list[str]:
         """Fallback async CLI command for non-CLI/internal call sites."""
-        cmd = ["uv", "run", "python", "src/vibe3/cli.py"]
+        cmd = [
+            "uv",
+            "run",
+            "--project",
+            str(cls._repo_root()),
+            "python",
+            cls._cli_entry(),
+        ]
 
         role_default_args: dict[ExecutionRole, list[str]] = {
             "planner": ["plan", "task"],
