@@ -173,6 +173,9 @@ class TaskResumeUsecase:
         """
         current_state = self.label_service.get_state(issue_number)
 
+        if resume_kind == "all":
+            return current_state is None or current_state != IssueState.DONE
+
         if current_state is None:
             return False
 
@@ -180,8 +183,6 @@ class TaskResumeUsecase:
             return current_state.value == "failed"
         elif resume_kind == "blocked":
             return current_state.value == "blocked"
-        elif resume_kind == "all":
-            return current_state != IssueState.DONE
         elif resume_kind == "aborted":
             # Aborted flows can be resumed from READY or HANDOFF states
             # The flow_status=aborted check is done in fetch_resume_candidates

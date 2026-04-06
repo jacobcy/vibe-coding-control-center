@@ -221,3 +221,58 @@ def test_task_status_groups_orchestration_issues_and_manual_scenes(
     assert "Manual Scenes:" in result.stdout
     assert "openai-review" in result.stdout
     assert "task: #420" in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_excludes_manual_flow_issues_from_issue_progress(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=2,
+        active_worktrees=2,
+        queued_issues=(),
+    )
+
+    manual_flow = FlowStatusResponse(
+        branch="debug/service-gap-analysis",
+        flow_slug="service_gap_analysis",
+        flow_status="active",
+        task_issue_number=443,
+    )
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = [manual_flow]
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 443,
+            "title": "Manual debug scene should stay out of Issue Progress",
+            "state": IssueState.IN_PROGRESS,
+            "flow": manual_flow,
+            "queued": False,
+        }
+    ]
+    query_svc.fetch_worktree_map.return_value = {
+        "debug/service-gap-analysis": "service-gap-analysis"
+    }
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Manual Scenes:" in result.stdout
+    assert "debug/service-gap-analysis" in result.stdout
+    assert "task: #443" in result.stdout
+    assert "Manual debug scene should stay out of Issue Progress" not in result.stdout
+    assert "# 443  IN-PROGRESS" not in result.stdout

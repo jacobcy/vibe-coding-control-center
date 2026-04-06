@@ -25,6 +25,14 @@ JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
+def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
+    """Only auto-task flows should participate in task-oriented Issue Progress."""
+    flow = cast(FlowStatusResponse | None, item.get("flow"))
+    if flow is None:
+        return True
+    return is_auto_task_branch(flow.branch)
+
+
 def _resolve_server_label(
     config: OrchestraConfig, snapshot_found: bool, server_running: bool
 ) -> str:
@@ -123,13 +131,18 @@ def status(
         orchestrated_issues = query_service.fetch_orchestrated_issues(
             flows, queued_set, stale_flows=stale_flows
         )
+        task_progress_items = [
+            item
+            for item in orchestrated_issues
+            if _include_issue_in_task_progress(item)
+        ]
 
         console.print("[bold cyan]Issue Progress:[/]")
 
-        if orchestrated_issues:
+        if task_progress_items:
             active_items = [
                 item
-                for item in orchestrated_issues
+                for item in task_progress_items
                 if cast(IssueState, item["state"])
                 in {
                     IssueState.CLAIMED,
@@ -140,7 +153,7 @@ def status(
             ]
             ready_items = [
                 item
-                for item in orchestrated_issues
+                for item in task_progress_items
                 if cast(IssueState, item["state"]) == IssueState.READY
             ]
 
@@ -192,7 +205,7 @@ def status(
 
         blocked_items = [
             item
-            for item in orchestrated_issues
+            for item in task_progress_items
             if cast(IssueState, item["state"]) == IssueState.BLOCKED
         ]
         console.print("[bold cyan]Blocked Issues:[/]")
@@ -213,7 +226,7 @@ def status(
 
         failed_items = [
             item
-            for item in orchestrated_issues
+            for item in task_progress_items
             if cast(IssueState, item["state"]) == IssueState.FAILED
         ]
         console.print("\n[bold cyan]Failed Issues:[/]")
