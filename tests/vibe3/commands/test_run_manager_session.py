@@ -257,8 +257,11 @@ class TestRunManagerIssueSession:
                 )
             ),
         )
+        # Mock the coordinator's has_progress_changed check
+        from vibe3.manager import manager_run_coordinator
+
         monkeypatch.setattr(
-            manager_run_service,
+            manager_run_coordinator,
             "has_progress_changed",
             lambda before, after, **kwargs: True,
         )
