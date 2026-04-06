@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -213,23 +214,32 @@ class WorktreeManager:
         if target.exists():
             # Valid worktree: .git file present means git tracks it
             if (target / ".git").exists():
+                registered = self._find_worktree_for_branch(branch)
+                if registered == target:
+                    logger.bind(
+                        domain="orchestra",
+                        issue=issue_number,
+                        branch=branch,
+                        worktree=str(target),
+                    ).info("Reusing existing manager worktree")
+                    return target, False
                 logger.bind(
                     domain="orchestra",
                     issue=issue_number,
                     branch=branch,
                     worktree=str(target),
-                ).info("Reusing existing manager worktree")
-                return target, False
-            logger.bind(
-                domain="orchestra",
-                issue=issue_number,
-                branch=branch,
-                worktree=str(target),
-            ).warning(
-                "Manager worktree path exists but has no .git file; "
-                "remove it manually to allow auto-creation"
-            )
-            return None, False
+                ).warning(
+                    "Recycling mismatched manager worktree path before auto-creation"
+                )
+                self._recycle_worktree_path(target)
+            else:
+                logger.bind(
+                    domain="orchestra",
+                    issue=issue_number,
+                    branch=branch,
+                    worktree=str(target),
+                ).warning("Recycling orphan manager worktree path before auto-creation")
+                self._recycle_worktree_path(target)
 
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -265,6 +275,35 @@ class WorktreeManager:
             worktree=str(target),
         ).info("Created manager worktree for flow branch")
         return target, True
+
+    def _recycle_worktree_path(self, target: Path) -> None:
+        """Recycle a mismatched worktree path, unregistering it first when possible."""
+        try:
+            result = subprocess.run(
+                ["git", "worktree", "remove", str(target), "--force"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                return
+        except Exception:
+            pass
+
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except Exception:
+            pass
+
+        if target.exists():
+            shutil.rmtree(target)
 
     def resolve_review_cwd(self, pr_number: int) -> Path:
         """Resolve best worktree cwd for PR review execution."""

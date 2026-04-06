@@ -133,3 +133,77 @@ def test_mark_ready_briefing_failure_still_records_event(
             # Both flow sync and event should happen
             mock_store.update_flow_state.assert_called()
             mock_store.add_event.assert_called_once()
+
+
+def test_pr_service_preserves_falsey_injected_dependencies() -> None:
+    """Injected PR collaborators should be preserved even if they are falsey."""
+    github_client = MagicMock()
+    github_client.__bool__.return_value = False
+    git_client = MagicMock()
+    git_client.__bool__.return_value = False
+    store = MagicMock()
+    store.__bool__.return_value = False
+    version_service = MagicMock()
+    version_service.__bool__.return_value = False
+
+    service = PRService(
+        github_client=github_client,
+        git_client=git_client,
+        store=store,
+        version_service=version_service,
+    )
+
+    assert service.github_client is github_client
+    assert service.git_client is git_client
+    assert service.store is store
+    assert service.version_service is version_service
+    assert service.briefing_service.github_client is github_client
+
+
+def test_close_pr_calls_gh_pr_close(pr_service: PRService) -> None:
+    """Test close_pr calls gh pr close with correct parameters."""
+    gh_instance = pr_service.github_client
+    gh_instance.close_pr.return_value = True
+
+    result = pr_service.close_pr(123, comment="Closing PR")
+
+    assert result is True
+    gh_instance.close_pr.assert_called_once_with(123, comment="Closing PR")
+
+
+def test_close_pr_returns_success_marker(pr_service: PRService) -> None:
+    """Test close_pr returns success marker."""
+    gh_instance = pr_service.github_client
+    gh_instance.close_pr.return_value = True
+
+    result = pr_service.close_pr(123)
+
+    assert result is True
+
+
+def test_pr_service_close_open_pr_for_flow(pr_service: PRService) -> None:
+    """Test PRService can close open PR for a flow branch."""
+    gh_instance = pr_service.github_client
+    gh_instance.list_prs_for_branch.return_value = [
+        PRResponse(
+            number=123,
+            title="Test PR",
+            body="Test body",
+            state=PRState.OPEN,
+            head_branch="feature-branch",
+            base_branch="main",
+            url="https://github.com/org/repo/pull/123",
+            draft=False,
+        )
+    ]
+    gh_instance.close_pr.return_value = True
+
+    result = pr_service.close_open_pr_for_flow(
+        branch="feature-branch", comment="Abandoning flow"
+    )
+
+    assert result == 123  # Returns PR number
+    gh_instance.list_prs_for_branch.assert_called_once_with(
+        "feature-branch", state="open"
+    )
+    gh_instance.close_pr.assert_called_once_with(123, comment="Abandoning flow")

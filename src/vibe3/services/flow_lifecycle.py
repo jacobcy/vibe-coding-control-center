@@ -91,3 +91,54 @@ class FlowLifecycleMixin:
             f"Flow blocked{': ' + reason if reason else ''}",
         )
         sync_flow_blocked_task_label(self.store, branch)
+
+    def abort_flow(
+        self: Any,
+        branch: str,
+        reason: str,
+        actor: str | None = None,
+    ) -> None:
+        """Mark flow as aborted (abandoned).
+
+        Args:
+            branch: Branch name for the flow
+            reason: Reason for aborting the flow
+            actor: Actor performing the abort (defaults to system)
+        """
+        logger.bind(
+            domain="flow",
+            action="abort",
+            branch=branch,
+            reason=reason,
+        ).info("Aborting flow")
+
+        flow_data = self.store.get_flow_state(branch)
+        if not flow_data:
+            logger.bind(
+                domain="flow",
+                branch=branch,
+            ).warning("Flow not found, creating minimal abort record")
+            # Create minimal flow record if it doesn't exist
+            self.store.update_flow_state(branch, flow_slug="aborted")
+
+        effective_actor = SignatureService.resolve_actor(
+            explicit_actor=actor,
+            flow_actor=flow_data.get("latest_actor") if flow_data else None,
+        )
+
+        # Update flow state to aborted
+        self.store.update_flow_state(
+            branch,
+            flow_status="aborted",
+            latest_actor=effective_actor,
+        )
+
+        # Record abort event
+        self.store.add_event(
+            branch,
+            "flow_aborted",
+            effective_actor,
+            f"Flow aborted: {reason}",
+        )
+
+        logger.bind(branch=branch).success("Flow aborted")

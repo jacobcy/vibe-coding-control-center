@@ -1,5 +1,7 @@
 """Flow management utilities for orchestra manager."""
 
+from pathlib import Path
+
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
@@ -25,13 +27,20 @@ class FlowManager:
     guard that is inappropriate for a background server context.
     """
 
-    def __init__(self, config: OrchestraConfig) -> None:
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        *,
+        store: SQLiteClient | None = None,
+        git: GitClient | None = None,
+        github: GitHubClient | None = None,
+    ) -> None:
         self.config = config
-        self.store = SQLiteClient()
-        self.git = GitClient()
+        self.store = SQLiteClient() if store is None else store
+        self.git = GitClient() if git is None else git
         self.flow_service = FlowService(store=self.store, git_client=self.git)
         self.task_service = TaskService(store=self.store)
-        self.github = GitHubClient()
+        self.github = GitHubClient() if github is None else github
         self.label_service = LabelService(repo=config.repo)
         self.issue_flow_service = IssueFlowService(store=self.store)
 
@@ -81,6 +90,43 @@ class FlowManager:
             )
 
         return flow_state.model_dump()
+
+    def _rebuild_stale_canonical_flow(
+        self, issue: IssueInfo, branch: str, slug: str
+    ) -> dict:
+        """Hard-reset stale canonical flow by removing scene residue first."""
+        from vibe3.manager.worktree_manager import WorktreeManager
+
+        worktree_path = self.git.find_worktree_path_for_branch(branch)
+        if worktree_path is not None:
+            self.git.remove_worktree(worktree_path, force=True)
+
+        if self.git.branch_exists(branch):
+            self.git.delete_branch(
+                branch,
+                force=True,
+                skip_if_worktree=True,
+            )
+
+        if not self.git.branch_exists(branch):
+            self.git.create_branch_ref(
+                branch,
+                start_ref=self.config.scene_base_ref,
+            )
+
+        manager_worktree = WorktreeManager(
+            self.config,
+            Path(self.git.get_worktree_root()),
+            flow_manager=self,
+        )
+        resolved_worktree, _ = manager_worktree.ensure_manager_worktree(
+            issue.number,
+            branch,
+        )
+        if resolved_worktree is None:
+            raise RuntimeError(f"Failed to create manager worktree for '{branch}'")
+
+        return self._reactivate_canonical_flow(issue, branch, slug)
 
     def get_active_flow_count(self) -> int:
         """Get count of active auto-managed flows across the system."""
@@ -140,15 +186,6 @@ class FlowManager:
             issue=issue.number,
         )
 
-        # Capacity Check: Before creating a NEW flow, verify global capacity
-        active_count = self.get_active_flow_count()
-        if active_count >= self.config.max_concurrent_flows:
-            limit = self.config.max_concurrent_flows
-            raise RuntimeError(
-                f"Global capacity reached ({active_count}/{limit}). "
-                "Deferred flow creation."
-            )
-
         slug = f"issue-{issue.number}"
         branch = f"task/{slug}"
         existing_flows = self.store.get_flows_by_issue(issue.number, role="task")
@@ -166,16 +203,30 @@ class FlowManager:
             None,
         )
         if existing_canonical:
+            if str(existing_canonical.get("flow_status") or "") == "stale":
+                log.info(f"Rebuilding stale canonical flow for issue #{issue.number}")
+                return self._rebuild_stale_canonical_flow(issue, branch, slug)
             log.info(f"Reactivating canonical flow for issue #{issue.number}")
             return self._reactivate_canonical_flow(issue, branch, slug)
 
+        # Capacity Check: Before creating a NEW flow, verify global capacity
+        active_count = self.get_active_flow_count()
+        if active_count >= self.config.max_concurrent_flows:
+            limit = self.config.max_concurrent_flows
+            raise RuntimeError(
+                f"Global capacity reached ({active_count}/{limit}). "
+                "Deferred flow creation."
+            )
+
         # Ensure branch exists (create_branch_ref: no checkout, no worktree mutation)
+        branch_created = False
         if not self.git.branch_exists(branch):
             try:
                 self.git.create_branch_ref(
                     branch,
                     start_ref=self.config.scene_base_ref,
                 )
+                branch_created = True
             except Exception as exc:
                 raise RuntimeError(
                     f"Failed to create branch '{branch}': {exc}"
@@ -201,6 +252,19 @@ class FlowManager:
                     f"Flow created concurrently for #{issue.number}, using existing"
                 )
                 return existing
+            # Clean up orphan branch if we created it and flow registration failed
+            if branch_created:
+                try:
+                    self.git.delete_branch(branch, skip_if_worktree=True)
+                    log.info(
+                        f"Cleaned up orphan branch '{branch}' "
+                        "after flow creation failure"
+                    )
+                except Exception as cleanup_exc:
+                    log.warning(
+                        f"Failed to clean up branch '{branch}' "
+                        f"after flow creation failure: {cleanup_exc}"
+                    )
             raise RuntimeError(
                 f"Failed to create flow for issue #{issue.number}: {exc}"
             ) from exc

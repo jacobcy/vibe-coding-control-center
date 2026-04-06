@@ -63,6 +63,10 @@ LIMIT_MAX=$(get_limit "code_limits.single_file_loc.max" 400)
 IGNORE_FILES=(
   "tests/vibe3/orchestra/test_state_label_dispatch.py"  # Comprehensive test suite for StateLabelDispatchService (498 lines): tests share fixtures and test highly related scenarios; splitting would increase maintenance cost
   "tests/vibe3/commands/test_run_manager_issue.py"  # Test suite for manager-issue mode (479 lines): single test class with shared fixtures; splitting would break test suite integrity
+  "tests/vibe3/manager/test_manager_executor.py"  # Manager executor test suite (415 lines): comprehensive tests for async/sync execution flows
+  "tests/vibe3/orchestra/test_flow_orchestrator.py"  # Flow orchestrator test suite (451 lines): integration tests with shared fixtures
+  "tests/vibe3/services/test_check_service.py"  # Check service test suite (475 lines): comprehensive validation tests
+  "tests/vibe3/services/test_status_query_service.py"  # Status query test suite (599 lines): complex integration tests with mocking
 )
 
 warnings=0

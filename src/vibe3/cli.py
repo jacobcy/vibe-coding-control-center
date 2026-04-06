@@ -71,11 +71,20 @@ app.add_typer(prompt_check.app, name="prompt")
 @app.command(name="status", hidden=True)
 def status_command(
     all_flows: status.AllOption = False,
+    check: Annotated[
+        bool,
+        typer.Option("--check", help="显示前先运行完整 vibe3 check"),
+    ] = False,
     json_output: status.JsonOption = False,
     trace: status.TraceOption = False,
 ) -> None:
     """[Compatibility] Redirect to task status."""
-    task.status(all_flows=all_flows, json_output=json_output, trace=trace)
+    task.status(
+        all_flows=all_flows,
+        check=check,
+        json_output=json_output,
+        trace=trace,
+    )
 
 
 @app.callback()

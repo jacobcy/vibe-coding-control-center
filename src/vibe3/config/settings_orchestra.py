@@ -83,6 +83,7 @@ class OrchestraSettings(BaseModel):
     enabled: bool = True
     polling_interval: int = 900
     debug_polling_interval: int = 60
+    debug_max_ticks: int = 10
     scene_base_ref: str = "origin/main"
     port: int = 8080
     webhook_secret: str | None = None

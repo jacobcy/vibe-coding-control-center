@@ -33,10 +33,12 @@ class PRService:
         version_service: VersionService | None = None,
     ) -> None:
         """Initialize PR service."""
-        self.github_client = github_client or GitHubClient()
-        self.git_client = git_client or GitClient()
-        self.store = store or SQLiteClient()
-        self.version_service = version_service or VersionService()
+        self.github_client = GitHubClient() if github_client is None else github_client
+        self.git_client = GitClient() if git_client is None else git_client
+        self.store = SQLiteClient() if store is None else store
+        self.version_service = (
+            VersionService() if version_service is None else version_service
+        )
         self.briefing_service = PRReviewBriefingService(self.github_client)
 
     def create_draft_pr(
@@ -253,6 +255,68 @@ class PRService:
         if not pr:
             raise RuntimeError(f"PR #{pr_number} not found")
         return self.version_service.calculate_bump(group)
+
+    def close_pr(self, pr_number: int, comment: str | None = None) -> bool:
+        """Close a pull request.
+
+        Args:
+            pr_number: PR number to close
+            comment: Optional comment to add before closing
+
+        Returns:
+            True if PR was closed successfully
+        """
+        logger.bind(
+            domain="pr",
+            action="close",
+            pr_number=pr_number,
+        ).info("Closing PR")
+
+        if not self.github_client.check_auth():
+            raise RuntimeError(
+                "Not authenticated to GitHub. Run 'gh auth login' first."
+            )
+
+        return self.github_client.close_pr(pr_number, comment=comment)
+
+    def close_open_pr_for_flow(
+        self, branch: str, comment: str | None = None
+    ) -> int | None:
+        """Close open PR for a flow branch if one exists.
+
+        Args:
+            branch: Branch name to check for open PR
+            comment: Optional comment to add before closing
+
+        Returns:
+            PR number if a PR was closed, None otherwise
+        """
+        logger.bind(
+            domain="pr",
+            action="close_open_pr_for_flow",
+            branch=branch,
+        ).info("Checking for open PR to close")
+
+        prs = self.github_client.list_prs_for_branch(branch, state="open")
+        if not prs:
+            logger.bind(branch=branch).info("No open PR found for branch")
+            return None
+
+        pr = prs[0]
+        success = self.close_pr(pr.number, comment=comment)
+
+        if success:
+            logger.bind(
+                branch=branch,
+                pr_number=pr.number,
+            ).success("Closed open PR for branch")
+            return pr.number
+        else:
+            logger.bind(
+                branch=branch,
+                pr_number=pr.number,
+            ).warning("Failed to close PR (close_pr returned False)")
+            return None
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
         """Persist activity to flow."""

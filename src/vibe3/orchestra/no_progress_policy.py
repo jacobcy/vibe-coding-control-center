@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import STATE_FALLBACK_MATRIX, IssueState
 
 if TYPE_CHECKING:
     from vibe3.clients.github_client import GitHubClient
@@ -76,14 +76,16 @@ def snapshot_progress(
     # Get flow state refs
     flow_state = store.get_flow_state(branch) if branch else {}
     state_dict = flow_state or {}
-    refs = (
-        state_dict.get("spec_ref"),
-        state_dict.get("plan_ref"),
-        state_dict.get("report_ref"),
-        state_dict.get("audit_ref"),
-        state_dict.get("next_step"),
-        state_dict.get("blocked_by"),
-    )
+
+    # Capture major refs in a dict for flexible comparison
+    refs = {
+        "spec_ref": state_dict.get("spec_ref"),
+        "plan_ref": state_dict.get("plan_ref"),
+        "report_ref": state_dict.get("report_ref"),
+        "audit_ref": state_dict.get("audit_ref"),
+        "next_step": state_dict.get("next_step"),
+        "blocked_by": state_dict.get("blocked_by"),
+    }
 
     try:
         git_dir = GitClient().get_git_common_dir()
@@ -103,25 +105,64 @@ def snapshot_progress(
         "comment_count": _comment_count(issue_payload),
         "handoff": handoff_sig,
         "refs": refs,
+        "issue_state": issue_payload.get(
+            "state", "open"
+        ),  # GitHub issue state: open/closed
+        "flow_status": state_dict.get("flow_status"),  # Flow status: active/aborted/etc
     }
 
 
 def has_progress_changed(
     before: dict[str, object],
     after: dict[str, object],
+    expected_ref: str | None = None,
+    require_state_transition: bool = False,
+    allow_close_as_progress: bool = False,
 ) -> bool:
     """Check if any progress signal changed between snapshots.
 
     Args:
         before: Previous progress snapshot
         after: Current progress snapshot
+        expected_ref: Optional specific ref key that MUST change to count as progress
+        require_state_transition: If True, only state label change counts as progress
+        allow_close_as_progress: If True, explicit abandon (flow_status=aborted)
+            counts as progress. This applies to READY and HANDOFF manager paths.
 
     Returns:
-        True if any signal changed (progress was made)
+        True if progress was made (signals changed as expected)
     """
+    # If state label changed, it's definitely a transition (considered progress)
+    if before["state_label"] != after["state_label"]:
+        return True
+
+    # Explicit abandon detection: flow_status changed to "aborted"
+    # This is the key signal that manager intentionally abandoned the flow,
+    # distinguishing it from incidental external closure.
+    if allow_close_as_progress:
+        before_flow_status = before.get("flow_status")
+        after_flow_status = after.get("flow_status")
+        if before_flow_status != "aborted" and after_flow_status == "aborted":
+            return True
+
+    # For states like READY/HANDOFF, we MUST transition to another state.
+    # Simple side effects (comments/handoff) do not count as "progress"
+    # for these states.
+    if require_state_transition:
+        return False
+
+    # If a specific ref was expected (strict progress contract for plan/run/review)
+    if expected_ref:
+        before_refs = before.get("refs")
+        after_refs = after.get("refs")
+        if not isinstance(before_refs, dict) or not isinstance(after_refs, dict):
+            return False
+        # Check if the specific expected ref changed
+        return before_refs.get(expected_ref) != after_refs.get(expected_ref)
+
+    # General heuristic progress check (for loose states if any)
     return any(
-        before[key] != after[key]
-        for key in ("state_label", "comment_count", "handoff", "refs")
+        before[key] != after[key] for key in ("comment_count", "handoff", "refs")
     )
 
 
@@ -158,71 +199,104 @@ def should_auto_block(
     return True
 
 
-def execute_auto_block(
+def execute_state_fallback(
     issue_number: int,
     current_labels: list[str],
     github: GitHubClient,
-    source_state_label: str = IssueState.READY.to_label(),
+    source_state: IssueState,
     repo: str | None = None,
 ) -> None:
-    """Execute the auto-block action.
-
-    Adds block comment and transitions issue from ready to blocked state.
+    """Execute the auto-fallback/block action based on the state machine contract.
 
     Args:
         issue_number: GitHub issue number
         current_labels: Current issue labels (used for skip check)
         github: GitHub client for API calls
+        source_state: The current issue state that failed to progress
         repo: Optional repository (owner/repo format)
     """
-    import subprocess
 
-    # Double-check: skip if already blocked
-    if IssueState.BLOCKED.to_label() in current_labels:
-        logger.bind(
-            domain="orchestra",
-            issue=issue_number,
-        ).debug("Issue already blocked, skipping auto-block")
+    target_state = STATE_FALLBACK_MATRIX.get(source_state, IssueState.BLOCKED)
+    target_label = target_state.to_label()
+    source_label = source_state.to_label()
+
+    # Double-check: skip if already transitioned or in target state
+    if source_label not in current_labels:
+        return
+    if target_label in current_labels:
         return
 
     logger.bind(
         domain="orchestra",
         issue=issue_number,
     ).warning(
-        f"Manager session ended without state change, "
-        f"auto-blocking issue #{issue_number}"
+        f"Session ({source_label}) ended without progress artifacts, "
+        f"auto-transitioning issue #{issue_number} to {target_label}"
     )
 
-    # Add block comment
-    reason = (
-        "Manager 执行完成但未改变状态。可能原因：\n"
-        "- Scene 不健康或无法恢复\n"
-        "- 缺少必要的前置条件（如 spec_ref）\n"
-        "- 需要人工决策或额外信息\n\n"
-        "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
-    )
-    # Use same repo for comment and labels to avoid split audit trail
-    github.add_comment(issue_number, f"[dispatcher] {reason}", repo=repo)
+    # Determine reason message based on target state
+    if target_state == IssueState.BLOCKED:
+        reason = (
+            "Manager 执行完成但未改变状态（no-progress）。可能原因：\n"
+            "- Scene 不健康或无法恢复\n"
+            "- 缺少必要的前置条件（如 spec_ref）\n"
+            "- 需要人工决策或额外信息\n\n"
+            "需要人工介入处理后，移除 state/blocked 标签以重新触发。"
+        )
+    else:
+        reason = (
+            "执行结束但未产出预期产物（no-progress）。"
+            f"已由系统自动回退到 {target_label} 以便重新进入判定环节。\n"
+            f"原因：本阶段（{source_label}）未产生有效的 refs / artifacts 变化。"
+        )
 
-    # Update labels: remove current trigger state, add blocked
-    cmd = [
-        "gh",
-        "issue",
-        "edit",
-        str(issue_number),
-        "--add-label",
-        IssueState.BLOCKED.to_label(),
-        "--remove-label",
-        source_state_label,
-    ]
-    if repo:
-        cmd.extend(["--repo", repo])
+    # Add comment (with deduplication to avoid spam during retries)
+    full_comment = f"[dispatcher] {reason}"
+    issue_payload = github.view_issue(issue_number, repo=repo)
+    if isinstance(issue_payload, dict) and not _has_matching_comment(
+        issue_payload, full_comment
+    ):
+        github.add_comment(issue_number, full_comment, repo=repo)
+
+    # Use LabelService for atomic state transition with validation
+    from vibe3.services.label_service import LabelService
 
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=15, check=False)
+        result = LabelService(repo=repo).confirm_issue_state(
+            issue_number,
+            target_state,
+            actor="orchestra:fallback",
+            force=True,  # Force if needed, but matrix should already allow this
+        )
+        if result == "blocked":
+            raise RuntimeError(
+                f"State transition to {target_state.value} was blocked by state machine"
+            )
     except Exception as exc:
         logger.bind(
             domain="orchestra",
             issue=issue_number,
-        ).error(f"Failed to update labels: {exc}")
+        ).error(f"Failed to update labels during fallback: {exc}")
         raise
+
+
+def _has_matching_comment(issue_payload: dict[str, object], comment_text: str) -> bool:
+    """Check if issue already has an identical comment.
+
+    Args:
+        issue_payload: GitHub issue payload
+        comment_text: Comment text to search for
+
+    Returns:
+        True if matching comment exists
+    """
+    comments = issue_payload.get("comments")
+    if not isinstance(comments, list):
+        return False
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        body = comment.get("body")
+        if isinstance(body, str) and comment_text.strip() == body.strip():
+            return True
+    return False

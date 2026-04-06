@@ -196,3 +196,149 @@ class TestGetHandoffDir:
 
         # Should use 'default' prefix with hash suffix
         assert "default" in str(handoff_dir)
+
+
+class TestHandoffRecordAPIs:
+    """Tests for record_plan, record_report, and record_audit methods."""
+
+    def test_record_plan_persists_plan_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_plan persists plan ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        plan_ref = "docs/plans/feature-x.md"
+
+        handoff_path = handoff_service.record_plan(
+            plan_ref=plan_ref,
+            next_step="Implement core logic",
+            blocked_by=None,
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert plan_ref in content
+        assert "Implement core logic" in content
+        assert "test-actor" in content
+        assert "plan" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            plan_ref=plan_ref,
+            planner_actor="test-actor",
+            next_step="Implement core logic",
+        )
+
+    def test_record_report_persists_report_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_report persists report ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        report_ref = ".agent/reports/test-report.md"
+
+        handoff_path = handoff_service.record_report(
+            report_ref=report_ref,
+            next_step="Review findings",
+            blocked_by="Missing data",
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert report_ref in content
+        assert "Review findings" in content
+        assert "Missing data" in content
+        assert "test-actor" in content
+        assert "report" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            report_ref=report_ref,
+            executor_actor="test-actor",
+            next_step="Review findings",
+            blocked_by="Missing data",
+        )
+
+    def test_record_audit_persists_audit_ref_and_update_block(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_audit persists audit ref and update block."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        audit_ref = ".agent/reports/audit-result.md"
+
+        handoff_path = handoff_service.record_audit(
+            audit_ref=audit_ref,
+            next_step="Finalize PR",
+            blocked_by=None,
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        content = handoff_path.read_text()
+        assert audit_ref in content
+        assert "Finalize PR" in content
+        assert "test-actor" in content
+        assert "audit" in content.lower()
+
+        # Verify flow state update
+        mock_store.update_flow_state.assert_called_with(
+            "feature/test-branch",
+            audit_ref=audit_ref,
+            reviewer_actor="test-actor",
+            next_step="Finalize PR",
+        )
+
+    def test_record_audit_does_not_update_flow_state_when_event_write_fails(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store
+    ):
+        """Test record_audit avoids dirty flow state if event persistence fails."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        mock_store.add_event.side_effect = RuntimeError("event write failed")
+
+        with pytest.raises(RuntimeError, match="event write failed"):
+            handoff_service.record_audit(
+                audit_ref=".agent/reports/audit-result.md",
+                next_step="Finalize PR",
+                blocked_by=None,
+                actor="test-actor",
+            )
+
+        mock_store.update_flow_state.assert_not_called()
+
+        handoff_path = handoff_service.ensure_current_handoff()
+        content = handoff_path.read_text()
+        assert ".agent/reports/audit-result.md" not in content
+        assert "Finalize PR" not in content
+
+    def test_record_audit_treats_handoff_file_append_as_best_effort(
+        self, handoff_service, temp_git_dir, mock_git_client, mock_store, monkeypatch
+    ):
+        """Test record_audit keeps authoritative writes when current.md append fails."""
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+
+        original_append = handoff_service.append_current_handoff
+
+        def fail_append(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(handoff_service, "append_current_handoff", fail_append)
+
+        handoff_path = handoff_service.record_audit(
+            audit_ref=".agent/reports/audit-result.md",
+            next_step="Finalize PR",
+            blocked_by=None,
+            actor="test-actor",
+        )
+
+        assert handoff_path.exists()
+        mock_store.add_event.assert_called_once()
+        mock_store.update_flow_state.assert_called_once_with(
+            "feature/test-branch",
+            audit_ref=".agent/reports/audit-result.md",
+            reviewer_actor="test-actor",
+            next_step="Finalize PR",
+        )
+
+        monkeypatch.setattr(handoff_service, "append_current_handoff", original_append)

@@ -64,11 +64,19 @@ class CodeagentBackend:
 
     @staticmethod
     def _build_async_log_filter() -> list[str]:
-        """Return awk filter that strips known Codex runtime noise from async logs."""
+        """Return awk filter that strips known Codex runtime noise from async logs.
+
+        Also filters out <agent-prompt> blocks to prevent full prompts from
+        appearing in repository logs.
+        """
         state_patterns = " || ".join(
             f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
         )
         script = (
+            # Filter agent-prompt blocks
+            "$0 ~ /<agent-prompt>/ { skip_prompt=1; prompt_lines++; next }\n"
+            "skip_prompt { if ($0 ~ /<\\/agent-prompt>/) { skip_prompt=0 } next }\n"
+            # Filter known Codex warnings
             f"({state_patterns}) {{ state_db++; next }}\n"
             f"$0 ~ /{KNOWN_CODEX_SNAPSHOT_WARNING}/ "
             f"{{ shell_snapshot++; next }}\n"
@@ -77,6 +85,8 @@ class CodeagentBackend:
             "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
             "{ print }\n"
             "END {\n"
+            '  if (prompt_lines > 0) print "[vibe3 async] suppressed " '
+            'prompt_lines " agent-prompt line(s)"\n'
             '  if (state_db > 0) print "[vibe3 async] suppressed " '
             'state_db " codex state-db warning line(s)"\n'
             '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '

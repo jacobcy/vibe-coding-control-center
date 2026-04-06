@@ -2,6 +2,11 @@
 
 This module handles manager mode execution for issue processing
 and orchestration.
+
+Note: Repository-local async logs (temp/logs/issues/*/manager.async.log) are
+runtime execution logs, not prompt provenance storage. Full agent prompts are
+filtered from these logs by the CodeagentBackend async log filter to prevent
+sensitive information from appearing in repository logs.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
 from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
@@ -26,9 +32,8 @@ from vibe3.manager.session_naming import (
 )
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.no_progress_policy import has_progress_changed, snapshot_progress
+from vibe3.orchestra.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
-    block_manager_noop_issue,
     fail_manager_issue,
 )
 
@@ -253,24 +258,26 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    if not has_progress_changed(before_snapshot, after_snapshot):
-        reason = (
-            "manager 本轮未产生任何有效动作(无状态变化、无新 comment、"
-            "无 handoff/refs 更新)"
-        )
-        store.add_event(
-            branch,
-            "manager_noop_blocked",
-            actor,
-            detail=f"Manager auto-blocked issue #{issue_number}: {reason}",
-            refs={"issue": str(issue_number), "reason": reason},
-        )
-        block_manager_noop_issue(
-            issue_number=issue_number,
-            repo=orchestra_config.repo,
-            reason=reason,
-            actor=actor,
-        )
+    coordinator = ManagerRunCoordinator(store)
+    if coordinator.handle_post_run_outcome(
+        issue_number=issue_number,
+        branch=branch,
+        actor=actor,
+        repo=orchestra_config.repo,
+        before_snapshot=before_snapshot,
+        after_snapshot=after_snapshot,
+    ):
+        return
+
+    if coordinator.check_progress_and_block_if_noop(
+        issue_number=issue_number,
+        branch=branch,
+        actor=actor,
+        repo=orchestra_config.repo,
+        before_snapshot=before_snapshot,
+        after_snapshot=after_snapshot,
+    ):
+        return
 
 
 def resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:

@@ -18,7 +18,7 @@ class TaskService(FlowQueryMixin):
         self,
         store: SQLiteClient | None = None,
     ) -> None:
-        self.store = store or SQLiteClient()
+        self.store = SQLiteClient() if store is None else store
 
     # ------------------------------------------------------------------
     # Core task operations
