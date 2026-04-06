@@ -7,13 +7,17 @@ a thin rendering layer.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.queue_ordering import (
+    resolve_priority,
+    resolve_roadmap_rank,
+)
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowStatusResponse
@@ -102,7 +106,6 @@ class StatusQueryService:
         Returns:
             Sorted list of issue dicts with number, title, state, flow, queued
         """
-        from typing import cast
 
         # stale flows first, active flows overwrite (active priority)
         issue_to_flow: dict[int, FlowStatusResponse] = {}
@@ -140,6 +143,24 @@ class StatusQueryService:
                 if state == IssueState.FAILED
                 else None
             )
+
+            # Parse queue metadata from labels
+            labels = [
+                label.get("name", "")
+                for label in item.get("labels", [])
+                if isinstance(label, dict) and "name" in label
+            ]
+
+            # Extract milestone from GitHub milestone field
+            milestone = None
+            milestone_data = item.get("milestone")
+            if isinstance(milestone_data, dict) and "title" in milestone_data:
+                milestone = milestone_data["title"]
+
+            # Resolve priority and roadmap
+            priority = resolve_priority(labels)
+            _, roadmap = resolve_roadmap_rank(labels)
+
             orchestrated_issues.append(
                 {
                     "number": number,
@@ -148,16 +169,67 @@ class StatusQueryService:
                     "flow": flow,
                     "queued": number in queued_set,
                     "failed_reason": failed_reason,
+                    # Queue metadata
+                    "milestone": milestone,
+                    "roadmap": roadmap,
+                    "priority": priority,
+                    "labels": labels,
                 }
             )
 
-        orchestrated_issues.sort(
+        # Sort issues: READY issues use queue ordering, others use issue_priority
+        ready_issues = [
+            item for item in orchestrated_issues if item["state"] == IssueState.READY
+        ]
+        other_issues = [
+            item for item in orchestrated_issues if item["state"] != IssueState.READY
+        ]
+
+        # Sort ready issues using queue ordering rules and assign real queue ranks
+        if ready_issues:
+            from vibe3.models.orchestration import IssueInfo
+            from vibe3.orchestra.queue_ordering import sort_ready_issues
+
+            ready_issue_infos = [
+                IssueInfo(
+                    number=cast(int, item["number"]),
+                    title=cast(str, item["title"]),
+                    state=cast(IssueState | None, item["state"]),
+                    labels=cast(list[str], item["labels"]),
+                    assignees=[],
+                    milestone=cast(str | None, item["milestone"]),
+                )
+                for item in ready_issues
+            ]
+            sorted_ready_infos = sort_ready_issues(ready_issue_infos)
+
+            # Build sorted ready issues with real queue ranks
+            sorted_ready_issues = []
+            for rank, issue_info in enumerate(sorted_ready_infos, start=1):
+                matching_item = next(
+                    (
+                        item
+                        for item in ready_issues
+                        if item["number"] == issue_info.number
+                    ),
+                    None,
+                )
+                if matching_item:
+                    matching_item["queue_rank"] = rank
+                    sorted_ready_issues.append(matching_item)
+
+            ready_issues = sorted_ready_issues
+
+        # Sort other issues by operational urgency
+        other_issues.sort(
             key=lambda item: (
                 *issue_priority(cast(IssueState, item["state"])),
                 cast(int, item["number"]),
             )
         )
-        return orchestrated_issues
+
+        # Combine: ready issues first (sorted with real ranks), then others
+        return ready_issues + other_issues
 
     def _extract_failed_reason(self, issue_number: int) -> str | None:
         """Extract a compact failure reason from issue comments."""

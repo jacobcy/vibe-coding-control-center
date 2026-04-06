@@ -38,6 +38,11 @@ def _serialize_snapshot(snapshot: "OrchestraSnapshot") -> dict:
                 "has_pr": entry.has_pr,
                 "pr_number": entry.pr_number,
                 "blocked_by": list(entry.blocked_by),
+                # Queue metadata
+                "milestone": entry.milestone,
+                "roadmap": entry.roadmap,
+                "priority": entry.priority,
+                "queue_rank": entry.queue_rank,
             }
             for entry in snapshot.active_issues
         ],

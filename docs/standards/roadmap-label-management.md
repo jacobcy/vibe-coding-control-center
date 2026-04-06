@@ -38,9 +38,24 @@
 ### 2.2 Label 触发机制
 
 - **优先级管理**: 通过 `priority/*` 标签控制
+  - **Numeric priority (推荐)**: `priority/0` ~ `priority/9`（数值越大优先级越高）
+  - **Legacy priority (兼容)**: `priority/critical`, `priority/high`, `priority/medium`, `priority/low`
+  - 默认优先级为 `priority/0`（无标签时）
 - **版本规划**: 通过 `roadmap/*` 标签控制
 - **Milestone 分配**: 通过 GitHub Milestone 功能控制
 - **执行状态**: 通过 `state/*` 标签控制（由执行层管理）
+
+### 2.3 队列排序规则
+
+Orchestra 的 ready queue 使用三级排序（从高到低）：
+
+1. **Milestone** (大桶): 版本号小的优先（v0.1 > v0.3）
+2. **Roadmap** (版本内排序): roadmap/p0 > roadmap/p1 > roadmap/p2
+3. **Priority** (细粒度排序): priority/9 > priority/8 > ... > priority/0
+
+**示例**：
+- v0.1 的 roadmap/p0 + priority/9 会优先于 v0.1 的 roadmap/p1 + priority/5
+- v0.1 的所有 issues 会优先于 v0.3 的所有 issues
 
 ### 2.3 标签层级关系
 
@@ -89,6 +104,27 @@ gh issue edit <issue_number> --add-label "type/docs"
 
 根据紧急程度添加 `priority/*` 标签：
 
+**推荐使用 Numeric Priority (0-9)**:
+
+```bash
+# 最高优先级 - 紧急阻断性问题
+gh issue edit <issue_number> --add-label "priority/9"
+
+# 高优先级 - 核心功能、关键 bug 修复
+gh issue edit <issue_number> --add-label "priority/7"
+
+# 中等优先级 - 重要但非紧急的功能
+gh issue edit <issue_number> --add-label "priority/5"
+
+# 低优先级 - 优化、改进等非关键任务
+gh issue edit <issue_number> --add-label "priority/3"
+
+# 最低优先级 - 默认值
+# 不添加标签即默认为 priority/0
+```
+
+**Legacy Priority (兼容支持)**:
+
 ```bash
 # 高优先级 - 核心功能、关键 bug 修复
 gh issue edit <issue_number> --add-label "priority/high"
@@ -98,12 +134,24 @@ gh issue edit <issue_number> --add-label "priority/medium"
 
 # 低优先级 - 优化、改进等非关键任务
 gh issue edit <issue_number> --add-label "priority/low"
+
+# 紧急问题 - 等同于 priority/9
+gh issue edit <issue_number> --add-label "priority/critical"
 ```
 
+**Legacy 标签映射**:
+- `priority/critical` → 等同于 `priority/9`
+- `priority/high` → 等同于 `priority/7`
+- `priority/medium` → 等同于 `priority/5`
+- `priority/low` → 等同于 `priority/3`
+
 **决策标准**:
-- 影响核心功能、阻断性问题 → `priority/high`
-- 重要功能改进、非阻断性 bug → `priority/medium`
-- 优化、文档完善、代码清理 → `priority/low`
+- 9: 紧急阻断性问题、系统崩溃、核心功能失效
+- 7-8: 核心功能、关键 bug 修复、影响大量用户的问题
+- 5-6: 重要功能改进、非阻断性 bug
+- 3-4: 优化、文档完善、代码清理
+- 1-2: 低优先级改进、nice-to-have
+- 0: 默认优先级（未设置标签时）
 
 #### Step 3: 确定规划窗口
 
@@ -245,11 +293,25 @@ uv run python src/vibe3/cli.py flow bind <issue_number>
 
 ### 4.1 Priority 标签使用
 
+**Numeric Priority (推荐)**:
+
 | 优先级 | 使用场景 | 示例 |
 |--------|----------|------|
-| `priority/high` | 核心功能、关键 bug 修复、阻断性问题 | 支付功能失效、系统崩溃 |
-| `priority/medium` | 重要但非紧急的功能 | 性能优化、用户体验改进 |
-| `priority/low` | 优化、改进等非关键任务 | 代码清理、文档完善 |
+| `priority/9` | 紧急阻断性问题、系统崩溃、核心功能失效 | 支付功能失效、数据库损坏 |
+| `priority/7-8` | 核心功能、关键 bug 修复、影响大量用户 | 登录失败、性能严重下降 |
+| `priority/5-6` | 重要但非紧急的功能 | 性能优化、用户体验改进 |
+| `priority/3-4` | 一般功能、改进项 | 代码清理、小优化 |
+| `priority/1-2` | 低优先级改进 | 次要文档完善、边缘 case 处理 |
+| `priority/0` | 默认优先级（无标签） | - |
+
+**Legacy Priority (兼容支持)**:
+
+| 优先级 | 使用场景 | 映射到 Numeric |
+|--------|----------|---------------|
+| `priority/critical` | 紧急阻断性问题 | `priority/9` |
+| `priority/high` | 核心功能、关键 bug 修复 | `priority/7` |
+| `priority/medium` | 重要但非紧急的功能 | `priority/5` |
+| `priority/low` | 优化、改进等非关键任务 | `priority/3` |
 
 ### 4.2 Roadmap 标签使用
 

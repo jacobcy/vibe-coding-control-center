@@ -11,8 +11,13 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_blocked_by
-from vibe3.models.orchestration import IssueState
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.orchestra.queue_ordering import (
+    resolve_priority,
+    resolve_roadmap_rank,
+    sort_ready_issues,
+)
 from vibe3.services.flow_reader import FlowReader
 from vibe3.services.label_service import LabelService
 
@@ -35,6 +40,11 @@ class IssueStatusEntry:
     has_pr: bool
     pr_number: int | None
     blocked_by: tuple[int, ...] = ()
+    # Queue metadata fields
+    milestone: str | None = None
+    roadmap: str | None = None
+    priority: int = 0
+    queue_rank: int | None = None
 
 
 @dataclass(frozen=True)
@@ -180,6 +190,10 @@ class OrchestraStatusService:
         entries: list[IssueStatusEntry] = []
         active_flows = 0
 
+        # First pass: collect all ready issues for sorting
+        ready_issues_data: list[dict[str, Any]] = []
+        other_issues_data: list[dict[str, Any]] = []
+
         for issue in issues:
             number = issue.get("number")
             if not number:
@@ -214,19 +228,95 @@ class OrchestraStatusService:
             # Parse blocked_by from issue body
             blocked_by_list = parse_blocked_by(issue.get("body") or "")
 
+            # Parse queue metadata
+            labels = [
+                label.get("name", "")
+                for label in issue.get("labels", [])
+                if isinstance(label, dict) and "name" in label
+            ]
+
+            # Extract milestone from GitHub milestone field
+            milestone = None
+            milestone_data = issue.get("milestone")
+            if isinstance(milestone_data, dict) and "title" in milestone_data:
+                milestone = milestone_data["title"]
+
+            # Resolve priority and roadmap
+            priority = resolve_priority(labels)
+            _, roadmap = resolve_roadmap_rank(labels)
+
+            # Collect issue data
+            issue_data = {
+                "number": number,
+                "title": title,
+                "state": state,
+                "assignee": assignee,
+                "has_flow": has_flow,
+                "flow_branch": flow_branch,
+                "has_worktree": has_worktree,
+                "worktree_path": worktree_path,
+                "has_pr": has_pr,
+                "pr_number": pr_number,
+                "blocked_by": tuple(blocked_by_list),
+                "milestone": milestone,
+                "roadmap": roadmap,
+                "priority": priority,
+                "labels": labels,
+            }
+
+            if state == IssueState.READY:
+                ready_issues_data.append(issue_data)
+            else:
+                other_issues_data.append(issue_data)
+
+        # Sort ready issues and assign real queue ranks
+        ready_issue_infos = [
+            IssueInfo(
+                number=data["number"],
+                title=data["title"],
+                state=data["state"],
+                labels=data["labels"],
+                assignees=[data["assignee"]] if data["assignee"] else [],
+                milestone=data["milestone"],
+            )
+            for data in ready_issues_data
+        ]
+        sorted_ready_infos = sort_ready_issues(ready_issue_infos)
+
+        # Create sorted ready issue data with real queue ranks
+        sorted_ready_data = []
+        for rank, issue_info in enumerate(sorted_ready_infos, start=1):
+            # Find matching issue_data
+            matching_data = next(
+                (d for d in ready_issues_data if d["number"] == issue_info.number),
+                None,
+            )
+            if matching_data:
+                matching_data["queue_rank"] = rank
+                sorted_ready_data.append(matching_data)
+
+        # Combine: ready issues first (sorted with real ranks), then others
+        all_issues_data = sorted_ready_data + other_issues_data
+
+        # Build final entries
+        for data in all_issues_data:
             entries.append(
                 IssueStatusEntry(
-                    number=number,
-                    title=title,
-                    state=state,
-                    assignee=assignee,
-                    has_flow=has_flow,
-                    flow_branch=flow_branch,
-                    has_worktree=has_worktree,
-                    worktree_path=worktree_path,
-                    has_pr=has_pr,
-                    pr_number=pr_number,
-                    blocked_by=tuple(blocked_by_list),
+                    number=data["number"],
+                    title=data["title"],
+                    state=data["state"],
+                    assignee=data["assignee"],
+                    has_flow=data["has_flow"],
+                    flow_branch=data["flow_branch"],
+                    has_worktree=data["has_worktree"],
+                    worktree_path=data["worktree_path"],
+                    has_pr=data["has_pr"],
+                    pr_number=data["pr_number"],
+                    blocked_by=data["blocked_by"],
+                    milestone=data["milestone"],
+                    roadmap=data["roadmap"],
+                    priority=data["priority"],
+                    queue_rank=data.get("queue_rank"),
                 )
             )
 

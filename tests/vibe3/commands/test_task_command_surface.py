@@ -276,3 +276,78 @@ def test_task_status_excludes_manual_flow_issues_from_issue_progress(
     assert "task: #443" in result.stdout
     assert "Manual debug scene should stay out of Issue Progress" not in result.stdout
     assert "# 443  IN-PROGRESS" not in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_ready_queue_shows_queue_metadata(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    """Ready queue rows should render rank, milestone, roadmap, and priority."""
+    from vibe3.orchestra.services.status_service import IssueStatusEntry
+
+    mock_validate_pid.return_value = (12345, True)
+
+    # Create ready issues with queue metadata
+    ready_issue_entry = IssueStatusEntry(
+        number=439,
+        title="Manager backend regression",
+        state=IssueState.READY,
+        assignee=None,
+        has_flow=False,
+        flow_branch=None,
+        has_worktree=False,
+        worktree_path=None,
+        has_pr=False,
+        pr_number=None,
+        blocked_by=(),
+        milestone="v0.3",
+        roadmap="p1",
+        priority=7,
+        queue_rank=2,
+    )
+
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(ready_issue_entry,),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 439,
+            "title": "Manager backend regression",
+            "state": IssueState.READY,
+            "flow": None,
+            "queued": False,
+            "milestone": "v0.3",
+            "roadmap": "p1",
+            "priority": 7,
+            "queue_rank": 2,
+        }
+    ]
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Ready Queue:" in result.stdout
+    assert "#439" in result.stdout or "439" in result.stdout
+    # Verify queue metadata is shown
+    assert "rank=" in result.stdout
+    assert "milestone=v0.3" in result.stdout
+    assert "roadmap/p1" in result.stdout
+    assert "priority/7" in result.stdout

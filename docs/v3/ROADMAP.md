@@ -285,15 +285,31 @@ related_docs:
 - `status/ready-for-review` - 待审核
 
 **优先级标签**:
-- `priority/critical` - 最高优先级
-- `priority/high` - 高优先级
-- `priority/medium` - 中等优先级
-- `priority/low` - 低优先级
+
+**Numeric Priority (推荐)**:
+- `priority/9` - 紧急阻断性问题（最高优先级）
+- `priority/7-8` - 核心功能、关键 bug 修复
+- `priority/5-6` - 重要但非紧急的功能
+- `priority/3-4` - 一般功能、改进项
+- `priority/1-2` - 低优先级改进
+- `priority/0` - 默认优先级（无标签时）
+
+**Legacy Priority (兼容支持)**:
+- `priority/critical` - 最高优先级（等同于 priority/9）
+- `priority/high` - 高优先级（等同于 priority/7）
+- `priority/medium` - 中等优先级（等同于 priority/5）
+- `priority/low` - 低优先级（等同于 priority/3）
+
+**队列排序规则**:
+Orchestra ready queue 使用三级排序：
+1. Milestone (版本号小的优先，如 v0.1 > v0.3)
+2. Roadmap (p0 > p1 > p2)
+3. Priority (数值大的优先，如 priority/9 > priority/0)
 
 ### Project 字段建议
 
 1. **Status**: Todo, In Progress, Done, Blocked
-2. **Priority**: P0, P1, P2, P3
+2. **Priority**: P0 (priority/9), P1 (priority/7), P2 (priority/5), P3 (priority/3)
 3. **Phase**: Phase 1, Phase 2, Phase 3, Phase 4
 4. **Estimate**: 时间估算（小时）
 5. **Dependencies**: 依赖任务
