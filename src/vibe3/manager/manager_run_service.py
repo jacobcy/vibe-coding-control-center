@@ -258,6 +258,21 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
+    # Check if issue was closed by manager (ready-close path)
+    # If closed, skip all further checks - no fallback, no progress verification
+    if after_snapshot.get("issue_state") == "closed":
+        store.add_event(
+            branch,
+            "manager_closed_issue",
+            actor,
+            detail=(
+                f"Manager closed issue #{issue_number} "
+                f"(task deemed invalid/unnecessary)"
+            ),
+            refs={"issue": str(issue_number), "action": "closed"},
+        )
+        return  # Exit early - no further processing needed
+
     # Manager must leave READY or HANDOFF state to count as progress
     # For ready-manager path, closing the issue also counts as valid progress
     current_state_label = before_snapshot.get("state_label", "")

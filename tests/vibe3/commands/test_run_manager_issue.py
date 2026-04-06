@@ -258,7 +258,7 @@ class TestRunManagerIssueMode:
         monkeypatch.setattr(
             manager_run_service,
             "has_progress_changed",
-            lambda before, after: True,
+            lambda before, after, **kwargs: True,
         )
 
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
@@ -476,4 +476,4 @@ class TestRunManagerIssueMode:
         github.add_comment.assert_called_once()
         comment = github.add_comment.call_args[0][1]
         assert "[manager]" in comment
-        assert "未产生任何有效动作" in comment
+        assert "未产生状态迁移" in comment

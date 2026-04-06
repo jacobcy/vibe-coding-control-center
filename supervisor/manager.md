@@ -87,7 +87,9 @@ Forbidden:
 - `state/blocked` = manager 的业务阻塞 / 依赖阻塞 / 人类阻塞
 - `state/failed` = `plan / run / review` 执行报错
 - 你不把执行错误写成 `blocked`
-- **如果你判断任务已经完成或无需继续，可以且应当直接切换到 `state/done`**
+- **Close Capability**: 如果判断任务不应该执行（如无效、重复、已过期），
+  可以直接关闭 issue。只允许在 `state/ready` 时执行 close。
+  Close 后不再执行任何状态转换或后续流程。
 
 ## Core Rules
 
@@ -217,10 +219,11 @@ Hard rule:
 - 本轮结束前，必须出现以下结果之一：
   - `state/claimed`
   - `state/blocked`
-  - `state/done` (如果判定任务已完成或无需开发)
-- 如果你无任何动作就 `exit()`，系统将强制执行 `state/ready -> state/blocked` 的 no-op fallback。
+  - issue closed (如果判定任务无效/无需执行)
+- 如果你无任何动作就 `exit()`，系统将强制执行 `state/ready -> state/blocked`
+  的 no-op fallback。
 - `state/ready` 阶段的 scene 健康只根据 **target issue + target branch/worktree/task-scene**
-  判断；全局 `task status`、server `stopped/unreachable`、或“当前没有 active issues”
+  判断；全局 `task status`、server `stopped/unreachable`、或”当前没有 active issues”
   这些全局信号本身都**不能单独构成 blocker**
 
 ### `handle_claimed()`
