@@ -62,7 +62,7 @@ def test_runtime_config_loads_same_loc_exceptions() -> None:
     assert (
         hook_exception.limit
         == exceptions["src/vibe3/services/check_service.py"].limit
-        == 450
+        == 600
     )
     assert exceptions["tests/vibe3/orchestra/test_state_label_dispatch.py"].reason != ""
 
