@@ -1,6 +1,8 @@
 # tests/vibe3/manager/test_manager_run_service.py
 from unittest.mock import MagicMock, patch
 
+from vibe3.models.orchestration import IssueState
+
 
 def test_run_manager_reads_backend_from_env(monkeypatch):
     """VIBE3_MANAGER_BACKEND/MODEL env vars should override config resolution."""
@@ -105,3 +107,89 @@ def test_resolve_manager_execution_cwd_falls_back_without_worktree(
     assert cwd == mock_launch.return_value
     assert worktree is False
     mock_launch.assert_called_once()
+
+
+@patch("vibe3.manager.manager_run_coordinator.AbandonFlowService")
+def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service):
+    """Closed HANDOFF issue should finalize PR close + flow abort.
+
+    Uses abandon service for cleanup.
+    """
+    from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
+
+    store = MagicMock()
+    coordinator = ManagerRunCoordinator(store=store)
+    actor = "agent:manager"
+    before_snapshot = {
+        "state_label": "state/handoff",
+        "issue_state": "open",
+        "flow_status": "active",
+    }
+    after_snapshot = {
+        "state_label": "state/handoff",
+        "issue_state": "closed",
+        "flow_status": "active",
+    }
+
+    handled = coordinator.handle_post_run_outcome(
+        issue_number=123,
+        branch="task/issue-123",
+        actor=actor,
+        repo="jacobcy/vibe-coding-control-center",
+        before_snapshot=before_snapshot,
+        after_snapshot=after_snapshot,
+    )
+
+    assert handled is True
+    mock_abandon_service.return_value.abandon_flow.assert_called_once_with(
+        issue_number=123,
+        branch="task/issue-123",
+        source_state=IssueState.HANDOFF,
+        reason="manager closed issue without finalizing abandon flow",
+        actor=actor,
+        issue_already_closed=True,
+        flow_already_aborted=False,
+    )
+
+
+@patch("vibe3.manager.manager_run_coordinator.block_manager_noop_issue")
+@patch("vibe3.manager.manager_run_coordinator.AbandonFlowService")
+def test_handle_closed_issue_retries_cleanup_when_flow_already_aborted(
+    mock_abandon_service, mock_block_noop
+):
+    """Closed issue with aborted flow should still retry PR cleanup.
+
+    Uses abandon service even when flow is already aborted.
+    """
+    from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
+
+    store = MagicMock()
+    coordinator = ManagerRunCoordinator(store=store)
+    handled = coordinator.handle_post_run_outcome(
+        issue_number=123,
+        branch="task/issue-123",
+        actor="agent:manager",
+        repo="jacobcy/vibe-coding-control-center",
+        before_snapshot={
+            "state_label": "state/ready",
+            "issue_state": "open",
+            "flow_status": "active",
+        },
+        after_snapshot={
+            "state_label": "state/ready",
+            "issue_state": "closed",
+            "flow_status": "aborted",
+        },
+    )
+
+    assert handled is True
+    mock_abandon_service.return_value.abandon_flow.assert_called_once_with(
+        issue_number=123,
+        branch="task/issue-123",
+        source_state=IssueState.READY,
+        reason="manager closed issue without finalizing abandon flow",
+        actor="agent:manager",
+        issue_already_closed=True,
+        flow_already_aborted=True,
+    )
+    mock_block_noop.assert_not_called()
