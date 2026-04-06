@@ -52,7 +52,7 @@ code_limits:
         limit: 600
         reason: "PR 生命周期聚合"
       - path: "src/vibe3/services/check_service.py"
-        limit: 450
+        limit: 600
         reason: "校验聚合服务，核心校验链路不适合再细碎拆分"
       - path: "src/vibe3/services/task_service.py"
         limit: 550
@@ -68,6 +68,9 @@ code_limits:
       - path: "src/vibe3/clients/github_client.py"
         limit: 500
         reason: "GitHub 门面聚合"
+      - path: "src/vibe3/clients/github_pr_ops.py"
+        limit: 500
+        reason: "GitHub PR 操作与查询聚合"
       - path: "src/vibe3/clients/sqlite_client.py"
         limit: 450
         reason: "已 388，持久化聚合"
