@@ -42,7 +42,7 @@ class TestAbortedFlowRecovery:
     """Tests for recovering aborted flows."""
 
     def test_resume_can_reactivate_aborted_flow(
-        self, resume_usecase, mock_status_service, mock_flow_service
+        self, resume_usecase, mock_status_service, mock_label_service, mock_flow_service
     ):
         """Aborted flow can be reactivated via resume."""
         # Mock an aborted flow candidate (issue reopened after abandon)
@@ -64,6 +64,8 @@ class TestAbortedFlowRecovery:
         ]
 
         mock_status_service.fetch_resume_candidates.return_value = candidates
+        # Mock label service to verify issue is in READY state
+        mock_label_service.get_state.return_value = IssueState.READY
 
         # Resume should reactivate the flow
         result = resume_usecase.resume_issues(issue_numbers=[123])
@@ -76,7 +78,7 @@ class TestAbortedFlowRecovery:
         mock_flow_service.reactivate_flow.assert_called_once_with("task/issue-123")
 
     def test_resume_aborted_flow_preserves_artifacts(
-        self, resume_usecase, mock_status_service, mock_flow_service
+        self, resume_usecase, mock_status_service, mock_label_service, mock_flow_service
     ):
         """Resuming aborted flow preserves historical refs."""
         # Mock an aborted flow with historical refs
@@ -99,6 +101,8 @@ class TestAbortedFlowRecovery:
         ]
 
         mock_status_service.fetch_resume_candidates.return_value = candidates
+        # Mock label service to verify issue is in HANDOFF state
+        mock_label_service.get_state.return_value = IssueState.HANDOFF
 
         # Resume the aborted flow
         result = resume_usecase.resume_issues(issue_numbers=[456])

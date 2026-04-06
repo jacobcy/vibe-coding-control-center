@@ -187,9 +187,10 @@ class TaskResumeUsecase:
         elif resume_kind == "blocked":
             return current_state.value == "blocked"
         elif resume_kind == "aborted":
-            # Aborted flows can be resumed from any state (READY/HANDOFF)
-            # as long as the flow_status is "aborted"
-            return True
+            # Aborted flows can be resumed from READY or HANDOFF states
+            # The flow_status=aborted check is done in fetch_resume_candidates
+            # Here we verify the issue is in a valid state for resumption
+            return current_state.value in ("ready", "handoff")
 
         return False
 

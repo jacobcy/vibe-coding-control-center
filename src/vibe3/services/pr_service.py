@@ -303,14 +303,20 @@ class PRService:
             return None
 
         pr = prs[0]
-        self.close_pr(pr.number, comment=comment)
+        success = self.close_pr(pr.number, comment=comment)
 
-        logger.bind(
-            branch=branch,
-            pr_number=pr.number,
-        ).success("Closed open PR for branch")
-
-        return pr.number
+        if success:
+            logger.bind(
+                branch=branch,
+                pr_number=pr.number,
+            ).success("Closed open PR for branch")
+            return pr.number
+        else:
+            logger.bind(
+                branch=branch,
+                pr_number=pr.number,
+            ).warning("Failed to close PR (close_pr returned False)")
+            return None
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
         """Persist activity to flow."""

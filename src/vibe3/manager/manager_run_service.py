@@ -29,9 +29,10 @@ from vibe3.manager.session_naming import (
     get_manager_session_name,
     wait_for_async_session_id,
 )
-from vibe3.models.orchestration import IssueInfo
+from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.no_progress_policy import has_progress_changed, snapshot_progress
+from vibe3.services.abandon_flow_service import AbandonFlowService
 from vibe3.services.issue_failure_service import (
     block_manager_noop_issue,
     fail_manager_issue,
@@ -258,25 +259,58 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    # Check if issue was closed by manager (ready-close path)
-    # If closed, skip all further checks - no fallback, no progress verification
+    # Check if issue was closed by manager (abandon path)
+    # If closed from READY or HANDOFF, execute unified abandon flow
     if after_snapshot.get("issue_state") == "closed":
-        store.add_event(
-            branch,
-            "manager_closed_issue",
-            actor,
-            detail=(
-                f"Manager closed issue #{issue_number} "
-                f"(task deemed invalid/unnecessary)"
-            ),
-            refs={"issue": str(issue_number), "action": "closed"},
-        )
+        before_state_label = before_snapshot.get("state_label", "")
+        # Determine source state from label
+        source_state: IssueState | None = None
+        if before_state_label == "state/ready":
+            source_state = IssueState.READY
+        elif before_state_label == "state/handoff":
+            source_state = IssueState.HANDOFF
+
+        if source_state:
+            # Execute unified abandon: close issue + close PR + abort flow
+            abandon_service = AbandonFlowService()
+            abandon_result: dict[str, str | int | None] = abandon_service.abandon_flow(
+                issue_number=issue_number,
+                branch=branch,
+                source_state=source_state,
+                reason="Task deemed invalid or not worth doing by manager",
+                actor=actor,
+            )
+            store.add_event(
+                branch,
+                "manager_abandoned_flow",
+                actor,
+                detail=(
+                    f"Manager abandoned flow for issue #{issue_number} "
+                    f"(issue={abandon_result.get('issue')}, "
+                    f"pr={abandon_result.get('pr')}, "
+                    f"flow={abandon_result.get('flow')})"
+                ),
+                refs={"issue": str(issue_number), "result": str(abandon_result)},
+            )
+        else:
+            # Issue closed but not from READY/HANDOFF - log warning
+            store.add_event(
+                branch,
+                "manager_closed_issue_unexpected_state",
+                actor,
+                detail=(
+                    f"Issue #{issue_number} closed but was in {before_state_label} "
+                    f"(expected state/ready or state/handoff)"
+                ),
+                refs={"issue": str(issue_number)},
+            )
         return  # Exit early - no further processing needed
 
     # Manager must leave READY or HANDOFF state to count as progress
-    # For ready-manager path, closing the issue also counts as valid progress
+    # For ready-manager and handoff-manager paths, closing the issue also counts
+    # as valid progress (handled by abandon-as-progress in runtime)
     current_state_label = before_snapshot.get("state_label", "")
-    allow_close = current_state_label == "state/ready"
+    allow_close = current_state_label in ("state/ready", "state/handoff")
     if not has_progress_changed(
         before_snapshot,
         after_snapshot,
