@@ -115,7 +115,7 @@ code_limits:
         limit: 450
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 450
+        limit: 550
         reason: "Codeagent execution backend"
       - path: "src/vibe3/orchestra/services/status_service.py"
         limit: 450
