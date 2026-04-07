@@ -126,7 +126,8 @@ docs/plans/
 .kiro/
 .augment/
 .codebuddy/
-.claude/
-!.claude/rules/  # Exception: share project-specific rules with team
+# Claude: track project config, exclude local commands and skills
+.claude/commands/
+.claude/skills/
 .aider*
 MagicMock/
