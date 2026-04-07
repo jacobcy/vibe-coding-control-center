@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services import task_resume_usecase
+from vibe3.services import task_resume_operations, task_resume_usecase
 
 
 def test_blocked_stale_issue_appears_in_resume_all_candidates() -> None:
@@ -74,7 +74,7 @@ def test_blocked_stale_issue_resume_posts_blocked_comment_and_returns_to_ready()
     mock_github_client = MagicMock()
 
     with patch.object(
-        task_resume_usecase, "resume_blocked_issue_to_ready"
+        task_resume_operations, "resume_blocked_issue_to_ready"
     ) as mock_blocked_to_ready:
         usecase = task_resume_usecase.TaskResumeUsecase(
             status_service=mock_status_service,
@@ -155,10 +155,10 @@ def test_blocked_resume_does_not_affect_failed_resume_path() -> None:
 
     with (
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_ready"
+            task_resume_operations, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(
-            task_resume_usecase, "resume_blocked_issue_to_ready"
+            task_resume_operations, "resume_blocked_issue_to_ready"
         ) as mock_blocked_to_ready,
     ):
         usecase = task_resume_usecase.TaskResumeUsecase(

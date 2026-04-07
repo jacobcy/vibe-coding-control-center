@@ -46,6 +46,16 @@ class TestOrchestraStatusService:
         assert snapshot.active_worktrees == 0
         mock_list.assert_called_once()
 
+    def test_get_active_manager_session_count_delegates_to_orchestrator(self) -> None:
+        config = _make_config()
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_active_manager_session_count.return_value = 3
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
+
+        assert service.get_active_manager_session_count() == 3
+
     def test_snapshot_with_issue(self) -> None:
         """Snapshot includes issue with flow and worktree."""
         config = _make_config()

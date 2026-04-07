@@ -23,3 +23,7 @@ class FlowReader(Protocol):
     def get_active_flow_count(self) -> int:
         """Return the number of currently active flows."""
         ...
+
+    def get_active_manager_session_count(self) -> int:
+        """Return the number of currently live manager sessions."""
+        ...

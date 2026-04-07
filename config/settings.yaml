@@ -75,6 +75,14 @@ code_limits:
         limit: 450
         reason: "已 388，持久化聚合"
 
+      # Commands 层（CLI 入口）—— 允许 450
+      - path: "src/vibe3/commands/plan.py"
+        limit: 450
+        reason: "Plan command CLI 入口，参数解析和路由逻辑集中，拆分成本高"
+      - path: "src/vibe3/commands/run.py"
+        limit: 450
+        reason: "Run command CLI 入口，多模式路由逻辑集中，拆分成本高"
+
       # Orchestra —— 允许 550
       - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
         limit: 650
@@ -98,9 +106,6 @@ code_limits:
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 450
         reason: "Codeagent execution backend"
-      - path: "src/vibe3/services/task_resume_usecase.py"
-        limit: 500
-        reason: "Task resume usecase，职责单一，方法粒度合理，主方法 resume_issues 逻辑完整不宜拆分"
       - path: "src/vibe3/orchestra/services/status_service.py"
         limit: 450
         reason: "Orchestra 状态聚合服务，数据类+辅助函数+主服务类结构清晰，snapshot 方法线性流程不宜拆分"
@@ -402,7 +407,7 @@ run:
     # - model 只有在 backend 已配置时才有意义
     backend: "opencode"  # e.g., "claude", "opencode", "gemini"
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
+    timeout_seconds: 3600
 
   # Static: Output format requirements
   output_format: |

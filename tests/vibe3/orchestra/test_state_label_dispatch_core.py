@@ -254,6 +254,28 @@ async def test_on_tick_appends_manager_started_event(
 
 
 @pytest.mark.asyncio
+async def test_on_tick_appends_manager_rejected_event_when_dispatch_fails(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, manager = manager_service
+    svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
+    manager.dispatch_manager.return_value = False
+    manager.queued_issues = {42}
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    assert any("dispatching #42" in message for _, message in events)
+    assert any("deferred #42" in message.lower() for _, message in events)
+
+
+@pytest.mark.asyncio
 async def test_on_tick_skips_when_live_tmux_session_exists(
     service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:

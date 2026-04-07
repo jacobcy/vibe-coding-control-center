@@ -38,7 +38,7 @@ class TestManagerDispatch:
         executor._flow_manager = MagicMock()
         executor._circuit_breaker = None
         executor.status_service = MagicMock()
-        executor.status_service.get_active_flow_count.return_value = 0
+        executor.status_service.get_active_manager_session_count.return_value = 0
 
         # flow exists with a branch
         executor._flow_manager.get_flow_for_issue.return_value = {
@@ -67,7 +67,7 @@ class TestManagerDispatch:
             manager.flow_manager,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            manager.status_service.get_active_flow_count = lambda: 0
+            manager.status_service.get_active_manager_session_count = lambda: 0
             with patch("subprocess.run") as mock_run:
                 result = manager.dispatch_manager(issue)
 
@@ -90,7 +90,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-102"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -156,7 +158,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-103"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -200,7 +204,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-104"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -240,7 +246,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-105"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -279,7 +287,9 @@ class TestManagerDispatch:
         issue = make_issue(number=42, title="Capacity test")
 
         with patch.object(
-            manager.status_service, "get_active_flow_count", return_value=3
+            manager.status_service,
+            "get_active_manager_session_count",
+            return_value=3,
         ):
             # Effective capacity = max(0, 3 - 3 - 0) = 0
             # Should refuse dispatch

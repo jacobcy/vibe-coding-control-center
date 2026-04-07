@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestration import IssueState
-from vibe3.services import task_resume_usecase
+from vibe3.services import task_resume_operations
 from vibe3.services.task_failed_resume_usecase import TaskFailedResumeUsecase
 
 
@@ -156,7 +156,7 @@ class TestTaskFailedResumeUsecase:
         mock_github_client = MagicMock()
 
         with patch.object(
-            task_resume_usecase,
+            task_resume_operations,
             "resume_failed_issue_to_ready",
         ) as mock_ready:
             usecase = TaskFailedResumeUsecase(

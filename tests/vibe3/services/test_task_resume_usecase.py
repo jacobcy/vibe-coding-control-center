@@ -4,7 +4,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 from vibe3.models.orchestration import IssueState
-from vibe3.services import task_resume_usecase
+from vibe3.services import task_resume_operations, task_resume_usecase
 
 
 def test_resume_issues_dry_run_reports_failed_and_blocked_candidates_without_mutation() -> (  # noqa: E501
@@ -75,10 +75,10 @@ def test_resume_issues_apply_routes_failed_by_plan_ref_and_blocked_to_ready() ->
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_ready"
+            task_resume_operations, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(
-            task_resume_usecase, "resume_blocked_issue_to_ready"
+            task_resume_operations, "resume_blocked_issue_to_ready"
         ) as mock_blocked_to_ready,
         patch.object(task_resume_usecase, "LabelService") as mock_label_service,
         patch.object(task_resume_usecase, "GitClient") as mock_git_client,
@@ -146,7 +146,7 @@ def test_resume_issues_skips_issue_when_current_state_no_longer_matches_resume_k
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_ready"
+            task_resume_operations, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(task_resume_usecase, "LabelService") as mock_label_service,
     ):
@@ -174,7 +174,7 @@ def test_resume_issues_with_explicit_issue_bypasses_orchestra_candidate_filter()
     mock_label_service.get_state.return_value = IssueState.FAILED
 
     with patch.object(
-        task_resume_usecase,
+        task_resume_operations,
         "resume_failed_issue_to_ready",
     ) as mock_failed_to_ready:
         usecase = task_resume_usecase.TaskResumeUsecase(
@@ -227,7 +227,7 @@ def test_resume_issues_with_explicit_issue_prefers_active_flow_scene() -> None:
     )
 
     with patch.object(
-        task_resume_usecase,
+        task_resume_operations,
         "resume_failed_issue_to_ready",
     ) as mock_failed_to_ready:
         usecase = task_resume_usecase.TaskResumeUsecase(
@@ -431,7 +431,7 @@ def test_resume_issues_clears_existing_tmux_sessions_before_reactivate() -> None
             task_resume_usecase, "StatusQueryService", return_value=mock_status_service
         ),
         patch.object(
-            task_resume_usecase, "resume_failed_issue_to_ready"
+            task_resume_operations, "resume_failed_issue_to_ready"
         ) as mock_failed_to_ready,
         patch.object(task_resume_usecase, "LabelService") as mock_label_service,
         patch.object(task_resume_usecase, "GitClient") as mock_git_client,
@@ -439,7 +439,7 @@ def test_resume_issues_clears_existing_tmux_sessions_before_reactivate() -> None
         patch.object(
             task_resume_usecase, "IssueFlowService"
         ) as mock_issue_flow_service,
-        patch("vibe3.services.task_resume_usecase.subprocess.run") as mock_run,
+        patch("vibe3.services.task_resume_operations.subprocess.run") as mock_run,
     ):
         mock_label_instance = MagicMock()
         mock_label_service.return_value = mock_label_instance

@@ -87,13 +87,36 @@ async def test_manager_tick_skips_dispatch_when_shared_status_service_reports_fu
     """共享 status_service 报告容量已满时，不应继续尝试 manager dispatch。"""
     svc, manager = manager_service
     svc._status_service = MagicMock()
-    svc._status_service.get_active_flow_count.return_value = 2
+    svc._status_service.get_active_manager_session_count.return_value = 2
     svc._github.list_issues.return_value = [_issue_payload(number=431)]
     svc._has_live_dispatch = MagicMock(return_value=False)
 
     await svc.on_tick()
 
     manager.dispatch_manager.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_manager_tick_appends_throttled_event_when_capacity_exhausted(
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc, manager = manager_service
+    svc._status_service = MagicMock()
+    svc._status_service.get_active_manager_session_count.return_value = 2
+    svc._github.list_issues.return_value = [_issue_payload(number=431)]
+    svc._has_live_dispatch = MagicMock(return_value=False)
+    events: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.state_label_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    await svc.on_tick()
+
+    manager.dispatch_manager.assert_not_called()
+    assert any("throttled" in message.lower() for _, message in events)
 
 
 @pytest.mark.asyncio

@@ -64,6 +64,47 @@ class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
     @staticmethod
+    def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
+        """Return tmux session names, optionally filtered by prefix."""
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return set()
+        except Exception:
+            return set()
+        if result.returncode != 0:
+            return set()
+
+        sessions: set[str] = set()
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if not session_name:
+                continue
+            if (
+                prefix is None
+                or session_name == prefix
+                or session_name.startswith(f"{prefix}-")
+            ):
+                sessions.add(session_name)
+        return sessions
+
+    @classmethod
+    def has_tmux_session(cls, session_name: str) -> bool:
+        """Return whether the exact tmux session currently exists."""
+        return session_name in cls.list_tmux_sessions()
+
+    @classmethod
+    def has_tmux_session_prefix(cls, prefix: str) -> bool:
+        """Return whether any tmux session exists for the given prefix."""
+        return bool(cls.list_tmux_sessions(prefix=prefix))
+
+    @staticmethod
     def _build_async_log_filter() -> list[str]:
         """Return awk filter that strips known Codex runtime noise from async logs.
 

@@ -354,7 +354,7 @@ class TestManagerDispatchIntegration:
                     ):
                         with patch.object(
                             manager.status_service,
-                            "get_active_flow_count",
+                            "get_active_manager_session_count",
                             return_value=0,
                         ):
                             with patch.object(

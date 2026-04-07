@@ -114,12 +114,12 @@ class ManagerExecutor:
             issue=issue.number,
         )
 
-        active_count = self.status_service.get_active_flow_count()
+        active_count = self.status_service.get_active_manager_session_count()
         capacity = self.config.max_concurrent_flows
 
         if active_count >= capacity:
             log.warning(
-                f"Throttled: Capacity reached ({active_count}/{capacity}). "
+                f"Throttled: Manager capacity reached ({active_count}/{capacity}). "
                 f"Queueing #{issue.number}"
             )
             self._queued_issues.add(issue.number)
