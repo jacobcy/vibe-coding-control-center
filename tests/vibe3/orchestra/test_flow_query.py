@@ -1,6 +1,6 @@
 """Tests for FlowManager query operations."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -93,48 +93,19 @@ class TestFlowQuery:
 
         assert count == 1
 
-    def test_get_active_manager_session_count_only_counts_live_manager_sessions(self):
+    def test_get_active_manager_session_count_only_counts_live_manager_sessions(
+        self,
+    ):
         config = OrchestraConfig()
         manager = FlowManager(config)
 
-        with patch.object(
-            manager.store,
-            "get_all_flows",
-            return_value=[
-                {
-                    "branch": "task/issue-320",
-                    "flow_status": "active",
-                    "manager_session_id": "vibe3-manager-issue-320",
-                },
-                {
-                    "branch": "task/issue-356",
-                    "flow_status": "active",
-                    "manager_session_id": "vibe3-manager-issue-356",
-                },
-                {
-                    "branch": "task/issue-999",
-                    "flow_status": "stale",
-                    "manager_session_id": "vibe3-manager-issue-999",
-                },
-                {
-                    "branch": "dev/issue-435",
-                    "flow_status": "active",
-                    "manager_session_id": "vibe3-manager-issue-435",
-                },
-                {
-                    "branch": "task/issue-320",
-                    "flow_status": "active",
-                    "manager_session_id": "vibe3-manager-issue-320",
-                },
-            ],
-        ):
-            with patch(
-                "vibe3.manager.flow_manager.CodeagentBackend.list_tmux_sessions",
-                return_value={
-                    "vibe3-manager-issue-320",
-                    "vibe3-manager-issue-999",
-                },
-            ):
-                count = manager.get_active_manager_session_count()
+        with patch(
+            "vibe3.manager.flow_manager.SessionRegistryService"
+        ) as mock_registry_class:
+            mock_registry = MagicMock()
+            mock_registry_class.return_value = mock_registry
+            mock_registry.count_live_worker_sessions.return_value = 2
+
+            count = manager.get_active_manager_session_count()
 
         assert count == 2

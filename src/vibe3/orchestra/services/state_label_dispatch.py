@@ -581,14 +581,6 @@ class StateLabelDispatchService(ServiceBase):
             section
         )
 
-    def _session_field(self) -> str:
-        return {
-            "manager": "manager_session_id",
-            "plan": "planner_session_id",
-            "run": "executor_session_id",
-            "review": "reviewer_session_id",
-        }[self.trigger_name]
-
     def _has_live_dispatch(self, issue_number: int) -> bool:
         if self._registry is not None:
             # Map trigger_name to registry role
