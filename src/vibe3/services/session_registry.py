@@ -58,6 +58,18 @@ class SessionRegistryService:
             session_id, status=status, ended_at=_now_iso()
         )
 
+    def mark_aborted(self, session_id: int) -> None:
+        """Mark a session as aborted (user-initiated termination)."""
+        self._store.update_runtime_session(
+            session_id, status="aborted", ended_at=_now_iso()
+        )
+
+    def mark_failed(self, session_id: int) -> None:
+        """Mark a session as failed (unsuccessful execution)."""
+        self._store.update_runtime_session(
+            session_id, status="failed", ended_at=_now_iso()
+        )
+
     def count_live_worker_sessions(self, *, role: str | None = None) -> int:
         """Count truly live worker sessions.
 
@@ -122,6 +134,35 @@ class SessionRegistryService:
                 )
                 orphaned_ids.append(session_id)
         return orphaned_ids
+
+    def get_truly_live_sessions_for_branch(self, branch: str) -> list[dict[str, Any]]:
+        """Return truly live sessions for a branch, confirming tmux liveness.
+
+        Unlike list_live_runtime_sessions which only checks status,
+        this method confirms tmux liveness for each session.
+
+        Sessions in starting status with no tmux_session are included
+        (assuming they are still launching).
+
+        Args:
+            branch: The branch to filter sessions by.
+
+        Returns:
+            List of session dicts that are truly live.
+        """
+        sessions = self._store.list_live_runtime_sessions()
+        truly_live: list[dict[str, Any]] = []
+        for session in sessions:
+            if session.get("branch") != branch:
+                continue
+            tmux = session.get("tmux_session")
+            if tmux:
+                if self._backend.has_tmux_session(tmux):
+                    truly_live.append(session)
+            else:
+                # Still starting, no tmux yet - count as live
+                truly_live.append(session)
+        return truly_live
 
 
 def _now_iso() -> str:

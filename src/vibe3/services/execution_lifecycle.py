@@ -64,7 +64,7 @@ def _sync_registry_from_lifecycle_event(
 
     - started  -> create a new running session in registry
     - completed -> mark the live session for this branch+role as done
-    - aborted   -> mark the live session for this branch+role as failed
+    - aborted   -> mark the live session for this branch+role as aborted
     """
     if lifecycle == "started":
         target_type, target_id = _parse_branch_target(branch)
@@ -81,7 +81,10 @@ def _sync_registry_from_lifecycle_event(
         return
 
     # terminal events: find live sessions for this branch+role and close them
-    terminal_status = "done" if lifecycle == "completed" else "failed"
+    terminal_status = {
+        "completed": "done",
+        "aborted": "aborted",
+    }.get(lifecycle, "failed")
     live_sessions = store.list_live_runtime_sessions(role=role)
     for session in live_sessions:
         if session.get("branch") == branch:

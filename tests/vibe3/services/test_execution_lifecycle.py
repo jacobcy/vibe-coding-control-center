@@ -237,8 +237,8 @@ class TestRegistrySync:
         live = store.list_live_runtime_sessions(role="executor")
         assert len(live) == 0
 
-    def test_aborted_event_marks_registry_session_failed(self, tmp_path: Path) -> None:
-        """aborted event should update the live registry session to failed."""
+    def test_aborted_event_marks_registry_session_aborted(self, tmp_path: Path) -> None:
+        """aborted event should update the live registry session to aborted."""
         store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
 
         persist_execution_lifecycle_event(
@@ -260,6 +260,7 @@ class TestRegistrySync:
             session_id="ses-review-55",
         )
 
+        # Aborted session should not appear in live list
         live = store.list_live_runtime_sessions(role="reviewer")
         assert len(live) == 0
 

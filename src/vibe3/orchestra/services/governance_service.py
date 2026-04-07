@@ -166,11 +166,18 @@ class GovernanceService(ServiceBase):
                 target_id="scan",
                 branch="governance",
             )
-        handle = await loop.run_in_executor(
-            self._executor,
-            self._dispatch_governance_prompt,
-            plan_content,
-        )
+        try:
+            handle = await loop.run_in_executor(
+                self._executor,
+                self._dispatch_governance_prompt,
+                plan_content,
+            )
+        except Exception:
+            # Clean up reserved session on dispatch failure
+            if self._registry is not None and session_id is not None:
+                self._registry.mark_failed(session_id)
+            self._in_flight = False
+            raise
         self._in_flight = True
         if self._registry is not None and session_id is not None:
             self._registry.mark_started(session_id, tmux_session=handle.tmux_session)

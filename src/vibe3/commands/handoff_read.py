@@ -7,10 +7,12 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.services.flow_service import FlowService
+from vibe3.services.session_registry import SessionRegistryService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,
@@ -24,13 +26,21 @@ UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
 
 def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict]:
-    """Return live runtime sessions from the registry for a given branch.
+    """Return truly live runtime sessions from the registry for a given branch.
 
-    Queries the runtime_session registry for sessions with status
-    'starting' or 'running', filtered to the given branch.
+    This function confirms tmux liveness for each session, unlike
+    store.list_live_runtime_sessions which only checks status.
+
+    Args:
+        store: SQLiteClient instance for database access.
+        branch: The branch to filter sessions by.
+
+    Returns:
+        List of session dicts that are truly live.
     """
-    all_live = store.list_live_runtime_sessions()
-    return [s for s in all_live if s.get("branch") == branch]
+    backend = CodeagentBackend()
+    registry = SessionRegistryService(store=store, backend=backend)
+    return registry.get_truly_live_sessions_for_branch(branch)
 
 
 def _render_agent_chain(

@@ -60,6 +60,14 @@ _TRIGGER_EXECUTION_ROLE: dict[
     "review": "reviewer",
 }
 
+# Map trigger_name to registry role for live session queries
+_TRIGGER_TO_REGISTRY_ROLE: dict[TriggerName, str] = {
+    "manager": "manager",
+    "plan": "planner",
+    "run": "executor",
+    "review": "reviewer",
+}
+
 
 def _normalize_labels(raw_labels: object) -> list[str]:
     labels: list[str] = []
@@ -604,8 +612,12 @@ class StateLabelDispatchService(ServiceBase):
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         if self._registry is not None:
+            # Map trigger_name to registry role
+            registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
+                self.trigger_name, self.trigger_name
+            )
             sessions = self._registry._store.list_live_runtime_sessions(
-                role=self.trigger_name
+                role=registry_role
             )
             target_id = str(issue_number)
             for session in sessions:
