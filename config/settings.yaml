@@ -90,9 +90,17 @@ code_limits:
       - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
         limit: 650
         reason: "状态标签触发执行服务，职责单一但核心方法逻辑完整，__init__/_prune_in_flight/_dispatch_issue 紧密耦合不宜拆分"
+      - path: "src/vibe3/orchestra/services/governance_service.py"
+        limit: 450
+        reason: "Governance 服务聚合，处理 governance dispatch 和 session 状态管理"
       - path: "src/vibe3/server/registry.py"
         limit: 450
         reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
+
+      # Manager —— 允许 450
+      - path: "src/vibe3/manager/manager_run_service.py"
+        limit: 450
+        reason: "Manager 运行服务聚合，处理同步/异步执行和状态管理"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
