@@ -166,7 +166,7 @@ class TestRunManagerWorktree:
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            "vibe3.manager.worktree_manager.WorktreeManager",
+            "vibe3.environment.worktree.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
         monkeypatch.setattr(
@@ -199,7 +199,7 @@ class TestRunManagerWorktree:
             lambda self: "/Users/jacobcy/src/vibe-center/main/.git",
         )
         monkeypatch.setattr(
-            "vibe3.manager.worktree_manager.WorktreeManager",
+            "vibe3.environment.worktree.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
         monkeypatch.setattr(
@@ -241,7 +241,7 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
         monkeypatch.setattr(
-            "vibe3.manager.worktree_manager.WorktreeManager",
+            "vibe3.environment.worktree.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
 
@@ -279,7 +279,7 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
         monkeypatch.setattr(
-            "vibe3.manager.worktree_manager.WorktreeManager",
+            "vibe3.environment.worktree.WorktreeManager",
             lambda config, repo_root: worktree_manager,
         )
 

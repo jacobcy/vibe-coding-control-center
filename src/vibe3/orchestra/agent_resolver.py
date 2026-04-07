@@ -42,7 +42,7 @@ def resolve_governance_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=gov.agent,
         backend=gov.backend,
         model=gov.model,
-        worktree=True,  # Governance runs in temporary worktree
+        worktree=False,  # Governance doesn't need worktree
     )
 
     return _resolve_and_sync(raw_options)
@@ -62,7 +62,7 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=handoff.agent,
         backend=handoff.backend,
         model=handoff.model,
-        worktree=True,  # Supervisor runs in temporary worktree
+        worktree=False,  # L2 uses self-managed temporary worktree, no --worktree flag
     )
 
     return _resolve_and_sync(raw_options)

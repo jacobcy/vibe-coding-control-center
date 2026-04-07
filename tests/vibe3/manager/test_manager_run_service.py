@@ -59,7 +59,7 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
     ), "resolve_manager_agent_options was called even though env vars were set"
 
 
-@patch("vibe3.manager.worktree_manager.WorktreeManager")
+@patch("vibe3.environment.worktree.WorktreeManager")
 def test_resolve_manager_execution_cwd_marks_worktree_when_resolved(
     mock_manager, tmp_path
 ):
@@ -85,7 +85,7 @@ def test_resolve_manager_execution_cwd_marks_worktree_when_resolved(
 
 
 @patch("vibe3.manager.manager_run_service.resolve_manager_launch_cwd")
-@patch("vibe3.manager.worktree_manager.WorktreeManager")
+@patch("vibe3.environment.worktree.WorktreeManager")
 def test_resolve_manager_execution_cwd_falls_back_without_worktree(
     mock_manager, mock_launch
 ):

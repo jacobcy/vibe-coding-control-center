@@ -14,6 +14,7 @@ from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
 )
+from vibe3.environment.session import SessionManager
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -253,9 +254,6 @@ class CodeagentBackend:
 
         command.extend(["--prompt-file", prompt_file_path])
 
-        if options.worktree and not session_id:
-            command.append("--worktree")
-
         if session_id:
             command.append("resume")
             command.append(cast(str, session_id))
@@ -322,29 +320,40 @@ class CodeagentBackend:
         keep_alive_seconds: int = 60,
     ) -> AsyncExecutionHandle:
         project_root = cwd or Path.cwd()
-        base_name = execution_name.replace("/", "-")[:50]
-        safe_name = self._allocate_tmux_session_name(base_name)
+
+        # Use SessionManager for tmux session creation
+        # Use codeagent's log dir to avoid worktree .git issues
         log_dir = self._default_log_dir()
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = self._resolve_async_log_path(log_dir, safe_name)
+        session_manager = SessionManager(repo_path=project_root, log_dir=log_dir)
+        prefix = execution_name.replace("/", "-")[:50]
+        tmux_ctx = session_manager.create_tmux_session(
+            prefix, keep_alive=keep_alive_seconds
+        )
+
+        # Use codeagent's specialized log path resolution (includes issue number)
+        # Use actual session_id (may include counter suffix like -2, -3)
+        log_path = self._resolve_async_log_path(log_dir, tmux_ctx.session_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
+
+        # Build shell command with log filtering
         shell_command = self._build_async_shell_command(
             command,
             log_path=log_path,
             keep_alive_seconds=keep_alive_seconds,
         )
 
+        # Execute command in the tmux session
         subprocess.run(
-            ["tmux", "new-session", "-d", "-s", safe_name, "sh", "-lc", shell_command],
+            ["tmux", "send-keys", "-t", tmux_ctx.session_id, shell_command, "Enter"],
             cwd=project_root,
             env=env,
             check=True,
         )
 
         return AsyncExecutionHandle(
-            tmux_session=safe_name,
+            tmux_session=tmux_ctx.session_id,
             log_path=log_path,
             prompt_file_path=Path(""),
         )
