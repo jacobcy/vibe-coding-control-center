@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.cli import app as cli_app
-from vibe3.manager import manager_run_service
+from vibe3.manager import manager_run_service, session_naming
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -52,7 +52,7 @@ def _patch_basic(monkeypatch, backend, github, sqlite=None):
         lambda config, issue: MagicMock(rendered_text="# Manager prompt\n"),
     )
     monkeypatch.setattr(
-        manager_run_service,
+        session_naming,
         "wait_for_async_session_id",
         lambda log_path, timeout_seconds=3.0: None,
     )
