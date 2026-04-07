@@ -77,6 +77,8 @@ def test_review_pr_pass(mock_review_usecase):
     assert result.exit_code == 0
     assert "PASS" in result.output
     mock_review_usecase.build_pr_review.assert_called_once_with(42)
+    _, kwargs = mock_review_usecase.execute_review.call_args
+    assert kwargs["branch"] == "feature/branch"
 
 
 def test_review_pr_block_exits_1(mock_review_usecase):
@@ -133,12 +135,27 @@ def test_async_pr_refuses_when_head_fetch_fails(mock_review_usecase):
     assert "Could not resolve head branch" in result.output
 
 
+def test_dry_run_pr_allows_missing_head_branch(mock_review_usecase):
+    mock_review_usecase.build_pr_review.return_value = (
+        ReviewRequest(scope=ReviewScope.for_pr(42)),
+        101,
+        None,
+    )
+    mock_review_usecase.execute_review.return_value.verdict = "DRY_RUN"
+
+    result = runner.invoke(app, ["pr", "42", "--dry-run", "--sync"])
+
+    assert result.exit_code == 0
+    _, kwargs = mock_review_usecase.execute_review.call_args
+    assert kwargs["branch"] is None
+
+
 def test_review_parser_failure_returns_error_verdict(mock_review_usecase):
     """Surface ERROR verdict when usecase returns parse-failure result."""
     mock_review_usecase.execute_review.return_value.verdict = "ERROR"
     result = runner.invoke(app, ["pr", "42", "--sync"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1
     assert "Verdict: ERROR" in result.output
 
 

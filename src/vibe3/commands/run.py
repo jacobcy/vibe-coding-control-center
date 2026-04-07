@@ -23,8 +23,6 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
-
-# Service module imports for delegation
 from vibe3.manager.manager_run_service import run_manager_issue_mode as _svc_run_manager
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.supervisor_run_service import (
@@ -32,6 +30,12 @@ from vibe3.orchestra.supervisor_run_service import (
 )
 from vibe3.orchestra.supervisor_run_service import (
     run_supervisor_mode as _svc_run_supervisor,
+)
+from vibe3.services.authoritative_ref_gate import (
+    require_authoritative_ref as _svc_require_authoritative_ref,
+)
+from vibe3.services.issue_failure_service import (
+    block_executor_noop_issue as _svc_block_executor_noop,
 )
 from vibe3.services.issue_failure_service import (
     fail_executor_issue as _svc_fail_executor,
@@ -306,6 +310,25 @@ def run_command(
     issue_number = usecase.transition_issue(branch)
     if not dry_run and not async_mode and issue_number:
         if getattr(result, "success", False):
+            if not _svc_require_authoritative_ref(
+                flow_service=flow_service,
+                branch=branch,
+                ref_name="report_ref",
+                issue_number=int(issue_number),
+                reason=(
+                    "executor output artifact was saved, but no authoritative "
+                    "report_ref was registered. Write a canonical report "
+                    "document and run handoff report."
+                ),
+                actor="agent:run",
+                block_issue=_svc_block_executor_noop,
+            ):
+                typer.echo(
+                    "Error: Executor completed without report_ref; "
+                    "issue moved to state/blocked",
+                    err=True,
+                )
+                raise typer.Exit(1)
             transition = LabelService().confirm_issue_state(
                 int(issue_number),
                 IssueState.HANDOFF,

@@ -4,6 +4,8 @@ Migrated from vibe3.services.review_usecase.
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Callable, cast
 
 import typer
@@ -21,14 +23,88 @@ from vibe3.agents.runner import (
     create_codeagent_command,
 )
 from vibe3.analysis.inspect_output_adapter import changed_symbols
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
+from vibe3.services.authoritative_ref_gate import require_authoritative_ref
 from vibe3.services.flow_service import FlowService
+from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
+from vibe3.services.handoff_service import HandoffService
+from vibe3.services.issue_failure_service import block_reviewer_noop_issue
 from vibe3.services.label_service import LabelService
+
+
+class _BranchBoundGitClient(GitClient):
+    """Git client shim that pins handoff writes to an explicit branch."""
+
+    def __init__(self, branch: str) -> None:
+        super().__init__()
+        self._branch = branch
+
+    def get_current_branch(self) -> str:
+        return self._branch
+
+
+def _build_handoff_service(branch: str | None) -> HandoffService:
+    """Build handoff service pinned to the target branch when provided."""
+    if not branch:
+        return HandoffService()
+
+    return HandoffService(git_client=_BranchBoundGitClient(branch))
+
+
+def _create_minimal_audit_artifact(
+    content: str,
+    verdict: str,
+    branch: str | None,
+) -> Path:
+    """Create a minimal canonical audit artifact from parsed review output."""
+    handoff_service = _build_handoff_service(branch)
+    handoff_dir = handoff_service.ensure_handoff_dir()
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    artifact_path = handoff_dir / f"audit-auto-{timestamp}.md"
+    sanitized_content = sanitize_handoff_content(content)
+    artifact_path.write_text(
+        "# Minimal Review Audit\n\n"
+        f"VERDICT: {verdict}\n\n"
+        "## Review Output\n\n"
+        f"{sanitized_content.rstrip()}\n",
+        encoding="utf-8",
+    )
+    return artifact_path
+
+
+def _resolve_authoritative_audit_ref(
+    handoff_file: str | None,
+    review_output: str,
+    verdict: str,
+    branch: str | None,
+) -> str:
+    """Resolve the authoritative audit ref for a successful review."""
+    if handoff_file:
+        handoff_path = Path(handoff_file)
+        if handoff_path.exists():
+            return str(handoff_path)
+
+    return str(_create_minimal_audit_artifact(review_output, verdict, branch))
+
+
+def _resolve_error_audit_ref(
+    handoff_file: str | None,
+    review_output: str,
+    branch: str | None,
+) -> str:
+    """Resolve a stable audit path for parse-error diagnostics."""
+    if handoff_file:
+        handoff_path = Path(handoff_file)
+        if handoff_path.exists():
+            return str(handoff_path)
+
+    return str(_create_minimal_audit_artifact(review_output, "ERROR", branch))
 
 
 @dataclass
@@ -146,18 +222,59 @@ class ReviewUsecase:
 
         try:
             review = self.review_parser(result.stdout)
-            self._transition_issue(issue_number)
+            audit_ref = _resolve_authoritative_audit_ref(
+                str(result.handoff_file) if result.handoff_file else None,
+                result.stdout,
+                review.verdict,
+                branch,
+            )
+            flow = self.flow_service.get_flow_status(branch) if branch else None
+            if flow is not None and branch is not None:
+                _build_handoff_service(branch).record_audit(
+                    audit_ref=audit_ref,
+                    actor="agent:review",
+                )
+                if not require_authoritative_ref(
+                    flow_service=self.flow_service,
+                    branch=branch,
+                    ref_name="audit_ref",
+                    issue_number=issue_number,
+                    reason=(
+                        "review output was saved, but no authoritative audit_ref "
+                        "was registered. Write or regenerate a canonical audit "
+                        "note and run handoff audit."
+                    ),
+                    actor="agent:review",
+                    block_issue=block_reviewer_noop_issue,
+                ):
+                    return ReviewRunResult(
+                        verdict="ERROR",
+                        handoff_file=audit_ref,
+                        issue_number=issue_number,
+                    )
+                self._transition_issue(issue_number)
             return ReviewRunResult(
                 verdict=review.verdict,
-                handoff_file=str(result.handoff_file) if result.handoff_file else None,
+                handoff_file=audit_ref,
                 issue_number=issue_number,
             )
         except ReviewParserError as err:
             logger.bind(domain="review").error(f"Failed to parse review output: {err}")
+            error_audit_ref = _resolve_error_audit_ref(
+                str(result.handoff_file) if result.handoff_file else None,
+                result.stdout,
+                branch,
+            )
+            flow = self.flow_service.get_flow_status(branch) if branch else None
+            if flow is not None and branch is not None:
+                _build_handoff_service(branch).record_audit(
+                    audit_ref=error_audit_ref,
+                    actor="agent:review",
+                )
             self._fail_issue(issue_number, f"review parse failed: {err}")
             return ReviewRunResult(
                 verdict="ERROR",
-                handoff_file=str(result.handoff_file) if result.handoff_file else None,
+                handoff_file=error_audit_ref,
                 issue_number=issue_number,
             )
 

@@ -113,7 +113,7 @@ class TaskResumeUsecase:
                     result["skipped"].append(
                         {
                             "number": issue_num,
-                            "reason": "不在 failed 或 blocked 状态，跳过恢复",
+                            "reason": "当前状态或现场不支持恢复，跳过恢复",
                         }
                     )
 
@@ -238,6 +238,36 @@ class TaskResumeUsecase:
     ) -> dict[str, Any] | None:
         """为显式指定的 issue 直接构造恢复候选。"""
         current_state = self.label_service.get_state(issue_number)
+        if current_state in {IssueState.READY, IssueState.HANDOFF}:
+            aborted_flow = self._find_resume_flow_by_status(
+                issue_number,
+                statuses={"aborted"},
+                flows=flows,
+                stale_flows=stale_flows,
+            )
+            if aborted_flow is not None:
+                return {
+                    "number": issue_number,
+                    "title": "",
+                    "state": current_state,
+                    "resume_kind": "aborted",
+                    "flow": aborted_flow,
+                }
+
+        flow = self._find_resume_flow(issue_number, flows, stale_flows)
+        if (
+            flow is not None
+            and flow.flow_status == "aborted"
+            and current_state in {IssueState.READY, IssueState.HANDOFF}
+        ):
+            return {
+                "number": issue_number,
+                "title": "",
+                "state": current_state,
+                "resume_kind": "aborted",
+                "flow": flow,
+            }
+
         if current_state == IssueState.FAILED:
             resume_kind = "failed"
         elif current_state == IssueState.BLOCKED:
@@ -250,8 +280,36 @@ class TaskResumeUsecase:
             "title": "",
             "state": current_state,
             "resume_kind": resume_kind,
-            "flow": self._find_resume_flow(issue_number, flows, stale_flows),
+            "flow": flow,
         }
+
+    def _find_resume_flow_by_status(
+        self,
+        issue_number: int,
+        *,
+        statuses: set[str],
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse],
+    ) -> FlowStatusResponse | None:
+        """按 flow_status 查找 issue 对应的恢复现场。"""
+        preferred: FlowStatusResponse | None = None
+        for flow in [*flows, *stale_flows]:
+            if (
+                flow.task_issue_number != issue_number
+                or flow.flow_status not in statuses
+            ):
+                continue
+            preferred = self._select_resume_flow(preferred, flow)
+
+        for flow in self.flow_service.list_flows(status=None):
+            if (
+                flow.task_issue_number != issue_number
+                or flow.flow_status not in statuses
+            ):
+                continue
+            preferred = self._select_resume_flow(preferred, flow)
+
+        return preferred
 
     def _find_resume_flow(
         self,
@@ -260,10 +318,50 @@ class TaskResumeUsecase:
         stale_flows: list[FlowStatusResponse],
     ) -> FlowStatusResponse | None:
         """从已加载 flow 列表中为恢复操作关联现场。"""
-        for flow in [*stale_flows, *flows]:
-            if flow.task_issue_number == issue_number:
-                return flow
-        return None
+        preferred: FlowStatusResponse | None = None
+        for flow in [*flows, *stale_flows]:
+            if flow.task_issue_number != issue_number:
+                continue
+            preferred = self._select_resume_flow(preferred, flow)
+
+        if preferred is not None:
+            return preferred
+
+        for flow in self.flow_service.list_flows(status=None):
+            if flow.task_issue_number != issue_number:
+                continue
+            preferred = self._select_resume_flow(preferred, flow)
+
+        return preferred
+
+    def _select_resume_flow(
+        self,
+        current: FlowStatusResponse | None,
+        candidate: FlowStatusResponse,
+    ) -> FlowStatusResponse:
+        """为显式恢复选择最合适的 flow 现场。"""
+        if current is None:
+            return candidate
+
+        current_is_task = self.issue_flow_service.is_task_branch(current.branch)
+        candidate_is_task = self.issue_flow_service.is_task_branch(candidate.branch)
+        if candidate_is_task != current_is_task:
+            return candidate if candidate_is_task else current
+
+        status_rank = {
+            "active": 0,
+            "stale": 1,
+            "aborted": 2,
+            "blocked": 3,
+            "done": 4,
+            "merged": 4,
+        }
+        current_rank = status_rank.get(current.flow_status, 5)
+        candidate_rank = status_rank.get(candidate.flow_status, 5)
+        if candidate_rank < current_rank:
+            return candidate
+
+        return current
 
     def _maybe_skip_all_task_candidate(
         self,
@@ -633,9 +731,9 @@ class TaskResumeUsecase:
             # Reactivate the aborted flow (change status from "aborted" to "active")
             self.flow_service.reactivate_flow(branch)
         except Exception as exc:
-            # Log but don't fail the resume operation
             logger.bind(
                 domain="resume",
                 action="reactivate_aborted",
                 branch=branch,
             ).warning(f"Failed to reactivate aborted flow: {exc}")
+            raise

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
 from loguru import logger
 
@@ -12,13 +13,20 @@ from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
+class _GitClientProtocol(Protocol):
+    """Protocol for git client operations."""
+
+    def get_current_branch(self) -> str: ...
+    def get_git_common_dir(self) -> str: ...
+
+
 class HandoffService:
     """Service for managing handoff records."""
 
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: GitClient | None = None,
+        git_client: _GitClientProtocol | None = None,
     ) -> None:
         """Initialize handoff service.
 

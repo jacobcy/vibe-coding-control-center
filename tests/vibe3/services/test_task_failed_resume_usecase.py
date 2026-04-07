@@ -208,7 +208,7 @@ class TestTaskFailedResumeUsecase:
         assert result["resumed"] == []
         assert len(result["skipped"]) == 1
         assert result["skipped"][0]["issue_number"] == 439
-        assert "failed" in result["skipped"][0]["reason"].lower()
+        assert "恢复" in result["skipped"][0]["reason"]
 
         failure_svc.resume_failed_issue_to_handoff.assert_not_called()
         failure_svc.resume_failed_issue_to_ready.assert_not_called()

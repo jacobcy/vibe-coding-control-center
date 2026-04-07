@@ -41,7 +41,6 @@ def manager_service() -> (
     )
     svc._github = MagicMock()
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
-    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
         yield svc, manager
@@ -67,7 +66,10 @@ async def test_manager_tick_dispatches_at_most_remaining_capacity(
     svc._github.list_issues.return_value = ready_issues
     svc._has_live_dispatch = MagicMock(return_value=False)
     # No active flows and no in-flight dispatches
-    manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-410"}
+    # Only issue 410 has a flow; others have no flow (manager can start fresh)
+    manager.flow_manager.get_flow_for_issue.side_effect = lambda n: (
+        {"branch": "task/issue-410"} if n == 410 else None
+    )
 
     await svc.on_tick()
 
@@ -76,6 +78,22 @@ async def test_manager_tick_dispatches_at_most_remaining_capacity(
     assert manager.dispatch_manager.call_count <= 2
     # Verify that we dispatched at least one (capacity not zero)
     assert manager.dispatch_manager.call_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_manager_tick_skips_dispatch_when_shared_status_service_reports_full_capacity(  # noqa: E501
+    manager_service: tuple[StateLabelDispatchService, MagicMock],
+) -> None:
+    """共享 status_service 报告容量已满时，不应继续尝试 manager dispatch。"""
+    svc, manager = manager_service
+    svc._status_service = MagicMock()
+    svc._status_service.get_active_flow_count.return_value = 2
+    svc._github.list_issues.return_value = [_issue_payload(number=431)]
+    svc._has_live_dispatch = MagicMock(return_value=False)
+
+    await svc.on_tick()
+
+    manager.dispatch_manager.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -103,9 +121,10 @@ async def test_manager_tick_logs_throttled_issue_numbers_when_capacity_exhausted
         ]
         svc._github.list_issues.return_value = ready_issues
         svc._has_live_dispatch = MagicMock(return_value=False)
-        manager.flow_manager.get_flow_for_issue.return_value = {
-            "branch": "task/issue-410"
-        }
+        # Only issue 410 has a flow; others have no flow (manager can start fresh)
+        manager.flow_manager.get_flow_for_issue.side_effect = lambda n: (
+            {"branch": "task/issue-410"} if n == 410 else None
+        )
 
         await svc.on_tick()
 
@@ -143,9 +162,10 @@ async def test_manager_tick_logs_selected_dispatched_and_throttled_issues(
         ]
         svc._github.list_issues.return_value = ready_issues
         svc._has_live_dispatch = MagicMock(return_value=False)
-        manager.flow_manager.get_flow_for_issue.return_value = {
-            "branch": "task/issue-410"
-        }
+        # Only issue 410 has a flow; others have no flow (manager can start fresh)
+        manager.flow_manager.get_flow_for_issue.side_effect = lambda n: (
+            {"branch": "task/issue-410"} if n == 410 else None
+        )
 
         await svc.on_tick()
 

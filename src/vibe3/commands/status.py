@@ -29,7 +29,13 @@ def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
     """Only auto-task flows should participate in task-oriented Issue Progress."""
     flow = cast(FlowStatusResponse | None, item.get("flow"))
     if flow is None:
-        return True
+        state = cast(IssueState, item["state"])
+        return state in {
+            IssueState.READY,
+            IssueState.HANDOFF,
+            IssueState.BLOCKED,
+            IssueState.FAILED,
+        }
     return is_auto_task_branch(flow.branch)
 
 

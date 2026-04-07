@@ -20,6 +20,7 @@ from vibe3.agents.models import (
 )
 from vibe3.agents.pipeline import ExecutionRequest, run_execution_pipeline
 from vibe3.agents.review_runner import format_agent_actor
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
@@ -40,6 +41,16 @@ class CodeagentExecutionService:
 
     def __init__(self, config: VibeConfig | None = None) -> None:
         self.config = config or VibeConfig.get_defaults()
+
+    @staticmethod
+    def _resolve_command_cwd(explicit_cwd: Path | None) -> Path:
+        """Resolve command cwd to the current worktree root unless overridden."""
+        if explicit_cwd is not None:
+            return explicit_cwd
+        try:
+            return Path(GitClient().get_worktree_root())
+        except Exception:
+            return Path.cwd()
 
     def resolve_agent_options(
         self,
@@ -158,6 +169,8 @@ class CodeagentExecutionService:
             dry_run=command.dry_run,
             handoff_kind=command.handoff_kind,
             handoff_metadata=command.handoff_metadata,
+            cwd=self._resolve_command_cwd(command.cwd),
+            branch=command.branch,
         )
 
         log.info("Starting sync execution")
@@ -199,9 +212,11 @@ class CodeagentExecutionService:
             worktree=command.worktree,
         )
         cli_command = self._build_cli_command(command)
+        execution_cwd = self._resolve_command_cwd(command.cwd)
         handle = backend.start_async_command(
             cli_command,
             execution_name=f"vibe3-{command.role}-{branch}",
+            cwd=execution_cwd,
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
 

@@ -215,6 +215,96 @@ def test_block_manager_noop_issue_handles_none_repo() -> None:
         mock_labels.confirm_issue_state.assert_called_once()
 
 
+def test_block_planner_noop_issue_adds_comment_and_transitions_state() -> None:
+    """Test that planner no-op blocking writes comment and moves to BLOCKED."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.block_planner_noop_issue(
+            issue_number=654,
+            reason="missing plan_ref",
+            actor="agent:plan",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 654
+        assert "state/blocked" in call_args[0][1]
+        assert "authoritative plan_ref" in call_args[0][1]
+        assert "missing plan_ref" in call_args[0][1]
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            654,
+            IssueState.BLOCKED,
+            actor="agent:plan",
+            force=True,
+        )
+
+
+def test_block_executor_noop_issue_adds_comment_and_transitions_state() -> None:
+    """Test that executor no-op blocking writes comment and moves to BLOCKED."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.block_executor_noop_issue(
+            issue_number=655,
+            reason="missing report_ref",
+            actor="agent:run",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 655
+        assert "state/blocked" in call_args[0][1]
+        assert "authoritative report_ref" in call_args[0][1]
+        assert "missing report_ref" in call_args[0][1]
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            655,
+            IssueState.BLOCKED,
+            actor="agent:run",
+            force=True,
+        )
+
+
+def test_block_reviewer_noop_issue_adds_comment_and_transitions_state() -> None:
+    """Test that reviewer no-op blocking writes comment and moves to BLOCKED."""
+    mock_github = MagicMock()
+    mock_labels = MagicMock()
+
+    with (
+        patch.object(issue_failure_service, "GitHubClient", return_value=mock_github),
+        patch.object(issue_failure_service, "LabelService", return_value=mock_labels),
+    ):
+        issue_failure_service.block_reviewer_noop_issue(
+            issue_number=656,
+            reason="missing audit_ref",
+            actor="agent:review",
+        )
+
+        mock_github.add_comment.assert_called_once()
+        call_args = mock_github.add_comment.call_args
+        assert call_args[0][0] == 656
+        assert "state/blocked" in call_args[0][1]
+        assert "authoritative audit_ref" in call_args[0][1]
+        assert "missing audit_ref" in call_args[0][1]
+
+        mock_labels.confirm_issue_state.assert_called_once_with(
+            656,
+            IssueState.BLOCKED,
+            actor="agent:review",
+            force=True,
+        )
+
+
 def test_resume_failed_issue_to_handoff_adds_comment_and_transitions_state() -> None:
     """Test that failed resume returns to HANDOFF for manager triage."""
     mock_github = MagicMock()

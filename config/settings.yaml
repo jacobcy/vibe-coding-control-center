@@ -310,6 +310,9 @@ review:
     Use AST analysis to understand impact scope.
     Prioritize actionable findings with clear severity.
     Follow the repository review contract.
+    The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
+    If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
+    and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
 
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
@@ -366,9 +369,15 @@ plan:
     Design minimal changes with clear implementation steps.
     Document risks and breaking changes upfront.
     Follow the repository planning contract.
+    The auto-saved planner artifact is only for shared handoff or audit and is not the authoritative `plan_ref`.
+    You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
+    Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
+    If you do not register `plan_ref`, the planner run is treated as no-op and the issue is moved to `state/blocked`.
 
-  # Static: Custom plan prompt (optional prefix)
-  plan_prompt: "/writing-plan"
+  # Static: Optional plain-text default task guidance.
+  # Slash-prefixed external skill triggers are ignored by vibe3 plan.
+  plan_prompt: ""
 
 # Run command configuration
 # Run Configuration
@@ -422,6 +431,11 @@ run:
     Write clean code with tests, run verification after changes.
     Document any deviations with reasons.
     Follow the repository execution contract.
+    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+    You must write a canonical execution report under `docs/reports/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
+    Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
+    If you do not register `report_ref`, the executor run is treated as no-op and the issue is moved to `state/blocked`.
 
   # Static: Custom run prompt (optional prefix)
   run_prompt: "/executing-plan"

@@ -2,7 +2,7 @@
 
 > **文档定位**：定义如何使用 AI Agent（通过 `vibe3 run`）执行开发任务
 > **适用范围**：所有需要 AI 辅助的开发工作
-> **权威性**：本标准为 agent 工作流的权威依据
+> **权威性**：本标准为 agent 工作流的权威依据。状态迁移与 authoritative ref 真源定义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准。
 
 相关调试方法见 [agent-debugging-standard.md](agent-debugging-standard.md)。
 
@@ -108,6 +108,18 @@ vibe3 run --plan  # 恢复 session 继续工作
 ```
 
 ---
+
+### 2.1.1 authoritative ref 使用约定
+
+以下内容只描述工作流操作约定；ref 的正式语义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准。
+
+- `plan`、`run`、`review` 过程中可能会自动保存 handoff artifact，便于共享与审计
+- 这些 auto-saved artifact 不是 authoritative `plan_ref` / `report_ref` / `audit_ref`
+- planner 完成后，应将 canonical 计划文档写入 `docs/plans/`，再执行 `vibe3 handoff plan <path>`
+- executor 完成后，应将 canonical 执行报告写入 `docs/reports/`，再执行 `vibe3 handoff report <path>`
+- reviewer 只需输出合法 `VERDICT: PASS | MAJOR | BLOCK`；系统会在成功后自动登记最小 `audit_ref`
+- 如果需要更完整的审查留痕，仍可额外执行 `vibe3 handoff audit <path>` 覆盖该最小引用
+- 如果 plan/run 同步执行结束后缺少 authoritative `plan_ref` / `report_ref`，该轮应视为 no-op，而不是当作完成交接
 
 ### 2.2 Agent Session 管理
 

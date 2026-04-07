@@ -2,7 +2,7 @@
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
-> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义与 authoritative ref 定义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
 
 ---
 
@@ -434,8 +434,13 @@ HeartbeatServer._tick_loop()
 当 issue 处于 `state/handoff` 且满足以下条件时，manager 会自动恢复执行：
 
 1. Issue 有 canonical task flow（`task/issue-*` 分支）
-2. Flow state 有有效 refs（如 `plan_ref`）
-3. 没有活动的 manager session
+2. 没有活动的 manager session
+
+这里不要把 auto-saved artifact 或 async log 误认成 authoritative ref：
+
+- `.git/vibe3/handoff/...` 下的自动产物，只是共享 artifact
+- `temp/logs/*.async.log` 只是调试日志
+- authoritative ref 是否成立，以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 中定义的 handoff write + flow state 为准
 
 这个 resume 路径使用与 `state/ready` 相同的去重机制：
 - 如果已有 live session，不会重复 dispatch
@@ -450,12 +455,15 @@ HeartbeatServer._tick_loop()
 - 本轮推进成功，产生明确状态变化或交接产物
 - 本轮无法推进，且 manager session 结束后没有任何可观察进展，此时进入 `state/blocked`
 
-这里的”可观察进展”包括以下任一项：
+对 manager 的 `state/ready` / `state/handoff` 路径，最关键的“可观察进展”是状态迁移本身。
 
-- `state/*` label 变化
-- 新的 issue comment
-- 新的 handoff 文件
-- Flow refs 更新（plan_ref, report_ref, audit_ref）
+调试时应按下面顺序读：
+
+1. `state/*` label 是否离开当前状态
+2. 是否发生显式 abandon / close
+3. 其余 comment、handoff、refs 仅作为辅助现场，不单独构成 manager 路径成功
+
+如果你看到新的 handoff 文件或 auto-saved artifact，但 issue 仍停在 `state/handoff`，不要把它误判成 manager 已完成推进。
 
 **Progress Detection Parity**：
 
