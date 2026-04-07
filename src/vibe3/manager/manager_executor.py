@@ -39,7 +39,7 @@ class ManagerExecutor:
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
 
-        self._flow_manager = FlowManager(config)
+        self._flow_manager = FlowManager(config, registry=registry)
         self.worktree_manager = WorktreeManager(
             config, self.repo_path, self._flow_manager
         )

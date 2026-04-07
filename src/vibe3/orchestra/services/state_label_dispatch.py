@@ -420,22 +420,22 @@ class StateLabelDispatchService(ServiceBase):
             # (e.g. after a no-op fallback from planner/executor).
             return not flow_state.get("manager_session_id")
         if self.trigger_name == "plan":
-            return (
-                not flow_state.get("plan_ref")
-                and not flow_state.get("planner_session_id")
-                and not has_live_session
-            )
+            # Dispatch if no plan_ref AND no live session running.
+            # planner_session_id is a resume hint, not a dispatch gate.
+            return not flow_state.get("plan_ref") and not has_live_session
         if self.trigger_name == "run":
+            # Dispatch if plan_ref exists AND no report_ref AND no live session.
+            # executor_session_id is a resume hint, not a dispatch gate.
             return (
                 bool(flow_state.get("plan_ref"))
                 and not flow_state.get("report_ref")
-                and not flow_state.get("executor_session_id")
                 and not has_live_session
             )
+        # Dispatch if report_ref exists AND no audit_ref AND no live session.
+        # reviewer_session_id is a resume hint, not a dispatch gate.
         return (
             bool(flow_state.get("report_ref"))
             and not flow_state.get("audit_ref")
-            and not flow_state.get("reviewer_session_id")
             and not has_live_session
         )
 

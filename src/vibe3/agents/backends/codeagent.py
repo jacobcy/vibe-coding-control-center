@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
+from loguru import logger
+
 from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
@@ -32,6 +34,15 @@ KNOWN_CODEX_SNAPSHOT_WARNING: Final[str] = (
 )
 KNOWN_CODEX_ANALYTICS_WARNING: Final[str] = (
     r"analytics_client: events failed with status 403 Forbidden:"
+)
+RESUME_RETRY_EXIT_CODES: Final[frozenset[int]] = frozenset({42})
+RESUME_RETRY_ERROR_SNIPPETS: Final[tuple[str, ...]] = (
+    "session not found",
+    "invalid session",
+    "failed to resume",
+    "unable to resume",
+    "could not resume",
+    "resume error",
 )
 
 
@@ -62,6 +73,39 @@ def extract_session_id(stdout: str) -> str | None:
 
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
+
+    @staticmethod
+    def _should_retry_without_session(
+        result: subprocess.CompletedProcess[str],
+        *,
+        session_id: str | None,
+    ) -> bool:
+        """Return True when wrapper failure indicates the resume target is invalid."""
+        if not session_id:
+            return False
+        if result.returncode not in RESUME_RETRY_EXIT_CODES:
+            return False
+
+        combined_output = f"{result.stdout}\n{result.stderr}".lower()
+        return any(
+            snippet in combined_output for snippet in RESUME_RETRY_ERROR_SNIPPETS
+        )
+
+    @staticmethod
+    def _run_subprocess(
+        command: list[str],
+        *,
+        project_root: str,
+        timeout_seconds: int,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            command,
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
 
     @staticmethod
     def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
@@ -393,14 +437,28 @@ class CodeagentBackend:
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             try:
-                result = subprocess.run(
+                result = self._run_subprocess(
                     command,
-                    cwd=project_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=options.timeout_seconds,
-                    check=False,
+                    project_root=project_root,
+                    timeout_seconds=options.timeout_seconds,
                 )
+
+                if self._should_retry_without_session(result, session_id=session_id):
+                    retry_command = self._build_command(
+                        options,
+                        cast(str, prompt_file_path),
+                        task=task,
+                        session_id=None,
+                    )
+                    logger.bind(domain="agent_execution").warning(
+                        "Stored wrapper session is not resumable; "
+                        "retrying with a fresh session."
+                    )
+                    result = self._run_subprocess(
+                        retry_command,
+                        project_root=project_root,
+                        timeout_seconds=options.timeout_seconds,
+                    )
 
             except FileNotFoundError:
                 raise AgentExecutionError(

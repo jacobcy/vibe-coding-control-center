@@ -11,6 +11,7 @@ from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
+from vibe3.services.session_registry import SessionRegistryService
 from vibe3.services.task_service import TaskService
 
 
@@ -33,6 +34,7 @@ class FlowManager:
         store: SQLiteClient | None = None,
         git: GitClient | None = None,
         github: GitHubClient | None = None,
+        registry: SessionRegistryService | None = None,
     ) -> None:
         self.config = config
         self.store = SQLiteClient() if store is None else store
@@ -42,6 +44,7 @@ class FlowManager:
         self.github = GitHubClient() if github is None else github
         self.label_service = LabelService(repo=config.repo)
         self.issue_flow_service = IssueFlowService(store=self.store)
+        self._registry = registry
 
     def get_flow_for_issue(self, issue_number: int) -> dict | None:
         """Get flow linked to an issue with deterministic selection.
@@ -228,7 +231,11 @@ class FlowManager:
             return self._reactivate_canonical_flow(issue, branch, slug)
 
         # Capacity Check: Before creating a NEW flow, verify global capacity
-        active_count = self.get_active_manager_session_count()
+        # Prefer registry count for consistency with dispatch path
+        if self._registry is not None:
+            active_count = self._registry.count_live_worker_sessions(role="manager")
+        else:
+            active_count = self.get_active_manager_session_count()
         if active_count >= self.config.max_concurrent_flows:
             limit = self.config.max_concurrent_flows
             raise RuntimeError(

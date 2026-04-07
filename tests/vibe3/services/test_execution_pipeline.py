@@ -68,6 +68,44 @@ def test_run_execution_pipeline_marks_started_before_execute_agent(
 @patch("vibe3.agents.pipeline.record_handoff_unified")
 @patch("vibe3.agents.backends.codeagent.CodeagentBackend.run")
 @patch("vibe3.agents.pipeline.load_session_id", return_value="sess-existing")
+def test_run_execution_pipeline_records_fresh_session_after_resume_fallback(
+    _mock_session,
+    mock_execute,
+    mock_record,
+) -> None:
+    store = MagicMock()
+    mock_execute.return_value = AgentResult(
+        exit_code=0,
+        stdout="done",
+        stderr="",
+        session_id="sess-fresh",
+    )
+    mock_record.return_value = Path("/tmp/run-report.md")
+
+    with (
+        patch(
+            "vibe3.agents.pipeline.SQLiteClient",
+            return_value=store,
+            create=True,
+        ),
+        patch(
+            "vibe3.clients.git_client.GitClient",
+            return_value=MagicMock(
+                get_current_branch=MagicMock(return_value="task/demo")
+            ),
+            create=True,
+        ),
+    ):
+        result = run_execution_pipeline(_make_request())
+
+    assert result.session_id == "sess-fresh"
+    handoff_record = mock_record.call_args.args[0]
+    assert handoff_record.session_id == "sess-fresh"
+
+
+@patch("vibe3.agents.pipeline.record_handoff_unified")
+@patch("vibe3.agents.backends.codeagent.CodeagentBackend.run")
+@patch("vibe3.agents.pipeline.load_session_id", return_value="sess-existing")
 def test_run_execution_pipeline_marks_completed_with_report_ref(
     _mock_session,
     mock_execute,

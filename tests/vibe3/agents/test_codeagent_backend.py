@@ -3,6 +3,7 @@
 Tests the core runner functionality with extensible interface design.
 """
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -181,6 +182,65 @@ class TestCodeagentBackend:
                 backend.run("prompt body", options)
 
         assert "wrapper stderr details" in str(exc_info.value)
+
+    def test_run_retries_without_session_when_resume_session_is_invalid(self) -> None:
+        """Invalid resume session should fall back to a fresh session once."""
+        invalid_resume = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=42,
+            stdout="session not found\n",
+            stderr="Error: session not found for resume\n",
+        )
+        fresh_success = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=0,
+            stdout=(
+                "VERDICT: PASS\n" "SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8\n"
+            ),
+            stderr="",
+        )
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.side_effect = [invalid_resume, fresh_success]
+            backend = CodeagentBackend()
+
+            result = backend.run(
+                "prompt body",
+                AgentOptions(agent="code-reviewer"),
+                task="custom task",
+                session_id="11111111-1111-1111-1111-111111111111",
+            )
+
+        assert result.exit_code == 0
+        assert result.session_id == "262f0fea-eacb-4223-b842-b5b5097f94e8"
+        assert mock_run.call_count == 2
+        first_command = mock_run.call_args_list[0].args[0]
+        second_command = mock_run.call_args_list[1].args[0]
+        assert "resume" in first_command
+        assert "11111111-1111-1111-1111-111111111111" in first_command
+        assert "resume" not in second_command
+
+    def test_run_does_not_retry_without_session_for_non_resume_error(self) -> None:
+        """Non-resume failures should still fail fast without a fresh retry."""
+        hard_failure = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=1,
+            stdout="fatal error\n",
+            stderr="fatal error\n",
+        )
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.return_value = hard_failure
+            backend = CodeagentBackend()
+
+            with pytest.raises(AgentExecutionError):
+                backend.run(
+                    "prompt body",
+                    AgentOptions(agent="code-reviewer"),
+                    session_id="11111111-1111-1111-1111-111111111111",
+                )
+
+        assert mock_run.call_count == 1
 
     def test_run_wrapper_not_found(self) -> None:
         """Runner should give clear error when wrapper not found."""
