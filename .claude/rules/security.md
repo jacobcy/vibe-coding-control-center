@@ -7,7 +7,12 @@ paths:
 
 ## Secret Management
 
-本项目使用 **direnv** 管理环境变量（不使用 python-dotenv）：
+本项目使用 **direnv** 管理环境变量（不使用 python-dotenv）。
+
+**项目特定选择**:
+- 使用 `direnv` 自动加载 `.envrc` 文件中的环境变量
+- 全局 Python 规则推荐使用 `python-dotenv`，但本项目使用 `direnv` 实现更通用的环境变量管理
+- 该选择适用于 Shell + Python 混合项目
 
 ```bash
 # .envrc 文件（项目根目录）
