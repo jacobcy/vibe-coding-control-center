@@ -82,6 +82,24 @@ class SessionRegistryService:
                 count += 1
         return count
 
+    def count_live_governance_sessions(self) -> int:
+        """Count truly live governance sessions.
+
+        Checks sessions with role='governance' in starting|running status,
+        confirming liveness via tmux when a session name is available.
+        """
+        sessions = self._store.list_live_runtime_sessions(role="governance")
+        count = 0
+        for session in sessions:
+            tmux = session.get("tmux_session")
+            if tmux:
+                if self._backend.has_tmux_session(tmux):
+                    count += 1
+            else:
+                # Still starting, no tmux yet - count as live
+                count += 1
+        return count
+
     def reconcile_live_state(self) -> list[int]:
         """Mark starting|running sessions whose tmux is gone as orphaned.
 
