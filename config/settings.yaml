@@ -115,14 +115,29 @@ code_limits:
         limit: 550
         reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
       - path: "tests/vibe3/orchestra/test_state_label_dispatch_core.py"
-        limit: 450
-        reason: "State label dispatch 服务测试集，共享 fixture，围绕同一服务契约，按功能场景组织不宜拆分"
+        limit: 500
+        reason: "State label dispatch 核心服务测试，2 个超长集成测试，fixture 高度耦合不宜拆分"
       - path: "tests/vibe3/orchestra/test_serve.py"
         limit: 500
         reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
+      - path: "tests/vibe3/orchestra/test_status_service.py"
+        limit: 450
+        reason: "Orchestra 状态聚合服务测试，3 个超长集成测试，围绕同一服务契约"
       - path: "tests/vibe3/services/test_issue_failure_service.py"
-        limit: 420
-        reason: "Issue failure/resume 测试集，围绕同一服务契约，拆分收益低"
+        limit: 500
+        reason: "Issue failure/resume 测试集，16 个测试围绕同一服务契约，平均 31 lines/test，拆分收益低"
+      - path: "tests/vibe3/services/test_task_resume_usecase.py"
+        limit: 500
+        reason: "Task resume usecase 测试集，10 个测试，平均 49.5 lines/test，大量 mock setup，拆分成本高"
+      - path: "tests/vibe3/commands/test_plan.py"
+        limit: 500
+        reason: "Plan command 测试集，23 个测试，平均 20.8 lines/test，围绕同一 CLI 入口，拆分会破坏测试完整性"
+      - path: "tests/vibe3/commands/test_run.py"
+        limit: 450
+        reason: "Run command 测试集，15 个测试，超限 1 行，围绕同一 CLI 入口"
+      - path: "tests/vibe3/commands/test_task_command_surface.py"
+        limit: 500
+        reason: "Task command surface 测试集，10 个测试，平均 45.2 lines/test，大量 mock setup"
       - path: "tests/vibe3/commands/test_task_resume_failed.py"
         limit: 430
         reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
