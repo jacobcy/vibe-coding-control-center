@@ -1,5 +1,6 @@
 """Shared helpers for execution lifecycle events."""
 
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -36,6 +37,62 @@ _ROLE_SESSION_FIELD: dict[ExecutionRole, str] = {
 def execution_prefix(role: ExecutionRole) -> str:
     """Return the lifecycle prefix for a role."""
     return _ROLE_PREFIX[role]
+
+
+def _parse_branch_target(branch: str) -> tuple[str, str]:
+    """Extract (target_type, target_id) from branch name.
+
+    Examples:
+      task/issue-42  -> ("issue", "42")
+      dev/issue-123  -> ("issue", "123")
+      other-branch   -> ("branch", branch)
+    """
+    match = re.search(r"issue-(\d+)", branch)
+    if match:
+        return ("issue", match.group(1))
+    return ("branch", branch)
+
+
+def _sync_registry_from_lifecycle_event(
+    store: SQLiteClient,
+    branch: str,
+    role: ExecutionRole,
+    lifecycle: ExecutionLifecycleEvent,
+    session_id: str | None,
+) -> None:
+    """Sync runtime_session registry based on lifecycle event.
+
+    - started  -> create a new running session in registry
+    - completed -> mark the live session for this branch+role as done
+    - aborted   -> mark the live session for this branch+role as aborted
+    """
+    if lifecycle == "started":
+        target_type, target_id = _parse_branch_target(branch)
+        session_name = f"vibe3-{role}-{target_type}-{target_id}"
+        store.create_runtime_session(
+            role=role,
+            target_type=target_type,
+            target_id=target_id,
+            branch=branch,
+            session_name=session_name,
+            status="running",
+            backend_session_id=session_id,
+        )
+        return
+
+    # terminal events: find live sessions for this branch+role and close them
+    terminal_status = {
+        "completed": "done",
+        "aborted": "aborted",
+    }.get(lifecycle, "failed")
+    live_sessions = store.list_live_runtime_sessions(role=role)
+    for session in live_sessions:
+        if session.get("branch") == branch:
+            store.update_runtime_session(
+                session["id"],
+                status=terminal_status,
+                ended_at=datetime.now().isoformat(),
+            )
 
 
 def persist_execution_lifecycle_event(
@@ -97,3 +154,4 @@ def persist_execution_lifecycle_event(
         detail=detail,
         refs=refs,
     )
+    _sync_registry_from_lifecycle_event(store, branch, role, lifecycle, session_id)

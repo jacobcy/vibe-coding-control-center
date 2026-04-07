@@ -324,6 +324,139 @@ class SQLiteClient:
             external="sqlite", operation="update_bridge_fields", branch=branch
         ).debug("Updated bridge fields")
 
+    # ------------------------------------------------------------------
+    # Runtime session methods
+    # ------------------------------------------------------------------
+
+    #: Valid columns for runtime_session (security: prevent SQL injection)
+    VALID_RUNTIME_SESSION_FIELDS = {
+        "role",
+        "target_type",
+        "target_id",
+        "branch",
+        "session_name",
+        "backend_session_id",
+        "tmux_session",
+        "log_path",
+        "status",
+        "started_at",
+        "ended_at",
+        "worktree_path",
+        "created_at",
+        "updated_at",
+    }
+
+    def create_runtime_session(
+        self,
+        *,
+        role: str,
+        target_type: str,
+        target_id: str,
+        branch: str,
+        session_name: str,
+        status: str = "starting",
+        **kwargs: Any,
+    ) -> int:
+        """Insert a new runtime session record and return its id."""
+        now = datetime.datetime.now().isoformat()
+        row: dict[str, Any] = {
+            "role": role,
+            "target_type": target_type,
+            "target_id": target_id,
+            "branch": branch,
+            "session_name": session_name,
+            "status": status,
+            "created_at": now,
+            "updated_at": now,
+        }
+        extra_valid = self.VALID_RUNTIME_SESSION_FIELDS - row.keys()
+        for key, value in kwargs.items():
+            if key in extra_valid:
+                row[key] = value
+        columns = ", ".join(row.keys())
+        placeholders = ", ".join(["?"] * len(row))
+        values = list(row.values())
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"INSERT INTO runtime_session ({columns}) VALUES ({placeholders})",
+                values,
+            )
+            conn.commit()
+            last_id = cursor.lastrowid
+            if last_id is None:
+                raise RuntimeError("Failed to insert runtime_session: no lastrowid")
+            session_id = int(last_id)
+        logger.bind(
+            external="sqlite",
+            operation="create_runtime_session",
+            role=role,
+            branch=branch,
+            session_id=session_id,
+        ).debug("Created runtime session")
+        return session_id
+
+    def get_runtime_session(self, session_id: int) -> dict[str, Any] | None:
+        """Get a runtime session by id."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM runtime_session WHERE id = ?",
+                (session_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def update_runtime_session(self, session_id: int, **kwargs: Any) -> None:
+        """Update fields on an existing runtime session."""
+        invalid = set(kwargs.keys()) - self.VALID_RUNTIME_SESSION_FIELDS
+        if invalid:
+            raise ValueError(f"Invalid runtime_session fields: {invalid}")
+        if not kwargs:
+            return
+        kwargs["updated_at"] = datetime.datetime.now().isoformat()
+        set_clause = ", ".join([f"{f} = ?" for f in kwargs])
+        values = list(kwargs.values()) + [session_id]
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE runtime_session SET {set_clause} WHERE id = ?",
+                values,
+            )
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="update_runtime_session",
+            session_id=session_id,
+            fields=list(kwargs.keys()),
+        ).debug("Updated runtime session")
+
+    def list_live_runtime_sessions(
+        self, *, role: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List sessions with status 'starting' or 'running'."""
+        params: list[Any] = ["starting", "running"]
+        query = "SELECT * FROM runtime_session WHERE status IN (?, ?)"
+        if role is not None:
+            query += " AND role = ?"
+            params.append(role)
+        query += " ORDER BY created_at DESC"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            rows = [dict(row) for row in cursor.fetchall()]
+        logger.bind(
+            external="sqlite",
+            operation="list_live_runtime_sessions",
+            role=role,
+            count=len(rows),
+        ).debug("Listed live runtime sessions")
+        return rows
+
     def get_flow_dependents(self, branch: str) -> list[str]:
         """Get branches that depend on the given branch.
 

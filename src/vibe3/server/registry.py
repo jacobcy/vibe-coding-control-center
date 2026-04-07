@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
@@ -29,6 +30,7 @@ from vibe3.orchestra.services.status_service import (
 )
 from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.services.session_registry import SessionRegistryService
 
 
 def _resolve_orchestra_repo_root() -> Path:
@@ -84,9 +86,13 @@ def _build_server_with_launch_cwd(
     launch_cwd: Path | None = None,
 ) -> tuple[HeartbeatServer, FastAPI]:
     """Instantiate heartbeat + FastAPI app with explicit launch cwd context."""
+    from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.server.app import make_webhook_router
 
     shared_github = GitHubClient()
+    shared_store = SQLiteClient()
+    shared_backend = CodeagentBackend()
+    shared_registry = SessionRegistryService(store=shared_store, backend=shared_backend)
     failed_gate = FailedGate(github=shared_github, repo=config.repo)
 
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
@@ -96,6 +102,7 @@ def _build_server_with_launch_cwd(
         config,
         dry_run=config.dry_run,
         repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
+        registry=shared_registry,
     )
 
     # Pass circuit_breaker from manager for status reporting
@@ -141,6 +148,7 @@ def _build_server_with_launch_cwd(
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
         heartbeat.register(
@@ -152,6 +160,7 @@ def _build_server_with_launch_cwd(
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
         heartbeat.register(
@@ -163,6 +172,7 @@ def _build_server_with_launch_cwd(
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
         heartbeat.register(
@@ -174,6 +184,7 @@ def _build_server_with_launch_cwd(
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
         heartbeat.register(
@@ -185,6 +196,7 @@ def _build_server_with_launch_cwd(
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
 
@@ -195,6 +207,7 @@ def _build_server_with_launch_cwd(
                 status_service=status_service,
                 manager=shared_manager,
                 executor=shared_executor,
+                registry=shared_registry,
             )
         )
     if config.supervisor_handoff.enabled:

@@ -111,6 +111,7 @@ uv run python src/vibe3/cli.py run --skill vibe-manager --async
 - `state/*` label 只反映 flow 实际状态，不做主驱动
 - branch / worktree 清理能力属于 manager 模块，但何时清理由 agent / skill 判断
 - 常驻 server 和定时巡检只是运行模式差异，不改变模块职责
+- **容量限制按 live worker session 计算**：manager、planner、executor、reviewer、governance 的异步 session 都在 runtime_session registry 统一管理。容量 throttle 只看真实 live worker 数（starting/running 且探活成功），不看 active flow 数，不看服务自身 tmux。旧的 `flow_state.manager_session_id` 等字段已 deprecated，只做兼容 fallback。
 
 ## 目录速览
 

@@ -39,12 +39,16 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     manager_session_id: str | None = None
     planner_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     planner_session_id: str | None = None
     executor_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     executor_session_id: str | None = None
     reviewer_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     reviewer_session_id: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
@@ -53,6 +57,7 @@ class FlowState(BaseModel):
     flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"] = (
         "active"
     )
+
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
     executor_status: ExecutionStatus | None = None
@@ -159,12 +164,16 @@ class FlowStatusResponse(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     manager_session_id: str | None = None
     planner_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     planner_session_id: str | None = None
     executor_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     executor_session_id: str | None = None
     reviewer_actor: str | None = None
+    # [Deprecated] Use runtime_session registry instead.
     reviewer_session_id: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None

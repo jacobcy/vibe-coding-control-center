@@ -10,11 +10,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
+from vibe3.services.session_registry import SessionRegistryService
 from vibe3.services.status_query_service import StatusQueryService
 from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations
@@ -159,11 +161,21 @@ class TaskResumeUsecase:
                     worktree_path = (
                         str(resolved_path) if resolved_path is not None else None
                     )
+                    # Query registry for truly live sessions (with tmux liveness check)
+                    backend = CodeagentBackend()
+                    registry = SessionRegistryService(
+                        store=self.flow_service.store, backend=backend
+                    )
+                    live_sessions = registry.get_truly_live_sessions_for_branch(branch)
+                    has_live_sessions = len(live_sessions) > 0
+                else:
+                    has_live_sessions = None
                 skip_reason = self.candidates.maybe_skip_all_task_candidate(
                     issue_number=issue_number,
                     flow=flow,
                     candidate_state=candidate.get("state"),
                     worktree_path=worktree_path,
+                    has_live_sessions=has_live_sessions,
                 )
                 if skip_reason is not None:
                     result["skipped"].append(

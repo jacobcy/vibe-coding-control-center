@@ -75,8 +75,8 @@ code_limits:
         limit: 500
         reason: "GitHub PR 操作与查询聚合"
       - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 450
-        reason: "已 388，持久化聚合"
+        limit: 550
+        reason: "持久化聚合"
 
       # Commands 层（CLI 入口）—— 允许 450
       - path: "src/vibe3/commands/plan.py"
@@ -90,9 +90,17 @@ code_limits:
       - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
         limit: 650
         reason: "状态标签触发执行服务，职责单一但核心方法逻辑完整，__init__/_prune_in_flight/_dispatch_issue 紧密耦合不宜拆分"
+      - path: "src/vibe3/orchestra/services/governance_service.py"
+        limit: 450
+        reason: "Governance 服务聚合，处理 governance dispatch 和 session 状态管理"
       - path: "src/vibe3/server/registry.py"
         limit: 450
         reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
+
+      # Manager —— 允许 450
+      - path: "src/vibe3/manager/manager_run_service.py"
+        limit: 450
+        reason: "Manager 运行服务聚合，处理同步/异步执行和状态管理"
 
       # Shell / 脚本兼容入口
       - path: "lib/alias/worktree.sh"
@@ -107,7 +115,7 @@ code_limits:
         limit: 450
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 450
+        limit: 550
         reason: "Codeagent execution backend"
       - path: "src/vibe3/orchestra/services/status_service.py"
         limit: 450
@@ -130,8 +138,8 @@ code_limits:
         limit: 500
         reason: "Issue failure/resume 测试集，16 个测试围绕同一服务契约，平均 31 lines/test，拆分收益低"
       - path: "tests/vibe3/services/test_task_resume_usecase.py"
-        limit: 500
-        reason: "Task resume usecase 测试集，10 个测试，平均 49.5 lines/test，大量 mock setup，拆分成本高"
+        limit: 550
+        reason: "Task resume usecase 测试集，10 个测试，平均 53.5 lines/test，大量 mock setup，拆分成本高"
       - path: "tests/vibe3/commands/test_plan.py"
         limit: 500
         reason: "Plan command 测试集，23 个测试，平均 20.8 lines/test，围绕同一 CLI 入口，拆分会破坏测试完整性"

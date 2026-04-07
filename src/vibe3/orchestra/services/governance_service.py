@@ -38,6 +38,7 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:
     from vibe3.manager.manager_executor import ManagerExecutor
@@ -77,6 +78,7 @@ class GovernanceService(ServiceBase):
         executor: ThreadPoolExecutor | None = None,
         prompts_path: Path | None = None,
         backend: CodeagentBackend | None = None,
+        registry: SessionRegistryService | None = None,
     ) -> None:
         self.config = config
         self._status_service = status_service
@@ -95,6 +97,7 @@ class GovernanceService(ServiceBase):
         self._dry_run = config.governance.dry_run
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
         self._backend = backend or CodeagentBackend()
+        self._registry = registry
         self.last_render_result: PromptRenderResult | None = None
         self._in_flight = False
 
@@ -155,12 +158,29 @@ class GovernanceService(ServiceBase):
             dry_run_plan_path = self._write_dry_run_plan(plan_content)
             self._log_dry_run_preview(log, context, dry_run_plan_path, plan_content)
             return
-        handle = await loop.run_in_executor(
-            self._executor,
-            self._dispatch_governance_prompt,
-            plan_content,
-        )
+        session_id: int | None = None
+        if self._registry is not None:
+            session_id = self._registry.reserve(
+                role="governance",
+                target_type="governance",
+                target_id="scan",
+                branch="governance",
+            )
+        try:
+            handle = await loop.run_in_executor(
+                self._executor,
+                self._dispatch_governance_prompt,
+                plan_content,
+            )
+        except Exception:
+            # Clean up reserved session on dispatch failure
+            if self._registry is not None and session_id is not None:
+                self._registry.mark_failed(session_id)
+            self._in_flight = False
+            raise
         self._in_flight = True
+        if self._registry is not None and session_id is not None:
+            self._registry.mark_started(session_id, tmux_session=handle.tmux_session)
         log.info(
             "Governance scan dispatched",
             tmux_session=handle.tmux_session,
@@ -277,6 +297,23 @@ class GovernanceService(ServiceBase):
         return f"vibe3-governance-scan-{timestamp}-t{self._tick_count}"
 
     def _has_live_dispatch(self) -> bool:
+        if self._registry is not None:
+            # First, mark any governance sessions whose tmux is gone as done
+            # (normal completion should be reflected as done, not orphaned)
+            self._registry.mark_governance_sessions_done_when_tmux_gone()
+
+            # Also reconcile other stale sessions
+            self._registry.reconcile_live_state()
+
+            # Check for truly live governance sessions
+            live_sessions = self._registry.list_live_governance_sessions()
+            if live_sessions:
+                return True
+
+            # Registry confirms no live governance session - clear stale flag
+            self._in_flight = False
+            return False
+        # Fallback: tmux prefix detection when no registry is configured
         session_prefix = "vibe3-governance-scan"
         if self._backend.has_tmux_session_prefix(session_prefix):
             return True

@@ -36,9 +36,35 @@ from vibe3.orchestra.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
     fail_manager_issue,
 )
+from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:
     pass
+
+
+def _write_manager_registry_terminal(
+    store: SQLiteClient,
+    branch: str,
+    issue_number: int,
+    success: bool,
+) -> None:
+    """Write manager terminal state to runtime_session registry.
+
+    This is called by async child process when manager execution completes
+    or fails, ensuring the registry reflects the true terminal state.
+    """
+    backend = CodeagentBackend()
+    registry = SessionRegistryService(store=store, backend=backend)
+    sessions = registry.get_truly_live_sessions_for_target(
+        role="manager",
+        branch=branch,
+        target_id=str(issue_number),
+    )
+    for session in sessions:
+        if success:
+            registry.mark_finished(session["id"], success=True)
+        else:
+            registry.mark_failed(session["id"])
 
 
 def run_manager_issue_mode(
@@ -190,6 +216,8 @@ def run_manager_issue_mode(
         typer.echo(f"Session log: {handle.log_path}")
         return
 
+    _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+
     try:
         result = backend.run(
             prompt=prompt,
@@ -201,6 +229,11 @@ def run_manager_issue_mode(
         )
     except BaseException as exc:
         if not dry_run:
+            # Write registry terminal state for async child
+            if _is_async_child:
+                _write_manager_registry_terminal(
+                    store, branch, issue_number, success=False
+                )
             store.add_event(
                 branch,
                 "manager_failed",
@@ -216,6 +249,11 @@ def run_manager_issue_mode(
 
     if not result.is_success():
         if not dry_run:
+            # Write registry terminal state for async child
+            if _is_async_child:
+                _write_manager_registry_terminal(
+                    store, branch, issue_number, success=False
+                )
             store.update_flow_state(
                 branch,
                 latest_actor=actor,
@@ -237,6 +275,10 @@ def run_manager_issue_mode(
     if dry_run:
         typer.echo(f"-> Manager run: issue #{issue_number} (dry-run)")
         return
+
+    # Write registry terminal state for async child
+    if _is_async_child:
+        _write_manager_registry_terminal(store, branch, issue_number, success=True)
 
     store.update_flow_state(
         branch,

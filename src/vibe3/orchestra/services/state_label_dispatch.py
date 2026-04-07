@@ -39,6 +39,7 @@ from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.status_service import OrchestraStatusService
+    from vibe3.services.session_registry import SessionRegistryService
 
 TriggerName = Literal["manager", "plan", "run", "review"]
 
@@ -54,6 +55,14 @@ _TRIGGER_EXECUTION_ROLE: dict[
     Literal["planner", "executor", "reviewer"] | None,
 ] = {
     "manager": None,
+    "plan": "planner",
+    "run": "executor",
+    "review": "reviewer",
+}
+
+# Map trigger_name to registry role for live session queries
+_TRIGGER_TO_REGISTRY_ROLE: dict[TriggerName, str] = {
+    "manager": "manager",
     "plan": "planner",
     "run": "executor",
     "review": "reviewer",
@@ -105,6 +114,7 @@ class StateLabelDispatchService(ServiceBase):
         executor: ThreadPoolExecutor | None = None,
         status_service: OrchestraStatusService | None = None,
         manager: ManagerExecutor | None = None,
+        registry: "SessionRegistryService | None" = None,
     ) -> None:
         self.config = config
         self.trigger_state = trigger_state
@@ -118,6 +128,7 @@ class StateLabelDispatchService(ServiceBase):
         self._backend = CodeagentBackend()
         self._store = SQLiteClient()
         self._runtime_config = VibeConfig.get_defaults()
+        self._registry = registry
         self._in_flight_dispatches: set[int] = set()
         self._dispatch_guard = asyncio.Lock()
         self._progress_snapshots: dict[int, dict[str, object]] = {}
@@ -148,12 +159,14 @@ class StateLabelDispatchService(ServiceBase):
 
         # Apply capacity limit for manager trigger
         if self.trigger_name == "manager" and ready:
-            # Calculate effective remaining capacity
-            active_count = (
-                self._status_service.get_active_manager_session_count()
-                if self._status_service
-                else 0
-            )
+            # Calculate effective remaining capacity (prefer registry)
+            if self._registry is not None:
+                active_count = self._registry.count_live_worker_sessions(role="manager")
+            elif self._status_service:
+                # Fallback to deprecated method (backward compatibility)
+                active_count = self._status_service.get_active_manager_session_count()
+            else:
+                active_count = 0
             in_flight_count = len(self._in_flight_dispatches)
             remaining_capacity = max(
                 0, self.config.max_concurrent_flows - active_count - in_flight_count
@@ -407,22 +420,22 @@ class StateLabelDispatchService(ServiceBase):
             # (e.g. after a no-op fallback from planner/executor).
             return not flow_state.get("manager_session_id")
         if self.trigger_name == "plan":
-            return (
-                not flow_state.get("plan_ref")
-                and not flow_state.get("planner_session_id")
-                and not has_live_session
-            )
+            # Dispatch if no plan_ref AND no live session running.
+            # planner_session_id is a resume hint, not a dispatch gate.
+            return not flow_state.get("plan_ref") and not has_live_session
         if self.trigger_name == "run":
+            # Dispatch if plan_ref exists AND no report_ref AND no live session.
+            # executor_session_id is a resume hint, not a dispatch gate.
             return (
                 bool(flow_state.get("plan_ref"))
                 and not flow_state.get("report_ref")
-                and not flow_state.get("executor_session_id")
                 and not has_live_session
             )
+        # Dispatch if report_ref exists AND no audit_ref AND no live session.
+        # reviewer_session_id is a resume hint, not a dispatch gate.
         return (
             bool(flow_state.get("report_ref"))
             and not flow_state.get("audit_ref")
-            and not flow_state.get("reviewer_session_id")
             and not has_live_session
         )
 
@@ -598,5 +611,21 @@ class StateLabelDispatchService(ServiceBase):
         }[self.trigger_name]
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
+        if self._registry is not None:
+            # Map trigger_name to registry role
+            registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
+                self.trigger_name, self.trigger_name
+            )
+            # Use canonical SessionRegistryService API with branch filter
+            flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
+            branch = str(flow.get("branch") or "").strip() if flow else ""
+            if not branch:
+                return False
+            sessions = self._registry.get_truly_live_sessions_for_target(
+                role=registry_role,
+                branch=branch,
+                target_id=str(issue_number),
+            )
+            return len(sessions) > 0
         session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
         return self._backend.has_tmux_session_prefix(session_prefix)

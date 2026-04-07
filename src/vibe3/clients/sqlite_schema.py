@@ -73,6 +73,27 @@ _CREATE_FLOW_EVENTS = """
 """
 
 
+_CREATE_RUNTIME_SESSION = """
+    CREATE TABLE IF NOT EXISTS runtime_session (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        session_name TEXT NOT NULL,
+        backend_session_id TEXT,
+        tmux_session TEXT,
+        log_path TEXT,
+        status TEXT NOT NULL DEFAULT 'starting',
+        started_at TEXT,
+        ended_at TEXT,
+        worktree_path TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+"""
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
     cursor = conn.cursor()
@@ -124,6 +145,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
+    cursor.execute(_CREATE_RUNTIME_SESSION)
 
     # Migration: add refs column to flow_events if missing
     event_columns = {
