@@ -9,6 +9,8 @@ from typing import Optional
 
 from loguru import logger
 
+from vibe3.exceptions import SystemError
+
 
 @dataclass
 class TmuxSessionContext:
@@ -79,14 +81,28 @@ class SessionManager:
         session_id = self._allocate_session_name(prefix)
         log_path = self._resolve_log_path(session_id)
 
-        # Create tmux session (don't fail on error for compatibility)
-        subprocess.run(
+        # Create tmux session with proper error handling
+        result = subprocess.run(
             ["tmux", "new-session", "-d", "-s", session_id],
             cwd=self.repo_path,
             check=False,
             capture_output=True,
+            text=True,
             timeout=10,
         )
+
+        if result.returncode != 0:
+            error_msg = (
+                result.stderr.strip() or f"tmux exited with code {result.returncode}"
+            )
+            logger.error(
+                "Failed to create tmux session",
+                session=session_id,
+                error=error_msg,
+            )
+            raise SystemError(
+                f"Failed to create tmux session '{session_id}': {error_msg}"
+            )
 
         logger.info(
             "Created tmux session",

@@ -286,6 +286,43 @@ class WorktreeManager(ManagerCompatMixin):
 
     def _recycle_worktree_path(self, target: Path) -> None:
         """Recycle a worktree path, unregistering it first."""
+        # Safety check: verify no active tmux session is using this worktree
+        try:
+            sessions = subprocess.run(
+                ["tmux", "list-sessions", "-F", "#{session_name}:#{session_path}"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if sessions.returncode == 0:
+                for line in sessions.stdout.strip().split("\n"):
+                    if not line:
+                        continue
+                    # Check if session path matches or contains target worktree
+                    if ":" in line:
+                        session_name, session_path = line.split(":", 1)
+                        if str(target) in session_path or session_path.startswith(
+                            str(target)
+                        ):
+                            logger.warning(
+                                "Skipping worktree cleanup: active tmux session found",
+                                worktree=str(target),
+                                session=session_name,
+                                session_path=session_path,
+                            )
+                            return
+        except FileNotFoundError:
+            # tmux not installed, proceed with cleanup
+            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to check tmux sessions, proceeding with cleanup",
+                error=str(exc),
+                worktree=str(target),
+            )
+
+        # Proceed with worktree removal
         try:
             result = subprocess.run(
                 ["git", "worktree", "remove", str(target), "--force"],
