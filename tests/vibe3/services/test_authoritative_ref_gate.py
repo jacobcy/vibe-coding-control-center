@@ -41,6 +41,7 @@ def test_require_authoritative_ref_blocks_when_missing() -> None:
         issue_number=42,
         reason="missing report_ref",
         actor="agent:run",
+        repo=None,
     )
 
 
