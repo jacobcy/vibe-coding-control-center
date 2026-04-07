@@ -193,6 +193,16 @@ class ManagerExecutor:
             _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
 
         launched = False
+        # Reserve session in registry BEFORE launching tmux (prevent orphaned sessions)
+        session_id: int | None = None
+        if self._registry is not None:
+            session_id = self._registry.reserve(
+                role="manager",
+                target_type="issue",
+                target_id=str(issue.number),
+                branch=flow_branch,
+            )
+
         try:
             cmd = [
                 "uv",
@@ -215,6 +225,9 @@ class ManagerExecutor:
                     env=_manager_env,
                 )
             except Exception as exc:
+                # Clean up reserved session on launch failure
+                if self._registry is not None and session_id is not None:
+                    self._registry.mark_failed(session_id)
                 log.error(f"Manager async start failed: {exc}")
                 self._mark_manager_start_failed(
                     issue,
@@ -227,15 +240,8 @@ class ManagerExecutor:
             )
             launched = True
 
-            # Create runtime_session in registry (consistent with other async roles)
-            session_id: int | None = None
-            if self._registry is not None:
-                session_id = self._registry.reserve(
-                    role="manager",
-                    target_type="issue",
-                    target_id=str(issue.number),
-                    branch=flow_branch,
-                )
+            # Mark session as running AFTER successful launch
+            if self._registry is not None and session_id is not None:
                 self._registry.mark_started(
                     session_id, tmux_session=handle.tmux_session
                 )
