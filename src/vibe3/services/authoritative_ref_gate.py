@@ -29,8 +29,24 @@ def require_authoritative_ref(
     reason: str,
     actor: str,
     block_issue: Callable[..., None],
+    repo: str | None = None,
 ) -> bool:
-    """Ensure the named authoritative ref exists or invoke the block handler."""
+    """Ensure the named authoritative ref exists or invoke the block handler.
+
+    Args:
+        flow_service: Flow service instance
+        branch: Branch name
+        ref_name: Name of the authoritative ref
+            (e.g., "plan_ref", "report_ref", "audit_ref")
+        issue_number: GitHub issue number (optional)
+        reason: Reason for blocking if ref is missing
+        actor: Actor performing the block
+        block_issue: Callback to block the issue
+        repo: Repository (owner/repo format, optional)
+
+    Returns:
+        True if authoritative ref exists, False otherwise
+    """
     if has_authoritative_ref(
         flow_service=flow_service,
         branch=branch,
@@ -43,5 +59,6 @@ def require_authoritative_ref(
             issue_number=issue_number,
             reason=reason,
             actor=actor,
+            repo=repo,
         )
     return False

@@ -93,7 +93,7 @@ def create_handoff_artifact(
     else:
         handoff_service = HandoffService(git_client=_BranchBoundGitClient(branch))
 
-    handoff_dir = handoff_service._get_handoff_dir()
+    handoff_dir = handoff_service.ensure_handoff_dir()
 
     timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"

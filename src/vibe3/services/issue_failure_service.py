@@ -212,15 +212,28 @@ def block_planner_noop_issue(
     issue_number: int,
     reason: str,
     actor: str = "agent:plan",
+    repo: str | None = None,
 ) -> None:
-    """Block a planner issue when no authoritative plan_ref was produced."""
-    GitHubClient().add_comment(
-        issue_number,
-        "[plan] 规划执行完成，但未登记 authoritative plan_ref，"
-        "已切换为 state/blocked。\n\n"
-        f"原因:{reason}",
+    """Block a planner issue when no authoritative plan_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[plan] 规划执行完成，但未登记 authoritative plan_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
     )
-    LabelService().confirm_issue_state(
+    LabelService(repo=repo).confirm_issue_state(
         issue_number,
         IssueState.BLOCKED,
         actor=actor,
@@ -233,15 +246,28 @@ def block_executor_noop_issue(
     issue_number: int,
     reason: str,
     actor: str = "agent:run",
+    repo: str | None = None,
 ) -> None:
-    """Block an executor issue when no authoritative report_ref was produced."""
-    GitHubClient().add_comment(
-        issue_number,
-        "[run] 执行完成，但未登记 authoritative report_ref，"
-        "已切换为 state/blocked。\n\n"
-        f"原因:{reason}",
+    """Block an executor issue when no authoritative report_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[run] 执行完成，但未登记 authoritative report_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
     )
-    LabelService().confirm_issue_state(
+    LabelService(repo=repo).confirm_issue_state(
         issue_number,
         IssueState.BLOCKED,
         actor=actor,
@@ -254,15 +280,28 @@ def block_reviewer_noop_issue(
     issue_number: int,
     reason: str,
     actor: str = "agent:review",
+    repo: str | None = None,
 ) -> None:
-    """Block a reviewer issue when no authoritative audit_ref was produced."""
-    GitHubClient().add_comment(
-        issue_number,
-        "[review] 审查完成，但未登记 authoritative audit_ref，"
-        "已切换为 state/blocked。\n\n"
-        f"原因:{reason}",
+    """Block a reviewer issue when no authoritative audit_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[review] 审查完成，但未登记 authoritative audit_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
     )
-    LabelService().confirm_issue_state(
+    LabelService(repo=repo).confirm_issue_state(
         issue_number,
         IssueState.BLOCKED,
         actor=actor,
