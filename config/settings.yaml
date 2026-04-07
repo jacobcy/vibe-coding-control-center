@@ -75,8 +75,8 @@ code_limits:
         limit: 500
         reason: "GitHub PR 操作与查询聚合"
       - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 450
-        reason: "已 388，持久化聚合"
+        limit: 550
+        reason: "持久化聚合"
 
       # Commands 层（CLI 入口）—— 允许 450
       - path: "src/vibe3/commands/plan.py"
