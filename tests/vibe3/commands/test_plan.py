@@ -222,15 +222,65 @@ def test_plan_task_alias_still_works(monkeypatch) -> None:
 
 def test_plan_success_transitions_issue_to_handoff(monkeypatch) -> None:
     _patch_fast_plan_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(plan_ref="docs/plans/42.md")
     with patch("vibe3.commands.plan._svc_confirm_handoff") as mock_handoff:
         mock_handoff.return_value = "advanced"
-        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+        with patch(
+            "vibe3.commands.plan.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/demo"),
+        ):
+            result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
 
     assert result.exit_code == 0
     mock_handoff.assert_called_once_with(
         issue_number=42,
         actor="agent:plan",
     )
+
+
+def test_plan_success_without_plan_ref_blocks_issue(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(plan_ref=None)
+
+    with (
+        patch(
+            "vibe3.commands.plan.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/demo"),
+        ),
+        patch("vibe3.commands.plan._svc_confirm_handoff") as mock_handoff,
+        patch("vibe3.commands.plan._svc_block_planner_noop") as mock_block,
+    ):
+        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+
+    assert result.exit_code != 0
+    mock_handoff.assert_not_called()
+    mock_block.assert_called_once()
+    assert "plan_ref" in result.stderr
+
+
+def test_plan_sync_uses_shared_authoritative_ref_gate(monkeypatch) -> None:
+    _patch_fast_plan_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(plan_ref="docs/plans/42.md")
+
+    with (
+        patch(
+            "vibe3.commands.plan.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/demo"),
+        ),
+        patch("vibe3.commands.plan._svc_confirm_handoff") as mock_handoff,
+        patch(
+            "vibe3.commands.plan._svc_require_authoritative_ref",
+            return_value=True,
+        ) as mock_gate,
+    ):
+        result = runner.invoke(plan_app, ["--issue", "42", "--sync"])
+
+    assert result.exit_code == 0
+    mock_gate.assert_called_once()
+    mock_handoff.assert_called_once()
 
 
 def test_plan_failure_fails_issue_and_comments(monkeypatch) -> None:
@@ -277,6 +327,101 @@ def test_plan_timeout_exception_fails_issue_and_comments(monkeypatch) -> None:
         actor="agent:plan",
     )
     assert "state/failed" in result.stderr
+
+
+@patch("vibe3.commands.plan.create_codeagent_command")
+@patch("vibe3.commands.plan.CodeagentExecutionService.execute")
+def test_execute_plan_command_ignores_default_skill_trigger(
+    mock_execute,
+    mock_create_command,
+) -> None:
+    config = MagicMock()
+    config.plan.plan_prompt = "/writing-plan"
+    request = PlanRequest(scope=PlanScope.for_task(443))
+    mock_create_command.return_value = MagicMock()
+    mock_execute.return_value = MagicMock(success=True)
+
+    from vibe3.commands.plan import _execute_plan_command
+
+    _execute_plan_command(
+        config=config,
+        branch="task/issue-443",
+        request=request,
+        instructions=None,
+        dry_run=True,
+        async_mode=False,
+        agent=None,
+        backend=None,
+        model=None,
+        worktree=False,
+    )
+
+    assert mock_create_command.call_args.kwargs["task"] is None
+
+
+@patch("vibe3.commands.plan.create_codeagent_command")
+@patch("vibe3.commands.plan.CodeagentExecutionService.execute")
+def test_execute_plan_command_forwards_plain_text_default_prompt(
+    mock_execute,
+    mock_create_command,
+) -> None:
+    config = MagicMock()
+    config.plan.plan_prompt = "Focus on minimal diffs and verification evidence"
+    request = PlanRequest(scope=PlanScope.for_task(443))
+    mock_create_command.return_value = MagicMock()
+    mock_execute.return_value = MagicMock(success=True)
+
+    from vibe3.commands.plan import _execute_plan_command
+
+    _execute_plan_command(
+        config=config,
+        branch="task/issue-443",
+        request=request,
+        instructions=None,
+        dry_run=True,
+        async_mode=False,
+        agent=None,
+        backend=None,
+        model=None,
+        worktree=False,
+    )
+
+    assert (
+        mock_create_command.call_args.kwargs["task"]
+        == "Focus on minimal diffs and verification evidence"
+    )
+
+
+@patch("vibe3.commands.plan.create_codeagent_command")
+@patch("vibe3.commands.plan.CodeagentExecutionService.execute")
+def test_execute_plan_command_prefers_explicit_instructions_over_default_skill_trigger(
+    mock_execute,
+    mock_create_command,
+) -> None:
+    config = MagicMock()
+    config.plan.plan_prompt = "/writing-plan"
+    request = PlanRequest(scope=PlanScope.for_task(443))
+    mock_create_command.return_value = MagicMock()
+    mock_execute.return_value = MagicMock(success=True)
+
+    from vibe3.commands.plan import _execute_plan_command
+
+    _execute_plan_command(
+        config=config,
+        branch="task/issue-443",
+        request=request,
+        instructions="focus on status rendering only",
+        dry_run=True,
+        async_mode=False,
+        agent=None,
+        backend=None,
+        model=None,
+        worktree=False,
+    )
+
+    assert (
+        mock_create_command.call_args.kwargs["task"] == "focus on status rendering only"
+    )
 
 
 def test_plan_spec_alias_still_works(monkeypatch) -> None:

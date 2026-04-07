@@ -30,7 +30,7 @@ class TestFlowCreate:
             def model_dump(self):  # type: ignore[no-untyped-def]
                 return {"branch": "task/issue-222", "flow_slug": "issue-222"}
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(manager.git, "branch_exists", return_value=False):
                 with patch.object(
                     manager.git, "create_branch_ref", return_value=None
@@ -69,7 +69,7 @@ class TestFlowCreate:
             def model_dump(self):  # type: ignore[no-untyped-def]
                 return {"branch": "task/issue-320", "flow_slug": "issue-320"}
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(
                 manager.store,
                 "get_flows_by_issue",
@@ -105,7 +105,7 @@ class TestFlowCreate:
         manager = FlowManager(config)
         issue = make_issue(number=431, title="Rebuild stale flow")
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(
                 manager.store,
                 "get_flows_by_issue",
@@ -153,18 +153,12 @@ class TestFlowCreate:
                                             }
                                         ),
                                     ) as mock_reactivate:
-                                        with patch(
-                                            "vibe3.manager.worktree_manager.WorktreeManager.ensure_manager_worktree",
-                                            return_value=("/tmp/issue-431", True),
-                                        ) as mock_ensure_worktree:
-                                            with patch.object(
-                                                manager.task_service,
-                                                "link_issue",
-                                                return_value=None,
-                                            ) as mock_link:
-                                                flow = manager.create_flow_for_issue(
-                                                    issue
-                                                )
+                                        with patch.object(
+                                            manager.task_service,
+                                            "link_issue",
+                                            return_value=None,
+                                        ) as mock_link:
+                                            flow = manager.create_flow_for_issue(issue)
 
         assert flow["branch"] == "task/issue-431"
         assert mock_branch_exists.call_count == 2
@@ -179,7 +173,6 @@ class TestFlowCreate:
             "task/issue-431",
             start_ref="origin/main",
         )
-        mock_ensure_worktree.assert_called_once_with(431, "task/issue-431")
         mock_reactivate.assert_called_once()
         mock_link.assert_called_once_with("task/issue-431", 431, "task", actor=None)
 
@@ -189,7 +182,7 @@ class TestFlowCreate:
         manager = FlowManager(config)
         issue = make_issue(number=999, title="Failed flow creation")
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
                 with patch.object(manager.git, "branch_exists", return_value=False):
                     with patch.object(
@@ -228,7 +221,7 @@ class TestFlowCreate:
             def model_dump(self):  # type: ignore[no-untyped-def]
                 return {"branch": "task/issue-888", "flow_slug": "issue-888"}
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
                 with patch.object(manager.git, "branch_exists", return_value=False):
                     with patch.object(
@@ -261,7 +254,7 @@ class TestFlowCreate:
         manager = FlowManager(config)
         issue = make_issue(number=777, title="Pre-existing branch failure")
 
-        with patch.object(manager, "get_active_flow_count", return_value=0):
+        with patch.object(manager, "get_active_manager_session_count", return_value=0):
             with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
                 with patch.object(manager.git, "branch_exists", return_value=True):
                     with patch.object(
@@ -298,7 +291,11 @@ class TestFlowCreate:
         mock_log = MagicMock()
 
         with patch("vibe3.manager.flow_manager.logger.bind", return_value=mock_log):
-            with patch.object(manager, "get_active_flow_count", return_value=0):
+            with patch.object(
+                manager,
+                "get_active_manager_session_count",
+                return_value=0,
+            ):
                 with patch.object(manager.store, "get_flows_by_issue", return_value=[]):
                     with patch.object(manager.git, "branch_exists", return_value=False):
                         with patch.object(

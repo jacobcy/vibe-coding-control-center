@@ -85,12 +85,42 @@ class TestManagerCwdResolution:
             "subprocess.run",
             return_value=CompletedProcess(returncode=0),
         ) as mock_run:
-            path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+            with patch(
+                "vibe3.manager.worktree_manager.append_orchestra_event"
+            ) as mock_append_event:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
 
         assert path == tmp_path / ".worktrees" / "issue-77"
         assert is_temp is True
         assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
         assert mock_run.call_args.kwargs["cwd"] == tmp_path
+        mock_append_event.assert_called_once()
+        assert mock_append_event.call_args.args[0] == "worktree"
+        assert "created issue #77" in mock_append_event.call_args.args[1]
+        assert "task/issue-77" in mock_append_event.call_args.args[1]
+        assert str(tmp_path / ".worktrees" / "issue-77") in (
+            mock_append_event.call_args.args[1]
+        )
+        assert mock_append_event.call_args.kwargs["repo_root"] == tmp_path
+
+    def test_ensure_manager_worktree_does_not_log_event_on_creation_failure(
+        self, tmp_path: Path
+    ):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        with patch(
+            "subprocess.run",
+            return_value=CompletedProcess(returncode=1, stderr="boom"),
+        ):
+            with patch(
+                "vibe3.manager.worktree_manager.append_orchestra_event"
+            ) as mock_append_event:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path is None
+        assert is_temp is False
+        mock_append_event.assert_not_called()
 
     def test_ensure_manager_worktree_skips_when_path_exists(self, tmp_path: Path):
         config = make_config()
@@ -324,7 +354,7 @@ class TestManagerDispatchIntegration:
                     ):
                         with patch.object(
                             manager.status_service,
-                            "get_active_flow_count",
+                            "get_active_manager_session_count",
                             return_value=0,
                         ):
                             with patch.object(

@@ -38,7 +38,7 @@ class TestManagerDispatch:
         executor._flow_manager = MagicMock()
         executor._circuit_breaker = None
         executor.status_service = MagicMock()
-        executor.status_service.get_active_flow_count.return_value = 0
+        executor.status_service.get_active_manager_session_count.return_value = 0
 
         # flow exists with a branch
         executor._flow_manager.get_flow_for_issue.return_value = {
@@ -67,7 +67,7 @@ class TestManagerDispatch:
             manager.flow_manager,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            manager.status_service.get_active_flow_count = lambda: 0
+            manager.status_service.get_active_manager_session_count = lambda: 0
             with patch("subprocess.run") as mock_run:
                 result = manager.dispatch_manager(issue)
 
@@ -90,7 +90,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-102"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -105,19 +107,23 @@ class TestManagerDispatch:
                         with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
                                 manager.flow_manager.store,
-                                "add_event",
-                            ) as mock_add_event:
+                                "update_flow_state",
+                            ) as mock_update_flow_state:
                                 with patch.object(
-                                    manager._backend,
-                                    "start_async_command",
-                                    return_value=SimpleNamespace(
-                                        tmux_session="vibe3-manager-102",
-                                        log_path=Path(
-                                            "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                    manager.flow_manager.store,
+                                    "add_event",
+                                ) as mock_add_event:
+                                    with patch.object(
+                                        manager._backend,
+                                        "start_async_command",
+                                        return_value=SimpleNamespace(
+                                            tmux_session="vibe3-manager-102",
+                                            log_path=Path(
+                                                "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
+                                            ),
                                         ),
-                                    ),
-                                ) as mock_start:
-                                    result = manager.dispatch_manager(issue)
+                                    ) as mock_start:
+                                        result = manager.dispatch_manager(issue)
 
         assert result is True
         mock_start.assert_called_once()
@@ -133,6 +139,10 @@ class TestManagerDispatch:
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
+        mock_update_flow_state.assert_called_once_with(
+            "task/issue-102",
+            manager_session_id="vibe3-manager-102",
+        )
         # Async dispatch records "dispatched" event, not success
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"
@@ -148,7 +158,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-103"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -192,7 +204,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-104"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -232,7 +246,9 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-105"},
         ):
             with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
+                manager.status_service,
+                "get_active_manager_session_count",
+                return_value=0,
             ):
                 with patch.object(
                     manager,
@@ -271,7 +287,9 @@ class TestManagerDispatch:
         issue = make_issue(number=42, title="Capacity test")
 
         with patch.object(
-            manager.status_service, "get_active_flow_count", return_value=3
+            manager.status_service,
+            "get_active_manager_session_count",
+            return_value=3,
         ):
             # Effective capacity = max(0, 3 - 3 - 0) = 0
             # Should refuse dispatch

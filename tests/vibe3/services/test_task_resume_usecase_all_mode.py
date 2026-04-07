@@ -246,7 +246,14 @@ def test_resume_issues_all_task_mode_resets_scene_without_state_label() -> None:
 
 def test_resume_issues_all_task_mode_skips_ready_scene_without_worktree() -> None:
     """--all 遇到已是 ready 且无 worktree 的 scene 应直接跳过。"""
-    flow_415 = MagicMock(branch="task/issue-415", task_issue_number=415)
+    flow_415 = MagicMock(
+        branch="task/issue-415",
+        task_issue_number=415,
+        manager_session_id=None,
+        planner_session_id=None,
+        executor_session_id=None,
+        reviewer_session_id=None,
+    )
 
     mock_status_service = MagicMock()
     mock_status_service.fetch_orchestrated_issues.return_value = [

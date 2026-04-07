@@ -46,6 +46,16 @@ class TestOrchestraStatusService:
         assert snapshot.active_worktrees == 0
         mock_list.assert_called_once()
 
+    def test_get_active_manager_session_count_delegates_to_orchestrator(self) -> None:
+        config = _make_config()
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_active_manager_session_count.return_value = 3
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
+
+        assert service.get_active_manager_session_count() == 3
+
     def test_snapshot_with_issue(self) -> None:
         """Snapshot includes issue with flow and worktree."""
         config = _make_config()
@@ -122,6 +132,42 @@ class TestOrchestraStatusService:
             snapshot = service.snapshot()
 
         assert len(snapshot.active_issues) == 2
+
+    def test_snapshot_excludes_manual_flow_issue(self) -> None:
+        """Manual non-task flows should stay out of orchestra snapshot."""
+        config = _make_config()
+        from unittest.mock import MagicMock
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.get_flow_for_issue.return_value = {
+            "branch": "debug/service-gap-analysis"
+        }
+        mock_orchestrator.get_active_flow_count.return_value = 0
+        service = OrchestraStatusService(config, orchestrator=mock_orchestrator)
+
+        mock_issue = {
+            "number": 443,
+            "title": "Manual debug scene",
+            "assignees": [{"login": "vibe-manager-agent"}],
+            "labels": [{"name": "state/in-progress"}],
+        }
+
+        with (
+            patch.object(service._github, "list_issues", return_value=[mock_issue]),
+            patch.object(
+                service._label_service, "get_state", return_value=IssueState.IN_PROGRESS
+            ),
+            patch.object(
+                service._orchestrator,
+                "get_flow_for_issue",
+                return_value={"branch": "debug/service-gap-analysis"},
+            ),
+            patch.object(service._git, "list_worktrees", return_value=[]),
+        ):
+            snapshot = service.snapshot()
+
+        assert snapshot.active_issues == ()
+        assert snapshot.active_flows == 0
 
     def test_snapshot_deduplicates_issues(self) -> None:
         """Issues assigned to multiple managers are deduplicated."""

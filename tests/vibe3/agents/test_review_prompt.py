@@ -110,6 +110,13 @@ class TestBuildReviewTaskSection:
         assert "## Review Task" in result
         assert "Focus on security" in result
 
+    def test_task_section_can_carry_audit_ref_guidance(self) -> None:
+        result = build_review_task_section(
+            "If you write a fuller audit note, register it with handoff audit."
+        )
+
+        assert "handoff audit" in result
+
     def test_uses_default_task_if_none(self) -> None:
         """Should use default task if None."""
         result = build_review_task_section(None)
@@ -123,8 +130,7 @@ class TestBuildOutputContractSection:
     def test_uses_custom_format(self) -> None:
         """Should use custom output format."""
         result = build_output_contract_section("Custom format instructions")
-        assert "## Output format requirements" in result
-        assert "Custom format instructions" in result
+        assert result == "## Output format requirements\nCustom format instructions"
 
     def test_uses_default_format_if_none(self) -> None:
         """Should use default format if None."""

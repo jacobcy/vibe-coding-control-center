@@ -30,7 +30,7 @@
 - GitHub `state/*` labels：编排状态真源
 - 最新人类 issue comment：人类指示真源
 - scene 事实：当前 issue / flow / branch / worktree / session
-- handoff 与 refs：agent 交接真源
+- handoff 与 authoritative refs：agent 交接真源
 
 以下内容不是真源：
 
@@ -38,6 +38,23 @@
 - 历史 handoff 中写过的 `ready / claimed / blocked / in-progress`
 - GitHub Project 字段
 - 本地临时日志
+- 自动保存到 `.git/vibe3/handoff/...` 的 plan/run/review artifact 路径本身
+
+### 2.1 authoritative refs 与 artifact 的边界
+
+本标准中的 `plan_ref` / `report_ref` / `audit_ref` 指的是 authoritative refs。
+
+authoritative ref 只在以下条件同时满足时成立：
+
+- 产物已写成 canonical 文档
+- 通过 `vibe3 handoff plan|report|audit` 显式登记
+- 对应 ref 已进入 flow state
+
+因此：
+
+- 自动保存到 `.git/vibe3/handoff/...` 的 plan/run/review artifact 只是共享 artifact，不自动等于 authoritative ref
+- `temp/logs/*.async.log` 只是调试日志，不属于 handoff/ref 真源
+- manager 读取的是当前 flow state 中的 refs，不是根据最新 artifact 文件名反推 ref
 
 如果历史描述与当前 GitHub labels 冲突，以当前 labels 为准。
 
@@ -123,7 +140,8 @@ handoff 不代替 issue comment。
 典型动作：
 
 - plan agent 启动
-- plan 完成后写 handoff，并回到 `state/handoff`
+- plan 完成后写 canonical plan 文档、登记 `plan_ref`，再回到 `state/handoff`
+- 如果 planner 只产出 auto-saved artifact 而没有登记 authoritative `plan_ref`，该轮视为 no-op，进入 `state/blocked`
 
 ### `state/in-progress`
 
@@ -135,7 +153,8 @@ handoff 不代替 issue comment。
 典型动作：
 
 - run agent 执行
-- 执行结束后回到 `state/handoff`
+- 执行结束后写 canonical report 文档、登记 `report_ref`，再回到 `state/handoff`
+- 如果 executor 只产出 auto-saved artifact 而没有登记 authoritative `report_ref`，该轮视为 no-op，进入 `state/blocked`
 
 ### `state/handoff`
 
@@ -164,6 +183,8 @@ handoff 不代替 issue comment。
 典型动作：
 
 - review agent 执行
+- 审查输出必须给出合法 `VERDICT: PASS | MAJOR | BLOCK`
+- verdict 校验成功后，系统自动登记一个最小 authoritative `audit_ref`
 - 审查结束后回到 `state/handoff`
 
 ### `state/blocked`
@@ -294,19 +315,30 @@ plan agent 完成后：
 
 **触发条件**：
 - Issue 有 canonical task flow（`task/issue-*` 分支）
-- Flow state 有有效 refs（如 `plan_ref`）
 - 没有活动的 manager session
+
+补充语义：
+
+- manager 的 handoff resume 不以 `plan_ref` / `report_ref` / `audit_ref` 是否存在作为 dispatch 前置条件
+- authoritative ref 缺失的硬校验应在 plan/run 完成阶段处理，而不是延后到 manager dispatch 阶段
+- 因此 manager 会对 `state/handoff` 做重新分诊，但不把 handoff 目录中的 artifact 自动视为 authoritative ref
 
 **去重机制**：
 - 如果已有 live manager session，不会重复 dispatch
 - 如果 session 结束且无进展，会 auto-block
 
 **Progress Detection**：
-Manager 在判断是否有进展时，观察以下维度：
-- `state/*` label 变化
+Manager 在 `state/ready` / `state/handoff` 路径判断是否有进展时，主判断标准是：
+
+- 当前状态是否已离开 `state/ready` 或 `state/handoff`
+- 或 manager 是否明确执行了 abandon / close 等终止动作
+
+仅出现以下信号，不足以单独视为 manager 路径的有效进展：
+
 - 新的 issue comment
 - 新的 handoff 文件
-- Flow refs 更新
+- 新的 auto-saved artifact
+- Flow refs 更新但状态未迁移
 
 Async runtime 和 sync CLI 执行使用相同的 progress 判断标准。
 
@@ -338,7 +370,7 @@ manager 不应：
   - 依据的真源
 - 需要谁提供什么信息或决策
 
-### 6.3.1 blocked 与 failed 的边界
+### 6.5 blocked 与 failed 的边界
 
 `state/blocked` 只用于 manager 的业务判断：
 
@@ -360,9 +392,14 @@ manager 不应：
 - `plan / run / review` 不因为业务阻塞把 issue 标成 `failed`
 - server 看到 open 的 `state/failed` 时，应暂停新的自动任务进入，直到失败解除
 
-### 6.4 `handoff` 下的准备类 refs 修复顺序
+### 6.6 `handoff` 下的 authoritative refs 判定顺序
 
 在 `state/handoff` 下，manager 读取 `spec_ref / plan_ref / report_ref / audit_ref` 时，必须按下面顺序判断：
+
+0. 先区分 artifact 与 authoritative ref
+- `handoff show` 中出现的 artifact 路径，只表示有交接材料
+- 只有 flow state 中已登记的 `spec_ref / plan_ref / report_ref / audit_ref` 才是 authoritative refs
+- manager 不得根据 artifact 文件名、session log、或 handoff 正文去脑补 authoritative ref 已存在
 
 1. 如果缺少 `spec_ref`
 - 当前轮不进入 `run` / `review`
@@ -374,15 +411,18 @@ manager 不应：
 
 2. 如果已有 `spec_ref`，但缺少 `plan_ref`
 - 说明 planning 尚未完成或 planning 产物不可用
-- 当前 issue 应回退到 `state/claimed`
-- 让 plan agent 重新接手
-- manager 不在这一轮直接替代 plan 做判断
+- manager 可以据当前 scene 决定回到 `state/claimed` 或直接 `state/blocked`
+- 但缺失 `plan_ref` 不能被 handoff artifact 自动补齐
+- manager 不在这一轮直接替代 plan 产出 plan 结论
 
 3. 只有当 `plan_ref` 已存在时，manager 才能继续判断是否进入 `state/in-progress`
 
 4. 只有当 `report_ref` 已存在时，manager 才能继续判断是否进入 `state/review`
 
-5. 只有当 `audit_ref` 已存在且通过时，manager 才能继续判断是否进入 `state/merge-ready`
+5. review 阶段的硬输入条件仍然是合法 verdict
+- verdict 校验成功后，系统必须自动生成并登记最小 authoritative `audit_ref`
+- manager 应优先读取该 canonical 审查引用，而不是直接消费原始 review stdout
+- 完整审查文档仍可额外产出，但不再是 review 成功的额外格式负担
 
 ## 7. handoff 与 refs 的使用
 
@@ -404,6 +444,19 @@ refs 的推荐语义：
 - `spec_ref` / `plan_ref`：准备类产物
 - `report_ref`：执行结果
 - `audit_ref`：审查结果
+
+生产规则：
+
+- `plan_ref` 必须通过 `vibe3 handoff plan <path>` 显式登记
+- `report_ref` 必须通过 `vibe3 handoff report <path>` 显式登记
+- `audit_ref` 在 review verdict 校验成功后由系统自动登记；也允许显式 `vibe3 handoff audit <path>` 覆盖为更完整的审查文档
+- auto-saved handoff artifact 只用于共享与审计，不自动升级为 authoritative ref
+
+阶段硬规则：
+
+- planner 成功但缺少 authoritative `plan_ref`，该轮按 no-op 进入 `state/blocked`
+- executor 成功但缺少 authoritative `report_ref`，该轮按 no-op 进入 `state/blocked`
+- reviewer 以合法 verdict 完成；系统随后自动补齐最小 authoritative `audit_ref`
 
 manager 在 `state/handoff` 读取 refs 时，只做状态判断，不做实现。
 

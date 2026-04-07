@@ -16,6 +16,7 @@ def _make_request() -> ExecutionRequest:
         options_builder=lambda: AgentOptions(agent="executor"),
         task="ship it",
         handoff_kind="run",
+        branch="task/demo",
     )
 
 
@@ -218,4 +219,63 @@ def test_run_execution_pipeline_async_child_no_aborted_on_failure(
         run_execution_pipeline(_make_request())
 
     mock_persist.assert_not_called()
-    mock_record.assert_not_called()
+
+
+@patch("vibe3.agents.pipeline.record_handoff_unified")
+@patch("vibe3.agents.backends.codeagent.CodeagentBackend.run")
+@patch("vibe3.agents.pipeline.load_session_id", return_value="sess-existing")
+def test_run_execution_pipeline_passes_worktree_root_as_cwd(
+    _mock_session,
+    mock_execute,
+    mock_record,
+) -> None:
+    mock_execute.return_value = AgentResult(
+        exit_code=0,
+        stdout="done",
+        stderr="",
+        session_id="sess-new",
+    )
+    mock_record.return_value = Path("/tmp/run-report.md")
+
+    with patch(
+        "vibe3.clients.git_client.GitClient",
+        return_value=MagicMock(
+            get_current_branch=MagicMock(return_value="task/demo"),
+            get_worktree_root=MagicMock(return_value="/repo/worktree"),
+        ),
+        create=True,
+    ):
+        run_execution_pipeline(_make_request())
+
+    assert mock_execute.call_args.kwargs["cwd"] == Path("/repo/worktree")
+    mock_record.assert_called_once()
+
+
+@patch("vibe3.agents.pipeline.record_handoff_unified")
+@patch("vibe3.agents.backends.codeagent.CodeagentBackend.run")
+@patch("vibe3.agents.pipeline.load_session_id", return_value="sess-existing")
+def test_run_execution_pipeline_passes_explicit_branch_to_handoff_record(
+    _mock_session,
+    mock_execute,
+    mock_record,
+) -> None:
+    mock_execute.return_value = AgentResult(
+        exit_code=0,
+        stdout="done",
+        stderr="",
+        session_id="sess-new",
+    )
+    mock_record.return_value = Path("/tmp/run-report.md")
+
+    with patch(
+        "vibe3.clients.git_client.GitClient",
+        return_value=MagicMock(
+            get_current_branch=MagicMock(return_value="task/demo"),
+            get_worktree_root=MagicMock(return_value="/repo/worktree"),
+        ),
+        create=True,
+    ):
+        run_execution_pipeline(_make_request())
+
+    handoff_record = mock_record.call_args.args[0]
+    assert handoff_record.branch == "task/demo"

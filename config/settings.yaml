@@ -60,6 +60,9 @@ code_limits:
       - path: "src/vibe3/services/handoff_service.py"
         limit: 500
         reason: "handoff 状态读写聚合"
+      - path: "src/vibe3/services/issue_failure_service.py"
+        limit: 450
+        reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/git_client.py"
@@ -74,6 +77,14 @@ code_limits:
       - path: "src/vibe3/clients/sqlite_client.py"
         limit: 450
         reason: "已 388，持久化聚合"
+
+      # Commands 层（CLI 入口）—— 允许 450
+      - path: "src/vibe3/commands/plan.py"
+        limit: 450
+        reason: "Plan command CLI 入口，参数解析和路由逻辑集中，拆分成本高"
+      - path: "src/vibe3/commands/run.py"
+        limit: 450
+        reason: "Run command CLI 入口，多模式路由逻辑集中，拆分成本高"
 
       # Orchestra —— 允许 550
       - path: "src/vibe3/orchestra/services/state_label_dispatch.py"
@@ -98,9 +109,6 @@ code_limits:
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 450
         reason: "Codeagent execution backend"
-      - path: "src/vibe3/services/task_resume_usecase.py"
-        limit: 500
-        reason: "Task resume usecase，职责单一，方法粒度合理，主方法 resume_issues 逻辑完整不宜拆分"
       - path: "src/vibe3/orchestra/services/status_service.py"
         limit: 450
         reason: "Orchestra 状态聚合服务，数据类+辅助函数+主服务类结构清晰，snapshot 方法线性流程不宜拆分"
@@ -110,14 +118,29 @@ code_limits:
         limit: 550
         reason: "覆盖状态分发状态机主路径，fixture 与场景矩阵高度耦合"
       - path: "tests/vibe3/orchestra/test_state_label_dispatch_core.py"
-        limit: 450
-        reason: "State label dispatch 服务测试集，共享 fixture，围绕同一服务契约，按功能场景组织不宜拆分"
+        limit: 500
+        reason: "State label dispatch 核心服务测试，2 个超长集成测试，fixture 高度耦合不宜拆分"
       - path: "tests/vibe3/orchestra/test_serve.py"
         limit: 500
         reason: "Orchestra serve 功能测试集，共享 fixture，按功能组织不宜拆分"
+      - path: "tests/vibe3/orchestra/test_status_service.py"
+        limit: 450
+        reason: "Orchestra 状态聚合服务测试，3 个超长集成测试，围绕同一服务契约"
       - path: "tests/vibe3/services/test_issue_failure_service.py"
-        limit: 420
-        reason: "Issue failure/resume 测试集，围绕同一服务契约，拆分收益低"
+        limit: 500
+        reason: "Issue failure/resume 测试集，16 个测试围绕同一服务契约，平均 31 lines/test，拆分收益低"
+      - path: "tests/vibe3/services/test_task_resume_usecase.py"
+        limit: 500
+        reason: "Task resume usecase 测试集，10 个测试，平均 49.5 lines/test，大量 mock setup，拆分成本高"
+      - path: "tests/vibe3/commands/test_plan.py"
+        limit: 500
+        reason: "Plan command 测试集，23 个测试，平均 20.8 lines/test，围绕同一 CLI 入口，拆分会破坏测试完整性"
+      - path: "tests/vibe3/commands/test_run.py"
+        limit: 450
+        reason: "Run command 测试集，15 个测试，超限 1 行，围绕同一 CLI 入口"
+      - path: "tests/vibe3/commands/test_task_command_surface.py"
+        limit: 500
+        reason: "Task command surface 测试集，10 个测试，平均 45.2 lines/test，大量 mock setup"
       - path: "tests/vibe3/commands/test_task_resume_failed.py"
         limit: 430
         reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
@@ -310,6 +333,9 @@ review:
     Use AST analysis to understand impact scope.
     Prioritize actionable findings with clear severity.
     Follow the repository review contract.
+    The final review response must still end with a valid `VERDICT: PASS | MAJOR | BLOCK` line.
+    If you produce a fuller canonical audit note, prefer saving it under `docs/reports/`
+    and register it with `uv run python src/vibe3/cli.py handoff audit <path-to-audit-md>`.
 
   # Static: Custom review prompt (optional prefix)
   # Added to beginning of review context if provided
@@ -366,9 +392,15 @@ plan:
     Design minimal changes with clear implementation steps.
     Document risks and breaking changes upfront.
     Follow the repository planning contract.
+    The auto-saved planner artifact is only for shared handoff or audit and is not the authoritative `plan_ref`.
+    You must write a canonical plan markdown file under `docs/plans/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff plan <path-to-plan-md>`.
+    Use a repository-relative path such as `docs/plans/issue-123-implementation-plan.md`.
+    If you do not register `plan_ref`, the planner run is treated as no-op and the issue is moved to `state/blocked`.
 
-  # Static: Custom plan prompt (optional prefix)
-  plan_prompt: "/writing-plan"
+  # Static: Optional plain-text default task guidance.
+  # Slash-prefixed external skill triggers are ignored by vibe3 plan.
+  plan_prompt: ""
 
 # Run command configuration
 # Run Configuration
@@ -393,7 +425,7 @@ run:
     # - model 只有在 backend 已配置时才有意义
     backend: "opencode"  # e.g., "claude", "opencode", "gemini"
     model: "alibaba-coding-plan-cn/glm-5"  # e.g., "claude-sonnet-4-6", "gemini-3-flash-preview"
-    timeout_seconds: 1800
+    timeout_seconds: 3600
 
   # Static: Output format requirements
   output_format: |
@@ -422,6 +454,11 @@ run:
     Write clean code with tests, run verification after changes.
     Document any deviations with reasons.
     Follow the repository execution contract.
+    The auto-saved executor artifact is only for shared handoff or audit and is not the authoritative `report_ref`.
+    You must write a canonical execution report under `docs/reports/` in the current worktree.
+    After writing that file, register it with `uv run python src/vibe3/cli.py handoff report <path-to-report-md>`.
+    Use a repository-relative path such as `docs/reports/issue-123-execution-report.md`.
+    If you do not register `report_ref`, the executor run is treated as no-op and the issue is moved to `state/blocked`.
 
   # Static: Custom run prompt (optional prefix)
   run_prompt: "/executing-plan"

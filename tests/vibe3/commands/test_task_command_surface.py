@@ -282,6 +282,105 @@ def test_task_status_excludes_manual_flow_issues_from_issue_progress(
 @patch("vibe3.commands.status.OrchestraStatusService")
 @patch("vibe3.commands.status.FlowService")
 @patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_excludes_in_progress_issue_without_auto_flow_scene(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    for state in (IssueState.CLAIMED, IssueState.IN_PROGRESS, IssueState.REVIEW):
+        query_svc = MagicMock()
+        query_svc.fetch_orchestrated_issues.return_value = [
+            {
+                "number": 443,
+                "title": (
+                    f"Label-only {state.value} issue should stay out "
+                    "of Issue Progress"
+                ),
+                "state": state,
+                "flow": None,
+                "queued": False,
+            }
+        ]
+        query_svc.fetch_worktree_map.return_value = {}
+        mock_query_service_cls.return_value = query_svc
+
+        result = runner.invoke(app, ["task", "status"])
+
+        assert result.exit_code == 0
+        assert "Issue Progress:" in result.stdout
+        assert (
+            f"Label-only {state.value} issue should stay out "
+            "of Issue Progress" not in result.stdout
+        )
+        assert "# 443" not in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_keeps_failed_issue_without_flow_scene_visible(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 439,
+            "title": "Failed issue without flow scene should remain visible",
+            "state": IssueState.FAILED,
+            "flow": None,
+            "queued": False,
+            "failed_reason": "planner failed",
+        }
+    ]
+    query_svc.fetch_worktree_map.return_value = {}
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Failed Issues:" in result.stdout
+    assert "Failed issue without flow scene should remain visible" in result.stdout
+    assert "(no flow" in result.stdout
+    assert "scene)" in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
 def test_task_status_ready_queue_shows_queue_metadata(
     mock_validate_pid,
     mock_flow_service_cls,

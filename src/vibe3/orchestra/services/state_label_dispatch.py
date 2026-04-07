@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -104,12 +103,12 @@ class StateLabelDispatchService(ServiceBase):
         trigger_name: TriggerName,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
-        status_service: "OrchestraStatusService" | None = None,
+        status_service: OrchestraStatusService | None = None,
         manager: ManagerExecutor | None = None,
     ) -> None:
         self.config = config
         self.trigger_state = trigger_state
-        self.trigger_name = trigger_name
+        self.trigger_name: TriggerName = trigger_name
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
@@ -151,7 +150,7 @@ class StateLabelDispatchService(ServiceBase):
         if self.trigger_name == "manager" and ready:
             # Calculate effective remaining capacity
             active_count = (
-                self._status_service.get_active_flow_count()
+                self._status_service.get_active_manager_session_count()
                 if self._status_service
                 else 0
             )
@@ -171,9 +170,20 @@ class StateLabelDispatchService(ServiceBase):
                     trigger=self.trigger_name,
                 ).info(
                     f"Throttled {len(throttled)} issues due to capacity limit "
-                    f"(active={active_count}, in_flight={in_flight_count}, "
+                    f"(live={active_count}, in_flight={in_flight_count}, "
                     f"max={self.config.max_concurrent_flows}, "
                     f"remaining={remaining_capacity}): {', '.join(throttled_numbers)}"
+                )
+                append_orchestra_event(
+                    "dispatcher",
+                    (
+                        f"{self.service_name} throttled {len(throttled)} issues "
+                        f"due to capacity limit "
+                        f"(live={active_count}, in_flight={in_flight_count}, "
+                        f"max={self.config.max_concurrent_flows}, "
+                        f"remaining={remaining_capacity}): "
+                        f"{', '.join(throttled_numbers)}"
+                    ),
                 )
 
             # Log selected issues before dispatch
@@ -432,6 +442,14 @@ class StateLabelDispatchService(ServiceBase):
         if self.trigger_name == "manager":
             dispatched = self._manager.dispatch_manager(issue)
             if not dispatched:
+                reason = "dispatch rejected"
+                queued_issues: set[int] = getattr(self._manager, "queued_issues", set())
+                if issue.number in queued_issues:
+                    reason = "deferred due to capacity"
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} deferred #{issue.number} ({reason})",
+                )
                 self._in_flight_dispatches.discard(issue.number)
                 self._progress_snapshots.pop(issue.number, None)
             else:
@@ -581,24 +599,4 @@ class StateLabelDispatchService(ServiceBase):
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-        if result.returncode != 0:
-            return False
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if session_name == session_prefix or session_name.startswith(
-                f"{session_prefix}-"
-            ):
-                return True
-        return False
+        return self._backend.has_tmux_session_prefix(session_prefix)

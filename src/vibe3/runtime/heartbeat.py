@@ -153,6 +153,19 @@ class HeartbeatServer:
                 "server", f"---------- heartbeat tick #{tick_number} ----------"
             )
             append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
+            if gate_result.blocked:
+                append_orchestra_event(
+                    "server",
+                    (
+                        f"heartbeat tick #{tick_number} frozen by state/failed issue "
+                        f"#{gate_result.issue_number or '?'}"
+                        + (
+                            f" reason={gate_result.reason}"
+                            if gate_result.reason
+                            else ""
+                        )
+                    ),
+                )
 
             tasks = []
             tick_services: list[str] = []
@@ -262,7 +275,8 @@ class HeartbeatServer:
                 append_orchestra_event(
                     "server",
                     f"event {event.event_type} blocked for "
-                    f"{type(svc).__name__} by failed issue",
+                    f"{type(svc).__name__} by state/failed issue "
+                    f"#{gate_result.issue_number or '?'}",
                 )
                 continue
             tasks.append(self._handle_with_semaphore(svc, event))

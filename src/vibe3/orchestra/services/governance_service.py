@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import subprocess
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -279,26 +278,8 @@ class GovernanceService(ServiceBase):
 
     def _has_live_dispatch(self) -> bool:
         session_prefix = "vibe3-governance-scan"
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-        if result.returncode != 0:
-            return False
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if session_name == session_prefix or session_name.startswith(
-                f"{session_prefix}-"
-            ):
-                return True
+        if self._backend.has_tmux_session_prefix(session_prefix):
+            return True
         self._in_flight = False
         return False
 

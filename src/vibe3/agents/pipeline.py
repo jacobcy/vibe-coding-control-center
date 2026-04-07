@@ -39,6 +39,21 @@ class ExecutionRequest:
     dry_run: bool = False
     handoff_kind: str = "run"
     handoff_metadata: dict[str, Any] | None = None
+    cwd: Path | None = None
+    branch: str | None = None
+
+
+def _resolve_execution_cwd(explicit_cwd: Path | None) -> Path:
+    """Resolve agent launch cwd, preferring the current worktree root."""
+    if explicit_cwd is not None:
+        return explicit_cwd
+
+    from vibe3.clients.git_client import GitClient
+
+    try:
+        return Path(GitClient().get_worktree_root())
+    except Exception:
+        return Path.cwd()
 
 
 @dataclass
@@ -125,6 +140,7 @@ def run_execution_pipeline(
     log.info("Building execution context")
     try:
         prompt_content = request.context_builder()
+        execution_cwd = _resolve_execution_cwd(request.cwd)
 
         log.info(
             "Running agent",
@@ -142,6 +158,7 @@ def run_execution_pipeline(
             task=request.task,
             dry_run=request.dry_run,
             session_id=session_id,
+            cwd=execution_cwd,
         )
 
         if request.dry_run:
@@ -160,6 +177,7 @@ def run_execution_pipeline(
                 options=options,
                 session_id=effective_session_id,
                 metadata=request.handoff_metadata,
+                branch=request.branch,
             )
         )
         if handoff_file:

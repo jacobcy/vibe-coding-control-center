@@ -12,15 +12,12 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
-from vibe3.models.orchestration import IssueState
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_failure_service import (
-    resume_blocked_issue_to_ready,
-    resume_failed_issue_to_ready,
-)
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
 from vibe3.services.status_query_service import StatusQueryService
+from vibe3.services.task_resume_candidates import TaskResumeCandidates
+from vibe3.services.task_resume_operations import TaskResumeOperations
 
 if TYPE_CHECKING:
     from vibe3.models.flow import FlowStatusResponse
@@ -44,6 +41,21 @@ class TaskResumeUsecase:
         self.git_client = git_client or GitClient()
         self.github_client = github_client or GitHubClient()
         self.issue_flow_service = issue_flow_service or IssueFlowService()
+
+        # Initialize delegate modules
+        self.candidates = TaskResumeCandidates(
+            status_service=self.status_service,
+            label_service=self.label_service,
+            flow_service=self.flow_service,
+            issue_flow_service=self.issue_flow_service,
+        )
+        self.operations = TaskResumeOperations(
+            git_client=self.git_client,
+            github_client=self.github_client,
+            flow_service=self.flow_service,
+            label_service=self.label_service,
+            issue_flow_service=self.issue_flow_service,
+        )
 
     def resume_issues(
         self,
@@ -73,10 +85,18 @@ class TaskResumeUsecase:
                 - candidates: List of resumable candidates (dry-run only)
         """
         if candidate_mode == "all_task":
-            candidates = self._build_all_task_candidates(flows or [])
+            candidates = self.candidates.build_all_task_candidates(flows or [])
         else:
             candidates = self.status_service.fetch_resume_candidates(
                 flows=flows or [], stale_flows=stale_flows or []
+            )
+
+        if issue_numbers is not None and candidate_mode != "all_task":
+            candidates = self.candidates.merge_explicit_issue_candidates(
+                issue_numbers=issue_numbers,
+                candidates=candidates,
+                flows=flows or [],
+                stale_flows=stale_flows or [],
             )
 
         # Filter by requested issue numbers if provided
@@ -103,7 +123,7 @@ class TaskResumeUsecase:
                     result["skipped"].append(
                         {
                             "number": issue_num,
-                            "reason": "不在 failed 或 blocked 状态，跳过恢复",
+                            "reason": "当前状态或现场不支持恢复，跳过恢复",
                         }
                     )
 
@@ -139,7 +159,7 @@ class TaskResumeUsecase:
                     worktree_path = (
                         str(resolved_path) if resolved_path is not None else None
                     )
-                skip_reason = self._maybe_skip_all_task_candidate(
+                skip_reason = self.candidates.maybe_skip_all_task_candidate(
                     issue_number=issue_number,
                     flow=flow,
                     candidate_state=candidate.get("state"),
@@ -152,7 +172,9 @@ class TaskResumeUsecase:
                     continue
 
             # Defensive check: verify current state matches resume_kind
-            if not self._verify_issue_state_for_resume(issue_number, resume_kind, repo):
+            if not self.candidates.verify_issue_state_for_resume(
+                issue_number, resume_kind, repo
+            ):
                 result["skipped"].append(
                     {
                         "number": issue_number,
@@ -163,7 +185,7 @@ class TaskResumeUsecase:
 
             try:
                 if resume_kind in {"failed", "blocked", "all"}:
-                    self._reset_issue_to_ready(
+                    self.operations.reset_issue_to_ready(
                         issue_number=issue_number,
                         resume_kind=resume_kind,
                         flow=flow,
@@ -172,10 +194,17 @@ class TaskResumeUsecase:
                         worktree_path=worktree_path,
                     )
 
+                    if resume_kind == "all":
+                        self._comment_all_resume_success(
+                            issue_number=issue_number,
+                            repo=repo,
+                            reason=reason,
+                        )
+
                 elif resume_kind == "aborted":
                     flow = cast("FlowStatusResponse | None", candidate.get("flow"))
                     if flow and isinstance(flow.branch, str):
-                        self._reactivate_aborted_flow(flow.branch)
+                        self.operations.reactivate_aborted_flow(flow.branch)
 
                 result["resumed"].append(
                     {"number": issue_number, "resume_kind": resume_kind}
@@ -188,235 +217,6 @@ class TaskResumeUsecase:
                 )
 
         return result
-
-    def _maybe_skip_all_task_candidate(
-        self,
-        *,
-        issue_number: int,
-        flow: FlowStatusResponse | None,
-        candidate_state: object,
-        worktree_path: str | None,
-    ) -> str | None:
-        """Skip noop all-task candidates that no longer have a task scene to reset."""
-        branch = getattr(flow, "branch", None) if flow else None
-        if not isinstance(branch, str):
-            return None
-
-        if candidate_state == IssueState.READY and worktree_path is None:
-            logger.bind(
-                domain="resume",
-                action="skip_noop_all_task",
-                issue_number=issue_number,
-                branch=branch,
-                worktree_path=None,
-                state="ready",
-            ).info("Skipping ready candidate without task scene")
-            return "已是 state/ready 且无 task scene，跳过恢复"
-        return None
-
-    def _verify_issue_state_for_resume(
-        self, issue_number: int, resume_kind: str, repo: str | None
-    ) -> bool:
-        """Verify issue is still in expected state for resume.
-
-        Args:
-            issue_number: GitHub issue number
-            resume_kind: Expected resume kind ("failed", "blocked", or "aborted")
-            repo: Repository (owner/repo format, optional)
-
-        Returns:
-            True if issue state matches resume_kind, False otherwise
-        """
-        current_state = self.label_service.get_state(issue_number)
-
-        if resume_kind == "all":
-            return current_state is None or current_state != IssueState.DONE
-
-        if current_state is None:
-            return False
-
-        if resume_kind == "failed":
-            return current_state.value == "failed"
-        elif resume_kind == "blocked":
-            return current_state.value == "blocked"
-        elif resume_kind == "aborted":
-            # Aborted flows can be resumed from READY or HANDOFF states
-            # The flow_status=aborted check is done in fetch_resume_candidates
-            # Here we verify the issue is in a valid state for resumption
-            return current_state.value in ("ready", "handoff")
-
-        return False
-
-    def _cleanup_stale_flow(self, branch: str) -> None:
-        """Clean up stale flow metadata after blocked resume.
-
-        Args:
-            branch: Branch name for the flow to clean up
-        """
-        try:
-            logger.bind(
-                domain="resume",
-                action="cleanup_stale_flow",
-                branch=branch,
-            ).info("Cleaning up stale flow")
-
-            # Reactivate the stale flow (change status from "stale" to "active")
-            self.flow_service.reactivate_flow(branch)
-        except Exception as exc:
-            # Log but don't fail the resume operation
-            logger.bind(
-                domain="resume",
-                action="cleanup_stale_flow",
-                branch=branch,
-            ).warning(f"Failed to clean up stale flow: {exc}")
-
-    def _build_all_task_candidates(
-        self, flows: list[FlowStatusResponse]
-    ) -> list[dict[str, Any]]:
-        """Build reset candidates for every auto-created task flow."""
-        issue_details: dict[int, dict[str, Any]] = {}
-        try:
-            orchestrated_issues = self.status_service.fetch_orchestrated_issues(
-                flows=flows,
-                queued_set=set(),
-                stale_flows=[],
-            )
-            for issue in orchestrated_issues:
-                issue_number = issue.get("number")
-                if isinstance(issue_number, int):
-                    issue_details[issue_number] = issue
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="build_all_task_candidates",
-            ).warning(f"Failed to enrich all-task candidates from GitHub: {exc}")
-
-        candidates: list[dict[str, Any]] = []
-        for flow in flows:
-            branch = getattr(flow, "branch", None)
-            if not isinstance(branch, str):
-                continue
-            if not self.issue_flow_service.is_task_branch(branch):
-                continue
-            issue_number = getattr(flow, "task_issue_number", None)
-            if not isinstance(issue_number, int):
-                continue
-            issue = issue_details.get(issue_number, {})
-            candidate = {
-                "number": issue_number,
-                "title": str(issue.get("title") or ""),
-                "state": issue.get("state")
-                or self.label_service.get_state(issue_number),
-                "flow": flow,
-            }
-            candidate["resume_kind"] = "all"
-            candidates.append(candidate)
-        return candidates
-
-    def _reset_issue_to_ready(
-        self,
-        *,
-        issue_number: int,
-        resume_kind: str,
-        flow: FlowStatusResponse | None,
-        repo: str | None,
-        reason: str,
-        worktree_path: str | None = None,
-    ) -> None:
-        """Reset an issue to ready after clearing stale task scene state."""
-        branch = getattr(flow, "branch", None) if flow else None
-        previous_state = self.label_service.get_state(issue_number)
-
-        if resume_kind == "failed":
-            resume_failed_issue_to_ready(
-                issue_number=issue_number,
-                repo=repo,
-                reason=reason,
-            )
-        elif resume_kind == "blocked":
-            resume_blocked_issue_to_ready(
-                issue_number=issue_number,
-                repo=repo,
-                reason=reason,
-            )
-        else:
-            self.label_service.confirm_issue_state(
-                issue_number,
-                IssueState.READY,
-                actor="human:resume",
-                force=True,
-            )
-
-        if isinstance(branch, str):
-            try:
-                self._reset_task_scene(branch, worktree_path=worktree_path)
-            except Exception as exc:
-                self._restore_issue_state(
-                    issue_number=issue_number,
-                    previous_state=previous_state,
-                    repo=repo,
-                    failure_reason=str(exc),
-                )
-                raise
-
-        if resume_kind == "all":
-            self._comment_all_resume_success(
-                issue_number=issue_number,
-                repo=repo,
-                reason=reason,
-            )
-
-    def _reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
-        """Delete stale task worktree and clear flow runtime state."""
-        if not self.issue_flow_service.is_task_branch(branch):
-            return
-
-        resolved_path = worktree_path
-        if resolved_path is None:
-            found_path = self.git_client.find_worktree_path_for_branch(branch)
-            resolved_path = str(found_path) if found_path is not None else None
-        logger.bind(
-            domain="resume",
-            action="reset_task_scene",
-            branch=branch,
-            worktree_path=resolved_path,
-        ).info("Resetting task scene")
-        if resolved_path is not None:
-            self.git_client.remove_worktree(resolved_path, force=True)
-        self.flow_service.reactivate_flow(branch)
-
-    def _restore_issue_state(
-        self,
-        *,
-        issue_number: int,
-        previous_state: IssueState | None,
-        repo: str | None,
-        failure_reason: str,
-    ) -> None:
-        """Best-effort rollback when scene reset fails after issue transition."""
-        if previous_state is None or previous_state == IssueState.READY:
-            return
-        try:
-            self.label_service.confirm_issue_state(
-                issue_number,
-                previous_state,
-                actor="human:resume",
-                force=True,
-            )
-            self.github_client.add_comment(
-                issue_number,
-                "[resume] task scene 重置失败，已恢复为 "
-                f"state/{previous_state.value}。\n\n"
-                f"原因:{failure_reason}",
-                repo=repo,
-            )
-        except Exception as exc:
-            logger.bind(
-                domain="resume",
-                action="rollback_issue_state",
-                issue_number=issue_number,
-                previous_state=previous_state.value,
-            ).warning("Failed to rollback issue state after resume error: " f"{exc}")
 
     def _comment_all_resume_success(
         self,
@@ -469,26 +269,3 @@ class TaskResumeUsecase:
             body = comment.get("body")
             return isinstance(body, str) and body.strip() == normalized_comment
         return False
-
-    def _reactivate_aborted_flow(self, branch: str) -> None:
-        """Reactivate an aborted flow.
-
-        Args:
-            branch: Branch name for the aborted flow
-        """
-        try:
-            logger.bind(
-                domain="resume",
-                action="reactivate_aborted",
-                branch=branch,
-            ).info("Reactivating aborted flow")
-
-            # Reactivate the aborted flow (change status from "aborted" to "active")
-            self.flow_service.reactivate_flow(branch)
-        except Exception as exc:
-            # Log but don't fail the resume operation
-            logger.bind(
-                domain="resume",
-                action="reactivate_aborted",
-                branch=branch,
-            ).warning(f"Failed to reactivate aborted flow: {exc}")

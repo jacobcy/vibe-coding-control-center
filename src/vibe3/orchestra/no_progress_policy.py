@@ -219,6 +219,16 @@ def execute_state_fallback(
     target_state = STATE_FALLBACK_MATRIX.get(source_state, IssueState.BLOCKED)
     target_label = target_state.to_label()
     source_label = source_state.to_label()
+    failed_label = IssueState.FAILED.to_label()
+
+    # Execution failures are terminal recovery states for the current run.
+    # Never stack a no-progress fallback on top of state/failed.
+    if failed_label in current_labels:
+        logger.bind(
+            domain="orchestra",
+            issue=issue_number,
+        ).warning(f"Skip fallback for issue #{issue_number}: already in {failed_label}")
+        return
 
     # Double-check: skip if already transitioned or in target state
     if source_label not in current_labels:
