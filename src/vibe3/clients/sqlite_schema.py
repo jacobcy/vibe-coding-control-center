@@ -89,6 +89,17 @@ _CREATE_RUNTIME_SESSION = """
     )
 """
 
+_CREATE_RUNTIME_SESSION_INDEXES = """
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_status_role
+        ON runtime_session(status, role);
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_branch_role
+        ON runtime_session(branch, role);
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_role_branch_target
+        ON runtime_session(role, branch, target_id)
+"""
+
 
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
@@ -136,6 +147,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
     cursor.execute(_CREATE_RUNTIME_SESSION)
+
+    # Create indexes for runtime_session table
+    for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
 
     # Migration: add refs column to flow_events if missing
     event_columns = {

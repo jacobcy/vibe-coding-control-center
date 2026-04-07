@@ -11,7 +11,23 @@ WORKER_ROLES = frozenset({"manager", "planner", "executor", "reviewer"})
 
 
 class SessionRegistryService:
-    """Centralises session lifecycle: naming, status transitions, and liveness."""
+    """Centralises session lifecycle: naming, status transitions, and liveness.
+
+    ## Backend Parameter Contract
+
+    The `backend` parameter controls liveness verification behavior:
+
+    - **backend=None**: Read-only mode. Assumes all tmux sessions exist.
+      Use ONLY for queries that don't affect capacity checks or dispatch gates.
+      Example: `load_session_id()` reading resume hints.
+
+    - **backend=CodeagentBackend()**: Full liveness verification.
+      REQUIRED for capacity checks, dispatch gates, and state reconciliation.
+      Example: `ManagerExecutor`, `StateLabelDispatchService`.
+
+    **WARNING**: Using backend=None in capacity/dispatch logic will cause
+    false positives (treating dead sessions as live), leading to queue starvation.
+    """
 
     def __init__(
         self,
@@ -22,9 +38,13 @@ class SessionRegistryService:
         self._backend = backend
 
     def _has_tmux_session(self, tmux: str) -> bool:
-        """Check if tmux session exists, or assume True if no backend."""
+        """Check if tmux session exists.
+
+        In read-only mode (backend=None), assumes True to avoid false negatives
+        in query scenarios. This is safe only for non-capacity logic.
+        """
         if self._backend is None:
-            return True  # Assume exists when no backend for liveness check
+            return True
         return self._backend.has_tmux_session(tmux)
 
     def reserve(
@@ -89,6 +109,17 @@ class SessionRegistryService:
         - For sessions with a tmux_session, confirms liveness via backend.
         - Sessions still in starting with no tmux_session are counted as live.
         """
+        if self._backend is None:
+            from loguru import logger
+
+            logger.bind(
+                domain="session_registry",
+                mode="read_only",
+            ).warning(
+                "count_live_worker_sessions called with backend=None; "
+                "results may include dead sessions. This is incorrect for "
+                "capacity checks. Use backend=CodeagentBackend() instead."
+            )
         sessions = self._store.list_live_runtime_sessions(role=role)
         count = 0
         for session in sessions:
