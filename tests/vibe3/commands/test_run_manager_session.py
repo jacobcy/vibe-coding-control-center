@@ -35,7 +35,7 @@ def _make_github():
 
 def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=False):
     # Patch manager_run_service's dependencies
-    from vibe3.manager import manager_run_service
+    from vibe3.manager import manager_run_service, session_naming
     from vibe3.services import issue_failure_service
 
     monkeypatch.setattr(manager_run_service, "CodeagentBackend", lambda: backend)
@@ -59,7 +59,7 @@ def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=F
     )
     if not poll_session_id:
         monkeypatch.setattr(
-            manager_run_service,
+            session_naming,
             "wait_for_async_session_id",
             lambda log_path, timeout_seconds=3.0: None,
         )
@@ -134,7 +134,8 @@ class TestRunManagerIssueSession:
         assert result.exit_code != 0
         assert "GitHub read timed out or auth/network is unavailable" in result.stderr
 
-    def test_persists_async_session_id_from_log(self, monkeypatch, tmp_path) -> None:
+    def test_async_launch_succeeds(self, monkeypatch, tmp_path) -> None:
+        """Async manager launch should succeed without writing to flow_state."""
         log_path = tmp_path / "vibe3-manager-issue-372.async.log"
         log_path.write_text("SESSION_ID: ses_manager372\n")
 
@@ -155,15 +156,11 @@ class TestRunManagerIssueSession:
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
 
         assert result.exit_code == 0
-        sqlite.update_flow_state.assert_called_once()
-        assert (
-            sqlite.update_flow_state.call_args.kwargs["manager_session_id"]
-            == "ses_manager372"
-        )
+        # manager_session_id is no longer written to flow_state
+        # (registry is the source of truth)
 
-    def test_persists_async_session_id_from_wrapper_log(
-        self, monkeypatch, tmp_path
-    ) -> None:
+    def test_async_launch_from_wrapper_log(self, monkeypatch, tmp_path) -> None:
+        """Async manager launch should succeed when session id is in wrapper log."""
         wrapper_log = tmp_path / "codeagent-wrapper-53796.log"
         wrapper_log.write_text('{"type":"step_start","sessionID":"ses_wrapper372"}\n')
         log_path = tmp_path / "vibe3-manager-issue-372.async.log"
@@ -186,11 +183,8 @@ class TestRunManagerIssueSession:
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
 
         assert result.exit_code == 0
-        sqlite.update_flow_state.assert_called_once()
-        assert (
-            sqlite.update_flow_state.call_args.kwargs["manager_session_id"]
-            == "ses_wrapper372"
-        )
+        # manager_session_id is no longer written to flow_state
+        # (registry is the source of truth)
 
     def test_reuses_existing_session_for_launch_cwd(self, monkeypatch) -> None:
         backend = _make_backend()
@@ -235,7 +229,8 @@ class TestRunManagerIssueSession:
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] is None
 
-    def test_sync_completion_clears_manager_session_id(self, monkeypatch) -> None:
+    def test_sync_completion_succeeds(self, monkeypatch) -> None:
+        """Sync manager completion should succeed."""
         backend = _make_backend()
         backend.run.return_value = MagicMock(
             session_id="ses_manager372",
@@ -269,12 +264,11 @@ class TestRunManagerIssueSession:
         result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
 
         assert result.exit_code == 0
-        assert (
-            sqlite.update_flow_state.call_args_list[-1].kwargs.get("manager_session_id")
-            is None
-        )
+        # manager_session_id is no longer written to flow_state
+        # (registry is the source of truth)
 
-    def test_sync_dry_run_preserves_manager_session_id(self, monkeypatch) -> None:
+    def test_sync_dry_run_succeeds(self, monkeypatch) -> None:
+        """Sync dry-run should succeed without mutating flow_state."""
         backend = _make_backend()
         backend.run.return_value = MagicMock(
             session_id="ses_manager372",

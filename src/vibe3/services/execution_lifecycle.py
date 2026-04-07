@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from typing import Literal
 
+from loguru import logger
+
 from vibe3.clients.sqlite_client import SQLiteClient
 
 ExecutionRole = Literal["planner", "executor", "reviewer"]
@@ -25,12 +27,6 @@ _ROLE_ACTOR_FIELD: dict[ExecutionRole, str] = {
     "planner": "planner_actor",
     "executor": "executor_actor",
     "reviewer": "reviewer_actor",
-}
-
-_ROLE_SESSION_FIELD: dict[ExecutionRole, str] = {
-    "planner": "planner_session_id",
-    "executor": "executor_session_id",
-    "reviewer": "reviewer_session_id",
 }
 
 
@@ -67,6 +63,23 @@ def _sync_registry_from_lifecycle_event(
     - aborted   -> mark the live session for this branch+role as aborted
     """
     if lifecycle == "started":
+        # Check if a live session already exists for this branch+role
+        live_sessions = store.list_live_runtime_sessions(role=role)
+        for session in live_sessions:
+            if session.get("branch") == branch:
+                # Already have a live session for this context
+                # Skip creation to avoid duplicates
+                logger.bind(
+                    domain="execution_lifecycle",
+                    branch=branch,
+                    role=role,
+                ).warning(
+                    f"Live session already exists for {role}+{branch}, "
+                    "skipping duplicate creation"
+                )
+                return
+
+        # No duplicate found, proceed with creation
         target_type, target_id = _parse_branch_target(branch)
         session_name = f"vibe3-{role}-{target_type}-{target_id}"
         store.create_runtime_session(
@@ -108,7 +121,8 @@ def persist_execution_lifecycle_event(
 ) -> None:
     """Persist lifecycle state and timeline event for an execution role.
 
-    Terminal events (completed/aborted) clear the session_id to allow re-entry.
+    Terminal events (completed/aborted) no longer write to legacy session_id fields.
+    The runtime_session registry is the single source of truth for session tracking.
     """
     now = datetime.now().isoformat()
     status_field = _ROLE_STATUS_FIELD[role]
@@ -126,8 +140,6 @@ def persist_execution_lifecycle_event(
             status_field: status,
             "execution_completed_at": now,
             "execution_pid": None,
-            # Clear session_id on terminal state to allow re-entry
-            _ROLE_SESSION_FIELD[role]: None,
         }
     else:
         status = "crashed"
@@ -135,14 +147,9 @@ def persist_execution_lifecycle_event(
             status_field: status,
             "execution_completed_at": now,
             "execution_pid": None,
-            # Clear session_id on terminal state to allow re-entry
-            _ROLE_SESSION_FIELD[role]: None,
         }
 
     state_updates[_ROLE_ACTOR_FIELD[role]] = actor
-    # Only set session_id on started, not on terminal states
-    if lifecycle == "started" and session_id:
-        state_updates[_ROLE_SESSION_FIELD[role]] = session_id
     if extra_state_updates:
         state_updates.update(extra_state_updates)
 

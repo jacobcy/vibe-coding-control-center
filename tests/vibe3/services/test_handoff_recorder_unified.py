@@ -83,7 +83,8 @@ def test_record_handoff_unified_for_plan(mock_create, mock_persist) -> None:
     kwargs = mock_persist.call_args.kwargs
     assert kwargs["event_type"] == "handoff_plan"
     assert kwargs["flow_state_updates"]["planner_actor"] == "planner"
-    assert kwargs["flow_state_updates"]["planner_session_id"] == "sess-plan"
+    # session_id is NOT written to flow_state (registry is source of truth)
+    assert "planner_session_id" not in kwargs["flow_state_updates"]
     assert "plan_ref" not in kwargs["flow_state_updates"]
 
 
@@ -115,7 +116,8 @@ def test_record_handoff_unified_for_run_tracks_modified_files(
     assert kwargs["refs"]["modified_files"] == "src/foo.py,tests/test_foo.py"
     assert kwargs["refs"]["plan_ref"] == "docs/plans/demo.md"
     assert kwargs["flow_state_updates"]["executor_actor"] == "codex/gpt-5.4"
-    assert kwargs["flow_state_updates"]["executor_session_id"] == "sess-run"
+    # session_id is NOT written to flow_state (registry is source of truth)
+    assert "executor_session_id" not in kwargs["flow_state_updates"]
     assert "report_ref" not in kwargs["flow_state_updates"]
 
 
@@ -142,7 +144,8 @@ def test_record_handoff_unified_for_review_tracks_verdict_without_audit_ref(
     assert kwargs["event_type"] == "handoff_review"
     assert kwargs["refs"]["verdict"] == "PASS"
     assert kwargs["flow_state_updates"]["reviewer_actor"] == "reviewer"
-    assert kwargs["flow_state_updates"]["reviewer_session_id"] == "sess-review"
+    # session_id is NOT written to flow_state (registry is source of truth)
+    assert "reviewer_session_id" not in kwargs["flow_state_updates"]
     assert "audit_ref" not in kwargs["flow_state_updates"]
 
 

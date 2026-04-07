@@ -16,9 +16,9 @@ class _ImmediateLoop:
 
 def _svc() -> AssigneeDispatchService:
     svc = AssigneeDispatchService(OrchestraConfig(polling_interval=900, dry_run=True))
-    svc._status_service = MagicMock()
+    svc._registry = MagicMock()
     # Default to 0 active flows to allow dispatch
-    svc._status_service.get_active_flow_count.return_value = 0
+    svc._registry.count_live_worker_sessions.return_value = 0
     return svc
 
 

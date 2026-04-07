@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from vibe3.manager.manager_executor import ManagerExecutor
@@ -38,6 +39,7 @@ def _build_executor_with_registry(
     executor._last_error_category = None
     executor._circuit_breaker = None
     executor._registry = registry
+    executor.repo_path = Path("/tmp/repo")
 
     mock_backend = MagicMock()
     executor._backend = mock_backend
@@ -45,11 +47,8 @@ def _build_executor_with_registry(
     executor._flow_manager = MagicMock()
     executor.result_handler = MagicMock()
     executor.worktree_manager = MagicMock()
+    executor.worktree_manager.align_auto_scene_to_base = MagicMock(return_value=True)
     executor.command_builder = MagicMock()
-
-    # status_service fallback: should NOT be called when registry is present
-    executor.status_service = MagicMock()
-    executor.status_service.get_active_manager_session_count.return_value = 0
 
     return executor, mock_backend
 
@@ -73,9 +72,7 @@ class TestManagerExecutorRegistryCapacity:
 
         assert result is False
         mock_backend.start_async_command.assert_not_called()
-        # registry was consulted, not status_service
         registry.count_live_worker_sessions.assert_called()
-        executor.status_service.get_active_manager_session_count.assert_not_called()
 
     def test_manager_dispatch_proceeds_when_registry_has_capacity(
         self,
@@ -117,32 +114,64 @@ class TestManagerExecutorRegistryCapacity:
         assert result is False
         assert 99 in executor._queued_issues
 
-    def test_manager_dispatch_fallback_to_status_service_when_no_registry(
-        self,
-    ) -> None:
-        """When no registry is provided, capacity check falls back to status_service."""
-        config = OrchestraConfig(max_concurrent_flows=2)
-        executor = ManagerExecutor.__new__(ManagerExecutor)
-        executor.config = config
-        executor.dry_run = False
-        executor._queued_issues = set()
-        executor._last_error_category = None
-        executor._circuit_breaker = None
-        executor._registry = None  # no registry
 
-        mock_backend = MagicMock()
-        executor._backend = mock_backend
-        executor._flow_manager = MagicMock()
-        executor.result_handler = MagicMock()
-        executor.worktree_manager = MagicMock()
-        executor.command_builder = MagicMock()
+class TestManagerExecutorSessionExceptionHandling:
+    """Session registry exception handling during dispatch."""
 
-        executor.status_service = MagicMock()
-        executor.status_service.get_active_manager_session_count.return_value = 2
+    def test_dispatch_marks_session_failed_on_tmux_failure(self) -> None:
+        """When tmux launch fails, reserved session is marked as failed."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 0
+        registry.reserve.return_value = 123  # session_id
 
-        issue = make_issue(55)
+        executor, mock_backend = _build_executor_with_registry(registry)
+        issue = make_issue(42)
+
+        # Mock flow and worktree setup
+        executor._flow_manager.create_flow_for_issue.return_value = {
+            "branch": "task/issue-42"
+        }
+        executor._resolve_manager_cwd = MagicMock(return_value=("/tmp/worktree", False))
+
+        # Simulate tmux launch failure
+        mock_backend.start_async_command.side_effect = RuntimeError("tmux failed")
+
         result = executor.dispatch_manager(issue)
 
         assert result is False
-        executor.status_service.get_active_manager_session_count.assert_called()
-        mock_backend.start_async_command.assert_not_called()
+        # Verify session was marked failed after tmux launch failure
+        registry.mark_failed.assert_called_once_with(123)
+
+    def test_dispatch_succeeds_even_when_mark_started_fails(self) -> None:
+        """When mark_started fails (db error), dispatch still succeeds."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 0
+        registry.reserve.return_value = 456  # session_id
+        # Simulate database error in mark_started
+        registry.mark_started.side_effect = RuntimeError("db connection lost")
+
+        executor, mock_backend = _build_executor_with_registry(registry)
+        issue = make_issue(42)
+
+        # Mock successful tmux launch
+        from vibe3.agents.backends.codeagent import AsyncExecutionHandle
+
+        mock_handle = MagicMock(spec=AsyncExecutionHandle)
+        mock_handle.tmux_session = "vibe3-manager-issue-42"
+        mock_handle.log_path = Path("/tmp/log.txt")
+        mock_backend.start_async_command.return_value = mock_handle
+
+        # Mock flow and worktree setup
+        executor._flow_manager.create_flow_for_issue.return_value = {
+            "branch": "task/issue-42"
+        }
+        executor._flow_manager.store = MagicMock()
+        executor._resolve_manager_cwd = MagicMock(return_value=("/tmp/worktree", False))
+
+        result = executor.dispatch_manager(issue)
+
+        # Dispatch succeeds despite mark_started failure
+        assert result is True
+        # mark_started was called but failed
+        registry.mark_started.assert_called_once()
+        # Session cleanup will happen via reconcile later

@@ -24,12 +24,15 @@ def _issue_payload(number: int, labels: list[str]) -> dict[str, object]:
 def orchestra_svc():
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=1)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True),
         trigger_state=IssueState.CLAIMED,
         trigger_name="plan",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
     svc._store = MagicMock()

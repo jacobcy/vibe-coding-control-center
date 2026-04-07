@@ -32,15 +32,17 @@ def manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.READY,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
-    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
@@ -55,15 +57,17 @@ def handoff_manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.HANDOFF,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
-    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
@@ -204,42 +208,40 @@ async def test_manager_handoff_does_not_double_dispatch_live_session(
 
 
 @pytest.mark.asyncio
-async def test_manager_handoff_clears_stale_session_and_resumes(
+async def test_manager_handoff_dispatches_when_no_live_session(
     handoff_manager_service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
-    """state/handoff issue clears stale manager session and resumes."""
+    """state/handoff issue dispatches when registry shows no live session."""
     svc, manager = handoff_manager_service
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/handoff"])]
     svc._has_live_dispatch = MagicMock(return_value=False)
     svc._store.get_flow_state.return_value = {
         "plan_ref": "/tmp/plan.md",
-        "manager_session_id": "ses_stale_manager42",
+        "manager_session_id": "ses_stale_manager42",  # legacy field, ignored
     }
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
 
     await svc.on_tick()
 
     manager.dispatch_manager.assert_called_once()
-    assert svc._store.update_flow_state.call_args.kwargs["manager_session_id"] is None
 
 
 @pytest.mark.asyncio
-async def test_manager_ready_clears_stale_session_and_redispatches(
+async def test_manager_ready_dispatches_when_no_live_session(
     manager_service: tuple[StateLabelDispatchService, MagicMock],
 ) -> None:
-    """state/ready issue clears stale manager session and dispatches again."""
+    """state/ready issue dispatches when registry shows no live session."""
     svc, manager = manager_service
     svc._github.list_issues.return_value = [_issue_payload(labels=["state/ready"])]
     svc._has_live_dispatch = MagicMock(return_value=False)
     svc._store.get_flow_state.return_value = {
-        "manager_session_id": "ses_stale_manager42"
+        "manager_session_id": "ses_stale_manager42"  # legacy field, ignored
     }
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
 
     await svc.on_tick()
 
     manager.dispatch_manager.assert_called_once()
-    assert svc._store.update_flow_state.call_args.kwargs["manager_session_id"] is None
 
 
 @pytest.mark.asyncio

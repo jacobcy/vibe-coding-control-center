@@ -118,10 +118,11 @@ class ManagerExecutor:
             issue=issue.number,
         )
 
-        if self._registry is not None:
-            active_count = self._registry.count_live_worker_sessions(role="manager")
-        else:
-            active_count = self.status_service.get_active_manager_session_count()
+        if self._registry is None:
+            raise RuntimeError(
+                "SessionRegistryService is required for manager dispatch"
+            )
+        active_count = self._registry.count_live_worker_sessions(role="manager")
         capacity = self.config.max_concurrent_flows
 
         if active_count >= capacity:
@@ -192,6 +193,16 @@ class ManagerExecutor:
             _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
 
         launched = False
+        # Reserve session in registry BEFORE launching tmux (prevent orphaned sessions)
+        session_id: int | None = None
+        if self._registry is not None:
+            session_id = self._registry.reserve(
+                role="manager",
+                target_type="issue",
+                target_id=str(issue.number),
+                branch=flow_branch,
+            )
+
         try:
             cmd = [
                 "uv",
@@ -214,6 +225,9 @@ class ManagerExecutor:
                     env=_manager_env,
                 )
             except Exception as exc:
+                # Clean up reserved session on launch failure
+                if self._registry is not None and session_id is not None:
+                    self._registry.mark_failed(session_id)
                 log.error(f"Manager async start failed: {exc}")
                 self._mark_manager_start_failed(
                     issue,
@@ -226,23 +240,20 @@ class ManagerExecutor:
             )
             launched = True
 
-            # Create runtime_session in registry (consistent with other async roles)
-            session_id: int | None = None
-            if self._registry is not None:
-                session_id = self._registry.reserve(
-                    role="manager",
-                    target_type="issue",
-                    target_id=str(issue.number),
-                    branch=flow_branch,
-                )
-                self._registry.mark_started(
-                    session_id, tmux_session=handle.tmux_session
-                )
+            # Mark session as running AFTER successful launch
+            if self._registry is not None and session_id is not None:
+                try:
+                    self._registry.mark_started(
+                        session_id, tmux_session=handle.tmux_session
+                    )
+                except Exception as exc:
+                    # Database error, but tmux is already running
+                    # Log warning but don't fail the dispatch
+                    log.warning(
+                        f"Failed to mark session started in registry: {exc}. "
+                        "Session will be cleaned up by reconcile."
+                    )
 
-            self._flow_manager.store.update_flow_state(
-                flow_branch,
-                manager_session_id=handle.tmux_session,
-            )
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",

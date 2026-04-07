@@ -2,7 +2,6 @@
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
@@ -143,34 +142,6 @@ class FlowManager:
                 active += 1
         return active
 
-    def get_active_manager_session_count(self) -> int:
-        """Count live manager tmux sessions for task flows.
-
-        [Deprecated] Prefer SessionRegistryService.count_live_worker_sessions()
-        when registry is available. This method is kept for backward compatibility
-        and should not be used for new capacity checks.
-
-        Capacity for manager dispatch should reflect running manager/codeagent
-        instances, not logical flow occupancy.
-        """
-        live_sessions = CodeagentBackend.list_tmux_sessions(
-            prefix="vibe3-manager-issue-"
-        )
-        if not live_sessions:
-            return 0
-
-        active_sessions: set[str] = set()
-        for flow in self.store.get_all_flows():
-            branch = str(flow.get("branch") or "").strip()
-            if not self.issue_flow_service.is_task_branch(branch):
-                continue
-            session_id = str(flow.get("manager_session_id") or "").strip()
-            if not session_id:
-                continue
-            if session_id in live_sessions:
-                active_sessions.add(session_id)
-        return len(active_sessions)
-
     def _resolve_task_issue_number(
         self, branch: str, flow: dict[str, object]
     ) -> int | None:
@@ -231,11 +202,9 @@ class FlowManager:
             return self._reactivate_canonical_flow(issue, branch, slug)
 
         # Capacity Check: Before creating a NEW flow, verify global capacity
-        # Prefer registry count for consistency with dispatch path
-        if self._registry is not None:
-            active_count = self._registry.count_live_worker_sessions(role="manager")
-        else:
-            active_count = self.get_active_manager_session_count()
+        if self._registry is None:
+            raise RuntimeError("SessionRegistryService is required for capacity check")
+        active_count = self._registry.count_live_worker_sessions(role="manager")
         if active_count >= self.config.max_concurrent_flows:
             limit = self.config.max_concurrent_flows
             raise RuntimeError(

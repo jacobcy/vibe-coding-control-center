@@ -38,7 +38,8 @@ class TestManagerDispatch:
         executor._flow_manager = MagicMock()
         executor._circuit_breaker = None
         executor.status_service = MagicMock()
-        executor.status_service.get_active_manager_session_count.return_value = 0
+        executor._registry = MagicMock()
+        executor._registry.count_live_worker_sessions.return_value = 0
 
         # flow exists with a branch
         executor._flow_manager.get_flow_for_issue.return_value = {
@@ -67,7 +68,8 @@ class TestManagerDispatch:
             manager.flow_manager,
             "create_flow_for_issue",
         ) as mock_create_flow:
-            manager.status_service.get_active_manager_session_count = lambda: 0
+            manager._registry = MagicMock()
+            manager._registry.count_live_worker_sessions.return_value = 0
             with patch("subprocess.run") as mock_run:
                 result = manager.dispatch_manager(issue)
 
@@ -82,6 +84,7 @@ class TestManagerDispatch:
     def test_dispatch_manager_starts_internal_manager_run_in_target_worktree(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
         issue = make_issue(number=102, title="Manager session test")
 
         with patch.object(
@@ -90,9 +93,7 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-102"},
         ):
             with patch.object(
-                manager.status_service,
-                "get_active_manager_session_count",
-                return_value=0,
+                manager._registry, "count_live_worker_sessions", return_value=0
             ):
                 with patch.object(
                     manager,
@@ -108,7 +109,7 @@ class TestManagerDispatch:
                             with patch.object(
                                 manager.flow_manager.store,
                                 "update_flow_state",
-                            ) as mock_update_flow_state:
+                            ):
                                 with patch.object(
                                     manager.flow_manager.store,
                                     "add_event",
@@ -139,10 +140,8 @@ class TestManagerDispatch:
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
-        mock_update_flow_state.assert_called_once_with(
-            "task/issue-102",
-            manager_session_id="vibe3-manager-102",
-        )
+        # manager_session_id is no longer written to flow_state
+        # (registry is the source of truth)
         # Async dispatch records "dispatched" event, not success
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"
@@ -150,6 +149,7 @@ class TestManagerDispatch:
     def test_dispatch_manager_does_not_preclaim_before_launch(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
         issue = make_issue(number=103, title="Claim before manager run")
 
         with patch.object(
@@ -158,9 +158,7 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-103"},
         ):
             with patch.object(
-                manager.status_service,
-                "get_active_manager_session_count",
-                return_value=0,
+                manager._registry, "count_live_worker_sessions", return_value=0
             ):
                 with patch.object(
                     manager,
@@ -196,6 +194,7 @@ class TestManagerDispatch:
     def test_dispatch_manager_start_failure_marks_issue_failed(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
         issue = make_issue(number=104, title="Manager startup failure")
 
         with patch.object(
@@ -204,9 +203,7 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-104"},
         ):
             with patch.object(
-                manager.status_service,
-                "get_active_manager_session_count",
-                return_value=0,
+                manager._registry, "count_live_worker_sessions", return_value=0
             ):
                 with patch.object(
                     manager,
@@ -238,6 +235,7 @@ class TestManagerDispatch:
     def test_dispatch_manager_preserves_temporary_worktree_after_async_launch(self):
         config = OrchestraConfig()
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
         issue = make_issue(number=105, title="Preserve launched worktree")
 
         with patch.object(
@@ -246,9 +244,7 @@ class TestManagerDispatch:
             return_value={"branch": "task/issue-105"},
         ):
             with patch.object(
-                manager.status_service,
-                "get_active_manager_session_count",
-                return_value=0,
+                manager._registry, "count_live_worker_sessions", return_value=0
             ):
                 with patch.object(
                     manager,
@@ -284,12 +280,11 @@ class TestManagerDispatch:
         """dispatch_manager refuses launch when capacity is exhausted."""
         config = OrchestraConfig(max_concurrent_flows=3)
         manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
         issue = make_issue(number=42, title="Capacity test")
 
         with patch.object(
-            manager.status_service,
-            "get_active_manager_session_count",
-            return_value=3,
+            manager._registry, "count_live_worker_sessions", return_value=3
         ):
             # Effective capacity = max(0, 3 - 3 - 0) = 0
             # Should refuse dispatch

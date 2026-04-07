@@ -42,12 +42,15 @@ def service() -> Generator[tuple[StateLabelDispatchService, MagicMock], None, No
     manager = MagicMock()
     manager.flow_manager.get_flow_for_issue.return_value = {"branch": "task/issue-42"}
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.CLAIMED,
         trigger_name="plan",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._store = MagicMock()
     svc._store.get_flow_state.return_value = {"latest_actor": "agent:test"}
@@ -69,12 +72,15 @@ def manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.READY,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
     svc._github.view_issue.return_value = {"number": 42, "comments": []}

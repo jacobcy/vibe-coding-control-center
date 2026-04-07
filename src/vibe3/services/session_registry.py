@@ -11,11 +11,41 @@ WORKER_ROLES = frozenset({"manager", "planner", "executor", "reviewer"})
 
 
 class SessionRegistryService:
-    """Centralises session lifecycle: naming, status transitions, and liveness."""
+    """Centralises session lifecycle: naming, status transitions, and liveness.
 
-    def __init__(self, store: SQLiteClient, backend: CodeagentBackend) -> None:
+    ## Backend Parameter Contract
+
+    The `backend` parameter controls liveness verification behavior:
+
+    - **backend=None**: Read-only mode. Assumes all tmux sessions exist.
+      Use ONLY for queries that don't affect capacity checks or dispatch gates.
+      Example: `load_session_id()` reading resume hints.
+
+    - **backend=CodeagentBackend()**: Full liveness verification.
+      REQUIRED for capacity checks, dispatch gates, and state reconciliation.
+      Example: `ManagerExecutor`, `StateLabelDispatchService`.
+
+    **WARNING**: Using backend=None in capacity/dispatch logic will cause
+    false positives (treating dead sessions as live), leading to queue starvation.
+    """
+
+    def __init__(
+        self,
+        store: SQLiteClient,
+        backend: CodeagentBackend | None = None,
+    ) -> None:
         self._store = store
         self._backend = backend
+
+    def _has_tmux_session(self, tmux: str) -> bool:
+        """Check if tmux session exists.
+
+        In read-only mode (backend=None), assumes True to avoid false negatives
+        in query scenarios. This is safe only for non-capacity logic.
+        """
+        if self._backend is None:
+            return True
+        return self._backend.has_tmux_session(tmux)
 
     def reserve(
         self,
@@ -79,6 +109,17 @@ class SessionRegistryService:
         - For sessions with a tmux_session, confirms liveness via backend.
         - Sessions still in starting with no tmux_session are counted as live.
         """
+        if self._backend is None:
+            from loguru import logger
+
+            logger.bind(
+                domain="session_registry",
+                mode="read_only",
+            ).warning(
+                "count_live_worker_sessions called with backend=None; "
+                "results may include dead sessions. This is incorrect for "
+                "capacity checks. Use backend=CodeagentBackend() instead."
+            )
         sessions = self._store.list_live_runtime_sessions(role=role)
         count = 0
         for session in sessions:
@@ -87,7 +128,7 @@ class SessionRegistryService:
                 continue
             tmux = session.get("tmux_session")
             if tmux:
-                if self._backend.has_tmux_session(tmux):
+                if self._has_tmux_session(tmux):
                     count += 1
             else:
                 # Still starting, no tmux yet - count as live
@@ -105,7 +146,7 @@ class SessionRegistryService:
         for session in sessions:
             tmux = session.get("tmux_session")
             if tmux:
-                if self._backend.has_tmux_session(tmux):
+                if self._has_tmux_session(tmux):
                     count += 1
             else:
                 # Still starting, no tmux yet - count as live
@@ -126,7 +167,7 @@ class SessionRegistryService:
         for session in sessions:
             tmux = session.get("tmux_session")
             if tmux:
-                if self._backend.has_tmux_session(tmux):
+                if self._has_tmux_session(tmux):
                     truly_live.append(session)
             else:
                 # Still starting, no tmux yet - count as live
@@ -150,7 +191,7 @@ class SessionRegistryService:
             if not tmux:
                 # No tmux assigned yet - not complete
                 continue
-            if not self._backend.has_tmux_session(tmux):
+            if not self._has_tmux_session(tmux):
                 session_id = session["id"]
                 self._store.update_runtime_session(
                     session_id, status="done", ended_at=_now_iso()
@@ -173,7 +214,7 @@ class SessionRegistryService:
             if not tmux:
                 # No tmux assigned yet - not orphanable
                 continue
-            if not self._backend.has_tmux_session(tmux):
+            if not self._has_tmux_session(tmux):
                 session_id = session["id"]
                 self._store.update_runtime_session(
                     session_id, status="orphaned", ended_at=_now_iso()
@@ -203,7 +244,7 @@ class SessionRegistryService:
                 continue
             tmux = session.get("tmux_session")
             if tmux:
-                if self._backend.has_tmux_session(tmux):
+                if self._has_tmux_session(tmux):
                     truly_live.append(session)
             else:
                 # Still starting, no tmux yet - count as live
@@ -235,7 +276,7 @@ class SessionRegistryService:
                 continue
             tmux = session.get("tmux_session")
             if tmux:
-                if self._backend.has_tmux_session(tmux):
+                if self._has_tmux_session(tmux):
                     truly_live.append(session)
             else:
                 # Still starting, no tmux yet - count as live
