@@ -112,6 +112,52 @@ class SessionRegistryService:
                 count += 1
         return count
 
+    def list_live_governance_sessions(self) -> list[dict[str, Any]]:
+        """List truly live governance sessions with tmux liveness check.
+
+        Returns sessions with role='governance' in starting|running status,
+        confirming liveness via tmux when a session name is available.
+
+        Returns:
+            List of session dicts that are truly live.
+        """
+        sessions = self._store.list_live_runtime_sessions(role="governance")
+        truly_live: list[dict[str, Any]] = []
+        for session in sessions:
+            tmux = session.get("tmux_session")
+            if tmux:
+                if self._backend.has_tmux_session(tmux):
+                    truly_live.append(session)
+            else:
+                # Still starting, no tmux yet - count as live
+                truly_live.append(session)
+        return truly_live
+
+    def mark_governance_sessions_done_when_tmux_gone(self) -> list[int]:
+        """Mark governance sessions whose tmux is gone as done.
+
+        Unlike reconcile_live_state which marks as orphaned,
+        this method marks governance sessions as 'done' because
+        normal governance completion should be reflected as done.
+
+        Returns:
+            List of session_ids that were transitioned to done.
+        """
+        sessions = self._store.list_live_runtime_sessions(role="governance")
+        done_ids: list[int] = []
+        for session in sessions:
+            tmux = session.get("tmux_session")
+            if not tmux:
+                # No tmux assigned yet - not complete
+                continue
+            if not self._backend.has_tmux_session(tmux):
+                session_id = session["id"]
+                self._store.update_runtime_session(
+                    session_id, status="done", ended_at=_now_iso()
+                )
+                done_ids.append(session_id)
+        return done_ids
+
     def reconcile_live_state(self) -> list[int]:
         """Mark starting|running sessions whose tmux is gone as orphaned.
 

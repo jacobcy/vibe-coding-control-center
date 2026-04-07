@@ -225,6 +225,20 @@ class ManagerExecutor:
                 f"(log: {handle.log_path})"
             )
             launched = True
+
+            # Create runtime_session in registry (consistent with other async roles)
+            session_id: int | None = None
+            if self._registry is not None:
+                session_id = self._registry.reserve(
+                    role="manager",
+                    target_type="issue",
+                    target_id=str(issue.number),
+                    branch=flow_branch,
+                )
+                self._registry.mark_started(
+                    session_id, tmux_session=handle.tmux_session
+                )
+
             self._flow_manager.store.update_flow_state(
                 flow_branch,
                 manager_session_id=handle.tmux_session,

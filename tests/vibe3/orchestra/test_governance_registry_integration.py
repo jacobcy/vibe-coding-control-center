@@ -49,7 +49,11 @@ class TestGovernanceRegistryIntegration:
     async def test_skips_when_live_governance_session_in_registry(self) -> None:
         """Skip tick when registry reports a live governance session."""
         registry = MagicMock(spec=SessionRegistryService)
-        registry.count_live_governance_sessions.return_value = 1
+        registry.list_live_governance_sessions.return_value = [
+            {"id": 1, "role": "governance", "status": "running"}
+        ]
+        registry.mark_governance_sessions_done_when_tmux_gone.return_value = []
+        registry.reconcile_live_state.return_value = []
 
         backend = MagicMock()
         backend.has_tmux_session_prefix.return_value = False
@@ -76,7 +80,7 @@ class TestGovernanceRegistryIntegration:
             await service.on_tick()
 
         assert run_called["count"] == 0
-        registry.count_live_governance_sessions.assert_called_once()
+        registry.list_live_governance_sessions.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_dispatches_when_no_live_governance_session_in_registry(
@@ -84,7 +88,9 @@ class TestGovernanceRegistryIntegration:
     ) -> None:
         """Dispatch governance when registry reports no live governance session."""
         registry = MagicMock(spec=SessionRegistryService)
-        registry.count_live_governance_sessions.return_value = 0
+        registry.list_live_governance_sessions.return_value = []
+        registry.mark_governance_sessions_done_when_tmux_gone.return_value = []
+        registry.reconcile_live_state.return_value = []
 
         backend = MagicMock()
         backend.has_tmux_session_prefix.return_value = False

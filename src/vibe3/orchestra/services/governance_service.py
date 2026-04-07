@@ -298,11 +298,18 @@ class GovernanceService(ServiceBase):
 
     def _has_live_dispatch(self) -> bool:
         if self._registry is not None:
-            # First reconcile stale sessions before counting
+            # First, mark any governance sessions whose tmux is gone as done
+            # (normal completion should be reflected as done, not orphaned)
+            self._registry.mark_governance_sessions_done_when_tmux_gone()
+
+            # Also reconcile other stale sessions
             self._registry.reconcile_live_state()
-            live = self._registry.count_live_governance_sessions()
-            if live > 0:
+
+            # Check for truly live governance sessions
+            live_sessions = self._registry.list_live_governance_sessions()
+            if live_sessions:
                 return True
+
             # Registry confirms no live governance session - clear stale flag
             self._in_flight = False
             return False
