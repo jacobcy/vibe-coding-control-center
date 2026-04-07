@@ -39,6 +39,7 @@ from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 if TYPE_CHECKING:
     from vibe3.orchestra.services.status_service import OrchestraStatusService
+    from vibe3.services.session_registry import SessionRegistryService
 
 TriggerName = Literal["manager", "plan", "run", "review"]
 
@@ -105,6 +106,7 @@ class StateLabelDispatchService(ServiceBase):
         executor: ThreadPoolExecutor | None = None,
         status_service: OrchestraStatusService | None = None,
         manager: ManagerExecutor | None = None,
+        registry: "SessionRegistryService | None" = None,
     ) -> None:
         self.config = config
         self.trigger_state = trigger_state
@@ -118,6 +120,7 @@ class StateLabelDispatchService(ServiceBase):
         self._backend = CodeagentBackend()
         self._store = SQLiteClient()
         self._runtime_config = VibeConfig.get_defaults()
+        self._registry = registry
         self._in_flight_dispatches: set[int] = set()
         self._dispatch_guard = asyncio.Lock()
         self._progress_snapshots: dict[int, dict[str, object]] = {}
@@ -598,5 +601,18 @@ class StateLabelDispatchService(ServiceBase):
         }[self.trigger_name]
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
+        if self._registry is not None:
+            sessions = self._registry._store.list_live_runtime_sessions(
+                role=self.trigger_name
+            )
+            target_id = str(issue_number)
+            for session in sessions:
+                if session.get("target_id") == target_id:
+                    tmux = session.get("tmux_session")
+                    if tmux:
+                        return self._backend.has_tmux_session(tmux)
+                    # still in starting state, no tmux yet — counts as live
+                    return True
+            return False
         session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
         return self._backend.has_tmux_session_prefix(session_prefix)

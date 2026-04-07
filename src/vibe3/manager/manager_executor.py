@@ -20,6 +20,7 @@ from vibe3.runtime.executor import run_command
 
 if TYPE_CHECKING:
     from vibe3.prompts.models import PromptRenderResult
+    from vibe3.services.session_registry import SessionRegistryService
 
 
 class ManagerExecutor:
@@ -32,6 +33,7 @@ class ManagerExecutor:
         dry_run: bool = False,
         prompts_path: Path | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        registry: "SessionRegistryService | None" = None,
     ):
         self.config = config
         self.repo_path = repo_path or Path.cwd()
@@ -47,6 +49,8 @@ class ManagerExecutor:
             config, orchestrator=self._flow_manager
         )
         self._backend = CodeagentBackend()
+
+        self._registry = registry
 
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
@@ -114,7 +118,10 @@ class ManagerExecutor:
             issue=issue.number,
         )
 
-        active_count = self.status_service.get_active_manager_session_count()
+        if self._registry is not None:
+            active_count = self._registry.count_live_worker_sessions(role="manager")
+        else:
+            active_count = self.status_service.get_active_manager_session_count()
         capacity = self.config.max_concurrent_flows
 
         if active_count >= capacity:
