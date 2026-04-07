@@ -108,7 +108,7 @@ class TestManagerDispatch:
                             with patch.object(
                                 manager.flow_manager.store,
                                 "update_flow_state",
-                            ) as mock_update_flow_state:
+                            ):
                                 with patch.object(
                                     manager.flow_manager.store,
                                     "add_event",
@@ -139,10 +139,8 @@ class TestManagerDispatch:
         assert "--manager-issue" in cmd
         assert "--sync" in cmd
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
-        mock_update_flow_state.assert_called_once_with(
-            "task/issue-102",
-            manager_session_id="vibe3-manager-102",
-        )
+        # manager_session_id is no longer written to flow_state
+        # (registry is the source of truth)
         # Async dispatch records "dispatched" event, not success
         mock_add_event.assert_called_once()
         assert mock_add_event.call_args.args[1] == "manager_dispatched"

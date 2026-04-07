@@ -46,12 +46,6 @@ _ACTOR_ROLE_BY_KIND: dict[HandoffKind, str] = {
     "review": "reviewer_actor",
 }
 
-_SESSION_ROLE_BY_KIND: dict[HandoffKind, str] = {
-    "plan": "planner_session_id",
-    "run": "executor_session_id",
-    "review": "reviewer_session_id",
-}
-
 _RESERVED_REF_KEYS = {
     "ref",
     "backend",
@@ -239,7 +233,6 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
 
     flow_state_updates: dict[str, object] = {
         _ACTOR_ROLE_BY_KIND[record.kind]: actor,
-        _SESSION_ROLE_BY_KIND[record.kind]: record.session_id,
     }
 
     persist_handoff_event(

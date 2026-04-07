@@ -19,10 +19,10 @@ def mock_store() -> MagicMock:
 
 
 class TestExecutionLifecycleSessionCleanup:
-    """Tests for session id cleanup on terminal lifecycle events."""
+    """Tests for lifecycle events - session_id is no longer written to flow_state."""
 
-    def test_completed_lifecycle_clears_session_id(self, mock_store: MagicMock) -> None:
-        """Completed lifecycle should clear session id for re-entry."""
+    def test_completed_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
+        """Completed lifecycle should update status field."""
         persist_execution_lifecycle_event(
             store=mock_store,
             branch="task/issue-42",
@@ -33,12 +33,14 @@ class TestExecutionLifecycleSessionCleanup:
             session_id="ses_plan_42",
         )
 
-        # Verify session_id was cleared (set to None) on terminal state
+        # Verify status was updated
         call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("planner_session_id") is None
+        assert call_kwargs.get("planner_status") == "done"
+        # session_id is NOT written to flow_state (registry is source of truth)
+        assert "planner_session_id" not in call_kwargs
 
-    def test_aborted_lifecycle_clears_session_id(self, mock_store: MagicMock) -> None:
-        """Aborted lifecycle should clear session id for re-entry."""
+    def test_aborted_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
+        """Aborted lifecycle should update status field."""
         persist_execution_lifecycle_event(
             store=mock_store,
             branch="task/issue-42",
@@ -49,12 +51,14 @@ class TestExecutionLifecycleSessionCleanup:
             session_id="ses_exec_42",
         )
 
-        # Verify session_id was cleared (set to None) on terminal state
+        # Verify status was updated
         call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("executor_session_id") is None
+        assert call_kwargs.get("executor_status") == "crashed"
+        # session_id is NOT written to flow_state (registry is source of truth)
+        assert "executor_session_id" not in call_kwargs
 
-    def test_started_lifecycle_keeps_session_id(self, mock_store: MagicMock) -> None:
-        """Started lifecycle should keep session id (not terminal)."""
+    def test_started_lifecycle_updates_status(self, mock_store: MagicMock) -> None:
+        """Started lifecycle should update status field."""
         persist_execution_lifecycle_event(
             store=mock_store,
             branch="task/issue-42",
@@ -65,12 +69,11 @@ class TestExecutionLifecycleSessionCleanup:
             session_id="ses_review_42",
         )
 
-        # Verify session_id was persisted
+        # Verify status was updated
         call_kwargs = mock_store.update_flow_state.call_args.kwargs
-        assert call_kwargs.get("reviewer_session_id") == "ses_review_42"
-
-        # Started is not terminal, session_id should be kept
-        # (not cleared until completed/aborted)
+        assert call_kwargs.get("reviewer_status") == "running"
+        # session_id is NOT written to flow_state (registry is source of truth)
+        assert "reviewer_session_id" not in call_kwargs
 
     def test_completed_preserves_actor_and_event_history(
         self, mock_store: MagicMock
@@ -141,10 +144,8 @@ class TestExecutionLifecycleReEntry:
             session_id="ses_plan_42_v1",
         )
 
-        # TODO: After implementation, simulate re-plan scenario
-        # This test documents that stale session_id should not block re-entry
-        # Currently, the session_id persists and would block re-dispatch
-        # After Task 4 implementation, re-entry should be allowed
+        # Registry is now the source of truth for re-entry decisions
+        # flow_state no longer contains session_id for dispatch gating
 
     def test_stale_executor_session_does_not_block_re_entry(
         self, mock_store: MagicMock
@@ -161,10 +162,7 @@ class TestExecutionLifecycleReEntry:
             session_id="ses_exec_42_v1",
         )
 
-        # TODO: After implementation, simulate re-run scenario
-        # This test documents that stale session_id should not block re-entry
-        # Currently, the session_id persists and would block re-dispatch
-        # After Task 4 implementation, re-entry should be allowed
+        # Registry is now the source of truth for re-entry decisions
 
     def test_stale_reviewer_session_does_not_block_re_entry(
         self, mock_store: MagicMock
@@ -181,14 +179,11 @@ class TestExecutionLifecycleReEntry:
             session_id="ses_review_42_v1",
         )
 
-        # TODO: After implementation, simulate re-review scenario
-        # This test documents that stale session_id should not block re-entry
-        # Currently, the session_id persists and would block re-dispatch
-        # After Task 4 implementation, re-entry should be allowed
+        # Registry is now the source of truth for re-entry decisions
 
 
 class TestRegistrySync:
-    """Tests for runtime_session registry sync via lifecycle events (Task 4)."""
+    """Tests for runtime_session registry sync via lifecycle events."""
 
     def test_started_event_creates_running_registry_session(
         self, tmp_path: Path

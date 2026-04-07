@@ -27,12 +27,6 @@ _ROLE_ACTOR_FIELD: dict[ExecutionRole, str] = {
     "reviewer": "reviewer_actor",
 }
 
-_ROLE_SESSION_FIELD: dict[ExecutionRole, str] = {
-    "planner": "planner_session_id",
-    "executor": "executor_session_id",
-    "reviewer": "reviewer_session_id",
-}
-
 
 def execution_prefix(role: ExecutionRole) -> str:
     """Return the lifecycle prefix for a role."""
@@ -108,7 +102,8 @@ def persist_execution_lifecycle_event(
 ) -> None:
     """Persist lifecycle state and timeline event for an execution role.
 
-    Terminal events (completed/aborted) clear the session_id to allow re-entry.
+    Terminal events (completed/aborted) no longer write to legacy session_id fields.
+    The runtime_session registry is the single source of truth for session tracking.
     """
     now = datetime.now().isoformat()
     status_field = _ROLE_STATUS_FIELD[role]
@@ -126,8 +121,6 @@ def persist_execution_lifecycle_event(
             status_field: status,
             "execution_completed_at": now,
             "execution_pid": None,
-            # Clear session_id on terminal state to allow re-entry
-            _ROLE_SESSION_FIELD[role]: None,
         }
     else:
         status = "crashed"
@@ -135,14 +128,9 @@ def persist_execution_lifecycle_event(
             status_field: status,
             "execution_completed_at": now,
             "execution_pid": None,
-            # Clear session_id on terminal state to allow re-entry
-            _ROLE_SESSION_FIELD[role]: None,
         }
 
     state_updates[_ROLE_ACTOR_FIELD[role]] = actor
-    # Only set session_id on started, not on terminal states
-    if lifecycle == "started" and session_id:
-        state_updates[_ROLE_SESSION_FIELD[role]] = session_id
     if extra_state_updates:
         state_updates.update(extra_state_updates)
 

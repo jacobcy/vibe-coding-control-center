@@ -355,26 +355,6 @@ class StateLabelDispatchService(ServiceBase):
                 if flow:
                     branch = str(flow.get("branch") or "").strip()
                     flow_state = self._store.get_flow_state(branch) if branch else None
-                    if (
-                        flow_state
-                        and flow_state.get("manager_session_id")
-                        and not self._has_live_dispatch(issue.number)
-                    ):
-                        self._store.update_flow_state(branch, manager_session_id=None)
-                        self._store.add_event(
-                            branch,
-                            "manager_session_cleared",
-                            "system",
-                            detail=(
-                                f"Cleared stale manager session for "
-                                f"issue #{issue.number}"
-                            ),
-                            refs={"issue": str(issue.number)},
-                        )
-                        flow_state = {
-                            **flow_state,
-                            "manager_session_id": None,
-                        }
                 # For handoff resume: only dispatch for canonical task flows
                 if self.trigger_state == IssueState.HANDOFF:
                     if not flow:
@@ -414,11 +394,10 @@ class StateLabelDispatchService(ServiceBase):
         has_live_session = is_running and self._has_live_dispatch(issue_number)
 
         if self.trigger_name == "manager":
-            # For state/ready: dispatch if no manager session
-            # For state/handoff: dispatch if no manager session.
-            # We allow manager to re-triage even if refs (like plan_ref) are missing
-            # (e.g. after a no-op fallback from planner/executor).
-            return not flow_state.get("manager_session_id")
+            # For state/ready and state/handoff: dispatch based on registry
+            # live session status only. manager_session_id is a legacy field
+            # and no longer used for dispatch decisions.
+            return not has_live_session
         if self.trigger_name == "plan":
             # Dispatch if no plan_ref AND no live session running.
             # planner_session_id is a resume hint, not a dispatch gate.

@@ -28,7 +28,6 @@ from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
 from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
-    wait_for_async_session_id,
 )
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
@@ -193,12 +192,6 @@ def run_manager_issue_mode(
             )
             raise typer.Exit(1) from exc
         updates: dict[str, object] = {"latest_actor": actor}
-        effective_session_id = session_id or wait_for_async_session_id(
-            handle.log_path,
-            timeout_seconds=30.0,
-        )
-        if effective_session_id:
-            updates["manager_session_id"] = effective_session_id
         store.update_flow_state(branch, **updates)
         store.add_event(
             branch,
@@ -257,7 +250,6 @@ def run_manager_issue_mode(
             store.update_flow_state(
                 branch,
                 latest_actor=actor,
-                manager_session_id=None,
             )
         store.add_event(
             branch,
@@ -283,7 +275,6 @@ def run_manager_issue_mode(
     store.update_flow_state(
         branch,
         latest_actor=actor,
-        manager_session_id=None,
     )
 
     store.add_event(
@@ -368,7 +359,6 @@ def resolve_manager_branch(
         flows,
         key=lambda flow: (
             flow.get("flow_status") == "active",
-            flow.get("manager_session_id") is not None,
             flow.get("updated_at") or "",
         ),
         reverse=True,

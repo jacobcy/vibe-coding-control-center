@@ -301,6 +301,7 @@ class FlowService(FlowLifecycleMixin):
         event_actor = SignatureService.get_worktree_actor()
 
         # Reset all agent sessions and execution state
+        # Note: session_id fields are no longer written (registry is source of truth)
         self.store.update_flow_state(
             branch,
             flow_slug=flow_slug,
@@ -309,10 +310,6 @@ class FlowService(FlowLifecycleMixin):
             planner_actor=None,
             executor_actor=None,
             reviewer_actor=None,
-            manager_session_id=None,
-            planner_session_id=None,
-            executor_session_id=None,
-            reviewer_session_id=None,
             plan_ref=None,
             report_ref=None,
             audit_ref=None,

@@ -20,13 +20,9 @@ _CREATE_FLOW_STATE = """
         plan_ref TEXT,
         report_ref TEXT,
         audit_ref TEXT,
-        manager_session_id TEXT,
         planner_actor TEXT,
-        planner_session_id TEXT,
         executor_actor TEXT,
-        executor_session_id TEXT,
         reviewer_actor TEXT,
-        reviewer_session_id TEXT,
         latest_actor TEXT,
         initiated_by TEXT,
         blocked_by TEXT,
@@ -118,12 +114,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE flow_state ADD COLUMN initiated_by TEXT")
         logger.bind(external="sqlite", operation="migration").info(
             "Added initiated_by column to flow_state"
-        )
-
-    if "manager_session_id" not in existing:
-        cursor.execute("ALTER TABLE flow_state ADD COLUMN manager_session_id TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added manager_session_id column to flow_state"
         )
 
     # Migration: add async execution tracking columns if missing
