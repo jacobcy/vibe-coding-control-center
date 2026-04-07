@@ -18,7 +18,6 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.manager.manager_executor import ManagerExecutor
-from vibe3.manager.session_naming import get_trigger_session_prefix
 from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import (
     STATE_PROGRESS_CONTRACT,
@@ -159,14 +158,11 @@ class StateLabelDispatchService(ServiceBase):
 
         # Apply capacity limit for manager trigger
         if self.trigger_name == "manager" and ready:
-            # Calculate effective remaining capacity (prefer registry)
-            if self._registry is not None:
-                active_count = self._registry.count_live_worker_sessions(role="manager")
-            elif self._status_service:
-                # Fallback to deprecated method (backward compatibility)
-                active_count = self._status_service.get_active_manager_session_count()
-            else:
-                active_count = 0
+            if self._registry is None:
+                raise RuntimeError(
+                    "SessionRegistryService is required for capacity check"
+                )
+            active_count = self._registry.count_live_worker_sessions(role="manager")
             in_flight_count = len(self._in_flight_dispatches)
             remaining_capacity = max(
                 0, self.config.max_concurrent_flows - active_count - in_flight_count
@@ -582,21 +578,23 @@ class StateLabelDispatchService(ServiceBase):
         )
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
-        if self._registry is not None:
-            # Map trigger_name to registry role
-            registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
-                self.trigger_name, self.trigger_name
+        if self._registry is None:
+            raise RuntimeError(
+                "SessionRegistryService is required to check live dispatch"
             )
-            # Use canonical SessionRegistryService API with branch filter
-            flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
-            branch = str(flow.get("branch") or "").strip() if flow else ""
-            if not branch:
-                return False
-            sessions = self._registry.get_truly_live_sessions_for_target(
-                role=registry_role,
-                branch=branch,
-                target_id=str(issue_number),
-            )
-            return len(sessions) > 0
-        session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
-        return self._backend.has_tmux_session_prefix(session_prefix)
+
+        # Map trigger_name to registry role
+        registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
+            self.trigger_name, self.trigger_name
+        )
+        # Use canonical SessionRegistryService API with branch filter
+        flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
+        branch = str(flow.get("branch") or "").strip() if flow else ""
+        if not branch:
+            return False
+        sessions = self._registry.get_truly_live_sessions_for_target(
+            role=registry_role,
+            branch=branch,
+            target_id=str(issue_number),
+        )
+        return len(sessions) > 0

@@ -47,10 +47,6 @@ def _build_executor_with_registry(
     executor.worktree_manager = MagicMock()
     executor.command_builder = MagicMock()
 
-    # status_service fallback: should NOT be called when registry is present
-    executor.status_service = MagicMock()
-    executor.status_service.get_active_manager_session_count.return_value = 0
-
     return executor, mock_backend
 
 
@@ -73,9 +69,7 @@ class TestManagerExecutorRegistryCapacity:
 
         assert result is False
         mock_backend.start_async_command.assert_not_called()
-        # registry was consulted, not status_service
         registry.count_live_worker_sessions.assert_called()
-        executor.status_service.get_active_manager_session_count.assert_not_called()
 
     def test_manager_dispatch_proceeds_when_registry_has_capacity(
         self,
@@ -116,33 +110,3 @@ class TestManagerExecutorRegistryCapacity:
 
         assert result is False
         assert 99 in executor._queued_issues
-
-    def test_manager_dispatch_fallback_to_status_service_when_no_registry(
-        self,
-    ) -> None:
-        """When no registry is provided, capacity check falls back to status_service."""
-        config = OrchestraConfig(max_concurrent_flows=2)
-        executor = ManagerExecutor.__new__(ManagerExecutor)
-        executor.config = config
-        executor.dry_run = False
-        executor._queued_issues = set()
-        executor._last_error_category = None
-        executor._circuit_breaker = None
-        executor._registry = None  # no registry
-
-        mock_backend = MagicMock()
-        executor._backend = mock_backend
-        executor._flow_manager = MagicMock()
-        executor.result_handler = MagicMock()
-        executor.worktree_manager = MagicMock()
-        executor.command_builder = MagicMock()
-
-        executor.status_service = MagicMock()
-        executor.status_service.get_active_manager_session_count.return_value = 2
-
-        issue = make_issue(55)
-        result = executor.dispatch_manager(issue)
-
-        assert result is False
-        executor.status_service.get_active_manager_session_count.assert_called()
-        mock_backend.start_async_command.assert_not_called()

@@ -1,6 +1,6 @@
 """Tests for FlowManager query operations."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.models.orchestration import IssueInfo, IssueState
@@ -92,20 +92,3 @@ class TestFlowQuery:
                     count = manager.get_active_flow_count()
 
         assert count == 1
-
-    def test_get_active_manager_session_count_only_counts_live_manager_sessions(
-        self,
-    ):
-        config = OrchestraConfig()
-        manager = FlowManager(config)
-
-        with patch(
-            "vibe3.manager.flow_manager.SessionRegistryService"
-        ) as mock_registry_class:
-            mock_registry = MagicMock()
-            mock_registry_class.return_value = mock_registry
-            mock_registry.count_live_worker_sessions.return_value = 2
-
-            count = manager.get_active_manager_session_count()
-
-        assert count == 2

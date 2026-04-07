@@ -118,10 +118,11 @@ class ManagerExecutor:
             issue=issue.number,
         )
 
-        if self._registry is not None:
-            active_count = self._registry.count_live_worker_sessions(role="manager")
-        else:
-            active_count = self.status_service.get_active_manager_session_count()
+        if self._registry is None:
+            raise RuntimeError(
+                "SessionRegistryService is required for manager dispatch"
+            )
+        active_count = self._registry.count_live_worker_sessions(role="manager")
         capacity = self.config.max_concurrent_flows
 
         if active_count >= capacity:

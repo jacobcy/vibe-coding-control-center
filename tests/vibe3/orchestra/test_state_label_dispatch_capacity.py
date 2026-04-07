@@ -32,12 +32,15 @@ def manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.READY,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
@@ -86,8 +89,7 @@ async def test_manager_tick_skips_dispatch_when_shared_status_service_reports_fu
 ) -> None:
     """共享 status_service 报告容量已满时，不应继续尝试 manager dispatch。"""
     svc, manager = manager_service
-    svc._status_service = MagicMock()
-    svc._status_service.get_active_manager_session_count.return_value = 2
+    svc._registry.count_live_worker_sessions.return_value = 2
     svc._github.list_issues.return_value = [_issue_payload(number=431)]
     svc._has_live_dispatch = MagicMock(return_value=False)
 
@@ -102,8 +104,7 @@ async def test_manager_tick_appends_throttled_event_when_capacity_exhausted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     svc, manager = manager_service
-    svc._status_service = MagicMock()
-    svc._status_service.get_active_manager_session_count.return_value = 2
+    svc._registry.count_live_worker_sessions.return_value = 2
     svc._github.list_issues.return_value = [_issue_payload(number=431)]
     svc._has_live_dispatch = MagicMock(return_value=False)
     events: list[tuple[str, str]] = []

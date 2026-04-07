@@ -32,15 +32,17 @@ def manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.READY,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
-    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:
@@ -55,15 +57,17 @@ def handoff_manager_service() -> (
 ):
     manager = MagicMock()
     executor = ThreadPoolExecutor(max_workers=2)
+    registry = MagicMock()
+    registry.count_live_worker_sessions.return_value = 0
     svc = StateLabelDispatchService(
         OrchestraConfig(dry_run=True, max_concurrent_flows=2),
         trigger_state=IssueState.HANDOFF,
         trigger_name="manager",
         manager=manager,
         executor=executor,
+        registry=registry,
     )
     svc._github = MagicMock()
-    svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._github.view_issue.return_value = {"number": 42, "comments": []}
     svc._store = MagicMock()
     try:

@@ -2,7 +2,6 @@
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
@@ -143,22 +142,6 @@ class FlowManager:
                 active += 1
         return active
 
-    def get_active_manager_session_count(self) -> int:
-        """Count live manager sessions for task flows via runtime_session registry.
-
-        This method queries the runtime_session table directly to count
-        manager sessions in 'running' or 'starting' status.
-
-        Returns:
-            Number of live manager sessions.
-        """
-
-        registry = SessionRegistryService(
-            store=self.store,
-            backend=CodeagentBackend(),
-        )
-        return registry.count_live_worker_sessions(role="manager")
-
     def _resolve_task_issue_number(
         self, branch: str, flow: dict[str, object]
     ) -> int | None:
@@ -219,11 +202,9 @@ class FlowManager:
             return self._reactivate_canonical_flow(issue, branch, slug)
 
         # Capacity Check: Before creating a NEW flow, verify global capacity
-        # Prefer registry count for consistency with dispatch path
-        if self._registry is not None:
-            active_count = self._registry.count_live_worker_sessions(role="manager")
-        else:
-            active_count = self.get_active_manager_session_count()
+        if self._registry is None:
+            raise RuntimeError("SessionRegistryService is required for capacity check")
+        active_count = self._registry.count_live_worker_sessions(role="manager")
         if active_count >= self.config.max_concurrent_flows:
             limit = self.config.max_concurrent_flows
             raise RuntimeError(

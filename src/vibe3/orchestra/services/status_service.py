@@ -416,15 +416,6 @@ class OrchestraStatusService:
             )
             return 0
 
-    def get_active_manager_session_count(self) -> int:
-        try:
-            return self._orchestrator.get_active_manager_session_count()
-        except Exception as exc:
-            logger.bind(domain="orchestra").warning(
-                f"Failed to count live manager sessions: {exc}"
-            )
-            return 0
-
     def _get_circuit_breaker_state(self) -> str:
         if self._circuit_breaker:
             return self._circuit_breaker.state_value
