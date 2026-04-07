@@ -159,11 +159,19 @@ class TaskResumeUsecase:
                     worktree_path = (
                         str(resolved_path) if resolved_path is not None else None
                     )
+                    # Query registry for live sessions (prefer over deprecated fields)
+                    live_sessions = self.flow_service.store.list_live_runtime_sessions()
+                    has_live_sessions = any(
+                        s.get("branch") == branch for s in live_sessions
+                    )
+                else:
+                    has_live_sessions = None
                 skip_reason = self.candidates.maybe_skip_all_task_candidate(
                     issue_number=issue_number,
                     flow=flow,
                     candidate_state=candidate.get("state"),
                     worktree_path=worktree_path,
+                    has_live_sessions=has_live_sessions,
                 )
                 if skip_reason is not None:
                     result["skipped"].append(

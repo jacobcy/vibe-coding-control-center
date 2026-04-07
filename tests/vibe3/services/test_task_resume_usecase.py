@@ -3,6 +3,10 @@
 import subprocess
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.commands.handoff_read import _get_live_sessions_for_branch
 from vibe3.models.orchestration import IssueState
 from vibe3.services import task_resume_operations, task_resume_usecase
 
@@ -493,3 +497,39 @@ def test_resume_issues_clears_existing_tmux_sessions_before_reactivate() -> None
             ["tmux", "kill-session", "-t", "vibe3-manager-issue-320-2"],
             ["tmux", "kill-session", "-t", "vibe3-plan-issue-320"],
         ]
+
+
+def test_handoff_read_includes_runtime_sessions_from_registry(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """handoff read 结果中包含来自 registry 的 runtime_sessions 视图。
+
+    _get_live_sessions_for_branch 应从 SQLite registry 读取 live sessions，
+    按 branch 过滤后返回。
+    """
+    store = SQLiteClient(db_path=str(tmp_path / "handoff.db"))
+
+    # 在 registry 中创建一个 manager session（branch 匹配）
+    store.create_runtime_session(
+        role="manager",
+        target_type="issue",
+        target_id="451",
+        branch="task/issue-451",
+        session_name="vibe3-manager-issue-451",
+        status="running",
+    )
+    # 另一个 branch 的 session（不应出现）
+    store.create_runtime_session(
+        role="executor",
+        target_type="issue",
+        target_id="999",
+        branch="task/issue-999",
+        session_name="vibe3-executor-issue-999",
+        status="running",
+    )
+
+    sessions = _get_live_sessions_for_branch(store, "task/issue-451")
+
+    assert len(sessions) == 1
+    assert sessions[0]["role"] == "manager"
+    assert sessions[0]["branch"] == "task/issue-451"

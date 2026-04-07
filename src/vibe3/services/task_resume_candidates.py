@@ -206,24 +206,42 @@ class TaskResumeCandidates:
         flow: FlowStatusResponse | None,
         candidate_state: object,
         worktree_path: str | None,
+        has_live_sessions: bool | None = None,
     ) -> str | None:
-        """Skip noop all-task candidates that no longer have a task scene to reset."""
+        """Skip noop all-task candidates that no longer have a task scene to reset.
+
+        Args:
+            issue_number: GitHub issue number
+            flow: Flow status response
+            candidate_state: Current issue state
+            worktree_path: Worktree path (if exists)
+            has_live_sessions: Whether branch has live runtime sessions (from registry).
+                If provided, used instead of deprecated session_id fields.
+
+        Returns:
+            Skip reason string if candidate should be skipped, None otherwise.
+        """
         branch = getattr(flow, "branch", None) if flow else None
         if not isinstance(branch, str):
             return None
 
-        has_runtime_sessions = bool(
-            flow
-            and any(
-                getattr(flow, field, None)
-                for field in (
-                    "manager_session_id",
-                    "planner_session_id",
-                    "executor_session_id",
-                    "reviewer_session_id",
+        # Prefer registry result over deprecated session_id fields
+        if has_live_sessions is None:
+            # Fallback to deprecated fields (backward compatibility)
+            has_runtime_sessions = bool(
+                flow
+                and any(
+                    getattr(flow, field, None)
+                    for field in (
+                        "manager_session_id",
+                        "planner_session_id",
+                        "executor_session_id",
+                        "reviewer_session_id",
+                    )
                 )
             )
-        )
+        else:
+            has_runtime_sessions = has_live_sessions
 
         if (
             candidate_state == IssueState.READY

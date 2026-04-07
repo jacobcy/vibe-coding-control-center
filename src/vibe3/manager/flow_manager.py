@@ -143,6 +143,10 @@ class FlowManager:
     def get_active_manager_session_count(self) -> int:
         """Count live manager tmux sessions for task flows.
 
+        [Deprecated] Prefer SessionRegistryService.count_live_worker_sessions()
+        when registry is available. This method is kept for backward compatibility
+        and should not be used for new capacity checks.
+
         Capacity for manager dispatch should reflect running manager/codeagent
         instances, not logical flow occupancy.
         """

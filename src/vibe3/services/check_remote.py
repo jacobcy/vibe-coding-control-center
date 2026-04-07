@@ -73,12 +73,20 @@ def resolve_task_issue_number(
 
 
 def is_empty_auto_scene(flow_data: dict[str, object]) -> bool:
-    """Check if flow has empty auto scene markers."""
+    """Check if flow has empty auto scene markers.
+
+    Note: manager_session_id, planner_session_id, executor_session_id, and
+    reviewer_session_id are deprecated fields. They are kept for backward
+    compatibility but should not be used for runtime session checks.
+    Use runtime_session registry instead.
+    """
     markers = (
+        # Deprecated: use runtime_session registry instead
         "manager_session_id",
         "planner_session_id",
         "executor_session_id",
         "reviewer_session_id",
+        # Non-deprecated markers
         "plan_ref",
         "report_ref",
         "audit_ref",

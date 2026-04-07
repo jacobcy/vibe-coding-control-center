@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 from loguru import logger
 
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.services.flow_service import FlowService
@@ -22,8 +23,21 @@ from vibe3.utils.issue_branch_resolver import resolve_issue_branch_input
 UPDATE_LOG_MESSAGE_PREVIEW_LIMIT = 80
 
 
-def _render_agent_chain(state: FlowState) -> None:
-    console.print("[bold]═══ Agent Chain ═══[/]")
+def _get_live_sessions_for_branch(store: SQLiteClient, branch: str) -> list[dict]:
+    """Return live runtime sessions from the registry for a given branch.
+
+    Queries the runtime_session registry for sessions with status
+    'starting' or 'running', filtered to the given branch.
+    """
+    all_live = store.list_live_runtime_sessions()
+    return [s for s in all_live if s.get("branch") == branch]
+
+
+def _render_agent_chain(
+    state: FlowState,
+    live_sessions: list[dict] | None = None,
+) -> None:
+    console.print("[bold]Agent Chain[/]")
     for label, actor_label, session_label in [
         ("spec_ref", "planner_actor", "planner_session_id"),
         ("plan_ref", "planner_actor", "planner_session_id"),
@@ -38,6 +52,16 @@ def _render_agent_chain(state: FlowState) -> None:
         status = val if val else "[dim](pending)[/]"
         console.print(f"  [dim]{label}[/]  {status}{actor_str}{session_str}")
     console.print()
+
+    # Show live registry sessions (prefer registry over deprecated FlowState fields)
+    if live_sessions:
+        console.print("[bold]Live Sessions (registry)[/]")
+        for sess in live_sessions:
+            role = sess.get("role", "")
+            name = sess.get("session_name", "")
+            status = sess.get("status", "")
+            console.print(f"  [green]{role}[/]  {name}  [dim]{status}[/]")
+        console.print()
 
 
 def _render_handoff_events(events: list[FlowEvent]) -> None:
@@ -240,27 +264,35 @@ def show(
             typer.echo(json.dumps(output, indent=2, default=str))
             return
 
+        # Fetch live registry sessions (preferred over deprecated FlowState fields)
+        live_sessions = _get_live_sessions_for_branch(service.store, target_branch)
+
         console.print(f"\n[bold cyan]flow[/]: {state.flow_slug}")
         console.print()
-        _render_agent_chain(state)
+        _render_agent_chain(state, live_sessions=live_sessions)
 
-        # Show resume hints if session IDs exist
+        # Show resume hints: prefer registry sessions, fall back to deprecated fields
         hints_shown = False
-        for role, session_id in [
+        registry_session_ids = [
+            s.get("backend_session_id") or s.get("session_name", "")
+            for s in live_sessions
+        ]
+        legacy_sessions = [
             ("planner", state.planner_session_id),
             ("executor", state.executor_session_id),
             ("reviewer", state.reviewer_session_id),
-        ]:
-            if session_id:
+        ]
+        for role, session_id in legacy_sessions:
+            if session_id and session_id not in registry_session_ids:
                 if not hints_shown:
-                    console.print("[bold]💡 Resume Hints[/]")
+                    console.print("[bold]Resume Hints[/]")
                     hints_shown = True
                 console.print(f'  [dim]codeagent-wrapper resume {session_id} "..."[/]')
 
         if hints_shown:
             console.print()
 
-        console.print("[bold]═══ Recent Handoff Events ═══[/]")
+        console.print("[bold]--- Recent Handoff Events ---[/]")
         console.print()
         _render_handoff_events(handoff_events)
 
@@ -269,7 +301,7 @@ def show(
         handoff_dir = get_branch_handoff_dir(git_dir, target_branch)
         current_md = handoff_dir / "current.md"
 
-        console.print("[bold]═══ Update Log (current.md) ═══[/]")
+        console.print("[bold]--- Update Log (current.md) ---[/]")
         console.print(f"  [dim]path[/]  {current_md}")
         console.print()
 

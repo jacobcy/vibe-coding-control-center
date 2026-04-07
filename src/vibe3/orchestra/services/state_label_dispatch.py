@@ -151,12 +151,14 @@ class StateLabelDispatchService(ServiceBase):
 
         # Apply capacity limit for manager trigger
         if self.trigger_name == "manager" and ready:
-            # Calculate effective remaining capacity
-            active_count = (
-                self._status_service.get_active_manager_session_count()
-                if self._status_service
-                else 0
-            )
+            # Calculate effective remaining capacity (prefer registry)
+            if self._registry is not None:
+                active_count = self._registry.count_live_worker_sessions(role="manager")
+            elif self._status_service:
+                # Fallback to deprecated method (backward compatibility)
+                active_count = self._status_service.get_active_manager_session_count()
+            else:
+                active_count = 0
             in_flight_count = len(self._in_flight_dispatches)
             remaining_capacity = max(
                 0, self.config.max_concurrent_flows - active_count - in_flight_count
