@@ -616,17 +616,16 @@ class StateLabelDispatchService(ServiceBase):
             registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
                 self.trigger_name, self.trigger_name
             )
-            sessions = self._registry._store.list_live_runtime_sessions(
-                role=registry_role
+            # Use canonical SessionRegistryService API with branch filter
+            flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
+            branch = str(flow.get("branch") or "").strip() if flow else ""
+            if not branch:
+                return False
+            sessions = self._registry.get_truly_live_sessions_for_target(
+                role=registry_role,
+                branch=branch,
+                target_id=str(issue_number),
             )
-            target_id = str(issue_number)
-            for session in sessions:
-                if session.get("target_id") == target_id:
-                    tmux = session.get("tmux_session")
-                    if tmux:
-                        return self._backend.has_tmux_session(tmux)
-                    # still in starting state, no tmux yet — counts as live
-                    return True
-            return False
+            return len(sessions) > 0
         session_prefix = get_trigger_session_prefix(self.trigger_name, issue_number)
         return self._backend.has_tmux_session_prefix(session_prefix)

@@ -298,6 +298,8 @@ class GovernanceService(ServiceBase):
 
     def _has_live_dispatch(self) -> bool:
         if self._registry is not None:
+            # First reconcile stale sessions before counting
+            self._registry.reconcile_live_state()
             live = self._registry.count_live_governance_sessions()
             if live > 0:
                 return True

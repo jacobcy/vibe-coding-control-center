@@ -164,6 +164,38 @@ class SessionRegistryService:
                 truly_live.append(session)
         return truly_live
 
+    def get_truly_live_sessions_for_target(
+        self, role: str, branch: str, target_id: str
+    ) -> list[dict[str, Any]]:
+        """Return truly live sessions matching role + branch + target_id.
+
+        This is the canonical method for checking if a specific execution
+        context has a live session, with proper tmux liveness verification.
+
+        Args:
+            role: The session role (e.g., 'planner', 'executor', 'reviewer').
+            branch: The branch to filter sessions by.
+            target_id: The target ID (e.g., issue number as string).
+
+        Returns:
+            List of session dicts that are truly live and match all criteria.
+        """
+        sessions = self._store.list_live_runtime_sessions(role=role)
+        truly_live: list[dict[str, Any]] = []
+        for session in sessions:
+            if session.get("branch") != branch:
+                continue
+            if session.get("target_id") != target_id:
+                continue
+            tmux = session.get("tmux_session")
+            if tmux:
+                if self._backend.has_tmux_session(tmux):
+                    truly_live.append(session)
+            else:
+                # Still starting, no tmux yet - count as live
+                truly_live.append(session)
+        return truly_live
+
 
 def _now_iso() -> str:
     return datetime.datetime.now().isoformat()
