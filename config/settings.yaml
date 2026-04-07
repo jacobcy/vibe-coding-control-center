@@ -130,8 +130,8 @@ code_limits:
         limit: 500
         reason: "Issue failure/resume 测试集，16 个测试围绕同一服务契约，平均 31 lines/test，拆分收益低"
       - path: "tests/vibe3/services/test_task_resume_usecase.py"
-        limit: 500
-        reason: "Task resume usecase 测试集，10 个测试，平均 49.5 lines/test，大量 mock setup，拆分成本高"
+        limit: 550
+        reason: "Task resume usecase 测试集，10 个测试，平均 53.5 lines/test，大量 mock setup，拆分成本高"
       - path: "tests/vibe3/commands/test_plan.py"
         limit: 500
         reason: "Plan command 测试集，23 个测试，平均 20.8 lines/test，围绕同一 CLI 入口，拆分会破坏测试完整性"
