@@ -21,18 +21,23 @@
 ## 二、五层架构 Worktree 语义
 
 ```
-L0  Orchestra / Heartbeat          -- 调度主循环，无 agent dispatch
+L0  Orchestra / Heartbeat          -- 调度主循环，StateLabelDispatchService 负责所有 dispatch
 L1  Governance Service             -- 只操作 GitHub labels，无代码修改
-L2  Supervisor + Apply             -- 读取代码验证，需要 repo 路径
-L3  Manager / Plan / Run / Review  -- 代码开发核心，WorktreeManager 预分配
+L2  Supervisor + Apply             -- 轻量治理执行，临时 worktree 隔离
+L3  Manager / Plan / Run / Review  -- 代码开发核心，WorktreeManager 预分配 worktree
 L4  Human collaboration            -- vibe-new 流程，人工引导
 ```
 
 ### L0 — Orchestra / Heartbeat
 
-- 职责：调度主循环（tick），分发 L1/L2/L3 任务。
-- Worktree：**不需要**。Orchestra 本身不执行代码修改，不调用 codeagent-wrapper。
-- 参数要求：无 cwd，无 --worktree。
+- 职责：调度主循环（tick）。`StateLabelDispatchService` 监听 issue state labels，触发 manager/plan/run/review 四类 dispatch。
+- **关键**：**所有** agent dispatch（包括 plan/run/review）都由 `StateLabelDispatchService.on_tick()` 发起，不是 manager agent 发起。
+  - `manager` 触发器：检测 `state/ready` 或 `state/handoff` label → dispatch manager agent
+  - `plan` 触发器：检测 `state/plan` label → dispatch planner agent
+  - `run` 触发器：检测 `state/run` label → dispatch executor agent
+  - `review` 触发器：检测 `state/review` label → dispatch reviewer agent
+- Worktree：**不需要**。Orchestra 本身不执行代码修改，不调用 codeagent-wrapper 直接。
+- 实现位置：`src/vibe3/orchestra/services/state_label_dispatch.py`（`StateLabelDispatchService`）
 
 ### L1 — Governance Service
 
@@ -43,38 +48,40 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ### L2 — Supervisor + Apply
 
-- 职责：SupervisorHandoffService 读取 `supervisor+state/handoff` issue，验证 findings，执行修正动作（可能修改代码）。
-- Worktree：需要 **主仓库路径**（`cwd=repo_path`），无需独立 worktree。
-  - Supervisor apply 验证代码但通常不开新功能分支，直接在主仓库执行。
-  - 若将来需要隔离，可通过 WorktreeManager 预分配（但这是 L3 的模式，当前 L2 不适用）。
-- 参数要求：`cwd=self._manager.repo_path`，禁止 `--worktree`。
+- 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。
+- Apply agent 能力范围：
+  - 更改 issue labels、关闭 issue、写入 comment
+  - 简单文档修正（typo、补漏）
+  - 参数配置调整（非代码逻辑）
+  - **超出范围的复杂代码改动** → 创建正式 task issue（含 spec），交由 L3 manager 链条处理
+- Worktree：需要**临时隔离 worktree**。Apply agent 可能修改文档/配置，需要独立于主仓库的安全空间。
+- 参数要求：传递 `--worktree`（由 codeagent-wrapper 自动创建临时 worktree），`cwd=None`。
 - 实现位置：`src/vibe3/orchestra/services/supervisor_handoff.py`
-- **当前 bug**：`agent_resolver.py:65` 传递了 `worktree=True`，应改为 `cwd=repo_path`（待修复，见 §四）。
+- **当前状态**：`agent_resolver.py:65` 已传 `worktree=True`，方向正确，但 cwd 处理需确认（待代码重构 branch）。
 
 ### L3 — Manager / Plan / Run / Review
 
-这是 worktree 管理最复杂的一层，分两个子阶段：
+- **Manager agent 是状态机，不是 dispatcher**。Manager agent 读取 issue 上下文，执行状态流转（例如将 `state/ready` 改为 `state/plan`）。后续的 plan/run/review 由 L0 的 `StateLabelDispatchService` 检测到标签变化后触发。
+- **所有 L3 agents 均由 `StateLabelDispatchService` dispatch**，并通过 `WorktreeManager.resolve_manager_cwd()` 解析 worktree 路径。
 
-#### L3a — Manager Agent 启动
+#### L3 dispatch 流程
 
-- 职责：WorktreeManager 在 dispatch 前为 manager agent 预分配 worktree。
+```
+StateLabelDispatchService.on_tick()
+  → _resolve_cwd() → WorktreeManager.resolve_manager_cwd()
+  → start_async_command(cmd, cwd=wt_path)
+```
+
 - Worktree 分配者：**WorktreeManager**（`src/vibe3/manager/worktree_manager.py`）。
-- 参数要求：`cwd=manager_worktree_path`，禁止 `--worktree`。
+- 参数要求：`cwd=wt_path`，禁止 `--worktree`。
 - WorktreeManager 的 worktree 已包含：
   - 独立的 git worktree（与主仓库隔离）
   - 正确的 branch checkout
   - 环境变量与 flow 状态绑定
 
-#### L3b — Manager Agent 内部派发 Workers
+#### 关于 prompts.py 中 --worktree 的说明
 
-- 职责：Manager agent 运行中通过 `vibe3 run` / `vibe3 plan` 派发 worker agents。
-- Worktree 继承：Worker 继承 Manager 的 worktree（通过 `cwd` 透传）。
-- **关键约束**：Worker dispatch 命令里 **禁止** 携带 `--worktree`。
-  - Manager agent 的 `cwd` 已是 pre-allocated worktree。
-  - 若 worker 再加 `--worktree`，会在 worktree 内嵌套创建 `do-<n>` 子目录，导致路径嵌套 bug。
-- 实现位置（有 bug 待修）：
-  - `src/vibe3/manager/prompts.py:63-64` — `use_worktree` 条件注入 `--worktree` 到 worker cmd
-  - `src/vibe3/manager/command_builder.py:50-51` — PR review dispatch 同样有此问题
+`manager/prompts.py:63-64` 和 `command_builder.py:50-51` 中仍有 `--worktree` 注入逻辑。这些路径属于 CLI 直接调用路径（非 orchestra path）或遗留的 prompt 模板内容，不代表 manager agent 会在运行中 dispatch workers。这些 `--worktree` 注入在 orchestra 路径下会导致 bug（详见 §四）。
 
 ### L4 — Human Collaboration
 
@@ -86,14 +93,14 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ## 三、Worktree 所有权表
 
-| 层级 | 执行主体 | Worktree 需求 | 分配者 | 传递方式 | --worktree 使用 |
-|------|---------|-------------|-------|---------|---------------|
-| L0 | Orchestra/HB | 无 | - | - | 禁止 |
-| L1 | GovernanceService | 无 | - | cwd=None | 禁止 |
-| L2 | SupervisorHandoffService | repo 路径 | 调用方 | cwd=repo_path | 禁止 |
-| L3a | Manager Agent | 独立 worktree | WorktreeManager | cwd=wt_path | 禁止 |
-| L3b | Worker Agent | 继承 Manager | 继承 cwd | cwd 透传 | **严禁** |
-| L4 | 人工 | 可选 | 人工 | 视情况 | 允许 |
+| 层级 | 执行主体 | Dispatch 来源 | Worktree 需求 | 传递方式 | --worktree 使用 |
+|------|---------|-------------|-------------|---------|---------------|
+| L0 | StateLabelDispatchService | 自身（tick loop） | 无 | - | 禁止 |
+| L1 | GovernanceService | StateLabelDispatch | 无 | cwd=None | 禁止 |
+| L2 | SupervisorHandoffService | SupervisorHandoff.on_tick | 临时 worktree | --worktree | 允许（隔离用） |
+| L3 | Manager Agent | StateLabelDispatch | 独立 worktree | cwd=wt_path | 禁止 |
+| L3 | Plan/Run/Review Agent | StateLabelDispatch | 独立 worktree | cwd=wt_path | 禁止 |
+| L4 | 人工 | 人工触发 | 可选 | 视情况 | 允许 |
 
 ---
 
@@ -103,11 +110,11 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 | 位置 | 问题 | 修复方向 |
 |------|------|---------|
-| `manager/prompts.py:63-64` | Worker dispatch cmd 含 `--worktree`，与 manager cwd 同时存在 | 移除 `--worktree` 注入逻辑 |
-| `manager/command_builder.py:50-51` | PR review dispatch 同样含 `--worktree` | 移除 `use_worktree` 条件分支 |
-| `orchestra/agent_resolver.py:65` | supervisor apply 传 `worktree=True`，应传 `cwd=repo_path` | 改为 `cwd=self._manager.repo_path` |
-| `orchestra/agent_resolver.py:45` | governance 传 `worktree=True`，governance 无需 worktree | 改为 `worktree=False` 或移除 |
-| `manager/manager_executor.py:184` | `worktree=is_temporary` 错误地将临时标志传给 --worktree 参数 | 解耦 is_temporary 与 worktree 参数语义 |
+| `manager/prompts.py:63-64` | CLI 路径中 dispatch cmd 携带 `--worktree`，而调用环境已有 cwd（worktree 嵌套） | 移除 `--worktree` 注入逻辑（CLI 路径统一通过 cwd 传递） |
+| `manager/command_builder.py:50-51` | PR review dispatch 同样携带 `--worktree` | 移除 `use_worktree` 条件分支 |
+| `orchestra/agent_resolver.py:45` | governance resolve 传 `worktree=True`，governance 无需 worktree | 改为 `worktree=False` 或移除 |
+| `orchestra/agent_resolver.py:65` | supervisor apply 传 `worktree=True` 但 cwd 处理不清晰 | 确认 `--worktree` 路径通 → `cwd=None`；需与 `SupervisorHandoffService` 调用侧对齐 |
+| `manager/manager_executor.py:184` | `worktree=is_temporary` 将临时标志误传给 --worktree 参数 | 解耦 is_temporary 与 worktree 参数语义 |
 
 ---
 
