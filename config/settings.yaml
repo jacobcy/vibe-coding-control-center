@@ -60,6 +60,9 @@ code_limits:
       - path: "src/vibe3/services/handoff_service.py"
         limit: 500
         reason: "handoff 状态读写聚合"
+      - path: "src/vibe3/services/issue_failure_service.py"
+        limit: 450
+        reason: "Issue 状态异常转换聚合，职责单一，去重辅助函数共享，与测试对称"
 
       # Clients 聚合 —— 允许 500
       - path: "src/vibe3/clients/git_client.py"
