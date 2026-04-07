@@ -89,7 +89,8 @@
 2. **标记阻塞**：如果一个 Issue 因为依赖或其他原因无法推进，请设置 `state/blocked` 标签，并发表评论说明原因。
 3. **标记完成**：如果一个 Issue 对应的 PR 已合并或任务已确认完成，请设置 `state/done` 标签。
 4. **无需操作**：对于已经在 `state/in-progress` 或 `state/review` 状态且运行正常的 Issue，保持现状。
-5. **排序调整**：如需调整 ready queue，只允许建议 `milestone`、`roadmap/*`、`priority/[0-9]` 这类非 state 现场语义；不要用 `state/*` 做抢占排序。
+5. **同步执行状态**：如果 Issue 有活跃的手动场景（manual scene）或 flow，但缺少 `state/in-progress` 标签，需先通过 `handoff show` 确认该分支存在明确的 `plan_ref`，再添加 `state/in-progress` 标签以同步现场事实；若无 `plan_ref` 则不允许打标签。
+6. **排序调整**：如需调整 ready queue，只允许建议 `milestone`、`roadmap/*`、`priority/[0-9]` 这类非 state 现场语义；不要用 `state/*` 做抢占排序。
 
 **注意**：
 - 不要直接修改 Assignee。
