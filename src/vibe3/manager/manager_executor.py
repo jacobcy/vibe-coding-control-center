@@ -242,9 +242,17 @@ class ManagerExecutor:
 
             # Mark session as running AFTER successful launch
             if self._registry is not None and session_id is not None:
-                self._registry.mark_started(
-                    session_id, tmux_session=handle.tmux_session
-                )
+                try:
+                    self._registry.mark_started(
+                        session_id, tmux_session=handle.tmux_session
+                    )
+                except Exception as exc:
+                    # Database error, but tmux is already running
+                    # Log warning but don't fail the dispatch
+                    log.warning(
+                        f"Failed to mark session started in registry: {exc}. "
+                        "Session will be cleaned up by reconcile."
+                    )
 
             self._flow_manager.store.add_event(
                 flow_branch,
