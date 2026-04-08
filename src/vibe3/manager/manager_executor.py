@@ -12,11 +12,11 @@ from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
 from vibe3.manager.session_naming import get_manager_session_name
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.executor import run_command
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
     from vibe3.prompts.models import PromptRenderResult
@@ -176,7 +176,7 @@ class ManagerExecutor:
         # Resolve agent options in dispatcher context (correct worktree/config)
         # and pass to subprocess via env vars to override task-branch config
         from vibe3.config.settings import VibeConfig
-        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+        from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
         _manager_options = resolve_manager_agent_options(
             self.config,

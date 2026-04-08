@@ -29,9 +29,9 @@ from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.no_progress_policy import snapshot_progress
+from vibe3.runtime.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
     fail_manager_issue,
 )
@@ -142,7 +142,7 @@ def run_manager_issue_mode(
             worktree=effective_worktree,
         )
     else:
-        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+        from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
         options = resolve_manager_agent_options(
             orchestra_config,

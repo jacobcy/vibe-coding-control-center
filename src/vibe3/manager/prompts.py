@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.models import (
     PromptRecipe,

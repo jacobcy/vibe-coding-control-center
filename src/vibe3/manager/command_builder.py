@@ -8,7 +8,7 @@ from vibe3.manager.prompts import (
     build_manager_recipe,
     render_manager_prompt,
 )
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 
 if TYPE_CHECKING:
     from vibe3.models.orchestration import IssueInfo
