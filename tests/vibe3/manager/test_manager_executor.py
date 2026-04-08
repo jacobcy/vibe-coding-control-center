@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.services.session_registry import SessionRegistryService
+
+
+@pytest.fixture(autouse=True)
+def mock_failed_gate():
+    """Patch FailedGate to always pass by default in tests."""
+    with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
+        mock_check.return_value = MagicMock(blocked=False)
+        yield mock_check
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
