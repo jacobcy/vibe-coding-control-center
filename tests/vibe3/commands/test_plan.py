@@ -1,12 +1,18 @@
 """Tests for plan command."""
 
+import re
 from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
 from vibe3.commands.plan import app as plan_app
 
-runner = CliRunner()
+runner = CliRunner(env={"NO_COLOR": "1"})
+
+
+def strip_ansi(text: str) -> str:
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 def _patch_fast_plan_runtime(monkeypatch) -> MagicMock:
@@ -26,9 +32,10 @@ def _patch_fast_plan_runtime(monkeypatch) -> MagicMock:
 
 def test_plan_help_shows_options() -> None:
     result = runner.invoke(plan_app, ["--help"])
+    output = strip_ansi(result.output)
     assert result.exit_code == 0
-    assert "--issue" in result.output
-    assert "--spec" in result.output
+    assert "--issue" in output
+    assert "--spec" in output
 
 
 def test_plan_issue_exclusive_with_spec() -> None:
