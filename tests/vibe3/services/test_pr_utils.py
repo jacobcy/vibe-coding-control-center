@@ -51,21 +51,57 @@ class TestBuildLinkedSection:
     """Tests for _build_linked_section."""
 
     def test_no_task_issue(self) -> None:
-        metadata = PRMetadata(branch="main", task_issue=None)
+        metadata = PRMetadata(
+            branch="main",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         assert _build_linked_section(metadata, "body") == ""
 
     def test_injects_closes_when_new(self) -> None:
-        metadata = PRMetadata(branch="main", task_issue=42)
+        metadata = PRMetadata(
+            branch="main",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         result = _build_linked_section(metadata, "body")
         assert result == "Closes #42\n\n"
 
     def test_skips_when_already_linked(self) -> None:
-        metadata = PRMetadata(branch="main", task_issue=42)
+        metadata = PRMetadata(
+            branch="main",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         body = "Closes #42 already here"
         assert _build_linked_section(metadata, body) == ""
 
     def test_skips_when_linked_with_fixes(self) -> None:
-        metadata = PRMetadata(branch="main", task_issue=42)
+        metadata = PRMetadata(
+            branch="main",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         body = "Fixes #42"
         assert _build_linked_section(metadata, body) == ""
 
@@ -119,11 +155,24 @@ class TestContributors:
     """Tests for PRMetadata.contributors property."""
 
     def test_empty_when_all_none(self) -> None:
-        metadata = PRMetadata()
+        metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         assert metadata.contributors == []
 
     def test_empty_when_all_placeholder(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="unknown",
             executor="system",
             reviewer="server",
@@ -131,11 +180,72 @@ class TestContributors:
         )
         assert metadata.contributors == []
 
+    def test_handles_partial_none_fields(self) -> None:
+        """测试部分 actor 字段为 None 时仍能正常处理."""
+        metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor="claude/sonnet-4.6",
+            reviewer=None,
+            latest="codex/gpt-5.4",
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6", "codex/gpt-5.4"]
+
+    def test_handles_missing_planner_actor(self) -> None:
+        """测试 flow state 缺少 planner_actor 字段."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor="claude/sonnet-4.6",
+            reviewer="codex/gpt-5.4",
+            latest=None,
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6", "codex/gpt-5.4"]
+
+    def test_handles_missing_executor_actor(self) -> None:
+        """测试 flow state 缺少 executor_actor 字段."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner="claude/sonnet-4.6",
+            executor=None,
+            reviewer="codex/gpt-5.4",
+            latest=None,
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6", "codex/gpt-5.4"]
+
+    def test_handles_only_latest_actor(self) -> None:
+        """测试只有 latest_actor 字段存在."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest="claude/sonnet-4.6",
+        )
+        assert metadata.contributors == ["claude/sonnet-4.6"]
+
     def test_dedup_after_normalization(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="Agent-Claude",
             executor="claude/sonnet-4.6",
             reviewer="claude-opus",
+            latest=None,
         )
         # Agent-Claude and claude/sonnet-4.6 share backend "claude",
         # the more specific form wins. claude-opus is a different backend.
@@ -143,13 +253,23 @@ class TestContributors:
 
     def test_legacy_and_standard_merge(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="Agent-Claude",
             executor="claude/sonnet-4.6",
+            reviewer=None,
+            latest=None,
         )
         assert metadata.contributors == ["claude/sonnet-4.6"]
 
     def test_preserves_order(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="codex/gpt-5.4",
             executor="claude/sonnet-4.5",
             reviewer="claude/sonnet-4.5",
@@ -158,23 +278,53 @@ class TestContributors:
         assert metadata.contributors == ["codex/gpt-5.4", "claude/sonnet-4.5"]
 
     def test_includes_latest_actor(self) -> None:
-        metadata = PRMetadata(latest="claude/sonnet-4.6")
+        metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest="claude/sonnet-4.6",
+        )
         assert metadata.contributors == ["claude/sonnet-4.6"]
 
     def test_latest_deduped_with_other_roles(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="claude/sonnet-4.6",
+            executor=None,
+            reviewer=None,
             latest="claude/sonnet-4.6",
         )
         assert metadata.contributors == ["claude/sonnet-4.6"]
 
     def test_latest_actor_included(self) -> None:
-        metadata = PRMetadata(latest="codex/gpt-5.4")
+        metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest="codex/gpt-5.4",
+        )
         assert metadata.contributors == ["codex/gpt-5.4"]
 
     def test_latest_actor_deduplicated(self) -> None:
         metadata = PRMetadata(
+            branch=None,
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="claude-opus",
+            executor=None,
+            reviewer=None,
             latest="claude-opus",
         )
         assert metadata.contributors == ["claude-opus"]
@@ -187,23 +337,59 @@ class TestBuildPrBody:
         assert build_pr_body("plain body") == "plain body"
 
     def test_closes_prepended(self) -> None:
-        metadata = PRMetadata(branch="f1", task_issue=42)
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         result = build_pr_body("body", metadata)
         assert result.startswith("Closes #42\n\nbody")
 
     def test_no_duplicate_closes(self) -> None:
-        metadata = PRMetadata(branch="f1", task_issue=42)
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         body = "Fixes #42\n\nOriginal body"
         result = build_pr_body(body, metadata)
         assert result.startswith("Fixes #42\n\nOriginal body")
 
     def test_no_closes_when_task_zero(self) -> None:
-        metadata = PRMetadata(branch="f1", task_issue=0)
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=0,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
         result = build_pr_body("body", metadata)
         assert not result.startswith("Closes")
 
     def test_no_contributors_section_when_all_placeholder(self) -> None:
-        metadata = PRMetadata(branch="f1", planner="unknown", executor="system")
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner="unknown",
+            executor="system",
+            reviewer=None,
+            latest=None,
+        )
         result = build_pr_body("body", metadata)
         assert "Contributors" not in result
         assert "Vibe3 Metadata" not in result
@@ -212,8 +398,13 @@ class TestBuildPrBody:
     def test_contributors_section_rendered(self) -> None:
         metadata = PRMetadata(
             branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="claude/sonnet-4.6",
             executor="codex/gpt-5.4",
+            reviewer=None,
+            latest=None,
         )
         result = build_pr_body("body", metadata)
         assert "## Contributors" in result
@@ -222,9 +413,13 @@ class TestBuildPrBody:
     def test_contributors_with_three_distinct(self) -> None:
         metadata = PRMetadata(
             branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="agent-a",
             executor="agent-b",
             reviewer="agent-c",
+            latest=None,
         )
         result = build_pr_body("body", metadata)
         assert "agent-a, agent-b, agent-c" in result
@@ -237,7 +432,12 @@ class TestBuildPrBody:
         metadata = PRMetadata(
             branch="f1",
             task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
             planner="claude/sonnet-4.6",
+            executor=None,
+            reviewer=None,
+            latest=None,
         )
         result = build_pr_body("body", metadata)
         assert result.startswith("Closes #42\n\nbody")
@@ -247,8 +447,63 @@ class TestBuildPrBody:
     def test_idempotent_contributors(self) -> None:
         metadata = PRMetadata(
             branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
             planner="claude/sonnet-4.6",
             executor="claude/sonnet-4.6",
+            reviewer=None,
+            latest=None,
         )
         result = build_pr_body("body", metadata)
         assert result.count("claude/sonnet-4.6") == 1
+
+    def test_fallback_when_all_actors_placeholder(self) -> None:
+        """测试 Contributors 为空时仍有 fallback 输出."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner="unknown",
+            executor="system",
+            reviewer="server",
+            latest="ai_assistant",
+        )
+        result = build_pr_body("body", metadata)
+        # Contributors 为空,但仍有 issue linkage
+        assert result.startswith("Closes #42\n\nbody")
+        assert "Contributors" not in result
+
+    def test_fallback_when_metadata_has_no_actors(self) -> None:
+        """测试 metadata 没有 actor 字段时的 fallback."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=42,
+            flow_slug=None,
+            spec_ref=None,
+            planner=None,
+            executor=None,
+            reviewer=None,
+            latest=None,
+        )
+        result = build_pr_body("body", metadata)
+        # 没有 Contributors section,但仍有 issue linkage
+        assert result == "Closes #42\n\nbody"
+        assert "Contributors" not in result
+
+    def test_graceful_handling_of_mixed_valid_and_none_actors(self) -> None:
+        """测试混合有效 actor 和 None 字段时正常生成 Contributors."""
+        metadata = PRMetadata(
+            branch="f1",
+            task_issue=None,
+            flow_slug=None,
+            spec_ref=None,
+            planner="claude/sonnet-4.6",
+            executor=None,
+            reviewer="codex/gpt-5.4",
+            latest=None,
+        )
+        result = build_pr_body("body", metadata)
+        assert "## Contributors" in result
+        assert "claude/sonnet-4.6, codex/gpt-5.4" in result
