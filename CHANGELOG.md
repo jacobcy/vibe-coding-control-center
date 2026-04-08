@@ -1,5 +1,42 @@
 # 更新日志
 
+## [2.4.0] - 2026-04-08
+
+### ✨ New Features
+- **Domain Events System**: 引入事件驱动架构，支持 Issue 生命周期事件的发布-订阅模式
+  - 新增 domain events 模块（IssueStateChanged, IssueFailed, ReportRefRequired）
+  - 实现单例 EventPublisher 模式，支持事件发布和订阅
+  - 所有执行链（L1-L3）集成事件驱动回调机制
+- **Worktree Isolation for L2**: 为 Supervisor apply agent 添加临时 worktree 隔离
+  - SupervisorHandoffService 使用 WorktreeManager.acquire_temporary_worktree()
+  - 确保 L2 层安全执行文档修正和配置调整
+  - 符合 vibe3-worktree-ownership-standard.md 规范
+
+### 🔧 Refactor
+- **Async 标准化**: 统一所有命令和配置的 async 默认值为 True
+  - CLI 层统一使用 `--no-async` 标志（默认异步）
+  - PRReviewDispatchConfig.async_mode 默认值改为 True
+  - review_agent.py 默认异步执行
+- **Worktree 参数清理**: 移除废弃的 `--worktree` 参数
+  - 删除 CLI 命令中的 `--worktree` 选项
+  - 移除 AgentOptions.worktree 字段
+  - 清理 runner.py 中的 worktree 分支逻辑
+- **Legacy Architecture Cleanup**: 清理遗留架构代码
+  - orchestra/services/ 目录迁移为兼容层存根
+  - 删除 orchestra/config.py, orchestra/agent_resolver.py, orchestra/no_progress_policy.py
+  - 统一导入路径至新位置（services/, runtime/）
+
+### 🐛 Bug Fixes
+- 修复 `on_success` 逻辑：根据 handoff_file 存在决定发布事件类型
+- 修复测试以匹配事件驱动架构
+- 修复 CI pytest 失败（async defaults, plan tests, supervisor handoff tests）
+
+### 📚 Documentation
+- 新增 event-driven-architecture-standard.md 文档
+- 更新 vibe3-worktree-ownership-standard.md，明确 L2 worktree 隔离要求
+- 添加本地测试策略说明（避免全量 pytest）
+- 清理废弃的 --worktree 参数文档
+
 ## [2.3.0] - 2026-04-08
 
 ### ✨ New Features
