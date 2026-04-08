@@ -152,6 +152,10 @@ class SupervisorHandoffConfig(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    prompt_template: str = Field(
+        default="orchestra.supervisor.apply",
+        description="Dotted prompts.yaml path used to render supervisor/apply prompt",
+    )
     agent: str | None = Field(
         default=None,
         description="Agent preset name for supervisor handoff execution",
@@ -281,6 +285,7 @@ class OrchestraConfig(BaseModel):
             "issue_label": "supervisor",
             "handoff_state_label": "state/handoff",
             "supervisor_file": "supervisor/apply.md",
+            "prompt_template": "orchestra.supervisor.apply",
             "agent": None,
             "backend": None,
             "model": None,
@@ -306,6 +311,11 @@ class OrchestraConfig(BaseModel):
                             supervisor_handoff_src,
                             "supervisor_file",
                             "supervisor/apply.md",
+                        ),
+                        "prompt_template": getattr(
+                            supervisor_handoff_src,
+                            "prompt_template",
+                            "orchestra.supervisor.apply",
                         ),
                         "agent": getattr(supervisor_handoff_src, "agent", None),
                         "backend": getattr(supervisor_handoff_src, "backend", None),

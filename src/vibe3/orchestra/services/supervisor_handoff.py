@@ -165,6 +165,7 @@ class SupervisorHandoffService(ServiceBase):
         governance_cfg = self.config.governance.model_copy(
             update={
                 "supervisor_file": supervisor_file,
+                "prompt_template": self.config.supervisor_handoff.prompt_template,
                 "include_supervisor_content": True,
                 "dry_run": False,
             }

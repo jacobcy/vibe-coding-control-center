@@ -13,15 +13,22 @@ from typing import TYPE_CHECKING
 import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
+from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
     pass
+
+
+SUPERVISOR_APPLY_TASK = (
+    "Run supervisor/apply task. "
+    "Process the provided supervisor material or governance issue only, "
+    "perform the minimal allowed actions, then stop. "
+    "Do not switch into governance scan or run/plan/review execution modes."
+)
 
 
 def run_supervisor_mode(
@@ -43,6 +50,7 @@ def run_supervisor_mode(
     governance_cfg = config.governance.model_copy(
         update={
             "supervisor_file": supervisor_file,
+            "prompt_template": config.supervisor_handoff.prompt_template,
             "include_supervisor_content": True,
             "dry_run": dry_run,
         }
@@ -61,12 +69,14 @@ def run_supervisor_mode(
         typer.echo(plan_text)
         return
 
-    runtime_config = VibeConfig.get_defaults()
-    options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
-    run_task = build_supervisor_task(
-        config=config,
-        issue_number=issue_number,
-    ) or (runtime_config.run.run_prompt or "Execute governance supervisor task")
+    options = resolve_supervisor_agent_options(config)
+    run_task = (
+        build_supervisor_task(
+            config=config,
+            issue_number=issue_number,
+        )
+        or SUPERVISOR_APPLY_TASK
+    )
     backend = CodeagentBackend()
 
     typer.echo(f"-> Supervisor run: {supervisor_file}")

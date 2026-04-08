@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
-from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,
@@ -58,6 +57,13 @@ _GOVERNANCE_RUNTIME_VARS = (
     "running_issue_details",
     "suggested_issue_details",
     "truncated_note",
+)
+
+GOVERNANCE_TASK_PROMPT = (
+    "Run orchestra governance scan. "
+    "Analyze the current runtime snapshot, follow the governance supervisor "
+    "material only, produce governance conclusions or minimal allowed actions, "
+    "then stop. Do not switch into execution-plan or implementation mode."
 )
 
 
@@ -281,12 +287,10 @@ class GovernanceService(ServiceBase):
 
     def _dispatch_governance_prompt(self, prompt: str) -> AsyncExecutionHandle:
         options = resolve_governance_agent_options(self.config)
-        runtime_config = VibeConfig.get_defaults()
-        task = runtime_config.run.run_prompt or "Execute governance supervisor task"
         return self._backend.start_async(
             prompt=prompt,
             options=options,
-            task=task,
+            task=GOVERNANCE_TASK_PROMPT,
             execution_name=self._governance_execution_name(),
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
             keep_alive_seconds=0,
