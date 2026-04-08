@@ -135,6 +135,13 @@ def test_review_base_async_skips_parent_inspect_precompute():
     so inspect/snapshot WILL be called in the parent process.
     The optimization was removed for architectural consistency.
     """
+    mock_usecase = MagicMock()
+    mock_usecase.build_base_review.return_value = (MagicMock(), 101)
+    mock_usecase.execute_review.return_value = MagicMock(
+        verdict="ASYNC",
+        handoff_file=None,
+    )
+
     with (
         patch(
             "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
@@ -145,12 +152,12 @@ def test_review_base_async_skips_parent_inspect_precompute():
             return_value=(MagicMock(), "feature/test"),
         ),
         patch(
-            "vibe3.agents.review_agent.ReviewUsecase.execute_review",
-            return_value=MagicMock(verdict="ASYNC", handoff_file=None),
-        ) as mock_execute,
+            "vibe3.commands.review._build_review_usecase",
+            return_value=mock_usecase,
+        ),
     ):
         result = runner.invoke(app, ["base", "--async"])
 
     assert result.exit_code == 0
     # After refactoring, execute_review is called with async_mode=True
-    assert mock_execute.called
+    mock_usecase.execute_review.assert_called_once()
