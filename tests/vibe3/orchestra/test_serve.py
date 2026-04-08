@@ -33,6 +33,13 @@ from vibe3.server.registry import (
 
 
 @pytest.fixture(autouse=True)
+def mock_preflights():
+    """Patch pre-flight checks that require local network resources."""
+    with patch("vibe3.server.app._ensure_port_available", return_value=None):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def mock_failed_gate():
     with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
         mock_check.return_value = GateResult.open()
