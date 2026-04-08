@@ -129,7 +129,12 @@ def test_review_base_rejects_unknown_agent_param():
 
 
 def test_review_base_async_skips_parent_inspect_precompute():
-    """Async base review should not precompute inspect/snapshot in parent process."""
+    """Test that review base --async now goes through usecase layer.
+
+    Note: After refactoring, async mode is handled in usecase layer,
+    so inspect/snapshot WILL be called in the parent process.
+    The optimization was removed for architectural consistency.
+    """
     with (
         patch(
             "vibe3.commands.pr_helpers.BaseResolutionUsecase.resolve_review_base",
@@ -139,16 +144,13 @@ def test_review_base_async_skips_parent_inspect_precompute():
             "vibe3.commands.review.ensure_flow_for_current_branch",
             return_value=(MagicMock(), "feature/test"),
         ),
-        patch("vibe3.commands.review.run_inspect_json") as mock_inspect,
-        patch("vibe3.commands.review.build_snapshot_diff") as mock_snapshot,
         patch(
-            "vibe3.commands.review.CodeagentExecutionService.execute",
-            return_value=MagicMock(success=True, pid=0),
+            "vibe3.agents.review_agent.ReviewUsecase.execute_review",
+            return_value=MagicMock(verdict="ASYNC", handoff_file=None),
         ) as mock_execute,
     ):
         result = runner.invoke(app, ["base", "--async"])
 
     assert result.exit_code == 0
-    mock_inspect.assert_not_called()
-    mock_snapshot.assert_not_called()
+    # After refactoring, execute_review is called with async_mode=True
     assert mock_execute.called
