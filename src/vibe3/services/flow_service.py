@@ -152,6 +152,7 @@ class FlowService(FlowLifecycleMixin):
         Args:
             branch: Git branch name
         """
+        from vibe3.clients.github_client import GitHubClient
         from vibe3.services.issue_flow_service import IssueFlowService
 
         issue_service = IssueFlowService(store=self.store)
@@ -168,11 +169,36 @@ class FlowService(FlowLifecycleMixin):
             issue_number=issue_number,
         ).debug("Initializing issue flow context cache")
 
-        # Initialize cache with issue number (title will be fetched lazily)
+        # Check if there's an existing task issue link
+        issue_links = self.store.get_issue_links(branch)
+        task_issues = [
+            link["issue_number"]
+            for link in issue_links
+            if link["issue_role"] == "task"
+        ]
+        effective_issue_number = task_issues[0] if task_issues else issue_number
+
+        # Try to fetch issue title from GitHub
+        issue_title = None
+        try:
+            gh = GitHubClient()
+            issue_data = gh.view_issue(effective_issue_number)
+            if isinstance(issue_data, dict):
+                issue_title = issue_data.get("title")
+        except Exception as e:
+            logger.bind(
+                domain="flow",
+                action="init_issue_context",
+                branch=branch,
+                issue_number=effective_issue_number,
+                error=str(e),
+            ).warning("Failed to fetch issue title from GitHub")
+
+        # Initialize cache with issue number and title (if available)
         self.store.upsert_flow_context_cache(
             branch=branch,
-            task_issue_number=issue_number,
-            issue_title=None,  # Will be populated on first access
+            task_issue_number=effective_issue_number,
+            issue_title=issue_title,  # May be None if GitHub failed
             pr_number=None,
             pr_title=None,
         )
