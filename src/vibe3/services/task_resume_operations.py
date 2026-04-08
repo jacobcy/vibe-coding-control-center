@@ -13,6 +13,7 @@ from loguru import logger
 
 from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.models.orchestration import IssueState
+from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import (
     resume_blocked_issue_to_ready,
     resume_failed_issue_to_ready,
@@ -91,7 +92,7 @@ class TaskResumeOperations:
                 raise
 
     def reset_task_scene(self, branch: str, worktree_path: str | None = None) -> None:
-        """Delete stale task worktree and clear flow runtime state."""
+        """Delete the stale task scene so the next run starts from scratch."""
         if not self.issue_flow_service.is_task_branch(branch):
             return
 
@@ -109,7 +110,17 @@ class TaskResumeOperations:
         ).info("Resetting task scene")
         if resolved_path is not None:
             self.git_client.remove_worktree(resolved_path, force=True)
-        self.flow_service.reactivate_flow(branch)
+        if self.git_client.branch_exists(branch):
+            self.git_client.delete_branch(
+                branch,
+                force=True,
+                skip_if_worktree=True,
+            )
+        HandoffService(
+            store=self.flow_service.store,
+            git_client=self.git_client,
+        ).clear_handoff_for_branch(branch)
+        self.flow_service.delete_flow(branch)
 
     def terminate_task_sessions(self, branch: str) -> None:
         """Kill lingering tmux sessions for a task issue before resume."""

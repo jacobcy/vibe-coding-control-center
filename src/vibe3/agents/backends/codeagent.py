@@ -191,6 +191,10 @@ class CodeagentBackend:
             'analytics " codex analytics 403 warning block(s)"\n'
             "}\n"
         )
+        # tmux send-keys feeds literal newlines as Enter presses; keep the awk
+        # program on a single shell line so async sessions don't get stuck in
+        # zsh "pipe quote>" continuation mode.
+        script = script.replace("\n", "; ").strip()
         return ["awk", script]
 
     @classmethod
@@ -200,9 +204,20 @@ class CodeagentBackend:
         *,
         log_path: Path,
         keep_alive_seconds: int,
+        env: dict[str, str] | None = None,
     ) -> str:
         filter_command = shlex.join(cls._build_async_log_filter())
-        cmd_str = shlex.join(command)
+        env = env or {}
+        env_overrides = {
+            key: value for key, value in env.items() if os.environ.get(key) != value
+        }
+        command_with_env = command
+        if env_overrides:
+            env_prefix = ["env"] + [
+                f"{key}={value}" for key, value in sorted(env_overrides.items())
+            ]
+            command_with_env = env_prefix + command
+        cmd_str = shlex.join(command_with_env)
         log_str = shlex.quote(str(log_path))
         shell = (
             f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
@@ -355,6 +370,7 @@ class CodeagentBackend:
             command,
             log_path=log_path,
             keep_alive_seconds=keep_alive_seconds,
+            env=env,
         )
 
         # Execute command in the tmux session

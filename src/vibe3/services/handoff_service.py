@@ -1,5 +1,6 @@
 """Handoff service implementation."""
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol
@@ -149,6 +150,27 @@ class HandoffService:
         content = handoff_path.read_text(encoding="utf-8")
         logger.success("Handoff file read successfully")
         return content
+
+    def clear_handoff_for_branch(self, branch: str) -> Path:
+        """Delete all handoff files for the given branch.
+
+        This is used when a task scene is explicitly reset and any historical
+        handoff material would otherwise mislead the next manager/planner pass.
+
+        Args:
+            branch: Branch whose handoff directory should be removed
+
+        Returns:
+            The resolved handoff directory path (removed or non-existent)
+        """
+        git_dir = self.git_client.get_git_common_dir()
+        handoff_dir = get_branch_handoff_dir(git_dir, branch)
+        if handoff_dir.exists():
+            shutil.rmtree(handoff_dir)
+            logger.bind(path=str(handoff_dir), branch=branch).info(
+                "Cleared handoff directory for branch"
+            )
+        return handoff_dir
 
     def append_current_handoff(
         self,

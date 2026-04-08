@@ -24,6 +24,8 @@ from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
+    _kill_orchestra_tmux_session,
+    _orchestra_tmux_session_exists,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
@@ -160,11 +162,20 @@ async def _run(config: OrchestraConfig, port: int) -> None:
         log_level="warning",  # loguru handles our logs
     )
     uv_server = uvicorn.Server(uv_config)
+    heartbeat_task = asyncio.create_task(heartbeat.run())
+    server_task = asyncio.create_task(uv_server.serve())
 
-    await asyncio.gather(
-        heartbeat.run(),
-        uv_server.serve(),
+    done, _pending = await asyncio.wait(
+        {heartbeat_task, server_task},
+        return_when=asyncio.FIRST_COMPLETED,
     )
+
+    if heartbeat_task in done and not server_task.done():
+        uv_server.should_exit = True
+    if server_task in done and not heartbeat_task.done():
+        heartbeat.stop()
+
+    await asyncio.gather(heartbeat_task, server_task)
 
 
 # --- CLI Commands ---
@@ -361,10 +372,19 @@ def status() -> None:
     pid, is_valid = _validate_pid_file(config.pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            typer.echo("Orchestra server running in tmux session (PID file missing)")
+            raise typer.Exit(0)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            typer.echo(
+                "Orchestra server running in tmux session "
+                f"(stale PID file points to non-orchestra process {pid})"
+            )
+            raise typer.Exit(0)
         typer.echo(
             f"Orchestra server is not running (stale PID file, process {pid} "
             "is not orchestra)"
@@ -382,10 +402,29 @@ def stop() -> None:
     pid, is_valid = _validate_pid_file(pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                typer.echo("Stopped Orchestra server tmux session")
+                raise typer.Exit(0)
+            typer.echo("Failed to stop Orchestra tmux session")
+            raise typer.Exit(1)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                pid_file.unlink(missing_ok=True)
+                typer.echo(
+                    "Stopped Orchestra server tmux session "
+                    f"(stale PID file referenced process {pid})"
+                )
+                raise typer.Exit(0)
+            typer.echo(
+                "Failed to stop Orchestra tmux session "
+                f"(stale PID file referenced process {pid})"
+            )
+            raise typer.Exit(1)
         typer.echo(f"Cleaning up stale PID file (process {pid} is not orchestra)")
         pid_file.unlink()
         raise typer.Exit(0)

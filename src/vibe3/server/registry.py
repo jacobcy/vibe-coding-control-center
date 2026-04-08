@@ -32,6 +32,8 @@ from vibe3.services.orchestra_status_service import (
 )
 from vibe3.services.session_registry import SessionRegistryService
 
+ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
+
 
 def _resolve_orchestra_repo_root() -> Path:
     """Resolve the shared repo root for orchestra-managed auto scenes.
@@ -405,7 +407,7 @@ def _build_async_serve_command(
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session."""
-    session_name = "vibe3-orchestra-serve"
+    session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
     try:
@@ -435,3 +437,33 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )
+
+
+def _orchestra_tmux_session_exists() -> bool:
+    """Return whether the orchestra tmux session currently exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
+def _kill_orchestra_tmux_session() -> bool:
+    """Kill the orchestra tmux session if it exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "kill-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
