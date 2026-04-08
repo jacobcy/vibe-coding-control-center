@@ -47,8 +47,7 @@ def test_resolve_supervisor_returns_agent_options(mock_resolve, mock_sync):
     "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
     side_effect=_mock_resolve,
 )
-@patch("vibe3.runtime.agent_resolver.CodeagentExecutionService")
-def test_resolve_manager_returns_agent_options(mock_svc, mock_resolve, mock_sync):
+def test_resolve_manager_returns_agent_options(mock_resolve, mock_sync):
     config = OrchestraConfig()
     config.assignee_dispatch.backend = "gemini"
     config.assignee_dispatch.model = "gemini-3-flash-preview"
@@ -57,3 +56,18 @@ def test_resolve_manager_returns_agent_options(mock_svc, mock_resolve, mock_sync
     assert isinstance(result, AgentOptions)
     mock_resolve.assert_called_once()
     mock_sync.assert_called_once()
+
+
+def test_resolve_manager_requires_assignee_dispatch_config():
+    config = OrchestraConfig()
+    runtime_config = MagicMock()
+
+    with patch("vibe3.runtime.agent_resolver.sync_models_json") as mock_sync:
+        try:
+            resolve_manager_agent_options(config, runtime_config)
+        except ValueError as exc:
+            assert "assignee_dispatch" in str(exc)
+        else:
+            raise AssertionError("Expected ValueError when manager config is missing")
+
+    mock_sync.assert_not_called()

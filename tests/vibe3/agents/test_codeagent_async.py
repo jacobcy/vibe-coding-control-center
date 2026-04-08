@@ -61,6 +61,28 @@ class TestStartAsyncCommand:
         assert "keeping tmux session alive for 5s" in shell
         assert "sleep 5" in shell
 
+    def test_build_async_log_filter_is_single_shell_line(self) -> None:
+        filter_cmd = CodeagentBackend._build_async_log_filter()
+
+        assert filter_cmd[0] == "awk"
+        assert "\n" not in filter_cmd[1]
+
+    def test_build_async_shell_command_injects_env_overrides(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["uv", "run", "python", "src/vibe3/cli.py", "internal", "manager", "328"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=0,
+            env={
+                "VIBE3_ASYNC_CHILD": "1",
+                "VIBE3_MANAGER_BACKEND": "opencode",
+                "VIBE3_MANAGER_MODEL": "opencode/minimax-m2.5-free",
+            },
+        )
+
+        assert "env VIBE3_ASYNC_CHILD=1" in shell
+        assert "VIBE3_MANAGER_BACKEND=opencode" in shell
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in shell
+
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
@@ -117,6 +139,69 @@ class TestStartAsyncCommand:
                 )
 
         assert not stale_log.exists()
+
+    def test_start_async_command_embeds_env_overrides_in_tmux_shell(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+
+        sent_shell_commands: list[str] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            if cmd[:2] == ["tmux", "send-keys"]:
+                sent_shell_commands.append(cmd[4])
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+            ),
+            patch("vibe3.environment.session.subprocess.run", side_effect=fake_run),
+        ):
+            backend.start_async_command(
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "src/vibe3/cli.py",
+                    "internal",
+                    "manager",
+                    "328",
+                ],
+                execution_name="vibe3-manager-issue-328",
+                env={
+                    "VIBE3_ASYNC_CHILD": "1",
+                    "VIBE3_MANAGER_BACKEND": "opencode",
+                    "VIBE3_MANAGER_MODEL": "opencode/minimax-m2.5-free",
+                },
+            )
+
+        assert sent_shell_commands
+        assert "VIBE3_MANAGER_BACKEND=opencode" in sent_shell_commands[0]
+        assert (
+            "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in sent_shell_commands[0]
+        )
 
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path

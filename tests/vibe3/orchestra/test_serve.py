@@ -1,5 +1,6 @@
 """Tests for Orchestra server CLI commands and startup logic."""
 
+import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
@@ -165,3 +166,77 @@ def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None
 
     assert result.exit_code == 1
     assert "ts setup failed" in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_run_stops_uvicorn_when_heartbeat_exits(monkeypatch) -> None:
+    class FakeHeartbeat:
+        def __init__(self) -> None:
+            self.stop_called = False
+
+        async def run(self) -> None:
+            return None
+
+        def stop(self) -> None:
+            self.stop_called = True
+
+    class FakeServer:
+        def __init__(self, _config) -> None:
+            self.should_exit = False
+
+        async def serve(self) -> None:
+            while not self.should_exit:
+                await asyncio.sleep(0)
+
+    monkeypatch.setattr(
+        serve_module,
+        "_build_server_with_launch_cwd",
+        lambda _config, _cwd: (FakeHeartbeat(), object()),
+    )
+    monkeypatch.setattr(serve_module.uvicorn, "Server", FakeServer)
+    monkeypatch.setattr(
+        serve_module.uvicorn,
+        "Config",
+        lambda *args, **kwargs: object(),
+    )
+
+    await serve_module._run(OrchestraConfig(), 8080)
+
+
+def test_status_reports_tmux_session_when_pid_file_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        OrchestraConfig,
+        "from_settings",
+        lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(serve_module, "_orchestra_tmux_session_exists", lambda: True)
+
+    with patch(
+        "vibe3.config.settings.VibeConfig.get_defaults", return_value=VibeConfig()
+    ):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "status"])
+
+    assert result.exit_code == 0
+    assert "running in tmux session" in result.stdout.lower()
+
+
+def test_stop_kills_tmux_session_when_pid_file_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        OrchestraConfig,
+        "from_settings",
+        lambda: OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid")),
+    )
+    monkeypatch.setattr(serve_module, "_validate_pid_file", lambda _: (None, False))
+    monkeypatch.setattr(serve_module, "_orchestra_tmux_session_exists", lambda: True)
+    monkeypatch.setattr(serve_module, "_kill_orchestra_tmux_session", lambda: True)
+
+    with patch(
+        "vibe3.config.settings.VibeConfig.get_defaults", return_value=VibeConfig()
+    ):
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "stop"])
+
+    assert result.exit_code == 0
+    assert "stopped orchestra server tmux session" in result.stdout.lower()
