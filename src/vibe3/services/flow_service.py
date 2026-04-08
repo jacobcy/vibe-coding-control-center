@@ -172,9 +172,7 @@ class FlowService(FlowLifecycleMixin):
         # Check if there's an existing task issue link
         issue_links = self.store.get_issue_links(branch)
         task_issues = [
-            link["issue_number"]
-            for link in issue_links
-            if link["issue_role"] == "task"
+            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
         ]
         effective_issue_number = task_issues[0] if task_issues else issue_number
 
@@ -403,6 +401,9 @@ class FlowService(FlowLifecycleMixin):
             next_step=None,
             initiated_by=initiator,
         )
+
+        # Clear cached issue/PR metadata (will be re-initialized for new issue)
+        self.store.delete_flow_context_cache(branch)
 
         self.store.add_event(
             branch,
