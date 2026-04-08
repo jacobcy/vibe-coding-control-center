@@ -1,7 +1,10 @@
 """Serena service for symbol-level code analysis."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -10,6 +13,9 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.serena_client import SerenaClient
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import ChangeSource
+
+if TYPE_CHECKING:
+    from vibe3.models.dead_code import DeadCodeReport
 
 
 class SerenaService:
@@ -216,3 +222,123 @@ class SerenaService:
         except Exception as e:
             log.bind(error=str(e)).error("Change analysis failed")
             raise SerenaError("analyze_changes", str(e)) from e
+
+    def scan_dead_code(self, root: str = "src/vibe3") -> "DeadCodeReport":
+        """Scan for dead code (unused functions) in the codebase.
+
+        Args:
+            root: Root directory to scan (default: "src/vibe3")
+
+        Returns:
+            DeadCodeReport with findings
+
+        Raises:
+            SerenaError: If scan fails
+        """
+        from vibe3.analysis.dead_code_rules import classify_confidence, is_dead_code
+        from vibe3.models.dead_code import DeadCodeFinding, DeadCodeReport
+
+        log = logger.bind(domain="serena", action="scan_dead_code", root=root)
+        log.info("Scanning for dead code")
+
+        try:
+            # Find all Python files
+            root_path = Path(root)
+            if not root_path.exists():
+                raise SerenaError("scan_dead_code", f"Root directory not found: {root}")
+
+            python_files = sorted(root_path.glob("**/*.py"))
+            # Filter out __pycache__
+            python_files = [f for f in python_files if "__pycache__" not in str(f)]
+
+            log.bind(file_count=len(python_files)).debug("Found Python files")
+
+            # Scan each file
+            findings: list[DeadCodeFinding] = []
+            excluded: list[str] = []
+            total_symbols = 0
+            total_dead = 0
+            total_excluded = 0
+
+            for file_path in python_files:
+                relative_file = str(file_path)
+
+                try:
+                    # Analyze file symbols
+                    file_result = self.analyze_file(relative_file)
+                    symbols = file_result.get("symbols", [])
+                    total_symbols += len(symbols)
+
+                    # Check each symbol
+                    for sym in symbols:
+                        sym_name = sym.get("name", "")
+                        ref_count = sym.get("references", 0)
+                        sym_type = sym.get("type", "function")
+
+                        # Determine if CLI command
+                        is_cli_command = sym_type == "cli_command"
+
+                        # Apply dead code rules
+                        is_dead, reason = is_dead_code(
+                            sym_name, ref_count, is_cli_command
+                        )
+
+                        if is_dead:
+                            # Get line number and LOC
+                            # For now, use placeholder values
+                            line = 0  # TODO: extract from Serena
+                            loc = 0  # TODO: extract from Serena
+
+                            confidence = classify_confidence(
+                                sym_name, ref_count, is_cli_command
+                            )
+                            # Type narrowing
+                            if confidence == "excluded":
+                                continue
+
+                            findings.append(
+                                DeadCodeFinding(
+                                    symbol=sym_name,
+                                    file=relative_file,
+                                    line=line,
+                                    loc=loc,
+                                    confidence=confidence,
+                                    category="unused_function",
+                                    reason=reason,
+                                )
+                            )
+                            total_dead += 1
+                        elif (
+                            classify_confidence(sym_name, ref_count, is_cli_command)
+                            == "excluded"
+                        ):
+                            excluded.append(f"{relative_file}:{sym_name}")
+                            total_excluded += 1
+
+                except SerenaError as e:
+                    log.bind(file=relative_file, error=str(e)).warning(
+                        "Failed to analyze file, skipping"
+                    )
+                    continue
+
+            report = DeadCodeReport(
+                total_symbols=total_symbols,
+                dead_code_count=total_dead,
+                findings=findings,
+                excluded=excluded,
+                excluded_count=total_excluded,
+            )
+
+            log.bind(
+                total_symbols=total_symbols,
+                dead_code_count=total_dead,
+                excluded_count=total_excluded,
+            ).success("Dead code scan complete")
+
+            return report
+
+        except SerenaError:
+            raise
+        except Exception as e:
+            log.bind(error=str(e)).error("Dead code scan failed")
+            raise SerenaError("scan_dead_code", str(e)) from e

@@ -12,17 +12,3 @@ def parse_issue_number(issue: str) -> int:
     if match:
         return int(match.group(1))
     raise ValueError(f"Invalid issue format: {issue}")
-
-
-def infer_task_issue_from_flow_name(name: str) -> int | None:
-    """Infer issue number from supported flow-name shorthand patterns."""
-    patterns = (
-        r"^(?:issue|task)[-_]?(\d+)$",
-        r"^task/(\d+)$",
-        r"^task/(?:issue|task)[-_]?(\d+)$",
-    )
-    for pattern in patterns:
-        match = re.match(pattern, name, re.IGNORECASE)
-        if match:
-            return int(match.group(1))
-    return None
