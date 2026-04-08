@@ -287,19 +287,43 @@ git log --oneline <base>..HEAD
 
 发布入口只用：
 
-**人类用户**使用：
+**人类用户使用 vibe3 pr create --yes**：
 
 ```bash
-vibe3 pr create --base <ref> --yes
+vibe3 pr create --yes
 ```
 
-**Agent**直接使用：
+**Agent 使用 vibe3 pr create --agent**：
 
 ```bash
-gh pr create --base <ref> --title "..." --body "..."
+vibe3 pr create --agent --title "..." --body "..."
 ```
 
-**重要**：`vibe3 pr create` 是人类专用入口（需要 `--yes` 确认是人类）。Agent 执行自动化流程时应直接使用 `gh pr create`。
+**重要**：
+- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
+- `vibe3 pr create --yes` 是人类专用入口，需要明确确认
+- Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
+
+**Contributors 块自动生成**：
+
+PR 创建时，系统会自动从 flow state 中读取 actor 信息并生成 Contributors 块：
+
+1. **数据来源**：flow state 中的 `planner_actor`、`executor_actor`、`reviewer_actor`、`latest_actor`
+2. **自动生成位置**：PR body 末尾
+3. **生成格式**：
+```markdown
+---
+
+## Contributors
+
+claude/sonnet-4.6, gemini, jacob
+```
+
+4. **前置条件**：
+   - Flow 创建时使用了 `vibe3 flow update --actor <identity>`
+   - 各个操作步骤正确更新了 actor 字段
+
+**手动添加**：如果自动生成失败，可在 PR body 末尾手动添加 Contributors 块。
 
 ### Step 6.5: 自动应用标签与智能审查
 

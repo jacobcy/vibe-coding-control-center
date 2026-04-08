@@ -113,18 +113,22 @@ gh issue view <number>
 # 1. 创建新分支（人机协作统一使用 dev/issue-<id>）
 git checkout -b dev/issue-123
 
-# 2. 注册当前分支为 flow
-vibe3 flow update
+# 2. 注册当前分支为 flow，并设置 actor 署名
+vibe3 flow update --actor <your-identity>
 
 # 3. 绑定 task issue
 vibe3 flow bind 123 --role task
 ```
 
+**重要**：`--actor` 参数用于记录当前操作的执行者，是 Contributors 块的数据来源。建议格式：
+- Agent: `claude/sonnet-4.6`、`gemini`、`codex`
+- Human: `jacob`、`username`
+
 **场景 B：已经 `git checkout -b` 切到新分支，需要注册 flow**
 
 ```bash
-# 注册当前分支为 flow
-vibe3 flow update
+# 注册当前分支为 flow，并设置 actor 署名
+vibe3 flow update --actor <your-identity>
 
 # 绑定 task issue
 vibe3 flow bind <issue-number> --role task
@@ -142,10 +146,10 @@ vibe3 flow bind <issue-number> --role dependency
 
 ### Step 4: 创联 PR draft（按需）
 
-**Agent 使用 gh pr create**：
+**Agent 使用 vibe3 pr create --agent**：
 
 ```bash
-gh pr create --base main --title "feat: <feature-name>" --body "## Summary
+vibe3 pr create --agent --title "feat: <feature-name>" --body "## Summary
 
 - <bullet points>
 
@@ -156,13 +160,16 @@ gh pr create --base main --title "feat: <feature-name>" --body "## Summary
 Closes #<issue-number>"
 ```
 
-**人类用户使用 vibe3 pr create**：
+**人类用户使用 vibe3 pr create --yes**：
 
 ```bash
-vibe3 pr create --base main --yes
+vibe3 pr create --yes
 ```
 
-**说明**：`vibe3 pr create` 是人类专用入口（需要 `--yes` 确认是人类）。Agent 执行自动化流程时应直接使用 `gh pr create`。
+**说明**：
+- `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
+- `vibe3 pr create --yes` 是人类专用入口，需要明确确认
+- Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
 
 该步骤只在当前分支已经具备可发 PR 的条件时执行。PR draft 用于：
 
@@ -227,7 +234,7 @@ vibe3 flow show
 - 不得在没有 issue 的情况下创建 flow（issue 是 flow 的规划依据）
 - 如果当前输入只是 spec / plan / 需求草案，不得跳过 `/vibe-issue` 直接建 flow
 - 正确使用 `flow update` 和 `flow bind`：
-  - `flow update` - 注册当前分支为 flow（幂等操作，可重复调用）
+  - `flow update --actor <identity>` - 注册当前分支为 flow（幂等操作，可重复调用），**必须设置 actor 署名**
   - `flow bind` - 绑定 issue 到当前 flow
   - 不要混用其他命令尝试注册或绑定
 - 恢复已有 branch / flow 时不要再用已废弃的 `/vibe-start`，统一使用 `/vibe-continue`
