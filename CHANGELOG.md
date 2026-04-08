@@ -1,5 +1,26 @@
 # 更新日志
 
+## [2.3.0] - 2026-04-08
+
+### ✨ New Features
+- 统一 PR 创建入口：添加 `vibe3 pr create --agent` 参数，让 AI Agent 可以使用相同的自动化功能（base branch 自动选择、flow/task binding guard、metadata enrichment）
+- Agent 模式必须提供 `-t` (title) 和 `-b` (body)，禁止交互式输入
+- 明确区分三种入口：`--agent` (AI Agent)、`--yes` (人类确认)、`--ai` (AI suggestion)
+
+### 🔧 Refactor
+- 重构 agent 执行层：统一 plan 和 review 使用 callback-based agent launcher
+- PlanUsecase 和 ReviewUsecase 现在通过 `execute_with_callbacks` 支持 success/failure 回调
+- 分离 AgentSpec 创建逻辑，提高代码可测试性
+
+### 📚 Documentation
+- 添加署名规则：Issue、PR、Comment 必须明确标注创建者身份
+- 更新 skill 文档：所有 AI Agent 统一使用 `vibe3 pr create --agent` 而非 `gh pr create`
+- 添加 GitHub issue 和 PR 模板，包含署名字段和 Contributors 块
+
+### 🐛 Bug Fixes
+- 修复 Agent 模式进入交互式 prompt 的问题
+- 更新测试以匹配重构后的 API
+
 ## [2.2.3] - 2026-03-21
 
 ### ✨ Changed
