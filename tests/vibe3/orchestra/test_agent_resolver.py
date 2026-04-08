@@ -53,7 +53,7 @@ def test_resolve_manager_returns_agent_options(mock_svc, mock_resolve, mock_sync
     config.assignee_dispatch.backend = "gemini"
     config.assignee_dispatch.model = "gemini-3-flash-preview"
     runtime_config = MagicMock()
-    result = resolve_manager_agent_options(config, runtime_config, worktree=False)
+    result = resolve_manager_agent_options(config, runtime_config)
     assert isinstance(result, AgentOptions)
     mock_resolve.assert_called_once()
     mock_sync.assert_called_once()

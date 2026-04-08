@@ -16,7 +16,13 @@ app = typer.Typer(
 def internal_manager_dispatch(
     issue: Annotated[int, typer.Argument(help="Issue number to manage")],
     dry_run: bool = False,
-    async_mode: bool = True,
+    no_async: Annotated[
+        bool,
+        typer.Option(
+            "--no-async",
+            help="Run synchronously (blocking) instead of async tmux session",
+        ),
+    ] = False,
     fresh_session: bool = False,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
@@ -25,7 +31,7 @@ def internal_manager_dispatch(
     run_manager_issue_mode(
         issue_number=issue,
         dry_run=dry_run,
-        async_mode=async_mode,
+        async_mode=not no_async,
         fresh_session=fresh_session,
     )
 
@@ -37,7 +43,13 @@ def internal_apply_dispatch(
         Optional[int], typer.Option(help="Associated issue (optional)")
     ] = None,
     dry_run: bool = False,
-    async_mode: bool = True,
+    no_async: Annotated[
+        bool,
+        typer.Option(
+            "--no-async",
+            help="Run synchronously (blocking) instead of async tmux session",
+        ),
+    ] = False,
 ) -> None:
     """L2: Dispatch the Supervisor/Apply agent."""
     from vibe3.orchestra.supervisor_run_service import run_supervisor_mode
@@ -46,5 +58,5 @@ def internal_apply_dispatch(
         supervisor_file=supervisor,
         issue_number=issue,
         dry_run=dry_run,
-        async_mode=async_mode,
+        async_mode=not no_async,
     )

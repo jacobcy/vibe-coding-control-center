@@ -139,13 +139,7 @@ def run_command(
         bool,
         typer.Option("--dry-run", help="Print command and prompt without executing"),
     ] = False,
-    async_mode: Annotated[
-        bool,
-        typer.Option(
-            "--async/--no-async",
-            help="Run in async mode (tmux session) or synchronously (blocking)",
-        ),
-    ] = True,
+    no_async: run._ASYNC_OPT = False,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -176,7 +170,7 @@ def run_command(
         skill=skill,
         trace=trace,
         dry_run=dry_run,
-        async_mode=async_mode,
+        no_async=no_async,
         agent=agent,
         backend=backend,
         model=model,

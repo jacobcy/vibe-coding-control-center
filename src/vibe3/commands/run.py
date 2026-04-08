@@ -14,6 +14,7 @@ from vibe3.agents.runner import (
 )
 from vibe3.commands.command_options import (
     _AGENT_OPT,
+    _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
@@ -91,13 +92,7 @@ def run_command(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: Annotated[
-        bool,
-        typer.Option(
-            "--async/--no-async",
-            help="Run in async mode (tmux session) or synchronously (blocking)",
-        ),
-    ] = True,
+    no_async: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -134,7 +129,7 @@ def run_command(
             instructions=instructions or f"Execute skill: {skill}",
             context_builder=make_skill_context_builder(skill_content),
             dry_run=dry_run,
-            async_mode=async_mode,
+            async_mode=not no_async,
             agent=agent,
             backend=backend,
             model=model,
@@ -190,7 +185,7 @@ def run_command(
 
     # Build lifecycle callbacks if issue is linked
     issue_number = usecase.transition_issue(branch)
-    if not dry_run and not async_mode and issue_number:
+    if not dry_run and no_async and issue_number:
         on_success, on_failure = usecase.build_lifecycle_callbacks(
             int(issue_number), branch, flow_service
         )
@@ -200,11 +195,11 @@ def run_command(
             command=command,
             on_success=on_success,
             on_failure=on_failure,
-            async_mode=async_mode,
+            async_mode=not no_async,
         )
     else:
         # No issue linked or dry-run/async mode - execute without callbacks
-        CodeagentExecutionService(config).execute(command, async_mode=async_mode)
+        CodeagentExecutionService(config).execute(command, async_mode=not no_async)
 
 
 @app.callback(invoke_without_command=True)
@@ -226,13 +221,7 @@ def default(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: Annotated[
-        bool,
-        typer.Option(
-            "--async/--no-async",
-            help="Run in async mode (tmux session) or synchronously (blocking)",
-        ),
-    ] = True,
+    no_async: _ASYNC_OPT = False,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
@@ -246,7 +235,7 @@ def default(
         skill,
         trace,
         dry_run,
-        async_mode,
+        no_async,
         agent,
         backend,
         model,

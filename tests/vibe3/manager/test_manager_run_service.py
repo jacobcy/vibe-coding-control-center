@@ -11,7 +11,7 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
 
     captured_options = {}
 
-    def fake_resolve_manager_agent_options(config, runtime_config, worktree=False):
+    def fake_resolve_manager_agent_options(config, runtime_config):
         # This should NOT be called when env vars are set
         captured_options["called"] = True
         return MagicMock(backend="wrong-backend", model="wrong-model")
@@ -48,7 +48,6 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
                 issue_number=301,
                 dry_run=False,
                 async_mode=True,
-                worktree=False,
             )
         except Exception:
             pass
@@ -68,17 +67,15 @@ def test_resolve_manager_execution_cwd_marks_worktree_when_resolved(
 
     from vibe3.manager.manager_run_service import resolve_manager_execution_cwd
 
-    cwd, worktree = resolve_manager_execution_cwd(
+    cwd = resolve_manager_execution_cwd(
         orchestra_config=MagicMock(),
         issue_number=42,
         target_branch="task/issue-42",
         current_branch="main",
-        use_worktree=True,
         session_id=None,
     )
 
     assert cwd == tmp_path
-    assert worktree is True
     mock_manager.return_value.resolve_manager_cwd.assert_called_once_with(
         42, "task/issue-42"
     )
@@ -95,17 +92,15 @@ def test_resolve_manager_execution_cwd_falls_back_without_worktree(
 
     from vibe3.manager.manager_run_service import resolve_manager_execution_cwd
 
-    cwd, worktree = resolve_manager_execution_cwd(
+    cwd = resolve_manager_execution_cwd(
         orchestra_config=MagicMock(),
         issue_number=99,
         target_branch="feature/99",
         current_branch="main",
-        use_worktree=True,
         session_id=None,
     )
 
     assert cwd == mock_launch.return_value
-    assert worktree is False
     mock_launch.assert_called_once()
 
 

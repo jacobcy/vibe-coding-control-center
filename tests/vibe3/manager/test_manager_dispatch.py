@@ -136,9 +136,10 @@ class TestManagerDispatch:
             "-I",
             str(Path("/tmp/repo/src/vibe3/cli.py").resolve()),
         ]
-        assert cmd[7] == "run"
-        assert "--manager-issue" in cmd
-        assert "--sync" in cmd
+        assert cmd[7] == "internal"
+        assert cmd[8] == "manager"
+        assert cmd[9] == "102"
+        assert cmd[10] == "--no-async"
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
         # manager_session_id is no longer written to flow_state
         # (registry is the source of truth)

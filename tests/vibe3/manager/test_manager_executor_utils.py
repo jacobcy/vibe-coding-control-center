@@ -64,7 +64,17 @@ class TestManagerReviewDispatch:
             cmd = manager.command_builder.build_pr_review_command(42)
             cwd = manager._resolve_review_cwd_for_dispatch(42)
 
-        assert cmd == ["uv", "run", "python", "-m", "vibe3", "review", "pr", "42"]
+        assert cmd == [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "review",
+            "pr",
+            "42",
+            "--async",
+        ]
         assert cwd == Path("/tmp/wt-feature")
 
     def test_dispatch_pr_review_uses_resolved_worktree(self):

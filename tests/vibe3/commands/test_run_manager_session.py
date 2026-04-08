@@ -198,7 +198,7 @@ class TestRunManagerIssueSession:
             lambda role, branch=None: "ses_existing",
         )
 
-        result = runner.invoke(cli_app, ["internal", "manager", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] == "ses_existing"
@@ -261,9 +261,7 @@ class TestRunManagerIssueSession:
             lambda before, after, **kwargs: True,
         )
 
-        result = runner.invoke(
-            cli_app, ["internal", "manager", "372", "--no-async-mode"]
-        )
+        result = runner.invoke(cli_app, ["internal", "manager", "372", "--no-async"])
 
         assert result.exit_code == 0
         # manager_session_id is no longer written to flow_state
@@ -295,7 +293,7 @@ class TestRunManagerIssueSession:
 
         result = runner.invoke(
             cli_app,
-            ["internal", "manager", "372", "--no-async-mode", "--dry-run"],
+            ["internal", "manager", "372", "--no-async", "--dry-run"],
         )
 
         assert result.exit_code == 0
@@ -323,7 +321,7 @@ class TestRunManagerIssueSession:
 
         result = runner.invoke(
             cli_app,
-            ["internal", "manager", "372", "--no-async-mode", "--dry-run"],
+            ["internal", "manager", "372", "--no-async", "--dry-run"],
         )
 
         assert result.exit_code != 0

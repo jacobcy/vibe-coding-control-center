@@ -393,5 +393,5 @@ class CodeagentExecutionService:
             cmd.extend(["--model", command.model])
         if command.task:
             cmd.append(command.task)
-        cmd.append("--sync")
+        cmd.append("--no-async")
         return cmd
