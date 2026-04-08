@@ -219,9 +219,12 @@ def start(
             ),
         ),
     ] = False,
-    async_mode: Annotated[
+    no_async: Annotated[
         bool,
-        typer.Option("--async", help="Run in tmux background session"),
+        typer.Option(
+            "--no-async",
+            help="Run synchronously (blocking) instead of async tmux session",
+        ),
     ] = False,
     ts: Annotated[
         bool,
@@ -298,7 +301,7 @@ def start(
         )
         raise typer.Exit(1)
 
-    if async_mode:
+    if not no_async:
         ok, msg = _start_async_serve(config, verbose)
         typer.echo(msg)
         if not ok:
