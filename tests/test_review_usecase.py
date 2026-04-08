@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from vibe3.agents.models import AgentSpec, CodeagentResult
+from vibe3.agents.models import CodeagentResult
 from vibe3.agents.review_agent import ReviewUsecase
 from vibe3.models.orchestration import IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
@@ -22,8 +22,6 @@ def mock_dependencies():
     context_builder = Mock()
     execution_service_factory = Mock()
     command_builder = Mock()
-    session_manager = Mock()
-    worktree_manager = Mock()
 
     return {
         "config": config,
@@ -35,8 +33,6 @@ def mock_dependencies():
         "context_builder": context_builder,
         "execution_service_factory": execution_service_factory,
         "command_builder": command_builder,
-        "session_manager": session_manager,
-        "worktree_manager": worktree_manager,
     }
 
 
@@ -53,8 +49,6 @@ def usecase(mock_dependencies):
         context_builder=mock_dependencies["context_builder"],
         execution_service_factory=mock_dependencies["execution_service_factory"],
         command_builder=mock_dependencies["command_builder"],
-        session_manager=mock_dependencies["session_manager"],
-        worktree_manager=mock_dependencies["worktree_manager"],
     )
 
 
@@ -87,12 +81,9 @@ class TestExecuteReview:
     ):
         """测试 execute_review 成功路径."""
         # Setup mocks
-        mock_dependencies["session_manager"].create_codeagent_session.return_value = (
-            Mock()
-        )
-        mock_dependencies["execution_service_factory"].return_value = Mock(
-            execute_with_callbacks=Mock(return_value=success_result)
-        )
+        exec_service_mock = Mock()
+        exec_service_mock.execute_sync.return_value = success_result
+        mock_dependencies["execution_service_factory"].return_value = exec_service_mock
         mock_dependencies["command_builder"].return_value = Mock()
         mock_dependencies["context_builder"].return_value = Mock(return_value="context")
 
@@ -120,9 +111,6 @@ class TestExecuteReview:
 
         # Assertions
         assert result.verdict in {"PASS", "ERROR"}  # Depending on audit_ref handling
-        mock_dependencies[
-            "session_manager"
-        ].create_codeagent_session.assert_called_once()
 
     def test_execute_review_failure(
         self,
@@ -132,12 +120,9 @@ class TestExecuteReview:
     ):
         """测试 execute_review 失败路径."""
         # Setup mocks
-        mock_dependencies["session_manager"].create_codeagent_session.return_value = (
-            Mock()
-        )
-        mock_dependencies["execution_service_factory"].return_value = Mock(
-            execute_with_callbacks=Mock(side_effect=Exception("boom"))
-        )
+        exec_service_mock = Mock()
+        exec_service_mock.execute_sync.side_effect = Exception("boom")
+        mock_dependencies["execution_service_factory"].return_value = exec_service_mock
         mock_dependencies["command_builder"].return_value = Mock()
         mock_dependencies["context_builder"].return_value = Mock(return_value="context")
 
@@ -149,153 +134,6 @@ class TestExecuteReview:
                 issue_number=42,
                 branch="test-branch",
                 async_mode=False,
-            )
-
-
-class TestCreateReviewSpec:
-    """Tests for create_review_spec method."""
-
-    def test_create_review_spec(
-        self,
-        usecase,
-        review_request,
-    ):
-        """测试 create_review_spec."""
-        # Mock context_builder to return a callable
-        mock_context_callable = Mock(return_value="Test context")
-        usecase.context_builder = Mock(return_value=mock_context_callable)
-
-        spec = usecase.create_review_spec(
-            request=review_request,
-            dry_run=False,
-            instructions="Test instructions",
-            issue_number=42,
-            pr_number=None,
-            branch="test-branch",
-        )
-
-        # Assertions
-        assert isinstance(spec, AgentSpec)
-        assert spec.role == "reviewer"
-        assert spec.handoff_kind == "review"
-        assert callable(spec.on_success)
-        assert callable(spec.on_failure)
-
-
-class TestHandleReviewSuccess:
-    """Tests for _handle_review_success method."""
-
-    def test_handle_success_with_audit_ref(
-        self,
-        usecase,
-        success_result,
-        mock_dependencies,
-    ):
-        """测试 _handle_review_success 有 audit_ref."""
-        from vibe3.agents.review_parser import ParsedReview
-
-        # Mock review_parser
-        parsed_review = ParsedReview(
-            verdict="PASS",
-            comments=[],
-            raw="VERDICT: PASS\n## Summary\nAll good",
-        )
-        usecase.review_parser = Mock(return_value=parsed_review)
-
-        # Mock flow_service
-        flow = Mock()
-        flow.task_issue_number = 42
-        mock_dependencies["flow_service"].get_flow_status.return_value = flow
-
-        with patch(
-            "vibe3.agents.review_agent.require_authoritative_ref",
-            return_value=True,
-        ):
-            with patch.object(usecase, "_transition_to_handoff") as mock_transition:
-                usecase._handle_review_success(
-                    result=success_result,
-                    issue_number=42,
-                    branch="test-branch",
-                    dry_run=False,
-                )
-
-        # Verify transition was called
-        mock_transition.assert_called_once_with(42)
-
-    def test_handle_success_no_audit_ref(
-        self,
-        usecase,
-        success_result,
-        mock_dependencies,
-    ):
-        """测试 _handle_review_success 无 audit_ref."""
-        from vibe3.agents.review_parser import ParsedReview
-
-        # Mock review_parser
-        parsed_review = ParsedReview(
-            verdict="PASS",
-            comments=[],
-            raw="VERDICT: PASS\n## Summary\nAll good",
-        )
-        usecase.review_parser = Mock(return_value=parsed_review)
-
-        # Mock flow_service
-        flow = Mock()
-        flow.task_issue_number = 42
-        mock_dependencies["flow_service"].get_flow_status.return_value = flow
-
-        with patch(
-            "vibe3.agents.review_agent.require_authoritative_ref",
-            return_value=False,
-        ):
-            # Should not raise, but should log warning
-            usecase._handle_review_success(
-                result=success_result,
-                issue_number=42,
-                branch="test-branch",
-                dry_run=False,
-            )
-
-
-class TestHandleReviewFailure:
-    """Tests for _handle_review_failure method."""
-
-    def test_handle_failure(
-        self,
-        usecase,
-    ):
-        """测试 _handle_review_failure."""
-        error = Exception("test error")
-
-        with patch.object(usecase, "_fail_issue") as mock_fail:
-            usecase._handle_review_failure(
-                error=error,
-                issue_number=42,
-            )
-
-        # Verify fail_issue was called
-        mock_fail.assert_called_once_with(42, "test error")
-
-
-class TestTransitionToHandoff:
-    """Tests for _transition_to_handoff method."""
-
-    def test_transition_to_handoff(
-        self,
-        usecase,
-    ):
-        """测试 _transition_to_handoff."""
-        with patch("vibe3.agents.review_agent.LabelService") as mock_label_service:
-            mock_instance = Mock()
-            mock_label_service.return_value = mock_instance
-            mock_instance.confirm_issue_state.return_value = "confirmed"
-
-            usecase._transition_to_handoff(issue_number=42)
-
-            mock_instance.confirm_issue_state.assert_called_once_with(
-                42,
-                to_state=IssueState.HANDOFF,
-                actor="agent:review",
             )
 
 
@@ -314,7 +152,7 @@ class TestFailIssue:
                 mock_label_instance = Mock()
                 mock_label_service.return_value = mock_label_instance
 
-                usecase._fail_issue(
+                ReviewUsecase._fail_issue(
                     issue_number=42,
                     reason="Test reason",
                 )
