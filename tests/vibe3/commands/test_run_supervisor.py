@@ -89,7 +89,7 @@ class TestRunSupervisorOption:
                 "apply",
                 "supervisor/issue-cleanup.md",
                 "--dry-run",
-                "--no-async-mode",
+                "--no-async",
             ],
         )
         assert result.exit_code == 0
@@ -227,7 +227,7 @@ class TestRunSupervisorOption:
 
         result = runner.invoke(
             cli_app,
-            ["internal", "manager", "278", "--no-async-mode"],
+            ["internal", "manager", "278", "--no-async"],
         )
 
         assert result.exit_code != 0
@@ -316,7 +316,7 @@ class TestRunSupervisorOption:
 
         result = runner.invoke(
             cli_app,
-            ["internal", "manager", "278", "--no-async-mode"],
+            ["internal", "manager", "278", "--no-async"],
         )
 
         assert result.exit_code == 0
