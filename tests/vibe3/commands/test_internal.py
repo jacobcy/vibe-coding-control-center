@@ -12,13 +12,15 @@ runner = CliRunner()
 def test_internal_manager_dispatch():
     """测试 internal manager 命令参数解析和调用."""
     with patch("vibe3.manager.manager_run_service.run_manager_issue_mode") as mock_run:
-        result = runner.invoke(cli_app, ["internal", "manager", "123", "--sync"])
+        result = runner.invoke(
+            cli_app, ["internal", "manager", "123", "--no-async-mode"]
+        )
 
         assert result.exit_code == 0
         mock_run.assert_called_once_with(
             issue_number=123,
             dry_run=False,
-            async_mode=False,  # --sync
+            async_mode=False,  # --no-async-mode
             worktree=False,
             fresh_session=False,
         )
@@ -33,7 +35,7 @@ def test_internal_manager_with_options():
                 "internal",
                 "manager",
                 "456",
-                "--sync",
+                "--no-async-mode",
                 "--dry-run",
                 "--worktree",
                 "--fresh-session",
@@ -57,7 +59,7 @@ def test_internal_apply_dispatch():
     ) as mock_run:
         result = runner.invoke(
             cli_app,
-            ["internal", "apply", "/path/to/supervisor.md", "--sync"],
+            ["internal", "apply", "/path/to/supervisor.md", "--no-async-mode"],
         )
 
         assert result.exit_code == 0
@@ -82,7 +84,7 @@ def test_internal_apply_with_issue():
                 "/path/to/supervisor.md",
                 "--issue",
                 "789",
-                "--sync",
+                "--no-async-mode",
             ],
         )
 
