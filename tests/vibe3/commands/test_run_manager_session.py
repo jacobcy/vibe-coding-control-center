@@ -87,7 +87,7 @@ class TestRunManagerIssueSession:
             ),
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert "Manager run: issue #372" in result.output
@@ -115,7 +115,7 @@ class TestRunManagerIssueSession:
             ),
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["prompt"].startswith(
@@ -129,7 +129,7 @@ class TestRunManagerIssueSession:
 
         monkeypatch.setattr(manager_run_service, "GitHubClient", lambda: github)
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code != 0
         assert "GitHub read timed out or auth/network is unavailable" in result.stderr
@@ -153,7 +153,7 @@ class TestRunManagerIssueSession:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         # manager_session_id is no longer written to flow_state
@@ -180,7 +180,7 @@ class TestRunManagerIssueSession:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         # manager_session_id is no longer written to flow_state
@@ -198,7 +198,7 @@ class TestRunManagerIssueSession:
             lambda role, branch=None: "ses_existing",
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372", "--worktree"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] == "ses_existing"
@@ -223,7 +223,7 @@ class TestRunManagerIssueSession:
         )
 
         result = runner.invoke(
-            cli_app, ["run", "--manager-issue", "372", "--fresh-session"]
+            cli_app, ["internal", "manager", "372", "--fresh-session"]
         )
 
         assert result.exit_code == 0
@@ -261,7 +261,9 @@ class TestRunManagerIssueSession:
             lambda before, after, **kwargs: True,
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
+        result = runner.invoke(
+            cli_app, ["internal", "manager", "372", "--no-async-mode"]
+        )
 
         assert result.exit_code == 0
         # manager_session_id is no longer written to flow_state
@@ -293,7 +295,7 @@ class TestRunManagerIssueSession:
 
         result = runner.invoke(
             cli_app,
-            ["run", "--manager-issue", "372", "--sync", "--dry-run"],
+            ["internal", "manager", "372", "--no-async-mode", "--dry-run"],
         )
 
         assert result.exit_code == 0
@@ -321,7 +323,7 @@ class TestRunManagerIssueSession:
 
         result = runner.invoke(
             cli_app,
-            ["run", "--manager-issue", "372", "--sync", "--dry-run"],
+            ["internal", "manager", "372", "--no-async-mode", "--dry-run"],
         )
 
         assert result.exit_code != 0
