@@ -47,6 +47,24 @@ class CodeagentResult:
     log_path: Path | None = None
 
 
+@dataclass
+class AgentSpec:
+    """定义一个 Agent 需要做什么，以及做完后触发什么回调。
+
+    用于 Usecase 层描述业务逻辑，封装 role、context、task 和回调钩子。
+    执行引擎通过 execute_with_callbacks 方法接收回调函数。
+    """
+
+    role: ExecutionRole
+    handoff_kind: str
+    context: str
+    task: str | None = None
+
+    # 回调钩子
+    on_success: Callable[[CodeagentResult], None] = lambda _: None
+    on_failure: Callable[[Exception], None] = lambda _: None
+
+
 def create_codeagent_command(
     role: ExecutionRole,
     context_builder: Callable[[], str],

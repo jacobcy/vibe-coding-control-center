@@ -6,13 +6,14 @@ Migrated from vibe3.services.codeagent_execution_service.
 import os
 import sys
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence
 
 from loguru import logger
 from typer import echo
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.models import (
+    AgentSpec,
     CodeagentCommand,
     CodeagentResult,
     ExecutionRole,
@@ -31,6 +32,7 @@ __all__ = [
     "ExecutionRole",
     "CodeagentCommand",
     "CodeagentResult",
+    "AgentSpec",
     "create_codeagent_command",
     "CodeagentExecutionService",
 ]
@@ -264,6 +266,44 @@ class CodeagentExecutionService:
         if async_mode and not command.dry_run and command.branch:
             return self.execute_async(command, command.branch)
         return self.execute_sync(command)
+
+    def execute_with_callbacks(
+        self,
+        command: CodeagentCommand,
+        on_success: Callable[[CodeagentResult], None],
+        on_failure: Callable[[Exception], None],
+        async_mode: bool = False,
+    ) -> CodeagentResult:
+        """带回调的执行方法。
+
+        执行 Agent 并在成功或失败时调用回调函数。回调异常会被捕获并记录，
+        不会中断主流程。
+
+        Args:
+            command: 执行命令配置
+            on_success: 成功回调（result.success == True）
+            on_failure: 失败回调（异常或 result.success == False）
+            async_mode: 是否异步执行
+
+        Returns:
+            执行结果
+
+        Raises:
+            Exception: 执行过程中的异常（on_failure 已处理后重新抛出）
+        """
+        try:
+            result = self.execute(command, async_mode=async_mode)
+            if result.success:
+                try:
+                    on_success(result)
+                except Exception as e:
+                    logger.error(f"on_success callback failed: {e}")
+            else:
+                on_failure(Exception(result.stderr or "Execution failed"))
+            return result
+        except Exception as e:
+            on_failure(e)
+            raise
 
     def _build_cli_command(self, command: CodeagentCommand) -> list[str]:
         """Build CLI command for async execution.
