@@ -34,7 +34,9 @@ def test_issue_flow_init_caches_issue_title_without_mutating_spec_ref() -> None:
             # Verify flow state does NOT have spec_ref set
             flow = store.get_flow_state("dev/issue-328")
             assert flow is not None
-            assert flow["spec_ref"] is None, "spec_ref should not be set for issue flows"
+            assert (
+                flow["spec_ref"] is None
+            ), "spec_ref should not be set for issue flows"
 
             # Verify cache has issue number and title
             cache = store.get_flow_context_cache("dev/issue-328")
@@ -67,9 +69,13 @@ def test_issue_flow_init_handles_github_failure_gracefully() -> None:
 
             # Verify cache has issue number but no title
             cache = store.get_flow_context_cache("task/issue-999")
-            assert cache is not None, "Cache should be initialized even on GitHub failure"
+            assert (
+                cache is not None
+            ), "Cache should be initialized even on GitHub failure"
             assert cache["task_issue_number"] == 999
-            assert cache["issue_title"] is None, "Title should be None when GitHub fails"
+            assert (
+                cache["issue_title"] is None
+            ), "Title should be None when GitHub fails"
 
 
 def test_issue_flow_init_uses_existing_task_link() -> None:
