@@ -295,14 +295,17 @@ vibe3 pr create --yes
 
 **Agent 使用 vibe3 pr create --agent**：
 
+**重要**：Agent 模式必须提供 `-t` (title) 和 `-b` (body)，不允许交互式输入。
+
 ```bash
-vibe3 pr create --agent --title "..." --body "..."
+vibe3 pr create --agent -t "..." -b "..."
 ```
 
-**重要**：
+**说明**：
 - `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
 - `vibe3 pr create --yes` 是人类专用入口，需要明确确认
 - Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
+- Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
 
 **Contributors 块自动生成**：
 

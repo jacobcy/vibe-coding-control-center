@@ -97,7 +97,7 @@ def register_create_command(app: typer.Typer) -> None:
         """Create draft PR.
 
         Human entrance: use --yes to confirm.
-        Agent entrance: use --agent to bypass human confirmation.
+        Agent entrance: use --agent to bypass human confirmation (requires -t and -b).
         AI suggestion: use --ai to generate title/body (human only).
 
         Metadata (task, flow, spec, planner, executor) is automatically
@@ -147,7 +147,8 @@ def register_create_command(app: typer.Typer) -> None:
             logger.bind(command="pr create", title=title, base=resolved_base).info(
                 "Creating PR"
             )
-            interactive = _is_interactive(json_output, yaml_output)
+            # Agent mode is always non-interactive
+            interactive = _is_interactive(json_output, yaml_output) and not agent
 
             usecase = PRCreateUsecase(
                 flow_service=flow_service,
@@ -178,6 +179,14 @@ def register_create_command(app: typer.Typer) -> None:
                 ai_title, ai_body = usecase.suggest_content(
                     branch, resolved_base, interactive
                 )
+
+            # Agent mode requires explicit title and body
+            if agent and not title:
+                typer.echo(
+                    "Error: --agent mode requires -t (title) and -b (body)",
+                    err=True,
+                )
+                raise typer.Exit(1)
 
             try:
                 pr_title = usecase.resolve_title(title, ai_title, interactive)

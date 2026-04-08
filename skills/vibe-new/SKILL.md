@@ -148,8 +148,10 @@ vibe3 flow bind <issue-number> --role dependency
 
 **Agent 使用 vibe3 pr create --agent**：
 
+**重要**：Agent 模式必须提供 `-t` (title) 和 `-b` (body)，不允许交互式输入。
+
 ```bash
-vibe3 pr create --agent --title "feat: <feature-name>" --body "## Summary
+vibe3 pr create --agent -t "feat: <feature-name>" -b "## Summary
 
 - <bullet points>
 
@@ -170,6 +172,7 @@ vibe3 pr create --yes
 - `vibe3 pr create --agent` 是 Agent 专用入口，自动获取 base branch、flow metadata、Contributors 块
 - `vibe3 pr create --yes` 是人类专用入口，需要明确确认
 - Agent 禁止使用 `--ai` 参数（与 `--agent` 冲突）
+- Agent 模式必须提供完整的 `-t` (title) 和 `-b` (body)，否则报错
 
 该步骤只在当前分支已经具备可发 PR 的条件时执行。PR draft 用于：
 
