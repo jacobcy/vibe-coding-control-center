@@ -67,7 +67,7 @@ class TestPRCreateCommandAI:
         """PR create should exit with a warning if --yes is not provided."""
         result = runner.invoke(app, ["pr", "create"])
         assert result.exit_code == 0
-        assert "此命令仅建议人类使用" in result.output
+        assert "此命令需要明确确认" in result.output
 
     def test_pr_create_without_ai(self, runner: CliRunner, tmp_path: Path) -> None:
         """Test PR create without --ai flag works normally."""

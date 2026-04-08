@@ -20,7 +20,6 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
-from vibe3.config.settings import VibeConfig
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.trace import enable_trace
 
@@ -177,28 +176,6 @@ def base(
     )
     log.info("Starting branch review")
     typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
-
-    if async_mode and not dry_run:
-        # Parent only schedules tmux async run; child re-enters CLI and computes
-        # inspect/snapshot context once. Avoid duplicate precomputation here.
-        config = VibeConfig.get_defaults()
-        review_task = (
-            instructions
-            or (config.review.review_prompt if config.review else None)
-            or f"Review changes on {current_branch} vs {resolved_base.base_branch}"
-        )
-        command = create_codeagent_command(
-            role="reviewer",
-            context_builder=lambda: "",
-            task=review_task,
-            dry_run=False,
-            handoff_kind="review",
-            config=config,
-            branch=current_branch,
-            worktree=worktree,
-        )
-        CodeagentExecutionService(config).execute(command, async_mode=True)
-        return
 
     usecase = _build_review_usecase(flow_service=flow_service)
     request, issue_number = usecase.build_base_review(

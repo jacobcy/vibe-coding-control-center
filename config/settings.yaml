@@ -167,6 +167,9 @@ code_limits:
       - path: "tests/vibe3/services/test_check_service.py"
         limit: 400
         reason: "check service 回归按同一服务契约组织，当前维持集中更清晰"
+      - path: "tests/vibe3/services/test_pr_utils.py"
+        limit: 550
+        reason: "PR utils 测试集，54 个测试围绕同一服务契约，平均 9.4 lines/test，拆分收益低"
 
   total_file_loc:
     v2_shell: 4000         # Shell 核心代码总行数

@@ -49,3 +49,23 @@ class PlanRequest:
     scope: PlanScope
     task_guidance: str | None = None
     max_steps: int = 10
+
+
+@dataclass
+class PlanTaskInput:
+    """Resolved inputs for task planning."""
+
+    issue_number: int
+    branch: str
+    request: PlanRequest
+    used_flow_issue: bool = False
+
+
+@dataclass
+class PlanSpecInput:
+    """Resolved inputs for spec planning."""
+
+    branch: str
+    request: PlanRequest
+    description: str
+    spec_path: str | None = None
