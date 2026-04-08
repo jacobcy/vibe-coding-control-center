@@ -64,7 +64,7 @@ description: Use when starting or switching to a new human-collaboration task. C
   │       └─ vibe3 flow bind <issue> --role task
   │
   ├─ Step 4: 创联 PR（按需）
-  │   └─ gh pr create --base main --title "..." --body "..."
+  │   └─ vibe3 pr create --agent --title "..." --body "..."
   │
   └─ Step 5: 写入 handoff 并停止
       └─ vibe3 handoff append "vibe-new: ready to code" --actor vibe-new --kind milestone
