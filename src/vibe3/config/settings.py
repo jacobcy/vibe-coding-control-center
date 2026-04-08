@@ -36,6 +36,12 @@ class AIConfig(BaseModel):
     timeout: int = Field(default=30, ge=1, le=300)
 
 
+class AgentPromptConfig(BaseModel):
+    """Global prompt instructions applied to all code agents."""
+
+    global_notice: str = Field(default="")
+
+
 class FlowConfig(BaseModel):
     """Flow 管理配置."""
 
@@ -186,6 +192,7 @@ class QualityConfig(BaseModel):
 class VibeConfig(BaseModel):
     """Root configuration model."""
 
+    agent_prompt: AgentPromptConfig = Field(default_factory=AgentPromptConfig)
     flow: FlowConfig = Field(default_factory=FlowConfig)
     code_limits: CodeLimitsConfig = Field(default_factory=CodeLimitsConfig)
     review_scope: ReviewScopeConfig = Field(default_factory=ReviewScopeConfig)

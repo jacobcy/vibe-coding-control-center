@@ -14,6 +14,7 @@ from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
 )
+from vibe3.config.settings import VibeConfig
 from vibe3.environment.session import SessionManager
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
@@ -74,6 +75,14 @@ def extract_session_id(stdout: str) -> str | None:
 
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
+
+    @staticmethod
+    def _build_prompt_file_content(prompt: str) -> str:
+        """Apply configured global notice to the prompt file content."""
+        notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
+        if not notice:
+            return prompt
+        return f"{notice}\n\n---\n\n{prompt}"
 
     @staticmethod
     def _should_retry_without_session(
@@ -227,10 +236,11 @@ class CodeagentBackend:
     def _prepare_prompt_file(prompt: str) -> Path:
         prompt_dir = Path.home() / ".codeagent" / "agents"
         prompt_dir.mkdir(parents=True, exist_ok=True)
+        prompt_content = CodeagentBackend._build_prompt_file_content(prompt)
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, dir=prompt_dir
         ) as f:
-            f.write(prompt)
+            f.write(prompt_content)
             return Path(f.name)
 
     @staticmethod

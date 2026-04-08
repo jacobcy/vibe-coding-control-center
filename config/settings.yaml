@@ -29,6 +29,18 @@ ai:
   model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
   timeout: 30                 # 超时秒数
 
+# Agent Prompt 全局说明
+# 会置顶注入到所有 codeagent prompt 文件中
+agent_prompt:
+  global_notice: |
+    ## Debug Stop Rule
+    当前项目处于调试过程中。
+    如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
+    不要继续尝试其他替代方法。
+    请改为：
+    1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
+    2. 结束当前任务，等待人工或后续任务接手。
+
 # 文本量控制
 doc_limits:
   single_file_loc:
