@@ -136,7 +136,46 @@ class FlowService(FlowLifecycleMixin):
             existing=False,
         ).info("Creating flow via ensure")
 
-        return self.create_flow(slug=slug, branch=branch)
+        flow = self.create_flow(slug=slug, branch=branch)
+
+        # Initialize issue flow context cache if this is an issue branch
+        self._initialize_issue_flow_context(branch)
+
+        return flow
+
+    def _initialize_issue_flow_context(self, branch: str) -> None:
+        """Initialize issue flow context cache for issue branches.
+
+        This method is called after flow creation to populate the context cache
+        for branches that match task/issue-N or dev/issue-N patterns.
+
+        Args:
+            branch: Git branch name
+        """
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_service = IssueFlowService(store=self.store)
+        issue_number = issue_service.parse_issue_number_any(branch)
+
+        if issue_number is None:
+            # Not an issue branch, skip cache initialization
+            return
+
+        logger.bind(
+            domain="flow",
+            action="init_issue_context",
+            branch=branch,
+            issue_number=issue_number,
+        ).debug("Initializing issue flow context cache")
+
+        # Initialize cache with issue number (title will be fetched lazily)
+        self.store.upsert_flow_context_cache(
+            branch=branch,
+            task_issue_number=issue_number,
+            issue_title=None,  # Will be populated on first access
+            pr_number=None,
+            pr_title=None,
+        )
 
     def resolve_flow_name(self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.
