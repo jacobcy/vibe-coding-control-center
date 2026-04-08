@@ -141,6 +141,15 @@ class ManagerExecutor:
             raise RuntimeError(
                 "SessionRegistryService is required for manager dispatch"
             )
+
+        # Final pre-flight: check if system is frozen before doing any work
+        from vibe3.orchestra.failed_gate import FailedGate
+
+        gate = FailedGate(repo=self.config.repo)
+        if gate.check().blocked:
+            log.warning("Skip: System is frozen by another failed issue")
+            return False
+
         active_count = self._registry.count_live_worker_sessions(role="manager")
         capacity = self.config.max_concurrent_flows
 
@@ -161,59 +170,46 @@ class ManagerExecutor:
             return True
 
         try:
+            # 1. Flow management
             flow = self._flow_manager.create_flow_for_issue(issue)
             flow_branch = str(flow.get("branch") or "").strip()
             if not flow_branch:
-                log.error("Flow branch missing")
-                self._mark_manager_start_failed(issue, "flow branch missing")
-                return False
-        except Exception as e:
-            log.error(f"Flow creation failed: {e}")
-            self._mark_manager_start_failed(issue, f"flow creation failed: {e}")
-            return False
+                raise RuntimeError("flow branch missing")
 
-        # Worktree preparation
-        manager_cwd, is_temporary = self._resolve_manager_cwd(issue.number, flow_branch)
-        if not manager_cwd:
-            log.error("Unable to resolve worktree")
-            self._mark_manager_start_failed(issue, "unable to resolve worktree")
-            return False
-
-        if not self.worktree_manager.align_auto_scene_to_base(manager_cwd, flow_branch):
-            log.error("Unable to align auto scene to configured base ref")
-            self._mark_manager_start_failed(
-                issue,
-                (
-                    "unable to align auto scene to configured base ref "
-                    f"({self.config.scene_base_ref})"
-                ),
+            # 2. Worktree preparation
+            manager_cwd, is_temporary = self._resolve_manager_cwd(
+                issue.number, flow_branch
             )
-            return False
+            if not manager_cwd:
+                raise RuntimeError("unable to resolve worktree")
 
-        log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
+            if not self.worktree_manager.align_auto_scene_to_base(
+                manager_cwd, flow_branch
+            ):
+                raise RuntimeError(
+                    f"failed to align auto scene to {self.config.scene_base_ref}"
+                )
 
-        # Resolve agent options in dispatcher context (correct worktree/config)
-        # and pass to subprocess via env vars to override task-branch config
-        from vibe3.config.settings import VibeConfig
-        from vibe3.runtime.agent_resolver import resolve_manager_agent_options
+            log.info(f"Using worktree: {manager_cwd} (temp={is_temporary})")
 
-        _manager_options = resolve_manager_agent_options(
-            self.config,
-            VibeConfig.get_defaults(),
-        )
-        _manager_env = {
-            **os.environ,
-            "VIBE3_ASYNC_CHILD": "1",
-        }
-        if _manager_options.backend:
-            _manager_env["VIBE3_MANAGER_BACKEND"] = _manager_options.backend
-        if _manager_options.model:
-            _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
+            # 3. Resolve agent options
+            from vibe3.config.settings import VibeConfig
+            from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
-        launched = False
-        # Reserve session in registry BEFORE launching tmux (prevent orphaned sessions)
-        session_id: int | None = None
-        if self._registry is not None:
+            _manager_options = resolve_manager_agent_options(
+                self.config,
+                VibeConfig.get_defaults(),
+            )
+            _manager_env = {
+                **os.environ,
+                "VIBE3_ASYNC_CHILD": "1",
+            }
+            if _manager_options.backend:
+                _manager_env["VIBE3_MANAGER_BACKEND"] = _manager_options.backend
+            if _manager_options.model:
+                _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
+
+            # 4. Reserve session
             session_id = self._registry.reserve(
                 role="manager",
                 target_type="issue",
@@ -221,7 +217,7 @@ class ManagerExecutor:
                 branch=flow_branch,
             )
 
-        try:
+            # 5. Launch execution
             cmd = [
                 "uv",
                 "run",
@@ -235,42 +231,21 @@ class ManagerExecutor:
                 str(issue.number),
                 "--no-async",
             ]
-            try:
-                handle = self._backend.start_async_command(
-                    cmd,
-                    execution_name=get_manager_session_name(issue.number),
-                    cwd=manager_cwd,
-                    env=_manager_env,
-                )
-            except Exception as exc:
-                # Clean up reserved session on launch failure
-                if self._registry is not None and session_id is not None:
-                    self._registry.mark_failed(session_id)
-                log.error(f"Manager async start failed: {exc}")
-                self._mark_manager_start_failed(
-                    issue,
-                    f"manager async start failed: {exc}",
-                )
-                return False
+
+            handle = self._backend.start_async_command(
+                cmd,
+                execution_name=get_manager_session_name(issue.number),
+                cwd=manager_cwd,
+                env=_manager_env,
+            )
+
             log.info(
                 f"Started manager async session: {handle.tmux_session} "
                 f"(log: {handle.log_path})"
             )
-            launched = True
 
-            # Mark session as running AFTER successful launch
-            if self._registry is not None and session_id is not None:
-                try:
-                    self._registry.mark_started(
-                        session_id, tmux_session=handle.tmux_session
-                    )
-                except Exception as exc:
-                    # Database error, but tmux is already running
-                    # Log warning but don't fail the dispatch
-                    log.warning(
-                        f"Failed to mark session started in registry: {exc}. "
-                        "Session will be cleaned up by reconcile."
-                    )
+            # 6. Mark started and record event
+            self._registry.mark_started(session_id, tmux_session=handle.tmux_session)
 
             self._flow_manager.store.add_event(
                 flow_branch,
@@ -286,21 +261,15 @@ class ManagerExecutor:
                     "issue": str(issue.number),
                 },
             )
-            # Only record launch; child records its own lifecycle events
             return True
+
+        except Exception as exc:
+            log.error(f"Dispatch failed: {exc}")
+            self._mark_manager_start_failed(issue, str(exc))
+            return False
         finally:
-            if is_temporary and manager_cwd:
-                if launched:
-                    log.info(
-                        f"Preserving newly dispatched manager worktree at {manager_cwd}"
-                    )
-                elif self._should_recycle(issue.number):
-                    self.worktree_manager.recycle(manager_cwd)
-                else:
-                    log.info(
-                        f"Preserving worktree at {manager_cwd} "
-                        "(issue still in-progress)"
-                    )
+            # Note: worktree cleanup is best-effort, handled by recycle logic if needed
+            pass
 
     def dispatch_pr_review(self, pr_number: int) -> bool:
         """Complete lifecycle for PR review dispatch with queuing."""

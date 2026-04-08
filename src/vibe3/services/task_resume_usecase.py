@@ -206,6 +206,24 @@ class TaskResumeUsecase:
                         worktree_path=worktree_path,
                     )
 
+                    # Publish event to notify EDA handlers of the state change
+                    try:
+                        from vibe3.domain.events import IssueStateChanged
+                        from vibe3.domain.publisher import publish
+                        from vibe3.models.orchestration import IssueState
+
+                        publish(
+                            IssueStateChanged(
+                                issue_number=issue_number,
+                                from_state=None,
+                                to_state=IssueState.READY.value,
+                                actor="human:resume",
+                            )
+                        )
+                    except ImportError:
+                        # Gracefully handle missing EDA dependencies if in lean context
+                        pass
+
                     if resume_kind == "all":
                         self._comment_all_resume_success(
                             issue_number=issue_number,
