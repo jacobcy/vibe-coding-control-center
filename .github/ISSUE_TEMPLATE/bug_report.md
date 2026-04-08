@@ -29,3 +29,12 @@ If applicable, add screenshots to help explain your problem.
 
 **Additional context**
 Add any other context about the problem here.
+
+---
+
+**署名信息**
+
+按照 [署名规范](../../docs/standards/authorship-standard.md)，请填写创建者信息：
+
+- **Created by**: [your-identity or agent-name]
+- **Date**: [YYYY-MM-DD]

@@ -189,42 +189,49 @@ state/ready
 
 ## 4. Agent 协作规则
 
+Agent 执行生命周期的状态变迁遵循**事件驱动架构**。Agent 本身负责发布领域事件，由统一的事件处理器负责执行实际的 GitHub 标签更新。
+
 ### 4.1 认领
 
 agent 认领 issue 时：
 
 1. 确认当前是 `state/ready`
-2. 更新为 `state/claimed`
-3. 写入或更新 assignee / handoff 最小上下文
+2. 发布事件通知状态迁移意图
+3. 处理器更新标签为 `state/claimed`
+4. 写入或更新 assignee / handoff 最小上下文
 
 ### 4.2 执行
 
 进入实际修改后：
 
-1. 从 `state/claimed` 进入 `state/in-progress`
-2. 持续更新 handoff
-3. 保持 `state/*` 单值
+1. 发布事件从 `state/claimed` 进入 `state/in-progress`
+2. 处理器更新标签为 `state/in-progress`
+3. 持续更新 handoff
+4. 保持 `state/*` 单值
 
 ### 4.3 阻塞
 
 当 agent 无法继续推进时：
 
-1. 切换到 `state/blocked`
-2. handoff 中必须写明阻塞原因和下一步
+1. 发布 `IssueBlocked` 事件
+2. 处理器切换标签到 `state/blocked`
+3. handoff 中必须写明阻塞原因和下一步
 
 ### 4.4 交接
 
 当任务需要换手时：
 
-1. 切换到 `state/handoff`
-2. handoff 必须完整
-3. 接手方读取 handoff 后再进入 `state/in-progress`
+1. 发布阶段完成事件（如 `PlanCompleted`）
+2. 处理器切换标签到 `state/handoff`
+3. handoff 必须完整
+4. 接手方（如 Manager）在 `state/handoff` 自动恢复后读取 handoff，决定下一步迁移
 
 ### 4.5 Review 与完成
 
 1. 待 review 时使用 `state/review`
-2. 达到可合并条件时使用 `state/merge-ready`
-3. 真正完成后进入 `state/done`
+2. review 成功后发布 `ReviewCompleted` 事件，处理器自动生成最小 audit_ref 并迁移状态
+3. 达到可合并条件时进入 `state/merge-ready`
+4. 真正完成后进入 `state/done`
 
 ---
 

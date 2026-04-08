@@ -69,6 +69,13 @@ def register_create_command(app: typer.Typer) -> None:
             bool,
             typer.Option("--ai", help="Use AI to suggest PR title and body"),
         ] = False,
+        agent: Annotated[
+            bool,
+            typer.Option(
+                "--agent",
+                help="Agent mode: create PR without human confirmation",
+            ),
+        ] = False,
         yes: Annotated[
             bool,
             typer.Option(
@@ -87,19 +94,37 @@ def register_create_command(app: typer.Typer) -> None:
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
     ) -> None:
-        """Create draft PR (Human-only entrance).
+        """Create draft PR.
+
+        Human entrance: use --yes to confirm.
+        Agent entrance: use --agent to bypass human confirmation (requires -t and -b).
+        AI suggestion: use --ai to generate title/body (human only).
 
         Metadata (task, flow, spec, planner, executor) is automatically
         read from the current flow state.
         """
-        if not yes:
+        # Parameter combination validation
+        if agent and ai:
+            typer.echo(
+                "Error: --agent and --ai cannot be used together",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        if agent and yes:
+            typer.echo(
+                "Error: --agent and --yes cannot be used together",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # Human-only gate
+        if not (yes or agent):
             from vibe3.ui.console import console
 
-            console.print(
-                "[yellow]此命令仅建议人类使用。Agent 请直接使用 "
-                "`gh pr create --draft` 命令。[/]"
-            )
-            console.print("[yellow]如需继续，请使用 --yes 确认。[/]")
+            console.print("[yellow]此命令需要明确确认：[/]")
+            console.print("[yellow]  - 人类用户：使用 --yes[/]")
+            console.print("[yellow]  - AI Agent：使用 --agent[/]")
             raise typer.Exit(0)
 
         if json_output and yaml_output:
@@ -122,7 +147,8 @@ def register_create_command(app: typer.Typer) -> None:
             logger.bind(command="pr create", title=title, base=resolved_base).info(
                 "Creating PR"
             )
-            interactive = _is_interactive(json_output, yaml_output)
+            # Agent mode is always non-interactive
+            interactive = _is_interactive(json_output, yaml_output) and not agent
 
             usecase = PRCreateUsecase(
                 flow_service=flow_service,
@@ -142,7 +168,8 @@ def register_create_command(app: typer.Typer) -> None:
                 return
 
             try:
-                usecase.check_flow_task(branch, yes=yes)
+                # Bypass task binding check for agent mode (--agent or --yes)
+                usecase.check_flow_task(branch, yes=yes or agent)
             except RuntimeError as error:
                 typer.echo(str(error), err=True)
                 raise typer.Exit(1) from error
@@ -153,6 +180,14 @@ def register_create_command(app: typer.Typer) -> None:
                     branch, resolved_base, interactive
                 )
 
+            # Agent mode requires explicit title and body
+            if agent and not title:
+                typer.echo(
+                    "Error: --agent mode requires -t (title) and -b (body)",
+                    err=True,
+                )
+                raise typer.Exit(1)
+
             try:
                 pr_title = usecase.resolve_title(title, ai_title, interactive)
             except ValueError:
@@ -160,6 +195,10 @@ def register_create_command(app: typer.Typer) -> None:
                 raise typer.Exit(1)
 
             pr_body = ai_body if ai_body else body
+            # Actor determination:
+            # - AI suggestion mode: "ai-assistant"
+            # - Agent mode: None (will be resolved by PRService from flow state)
+            # - Human mode: None
             actor = "ai-assistant" if ai else None
 
             pr = pr_service.create_draft_pr(

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra import supervisor_run_service
-from vibe3.orchestra.config import OrchestraConfig
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 

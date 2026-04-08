@@ -3,9 +3,9 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from vibe3.orchestra.config import GovernanceConfig, OrchestraConfig
+from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.orchestra.services.status_service import (
+from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
 )
 

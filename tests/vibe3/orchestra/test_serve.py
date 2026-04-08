@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from vibe3.orchestra.config import (
+from vibe3.models.orchestra_config import (
     AssigneeDispatchConfig,
     CommentReplyConfig,
     GovernanceConfig,

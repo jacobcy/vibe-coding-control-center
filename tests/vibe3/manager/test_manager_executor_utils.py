@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.config import OrchestraConfig
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -64,7 +64,17 @@ class TestManagerReviewDispatch:
             cmd = manager.command_builder.build_pr_review_command(42)
             cwd = manager._resolve_review_cwd_for_dispatch(42)
 
-        assert cmd == ["uv", "run", "python", "-m", "vibe3", "review", "pr", "42"]
+        assert cmd == [
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "vibe3",
+            "review",
+            "pr",
+            "42",
+            "--async",
+        ]
         assert cwd == Path("/tmp/wt-feature")
 
     def test_dispatch_pr_review_uses_resolved_worktree(self):

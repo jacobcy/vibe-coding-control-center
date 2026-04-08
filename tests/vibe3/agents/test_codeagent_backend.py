@@ -316,7 +316,7 @@ class TestCodeagentBackend:
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer", worktree=True),
+                AgentOptions(agent="code-reviewer"),
             )
 
         command = mock_run.call_args[0][0]
@@ -334,7 +334,7 @@ class TestCodeagentBackend:
             backend = CodeagentBackend()
             backend.run(
                 "prompt body",
-                AgentOptions(agent="code-reviewer", worktree=True),
+                AgentOptions(agent="code-reviewer"),
                 session_id="262f0fea-eacb-4223-b842-b5b5097f94e8",
             )
 

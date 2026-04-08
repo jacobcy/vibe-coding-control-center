@@ -27,15 +27,11 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
-from vibe3.services.authoritative_ref_gate import require_authoritative_ref
 from vibe3.services.flow_service import FlowService
 from vibe3.services.handoff_recorder_unified import sanitize_handoff_content
 from vibe3.services.handoff_service import HandoffService
-from vibe3.services.issue_failure_service import block_reviewer_noop_issue
-from vibe3.services.label_service import LabelService
 
 
 class _BranchBoundGitClient(GitClient):
@@ -186,10 +182,12 @@ class ReviewUsecase:
         issue_number: int | None = None,
         pr_number: int | None = None,
         branch: str | None = None,
-        async_mode: bool = False,
-        worktree: bool = False,
+        async_mode: bool = True,
     ) -> ReviewRunResult:
         """Execute review request and return a command-facing summary."""
+        from vibe3.domain.events import IssueFailed, ReviewCompleted
+        from vibe3.domain.publisher import publish
+
         log = logger.bind(domain="review", scope=request.scope.kind)
         task = self._build_task(instructions, request, pr_number, log)
         exec_svc = self.execution_service_factory(self.config)
@@ -202,7 +200,6 @@ class ReviewUsecase:
             handoff_metadata={},
             config=self.config,
             branch=branch,
-            worktree=worktree,
         )
         if async_mode and not dry_run and branch:
             exec_svc.execute(command, async_mode=True)
@@ -234,25 +231,15 @@ class ReviewUsecase:
                     audit_ref=audit_ref,
                     actor="agent:review",
                 )
-                if not require_authoritative_ref(
-                    flow_service=self.flow_service,
-                    branch=branch,
-                    ref_name="audit_ref",
-                    issue_number=issue_number,
-                    reason=(
-                        "review output was saved, but no authoritative audit_ref "
-                        "was registered. Write or regenerate a canonical audit "
-                        "note and run handoff audit."
-                    ),
-                    actor="agent:review",
-                    block_issue=block_reviewer_noop_issue,
-                ):
-                    return ReviewRunResult(
-                        verdict="ERROR",
-                        handoff_file=audit_ref,
+                # Publish ReviewCompleted event (only if issue_number is set)
+                if issue_number is not None:
+                    review_event = ReviewCompleted(
                         issue_number=issue_number,
+                        branch=branch,
+                        verdict=review.verdict,
+                        actor="agent:review",
                     )
-                self._transition_issue(issue_number)
+                    publish(review_event)
             return ReviewRunResult(
                 verdict=review.verdict,
                 handoff_file=audit_ref,
@@ -271,7 +258,14 @@ class ReviewUsecase:
                     audit_ref=error_audit_ref,
                     actor="agent:review",
                 )
-            self._fail_issue(issue_number, f"review parse failed: {err}")
+            # Publish IssueFailed event
+            if issue_number is not None:
+                event = IssueFailed(
+                    issue_number=issue_number,
+                    reason=f"review parse failed: {err}",
+                    actor="agent:review",
+                )
+                publish(event)
             return ReviewRunResult(
                 verdict="ERROR",
                 handoff_file=error_audit_ref,
@@ -307,38 +301,6 @@ class ReviewUsecase:
             return self.config.review.review_prompt
         log.info("Using prompt file only (no custom task)")
         return request.task_guidance
-
-    @staticmethod
-    def _transition_issue(issue_number: int | None) -> None:
-        """Move linked issue back to handoff when review completes."""
-        if issue_number is None:
-            return
-        label_result = LabelService().confirm_issue_state(
-            issue_number,
-            to_state=IssueState.HANDOFF,
-            actor="agent:review",
-        )
-        if label_result == "blocked":
-            typer.echo(
-                "Warning: Failed to transition issue state: state_transition_blocked",
-                err=True,
-            )
-
-    @staticmethod
-    def _fail_issue(issue_number: int | None, reason: str) -> None:
-        """Mark the linked issue as failed and explain the execution error."""
-        if issue_number is None:
-            return
-        GitHubClient().add_comment(
-            issue_number,
-            f"[review] 审查执行报错，已切换为 state/failed。\n\n原因：{reason}",
-        )
-        LabelService().confirm_issue_state(
-            issue_number,
-            to_state=IssueState.FAILED,
-            actor="agent:review",
-            force=True,
-        )
 
     def _load_changed_symbols(
         self, inspect_args: list[str]

@@ -5,6 +5,7 @@ Migrated from vibe3.services.run_usecase.
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from vibe3.services.flow_service import FlowService
 
@@ -63,6 +64,81 @@ class RunUsecase:
         if not flow or not flow.task_issue_number:
             return None
         return str(flow.task_issue_number)
+
+    def build_lifecycle_callbacks(
+        self,
+        issue_number: int,
+        branch: str,
+        flow_service: FlowService,  # noqa: ARG002 - kept for API compatibility
+    ) -> tuple[Callable[[object], None], Callable[[Exception], None]]:
+        """生成执行成功/失败时的状态机流转回调。
+
+        Flow:
+            on_success:
+                - If handoff_file exists: IssueStateChanged(HANDOFF)
+                - If missing: ReportRefRequired (handler blocks issue)
+            on_failure: IssueFailed(reason)
+
+        Args:
+            issue_number: Issue 编号
+            branch: 当前分支
+            flow_service: Flow 服务实例 (deprecated: events create their own)
+
+        Returns:
+            (on_success, on_failure) 回调元组
+        """
+        from vibe3.domain.events import (
+            IssueFailed,
+            IssueStateChanged,
+            ReportRefRequired,
+        )
+        from vibe3.domain.publisher import publish
+        from vibe3.models.orchestration import IssueState
+
+        def on_success(result: object) -> None:
+            """执行成功：验证报告引用并确认 Issue 状态。"""
+            # Check if result has handoff_file (authoritative report ref)
+            from vibe3.agents.models import CodeagentResult
+
+            handoff_file = None
+            if isinstance(result, CodeagentResult):
+                handoff_file = result.handoff_file
+
+            if handoff_file:
+                # Report ref exists - transition to HANDOFF
+                state_changed_event = IssueStateChanged(
+                    issue_number=issue_number,
+                    from_state=None,  # Will be detected by handler
+                    to_state=IssueState.HANDOFF.value,
+                    actor="agent:run",
+                )
+                publish(state_changed_event)
+            else:
+                # Missing report ref - block issue state transition
+                report_required_event = ReportRefRequired(
+                    issue_number=issue_number,
+                    branch=branch,
+                    ref_name="report_ref",
+                    reason=(
+                        "executor output artifact was saved, but no authoritative "
+                        "report_ref was registered. Write a canonical report "
+                        "document and run handoff report."
+                    ),
+                    actor="agent:run",
+                )
+                publish(report_required_event)
+
+        def on_failure(error: Exception) -> None:
+            """执行失败：发布 Issue 失败事件。"""
+            # Publish IssueFailed event
+            failed_event = IssueFailed(
+                issue_number=issue_number,
+                reason=str(error),
+                actor="agent:run",
+            )
+            publish(failed_event)
+
+        return on_success, on_failure
 
     @staticmethod
     def find_skill_file(

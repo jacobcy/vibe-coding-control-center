@@ -21,9 +21,10 @@ description: Use when the user wants to create, draft, deduplicate, or refine a 
 
 - **不重造轮子**：直接调用 `gh` CLI 以及最小必要的 `vibe3 task status` 命令。
 - **治理先行**：创建前必先查重，必先匹配模板。
+- **署名必须**：Issue 创建后必须记录创建者信息，符合 [署名规范](../../docs/standards/authorship-standard.md)。
 - **先读 shell 输出**：先读取 `gh` / `vibe3` 输出，再做编排判断。
 - **只做 intake，不做排期**：Issue 创建后是否进入规划、何时进入版本窗口，由 `vibe-roadmap` 决定。
-- **自动队列只解释，不在此决策**：若用户追问“它之后会不会被自动处理、排在什么位置”，可以读取 `uv run python src/vibe3/cli.py task status` 解释当前 ready queue 事实，但不在 `vibe-issue` 中决定顺位。
+- **自动队列只解释，不在此决策**：若用户追问”它之后会不会被自动处理、排在什么位置”，可以读取 `uv run python src/vibe3/cli.py task status` 解释当前 ready queue 事实，但不在 `vibe-issue` 中决定顺位。
 - **进入执行现场属于后续阶段**：创建完成后，若要做版本规划转给 `vibe-roadmap`；若用户已明确要人工开工，则转给 `vibe-new`。
 - **范围先定义**：若采用主 issue / sub-issue 结构，必须先写清主 issue 的治理母题与范围边界。
 

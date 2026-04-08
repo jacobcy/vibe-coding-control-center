@@ -53,7 +53,6 @@ class TestAgentOptions:
         assert options.agent is None
         assert options.model is None
         assert options.backend is None
-        assert options.worktree is False
         assert options.timeout_seconds == 1800
 
     def test_custom_options_with_agent(self) -> None:
@@ -166,12 +165,6 @@ class TestResolveAgentOptions:
         svc = self._make_service()
         with pytest.raises(ValueError, match="No agent configuration"):
             svc.resolve_agent_options("run")
-
-    def test_worktree_flag_propagated(self) -> None:
-        """--worktree flag is passed through regardless of mode."""
-        svc = self._make_service(agent="code-reviewer")
-        opts = svc.resolve_agent_options("run", worktree=True)
-        assert opts.worktree is True
 
 
 class TestSyncModelsJson:

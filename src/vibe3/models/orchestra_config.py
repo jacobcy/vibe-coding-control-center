@@ -1,4 +1,8 @@
-"""Orchestra configuration."""
+"""Orchestra configuration models.
+
+These configuration classes are shared across orchestra, manager, and agents modules.
+Placed in models layer to avoid circular dependencies.
+"""
 
 import subprocess
 from pathlib import Path
@@ -74,7 +78,7 @@ class PRReviewDispatchConfig(BaseModel):
     """Configuration for PR review dispatch service."""
 
     enabled: bool = True
-    async_mode: bool = False
+    async_mode: bool = True
     use_worktree: bool = False
 
 
@@ -163,7 +167,11 @@ class SupervisorHandoffConfig(BaseModel):
 
 
 class OrchestraConfig(BaseModel):
-    """Orchestra daemon configuration."""
+    """Orchestra daemon configuration.
+
+    Shared configuration model for orchestra, manager, and agents modules.
+    Placed in models layer to avoid circular dependencies.
+    """
 
     enabled: bool = True
     polling_interval: int = Field(default=900, ge=1)

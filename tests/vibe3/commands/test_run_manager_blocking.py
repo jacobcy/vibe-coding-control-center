@@ -115,7 +115,7 @@ class TestRunManagerIssueBlocking:
         # Mock the shared snapshot_progress function
         monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372", "--no-async"])
 
         assert result.exit_code == 0
         # SHOULD block because state unchanged (READY requires transition)
@@ -170,7 +170,7 @@ class TestRunManagerIssueBlocking:
 
         monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372", "--no-async"])
 
         assert result.exit_code == 0
         # SHOULD block because state unchanged (READY requires transition)
@@ -217,7 +217,7 @@ class TestRunManagerIssueBlocking:
 
         monkeypatch.setattr(manager_run_service, "snapshot_progress", mock_snapshot)
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--sync"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372", "--no-async"])
 
         assert result.exit_code == 0
         # Should block because no change at all

@@ -5,8 +5,8 @@ from pathlib import Path
 import yaml
 
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.config import AssigneeDispatchConfig, OrchestraConfig
 from vibe3.prompts.models import PromptRecipe, VariableSourceKind
 
 

@@ -1,5 +1,63 @@
 # 更新日志
 
+## [2.4.0] - 2026-04-08
+
+### ✨ New Features
+- **Domain Events System**: 引入事件驱动架构，支持 Issue 生命周期事件的发布-订阅模式
+  - 新增 domain events 模块（IssueStateChanged, IssueFailed, ReportRefRequired）
+  - 实现单例 EventPublisher 模式，支持事件发布和订阅
+  - 所有执行链（L1-L3）集成事件驱动回调机制
+- **Worktree Isolation for L2**: 为 Supervisor apply agent 添加临时 worktree 隔离
+  - SupervisorHandoffService 使用 WorktreeManager.acquire_temporary_worktree()
+  - 确保 L2 层安全执行文档修正和配置调整
+  - 符合 vibe3-worktree-ownership-standard.md 规范
+
+### 🔧 Refactor
+- **Async 标准化**: 统一所有命令和配置的 async 默认值为 True
+  - CLI 层统一使用 `--no-async` 标志（默认异步）
+  - PRReviewDispatchConfig.async_mode 默认值改为 True
+  - review_agent.py 默认异步执行
+- **Worktree 参数清理**: 移除废弃的 `--worktree` 参数
+  - 删除 CLI 命令中的 `--worktree` 选项
+  - 移除 AgentOptions.worktree 字段
+  - 清理 runner.py 中的 worktree 分支逻辑
+- **Legacy Architecture Cleanup**: 清理遗留架构代码
+  - orchestra/services/ 目录迁移为兼容层存根
+  - 删除 orchestra/config.py, orchestra/agent_resolver.py, orchestra/no_progress_policy.py
+  - 统一导入路径至新位置（services/, runtime/）
+
+### 🐛 Bug Fixes
+- 修复 `on_success` 逻辑：根据 handoff_file 存在决定发布事件类型
+- 修复测试以匹配事件驱动架构
+- 修复 CI pytest 失败（async defaults, plan tests, supervisor handoff tests）
+
+### 📚 Documentation
+- 新增 event-driven-architecture-standard.md 文档
+- 更新 vibe3-worktree-ownership-standard.md，明确 L2 worktree 隔离要求
+- 添加本地测试策略说明（避免全量 pytest）
+- 清理废弃的 --worktree 参数文档
+
+## [2.3.0] - 2026-04-08
+
+### ✨ New Features
+- 统一 PR 创建入口：添加 `vibe3 pr create --agent` 参数，让 AI Agent 可以使用相同的自动化功能（base branch 自动选择、flow/task binding guard、metadata enrichment）
+- Agent 模式必须提供 `-t` (title) 和 `-b` (body)，禁止交互式输入
+- 明确区分三种入口：`--agent` (AI Agent)、`--yes` (人类确认)、`--ai` (AI suggestion)
+
+### 🔧 Refactor
+- 重构 agent 执行层：统一 plan 和 review 使用 callback-based agent launcher
+- PlanUsecase 和 ReviewUsecase 现在通过 `execute_with_callbacks` 支持 success/failure 回调
+- 分离 AgentSpec 创建逻辑，提高代码可测试性
+
+### 📚 Documentation
+- 添加署名规则：Issue、PR、Comment 必须明确标注创建者身份
+- 更新 skill 文档：所有 AI Agent 统一使用 `vibe3 pr create --agent` 而非 `gh pr create`
+- 添加 GitHub issue 和 PR 模板，包含署名字段和 Contributors 块
+
+### 🐛 Bug Fixes
+- 修复 Agent 模式进入交互式 prompt 的问题
+- 更新测试以匹配重构后的 API
+
 ## [2.2.3] - 2026-03-21
 
 ### ✨ Changed

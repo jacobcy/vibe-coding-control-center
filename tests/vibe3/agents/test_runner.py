@@ -72,7 +72,7 @@ class TestCodeagentExecutionService:
             "python",
             str(CodeagentExecutionService._cli_entry()),
         ]
-        assert "--sync" in called_command
+        assert "--no-async" in called_command
         backend.start_async.assert_not_called()
         expected_tmux = "Tmux session: vibe3-executor-dev-issue-424"
         expected_log = "Session log: temp/logs/issues/issue-424/run.async.log"

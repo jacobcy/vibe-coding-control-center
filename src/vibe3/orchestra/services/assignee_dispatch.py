@@ -10,12 +10,12 @@ from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 _PRIORITY_MAP: dict[str, int] = {
     "priority/urgent": 0,

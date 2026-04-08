@@ -25,7 +25,6 @@ class CodeagentCommand:
     agent: str | None = None
     backend: str | None = None
     model: str | None = None
-    worktree: bool = False
     cwd: Path | None = None
     config: VibeConfig | None = None
     branch: str | None = None
@@ -47,6 +46,24 @@ class CodeagentResult:
     log_path: Path | None = None
 
 
+@dataclass
+class AgentSpec:
+    """定义一个 Agent 需要做什么，以及做完后触发什么回调。
+
+    用于 Usecase 层描述业务逻辑，封装 role、context、task 和回调钩子。
+    执行引擎通过 execute_with_callbacks 方法接收回调函数。
+    """
+
+    role: ExecutionRole
+    handoff_kind: str
+    context: str
+    task: str | None = None
+
+    # 回调钩子
+    on_success: Callable[[CodeagentResult], None] = lambda _: None
+    on_failure: Callable[[Exception], None] = lambda _: None
+
+
 def create_codeagent_command(
     role: ExecutionRole,
     context_builder: Callable[[], str],
@@ -57,7 +74,6 @@ def create_codeagent_command(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
-    worktree: bool = False,
     cwd: Path | None = None,
     config: VibeConfig | None = None,
     branch: str | None = None,
@@ -75,7 +91,6 @@ def create_codeagent_command(
         agent: Agent preset override
         backend: Backend override
         model: Model override
-        worktree: Whether to use codeagent-wrapper --worktree mode
         cwd: Explicit working directory for agent execution
         config: VibeConfig instance
         branch: Current branch (for async execution)
@@ -100,7 +115,6 @@ def create_codeagent_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         cwd=cwd,
         config=config,
         branch=branch,

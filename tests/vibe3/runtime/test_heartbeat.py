@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.runtime.heartbeat import HeartbeatServer

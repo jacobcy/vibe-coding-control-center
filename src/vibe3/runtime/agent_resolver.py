@@ -18,7 +18,7 @@ from vibe3.models.review_runner import AgentOptions
 
 if TYPE_CHECKING:
     from vibe3.config.settings import VibeConfig
-    from vibe3.orchestra.config import OrchestraConfig
+    from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def _resolve_and_sync(raw_options: AgentOptions) -> AgentOptions:
@@ -42,7 +42,6 @@ def resolve_governance_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=gov.agent,
         backend=gov.backend,
         model=gov.model,
-        worktree=False,  # Governance doesn't need worktree
     )
 
     return _resolve_and_sync(raw_options)
@@ -62,7 +61,6 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=handoff.agent,
         backend=handoff.backend,
         model=handoff.model,
-        worktree=False,  # L2 uses self-managed temporary worktree, no --worktree flag
     )
 
     return _resolve_and_sync(raw_options)
@@ -71,7 +69,6 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
 def resolve_manager_agent_options(
     config: OrchestraConfig,
     runtime_config: VibeConfig,
-    worktree: bool = False,
 ) -> AgentOptions:
     """Resolve agent options from orchestra assignee dispatch config.
 
@@ -92,7 +89,6 @@ def resolve_manager_agent_options(
     Args:
         config: Orchestra configuration with assignee dispatch settings
         runtime_config: Vibe runtime config for fallback defaults
-        worktree: Whether to run in worktree mode
 
     Returns:
         Effective agent options with preset resolved from config/models.json
@@ -106,20 +102,18 @@ def resolve_manager_agent_options(
             agent=ad.agent,
             backend=ad.backend,
             model=ad.model,
-            worktree=worktree,
             timeout_seconds=ad.timeout_seconds,
         )
     else:
         # Fall back to generic run defaults
         raw_options = CodeagentExecutionService(runtime_config).resolve_agent_options(
-            "run", worktree=worktree
+            "run",
         )
         # Override timeout with manager-specific value
         raw_options = AgentOptions(
             agent=raw_options.agent,
             backend=raw_options.backend,
             model=raw_options.model,
-            worktree=raw_options.worktree,
             timeout_seconds=ad.timeout_seconds,
         )
 

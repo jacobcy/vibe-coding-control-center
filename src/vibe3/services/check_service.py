@@ -390,8 +390,8 @@ class CheckService(CheckRemote):
                 return False
 
         from vibe3.manager.flow_manager import FlowManager
+        from vibe3.models.orchestra_config import OrchestraConfig
         from vibe3.models.orchestration import IssueInfo
-        from vibe3.orchestra.config import OrchestraConfig
 
         issue = IssueInfo(
             number=issue_number,

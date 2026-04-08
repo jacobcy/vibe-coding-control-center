@@ -1,9 +1,31 @@
 """Shared fixtures for PR command tests."""
 
+from unittest.mock import patch
+
 import pytest
 
 from vibe3.models.coverage import CoverageReport, LayerCoverage
 from vibe3.models.pr import PRResponse, PRState
+
+
+@pytest.fixture(autouse=True)
+def mock_git_client_base():
+    """Globally patch GitClient methods that require a real git repo."""
+    # Use a non-protected branch name to avoid flow protection errors
+    with (
+        patch(
+            "vibe3.clients.git_client.GitClient.get_git_common_dir",
+            return_value="/tmp/.git",
+        ),
+        patch(
+            "vibe3.clients.git_client.GitClient.get_worktree_root", return_value="/tmp"
+        ),
+        patch(
+            "vibe3.clients.git_client.GitClient.get_current_branch",
+            return_value="task/test-branch",
+        ),
+    ):
+        yield
 
 
 @pytest.fixture

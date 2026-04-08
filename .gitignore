@@ -129,5 +129,6 @@ docs/plans/
 # Claude: track project config, exclude local commands and skills
 .claude/commands/
 .claude/skills/
+.claude/do-tasks/
 .aider*
 MagicMock/

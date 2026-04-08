@@ -3,8 +3,8 @@
 from unittest.mock import patch
 
 from vibe3.manager.flow_manager import FlowManager
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.config import OrchestraConfig
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:

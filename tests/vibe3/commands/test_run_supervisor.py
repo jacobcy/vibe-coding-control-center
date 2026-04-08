@@ -6,13 +6,12 @@ from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
-import vibe3.commands.run as run_module
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.cli import app as cli_app
 from vibe3.config.settings import VibeConfig
 from vibe3.manager import manager_run_service
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services import issue_failure_service
 
 runner = CliRunner(env={"NO_COLOR": "1"})
@@ -74,11 +73,11 @@ def _patch_supervisor_runtime(
 
 class TestRunSupervisorOption:
     def test_help_shows_supervisor_option(self) -> None:
-        result = runner.invoke(cli_app, ["run", "--help"])
+        # Check internal apply help instead of run help
+        result = runner.invoke(cli_app, ["internal", "apply", "--help"])
         output = strip_ansi(result.output)
         assert result.exit_code == 0
-        assert "supervisor" in output
-        assert "governance input" in output
+        assert "supervisor" in output.lower()
 
     def test_dry_run_outputs_rendered_governance_plan(self, monkeypatch) -> None:
         _patch_supervisor_runtime(monkeypatch)
@@ -86,10 +85,11 @@ class TestRunSupervisorOption:
         result = runner.invoke(
             cli_app,
             [
-                "run",
-                "--supervisor",
+                "internal",
+                "apply",
                 "supervisor/issue-cleanup.md",
                 "--dry-run",
+                "--no-async",
             ],
         )
         assert result.exit_code == 0
@@ -113,8 +113,8 @@ class TestRunSupervisorOption:
         result = runner.invoke(
             cli_app,
             [
-                "run",
-                "--supervisor",
+                "internal",
+                "apply",
                 "supervisor/issue-cleanup.md",
             ],
         )
@@ -128,7 +128,7 @@ class TestRunSupervisorOption:
         )
         backend.start_async.assert_called_once()
 
-    def test_issue_mode_defaults_to_supervisor_apply(self, monkeypatch) -> None:
+    def test_issue_mode_dispatch(self, monkeypatch) -> None:
         _patch_supervisor_runtime(monkeypatch, repo="owner/repo")
         backend = MagicMock()
         backend.start_async.return_value = AsyncExecutionHandle(
@@ -145,12 +145,10 @@ class TestRunSupervisorOption:
 
         monkeypatch.setattr(supervisor_run_service, "CodeagentBackend", lambda: backend)
         monkeypatch.setattr(supervisor_run_service, "GitHubClient", lambda: github)
-        monkeypatch.setattr(
-            "vibe3.orchestra.supervisor_run_service.resolve_issue_supervisor_file",
-            lambda: "supervisor/apply.md",
-        )
 
-        result = runner.invoke(cli_app, ["run", "--issue", "426"])
+        result = runner.invoke(
+            cli_app, ["internal", "apply", "supervisor/apply.md", "--issue", "426"]
+        )
 
         assert result.exit_code == 0
         assert "Supervisor run: supervisor/apply.md" in result.output
@@ -162,64 +160,15 @@ class TestRunSupervisorOption:
         task = backend.start_async.call_args.kwargs["task"]
         assert "Process governance issue #426" in task
         assert "cleanup: orchestra smoke test residuals" in task
-        assert "comment the outcome on the same issue" in task
-
-    def test_issue_mode_uses_configured_supervisor_file(self, monkeypatch) -> None:
-        _patch_supervisor_runtime(monkeypatch, repo="owner/repo")
-        backend = MagicMock()
-        backend.start_async.return_value = AsyncExecutionHandle(
-            tmux_session="vibe3-supervisor-governance-apply-issue-426",
-            log_path=Path(
-                "temp/logs/vibe3-supervisor-governance-apply-issue-426.async.log"
-            ),
-            prompt_file_path=Path("/tmp/prompt.md"),
-        )
-        github = MagicMock()
-        github.view_issue.return_value = {
-            "number": 426,
-            "title": "cleanup: orchestra smoke test residuals (issues #369, #370)",
-        }
-        from vibe3.orchestra import supervisor_run_service
-
-        monkeypatch.setattr(supervisor_run_service, "CodeagentBackend", lambda: backend)
-        monkeypatch.setattr(supervisor_run_service, "GitHubClient", lambda: github)
-        monkeypatch.setattr(
-            run_module,
-            "_svc_resolve_supervisor_file",
-            lambda: "supervisor/governance-apply.md",
-        )
-
-        result = runner.invoke(cli_app, ["run", "--issue", "426"])
-
-        assert result.exit_code == 0
-        assert "supervisor/governance-apply.md" in result.output
-        assert (
-            "Tmux session: vibe3-supervisor-governance-apply-issue-426" in result.output
-        )
-
-    def test_issue_mode_rejects_other_run_modes(self) -> None:
-        result = runner.invoke(
-            cli_app,
-            ["run", "--issue", "426", "--skill", "vibe-new"],
-        )
-
-        assert result.exit_code != 0
-        assert (
-            "--issue cannot be combined with --plan, --skill, or --supervisor."
-            in result.stderr
-        )
-
-    def test_manager_issue_mode_fresh_session_shows_in_help(self) -> None:
-        result = runner.invoke(cli_app, ["run", "--help"])
-        output = strip_ansi(result.output)
-        assert result.exit_code == 0
-        assert "fresh-session" in output
 
     def test_manager_issue_sync_failure_marks_issue_failed(self, monkeypatch) -> None:
         orchestra_config = OrchestraConfig(
             repo="owner/repo",
             pid_file=Path(".git/vibe3/orchestra.pid"),
         )
+        # Ensure assignee_dispatch is configured to avoid run-defaults fallback
+        orchestra_config.assignee_dispatch.agent = "manager-agent"
+
         monkeypatch.setattr(
             OrchestraConfig,
             "from_settings",
@@ -228,7 +177,7 @@ class TestRunSupervisorOption:
         monkeypatch.setattr(
             VibeConfig,
             "get_defaults",
-            classmethod(lambda cls: MagicMock()),
+            classmethod(lambda cls: VibeConfig()),
         )
         monkeypatch.setattr(manager_run_service, "SQLiteClient", lambda: MagicMock())
         monkeypatch.setattr(
@@ -247,18 +196,9 @@ class TestRunSupervisorOption:
             lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
         )
         monkeypatch.setattr(
-            "vibe3.orchestra.agent_resolver.resolve_manager_agent_options",
-            lambda *args, **kwargs: MagicMock(),
-        )
-        monkeypatch.setattr(
             manager_run_service,
             "render_manager_prompt",
             lambda config, issue: MagicMock(rendered_text="manager prompt"),
-        )
-        monkeypatch.setattr(
-            manager_run_service.GitClient,
-            "get_current_branch",
-            lambda self: "dev/issue-435",
         )
 
         github = MagicMock()
@@ -269,6 +209,9 @@ class TestRunSupervisorOption:
             "assignees": [],
         }
         monkeypatch.setattr(manager_run_service, "GitHubClient", lambda: github)
+
+        # IMPORTANT: Patch the class, not the instance factory if possible,
+        # but here we patch what the service uses.
         monkeypatch.setattr(issue_failure_service, "GitHubClient", lambda: github)
 
         backend = MagicMock()
@@ -284,7 +227,7 @@ class TestRunSupervisorOption:
 
         result = runner.invoke(
             cli_app,
-            ["run", "--manager-issue", "278", "--sync"],
+            ["internal", "manager", "278", "--no-async"],
         )
 
         assert result.exit_code != 0
@@ -301,6 +244,8 @@ class TestRunSupervisorOption:
             repo="owner/repo",
             pid_file=Path(".git/vibe3/orchestra.pid"),
         )
+        orchestra_config.assignee_dispatch.agent = "manager-agent"
+
         monkeypatch.setattr(
             OrchestraConfig,
             "from_settings",
@@ -309,7 +254,7 @@ class TestRunSupervisorOption:
         monkeypatch.setattr(
             VibeConfig,
             "get_defaults",
-            classmethod(lambda cls: MagicMock()),
+            classmethod(lambda cls: VibeConfig()),
         )
         sqlite = MagicMock()
         monkeypatch.setattr(manager_run_service, "SQLiteClient", lambda: sqlite)
@@ -329,21 +274,12 @@ class TestRunSupervisorOption:
             lambda **kwargs: (Path("/tmp/repo/.worktrees/issue-278"), False),
         )
         monkeypatch.setattr(
-            "vibe3.orchestra.agent_resolver.resolve_manager_agent_options",
-            lambda *args, **kwargs: MagicMock(),
-        )
-        monkeypatch.setattr(
             manager_run_service,
             "render_manager_prompt",
             lambda config, issue: MagicMock(rendered_text="manager prompt"),
         )
         monkeypatch.setattr(
-            manager_run_service.GitClient,
-            "get_current_branch",
-            lambda self: "dev/post-437-debug",
-        )
-        monkeypatch.setattr(
-            "vibe3.orchestra.no_progress_policy.snapshot_progress",
+            "vibe3.runtime.no_progress_policy.snapshot_progress",
             lambda **kwargs: {
                 "state_label": "state/ready",
                 "comment_count": 1,
@@ -380,7 +316,7 @@ class TestRunSupervisorOption:
 
         result = runner.invoke(
             cli_app,
-            ["run", "--manager-issue", "278", "--sync"],
+            ["internal", "manager", "278", "--no-async"],
         )
 
         assert result.exit_code == 0

@@ -57,8 +57,9 @@ def test_pr_create_requires_human_confirmation(
 
     # New behavior: exits with 0 and shows human-only warning
     assert result.exit_code == 0
-    assert "此命令仅建议人类使用" in result.output
-    assert "--yes 确认" in result.output
+    assert "此命令需要明确确认" in result.output
+    assert "--yes" in result.output
+    assert "--agent" in result.output
     mock_pr_service.create_draft_pr.assert_not_called()
 
 

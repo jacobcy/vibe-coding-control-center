@@ -9,7 +9,10 @@ from typer.testing import CliRunner
 from vibe3.agents.run_agent import RunUsecase
 from vibe3.cli import app as cli_app
 from vibe3.config.settings import VibeConfig
-from vibe3.models.orchestration import IssueState
+from vibe3.domain.events import (
+    IssueFailed,
+    IssueStateChanged,
+)
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -21,13 +24,18 @@ def strip_ansi(text: str) -> str:
 
 def _patch_fast_run_runtime(monkeypatch) -> None:
     monkeypatch.setattr(
-        "vibe3.commands.run.ensure_flow_for_current_branch",
+        "vibe3.commands.command_options.ensure_flow_for_current_branch",
         lambda: (MagicMock(), "task/test-branch"),
+    )
+    from vibe3.config.settings import AgentConfig, RunConfig
+
+    cfg = VibeConfig(
+        run=RunConfig(agent_config=AgentConfig(agent="executor")),
     )
     monkeypatch.setattr(
         VibeConfig,
         "get_defaults",
-        classmethod(lambda cls: VibeConfig()),
+        classmethod(lambda cls: cfg),
     )
 
 
@@ -52,14 +60,18 @@ def test_run_direct_help_shows_file_option() -> None:
 
 def test_run_file_not_found() -> None:
     with patch(
-        "vibe3.commands.run.ensure_flow_for_current_branch",
+        "vibe3.commands.command_options.ensure_flow_for_current_branch",
         return_value=(MagicMock(), "task/test-branch"),
     ):
         with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
-            return_value=MagicMock(success=True),
-        ) as mock_execute:
-            result = runner.invoke(cli_app, ["run", "--file", "nonexistent.md"])
+            "vibe3.config.settings.VibeConfig.get_defaults",
+            return_value=VibeConfig(),
+        ):
+            with patch(
+                "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+                return_value=MagicMock(success=True),
+            ) as mock_execute:
+                result = runner.invoke(cli_app, ["run", "--plan", "nonexistent.md"])
 
     assert result.exit_code != 0
     assert "Plan file not found: nonexistent.md" in strip_ansi(result.output)
@@ -89,10 +101,10 @@ def test_run_dry_run_shows_command(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ) as mock_execute:
-            result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--dry-run"])
+            result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--dry-run"])
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
@@ -105,14 +117,14 @@ def test_run_with_agent_override(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ) as mock_execute:
             result = runner.invoke(
                 cli_app,
                 [
                     "run",
-                    "--file",
+                    "--plan",
                     "plan.md",
                     "--agent",
                     "executor-pro",
@@ -130,14 +142,14 @@ def test_run_with_backend_override(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ) as mock_execute:
             result = runner.invoke(
                 cli_app,
                 [
                     "run",
-                    "--file",
+                    "--plan",
                     "plan.md",
                     "--backend",
                     "claude",
@@ -159,12 +171,12 @@ def test_run_uses_shared_agent_options_with_run_context(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
     with patch("vibe3.commands.run._ensure_plan_file_exists"):
         with patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute_sync",
+            "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ) as mock_execute:
             result = runner.invoke(
                 cli_app,
-                ["run", "--file", "plan.md", "--dry-run"],
+                ["run", "--plan", "plan.md", "--dry-run"],
             )
 
     assert result.exit_code == 0
@@ -186,13 +198,17 @@ def test_run_skill_uses_shared_agent_options_with_run_context() -> None:
                 return_value=MagicMock(success=True),
             ) as mock_execute:
                 with patch(
-                    "vibe3.commands.run.ensure_flow_for_current_branch",
+                    "vibe3.commands.command_options.ensure_flow_for_current_branch",
                     return_value=(MagicMock(), "task/test-branch"),
                 ):
-                    result = runner.invoke(
-                        cli_app,
-                        ["run", "--skill", "demo", "--dry-run"],
-                    )
+                    with patch(
+                        "vibe3.config.settings.VibeConfig.get_defaults",
+                        return_value=VibeConfig(),
+                    ):
+                        result = runner.invoke(
+                            cli_app,
+                            ["run", "--skill", "demo", "--dry-run"],
+                        )
 
     assert result.exit_code == 0
     command = mock_execute.call_args.args[0]
@@ -213,189 +229,107 @@ def test_run_skill_records_with_unified_recorder() -> None:
                 return_value=MagicMock(success=True),
             ) as mock_execute:
                 with patch(
-                    "vibe3.commands.run.ensure_flow_for_current_branch",
+                    "vibe3.commands.command_options.ensure_flow_for_current_branch",
                     return_value=(MagicMock(), "task/test-branch"),
                 ):
-                    result = runner.invoke(
-                        cli_app,
-                        ["run", "--skill", "demo"],
-                    )
+                    with patch(
+                        "vibe3.config.settings.VibeConfig.get_defaults",
+                        return_value=VibeConfig(),
+                    ):
+                        result = runner.invoke(
+                            cli_app,
+                            ["run", "--skill", "demo"],
+                        )
 
     assert result.exit_code == 0
     command = mock_execute.call_args.args[0]
     assert command.task == "Execute skill: demo"
 
 
-def test_run_success_transitions_issue_to_handoff(monkeypatch) -> None:
+def test_run_success_invokes_callbacks_via_event_driven_architecture(
+    monkeypatch,
+) -> None:
     _patch_fast_run_runtime(monkeypatch)
     flow_service = MagicMock()
     flow_service.get_flow_status.return_value = MagicMock(task_issue_number=42)
     with (
         patch(
-            "vibe3.commands.run.ensure_flow_for_current_branch",
+            "vibe3.commands.command_options.ensure_flow_for_current_branch",
             return_value=(flow_service, "task/test-branch"),
         ),
         patch("vibe3.commands.run._ensure_plan_file_exists"),
         patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute",
-            return_value=MagicMock(success=True),
-        ),
+            "vibe3.commands.run.CodeagentExecutionService.execute_with_callbacks",
+        ) as mock_exec_with_callbacks,
         patch.object(RunUsecase, "transition_issue", return_value=42),
         patch.object(
             RunUsecase,
             "resolve_run_mode",
             return_value=MagicMock(mode="plan", plan_file="plan.md"),
         ),
-        patch("vibe3.commands.run.LabelService") as mock_labels,
+        patch("vibe3.domain.publisher.publish") as mock_publish,
     ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+        result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--no-async"])
 
     assert result.exit_code == 0
-    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
-        42,
-        IssueState.HANDOFF,
-        actor="agent:run",
+    # verify execute_with_callbacks was called
+    mock_exec_with_callbacks.assert_called_once()
+
+    # Manually trigger success callback to verify event publishing
+    from vibe3.agents.models import CodeagentResult
+
+    on_success = mock_exec_with_callbacks.call_args.kwargs["on_success"]
+    # Create result with handoff_file
+    result_with_handoff = CodeagentResult(
+        success=True,
+        exit_code=0,
+        stdout="",
+        stderr="",
+        handoff_file=Path("/tmp/handoff.md"),
+        session_id=None,
+        pid=None,
+        tmux_session=None,
+        log_path=None,
     )
+    on_success(result_with_handoff)
+
+    # Should publish only IssueStateChanged (has handoff_file)
+    assert mock_publish.call_count == 1
+    event = mock_publish.call_args[0][0]
+    assert isinstance(event, IssueStateChanged)
 
 
-def test_run_success_without_report_ref_blocks_issue(monkeypatch) -> None:
+def test_run_failure_invokes_failure_callback(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
     flow_service = MagicMock()
-    flow_service.get_flow_status.return_value = MagicMock(
-        task_issue_number=42,
-        report_ref=None,
-    )
+    flow_service.get_flow_status.return_value = MagicMock(task_issue_number=42)
     with (
         patch(
-            "vibe3.commands.run.ensure_flow_for_current_branch",
+            "vibe3.commands.command_options.ensure_flow_for_current_branch",
             return_value=(flow_service, "task/test-branch"),
         ),
         patch("vibe3.commands.run._ensure_plan_file_exists"),
         patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute",
-            return_value=MagicMock(success=True),
-        ),
+            "vibe3.commands.run.CodeagentExecutionService.execute_with_callbacks",
+        ) as mock_exec_with_callbacks,
         patch.object(RunUsecase, "transition_issue", return_value=42),
         patch.object(
             RunUsecase,
             "resolve_run_mode",
             return_value=MagicMock(mode="plan", plan_file="plan.md"),
         ),
-        patch("vibe3.commands.run._svc_block_executor_noop") as mock_block,
-        patch("vibe3.commands.run.LabelService") as mock_labels,
+        patch("vibe3.domain.publisher.publish") as mock_publish,
     ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
-
-    assert result.exit_code != 0
-    mock_block.assert_called_once()
-    mock_labels.return_value.confirm_issue_state.assert_not_called()
-    assert "report_ref" in strip_ansi(result.output)
-
-
-def test_run_sync_uses_shared_authoritative_ref_gate(monkeypatch) -> None:
-    _patch_fast_run_runtime(monkeypatch)
-    flow_service = MagicMock()
-    flow_service.get_flow_status.return_value = MagicMock(
-        task_issue_number=42,
-        report_ref="docs/reports/42.md",
-    )
-    with (
-        patch(
-            "vibe3.commands.run.ensure_flow_for_current_branch",
-            return_value=(flow_service, "task/test-branch"),
-        ),
-        patch("vibe3.commands.run._ensure_plan_file_exists"),
-        patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute",
-            return_value=MagicMock(success=True),
-        ),
-        patch.object(RunUsecase, "transition_issue", return_value=42),
-        patch.object(
-            RunUsecase,
-            "resolve_run_mode",
-            return_value=MagicMock(mode="plan", plan_file="plan.md"),
-        ),
-        patch(
-            "vibe3.commands.run._svc_require_authoritative_ref",
-            return_value=True,
-        ) as mock_gate,
-        patch("vibe3.commands.run.LabelService") as mock_labels,
-    ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+        result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--no-async"])
 
     assert result.exit_code == 0
-    mock_gate.assert_called_once()
-    mock_labels.return_value.confirm_issue_state.assert_called_once()
+    mock_exec_with_callbacks.assert_called_once()
 
+    # Manually trigger failure callback
+    on_failure = mock_exec_with_callbacks.call_args.kwargs["on_failure"]
+    on_failure(Exception("executor failed"))
 
-def test_run_failure_fails_issue_and_comments(monkeypatch) -> None:
-    _patch_fast_run_runtime(monkeypatch)
-    with (
-        patch("vibe3.commands.run._ensure_plan_file_exists"),
-        patch(
-            "vibe3.commands.run.CodeagentExecutionService.execute",
-            return_value=MagicMock(success=False, stderr="executor failed"),
-        ),
-        patch.object(RunUsecase, "transition_issue", return_value=42),
-        patch("vibe3.services.issue_failure_service.GitHubClient") as mock_github,
-        patch("vibe3.services.issue_failure_service.LabelService") as mock_labels,
-    ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
-
-    assert result.exit_code != 0
-    mock_github.return_value.add_comment.assert_called_once()
-    mock_labels.return_value.confirm_issue_state.assert_called_once_with(
-        42,
-        IssueState.FAILED,
-        actor="agent:run",
-        force=True,
-    )
-
-
-class TestRunContextBuilderUsesAssembler:
-    """Assert run command context builders go through PromptAssembler."""
-
-    def test_make_skill_context_builder_returns_skill_content(self) -> None:
-        """make_skill_context_builder should return skill text via assembler."""
-        from vibe3.agents.run_prompt import make_skill_context_builder
-
-        cb = make_skill_context_builder("# Demo Skill")
-        text = cb()
-        assert text == "# Demo Skill"
-
-    def test_skill_context_builder_exposes_render_result(self) -> None:
-        """Context builder should expose last_result after being called."""
-        from vibe3.agents.run_prompt import make_skill_context_builder
-
-        cb = make_skill_context_builder("# My Skill")
-        cb()
-        assert hasattr(cb, "last_result")
-        assert cb.last_result is not None
-        assert cb.last_result.recipe_key == "run.skill"
-
-    def test_make_run_context_builder_calls_body_builder(self, tmp_path) -> None:
-        """make_run_context_builder provider should invoke build_run_prompt_body."""
-        from unittest.mock import patch
-
-        from vibe3.agents.run_prompt import make_run_context_builder
-        from vibe3.config.settings import VibeConfig
-
-        config = VibeConfig.get_defaults()
-        with patch(
-            "vibe3.agents.run_prompt.build_run_prompt_body",
-            return_value="assembled run body",
-        ):
-            cb = make_run_context_builder(None, config)
-            text = cb()
-
-        assert text == "assembled run body"
-        assert cb.last_result is not None
-        assert cb.last_result.recipe_key == "run.plan"
-
-    def test_run_context_builder_no_longer_exports_build_run_context(self) -> None:
-        """build_run_context (old name) must not exist in run_context_builder."""
-        import vibe3.agents.run_prompt as mod
-
-        assert not hasattr(
-            mod, "build_run_context"
-        ), "build_run_context should be deleted; use build_run_prompt_body"
+    mock_publish.assert_called_once()
+    event = mock_publish.call_args[0][0]
+    assert isinstance(event, IssueFailed)
+    assert event.reason == "executor failed"

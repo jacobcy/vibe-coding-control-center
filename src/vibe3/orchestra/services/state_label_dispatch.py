@@ -19,25 +19,25 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import (
     STATE_PROGRESS_CONTRACT,
     IssueInfo,
     IssueState,
 )
 from vibe3.models.review_runner import AgentOptions
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.no_progress_policy import (
+from vibe3.orchestra.queue_ordering import sort_ready_issues
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.no_progress_policy import (
     execute_state_fallback,
     has_progress_changed,
     snapshot_progress,
 )
-from vibe3.orchestra.queue_ordering import sort_ready_issues
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 if TYPE_CHECKING:
-    from vibe3.orchestra.services.status_service import OrchestraStatusService
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
     from vibe3.services.session_registry import SessionRegistryService
 
 TriggerName = Literal["manager", "plan", "run", "review"]
@@ -536,6 +536,7 @@ class StateLabelDispatchService(ServiceBase):
                 "--sync",
             ]
         if self.trigger_name == "manager":
+            # 彻底走向新的 internal 路由
             return [
                 "uv",
                 "run",
@@ -544,8 +545,8 @@ class StateLabelDispatchService(ServiceBase):
                 "python",
                 "-I",
                 cli_entry,
-                "run",
-                "--manager-issue",
+                "internal",
+                "manager",
                 str(issue_number),
                 "--sync",
             ]

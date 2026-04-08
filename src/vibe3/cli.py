@@ -18,6 +18,7 @@ from vibe3.commands import (
     flow,
     handoff,
     inspect,
+    internal,
     plan,
     pr,
     prompt_check,
@@ -66,6 +67,7 @@ app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(prompt_check.app, name="prompt")
+app.add_typer(internal.app, name="internal")
 
 
 @app.command(name="status", hidden=True)
@@ -104,6 +106,11 @@ def main_callback(
     """Vibe 3.0 - Development orchestration tool."""
     setup_logging(verbose=verbose)
 
+    # Register domain event handlers
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
 
 @app.command(name="run")
 def run_command(
@@ -125,24 +132,6 @@ def run_command(
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
     ] = None,
-    supervisor: Annotated[
-        Optional[str],
-        typer.Option(
-            "--supervisor",
-            help="Run a supervisor markdown file as one-shot governance input",
-        ),
-    ] = None,
-    issue: Annotated[
-        Optional[int],
-        typer.Option(
-            "--issue",
-            help="Process a governance issue using the default supervisor/apply flow",
-        ),
-    ] = None,
-    manager_issue: Annotated[
-        Optional[int],
-        typer.Option("--manager-issue", hidden=True),
-    ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
     ] = False,
@@ -150,13 +139,7 @@ def run_command(
         bool,
         typer.Option("--dry-run", help="Print command and prompt without executing"),
     ] = False,
-    async_mode: Annotated[
-        bool,
-        typer.Option(
-            "--async/--sync",
-            help="Run asynchronously in background (default: async)",
-        ),
-    ] = True,
+    no_async: run._ASYNC_OPT = False,
     agent: Annotated[
         Optional[str],
         typer.Option(
@@ -171,16 +154,6 @@ def run_command(
         Optional[str],
         typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
     ] = None,
-    worktree: Annotated[
-        bool,
-        typer.Option(
-            "--worktree",
-            help=(
-                "Pass --worktree to codeagent-wrapper "
-                "(new isolated worktree execution)"
-            ),
-        ),
-    ] = False,
     fresh_session: Annotated[
         bool,
         typer.Option(
@@ -195,16 +168,12 @@ def run_command(
         instructions=instructions,
         plan=resolved_plan,
         skill=skill,
-        supervisor=supervisor,
-        issue=issue,
-        manager_issue=manager_issue,
         trace=trace,
         dry_run=dry_run,
-        async_mode=async_mode,
+        no_async=no_async,
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         fresh_session=fresh_session,
     )
 

@@ -29,9 +29,9 @@ from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.no_progress_policy import snapshot_progress
+from vibe3.runtime.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
     fail_manager_issue,
 )
@@ -71,7 +71,6 @@ def run_manager_issue_mode(
     issue_number: int,
     dry_run: bool,
     async_mode: bool,
-    worktree: bool,
     fresh_session: bool = False,
 ) -> None:
     """Execute manager run mode for issue processing.
@@ -80,7 +79,6 @@ def run_manager_issue_mode(
         issue_number: GitHub issue number
         dry_run: If True, only show what would be done
         async_mode: If True, run in async mode (tmux session)
-        worktree: Whether to use worktree mode
         fresh_session: If True, skip session resume
     """
     orchestra_config = OrchestraConfig.from_settings()
@@ -120,12 +118,11 @@ def run_manager_issue_mode(
         current_branch=current_branch,
     )
     session_id = None if fresh_session else load_session_id("manager", branch=branch)
-    launch_cwd, effective_worktree = resolve_manager_execution_cwd(
+    launch_cwd = resolve_manager_execution_cwd(
         orchestra_config=orchestra_config,
         issue_number=issue_number,
         target_branch=branch,
         current_branch=current_branch,
-        use_worktree=worktree,
         session_id=session_id,
     )
     # Prefer dispatcher-injected backend/model over local config resolution.
@@ -139,15 +136,13 @@ def run_manager_issue_mode(
         options = AgentOptions(
             backend=_backend_override,
             model=_model_override,
-            worktree=effective_worktree,
         )
     else:
-        from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
+        from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
         options = resolve_manager_agent_options(
             orchestra_config,
             runtime_config,
-            worktree=effective_worktree,
         )
     actor = format_agent_actor(options)
     backend = CodeagentBackend()
@@ -313,17 +308,16 @@ def run_manager_issue_mode(
         return
 
 
-def resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:
+def resolve_manager_launch_cwd(*, session_id: str | None) -> Path:
     """Resolve launch CWD for manager execution.
 
     Args:
-        use_worktree: Whether to use worktree mode
         session_id: Existing session ID (if resuming)
 
     Returns:
         Path to launch CWD
     """
-    if not use_worktree or session_id:
+    if session_id:
         return Path.cwd()
     git_common_dir = Path(GitClient().get_git_common_dir())
     return git_common_dir.parent
@@ -373,57 +367,42 @@ def resolve_manager_execution_cwd(
     issue_number: int,
     target_branch: str,
     current_branch: str,
-    use_worktree: bool,
     session_id: str | None,
-) -> tuple[Path, bool]:
-    """Resolve execution CWD and effective worktree flag for manager run.
+) -> Path:
+    """Resolve execution CWD for manager run.
 
     Args:
         orchestra_config: Orchestra configuration
         issue_number: GitHub issue number
         target_branch: Target branch for execution
         current_branch: Current git branch
-        use_worktree: Whether to use worktree mode
         session_id: Existing session ID (if resuming)
 
     Returns:
-        Tuple of (CWD path, effective worktree flag)
+        Path: Resolved CWD path
     """
     from vibe3.environment.worktree import WorktreeManager
 
     # For session resume, use current directory
     if session_id:
-        return Path.cwd(), False
+        return Path.cwd()
 
     # For current branch execution
     if target_branch == current_branch:
-        return (
-            resolve_manager_launch_cwd(
-                use_worktree=use_worktree,
-                session_id=session_id,
-            ),
-            False,
+        return resolve_manager_launch_cwd(
+            session_id=session_id,
         )
 
     # Use WorktreeManager for foreign branch execution
     repo_root = Path(GitClient().get_git_common_dir()).parent
-    manager_cwd, is_new_worktree = WorktreeManager(
-        orchestra_config, repo_root
-    ).resolve_manager_cwd(
+    manager_cwd, _ = WorktreeManager(orchestra_config, repo_root).resolve_manager_cwd(
         issue_number,
         target_branch,
     )
     if manager_cwd is not None:
-        # Return the resolved CWD and the worktree creation flag
-        return manager_cwd, is_new_worktree
+        return manager_cwd
 
-    # Fallback: use launch cwd resolver, but drop worktree flag
-    # WorktreeManager failed to create/resolve worktree, so we cannot
-    # honor the user's --worktree request
-    return (
-        resolve_manager_launch_cwd(
-            use_worktree=use_worktree,
-            session_id=session_id,
-        ),
-        False,
+    # Fallback: use launch cwd resolver
+    return resolve_manager_launch_cwd(
+        session_id=session_id,
     )

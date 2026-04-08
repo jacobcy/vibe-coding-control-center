@@ -18,3 +18,12 @@ A clear and concise description of any alternative solutions or features you've 
 
 **Additional context**
 Add any other context or screenshots about the feature request here.
+
+---
+
+**署名信息**
+
+按照 [署名规范](../../docs/standards/authorship-standard.md)，请填写创建者信息：
+
+- **Created by**: [your-identity or agent-name]
+- **Date**: [YYYY-MM-DD]

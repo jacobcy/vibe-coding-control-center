@@ -73,7 +73,7 @@ def test_review_pr_missing_arg_shows_error():
 
 def test_review_pr_pass(mock_review_usecase):
     mock_review_usecase.execute_review.return_value.verdict = "PASS"
-    result = runner.invoke(app, ["pr", "42", "--sync"])
+    result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 0
     assert "PASS" in result.output
     mock_review_usecase.build_pr_review.assert_called_once_with(42)
@@ -83,7 +83,7 @@ def test_review_pr_pass(mock_review_usecase):
 
 def test_review_pr_block_exits_1(mock_review_usecase):
     mock_review_usecase.execute_review.return_value.verdict = "BLOCK"
-    result = runner.invoke(app, ["pr", "42", "--sync"])
+    result = runner.invoke(app, ["pr", "42"])
     assert result.exit_code == 1
 
 
@@ -92,7 +92,6 @@ def test_review_pr_help():
     output = _strip_ansi(result.output)
     assert result.exit_code == 0
     assert "PR number" in output
-    assert "--async" in output
 
 
 def test_review_pr_does_not_have_publish_option():
@@ -106,18 +105,17 @@ def test_review_pr_does_not_have_publish_option():
 def test_review_pr_is_local_only(mock_review_usecase):
     """review pr should not call GitHub publish methods."""
     mock_review_usecase.execute_review.return_value.verdict = "PASS"
-    result = runner.invoke(app, ["pr", "42", "--sync"])
+    result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
 
 
 def test_review_pr_async_dispatches_background_execution(mock_review_usecase):
     mock_review_usecase.execute_review.return_value.verdict = "ASYNC"
-    result = runner.invoke(app, ["pr", "42", "--async"])
+    result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 0
     _, kwargs = mock_review_usecase.execute_review.call_args
-    assert kwargs["async_mode"] is True
     assert kwargs["branch"] == "feature/branch"
 
 
@@ -129,7 +127,7 @@ def test_async_pr_refuses_when_head_fetch_fails(mock_review_usecase):
         None,  # head_branch resolve failed
     )
 
-    result = runner.invoke(app, ["pr", "42", "--async"])
+    result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 1
     assert "Could not resolve head branch" in result.output
@@ -143,7 +141,7 @@ def test_dry_run_pr_allows_missing_head_branch(mock_review_usecase):
     )
     mock_review_usecase.execute_review.return_value.verdict = "DRY_RUN"
 
-    result = runner.invoke(app, ["pr", "42", "--dry-run", "--sync"])
+    result = runner.invoke(app, ["pr", "42", "--dry-run"])
 
     assert result.exit_code == 0
     _, kwargs = mock_review_usecase.execute_review.call_args
@@ -153,7 +151,7 @@ def test_dry_run_pr_allows_missing_head_branch(mock_review_usecase):
 def test_review_parser_failure_returns_error_verdict(mock_review_usecase):
     """Surface ERROR verdict when usecase returns parse-failure result."""
     mock_review_usecase.execute_review.return_value.verdict = "ERROR"
-    result = runner.invoke(app, ["pr", "42", "--sync"])
+    result = runner.invoke(app, ["pr", "42"])
 
     assert result.exit_code == 1
     assert "Verdict: ERROR" in result.output

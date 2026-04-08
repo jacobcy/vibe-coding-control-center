@@ -151,12 +151,12 @@ temp/logs/vibe3-{role}-{target}.async.log
 
 | 角色 | 文件名模式 | 示例 |
 |---|---|---|
-| manager | `vibe3-manager-issue-{n}.async.log` | `vibe3-manager-issue-372.async.log` |
-| plan | `vibe3-plan-issue-{n}.async.log` | `vibe3-plan-issue-420.async.log` |
-| run | `vibe3-run-issue-{n}.async.log` | `vibe3-run-issue-420.async.log` |
-| review | `vibe3-review-issue-{n}.async.log` | `vibe3-review-issue-420.async.log` |
+| manager | `temp/logs/issues/issue-{n}/manager.async.log` | `temp/logs/issues/issue-372/manager.async.log` |
+| plan | `temp/logs/issues/issue-{n}/plan.async.log` | `temp/logs/issues/issue-420/plan.async.log` |
+| run | `temp/logs/issues/issue-{n}/run.async.log` | `temp/logs/issues/issue-420/run.async.log` |
+| review | `temp/logs/issues/issue-{n}/review.async.log` | `temp/logs/issues/issue-420/review.async.log` |
 | governance | `vibe3-governance-scan-{ts}-t{n}.async.log` | `vibe3-governance-scan-20260404-142351-t3.async.log` |
-| supervisor | `vibe3-supervisor-issue-{n}.async.log` | `vibe3-supervisor-issue-435.async.log` |
+| supervisor | `temp/logs/issues/issue-{n}/supervisor.async.log` | `temp/logs/issues/issue-435/supervisor.async.log` |
 
 会话日志特性：
 
@@ -201,7 +201,7 @@ cat temp/logs/orchestra/governance/dry-run/governance_dry_run_*.md
 ```bash
 # 查看最新 manager 执行
 ls -lt temp/logs/vibe3-manager-*.async.log | head -1
-tail -100 temp/logs/vibe3-manager-issue-XXX.async.log
+tail -100 temp/logs/issues/issue-XXX/manager.async.log
 
 # 实时跟踪正在运行的 agent
 tail -f temp/logs/vibe3-plan-issue-XXX.async.log
@@ -429,15 +429,15 @@ HeartbeatServer._tick_loop()
     -> ManagerExecutor.dispatch_manager(issue)
       -> CodeagentBackend.start_async_command()
         -> tmux session: vibe3-manager-issue-{n}
-        -> log: temp/logs/vibe3-manager-issue-{n}.async.log
+        -> log: temp/logs/issues/issue-{n}/manager.async.log
 ```
 
 状态迁移由 `StateLabelDispatchService` 按 `state/*` labels 触发：
 
 | 触发状态 | 触发角色 | 调度方式 | 调试方法 |
 |---|---|---|---|
-| `state/ready` | manager | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
-| `state/handoff` | manager (resume) | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/vibe3-manager-issue-{n}.async.log` |
+| `state/ready` | manager | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/issues/issue-{n}/manager.async.log` |
+| `state/handoff` | manager (resume) | Orchestra 自动调度 | `vibe3 serve start` 后观察 `temp/logs/issues/issue-{n}/manager.async.log` |
 | `state/claimed` | plan | 手动触发 | `vibe3 plan --issue {n}` |
 | `state/in-progress` | run | 手动触发 | `vibe3 run` |
 | `state/review` | review | 手动触发 | `vibe3 review base` |
@@ -532,7 +532,7 @@ curl http://127.0.0.1:8080/status
 
 ```bash
 # 实时跟踪 agent 日志
-tail -f temp/logs/vibe3-manager-issue-372.async.log
+tail -f temp/logs/issues/issue-372/manager.async.log
 
 # 查看 tmux session
 tmux attach -t vibe3-manager-issue-372  # 或 tmux capture-pane
