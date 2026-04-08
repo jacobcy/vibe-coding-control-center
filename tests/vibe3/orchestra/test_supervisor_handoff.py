@@ -26,12 +26,25 @@ def service() -> tuple[SupervisorHandoffService, MagicMock, MagicMock]:
         prompt_file_path=Path("/tmp/prompt.md"),
     )
     executor = ThreadPoolExecutor(max_workers=2)
+
+    # Mock WorktreeManager to avoid real git operations
+    mock_worktree_manager = MagicMock()
+    mock_worktree_manager.acquire_temporary_worktree.return_value = MagicMock(
+        path=Path("/tmp/test-worktree"),
+        is_temporary=True,
+        branch=None,
+        issue_number=101,
+    )
+
     svc = SupervisorHandoffService(
         OrchestraConfig(dry_run=False, max_concurrent_flows=2),
         github=github,
         backend=backend,
         executor=executor,
     )
+    # Inject mock worktree manager
+    svc._worktree_manager = mock_worktree_manager
+
     try:
         yield svc, github, backend
     finally:
