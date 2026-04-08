@@ -16,9 +16,9 @@ def _mock_resolve(options: AgentOptions) -> AgentOptions:
     return options
 
 
-@patch("vibe3.orchestra.agent_resolver.sync_models_json")
+@patch("vibe3.runtime.agent_resolver.sync_models_json")
 @patch(
-    "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+    "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
     side_effect=_mock_resolve,
 )
 def test_resolve_governance_returns_agent_options(mock_resolve, mock_sync):
@@ -29,9 +29,9 @@ def test_resolve_governance_returns_agent_options(mock_resolve, mock_sync):
     mock_sync.assert_called_once()
 
 
-@patch("vibe3.orchestra.agent_resolver.sync_models_json")
+@patch("vibe3.runtime.agent_resolver.sync_models_json")
 @patch(
-    "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+    "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
     side_effect=_mock_resolve,
 )
 def test_resolve_supervisor_returns_agent_options(mock_resolve, mock_sync):
@@ -42,12 +42,12 @@ def test_resolve_supervisor_returns_agent_options(mock_resolve, mock_sync):
     mock_sync.assert_called_once()
 
 
-@patch("vibe3.orchestra.agent_resolver.sync_models_json")
+@patch("vibe3.runtime.agent_resolver.sync_models_json")
 @patch(
-    "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+    "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
     side_effect=_mock_resolve,
 )
-@patch("vibe3.orchestra.agent_resolver.CodeagentExecutionService")
+@patch("vibe3.runtime.agent_resolver.CodeagentExecutionService")
 def test_resolve_manager_returns_agent_options(mock_svc, mock_resolve, mock_sync):
     config = OrchestraConfig()
     config.assignee_dispatch.backend = "gemini"
