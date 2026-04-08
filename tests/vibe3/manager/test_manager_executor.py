@@ -36,6 +36,7 @@ def _build_executor_with_registry(
     executor.config = config
     executor.dry_run = False
     executor._queued_issues = set()
+    executor._active_dispatch_locks = set()
     executor._last_error_category = None
     executor._circuit_breaker = None
     executor._registry = registry

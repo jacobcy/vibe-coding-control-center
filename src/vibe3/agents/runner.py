@@ -355,15 +355,15 @@ class CodeagentExecutionService:
             "python",
             cls._cli_entry(),
         ]
-        saw_sync_flag = False
+        saw_no_async_flag = False
         for arg in args:
             if arg == "--async":
                 continue
-            if arg == "--sync":
-                saw_sync_flag = True
+            if arg == "--no-async":
+                saw_no_async_flag = True
             cmd.append(arg)
-        if not saw_sync_flag:
-            cmd.append("--sync")
+        if not saw_no_async_flag:
+            cmd.append("--no-async")
         return cmd
 
     @classmethod

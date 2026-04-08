@@ -232,12 +232,18 @@ class ManagerExecutor:
                 "--no-async",
             ]
 
-            handle = self._backend.start_async_command(
-                cmd,
-                execution_name=get_manager_session_name(issue.number),
-                cwd=manager_cwd,
-                env=_manager_env,
-            )
+            try:
+                handle = self._backend.start_async_command(
+                    cmd,
+                    execution_name=get_manager_session_name(issue.number),
+                    cwd=manager_cwd,
+                    env=_manager_env,
+                )
+            except Exception as exc:
+                # Clean up reserved session on launch failure
+                if self._registry is not None and session_id is not None:
+                    self._registry.mark_failed(session_id)
+                raise exc
 
             log.info(
                 f"Started manager async session: {handle.tmux_session} "
@@ -245,7 +251,18 @@ class ManagerExecutor:
             )
 
             # 6. Mark started and record event
-            self._registry.mark_started(session_id, tmux_session=handle.tmux_session)
+            if self._registry is not None and session_id is not None:
+                try:
+                    self._registry.mark_started(
+                        session_id, tmux_session=handle.tmux_session
+                    )
+                except Exception as exc:
+                    # Database error, but tmux is already running
+                    # Log warning but don't fail the dispatch
+                    log.warning(
+                        f"Failed to mark session started in registry: {exc}. "
+                        "Session will be cleaned up by reconcile."
+                    )
 
             self._flow_manager.store.add_event(
                 flow_branch,
