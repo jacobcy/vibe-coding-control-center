@@ -279,7 +279,7 @@ class TestRunSupervisorOption:
             lambda config, issue: MagicMock(rendered_text="manager prompt"),
         )
         monkeypatch.setattr(
-            "vibe3.orchestra.no_progress_policy.snapshot_progress",
+            "vibe3.runtime.no_progress_policy.snapshot_progress",
             lambda **kwargs: {
                 "state_label": "state/ready",
                 "comment_count": 1,

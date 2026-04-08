@@ -12,7 +12,6 @@ from vibe3.config.settings import VibeConfig
 from vibe3.domain.events import (
     IssueFailed,
     IssueStateChanged,
-    ReportRefRequired,
 )
 
 runner = CliRunner(env={"NO_COLOR": "1"})
@@ -272,14 +271,27 @@ def test_run_success_invokes_callbacks_via_event_driven_architecture(
     mock_exec_with_callbacks.assert_called_once()
 
     # Manually trigger success callback to verify event publishing
-    on_success = mock_exec_with_callbacks.call_args.kwargs["on_success"]
-    on_success(MagicMock())
+    from vibe3.agents.models import CodeagentResult
 
-    assert mock_publish.call_count == 2
-    event1 = mock_publish.call_args_list[0][0][0]
-    assert isinstance(event1, ReportRefRequired)
-    event2 = mock_publish.call_args_list[1][0][0]
-    assert isinstance(event2, IssueStateChanged)
+    on_success = mock_exec_with_callbacks.call_args.kwargs["on_success"]
+    # Create result with handoff_file
+    result_with_handoff = CodeagentResult(
+        success=True,
+        exit_code=0,
+        stdout="",
+        stderr="",
+        handoff_file=Path("/tmp/handoff.md"),
+        session_id=None,
+        pid=None,
+        tmux_session=None,
+        log_path=None,
+    )
+    on_success(result_with_handoff)
+
+    # Should publish only IssueStateChanged (has handoff_file)
+    assert mock_publish.call_count == 1
+    event = mock_publish.call_args[0][0]
+    assert isinstance(event, IssueStateChanged)
 
 
 def test_run_failure_invokes_failure_callback(monkeypatch) -> None:
