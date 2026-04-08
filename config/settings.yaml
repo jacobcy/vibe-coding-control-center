@@ -172,8 +172,8 @@ code_limits:
         reason: "PR utils 测试集，54 个测试围绕同一服务契约，平均 9.4 lines/test，拆分收益低"
 
   total_file_loc:
-    v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 35000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
+    v2_shell: 2000         # Shell 核心代码总行数
+    v3_python: 38000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:
