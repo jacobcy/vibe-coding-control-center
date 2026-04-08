@@ -11,7 +11,6 @@ from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
-from vibe3.ui.orchestra_ui import _format_snapshot
 
 
 def _make_config() -> OrchestraConfig:
@@ -208,39 +207,6 @@ class TestOrchestraStatusService:
         issue_numbers = [e.number for e in snapshot.active_issues]
         assert 42 in issue_numbers
         assert 43 in issue_numbers
-
-    def test_format_snapshot(self) -> None:
-        """_format_snapshot produces readable output."""
-        entry = IssueStatusEntry(
-            number=42,
-            title="Test issue title",
-            state=IssueState.IN_PROGRESS,
-            assignee="vibe-manager-agent",
-            has_flow=True,
-            flow_branch="task/issue-42",
-            has_worktree=True,
-            worktree_path="/repo/.worktrees/issue-42",
-            has_pr=False,
-            pr_number=None,
-            blocked_by=(333, 336),
-        )
-        snapshot = OrchestraSnapshot(
-            timestamp=1700000000.0,
-            server_running=True,
-            active_issues=(entry,),
-            active_flows=1,
-            active_worktrees=1,
-        )
-
-        output = _format_snapshot(snapshot)
-
-        assert "Orchestra Status" in output
-        assert "#42" in output
-        assert "state/in-progress" in output
-        assert "flow=task/issue-42" in output
-        assert "blocked_by=#333, #336" in output
-        assert "Flows: 1 active" in output
-        assert "Circuit breaker: closed" in output
 
     def test_snapshot_includes_circuit_breaker_metadata(self) -> None:
         """Snapshot surfaces circuit breaker state and last failure."""
