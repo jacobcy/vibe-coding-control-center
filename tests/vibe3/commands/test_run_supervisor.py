@@ -10,8 +10,8 @@ from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.cli import app as cli_app
 from vibe3.config.settings import VibeConfig
 from vibe3.manager import manager_run_service
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services import issue_failure_service
 
 runner = CliRunner(env={"NO_COLOR": "1"})

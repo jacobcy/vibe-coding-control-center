@@ -9,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from vibe3.manager.manager_executor import ManagerExecutor
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 

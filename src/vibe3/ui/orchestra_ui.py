@@ -5,7 +5,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from vibe3.orchestra.services.status_service import OrchestraSnapshot
+from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 
 def render_orchestra_status(snapshot: OrchestraSnapshot, json_output: bool) -> None:

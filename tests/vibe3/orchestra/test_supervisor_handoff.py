@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.supervisor_handoff import (
     SupervisorHandoffIssue,
     SupervisorHandoffService,

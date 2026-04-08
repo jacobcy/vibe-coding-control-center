@@ -2,13 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.review_runner import AgentOptions
-from vibe3.orchestra.agent_resolver import (
+from vibe3.runtime.agent_resolver import (
     resolve_governance_agent_options,
     resolve_manager_agent_options,
     resolve_supervisor_agent_options,
 )
-from vibe3.orchestra.config import OrchestraConfig
 
 
 def _mock_resolve(options: AgentOptions) -> AgentOptions:

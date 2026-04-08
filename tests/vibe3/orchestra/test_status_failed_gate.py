@@ -2,9 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
-from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 
 def test_status_snapshot_with_gate_blocked() -> None:

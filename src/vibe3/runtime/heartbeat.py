@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
 from vibe3.orchestra.logging import (
     append_orchestra_event,

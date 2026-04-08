@@ -16,9 +16,9 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
 from vibe3.config.settings import VibeConfig
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
     pass

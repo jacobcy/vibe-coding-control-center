@@ -15,8 +15,8 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
@@ -24,12 +24,12 @@ from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.orchestra.services.status_service import (
+from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
+from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
-from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
-from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.session_registry import SessionRegistryService
 
 

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 from vibe3.runtime.no_progress_policy import execute_state_fallback
 

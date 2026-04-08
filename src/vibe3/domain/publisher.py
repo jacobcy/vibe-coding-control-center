@@ -27,6 +27,11 @@ class EventPublisher:
             cls._instance._handlers = {}
         return cls._instance
 
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance (for testing)."""
+        cls._instance = None
+
     def subscribe(
         self, event_type: str, handler: Callable[[DomainEvent], None]
     ) -> None:
@@ -59,23 +64,17 @@ class EventPublisher:
                 )
 
 
-# Global publisher instance
-_publisher: EventPublisher | None = None
-
-
+# Convenience functions for direct usage
 def get_publisher() -> EventPublisher:
-    """Get the global event publisher."""
-    global _publisher
-    if _publisher is None:
-        _publisher = EventPublisher()
-    return _publisher
+    """Get the global event publisher singleton."""
+    return EventPublisher()
 
 
 def publish(event: DomainEvent) -> None:
     """Publish an event using the global publisher."""
-    get_publisher().publish(event)
+    EventPublisher().publish(event)
 
 
 def subscribe(event_type: str, handler: Callable[[DomainEvent], None]) -> None:
     """Subscribe to an event type using the global publisher."""
-    get_publisher().subscribe(event_type, handler)
+    EventPublisher().subscribe(event_type, handler)

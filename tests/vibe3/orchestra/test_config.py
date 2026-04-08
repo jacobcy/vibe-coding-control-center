@@ -6,8 +6,8 @@ from pathlib import Path
 import yaml
 
 from vibe3.config.settings import AgentConfig, RunConfig, VibeConfig
-from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
 
 def test_default_config():
