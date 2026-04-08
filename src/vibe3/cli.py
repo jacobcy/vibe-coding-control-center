@@ -18,6 +18,7 @@ from vibe3.commands import (
     flow,
     handoff,
     inspect,
+    internal,
     plan,
     pr,
     prompt_check,
@@ -66,6 +67,7 @@ app.add_typer(check.app, name="check")
 app.add_typer(snapshot.app, name="snapshot")
 app.add_typer(serve.app, name="serve")
 app.add_typer(prompt_check.app, name="prompt")
+app.add_typer(internal.app, name="internal")
 
 
 @app.command(name="status", hidden=True)
@@ -104,6 +106,11 @@ def main_callback(
     """Vibe 3.0 - Development orchestration tool."""
     setup_logging(verbose=verbose)
 
+    # Register domain event handlers
+    from vibe3.domain.handlers import register_event_handlers
+
+    register_event_handlers()
+
 
 @app.command(name="run")
 def run_command(
@@ -124,24 +131,6 @@ def run_command(
     skill: Annotated[
         Optional[str],
         typer.Option("--skill", "-s", help="Run a skill from skills/<name>/SKILL.md"),
-    ] = None,
-    supervisor: Annotated[
-        Optional[str],
-        typer.Option(
-            "--supervisor",
-            help="Run a supervisor markdown file as one-shot governance input",
-        ),
-    ] = None,
-    issue: Annotated[
-        Optional[int],
-        typer.Option(
-            "--issue",
-            help="Process a governance issue using the default supervisor/apply flow",
-        ),
-    ] = None,
-    manager_issue: Annotated[
-        Optional[int],
-        typer.Option("--manager-issue", hidden=True),
     ] = None,
     trace: Annotated[
         bool, typer.Option("--trace", help="Enable call tracing + DEBUG logs")
@@ -195,9 +184,6 @@ def run_command(
         instructions=instructions,
         plan=resolved_plan,
         skill=skill,
-        supervisor=supervisor,
-        issue=issue,
-        manager_issue=manager_issue,
         trace=trace,
         dry_run=dry_run,
         async_mode=async_mode,

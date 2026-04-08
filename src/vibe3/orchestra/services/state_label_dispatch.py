@@ -27,13 +27,10 @@ from vibe3.models.orchestration import (
 from vibe3.models.review_runner import AgentOptions
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.orchestra.no_progress_policy import (
-    execute_state_fallback,
-    has_progress_changed,
-    snapshot_progress,
-)
+from vibe3.orchestra.no_progress_policy import has_progress_changed, snapshot_progress
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.no_progress_policy import execute_state_fallback
 from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 if TYPE_CHECKING:
@@ -536,6 +533,7 @@ class StateLabelDispatchService(ServiceBase):
                 "--sync",
             ]
         if self.trigger_name == "manager":
+            # 彻底走向新的 internal 路由
             return [
                 "uv",
                 "run",
@@ -544,8 +542,8 @@ class StateLabelDispatchService(ServiceBase):
                 "python",
                 "-I",
                 cli_entry,
-                "run",
-                "--manager-issue",
+                "internal",
+                "manager",
                 str(issue_number),
                 "--sync",
             ]
