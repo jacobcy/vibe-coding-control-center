@@ -3,7 +3,6 @@
 Migrated from vibe3.services.plan_usecase.
 """
 
-from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
@@ -16,7 +15,7 @@ from vibe3.config.settings import VibeConfig
 from vibe3.environment.session import SessionManager
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.models.flow import FlowStatusResponse
-from vibe3.models.plan import PlanRequest, PlanScope
+from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput, PlanTaskInput
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.services.authoritative_ref_gate import require_authoritative_ref
 from vibe3.services.flow_service import FlowService
@@ -26,26 +25,6 @@ from vibe3.services.issue_failure_service import (
     fail_planner_issue,
 )
 from vibe3.services.spec_ref_service import SpecRefService
-
-
-@dataclass
-class PlanTaskInput:
-    """Resolved inputs for task planning."""
-
-    issue_number: int
-    branch: str
-    request: PlanRequest
-    used_flow_issue: bool = False
-
-
-@dataclass
-class PlanSpecInput:
-    """Resolved inputs for spec planning."""
-
-    branch: str
-    request: PlanRequest
-    description: str
-    spec_path: str | None = None
 
 
 class PlanUsecase:
