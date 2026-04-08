@@ -100,6 +100,17 @@ _CREATE_RUNTIME_SESSION_INDEXES = """
         ON runtime_session(role, branch, target_id)
 """
 
+_CREATE_FLOW_CONTEXT_CACHE = """
+    CREATE TABLE IF NOT EXISTS flow_context_cache (
+        branch TEXT PRIMARY KEY,
+        task_issue_number INTEGER,
+        issue_title TEXT,
+        pr_number INTEGER,
+        pr_title TEXT,
+        updated_at TEXT NOT NULL
+    )
+"""
+
 
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
@@ -147,6 +158,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
     cursor.execute(_CREATE_RUNTIME_SESSION)
+    cursor.execute(_CREATE_FLOW_CONTEXT_CACHE)
 
     # Create indexes for runtime_session table
     for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
