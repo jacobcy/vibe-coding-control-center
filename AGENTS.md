@@ -70,4 +70,4 @@ Install via respective tools, then create symlinks in `.agent/skills/`. See [DEV
 
 ## 🔗 Kiro Integration
 
-When using Kiro (AI IDE with spec workflow), follow rules in [.agent/rules/kiro-integration.md](.agent/rules/kiro-integration.md).
+When using Kiro (AI IDE with spec workflow), follow rules in [.agent/policies/kiro-integration.md](.agent/policies/kiro-integration.md).

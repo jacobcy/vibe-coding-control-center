@@ -73,12 +73,12 @@ def resolve_task_issue_number(
 
 
 def is_empty_auto_scene(flow_data: dict[str, object]) -> bool:
-    """Check if flow has empty auto scene markers."""
+    """Check if flow has empty auto scene markers.
+
+    Session state is now tracked in runtime_session registry, not flow_state.
+    This function only checks for execution artifacts and status markers.
+    """
     markers = (
-        "manager_session_id",
-        "planner_session_id",
-        "executor_session_id",
-        "reviewer_session_id",
         "plan_ref",
         "report_ref",
         "audit_ref",

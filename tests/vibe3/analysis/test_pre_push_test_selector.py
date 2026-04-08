@@ -77,5 +77,5 @@ def test_skips_when_no_applicable_files() -> None:
 def test_maps_hook_changes_to_hook_regression_tests() -> None:
     selection = select_pre_push_tests(["scripts/hooks/pre-push.sh"])
 
-    assert selection.mode == "incremental"
-    assert "tests/vibe3/integration/test_review_shell_contract.py" in selection.tests
+    assert selection.mode == "smoke"
+    assert selection.tests == ["tests/vibe3/analysis/test_pre_push_scope.py"]

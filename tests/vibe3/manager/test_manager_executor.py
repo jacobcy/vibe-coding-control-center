@@ -1,398 +1,177 @@
-"""Tests for Orchestra ManagerExecutor - review dispatch and manager commands."""
+"""Tests for ManagerExecutor with SessionRegistryService capacity integration."""
+
+from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
-from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
+from vibe3.services.session_registry import SessionRegistryService
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
     return IssueInfo(
         number=number,
         title=title,
-        state=IssueState.CLAIMED,
-        labels=["state/claimed"],
+        state=IssueState.READY,
+        labels=["state/ready"],
     )
 
 
-class TestManagerReviewWorktreeResolution:
-    def test_prepare_pr_review_dispatch_returns_command_and_cwd(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+def _build_executor_with_registry(
+    registry: SessionRegistryService,
+    max_concurrent_flows: int = 3,
+) -> tuple[ManagerExecutor, MagicMock]:
+    """Build a ManagerExecutor with a mocked registry and backend.
 
-        with patch.object(
-            manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
-        ):
-            # prepare_pr_review_dispatch was a test proxy, now we call components
-            cmd = manager.command_builder.build_pr_review_command(42)
-            cwd = manager._resolve_review_cwd_for_dispatch(42)
+    Returns (executor, mock_backend).
+    """
+    config = OrchestraConfig(
+        dry_run=False,
+        max_concurrent_flows=max_concurrent_flows,
+    )
+    executor = ManagerExecutor.__new__(ManagerExecutor)
+    executor.config = config
+    executor.dry_run = False
+    executor._queued_issues = set()
+    executor._last_error_category = None
+    executor._circuit_breaker = None
+    executor._registry = registry
+    executor.repo_path = Path("/tmp/repo")
 
-        assert cmd == ["uv", "run", "python", "-m", "vibe3", "review", "pr", "42"]
-        assert cwd == Path("/tmp/wt-feature")
+    mock_backend = MagicMock()
+    executor._backend = mock_backend
 
-    def test_dispatch_pr_review_uses_resolved_worktree(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+    executor._flow_manager = MagicMock()
+    executor.result_handler = MagicMock()
+    executor.worktree_manager = MagicMock()
+    executor.worktree_manager.align_auto_scene_to_base = MagicMock(return_value=True)
+    executor.command_builder = MagicMock()
 
-        with patch.object(
-            manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
-        ):
-            manager.status_service.get_active_flow_count = lambda: 0
-            with patch(
-                "subprocess.run",
-                return_value=CompletedProcess(returncode=0),
-            ) as mock_run:
-                result = manager.dispatch_pr_review(42)
+    return executor, mock_backend
 
-        assert result is True
-        # ManagerExecutor calls run_command which calls subprocess.run
-        cwd_calls = [c for c in mock_run.call_args_list if c[1].get("cwd") is not None]
-        assert any(c[1]["cwd"] == Path("/tmp/wt-feature") for c in cwd_calls)
 
-    def test_dispatch_pr_review_appends_async_flag_when_enabled(self):
-        config = OrchestraConfig()
-        config.pr_review_dispatch.async_mode = True
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+class TestManagerExecutorRegistryCapacity:
+    """Capacity checks via SessionRegistryService."""
 
-        with patch.object(
-            manager, "_resolve_review_cwd", return_value=Path("/tmp/wt-feature")
-        ):
-            manager.status_service.get_active_flow_count = lambda: 0
-            with patch(
-                "subprocess.run",
-                return_value=CompletedProcess(returncode=0),
-            ) as mock_run:
-                result = manager.dispatch_pr_review(42)
+    def test_manager_dispatch_uses_live_worker_capacity_not_active_flows(
+        self,
+    ) -> None:
+        """When registry has max live worker sessions, dispatch is refused."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 3  # == max_concurrent_flows
 
-        assert result is True
-        async_calls = [c for c in mock_run.call_args_list if "--async" in c[0][0]]
-        assert len(async_calls) > 0
-
-    def test_build_manager_command_formats_issue_prompt(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=88, title="Improve parser")
-
-        cmd = manager.command_builder.build_manager_command(issue)
-
-        assert cmd[:6] == ["uv", "run", "python", "-m", "vibe3", "run"]
-        assert "--async" in cmd
-        assert "--worktree" in cmd
-        assert "Manage issue #88: Improve parser" in cmd[-1]
-        assert "## Role" in cmd[-1]
-        assert "状态控制器" in cmd[-1]
-        assert "不是实现 agent" in cmd[-1]
-
-    def test_build_manager_command_can_disable_worktree_mode(self):
-        config = OrchestraConfig()
-        config.assignee_dispatch.use_worktree = False
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=89, title="Run in current flow")
-
-        cmd = manager.command_builder.build_manager_command(issue)
-
-        assert "--async" in cmd
-        assert "--worktree" not in cmd
-        assert "Manage issue #89: Run in current flow" in cmd[-1]
-
-    def test_mark_manager_start_failed_marks_flow_stale(self):
-        """manager 启动失败时，flow 应被标记为 stale（而不是保持 active）。"""
-        from unittest.mock import MagicMock
-
-        from vibe3.models.orchestration import IssueState
-
-        config = MagicMock()
-        config.max_concurrent_flows = 3
-        config.dry_run = False
-        config.circuit_breaker.enabled = False
-
-        executor = ManagerExecutor.__new__(ManagerExecutor)
-        executor.config = config
-        executor.dry_run = False
-        executor._queued_issues = set()
-        executor._last_error_category = None
-
-        executor.result_handler = MagicMock()
-        executor._flow_manager = MagicMock()
-        executor._circuit_breaker = None
-        executor.status_service = MagicMock()
-        executor.status_service.get_active_flow_count.return_value = 0
-
-        # flow exists with a branch
-        executor._flow_manager.get_flow_for_issue.return_value = {
-            "branch": "task/issue-301",
-            "flow_status": "active",
-        }
-
-        issue = make_issue(301)
-        executor._mark_manager_start_failed(issue, "test failure")
-
-        # flow should be marked stale
-        executor._flow_manager.store.update_flow_state.assert_called_once_with(
-            "task/issue-301", flow_status="stale"
+        executor, mock_backend = _build_executor_with_registry(
+            registry, max_concurrent_flows=3
         )
-        # issue should be marked FAILED
-        executor.result_handler.update_state_label.assert_called_once_with(
-            301, IssueState.FAILED
-        )
+        issue = make_issue(42)
 
-    def test_dispatch_manager_dry_run_skips_flow_creation_and_execution(self):
-        config = OrchestraConfig(dry_run=True)
-        manager = ManagerExecutor(config, dry_run=True, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=101, title="Dry run manager dispatch")
-
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
-        ) as mock_create_flow:
-            manager.status_service.get_active_flow_count = lambda: 0
-            with patch("subprocess.run") as mock_run:
-                result = manager.dispatch_manager(issue)
-
-        assert result is True
-        mock_create_flow.assert_not_called()
-        # subprocess.run might be called by other components (e.g. SQLiteClient)
-        # but NOT for actual execution if dry_run works.
-        # However, ManagerExecutor doesn't call run_command in dry_run mode.
-        exec_calls = [c for c in mock_run.call_args_list if "vibe3" in str(c[0][0])]
-        assert len(exec_calls) == 0
-
-    def test_dispatch_manager_starts_internal_manager_run_in_target_worktree(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=102, title="Manager session test")
-
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
-            return_value={"branch": "task/issue-102"},
-        ):
-            with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
-            ):
-                with patch.object(
-                    manager,
-                    "_resolve_manager_cwd",
-                    return_value=(Path("/tmp/repo/.worktrees/issue-102"), False),
-                ):
-                    with patch.object(
-                        manager.worktree_manager,
-                        "align_auto_scene_to_base",
-                        return_value=True,
-                    ):
-                        with patch.object(manager.result_handler, "update_state_label"):
-                            with patch.object(
-                                manager.flow_manager.store,
-                                "add_event",
-                            ) as mock_add_event:
-                                with patch.object(
-                                    manager._backend,
-                                    "start_async_command",
-                                    return_value=SimpleNamespace(
-                                        tmux_session="vibe3-manager-102",
-                                        log_path=Path(
-                                            "/tmp/repo/temp/logs/vibe3-manager-102.async.log"
-                                        ),
-                                    ),
-                                ) as mock_start:
-                                    result = manager.dispatch_manager(issue)
-
-        assert result is True
-        mock_start.assert_called_once()
-        call = mock_start.call_args
-        cmd = call.args[0]
-        assert cmd[:4] == ["uv", "run", "python", "-I"]
-        assert cmd[4] == str(Path("/tmp/repo/src/vibe3/cli.py").resolve())
-        assert cmd[5] == "run"
-        assert "--manager-issue" in cmd
-        assert "--sync" in cmd
-        assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
-        # Async dispatch records "dispatched" event, not success
-        mock_add_event.assert_called_once()
-        assert mock_add_event.call_args.args[1] == "manager_dispatched"
-
-    def test_dispatch_manager_does_not_preclaim_before_launch(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=103, title="Claim before manager run")
-
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
-            return_value={"branch": "task/issue-103"},
-        ):
-            with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
-            ):
-                with patch.object(
-                    manager,
-                    "_resolve_manager_cwd",
-                    return_value=(Path("/tmp/repo/.worktrees/issue-103"), False),
-                ):
-                    with patch.object(
-                        manager.worktree_manager,
-                        "align_auto_scene_to_base",
-                        return_value=True,
-                    ):
-                        with patch.object(
-                            manager.result_handler, "update_state_label"
-                        ) as mock_update:
-                            with patch.object(
-                                manager.result_handler, "on_dispatch_success"
-                            ):
-                                with patch.object(
-                                    manager._backend,
-                                    "start_async_command",
-                                    return_value=SimpleNamespace(
-                                        tmux_session="vibe3-manager-103",
-                                        log_path=Path(
-                                            "/tmp/repo/temp/logs/vibe3-manager-103.async.log"
-                                        ),
-                                    ),
-                                ):
-                                    result = manager.dispatch_manager(issue)
-
-        assert result is True
-        mock_update.assert_not_called()
-
-    def test_dispatch_manager_start_failure_marks_issue_failed(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=104, title="Manager startup failure")
-
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
-            return_value={"branch": "task/issue-104"},
-        ):
-            with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
-            ):
-                with patch.object(
-                    manager,
-                    "_resolve_manager_cwd",
-                    return_value=(Path("/tmp/repo/.worktrees/issue-104"), False),
-                ):
-                    with patch.object(
-                        manager.worktree_manager,
-                        "align_auto_scene_to_base",
-                        return_value=True,
-                    ):
-                        with patch.object(
-                            manager.result_handler, "update_state_label"
-                        ) as mock_update:
-                            with patch.object(
-                                manager.result_handler, "post_failure_comment"
-                            ) as mock_comment:
-                                with patch.object(
-                                    manager._backend,
-                                    "start_async_command",
-                                    side_effect=RuntimeError("tmux unavailable"),
-                                ):
-                                    result = manager.dispatch_manager(issue)
+        result = executor.dispatch_manager(issue)
 
         assert result is False
-        assert mock_update.call_args_list[-1].args == (issue.number, IssueState.FAILED)
-        mock_comment.assert_called_once()
+        mock_backend.start_async_command.assert_not_called()
+        registry.count_live_worker_sessions.assert_called()
 
-    def test_dispatch_manager_preserves_temporary_worktree_after_async_launch(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=105, title="Preserve launched worktree")
+    def test_manager_dispatch_proceeds_when_registry_has_capacity(
+        self,
+    ) -> None:
+        """When registry has free capacity, dispatch proceeds to flow creation."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 1  # < max=3
 
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
-            return_value={"branch": "task/issue-105"},
-        ):
-            with patch.object(
-                manager.status_service, "get_active_flow_count", return_value=0
-            ):
-                with patch.object(
-                    manager,
-                    "_resolve_manager_cwd",
-                    return_value=(Path("/tmp/repo/.worktrees/issue-105"), True),
-                ):
-                    with patch.object(
-                        manager.worktree_manager,
-                        "align_auto_scene_to_base",
-                        return_value=True,
-                    ):
-                        with patch.object(
-                            manager.worktree_manager, "recycle"
-                        ) as mock_recycle:
-                            with patch.object(
-                                manager._backend,
-                                "start_async_command",
-                                return_value=SimpleNamespace(
-                                    tmux_session="vibe3-manager-105",
-                                    log_path=Path(
-                                        "/tmp/repo/temp/logs/vibe3-manager-105.async.log"
-                                    ),
-                                ),
-                            ):
-                                result = manager.dispatch_manager(issue)
+        executor, mock_backend = _build_executor_with_registry(
+            registry, max_concurrent_flows=3
+        )
+        issue = make_issue(42)
 
-        assert result is True
-        mock_recycle.assert_not_called()
-
-    def test_find_worktree_for_branch_parses_porcelain_output(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        output = (
-            "worktree /tmp/repo\n"
-            "HEAD abcdef0\n"
-            "branch refs/heads/main\n"
-            "\n"
-            "worktree /tmp/wt-feature\n"
-            "HEAD 1234567\n"
-            "branch refs/heads/task/issue250-orchestra-manager\n"
-            "\n"
+        # Flow creation will raise (we only care about capacity gate passing)
+        executor._flow_manager.create_flow_for_issue.side_effect = RuntimeError(
+            "flow error"
         )
 
-        with patch(
-            "subprocess.run",
-            return_value=CompletedProcess(returncode=0, stdout=output),
-        ):
-            wt = manager.worktree_manager._find_worktree_for_branch(
-                "task/issue250-orchestra-manager"
-            )
+        result = executor.dispatch_manager(issue)
 
-        assert wt == Path("/tmp/wt-feature")
+        # capacity gate passed; flow creation failed -> False, but not from capacity
+        assert result is False
+        registry.count_live_worker_sessions.assert_called()
+        # issue NOT queued (capacity was available, failed for a different reason)
+        assert 42 not in executor._queued_issues
 
-    def test_resolve_review_cwd_falls_back_to_repo_path(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+    def test_manager_dispatch_queues_issue_when_registry_full(self) -> None:
+        """Refused dispatch due to registry capacity adds issue to queued_issues."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 2  # == max=2
 
-        class _PR:
-            head_branch = "task/missing"
+        executor, mock_backend = _build_executor_with_registry(
+            registry, max_concurrent_flows=2
+        )
+        issue = make_issue(99)
 
-        with patch(
-            "vibe3.clients.github_client.GitHubClient.get_pr",
-            return_value=_PR(),
-        ):
-            with patch.object(
-                manager.worktree_manager,
-                "_find_worktree_for_branch",
-                return_value=None,
-            ):
-                cwd = manager._resolve_review_cwd(99)
+        result = executor.dispatch_manager(issue)
 
-        assert cwd == Path("/tmp/repo")
+        assert result is False
+        assert 99 in executor._queued_issues
 
-    def test_prepare_pr_review_dispatch_can_force_wrapper_worktree(self):
-        config = OrchestraConfig()
-        config.pr_review_dispatch.use_worktree = True
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
 
-        with patch.object(manager, "_resolve_review_cwd") as mock_resolve:
-            cmd = manager.command_builder.build_pr_review_command(42)
-            cwd = manager._resolve_review_cwd_for_dispatch(42)
+class TestManagerExecutorSessionExceptionHandling:
+    """Session registry exception handling during dispatch."""
 
-        mock_resolve.assert_not_called()
-        assert "--worktree" in cmd
-        assert cwd == Path("/tmp/repo")
+    def test_dispatch_marks_session_failed_on_tmux_failure(self) -> None:
+        """When tmux launch fails, reserved session is marked as failed."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 0
+        registry.reserve.return_value = 123  # session_id
+
+        executor, mock_backend = _build_executor_with_registry(registry)
+        issue = make_issue(42)
+
+        # Mock flow and worktree setup
+        executor._flow_manager.create_flow_for_issue.return_value = {
+            "branch": "task/issue-42"
+        }
+        executor._resolve_manager_cwd = MagicMock(return_value=("/tmp/worktree", False))
+
+        # Simulate tmux launch failure
+        mock_backend.start_async_command.side_effect = RuntimeError("tmux failed")
+
+        result = executor.dispatch_manager(issue)
+
+        assert result is False
+        # Verify session was marked failed after tmux launch failure
+        registry.mark_failed.assert_called_once_with(123)
+
+    def test_dispatch_succeeds_even_when_mark_started_fails(self) -> None:
+        """When mark_started fails (db error), dispatch still succeeds."""
+        registry = MagicMock(spec=SessionRegistryService)
+        registry.count_live_worker_sessions.return_value = 0
+        registry.reserve.return_value = 456  # session_id
+        # Simulate database error in mark_started
+        registry.mark_started.side_effect = RuntimeError("db connection lost")
+
+        executor, mock_backend = _build_executor_with_registry(registry)
+        issue = make_issue(42)
+
+        # Mock successful tmux launch
+        from vibe3.agents.backends.codeagent import AsyncExecutionHandle
+
+        mock_handle = MagicMock(spec=AsyncExecutionHandle)
+        mock_handle.tmux_session = "vibe3-manager-issue-42"
+        mock_handle.log_path = Path("/tmp/log.txt")
+        mock_backend.start_async_command.return_value = mock_handle
+
+        # Mock flow and worktree setup
+        executor._flow_manager.create_flow_for_issue.return_value = {
+            "branch": "task/issue-42"
+        }
+        executor._flow_manager.store = MagicMock()
+        executor._resolve_manager_cwd = MagicMock(return_value=("/tmp/worktree", False))
+
+        result = executor.dispatch_manager(issue)
+
+        # Dispatch succeeds despite mark_started failure
+        assert result is True
+        # mark_started was called but failed
+        registry.mark_started.assert_called_once()
+        # Session cleanup will happen via reconcile later

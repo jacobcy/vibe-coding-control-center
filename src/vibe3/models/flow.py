@@ -31,7 +31,12 @@ def _migrate_flow_status_value(v: str) -> str:
 
 
 class FlowState(BaseModel):
-    """Flow state model."""
+    """Flow state model.
+
+    Session tracking is now handled by runtime_session registry.
+    Legacy session_id fields (manager_session_id, planner_session_id,
+    executor_session_id, reviewer_session_id) are no longer in the model.
+    """
 
     branch: str
     flow_slug: str
@@ -39,13 +44,9 @@ class FlowState(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
-    manager_session_id: str | None = None
     planner_actor: str | None = None
-    planner_session_id: str | None = None
     executor_actor: str | None = None
-    executor_session_id: str | None = None
     reviewer_actor: str | None = None
-    reviewer_session_id: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
     blocked_by: str | None = None
@@ -53,6 +54,7 @@ class FlowState(BaseModel):
     flow_status: Literal["active", "blocked", "done", "stale", "aborted", "merged"] = (
         "active"
     )
+
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     planner_status: ExecutionStatus | None = None
     executor_status: ExecutionStatus | None = None
@@ -147,7 +149,11 @@ class FlowEvent(BaseModel):
 
 
 class FlowStatusResponse(BaseModel):
-    """Response model for flow status."""
+    """Response model for flow status.
+
+    Session tracking is now handled by runtime_session registry.
+    Legacy session_id fields are no longer included.
+    """
 
     branch: str
     flow_slug: str
@@ -159,13 +165,9 @@ class FlowStatusResponse(BaseModel):
     plan_ref: str | None = None
     report_ref: str | None = None
     audit_ref: str | None = None
-    manager_session_id: str | None = None
     planner_actor: str | None = None
-    planner_session_id: str | None = None
     executor_actor: str | None = None
-    executor_session_id: str | None = None
     reviewer_actor: str | None = None
-    reviewer_session_id: str | None = None
     latest_actor: str | None = None
     initiated_by: str | None = None
     blocked_by: str | None = None
@@ -214,13 +216,9 @@ class FlowStatusResponse(BaseModel):
             plan_ref=data.get("plan_ref"),
             report_ref=data.get("report_ref"),
             audit_ref=data.get("audit_ref"),
-            manager_session_id=data.get("manager_session_id"),
             planner_actor=data.get("planner_actor"),
-            planner_session_id=data.get("planner_session_id"),
             executor_actor=data.get("executor_actor"),
-            executor_session_id=data.get("executor_session_id"),
             reviewer_actor=data.get("reviewer_actor"),
-            reviewer_session_id=data.get("reviewer_session_id"),
             latest_actor=data.get("latest_actor"),
             initiated_by=data.get("initiated_by"),
             blocked_by=data.get("blocked_by"),

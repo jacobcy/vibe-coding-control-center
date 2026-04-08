@@ -25,7 +25,13 @@ from vibe3.commands.command_options import (
 )
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest
+from vibe3.services.authoritative_ref_gate import (
+    require_authoritative_ref as _svc_require_authoritative_ref,
+)
 from vibe3.services.flow_service import FlowService
+from vibe3.services.issue_failure_service import (
+    block_planner_noop_issue as _svc_block_planner_noop,
+)
 from vibe3.services.issue_failure_service import (
     confirm_plan_handoff as _svc_confirm_handoff,
 )
@@ -51,6 +57,21 @@ def _build_plan_usecase(config: VibeConfig, flow_service: FlowService) -> PlanUs
     )
 
 
+def _resolve_plan_task(instructions: str | None, config: VibeConfig) -> str | None:
+    """Resolve optional planner task text without triggering external slash skills."""
+    if instructions:
+        return instructions
+
+    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
+    if not plan_prompt:
+        return None
+
+    normalized = plan_prompt.strip()
+    if not normalized or normalized.startswith("/"):
+        return None
+    return normalized
+
+
 def _execute_plan_command(
     *,
     config: VibeConfig,
@@ -64,11 +85,10 @@ def _execute_plan_command(
     model: str | None,
     worktree: bool,
 ) -> object:
-    plan_prompt = config.plan.plan_prompt if getattr(config, "plan", None) else None
     command = create_codeagent_command(
         role="planner",
         context_builder=make_plan_context_builder(request, config),
-        task=instructions or plan_prompt,
+        task=_resolve_plan_task(instructions, config),
         dry_run=dry_run,
         handoff_kind="plan",
         agent=agent,
@@ -129,21 +149,54 @@ def _plan_issue_impl(
         typer.echo(f"-> Using flow task: Issue #{task_input.issue_number}")
 
     typer.echo(f"-> Plan: Issue #{task_input.issue_number}")
-    result = _execute_plan_command(
-        config=config,
-        branch=branch,
-        request=task_input.request,
-        instructions=instructions,
-        dry_run=dry_run,
-        async_mode=async_mode,
-        agent=agent,
-        backend=backend,
-        model=model,
-        worktree=worktree,
-    )
+    try:
+        result = _execute_plan_command(
+            config=config,
+            branch=branch,
+            request=task_input.request,
+            instructions=instructions,
+            dry_run=dry_run,
+            async_mode=async_mode,
+            agent=agent,
+            backend=backend,
+            model=model,
+            worktree=worktree,
+        )
+    except BaseException as error:
+        if dry_run or async_mode:
+            raise
+        _comment_and_fail_issue(
+            issue_number=task_input.issue_number,
+            reason=str(error) or "planner execution raised an unexpected error",
+            actor="agent:plan",
+        )
+        typer.echo(
+            "Error: Planner execution failed; issue moved to state/failed",
+            err=True,
+        )
+        raise typer.Exit(1) from error
 
     if not dry_run and not async_mode:
         if getattr(result, "success", False):
+            if not _svc_require_authoritative_ref(
+                flow_service=flow_service,
+                branch=branch,
+                ref_name="plan_ref",
+                issue_number=task_input.issue_number,
+                reason=(
+                    "planner output artifact was saved, but no authoritative "
+                    "plan_ref was registered. Write a canonical plan document "
+                    "and run handoff plan."
+                ),
+                actor="agent:plan",
+                block_issue=_svc_block_planner_noop,
+            ):
+                typer.echo(
+                    "Error: Planner completed without plan_ref; "
+                    "issue moved to state/blocked",
+                    err=True,
+                )
+                raise typer.Exit(1)
             transition = _svc_confirm_handoff(
                 issue_number=task_input.issue_number,
                 actor="agent:plan",

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
 from loguru import logger
 
@@ -12,13 +13,20 @@ from vibe3.services.signature_service import SignatureService
 from vibe3.utils.git_helpers import get_branch_handoff_dir
 
 
+class _GitClientProtocol(Protocol):
+    """Protocol for git client operations."""
+
+    def get_current_branch(self) -> str: ...
+    def get_git_common_dir(self) -> str: ...
+
+
 class HandoffService:
     """Service for managing handoff records."""
 
     def __init__(
         self,
         store: SQLiteClient | None = None,
-        git_client: GitClient | None = None,
+        git_client: _GitClientProtocol | None = None,
     ) -> None:
         """Initialize handoff service.
 
@@ -185,6 +193,126 @@ class HandoffService:
         handoff_path.write_text(updated.rstrip() + "\n", encoding="utf-8")
         logger.bind(path=str(handoff_path)).success("Appended handoff update")
         return handoff_path
+
+    def _record_ref(
+        self,
+        ref_kind: str,
+        ref_value: str,
+        next_step: str | None,
+        blocked_by: str | None,
+        actor: str | None,
+    ) -> Path:
+        """Internal helper to record a handoff reference.
+
+        Args:
+            ref_kind: Kind of reference (plan, report, audit)
+            ref_value: Reference value (path or identifier)
+            next_step: Optional next step suggestion
+            blocked_by: Optional blocker description
+            actor: Optional explicit actor identifier
+
+        Returns:
+            Path to the current.md file
+        """
+        branch = self.git_client.get_current_branch()
+        effective_actor = SignatureService.resolve_for_branch(
+            self.store,
+            branch,
+            explicit_actor=actor,
+        )
+
+        # 1. Ensure current.md exists (idempotent)
+        handoff_path = self.ensure_current_handoff()
+
+        # 2. Build flow state updates, but defer persistence until file/event
+        #    writes succeed.
+        ref_field = f"{ref_kind.lower()}_ref"
+        flow_updates = {ref_field: ref_value}
+        actor_field_by_kind = {
+            "plan": "planner_actor",
+            "report": "executor_actor",
+            "audit": "reviewer_actor",
+        }
+        actor_field = actor_field_by_kind.get(ref_kind.lower())
+        if actor_field:
+            flow_updates[actor_field] = effective_actor
+        if next_step:
+            flow_updates["next_step"] = next_step
+        if blocked_by:
+            flow_updates["blocked_by"] = blocked_by
+
+        # 3. Build the update block content.
+        message = f"Recorded {ref_kind} reference: {ref_value}"
+        if next_step:
+            message += f"\nNext Step: {next_step}"
+        if blocked_by:
+            message += f"\nBlocked By: {blocked_by}"
+
+        # 4. Record event in SQLite
+        self.store.add_event(
+            branch=branch,
+            event_type=f"handoff_{ref_kind.lower()}",
+            actor=effective_actor,
+            detail=message,
+            refs={
+                "ref": ref_value,
+                "kind": ref_kind.lower(),
+                "next_step": next_step,
+                "blocked_by": blocked_by,
+            },
+        )
+
+        # 5. Persist flow state after event persistence succeeds.
+        self.store.update_flow_state(branch, **flow_updates)
+
+        # 6. Append update block to handoff file only after authoritative writes
+        #    succeed.
+        try:
+            self.append_current_handoff(
+                message=message,
+                actor=effective_actor,
+                kind=ref_kind.lower(),
+            )
+        except (OSError, PermissionError) as exc:
+            logger.bind(
+                domain="handoff",
+                action="append_current_handoff_best_effort",
+                branch=branch,
+                ref_kind=ref_kind.lower(),
+                handoff_path=str(handoff_path),
+            ).warning(f"Skipping non-authoritative handoff file append: {exc}")
+
+        return handoff_path
+
+    def record_plan(
+        self,
+        plan_ref: str,
+        next_step: str | None = None,
+        blocked_by: str | None = None,
+        actor: str | None = None,
+    ) -> Path:
+        """Record plan handoff reference."""
+        return self._record_ref("plan", plan_ref, next_step, blocked_by, actor)
+
+    def record_report(
+        self,
+        report_ref: str,
+        next_step: str | None = None,
+        blocked_by: str | None = None,
+        actor: str | None = None,
+    ) -> Path:
+        """Record report handoff reference."""
+        return self._record_ref("report", report_ref, next_step, blocked_by, actor)
+
+    def record_audit(
+        self,
+        audit_ref: str,
+        next_step: str | None = None,
+        blocked_by: str | None = None,
+        actor: str | None = None,
+    ) -> Path:
+        """Record audit handoff reference."""
+        return self._record_ref("audit", audit_ref, next_step, blocked_by, actor)
 
     def _get_handoff_template(self) -> str:
         """Get minimal handoff template.

@@ -23,6 +23,46 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 
 
+def build_run_task_section(task_text: str | None) -> str:
+    """Build execution task section."""
+    if task_text:
+        return f"## Execution Task\n{task_text}"
+
+    return """## Execution Task
+
+- Execute the implementation plan
+- Make the necessary code changes
+- Ensure changes compile and pass tests
+- Output a report of changes made"""
+
+
+def build_run_output_contract_section(output_format: str | None) -> str:
+    """Build execution output contract section."""
+    if output_format:
+        return "## Output format requirements\n" f"{output_format}"
+
+    return """## Output format requirements
+
+You MUST output a structured report in this EXACT format at the END of your response,
+no matter what. Do not include this section in your response until the very end.
+
+## Changes Made
+### Modified Files
+- [file path 1]: [brief description of changes]
+- [file path 2]: [brief description of changes]
+- ... (list EVERY file you modified, created, or deleted)
+
+### Summary
+[1-2 sentence summary of what was accomplished]
+
+### Verification
+- [X] Code compiles (if applicable)
+- [X] All existing tests pass
+- [X] No breaking changes introduced
+- [X] Changes follow coding standards
+"""
+
+
 def build_run_prompt_body(
     plan_file: str | None,
     config: VibeConfig | None = None,
@@ -65,39 +105,11 @@ def build_run_prompt_body(
     if plan_content:
         sections.append(f"## Implementation Plan\n\n{plan_content}")
 
-    sections.append(
-        "## Execution Task\n\n"
-        "- Execute the implementation plan\n"
-        "- Make the necessary code changes\n"
-        "- Ensure changes compile and pass tests\n"
-        "- Output a report of changes made"
-    )
+    run_task = getattr(run_config, "run_task", None) if run_config else None
+    sections.append(build_run_task_section(run_task))
 
-    if run_config and hasattr(run_config, "output_format"):
-        output_format: str = run_config.output_format
-    else:
-        output_format = """## Output format requirements
-
-You MUST output a structured report in this EXACT format at the END of your response,
-no matter what. Do not include this section in your response until the very end.
-
-## Changes Made
-### Modified Files
-- [file path 1]: [brief description of changes]
-- [file path 2]: [brief description of changes]
-- ... (list EVERY file you modified, created, or deleted)
-
-### Summary
-[1-2 sentence summary of what was accomplished]
-
-### Verification
-- [X] Code compiles (if applicable)
-- [X] All existing tests pass
-- [X] No breaking changes introduced
-- [X] Changes follow coding standards
-"""
-
-    sections.append(output_format)
+    output_format = getattr(run_config, "output_format", None) if run_config else None
+    sections.append(build_run_output_contract_section(output_format))
 
     body = "\n\n---\n\n".join(sections)
     log.bind(body_len=len(body)).success("Run prompt body built")

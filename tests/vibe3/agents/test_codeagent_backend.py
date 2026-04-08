@@ -3,6 +3,7 @@
 Tests the core runner functionality with extensible interface design.
 """
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,23 @@ from vibe3.models.review_runner import (
 
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
+
+    def test_default_log_dir_uses_env_override(self, monkeypatch) -> None:
+        """Async log dir should honor orchestra-provided override."""
+        monkeypatch.setenv("VIBE3_ASYNC_LOG_DIR", "/tmp/orchestra-logs")
+
+        assert (
+            CodeagentBackend._default_log_dir() == Path("/tmp/orchestra-logs").resolve()
+        )
+
+    def test_resolve_async_log_path_routes_plan_issue_logs_into_issue_dir(self) -> None:
+        """Plan issue async logs should live under temp/logs/issues/issue-N."""
+        log_path = CodeagentBackend._resolve_async_log_path(
+            Path("/tmp/logs"),
+            "vibe3-plan-issue-419",
+        )
+
+        assert log_path == Path("/tmp/logs/issues/issue-419/plan.async.log")
 
     def test_run_uses_repo_models_mapping_for_agent_preset(
         self, tmp_path: Path
@@ -165,6 +183,65 @@ class TestCodeagentBackend:
 
         assert "wrapper stderr details" in str(exc_info.value)
 
+    def test_run_retries_without_session_when_resume_session_is_invalid(self) -> None:
+        """Invalid resume session should fall back to a fresh session once."""
+        invalid_resume = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=42,
+            stdout="session not found\n",
+            stderr="Error: session not found for resume\n",
+        )
+        fresh_success = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=0,
+            stdout=(
+                "VERDICT: PASS\n" "SESSION_ID: 262f0fea-eacb-4223-b842-b5b5097f94e8\n"
+            ),
+            stderr="",
+        )
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.side_effect = [invalid_resume, fresh_success]
+            backend = CodeagentBackend()
+
+            result = backend.run(
+                "prompt body",
+                AgentOptions(agent="code-reviewer"),
+                task="custom task",
+                session_id="11111111-1111-1111-1111-111111111111",
+            )
+
+        assert result.exit_code == 0
+        assert result.session_id == "262f0fea-eacb-4223-b842-b5b5097f94e8"
+        assert mock_run.call_count == 2
+        first_command = mock_run.call_args_list[0].args[0]
+        second_command = mock_run.call_args_list[1].args[0]
+        assert "resume" in first_command
+        assert "11111111-1111-1111-1111-111111111111" in first_command
+        assert "resume" not in second_command
+
+    def test_run_does_not_retry_without_session_for_non_resume_error(self) -> None:
+        """Non-resume failures should still fail fast without a fresh retry."""
+        hard_failure = subprocess.CompletedProcess(
+            args=["codeagent-wrapper"],
+            returncode=1,
+            stdout="fatal error\n",
+            stderr="fatal error\n",
+        )
+
+        with patch("vibe3.agents.backends.codeagent.subprocess.run") as mock_run:
+            mock_run.return_value = hard_failure
+            backend = CodeagentBackend()
+
+            with pytest.raises(AgentExecutionError):
+                backend.run(
+                    "prompt body",
+                    AgentOptions(agent="code-reviewer"),
+                    session_id="11111111-1111-1111-1111-111111111111",
+                )
+
+        assert mock_run.call_count == 1
+
     def test_run_wrapper_not_found(self) -> None:
         """Runner should give clear error when wrapper not found."""
         from vibe3.exceptions import AgentExecutionError
@@ -224,7 +301,11 @@ class TestCodeagentBackend:
         # The last argument should be the custom task
         assert command[-1] == "custom task"
 
-    def test_run_adds_worktree_flag_for_new_session(self) -> None:
+    def test_run_no_worktree_flag_after_refactor(self) -> None:
+        """After refactoring, --worktree flag is no longer used.
+
+        Worktree is now self-managed.
+        """
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
@@ -239,7 +320,8 @@ class TestCodeagentBackend:
             )
 
         command = mock_run.call_args[0][0]
-        assert "--worktree" in command
+        # After refactoring, --worktree flag is removed (vibe3 self-manages worktrees)
+        assert "--worktree" not in command
 
     def test_run_skips_worktree_flag_for_resume_session(self) -> None:
         mock_result = MagicMock()

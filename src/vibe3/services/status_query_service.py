@@ -7,13 +7,17 @@ a thin rendering layer.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.orchestration import IssueState
+from vibe3.orchestra.queue_ordering import (
+    resolve_priority,
+    resolve_roadmap_rank,
+)
 
 if TYPE_CHECKING:
     from vibe3.services.flow_service import FlowStatusResponse
@@ -69,6 +73,38 @@ def is_canonical_task_branch(branch: str, task_issue_number: int | None) -> bool
     return task_issue_number is not None and branch == f"task/issue-{task_issue_number}"
 
 
+def is_orchestra_managed_flow_branch(branch: str | None) -> bool:
+    """Whether a flow branch belongs to orchestra-managed auto task scenes."""
+    return isinstance(branch, str) and is_auto_task_branch(branch)
+
+
+def _select_preferred_issue_flow(
+    existing: FlowStatusResponse | None,
+    candidate: FlowStatusResponse,
+) -> FlowStatusResponse:
+    """Choose the preferred flow for issue aggregation.
+
+    Priority order:
+    1. Orchestra-managed flow over manual flow
+    2. Active flow over stale/done flow
+    3. Keep existing on ties to preserve first-seen stability
+    """
+    if existing is None:
+        return candidate
+
+    existing_managed = is_orchestra_managed_flow_branch(existing.branch)
+    candidate_managed = is_orchestra_managed_flow_branch(candidate.branch)
+    if candidate_managed != existing_managed:
+        return candidate if candidate_managed else existing
+
+    existing_active = existing.flow_status == "active"
+    candidate_active = candidate.flow_status == "active"
+    if candidate_active != existing_active:
+        return candidate if candidate_active else existing
+
+    return existing
+
+
 class StatusQueryService:
     """Aggregates GitHub/Git data for the status dashboard.
 
@@ -102,16 +138,21 @@ class StatusQueryService:
         Returns:
             Sorted list of issue dicts with number, title, state, flow, queued
         """
-        from typing import cast
 
         # stale flows first, active flows overwrite (active priority)
         issue_to_flow: dict[int, FlowStatusResponse] = {}
         for f in stale_flows or []:
             if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = f
+                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
+                    issue_to_flow.get(f.task_issue_number),
+                    f,
+                )
         for f in flows:
             if f.task_issue_number:
-                issue_to_flow[f.task_issue_number] = f
+                issue_to_flow[f.task_issue_number] = _select_preferred_issue_flow(
+                    issue_to_flow.get(f.task_issue_number),
+                    f,
+                )
 
         orchestrated_issues: list[dict[str, object]] = []
         try:
@@ -135,11 +176,31 @@ class StatusQueryService:
             if state == IssueState.DONE:
                 continue
             flow = issue_to_flow.get(number)
+            if flow and not is_orchestra_managed_flow_branch(flow.branch):
+                continue
             failed_reason = (
                 self._extract_failed_reason(number)
                 if state == IssueState.FAILED
                 else None
             )
+
+            # Parse queue metadata from labels
+            labels = [
+                label.get("name", "")
+                for label in item.get("labels", [])
+                if isinstance(label, dict) and "name" in label
+            ]
+
+            # Extract milestone from GitHub milestone field
+            milestone = None
+            milestone_data = item.get("milestone")
+            if isinstance(milestone_data, dict) and "title" in milestone_data:
+                milestone = milestone_data["title"]
+
+            # Resolve priority and roadmap
+            priority = resolve_priority(labels)
+            _, roadmap = resolve_roadmap_rank(labels)
+
             orchestrated_issues.append(
                 {
                     "number": number,
@@ -148,16 +209,67 @@ class StatusQueryService:
                     "flow": flow,
                     "queued": number in queued_set,
                     "failed_reason": failed_reason,
+                    # Queue metadata
+                    "milestone": milestone,
+                    "roadmap": roadmap,
+                    "priority": priority,
+                    "labels": labels,
                 }
             )
 
-        orchestrated_issues.sort(
+        # Sort issues: READY issues use queue ordering, others use issue_priority
+        ready_issues = [
+            item for item in orchestrated_issues if item["state"] == IssueState.READY
+        ]
+        other_issues = [
+            item for item in orchestrated_issues if item["state"] != IssueState.READY
+        ]
+
+        # Sort ready issues using queue ordering rules and assign real queue ranks
+        if ready_issues:
+            from vibe3.models.orchestration import IssueInfo
+            from vibe3.orchestra.queue_ordering import sort_ready_issues
+
+            ready_issue_infos = [
+                IssueInfo(
+                    number=cast(int, item["number"]),
+                    title=cast(str, item["title"]),
+                    state=cast(IssueState | None, item["state"]),
+                    labels=cast(list[str], item["labels"]),
+                    assignees=[],
+                    milestone=cast(str | None, item["milestone"]),
+                )
+                for item in ready_issues
+            ]
+            sorted_ready_infos = sort_ready_issues(ready_issue_infos)
+
+            # Build sorted ready issues with real queue ranks
+            sorted_ready_issues = []
+            for rank, issue_info in enumerate(sorted_ready_infos, start=1):
+                matching_item = next(
+                    (
+                        item
+                        for item in ready_issues
+                        if item["number"] == issue_info.number
+                    ),
+                    None,
+                )
+                if matching_item:
+                    matching_item["queue_rank"] = rank
+                    sorted_ready_issues.append(matching_item)
+
+            ready_issues = sorted_ready_issues
+
+        # Sort other issues by operational urgency
+        other_issues.sort(
             key=lambda item: (
                 *issue_priority(cast(IssueState, item["state"])),
                 cast(int, item["number"]),
             )
         )
-        return orchestrated_issues
+
+        # Combine: ready issues first (sorted with real ranks), then others
+        return ready_issues + other_issues
 
     def _extract_failed_reason(self, issue_number: int) -> str | None:
         """Extract a compact failure reason from issue comments."""
@@ -177,7 +289,12 @@ class StatusQueryService:
                 continue
 
             body_lower = body.lower()
-            if "[recovery]" in body_lower or "恢复到 state/handoff" in body:
+            if (
+                "[resume]" in body_lower
+                or "[recovery]" in body_lower
+                or "继续到 state/handoff" in body
+                or "恢复到 state/handoff" in body
+            ):
                 continue
 
             match = re.search(r"(?:原因|reason)[:：\s]+(.*)", body, re.IGNORECASE)
@@ -212,3 +329,71 @@ class StatusQueryService:
         except Exception:
             pass
         return worktree_map
+
+    def fetch_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+        stale_flows: list[FlowStatusResponse] | None = None,
+    ) -> list[dict[str, object]]:
+        """Fetch resumable issue candidates (failed + stale blocked + aborted).
+
+        Reuses fetch_orchestrated_issues() and filters for resumable states.
+        Adds resume_kind field to distinguish failed vs blocked vs aborted recovery.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+            stale_flows: Stale flow status responses for blocked recovery
+
+        Returns:
+            List of resumable issue dicts with number, title, state, flow,
+            failed_reason (if applicable), and resume_kind ("failed",
+            "blocked", or "aborted")
+        """
+        all_issues = self.fetch_orchestrated_issues(
+            flows, queued_set=set(), stale_flows=stale_flows
+        )
+
+        resumable: list[dict[str, object]] = []
+        for issue in all_issues:
+            state = issue.get("state")
+            flow = issue.get("flow")
+
+            if state == IssueState.FAILED:
+                # Failed issues are always resumable
+                resumable.append({**issue, "resume_kind": "failed"})
+            elif state == IssueState.BLOCKED:
+                # Blocked issues are resumable only if flow is stale
+                if flow is not None and hasattr(flow, "flow_status"):
+                    if flow.flow_status == "stale":
+                        resumable.append({**issue, "resume_kind": "blocked"})
+            else:
+                # For other states (READY, HANDOFF), check if flow is aborted
+                if flow is not None and hasattr(flow, "flow_status"):
+                    if flow.flow_status == "aborted":
+                        resumable.append({**issue, "resume_kind": "aborted"})
+
+        return resumable
+
+    def fetch_failed_resume_candidates(
+        self,
+        flows: list[FlowStatusResponse],
+    ) -> list[dict[str, object]]:
+        """Fetch open issues with state/failed label for resume candidates.
+
+        DEPRECATED: Use fetch_resume_candidates() instead.
+
+        This method is kept for backward compatibility and filters
+        fetch_resume_candidates() results for FAILED state only.
+
+        Args:
+            flows: Active flow status responses to cross-reference
+
+        Returns:
+            List of failed issue dicts with number, title, state, flow, failed_reason
+        """
+        candidates = self.fetch_resume_candidates(flows, stale_flows=[])
+        return [
+            candidate
+            for candidate in candidates
+            if candidate.get("resume_kind") == "failed"
+        ]

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Vibe Manager"
-  short_description: "Govern one flow through plan, run, and review"
-  default_prompt: "Use $vibe-manager to manage a single flow/task as a reviewer-governor, approve the next stage, and coordinate vibe3 plan/run/review without writing code directly."

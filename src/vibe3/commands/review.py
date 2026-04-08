@@ -98,15 +98,12 @@ def pr(
     usecase = _build_review_usecase()
     request, issue_number, head_branch = usecase.build_pr_review(pr_number)
 
-    if async_mode and not dry_run:
-        if not head_branch:
-            typer.echo(
-                f"Error: Could not resolve head branch for PR #{pr_number}", err=True
-            )
-            raise typer.Exit(1)
-        branch = head_branch
-    else:
-        branch = None
+    if not head_branch and not dry_run:
+        typer.echo(
+            f"Error: Could not resolve head branch for PR #{pr_number}", err=True
+        )
+        raise typer.Exit(1)
+    branch = head_branch
 
     result = usecase.execute_review(
         request,
@@ -119,7 +116,7 @@ def pr(
         worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
-    if result.verdict == "BLOCK":
+    if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)
 
 
@@ -218,5 +215,5 @@ def base(
         worktree=worktree,
     )
     _emit_review_result(result.verdict, result.handoff_file)
-    if result.verdict == "BLOCK":
+    if result.verdict in {"BLOCK", "ERROR"}:
         raise typer.Exit(1)

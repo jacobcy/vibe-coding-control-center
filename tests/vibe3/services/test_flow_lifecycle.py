@@ -31,10 +31,8 @@ def test_reactivate_flow_records_event():
 
         assert result.flow_slug == slug
         assert result.flow_status == "active"
-        assert result.manager_session_id is None
-        assert result.planner_session_id is None
-        assert result.executor_session_id is None
-        assert result.reviewer_session_id is None
+        # session_id fields are no longer in the model
+        # (registry is the source of truth)
         assert result.plan_ref is None
         assert result.report_ref is None
         assert result.audit_ref is None
@@ -51,7 +49,7 @@ def test_reactivate_flow_records_event():
 
 
 def test_reactivate_flow_resets_all_sessions():
-    """Reactivation should clear all agent session IDs."""
+    """Reactivation should clear all agent actors and refs."""
     with tempfile.TemporaryDirectory() as tmpdir:
         from vibe3.clients.sqlite_client import SQLiteClient
 
@@ -60,15 +58,11 @@ def test_reactivate_flow_resets_all_sessions():
 
         service = FlowService(store=store)
 
-        # Create and manually set sessions
+        # Create and manually set actors and refs
         branch = "task/issue-456"
         service.create_flow(slug="issue-456", branch=branch)
         store.update_flow_state(
             branch,
-            manager_session_id="old-manager-session",
-            planner_session_id="old-planner-session",
-            executor_session_id="old-executor-session",
-            reviewer_session_id="old-reviewer-session",
             planner_actor="old-planner",
             executor_actor="old-executor",
             reviewer_actor="old-reviewer",
@@ -81,17 +75,15 @@ def test_reactivate_flow_resets_all_sessions():
         # Reactivate
         service.reactivate_flow(branch)
 
-        # Verify all sessions cleared
+        # Verify all actors and refs cleared
         state = store.get_flow_state(branch)
         assert state is not None
         assert state.get("latest_actor") is None
         assert state.get("planner_actor") is None
         assert state.get("executor_actor") is None
         assert state.get("reviewer_actor") is None
-        assert state.get("manager_session_id") is None
-        assert state.get("planner_session_id") is None
-        assert state.get("executor_session_id") is None
-        assert state.get("reviewer_session_id") is None
+        # session_id fields are no longer tracked in flow_state
+        # (registry is the source of truth)
         assert state.get("plan_ref") is None
         assert state.get("report_ref") is None
         assert state.get("audit_ref") is None

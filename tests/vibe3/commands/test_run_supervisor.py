@@ -351,9 +351,12 @@ class TestRunSupervisorOption:
                 "refs": (None, None, None, None, None, None),
             },
         )
+        # Mock the coordinator's block_manager_noop_issue
+        from vibe3.manager import manager_run_coordinator
+
         block_noop = MagicMock()
         monkeypatch.setattr(
-            manager_run_service,
+            manager_run_coordinator,
             "block_manager_noop_issue",
             block_noop,
         )

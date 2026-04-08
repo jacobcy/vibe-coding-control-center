@@ -35,8 +35,8 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 - [docs/standards/glossary.md](../../docs/standards/glossary.md)
 - [docs/standards/action-verbs.md](../../docs/standards/action-verbs.md)
-- [docs/standards/v2/git-workflow-standard.md](../../docs/standards/v2/git-workflow-standard.md)
-- [docs/standards/v2/worktree-lifecycle-standard.md](../../docs/standards/v2/worktree-lifecycle-standard.md)
+- [docs/standards/v3/git-workflow-standard.md](../../docs/standards/v3/git-workflow-standard.md)
+- [docs/standards/v3/worktree-lifecycle-standard.md](../../docs/standards/v3/worktree-lifecycle-standard.md)
 
 
 ### Task Overview
@@ -62,23 +62,23 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 
 **通用原则:**
 
-- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py status` / `flow show` 命令获取数据
-- Audit 模式必须通过 `uv run python src/vibe3/cli.py check` 命令进行核对和修复
-- 不得直接读取或修改 `registry.json`
+- Task Overview 模式必须通过 `uv run python src/vibe3/cli.py task status --all --check` / `flow show` 命令获取数据
+- Audit 模式只允许基于 `task status --all --check`、`flow show` 与 `gh` / `git` 现场做诊断；若缺少原子修复能力，明确报告 Capability Gap
+- 不得直接读取或修改底层 JSON / SQLite 真源
 - 不得自己重写 task 匹配逻辑或数据修复逻辑
 
-**Task Overview 模式:**
+- **Task Overview 模式:**
 
-- 必须先运行 `uv run python src/vibe3/cli.py status`
+- 必须先运行 `uv run python src/vibe3/cli.py task status --all --check`
 - 不得补充 CLI 未提供的字段
 - 不得补充 CLI 未提供的字段
 
 **Audit 模式:**
 
-- 必须通过 `uv run python src/vibe3/cli.py check --all` 获取核对结果
-- 必须通过 `uv run python src/vibe3/cli.py check --fix` 执行修复操作
+- 必须先给出 shell 证据，再决定是否存在真实的元数据缺口
+- 若当前 CLI 没有对应的原子修复能力，必须停止并报告 Capability Gap
 - 不得直接修改 JSON 文件
-- **所有修复操作必须在用户明确确认后执行**
+- **所有修复操作必须在用户明确确认且命令面真实存在时执行**
 
 如果 CLI 失败，直接报告失败原因并停止，不要绕过 CLI。
 
@@ -98,7 +98,7 @@ description: Use when the user wants a cross-worktree flow/task overview, asks w
 ### Step 1: 运行 CLI
 
 ```bash
-uv run python src/vibe3/cli.py status
+uv run python src/vibe3/cli.py task status --all --check
 uv run python src/vibe3/cli.py flow show
 ```
 
@@ -185,11 +185,14 @@ Recommendation
 根据用户需求选择核对范围：
 
 ```bash
-# 完整核对
-uv run python src/vibe3/cli.py check --all
+# 当前全局总览
+uv run python src/vibe3/cli.py task status --all --check
+
+# 必要时补当前现场
+uv run python src/vibe3/cli.py flow show
 ```
 
-**注意**: 修复操作 (`--fix`) 必须在用户确认后才可执行。
+**注意**: 若问题需要修复，必须先确认当前 CLI 是否真的提供对应原子能力；没有能力时报告 `Capability Gap`，不要发明 `--fix` 一类不存在的入口。
 
 ## Step 2: 解析核对结果
 
@@ -213,43 +216,43 @@ uv run python src/vibe3/cli.py check --all
 ### 3.1 数据质量问题
 
 ```
-📋 数据质量修复结果
-- 修复了 N 个问题
-- 状态: ✅ 已自动修复
+📋 数据质量诊断结果
+- 发现 N 个需要进一步确认的问题
+- 状态: 需人工判断 / 需现有 shell 能力支持
 ```
 
 ## Step 4: 用户交互流程
 
-提供三种修复模式，根据问题数量和用户偏好选择。
+提供三种处理模式，根据问题数量和当前命令能力选择。
 
 ### 模式选择
 
 ```
 检测到以下问题:
-- N 个数据质量问题（已自动修复）
+- N 个数据质量问题（待确认或待修复）
 - M 个需要确认的问题
 
-请选择修复模式:
-1. 批量修复（自动处理所有高置信度问题）
-2. 逐个确认（每个问题单独询问）
-3. 仅查看（不执行修复）
+请选择处理模式:
+1. 输出建议（只给出下一步）
+2. 逐个确认（逐项判断是否需要真实 shell 修复）
+3. 仅查看（不执行任何动作）
 ```
 
 ## Step 5: 执行修复操作
 
-**修复前必须获得用户明确确认。**
+**修复前必须获得用户明确确认，且命令面必须真实存在。**
 
-根据用户确认，调用 Shell 命令执行修复：
+若当前 shell 具备对应修复入口，再调用真实命令；否则停止并报告能力缺口。
 
 ```bash
-uv run python src/vibe3/cli.py check --fix
+uv run python src/vibe3/cli.py check
 ```
 
 ### 5.1 验证修复结果
 
 ```bash
-# 再次运行核对，确认问题已解决
-uv run python src/vibe3/cli.py check --all
+# 再次运行核对，确认问题已重新投影到总览中
+uv run python src/vibe3/cli.py task status --all --check
 ```
 
 ## Step 6: 输出修复报告

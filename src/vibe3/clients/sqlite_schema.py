@@ -20,13 +20,9 @@ _CREATE_FLOW_STATE = """
         plan_ref TEXT,
         report_ref TEXT,
         audit_ref TEXT,
-        manager_session_id TEXT,
         planner_actor TEXT,
-        planner_session_id TEXT,
         executor_actor TEXT,
-        executor_session_id TEXT,
         reviewer_actor TEXT,
-        reviewer_session_id TEXT,
         latest_actor TEXT,
         initiated_by TEXT,
         blocked_by TEXT,
@@ -73,6 +69,38 @@ _CREATE_FLOW_EVENTS = """
 """
 
 
+_CREATE_RUNTIME_SESSION = """
+    CREATE TABLE IF NOT EXISTS runtime_session (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        branch TEXT NOT NULL,
+        session_name TEXT NOT NULL,
+        backend_session_id TEXT,
+        tmux_session TEXT,
+        log_path TEXT,
+        status TEXT NOT NULL DEFAULT 'starting',
+        started_at TEXT,
+        ended_at TEXT,
+        worktree_path TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+"""
+
+_CREATE_RUNTIME_SESSION_INDEXES = """
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_status_role
+        ON runtime_session(status, role);
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_branch_role
+        ON runtime_session(branch, role);
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_session_role_branch_target
+        ON runtime_session(role, branch, target_id)
+"""
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create all tables and run migrations."""
     cursor = conn.cursor()
@@ -99,12 +127,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             "Added initiated_by column to flow_state"
         )
 
-    if "manager_session_id" not in existing:
-        cursor.execute("ALTER TABLE flow_state ADD COLUMN manager_session_id TEXT")
-        logger.bind(external="sqlite", operation="migration").info(
-            "Added manager_session_id column to flow_state"
-        )
-
     # Migration: add async execution tracking columns if missing
     async_columns = {
         "planner_status": "TEXT",
@@ -124,6 +146,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
     cursor.execute(_CREATE_FLOW_ISSUE_LINKS)
     cursor.execute(_CREATE_TASK_ISSUE_INDEX)
     cursor.execute(_CREATE_FLOW_EVENTS)
+    cursor.execute(_CREATE_RUNTIME_SESSION)
+
+    # Create indexes for runtime_session table
+    for stmt in _CREATE_RUNTIME_SESSION_INDEXES.strip().split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
 
     # Migration: add refs column to flow_events if missing
     event_columns = {

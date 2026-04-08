@@ -66,26 +66,30 @@ def fail_manager_issue(
     )
 
 
-def recover_failed_issue_to_handoff(
+def resume_failed_issue_to_handoff(
     *,
     issue_number: int,
     repo: str | None,
     reason: str,
-    actor: str = "human:recovery",
+    actor: str = "human:resume",
 ) -> None:
-    """Recover a failed issue back to handoff for manager triage.
+    """Resume a failed issue back to handoff for manager triage.
 
     Args:
         issue_number: GitHub issue number
         repo: Repository (owner/repo format, optional)
-        reason: Recovery reason to include in comment
-        actor: Actor performing the recovery
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
     """
-    GitHubClient().add_comment(
-        issue_number,
-        "[recovery] 已从 state/failed 恢复到 state/handoff。\n\n"
-        "manager 将重新判断现场并决定下一步。\n\n"
-        f"原因:{reason}",
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/failed 继续到 state/handoff。",
+            detail="manager 将重新判断现场并决定下一步。",
+            reason=reason,
+        ),
         repo=repo,
     )
     LabelService(repo=repo).confirm_issue_state(
@@ -93,6 +97,78 @@ def recover_failed_issue_to_handoff(
         IssueState.HANDOFF,
         actor=actor,
         force=False,
+    )
+
+
+# Backward compatibility alias
+recover_failed_issue_to_handoff = resume_failed_issue_to_handoff
+
+
+def resume_failed_issue_to_ready(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:resume",
+) -> None:
+    """Resume a failed issue back to ready for fresh manager entry.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/failed 继续到 state/ready。",
+            detail="将重新进入 manager 标准入口。",
+            reason=reason,
+        ),
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.READY,
+        actor=actor,
+        force=True,  # Force transition from FAILED to READY
+    )
+
+
+def resume_blocked_issue_to_ready(
+    *,
+    issue_number: int,
+    repo: str | None,
+    reason: str,
+    actor: str = "human:resume",
+) -> None:
+    """Resume a blocked issue back to ready after blockage resolved.
+
+    Args:
+        issue_number: GitHub issue number
+        repo: Repository (owner/repo format, optional)
+        reason: Resume reason to include in comment
+        actor: Actor performing the resume
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=_build_resume_comment(
+            header="[resume] 已从 state/blocked 恢复到 state/ready。",
+            detail="阻塞已解除,准备继续执行。",
+            reason=reason,
+        ),
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.READY,
+        actor=actor,
+        force=True,  # Force transition from BLOCKED to READY
     )
 
 
@@ -123,6 +199,108 @@ def block_manager_noop_issue(
             "[manager] 无法推进,已切换为 state/blocked。\n\n" f"原因:{reason}",
             repo=repo,
         )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.BLOCKED,
+        actor=actor,
+        force=True,
+    )
+
+
+def block_planner_noop_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:plan",
+    repo: str | None = None,
+) -> None:
+    """Block a planner issue when no authoritative plan_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[plan] 规划执行完成，但未登记 authoritative plan_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.BLOCKED,
+        actor=actor,
+        force=True,
+    )
+
+
+def block_executor_noop_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:run",
+    repo: str | None = None,
+) -> None:
+    """Block an executor issue when no authoritative report_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[run] 执行完成，但未登记 authoritative report_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
+    )
+    LabelService(repo=repo).confirm_issue_state(
+        issue_number,
+        IssueState.BLOCKED,
+        actor=actor,
+        force=True,
+    )
+
+
+def block_reviewer_noop_issue(
+    *,
+    issue_number: int,
+    reason: str,
+    actor: str = "agent:review",
+    repo: str | None = None,
+) -> None:
+    """Block a reviewer issue when no authoritative audit_ref was produced.
+
+    Args:
+        issue_number: GitHub issue number
+        reason: Reason for blocking
+        actor: Actor performing the block
+        repo: Repository (owner/repo format, optional)
+    """
+    github = GitHubClient()
+    _add_comment_if_missing(
+        github=github,
+        issue_number=issue_number,
+        body=(
+            "[review] 审查完成，但未登记 authoritative audit_ref，"
+            "已切换为 state/blocked。\n\n"
+            f"原因:{reason}"
+        ),
+        repo=repo,
+    )
     LabelService(repo=repo).confirm_issue_state(
         issue_number,
         IssueState.BLOCKED,
@@ -196,4 +374,47 @@ def _has_matching_block_comment(issue_payload: dict[str, object], reason: str) -
         body = comment.get("body")
         if isinstance(body, str) and reason in body:
             return True
+    return False
+
+
+def _build_resume_comment(*, header: str, detail: str, reason: str) -> str:
+    """Build a stable resume comment body.
+
+    When reason is empty, omit the reason section so repeated manual retries can be
+    deduplicated using the exact same comment body.
+    """
+    body = f"{header}\n\n{detail}"
+    normalized_reason = reason.strip()
+    if normalized_reason:
+        body += f"\n\n原因:{normalized_reason}"
+    return body
+
+
+def _add_comment_if_missing(
+    *,
+    github: GitHubClient,
+    issue_number: int,
+    body: str,
+    repo: str | None,
+) -> None:
+    """Add a GitHub comment unless the latest comment already has the same body."""
+    issue_payload = github.view_issue(issue_number, repo=repo)
+    if isinstance(issue_payload, dict) and _latest_comment_matches(issue_payload, body):
+        return
+    github.add_comment(issue_number, body, repo=repo)
+
+
+def _latest_comment_matches(
+    issue_payload: dict[str, object], comment_text: str
+) -> bool:
+    """Return True when the latest issue comment has the same body."""
+    comments = issue_payload.get("comments")
+    if not isinstance(comments, list):
+        return False
+    normalized_comment = comment_text.strip()
+    for comment in reversed(comments):
+        if not isinstance(comment, dict):
+            continue
+        body = comment.get("body")
+        return isinstance(body, str) and body.strip() == normalized_comment
     return False

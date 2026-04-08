@@ -1,3 +1,4 @@
+import os
 import re
 import shlex
 import subprocess
@@ -7,10 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
+from loguru import logger
+
 from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
 )
+from vibe3.environment.session import SessionManager
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -31,6 +35,15 @@ KNOWN_CODEX_SNAPSHOT_WARNING: Final[str] = (
 )
 KNOWN_CODEX_ANALYTICS_WARNING: Final[str] = (
     r"analytics_client: events failed with status 403 Forbidden:"
+)
+RESUME_RETRY_EXIT_CODES: Final[frozenset[int]] = frozenset({42})
+RESUME_RETRY_ERROR_SNIPPETS: Final[tuple[str, ...]] = (
+    "session not found",
+    "invalid session",
+    "failed to resume",
+    "unable to resume",
+    "could not resume",
+    "resume error",
 )
 
 
@@ -63,12 +76,94 @@ class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
 
     @staticmethod
+    def _should_retry_without_session(
+        result: subprocess.CompletedProcess[str],
+        *,
+        session_id: str | None,
+    ) -> bool:
+        """Return True when wrapper failure indicates the resume target is invalid."""
+        if not session_id:
+            return False
+        if result.returncode not in RESUME_RETRY_EXIT_CODES:
+            return False
+
+        combined_output = f"{result.stdout}\n{result.stderr}".lower()
+        return any(
+            snippet in combined_output for snippet in RESUME_RETRY_ERROR_SNIPPETS
+        )
+
+    @staticmethod
+    def _run_subprocess(
+        command: list[str],
+        *,
+        project_root: str,
+        timeout_seconds: int,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            command,
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+
+    @staticmethod
+    def list_tmux_sessions(*, prefix: str | None = None) -> set[str]:
+        """Return tmux session names, optionally filtered by prefix."""
+        try:
+            result = subprocess.run(
+                ["tmux", "ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except FileNotFoundError:
+            return set()
+        except Exception:
+            return set()
+        if result.returncode != 0:
+            return set()
+
+        sessions: set[str] = set()
+        for line in result.stdout.splitlines():
+            session_name = line.split(":", 1)[0].strip()
+            if not session_name:
+                continue
+            if (
+                prefix is None
+                or session_name == prefix
+                or session_name.startswith(f"{prefix}-")
+            ):
+                sessions.add(session_name)
+        return sessions
+
+    @classmethod
+    def has_tmux_session(cls, session_name: str) -> bool:
+        """Return whether the exact tmux session currently exists."""
+        return session_name in cls.list_tmux_sessions()
+
+    @classmethod
+    def has_tmux_session_prefix(cls, prefix: str) -> bool:
+        """Return whether any tmux session exists for the given prefix."""
+        return bool(cls.list_tmux_sessions(prefix=prefix))
+
+    @staticmethod
     def _build_async_log_filter() -> list[str]:
-        """Return awk filter that strips known Codex runtime noise from async logs."""
+        """Return awk filter that strips known Codex runtime noise from async logs.
+
+        Also filters out <agent-prompt> blocks to prevent full prompts from
+        appearing in repository logs.
+        """
         state_patterns = " || ".join(
             f"$0 ~ /{pattern}/" for pattern in KNOWN_CODEX_STATE_DB_WARNINGS
         )
         script = (
+            # Filter agent-prompt blocks
+            "$0 ~ /<agent-prompt>/ { skip_prompt=1; prompt_lines++; next }\n"
+            "skip_prompt { if ($0 ~ /<\\/agent-prompt>/) { skip_prompt=0 } next }\n"
+            # Filter known Codex warnings
             f"({state_patterns}) {{ state_db++; next }}\n"
             f"$0 ~ /{KNOWN_CODEX_SNAPSHOT_WARNING}/ "
             f"{{ shell_snapshot++; next }}\n"
@@ -77,6 +172,8 @@ class CodeagentBackend:
             "skip_html { if ($0 ~ /<\\/html>/) { skip_html=0 } next }\n"
             "{ print }\n"
             "END {\n"
+            '  if (prompt_lines > 0) print "[vibe3 async] suppressed " '
+            'prompt_lines " agent-prompt line(s)"\n'
             '  if (state_db > 0) print "[vibe3 async] suppressed " '
             'state_db " codex state-db warning line(s)"\n'
             '  if (shell_snapshot > 0) print "[vibe3 async] suppressed " '
@@ -157,9 +254,6 @@ class CodeagentBackend:
 
         command.extend(["--prompt-file", prompt_file_path])
 
-        if options.worktree and not session_id:
-            command.append("--worktree")
-
         if session_id:
             command.append("resume")
             command.append(cast(str, session_id))
@@ -174,12 +268,15 @@ class CodeagentBackend:
 
     @staticmethod
     def _default_log_dir() -> Path:
+        override_dir = os.environ.get("VIBE3_ASYNC_LOG_DIR", "").strip()
+        if override_dir:
+            return Path(override_dir).expanduser().resolve()
         return Path(__file__).resolve().parents[4] / "temp" / "logs"
 
     @classmethod
     def _resolve_async_log_path(cls, log_dir: Path, execution_name: str) -> Path:
         issue_match = re.match(
-            r"^vibe3-(manager|planner|executor|reviewer|supervisor)(?:-[^-]+)?-(?:task|dev)-issue-(\d+)(?:-(\d+))?$",
+            r"^vibe3-(manager|planner|executor|reviewer|supervisor|plan|run|review)(?:-[^-]+)?(?:-(?:task|dev))?-issue-(\d+)(?:-(\d+))?$",
             execution_name,
         )
         if issue_match:
@@ -190,19 +287,10 @@ class CodeagentBackend:
                 "executor": "run",
                 "reviewer": "review",
                 "supervisor": "supervisor",
+                "plan": "plan",
+                "run": "run",
+                "review": "review",
             }[role]
-            file_name = role_name if suffix is None else f"{role_name}-{suffix}"
-            return (
-                log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
-            )
-
-        manager_issue_match = re.match(
-            r"^vibe3-(manager|supervisor)(?:-[^-]+)?-issue-(\d+)(?:-(\d+))?$",
-            execution_name,
-        )
-        if manager_issue_match:
-            role, issue_number, suffix = manager_issue_match.groups()
-            role_name = "manager" if role == "manager" else "supervisor"
             file_name = role_name if suffix is None else f"{role_name}-{suffix}"
             return (
                 log_dir / "issues" / f"issue-{issue_number}" / f"{file_name}.async.log"
@@ -232,29 +320,40 @@ class CodeagentBackend:
         keep_alive_seconds: int = 60,
     ) -> AsyncExecutionHandle:
         project_root = cwd or Path.cwd()
-        base_name = execution_name.replace("/", "-")[:50]
-        safe_name = self._allocate_tmux_session_name(base_name)
+
+        # Use SessionManager for tmux session creation
+        # Use codeagent's log dir to avoid worktree .git issues
         log_dir = self._default_log_dir()
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = self._resolve_async_log_path(log_dir, safe_name)
+        session_manager = SessionManager(repo_path=project_root, log_dir=log_dir)
+        prefix = execution_name.replace("/", "-")[:50]
+        tmux_ctx = session_manager.create_tmux_session(
+            prefix, keep_alive=keep_alive_seconds
+        )
+
+        # Use codeagent's specialized log path resolution (includes issue number)
+        # Use actual session_id (may include counter suffix like -2, -3)
+        log_path = self._resolve_async_log_path(log_dir, tmux_ctx.session_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
+
+        # Build shell command with log filtering
         shell_command = self._build_async_shell_command(
             command,
             log_path=log_path,
             keep_alive_seconds=keep_alive_seconds,
         )
 
+        # Execute command in the tmux session
         subprocess.run(
-            ["tmux", "new-session", "-d", "-s", safe_name, "sh", "-lc", shell_command],
+            ["tmux", "send-keys", "-t", tmux_ctx.session_id, shell_command, "Enter"],
             cwd=project_root,
             env=env,
             check=True,
         )
 
         return AsyncExecutionHandle(
-            tmux_session=safe_name,
+            tmux_session=tmux_ctx.session_id,
             log_path=log_path,
             prompt_file_path=Path(""),
         )
@@ -347,14 +446,28 @@ class CodeagentBackend:
                 return AgentResult(exit_code=0, stdout="[dry-run]", stderr="")
 
             try:
-                result = subprocess.run(
+                result = self._run_subprocess(
                     command,
-                    cwd=project_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=options.timeout_seconds,
-                    check=False,
+                    project_root=project_root,
+                    timeout_seconds=options.timeout_seconds,
                 )
+
+                if self._should_retry_without_session(result, session_id=session_id):
+                    retry_command = self._build_command(
+                        options,
+                        cast(str, prompt_file_path),
+                        task=task,
+                        session_id=None,
+                    )
+                    logger.bind(domain="agent_execution").warning(
+                        "Stored wrapper session is not resumable; "
+                        "retrying with a fresh session."
+                    )
+                    result = self._run_subprocess(
+                        retry_command,
+                        project_root=project_root,
+                        timeout_seconds=options.timeout_seconds,
+                    )
 
             except FileNotFoundError:
                 raise AgentExecutionError(

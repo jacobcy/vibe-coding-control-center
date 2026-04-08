@@ -42,7 +42,7 @@ def resolve_governance_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=gov.agent,
         backend=gov.backend,
         model=gov.model,
-        worktree=True,  # Governance runs in temporary worktree
+        worktree=False,  # Governance doesn't need worktree
     )
 
     return _resolve_and_sync(raw_options)
@@ -62,7 +62,7 @@ def resolve_supervisor_agent_options(config: OrchestraConfig) -> AgentOptions:
         agent=handoff.agent,
         backend=handoff.backend,
         model=handoff.model,
-        worktree=True,  # Supervisor runs in temporary worktree
+        worktree=False,  # L2 uses self-managed temporary worktree, no --worktree flag
     )
 
     return _resolve_and_sync(raw_options)
@@ -107,11 +107,20 @@ def resolve_manager_agent_options(
             backend=ad.backend,
             model=ad.model,
             worktree=worktree,
+            timeout_seconds=ad.timeout_seconds,
         )
     else:
         # Fall back to generic run defaults
         raw_options = CodeagentExecutionService(runtime_config).resolve_agent_options(
             "run", worktree=worktree
+        )
+        # Override timeout with manager-specific value
+        raw_options = AgentOptions(
+            agent=raw_options.agent,
+            backend=raw_options.backend,
+            model=raw_options.model,
+            worktree=raw_options.worktree,
+            timeout_seconds=ad.timeout_seconds,
         )
 
     # Resolve preset mapping from config/models.json and sync to ~/.codeagent

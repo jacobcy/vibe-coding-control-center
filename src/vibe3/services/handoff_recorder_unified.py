@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from vibe3.agents.review_runner import (
     format_agent_actor,
@@ -16,24 +16,34 @@ from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
 
+
+class _BranchBoundGitClientProtocol(Protocol):
+    """Protocol for git client operations needed by HandoffService."""
+
+    def get_current_branch(self) -> str: ...
+    def get_git_common_dir(self) -> str: ...
+
+
+class _BranchBoundGitClient:
+    """Git client shim that pins handoff artifact writes to a target branch."""
+
+    def __init__(self, branch: str) -> None:
+        self._branch = branch
+        self._delegate = GitClient()
+
+    def get_current_branch(self) -> str:
+        return self._branch
+
+    def get_git_common_dir(self) -> str:
+        return self._delegate.get_git_common_dir()
+
+
 HandoffKind = Literal["plan", "run", "review"]
 
 _ACTOR_ROLE_BY_KIND: dict[HandoffKind, str] = {
     "plan": "planner_actor",
     "run": "executor_actor",
     "review": "reviewer_actor",
-}
-
-_SESSION_ROLE_BY_KIND: dict[HandoffKind, str] = {
-    "plan": "planner_session_id",
-    "run": "executor_session_id",
-    "review": "reviewer_session_id",
-}
-
-_REF_FIELD_BY_KIND: dict[HandoffKind, str] = {
-    "plan": "plan_ref",
-    "run": "report_ref",
-    "review": "audit_ref",
 }
 
 _RESERVED_REF_KEYS = {
@@ -46,6 +56,8 @@ _RESERVED_REF_KEYS = {
     "verdict",
 }
 
+_AGENT_PROMPT_BLOCK_RE = re.compile(r"<agent-prompt>.*?</agent-prompt>\s*", re.DOTALL)
+
 
 # ---------------------------------------------------------------------------
 # Handoff artifact & event helpers (inlined from handoff_event_service)
@@ -55,6 +67,7 @@ _RESERVED_REF_KEYS = {
 def create_handoff_artifact(
     prefix: str,
     content: str | None,
+    branch: str | None = None,
 ) -> tuple[str, Path] | None:
     """Create a timestamped handoff artifact file for current branch.
 
@@ -64,14 +77,17 @@ def create_handoff_artifact(
     Returns:
         tuple(branch, file_path) when branch is available, else None.
     """
-    git = GitClient()
-    try:
-        branch = git.get_current_branch()
-    except Exception:
-        return None
+    if branch is None:
+        git = GitClient()
+        try:
+            branch = git.get_current_branch()
+        except Exception:
+            return None
+        handoff_service = HandoffService(git_client=git)
+    else:
+        handoff_service = HandoffService(git_client=_BranchBoundGitClient(branch))
 
-    handoff_service = HandoffService()
-    handoff_dir = handoff_service._get_handoff_dir()
+    handoff_dir = handoff_service.ensure_handoff_dir()
 
     timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     artifact_path = handoff_dir / f"{prefix}-{timestamp}.md"
@@ -105,6 +121,7 @@ class HandoffRecord:
     options: AgentOptions
     session_id: str | None = None
     metadata: dict[str, str] | None = None
+    branch: str | None = None
 
 
 def parse_modified_files(content: str) -> list[str]:
@@ -130,8 +147,13 @@ def parse_modified_files(content: str) -> list[str]:
 def parse_review_verdict(content: str) -> str | None:
     """Extract verdict token from review content."""
 
-    match = re.search(r"VERDICT:\s*(PASS|FAIL|BLOCK)", content, re.IGNORECASE)
+    match = re.search(r"VERDICT:\s*(PASS|MAJOR|BLOCK)", content, re.IGNORECASE)
     return match.group(1).upper() if match else None
+
+
+def sanitize_handoff_content(content: str) -> str:
+    """Strip prompt-provenance blocks from persisted shared artifacts."""
+    return _AGENT_PROMPT_BLOCK_RE.sub("", content)
 
 
 def _build_detail(
@@ -154,7 +176,7 @@ def _build_detail(
                 detail_parts.append(f"  ... and {len(modified_files) - 3} more")
 
     if record.kind == "review":
-        verdict = metadata.get("verdict") or parse_review_verdict(record.content)
+        verdict = parse_review_verdict(record.content) or metadata.get("verdict")
         if verdict:
             refs["verdict"] = verdict
             comment_count = metadata.get("comment_count")
@@ -173,7 +195,12 @@ def _build_detail(
 def record_handoff_unified(record: HandoffRecord) -> Path | None:
     """Persist a plan/run/review artifact and corresponding handoff event."""
 
-    artifact = create_handoff_artifact(record.kind, record.content)
+    sanitized_content = sanitize_handoff_content(record.content)
+    artifact = create_handoff_artifact(
+        record.kind,
+        sanitized_content,
+        branch=record.branch,
+    )
     if artifact is None:
         return None
 
@@ -185,7 +212,15 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
     )
     backend, model = resolve_actor_backend_model(record.options)
 
-    detail, derived_refs = _build_detail(record, artifact_file)
+    sanitized_record = HandoffRecord(
+        kind=record.kind,
+        content=sanitized_content,
+        options=record.options,
+        session_id=record.session_id,
+        metadata=record.metadata,
+    )
+
+    detail, derived_refs = _build_detail(sanitized_record, artifact_file)
     refs: dict[str, str] = {
         "ref": str(artifact_file),
         "backend": backend,
@@ -197,9 +232,7 @@ def record_handoff_unified(record: HandoffRecord) -> Path | None:
         refs["session_id"] = record.session_id
 
     flow_state_updates: dict[str, object] = {
-        _REF_FIELD_BY_KIND[record.kind]: str(artifact_file),
         _ACTOR_ROLE_BY_KIND[record.kind]: actor,
-        _SESSION_ROLE_BY_KIND[record.kind]: record.session_id,
     }
 
     persist_handoff_event(

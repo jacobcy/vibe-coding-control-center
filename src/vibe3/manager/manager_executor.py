@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
 from vibe3.manager.result_handler import DispatchResultHandler
 from vibe3.manager.session_naming import get_manager_session_name
-from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -20,6 +20,7 @@ from vibe3.runtime.executor import run_command
 
 if TYPE_CHECKING:
     from vibe3.prompts.models import PromptRenderResult
+    from vibe3.services.session_registry import SessionRegistryService
 
 
 class ManagerExecutor:
@@ -32,12 +33,13 @@ class ManagerExecutor:
         dry_run: bool = False,
         prompts_path: Path | None = None,
         circuit_breaker: CircuitBreaker | None = None,
+        registry: "SessionRegistryService | None" = None,
     ):
         self.config = config
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
 
-        self._flow_manager = FlowManager(config)
+        self._flow_manager = FlowManager(config, registry=registry)
         self.worktree_manager = WorktreeManager(
             config, self.repo_path, self._flow_manager
         )
@@ -47,6 +49,8 @@ class ManagerExecutor:
             config, orchestrator=self._flow_manager
         )
         self._backend = CodeagentBackend()
+
+        self._registry = registry
 
         self._circuit_breaker = circuit_breaker
         if self._circuit_breaker is None and config.circuit_breaker.enabled:
@@ -114,12 +118,16 @@ class ManagerExecutor:
             issue=issue.number,
         )
 
-        active_count = self.status_service.get_active_flow_count()
+        if self._registry is None:
+            raise RuntimeError(
+                "SessionRegistryService is required for manager dispatch"
+            )
+        active_count = self._registry.count_live_worker_sessions(role="manager")
         capacity = self.config.max_concurrent_flows
 
         if active_count >= capacity:
             log.warning(
-                f"Throttled: Capacity reached ({active_count}/{capacity}). "
+                f"Throttled: Manager capacity reached ({active_count}/{capacity}). "
                 f"Queueing #{issue.number}"
             )
             self._queued_issues.add(issue.number)
@@ -173,7 +181,7 @@ class ManagerExecutor:
         _manager_options = resolve_manager_agent_options(
             self.config,
             VibeConfig.get_defaults(),
-            worktree=is_temporary,
+            worktree=False,  # Never use --worktree flag, worktree is self-managed
         )
         _manager_env = {
             **os.environ,
@@ -185,10 +193,22 @@ class ManagerExecutor:
             _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
 
         launched = False
+        # Reserve session in registry BEFORE launching tmux (prevent orphaned sessions)
+        session_id: int | None = None
+        if self._registry is not None:
+            session_id = self._registry.reserve(
+                role="manager",
+                target_type="issue",
+                target_id=str(issue.number),
+                branch=flow_branch,
+            )
+
         try:
             cmd = [
                 "uv",
                 "run",
+                "--project",
+                str(self.repo_path),
                 "python",
                 "-I",
                 str(self._resolve_cli_entry()),
@@ -205,6 +225,9 @@ class ManagerExecutor:
                     env=_manager_env,
                 )
             except Exception as exc:
+                # Clean up reserved session on launch failure
+                if self._registry is not None and session_id is not None:
+                    self._registry.mark_failed(session_id)
                 log.error(f"Manager async start failed: {exc}")
                 self._mark_manager_start_failed(
                     issue,
@@ -216,6 +239,21 @@ class ManagerExecutor:
                 f"(log: {handle.log_path})"
             )
             launched = True
+
+            # Mark session as running AFTER successful launch
+            if self._registry is not None and session_id is not None:
+                try:
+                    self._registry.mark_started(
+                        session_id, tmux_session=handle.tmux_session
+                    )
+                except Exception as exc:
+                    # Database error, but tmux is already running
+                    # Log warning but don't fail the dispatch
+                    log.warning(
+                        f"Failed to mark session started in registry: {exc}. "
+                        "Session will be cleaned up by reconcile."
+                    )
+
             self._flow_manager.store.add_event(
                 flow_branch,
                 "manager_dispatched",

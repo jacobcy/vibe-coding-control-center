@@ -105,3 +105,32 @@ def test_failed_gate_error_handling() -> None:
 
         assert result.blocked
         assert "failed gate check error" in result.reason
+
+
+def test_failed_gate_unblocks_after_resumed() -> None:
+    """Gate should unblock after failed issue is resumed (label changed)."""
+    with patch("subprocess.run") as mock_run:
+        # First call: issue has state/failed -> blocked
+        # Second call: issue no longer has state/failed -> open
+        mock_run.side_effect = [
+            MagicMock(
+                returncode=0,
+                stdout=json.dumps([{"number": 123, "title": "Failed issue"}]),
+            ),
+            MagicMock(
+                returncode=0,
+                stdout=json.dumps({"comments": []}),
+            ),
+            MagicMock(returncode=0, stdout="[]"),  # No more failed issues
+        ]
+
+        gate = FailedGate(repo="owner/repo")
+
+        # First check: blocked
+        result1 = gate.check()
+        assert result1.blocked
+        assert result1.issue_number == 123
+
+        # Second check: open (after resume)
+        result2 = gate.check()
+        assert not result2.blocked

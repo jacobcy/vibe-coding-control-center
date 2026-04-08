@@ -5,7 +5,7 @@ Merge is now handled by flow done / integrate, not pr merge.
 """
 
 import json
-from typing import Annotated
+from typing import Annotated, List
 
 import typer
 from loguru import logger
@@ -73,6 +73,13 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
         yaml_output: Annotated[
             bool, typer.Option("--yaml", help="YAML 格式输出")
         ] = False,
+        review: Annotated[
+            List[str] | None,
+            typer.Option(
+                "--review",
+                help="Request AI review (codex, copilot, auggie, claude)",
+            ),
+        ] = None,
     ) -> None:
         """Mark PR as ready for review.
 
@@ -110,7 +117,7 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
 
             try:
                 pr = _build_pr_ready_usecase(pr_service=pr_service).mark_ready(
-                    pr_number=target_pr_number, yes=yes
+                    pr_number=target_pr_number, yes=yes, requested_reviewers=review
                 )
             except PrReadyAbortedError:
                 logger.info("Aborted by user")
@@ -127,4 +134,4 @@ def register_lifecycle_commands(app: typer.Typer) -> None:
                     )
                 )
             else:
-                render_pr_ready(pr)
+                render_pr_ready(pr, requested_reviewers=review)

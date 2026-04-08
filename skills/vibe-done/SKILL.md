@@ -1,27 +1,28 @@
 ---
 name: vibe-done
-description: Use when a PR is already merged, or is review-ready for vibe flow done to merge, and the user wants to close the related task, close linked issues, run flow closure, and archive the final handoff without changing source code.
+description: Use when the current human-collaboration flow has reached terminal PR state and the user wants to do final closeout: confirm PR outcome, close owned issues, record terminal handoff, and stop using this branch. Do not use for code changes or abandoned work.
 ---
 
-# /vibe-done - 合并后收口
+# /vibe-done - 终态收口
 
 ## 核心职责
 
-`/vibe-done` 负责最终收口编排，不做业务代码修复，不替代 PR 整合。
+`/vibe-done` 负责当前人机协作 flow 的最终收口编排，不做业务代码修复，不替代 PR 整合。
 
 **核心职责**：
 
-- 检查 PR 状态
-- PR 已合并 → 关闭 issue
-- 使用 `vibe3 check --all --fix` 自动同步并标记 flow 为 done
+- 检查 PR 是否已进入终态（通常是 merged）
+- 关闭当前 flow 负责收口的 issue
+- 写入最终 handoff 与 closeout 证据
+- 必要时运行 `vibe3 check` 做一致性审计
 
 ## 停止点
 
 完成后输出：
 
 - ✅ issue 已关闭
-- ✅ flow 已归档
-- ✅ 工作区已清理
+- ✅ terminal handoff 已写入
+- ✅ 如需清理 branch，已明确交给 git / gh 原生命令
 
 ## 必读文档
 
@@ -36,18 +37,18 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 /vibe-done
   ├─ Step 1: 读取当前 flow 事实
   │   ├─ uv run python src/vibe3/cli.py flow show
-  │   └─ 确认 flow、branch、task、issue、pr
+  │   ├─ uv run python src/vibe3/cli.py handoff show
+  │   └─ gh pr view / gh issue view 确认终态事实
   │
-  ├─ Step 2: 确认 task 收口事实
-  │   └─ 不再调用独立 task status；以 flow / issue closeout 为准
+  ├─ Step 2: 判断是否可收口
+  │   └─ PR 未终态或仍有 review / CI 阻塞 → 返回 /vibe-integrate
   │
   ├─ Step 3: 关闭 issue
-  │   └─ gh issue close <issue-number-or-ref>
+  │   └─ gh issue close <primary-issue-or-owned-related-issue>
   │
-  ├─ Step 4: 关闭 flow (自动)
-  │   └─ vibe3 check --all --fix
-  │       ├─ PR 已 merged → 自动标记 flow 为 done
-  │       └─ 保持本地数据库与 GitHub 状态一致
+  ├─ Step 4: 记录 closeout 证据
+  │   ├─ vibe3 handoff append
+  │   └─ 必要时 vibe3 check
   │
   ├─ Step 5: 汇总并反馈问题
   │   ├─ 从 handoff 提取 Issues Found
@@ -60,10 +61,9 @@ description: Use when a PR is already merged, or is review-ready for vibe flow d
 
 ## 核心边界
 
-- 允许：读取 `uv run python src/vibe3/cli.py flow show`、关闭 issue、执行 `uv run python src/vibe3/cli.py flow done`、写入 handoff
+- 允许：读取 `flow show` / `handoff show` / `gh pr view`、关闭 issue、写入 handoff、必要时执行 `vibe3 check`
 - 不允许：修业务代码、补 review follow-up、手工改 `.git/vibe/*.json`
-- `uv run python src/vibe3/cli.py flow done` 只负责关闭 flow 并删本地/远端 branch；task / issue 的关闭由 skill 编排
-- 若 PR 尚未 merged，但已满足 review gate，`flow done` 会先执行 merge，再继续 closeout
+- branch / PR / issue 生命周期优先直接使用 git / gh；`flow` / `handoff` 只负责创联和本地协作证据
 - 若 review evidence 尚不存在，或 PR 还没达到 merge 条件，必须停回 `/vibe-integrate`，不得强行继续
 
 ## Workflow
@@ -96,7 +96,7 @@ uv run python src/vibe3/cli.py flow show <branch>
 
 - PR 已 merged
   或
-- PR 虽未 merged，但 shell 真源已经表明它属于 review-ready，可交给 `flow done` 执行 merge gate
+- PR 已明确进入 closed / aborted 等终态，且用户要做终态记录与 issue closeout
 
 若 handoff 与当前真源或现场不一致，必须在退出前修正，不能把过时 handoff 留给下一个环节。
 
@@ -111,13 +111,11 @@ uv run python src/vibe3/cli.py flow show <branch>
 
 ### Step 2: 确认 task 收口事实
 
-若 `flow show` 返回 `current_task`，只在 handoff / 总结中记录该 task 将随当前 flow 收口，不再调用独立的 `task status` 命令。
-
-禁止直接编辑 `registry.json`。
+若 `flow show` 返回了 task / issue 线索，只在 handoff / 总结中记录该 flow 已进入终态；不要直接编辑任何本地 JSON / SQLite 真源。
 
 ### Step 3: 关闭 issue
 
-若 task 绑定了 `issue_refs`，逐个执行：
+优先关闭 `primary_issue_ref` 指向的主闭环 issue；其余 issue 只有在当前 flow 明确负责时才关闭：
 
 ```bash
 gh issue close <issue-number-or-ref>
@@ -130,25 +128,24 @@ gh issue close <issue-number-or-ref>
 - `primary_issue_ref` 若存在，它对应的 `repo issue` 是当前 task 的 `task issue`，应作为主闭环 issue 优先确认
 - 其余 `issue_refs` 只表示关联来源，不等于都应由当前收口动作负责关闭
 
-### Step 4: 关闭 flow
+### Step 4: 记录 closeout 与一致性审计
 
 执行：
 
 ```bash
-vibe3 check --all --fix
+uv run python src/vibe3/cli.py handoff append "vibe-done: flow reached terminal state" --actor vibe-done --kind milestone
+uv run python src/vibe3/cli.py check
 ```
 
-该命令会负责：
+这些动作负责：
 
-- 检测所有 active flows 关联的远端 PR
-- 若 PR 已 merged 或 closed，自动标记本地 flow 为 `done`
-- 写入 flow 自动完成事件
+- 记录当前 flow 的 terminal 证据
+- 对 shared-state 做最小一致性审计
 
-该命令不会负责：
+它们不会负责：
 
 - 强行 merge 未就绪的 PR
-- 关闭关联的 GitHub Issue (由 Step 3 负责)
-- 手工删除分支（不再作为 vibe3 核心动作，由用户自行决定或 git 原生清理）
+- 替代 git / gh 去删除 branch 或处理远端生命周期
 
 ### Step 5: 汇总并反馈问题
 
@@ -173,17 +170,10 @@ vibe3 check --all --fix
      --label "vibe-feedback,enhancement"
    ```
 
-3. **清理 Handoff**
-   反馈完成后，清理 handoff 中当前 flow 的信息：
-   - **保留**：
-     - 当前 flow 的最终状态
-     - 关键交付物链接（PR、issue）
+3. **补 terminal handoff**
+   反馈完成后，不额外发明 handoff cleanup 动作；只补一条明确的 terminal milestone，记录当前 flow 的最终状态与关键交付物链接。
 
-   - **删除**：
-     - 已反馈的问题记录
-     - 过程性判断和临时状态
-
-   最终格式：
+   推荐格式：
 
    ```markdown
    ## Flow Closure
@@ -215,7 +205,7 @@ uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor v
 - completed_at: <ISO-8601>
 ```
 
-注意：问题记录已在 Step 5 反馈后清理，不再重复记录。
+注意：handoff 没有单独的清理 / 删除命令；若需要纠正旧记录，应通过追加更正或终态说明来覆盖语义，而不是假设存在 cleanup 入口。
 
 若当前 PR 已 merged，对应旧 plan 已进入 terminal state。此阶段只允许补记交付证据、审计说明、handoff 更正与 follow-up 链接；若出现新需求，必须创建或挂接新的 `repo issue`，不得继续塞回旧 plan。
 
@@ -223,7 +213,7 @@ uv run python src/vibe3/cli.py handoff append "vibe-done: flow closed" --actor v
 
 - 不得修改业务源代码文件
 - 不得跳过 `uv run python src/vibe3/cli.py flow show` 直接猜测 task / issue / pr 关联
-- 不得手工编辑 `.git/vibe/*.json`
-- 建议运行 `vibe3 check --all --fix` 来确保状态正确同步
+- 不得手工编辑 `.git/vibe*.json` 或本地 SQLite 真源
+- 建议运行 `vibe3 check` 做收口后的最小一致性审计
 - 不得在 PR 合并前伪装收口
 - 不得把 merge 后的新需求伪装成"补充说明"继续留在旧 plan

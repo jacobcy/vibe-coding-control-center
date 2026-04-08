@@ -147,7 +147,25 @@ class HeartbeatServer:
             tick_number = self._tick_count
             started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
+
+            # Write tick separator for readability
+            append_orchestra_event(
+                "server", f"---------- heartbeat tick #{tick_number} ----------"
+            )
             append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
+            if gate_result.blocked:
+                append_orchestra_event(
+                    "server",
+                    (
+                        f"heartbeat tick #{tick_number} frozen by state/failed issue "
+                        f"#{gate_result.issue_number or '?'}"
+                        + (
+                            f" reason={gate_result.reason}"
+                            if gate_result.reason
+                            else ""
+                        )
+                    ),
+                )
 
             tasks = []
             tick_services: list[str] = []
@@ -188,6 +206,16 @@ class HeartbeatServer:
                 "server",
                 f"heartbeat tick #{tick_number} completed in {duration:.2f}s",
             )
+
+            if self.config.debug and tick_number >= self.config.debug_max_ticks:
+                append_orchestra_event(
+                    "server",
+                    (
+                        "debug tick limit reached "
+                        f"({self.config.debug_max_ticks}), stopping server"
+                    ),
+                )
+                self.stop()
 
     async def _tick_service(self, service: ServiceBase) -> None:
         async with self._semaphore:
@@ -247,7 +275,8 @@ class HeartbeatServer:
                 append_orchestra_event(
                     "server",
                     f"event {event.event_type} blocked for "
-                    f"{type(svc).__name__} by failed issue",
+                    f"{type(svc).__name__} by state/failed issue "
+                    f"#{gate_result.issue_number or '?'}",
                 )
                 continue
             tasks.append(self._handle_with_semaphore(svc, event))

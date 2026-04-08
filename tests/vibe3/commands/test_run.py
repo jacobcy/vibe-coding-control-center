@@ -228,13 +228,24 @@ def test_run_skill_records_with_unified_recorder() -> None:
 
 def test_run_success_transitions_issue_to_handoff(monkeypatch) -> None:
     _patch_fast_run_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(task_issue_number=42)
     with (
+        patch(
+            "vibe3.commands.run.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/test-branch"),
+        ),
         patch("vibe3.commands.run._ensure_plan_file_exists"),
         patch(
             "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ),
         patch.object(RunUsecase, "transition_issue", return_value=42),
+        patch.object(
+            RunUsecase,
+            "resolve_run_mode",
+            return_value=MagicMock(mode="plan", plan_file="plan.md"),
+        ),
         patch("vibe3.commands.run.LabelService") as mock_labels,
     ):
         result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
@@ -245,6 +256,76 @@ def test_run_success_transitions_issue_to_handoff(monkeypatch) -> None:
         IssueState.HANDOFF,
         actor="agent:run",
     )
+
+
+def test_run_success_without_report_ref_blocks_issue(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(
+        task_issue_number=42,
+        report_ref=None,
+    )
+    with (
+        patch(
+            "vibe3.commands.run.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/test-branch"),
+        ),
+        patch("vibe3.commands.run._ensure_plan_file_exists"),
+        patch(
+            "vibe3.commands.run.CodeagentExecutionService.execute",
+            return_value=MagicMock(success=True),
+        ),
+        patch.object(RunUsecase, "transition_issue", return_value=42),
+        patch.object(
+            RunUsecase,
+            "resolve_run_mode",
+            return_value=MagicMock(mode="plan", plan_file="plan.md"),
+        ),
+        patch("vibe3.commands.run._svc_block_executor_noop") as mock_block,
+        patch("vibe3.commands.run.LabelService") as mock_labels,
+    ):
+        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+
+    assert result.exit_code != 0
+    mock_block.assert_called_once()
+    mock_labels.return_value.confirm_issue_state.assert_not_called()
+    assert "report_ref" in strip_ansi(result.output)
+
+
+def test_run_sync_uses_shared_authoritative_ref_gate(monkeypatch) -> None:
+    _patch_fast_run_runtime(monkeypatch)
+    flow_service = MagicMock()
+    flow_service.get_flow_status.return_value = MagicMock(
+        task_issue_number=42,
+        report_ref="docs/reports/42.md",
+    )
+    with (
+        patch(
+            "vibe3.commands.run.ensure_flow_for_current_branch",
+            return_value=(flow_service, "task/test-branch"),
+        ),
+        patch("vibe3.commands.run._ensure_plan_file_exists"),
+        patch(
+            "vibe3.commands.run.CodeagentExecutionService.execute",
+            return_value=MagicMock(success=True),
+        ),
+        patch.object(RunUsecase, "transition_issue", return_value=42),
+        patch.object(
+            RunUsecase,
+            "resolve_run_mode",
+            return_value=MagicMock(mode="plan", plan_file="plan.md"),
+        ),
+        patch(
+            "vibe3.commands.run._svc_require_authoritative_ref",
+            return_value=True,
+        ) as mock_gate,
+        patch("vibe3.commands.run.LabelService") as mock_labels,
+    ):
+        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+
+    assert result.exit_code == 0
+    mock_gate.assert_called_once()
+    mock_labels.return_value.confirm_issue_state.assert_called_once()
 
 
 def test_run_failure_fails_issue_and_comments(monkeypatch) -> None:

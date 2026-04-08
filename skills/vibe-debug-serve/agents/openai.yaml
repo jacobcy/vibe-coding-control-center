@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vibe Debug Serve"
+  short_description: "调试 vibe3 serve orchestra server 的自动化指南"
+  default_prompt: "Use /vibe-debug-serve to debug the vibe3 serve orchestra server"

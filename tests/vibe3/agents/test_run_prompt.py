@@ -3,7 +3,11 @@
 from pathlib import Path
 
 from vibe3.agents.plan_prompt import build_plan_prompt_body
-from vibe3.agents.run_prompt import build_run_prompt_body
+from vibe3.agents.run_prompt import (
+    build_run_output_contract_section,
+    build_run_prompt_body,
+    build_run_task_section,
+)
 from vibe3.config.settings import VibeConfig
 from vibe3.models.plan import PlanRequest, PlanScope
 
@@ -38,3 +42,29 @@ def test_build_run_prompt_body_hides_internal_prompt_wiring(tmp_path: Path) -> N
     assert "## Execution Task" in context
     for token in FORBIDDEN_INTERNAL_TOKENS:
         assert token not in context
+
+
+def test_build_run_prompt_body_requires_report_ref_registration(tmp_path: Path) -> None:
+    config = VibeConfig.get_defaults()
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("## Summary\nTest plan\n", encoding="utf-8")
+
+    context = build_run_prompt_body(str(plan_file), config)
+
+    assert "docs/reports/" in context
+    assert "handoff report" in context
+
+
+def test_build_run_output_contract_section_keeps_output_contract_only() -> None:
+    result = build_run_output_contract_section("Use exactly this report format")
+
+    assert result == "## Output format requirements\nUse exactly this report format"
+
+
+def test_build_run_task_section_can_carry_report_ref_guidance() -> None:
+    result = build_run_task_section(
+        "Write the canonical report under docs/reports/ and run handoff report."
+    )
+
+    assert "docs/reports/" in result
+    assert "handoff report" in result

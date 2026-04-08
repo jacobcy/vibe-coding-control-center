@@ -14,18 +14,16 @@ runner = CliRunner(env={"NO_COLOR": "1"})
 
 @patch("vibe3.commands.task.TaskService")
 @patch("vibe3.commands.task.render_task_show_with_milestone")
-@patch("vibe3.commands.task.TaskUsecase")
 @patch("vibe3.commands.task.MilestoneService")
 def test_task_show_comments_outputs_latest_human_instruction(
     mock_milestone_service_cls,
-    mock_task_usecase_cls,
     _render_task_show,
     mock_task_service_cls,
 ) -> None:
     """task show --comments should print latest comment and latest human comment."""
-    usecase = MagicMock()
-    usecase.resolve_branch.return_value = "task/issue-372"
-    usecase.show_task.return_value = MagicMock(
+    task_svc = MagicMock()
+    task_svc.resolve_branch.return_value = "task/issue-372"
+    task_svc.show_task.return_value = MagicMock(
         local_task=FlowStatusResponse(
             branch="task/issue-372",
             flow_slug="issue-372",
@@ -33,13 +31,6 @@ def test_task_show_comments_outputs_latest_human_instruction(
             task_issue_number=372,
         )
     )
-    mock_task_usecase_cls.return_value = usecase
-
-    milestone_svc = MagicMock()
-    milestone_svc.get_milestone_context.return_value = None
-    mock_milestone_service_cls.return_value = milestone_svc
-
-    task_svc = MagicMock()
     task_svc.fetch_issue_with_comments.return_value = {
         "number": 372,
         "title": "Task 372",
@@ -51,6 +42,10 @@ def test_task_show_comments_outputs_latest_human_instruction(
         ],
     }
     mock_task_service_cls.return_value = task_svc
+
+    milestone_svc = MagicMock()
+    milestone_svc.get_milestone_context.return_value = None
+    mock_milestone_service_cls.return_value = milestone_svc
 
     result = runner.invoke(app, ["task", "show", "--comments"])
 
@@ -73,6 +68,17 @@ def test_task_status_delegates_to_status_command(mock_status) -> None:
 
 
 @patch("vibe3.commands.status.status")
+def test_task_status_check_delegates_check_flag(mock_status) -> None:
+    """task status --check should forward the full check shortcut flag."""
+    result = runner.invoke(app, ["task", "status", "--check"])
+
+    assert result.exit_code == 0
+    mock_status.assert_called_once_with(
+        all_flows=False, check=True, json_output=False, trace=False
+    )
+
+
+@patch("vibe3.commands.status.status")
 def test_top_level_status_is_hidden_compat_alias(mock_status) -> None:
     """top-level status should still delegate for compatibility."""
     result = runner.invoke(app, ["status"])
@@ -80,6 +86,17 @@ def test_top_level_status_is_hidden_compat_alias(mock_status) -> None:
     assert result.exit_code == 0
     mock_status.assert_called_once_with(
         all_flows=False, check=False, json_output=False, trace=False
+    )
+
+
+@patch("vibe3.commands.status.status")
+def test_top_level_status_check_is_forwarded(mock_status) -> None:
+    """top-level compatibility status should accept and forward --check."""
+    result = runner.invoke(app, ["status", "--check"])
+
+    assert result.exit_code == 0
+    mock_status.assert_called_once_with(
+        all_flows=False, check=True, json_output=False, trace=False
     )
 
 
@@ -204,3 +221,232 @@ def test_task_status_groups_orchestration_issues_and_manual_scenes(
     assert "Manual Scenes:" in result.stdout
     assert "openai-review" in result.stdout
     assert "task: #420" in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_excludes_manual_flow_issues_from_issue_progress(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=2,
+        active_worktrees=2,
+        queued_issues=(),
+    )
+
+    manual_flow = FlowStatusResponse(
+        branch="debug/service-gap-analysis",
+        flow_slug="service_gap_analysis",
+        flow_status="active",
+        task_issue_number=443,
+    )
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = [manual_flow]
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 443,
+            "title": "Manual debug scene should stay out of Issue Progress",
+            "state": IssueState.IN_PROGRESS,
+            "flow": manual_flow,
+            "queued": False,
+        }
+    ]
+    query_svc.fetch_worktree_map.return_value = {
+        "debug/service-gap-analysis": "service-gap-analysis"
+    }
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Manual Scenes:" in result.stdout
+    assert "debug/service-gap-analysis" in result.stdout
+    assert "task: #443" in result.stdout
+    assert "Manual debug scene should stay out of Issue Progress" not in result.stdout
+    assert "# 443  IN-PROGRESS" not in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_excludes_in_progress_issue_without_auto_flow_scene(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    for state in (IssueState.CLAIMED, IssueState.IN_PROGRESS, IssueState.REVIEW):
+        query_svc = MagicMock()
+        query_svc.fetch_orchestrated_issues.return_value = [
+            {
+                "number": 443,
+                "title": (
+                    f"Label-only {state.value} issue should stay out "
+                    "of Issue Progress"
+                ),
+                "state": state,
+                "flow": None,
+                "queued": False,
+            }
+        ]
+        query_svc.fetch_worktree_map.return_value = {}
+        mock_query_service_cls.return_value = query_svc
+
+        result = runner.invoke(app, ["task", "status"])
+
+        assert result.exit_code == 0
+        assert "Issue Progress:" in result.stdout
+        assert (
+            f"Label-only {state.value} issue should stay out "
+            "of Issue Progress" not in result.stdout
+        )
+        assert "# 443" not in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_keeps_failed_issue_without_flow_scene_visible(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    mock_validate_pid.return_value = (12345, True)
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 439,
+            "title": "Failed issue without flow scene should remain visible",
+            "state": IssueState.FAILED,
+            "flow": None,
+            "queued": False,
+            "failed_reason": "planner failed",
+        }
+    ]
+    query_svc.fetch_worktree_map.return_value = {}
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Failed Issues:" in result.stdout
+    assert "Failed issue without flow scene should remain visible" in result.stdout
+    assert "(no flow" in result.stdout
+    assert "scene)" in result.stdout
+
+
+@patch("vibe3.commands.status.StatusQueryService")
+@patch("vibe3.commands.status.OrchestraStatusService")
+@patch("vibe3.commands.status.FlowService")
+@patch("vibe3.commands.status._validate_pid_file")
+def test_task_status_ready_queue_shows_queue_metadata(
+    mock_validate_pid,
+    mock_flow_service_cls,
+    mock_status_service_cls,
+    mock_query_service_cls,
+) -> None:
+    """Ready queue rows should render rank, milestone, roadmap, and priority."""
+    from vibe3.orchestra.services.status_service import IssueStatusEntry
+
+    mock_validate_pid.return_value = (12345, True)
+
+    # Create ready issues with queue metadata
+    ready_issue_entry = IssueStatusEntry(
+        number=439,
+        title="Manager backend regression",
+        state=IssueState.READY,
+        assignee=None,
+        has_flow=False,
+        flow_branch=None,
+        has_worktree=False,
+        worktree_path=None,
+        has_pr=False,
+        pr_number=None,
+        blocked_by=(),
+        milestone="v0.3",
+        roadmap="p1",
+        priority=7,
+        queue_rank=2,
+    )
+
+    mock_status_service_cls.fetch_live_snapshot.return_value = OrchestraSnapshot(
+        timestamp=1700000000.0,
+        server_running=False,
+        active_issues=(ready_issue_entry,),
+        active_flows=0,
+        active_worktrees=0,
+        queued_issues=(),
+    )
+
+    flow_service = MagicMock()
+    flow_service.list_flows.return_value = []
+    mock_flow_service_cls.return_value = flow_service
+
+    query_svc = MagicMock()
+    query_svc.fetch_orchestrated_issues.return_value = [
+        {
+            "number": 439,
+            "title": "Manager backend regression",
+            "state": IssueState.READY,
+            "flow": None,
+            "queued": False,
+            "milestone": "v0.3",
+            "roadmap": "p1",
+            "priority": 7,
+            "queue_rank": 2,
+        }
+    ]
+    mock_query_service_cls.return_value = query_svc
+
+    result = runner.invoke(app, ["task", "status"])
+
+    assert result.exit_code == 0
+    assert "Ready Queue:" in result.stdout
+    assert "#439" in result.stdout or "439" in result.stdout
+    # Verify queue metadata is shown
+    assert "rank=" in result.stdout
+    assert "milestone=v0.3" in result.stdout
+    assert "roadmap/p1" in result.stdout
+    assert "priority/7" in result.stdout

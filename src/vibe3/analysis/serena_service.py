@@ -7,7 +7,6 @@ from loguru import logger
 
 from vibe3.analysis.serena_file_analyzer import analyze_files
 from vibe3.clients.git_client import GitClient
-from vibe3.clients.git_diff_hunks import get_diff_hunk_ranges
 from vibe3.clients.serena_client import SerenaClient
 from vibe3.exceptions import SerenaError
 from vibe3.models.change_source import ChangeSource
@@ -119,7 +118,7 @@ class SerenaService:
             # 1. Get diff hunk ranges from git_client
             if source is None:
                 return []
-            ranges = get_diff_hunk_ranges(self.git_client, file_path, source)
+            ranges = self.git_client.get_diff_hunk_ranges(file_path, source)
             if not ranges:
                 return []
             # 2. Parse AST to find functions in these ranges

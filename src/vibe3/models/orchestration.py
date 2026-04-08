@@ -64,6 +64,7 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.HANDOFF, IssueState.MERGE_READY),
     (IssueState.MERGE_READY, IssueState.DONE),
     # Side paths
+    (IssueState.READY, IssueState.BLOCKED),
     (IssueState.CLAIMED, IssueState.BLOCKED),
     (IssueState.HANDOFF, IssueState.BLOCKED),
     (IssueState.IN_PROGRESS, IssueState.BLOCKED),
@@ -79,6 +80,28 @@ ALLOWED_TRANSITIONS: set[tuple[IssueState, IssueState]] = {
     (IssueState.FAILED, IssueState.HANDOFF),
     (IssueState.FAILED, IssueState.IN_PROGRESS),
     (IssueState.FAILED, IssueState.REVIEW),
+    # Closure paths
+    (IssueState.MERGE_READY, IssueState.DONE),
+}
+
+# Progress expectations for each state
+# (the artifact that must be created to consider it "progressed")
+# Format: State -> Field in handoff/refs
+STATE_PROGRESS_CONTRACT: dict[IssueState, str | None] = {
+    IssueState.READY: None,  # System enforces MUST transition (claimed/blocked only)
+    IssueState.HANDOFF: None,  # System enforces MUST transition
+    IssueState.CLAIMED: "plan_ref",
+    IssueState.IN_PROGRESS: "report_ref",
+    IssueState.REVIEW: "audit_ref",
+}
+
+# Fallback targets for each state if progress contract is NOT met
+STATE_FALLBACK_MATRIX: dict[IssueState, IssueState] = {
+    IssueState.READY: IssueState.BLOCKED,
+    IssueState.HANDOFF: IssueState.BLOCKED,
+    IssueState.CLAIMED: IssueState.HANDOFF,
+    IssueState.IN_PROGRESS: IssueState.HANDOFF,
+    IssueState.REVIEW: IssueState.HANDOFF,
 }
 
 # Forbidden transitions (require force=True)
@@ -105,6 +128,7 @@ class IssueInfo(BaseModel):
     labels: list[str] = Field(default_factory=list)
     assignees: list[str] = Field(default_factory=list)  # GitHub login names
     url: str | None = None
+    milestone: str | None = None  # GitHub milestone title
 
     @property
     def slug(self) -> str:
@@ -133,6 +157,12 @@ class IssueInfo(BaseModel):
                     state = parsed
                     break
 
+            # Parse GitHub milestone
+            milestone = None
+            milestone_data = payload.get("milestone")
+            if isinstance(milestone_data, dict) and "title" in milestone_data:
+                milestone = milestone_data["title"]
+
             return cls(
                 number=int(payload["number"]),
                 title=str(payload.get("title", "")),
@@ -140,6 +170,7 @@ class IssueInfo(BaseModel):
                 labels=labels,
                 assignees=[a["login"] for a in payload.get("assignees", [])],
                 url=payload.get("html_url") or payload.get("url"),
+                milestone=milestone,
             )
         except (KeyError, ValueError) as exc:
             logger.bind(domain="orchestra").warning(

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from vibe3.models.review_runner import AgentOptions, AgentResult
@@ -14,6 +15,7 @@ class AgentBackend(Protocol):
         task: str | None = None,
         dry_run: bool = False,
         session_id: str | None = None,
+        cwd: Path | None = None,
     ) -> AgentResult:
         """运行 agent。
 
@@ -23,6 +25,7 @@ class AgentBackend(Protocol):
             task: 可选的任务名称（用于标识）。
             dry_run: 是否为预览模式（不真正执行）。
             session_id: 可选的会话 ID（用于接续之前的执行）。
+            cwd: 可选的工作目录（覆盖默认执行目录）。
 
         Returns:
             AgentResult: 执行结果。

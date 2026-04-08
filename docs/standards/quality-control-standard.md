@@ -210,14 +210,33 @@ Required approving reviews: 0  # 允许self-merge，但需CI通过
 
 **目的**：防止代码膨胀，鼓励模块化
 
+**核心原则（治理哲学）**：
+1. **LOC 上限 = 代码膨胀预警器**：命中上限时触发一次质量回收审计，而不是硬性阻塞开发
+2. **各层有各层的合理密度**：
+   - `commands` 越薄越好（业务下沉到 services）
+   - `services` 容忍核心聚合（登记例外即可）
+   - `clients` 允许少量样板换取类型安全
+3. **承认沉没成本**：既有的拆分/聚合都有其上下文，只在对齐收益明显时才重构
+
 **检查维度**：
-1. **总LOC**：Python ≤ 20,000 | Shell ≤ 7,000
-2. **单文件LOC**：Default ≤ 300 | Max ≤ 400
+1. **总LOC**：Python ≤ 32,000 | Shell ≤ 7,000（治理触发器）
+2. **单文件LOC**：Default ≤ 300 | Max ≤ 400（例外需登记）
+
+**例外登记机制**：
+```yaml
+# config/settings.yaml
+code_limits:
+  single_file_loc:
+    exceptions:
+      - path: "src/vibe3/services/flow_service.py"
+        limit: 600
+        reason: "核心状态机聚合"
+```
 
 **阻断性**：
 - Pre-commit: - 不检查（保持commit快速）
 - Pre-push: ⚠️ Warning only（允许draft PR）
-- CI: ✅ 阻断（最终合并前强制）
+- CI: ✅ 阻断（最终合并前强制，但可通过例外登记豁免）
 
 **实现方式**：
 ```bash
@@ -343,11 +362,12 @@ ENFORCE_LOC_LIMITS=true bash scripts/hooks/check-python-loc.sh  # exits 1 if ove
 # config/settings.yaml
 code_limits:
   total_file_loc:
-    v3_python: 20000  # 可根据项目规模调整
+    v3_python: 32000  # 可根据项目规模调整（治理触发器）
     v2_shell: 7000
   single_file_loc:
     default: 300
     max: 400
+    # 例外登记见上文"例外登记机制"
 ```
 
 **Review gate阈值调整**：

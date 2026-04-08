@@ -2,6 +2,11 @@
 
 This module handles manager mode execution for issue processing
 and orchestration.
+
+Note: Repository-local async logs (temp/logs/issues/*/manager.async.log) are
+runtime execution logs, not prompt provenance storage. Full agent prompts are
+filtered from these logs by the CodeagentBackend async log filter to prevent
+sensitive information from appearing in repository logs.
 """
 
 from __future__ import annotations
@@ -19,21 +24,46 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
 from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
-    wait_for_async_session_id,
 )
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.no_progress_policy import has_progress_changed, snapshot_progress
+from vibe3.orchestra.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
-    block_manager_noop_issue,
     fail_manager_issue,
 )
+from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:
     pass
+
+
+def _write_manager_registry_terminal(
+    store: SQLiteClient,
+    branch: str,
+    issue_number: int,
+    success: bool,
+) -> None:
+    """Write manager terminal state to runtime_session registry.
+
+    This is called by async child process when manager execution completes
+    or fails, ensuring the registry reflects the true terminal state.
+    """
+    backend = CodeagentBackend()
+    registry = SessionRegistryService(store=store, backend=backend)
+    sessions = registry.get_truly_live_sessions_for_target(
+        role="manager",
+        branch=branch,
+        target_id=str(issue_number),
+    )
+    for session in sessions:
+        if success:
+            registry.mark_finished(session["id"], success=True)
+        else:
+            registry.mark_failed(session["id"])
 
 
 def run_manager_issue_mode(
@@ -162,12 +192,6 @@ def run_manager_issue_mode(
             )
             raise typer.Exit(1) from exc
         updates: dict[str, object] = {"latest_actor": actor}
-        effective_session_id = session_id or wait_for_async_session_id(
-            handle.log_path,
-            timeout_seconds=30.0,
-        )
-        if effective_session_id:
-            updates["manager_session_id"] = effective_session_id
         store.update_flow_state(branch, **updates)
         store.add_event(
             branch,
@@ -185,6 +209,8 @@ def run_manager_issue_mode(
         typer.echo(f"Session log: {handle.log_path}")
         return
 
+    _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
+
     try:
         result = backend.run(
             prompt=prompt,
@@ -196,6 +222,11 @@ def run_manager_issue_mode(
         )
     except BaseException as exc:
         if not dry_run:
+            # Write registry terminal state for async child
+            if _is_async_child:
+                _write_manager_registry_terminal(
+                    store, branch, issue_number, success=False
+                )
             store.add_event(
                 branch,
                 "manager_failed",
@@ -211,10 +242,14 @@ def run_manager_issue_mode(
 
     if not result.is_success():
         if not dry_run:
+            # Write registry terminal state for async child
+            if _is_async_child:
+                _write_manager_registry_terminal(
+                    store, branch, issue_number, success=False
+                )
             store.update_flow_state(
                 branch,
                 latest_actor=actor,
-                manager_session_id=None,
             )
         store.add_event(
             branch,
@@ -233,10 +268,13 @@ def run_manager_issue_mode(
         typer.echo(f"-> Manager run: issue #{issue_number} (dry-run)")
         return
 
+    # Write registry terminal state for async child
+    if _is_async_child:
+        _write_manager_registry_terminal(store, branch, issue_number, success=True)
+
     store.update_flow_state(
         branch,
         latest_actor=actor,
-        manager_session_id=None,
     )
 
     store.add_event(
@@ -253,24 +291,26 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    if not has_progress_changed(before_snapshot, after_snapshot):
-        reason = (
-            "manager 本轮未产生任何有效动作(无状态变化、无新 comment、"
-            "无 handoff/refs 更新)"
-        )
-        store.add_event(
-            branch,
-            "manager_noop_blocked",
-            actor,
-            detail=f"Manager auto-blocked issue #{issue_number}: {reason}",
-            refs={"issue": str(issue_number), "reason": reason},
-        )
-        block_manager_noop_issue(
-            issue_number=issue_number,
-            repo=orchestra_config.repo,
-            reason=reason,
-            actor=actor,
-        )
+    coordinator = ManagerRunCoordinator(store)
+    if coordinator.handle_post_run_outcome(
+        issue_number=issue_number,
+        branch=branch,
+        actor=actor,
+        repo=orchestra_config.repo,
+        before_snapshot=before_snapshot,
+        after_snapshot=after_snapshot,
+    ):
+        return
+
+    if coordinator.check_progress_and_block_if_noop(
+        issue_number=issue_number,
+        branch=branch,
+        actor=actor,
+        repo=orchestra_config.repo,
+        before_snapshot=before_snapshot,
+        after_snapshot=after_snapshot,
+    ):
+        return
 
 
 def resolve_manager_launch_cwd(*, use_worktree: bool, session_id: str | None) -> Path:
@@ -319,7 +359,6 @@ def resolve_manager_branch(
         flows,
         key=lambda flow: (
             flow.get("flow_status") == "active",
-            flow.get("manager_session_id") is not None,
             flow.get("updated_at") or "",
         ),
         reverse=True,
@@ -350,7 +389,7 @@ def resolve_manager_execution_cwd(
     Returns:
         Tuple of (CWD path, effective worktree flag)
     """
-    from vibe3.manager.worktree_manager import WorktreeManager
+    from vibe3.environment.worktree import WorktreeManager
 
     # For session resume, use current directory
     if session_id:

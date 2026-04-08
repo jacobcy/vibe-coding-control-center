@@ -104,6 +104,12 @@ deletion.
   as done when PRs are merged
 - **Main Branch Protection**: Flows cannot be created on protected branches
   (main, master, develop by default)
+- **Runtime Session Registry**: All async sessions (manager, planner, executor,
+  reviewer, governance) are tracked in a unified `runtime_session` registry.
+  Capacity throttling is based on **live worker sessions** (starting/running
+  with successful liveness check), not on active flow count. The deprecated
+  `manager_session_id`, `planner_session_id`, etc. fields in `flow_state` are
+  kept only for backward compatibility and should not be used for business logic.
 
 ### Usage
 

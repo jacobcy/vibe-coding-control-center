@@ -16,6 +16,7 @@ from typer import echo
 from vibe3.agents.base import AgentBackend
 from vibe3.agents.review_runner import format_agent_actor
 from vibe3.agents.session_service import load_session_id
+from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions, AgentResult
 from vibe3.services.execution_lifecycle import (
@@ -39,6 +40,21 @@ class ExecutionRequest:
     dry_run: bool = False
     handoff_kind: str = "run"
     handoff_metadata: dict[str, Any] | None = None
+    cwd: Path | None = None
+    branch: str | None = None
+
+
+def _resolve_execution_cwd(explicit_cwd: Path | None) -> Path:
+    """Resolve agent launch cwd, preferring the current worktree root."""
+    if explicit_cwd is not None:
+        return explicit_cwd
+
+    from vibe3.clients.git_client import GitClient
+
+    try:
+        return Path(GitClient().get_worktree_root())
+    except Exception:
+        return Path.cwd()
 
 
 @dataclass
@@ -88,36 +104,28 @@ def run_execution_pipeline(
     options = request.options_builder()
     actor = format_agent_actor(options)
 
-    # When running as an async child, the parent process owns lifecycle events.
-    # Skip recording to avoid duplicate started/completed/aborted entries.
+    # When running as an async child, the parent process wrote "started".
+    # The child is responsible for writing terminal state (completed/aborted).
     _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
 
+    # Resolve branch for lifecycle events (all roles, not just executor)
     branch = None
     store = None
-    if (
-        not request.dry_run
-        and request.role == "executor"
-        and request.handoff_kind == "run"
-        and not _is_async_child
-    ):
-        from vibe3.clients.git_client import GitClient
-
+    if not request.dry_run:
         try:
-            branch = GitClient().get_current_branch()
+            branch = request.branch or GitClient().get_current_branch()
             store = SQLiteClient()
         except Exception as exc:  # pragma: no cover - defensive path
-            logger.bind(domain="execution_pipeline").warning(
-                f"Failed to resolve branch for run lifecycle event: {exc}"
-            )
+            log.warning(f"Failed to resolve branch for lifecycle event: {exc}")
 
-    if branch and store:
+    if branch and store and not _is_async_child:
         persist_execution_lifecycle_event(
             store,
             branch,
             request.role,
             "started",
             actor,
-            "Run started (status: in_progress)",
+            f"{request.role.capitalize()} started (status: running)",
             session_id=session_id,
         )
 
@@ -125,6 +133,7 @@ def run_execution_pipeline(
     log.info("Building execution context")
     try:
         prompt_content = request.context_builder()
+        execution_cwd = _resolve_execution_cwd(request.cwd)
 
         log.info(
             "Running agent",
@@ -142,6 +151,7 @@ def run_execution_pipeline(
             task=request.task,
             dry_run=request.dry_run,
             session_id=session_id,
+            cwd=execution_cwd,
         )
 
         if request.dry_run:
@@ -160,19 +170,21 @@ def run_execution_pipeline(
                 options=options,
                 session_id=effective_session_id,
                 metadata=request.handoff_metadata,
+                branch=request.branch,
             )
         )
         if handoff_file:
             echo(f"-> {request.handoff_kind.capitalize()} saved: {handoff_file}")
 
-        if branch and store:
+        # Write completed state (sync only; async child parent handles registry)
+        if branch and store and not _is_async_child:
             persist_execution_lifecycle_event(
                 store,
                 branch,
                 request.role,
                 "completed",
                 actor,
-                "Run completed (status: completed)",
+                f"{request.role.capitalize()} completed (status: done)",
                 session_id=effective_session_id,
                 refs={"status": "completed"},
             )
@@ -183,14 +195,15 @@ def run_execution_pipeline(
             session_id=effective_session_id,
         )
     except BaseException as exc:
-        if branch and store:
+        # Write aborted state (sync only; async child parent handles registry)
+        if branch and store and not _is_async_child:
             persist_execution_lifecycle_event(
                 store,
                 branch,
                 request.role,
                 "aborted",
                 actor,
-                f"Run aborted (status: aborted, reason: {exc})",
+                f"{request.role.capitalize()} aborted (status: aborted, reason: {exc})",
                 session_id=session_id,
                 refs={"reason": str(exc), "status": "aborted"},
             )

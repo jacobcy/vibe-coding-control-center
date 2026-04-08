@@ -9,7 +9,7 @@ from vibe3.ui.console import console
 from vibe3.ui.flow_ui import render_milestone
 
 if TYPE_CHECKING:
-    from vibe3.services.task_usecase import TaskShowResult
+    from vibe3.services.task_service import TaskShowResult
 
 
 def render_no_active_task() -> None:

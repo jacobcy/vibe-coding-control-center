@@ -41,7 +41,9 @@ def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
         result = runner.invoke(app, ["ready", "--yes"])
 
         assert result.exit_code == 0
-        mock_usecase.mark_ready.assert_called_once_with(pr_number=123, yes=True)
+        mock_usecase.mark_ready.assert_called_once_with(
+            pr_number=123, yes=True, requested_reviewers=None
+        )
 
 
 def test_pr_ready_without_arg_and_no_current_pr_shows_error():

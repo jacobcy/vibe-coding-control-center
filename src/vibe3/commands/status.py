@@ -5,7 +5,7 @@ from typing import Annotated, cast
 
 import typer
 
-from vibe3.commands.common import trace_scope
+from vibe3.commands.common import run_full_check_shortcut, trace_scope
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.services.status_service import OrchestraStatusService
@@ -25,6 +25,20 @@ JsonOption = Annotated[bool, typer.Option("--json", help="JSON 格式输出")]
 TraceOption = Annotated[bool, typer.Option("--trace", help="启用调用链路追踪")]
 
 
+def _include_issue_in_task_progress(item: dict[str, object]) -> bool:
+    """Only auto-task flows should participate in task-oriented Issue Progress."""
+    flow = cast(FlowStatusResponse | None, item.get("flow"))
+    if flow is None:
+        state = cast(IssueState, item["state"])
+        return state in {
+            IssueState.READY,
+            IssueState.HANDOFF,
+            IssueState.BLOCKED,
+            IssueState.FAILED,
+        }
+    return is_auto_task_branch(flow.branch)
+
+
 def _resolve_server_label(
     config: OrchestraConfig, snapshot_found: bool, server_running: bool
 ) -> str:
@@ -40,7 +54,7 @@ def status(
     all_flows: AllOption = False,
     check: Annotated[
         bool,
-        typer.Option("--check", help="显示前先运行 flow 一致性校验"),
+        typer.Option("--check", help="显示前先运行完整 vibe3 check"),
     ] = False,
     json_output: JsonOption = False,
     trace: TraceOption = False,
@@ -48,12 +62,7 @@ def status(
     """Show dashboard of all issues and their flow status from Orchestra perspective."""
     with trace_scope(trace, "status", domain="status"):
         if check:
-            from vibe3.services.check_service import CheckService
-
-            try:
-                CheckService().verify_all_flows()
-            except Exception:
-                pass  # check failure should not block status display
+            run_full_check_shortcut()
 
         # 1. Orchestra State (Issues & Managers)
         config = OrchestraConfig.from_settings()
@@ -128,13 +137,18 @@ def status(
         orchestrated_issues = query_service.fetch_orchestrated_issues(
             flows, queued_set, stale_flows=stale_flows
         )
+        task_progress_items = [
+            item
+            for item in orchestrated_issues
+            if _include_issue_in_task_progress(item)
+        ]
 
         console.print("[bold cyan]Issue Progress:[/]")
 
-        if orchestrated_issues:
+        if task_progress_items:
             active_items = [
                 item
-                for item in orchestrated_issues
+                for item in task_progress_items
                 if cast(IssueState, item["state"])
                 in {
                     IssueState.CLAIMED,
@@ -145,7 +159,7 @@ def status(
             ]
             ready_items = [
                 item
-                for item in orchestrated_issues
+                for item in task_progress_items
                 if cast(IssueState, item["state"]) == IssueState.READY
             ]
 
@@ -179,15 +193,34 @@ def status(
                     number = cast(int, item["number"])
                     title = cast(str, item["title"])
                     flow = cast(FlowStatusResponse | None, item["flow"])
+
+                    # Queue metadata
+                    milestone = cast(str | None, item.get("milestone"))
+                    roadmap = cast(str | None, item.get("roadmap"))
+                    priority = cast(int, item.get("priority", 0))
+                    queue_rank = cast(int | None, item.get("queue_rank"))
+
                     flow_info = (
                         f"  [dim]flow:[/] [cyan]{flow.branch}[/]"
                         if flow
                         else "  [dim]flow:[/] [dim](none)[/]"
                     )
+
+                    # Format queue metadata
+                    metadata_parts = []
+                    if queue_rank is not None:
+                        metadata_parts.append(f"rank={queue_rank}")
+                    if milestone:
+                        metadata_parts.append(f"milestone={milestone}")
+                    if roadmap:
+                        metadata_parts.append(f"roadmap/{roadmap}")
+                    metadata_parts.append(f"priority/{priority}")
+                    metadata_str = "  ".join(metadata_parts)
+
                     console.print(
                         f"  #{number:4}  [cyan]READY     [/]  {title[:48]}..."
                     )
-                    console.print(f"             {flow_info}")
+                    console.print(f"             {flow_info}  [dim]{metadata_str}[/]")
             else:
                 console.print("  [dim](none)[/]")
         else:
@@ -197,7 +230,7 @@ def status(
 
         blocked_items = [
             item
-            for item in orchestrated_issues
+            for item in task_progress_items
             if cast(IssueState, item["state"]) == IssueState.BLOCKED
         ]
         console.print("[bold cyan]Blocked Issues:[/]")
@@ -218,7 +251,7 @@ def status(
 
         failed_items = [
             item
-            for item in orchestrated_issues
+            for item in task_progress_items
             if cast(IssueState, item["state"]) == IssueState.FAILED
         ]
         console.print("\n[bold cyan]Failed Issues:[/]")

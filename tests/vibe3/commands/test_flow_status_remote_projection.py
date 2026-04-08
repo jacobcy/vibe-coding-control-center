@@ -145,4 +145,39 @@ def test_flow_status_check_runs_verification(
     result = runner.invoke(app, ["flow", "status", "--check"])
 
     assert result.exit_code == 0
-    mock_check_service.return_value.verify_all_flows.assert_called_once_with()
+    mock_check_service.return_value.execute_check.assert_called_once_with("fix_all")
+
+
+@patch("vibe3.commands.flow_status.FlowService")
+@patch("vibe3.commands.flow_status.render_flows_status_dashboard")
+@patch("vibe3.commands.flow_status.FlowProjectionService")
+@patch("vibe3.services.check_service.CheckService")
+@patch("vibe3.clients.git_client.GitClient")
+def test_flow_status_check_surfaces_check_warning(
+    _mock_git_client,
+    mock_check_service,
+    mock_projection_service_class,
+    _render_dashboard,
+    mock_service_class,
+) -> None:
+    """flow status --check should warn if the full check returns issues."""
+    from vibe3.services.check_service import ExecuteCheckResult
+
+    mock_check_service.return_value.execute_check.return_value = ExecuteCheckResult(
+        mode="fix_all",
+        success=False,
+        summary="Fixed 1/2, 1 had unfixable issues",
+        details={"fixed": 1, "failed": ["task/demo: PR mismatch"]},
+    )
+    mock_service = MagicMock()
+    mock_service.list_flows.return_value = [_make_flow_state("task/active-1")]
+    mock_service_class.return_value = mock_service
+    mock_projection_service = MagicMock()
+    mock_projection_service.get_issue_titles.return_value = ({}, False)
+    mock_projection_service_class.return_value = mock_projection_service
+
+    result = runner.invoke(app, ["flow", "status", "--check"])
+
+    assert result.exit_code == 0
+    assert "Warning: vibe3 check incomplete before status" in result.stderr
+    assert "Fixed 1/2, 1 had unfixable issues" in result.stderr

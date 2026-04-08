@@ -8,6 +8,15 @@ from typing import Literal
 from vibe3.agents.backends.codeagent import extract_session_id
 
 
+def build_session_name(
+    role: str,
+    target_type: str,
+    target_id: str,
+) -> str:
+    """Unified naming rule: vibe3-{role}-{target_type}-{target_id}."""
+    return f"vibe3-{role}-{target_type}-{target_id}"
+
+
 def get_manager_session_name(issue_number: int) -> str:
     """Return the canonical tmux session name for manager execution.
 

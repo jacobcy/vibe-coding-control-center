@@ -85,24 +85,117 @@ class TestManagerCwdResolution:
             "subprocess.run",
             return_value=CompletedProcess(returncode=0),
         ) as mock_run:
-            path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+            with patch(
+                "vibe3.environment.worktree_manager_compat.append_orchestra_event"
+            ) as mock_append_event:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
 
         assert path == tmp_path / ".worktrees" / "issue-77"
         assert is_temp is True
         assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
         assert mock_run.call_args.kwargs["cwd"] == tmp_path
+        mock_append_event.assert_called_once()
+        assert mock_append_event.call_args.args[0] == "worktree"
+        assert "created issue #77" in mock_append_event.call_args.args[1]
+        assert "task/issue-77" in mock_append_event.call_args.args[1]
+        assert str(tmp_path / ".worktrees" / "issue-77") in (
+            mock_append_event.call_args.args[1]
+        )
+        assert mock_append_event.call_args.kwargs["repo_root"] == tmp_path
+
+    def test_ensure_manager_worktree_does_not_log_event_on_creation_failure(
+        self, tmp_path: Path
+    ):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+
+        with patch(
+            "subprocess.run",
+            return_value=CompletedProcess(returncode=1, stderr="boom"),
+        ):
+            with patch(
+                "vibe3.environment.worktree_manager_compat.append_orchestra_event"
+            ) as mock_append_event:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path is None
+        assert is_temp is False
+        mock_append_event.assert_not_called()
 
     def test_ensure_manager_worktree_skips_when_path_exists(self, tmp_path: Path):
         config = make_config()
         manager = ManagerExecutor(config, repo_path=tmp_path)
         existing = tmp_path / ".worktrees" / "issue-77"
         existing.mkdir(parents=True)
+        (existing / ".git").write_text("gitdir: /tmp/mock")
 
-        with patch("subprocess.run") as mock_run:
-            result = manager._ensure_manager_worktree(77, "task/issue-77")
+        with patch.object(
+            manager.worktree_manager,
+            "_find_worktree_for_branch",
+            return_value=existing,
+        ):
+            with patch("subprocess.run") as mock_run:
+                result = manager._ensure_manager_worktree(77, "task/issue-77")
 
-        assert result == (None, False)
+        assert result == (existing, False)
         mock_run.assert_not_called()
+
+    def test_ensure_manager_worktree_recycles_orphan_path(self, tmp_path: Path):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+        orphan = tmp_path / ".worktrees" / "issue-77"
+        orphan.mkdir(parents=True)
+        (orphan / "stale.txt").write_text("orphan")
+
+        def mock_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["git", "worktree", "remove"]:
+                import shutil
+
+                shutil.rmtree(orphan)
+            return CompletedProcess(returncode=0)
+
+        with patch(
+            "subprocess.run",
+            side_effect=mock_run,
+        ) as mock_run:
+            path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path == orphan
+        assert is_temp is True
+        assert not (orphan / "stale.txt").exists()
+        assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
+
+    def test_ensure_manager_worktree_recycles_mismatched_git_path(self, tmp_path: Path):
+        config = make_config()
+        manager = ManagerExecutor(config, repo_path=tmp_path)
+        target = tmp_path / ".worktrees" / "issue-77"
+        target.mkdir(parents=True)
+        (target / ".git").write_text("gitdir: /tmp/mock")
+        (target / "wrong.txt").write_text("bad scene")
+
+        with patch.object(
+            manager.worktree_manager,
+            "_find_worktree_for_branch",
+            return_value=tmp_path / ".worktrees" / "other-77",
+        ):
+
+            def mock_run(cmd, *args, **kwargs):
+                if cmd[:3] == ["git", "worktree", "remove"]:
+                    import shutil
+
+                    shutil.rmtree(target)
+                return CompletedProcess(returncode=0)
+
+            with patch(
+                "subprocess.run",
+                side_effect=mock_run,
+            ) as mock_run:
+                path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
+
+        assert path == target
+        assert is_temp is True
+        assert not (target / "wrong.txt").exists()
+        assert mock_run.call_args.args[0][:3] == ["git", "worktree", "add"]
 
     def test_align_auto_scene_to_base_resets_canonical_task_scene(self, tmp_path: Path):
         """Test alignment for fresh branch (no commits) - should reset."""
@@ -239,6 +332,8 @@ class TestManagerDispatchIntegration:
     def test_dispatch_manager_executes_in_resolved_manager_cwd(self):
         config = make_config()
         manager = ManagerExecutor(config, dry_run=False, repo_path=Path("/tmp/repo"))
+        manager._registry = MagicMock()
+        manager._registry.count_live_worker_sessions.return_value = 0
         issue = make_issue(number=102, title="Manager real dispatch")
 
         with patch.object(
@@ -259,33 +354,24 @@ class TestManagerDispatchIntegration:
                     with patch.object(
                         manager, "_normalize_manager_command", return_value=["uv"]
                     ):
-                        with patch.object(
-                            manager.status_service,
-                            "get_active_flow_count",
-                            return_value=0,
-                        ):
+                        with patch.object(manager.result_handler, "update_state_label"):
                             with patch.object(
-                                manager.result_handler, "update_state_label"
-                            ):
-                                with patch.object(
-                                    manager.flow_manager.store,
-                                    "add_event",
-                                    return_value=None,
-                                ) as mock_add_event:
-                                    handle = AsyncExecutionHandle(
-                                        tmux_session="vibe3-manager-102",
-                                        log_path=Path(
-                                            "temp/logs/vibe3-manager-102.async.log"
-                                        ),
-                                        prompt_file_path=Path("/tmp/prompt.md"),
-                                    )
-                                    mock_backend = MagicMock()
-                                    start_async_command = (
-                                        mock_backend.start_async_command
-                                    )
-                                    start_async_command.return_value = handle
-                                    manager._backend = mock_backend
-                                    result = manager.dispatch_manager(issue)
+                                manager.flow_manager.store,
+                                "add_event",
+                                return_value=None,
+                            ) as mock_add_event:
+                                handle = AsyncExecutionHandle(
+                                    tmux_session="vibe3-manager-102",
+                                    log_path=Path(
+                                        "temp/logs/vibe3-manager-102.async.log"
+                                    ),
+                                    prompt_file_path=Path("/tmp/prompt.md"),
+                                )
+                                mock_backend = MagicMock()
+                                start_async_command = mock_backend.start_async_command
+                                start_async_command.return_value = handle
+                                manager._backend = mock_backend
+                                result = manager.dispatch_manager(issue)
 
         assert result is True
         # Async dispatch only records "dispatched" event, not success/failure

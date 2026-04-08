@@ -28,7 +28,7 @@ class TestFlowStatus:
 
         service = FlowService(store=mock_store)
         # GitHubClient is imported inside get_flow_status, need to patch it
-        with patch("vibe3.services.flow_query_mixin.GitHubClient") as mock_gh_class:
+        with patch("vibe3.services.flow_service.GitHubClient") as mock_gh_class:
             mock_gh = mock_gh_class.return_value
             mock_gh.get_pr.return_value = None
 

@@ -13,6 +13,7 @@ from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.config import OrchestraConfig
 from vibe3.orchestra.dependency_checker import DependencyChecker
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.services.status_service import OrchestraStatusService
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
@@ -143,6 +144,11 @@ class AssigneeDispatchService(ServiceBase):
                 "Tick summary: blocked issues "
                 + ", ".join(f"#{n} by {deps}" for n, deps in blocked)
             )
+        ready_numbers = ", ".join(f"#{issue.number}" for issue in ready) or "(none)"
+        append_orchestra_event(
+            "dispatcher",
+            f"{type(self).__name__} tick candidates: {ready_numbers}",
+        )
 
         for issue in self._sort_by_priority(ready):
             await self._dispatch_if_ready(issue, source="tick")
@@ -172,6 +178,10 @@ class AssigneeDispatchService(ServiceBase):
 
         # ManagerExecutor handles its own capacity check and queuing
         loop = asyncio.get_event_loop()
+        append_orchestra_event(
+            "dispatcher",
+            f"{type(self).__name__} dispatching #{issue.number} from {source}",
+        )
         dispatched = await loop.run_in_executor(
             self._executor, self._manager.dispatch_manager, issue
         )

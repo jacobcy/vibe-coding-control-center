@@ -16,9 +16,9 @@ class _ImmediateLoop:
 
 def _svc() -> AssigneeDispatchService:
     svc = AssigneeDispatchService(OrchestraConfig(polling_interval=900, dry_run=True))
-    svc._status_service = MagicMock()
+    svc._registry = MagicMock()
     # Default to 0 active flows to allow dispatch
-    svc._status_service.get_active_flow_count.return_value = 0
+    svc._registry.count_live_worker_sessions.return_value = 0
     return svc
 
 
@@ -89,6 +89,44 @@ async def test_on_tick_dispatches_on_new_assignment_after_warmup() -> None:
         await svc.on_tick()
 
     svc._dispatcher.dispatch_manager.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_on_tick_appends_tick_dispatcher_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    svc = _svc()
+    svc._cold_start = False
+    svc._assignee_cache = {42: frozenset()}
+    svc._github = MagicMock()
+    svc._github.list_issues_with_assignees.return_value = [
+        {
+            "number": 42,
+            "title": "test issue",
+            "labels": [{"name": "priority/high"}],
+            "assignees": [{"login": "vibe-manager-agent"}],
+            "url": "https://example.com/issues/42",
+        }
+    ]
+    svc._dep_checker = MagicMock()
+    svc._dep_checker.check.return_value = (True, [])
+    svc._dispatcher = MagicMock()
+    svc._dispatcher.dispatch_manager.return_value = True
+    svc._dispatcher.flow_manager.get_flow_for_issue.return_value = None
+    events: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "vibe3.orchestra.services.assignee_dispatch.append_orchestra_event",
+        lambda component, message, repo_root=None: events.append((component, message)),
+    )
+
+    with patch(
+        "vibe3.orchestra.services.assignee_dispatch.asyncio.get_event_loop",
+        return_value=_ImmediateLoop(),
+    ):
+        await svc.on_tick()
+
+    assert any("tick candidates" in message for _, message in events)
+    assert any("dispatching #42" in message for _, message in events)
 
 
 @pytest.mark.asyncio

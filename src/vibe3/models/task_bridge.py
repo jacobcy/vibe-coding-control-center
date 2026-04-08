@@ -72,38 +72,3 @@ class FieldSource(BaseModel):
 
     value: Any
     source: Literal["local", "remote"]
-
-
-class HydratedTaskView(BaseModel):
-    """合并本地 bridge 字段与远端 truth 字段的视图对象。
-
-    每个字段通过 FieldSource 标注数据来源（local / remote）。
-    此对象为只读视图，不写入本地存储。
-    """
-
-    branch: str
-
-    # --- Bridge 字段（来源：local）---
-    project_item_id: FieldSource | None = None
-    task_issue_number: FieldSource | None = None
-    spec_ref: FieldSource | None = None
-    next_step: FieldSource | None = None
-    blocked_by: FieldSource | None = None
-
-    # --- Truth 字段（来源：remote）---
-    title: FieldSource | None = None
-    body: FieldSource | None = None
-    status: FieldSource | None = None
-    priority: FieldSource | None = None
-    assignees: FieldSource | None = None
-
-    # --- 元信息 ---
-    identity_drift: bool = False  # 本地与远端 identity 不一致时为 True
-    offline_mode: bool = False  # 远端读取失败时为 True
-
-
-class HydrateError(BaseModel):
-    """hydrate 操作失败时返回的错误对象。"""
-
-    type: str  # "no_remote_identity" | "binding_invalid"
-    message: str

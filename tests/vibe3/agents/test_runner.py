@@ -15,7 +15,8 @@ class TestCodeagentExecutionService:
             ["run", "--plan", "/tmp/demo.md"]
         )
 
-        assert cmd[:4] == ["uv", "run", "python", "src/vibe3/cli.py"]
+        assert cmd[:3] == ["uv", "run", "--project"]
+        assert cmd[4:6] == ["python", str(CodeagentExecutionService._cli_entry())]
         assert "--sync" in cmd
 
     def test_build_self_invocation_drops_async_and_keeps_sync_single(self) -> None:
@@ -66,7 +67,11 @@ class TestCodeagentExecutionService:
         assert result.log_path == Path("temp/logs/issues/issue-424/run.async.log")
         backend.start_async_command.assert_called_once()
         called_command = backend.start_async_command.call_args.args[0]
-        assert called_command[:4] == ["uv", "run", "python", "src/vibe3/cli.py"]
+        assert called_command[:3] == ["uv", "run", "--project"]
+        assert called_command[4:6] == [
+            "python",
+            str(CodeagentExecutionService._cli_entry()),
+        ]
         assert "--sync" in called_command
         backend.start_async.assert_not_called()
         expected_tmux = "Tmux session: vibe3-executor-dev-issue-424"
@@ -108,10 +113,57 @@ class TestCodeagentExecutionService:
         assert called_command == [
             "uv",
             "run",
+            "--project",
+            str(CodeagentExecutionService._repo_root()),
             "python",
-            "src/vibe3/cli.py",
+            str(CodeagentExecutionService._cli_entry()),
             "plan",
             "--issue",
             "42",
             "--sync",
         ]
+
+    def test_execute_async_passes_explicit_worktree_root_as_cwd(
+        self,
+        monkeypatch,
+    ) -> None:
+        service = CodeagentExecutionService(VibeConfig.get_defaults())
+        backend = MagicMock()
+        backend.start_async_command.return_value = AsyncExecutionHandle(
+            tmux_session="vibe3-planner-task-issue-42",
+            log_path=Path("temp/logs/issues/issue-42/plan.async.log"),
+            prompt_file_path=Path(""),
+        )
+
+        monkeypatch.setattr("vibe3.agents.runner.CodeagentBackend", lambda: backend)
+        monkeypatch.setattr(
+            "vibe3.agents.runner.persist_execution_lifecycle_event",
+            lambda *args, **kwargs: None,
+        )
+        monkeypatch.setattr(
+            "vibe3.agents.runner.SQLiteClient",
+            lambda: MagicMock(),
+        )
+        monkeypatch.setattr(
+            "vibe3.agents.runner.GitClient",
+            lambda: MagicMock(
+                get_worktree_root=MagicMock(return_value="/repo/worktree")
+            ),
+            raising=False,
+        )
+
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=lambda: "prompt",
+            task="extra guidance",
+            config=service.config,
+            branch="task/issue-42",
+        )
+
+        monkeypatch.setattr("vibe3.agents.runner.sys.argv", ["pytest"])
+
+        service.execute_async(command, "task/issue-42")
+
+        assert backend.start_async_command.call_args.kwargs["cwd"] == Path(
+            "/repo/worktree"
+        )

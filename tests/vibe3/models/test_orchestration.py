@@ -87,7 +87,7 @@ class TestTransitionRules:
 
     def test_allowed_transitions_count(self):
         """Test that we have expected number of allowed transitions."""
-        assert len(ALLOWED_TRANSITIONS) == 22
+        assert len(ALLOWED_TRANSITIONS) == 23
 
     def test_main_chain_transitions_allowed(self):
         """Test that main chain transitions are allowed."""
@@ -102,6 +102,7 @@ class TestTransitionRules:
 
     def test_side_path_transitions_allowed(self):
         """Test that side path transitions are allowed."""
+        assert (IssueState.READY, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.HANDOFF, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
         assert (IssueState.IN_PROGRESS, IssueState.BLOCKED) in ALLOWED_TRANSITIONS
@@ -117,12 +118,21 @@ class TestTransitionRules:
         assert (IssueState.FAILED, IssueState.IN_PROGRESS) in ALLOWED_TRANSITIONS
         assert (IssueState.FAILED, IssueState.REVIEW) in ALLOWED_TRANSITIONS
 
+    def test_closure_path_transitions_allowed(self):
+        """Test that closure path transitions are allowed."""
+        # Only MERGE_READY -> DONE is allowed for normal delivery completion
+        assert (IssueState.MERGE_READY, IssueState.DONE) in ALLOWED_TRANSITIONS
+        # READY -> DONE and HANDOFF -> DONE are now forbidden
+        assert (IssueState.READY, IssueState.DONE) not in ALLOWED_TRANSITIONS
+        assert (IssueState.HANDOFF, IssueState.DONE) not in ALLOWED_TRANSITIONS
+
     def test_forbidden_transitions_count(self):
         """Test that we have expected number of forbidden transitions."""
         assert len(FORBIDDEN_TRANSITIONS) == 5
 
     def test_skip_to_done_forbidden(self):
         """Test that skipping to done is forbidden."""
+        # All states except MERGE_READY cannot jump directly to DONE
         assert (IssueState.READY, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.CLAIMED, IssueState.DONE) in FORBIDDEN_TRANSITIONS
         assert (IssueState.BLOCKED, IssueState.DONE) in FORBIDDEN_TRANSITIONS

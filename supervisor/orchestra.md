@@ -21,6 +21,9 @@
 - 尚未启动但可被考虑的候选 issues
 - assignee 与 queue / flow 现场事实
 - issue state labels
+- GitHub milestone
+- `roadmap/*` labels
+- `priority/[0-9]` labels（兼容 legacy priority labels）
 - dependency information such as blocked_by
 - orchestra heartbeat status
 
@@ -29,6 +32,7 @@
 - running issues summary
 - backfill candidates summary
 - suggested issues list
+- ready queue 排序建议
 - 最小 non-state label actions 或 routing suggestions
 - start / wait / defer recommendations with short reasons
 
@@ -47,10 +51,21 @@
 
 1. 查看当前 running issues 与 queue / flow 现场
 2. 补捞已满足 assignee 条件但尚未进入调度的候选 issue
-3. 判断是否已经存在足够明确的执行现场
-4. 对未运行 issue 给出建议顺序
-5. 如有必要，提出最小 non-state label 调整建议
-6. 在治理结论处停止
+3. 先过滤不能进入 ready queue 的 issue：依赖未解除、已有有效 flow / live dispatch、或被硬规则阻塞
+4. 对 ready candidates 按 `milestone -> roadmap/* -> priority/[0-9] -> issue number` 理解当前顺序
+5. 对未运行 issue 给出建议顺序
+6. 如有必要，提出最小 non-state label 调整建议
+7. 在治理结论处停止
+
+## Queue Guidance
+
+- `milestone` 是大桶，用于表达大的交付窗口
+- `roadmap/*` 是 milestone 内的排序桶
+- `priority/[0-9]` 是同一 roadmap 桶内的细粒度抢占顺序，默认 `0`
+- 数字越大越靠前
+- legacy `priority/critical|high|medium|low` 仅作兼容输入；新建议统一使用数字 priority
+- 不要用 `state/*` label 编码排序意图
+- 如需前移某个 task，优先只做最小调整：先确认 milestone 是否正确，再调整 roadmap，最后再调 priority
 
 ## Output Contract
 
@@ -74,8 +89,10 @@
 2. **标记阻塞**：如果一个 Issue 因为依赖或其他原因无法推进，请设置 `state/blocked` 标签，并发表评论说明原因。
 3. **标记完成**：如果一个 Issue 对应的 PR 已合并或任务已确认完成，请设置 `state/done` 标签。
 4. **无需操作**：对于已经在 `state/in-progress` 或 `state/review` 状态且运行正常的 Issue，保持现状。
+5. **同步执行状态**：如果 Issue 有活跃的手动场景（manual scene）或 flow，但缺少 `state/in-progress` 标签，需先通过 `handoff show` 确认该分支存在明确的 `plan_ref`，再添加 `state/in-progress` 标签以同步现场事实；若无 `plan_ref` 则不允许打标签。
+6. **排序调整**：如需调整 ready queue，只允许建议 `milestone`、`roadmap/*`、`priority/[0-9]` 这类非 state 现场语义；不要用 `state/*` 做抢占排序。
 
 **注意**：
 - 不要直接修改 Assignee。
 - 不要尝试直接调用执行命令或创建 Flow。
-- 唯一输出手段是变更 GitHub Label。
+- milestone 调整与 label 调整都属于允许的治理输出；除此之外不要写入其他内部状态。

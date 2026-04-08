@@ -1,14 +1,6 @@
 ---
 name: vibe-rules
-description: Claude Code rules 冲突检测与清理
-version: 1.0.0
-author: Vibe Team
-created: 2026-03-18
-scope: project-management
-triggers:
-  - 当 rules 文件发生变化时
-  - 定期检查（建议每周）
-  - Agent 创建新 rules 后
+description: Use when rules files change, when checking for duplicate or conflicting rules across ~/.claude/rules/common/, .claude/rules/, .agent/rules/, and CLAUDE.md, or when an agent has created new rules that may overlap with existing ones. Do not use for skill authoring or flow governance.
 ---
 
 # Vibe Rules - Rules 冲突检测与清理
@@ -449,17 +441,7 @@ jobs:
 
 ## 相关文档
 
+- [docs/standards/v3/skill-standard.md](../../docs/standards/v3/skill-standard.md) - Skill 结构规范
 - [CLAUDE.md](../../CLAUDE.md) - 项目最高标准
 - [SOUL.md](../../SOUL.md) - 项目宪法
 - [docs/standards/glossary.md](../../docs/standards/glossary.md) - 术语真源
-
-## 版本历史
-
-| 版本  | 日期       | 变更                             |
-| ----- | ---------- | -------------------------------- |
-| 1.0.0 | 2026-03-18 | 初始版本，定义分层体系和清理策略 |
-
----
-
-**维护者**: Vibe Team
-**最后更新**: 2026-03-18

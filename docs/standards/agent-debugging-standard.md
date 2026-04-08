@@ -2,7 +2,7 @@
 
 > **文档定位**：Vibe3 agent 编排调试的统一入口。涵盖日志规范、链路调试方法、观测手段和项目理解。
 > **适用范围**：所有使用 `vibe3 serve`、`vibe3 run`、`vibe3 plan`、`vibe3 review`、heartbeat、orchestra、manager 的 agent 编排调试。
-> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
+> **权威性**：本标准是 agent 调试流程与日志规范的权威依据。业务语义以 `skills/`、`supervisor/`、`.agent/policies/` 为准；编排状态语义与 authoritative ref 定义以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 为准；运行时架构以 [vibe3-orchestra-runtime-standard.md](vibe3-orchestra-runtime-standard.md) 为准。
 
 ---
 
@@ -328,18 +328,33 @@ uv run python src/vibe3/cli.py run --supervisor supervisor/issue-cleanup.md
 - 创建前是否先查重，避免重复发布重叠 issue
 - 是否只创建当前轮次需要的最小 issue 集
 
-#### 第三步：手动触发 apply
+#### 第三步：观察 apply 自动触发
+
+> **注意**：apply 由 `SupervisorHandoffService.on_tick()` 自动触发，无需手动命令。
+> 当检测到带有 `supervisor` + `state/handoff` labels 的 issue 时，服务会自动 dispatch apply agent。
+> 手动执行 `run --issue <n>` **不是**正确的触发方式，会绕过 on_tick 状态机，可能导致重复执行或状态不一致。
+
+观察方式：
 
 ```bash
-uv run python src/vibe3/cli.py run --issue <governance_issue_number>
+# 方式一：观察 serve 运行时日志（推荐）
+tail -f temp/logs/vibe3-serve.log | grep supervisor
+
+# 方式二：确认 issue 已被识别并进入队列
+uv run python src/vibe3/cli.py flow status
+
+# 方式三：查看 apply session log（由 on_tick 生成）
+ls -lt temp/logs/vibe3-supervisor-issue-*.async.log | head -5
 ```
 
 检查点：
 
-- 是否默认使用配置中的 apply supervisor
-- 是否进入 async/tmux
-- 是否正确读取指定 issue，而不是自行重新查找一批 issue
-- CLI 是否显示了 `Session log: temp/logs/vibe3-supervisor-issue-...`
+- `on_tick` 是否检测到了正确的 `supervisor+state/handoff` issue
+- apply agent 是否已进入 async/tmux session
+- Session log 路径是否显示：`temp/logs/vibe3-supervisor-issue-{n}.async.log`
+
+> **调试用途**（仅限本地单步验证）：若需要隔离测试 apply 逻辑而不依赖 on_tick，
+> 可直接调用服务层，但不要通过 CLI `run --issue` 命令，该命令路径与 supervisor apply 逻辑不匹配。
 
 #### 第四步：观察结果
 
@@ -359,7 +374,7 @@ uv run python src/vibe3/cli.py run --issue <governance_issue_number>
 ### 5.4 治理链调试结论
 
 - 治理链通过 issue 交接，不通过 branch handoff 交接
-- `run --issue` 是治理 issue 的统一 apply 入口
+- apply 由 `SupervisorHandoffService.on_tick()` **自动触发**，检测 `supervisor+state/handoff` issue 后 dispatch；`run --issue` 不是 apply 的触发入口
 - async/tmux 与 session log 属于底层 codeagent 适配层，不属于上层 orchestration
 - 底层只负责触发；是否检查 `vibe3 task status`、是否创建 issue、是否 comment / close，全部由 supervisor prompt 决定
 
@@ -434,8 +449,13 @@ HeartbeatServer._tick_loop()
 当 issue 处于 `state/handoff` 且满足以下条件时，manager 会自动恢复执行：
 
 1. Issue 有 canonical task flow（`task/issue-*` 分支）
-2. Flow state 有有效 refs（如 `plan_ref`）
-3. 没有活动的 manager session
+2. 没有活动的 manager session
+
+这里不要把 auto-saved artifact 或 async log 误认成 authoritative ref：
+
+- `.git/vibe3/handoff/...` 下的自动产物，只是共享 artifact
+- `temp/logs/*.async.log` 只是调试日志
+- authoritative ref 是否成立，以 [vibe3-state-sync-standard.md](vibe3-state-sync-standard.md) 中定义的 handoff write + flow state 为准
 
 这个 resume 路径使用与 `state/ready` 相同的去重机制：
 - 如果已有 live session，不会重复 dispatch
@@ -450,12 +470,15 @@ HeartbeatServer._tick_loop()
 - 本轮推进成功，产生明确状态变化或交接产物
 - 本轮无法推进，且 manager session 结束后没有任何可观察进展，此时进入 `state/blocked`
 
-这里的”可观察进展”包括以下任一项：
+对 manager 的 `state/ready` / `state/handoff` 路径，最关键的“可观察进展”是状态迁移本身。
 
-- `state/*` label 变化
-- 新的 issue comment
-- 新的 handoff 文件
-- Flow refs 更新（plan_ref, report_ref, audit_ref）
+调试时应按下面顺序读：
+
+1. `state/*` label 是否离开当前状态
+2. 是否发生显式 abandon / close
+3. 其余 comment、handoff、refs 仅作为辅助现场，不单独构成 manager 路径成功
+
+如果你看到新的 handoff 文件或 auto-saved artifact，但 issue 仍停在 `state/handoff`，不要把它误判成 manager 已完成推进。
 
 **Progress Detection Parity**：
 

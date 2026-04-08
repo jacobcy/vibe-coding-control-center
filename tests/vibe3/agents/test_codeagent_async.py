@@ -1,5 +1,6 @@
 """Tests for CodeagentBackend - async, session, and streaming features."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -54,19 +55,42 @@ class TestStartAsyncCommand:
         # Mock subprocess.run - must return returncode != 0
         # to break _allocate_tmux_session_name loop
         def fake_run(*args, **kwargs):
-            result = MagicMock()
-            result.returncode = (
-                1  # Simulate "tmux has-session" failing (no session exists)
+            cmd = args[0] if args else []
+            # tmux has-session should fail (session doesn't exist)
+            if "has-session" in cmd:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            # tmux new-session should succeed
+            elif "new-session" in cmd:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            # Default: fail
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=1,
+                stdout="",
+                stderr="error",
             )
-            return result
 
         with patch(
             "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
         ):
-            backend.start_async_command(
-                ["echo", "hello"],
-                execution_name="vibe3-manager-issue-372",
-            )
+            # Also mock session.py subprocess.run to avoid actual tmux calls
+            with patch(
+                "vibe3.environment.session.subprocess.run", side_effect=fake_run
+            ):
+                backend.start_async_command(
+                    ["echo", "hello"],
+                    execution_name="vibe3-manager-issue-372",
+                )
 
         assert not stale_log.exists()
 
@@ -116,18 +140,42 @@ class TestStartAsyncCommand:
 
         # Mock subprocess.run to break _allocate_tmux_session_name loop
         def fake_run(*args, **kwargs):
-            result = MagicMock()
-            # Simulate "tmux has-session" failing (no session exists)
-            result.returncode = 1
-            return result
+            cmd = args[0] if args else []
+            # tmux has-session should fail (session doesn't exist)
+            if "has-session" in cmd:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            # tmux new-session should succeed
+            elif "new-session" in cmd:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            # Default: fail
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=1,
+                stdout="",
+                stderr="error",
+            )
 
         with patch(
             "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
         ):
-            handle = backend.start_async_command(
-                ["echo", "hello"],
-                execution_name="vibe3-governance-scan-20260405-114913-t1",
-            )
+            # Also mock session.py subprocess.run
+            with patch(
+                "vibe3.environment.session.subprocess.run", side_effect=fake_run
+            ):
+                handle = backend.start_async_command(
+                    ["echo", "hello"],
+                    execution_name="vibe3-governance-scan-20260405-114913-t1",
+                )
 
         assert handle.log_path == (
             log_dir / "orchestra" / "governance" / "scan-20260405-114913-t1.async.log"
@@ -214,3 +262,74 @@ class TestRunStreamingAndEdgeCases:
         prompt_file_idx = command.index("--prompt-file") + 1
         expected_dir = Path.home() / ".codeagent" / "agents"
         assert Path(command[prompt_file_idx]).parent == expected_dir
+
+
+class TestAsyncLogFilter:
+    def test_async_log_filter_strips_agent_prompt_block(self, tmp_path: Path) -> None:
+        """Async log filter should remove <agent-prompt> blocks."""
+        backend = CodeagentBackend()
+        filter_cmd = backend._build_async_log_filter()
+
+        # Create test input file
+        input_file = tmp_path / "input.log"
+        input_text = """SESSION_ID: ses_test123
+<agent-prompt>
+This is the full prompt content that should not appear in logs.
+It may contain sensitive information or be very long.
+</agent-prompt>
+[vibe3 async] command exited with status: 0
+"""
+        input_file.write_text(input_text)
+
+        # Run the filter
+        import subprocess
+
+        result = subprocess.run(
+            filter_cmd + [str(input_file)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        output = result.stdout
+
+        assert "<agent-prompt>" not in output
+        assert "</agent-prompt>" not in output
+        assert "full prompt content" not in output
+        # But should keep control info
+        assert "SESSION_ID: ses_test123" in output
+        assert "command exited with status: 0" in output
+        # Should report suppression
+        assert "suppressed" in output and "agent-prompt" in output
+
+    def test_async_log_filter_keeps_session_id_and_exit_status_lines(
+        self, tmp_path: Path
+    ) -> None:
+        """Filter should preserve session ID, exit status, and other diagnostics."""
+        backend = CodeagentBackend()
+        filter_cmd = backend._build_async_log_filter()
+
+        input_file = tmp_path / "input.log"
+        input_text = """SESSION_ID: ses_abc123
+Some wrapper output line
+[vibe3 async] command exited with status: 0
+[vibe3 async] suppressed output summary: 150 lines
+"""
+        input_file.write_text(input_text)
+
+        import subprocess
+
+        result = subprocess.run(
+            filter_cmd + [str(input_file)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        output = result.stdout
+
+        # All diagnostic lines should be preserved
+        assert "SESSION_ID: ses_abc123" in output
+        assert "[vibe3 async] command exited with status: 0" in output
+        assert "[vibe3 async] suppressed output summary: 150 lines" in output
+        assert "Some wrapper output line" in output
