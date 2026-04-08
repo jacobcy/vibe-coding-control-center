@@ -69,7 +69,7 @@ def test_review_base_defaults_to_origin_main(monkeypatch):
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base", "--sync"])
+        result = runner.invoke(app, ["base", "--no-async"])
     assert result.exit_code == 0
     mock_usecase.execute_review.assert_called_once()
 
@@ -86,7 +86,7 @@ def test_review_base_pass(monkeypatch):
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base", "origin/develop", "--sync"])
+        result = runner.invoke(app, ["base", "origin/develop", "--no-async"])
     assert result.exit_code == 0
     mock_usecase.execute_review.assert_called_once()
 
@@ -104,7 +104,7 @@ def test_review_base_uses_shared_resolution_when_base_omitted(monkeypatch):
             return_value=(MagicMock(), "feature/test"),
         ),
     ):
-        result = runner.invoke(app, ["base", "--sync"])
+        result = runner.invoke(app, ["base", "--no-async"])
 
     assert result.exit_code == 0
     mock_resolve.assert_called_once_with(None, current_branch="feature/test")
@@ -156,7 +156,7 @@ def test_review_base_async_skips_parent_inspect_precompute():
             return_value=mock_usecase,
         ),
     ):
-        result = runner.invoke(app, ["base", "--async"])
+        result = runner.invoke(app, ["base"])
 
     assert result.exit_code == 0
     # After refactoring, execute_review is called with async_mode=True

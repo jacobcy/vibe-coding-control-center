@@ -184,7 +184,7 @@ handoff 不代替 issue comment。
 
 - review agent 执行
 - 审查输出必须给出合法 `VERDICT: PASS | MAJOR | BLOCK`
-- verdict 校验成功后，系统自动登记一个最小 authoritative `audit_ref`
+- verdict 校验成功后，通过发布 `ReviewCompleted` 事件，由事件处理器自动登记一个最小 authoritative `audit_ref` 并更新状态
 - 审查结束后回到 `state/handoff`
 
 ### `state/blocked`
@@ -205,7 +205,7 @@ handoff 不代替 issue comment。
 含义：
 
 - `plan / run / review` 执行过程中发生了真实报错
-- 当前问题属于执行器、代码、环境或触发链故障
+- 发布 `IssueFailed` 事件，由处理器记录失败原因并更新状态
 - 这是 bug / error 语义，不是 manager 的业务阻塞语义
 
 典型动作：
@@ -306,7 +306,8 @@ manager 只有在以下条件都满足时，才应迁移：
 plan agent 完成后：
 
 - 写 handoff
-- 将 issue 调整为 `state/handoff`
+- 发布 `PlanCompleted` 事件
+- 由事件处理器验证 `plan_ref` 并将 issue 调整为 `state/handoff`
 - **Manager 自动恢复**，读取 refs 并决定下一步
 
 ### 6.3 `handoff` 触发 manager 自动恢复

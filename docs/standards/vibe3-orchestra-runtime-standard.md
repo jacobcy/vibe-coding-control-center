@@ -295,6 +295,7 @@ state trigger 是消费已有 `state/*` labels 的 service 集合。
 - `heartbeat tick` = driver 内部一次轮询，不是独立进程
 - `governance` = 由 tick 派发的治理任务，不是 driver
 - `manager / plan / run / review` = 由 state trigger 派发的异步 child
+- `领域事件 (Domain Events)` = Agent 执行生命周期的真源，负责驱动状态转换与副作用
 - `ready` 的判定来源于 governance / supervisor / 人工治理
 - `state trigger` 只消费已有状态
 

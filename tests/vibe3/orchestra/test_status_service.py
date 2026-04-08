@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.services.status_service import (
+from vibe3.services.orchestra_status_service import (
     IssueStatusEntry,
     OrchestraSnapshot,
     OrchestraStatusService,

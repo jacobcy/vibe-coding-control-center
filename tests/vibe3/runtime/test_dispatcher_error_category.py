@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from tests.vibe3.conftest import CompletedProcess
 from vibe3.manager.manager_executor import ManagerExecutor
-from vibe3.orchestra.config import CircuitBreakerConfig, OrchestraConfig
+from vibe3.models.orchestra_config import CircuitBreakerConfig, OrchestraConfig
 
 
 class TestManagerErrorCategoryTracking:

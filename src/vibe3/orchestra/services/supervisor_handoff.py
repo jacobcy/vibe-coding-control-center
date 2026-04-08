@@ -7,17 +7,19 @@ import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.github_client import GitHubClient
-from vibe3.orchestra.agent_resolver import resolve_supervisor_agent_options
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.environment.worktree import WorktreeManager
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.orchestra.services.status_service import OrchestraStatusService
+from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
     from vibe3.manager.manager_executor import ManagerExecutor
@@ -63,14 +65,20 @@ class SupervisorHandoffService(ServiceBase):
         self._github = github or GitHubClient()
         from vibe3.manager.flow_manager import FlowManager
 
+        flow_manager = FlowManager(config)
         self._status_service = status_service or OrchestraStatusService(
-            config, github=self._github, orchestrator=FlowManager(config)
+            config, github=self._github, orchestrator=flow_manager
         )
         self._manager = manager
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
         self._backend = backend or CodeagentBackend()
+        self._worktree_manager = WorktreeManager(
+            config=config,
+            repo_path=Path.cwd(),
+            flow_manager=flow_manager,
+        )
         self._in_flight: set[int] = set()
 
     async def handle_event(self, event: GitHubEvent) -> None:
@@ -176,13 +184,27 @@ class SupervisorHandoffService(ServiceBase):
         prompt: str,
     ) -> None:
         options = resolve_supervisor_agent_options(self.config)
-        self._backend.start_async(
-            prompt=prompt,
-            options=options,
-            task=self._build_issue_task(issue),
-            execution_name=f"vibe3-supervisor-issue-{issue.number}",
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+
+        # Acquire temporary worktree for L2 apply execution
+        # This ensures safe isolation for document/config modifications
+        wt_context = self._worktree_manager.acquire_temporary_worktree(
+            issue_number=issue.number,
+            base_branch="main",
         )
+
+        try:
+            self._backend.start_async(
+                prompt=prompt,
+                options=options,
+                task=self._build_issue_task(issue),
+                execution_name=f"vibe3-supervisor-issue-{issue.number}",
+                cwd=wt_context.path,
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            )
+        except Exception:
+            # Release worktree on dispatch failure
+            self._worktree_manager.release_temporary_worktree(wt_context)
+            raise
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         session_prefix = f"vibe3-supervisor-issue-{issue_number}"

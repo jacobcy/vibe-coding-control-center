@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.comment_reply import (
     CommentReplyService,
     _build_mention_pattern,

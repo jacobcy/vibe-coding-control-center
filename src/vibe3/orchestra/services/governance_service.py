@@ -15,18 +15,10 @@ from loguru import logger
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
 from vibe3.config.settings import VibeConfig
-from vibe3.orchestra.agent_resolver import resolve_governance_agent_options
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,
     governance_dry_run_dir,
-)
-from vibe3.orchestra.services.status_service import (
-    OrchestraSnapshot,
-    OrchestraStatusService,
-    format_issue_runtime_line,
-    format_issue_summary_line,
-    is_running_issue,
 )
 from vibe3.prompts.assembler import PromptAssembler
 from vibe3.prompts.models import (
@@ -37,7 +29,15 @@ from vibe3.prompts.models import (
 )
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
+from vibe3.runtime.agent_resolver import resolve_governance_agent_options
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.services.orchestra_status_service import (
+    OrchestraSnapshot,
+    OrchestraStatusService,
+    format_issue_runtime_line,
+    format_issue_summary_line,
+    is_running_issue,
+)
 from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:

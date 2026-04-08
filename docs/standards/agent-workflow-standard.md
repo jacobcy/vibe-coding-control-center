@@ -10,7 +10,9 @@
 
 ## 概述
 
-Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 执行开发任务。Agent 工作流适用于：
+Vibe Center 通过 `vibe3 run` 命令集成 codeagent-wrapper，支持 AI Agent 执行开发任务。Agent 工作流采用**事件驱动架构**（见 [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md)），Agent 执行的生命周期变迁通过领域事件（Domain Events）发布并由后台处理器统一调度。
+
+Agent 工作流适用于：
 
 - 代码实现（根据 plan 执行）
 - Bug 修复

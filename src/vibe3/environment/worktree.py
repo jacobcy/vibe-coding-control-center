@@ -15,7 +15,7 @@ from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
     from vibe3.manager.flow_manager import FlowManager
-    from vibe3.orchestra.config import OrchestraConfig
+    from vibe3.models.orchestra_config import OrchestraConfig
 
 
 @dataclass

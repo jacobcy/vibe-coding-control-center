@@ -6,8 +6,8 @@ Primary entry point: HeartbeatServer (vibe3 serve start)
   - Polling fallback every 15 min via on_tick()
 """
 
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
-from vibe3.orchestra.config import OrchestraConfig
 
 __all__ = [
     "OrchestraConfig",

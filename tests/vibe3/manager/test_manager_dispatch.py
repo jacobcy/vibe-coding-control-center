@@ -5,8 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.orchestra.config import OrchestraConfig
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -136,9 +136,10 @@ class TestManagerDispatch:
             "-I",
             str(Path("/tmp/repo/src/vibe3/cli.py").resolve()),
         ]
-        assert cmd[7] == "run"
-        assert "--manager-issue" in cmd
-        assert "--sync" in cmd
+        assert cmd[7] == "internal"
+        assert cmd[8] == "manager"
+        assert cmd[9] == "102"
+        assert cmd[10] == "--no-async"
         assert call.kwargs["cwd"] == Path("/tmp/repo/.worktrees/issue-102")
         # manager_session_id is no longer written to flow_state
         # (registry is the source of truth)

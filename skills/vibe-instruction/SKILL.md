@@ -137,7 +137,7 @@ cat config/settings.yaml
 uv run python src/vibe3/cli.py run --skill <name> # 派发特定 skill 执行 (推荐使用 --async 后台运行)
 uv run python src/vibe3/cli.py run "指令描述"      # 派发自定义指令执行
 uv run python src/vibe3/cli.py run --plan <file>  # 执行指定的实现计划
-uv run python src/vibe3/cli.py run --worktree     # 在隔离的临时 worktree 中执行 (防止污染当前环境)
+uv run python src/vibe3/cli.py run             # 执行指令 (系统会自动确保在隔离的 worktree 中执行)
 ```
 
 #### plan - 计划生成

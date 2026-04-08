@@ -117,9 +117,15 @@ code_limits:
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 550
         reason: "Codeagent execution backend"
+      - path: "src/vibe3/agents/runner.py"
+        limit: 450
+        reason: "Codeagent 执行服务核心，包含完整的执行流程管理，逻辑高度耦合不宜拆分"
       - path: "src/vibe3/orchestra/services/status_service.py"
         limit: 450
         reason: "Orchestra 状态聚合服务，数据类+辅助函数+主服务类结构清晰，snapshot 方法线性流程不宜拆分"
+      - path: "src/vibe3/services/orchestra_status_service.py"
+        limit: 450
+        reason: "Orchestra 状态查询服务，包含状态快照和格式化逻辑，职责单一但方法较多"
 
       # 强耦合测试例外
       - path: "tests/vibe3/orchestra/test_state_label_dispatch.py"
@@ -172,8 +178,8 @@ code_limits:
         reason: "PR utils 测试集，54 个测试围绕同一服务契约，平均 9.4 lines/test，拆分收益低"
 
   total_file_loc:
-    v2_shell: 4000         # Shell 核心代码总行数
-    v3_python: 35000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
+    v2_shell: 2000         # Shell 核心代码总行数
+    v3_python: 38000        # Python 核心代码总行数（治理触发器：命中时触发质量回收审计）
 
   # 统计口径（路径定义）
   code_paths:

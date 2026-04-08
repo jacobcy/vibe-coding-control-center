@@ -295,7 +295,7 @@ class TestMCPServerIntegration:
 
     def test_mcp_server_graceful_degradation_on_import_error(self):
         """Should continue without MCP if import fails."""
-        from vibe3.orchestra.config import OrchestraConfig
+        from vibe3.models.orchestra_config import OrchestraConfig
         from vibe3.server.registry import _build_server
 
         config = OrchestraConfig()
@@ -310,7 +310,7 @@ class TestMCPServerIntegration:
 
     def test_build_server_creates_fastapi_app(self):
         """_build_server should create FastAPI app with status endpoint."""
-        from vibe3.orchestra.config import OrchestraConfig
+        from vibe3.models.orchestra_config import OrchestraConfig
         from vibe3.server.registry import _build_server
 
         config = OrchestraConfig()

@@ -32,7 +32,7 @@ class OrchestraPRReviewDispatchSettings(BaseModel):
     """PR review dispatch settings for orchestra."""
 
     enabled: bool = True
-    async_mode: bool = False
+    async_mode: bool = True
     use_worktree: bool = False
 
 

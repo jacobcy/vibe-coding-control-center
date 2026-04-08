@@ -25,7 +25,6 @@ class CodeagentCommand:
     agent: str | None = None
     backend: str | None = None
     model: str | None = None
-    worktree: bool = False
     cwd: Path | None = None
     config: VibeConfig | None = None
     branch: str | None = None
@@ -75,7 +74,6 @@ def create_codeagent_command(
     agent: str | None = None,
     backend: str | None = None,
     model: str | None = None,
-    worktree: bool = False,
     cwd: Path | None = None,
     config: VibeConfig | None = None,
     branch: str | None = None,
@@ -93,7 +91,6 @@ def create_codeagent_command(
         agent: Agent preset override
         backend: Backend override
         model: Model override
-        worktree: Whether to use codeagent-wrapper --worktree mode
         cwd: Explicit working directory for agent execution
         config: VibeConfig instance
         branch: Current branch (for async execution)
@@ -118,7 +115,6 @@ def create_codeagent_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         cwd=cwd,
         config=config,
         branch=branch,

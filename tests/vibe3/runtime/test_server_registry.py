@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi import APIRouter
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.server import registry
 
 

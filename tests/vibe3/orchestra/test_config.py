@@ -6,8 +6,8 @@ from pathlib import Path
 import yaml
 
 from vibe3.config.settings import AgentConfig, RunConfig, VibeConfig
-from vibe3.orchestra.agent_resolver import resolve_manager_agent_options
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.runtime.agent_resolver import resolve_manager_agent_options
 
 
 def test_default_config():
@@ -45,7 +45,7 @@ def test_default_config():
     assert config.assignee_dispatch.supervisor_file == "supervisor/manager.md"
     assert config.assignee_dispatch.include_supervisor_content is True
     assert config.pr_review_dispatch.enabled is True
-    assert config.pr_review_dispatch.async_mode is False
+    assert config.pr_review_dispatch.async_mode is True
     assert config.pr_review_dispatch.use_worktree is False
     assert config.state_label_dispatch.enabled is True
     pid_path = config.pid_file.as_posix()
@@ -238,11 +238,11 @@ def test_from_settings_does_not_invent_agent_presets_when_yaml_omits_them():
 
 def test_manager_agent_resolution_falls_back_to_run_config(monkeypatch):
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
         lambda options: options,
     )
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.sync_models_json",
+        "vibe3.runtime.agent_resolver.sync_models_json",
         lambda options: None,
     )
 
@@ -251,21 +251,20 @@ def test_manager_agent_resolution_falls_back_to_run_config(monkeypatch):
     )
     config = OrchestraConfig()
 
-    options = resolve_manager_agent_options(config, runtime, worktree=True)
+    options = resolve_manager_agent_options(config, runtime)
 
     assert options.agent == "develop"
     assert options.backend is None
     assert options.model is None
-    assert options.worktree is True
 
 
 def test_manager_agent_resolution_supports_backend_only_override(monkeypatch):
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
         lambda options: options,
     )
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.sync_models_json",
+        "vibe3.runtime.agent_resolver.sync_models_json",
         lambda options: None,
     )
 
@@ -281,12 +280,11 @@ def test_manager_agent_resolution_supports_backend_only_override(monkeypatch):
         }
     )
 
-    options = resolve_manager_agent_options(config, runtime, worktree=True)
+    options = resolve_manager_agent_options(config, runtime)
 
     assert options.agent is None
     assert options.backend == "opencode"
     assert options.model == "alibaba-coding-plan-cn/glm-5"
-    assert options.worktree is True
 
 
 def test_manager_timeout_defaults_to_1800_seconds():
@@ -303,6 +301,6 @@ def test_resolve_manager_agent_options_uses_orchestra_timeout_override():
         run=RunConfig(agent_config=AgentConfig(agent="develop")),
     )
 
-    options = resolve_manager_agent_options(config, runtime, worktree=True)
+    options = resolve_manager_agent_options(config, runtime)
 
     assert options.timeout_seconds == 1800

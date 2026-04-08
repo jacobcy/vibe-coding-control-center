@@ -21,15 +21,17 @@ class TestAsyncDefaults:
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
-        assert "[default: async]" in output or "[default: True]" in output
+        # Typer shows --no-async flag (inverted boolean)
+        assert "--no-async" in output
 
     def test_plan_help_shows_async_and_sync(self) -> None:
-        result = runner.invoke(cli_app, ["plan", "task", "--help"])
+        result = runner.invoke(cli_app, ["plan", "issue", "--help"])
         output = strip_ansi(result.output)
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
-        assert "[default: async]" in output or "[default: True]" in output
+        # Typer shows --no-async flag (inverted boolean)
+        assert "--no-async" in output
 
     def test_review_help_shows_async_and_sync(self) -> None:
         result = runner.invoke(cli_app, ["review", "base", "--help"])
@@ -37,4 +39,5 @@ class TestAsyncDefaults:
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
-        assert "[default: async]" in output or "[default: True]" in output
+        # Typer shows --no-async flag (inverted boolean)
+        assert "--no-async" in output

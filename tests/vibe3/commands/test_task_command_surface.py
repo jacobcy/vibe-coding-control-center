@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 from vibe3.cli import app
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.services.status_service import OrchestraSnapshot
+from vibe3.services.orchestra_status_service import OrchestraSnapshot
 
 runner = CliRunner(env={"NO_COLOR": "1"})
 
@@ -388,7 +388,7 @@ def test_task_status_ready_queue_shows_queue_metadata(
     mock_query_service_cls,
 ) -> None:
     """Ready queue rows should render rank, milestone, roadmap, and priority."""
-    from vibe3.orchestra.services.status_service import IssueStatusEntry
+    from vibe3.services.orchestra_status_service import IssueStatusEntry
 
     mock_validate_pid.return_value = (12345, True)
 

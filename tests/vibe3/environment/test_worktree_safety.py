@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from vibe3.environment.worktree import WorktreeManager
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 
 
 def make_config() -> OrchestraConfig:

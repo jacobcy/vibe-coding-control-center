@@ -14,22 +14,14 @@ from vibe3.agents.runner import (
     create_codeagent_command,
 )
 from vibe3.commands.command_options import (
+    _ASYNC_OPT,
     _DRY_RUN_OPT,
     _TRACE_OPT,
-    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.services.flow_service import FlowService
 from vibe3.utils.trace import enable_trace
-
-_ASYNC_OPT = Annotated[
-    bool,
-    typer.Option(
-        "--async/--sync",
-        help="Run asynchronously in background (default: async)",
-    ),
-]
 
 app = typer.Typer(
     name="review",
@@ -74,8 +66,7 @@ def pr(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = True,
-    worktree: _WORKTREE_OPT = False,
+    no_async: _ASYNC_OPT = False,
 ) -> None:
     """Review an existing PR by number (fetches diff from GitHub API).
 
@@ -111,8 +102,7 @@ def pr(
         issue_number=issue_number,
         pr_number=pr_number,
         branch=branch,
-        async_mode=async_mode,
-        worktree=worktree,
+        async_mode=not no_async,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:
@@ -133,8 +123,7 @@ def base(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = True,
-    worktree: _WORKTREE_OPT = False,
+    no_async: _ASYNC_OPT = False,
 ) -> None:
     """Review local branch changes against a base branch (compares codebase snapshots).
 
@@ -188,8 +177,7 @@ def base(
         instructions,
         issue_number=issue_number,
         branch=current_branch,
-        async_mode=async_mode,
-        worktree=worktree,
+        async_mode=not no_async,
     )
     _emit_review_result(result.verdict, result.handoff_file)
     if result.verdict in {"BLOCK", "ERROR"}:

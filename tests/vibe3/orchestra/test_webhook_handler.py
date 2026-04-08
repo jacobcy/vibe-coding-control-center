@@ -7,7 +7,7 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.app import _verify_signature, make_webhook_router
 

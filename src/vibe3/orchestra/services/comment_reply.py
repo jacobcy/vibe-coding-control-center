@@ -7,7 +7,7 @@ import re
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.orchestra.config import OrchestraConfig
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 

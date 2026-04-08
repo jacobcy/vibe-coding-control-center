@@ -113,7 +113,7 @@ def test_reactivate_flow_preserves_initiator():
 def test_flow_manager_uses_service_for_reactivation():
     """FlowManager should delegate to FlowService for reactivation."""
     from vibe3.manager.flow_manager import FlowManager
-    from vibe3.orchestra.config import OrchestraConfig
+    from vibe3.models.orchestra_config import OrchestraConfig
 
     config = OrchestraConfig(repo="test/repo")
     manager = FlowManager(config)

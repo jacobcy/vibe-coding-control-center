@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from vibe3.models.orchestration import IssueState
-from vibe3.orchestra.no_progress_policy import has_progress_changed
+from vibe3.runtime.no_progress_policy import has_progress_changed
 from vibe3.services.abandon_flow_service import AbandonFlowService
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 

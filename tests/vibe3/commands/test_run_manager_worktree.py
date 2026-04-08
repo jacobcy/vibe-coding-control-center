@@ -78,7 +78,7 @@ class TestRunManagerFlowResolution:
             lambda role, branch=None: "ses_target",
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] == "ses_target"
@@ -114,7 +114,7 @@ class TestRunManagerFlowResolution:
         _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(manager_run_service, "load_session_id", load_session)
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["session_id"] is None
@@ -133,7 +133,7 @@ class TestRunManagerFlowResolution:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         sqlite.add_event.assert_called_once()
@@ -173,11 +173,9 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
-        options = backend.start_async.call_args.kwargs["options"]
-        assert options.worktree is False
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
             "/Users/jacobcy/src/vibe-center/main/.worktrees/issue-372"
         )
@@ -206,7 +204,7 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
@@ -245,7 +243,7 @@ class TestRunManagerWorktree:
             lambda config, repo_root: worktree_manager,
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
@@ -283,13 +281,10 @@ class TestRunManagerWorktree:
             lambda config, repo_root: worktree_manager,
         )
 
-        result = runner.invoke(cli_app, ["run", "--manager-issue", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
             "/Users/jacobcy/src/vibe-center/main"
         )
-        options = backend.start_async.call_args.kwargs["options"]
-        # WorktreeManager failed to create worktree, so worktree flag is dropped
-        assert options.worktree is False
         worktree_manager.resolve_manager_cwd.assert_called_once()

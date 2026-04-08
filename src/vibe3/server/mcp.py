@@ -8,7 +8,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from vibe3.orchestra.services.status_service import (
+    from vibe3.services.orchestra_status_service import (
         OrchestraSnapshot,
         OrchestraStatusService,
     )
