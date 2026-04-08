@@ -89,12 +89,14 @@ temp/logs/
     governance/
       governance.log                    # Governance service 详细事件
       dry-run/governance_dry_run_*.md   # dry-run prompt 组装结果
-  vibe3-manager-issue-{n}.async.log     # Manager 执行日志
-  vibe3-plan-issue-{n}.async.log        # Plan 执行日志
-  vibe3-run-issue-{n}.async.log         # Run 执行日志
-  vibe3-review-issue-{n}.async.log      # Review 执行日志
-  vibe3-governance-scan-{ts}-t{n}.async.log  # Governance 执行日志
-  vibe3-supervisor-issue-{n}.async.log  # Supervisor apply 执行日志
+  temp/logs/issues/issue-{n}/
+    manager.async.log                   # Manager 执行日志
+    plan.async.log                      # Plan 执行日志
+    run.async.log                       # Run 执行日志
+    review.async.log                    # Review 执行日志
+    supervisor.async.log                # Supervisor apply 执行日志
+  temp/logs/governance/
+    vibe3-governance-scan-{ts}-t{n}.async.log  # Governance 执行日志
 ```
 
 `temp/` 在 `.gitignore` 中排除，日志不进入 git。
@@ -161,7 +163,7 @@ cat temp/logs/orchestra/events.log
 ls -lt temp/logs/vibe3-manager-*.async.log | head -5
 
 # 实时跟踪正在运行的 agent
-tail -f temp/logs/vibe3-manager-issue-{n}.async.log
+tail -f temp/logs/issues/issue-{n}/manager.async.log
 
 # 查看特定 issue 的所有执行日志
 ls temp/logs/*issue-{n}*.async.log
@@ -229,7 +231,7 @@ gh issue view {n} --json labels,state
 
 ```bash
 # 查看日志尾部
-tail -50 temp/logs/vibe3-manager-issue-{n}.async.log
+tail -50 temp/logs/issues/issue-{n}/manager.async.log
 
 # 检查 tmux session 是否异常退出
 tmux ls 2>&1
@@ -258,7 +260,7 @@ Manager 由 `StateLabelDispatchService` 自动调度（`state/ready` 或 `state/
 tail -f temp/logs/orchestra/events.log
 
 # 查看 manager 执行日志
-tail -f temp/logs/vibe3-manager-issue-{n}.async.log
+tail -f temp/logs/issues/issue-{n}/manager.async.log
 ```
 
 禁止同时打开 heartbeat + dry-run + 自动 apply + 自动回收，每步执行后必须停下来确认结果。

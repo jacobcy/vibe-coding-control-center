@@ -78,7 +78,7 @@ L4  Human collaboration            -- 人工协作流程
 - `orchestra/services/governance_service.py` → 发布扫描事件
 - `orchestra/supervisor_run_service.py` → 发布执行完成事件
 
-**Worktree 语义**: 无 worktree，`cwd=None`，无 `--worktree`。
+**Worktree 语义**: 通常在主仓库执行，无需独立隔离（`cwd=None`）。
 
 ---
 
@@ -106,7 +106,7 @@ L4  Human collaboration            -- 人工协作流程
 - `orchestra/services/supervisor_handoff.py` → 发布所有 L2 事件
 - Apply agent hooks → 发布执行开始/完成事件
 
-**Worktree 语义**: 临时隔离 worktree，`cwd=None`，使用 `--worktree` 标志。
+**Worktree 语义**: 临时隔离 worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
 **委托流程**:
 ```
@@ -141,7 +141,7 @@ Apply agent executes
 - `manager/manager_executor.py` → 发布分发/排队事件
 - `manager/manager_run_service.py` → 发布执行开始/完成事件
 
-**Worktree 语义**: 预分配 worktree (WorktreeManager)，`cwd=wt_path`，禁止 `--worktree`。
+**Worktree 语义**: 持久 issue-worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
 ---
 
@@ -164,7 +164,7 @@ Apply agent executes
 
 **处理器** (`src/vibe3/domain/handlers/flow_lifecycle.py`):
 - 验证权威引用存在性（`require_authoritative_ref`）
-- 转换 issue 状态（`LabelService.confirm_issue_state`）
+- 转换 issue 状态（由事件处理器调用 `LabelService.confirm_issue_state`）
 - 记录失败与阻塞（`IssueFailureService`）
 
 **集成点**:
@@ -172,7 +172,7 @@ Apply agent executes
 - `agents/run_agent.py` → 发布 `ReportRefRequired` + `IssueStateChanged`
 - `agents/review_agent.py` → 发布 `ReviewCompleted`
 
-**Worktree 语义**: 预分配 worktree (WorktreeManager)，`cwd=wt_path`，禁止 `--worktree`。
+**Worktree 语义**: 持久 issue-worktree，由系统自动解析并锁定路径（`cwd=wt_path`）。
 
 ---
 
