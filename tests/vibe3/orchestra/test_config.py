@@ -238,11 +238,11 @@ def test_from_settings_does_not_invent_agent_presets_when_yaml_omits_them():
 
 def test_manager_agent_resolution_falls_back_to_run_config(monkeypatch):
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
         lambda options: options,
     )
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.sync_models_json",
+        "vibe3.runtime.agent_resolver.sync_models_json",
         lambda options: None,
     )
 
@@ -261,11 +261,11 @@ def test_manager_agent_resolution_falls_back_to_run_config(monkeypatch):
 
 def test_manager_agent_resolution_supports_backend_only_override(monkeypatch):
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.resolve_effective_agent_options",
+        "vibe3.runtime.agent_resolver.resolve_effective_agent_options",
         lambda options: options,
     )
     monkeypatch.setattr(
-        "vibe3.orchestra.agent_resolver.sync_models_json",
+        "vibe3.runtime.agent_resolver.sync_models_json",
         lambda options: None,
     )
 
