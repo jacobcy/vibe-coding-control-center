@@ -18,7 +18,7 @@ def _strip_ansi(text: str) -> str:
 
 
 def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
-    """pr ready (missing PR number) should resolve from current flow PR."""
+    """pr ready (missing PR number) should resolve from GitHub API."""
     with (
         patch("vibe3.commands.pr_lifecycle.PRService") as mock_pr_service,
         patch("vibe3.commands.pr_lifecycle.FlowService") as mock_flow_service,
@@ -27,7 +27,7 @@ def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
         ) as mock_build_usecase,
     ):
         mock_pr_instance = MagicMock()
-        mock_pr_instance.store.get_flow_state.return_value = {"pr_number": 123}
+        mock_pr_instance.get_pr.return_value = mock_pr_response  # GitHub API returns PR
         mock_pr_service.return_value = mock_pr_instance
 
         mock_flow_instance = MagicMock()
@@ -41,6 +41,7 @@ def test_pr_ready_without_arg_resolves_pr_from_flow_state(mock_pr_response):
         result = runner.invoke(app, ["ready", "--yes"])
 
         assert result.exit_code == 0
+        mock_pr_instance.get_pr.assert_called_once_with(branch="task/demo")
         mock_usecase.mark_ready.assert_called_once_with(
             pr_number=123, yes=True, requested_reviewers=None
         )

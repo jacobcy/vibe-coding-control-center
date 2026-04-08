@@ -239,6 +239,21 @@ class FlowService(FlowLifecycleMixin):
         """
         self.store.update_flow_state(branch, **updates)
 
+    def delete_flow(self, branch: str) -> None:
+        """Delete all persisted flow truth for a branch.
+
+        This is the hard-reset counterpart to ``reactivate_flow()``.
+        It removes authoritative database state so any future manager/planner
+        pass must recreate the flow scene from scratch instead of inheriting
+        stale refs, events, issue links, or runtime session registry entries.
+        """
+        logger.bind(
+            domain="flow",
+            action="delete",
+            branch=branch,
+        ).info("Deleting flow")
+        self.store.delete_flow(branch)
+
     def reactivate_flow(
         self,
         branch: str,
@@ -394,14 +409,13 @@ class FlowService(FlowLifecycleMixin):
             return None
 
         # Fetch PR info from GitHub (truth)
+        # TODO: Optimize with cache service when implemented
         gh = GitHubClient()
-        pr_number_hint = flow_data.get("pr_number")
-        pr_number, pr_ready = pr_number_hint, bool(flow_data.get("pr_ready_for_review"))
+        pr_number, pr_ready = None, False  # Default values
 
         try:
-            # Remote-first: if pr_number exists in local cache, use it as hint;
-            # otherwise lookup by branch.
-            pr = gh.get_pr(pr_number_hint, branch)
+            # Query PR by branch (pr_number not cached in flow_state yet)
+            pr = gh.get_pr(None, branch)
             if pr:
                 pr_number = pr.number
                 pr_ready = pr.is_ready

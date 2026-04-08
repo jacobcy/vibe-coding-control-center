@@ -394,8 +394,14 @@ class PRService:
             )
 
         current_branch = self.git_client.get_current_branch()
-        flow_data = self.store.get_flow_state(current_branch)
-        resolved_pr = flow_data.get("pr_number") if flow_data else None
+        # Try to find PR for current branch from GitHub
+        # TODO: Optimize with cache service when implemented
+        try:
+            pr = self.github_client.get_pr(None, current_branch)
+            resolved_pr = pr.number if pr else None
+        except Exception:
+            resolved_pr = None
+
         return PrQueryTarget(
             pr_number=resolved_pr,
             branch=None,
