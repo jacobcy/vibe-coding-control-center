@@ -33,9 +33,9 @@ def _make_github():
     return github
 
 
-def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=False):
+def _patch_basic(monkeypatch, backend, github, sqlite=None):
     # Patch manager_run_service's dependencies
-    from vibe3.manager import manager_run_service, session_naming
+    from vibe3.manager import manager_run_service
     from vibe3.services import issue_failure_service
 
     monkeypatch.setattr(manager_run_service, "CodeagentBackend", lambda: backend)
@@ -57,12 +57,6 @@ def _patch_basic(monkeypatch, backend, github, sqlite=None, *, poll_session_id=F
         "render_manager_prompt",
         lambda config, issue: MagicMock(rendered_text="# Manager 自动化执行材料\n"),
     )
-    if not poll_session_id:
-        monkeypatch.setattr(
-            session_naming,
-            "wait_for_async_session_id",
-            lambda log_path, timeout_seconds=3.0: None,
-        )
 
 
 class TestRunManagerIssueSession:
@@ -148,7 +142,7 @@ class TestRunManagerIssueSession:
         github = _make_github()
         sqlite = MagicMock()
 
-        _patch_basic(monkeypatch, backend, github, sqlite, poll_session_id=True)
+        _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
@@ -175,7 +169,7 @@ class TestRunManagerIssueSession:
         github = _make_github()
         sqlite = MagicMock()
 
-        _patch_basic(monkeypatch, backend, github, sqlite, poll_session_id=True)
+        _patch_basic(monkeypatch, backend, github, sqlite)
         monkeypatch.setattr(
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
