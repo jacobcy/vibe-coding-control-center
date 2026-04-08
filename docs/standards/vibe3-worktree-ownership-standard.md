@@ -36,19 +36,20 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
   - `plan` 触发器：检测 `state/plan` label → dispatch planner agent
   - `run` 触发器：检测 `state/run` label → dispatch executor agent
   - `review` 触发器：检测 `state/review` label → dispatch reviewer agent
+- **事件驱动协同**：Agent 执行完成或失败时发布领域事件（见 [vibe3-event-driven-standard.md](vibe3-event-driven-standard.md)），由事件处理器负责更新 GitHub labels。Orchestra 的 tick 循环作为“外部观察者”消费这些 label 变迁并触发下一阶段 dispatch。
 - Worktree：**不需要**。Orchestra 本身不执行代码修改，不调用 codeagent-wrapper 直接。
 - 实现位置：`src/vibe3/orchestra/services/state_label_dispatch.py`（`StateLabelDispatchService`）
 
 ### L1 — Governance Service
 
-- 职责：扫描仓库状态（LOC、标签、规则合规），向 GitHub issue 写入治理结论，更新 labels。
+- 职责：扫描仓库状态（LOC、标签、规则合规），向 GitHub issue 写入治理结论，发布扫描事件，更新 labels。
 - Worktree：**不需要**。Governance 只读取文件、操作 GitHub API，不修改代码。
 - 参数要求：`cwd=None`，无 --worktree。可在主仓库路径或任意目录执行。
 - 实现位置：`src/vibe3/orchestra/services/governance_service.py`
 
 ### L2 — Supervisor + Apply
 
-- 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。
+- 职责：`SupervisorHandoffService` 读取 `supervisor+state/handoff` issue，dispatch apply agent 执行治理动作。发布 `SupervisorApplyDispatched` 等事件。
 - Apply agent 能力范围：
   - 更改 issue labels、关闭 issue、写入 comment
   - 简单文档修正（typo、补漏）
@@ -61,7 +62,7 @@ L4  Human collaboration            -- vibe-new 流程，人工引导
 
 ### L3 — Manager / Plan / Run / Review
 
-- **Manager agent 是状态机，不是 dispatcher**。Manager agent 读取 issue 上下文，执行状态流转（例如将 `state/ready` 改为 `state/plan`）。后续的 plan/run/review 由 L0 的 `StateLabelDispatchService` 检测到标签变化后触发。
+- **Manager agent 是状态机，不是 dispatcher**。Manager agent 读取 issue 上下文，决定状态流转意图并发布事件（如 `IssueStateChanged` 或 `ManagerExecutionCompleted`）。后续的 plan/run/review 由 L0 的 `StateLabelDispatchService` 检测到由事件处理器更新的标签变化后触发。
 - **所有 L3 agents 均由 `StateLabelDispatchService` dispatch**，并通过 `WorktreeManager.resolve_manager_cwd()` 解析 worktree 路径。
 
 #### L3 dispatch 流程
