@@ -162,7 +162,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 **规则**：
 - 使用 `uv` 进行依赖管理
 - 禁止使用 `python`/`pip`，必须用 `uv run`
-- 详细标准见 [.agent/rules/python-standards.md](.agent/rules/python-standards.md)
+- 详细标准见 [.claude/rules/python-standards.md](.claude/rules/python-standards.md)
 
 **主要模块**：
 - `cli.py` - CLI 主入口（Typer 路由分发）
@@ -171,6 +171,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
 - `commands/` - CLI 子命令实现
 - `config/` - 配置加载与 Pydantic schema 验证
+- `environment/` - 环境资源管理（Session 和 Worktree 统一抽象层）
 - `exceptions/` - 统一异常层级
 - `manager/` - Orchestra 执行代理（flow 映射、命令构建、worktree）
 - `models/` - Pydantic 领域数据模型
@@ -255,7 +256,7 @@ vibe3 inspect commit <sha>                # 改动影响范围
 | `task.md` | **[UNTRACKED]** 当前 flow handoff 草稿、阻塞点、短期 TODO（已放入 .gitignore 隔离，通过 `vibe3 handoff` 命令访问，不直接编辑） | 每个动作后 |
 | `memory.md` | **[TRACKED]** 长期共识、跨项目的架构决策池 | 重要架构决策时 |
 
-#### `.agent/rules/` - 编码规则
+#### `.claude/rules/` - 编码规则
 
 | 文件 | 职责 |
 |------|------|

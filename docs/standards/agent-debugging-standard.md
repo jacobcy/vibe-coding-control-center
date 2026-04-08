@@ -328,18 +328,33 @@ uv run python src/vibe3/cli.py run --supervisor supervisor/issue-cleanup.md
 - 创建前是否先查重，避免重复发布重叠 issue
 - 是否只创建当前轮次需要的最小 issue 集
 
-#### 第三步：手动触发 apply
+#### 第三步：观察 apply 自动触发
+
+> **注意**：apply 由 `SupervisorHandoffService.on_tick()` 自动触发，无需手动命令。
+> 当检测到带有 `supervisor` + `state/handoff` labels 的 issue 时，服务会自动 dispatch apply agent。
+> 手动执行 `run --issue <n>` **不是**正确的触发方式，会绕过 on_tick 状态机，可能导致重复执行或状态不一致。
+
+观察方式：
 
 ```bash
-uv run python src/vibe3/cli.py run --issue <governance_issue_number>
+# 方式一：观察 serve 运行时日志（推荐）
+tail -f temp/logs/vibe3-serve.log | grep supervisor
+
+# 方式二：确认 issue 已被识别并进入队列
+uv run python src/vibe3/cli.py flow status
+
+# 方式三：查看 apply session log（由 on_tick 生成）
+ls -lt temp/logs/vibe3-supervisor-issue-*.async.log | head -5
 ```
 
 检查点：
 
-- 是否默认使用配置中的 apply supervisor
-- 是否进入 async/tmux
-- 是否正确读取指定 issue，而不是自行重新查找一批 issue
-- CLI 是否显示了 `Session log: temp/logs/vibe3-supervisor-issue-...`
+- `on_tick` 是否检测到了正确的 `supervisor+state/handoff` issue
+- apply agent 是否已进入 async/tmux session
+- Session log 路径是否显示：`temp/logs/vibe3-supervisor-issue-{n}.async.log`
+
+> **调试用途**（仅限本地单步验证）：若需要隔离测试 apply 逻辑而不依赖 on_tick，
+> 可直接调用服务层，但不要通过 CLI `run --issue` 命令，该命令路径与 supervisor apply 逻辑不匹配。
 
 #### 第四步：观察结果
 
@@ -359,7 +374,7 @@ uv run python src/vibe3/cli.py run --issue <governance_issue_number>
 ### 5.4 治理链调试结论
 
 - 治理链通过 issue 交接，不通过 branch handoff 交接
-- `run --issue` 是治理 issue 的统一 apply 入口
+- apply 由 `SupervisorHandoffService.on_tick()` **自动触发**，检测 `supervisor+state/handoff` issue 后 dispatch；`run --issue` 不是 apply 的触发入口
 - async/tmux 与 session log 属于底层 codeagent 适配层，不属于上层 orchestration
 - 底层只负责触发；是否检查 `vibe3 task status`、是否创建 issue、是否 comment / close，全部由 supervisor prompt 决定
 

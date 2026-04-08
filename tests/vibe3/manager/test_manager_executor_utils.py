@@ -30,7 +30,8 @@ class TestManagerCommandBuilding:
 
         assert cmd[:6] == ["uv", "run", "python", "-m", "vibe3", "run"]
         assert "--async" in cmd
-        assert "--worktree" in cmd
+        # --worktree flag removed after refactoring (worktree is self-managed)
+        assert "--worktree" not in cmd
         assert "Manage issue #88: Improve parser" in cmd[-1]
         assert "## Role" in cmd[-1]
         assert "状态控制器" in cmd[-1]
@@ -114,7 +115,8 @@ class TestManagerReviewDispatch:
             cwd = manager._resolve_review_cwd_for_dispatch(42)
 
         mock_resolve.assert_not_called()
-        assert "--worktree" in cmd
+        # --worktree flag removed after refactoring (worktree is self-managed)
+        assert "--worktree" not in cmd
         assert cwd == Path("/tmp/repo")
 
 

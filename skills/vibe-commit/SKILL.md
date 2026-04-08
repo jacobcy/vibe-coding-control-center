@@ -287,11 +287,19 @@ git log --oneline <base>..HEAD
 
 发布入口只用：
 
+**人类用户**使用：
+
 ```bash
-uv run python src/vibe3/cli.py pr create --base <ref>
+vibe3 pr create --base <ref> --yes
 ```
 
-不要绕过 shell 规则直接把 `gh pr create` 当成真源入口。
+**Agent**直接使用：
+
+```bash
+gh pr create --base <ref> --title "..." --body "..."
+```
+
+**重要**：`vibe3 pr create` 是人类专用入口（需要 `--yes` 确认是人类）。Agent 执行自动化流程时应直接使用 `gh pr create`。
 
 ### Step 6.5: 自动应用标签与智能审查
 

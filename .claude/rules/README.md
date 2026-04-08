@@ -4,7 +4,7 @@
 
 ## 目录职责
 
-- `.agent/rules/`：仓库长期规则、硬约束、实现标准
+- `.claude/rules/`：仓库长期规则、硬约束、实现标准
 - `.agent/policies/`：按 `plan/run/review` mode 注入的策略材料与共享工具约束
 
 ## 规则文件说明
@@ -40,8 +40,8 @@
 ## 规则优先级
 
 1. **HARD RULES** (CLAUDE.md) - 最小不可协商规则
-2. **权威标准** (.agent/rules/*-standards.md) - 技术实现标准
-3. **执行细则** (.agent/rules/*.md) - 具体操作指南
+2. **权威标准** (.claude/rules/*-standards.md) - 技术实现标准
+3. **执行细则** (.claude/rules/*.md) - 具体操作指南
 
 ## 更新规则
 

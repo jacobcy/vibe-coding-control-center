@@ -301,7 +301,11 @@ class TestCodeagentBackend:
         # The last argument should be the custom task
         assert command[-1] == "custom task"
 
-    def test_run_adds_worktree_flag_for_new_session(self) -> None:
+    def test_run_no_worktree_flag_after_refactor(self) -> None:
+        """After refactoring, --worktree flag is no longer used.
+
+        Worktree is now self-managed.
+        """
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "VERDICT: PASS\n"
@@ -316,7 +320,8 @@ class TestCodeagentBackend:
             )
 
         command = mock_run.call_args[0][0]
-        assert "--worktree" in command
+        # After refactoring, --worktree flag is removed (vibe3 self-manages worktrees)
+        assert "--worktree" not in command
 
     def test_run_skips_worktree_flag_for_resume_session(self) -> None:
         mock_result = MagicMock()

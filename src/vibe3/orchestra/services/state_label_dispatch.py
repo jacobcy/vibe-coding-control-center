@@ -17,8 +17,8 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.manager_executor import ManagerExecutor
-from vibe3.manager.worktree_manager import WorktreeManager
 from vibe3.models.orchestration import (
     STATE_PROGRESS_CONTRACT,
     IssueInfo,
@@ -351,6 +351,9 @@ class StateLabelDispatchService(ServiceBase):
                 if flow:
                     branch = str(flow.get("branch") or "").strip()
                     flow_state = self._store.get_flow_state(branch) if branch else None
+                else:
+                    branch = ""
+                    flow_state = None
                 # For handoff resume: only dispatch for canonical task flows
                 if self.trigger_state == IssueState.HANDOFF:
                     if not flow:

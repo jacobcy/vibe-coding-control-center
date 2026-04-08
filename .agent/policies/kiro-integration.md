@@ -59,4 +59,4 @@ This project uses **uv** for Python dependency management and virtual environmen
 - ❌ Manual virtual environment creation (`python -m venv`)
 - ❌ Using `requirements.txt` (use `pyproject.toml` only)
 
-See [.agent/rules/python-standards.md](./python-standards.md) for complete Python coding standards.
+See [.claude/rules/python-standards.md](./python-standards.md) for complete Python coding standards.

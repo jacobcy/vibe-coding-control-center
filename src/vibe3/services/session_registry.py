@@ -1,11 +1,13 @@
 """Session registry service: reserve, track, and reconcile runtime sessions."""
 
 import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.manager.session_naming import build_session_name
+
+if TYPE_CHECKING:
+    from vibe3.agents.backends.codeagent import CodeagentBackend
 
 WORKER_ROLES = frozenset({"manager", "planner", "executor", "reviewer"})
 
@@ -32,7 +34,7 @@ class SessionRegistryService:
     def __init__(
         self,
         store: SQLiteClient,
-        backend: CodeagentBackend | None = None,
+        backend: "CodeagentBackend | None" = None,
     ) -> None:
         self._store = store
         self._backend = backend

@@ -47,6 +47,5 @@ class CommandBuilder:
         cmd = ["uv", "run", "python", "-m", "vibe3", "review", "pr", str(pr_number)]
         if self.config.pr_review_dispatch.async_mode:
             cmd.append("--async")
-        if self.config.pr_review_dispatch.use_worktree:
-            cmd.append("--worktree")
+        # Worktree is now self-managed, no --worktree flag needed
         return cmd

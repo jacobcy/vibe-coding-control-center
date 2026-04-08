@@ -86,7 +86,7 @@ class TestManagerCwdResolution:
             return_value=CompletedProcess(returncode=0),
         ) as mock_run:
             with patch(
-                "vibe3.manager.worktree_manager.append_orchestra_event"
+                "vibe3.environment.worktree_manager_compat.append_orchestra_event"
             ) as mock_append_event:
                 path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
 
@@ -114,7 +114,7 @@ class TestManagerCwdResolution:
             return_value=CompletedProcess(returncode=1, stderr="boom"),
         ):
             with patch(
-                "vibe3.manager.worktree_manager.append_orchestra_event"
+                "vibe3.environment.worktree_manager_compat.append_orchestra_event"
             ) as mock_append_event:
                 path, is_temp = manager._ensure_manager_worktree(77, "task/issue-77")
 

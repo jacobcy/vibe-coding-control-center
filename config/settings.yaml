@@ -111,7 +111,7 @@ code_limits:
         reason: "外部集成脚本，保持独立发布形态，不按常规模块拆分"
 
       # 基础设施核心模块
-      - path: "src/vibe3/manager/worktree_manager.py"
+      - path: "src/vibe3/environment/worktree.py"
         limit: 450
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"

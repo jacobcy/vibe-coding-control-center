@@ -389,7 +389,7 @@ def resolve_manager_execution_cwd(
     Returns:
         Tuple of (CWD path, effective worktree flag)
     """
-    from vibe3.manager.worktree_manager import WorktreeManager
+    from vibe3.environment.worktree import WorktreeManager
 
     # For session resume, use current directory
     if session_id:
