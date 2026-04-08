@@ -181,7 +181,6 @@ class ManagerExecutor:
         _manager_options = resolve_manager_agent_options(
             self.config,
             VibeConfig.get_defaults(),
-            worktree=False,  # Never use --worktree flag, worktree is self-managed
         )
         _manager_env = {
             **os.environ,
@@ -212,10 +211,10 @@ class ManagerExecutor:
                 "python",
                 "-I",
                 str(self._resolve_cli_entry()),
-                "run",
-                "--manager-issue",
+                "internal",
+                "manager",
                 str(issue.number),
-                "--sync",
+                "--no-async",
             ]
             try:
                 handle = self._backend.start_async_command(

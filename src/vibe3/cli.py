@@ -142,8 +142,8 @@ def run_command(
     async_mode: Annotated[
         bool,
         typer.Option(
-            "--async/--sync",
-            help="Run asynchronously in background (default: async)",
+            "--async/--no-async",
+            help="Run in async mode (tmux session) or synchronously (blocking)",
         ),
     ] = True,
     agent: Annotated[
@@ -160,16 +160,6 @@ def run_command(
         Optional[str],
         typer.Option("--model", help="Override model (e.g., claude-3-opus)"),
     ] = None,
-    worktree: Annotated[
-        bool,
-        typer.Option(
-            "--worktree",
-            help=(
-                "Pass --worktree to codeagent-wrapper "
-                "(new isolated worktree execution)"
-            ),
-        ),
-    ] = False,
     fresh_session: Annotated[
         bool,
         typer.Option(
@@ -190,7 +180,6 @@ def run_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         fresh_session=fresh_session,
     )
 

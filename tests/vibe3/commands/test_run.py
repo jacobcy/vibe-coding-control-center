@@ -27,10 +27,15 @@ def _patch_fast_run_runtime(monkeypatch) -> None:
         "vibe3.commands.command_options.ensure_flow_for_current_branch",
         lambda: (MagicMock(), "task/test-branch"),
     )
+    from vibe3.config.settings import AgentConfig, RunConfig
+
+    cfg = VibeConfig(
+        run=RunConfig(agent_config=AgentConfig(agent="executor")),
+    )
     monkeypatch.setattr(
         VibeConfig,
         "get_defaults",
-        classmethod(lambda cls: VibeConfig()),
+        classmethod(lambda cls: cfg),
     )
 
 
@@ -66,7 +71,7 @@ def test_run_file_not_found() -> None:
                 "vibe3.commands.run.CodeagentExecutionService.execute_sync",
                 return_value=MagicMock(success=True),
             ) as mock_execute:
-                result = runner.invoke(cli_app, ["run", "--file", "nonexistent.md"])
+                result = runner.invoke(cli_app, ["run", "--plan", "nonexistent.md"])
 
     assert result.exit_code != 0
     assert "Plan file not found: nonexistent.md" in strip_ansi(result.output)
@@ -99,7 +104,7 @@ def test_run_dry_run_shows_command(monkeypatch) -> None:
             "vibe3.commands.run.CodeagentExecutionService.execute",
             return_value=MagicMock(success=True),
         ) as mock_execute:
-            result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--dry-run"])
+            result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--dry-run"])
 
     assert result.exit_code == 0
     assert "-> Execute: plan.md" in result.stdout
@@ -119,7 +124,7 @@ def test_run_with_agent_override(monkeypatch) -> None:
                 cli_app,
                 [
                     "run",
-                    "--file",
+                    "--plan",
                     "plan.md",
                     "--agent",
                     "executor-pro",
@@ -144,7 +149,7 @@ def test_run_with_backend_override(monkeypatch) -> None:
                 cli_app,
                 [
                     "run",
-                    "--file",
+                    "--plan",
                     "plan.md",
                     "--backend",
                     "claude",
@@ -171,7 +176,7 @@ def test_run_uses_shared_agent_options_with_run_context(monkeypatch) -> None:
         ) as mock_execute:
             result = runner.invoke(
                 cli_app,
-                ["run", "--file", "plan.md", "--dry-run"],
+                ["run", "--plan", "plan.md", "--dry-run"],
             )
 
     assert result.exit_code == 0
@@ -264,7 +269,7 @@ def test_run_success_invokes_callbacks_via_event_driven_architecture(
         ),
         patch("vibe3.domain.publisher.publish") as mock_publish,
     ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+        result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--no-async"])
 
     assert result.exit_code == 0
     # verify execute_with_callbacks was called
@@ -315,7 +320,7 @@ def test_run_failure_invokes_failure_callback(monkeypatch) -> None:
         ),
         patch("vibe3.domain.publisher.publish") as mock_publish,
     ):
-        result = runner.invoke(cli_app, ["run", "--file", "plan.md", "--sync"])
+        result = runner.invoke(cli_app, ["run", "--plan", "plan.md", "--no-async"])
 
     assert result.exit_code == 0
     mock_exec_with_callbacks.assert_called_once()

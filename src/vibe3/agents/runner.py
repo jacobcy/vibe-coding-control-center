@@ -60,7 +60,6 @@ class CodeagentExecutionService:
         agent: str | None = None,
         backend: str | None = None,
         model: str | None = None,
-        worktree: bool = False,
     ) -> AgentOptions:
         """Resolve agent options with CLI override support.
 
@@ -105,7 +104,6 @@ class CodeagentExecutionService:
         if agent:
             return AgentOptions(
                 agent=agent,
-                worktree=worktree,
                 timeout_seconds=config_timeout,
             )
 
@@ -116,7 +114,6 @@ class CodeagentExecutionService:
             return AgentOptions(
                 backend=backend,
                 model=model,
-                worktree=worktree,
                 timeout_seconds=config_timeout,
             )
 
@@ -124,7 +121,6 @@ class CodeagentExecutionService:
         if config_agent:
             return AgentOptions(
                 agent=config_agent,
-                worktree=worktree,
                 timeout_seconds=config_timeout,
             )
 
@@ -133,7 +129,6 @@ class CodeagentExecutionService:
             return AgentOptions(
                 backend=config_backend,
                 model=config_model,
-                worktree=worktree,
                 timeout_seconds=config_timeout,
             )
 
@@ -160,7 +155,6 @@ class CodeagentExecutionService:
             agent=command.agent,
             backend=command.backend,
             model=command.model,
-            worktree=command.worktree,
         )
 
         request = ExecutionRequest(
@@ -211,7 +205,6 @@ class CodeagentExecutionService:
             agent=command.agent,
             backend=command.backend,
             model=command.model,
-            worktree=command.worktree,
         )
         cli_command = self._build_cli_command(command)
         execution_cwd = self._resolve_command_cwd(command.cwd)
@@ -398,8 +391,6 @@ class CodeagentExecutionService:
             cmd.extend(["--backend", command.backend])
         if command.model:
             cmd.extend(["--model", command.model])
-        if command.worktree:
-            cmd.append("--worktree")
         if command.task:
             cmd.append(command.task)
         cmd.append("--sync")

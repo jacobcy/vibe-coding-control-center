@@ -14,12 +14,10 @@ from vibe3.agents.runner import (
 )
 from vibe3.commands.command_options import (
     _AGENT_OPT,
-    _ASYNC_OPT,
     _BACKEND_OPT,
     _DRY_RUN_OPT,
     _MODEL_OPT,
     _TRACE_OPT,
-    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
@@ -49,7 +47,6 @@ def _execute_run_command(
     agent: str | None,
     backend: str | None,
     model: str | None,
-    worktree: bool,
     handoff_metadata: dict[str, object] | None,
 ) -> object:
     run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
@@ -63,7 +60,6 @@ def _execute_run_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         config=config,
         branch=branch,
     )
@@ -95,11 +91,16 @@ def run_command(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = True,
+    async_mode: Annotated[
+        bool,
+        typer.Option(
+            "--async/--no-async",
+            help="Run in async mode (tmux session) or synchronously (blocking)",
+        ),
+    ] = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
     fresh_session: Annotated[
         bool,
         typer.Option(
@@ -137,7 +138,6 @@ def run_command(
             agent=agent,
             backend=backend,
             model=model,
-            worktree=worktree,
             handoff_metadata={"skill": skill},
         )
         return
@@ -184,7 +184,6 @@ def run_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
         config=config,
         branch=branch,
     )
@@ -227,11 +226,16 @@ def default(
     ] = None,
     trace: _TRACE_OPT = False,
     dry_run: _DRY_RUN_OPT = False,
-    async_mode: _ASYNC_OPT = True,
+    async_mode: Annotated[
+        bool,
+        typer.Option(
+            "--async/--no-async",
+            help="Run in async mode (tmux session) or synchronously (blocking)",
+        ),
+    ] = True,
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
@@ -246,5 +250,4 @@ def default(
         agent,
         backend,
         model,
-        worktree,
     )

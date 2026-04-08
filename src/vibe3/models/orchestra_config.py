@@ -78,7 +78,7 @@ class PRReviewDispatchConfig(BaseModel):
     """Configuration for PR review dispatch service."""
 
     enabled: bool = True
-    async_mode: bool = False
+    async_mode: bool = True
     use_worktree: bool = False
 
 

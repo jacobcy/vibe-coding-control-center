@@ -13,7 +13,6 @@ from vibe3.commands.command_options import (
     _DRY_RUN_OPT,
     _MODEL_OPT,
     _TRACE_OPT,
-    _WORKTREE_OPT,
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
@@ -52,7 +51,6 @@ def _plan_issue_impl(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Create implementation plan for an issue."""
     if trace:
@@ -112,7 +110,6 @@ def _plan_spec_impl(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     """Create implementation plan from a specification."""
     if trace:
@@ -202,7 +199,6 @@ def default(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     if ctx.invoked_subcommand is not None:
         return
@@ -219,7 +215,6 @@ def default(
             agent=agent,
             backend=backend,
             model=model,
-            worktree=worktree,
         )
         return
     if spec:
@@ -233,7 +228,6 @@ def default(
             agent=agent,
             backend=backend,
             model=model,
-            worktree=worktree,
         )
         return
     if file is not None or msg is not None:
@@ -260,7 +254,6 @@ def issue_command(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     _plan_issue_impl(
         issue=issue,
@@ -271,7 +264,6 @@ def issue_command(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
     )
 
 
@@ -295,7 +287,6 @@ def spec(
     agent: _AGENT_OPT = None,
     backend: _BACKEND_OPT = None,
     model: _MODEL_OPT = None,
-    worktree: _WORKTREE_OPT = False,
 ) -> None:
     _plan_spec_impl(
         file=file,
@@ -307,5 +298,4 @@ def spec(
         agent=agent,
         backend=backend,
         model=model,
-        worktree=worktree,
     )

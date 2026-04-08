@@ -88,7 +88,6 @@ def resolve_effective_agent_options(options: AgentOptions) -> AgentOptions:
         agent=None,
         backend=backend,
         model=options.model or mapped_model,
-        worktree=options.worktree,
         timeout_seconds=options.timeout_seconds,
     )
 

@@ -16,8 +16,8 @@ _DRY_RUN_OPT = Annotated[
 _ASYNC_OPT = Annotated[
     bool,
     typer.Option(
-        "--async/--sync",
-        help="Run asynchronously in background (default: async)",
+        "--no-async",
+        help="Run synchronously (blocking) instead of async tmux session",
     ),
 ]
 _AGENT_OPT = Annotated[
@@ -27,13 +27,6 @@ _BACKEND_OPT = Annotated[
     Optional[str], typer.Option("--backend", help="Override backend")
 ]
 _MODEL_OPT = Annotated[Optional[str], typer.Option("--model", help="Override model")]
-_WORKTREE_OPT = Annotated[
-    bool,
-    typer.Option(
-        "--worktree",
-        help="Pass --worktree to codeagent-wrapper (new isolated worktree execution)",
-    ),
-]
 
 
 def ensure_flow_for_current_branch() -> tuple["FlowService", str]:

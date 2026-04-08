@@ -182,8 +182,7 @@ class ReviewUsecase:
         issue_number: int | None = None,
         pr_number: int | None = None,
         branch: str | None = None,
-        async_mode: bool = False,
-        worktree: bool = False,
+        async_mode: bool = True,
     ) -> ReviewRunResult:
         """Execute review request and return a command-facing summary."""
         from vibe3.domain.events import IssueFailed, ReviewCompleted
@@ -201,7 +200,6 @@ class ReviewUsecase:
             handoff_metadata={},
             config=self.config,
             branch=branch,
-            worktree=worktree,
         )
         if async_mode and not dry_run and branch:
             exec_svc.execute(command, async_mode=True)

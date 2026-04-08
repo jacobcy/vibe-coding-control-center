@@ -17,7 +17,6 @@ def internal_manager_dispatch(
     issue: Annotated[int, typer.Argument(help="Issue number to manage")],
     dry_run: bool = False,
     async_mode: bool = True,
-    worktree: bool = False,
     fresh_session: bool = False,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
@@ -27,7 +26,6 @@ def internal_manager_dispatch(
         issue_number=issue,
         dry_run=dry_run,
         async_mode=async_mode,
-        worktree=worktree,
         fresh_session=fresh_session,
     )
 

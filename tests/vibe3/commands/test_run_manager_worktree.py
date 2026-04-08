@@ -173,11 +173,9 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["internal", "manager", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
-        options = backend.start_async.call_args.kwargs["options"]
-        assert options.worktree is False
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
             "/Users/jacobcy/src/vibe-center/main/.worktrees/issue-372"
         )
@@ -206,7 +204,7 @@ class TestRunManagerWorktree:
             manager_run_service, "load_session_id", lambda role, branch=None: None
         )
 
-        result = runner.invoke(cli_app, ["internal", "manager", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
@@ -283,13 +281,10 @@ class TestRunManagerWorktree:
             lambda config, repo_root: worktree_manager,
         )
 
-        result = runner.invoke(cli_app, ["internal", "manager", "372", "--worktree"])
+        result = runner.invoke(cli_app, ["internal", "manager", "372"])
 
         assert result.exit_code == 0
         assert backend.start_async.call_args.kwargs["cwd"] == Path(
             "/Users/jacobcy/src/vibe-center/main"
         )
-        options = backend.start_async.call_args.kwargs["options"]
-        # WorktreeManager failed to create worktree, so worktree flag is dropped
-        assert options.worktree is False
         worktree_manager.resolve_manager_cwd.assert_called_once()
