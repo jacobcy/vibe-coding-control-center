@@ -33,13 +33,6 @@ from vibe3.server.registry import (
 
 
 @pytest.fixture(autouse=True)
-def mock_preflights():
-    """Patch pre-flight checks that require local network resources."""
-    with patch("vibe3.server.app._ensure_port_available", return_value=None):
-        yield
-
-
-@pytest.fixture(autouse=True)
 def mock_failed_gate():
     with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
         mock_check.return_value = GateResult.open()
@@ -170,7 +163,7 @@ def test_start_async_spawns_tmux_session(monkeypatch) -> None:
 
     with patch("vibe3.server.registry.subprocess.run") as mock_run:
         runner = CliRunner()
-        result = runner.invoke(app, ["start"])
+        result = runner.invoke(app, ["start", "--async"])
 
     assert result.exit_code == 0
     assert "tmux session" in result.stdout.lower()
@@ -200,7 +193,7 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
     )
     with patch("vibe3.server.registry.subprocess.run", side_effect=error):
         runner = CliRunner()
-        result = runner.invoke(app, ["start"])
+        result = runner.invoke(app, ["start", "--async"])
 
     assert result.exit_code == 1
     assert "already exists" in result.stdout.lower()
@@ -296,7 +289,7 @@ def test_start_debug_overrides_interval_and_scene_base(monkeypatch) -> None:
     monkeypatch.setattr(serve_module, "_run", _fake_run)
 
     runner = CliRunner()
-    result = runner.invoke(app, ["start", "--debug", "--no-async"])
+    result = runner.invoke(app, ["start", "--debug"])
 
     assert result.exit_code == 0
     config = captured["config"]
@@ -340,7 +333,7 @@ def test_start_honors_settings_debug_for_scene_base_and_interval(monkeypatch) ->
     monkeypatch.setattr(serve_module, "_run", _fake_run)
 
     runner = CliRunner()
-    result = runner.invoke(app, ["start", "--no-async"])
+    result = runner.invoke(app, ["start"])
 
     assert result.exit_code == 0
     config = captured["config"]
@@ -434,7 +427,7 @@ def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:
     )
 
     runner = CliRunner()
-    result = runner.invoke(app, ["start", "--ts"])
+    result = runner.invoke(app, ["start", "--async", "--ts"])
 
     assert result.exit_code == 0
     assert "started async" in result.stdout
@@ -461,7 +454,7 @@ def test_start_async_with_ts_exits_nonzero_when_setup_fails(monkeypatch) -> None
     )
 
     runner = CliRunner()
-    result = runner.invoke(app, ["start", "--ts"])
+    result = runner.invoke(app, ["start", "--async", "--ts"])
 
     assert result.exit_code == 1
     assert "ts setup failed" in result.stdout

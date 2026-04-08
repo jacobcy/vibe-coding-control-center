@@ -18,7 +18,7 @@ def strip_ansi(text: str) -> str:
 class TestAsyncDefaults:
     def test_run_help_shows_async_and_sync(self) -> None:
         result = runner.invoke(cli_app, ["run", "--help"])
-        output = strip_ansi(result.output)
+        output = strip_ansi(result.stdout)
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
@@ -27,7 +27,7 @@ class TestAsyncDefaults:
 
     def test_plan_help_shows_async_and_sync(self) -> None:
         result = runner.invoke(cli_app, ["plan", "issue", "--help"])
-        output = strip_ansi(result.output)
+        output = strip_ansi(result.stdout)
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
@@ -36,7 +36,7 @@ class TestAsyncDefaults:
 
     def test_review_help_shows_async_and_sync(self) -> None:
         result = runner.invoke(cli_app, ["review", "base", "--help"])
-        output = strip_ansi(result.output)
+        output = strip_ansi(result.stdout)
         assert result.exit_code == 0
         assert "async" in output
         assert "sync" in output
