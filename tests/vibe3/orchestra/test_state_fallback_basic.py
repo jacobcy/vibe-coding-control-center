@@ -7,8 +7,8 @@ import pytest
 
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.config import OrchestraConfig
-from vibe3.orchestra.no_progress_policy import execute_state_fallback
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.runtime.no_progress_policy import execute_state_fallback
 
 
 def _issue_payload(number: int, labels: list[str]) -> dict[str, object]:

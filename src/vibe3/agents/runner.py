@@ -299,10 +299,16 @@ class CodeagentExecutionService:
                 except Exception as e:
                     logger.error(f"on_success callback failed: {e}")
             else:
-                on_failure(Exception(result.stderr or "Execution failed"))
+                try:
+                    on_failure(Exception(result.stderr or "Execution failed"))
+                except Exception as e:
+                    logger.error(f"on_failure callback failed: {e}")
             return result
         except Exception as e:
-            on_failure(e)
+            try:
+                on_failure(e)
+            except Exception as callback_error:
+                logger.error(f"on_failure callback failed: {callback_error}")
             raise
 
     def _build_cli_command(self, command: CodeagentCommand) -> list[str]:

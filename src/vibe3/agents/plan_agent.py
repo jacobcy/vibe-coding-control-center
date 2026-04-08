@@ -15,15 +15,9 @@ from vibe3.config.settings import VibeConfig
 from vibe3.environment.session import SessionManager
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.models.flow import FlowStatusResponse
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput, PlanTaskInput
-from vibe3.orchestra.config import OrchestraConfig
-from vibe3.services.authoritative_ref_gate import require_authoritative_ref
 from vibe3.services.flow_service import FlowService
-from vibe3.services.issue_failure_service import (
-    block_planner_noop_issue,
-    confirm_plan_handoff,
-    fail_planner_issue,
-)
 from vibe3.services.spec_ref_service import SpecRefService
 
 
@@ -231,42 +225,36 @@ class PlanUsecase:
 
     def _handle_plan_success(
         self,
-        result: CodeagentResult,
+        result: object,
         issue_number: int,
         branch: str,
     ) -> None:
         """处理 plan 执行成功。
 
         职责：
-        - 检查 plan_ref 是否存在
-        - 如果存在：转换到 handoff 状态
-        - 如果不存在：阻塞 issue
+        - 发布 PlanCompleted 事件（验证 plan_ref 并转换状态）
 
         Args:
             result: 执行结果
             issue_number: GitHub issue 编号
             branch: Git 分支名
         """
+        from vibe3.domain.events import PlanCompleted
+        from vibe3.domain.publisher import publish
+
         log = logger.bind(
             domain="plan_usecase",
             action="handle_plan_success",
             issue=issue_number,
         )
 
-        has_ref = self._require_plan_ref(
+        log.info("Publishing PlanCompleted event")
+        event = PlanCompleted(
             issue_number=issue_number,
             branch=branch,
+            actor="agent:plan",
         )
-
-        if has_ref:
-            log.info("plan_ref found, transitioning to handoff")
-            self._transition_to_handoff(issue_number)
-        else:
-            log.warning("plan_ref missing, blocking issue")
-            self._block_issue(
-                issue_number=issue_number,
-                reason="Missing authoritative plan_ref",
-            )
+        publish(event)
 
     def _handle_plan_failure(
         self,
@@ -276,12 +264,15 @@ class PlanUsecase:
         """处理 plan 执行失败。
 
         职责：
-        - 标记 issue 为 failed 状态
+        - 发布 IssueFailed 事件
 
         Args:
             error: 异常对象
             issue_number: GitHub issue 编号
         """
+        from vibe3.domain.events import IssueFailed
+        from vibe3.domain.publisher import publish
+
         log = logger.bind(
             domain="plan_usecase",
             action="handle_plan_failure",
@@ -289,10 +280,12 @@ class PlanUsecase:
         )
 
         log.error("Plan execution failed", error=str(error))
-        self._fail_issue(
+        event = IssueFailed(
             issue_number=issue_number,
             reason=str(error),
+            actor="agent:plan",
         )
+        publish(event)
 
     def create_plan_spec(
         self,
@@ -321,76 +314,4 @@ class PlanUsecase:
             task=request.task_guidance,
             on_success=lambda r: self._handle_plan_success(r, issue_number, branch),
             on_failure=lambda e: self._handle_plan_failure(e, issue_number),
-        )
-
-    def _require_plan_ref(
-        self,
-        issue_number: int,
-        branch: str,
-    ) -> bool:
-        """检查 plan_ref 是否存在。
-
-        Args:
-            issue_number: GitHub issue 编号
-            branch: Git 分支名
-
-        Returns:
-            True 如果 plan_ref 存在，False 否则
-        """
-        return require_authoritative_ref(
-            flow_service=self.flow_service,
-            branch=branch,
-            ref_name="plan_ref",
-            issue_number=issue_number,
-            reason="Missing authoritative plan_ref",
-            actor="agent:plan",
-            block_issue=lambda **kwargs: self._block_issue(**kwargs),
-        )
-
-    def _block_issue(
-        self,
-        issue_number: int,
-        reason: str,
-    ) -> None:
-        """阻塞 issue。
-
-        Args:
-            issue_number: GitHub issue 编号
-            reason: 阻塞原因
-        """
-        block_planner_noop_issue(
-            issue_number=issue_number,
-            reason=reason,
-            actor="agent:plan",
-        )
-
-    def _transition_to_handoff(
-        self,
-        issue_number: int,
-    ) -> None:
-        """转换 issue 到 handoff 状态。
-
-        Args:
-            issue_number: GitHub issue 编号
-        """
-        confirm_plan_handoff(
-            issue_number=issue_number,
-            actor="agent:plan",
-        )
-
-    def _fail_issue(
-        self,
-        issue_number: int,
-        reason: str,
-    ) -> None:
-        """标记 issue 为 failed 状态。
-
-        Args:
-            issue_number: GitHub issue 编号
-            reason: 失败原因
-        """
-        fail_planner_issue(
-            issue_number=issue_number,
-            reason=reason,
-            actor="agent:plan",
         )
