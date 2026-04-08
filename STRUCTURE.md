@@ -171,6 +171,7 @@ AI Agent → AGENTS.md → SOUL.md (宪法和原则)
 - `clients/` - 外部系统客户端（Git, GitHub, AI, Serena, SQLite）
 - `commands/` - CLI 子命令实现
 - `config/` - 配置加载与 Pydantic schema 验证
+- `environment/` - 环境资源管理（Session 和 Worktree 统一抽象层）
 - `exceptions/` - 统一异常层级
 - `manager/` - Orchestra 执行代理（flow 映射、命令构建、worktree）
 - `models/` - Pydantic 领域数据模型

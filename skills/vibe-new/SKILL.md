@@ -64,7 +64,7 @@ description: Use when starting or switching to a new human-collaboration task. C
   │       └─ vibe3 flow bind <issue> --role task
   │
   ├─ Step 4: 创联 PR（按需）
-  │   └─ vibe3 pr create --base main --yes
+  │   └─ gh pr create --base main --title "..." --body "..."
   │
   └─ Step 5: 写入 handoff 并停止
       └─ vibe3 handoff append "vibe-new: ready to code" --actor vibe-new --kind milestone
@@ -78,7 +78,7 @@ description: Use when starting or switching to a new human-collaboration task. C
 
 ```bash
 vibe3 flow show       # 当前 branch 的 flow 详情
-vibe3 task status --all --check  # 全局 flow / issue / PR 上下文总览
+vibe3 task status --all  # 全局 flow / issue / PR 上下文总览
 ```
 
 检查点：
@@ -142,9 +142,27 @@ vibe3 flow bind <issue-number> --role dependency
 
 ### Step 4: 创联 PR draft（按需）
 
+**Agent 使用 gh pr create**：
+
+```bash
+gh pr create --base main --title "feat: <feature-name>" --body "## Summary
+
+- <bullet points>
+
+## Test Plan
+
+- [ ] <test items>
+
+Closes #<issue-number>"
+```
+
+**人类用户使用 vibe3 pr create**：
+
 ```bash
 vibe3 pr create --base main --yes
 ```
+
+**说明**：`vibe3 pr create` 是人类专用入口（需要 `--yes` 确认是人类）。Agent 执行自动化流程时应直接使用 `gh pr create`。
 
 该步骤只在当前分支已经具备可发 PR 的条件时执行。PR draft 用于：
 
@@ -208,5 +226,8 @@ vibe3 flow show
 - 不得把 handoff 当真源，必须先核查 `vibe3 flow show` 输出
 - 不得在没有 issue 的情况下创建 flow（issue 是 flow 的规划依据）
 - 如果当前输入只是 spec / plan / 需求草案，不得跳过 `/vibe-issue` 直接建 flow
-- 不得把 `flow bind` 和 `flow add` 混用（`add` 注册分支，`bind` 绑定 issue）
+- 正确使用 `flow update` 和 `flow bind`：
+  - `flow update` - 注册当前分支为 flow（幂等操作，可重复调用）
+  - `flow bind` - 绑定 issue 到当前 flow
+  - 不要混用其他命令尝试注册或绑定
 - 恢复已有 branch / flow 时不要再用已废弃的 `/vibe-start`，统一使用 `/vibe-continue`
