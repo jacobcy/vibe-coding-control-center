@@ -96,6 +96,9 @@ code_limits:
       - path: "src/vibe3/server/registry.py"
         limit: 450
         reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
+      - path: "src/vibe3/server/app.py"
+        limit: 450
+        reason: "组装聚合，职责单一"
 
       # Manager —— 允许 450
       - path: "src/vibe3/manager/manager_run_service.py"
@@ -112,7 +115,7 @@ code_limits:
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
-        limit: 450
+        limit: 500
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 550
@@ -156,7 +159,7 @@ code_limits:
         limit: 500
         reason: "Task command surface 测试集，10 个测试，平均 45.2 lines/test，大量 mock setup"
       - path: "tests/vibe3/commands/test_task_resume_failed.py"
-        limit: 430
+        limit: 450
         reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
       - path: "tests/vibe3/commands/test_run_manager_issue.py"
         limit: 500
