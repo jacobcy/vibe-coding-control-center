@@ -11,6 +11,7 @@ from vibe3.cli import app
 from vibe3.config.settings import VibeConfig
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import GateResult
+from vibe3.server.registry import _build_async_serve_command
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +102,16 @@ def test_start_async_reports_duplicate_session(monkeypatch) -> None:
 
     assert result.exit_code == 1
     assert "already exists" in result.stdout.lower()
+
+
+def test_build_async_serve_command_forces_sync_child_process() -> None:
+    cmd = _build_async_serve_command(
+        OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"), debug=True),
+        verbose=0,
+        launch_cwd=Path("/tmp/debug-wt"),
+    )
+
+    assert "--no-async" in cmd
 
 
 def test_start_async_with_ts_prints_public_url(monkeypatch) -> None:

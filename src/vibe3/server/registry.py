@@ -386,6 +386,7 @@ def _build_async_serve_command(
         "src/vibe3/cli.py",
         "serve",
         "start",
+        "--no-async",
         "--interval",
         str(config.polling_interval),
         "--port",

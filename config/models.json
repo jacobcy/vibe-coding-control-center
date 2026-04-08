@@ -19,8 +19,8 @@
       "yolo": true
     },
     "explore": {
-      "backend": "gemini",
-      "model": "gemini-3-flash-preview"
+      "backend": "opencode",
+      "model": "opencode/minimax-m2.5-free"
     },
     "develop": {
       "backend": "opencode",

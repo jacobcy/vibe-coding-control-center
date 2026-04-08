@@ -37,6 +37,30 @@ class TestSessionIdExtraction:
 
 
 class TestStartAsyncCommand:
+    def test_build_async_shell_command_exits_immediately_by_default(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["echo", "hello"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=0,
+        )
+
+        assert "cmd_status=${PIPESTATUS[0]:-$?}" in shell
+        assert "command exited with status: ${cmd_status}" in shell
+        assert "exit ${cmd_status}" in shell
+        assert "; status=${PIPESTATUS[0]:-$?};" not in shell
+        assert "keeping tmux session alive" not in shell
+        assert "sleep 0" not in shell
+
+    def test_build_async_shell_command_can_keep_session_when_requested(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["echo", "hello"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=5,
+        )
+
+        assert "keeping tmux session alive for 5s" in shell
+        assert "sleep 5" in shell
+
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:

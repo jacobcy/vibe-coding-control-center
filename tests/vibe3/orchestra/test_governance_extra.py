@@ -191,7 +191,7 @@ class TestGovernanceService:
 
         backend.start_async.assert_called_once()
         backend.run.assert_not_called()
-        assert backend.start_async.call_args.kwargs["keep_alive_seconds"] == 10
+        assert backend.start_async.call_args.kwargs["keep_alive_seconds"] == 0
         assert backend.start_async.call_args.kwargs["execution_name"].startswith(
             "vibe3-governance-scan-"
         )

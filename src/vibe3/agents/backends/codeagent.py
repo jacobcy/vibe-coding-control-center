@@ -204,16 +204,19 @@ class CodeagentBackend:
         filter_command = shlex.join(cls._build_async_log_filter())
         cmd_str = shlex.join(command)
         log_str = shlex.quote(str(log_path))
-        return (
+        shell = (
             f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
-            "status=${PIPESTATUS[0]:-$?}; "
+            "cmd_status=${PIPESTATUS[0]:-$?}; "
             "echo; "
-            'echo "[vibe3 async] command exited with status: ${status}"; '
-            f'echo "[vibe3 async] keeping tmux session alive for '
-            f'{keep_alive_seconds}s for inspection..."; '
-            f"sleep {keep_alive_seconds}; "
-            "exit ${status}"
+            'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
         )
+        if keep_alive_seconds > 0:
+            shell += (
+                f'echo "[vibe3 async] keeping tmux session alive for '
+                f'{keep_alive_seconds}s for inspection..."; '
+                f"sleep {keep_alive_seconds}; "
+            )
+        return shell + "exit ${cmd_status}"
 
     @staticmethod
     def _allocate_tmux_session_name(base_name: str) -> str:
@@ -327,7 +330,7 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         project_root = cwd or Path.cwd()
 
@@ -375,7 +378,7 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start an already-built command in tmux with repo-local logging."""
         return self._spawn_tmux_command(
@@ -396,7 +399,7 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start codeagent-wrapper in tmux and return the async handle."""
         sync_models_json(options)

@@ -289,7 +289,7 @@ class GovernanceService(ServiceBase):
             task=task,
             execution_name=self._governance_execution_name(),
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            keep_alive_seconds=10,
+            keep_alive_seconds=0,
         )
 
     def _governance_execution_name(self) -> str:

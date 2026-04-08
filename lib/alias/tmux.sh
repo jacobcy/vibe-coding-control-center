@@ -230,28 +230,48 @@ vtls() {
   echo "💡 Next: Run ${CYAN}vt${NC} to attach to default, or ${CYAN}vtup <name>${NC} for specific."
 }
 
-# @desc Kill a specific Tmux session
+# @desc Kill a specific Tmux session or all sessions
 vtkill() {
-  local assume_yes=false session="$1"
+  local assume_yes=false kill_all=false session=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -y|--yes) assume_yes=true; shift ;;
+      -all|--all) kill_all=true; shift ;;
       *)
         session="$1"
         shift
         ;;
     esac
   done
+
+  if [[ "$kill_all" == true ]]; then
+    local -a sessions=()
+    while IFS= read -r s; do
+      [[ -n "$s" ]] && sessions+=("$s")
+    done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+
+    [[ ${#sessions[@]} -eq 0 ]] && { echo "ℹ️ No active sessions to kill"; return 0; }
+    [[ "$assume_yes" == true ]] || {
+      echo "⚠️ vtkill --yes --all would kill ${#sessions[@]} sessions:"
+      for s in "${sessions[@]}"; do echo "  • $s"; done
+      echo "Rerun with --yes to confirm."
+      return 1
+    }
+    for s in "${sessions[@]}"; do tmux kill-session -t "$s"; done
+    echo "✅ Killed all sessions (${#sessions[@]} total)"
+    return 0
+  fi
+
   if [[ -z "$session" ]]; then
     if [[ -n "$TMUX" ]]; then
       session="$(tmux display-message -p '#S')"
-      [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate the current session '$session'."; return 1; }
+      [[ "$assume_yes" == true ]] || { echo "⚠️ Pass --yes to vtkill to terminate the current session '$session'."; return 1; }
     else
       session="$VIBE_SESSION"
     fi
   fi
   tmux has-session -t "$session" 2>/dev/null || { echo "❌ No session: $session"; return 1; }
-  [[ "$assume_yes" == true ]] || { echo "⚠️  Pass --yes to vtkill to terminate session '$session'."; return 1; }
+  [[ "$assume_yes" == true ]] || { echo "⚠️ Pass --yes to vtkill to terminate session '$session'."; return 1; }
   tmux kill-session -t "$session"
   echo "✅ Killed: $session"
 }
