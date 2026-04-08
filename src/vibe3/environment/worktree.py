@@ -195,6 +195,26 @@ class WorktreeManager(ManagerCompatMixin):
         """Create an issue-bound worktree."""
         wt_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Pre-flight: cleanup stale references
+        try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        # If path exists but is not registered, delete it
+        if wt_path.exists() and not self._find_worktree_by_path(wt_path):
+            logger.warning(
+                "Deleting unregistered directory at target worktree path",
+                path=str(wt_path),
+            )
+            shutil.rmtree(wt_path)
+
         try:
             result = subprocess.run(
                 ["git", "worktree", "add", str(wt_path), branch],
@@ -213,6 +233,23 @@ class WorktreeManager(ManagerCompatMixin):
             raise SystemError(f"Failed to create issue worktree: {exc}") from exc
 
         if result.returncode != 0:
+            # Handle "already checked out" error
+            if "already checked out" in result.stderr:
+                logger.warning(
+                    "Branch already checked out elsewhere, attempting to resolve",
+                    branch=branch,
+                )
+                # Attempt to find where it is checked out
+                existing_path = self._find_worktree_for_branch(branch)
+                if existing_path:
+                    logger.info("Reusing worktree", path=str(existing_path))
+                    return WorktreeContext(
+                        path=existing_path,
+                        is_temporary=False,
+                        branch=branch,
+                        issue_number=issue_number,
+                    )
+
             logger.error(
                 "Git worktree add failed",
                 issue=issue_number,
@@ -244,9 +281,25 @@ class WorktreeManager(ManagerCompatMixin):
         """Create a temporary worktree."""
         wt_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Pre-flight prune
         try:
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=self.repo_path,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        if wt_path.exists():
+            shutil.rmtree(wt_path)
+
+        try:
+            # Use --detach for temporary worktrees to allow multiple from same base
             result = subprocess.run(
-                ["git", "worktree", "add", str(wt_path), base_branch],
+                ["git", "worktree", "add", "--detach", str(wt_path), base_branch],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
@@ -283,6 +336,29 @@ class WorktreeManager(ManagerCompatMixin):
             branch=base_branch,
             issue_number=issue_number,
         )
+
+    def _find_worktree_by_path(self, target_path: Path) -> bool:
+        """Return True if path is a registered git worktree."""
+        try:
+            result = subprocess.run(
+                ["git", "worktree", "list", "--porcelain"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return False
+
+            target_abs = target_path.resolve()
+            for line in result.stdout.split("\n"):
+                if line.startswith("worktree "):
+                    path = Path(line.split(" ", 1)[1]).resolve()
+                    if path == target_abs:
+                        return True
+            return False
+        except Exception:
+            return False
 
     def _recycle_worktree_path(self, target: Path) -> None:
         """Recycle a worktree path, unregistering it first."""

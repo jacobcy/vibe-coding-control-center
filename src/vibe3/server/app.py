@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import signal
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -116,6 +117,33 @@ def make_webhook_router(
         )
 
     return router
+
+
+def _ensure_port_available(port: int) -> None:
+    """Raise typer.Exit if port is already in use."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            # Use SO_REUSEADDR to be consistent with common server behavior
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("0.0.0.0", port))
+        except OSError as e:
+            if e.errno in (48, 98):  # MacOS: 48, Linux: 98
+                typer.echo(
+                    f"\n[bold red]Error:[/] Port {port} is already in use.",
+                    err=True,
+                )
+                typer.echo(
+                    "Check if another Orchestra service is running on this port.",
+                    err=True,
+                )
+                typer.echo(
+                    "Use [bold]vibe3 serve stop[/] or specify [bold]--port[/].\n",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            raise
 
 
 # --- Server Run Logic ---
@@ -249,6 +277,9 @@ def start(
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
 
+    # Pre-flight: Check if port is available
+    _ensure_port_available(config.port)
+
     # Phase 1: FailedGate Preflight
     from vibe3.orchestra.failed_gate import FailedGate
 
@@ -296,6 +327,10 @@ def start(
     typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
+    # Write PID file for the synchronous server process
+    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
+    config.pid_file.write_text(str(os.getpid()))
+
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         os.environ["VIBE3_REPO_MODELS_ROOT"] = str(
@@ -305,6 +340,15 @@ def start(
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")
+    except SystemExit as e:
+        # Catch uvicorn exit to avoid asyncio "never retrieved" warnings
+        if e.code != 0:
+            sys.exit(e.code)
+        raise
+    finally:
+        # Cleanup PID file on exit
+        if config.pid_file.exists():
+            config.pid_file.unlink()
 
 
 @app.command()
