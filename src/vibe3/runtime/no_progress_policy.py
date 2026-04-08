@@ -166,39 +166,6 @@ def has_progress_changed(
     )
 
 
-def should_auto_block(
-    issue_number: int,
-    current_labels: list[str],
-    has_live_session: bool,
-    state_changed: bool,
-) -> bool:
-    """Determine if issue should be auto-blocked.
-
-    Args:
-        issue_number: GitHub issue number
-        current_labels: Current issue labels
-        has_live_session: Whether manager session is still alive
-        state_changed: Whether state label changed during manager run
-
-    Returns:
-        True if issue should be auto-blocked, False otherwise
-    """
-    # Do not block if session is still alive
-    if has_live_session:
-        return False
-
-    # Do not block if state already changed (manager made progress)
-    if state_changed:
-        return False
-
-    # Do not block if already blocked
-    if IssueState.BLOCKED.to_label() in current_labels:
-        return False
-
-    # Block if session ended without state change
-    return True
-
-
 def execute_state_fallback(
     issue_number: int,
     current_labels: list[str],
