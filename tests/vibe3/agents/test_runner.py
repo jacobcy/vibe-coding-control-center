@@ -17,15 +17,15 @@ class TestCodeagentExecutionService:
 
         assert cmd[:3] == ["uv", "run", "--project"]
         assert cmd[4:6] == ["python", str(CodeagentExecutionService._cli_entry())]
-        assert "--sync" in cmd
+        assert "--no-async" in cmd
 
     def test_build_self_invocation_drops_async_and_keeps_sync_single(self) -> None:
         cmd = CodeagentExecutionService.build_self_invocation(
-            ["review", "base", "--async", "--sync"]
+            ["review", "base", "--async", "--no-async"]
         )
 
         assert "--async" not in cmd
-        assert cmd.count("--sync") == 1
+        assert cmd.count("--no-async") == 1
 
     def test_execute_async_prints_tmux_session_and_log(self, monkeypatch) -> None:
         service = CodeagentExecutionService(VibeConfig.get_defaults())
@@ -120,7 +120,7 @@ class TestCodeagentExecutionService:
             "plan",
             "--issue",
             "42",
-            "--sync",
+            "--no-async",
         ]
 
     def test_execute_async_passes_explicit_worktree_root_as_cwd(

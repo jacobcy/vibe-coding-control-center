@@ -62,6 +62,7 @@ class ManagerExecutor:
 
         self._last_error_category: str | None = None
         self._queued_issues: set[int] = set()
+        self._active_dispatch_locks: set[int] = set()
 
     @property
     def flow_manager(self) -> Any:
@@ -112,6 +113,24 @@ class ManagerExecutor:
 
     def dispatch_manager(self, issue: IssueInfo) -> bool:
         """Complete lifecycle for manager dispatch with queuing."""
+        log = logger.bind(
+            domain="orchestra",
+            action="manager_dispatch",
+            issue=issue.number,
+        )
+
+        if issue.number in self._active_dispatch_locks:
+            log.debug("Skip: Issue already being dispatched by another worker")
+            return False
+
+        self._active_dispatch_locks.add(issue.number)
+        try:
+            return self._dispatch_manager_impl(issue)
+        finally:
+            self._active_dispatch_locks.discard(issue.number)
+
+    def _dispatch_manager_impl(self, issue: IssueInfo) -> bool:
+        """Internal implementation of manager dispatch."""
         log = logger.bind(
             domain="orchestra",
             action="manager_dispatch",

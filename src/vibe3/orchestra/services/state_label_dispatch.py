@@ -533,7 +533,7 @@ class StateLabelDispatchService(ServiceBase):
                 "plan",
                 "--issue",
                 str(issue_number),
-                "--sync",
+                "--no-async",
             ]
         if self.trigger_name == "manager":
             # 彻底走向新的 internal 路由
@@ -548,7 +548,7 @@ class StateLabelDispatchService(ServiceBase):
                 "internal",
                 "manager",
                 str(issue_number),
-                "--sync",
+                "--no-async",
             ]
         if self.trigger_name == "run":
             return [
@@ -560,7 +560,7 @@ class StateLabelDispatchService(ServiceBase):
                 "-I",
                 cli_entry,
                 "run",
-                "--sync",
+                "--no-async",
             ]
         return [
             "uv",
@@ -572,7 +572,7 @@ class StateLabelDispatchService(ServiceBase):
             cli_entry,
             "review",
             "base",
-            "--sync",
+            "--no-async",
         ]
 
     def _resolve_agent_options(self) -> AgentOptions:
