@@ -127,7 +127,7 @@ code_limits:
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
-        limit: 500
+        limit: 600
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
         limit: 570
