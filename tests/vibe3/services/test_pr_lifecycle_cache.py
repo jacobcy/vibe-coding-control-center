@@ -102,11 +102,24 @@ def test_mark_ready_updates_cache_title() -> None:
             metadata=None,
         )
 
-        with patch("vibe3.services.pr_service.GitHubClient") as mock_gh_class:
+        with (
+            patch("vibe3.services.pr_service.GitHubClient") as mock_gh_class,
+            patch("vibe3.services.pr_service.GitClient") as mock_git_class,
+            patch("vibe3.services.pr_service.check_upstream_conflicts"),
+            patch(
+                "vibe3.services.pr_service.SignatureService.resolve_for_branch",
+                return_value="test-actor",
+            ),
+        ):
             mock_gh = MagicMock()
+            mock_gh.check_auth.return_value = True
             mock_gh.get_pr.return_value = mock_pr
             mock_gh.mark_pr_ready.return_value = mock_pr
             mock_gh_class.return_value = mock_gh
+
+            mock_git = MagicMock()
+            mock_git.get_current_branch.return_value = "feature-branch"
+            mock_git_class.return_value = mock_git
 
             service = PRService(store=store)
             result = service.mark_ready(512)
