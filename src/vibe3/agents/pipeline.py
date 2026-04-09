@@ -14,15 +14,15 @@ from loguru import logger
 from typer import echo
 
 from vibe3.agents.base import AgentBackend
+from vibe3.agents.execution_lifecycle import (
+    ExecutionRole,
+    persist_execution_lifecycle_event,
+)
 from vibe3.agents.review_runner import format_agent_actor
 from vibe3.agents.session_service import load_session_id
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions, AgentResult
-from vibe3.services.execution_lifecycle import (
-    ExecutionRole,
-    persist_execution_lifecycle_event,
-)
 from vibe3.services.handoff_recorder_unified import (
     HandoffRecord,
     record_handoff_unified,

@@ -13,10 +13,10 @@ from loguru import logger
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
-from vibe3.services.session_registry import SessionRegistryService
 from vibe3.services.status_query_service import StatusQueryService
 from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations

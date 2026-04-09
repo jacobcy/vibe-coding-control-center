@@ -3,13 +3,17 @@
 import datetime
 from typing import TYPE_CHECKING, Any
 
+from vibe3.clients.protocols import BackendProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.manager.session_naming import build_session_name
 
 if TYPE_CHECKING:
-    from vibe3.agents.backends.codeagent import CodeagentBackend
+    pass
 
-WORKER_ROLES = frozenset({"manager", "planner", "executor", "reviewer"})
+# All supported execution roles (L1/L2/L3 chains)
+WORKER_ROLES = frozenset(
+    {"manager", "planner", "executor", "reviewer", "supervisor", "governance"}
+)
 
 
 class SessionRegistryService:
@@ -34,7 +38,7 @@ class SessionRegistryService:
     def __init__(
         self,
         store: SQLiteClient,
-        backend: "CodeagentBackend | None" = None,
+        backend: BackendProtocol | None = None,
     ) -> None:
         self._store = store
         self._backend = backend
@@ -107,7 +111,7 @@ class SessionRegistryService:
 
         Rules:
         - Only considers sessions in starting|running status.
-        - Excludes governance role.
+        - Excludes governance role (governance uses separate capacity pool).
         - For sessions with a tmux_session, confirms liveness via backend.
         - Sessions still in starting with no tmux_session are counted as live.
         """
@@ -126,6 +130,9 @@ class SessionRegistryService:
         count = 0
         for session in sessions:
             session_role = session.get("role", "")
+            # Exclude governance (has separate capacity pool)
+            if session_role == "governance":
+                continue
             if session_role not in WORKER_ROLES:
                 continue
             tmux = session.get("tmux_session")

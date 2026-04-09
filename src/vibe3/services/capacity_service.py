@@ -1,0 +1,177 @@
+"""Unified capacity service: capacity control for all execution roles.
+
+Solves the dual-layer throttling problem by providing a single capacity check
+point that combines live session count and in-flight dispatch tracking.
+
+Usage Guide: docs/v3/architecture/infrastructure-guide.md#capacityservice
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import TYPE_CHECKING
+
+from loguru import logger
+
+from vibe3.clients.protocols import BackendProtocol
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.models.orchestra_config import OrchestraConfig
+
+if TYPE_CHECKING:
+    pass
+
+
+class CapacityService:
+    """Unified capacity control for all execution roles.
+
+    Combines live session count and in-flight dispatch tracking to prevent
+    dual-layer throttling issues between StateLabelDispatchService and
+    ManagerExecutor.
+
+    Capacity Formula:
+        remaining = max_capacity(role) - active_count(role) - in_flight_count(role)
+
+    Where:
+        - active_count: live worker sessions (starting/running) for the role
+        - in_flight_count: targets being dispatched right now for the role
+
+    Usage:
+        service = CapacityService(config, store, backend)
+
+        # Check before dispatch
+        if service.can_dispatch("manager", issue_number):
+            service.mark_in_flight("manager", issue_number)
+            # ... dispatch logic ...
+            service.prune_in_flight("manager", {issue_number})
+    """
+
+    def __init__(
+        self,
+        config: OrchestraConfig,
+        store: SQLiteClient,
+        backend: BackendProtocol,
+    ) -> None:
+        """Initialize capacity service.
+
+        Args:
+            config: Orchestra config with max_concurrent_flows
+            store: SQLite client for session registry
+            backend: Backend protocol for tmux liveness check
+        """
+        self.config = config
+        self._store = store
+        self._backend = backend
+        self._registry = SessionRegistryService(store, backend)
+        # Track in-flight dispatches per role
+        self._in_flight_dispatches: dict[str, set[int]] = defaultdict(set)
+
+    def can_dispatch(self, role: str, target_id: int) -> bool:
+        """Check if role can dispatch target given current capacity.
+
+        Args:
+            role: Execution role (manager, planner, executor, reviewer, supervisor)
+            target_id: Target ID (e.g., issue number)
+
+        Returns:
+            True if capacity available, False if should throttle/queue
+        """
+        active_count = self._registry.count_live_worker_sessions(role=role)
+        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
+        max_capacity = self._get_max_capacity(role)
+        remaining = max(0, max_capacity - active_count - in_flight_count)
+
+        can_dispatch = remaining > 0
+
+        if not can_dispatch:
+            logger.bind(
+                domain="capacity",
+                role=role,
+                target=target_id,
+                active=active_count,
+                in_flight=in_flight_count,
+                max=max_capacity,
+            ).info(
+                f"Capacity full for {role} #{target_id} "
+                f"(live={active_count}, in_flight={in_flight_count}, "
+                f"max={max_capacity})"
+            )
+
+        return can_dispatch
+
+    def mark_in_flight(self, role: str, target_id: int) -> None:
+        """Mark target as in-flight (being dispatched) for role.
+
+        Args:
+            role: Execution role
+            target_id: Target ID to track
+        """
+        self._in_flight_dispatches[role].add(target_id)
+        logger.bind(
+            domain="capacity",
+            role=role,
+            target=target_id,
+            in_flight_count=len(self._in_flight_dispatches[role]),
+        ).debug(f"Marked {role} #{target_id} as in-flight")
+
+    def prune_in_flight(self, role: str, target_ids: set[int]) -> None:
+        """Remove in-flight markers for completed/failed dispatches.
+
+        Args:
+            role: Execution role
+            target_ids: Targets to prune
+        """
+        before = len(self._in_flight_dispatches.get(role, set()))
+        self._in_flight_dispatches[role].difference_update(target_ids)
+        after = len(self._in_flight_dispatches.get(role, set()))
+
+        if before != after:
+            logger.bind(
+                domain="capacity",
+                role=role,
+                pruned=before - after,
+                remaining_in_flight=after,
+            ).debug(f"Pruned {before - after} in-flight dispatches for {role}")
+
+    @property
+    def in_flight_dispatches(self) -> dict[str, set[int]]:
+        """Current in-flight dispatches per role."""
+        return self._in_flight_dispatches
+
+    def get_capacity_status(self, role: str) -> dict[str, int]:
+        """Get current capacity status for role.
+
+        Args:
+            role: Execution role
+
+        Returns:
+            Dict with active_count, in_flight_count, max_capacity, remaining
+        """
+        active_count = self._registry.count_live_worker_sessions(role=role)
+        in_flight_count = len(self._in_flight_dispatches.get(role, set()))
+        max_capacity = self._get_max_capacity(role)
+        remaining = max(0, max_capacity - active_count - in_flight_count)
+
+        return {
+            "active_count": active_count,
+            "in_flight_count": in_flight_count,
+            "max_capacity": max_capacity,
+            "remaining": remaining,
+        }
+
+    def _get_max_capacity(self, role: str) -> int:
+        """Get max capacity for role.
+
+        Args:
+            role: Execution role
+
+        Returns:
+            Maximum concurrent dispatches for the role
+        """
+        # TODO: Integrate with ExecutionRolePolicyService (Task B4)
+        # For now, manager uses max_concurrent_flows, others use default
+        if role == "manager":
+            return self.config.max_concurrent_flows
+        else:
+            # Default capacity for other roles
+            return self.config.max_concurrent_flows

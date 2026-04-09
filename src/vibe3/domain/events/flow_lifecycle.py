@@ -109,6 +109,19 @@ class PlanCompleted(DomainEvent):
 
 
 @dataclass(frozen=True)
+class ExecutionCompleted(DomainEvent):
+    """Execution phase completed event.
+
+    Published when executor completes successfully.
+    """
+
+    issue_number: int
+    branch: str
+    actor: str = "agent:executor"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class ReviewCompleted(DomainEvent):
     """Review phase completed event.
 

@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.services.session_registry import SessionRegistryService
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -135,7 +135,15 @@ class TestManagerDispatchIntegration:
                             start_async_command = mock_backend.start_async_command
                             start_async_command.return_value = handle
                             manager._backend = mock_backend
-                            result = manager.dispatch_manager(issue)
+
+                            # Mock agent options resolution
+                            with patch(
+                                "vibe3.runtime.agent_resolver.resolve_manager_agent_options"
+                            ) as mock_resolve:
+                                mock_resolve.return_value = MagicMock(
+                                    backend="claude", model=None
+                                )
+                                result = manager.dispatch_manager(issue)
 
         assert result is True
         # Async dispatch only records "dispatched" event, not success/failure

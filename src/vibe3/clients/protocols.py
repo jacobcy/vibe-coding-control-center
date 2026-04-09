@@ -5,6 +5,37 @@ from typing import Any, Protocol
 from vibe3.models.pr import CreatePRRequest, PRResponse, UpdatePRRequest  # type: ignore
 
 
+class BackendProtocol(Protocol):
+    """Protocol for backend operations (tmux, execution).
+
+    Used for dependency injection to avoid architecture layer violations.
+    Services layer depends on this protocol, concrete implementation
+    (CodeagentBackend) is injected at handler/orchestration layer.
+    """
+
+    def has_tmux_session(self, session_name: str) -> bool:
+        """Check if tmux session exists.
+
+        Args:
+            session_name: Exact tmux session name to check
+
+        Returns:
+            True if session exists, False otherwise
+        """
+        ...
+
+    def list_tmux_sessions(self, *, prefix: str | None = None) -> set[str]:
+        """List tmux sessions, optionally filtered by prefix.
+
+        Args:
+            prefix: Optional prefix to filter sessions (e.g., "vibe3-manager")
+
+        Returns:
+            Set of tmux session names
+        """
+        ...
+
+
 class GitHubClientProtocol(Protocol):
     """Protocol for GitHub client."""
 

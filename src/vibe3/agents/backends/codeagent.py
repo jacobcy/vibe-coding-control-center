@@ -15,7 +15,6 @@ from vibe3.agents.backends.codeagent_config import (
     sync_models_json,
 )
 from vibe3.config.settings import VibeConfig
-from vibe3.environment.session import SessionManager
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -194,7 +193,7 @@ class CodeagentBackend:
         # tmux send-keys feeds literal newlines as Enter presses; keep the awk
         # program on a single shell line so async sessions don't get stuck in
         # zsh "pipe quote>" continuation mode.
-        script = script.replace("\n", "; ").strip()
+        script = script.replace("\n", "; ").replace("{;", "{ ").strip()
         return ["awk", script]
 
     @classmethod
@@ -349,43 +348,61 @@ class CodeagentBackend:
     ) -> AsyncExecutionHandle:
         project_root = cwd or Path.cwd()
 
-        # Use SessionManager for tmux session creation
-        # Use codeagent's log dir to avoid worktree .git issues
         log_dir = self._default_log_dir()
-        session_manager = SessionManager(repo_path=project_root, log_dir=log_dir)
         prefix = execution_name.replace("/", "-")[:50]
-        tmux_ctx = session_manager.create_tmux_session(
-            prefix, keep_alive=keep_alive_seconds
-        )
+        session_id = self._allocate_tmux_session_name(prefix)
 
         # Use codeagent's specialized log path resolution (includes issue number)
         # Use actual session_id (may include counter suffix like -2, -3)
-        log_path = self._resolve_async_log_path(log_dir, tmux_ctx.session_id)
+        log_path = self._resolve_async_log_path(log_dir, session_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
 
-        # Build shell command with log filtering
         shell_command = self._build_async_shell_command(
             command,
             log_path=log_path,
             keep_alive_seconds=keep_alive_seconds,
             env=env,
         )
+        wrapper_path = self._write_async_wrapper_script(
+            shell_command,
+            execution_name=execution_name,
+        )
 
-        # Execute command in the tmux session
         subprocess.run(
-            ["tmux", "send-keys", "-t", tmux_ctx.session_id, shell_command, "Enter"],
+            ["tmux", "new-session", "-d", "-s", session_id, "zsh", str(wrapper_path)],
             cwd=project_root,
-            env=env,
             check=True,
         )
 
         return AsyncExecutionHandle(
-            tmux_session=tmux_ctx.session_id,
+            tmux_session=session_id,
             log_path=log_path,
             prompt_file_path=Path(""),
         )
+
+    @staticmethod
+    def _write_async_wrapper_script(shell_command: str, *, execution_name: str) -> Path:
+        """Persist the async wrapper command to a script file for tmux launch.
+
+        Launching tmux with a script avoids racing interactive shell startup
+        output against `send-keys`, which can corrupt long async commands.
+        """
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", execution_name).strip("-") or "async"
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f"vibe3-{slug}-",
+            suffix=".sh",
+            delete=False,
+        ) as tmp:
+            tmp.write("#!/usr/bin/env zsh\n")
+            tmp.write(shell_command)
+            tmp.write("\n")
+        path = Path(tmp.name)
+        path.chmod(0o700)
+        return path
 
     def start_async_command(
         self,

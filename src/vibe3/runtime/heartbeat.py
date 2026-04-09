@@ -148,11 +148,8 @@ class HeartbeatServer:
             started_at = time.perf_counter()
             logger.bind(domain="orchestra", action="tick").debug("Heartbeat tick")
 
-            # Write tick separator for readability
-            append_orchestra_event(
-                "server", f"---------- heartbeat tick #{tick_number} ----------"
-            )
-            append_orchestra_event("server", f"heartbeat tick #{tick_number} start")
+            # Write tick marker for readability (INFO level - shows timeline)
+            append_orchestra_event("server", f"tick #{tick_number} start")
             if gate_result.blocked:
                 append_orchestra_event(
                     "server",
@@ -182,20 +179,24 @@ class HeartbeatServer:
                 tick_services.append(svc.service_name)
                 tasks.append(self._tick_service(svc))
 
-            append_orchestra_event(
-                "server",
-                "heartbeat tick #"
-                + str(tick_number)
-                + " services: "
-                + (", ".join(tick_services) if tick_services else "(none)"),
-            )
+            # Only log services list in DEBUG mode
+            if tick_services:
+                append_orchestra_event(
+                    "server",
+                    "tick #"
+                    + str(tick_number)
+                    + " services: "
+                    + ", ".join(tick_services),
+                    level="DEBUG",
+                )
             if blocked_services:
                 append_orchestra_event(
                     "server",
-                    "heartbeat tick #"
+                    "tick #"
                     + str(tick_number)
                     + " blocked dispatchers: "
                     + ", ".join(blocked_services),
+                    level="DEBUG",
                 )
 
             if tasks:
@@ -204,7 +205,7 @@ class HeartbeatServer:
             duration = time.perf_counter() - started_at
             append_orchestra_event(
                 "server",
-                f"heartbeat tick #{tick_number} completed in {duration:.2f}s",
+                f"tick #{tick_number} completed in {duration:.2f}s",
             )
 
             if self.config.debug and tick_number >= self.config.debug_max_ticks:

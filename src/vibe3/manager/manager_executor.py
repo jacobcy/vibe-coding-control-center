@@ -19,8 +19,8 @@ from vibe3.runtime.executor import run_command
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
+    from vibe3.environment.session_registry import SessionRegistryService
     from vibe3.prompts.models import PromptRenderResult
-    from vibe3.services.session_registry import SessionRegistryService
 
 
 class ManagerExecutor:
@@ -150,19 +150,8 @@ class ManagerExecutor:
             log.warning("Skip: System is frozen by another failed issue")
             return False
 
-        active_count = self._registry.count_live_worker_sessions(role="manager")
-        capacity = self.config.max_concurrent_flows
-
-        if active_count >= capacity:
-            log.warning(
-                f"Throttled: Manager capacity reached ({active_count}/{capacity}). "
-                f"Queueing #{issue.number}"
-            )
-            self._queued_issues.add(issue.number)
-            return False
-
-        # If it was in queue, remove it now that we are dispatching
-        self._queued_issues.discard(issue.number)
+        # Note: Capacity check moved to StateLabelDispatchService
+        # ManagerExecutor assumes caller has already verified capacity
 
         if self.dry_run:
             cmd = self.command_builder.build_manager_command(issue)

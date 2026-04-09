@@ -118,7 +118,7 @@ async def test_tick_loop_writes_tick_separator_lines(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -134,12 +134,10 @@ async def test_tick_loop_writes_tick_separator_lines(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    # Should have tick separator lines
+    # Should have tick start markers (simplified format)
     assert any(
-        "---------- heartbeat tick #1 ----------" in item for item in events
-    ), f"Expected tick separator, got: {events}"
-    # Note: We may not get tick #2 if server stopped early,
-    # but we should at least see tick #1 separator
+        "server:tick #1 start" in item for item in events
+    ), f"Expected tick start marker, got: {events}"
     assert len(events) >= 4, f"Expected at least 4 events, got: {events}"
 
 
@@ -153,7 +151,7 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -169,12 +167,9 @@ async def test_tick_loop_logs_start_and_completion(monkeypatch) -> None:
 
     await server._tick_loop()
 
-    assert any("server:heartbeat tick #1 start" == item for item in events)
-    assert any(
-        f"server:heartbeat tick #1 services: {svc.service_name}" == item
-        for item in events
-    )
-    assert any("server:heartbeat tick #1 completed in " in item for item in events)
+    assert any("server:tick #1 start" == item for item in events)
+    # Services list is DEBUG level, so not present in default log level
+    assert any("server:tick #1 completed in " in item for item in events)
 
 
 @pytest.mark.asyncio
@@ -187,7 +182,7 @@ async def test_tick_loop_logs_failed_gate_reason(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     calls = {"count": 0}
@@ -237,7 +232,7 @@ async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
 
     events: list[str] = []
 
-    def _capture(domain: str, message: str) -> None:
+    def _capture(domain: str, message: str, **kwargs) -> None:
         events.append(f"{domain}:{message}")
 
     async def _no_wait(_seconds: float) -> None:
@@ -251,7 +246,7 @@ async def test_tick_loop_stops_after_debug_max_ticks(monkeypatch) -> None:
 
     assert server.running is False
     assert svc.ticks == 2
-    assert any("server:heartbeat tick #2 start" == item for item in events)
+    assert any("server:tick #2 start" == item for item in events)
     assert any(
         "server:debug tick limit reached (2), stopping server" == item
         for item in events

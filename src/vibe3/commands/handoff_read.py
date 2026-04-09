@@ -10,9 +10,9 @@ from loguru import logger
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.common import trace_scope
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.flow import FlowEvent, FlowState
 from vibe3.services.flow_service import FlowService
-from vibe3.services.session_registry import SessionRegistryService
 from vibe3.ui.console import console
 from vibe3.ui.handoff_ui import (
     render_handoff_detail,

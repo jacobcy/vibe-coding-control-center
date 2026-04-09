@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.session_registry import SessionRegistryService
+from vibe3.environment.session_registry import SessionRegistryService
 
 
 @pytest.fixture()

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,
@@ -37,7 +38,6 @@ from vibe3.services.orchestra_status_service import (
     format_issue_summary_line,
     is_running_issue,
 )
-from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:
     from vibe3.manager.manager_executor import ManagerExecutor

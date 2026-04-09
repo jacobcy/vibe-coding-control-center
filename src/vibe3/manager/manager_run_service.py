@@ -24,6 +24,7 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
 from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
@@ -35,7 +36,6 @@ from vibe3.runtime.no_progress_policy import snapshot_progress
 from vibe3.services.issue_failure_service import (
     fail_manager_issue,
 )
-from vibe3.services.session_registry import SessionRegistryService
 
 if TYPE_CHECKING:
     pass

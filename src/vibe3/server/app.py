@@ -183,6 +183,7 @@ async def _run(config: OrchestraConfig, port: int) -> None:
 
 @app.command()
 def start(
+    ctx: typer.Context,
     interval: Annotated[
         int | None,
         typer.Option(
@@ -249,14 +250,32 @@ def start(
     ] = False,
     verbose: Annotated[
         int,
-        typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
+        typer.Option(
+            "-v", "--verbose", count=True, help="Increase verbosity (or use global -v)"
+        ),
     ] = 0,
 ) -> None:
     """Start Orchestra server (webhook receiver + heartbeat polling).
 
     Defaults from config/settings.yaml; repo defaults to current repository.
     """
+    # Inherit global verbose if not specified locally
+    if verbose == 0 and "verbose" in ctx.meta:
+        verbose = ctx.meta["verbose"]
+
     setup_logging(verbose=verbose)
+
+    # Orchestra events.log level follows global verbosity
+    # Default: INFO (key runtime events for monitoring)
+    # -v: already INFO (no change needed)
+    # -vv: DEBUG (full debugging details)
+    import os as _os
+
+    if verbose >= 2:
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "DEBUG"
+    else:
+        # Default and -v: show key events (tick completion, issue dispatch, etc.)
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "INFO"
 
     config = OrchestraConfig.from_settings()
     if not config.enabled:

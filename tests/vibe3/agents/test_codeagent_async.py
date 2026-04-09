@@ -66,6 +66,7 @@ class TestStartAsyncCommand:
 
         assert filter_cmd[0] == "awk"
         assert "\n" not in filter_cmd[1]
+        assert "END {;" not in filter_cmd[1]
 
     def test_build_async_shell_command_injects_env_overrides(self) -> None:
         shell = CodeagentBackend._build_async_shell_command(
@@ -140,7 +141,7 @@ class TestStartAsyncCommand:
 
         assert not stale_log.exists()
 
-    def test_start_async_command_embeds_env_overrides_in_tmux_shell(
+    def test_start_async_command_embeds_env_overrides_in_wrapper_script(
         self, monkeypatch, tmp_path
     ) -> None:
         backend = CodeagentBackend()
@@ -148,7 +149,7 @@ class TestStartAsyncCommand:
         log_dir.mkdir(parents=True)
         monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
 
-        sent_shell_commands: list[str] = []
+        launched_scripts: list[Path] = []
 
         def fake_run(cmd, *args, **kwargs):
             if cmd[:3] == ["tmux", "has-session", "-t"]:
@@ -158,8 +159,8 @@ class TestStartAsyncCommand:
                     stdout="",
                     stderr="no session",
                 )
-            if cmd[:2] == ["tmux", "send-keys"]:
-                sent_shell_commands.append(cmd[4])
+            if cmd[:4] == ["tmux", "new-session", "-d", "-s"]:
+                launched_scripts.append(Path(cmd[6]))
                 return subprocess.CompletedProcess(
                     args=cmd,
                     returncode=0,
@@ -177,7 +178,6 @@ class TestStartAsyncCommand:
             patch(
                 "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
             ),
-            patch("vibe3.environment.session.subprocess.run", side_effect=fake_run),
         ):
             backend.start_async_command(
                 [
@@ -197,11 +197,10 @@ class TestStartAsyncCommand:
                 },
             )
 
-        assert sent_shell_commands
-        assert "VIBE3_MANAGER_BACKEND=opencode" in sent_shell_commands[0]
-        assert (
-            "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in sent_shell_commands[0]
-        )
+        assert launched_scripts
+        wrapper_text = launched_scripts[0].read_text(encoding="utf-8")
+        assert "VIBE3_MANAGER_BACKEND=opencode" in wrapper_text
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in wrapper_text
 
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path

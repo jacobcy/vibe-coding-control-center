@@ -14,6 +14,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
@@ -30,7 +31,6 @@ from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
-from vibe3.services.session_registry import SessionRegistryService
 
 ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 

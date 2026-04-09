@@ -12,6 +12,7 @@ from loguru import logger
 from typer import echo
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.execution_lifecycle import persist_execution_lifecycle_event
 from vibe3.agents.models import (
     AgentSpec,
     CodeagentCommand,
@@ -25,7 +26,6 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
 from vibe3.models.review_runner import AgentOptions
-from vibe3.services.execution_lifecycle import persist_execution_lifecycle_event
 
 # Re-export models for backward compatibility.
 __all__ = [

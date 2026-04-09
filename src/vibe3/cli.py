@@ -91,6 +91,7 @@ def status_command(
 
 @app.callback()
 def main_callback(
+    ctx: typer.Context,
     verbose: Annotated[
         int,
         typer.Option(
@@ -104,6 +105,8 @@ def main_callback(
     ] = 0,
 ) -> None:
     """Vibe 3.0 - Development orchestration tool."""
+    # Store verbose in context for subcommands to inherit
+    ctx.meta["verbose"] = verbose
     setup_logging(verbose=verbose)
 
     # Register domain event handlers
