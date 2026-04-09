@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from vibe3.execution.contracts import ExecutionLaunchResult
 from vibe3.models.orchestra_config import OrchestraConfig, SupervisorHandoffConfig
 from vibe3.orchestra.supervisor_run_service import (
     SUPERVISOR_APPLY_TASK,
@@ -9,6 +10,8 @@ from vibe3.orchestra.supervisor_run_service import (
 )
 
 
+@patch("vibe3.orchestra.supervisor_run_service.ExecutionCoordinator")
+@patch("vibe3.orchestra.supervisor_run_service.SQLiteClient")
 @patch("vibe3.orchestra.supervisor_run_service.OrchestraStatusService")
 @patch("vibe3.manager.flow_manager.FlowManager")
 @patch("vibe3.orchestra.supervisor_run_service.GovernanceService")
@@ -22,6 +25,8 @@ def test_run_supervisor_mode_uses_supervisor_config_and_task(
     mock_governance_service,
     mock_flow_manager,
     mock_status_service,
+    mock_sqlite_cls,
+    mock_coordinator_cls,
 ):
     config = OrchestraConfig(
         supervisor_handoff=SupervisorHandoffConfig(
@@ -36,12 +41,14 @@ def test_run_supervisor_mode_uses_supervisor_config_and_task(
         model="opencode/minimax-m2.5-free",
     )
     mock_governance_service.return_value.render_current_plan.return_value = "plan text"
-    backend = MagicMock()
-    mock_backend_cls.return_value = backend
-    backend.start_async.return_value = MagicMock(
+
+    mock_coordinator = MagicMock()
+    mock_coordinator.dispatch_execution.return_value = ExecutionLaunchResult(
+        launched=True,
         tmux_session="vibe3-supervisor-apply",
         log_path="/tmp/supervisor.log",
     )
+    mock_coordinator_cls.return_value = mock_coordinator
 
     run_supervisor_mode(
         supervisor_file="supervisor/apply.md",
@@ -51,7 +58,8 @@ def test_run_supervisor_mode_uses_supervisor_config_and_task(
     )
 
     mock_resolve_supervisor.assert_called_once()
-    backend.start_async.assert_called_once()
-    assert backend.start_async.call_args.kwargs["task"] == SUPERVISOR_APPLY_TASK
+    mock_coordinator.dispatch_execution.assert_called_once()
+    request = mock_coordinator.dispatch_execution.call_args[0][0]
+    assert request.refs["task"] == SUPERVISOR_APPLY_TASK
     rendered_config = mock_governance_service.call_args.kwargs["config"]
     assert rendered_config.governance.prompt_template == "orchestra.supervisor.apply"

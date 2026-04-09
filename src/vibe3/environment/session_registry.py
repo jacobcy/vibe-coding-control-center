@@ -1,6 +1,7 @@
 """Session registry service: reserve, track, and reconcile runtime sessions."""
 
 import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from vibe3.clients.protocols import BackendProtocol
@@ -228,8 +229,37 @@ class SessionRegistryService:
                 self._store.update_runtime_session(
                     session_id, status="orphaned", ended_at=_now_iso()
                 )
+                self._cleanup_orphaned_session_resources(session)
                 orphaned_ids.append(session_id)
         return orphaned_ids
+
+    def _cleanup_orphaned_session_resources(self, session: dict[str, Any]) -> None:
+        """Best-effort cleanup for resources owned by a dead session."""
+        role = str(session.get("role") or "")
+        if role != "supervisor":
+            return
+
+        target_id = str(session.get("target_id") or "").strip()
+        if not target_id:
+            return
+
+        try:
+            from vibe3.clients.git_client import GitClient
+            from vibe3.environment.worktree import WorktreeContext, WorktreeManager
+            from vibe3.models.orchestra_config import OrchestraConfig
+
+            git_common_dir = GitClient().get_git_common_dir()
+            repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+            config = OrchestraConfig.from_settings()
+            context = WorktreeContext(
+                path=repo_root / ".worktrees" / "tmp" / target_id,
+                is_temporary=True,
+                issue_number=int(target_id),
+            )
+            WorktreeManager(config, repo_root).release_temporary_worktree(context)
+        except Exception:
+            # Best-effort cleanup only; orphan reconciliation should still succeed.
+            pass
 
     def get_truly_live_sessions_for_branch(self, branch: str) -> list[dict[str, Any]]:
         """Return truly live sessions for a branch, confirming tmux liveness.

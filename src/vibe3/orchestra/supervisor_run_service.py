@@ -14,6 +14,9 @@ import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
@@ -81,10 +84,6 @@ def run_supervisor_mode(
 
     typer.echo(f"-> Supervisor run: {supervisor_file}")
     if async_mode:
-        from vibe3.clients.sqlite_client import SQLiteClient
-        from vibe3.execution.contracts import ExecutionRequest
-        from vibe3.execution.coordinator import ExecutionCoordinator
-
         store = SQLiteClient()
         coordinator = ExecutionCoordinator(config, store, backend)
 
@@ -109,7 +108,8 @@ def run_supervisor_mode(
         try:
             result = coordinator.dispatch_execution(request)
             if not result.launched:
-                raise RuntimeError(result.reason or "Capacity full or failed to launch")
+                typer.echo(f"Supervisor dispatch queued/throttled: {result.reason}")
+                return
 
             typer.echo(f"Tmux session: {result.tmux_session}")
             typer.echo(f"Session log: {result.log_path}")

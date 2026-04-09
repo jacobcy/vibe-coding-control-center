@@ -31,3 +31,4 @@ class ExecutionLaunchResult:
     tmux_session: Optional[str] = None
     log_path: Optional[str] = None
     reason: Optional[str] = None
+    reason_code: Optional[str] = None

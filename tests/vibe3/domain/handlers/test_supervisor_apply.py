@@ -26,7 +26,7 @@ class TestSupervisorApplyHandlerDispatch:
     @patch("vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService")
     @patch("vibe3.domain.handlers.supervisor_apply.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_apply.OrchestraConfig")
-    @patch("vibe3.domain.handlers.supervisor_apply.WorktreeManager")
+    @patch("vibe3.environment.worktree.WorktreeManager")
     def test_handler_calls_coordinator(
         self,
         mock_worktree_manager_cls: MagicMock,

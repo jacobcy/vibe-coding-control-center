@@ -48,6 +48,7 @@ class ExecutionCoordinator:
             return ExecutionLaunchResult(
                 launched=False,
                 reason=f"Capacity full for {request.role}",
+                reason_code="capacity_full",
             )
 
         # 2. Mark in-flight
@@ -176,7 +177,11 @@ class ExecutionCoordinator:
                             f"Execution failed for {request.role} (sync): {error_msg}"
                         )
 
-                        return ExecutionLaunchResult(launched=False, reason=error_msg)
+                        return ExecutionLaunchResult(
+                            launched=False,
+                            reason=error_msg,
+                            reason_code="launch_failed",
+                        )
                 except Exception as run_exc:
                     self.lifecycle.record_failed(
                         role=request.role,  # type: ignore
@@ -191,7 +196,11 @@ class ExecutionCoordinator:
                         target_id=request.target_id,
                     ).exception(f"Execution threw for {request.role} (sync): {run_exc}")
 
-                    return ExecutionLaunchResult(launched=False, reason=str(run_exc))
+                    return ExecutionLaunchResult(
+                        launched=False,
+                        reason=str(run_exc),
+                        reason_code="launch_failed",
+                    )
             else:
                 raise ValueError(f"Unknown mode: {request.mode}")
 
@@ -213,6 +222,7 @@ class ExecutionCoordinator:
             return ExecutionLaunchResult(
                 launched=False,
                 reason=str(exc),
+                reason_code="launch_failed",
             )
         finally:
             # 6. Prune in-flight

@@ -111,6 +111,7 @@ def test_coordinator_dispatch_capacity_full(mock_dependencies):
 
     assert result.launched is False
     assert "Capacity full" in result.reason
+    assert result.reason_code == "capacity_full"
 
     # Verify backend and lifecycle not called
     backend.start_async_command.assert_not_called()
@@ -149,6 +150,7 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
 
     assert result.launched is False
     assert "Tmux failed to start" in result.reason
+    assert result.reason_code == "launch_failed"
 
     # Verify lifecycle record_failed was called
     lifecycle.record_started.assert_not_called()

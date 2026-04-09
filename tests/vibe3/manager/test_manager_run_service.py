@@ -1,6 +1,7 @@
 # tests/vibe3/manager/test_manager_run_service.py
 from unittest.mock import MagicMock, patch
 
+from vibe3.execution.contracts import ExecutionLaunchResult
 from vibe3.models.orchestration import IssueState
 
 
@@ -56,6 +57,61 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
     assert not captured_options.get(
         "called"
     ), "resolve_manager_agent_options was called even though env vars were set"
+
+
+def test_run_manager_capacity_full_does_not_fail_issue() -> None:
+    """Capacity rejection should not mark the issue as failed."""
+    with (
+        patch("vibe3.manager.manager_run_service.OrchestraConfig") as mock_config,
+        patch("vibe3.manager.manager_run_service.GitHubClient") as mock_gh,
+        patch("vibe3.manager.manager_run_service.SQLiteClient") as mock_store_cls,
+        patch("vibe3.manager.manager_run_service.GitClient") as mock_git_cls,
+        patch("vibe3.manager.manager_run_service.CodeagentBackend"),
+        patch("vibe3.execution.coordinator.ExecutionCoordinator") as mock_coord_cls,
+        patch("vibe3.manager.manager_run_service.fail_manager_issue") as mock_fail,
+        patch("vibe3.manager.manager_run_service.load_session_id", return_value=None),
+        patch(
+            "vibe3.manager.manager_run_service.resolve_manager_execution_cwd",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "vibe3.manager.manager_run_service.render_manager_prompt",
+            return_value=MagicMock(rendered_text="prompt"),
+        ),
+        patch(
+            "vibe3.manager.manager_run_service.format_agent_actor",
+            return_value="agent:manager",
+        ),
+        patch("vibe3.manager.manager_run_service.typer.echo"),
+    ):
+        mock_config.from_settings.return_value = MagicMock(repo=None)
+        mock_gh.return_value.view_issue.return_value = {
+            "number": 301,
+            "title": "test",
+            "labels": [],
+            "state": "open",
+        }
+        mock_git_cls.return_value.get_current_branch.return_value = "task/issue-301"
+        mock_store = MagicMock()
+        mock_store_cls.return_value = mock_store
+
+        mock_coord = MagicMock()
+        mock_coord.dispatch_execution.return_value = ExecutionLaunchResult(
+            launched=False,
+            reason="Capacity full for manager",
+            reason_code="capacity_full",
+        )
+        mock_coord_cls.return_value = mock_coord
+
+        from vibe3.manager.manager_run_service import run_manager_issue_mode
+
+        run_manager_issue_mode(
+            issue_number=301,
+            dry_run=False,
+            async_mode=True,
+        )
+
+        mock_fail.assert_not_called()
 
 
 @patch("vibe3.environment.worktree.WorktreeManager")

@@ -256,6 +256,33 @@ def handle_supervisor_apply_completed(event: SupervisorApplyCompleted) -> None:
 
     GitHubClient().add_comment(event.issue_number, comment)
 
+    # Release temporary worktree after execution completes
+    try:
+        from pathlib import Path
+
+        from vibe3.clients.git_client import GitClient
+        from vibe3.environment.worktree import WorktreeContext, WorktreeManager
+        from vibe3.manager.manager_executor import ManagerExecutor
+
+        config = OrchestraConfig.from_settings()
+        git_common_dir = GitClient().get_git_common_dir()
+        repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+
+        wt_path = repo_root / ".worktrees" / "tmp" / str(event.issue_number)
+        context = WorktreeContext(
+            path=wt_path,
+            is_temporary=True,
+            branch=None,
+            issue_number=event.issue_number,
+        )
+
+        manager = ManagerExecutor(config)
+        worktree_manager = WorktreeManager(config, repo_root, manager.flow_manager)
+        worktree_manager.release_temporary_worktree(context)
+        log.info(f"Released temporary worktree for issue #{event.issue_number}")
+    except Exception as exc:
+        log.warning(f"Failed to release temporary worktree: {exc}")
+
 
 def handle_supervisor_apply_delegated(event: SupervisorApplyDelegated) -> None:
     """Handle SupervisorApplyDelegated event.

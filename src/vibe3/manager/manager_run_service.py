@@ -189,7 +189,11 @@ def run_manager_issue_mode(
         try:
             result = coordinator.dispatch_execution(request)
             if not result.launched:
-                raise RuntimeError(result.reason or "Capacity full or failed to launch")
+                # Capacity full or dispatch rejected - this is a normal
+                # throttling result, not an execution failure.
+                # Do not mark issue as failed.
+                typer.echo(f"Manager dispatch queued/throttled: {result.reason}")
+                return
 
             typer.echo(f"-> Manager run: issue #{issue_number}")
             typer.echo(f"Tmux session: {result.tmux_session}")
