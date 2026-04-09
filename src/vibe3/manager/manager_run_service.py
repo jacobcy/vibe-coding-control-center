@@ -163,16 +163,38 @@ def run_manager_issue_mode(
     )
 
     if async_mode and not dry_run:
+        from vibe3.execution.contracts import ExecutionRequest
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        coordinator = ExecutionCoordinator(orchestra_config, store, backend)
+
+        refs = {"task": manager_task}
+        if session_id:
+            refs["session_id"] = session_id
+
+        request = ExecutionRequest(
+            role="manager",
+            target_branch=branch,
+            target_id=issue_number,
+            execution_name=get_manager_session_name(issue_number),
+            prompt=prompt,
+            options=options,
+            cwd=str(launch_cwd),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=refs,
+            actor=actor,
+            mode="async",
+        )
+
         try:
-            handle = backend.start_async(
-                prompt=prompt,
-                options=options,
-                task=manager_task,
-                session_id=session_id,
-                execution_name=get_manager_session_name(issue_number),
-                cwd=launch_cwd,
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            )
+            result = coordinator.dispatch_execution(request)
+            if not result.launched:
+                raise RuntimeError(result.reason or "Capacity full or failed to launch")
+
+            typer.echo(f"-> Manager run: issue #{issue_number}")
+            typer.echo(f"Tmux session: {result.tmux_session}")
+            typer.echo(f"Session log: {result.log_path}")
+            return
         except BaseException as exc:
             store.add_event(
                 branch,
@@ -186,28 +208,11 @@ def run_manager_issue_mode(
                 reason=f"manager async start failed: {exc}",
             )
             raise typer.Exit(1) from exc
-        updates: dict[str, object] = {"latest_actor": actor}
-        store.update_flow_state(branch, **updates)
-        store.add_event(
-            branch,
-            "manager_started",
-            actor,
-            detail=f"Manager execution started for issue #{issue_number}",
-            refs={
-                "issue": str(issue_number),
-                "tmux_session": handle.tmux_session,
-                "log": str(handle.log_path),
-            },
-        )
-        typer.echo(f"-> Manager run: issue #{issue_number}")
-        typer.echo(f"Tmux session: {handle.tmux_session}")
-        typer.echo(f"Session log: {handle.log_path}")
-        return
 
     _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
 
     try:
-        result = backend.run(
+        sync_result = backend.run(
             prompt=prompt,
             options=options,
             task=manager_task,
@@ -235,7 +240,7 @@ def run_manager_issue_mode(
             )
         raise
 
-    if not result.is_success():
+    if not sync_result.is_success():
         if not dry_run:
             # Write registry terminal state for async child
             if _is_async_child:
@@ -255,7 +260,7 @@ def run_manager_issue_mode(
         )
         fail_manager_issue(
             issue_number=issue_number,
-            reason=getattr(result, "stderr", "") or "manager exited with failure",
+            reason=getattr(sync_result, "stderr", "") or "manager exited with failure",
         )
         raise typer.Exit(1)
 
@@ -286,8 +291,8 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    coordinator = ManagerRunCoordinator(store)
-    if coordinator.handle_post_run_outcome(
+    run_coordinator = ManagerRunCoordinator(store)
+    if run_coordinator.handle_post_run_outcome(
         issue_number=issue_number,
         branch=branch,
         actor=actor,
@@ -297,7 +302,7 @@ def run_manager_issue_mode(
     ):
         return
 
-    if coordinator.check_progress_and_block_if_noop(
+    if run_coordinator.check_progress_and_block_if_noop(
         issue_number=issue_number,
         branch=branch,
         actor=actor,

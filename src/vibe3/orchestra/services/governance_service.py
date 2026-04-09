@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import tempfile
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import AsyncExecutionHandle, CodeagentBackend
+from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
@@ -109,25 +108,18 @@ class GovernanceService(ServiceBase):
     async def handle_event(self, event: GitHubEvent) -> None:
         pass
 
-    async def run_once(self) -> None:
-        """Run governance exactly once for manual debugging."""
-        await self._run_governance()
-
-    async def run_scan(self) -> None:
-        """Run governance scan (callable from domain handlers).
-
-        This method provides a clean interface for domain handlers to
-        trigger governance execution. It does not manage capacity or
-        lifecycle - those should be handled by the caller (domain handler).
-        """
-        await self._run_governance()
-
     def render_current_plan(self) -> str:
         """Render governance plan from the current live snapshot."""
         snapshot = self._status_service.snapshot()
         return self._build_governance_plan(snapshot)
 
-    async def _run_governance(self) -> None:
+    async def build_governance_execution_payload(self) -> tuple[str | None, Any, str]:
+        """Build governance prompt and options for execution.
+
+        Returns:
+            Tuple of (prompt_content, agent_options, task_prompt).
+            If circuit breaker is open, returns (None, None, "").
+        """
         loop = asyncio.get_event_loop()
         log = logger.bind(domain="orchestra", action="governance")
         snapshot = await loop.run_in_executor(
@@ -135,46 +127,18 @@ class GovernanceService(ServiceBase):
         )
         if snapshot.circuit_breaker_state == "open":
             log.warning("Skipping governance: circuit breaker is OPEN")
-            return
+            return None, None, ""
+
         context = self._build_prompt_context(snapshot)
         plan_content = self._render_governance_plan(context)
+
         if self._dry_run:
             dry_run_plan_path = self._write_dry_run_plan(plan_content)
             self._log_dry_run_preview(log, context, dry_run_plan_path, plan_content)
-            return
-        session_id: int | None = None
-        if self._registry is not None:
-            session_id = self._registry.reserve(
-                role="governance",
-                target_type="governance",
-                target_id="scan",
-                branch="governance",
-            )
-        try:
-            handle = await loop.run_in_executor(
-                self._executor,
-                self._dispatch_governance_prompt,
-                plan_content,
-            )
-        except Exception:
-            # Clean up reserved session on dispatch failure
-            if self._registry is not None and session_id is not None:
-                self._registry.mark_failed(session_id)
-            raise
-        if self._registry is not None and session_id is not None:
-            self._registry.mark_started(session_id, tmux_session=handle.tmux_session)
-        log.info(
-            "Governance scan dispatched",
-            tmux_session=handle.tmux_session,
-            log_path=str(handle.log_path),
-        )
-        append_governance_event(
-            (
-                f"tick #{self._tick_count} dispatched: "
-                f"tmux={handle.tmux_session} log={handle.log_path}"
-            ),
-            repo_root=self._manager.repo_path,
-        )
+            return None, None, ""
+
+        options = resolve_governance_agent_options(self.config)
+        return plan_content, options, GOVERNANCE_TASK_PROMPT
 
     def _build_governance_plan(self, snapshot: OrchestraSnapshot) -> str:
         context = self._build_prompt_context(snapshot)
@@ -260,17 +224,6 @@ class GovernanceService(ServiceBase):
         )
         log.info("Dry run rendered governance plan:")
         log.info(f"\n{plan_content}")
-
-    def _dispatch_governance_prompt(self, prompt: str) -> AsyncExecutionHandle:
-        options = resolve_governance_agent_options(self.config)
-        return self._backend.start_async(
-            prompt=prompt,
-            options=options,
-            task=GOVERNANCE_TASK_PROMPT,
-            execution_name=self._governance_execution_name(),
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            keep_alive_seconds=0,
-        )
 
     def _governance_execution_name(self) -> str:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")

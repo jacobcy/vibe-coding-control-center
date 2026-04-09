@@ -81,28 +81,50 @@ def run_supervisor_mode(
 
     typer.echo(f"-> Supervisor run: {supervisor_file}")
     if async_mode:
+        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.execution.contracts import ExecutionRequest
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        store = SQLiteClient()
+        coordinator = ExecutionCoordinator(config, store, backend)
+
         safe_name = Path(supervisor_file).stem.replace("/", "-")
         execution_name = f"vibe3-supervisor-{safe_name}"
         if issue_number is not None:
             execution_name = f"{execution_name}-issue-{issue_number}"
-        handle = backend.start_async(
+
+        request = ExecutionRequest(
+            role="supervisor",
+            target_branch=f"issue-{issue_number}" if issue_number else "supervisor",
+            target_id=issue_number or 0,
+            execution_name=execution_name,
             prompt=plan_text,
             options=options,
-            task=run_task,
-            execution_name=execution_name,
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs={"task": run_task},
+            actor="orchestra:supervisor",
+            mode="async",
         )
-        typer.echo(f"Tmux session: {handle.tmux_session}")
-        typer.echo(f"Session log: {handle.log_path}")
-        return
 
-    result = backend.run(
+        try:
+            result = coordinator.dispatch_execution(request)
+            if not result.launched:
+                raise RuntimeError(result.reason or "Capacity full or failed to launch")
+
+            typer.echo(f"Tmux session: {result.tmux_session}")
+            typer.echo(f"Session log: {result.log_path}")
+            return
+        except BaseException as exc:
+            typer.echo(f"Error: supervisor async start failed: {exc}", err=True)
+            raise typer.Exit(1) from exc
+
+    sync_result = backend.run(
         prompt=plan_text,
         options=options,
         task=run_task,
         dry_run=False,
     )
-    if not result.is_success():
+    if not sync_result.is_success():
         raise typer.Exit(1)
 
 

@@ -7,10 +7,8 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.agents.execution_role_policy import ExecutionRolePolicyService
 from vibe3.clients.github_client import GitHubClient
-from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.domain.events.manager import (
     DomainEvent,
@@ -62,28 +60,6 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
         session_mode=session_strategy.mode,
     ).debug("Resolved execution policy for manager role")
 
-    # Setup ExecutionLifecycleService for unified lifecycle recording
-    store = SQLiteClient()
-    lifecycle = ExecutionLifecycleService(store)
-
-    # Build target branch name (will be used for lifecycle tracking)
-    # Format: task/issue-{number} (manager convention)
-    target = f"task/issue-{event.issue_number}"
-
-    # Record execution started
-    lifecycle.record_started(
-        role="manager",
-        target=target,
-        actor="orchestra:manager",
-        refs={"issue_number": str(event.issue_number)},
-    )
-
-    logger.bind(
-        domain="manager_handler",
-        issue_number=event.issue_number,
-        target=target,
-    ).debug("Recorded manager execution started")
-
     # Fetch full issue details from GitHub API
     github_client = GitHubClient()
     issue_data = github_client.view_issue(event.issue_number)
@@ -94,15 +70,6 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
             issue_number=event.issue_number,
             error="issue_not_found",
         ).error("Failed to fetch issue details from GitHub")
-
-        # Record failed lifecycle event
-        lifecycle.record_failed(
-            role="manager",
-            target=target,
-            actor="orchestra:manager",
-            error="Failed to fetch issue details from GitHub",
-            refs={"issue_number": str(event.issue_number)},
-        )
         return
 
     # Build IssueInfo from GitHub API response
@@ -114,14 +81,6 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
             issue_number=event.issue_number,
             error="invalid_issue_data",
         ).error("Failed to parse issue data from GitHub response")
-
-        lifecycle.record_failed(
-            role="manager",
-            target=target,
-            actor="orchestra:manager",
-            error="Failed to parse issue data",
-            refs={"issue_number": str(event.issue_number)},
-        )
         return
 
     # Ensure state is CLAIMED (override parsed state with event state)
@@ -141,45 +100,20 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
         dispatch_result = manager_executor.dispatch_manager(issue_info)
 
         if dispatch_result:
-            lifecycle.record_completed(
-                role="manager",
-                target=target,
-                actor="orchestra:manager",
-                detail=f"Manager dispatched issue #{event.issue_number}",
-                refs={"issue_number": str(event.issue_number)},
-            )
-
             logger.bind(
                 domain="manager_handler",
                 issue_number=event.issue_number,
                 backend=backend,
                 prompt_template=prompt_contract.template,
                 session_mode=session_strategy.mode,
-                target=target,
             ).success("Manager execution completed via domain event")
         else:
-            lifecycle.record_failed(
-                role="manager",
-                target=target,
-                actor="orchestra:manager",
-                error="ManagerExecutor.dispatch_manager returned False",
-                refs={"issue_number": str(event.issue_number)},
-            )
-
             logger.bind(
                 domain="manager_handler",
                 issue_number=event.issue_number,
             ).warning("Manager dispatch returned False")
 
     except Exception as exc:
-        lifecycle.record_failed(
-            role="manager",
-            target=target,
-            actor="orchestra:manager",
-            error=str(exc),
-            refs={"issue_number": str(event.issue_number)},
-        )
-
         logger.bind(
             domain="manager_handler",
             issue_number=event.issue_number,

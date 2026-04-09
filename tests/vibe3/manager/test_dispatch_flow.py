@@ -146,9 +146,9 @@ class TestManagerDispatchIntegration:
                                 result = manager.dispatch_manager(issue)
 
         assert result is True
-        # Async dispatch only records "dispatched" event, not success/failure
+        # Async dispatch only records "started" event via coordinator
         mock_add_event.assert_called_once()
-        assert mock_add_event.call_args.args[1] == "manager_dispatched"
+        assert mock_add_event.call_args.args[1] == "manager_started"
         mock_backend.start_async_command.assert_called_once()
         assert mock_backend.start_async_command.call_args.kwargs["cwd"] == Path(
             "/tmp/wt-issue-102"

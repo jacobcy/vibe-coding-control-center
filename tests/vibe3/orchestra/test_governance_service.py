@@ -252,7 +252,7 @@ class TestGovernanceService:
 
     @pytest.mark.asyncio
     async def test_skip_when_circuit_breaker_open(self):
-        """Governance skips dispatch when circuit breaker is OPEN (snapshot check)."""
+        """Governance skips payload generation when circuit breaker is OPEN."""
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -271,21 +271,22 @@ class TestGovernanceService:
             manager=dispatcher,
         )
 
-        await service._run_governance()
+        prompt, options, task = await service.build_governance_execution_payload()
+        assert prompt is None
         assert dispatcher.method_calls == []
 
     @pytest.mark.asyncio
-    async def test_on_tick_is_stub_does_not_call_run_governance(
+    async def test_on_tick_is_stub_does_not_call_build_payload(
         self, monkeypatch, tmp_path
     ):
         """GovernanceService.on_tick() is now a stub delegating to domain handlers.
 
         Governance scans are triggered by:
           OrchestrationFacade.on_tick() -> GovernanceScanStarted event
-          -> governance domain handler -> GovernanceService.run_scan()
+          -> governance handler -> GovernanceService.build_payload()
 
-        on_tick() must NOT call _run_governance() directly to avoid
-        bypassing the unified CapacityService / ExecutionLifecycleService.
+        on_tick() must NOT call build_governance_execution_payload() directly
+        to avoid bypassing the unified CapacityService / ExecutionLifecycleService.
         """
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
@@ -311,10 +312,10 @@ class TestGovernanceService:
         async def fake_run():
             called["count"] += 1
 
-        monkeypatch.setattr(service, "_run_governance", fake_run)
+        monkeypatch.setattr(service, "build_governance_execution_payload", fake_run)
 
         await service.on_tick()
-        # Domain-first: on_tick() is a stub and must NOT call _run_governance()
+        # Domain-first: on_tick() is a stub, must NOT call build_payload()
         assert called["count"] == 0, (
             "on_tick() should not dispatch directly. "
             "Governance is now triggered via OrchestrationFacade -> domain events."

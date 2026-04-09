@@ -9,8 +9,6 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events import (
     ExecutorDispatched,
@@ -18,6 +16,8 @@ from vibe3.domain.events import (
     ReviewerDispatched,
 )
 from vibe3.domain.events.flow_lifecycle import DomainEvent
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 
@@ -38,7 +38,7 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
     """Handle PlannerDispatched event.
 
     Triggers planner execution when plan trigger is activated.
-    Uses backend.start_async_command to execute CLI command.
+    Uses ExecutionCoordinator to execute CLI command.
     """
     logger.bind(
         domain="planner_handler",
@@ -46,13 +46,11 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
         branch=event.branch,
     ).info("Planner dispatch triggered")
 
-    # Setup lifecycle service
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
-    lifecycle = ExecutionLifecycleService(store)
+    coordinator = ExecutionCoordinator(config, store)
 
     try:
-        # Build CLI command
         cli_entry = _current_cli_entry()
         repo_root = _current_repo_root()
         cmd = [
@@ -75,8 +73,6 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             cmd=" ".join(cmd),
         ).debug("Executing planner command")
 
-        # Execute via backend
-        backend = CodeagentBackend()
         manager = ManagerExecutor(config, dry_run=config.dry_run)
 
         # Resolve CWD (worktree path)
@@ -101,31 +97,32 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             cwd_result = manager._resolve_manager_cwd(event.issue_number, event.branch)
             cwd = cwd_result[0] if cwd_result else None
 
-        handle = backend.start_async_command(
-            cmd,
-            execution_name=f"vibe3-planner-issue-{event.issue_number}",
-            cwd=cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
-
-        # Async wrapper has only been launched here; child CLI remains responsible
-        # for terminal lifecycle events when execution actually ends.
-        lifecycle.record_started(
+        request = ExecutionRequest(
             role="planner",
-            target=event.branch,
+            target_branch=event.branch,
+            target_id=event.issue_number,
+            execution_name=f"vibe3-planner-issue-{event.issue_number}",
+            cmd=cmd,
+            cwd=str(cwd) if cwd else None,
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs={"issue_number": str(event.issue_number)},
             actor="orchestra:planner",
-            refs={
-                "issue_number": str(event.issue_number),
-                "tmux_session": handle.tmux_session,
-                "log_path": str(handle.log_path),
-            },
+            mode="async",
         )
 
-        logger.bind(
-            domain="planner_handler",
-            issue_number=event.issue_number,
-            tmux_session=handle.tmux_session,
-        ).success("Planner dispatch completed")
+        result = coordinator.dispatch_execution(request)
+
+        if result.launched:
+            logger.bind(
+                domain="planner_handler",
+                issue_number=event.issue_number,
+                tmux_session=result.tmux_session,
+            ).success("Planner dispatch completed")
+        else:
+            logger.bind(
+                domain="planner_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Planner dispatch not launched: {result.reason}")
 
     except Exception as exc:
         logger.bind(
@@ -133,20 +130,12 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             issue_number=event.issue_number,
         ).exception(f"Planner dispatch failed: {exc}")
 
-        lifecycle.record_failed(
-            role="planner",
-            target=event.branch,
-            actor="orchestra:planner",
-            error=str(exc),
-            refs={"issue_number": str(event.issue_number)},
-        )
-
 
 def handle_executor_dispatched(event: ExecutorDispatched) -> None:
     """Handle ExecutorDispatched event.
 
     Triggers executor execution when run trigger is activated.
-    Uses backend.start_async_command to execute CLI command.
+    Uses ExecutionCoordinator to execute CLI command.
     """
     logger.bind(
         domain="executor_handler",
@@ -155,13 +144,11 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
         plan_ref=event.plan_ref,
     ).info("Executor dispatch triggered")
 
-    # Setup lifecycle service
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
-    lifecycle = ExecutionLifecycleService(store)
+    coordinator = ExecutionCoordinator(config, store)
 
     try:
-        # Build CLI command
         cli_entry = _current_cli_entry()
         repo_root = _current_repo_root()
         cmd = [
@@ -187,8 +174,6 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             cmd=" ".join(cmd),
         ).debug("Executing executor command")
 
-        # Execute via backend
-        backend = CodeagentBackend()
         manager = ManagerExecutor(config, dry_run=config.dry_run)
 
         # Resolve CWD (worktree path)
@@ -213,32 +198,36 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             cwd_result = manager._resolve_manager_cwd(event.issue_number, event.branch)
             cwd = cwd_result[0] if cwd_result else None
 
-        handle = backend.start_async_command(
-            cmd,
-            execution_name=f"vibe3-executor-issue-{event.issue_number}",
-            cwd=cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
+        refs = {"issue_number": str(event.issue_number)}
+        if event.plan_ref:
+            refs["plan_ref"] = event.plan_ref
 
-        # Async wrapper has only been launched here; child CLI remains responsible
-        # for terminal lifecycle events when execution actually ends.
-        lifecycle.record_started(
+        request = ExecutionRequest(
             role="executor",
-            target=event.branch,
+            target_branch=event.branch,
+            target_id=event.issue_number,
+            execution_name=f"vibe3-executor-issue-{event.issue_number}",
+            cmd=cmd,
+            cwd=str(cwd) if cwd else None,
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=refs,
             actor="orchestra:executor",
-            refs={
-                "issue_number": str(event.issue_number),
-                "tmux_session": handle.tmux_session,
-                "log_path": str(handle.log_path),
-                "plan_ref": event.plan_ref or "",
-            },
+            mode="async",
         )
 
-        logger.bind(
-            domain="executor_handler",
-            issue_number=event.issue_number,
-            tmux_session=handle.tmux_session,
-        ).success("Executor dispatch completed")
+        result = coordinator.dispatch_execution(request)
+
+        if result.launched:
+            logger.bind(
+                domain="executor_handler",
+                issue_number=event.issue_number,
+                tmux_session=result.tmux_session,
+            ).success("Executor dispatch completed")
+        else:
+            logger.bind(
+                domain="executor_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Executor dispatch not launched: {result.reason}")
 
     except Exception as exc:
         logger.bind(
@@ -246,23 +235,12 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             issue_number=event.issue_number,
         ).exception(f"Executor dispatch failed: {exc}")
 
-        lifecycle.record_failed(
-            role="executor",
-            target=event.branch,
-            actor="orchestra:executor",
-            error=str(exc),
-            refs={
-                "issue_number": str(event.issue_number),
-                "plan_ref": event.plan_ref or "",
-            },
-        )
-
 
 def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
     """Handle ReviewerDispatched event.
 
     Triggers reviewer execution when review trigger is activated.
-    Uses backend.start_async_command to execute CLI command.
+    Uses ExecutionCoordinator to execute CLI command.
     """
     logger.bind(
         domain="reviewer_handler",
@@ -271,13 +249,11 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
         report_ref=event.report_ref,
     ).info("Reviewer dispatch triggered")
 
-    # Setup lifecycle service
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
-    lifecycle = ExecutionLifecycleService(store)
+    coordinator = ExecutionCoordinator(config, store)
 
     try:
-        # Build CLI command
         cli_entry = _current_cli_entry()
         repo_root = _current_repo_root()
         cmd = [
@@ -303,8 +279,6 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             cmd=" ".join(cmd),
         ).debug("Executing reviewer command")
 
-        # Execute via backend
-        backend = CodeagentBackend()
         manager = ManagerExecutor(config, dry_run=config.dry_run)
 
         # Resolve CWD (worktree path)
@@ -329,49 +303,42 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             cwd_result = manager._resolve_manager_cwd(event.issue_number, event.branch)
             cwd = cwd_result[0] if cwd_result else None
 
-        handle = backend.start_async_command(
-            cmd,
-            execution_name=f"vibe3-reviewer-issue-{event.issue_number}",
-            cwd=cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
+        refs = {"issue_number": str(event.issue_number)}
+        if event.report_ref:
+            refs["report_ref"] = event.report_ref
 
-        # Async wrapper has only been launched here; child CLI remains responsible
-        # for terminal lifecycle events when execution actually ends.
-        lifecycle.record_started(
+        request = ExecutionRequest(
             role="reviewer",
-            target=event.branch,
+            target_branch=event.branch,
+            target_id=event.issue_number,
+            execution_name=f"vibe3-reviewer-issue-{event.issue_number}",
+            cmd=cmd,
+            cwd=str(cwd) if cwd else None,
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=refs,
             actor="orchestra:reviewer",
-            refs={
-                "issue_number": str(event.issue_number),
-                "tmux_session": handle.tmux_session,
-                "log_path": str(handle.log_path),
-                "report_ref": event.report_ref or "",
-            },
+            mode="async",
         )
 
-        logger.bind(
-            domain="reviewer_handler",
-            issue_number=event.issue_number,
-            tmux_session=handle.tmux_session,
-        ).success("Reviewer dispatch completed")
+        result = coordinator.dispatch_execution(request)
+
+        if result.launched:
+            logger.bind(
+                domain="reviewer_handler",
+                issue_number=event.issue_number,
+                tmux_session=result.tmux_session,
+            ).success("Reviewer dispatch completed")
+        else:
+            logger.bind(
+                domain="reviewer_handler",
+                issue_number=event.issue_number,
+            ).warning(f"Reviewer dispatch not launched: {result.reason}")
 
     except Exception as exc:
         logger.bind(
             domain="reviewer_handler",
             issue_number=event.issue_number,
         ).exception(f"Reviewer dispatch failed: {exc}")
-
-        lifecycle.record_failed(
-            role="reviewer",
-            target=event.branch,
-            actor="orchestra:reviewer",
-            error=str(exc),
-            refs={
-                "issue_number": str(event.issue_number),
-                "report_ref": event.report_ref or "",
-            },
-        )
 
 
 def register_dispatch_handlers() -> None:

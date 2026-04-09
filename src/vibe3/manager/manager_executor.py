@@ -198,15 +198,10 @@ class ManagerExecutor:
             if _manager_options.model:
                 _manager_env["VIBE3_MANAGER_MODEL"] = _manager_options.model
 
-            # 4. Reserve session
-            session_id = self._registry.reserve(
-                role="manager",
-                target_type="issue",
-                target_id=str(issue.number),
-                branch=flow_branch,
-            )
+            # 4. Dispatch via execution coordinator
+            from vibe3.execution.contracts import ExecutionRequest
+            from vibe3.execution.coordinator import ExecutionCoordinator
 
-            # 5. Launch execution
             cmd = [
                 "uv",
                 "run",
@@ -221,52 +216,32 @@ class ManagerExecutor:
                 "--no-async",
             ]
 
-            try:
-                handle = self._backend.start_async_command(
-                    cmd,
-                    execution_name=get_manager_session_name(issue.number),
-                    cwd=manager_cwd,
-                    env=_manager_env,
+            request = ExecutionRequest(
+                role="manager",
+                target_branch=flow_branch,
+                target_id=issue.number,
+                execution_name=get_manager_session_name(issue.number),
+                cmd=cmd,
+                cwd=str(manager_cwd),
+                env=_manager_env,
+                refs={"issue": str(issue.number)},
+                actor="system",
+                mode="async",
+            )
+
+            coordinator = ExecutionCoordinator(
+                config=self.config,
+                store=self._flow_manager.store,
+                backend=self._backend,
+            )
+
+            result = coordinator.dispatch_execution(request)
+
+            if not result.launched:
+                raise RuntimeError(
+                    result.reason or "Failed to launch manager execution"
                 )
-            except Exception as exc:
-                # Clean up reserved session on launch failure
-                if self._registry is not None and session_id is not None:
-                    self._registry.mark_failed(session_id)
-                raise exc
 
-            log.info(
-                f"Started manager async session: {handle.tmux_session} "
-                f"(log: {handle.log_path})"
-            )
-
-            # 6. Mark started and record event
-            if self._registry is not None and session_id is not None:
-                try:
-                    self._registry.mark_started(
-                        session_id, tmux_session=handle.tmux_session
-                    )
-                except Exception as exc:
-                    # Database error, but tmux is already running
-                    # Log warning but don't fail the dispatch
-                    log.warning(
-                        f"Failed to mark session started in registry: {exc}. "
-                        "Session will be cleaned up by reconcile."
-                    )
-
-            self._flow_manager.store.add_event(
-                flow_branch,
-                "manager_dispatched",
-                "system",
-                detail=(
-                    f"Dispatched manager to tmux session: {handle.tmux_session}\n"
-                    f"Log: {handle.log_path}"
-                ),
-                refs={
-                    "tmux_session": handle.tmux_session,
-                    "log_path": str(handle.log_path),
-                    "issue": str(issue.number),
-                },
-            )
             return True
 
         except Exception as exc:

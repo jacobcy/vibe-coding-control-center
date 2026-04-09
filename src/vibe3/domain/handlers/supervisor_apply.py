@@ -12,8 +12,6 @@ from typing import Callable
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.supervisor_apply import (
@@ -26,12 +24,13 @@ from vibe3.domain.events.supervisor_apply import (
     SupervisorPromptRendered,
 )
 from vibe3.domain.publisher import publish
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.supervisor_handoff import (
     SupervisorHandoffIssue,
     SupervisorHandoffService,
 )
-from vibe3.services.capacity_service import CapacityService
 
 
 def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None:
@@ -72,8 +71,8 @@ def handle_supervisor_prompt_rendered(event: SupervisorPromptRendered) -> None:
 def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None:
     """Handle SupervisorApplyDispatched event.
 
-    Triggers supervisor handoff execution via SupervisorHandoffService.
-    Uses unified infrastructure services for lifecycle and capacity.
+    Triggers supervisor handoff execution via SupervisorHandoffService
+    and ExecutionCoordinator. Uses unified infrastructure services.
     """
     logger.bind(
         domain="events",
@@ -86,77 +85,94 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
 
-    # Setup ExecutionLifecycleService for lifecycle recording
-    lifecycle = ExecutionLifecycleService(store)
+    coordinator = ExecutionCoordinator(config, store)
 
-    # Setup CapacityService for capacity control
-    backend = CodeagentBackend()
-    capacity = CapacityService(config, store, backend)
+    from vibe3.manager.manager_executor import ManagerExecutor
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-    # Check capacity before dispatching
-    if not capacity.can_dispatch(role="supervisor", target_id=event.issue_number):
-        logger.bind(
-            domain="supervisor_handler",
-            issue=event.issue_number,
-        ).info("Supervisor capacity full, skipping handoff")
-        return
+    github = GitHubClient()
+    manager = ManagerExecutor(config, dry_run=config.dry_run)
+    status_service = OrchestraStatusService(
+        config,
+        github=github,
+        orchestrator=manager.flow_manager,
+    )
 
-    # Mark in-flight
-    capacity.mark_in_flight(role="supervisor", target_id=event.issue_number)
+    handoff_service = SupervisorHandoffService(
+        config,
+        github=github,
+        status_service=status_service,
+        manager=manager,
+    )
 
     logger.bind(
         domain="supervisor_handler",
         issue=event.issue_number,
-    ).debug("Supervisor handler dispatching handoff via SupervisorHandoffService")
+    ).debug("Supervisor handler dispatching handoff via ExecutionCoordinator")
 
-    # Dispatch supervisor handoff
+    # Setup WorktreeManager to acquire temporary worktree for L2 apply execution
+    from pathlib import Path
+
+    from vibe3.clients.git_client import GitClient
+    from vibe3.environment.worktree import WorktreeManager
+
+    git_common_dir = GitClient().get_git_common_dir()
+    repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
+    worktree_manager = WorktreeManager(config, repo_root, manager.flow_manager)
+
+    wt_context = None
+
     try:
-        # Initialize dependencies for SupervisorHandoffService
-        from vibe3.manager.manager_executor import ManagerExecutor
-        from vibe3.services.orchestra_status_service import OrchestraStatusService
-
-        github = GitHubClient()
-        manager = ManagerExecutor(config, dry_run=config.dry_run)
-        status_service = OrchestraStatusService(
-            config,
-            github=github,
-            orchestrator=manager.flow_manager,
-        )
-
-        handoff_service = SupervisorHandoffService(
-            config,
-            github=github,
-            status_service=status_service,
-            manager=manager,
-        )
-
         # Create handoff issue payload
         handoff_issue = SupervisorHandoffIssue(
             number=event.issue_number,
             title=f"Supervisor handoff for issue #{event.issue_number}",
         )
 
-        # Dispatch handoff (sync method)
-        handoff_service.dispatch_handoff(handoff_issue)
+        if config.dry_run:
+            logger.bind(domain="supervisor_handler").info(
+                "Dry run: skipping supervisor dispatch"
+            )
+            return
 
-        # Async wrapper has only been launched here; child apply execution remains
-        # responsible for terminal lifecycle events.
-        lifecycle.record_started(
-            role="supervisor",
-            target=f"issue-{event.issue_number}",
-            actor="orchestra:supervisor",
-            refs={
-                "issue_number": str(event.issue_number),
-                "tmux_session": event.tmux_session,
-            },
+        # Build payload (sync)
+        prompt, options, task = handoff_service.build_handoff_payload(handoff_issue)
+
+        # Acquire temporary worktree for L2 apply execution
+        wt_context = worktree_manager.acquire_temporary_worktree(
+            issue_number=event.issue_number,
+            base_branch="main",
         )
+
+        import os
+
+        request = ExecutionRequest(
+            role="supervisor",
+            target_branch=f"issue-{event.issue_number}",
+            target_id=event.issue_number,
+            execution_name=event.tmux_session,
+            prompt=prompt,
+            options=options,
+            cwd=str(wt_context.path),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs={"task": task, "issue_number": str(event.issue_number)},
+            actor="orchestra:supervisor",
+            mode="async",
+        )
+
+        result = coordinator.dispatch_execution(request)
+
+        if not result.launched:
+            raise RuntimeError(
+                f"Failed to launch supervisor execution: {result.reason}"
+            )
 
         try:
             github.add_comment(
                 event.issue_number,
                 f"🔄 Supervisor apply agent dispatched\n\n"
                 f"**Supervisor file**: `{event.supervisor_file}`\n"
-                f"**Session**: `{event.tmux_session}`\n\n"
+                f"**Session**: `{result.tmux_session}`\n\n"
                 "Apply agent will execute governance actions in an isolated worktree.",
             )
         except Exception as comment_exc:
@@ -174,28 +190,21 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         ).success("Supervisor handoff completed successfully")
 
     except Exception as exc:
-        # Record failure
-        lifecycle.record_failed(
-            role="supervisor",
-            target=f"issue-{event.issue_number}",
-            actor="orchestra:supervisor",
-            error=str(exc),
-            refs={"issue_number": str(event.issue_number)},
-        )
+        if wt_context:
+            worktree_manager.release_temporary_worktree(wt_context)
 
         logger.bind(
             domain="supervisor_handler",
             issue=event.issue_number,
         ).exception(f"Supervisor handoff failed: {exc}")
 
-        raise
+        # Note: If coordinator.dispatch_execution failed, it would have already
+        # recorded the failure lifecycle event. If build_handoff_payload
+        # failed before coordinator was called, we aren't tracking capacity.
+        # Coordinator handles checking and taking capacity.
+        # So we don't need to manually clean up capacity.
 
-    finally:
-        # Clear in-flight marker
-        capacity.prune_in_flight(
-            role="supervisor",
-            target_ids={event.issue_number},
-        )
+        raise
 
 
 def handle_supervisor_apply_started(event: SupervisorApplyStarted) -> None:

@@ -140,70 +140,9 @@ class StateLabelDispatchService(ServiceBase):
                     level="DEBUG",
                 )
 
-        # Apply unified capacity control for all triggers
-        if ready:
-            from vibe3.services.capacity_service import CapacityService
-
-            capacity_service = CapacityService(self.config, self._store, self._backend)
-
-            # Get role for this trigger
-            role = _TRIGGER_TO_REGISTRY_ROLE.get(self.trigger_name, self.trigger_name)
-
-            # Filter issues that can be dispatched
-            to_dispatch = []
-            throttled = []
-            for issue in ready:
-                if capacity_service.can_dispatch(role, issue.number):
-                    capacity_service.mark_in_flight(role, issue.number)
-                    to_dispatch.append(issue)
-                else:
-                    throttled.append(issue)
-
-            if throttled:
-                throttled_count = len(throttled)
-                capacity_status = capacity_service.get_capacity_status(role)
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.trigger_name,
-                ).info(
-                    f"Throttled {throttled_count} issues due to capacity limit "
-                    f"(live={capacity_status['active_count']}, "
-                    f"in_flight={capacity_status['in_flight_count']}, "
-                    f"max={capacity_status['max_capacity']}, "
-                    f"remaining={capacity_status['remaining']})"
-                )
-                # INFO: simplified message
-                append_orchestra_event(
-                    "dispatcher",
-                    (
-                        f"{self.service_name} throttled {throttled_count} issues "
-                        f"(capacity full: live={capacity_status['active_count']}, "
-                        f"in_flight={capacity_status['in_flight_count']})"
-                    ),
-                )
-                # DEBUG: full list
-                throttled_numbers = [f"#{issue.number}" for issue in throttled]
-                append_orchestra_event(
-                    "dispatcher",
-                    (
-                        f"{self.service_name} throttled issues: "
-                        f"{', '.join(throttled_numbers)}"
-                    ),
-                    level="DEBUG",
-                )
-
-            # Log selected issues before dispatch
-            if to_dispatch:
-                selected_numbers = [f"#{issue.number}" for issue in to_dispatch]
-                logger.bind(
-                    domain="orchestra",
-                    trigger=self.trigger_name,
-                ).info(
-                    f"Selected {len(to_dispatch)} issues for dispatch: "
-                    f"{', '.join(selected_numbers)}"
-                )
-
-            ready = to_dispatch
+        # Note: Unified capacity control is now handled by ExecutionCoordinator.
+        # state_label_dispatch only emits intent events. If capacity is full,
+        # coordinator rejects the launch and issue remains in current state.
 
         for issue in ready:
             try:
