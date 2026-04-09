@@ -105,43 +105,40 @@ class GovernanceService(ServiceBase):
         self._backend = backend or CodeagentBackend()
         self._registry = registry
         self.last_render_result: PromptRenderResult | None = None
-        self._in_flight = False
 
     async def handle_event(self, event: GitHubEvent) -> None:
         pass
 
     async def on_tick(self) -> None:
+        """Periodic governance tick (emits GovernanceScanStarted event via facade).
+
+        Note: Capacity and lifecycle tracking are now handled by domain
+        handlers using unified infrastructure services (CapacityService,
+        ExecutionLifecycleService).
+        """
         self._tick_count += 1
         if self._tick_count % self.config.governance.interval_ticks != 0:
             return
+
         log = logger.bind(domain="orchestra", action="governance")
-        if not self._dry_run and (self._in_flight or self._has_live_dispatch()):
-            self._in_flight = True
-            log.info(
-                f"Governance tick #{self._tick_count}: existing session still running"
-            )
-            append_governance_event(
-                f"tick #{self._tick_count} skipped: existing session still running",
-                repo_root=self._manager.repo_path,
-            )
-            return
-        log.info(f"Governance tick #{self._tick_count}: dispatching")
-        append_governance_event(
-            f"tick #{self._tick_count} dispatching",
-            repo_root=self._manager.repo_path,
-        )
-        try:
-            await self._run_governance()
-        except Exception as exc:
-            self._in_flight = False
-            log.error(f"Governance scan failed: {exc}")
-            append_governance_event(
-                f"tick #{self._tick_count} failed: {exc}",
-                repo_root=self._manager.repo_path,
-            )
+        log.info(f"Governance tick #{self._tick_count}")
+
+        # Governance scan is now triggered by OrchestrationFacade.on_tick()
+        # which emits GovernanceScanStarted event, handled by domain handlers
+        # This service's on_tick is kept for backward compatibility
+        # but should be removed after full migration to domain-first architecture
 
     async def run_once(self) -> None:
         """Run governance exactly once for manual debugging."""
+        await self._run_governance()
+
+    async def run_scan(self) -> None:
+        """Run governance scan (callable from domain handlers).
+
+        This method provides a clean interface for domain handlers to
+        trigger governance execution. It does not manage capacity or
+        lifecycle - those should be handled by the caller (domain handler).
+        """
         await self._run_governance()
 
     def render_current_plan(self) -> str:
@@ -299,30 +296,6 @@ class GovernanceService(ServiceBase):
     def _governance_execution_name(self) -> str:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         return f"vibe3-governance-scan-{timestamp}-t{self._tick_count}"
-
-    def _has_live_dispatch(self) -> bool:
-        if self._registry is not None:
-            # First, mark any governance sessions whose tmux is gone as done
-            # (normal completion should be reflected as done, not orphaned)
-            self._registry.mark_governance_sessions_done_when_tmux_gone()
-
-            # Also reconcile other stale sessions
-            self._registry.reconcile_live_state()
-
-            # Check for truly live governance sessions
-            live_sessions = self._registry.list_live_governance_sessions()
-            if live_sessions:
-                return True
-
-            # Registry confirms no live governance session - clear stale flag
-            self._in_flight = False
-            return False
-        # Fallback: tmux prefix detection when no registry is configured
-        session_prefix = "vibe3-governance-scan"
-        if self._backend.has_tmux_session_prefix(session_prefix):
-            return True
-        self._in_flight = False
-        return False
 
     def _build_prompt_context(self, snapshot: OrchestraSnapshot) -> dict[str, Any]:
         active_entries = snapshot.active_issues

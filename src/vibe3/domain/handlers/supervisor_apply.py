@@ -12,7 +12,10 @@ from typing import Callable
 
 from loguru import logger
 
+from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.supervisor_apply import (
     DomainEvent,
     SupervisorApplyCompleted,
@@ -22,6 +25,12 @@ from vibe3.domain.events.supervisor_apply import (
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.services.supervisor_handoff import (
+    SupervisorHandoffIssue,
+    SupervisorHandoffService,
+)
+from vibe3.services.capacity_service import CapacityService
 
 
 def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None:
@@ -53,7 +62,8 @@ def handle_supervisor_prompt_rendered(event: SupervisorPromptRendered) -> None:
 def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None:
     """Handle SupervisorApplyDispatched event.
 
-    Adds a comment to the issue indicating supervisor dispatch.
+    Triggers supervisor handoff execution via SupervisorHandoffService.
+    Uses unified infrastructure services for lifecycle and capacity.
     """
     logger.bind(
         domain="events",
@@ -62,14 +72,117 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         tmux=event.tmux_session,
     ).info("Supervisor apply dispatched")
 
-    # Add comment to issue
-    GitHubClient().add_comment(
-        event.issue_number,
-        f"🔄 Supervisor apply agent dispatched\n\n"
-        f"**Supervisor file**: `{event.supervisor_file}`\n"
-        f"**Session**: `{event.tmux_session}`\n\n"
-        f"Apply agent will execute governance actions in an isolated worktree.",
+    # Initialize unified infrastructure services
+    config = OrchestraConfig.from_settings()
+    store = SQLiteClient()
+
+    # Setup ExecutionLifecycleService for lifecycle recording
+    lifecycle = ExecutionLifecycleService(store)
+
+    # Setup CapacityService for capacity control
+    backend = CodeagentBackend()
+    capacity = CapacityService(config, store, backend)
+
+    # Check capacity before dispatching
+    if not capacity.can_dispatch(role="supervisor", target_id=event.issue_number):
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).info("Supervisor capacity full, skipping handoff")
+        return
+
+    # Mark in-flight
+    capacity.mark_in_flight(role="supervisor", target_id=event.issue_number)
+
+    # Record execution started
+    lifecycle.record_started(
+        role="supervisor",
+        target=f"issue-{event.issue_number}",
+        actor="orchestra:supervisor",
+        refs={"issue_number": str(event.issue_number)},
     )
+
+    logger.bind(
+        domain="supervisor_handler",
+        issue=event.issue_number,
+    ).debug("Supervisor handler dispatching handoff via SupervisorHandoffService")
+
+    # Dispatch supervisor handoff
+    try:
+        # Initialize dependencies for SupervisorHandoffService
+        from vibe3.manager.manager_executor import ManagerExecutor
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        github = GitHubClient()
+        manager = ManagerExecutor(config, dry_run=config.dry_run)
+        status_service = OrchestraStatusService(
+            config,
+            github=github,
+            orchestrator=manager.flow_manager,
+        )
+
+        handoff_service = SupervisorHandoffService(
+            config,
+            github=github,
+            status_service=status_service,
+            manager=manager,
+        )
+
+        # Create handoff issue payload
+        handoff_issue = SupervisorHandoffIssue(
+            number=event.issue_number,
+            title=f"Supervisor handoff for issue #{event.issue_number}",
+        )
+
+        # Dispatch handoff (sync method)
+        handoff_service.dispatch_handoff(handoff_issue)
+
+        # Record completion
+        lifecycle.record_completed(
+            role="supervisor",
+            target=f"issue-{event.issue_number}",
+            actor="orchestra:supervisor",
+            detail=f"Supervisor handoff completed for issue #{event.issue_number}",
+            refs={"issue_number": str(event.issue_number)},
+        )
+
+        # Add comment to issue
+        github.add_comment(
+            event.issue_number,
+            f"🔄 Supervisor apply agent dispatched\n\n"
+            f"**Supervisor file**: `{event.supervisor_file}`\n"
+            f"**Session**: `{event.tmux_session}`\n\n"
+            f"Apply agent will execute governance actions in an isolated worktree.",
+        )
+
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).success("Supervisor handoff completed successfully")
+
+    except Exception as exc:
+        # Record failure
+        lifecycle.record_failed(
+            role="supervisor",
+            target=f"issue-{event.issue_number}",
+            actor="orchestra:supervisor",
+            error=str(exc),
+            refs={"issue_number": str(event.issue_number)},
+        )
+
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).exception(f"Supervisor handoff failed: {exc}")
+
+        raise
+
+    finally:
+        # Clear in-flight marker
+        capacity.prune_in_flight(
+            role="supervisor",
+            target_ids={event.issue_number},
+        )
 
 
 def handle_supervisor_apply_started(event: SupervisorApplyStarted) -> None:

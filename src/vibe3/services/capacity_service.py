@@ -168,10 +168,14 @@ class CapacityService:
         Returns:
             Maximum concurrent dispatches for the role
         """
-        # TODO: Integrate with ExecutionRolePolicyService (Task B4)
-        # For now, manager uses max_concurrent_flows, others use default
-        if role == "manager":
-            return self.config.max_concurrent_flows
-        else:
-            # Default capacity for other roles
-            return self.config.max_concurrent_flows
+        # Per-role capacity configuration
+        role_capacity_map = {
+            "manager": self.config.max_concurrent_flows,
+            "governance": self.config.governance_max_concurrent,
+            "supervisor": self.config.supervisor_max_concurrent,
+            "planner": self.config.max_concurrent_flows,  # Uses default
+            "executor": self.config.max_concurrent_flows,  # Uses default
+            "reviewer": self.config.max_concurrent_flows,  # Uses default
+        }
+
+        return role_capacity_map.get(role, self.config.max_concurrent_flows)

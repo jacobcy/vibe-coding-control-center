@@ -14,6 +14,7 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -201,6 +202,10 @@ def _build_server_with_launch_cwd(
                 registry=shared_registry,
             )
         )
+
+    # Register OrchestrationFacade as primary domain-first entry point
+    facade = OrchestrationFacade()
+    heartbeat.register(facade)
 
     if config.governance.enabled:
         heartbeat.register(

@@ -4,6 +4,7 @@ Uses unified infrastructure services:
 - ExecutionRolePolicyService for configuration resolution
 - CapacityService for capacity control
 - ExecutionLifecycleService for lifecycle events
+- OrchestrationFacade for domain-first event publishing
 
 Usage Guide: docs/v3/architecture/infrastructure-guide.md
 """
@@ -25,6 +26,7 @@ from vibe3.agents.review_runner import format_agent_actor
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
@@ -132,6 +134,7 @@ class StateLabelDispatchService(ServiceBase):
         self._policy_service = ExecutionRolePolicyService(config)
         self._dispatch_guard = asyncio.Lock()
         self._progress_snapshots: dict[int, dict[str, object]] = {}
+        self._facade = OrchestrationFacade()  # Domain-first entry point
 
     async def handle_event(self, event: GitHubEvent) -> None:
         return
@@ -234,6 +237,26 @@ class StateLabelDispatchService(ServiceBase):
 
         for issue in ready:
             try:
+                # Domain-first: emit event via facade
+                # This triggers domain handlers which will dispatch
+                # via unified framework
+                self._facade.on_issue_state_changed(
+                    issue_info=issue,
+                    from_state=None,  # Unknown previous state
+                )
+
+                # TODO: Remove legacy dispatch after domain handler migration complete
+                # The above facade call should be sufficient once domain handlers
+                # are fully wired to CapacityService and ExecutionLifecycleService
+                logger.bind(
+                    domain="orchestra",
+                    trigger=self.trigger_name,
+                    issue=issue.number,
+                ).warning(
+                    "Using legacy dispatch path. "
+                    "Domain handlers should handle dispatch via facade events."
+                )
+
                 # DEBUG: dispatching attempt
                 append_orchestra_event(
                     "dispatcher",

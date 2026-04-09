@@ -185,6 +185,19 @@ class OrchestraConfig(BaseModel):
     scene_base_ref: str = Field(default="origin/main", min_length=1)
     repo: str | None = None
     max_concurrent_flows: int = Field(default=3, ge=1)
+
+    # Per-role capacity configuration
+    governance_max_concurrent: int = Field(
+        default=1,
+        ge=1,
+        description="Maximum concurrent governance executions",
+    )
+    supervisor_max_concurrent: int = Field(
+        default=2,
+        ge=1,
+        description="Maximum concurrent supervisor executions",
+    )
+
     dry_run: bool = False
     pid_file: Path = Field(default_factory=_default_pid_file)
     port: int = Field(default=8080, ge=1, le=65535)
@@ -332,6 +345,8 @@ class OrchestraConfig(BaseModel):
             scene_base_ref=getattr(src, "scene_base_ref", "origin/main"),
             repo=repo,
             max_concurrent_flows=src.max_concurrent_flows,
+            governance_max_concurrent=getattr(src, "governance_max_concurrent", 1),
+            supervisor_max_concurrent=getattr(src, "supervisor_max_concurrent", 2),
             port=src.port,
             webhook_secret=src.webhook_secret,
             bot_username=getattr(src, "bot_username", None),

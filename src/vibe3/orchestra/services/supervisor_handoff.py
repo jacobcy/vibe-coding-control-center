@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -79,37 +77,24 @@ class SupervisorHandoffService(ServiceBase):
             repo_path=Path.cwd(),
             flow_manager=flow_manager,
         )
-        self._in_flight: set[int] = set()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         return
 
     async def on_tick(self) -> None:
-        candidates = await asyncio.get_event_loop().run_in_executor(
-            self._executor,
-            self._list_handoff_issues,
+        """Periodic handoff issue scan (emits events via facade).
+
+        Note: Capacity and lifecycle tracking are now handled by domain
+        handlers using unified infrastructure services (CapacityService,
+        ExecutionLifecycleService).
+        """
+        # Supervisor handoff is now triggered by domain events
+        # (e.g., SupervisorApplyDispatched event from OrchestrationFacade)
+        # This on_tick method is kept for backward compatibility
+        # but should be removed after full migration to domain-first architecture
+        logger.bind(domain="orchestra").debug(
+            "Supervisor handoff service on_tick (delegated to domain handlers)"
         )
-        if not candidates:
-            self._in_flight.clear()
-            return
-
-        active_issue_numbers = {issue.number for issue in candidates}
-        self._in_flight.intersection_update(active_issue_numbers)
-
-        for issue in candidates:
-            if issue.number in self._in_flight or self._has_live_dispatch(issue.number):
-                self._in_flight.add(issue.number)
-                continue
-            self._in_flight.add(issue.number)
-            try:
-                await asyncio.get_event_loop().run_in_executor(
-                    self._executor,
-                    self._process_issue,
-                    issue,
-                )
-            except Exception:
-                self._in_flight.discard(issue.number)
-                raise
 
     def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
         raw = self._github.list_issues(
@@ -139,6 +124,19 @@ class SupervisorHandoffService(ServiceBase):
         return candidates
 
     def _process_issue(self, issue: SupervisorHandoffIssue) -> None:
+        """Internal method for processing handoff issues (legacy on_tick path)."""
+        self.dispatch_handoff(issue)
+
+    def dispatch_handoff(self, issue: SupervisorHandoffIssue) -> None:
+        """Dispatch supervisor handoff execution (callable from domain handlers).
+
+        This method provides a clean interface for domain handlers to
+        trigger supervisor handoff execution. It does not manage capacity or
+        lifecycle - those should be handled by the caller (domain handler).
+
+        Args:
+            issue: Supervisor handoff issue to process
+        """
         supervisor_file = self.config.supervisor_handoff.supervisor_file
         log = logger.bind(
             domain="orchestra",
@@ -206,30 +204,6 @@ class SupervisorHandoffService(ServiceBase):
             # Release worktree on dispatch failure
             self._worktree_manager.release_temporary_worktree(wt_context)
             raise
-
-    def _has_live_dispatch(self, issue_number: int) -> bool:
-        session_prefix = f"vibe3-supervisor-issue-{issue_number}"
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-        if result.returncode != 0:
-            return False
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if session_name == session_prefix or session_name.startswith(
-                f"{session_prefix}-"
-            ):
-                return True
-        return False
 
     def _build_issue_task(self, issue: SupervisorHandoffIssue) -> str:
         repo_hint = f" in repo {self.config.repo}" if self.config.repo else ""

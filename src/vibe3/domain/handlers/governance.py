@@ -7,7 +7,9 @@ from typing import Callable
 
 from loguru import logger
 
+from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.governance import (
     DomainEvent,
     GovernanceDecisionRequired,
@@ -15,18 +17,119 @@ from vibe3.domain.events.governance import (
     GovernanceScanStarted,
     SupervisorExecutionCompleted,
 )
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.services.governance_service import GovernanceService
+from vibe3.services.capacity_service import CapacityService
 
 
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     """Handle GovernanceScanStarted event.
 
-    Logs the start of a governance scan.
+    Triggers governance scan execution via GovernanceService.
+    Uses unified infrastructure services for lifecycle and capacity.
     """
     logger.bind(
         domain="events",
         event="governance_scan_started",
         tick=event.tick_count,
     ).info("Governance scan started")
+
+    # Initialize unified infrastructure services
+    config = OrchestraConfig.from_settings()
+    store = SQLiteClient()
+
+    # Setup ExecutionLifecycleService for lifecycle recording
+    lifecycle = ExecutionLifecycleService(store)
+
+    # Setup CapacityService for capacity control
+    from vibe3.agents.backends.codeagent import CodeagentBackend
+
+    backend = CodeagentBackend()
+    capacity = CapacityService(config, store, backend)
+
+    # Check capacity before dispatching
+    if not capacity.can_dispatch(role="governance", target_id=1):
+        logger.bind(
+            domain="governance_handler",
+            tick=event.tick_count,
+        ).info("Governance capacity full, skipping scan")
+        return
+
+    # Mark in-flight
+    capacity.mark_in_flight(role="governance", target_id=1)
+
+    # Record execution started
+    lifecycle.record_started(
+        role="governance",
+        target="governance_scan",
+        actor="orchestra:governance",
+        refs={},
+    )
+
+    logger.bind(
+        domain="governance_handler",
+        tick=event.tick_count,
+    ).debug("Governance handler dispatching scan via GovernanceService")
+
+    # Dispatch governance scan
+    try:
+        # Initialize dependencies for GovernanceService
+        from vibe3.manager.manager_executor import ManagerExecutor
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        github = GitHubClient()
+        manager = ManagerExecutor(config, dry_run=config.dry_run)
+        status_service = OrchestraStatusService(
+            config,
+            github=github,
+            orchestrator=manager.flow_manager,
+        )
+
+        governance_service = GovernanceService(
+            config,
+            status_service=status_service,
+            manager=manager,
+        )
+
+        # Run async scan in new event loop (avoids deprecation warning)
+        import asyncio
+
+        asyncio.run(governance_service.run_scan())
+
+        # Record completion
+        lifecycle.record_completed(
+            role="governance",
+            target="governance_scan",
+            actor="orchestra:governance",
+            detail=f"Governance scan completed for tick {event.tick_count}",
+            refs={},
+        )
+
+        logger.bind(
+            domain="governance_handler",
+            tick=event.tick_count,
+        ).success("Governance scan completed successfully")
+
+    except Exception as exc:
+        # Record failure
+        lifecycle.record_failed(
+            role="governance",
+            target="governance_scan",
+            actor="orchestra:governance",
+            error=str(exc),
+            refs={},
+        )
+
+        logger.bind(
+            domain="governance_handler",
+            tick=event.tick_count,
+        ).exception(f"Governance scan failed: {exc}")
+
+        raise
+
+    finally:
+        # Clear in-flight marker
+        capacity.prune_in_flight(role="governance", target_ids={1})
 
 
 def handle_governance_scan_completed(event: GovernanceScanCompleted) -> None:

@@ -12,9 +12,10 @@ from vibe3.domain.events import (
     IssueStateChanged,
 )
 from vibe3.models.orchestration import IssueInfo
+from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 
-class OrchestrationFacade:
+class OrchestrationFacade(ServiceBase):
     """Unified orchestration entry point.
 
     职责：
@@ -32,6 +33,29 @@ class OrchestrationFacade:
             tick_count: Initial tick count for governance scan tracking
         """
         self._tick_count = tick_count
+
+    async def on_tick(self) -> None:
+        """Heartbeat polling -> trigger governance scan.
+
+        Called by runtime heartbeat periodically, triggering governance chain.
+        """
+        self.on_heartbeat_tick()
+
+    async def handle_event(self, event: GitHubEvent) -> None:
+        """React to a GitHub event.
+
+        Converts GitHub webhook/poll events to domain events.
+
+        Args:
+            event: GitHub event from webhook or polling
+        """
+        # TODO: Convert GitHub event to appropriate domain event
+        # For now, just log the event
+        logger.bind(
+            domain="orchestration_facade",
+            event_type=event.event_type,
+            action=event.action,
+        ).debug(f"Received GitHub event: {event.event_type}.{event.action}")
 
     def on_issue_state_changed(
         self,
