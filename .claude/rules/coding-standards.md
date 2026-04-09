@@ -15,7 +15,7 @@
 
 ## Python Implementation (v3)
 
-- 使用 Python 3.10+ 特性。
+- 使用 Python 3.12+ 特性。
 - 类型注解必须完整，通过 `mypy --strict` 检查。
 - 代码格式化使用 `black`，行宽 88 字符。
 - Lint 检查使用 `ruff`，启用规则 `E, F, I, N, W`。
