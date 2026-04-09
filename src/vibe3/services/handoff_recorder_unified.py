@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal
 
 from vibe3.agents.review_runner import (
     format_agent_actor,
@@ -15,13 +15,6 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.models.review_runner import AgentOptions
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.signature_service import SignatureService
-
-
-class _BranchBoundGitClientProtocol(Protocol):
-    """Protocol for git client operations needed by HandoffService."""
-
-    def get_current_branch(self) -> str: ...
-    def get_git_common_dir(self) -> str: ...
 
 
 class _BranchBoundGitClient:

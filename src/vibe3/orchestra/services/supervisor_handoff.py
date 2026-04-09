@@ -1,28 +1,23 @@
-"""Supervisor handoff service: consume governance issues and execute supervisors."""
+"""Supervisor handoff payload adapter for L2 supervisor execution."""
 
 from __future__ import annotations
 
-import asyncio
-import os
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.github_client import GitHubClient
-from vibe3.environment.worktree import WorktreeManager
+from vibe3.clients.git_client import GitClient
+from vibe3.environment.worktree import WorktreeContext, WorktreeManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
-    from vibe3.manager.manager_executor import ManagerExecutor
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 
 @dataclass(frozen=True)
@@ -33,112 +28,45 @@ class SupervisorHandoffIssue:
     title: str
 
 
-def _normalize_labels(raw_labels: object) -> list[str]:
-    labels: list[str] = []
-    if not isinstance(raw_labels, list):
-        return labels
-    for item in raw_labels:
-        if isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str) and name:
-                labels.append(name)
-        elif isinstance(item, str) and item:
-            labels.append(item)
-    return labels
-
-
-class SupervisorHandoffService(ServiceBase):
-    """Consume governance handoff issues and recycle them after execution."""
-
-    event_types: list[str] = []
+class SupervisorHandoffService:
+    """Build supervisor prompt payload from orchestration context."""
 
     def __init__(
         self,
         config: OrchestraConfig,
-        github: GitHubClient | None = None,
         status_service: OrchestraStatusService | None = None,
-        manager: ManagerExecutor | None = None,
         executor: ThreadPoolExecutor | None = None,
-        backend: CodeagentBackend | None = None,
     ) -> None:
         self.config = config
-        self._github = github or GitHubClient()
         from vibe3.manager.flow_manager import FlowManager
 
         flow_manager = FlowManager(config)
+        self._flow_manager = flow_manager
         self._status_service = status_service or OrchestraStatusService(
-            config, github=self._github, orchestrator=flow_manager
+            config, orchestrator=flow_manager
         )
-        self._manager = manager
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._backend = backend or CodeagentBackend()
-        self._worktree_manager = WorktreeManager(
-            config=config,
-            repo_path=Path.cwd(),
-            flow_manager=flow_manager,
-        )
-        self._in_flight: set[int] = set()
 
-    async def handle_event(self, event: GitHubEvent) -> None:
-        return
+    @classmethod
+    def from_config(
+        cls,
+        config: OrchestraConfig,
+        *,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> SupervisorHandoffService:
+        """Build a supervisor handoff adapter with default read-model dependencies."""
+        return cls(config=config, executor=executor)
 
-    async def on_tick(self) -> None:
-        candidates = await asyncio.get_event_loop().run_in_executor(
-            self._executor,
-            self._list_handoff_issues,
-        )
-        if not candidates:
-            self._in_flight.clear()
-            return
+    def build_handoff_payload(
+        self, issue: SupervisorHandoffIssue
+    ) -> tuple[str, Any, str]:
+        """Build payload for handoff execution.
 
-        active_issue_numbers = {issue.number for issue in candidates}
-        self._in_flight.intersection_update(active_issue_numbers)
-
-        for issue in candidates:
-            if issue.number in self._in_flight or self._has_live_dispatch(issue.number):
-                self._in_flight.add(issue.number)
-                continue
-            self._in_flight.add(issue.number)
-            try:
-                await asyncio.get_event_loop().run_in_executor(
-                    self._executor,
-                    self._process_issue,
-                    issue,
-                )
-            except Exception:
-                self._in_flight.discard(issue.number)
-                raise
-
-    def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
-        raw = self._github.list_issues(
-            limit=100,
-            state="open",
-            assignee=None,
-            repo=self.config.repo,
-        )
-        issue_label = self.config.supervisor_handoff.issue_label
-        handoff_label = self.config.supervisor_handoff.handoff_state_label
-
-        candidates: list[SupervisorHandoffIssue] = []
-        for item in raw:
-            number = item.get("number")
-            title = item.get("title")
-            if not isinstance(number, int) or not isinstance(title, str):
-                continue
-            labels = _normalize_labels(item.get("labels"))
-            if issue_label not in labels or handoff_label not in labels:
-                continue
-            candidates.append(
-                SupervisorHandoffIssue(
-                    number=number,
-                    title=title,
-                )
-            )
-        return candidates
-
-    def _process_issue(self, issue: SupervisorHandoffIssue) -> None:
+        Returns:
+            Tuple of (prompt, agent_options, task_string).
+        """
         supervisor_file = self.config.supervisor_handoff.supervisor_file
         log = logger.bind(
             domain="orchestra",
@@ -149,22 +77,16 @@ class SupervisorHandoffService(ServiceBase):
         log.info("Processing supervisor handoff issue")
 
         prompt = self._render_supervisor_prompt(supervisor_file)
+        options = resolve_supervisor_agent_options(self.config)
+        task = self._build_issue_task(issue)
 
-        if self.config.dry_run:
-            log.info("Dry run enabled; skipping supervisor handoff dispatch")
-            return
-
-        self._dispatch_supervisor_prompt(issue, prompt)
-        log.info(
-            "Dispatched supervisor handoff issue",
-            issue_number=issue.number,
-            supervisor_file=supervisor_file,
-        )
+        return prompt, options, task
 
     def _render_supervisor_prompt(self, supervisor_file: str) -> str:
         governance_cfg = self.config.governance.model_copy(
             update={
                 "supervisor_file": supervisor_file,
+                "prompt_template": self.config.supervisor_handoff.prompt_template,
                 "include_supervisor_content": True,
                 "dry_run": False,
             }
@@ -173,62 +95,9 @@ class SupervisorHandoffService(ServiceBase):
         service = GovernanceService(
             config=config,
             status_service=self._status_service,
-            manager=self._manager,
             executor=self._executor,
         )
         return service.render_current_plan()
-
-    def _dispatch_supervisor_prompt(
-        self,
-        issue: SupervisorHandoffIssue,
-        prompt: str,
-    ) -> None:
-        options = resolve_supervisor_agent_options(self.config)
-
-        # Acquire temporary worktree for L2 apply execution
-        # This ensures safe isolation for document/config modifications
-        wt_context = self._worktree_manager.acquire_temporary_worktree(
-            issue_number=issue.number,
-            base_branch="main",
-        )
-
-        try:
-            self._backend.start_async(
-                prompt=prompt,
-                options=options,
-                task=self._build_issue_task(issue),
-                execution_name=f"vibe3-supervisor-issue-{issue.number}",
-                cwd=wt_context.path,
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            )
-        except Exception:
-            # Release worktree on dispatch failure
-            self._worktree_manager.release_temporary_worktree(wt_context)
-            raise
-
-    def _has_live_dispatch(self, issue_number: int) -> bool:
-        session_prefix = f"vibe3-supervisor-issue-{issue_number}"
-        try:
-            result = subprocess.run(
-                ["tmux", "ls"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-        except FileNotFoundError:
-            return False
-        except Exception:
-            return False
-        if result.returncode != 0:
-            return False
-        for line in result.stdout.splitlines():
-            session_name = line.split(":", 1)[0].strip()
-            if session_name == session_prefix or session_name.startswith(
-                f"{session_prefix}-"
-            ):
-                return True
-        return False
 
     def _build_issue_task(self, issue: SupervisorHandoffIssue) -> str:
         repo_hint = f" in repo {self.config.repo}" if self.config.repo else ""
@@ -241,3 +110,29 @@ class SupervisorHandoffService(ServiceBase):
             "allowed actions, "
             "comment the outcome on the same issue, and close it when complete."
         )
+
+    def acquire_temporary_worktree(self, issue_number: int) -> WorktreeContext:
+        """Acquire the isolated temporary worktree for supervisor apply."""
+        return self._make_worktree_manager().acquire_temporary_worktree(
+            issue_number=issue_number,
+            base_branch="main",
+        )
+
+    def release_temporary_worktree(self, issue_number: int) -> None:
+        """Release the isolated temporary worktree for supervisor apply."""
+        wt_path = self._repo_root() / ".worktrees" / "tmp" / str(issue_number)
+        context = WorktreeContext(
+            path=wt_path,
+            is_temporary=True,
+            branch=None,
+            issue_number=issue_number,
+        )
+        self._make_worktree_manager().release_temporary_worktree(context)
+
+    def _make_worktree_manager(self) -> WorktreeManager:
+        return WorktreeManager(self.config, self._repo_root(), self._flow_manager)
+
+    @staticmethod
+    def _repo_root() -> Path:
+        git_common_dir = GitClient().get_git_common_dir()
+        return Path(git_common_dir).parent if git_common_dir else Path.cwd()

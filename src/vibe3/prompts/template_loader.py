@@ -75,6 +75,36 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, Any] = {
 3. 是否需要最小 label 调整来表达上述判断
 4. 如果暂不建议启动，说明原因
 """},
+        "supervisor": {"apply": """# Supervisor Apply Scan
+
+## Supervisor Material
+
+- Supervisor: {supervisor_name}
+
+{supervisor_content}
+
+## Runtime Summary
+
+- Server: {server_status}
+- Running issues: {running_issue_count}
+- Suggested issues: {suggested_issue_count}
+- Active flows: {active_flows}
+- Circuit breaker: {circuit_breaker_state} (failures={circuit_breaker_failures})
+
+## Running Issues
+
+{running_issue_details}
+
+## Suggested Issues
+
+仅供参考；最终仍需结合 flow / worktree / PR 现场判断。
+{suggested_issue_details}
+
+## 指令
+
+你当前处于 supervisor/apply 场景。只围绕 Supervisor 材料处理 handoff 或治理 issue。
+不要进入 governance 巡检模式，也不要进入 run / plan / review 执行模式。
+"""},
     },
 }
 

@@ -116,6 +116,9 @@ wt-*/
 .agent/reports/
 docs/audits/
 docs/plans/
+docs/reports/
+docs/superpowers/
+openspec/
 
 # Tool-specific directories (symlinks only, see DEVELOPER.md)
 .agent/skills/
@@ -132,3 +135,4 @@ docs/plans/
 .claude/do-tasks/
 .aider*
 MagicMock/
+

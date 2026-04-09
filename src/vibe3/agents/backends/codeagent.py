@@ -14,7 +14,7 @@ from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
 )
-from vibe3.environment.session import SessionManager
+from vibe3.config.settings import VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import AgentOptions, AgentResult
 
@@ -74,6 +74,14 @@ def extract_session_id(stdout: str) -> str | None:
 
 class CodeagentBackend:
     """基于 codeagent-wrapper 二进制的 agent 执行后端。"""
+
+    @staticmethod
+    def _build_prompt_file_content(prompt: str) -> str:
+        """Apply configured global notice to the prompt file content."""
+        notice = VibeConfig.get_defaults().agent_prompt.global_notice.strip()
+        if not notice:
+            return prompt
+        return f"{notice}\n\n---\n\n{prompt}"
 
     @staticmethod
     def _should_retry_without_session(
@@ -182,6 +190,10 @@ class CodeagentBackend:
             'analytics " codex analytics 403 warning block(s)"\n'
             "}\n"
         )
+        # tmux send-keys feeds literal newlines as Enter presses; keep the awk
+        # program on a single shell line so async sessions don't get stuck in
+        # zsh "pipe quote>" continuation mode.
+        script = script.replace("\n", "; ").replace("{;", "{ ").strip()
         return ["awk", script]
 
     @classmethod
@@ -191,20 +203,34 @@ class CodeagentBackend:
         *,
         log_path: Path,
         keep_alive_seconds: int,
+        env: dict[str, str] | None = None,
     ) -> str:
         filter_command = shlex.join(cls._build_async_log_filter())
-        cmd_str = shlex.join(command)
+        env = env or {}
+        env_overrides = {
+            key: value for key, value in env.items() if os.environ.get(key) != value
+        }
+        command_with_env = command
+        if env_overrides:
+            env_prefix = ["env"] + [
+                f"{key}={value}" for key, value in sorted(env_overrides.items())
+            ]
+            command_with_env = env_prefix + command
+        cmd_str = shlex.join(command_with_env)
         log_str = shlex.quote(str(log_path))
-        return (
+        shell = (
             f"{cmd_str} 2>&1 | {filter_command} | tee {log_str}; "
-            "status=${PIPESTATUS[0]:-$?}; "
+            "cmd_status=${PIPESTATUS[0]:-$?}; "
             "echo; "
-            'echo "[vibe3 async] command exited with status: ${status}"; '
-            f'echo "[vibe3 async] keeping tmux session alive for '
-            f'{keep_alive_seconds}s for inspection..."; '
-            f"sleep {keep_alive_seconds}; "
-            "exit ${status}"
+            'echo "[vibe3 async] command exited with status: ${cmd_status}"; '
         )
+        if keep_alive_seconds > 0:
+            shell += (
+                f'echo "[vibe3 async] keeping tmux session alive for '
+                f'{keep_alive_seconds}s for inspection..."; '
+                f"sleep {keep_alive_seconds}; "
+            )
+        return shell + "exit ${cmd_status}"
 
     @staticmethod
     def _allocate_tmux_session_name(base_name: str) -> str:
@@ -227,10 +253,11 @@ class CodeagentBackend:
     def _prepare_prompt_file(prompt: str) -> Path:
         prompt_dir = Path.home() / ".codeagent" / "agents"
         prompt_dir.mkdir(parents=True, exist_ok=True)
+        prompt_content = CodeagentBackend._build_prompt_file_content(prompt)
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".md", delete=False, dir=prompt_dir
         ) as f:
-            f.write(prompt)
+            f.write(prompt_content)
             return Path(f.name)
 
     @staticmethod
@@ -317,46 +344,65 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         project_root = cwd or Path.cwd()
 
-        # Use SessionManager for tmux session creation
-        # Use codeagent's log dir to avoid worktree .git issues
         log_dir = self._default_log_dir()
-        session_manager = SessionManager(repo_path=project_root, log_dir=log_dir)
         prefix = execution_name.replace("/", "-")[:50]
-        tmux_ctx = session_manager.create_tmux_session(
-            prefix, keep_alive=keep_alive_seconds
-        )
+        session_id = self._allocate_tmux_session_name(prefix)
 
         # Use codeagent's specialized log path resolution (includes issue number)
         # Use actual session_id (may include counter suffix like -2, -3)
-        log_path = self._resolve_async_log_path(log_dir, tmux_ctx.session_id)
+        log_path = self._resolve_async_log_path(log_dir, session_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         if log_path.exists():
             log_path.unlink()
 
-        # Build shell command with log filtering
         shell_command = self._build_async_shell_command(
             command,
             log_path=log_path,
             keep_alive_seconds=keep_alive_seconds,
+            env=env,
+        )
+        wrapper_path = self._write_async_wrapper_script(
+            shell_command,
+            execution_name=execution_name,
         )
 
-        # Execute command in the tmux session
         subprocess.run(
-            ["tmux", "send-keys", "-t", tmux_ctx.session_id, shell_command, "Enter"],
+            ["tmux", "new-session", "-d", "-s", session_id, "zsh", str(wrapper_path)],
             cwd=project_root,
-            env=env,
             check=True,
         )
 
         return AsyncExecutionHandle(
-            tmux_session=tmux_ctx.session_id,
+            tmux_session=session_id,
             log_path=log_path,
             prompt_file_path=Path(""),
         )
+
+    @staticmethod
+    def _write_async_wrapper_script(shell_command: str, *, execution_name: str) -> Path:
+        """Persist the async wrapper command to a script file for tmux launch.
+
+        Launching tmux with a script avoids racing interactive shell startup
+        output against `send-keys`, which can corrupt long async commands.
+        """
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", execution_name).strip("-") or "async"
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f"vibe3-{slug}-",
+            suffix=".sh",
+            delete=False,
+        ) as tmp:
+            tmp.write("#!/usr/bin/env zsh\n")
+            tmp.write(shell_command)
+            tmp.write("\n")
+        path = Path(tmp.name)
+        path.chmod(0o700)
+        return path
 
     def start_async_command(
         self,
@@ -365,7 +411,7 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start an already-built command in tmux with repo-local logging."""
         return self._spawn_tmux_command(
@@ -386,7 +432,7 @@ class CodeagentBackend:
         execution_name: str,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
-        keep_alive_seconds: int = 60,
+        keep_alive_seconds: int = 0,
     ) -> AsyncExecutionHandle:
         """Start codeagent-wrapper in tmux and return the async handle."""
         sync_models_json(options)

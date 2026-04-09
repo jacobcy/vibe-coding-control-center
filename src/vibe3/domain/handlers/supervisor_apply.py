@@ -13,6 +13,7 @@ from typing import Callable
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.supervisor_apply import (
     DomainEvent,
     SupervisorApplyCompleted,
@@ -22,12 +23,20 @@ from vibe3.domain.events.supervisor_apply import (
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
+from vibe3.domain.publisher import publish
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.services.supervisor_handoff import (
+    SupervisorHandoffIssue,
+    SupervisorHandoffService,
+)
 
 
 def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None:
     """Handle SupervisorIssueIdentified event.
 
-    Logs the detection of a governance issue requiring supervisor attention.
+    Promote identification into the actual apply-dispatch intent.
     """
     logger.bind(
         domain="events",
@@ -35,6 +44,15 @@ def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None
         issue=event.issue_number,
         supervisor=event.supervisor_file,
     ).info("Supervisor issue identified")
+
+    publish(
+        SupervisorApplyDispatched(
+            issue_number=event.issue_number,
+            tmux_session=f"vibe3-supervisor-issue-{event.issue_number}",
+            supervisor_file=event.supervisor_file,
+            actor="system:supervisor",
+        )
+    )
 
 
 def handle_supervisor_prompt_rendered(event: SupervisorPromptRendered) -> None:
@@ -53,7 +71,8 @@ def handle_supervisor_prompt_rendered(event: SupervisorPromptRendered) -> None:
 def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None:
     """Handle SupervisorApplyDispatched event.
 
-    Adds a comment to the issue indicating supervisor dispatch.
+    Triggers supervisor handoff execution via SupervisorHandoffService
+    and ExecutionCoordinator. Uses unified infrastructure services.
     """
     logger.bind(
         domain="events",
@@ -62,14 +81,99 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         tmux=event.tmux_session,
     ).info("Supervisor apply dispatched")
 
-    # Add comment to issue
-    GitHubClient().add_comment(
-        event.issue_number,
-        f"🔄 Supervisor apply agent dispatched\n\n"
-        f"**Supervisor file**: `{event.supervisor_file}`\n"
-        f"**Session**: `{event.tmux_session}`\n\n"
-        f"Apply agent will execute governance actions in an isolated worktree.",
-    )
+    config = OrchestraConfig.from_settings()
+    store = SQLiteClient()
+
+    coordinator = ExecutionCoordinator(config, store)
+    github = GitHubClient()
+    handoff_service = SupervisorHandoffService.from_config(config)
+
+    logger.bind(
+        domain="supervisor_handler",
+        issue=event.issue_number,
+    ).debug("Supervisor handler dispatching handoff via ExecutionCoordinator")
+
+    wt_context = None
+
+    try:
+        # Create handoff issue payload
+        handoff_issue = SupervisorHandoffIssue(
+            number=event.issue_number,
+            title=f"Supervisor handoff for issue #{event.issue_number}",
+        )
+
+        if config.dry_run:
+            logger.bind(domain="supervisor_handler").info(
+                "Dry run: skipping supervisor dispatch"
+            )
+            return
+
+        # Build payload (sync)
+        prompt, options, task = handoff_service.build_handoff_payload(handoff_issue)
+
+        wt_context = handoff_service.acquire_temporary_worktree(event.issue_number)
+
+        import os
+
+        request = ExecutionRequest(
+            role="supervisor",
+            target_branch=f"issue-{event.issue_number}",
+            target_id=event.issue_number,
+            execution_name=event.tmux_session,
+            prompt=prompt,
+            options=options,
+            cwd=str(wt_context.path),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs={"task": task, "issue_number": str(event.issue_number)},
+            actor="orchestra:supervisor",
+            mode="async",
+        )
+
+        result = coordinator.dispatch_execution(request)
+
+        if not result.launched:
+            raise RuntimeError(
+                f"Failed to launch supervisor execution: {result.reason}"
+            )
+
+        try:
+            github.add_comment(
+                event.issue_number,
+                f"🔄 Supervisor apply agent dispatched\n\n"
+                f"**Supervisor file**: `{event.supervisor_file}`\n"
+                f"**Session**: `{result.tmux_session}`\n\n"
+                "Apply agent will execute governance actions in an isolated worktree.",
+            )
+        except Exception as comment_exc:
+            logger.bind(
+                domain="supervisor_handler",
+                issue=event.issue_number,
+            ).warning(
+                f"Supervisor dispatch launched but failed to post comment: "
+                f"{comment_exc}"
+            )
+
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).success("Supervisor handoff completed successfully")
+
+    except Exception as exc:
+        if wt_context:
+            handoff_service.release_temporary_worktree(event.issue_number)
+
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).exception(f"Supervisor handoff failed: {exc}")
+
+        # Note: If coordinator.dispatch_execution failed, it would have already
+        # recorded the failure lifecycle event. If build_handoff_payload
+        # failed before coordinator was called, we aren't tracking capacity.
+        # Coordinator handles checking and taking capacity.
+        # So we don't need to manually clean up capacity.
+
+        raise
 
 
 def handle_supervisor_apply_started(event: SupervisorApplyStarted) -> None:
@@ -120,6 +224,15 @@ def handle_supervisor_apply_completed(event: SupervisorApplyCompleted) -> None:
     )
 
     GitHubClient().add_comment(event.issue_number, comment)
+
+    try:
+        config = OrchestraConfig.from_settings()
+        SupervisorHandoffService.from_config(config).release_temporary_worktree(
+            event.issue_number
+        )
+        log.info(f"Released temporary worktree for issue #{event.issue_number}")
+    except Exception as exc:
+        log.warning(f"Failed to release temporary worktree: {exc}")
 
 
 def handle_supervisor_apply_delegated(event: SupervisorApplyDelegated) -> None:

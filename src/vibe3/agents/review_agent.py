@@ -26,7 +26,11 @@ from vibe3.analysis.inspect_output_adapter import changed_symbols
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.github_issues_ops import parse_linked_issues
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.review import ReviewRequest, ReviewScope
 from vibe3.models.snapshot import StructureDiff
 from vibe3.services.flow_service import FlowService
@@ -126,10 +130,6 @@ class ReviewUsecase:
         ),
         review_parser: Callable[[str], ParsedReview] = parse_codex_review,
         context_builder: Callable[..., object] = make_review_context_builder,
-        execution_service_factory: Callable[[VibeConfig], Any] = (
-            CodeagentExecutionService
-        ),
-        command_builder: Callable[..., object] = create_codeagent_command,
     ) -> None:
         self.config = config or VibeConfig.get_defaults()
         self.flow_service = flow_service or FlowService()
@@ -138,8 +138,6 @@ class ReviewUsecase:
         self.snapshot_diff_builder = snapshot_diff_builder
         self.review_parser = review_parser
         self.context_builder = context_builder
-        self.execution_service_factory = execution_service_factory
-        self.command_builder = command_builder
 
     def build_pr_review(
         self, pr_number: int
@@ -190,10 +188,12 @@ class ReviewUsecase:
 
         log = logger.bind(domain="review", scope=request.scope.kind)
         task = self._build_task(instructions, request, pr_number, log)
-        exec_svc = self.execution_service_factory(self.config)
-        command = self.command_builder(
+        exec_svc = CodeagentExecutionService(self.config)
+        command = create_codeagent_command(
             role="reviewer",
-            context_builder=self.context_builder(request, self.config),
+            context_builder=cast(
+                Callable[[], str], self.context_builder(request, self.config)
+            ),
             task=task,
             dry_run=dry_run,
             handoff_kind="review",
@@ -202,7 +202,24 @@ class ReviewUsecase:
             branch=branch,
         )
         if async_mode and not dry_run and branch:
-            exec_svc.execute(command, async_mode=True)
+            launch = self._dispatch_async_review(
+                request=request,
+                branch=branch,
+                issue_number=issue_number,
+                pr_number=pr_number,
+                instructions=instructions,
+            )
+            if not launch.launched:
+                logger.bind(domain="review").warning(
+                    "Async review launch skipped",
+                    reason=launch.reason,
+                    reason_code=launch.reason_code,
+                )
+                return ReviewRunResult(
+                    verdict="ERROR",
+                    handoff_file=None,
+                    issue_number=issue_number,
+                )
             return ReviewRunResult(
                 verdict="ASYNC",
                 handoff_file=None,
@@ -271,6 +288,66 @@ class ReviewUsecase:
                 handoff_file=error_audit_ref,
                 issue_number=issue_number,
             )
+
+    def _dispatch_async_review(
+        self,
+        *,
+        request: ReviewRequest,
+        branch: str,
+        issue_number: int | None,
+        pr_number: int | None,
+        instructions: str | None,
+    ) -> Any:
+        """Launch async review through the unified execution coordinator."""
+        cli_args = self._build_async_cli_args(request, instructions)
+        target_id = pr_number or issue_number or 0
+        execution_name = (
+            f"vibe3-reviewer-issue-{target_id}"
+            if issue_number is not None
+            else f"vibe3-reviewer-{request.scope.kind}-{target_id or 'adhoc'}"
+        )
+        coordinator = ExecutionCoordinator(
+            OrchestraConfig.from_settings(),
+            SQLiteClient(),
+        )
+        return coordinator.dispatch_execution(
+            ExecutionRequest(
+                role="reviewer",
+                target_branch=branch,
+                target_id=target_id,
+                execution_name=execution_name,
+                cmd=CodeagentExecutionService.build_self_invocation(cli_args),
+                cwd=str(Path.cwd()),
+                refs={
+                    "task": instructions or "",
+                    "review_scope": request.scope.kind,
+                    **(
+                        {"issue_number": str(issue_number)}
+                        if issue_number is not None
+                        else {}
+                    ),
+                    **({"pr_number": str(pr_number)} if pr_number is not None else {}),
+                },
+                actor="agent:review",
+                mode="async",
+            )
+        )
+
+    @staticmethod
+    def _build_async_cli_args(
+        request: ReviewRequest,
+        instructions: str | None,
+    ) -> list[str]:
+        """Build explicit self-invocation args for async review."""
+        if request.scope.kind == "pr":
+            args = ["review", "pr", str(request.scope.pr_number)]
+        else:
+            args = ["review", "base"]
+            if request.scope.base_branch:
+                args.append(request.scope.base_branch)
+        if instructions:
+            args.append(instructions)
+        return args
 
     def _build_task(
         self,

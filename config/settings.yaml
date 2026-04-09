@@ -29,6 +29,18 @@ ai:
   model: "deepseek/deepseek-chat"  # litellm 格式: provider/model
   timeout: 30                 # 超时秒数
 
+# Agent Prompt 全局说明
+# 会置顶注入到所有 codeagent prompt 文件中
+agent_prompt:
+  global_notice: |
+    ## Debug Stop Rule
+    当前项目处于调试过程中。
+    如果任何工具重试两次后仍然报错，并且该错误会导致任务无法完成，必须停止当前任务。
+    不要继续尝试其他替代方法。
+    请改为：
+    1. 通过 issue 或 handoff 明确记录失败现象、已尝试步骤和阻塞原因。
+    2. 结束当前任务，等待人工或后续任务接手。
+
 # 文本量控制
 doc_limits:
   single_file_loc:
@@ -75,8 +87,8 @@ code_limits:
         limit: 500
         reason: "GitHub PR 操作与查询聚合"
       - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 550
-        reason: "持久化聚合"
+        limit: 650
+        reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
       # Commands 层（CLI 入口）—— 允许 450
       - path: "src/vibe3/commands/plan.py"
@@ -94,8 +106,11 @@ code_limits:
         limit: 450
         reason: "Governance 服务聚合，处理 governance dispatch 和 session 状态管理"
       - path: "src/vibe3/server/registry.py"
-        limit: 450
+        limit: 470
         reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
+      - path: "src/vibe3/server/app.py"
+        limit: 470
+        reason: "Orchestra CLI 入口聚合，职责单一"
 
       # Manager —— 允许 450
       - path: "src/vibe3/manager/manager_run_service.py"
@@ -112,11 +127,11 @@ code_limits:
 
       # 基础设施核心模块
       - path: "src/vibe3/environment/worktree.py"
-        limit: 450
+        limit: 600
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 550
-        reason: "Codeagent execution backend"
+        limit: 570
+        reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
       - path: "src/vibe3/agents/runner.py"
         limit: 450
         reason: "Codeagent 执行服务核心，包含完整的执行流程管理，逻辑高度耦合不宜拆分"
@@ -156,7 +171,7 @@ code_limits:
         limit: 500
         reason: "Task command surface 测试集，10 个测试，平均 45.2 lines/test，大量 mock setup"
       - path: "tests/vibe3/commands/test_task_resume_failed.py"
-        limit: 430
+        limit: 450
         reason: "Task resume 命令测试集，共享 fixture，集中管理相关测试"
       - path: "tests/vibe3/commands/test_run_manager_issue.py"
         limit: 500
@@ -176,6 +191,12 @@ code_limits:
       - path: "tests/vibe3/services/test_pr_utils.py"
         limit: 550
         reason: "PR utils 测试集，54 个测试围绕同一服务契约，平均 9.4 lines/test，拆分收益低"
+      - path: "tests/vibe3/agents/test_codeagent_backend.py"
+        limit: 450
+        reason: "Codeagent backend 核心测试，单一测试类，刚超限，拆分收益低"
+      - path: "tests/vibe3/services/test_execution_lifecycle.py"
+        limit: 550
+        reason: "Execution lifecycle 测试集，5 个测试类围绕同一服务契约，共享 fixture"
 
   total_file_loc:
     v2_shell: 2000         # Shell 核心代码总行数
@@ -578,6 +599,7 @@ orchestra:
     issue_label: "supervisor"
     handoff_state_label: "state/handoff"
     supervisor_file: "supervisor/apply.md"
+    prompt_template: "orchestra.supervisor.apply"
     # Supervisor handoff agent configuration (independent from run/manager/governance)
     # 允许 agent 模式和 backend 模式并存；如果同时配置，agent 优先。
     agent: "explore"  # Maps to gemini-3-flash-preview in config/models.json

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
+from vibe3.config.settings import AgentPromptConfig, VibeConfig
 from vibe3.exceptions import AgentExecutionError
 from vibe3.models.review_runner import (
     AgentOptions,
@@ -18,6 +19,29 @@ from vibe3.models.review_runner import (
 
 class TestCodeagentBackend:
     """Tests for CodeagentBackend.run method."""
+
+    def test_build_prompt_file_content_prepends_global_notice(self) -> None:
+        config = VibeConfig(
+            agent_prompt=AgentPromptConfig(global_notice="## Debug Stop Rule\nStop now")
+        )
+
+        with patch(
+            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            return_value=config,
+        ):
+            content = CodeagentBackend._build_prompt_file_content("prompt body")
+
+        assert content.startswith("## Debug Stop Rule\nStop now\n\n---\n\n")
+        assert content.endswith("prompt body")
+
+    def test_build_prompt_file_content_keeps_prompt_when_notice_empty(self) -> None:
+        with patch(
+            "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+            return_value=VibeConfig(),
+        ):
+            content = CodeagentBackend._build_prompt_file_content("prompt body")
+
+        assert content == "prompt body"
 
     def test_default_log_dir_uses_env_override(self, monkeypatch) -> None:
         """Async log dir should honor orchestra-provided override."""
@@ -147,6 +171,41 @@ class TestCodeagentBackend:
             )
 
         assert mock_run.call_args.kwargs["cwd"] == "/tmp/worktree-430"
+
+    def test_run_writes_global_notice_into_prompt_file(self, tmp_path: Path) -> None:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "VERDICT: PASS\n"
+        mock_result.stderr = ""
+        config = VibeConfig(
+            agent_prompt=AgentPromptConfig(
+                global_notice="## Debug Stop Rule\nStop current task after two retries."
+            )
+        )
+        captured_prompt: dict[str, str] = {}
+
+        def fake_run_subprocess(command, *, project_root, timeout_seconds):
+            prompt_file = Path(command[command.index("--prompt-file") + 1])
+            captured_prompt["content"] = prompt_file.read_text()
+            return mock_result
+
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent.VibeConfig.get_defaults",
+                return_value=config,
+            ),
+            patch("pathlib.Path.home", return_value=tmp_path),
+        ):
+            backend = CodeagentBackend()
+            with patch.object(
+                backend, "_run_subprocess", side_effect=fake_run_subprocess
+            ):
+                backend.run("prompt body", AgentOptions(agent="code-reviewer"))
+
+        assert captured_prompt["content"].startswith(
+            "## Debug Stop Rule\nStop current task after two retries.\n\n---\n\n"
+        )
+        assert captured_prompt["content"].endswith("prompt body")
 
     def test_run_non_zero_exit_raises_error(self) -> None:
         """Runner should raise error on non-zero exit code."""

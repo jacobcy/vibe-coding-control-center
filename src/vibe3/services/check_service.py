@@ -281,8 +281,9 @@ class CheckService(CheckRemote):
             logger.bind(domain="check", branch=branch).warning(
                 f"Failed to verify PR status from GitHub: {e}"
             )
-            if not flow_data.get("pr_number"):
-                issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
+            # Cannot verify PR status when GitHub API fails
+            # TODO: Check cache service when implemented to provide offline PR number
+            issues.append(f"Cannot verify PR status for branch '{branch}': {e}")
 
         # Auto-complete when task issue is closed (and no open PR found)
         if task_issue_closed:

@@ -63,19 +63,13 @@ class TestGovernanceService:
         assert service.event_types == []
 
     def test_tick_interval_from_config(self):
-        """Governance should only run on config.governance.interval_ticks boundary."""
+        """Tick interval lives in config, not mutable GovernanceService state."""
         config = OrchestraConfig(governance=GovernanceConfig(interval_ticks=4))
         service = _make_service(config=config)
 
-        assert service._tick_count == 0
-        # Ticks 1-3 should not trigger
-        service._tick_count = 1
-        assert service._tick_count % 4 != 0
-        service._tick_count = 3
-        assert service._tick_count % 4 != 0
-        # Tick 4 triggers
-        service._tick_count = 4
-        assert service._tick_count % 4 == 0
+        assert service.config.governance.interval_ticks == 4
+        assert service.build_execution_name(4).startswith("vibe3-governance-scan-")
+        assert service.build_execution_name(4).endswith("-t4")
 
     def test_build_governance_plan_empty(self):
         """Plan should handle empty issue list."""
@@ -244,15 +238,14 @@ class TestGovernanceService:
         assert "# Orchestra" in plan or "治理材料" in plan
 
     def test_keeps_manager_for_repo_context(self):
-        """Governance keeps manager-like dependency for repo-local context."""
+        """Governance stores repo context without owning manager execution."""
         service = _make_service()
         assert not hasattr(service, "_execute_command")
-        assert service._manager is not None
-        assert service._manager.repo_path == Path("/repo")
+        assert service._repo_path == Path("/repo")
 
     @pytest.mark.asyncio
     async def test_skip_when_circuit_breaker_open(self):
-        """Governance skips dispatch when circuit breaker is OPEN (snapshot check)."""
+        """Governance skips payload generation when circuit breaker is OPEN."""
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -271,14 +264,23 @@ class TestGovernanceService:
             manager=dispatcher,
         )
 
-        await service._run_governance()
+        prompt, options, task = await service.build_governance_execution_payload()
+        assert prompt is None
         assert dispatcher.method_calls == []
 
     @pytest.mark.asyncio
-    async def test_on_tick_runs_on_interval_and_respects_dry_run(
+    async def test_on_tick_is_stub_does_not_call_build_payload(
         self, monkeypatch, tmp_path
     ):
-        """Governance runs on interval and uses governance.dry_run."""
+        """GovernanceService.on_tick() is now a stub delegating to domain handlers.
+
+        Governance scans are triggered by:
+          OrchestrationFacade.on_tick() -> GovernanceScanStarted event
+          -> governance handler -> GovernanceService.build_payload()
+
+        on_tick() must NOT call build_governance_execution_payload() directly
+        to avoid bypassing the unified CapacityService / ExecutionLifecycleService.
+        """
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -295,16 +297,18 @@ class TestGovernanceService:
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(),
         )
-        service._manager.repo_path = tmp_path
-        # Force tick boundary
-        service._tick_count = 1
+        service._repo_path = tmp_path
 
         called = {"count": 0}
 
         async def fake_run():
             called["count"] += 1
 
-        monkeypatch.setattr(service, "_run_governance", fake_run)
+        monkeypatch.setattr(service, "build_governance_execution_payload", fake_run)
 
         await service.on_tick()
-        assert called["count"] == 1
+        # Domain-first: on_tick() is a stub, must NOT call build_payload()
+        assert called["count"] == 0, (
+            "on_tick() should not dispatch directly. "
+            "Governance is now triggered via OrchestrationFacade -> domain events."
+        )

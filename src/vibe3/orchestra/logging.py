@@ -46,10 +46,23 @@ def append_orchestra_event(
     component: str,
     message: str,
     *,
+    level: str = "INFO",
     repo_root: Path | None = None,
 ) -> Path:
+    """Append an event to the orchestra events log.
+
+    Levels: DEBUG, INFO, WARNING, ERROR
+    Default is INFO. Use VIBE3_ORCHESTRA_LOG_LEVEL to filter (default: INFO).
+    """
     if os.environ.get("VIBE3_ORCHESTRA_EVENT_LOG") != "1":
         return orchestra_events_log_path(repo_root)
+
+    # Check log level filter
+    current_level = os.environ.get("VIBE3_ORCHESTRA_LOG_LEVEL", "INFO").upper()
+    levels = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3}
+    if levels.get(level.upper(), 1) < levels.get(current_level, 1):
+        return orchestra_events_log_path(repo_root)
+
     path = orchestra_events_log_path(repo_root)
     timestamp = datetime.now().isoformat(timespec="seconds")
     with path.open("a", encoding="utf-8") as handle:

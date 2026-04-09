@@ -13,7 +13,6 @@ from vibe3.agents.backends.codeagent_config import (
     resolve_effective_agent_options,
     sync_models_json,
 )
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.models.review_runner import AgentOptions
 
 if TYPE_CHECKING:
@@ -78,7 +77,6 @@ def resolve_manager_agent_options(
     Resolution order:
     1. assignee_dispatch.agent          -> preset mode
     2. assignee_dispatch.backend/model  -> backend direct mode
-    3. run.agent_config                 -> generic fallback
 
     If assignee_dispatch contains both ``agent`` and ``backend/model``,
     manager execution intentionally prefers ``agent`` as the primary entry.
@@ -88,34 +86,26 @@ def resolve_manager_agent_options(
 
     Args:
         config: Orchestra configuration with assignee dispatch settings
-        runtime_config: Vibe runtime config for fallback defaults
+        runtime_config: Unused compatibility parameter kept for existing callers
 
     Returns:
         Effective agent options with preset resolved from config/models.json
     """
+    _ = runtime_config
     ad = config.assignee_dispatch
-    raw_options: AgentOptions
-    if ad.agent or ad.backend:
-        # Use orchestra-specific config when a preset or explicit backend override
-        # is configured for the manager role.
-        raw_options = AgentOptions(
-            agent=ad.agent,
-            backend=ad.backend,
-            model=ad.model,
-            timeout_seconds=ad.timeout_seconds,
+    if not ad.agent and not ad.backend:
+        raise ValueError(
+            "No manager agent configuration found in orchestra.assignee_dispatch. "
+            "Configure assignee_dispatch.agent or assignee_dispatch.backend in "
+            "settings.yaml."
         )
-    else:
-        # Fall back to generic run defaults
-        raw_options = CodeagentExecutionService(runtime_config).resolve_agent_options(
-            "run",
-        )
-        # Override timeout with manager-specific value
-        raw_options = AgentOptions(
-            agent=raw_options.agent,
-            backend=raw_options.backend,
-            model=raw_options.model,
-            timeout_seconds=ad.timeout_seconds,
-        )
+
+    raw_options = AgentOptions(
+        agent=ad.agent,
+        backend=ad.backend,
+        model=ad.model,
+        timeout_seconds=ad.timeout_seconds,
+    )
 
     # Resolve preset mapping from config/models.json and sync to ~/.codeagent
     return _resolve_and_sync(raw_options)

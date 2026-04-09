@@ -369,10 +369,24 @@ class PRService:
             return None
 
     def _sync_pr_flow_state(self, pr: PRResponse, actor: str) -> None:
-        """Persist activity to flow."""
+        """Persist activity to flow and update PR context cache."""
         self.store.update_flow_state(
             pr.head_branch,
             latest_actor=actor,
+        )
+
+        # Update PR context cache with latest PR info
+        # Get existing cache or create new entry
+        existing_cache = self.store.get_flow_context_cache(pr.head_branch)
+
+        self.store.upsert_flow_context_cache(
+            branch=pr.head_branch,
+            task_issue_number=(
+                existing_cache.get("task_issue_number") if existing_cache else None
+            ),
+            issue_title=existing_cache.get("issue_title") if existing_cache else None,
+            pr_number=pr.number,
+            pr_title=pr.title,
         )
 
     # ------------------------------------------------------------------
@@ -394,8 +408,14 @@ class PRService:
             )
 
         current_branch = self.git_client.get_current_branch()
-        flow_data = self.store.get_flow_state(current_branch)
-        resolved_pr = flow_data.get("pr_number") if flow_data else None
+        # Try to find PR for current branch from GitHub
+        # TODO: Optimize with cache service when implemented
+        try:
+            pr = self.github_client.get_pr(None, current_branch)
+            resolved_pr = pr.number if pr else None
+        except Exception:
+            resolved_pr = None
+
         return PrQueryTarget(
             pr_number=resolved_pr,
             branch=None,

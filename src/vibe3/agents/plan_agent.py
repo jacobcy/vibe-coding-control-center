@@ -3,17 +3,20 @@
 Migrated from vibe3.services.plan_usecase.
 """
 
+import os
 from pathlib import Path
 
 from loguru import logger
 
-from vibe3.agents.models import AgentSpec, CodeagentResult
+from vibe3.agents.models import CodeagentResult, create_codeagent_command
 from vibe3.agents.plan_prompt import make_plan_context_builder
 from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.environment.session import SessionManager
 from vibe3.environment.worktree import WorktreeManager
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.plan import PlanRequest, PlanScope, PlanSpecInput, PlanTaskInput
@@ -31,7 +34,6 @@ class PlanUsecase:
         github_client: GitHubClient | None = None,
         spec_ref_service: SpecRefService | None = None,
         execution_service: CodeagentExecutionService | None = None,
-        session_manager: SessionManager | None = None,
         worktree_manager: WorktreeManager | None = None,
     ) -> None:
         self.config = config or VibeConfig.get_defaults()
@@ -41,7 +43,6 @@ class PlanUsecase:
         self.execution_service = execution_service or CodeagentExecutionService(
             self.config
         )
-        self.session_manager = session_manager or SessionManager(repo_path=Path.cwd())
         # WorktreeManager 需要 OrchestraConfig，从 VibeConfig 转换
         orchestra_config = OrchestraConfig.from_settings()
         self.worktree_manager = worktree_manager or WorktreeManager(
@@ -152,80 +153,88 @@ class PlanUsecase:
     def execute_plan(
         self,
         request: PlanRequest,
-        issue_number: int,
+        issue_number: int | None,
         branch: str,
         async_mode: bool = True,
+        cli_args: list[str] | None = None,
     ) -> CodeagentResult:
-        """执行 plan 的完整流程。
-
-        职责：
-        1. 获取资源（session、worktree）
-        2. 构建 AgentSpec（包含回调）
-        3. 执行 Agent
-        4. 清理资源（finally）
-
-        Args:
-            request: Plan 请求数据
-            issue_number: GitHub issue 编号
-            branch: Git 分支名
-            async_mode: 是否异步执行
-
-        Returns:
-            执行结果
-
-        Raises:
-            Exception: 执行过程中的异常
-        """
+        """执行 plan 并在同步成功/失败后发布领域事件。"""
         log = logger.bind(
             domain="plan_usecase",
             action="execute_plan",
             issue=issue_number,
             branch=branch,
         )
+        cwd = Path.cwd()
+        if issue_number is not None:
+            cwd = self.worktree_manager.acquire_issue_worktree(
+                issue_number=issue_number,
+                branch=branch,
+            ).path
 
-        # 1. 获取资源
-        log.info("Acquiring resources")
-        self.session_manager.create_codeagent_session(
-            sync_mode=not async_mode,
-            prefix="plan",
-        )
-        worktree = self.worktree_manager.acquire_issue_worktree(
-            issue_number=issue_number,
+        command = create_codeagent_command(
+            role="planner",
+            context_builder=make_plan_context_builder(request, self.config),
+            task=request.task_guidance,
+            handoff_kind="plan",
             branch=branch,
+            cwd=cwd,
+            config=self.config,
         )
-
-        # 2. 构建 AgentSpec
-        spec = self.create_plan_spec(request, issue_number, branch)
-
-        # 3. 执行
+        if async_mode:
+            if cli_args is None:
+                raise ValueError("Async plan execution requires explicit cli_args")
+            launch = ExecutionCoordinator(
+                OrchestraConfig.from_settings(),
+                SQLiteClient(),
+            ).dispatch_execution(
+                ExecutionRequest(
+                    role="planner",
+                    target_branch=branch,
+                    target_id=issue_number or 0,
+                    execution_name=(
+                        f"vibe3-planner-issue-{issue_number}"
+                        if issue_number is not None
+                        else f"vibe3-planner-{branch.replace('/', '-')}"
+                    ),
+                    cmd=CodeagentExecutionService.build_self_invocation(cli_args),
+                    cwd=str(cwd),
+                    env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                    refs=(
+                        {"issue_number": str(issue_number)}
+                        if issue_number is not None
+                        else {}
+                    ),
+                    actor="agent:plan",
+                    mode="async",
+                )
+            )
+            return CodeagentResult(
+                success=launch.launched,
+                stderr=launch.reason or "",
+                tmux_session=launch.tmux_session,
+                log_path=Path(launch.log_path) if launch.log_path else None,
+            )
         try:
             log.info("Executing plan agent")
-            from vibe3.agents.models import create_codeagent_command
-
-            command = create_codeagent_command(
-                role="planner",
-                context_builder=lambda: spec.context,
-                task=spec.task,
-                handoff_kind=spec.handoff_kind,
-                branch=branch,
-                cwd=worktree.path,
-                config=self.config,
-            )
-            result = self.execution_service.execute_with_callbacks(
-                command=command,
-                on_success=spec.on_success,
-                on_failure=spec.on_failure,
-                async_mode=async_mode,
-            )
+            result = self.execution_service.execute_sync(command)
+            if issue_number is not None:
+                if result.success:
+                    self._handle_plan_success(issue_number, branch)
+                else:
+                    self._handle_plan_failure(
+                        Exception(result.stderr or "Plan execution failed"),
+                        issue_number,
+                    )
             log.info("Plan execution completed", success=result.success)
             return result
-        finally:
-            # 4. 清理资源（issue worktree 是长期的，不释放）
-            log.info("Resource cleanup completed")
+        except Exception as error:
+            if issue_number is not None:
+                self._handle_plan_failure(error, issue_number)
+            raise
 
     def _handle_plan_success(
         self,
-        result: object,
         issue_number: int,
         branch: str,
     ) -> None:
@@ -286,32 +295,3 @@ class PlanUsecase:
             actor="agent:plan",
         )
         publish(event)
-
-    def create_plan_spec(
-        self,
-        request: PlanRequest,
-        issue_number: int,
-        branch: str,
-    ) -> AgentSpec:
-        """工厂方法：生成 Planner 的规格说明。
-
-        Args:
-            request: Plan 请求数据
-            issue_number: GitHub issue 编号
-            branch: Git 分支名
-
-        Returns:
-            AgentSpec 实例
-        """
-        # 构建 context
-        context_builder = make_plan_context_builder(request, self.config)
-        context = context_builder()
-
-        return AgentSpec(
-            role="planner",
-            handoff_kind="plan",
-            context=context,
-            task=request.task_guidance,
-            on_success=lambda r: self._handle_plan_success(r, issue_number, branch),
-            on_failure=lambda e: self._handle_plan_failure(e, issue_number),
-        )

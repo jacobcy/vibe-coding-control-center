@@ -1,4 +1,4 @@
-"""Tests for CodeagentBackend - async, session, and streaming features."""
+"""Tests for CodeagentBackend - async command and streaming features."""
 
 import subprocess
 from pathlib import Path
@@ -10,33 +10,54 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.models.review_runner import AgentOptions
 
 
-class TestSessionIdExtraction:
-    def test_extract_session_id_supports_modern_wrapper_format(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
-
-        output = "some text\nSESSION_ID: ses_2aea4d6b6ffexDUssWC9tEP4Nh\nmore text\n"
-
-        assert extract_session_id(output) == "ses_2aea4d6b6ffexDUssWC9tEP4Nh"
-
-    def test_extract_session_id_supports_wrapper_json_event(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
-
-        output = '{"type":"step_start","sessionID":"ses_2ae4422c7ffeYDHGar7ZxRsnTC"}'
-
-        assert extract_session_id(output) == "ses_2ae4422c7ffeYDHGar7ZxRsnTC"
-
-    def test_extract_session_id_supports_escaped_wrapper_json_event(self) -> None:
-        from vibe3.agents.backends.codeagent import extract_session_id
-
-        output = (
-            '{"message":"{\\"type\\":\\"step_start\\",'
-            '\\"sessionID\\":\\"ses_2ae0c24f2ffehx2ejWE21YTtHi\\"}"}'
+class TestStartAsyncCommand:
+    def test_build_async_shell_command_exits_immediately_by_default(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["echo", "hello"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=0,
         )
 
-        assert extract_session_id(output) == "ses_2ae0c24f2ffehx2ejWE21YTtHi"
+        assert "cmd_status=${PIPESTATUS[0]:-$?}" in shell
+        assert "command exited with status: ${cmd_status}" in shell
+        assert "exit ${cmd_status}" in shell
+        assert "; status=${PIPESTATUS[0]:-$?};" not in shell
+        assert "keeping tmux session alive" not in shell
+        assert "sleep 0" not in shell
 
+    def test_build_async_shell_command_can_keep_session_when_requested(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["echo", "hello"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=5,
+        )
 
-class TestStartAsyncCommand:
+        assert "keeping tmux session alive for 5s" in shell
+        assert "sleep 5" in shell
+
+    def test_build_async_log_filter_is_single_shell_line(self) -> None:
+        filter_cmd = CodeagentBackend._build_async_log_filter()
+
+        assert filter_cmd[0] == "awk"
+        assert "\n" not in filter_cmd[1]
+        assert "END {;" not in filter_cmd[1]
+
+    def test_build_async_shell_command_injects_env_overrides(self) -> None:
+        shell = CodeagentBackend._build_async_shell_command(
+            ["uv", "run", "python", "src/vibe3/cli.py", "internal", "manager", "328"],
+            log_path=Path("/tmp/test.log"),
+            keep_alive_seconds=0,
+            env={
+                "VIBE3_ASYNC_CHILD": "1",
+                "VIBE3_MANAGER_BACKEND": "opencode",
+                "VIBE3_MANAGER_MODEL": "opencode/minimax-m2.5-free",
+            },
+        )
+
+        assert "env VIBE3_ASYNC_CHILD=1" in shell
+        assert "VIBE3_MANAGER_BACKEND=opencode" in shell
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in shell
+
     def test_start_async_command_clears_existing_repo_log(
         self, monkeypatch, tmp_path
     ) -> None:
@@ -93,6 +114,67 @@ class TestStartAsyncCommand:
                 )
 
         assert not stale_log.exists()
+
+    def test_start_async_command_embeds_env_overrides_in_wrapper_script(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        backend = CodeagentBackend()
+        log_dir = tmp_path / "temp" / "logs"
+        log_dir.mkdir(parents=True)
+        monkeypatch.setattr(backend, "_default_log_dir", lambda: log_dir)
+
+        launched_scripts: list[Path] = []
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:3] == ["tmux", "has-session", "-t"]:
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=1,
+                    stdout="",
+                    stderr="no session",
+                )
+            if cmd[:4] == ["tmux", "new-session", "-d", "-s"]:
+                launched_scripts.append(Path(cmd[6]))
+                return subprocess.CompletedProcess(
+                    args=cmd,
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+        with (
+            patch(
+                "vibe3.agents.backends.codeagent.subprocess.run", side_effect=fake_run
+            ),
+        ):
+            backend.start_async_command(
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "src/vibe3/cli.py",
+                    "internal",
+                    "manager",
+                    "328",
+                ],
+                execution_name="vibe3-manager-issue-328",
+                env={
+                    "VIBE3_ASYNC_CHILD": "1",
+                    "VIBE3_MANAGER_BACKEND": "opencode",
+                    "VIBE3_MANAGER_MODEL": "opencode/minimax-m2.5-free",
+                },
+            )
+
+        assert launched_scripts
+        wrapper_text = launched_scripts[0].read_text(encoding="utf-8")
+        assert "VIBE3_MANAGER_BACKEND=opencode" in wrapper_text
+        assert "VIBE3_MANAGER_MODEL=opencode/minimax-m2.5-free" in wrapper_text
 
     def test_start_async_command_uses_unique_tmux_session_when_name_exists(
         self, monkeypatch, tmp_path
@@ -262,74 +344,3 @@ class TestRunStreamingAndEdgeCases:
         prompt_file_idx = command.index("--prompt-file") + 1
         expected_dir = Path.home() / ".codeagent" / "agents"
         assert Path(command[prompt_file_idx]).parent == expected_dir
-
-
-class TestAsyncLogFilter:
-    def test_async_log_filter_strips_agent_prompt_block(self, tmp_path: Path) -> None:
-        """Async log filter should remove <agent-prompt> blocks."""
-        backend = CodeagentBackend()
-        filter_cmd = backend._build_async_log_filter()
-
-        # Create test input file
-        input_file = tmp_path / "input.log"
-        input_text = """SESSION_ID: ses_test123
-<agent-prompt>
-This is the full prompt content that should not appear in logs.
-It may contain sensitive information or be very long.
-</agent-prompt>
-[vibe3 async] command exited with status: 0
-"""
-        input_file.write_text(input_text)
-
-        # Run the filter
-        import subprocess
-
-        result = subprocess.run(
-            filter_cmd + [str(input_file)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        output = result.stdout
-
-        assert "<agent-prompt>" not in output
-        assert "</agent-prompt>" not in output
-        assert "full prompt content" not in output
-        # But should keep control info
-        assert "SESSION_ID: ses_test123" in output
-        assert "command exited with status: 0" in output
-        # Should report suppression
-        assert "suppressed" in output and "agent-prompt" in output
-
-    def test_async_log_filter_keeps_session_id_and_exit_status_lines(
-        self, tmp_path: Path
-    ) -> None:
-        """Filter should preserve session ID, exit status, and other diagnostics."""
-        backend = CodeagentBackend()
-        filter_cmd = backend._build_async_log_filter()
-
-        input_file = tmp_path / "input.log"
-        input_text = """SESSION_ID: ses_abc123
-Some wrapper output line
-[vibe3 async] command exited with status: 0
-[vibe3 async] suppressed output summary: 150 lines
-"""
-        input_file.write_text(input_text)
-
-        import subprocess
-
-        result = subprocess.run(
-            filter_cmd + [str(input_file)],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        output = result.stdout
-
-        # All diagnostic lines should be preserved
-        assert "SESSION_ID: ses_abc123" in output
-        assert "[vibe3 async] command exited with status: 0" in output
-        assert "[vibe3 async] suppressed output summary: 150 lines" in output
-        assert "Some wrapper output line" in output

@@ -10,10 +10,6 @@ from vibe3.domain.events import (
     # Flow Lifecycle
     IssueFailed,
     IssueStateChanged,
-    # Manager
-    ManagerExecutionStarted,
-    ManagerFlowDispatched,
-    ManagerFlowQueued,
     PlanCompleted,
     ReviewCompleted,
     SupervisorExecutionCompleted,
@@ -49,34 +45,6 @@ def test_governance_event_creation():
     assert event2.tick_count == 42
     assert event2.active_flows == 3
     assert event2.suggested_issues == 5
-
-
-def test_manager_event_creation():
-    """Test creating manager events."""
-    event = ManagerExecutionStarted(
-        issue_number=789,
-        branch="dev/test",
-    )
-    assert event.issue_number == 789
-    assert event.branch == "dev/test"
-    assert event.actor == "agent:manager"
-
-    event2 = ManagerFlowDispatched(
-        issue_number=789,
-        branch="dev/test",
-        tmux_session="vibe3-manager-789",
-    )
-    assert event2.tmux_session == "vibe3-manager-789"
-
-    event3 = ManagerFlowQueued(
-        issue_number=789,
-        reason="Capacity limit reached",
-        active_flows=5,
-        max_capacity=5,
-    )
-    assert event3.reason == "Capacity limit reached"
-    assert event3.active_flows == 5
-    assert event3.max_capacity == 5
 
 
 def test_event_frozen():

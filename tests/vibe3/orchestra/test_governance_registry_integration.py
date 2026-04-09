@@ -1,4 +1,4 @@
-"""Tests for GovernanceService registry integration."""
+"""Tests for GovernanceService domain-first no-op tick behavior."""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,7 +7,6 @@ import pytest
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.services.orchestra_status_service import OrchestraSnapshot
-from vibe3.services.session_registry import SessionRegistryService
 
 
 class MockStatusService:
@@ -43,20 +42,11 @@ _APPEND_EVENT_PATH = (
 
 
 class TestGovernanceRegistryIntegration:
-    """Tests for GovernanceService registry-backed live dispatch detection."""
+    """Tests for GovernanceService no-op tick behavior."""
 
     @pytest.mark.asyncio
-    async def test_skips_when_live_governance_session_in_registry(self) -> None:
-        """Skip tick when registry reports a live governance session."""
-        registry = MagicMock(spec=SessionRegistryService)
-        registry.list_live_governance_sessions.return_value = [
-            {"id": 1, "role": "governance", "status": "running"}
-        ]
-        registry.mark_governance_sessions_done_when_tmux_gone.return_value = []
-        registry.reconcile_live_state.return_value = []
-
-        backend = MagicMock()
-        backend.has_tmux_session_prefix.return_value = False
+    async def test_on_tick_is_stub_not_affected_by_registry(self) -> None:
+        """on_tick() is a stub and never dispatches from the service layer."""
 
         service = GovernanceService(
             config=OrchestraConfig(
@@ -64,10 +54,7 @@ class TestGovernanceRegistryIntegration:
             ),
             status_service=MockStatusService(),
             manager=_make_dispatcher(),
-            backend=backend,
-            registry=registry,
         )
-        service._tick_count = 0
 
         run_called = {"count": 0}
 
@@ -79,32 +66,30 @@ class TestGovernanceRegistryIntegration:
         with patch(_APPEND_EVENT_PATH):
             await service.on_tick()
 
-        assert run_called["count"] == 0
-        registry.list_live_governance_sessions.assert_called_once()
+        # Domain-first: on_tick is a stub — no dispatch regardless of registry state
+        assert run_called["count"] == 0, (
+            "on_tick() should not call _run_governance(). "
+            "Governance dispatch is triggered via OrchestrationFacade "
+            "-> GovernanceScanStarted."
+        )
 
     @pytest.mark.asyncio
-    async def test_dispatches_when_no_live_governance_session_in_registry(
+    async def test_on_tick_is_stub_does_not_dispatch_even_when_no_live_session(
         self,
     ) -> None:
-        """Dispatch governance when registry reports no live governance session."""
-        registry = MagicMock(spec=SessionRegistryService)
-        registry.list_live_governance_sessions.return_value = []
-        registry.mark_governance_sessions_done_when_tmux_gone.return_value = []
-        registry.reconcile_live_state.return_value = []
+        """on_tick() is a stub, does NOT call _run_governance even when capacity free.
 
-        backend = MagicMock()
-        backend.has_tmux_session_prefix.return_value = False
-
+        Capacity availability check + dispatch is handled by the domain handler
+        for GovernanceScanStarted (via CapacityService). on_tick() is never the
+        dispatcher — it only increments the tick counter.
+        """
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(interval_ticks=1, dry_run=False)
             ),
             status_service=MockStatusService(),
             manager=_make_dispatcher(),
-            backend=backend,
-            registry=registry,
         )
-        service._tick_count = 0
 
         run_called = {"count": 0}
 
@@ -116,23 +101,23 @@ class TestGovernanceRegistryIntegration:
         with patch(_APPEND_EVENT_PATH):
             await service.on_tick()
 
-        assert run_called["count"] == 1
+        # Domain-first: on_tick is a stub — no dispatch
+        assert run_called["count"] == 0, (
+            "on_tick() should not call _run_governance(). "
+            "Governance dispatch is triggered via OrchestrationFacade "
+            "-> GovernanceScanStarted."
+        )
 
     @pytest.mark.asyncio
-    async def test_fallback_to_tmux_prefix_when_no_registry(self) -> None:
-        """Without registry, falls back to tmux prefix detection."""
-        backend = MagicMock()
-        backend.has_tmux_session_prefix.return_value = True
-
+    async def test_on_tick_is_stub_does_not_depend_on_backend_state(self) -> None:
+        """on_tick() is a stub and does not need backend/session knowledge."""
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(interval_ticks=1, dry_run=False)
             ),
             status_service=MockStatusService(),
             manager=_make_dispatcher(),
-            backend=backend,
         )
-        service._tick_count = 0
 
         run_called = {"count": 0}
 
@@ -144,5 +129,8 @@ class TestGovernanceRegistryIntegration:
         with patch(_APPEND_EVENT_PATH):
             await service.on_tick()
 
-        assert run_called["count"] == 0
-        backend.has_tmux_session_prefix.assert_called_once_with("vibe3-governance-scan")
+        # Domain-first: on_tick is a stub — no dispatch, no tmux check
+        assert run_called["count"] == 0, (
+            "on_tick() should not call _run_governance(). "
+            "Backend/session state is handled outside GovernanceService."
+        )

@@ -10,10 +10,12 @@ from loguru import logger
 
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.exceptions import SystemError, UserError
-from vibe3.services.session_registry import SessionRegistryService
 
-SessionRole = Literal["manager", "planner", "executor", "reviewer"]
+SessionRole = Literal[
+    "manager", "planner", "executor", "reviewer", "supervisor", "governance"
+]
 
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 

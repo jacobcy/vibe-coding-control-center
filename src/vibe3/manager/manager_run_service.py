@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import typer
 
@@ -24,46 +23,113 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
-from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
 from vibe3.manager.prompts import render_manager_prompt
 from vibe3.manager.session_naming import (
     get_manager_session_name,
 )
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo
-from vibe3.runtime.no_progress_policy import snapshot_progress
+from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.runtime.no_progress_policy import has_progress_changed, snapshot_progress
+from vibe3.services.abandon_flow_service import AbandonFlowService
 from vibe3.services.issue_failure_service import (
+    block_manager_noop_issue,
     fail_manager_issue,
 )
-from vibe3.services.session_registry import SessionRegistryService
-
-if TYPE_CHECKING:
-    pass
 
 
-def _write_manager_registry_terminal(
+def _handle_closed_issue_post_run(
+    *,
     store: SQLiteClient,
-    branch: str,
     issue_number: int,
-    success: bool,
-) -> None:
-    """Write manager terminal state to runtime_session registry.
+    branch: str,
+    actor: str,
+    before_snapshot: dict[str, object],
+    after_snapshot: dict[str, object],
+) -> bool:
+    """Finalize abandon-flow handling when manager closed the issue."""
+    if after_snapshot.get("issue_state") != "closed":
+        return False
 
-    This is called by async child process when manager execution completes
-    or fails, ensuring the registry reflects the true terminal state.
-    """
-    backend = CodeagentBackend()
-    registry = SessionRegistryService(store=store, backend=backend)
-    sessions = registry.get_truly_live_sessions_for_target(
-        role="manager",
+    before_state_label = before_snapshot.get("state_label", "")
+    source_state: IssueState | None = None
+    if before_state_label == "state/ready":
+        source_state = IssueState.READY
+    elif before_state_label == "state/handoff":
+        source_state = IssueState.HANDOFF
+
+    if source_state is None:
+        store.add_event(
+            branch,
+            "manager_closed_issue_unexpected_state",
+            actor,
+            detail=(
+                f"Issue #{issue_number} closed but was in {before_state_label} "
+                f"(expected state/ready or state/handoff)"
+            ),
+            refs={"issue": str(issue_number)},
+        )
+        return True
+
+    abandon_result = AbandonFlowService().abandon_flow(
+        issue_number=issue_number,
         branch=branch,
-        target_id=str(issue_number),
+        source_state=source_state,
+        reason="manager closed issue without finalizing abandon flow",
+        actor=actor,
+        issue_already_closed=True,
+        flow_already_aborted=after_snapshot.get("flow_status") == "aborted",
     )
-    for session in sessions:
-        if success:
-            registry.mark_finished(session["id"], success=True)
-        else:
-            registry.mark_failed(session["id"])
+    store.add_event(
+        branch,
+        "manager_abandoned_flow",
+        actor,
+        detail=(
+            f"Manager abandoned flow for issue #{issue_number} "
+            f"(issue={abandon_result.get('issue')}, "
+            f"pr={abandon_result.get('pr')}, "
+            f"flow={abandon_result.get('flow')})"
+        ),
+        refs={"issue": str(issue_number), "result": str(abandon_result)},
+    )
+    return True
+
+
+def _block_manager_if_noop(
+    *,
+    store: SQLiteClient,
+    issue_number: int,
+    branch: str,
+    actor: str,
+    repo: str | None,
+    before_snapshot: dict[str, object],
+    after_snapshot: dict[str, object],
+) -> bool:
+    """Block manager runs that do not make required state progress."""
+    current_state_label = before_snapshot.get("state_label", "")
+    allow_close = current_state_label in ("state/ready", "state/handoff")
+    if has_progress_changed(
+        before_snapshot,
+        after_snapshot,
+        require_state_transition=True,
+        allow_close_as_progress=allow_close,
+    ):
+        return False
+
+    reason = "manager 本轮未产生状态迁移（must leave READY/HANDOFF per contract）"
+    store.add_event(
+        branch,
+        "manager_noop_blocked",
+        actor,
+        detail=f"Manager auto-blocked issue #{issue_number}: {reason}",
+        refs={"issue": str(issue_number), "reason": reason},
+    )
+    block_manager_noop_issue(
+        issue_number=issue_number,
+        repo=repo,
+        reason=reason,
+        actor=actor,
+    )
+    return True
 
 
 def run_manager_issue_mode(
@@ -163,16 +229,42 @@ def run_manager_issue_mode(
     )
 
     if async_mode and not dry_run:
+        from vibe3.execution.contracts import ExecutionRequest
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        coordinator = ExecutionCoordinator(orchestra_config, store, backend)
+
+        refs = {"task": manager_task}
+        if session_id:
+            refs["session_id"] = session_id
+
+        request = ExecutionRequest(
+            role="manager",
+            target_branch=branch,
+            target_id=issue_number,
+            execution_name=get_manager_session_name(issue_number),
+            prompt=prompt,
+            options=options,
+            cwd=str(launch_cwd),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=refs,
+            actor=actor,
+            mode="async",
+        )
+
         try:
-            handle = backend.start_async(
-                prompt=prompt,
-                options=options,
-                task=manager_task,
-                session_id=session_id,
-                execution_name=get_manager_session_name(issue_number),
-                cwd=launch_cwd,
-                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            )
+            result = coordinator.dispatch_execution(request)
+            if not result.launched:
+                # Capacity full or dispatch rejected - this is a normal
+                # throttling result, not an execution failure.
+                # Do not mark issue as failed.
+                typer.echo(f"Manager dispatch queued/throttled: {result.reason}")
+                return
+
+            typer.echo(f"-> Manager run: issue #{issue_number}")
+            typer.echo(f"Tmux session: {result.tmux_session}")
+            typer.echo(f"Session log: {result.log_path}")
+            return
         except BaseException as exc:
             store.add_event(
                 branch,
@@ -186,99 +278,39 @@ def run_manager_issue_mode(
                 reason=f"manager async start failed: {exc}",
             )
             raise typer.Exit(1) from exc
-        updates: dict[str, object] = {"latest_actor": actor}
-        store.update_flow_state(branch, **updates)
-        store.add_event(
-            branch,
-            "manager_started",
-            actor,
-            detail=f"Manager execution started for issue #{issue_number}",
-            refs={
-                "issue": str(issue_number),
-                "tmux_session": handle.tmux_session,
-                "log": str(handle.log_path),
-            },
-        )
-        typer.echo(f"-> Manager run: issue #{issue_number}")
-        typer.echo(f"Tmux session: {handle.tmux_session}")
-        typer.echo(f"Session log: {handle.log_path}")
-        return
 
-    _is_async_child = os.environ.get("VIBE3_ASYNC_CHILD") == "1"
-
-    try:
-        result = backend.run(
-            prompt=prompt,
-            options=options,
-            task=manager_task,
-            dry_run=dry_run,
-            session_id=session_id,
-            cwd=launch_cwd,
-        )
-    except BaseException as exc:
-        if not dry_run:
-            # Write registry terminal state for async child
-            if _is_async_child:
-                _write_manager_registry_terminal(
-                    store, branch, issue_number, success=False
-                )
-            store.add_event(
-                branch,
-                "manager_failed",
-                actor,
-                detail=f"Manager execution failed for issue #{issue_number}: {exc}",
-                refs={"issue": str(issue_number), "reason": str(exc)},
-            )
-            fail_manager_issue(
-                issue_number=issue_number,
-                reason=f"manager sync execution failed: {exc}",
-            )
-        raise
-
-    if not result.is_success():
-        if not dry_run:
-            # Write registry terminal state for async child
-            if _is_async_child:
-                _write_manager_registry_terminal(
-                    store, branch, issue_number, success=False
-                )
-            store.update_flow_state(
-                branch,
-                latest_actor=actor,
-            )
-        store.add_event(
-            branch,
-            "manager_failed",
-            actor,
-            detail=f"Manager execution failed for issue #{issue_number}",
-            refs={"issue": str(issue_number), "status": "failed"},
-        )
-        fail_manager_issue(
-            issue_number=issue_number,
-            reason=getattr(result, "stderr", "") or "manager exited with failure",
-        )
-        raise typer.Exit(1)
+    sync_request = ExecutionRequest(
+        role="manager",
+        target_branch=branch,
+        target_id=issue_number,
+        execution_name=get_manager_session_name(issue_number),
+        prompt=prompt,
+        options=options,
+        cwd=str(launch_cwd),
+        refs={
+            "task": manager_task,
+            **({"session_id": session_id} if session_id else {}),
+        },
+        actor=actor,
+        mode="sync",
+        dry_run=dry_run,
+    )
+    sync_result = ExecutionCoordinator(
+        orchestra_config, store, backend
+    ).dispatch_execution(sync_request)
 
     if dry_run:
         typer.echo(f"-> Manager run: issue #{issue_number} (dry-run)")
         return
 
-    # Write registry terminal state for async child
-    if _is_async_child:
-        _write_manager_registry_terminal(store, branch, issue_number, success=True)
+    if not sync_result.launched:
+        fail_manager_issue(
+            issue_number=issue_number,
+            reason=sync_result.reason or "manager exited with failure",
+        )
+        raise typer.Exit(1)
 
-    store.update_flow_state(
-        branch,
-        latest_actor=actor,
-    )
-
-    store.add_event(
-        branch,
-        "manager_completed",
-        actor,
-        detail=f"Manager execution completed for issue #{issue_number}",
-        refs={"issue": str(issue_number), "status": "completed"},
-    )
+    store.update_flow_state(branch, latest_actor=actor)
     after_snapshot = snapshot_progress(
         issue_number=issue_number,
         branch=branch,
@@ -286,18 +318,18 @@ def run_manager_issue_mode(
         github=GitHubClient(),
         repo=orchestra_config.repo,
     )
-    coordinator = ManagerRunCoordinator(store)
-    if coordinator.handle_post_run_outcome(
+    if _handle_closed_issue_post_run(
+        store=store,
         issue_number=issue_number,
         branch=branch,
         actor=actor,
-        repo=orchestra_config.repo,
         before_snapshot=before_snapshot,
         after_snapshot=after_snapshot,
     ):
         return
 
-    if coordinator.check_progress_and_block_if_noop(
+    if _block_manager_if_noop(
+        store=store,
         issue_number=issue_number,
         branch=branch,
         actor=actor,

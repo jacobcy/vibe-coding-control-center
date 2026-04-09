@@ -3,7 +3,7 @@
 This module provides domain events for all execution layers:
 - L1: Governance service (periodic scans)
 - L2: Supervisor + Apply chain (lightweight governance execution)
-- L3: Manager + Agent chain (full development workflow)
+- L3: Agent chain (full development workflow)
 
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
@@ -21,11 +21,6 @@ from vibe3.domain.events import (
     IssueBlocked,
     IssueFailed,
     IssueStateChanged,
-    # L3 Manager Events
-    ManagerExecutionCompleted,
-    ManagerExecutionStarted,
-    ManagerFlowDispatched,
-    ManagerFlowQueued,
     PlanCompleted,
     ReportRefRequired,
     ReviewCompleted,
@@ -58,11 +53,6 @@ __all__ = [
     "GovernanceScanCompleted",
     "GovernanceDecisionRequired",
     "SupervisorExecutionCompleted",
-    # L3 Manager Events
-    "ManagerExecutionStarted",
-    "ManagerExecutionCompleted",
-    "ManagerFlowDispatched",
-    "ManagerFlowQueued",
     # L2 Supervisor Apply Events
     "SupervisorIssueIdentified",
     "SupervisorPromptRendered",

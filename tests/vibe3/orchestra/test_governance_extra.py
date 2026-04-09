@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibe3.agents.backends.codeagent import AsyncExecutionHandle
 from vibe3.models.orchestra_config import GovernanceConfig, OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.services.orchestra_status_service import (
@@ -40,20 +39,6 @@ def _make_dispatcher(
     dispatcher = MagicMock()
     dispatcher.repo_path = repo_path or Path("/tmp/vibe-repo")
     return dispatcher
-
-
-def _make_service(
-    config: OrchestraConfig | None = None,
-    snapshot: OrchestraSnapshot | None = None,
-    run_result: bool = True,
-    repo_path: Path | None = None,
-) -> GovernanceService:
-    """Helper to create a GovernanceService with mocked dependencies."""
-    return GovernanceService(
-        config=config or OrchestraConfig(),
-        status_service=MockStatusService(snapshot),
-        manager=_make_dispatcher(run_result, repo_path),
-    )
 
 
 class TestGovernanceService:
@@ -145,12 +130,10 @@ class TestGovernanceService:
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=MagicMock(),
         )
 
-        await service._run_governance()
-        service._backend.run.assert_not_called()
-        service._backend.start_async.assert_not_called()
+        prompt, options, task = await service.build_governance_execution_payload()
+        assert prompt is None
 
         dry_run_files = sorted(
             (tmp_path / "temp" / "logs" / "orchestra" / "governance" / "dry-run").glob(
@@ -171,35 +154,25 @@ class TestGovernanceService:
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
-        backend = MagicMock()
-        backend.start_async.return_value = AsyncExecutionHandle(
-            tmux_session="vibe3-governance-scan-20260404-140000-t1",
-            log_path=tmp_path
-            / "temp"
-            / "logs"
-            / "vibe3-governance-scan-20260404-140000-t1.async.log",
-            prompt_file_path=tmp_path / "prompt.md",
-        )
         service = GovernanceService(
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=False)),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=backend,
         )
 
-        await service._run_governance()
+        prompt, options, task = await service.build_governance_execution_payload()
 
-        backend.start_async.assert_called_once()
-        backend.run.assert_not_called()
-        assert backend.start_async.call_args.kwargs["keep_alive_seconds"] == 10
-        assert backend.start_async.call_args.kwargs["execution_name"].startswith(
-            "vibe3-governance-scan-"
-        )
+        assert prompt is not None
+        assert options is not None
+        assert "governance scan" in task
 
     @pytest.mark.asyncio
-    async def test_on_tick_skips_when_existing_governance_session(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_on_tick_is_stub_does_not_dispatch(self, tmp_path, monkeypatch):
+        """on_tick() is a stub and must NOT dispatch.
+
+        Governance skipping when a live session exists is now handled by
+        CapacityService in the domain handler (GovernanceScanStarted).
+        """
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -209,17 +182,22 @@ class TestGovernanceService:
             circuit_breaker_state="closed",
             circuit_breaker_failures=0,
         )
-        backend = MagicMock()
         service = GovernanceService(
             config=OrchestraConfig(
                 governance=GovernanceConfig(interval_ticks=1, dry_run=False)
             ),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=backend,
         )
-        monkeypatch.setattr(service, "_has_live_dispatch", lambda: True)
+
+        run_called = {"count": 0}
+
+        async def fake_run() -> None:
+            run_called["count"] += 1
+
+        monkeypatch.setattr(service, "build_governance_execution_payload", fake_run)
 
         await service.on_tick()
 
-        backend.start_async.assert_not_called()
+        # Domain-first: on_tick() is a stub — must NOT dispatch
+        assert run_called["count"] == 0

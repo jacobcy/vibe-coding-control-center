@@ -12,6 +12,7 @@ Handlers are organized by execution chain:
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二
 """
 
+from vibe3.domain.handlers.dispatch import register_dispatch_handlers
 from vibe3.domain.handlers.flow_lifecycle import register_flow_lifecycle_handlers
 from vibe3.domain.handlers.governance import register_governance_handlers
 from vibe3.domain.handlers.manager import register_manager_handlers
@@ -29,11 +30,13 @@ def register_event_handlers() -> None:
     2. L2 Supervisor Apply handlers
     3. L3 Flow Lifecycle handlers
     4. L3 Manager handlers
+    5. L3 Dispatch handlers
     """
     register_governance_handlers()
     register_supervisor_apply_handlers()
     register_flow_lifecycle_handlers()
     register_manager_handlers()
+    register_dispatch_handlers()
 
 
 __all__ = [

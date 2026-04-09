@@ -72,6 +72,7 @@ class OrchestraSupervisorHandoffSettings(BaseModel):
     issue_label: str = "supervisor"
     handoff_state_label: str = "state/handoff"
     supervisor_file: str = "supervisor/apply.md"
+    prompt_template: str = "orchestra.supervisor.apply"
     agent: str | None = None
     backend: str | None = None
     model: str | None = None

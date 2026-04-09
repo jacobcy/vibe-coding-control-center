@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from typing import Any
 
+from loguru import logger
+
+from vibe3.clients import SQLiteClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.models.flow import FlowStatusResponse
 from vibe3.services.flow_service import FlowService
@@ -57,11 +60,13 @@ class FlowProjectionService:
         task_service: TaskService | None = None,
         pr_service: PRService | None = None,
         github_client: GitHubClient | None = None,
+        store: SQLiteClient | None = None,
     ) -> None:
         self.flow_service = flow_service or FlowService()
         self.task_service = task_service or TaskService()
         self.pr_service = pr_service or PRService()
         self.github_client = github_client or GitHubClient()
+        self.store = store or SQLiteClient()
 
     def get_projection(
         self, branch: str, include_remote: bool = True
@@ -92,22 +97,98 @@ class FlowProjectionService:
         return projection
 
     def get_issue_titles(self, issue_numbers: list[int]) -> tuple[dict[int, str], bool]:
-        """Fetch titles for a list of issues.
+        """Fetch titles for a list of issues with cache optimization.
+
+        Uses cache-first strategy: checks local cache before calling GitHub API.
+        Only calls GitHub for cache misses and updates cache with fetched titles.
 
         Returns:
             Tuple of (titles_dict, has_network_error)
         """
         titles: dict[int, str] = {}
         network_error = False
+
+        # Group issue numbers by branch to check cache
+        # Build mapping: issue_number -> list of branches with this issue as task
+        issue_to_branches: dict[int, list[str]] = {}
         for n in issue_numbers:
-            try:
-                issue = self.github_client.view_issue(n)
-                if isinstance(issue, dict):
-                    titles[n] = issue.get("title", f"Issue #{n}")
-                elif issue == "network_error":
+            # Find branches that have this issue as task_issue_number
+            # Note: This requires querying all flows, which may be expensive
+            # Alternative: direct cache lookup by constructing branch names
+            # For issue-N pattern, likely branches are task/issue-N or dev/issue-N
+            possible_branches = [f"task/issue-{n}", f"dev/issue-{n}"]
+            issue_to_branches[n] = possible_branches
+
+        # Check cache for each issue
+        cache_misses: list[int] = []
+        for n in issue_numbers:
+            cached_title = None
+            # Try each possible branch pattern
+            for branch in issue_to_branches[n]:
+                cache = self.store.get_flow_context_cache(branch)
+                if cache and cache.get("task_issue_number") == n:
+                    cached_title = cache.get("issue_title")
+                    if cached_title:
+                        break  # Found cached title
+
+            if cached_title:
+                titles[n] = cached_title
+                logger.bind(
+                    domain="flow_projection",
+                    action="get_issue_titles",
+                    issue_number=n,
+                    source="cache",
+                ).debug(f"Using cached title for issue #{n}")
+            else:
+                cache_misses.append(n)
+
+        # Fetch missing titles from GitHub
+        if cache_misses:
+            logger.bind(
+                domain="flow_projection",
+                action="get_issue_titles",
+                cache_misses=cache_misses,
+            ).debug(f"Fetching {len(cache_misses)} issues from GitHub")
+
+            for n in cache_misses:
+                try:
+                    issue = self.github_client.view_issue(n)
+                    if isinstance(issue, dict):
+                        fetched_title = issue.get("title", f"Issue #{n}")
+                        titles[n] = fetched_title
+
+                        # Update cache for all associated branches
+                        for branch in issue_to_branches[n]:
+                            existing_cache = self.store.get_flow_context_cache(branch)
+                            if existing_cache:
+                                # Update existing cache entry with title
+                                self.store.upsert_flow_context_cache(
+                                    branch=branch,
+                                    task_issue_number=existing_cache.get(
+                                        "task_issue_number"
+                                    ),
+                                    issue_title=fetched_title,
+                                    pr_number=existing_cache.get("pr_number"),
+                                    pr_title=existing_cache.get("pr_title"),
+                                )
+                                logger.bind(
+                                    domain="flow_projection",
+                                    action="get_issue_titles",
+                                    issue_number=n,
+                                    branch=branch,
+                                ).debug("Updated cache with fetched title")
+
+                    elif issue == "network_error":
+                        network_error = True
+                except Exception as e:
                     network_error = True
-            except Exception:
-                network_error = True
+                    logger.bind(
+                        domain="flow_projection",
+                        action="get_issue_titles",
+                        issue_number=n,
+                        error=str(e),
+                    ).warning(f"Failed to fetch issue #{n} from GitHub")
+
         return titles, network_error
 
     def get_milestone_data(self, issue_number: int) -> dict[str, Any] | None:

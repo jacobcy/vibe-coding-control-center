@@ -13,10 +13,10 @@ from loguru import logger
 from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.services.flow_service import FlowService
 from vibe3.services.issue_flow_service import IssueFlowService
 from vibe3.services.label_service import LabelService
-from vibe3.services.session_registry import SessionRegistryService
 from vibe3.services.status_query_service import StatusQueryService
 from vibe3.services.task_resume_candidates import TaskResumeCandidates
 from vibe3.services.task_resume_operations import TaskResumeOperations
@@ -205,6 +205,24 @@ class TaskResumeUsecase:
                         reason=reason,
                         worktree_path=worktree_path,
                     )
+
+                    # Publish event to notify EDA handlers of the state change
+                    try:
+                        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+                        from vibe3.domain.publisher import publish
+                        from vibe3.models.orchestration import IssueState
+
+                        publish(
+                            IssueStateChanged(
+                                issue_number,
+                                None,
+                                IssueState.READY.value,
+                                actor="human:resume",
+                            )
+                        )
+                    except ImportError:
+                        # Gracefully handle missing EDA dependencies if in lean context
+                        pass
 
                     if resume_kind == "all":
                         self._comment_all_resume_success(

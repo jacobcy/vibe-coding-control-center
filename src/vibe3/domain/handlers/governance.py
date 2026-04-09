@@ -3,11 +3,14 @@
 Handlers for governance service and supervisor execution.
 """
 
+import asyncio
+import os
 from typing import Callable
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.events.governance import (
     DomainEvent,
     GovernanceDecisionRequired,
@@ -15,18 +18,83 @@ from vibe3.domain.events.governance import (
     GovernanceScanStarted,
     SupervisorExecutionCompleted,
 )
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.orchestra.services.governance_service import GovernanceService
 
 
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     """Handle GovernanceScanStarted event.
 
-    Logs the start of a governance scan.
+    Triggers governance scan execution via GovernanceService and ExecutionCoordinator.
+    Uses unified infrastructure services for lifecycle and capacity.
+
+    Schedules the async scan as a task on the running event loop to avoid
+    calling asyncio.run() inside an already-running loop (heartbeat context).
     """
     logger.bind(
         domain="events",
         event="governance_scan_started",
         tick=event.tick_count,
     ).info("Governance scan started")
+
+    # Initialize unified infrastructure services
+    config = OrchestraConfig.from_settings()
+    store = SQLiteClient()
+    coordinator = ExecutionCoordinator(config, store)
+
+    governance_service = GovernanceService.from_config(config)
+
+    async def _do_scan() -> None:
+        try:
+            prompt, options, task = (
+                await governance_service.build_governance_execution_payload()
+            )
+            if not prompt:
+                # e.g. dry-run or circuit breaker
+                return
+
+            request = ExecutionRequest(
+                role="governance",
+                target_branch="governance",
+                target_id=1,
+                execution_name=governance_service.build_execution_name(
+                    event.tick_count
+                ),
+                prompt=prompt,
+                options=options,
+                refs={"task": task},
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                actor="orchestra:governance",
+                mode="async",
+            )
+            result = coordinator.dispatch_execution(request)
+
+            if result.launched:
+                logger.bind(
+                    domain="governance_handler",
+                    tick=event.tick_count,
+                ).success("Governance scan dispatched successfully")
+            else:
+                logger.bind(
+                    domain="governance_handler",
+                    tick=event.tick_count,
+                ).warning(f"Governance scan dispatch failed: {result.reason}")
+
+        except Exception as exc:
+            logger.bind(
+                domain="governance_handler",
+                tick=event.tick_count,
+            ).exception(f"Governance scan failed: {exc}")
+
+    try:
+        # Called from within heartbeat's async event loop — schedule as task.
+        loop = asyncio.get_running_loop()
+        loop.create_task(_do_scan(), name=f"governance-scan-tick-{event.tick_count}")
+    except RuntimeError:
+        # No running loop (e.g. tests, direct CLI call) — safe to use asyncio.run().
+        asyncio.run(_do_scan())
 
 
 def handle_governance_scan_completed(event: GovernanceScanCompleted) -> None:
@@ -81,10 +149,7 @@ def handle_supervisor_execution_completed(event: SupervisorExecutionCompleted) -
         success=event.success,
     ).info("Supervisor execution completed")
 
-    # If supervisor execution failed on an issue, add a comment
     if not event.success and event.issue_number is not None:
-        from vibe3.clients.github_client import GitHubClient
-
         GitHubClient().add_comment(
             event.issue_number,
             f"❌ Supervisor execution failed for `{event.supervisor_file}`\n\n"

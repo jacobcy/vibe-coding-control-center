@@ -136,7 +136,70 @@ class FlowService(FlowLifecycleMixin):
             existing=False,
         ).info("Creating flow via ensure")
 
-        return self.create_flow(slug=slug, branch=branch)
+        flow = self.create_flow(slug=slug, branch=branch)
+
+        # Initialize issue flow context cache if this is an issue branch
+        self._initialize_issue_flow_context(branch)
+
+        return flow
+
+    def _initialize_issue_flow_context(self, branch: str) -> None:
+        """Initialize issue flow context cache for issue branches.
+
+        This method is called after flow creation to populate the context cache
+        for branches that match task/issue-N or dev/issue-N patterns.
+
+        Args:
+            branch: Git branch name
+        """
+        from vibe3.clients.github_client import GitHubClient
+        from vibe3.services.issue_flow_service import IssueFlowService
+
+        issue_service = IssueFlowService(store=self.store)
+        issue_number = issue_service.parse_issue_number_any(branch)
+
+        if issue_number is None:
+            # Not an issue branch, skip cache initialization
+            return
+
+        logger.bind(
+            domain="flow",
+            action="init_issue_context",
+            branch=branch,
+            issue_number=issue_number,
+        ).debug("Initializing issue flow context cache")
+
+        # Check if there's an existing task issue link
+        issue_links = self.store.get_issue_links(branch)
+        task_issues = [
+            link["issue_number"] for link in issue_links if link["issue_role"] == "task"
+        ]
+        effective_issue_number = task_issues[0] if task_issues else issue_number
+
+        # Try to fetch issue title from GitHub
+        issue_title = None
+        try:
+            gh = GitHubClient()
+            issue_data = gh.view_issue(effective_issue_number)
+            if isinstance(issue_data, dict):
+                issue_title = issue_data.get("title")
+        except Exception as e:
+            logger.bind(
+                domain="flow",
+                action="init_issue_context",
+                branch=branch,
+                issue_number=effective_issue_number,
+                error=str(e),
+            ).warning("Failed to fetch issue title from GitHub")
+
+        # Initialize cache with issue number and title (if available)
+        self.store.upsert_flow_context_cache(
+            branch=branch,
+            task_issue_number=effective_issue_number,
+            issue_title=issue_title,  # May be None if GitHub failed
+            pr_number=None,
+            pr_title=None,
+        )
 
     def resolve_flow_name(self, name: str | None = None) -> str:
         """Return explicit name or derive slug from current branch.
@@ -239,6 +302,21 @@ class FlowService(FlowLifecycleMixin):
         """
         self.store.update_flow_state(branch, **updates)
 
+    def delete_flow(self, branch: str) -> None:
+        """Delete all persisted flow truth for a branch.
+
+        This is the hard-reset counterpart to ``reactivate_flow()``.
+        It removes authoritative database state so any future manager/planner
+        pass must recreate the flow scene from scratch instead of inheriting
+        stale refs, events, issue links, or runtime session registry entries.
+        """
+        logger.bind(
+            domain="flow",
+            action="delete",
+            branch=branch,
+        ).info("Deleting flow")
+        self.store.delete_flow(branch)
+
     def reactivate_flow(
         self,
         branch: str,
@@ -324,6 +402,9 @@ class FlowService(FlowLifecycleMixin):
             initiated_by=initiator,
         )
 
+        # Clear cached issue/PR metadata (will be re-initialized for new issue)
+        self.store.delete_flow_context_cache(branch)
+
         self.store.add_event(
             branch,
             "flow_reactivated",
@@ -394,14 +475,13 @@ class FlowService(FlowLifecycleMixin):
             return None
 
         # Fetch PR info from GitHub (truth)
+        # TODO: Optimize with cache service when implemented
         gh = GitHubClient()
-        pr_number_hint = flow_data.get("pr_number")
-        pr_number, pr_ready = pr_number_hint, bool(flow_data.get("pr_ready_for_review"))
+        pr_number, pr_ready = None, False  # Default values
 
         try:
-            # Remote-first: if pr_number exists in local cache, use it as hint;
-            # otherwise lookup by branch.
-            pr = gh.get_pr(pr_number_hint, branch)
+            # Query PR by branch (pr_number not cached in flow_state yet)
+            pr = gh.get_pr(None, branch)
             if pr:
                 pr_number = pr.number
                 pr_ready = pr.is_ready

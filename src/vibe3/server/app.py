@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import signal
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -23,6 +24,8 @@ from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
+    _kill_orchestra_tmux_session,
+    _orchestra_tmux_session_exists,
     _resolve_dispatcher_models_root,
     _resolve_orchestra_log_dir,
     _setup_tailscale_webhook,
@@ -118,6 +121,33 @@ def make_webhook_router(
     return router
 
 
+def _ensure_port_available(port: int) -> None:
+    """Raise typer.Exit if port is already in use."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            # Use SO_REUSEADDR to be consistent with common server behavior
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("0.0.0.0", port))
+        except OSError as e:
+            if e.errno in (48, 98):  # MacOS: 48, Linux: 98
+                typer.echo(
+                    f"\n[bold red]Error:[/] Port {port} is already in use.",
+                    err=True,
+                )
+                typer.echo(
+                    "Check if another Orchestra service is running on this port.",
+                    err=True,
+                )
+                typer.echo(
+                    "Use [bold]vibe3 serve stop[/] or specify [bold]--port[/].\n",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            raise
+
+
 # --- Server Run Logic ---
 
 
@@ -132,11 +162,20 @@ async def _run(config: OrchestraConfig, port: int) -> None:
         log_level="warning",  # loguru handles our logs
     )
     uv_server = uvicorn.Server(uv_config)
+    heartbeat_task = asyncio.create_task(heartbeat.run())
+    server_task = asyncio.create_task(uv_server.serve())
 
-    await asyncio.gather(
-        heartbeat.run(),
-        uv_server.serve(),
+    done, _pending = await asyncio.wait(
+        {heartbeat_task, server_task},
+        return_when=asyncio.FIRST_COMPLETED,
     )
+
+    if heartbeat_task in done and not server_task.done():
+        uv_server.should_exit = True
+    if server_task in done and not heartbeat_task.done():
+        heartbeat.stop()
+
+    await asyncio.gather(heartbeat_task, server_task)
 
 
 # --- CLI Commands ---
@@ -144,6 +183,7 @@ async def _run(config: OrchestraConfig, port: int) -> None:
 
 @app.command()
 def start(
+    ctx: typer.Context,
     interval: Annotated[
         int | None,
         typer.Option(
@@ -191,9 +231,12 @@ def start(
             ),
         ),
     ] = False,
-    async_mode: Annotated[
+    no_async: Annotated[
         bool,
-        typer.Option("--async", help="Run in tmux background session"),
+        typer.Option(
+            "--no-async",
+            help="Run synchronously (blocking) instead of async tmux session",
+        ),
     ] = False,
     ts: Annotated[
         bool,
@@ -207,14 +250,32 @@ def start(
     ] = False,
     verbose: Annotated[
         int,
-        typer.Option("-v", "--verbose", count=True, help="Increase verbosity"),
+        typer.Option(
+            "-v", "--verbose", count=True, help="Increase verbosity (or use global -v)"
+        ),
     ] = 0,
 ) -> None:
     """Start Orchestra server (webhook receiver + heartbeat polling).
 
     Defaults from config/settings.yaml; repo defaults to current repository.
     """
+    # Inherit global verbose if not specified locally
+    if verbose == 0 and "verbose" in ctx.meta:
+        verbose = ctx.meta["verbose"]
+
     setup_logging(verbose=verbose)
+
+    # Orchestra events.log level follows global verbosity
+    # Default: INFO (key runtime events for monitoring)
+    # -v: already INFO (no change needed)
+    # -vv: DEBUG (full debugging details)
+    import os as _os
+
+    if verbose >= 2:
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "DEBUG"
+    else:
+        # Default and -v: show key events (tick completion, issue dispatch, etc.)
+        _os.environ["VIBE3_ORCHESTRA_LOG_LEVEL"] = "INFO"
 
     config = OrchestraConfig.from_settings()
     if not config.enabled:
@@ -249,6 +310,9 @@ def start(
         typer.echo(f"Cleaning up stale PID file (dead process {pid})")
         config.pid_file.unlink(missing_ok=True)
 
+    # Pre-flight: Check if port is available
+    _ensure_port_available(config.port)
+
     # Phase 1: FailedGate Preflight
     from vibe3.orchestra.failed_gate import FailedGate
 
@@ -267,7 +331,7 @@ def start(
         )
         raise typer.Exit(1)
 
-    if async_mode:
+    if not no_async:
         ok, msg = _start_async_serve(config, verbose)
         typer.echo(msg)
         if not ok:
@@ -296,6 +360,10 @@ def start(
     typer.echo(f"Webhook endpoint: POST http://0.0.0.0:{config.port}/webhook/github")
     typer.echo("Press Ctrl+C to stop")
 
+    # Write PID file for the synchronous server process
+    config.pid_file.parent.mkdir(parents=True, exist_ok=True)
+    config.pid_file.write_text(str(os.getpid()))
+
     try:
         os.environ["VIBE3_ORCHESTRA_EVENT_LOG"] = "1"
         os.environ["VIBE3_REPO_MODELS_ROOT"] = str(
@@ -305,6 +373,15 @@ def start(
         asyncio.run(_run(config, config.port))
     except KeyboardInterrupt:
         typer.echo("Orchestra server stopped")
+    except SystemExit as e:
+        # Catch uvicorn exit to avoid asyncio "never retrieved" warnings
+        if e.code != 0:
+            sys.exit(e.code)
+        raise
+    finally:
+        # Cleanup PID file on exit
+        if config.pid_file.exists():
+            config.pid_file.unlink()
 
 
 @app.command()
@@ -314,10 +391,19 @@ def status() -> None:
     pid, is_valid = _validate_pid_file(config.pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            typer.echo("Orchestra server running in tmux session (PID file missing)")
+            raise typer.Exit(0)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            typer.echo(
+                "Orchestra server running in tmux session "
+                f"(stale PID file points to non-orchestra process {pid})"
+            )
+            raise typer.Exit(0)
         typer.echo(
             f"Orchestra server is not running (stale PID file, process {pid} "
             "is not orchestra)"
@@ -335,10 +421,29 @@ def stop() -> None:
     pid, is_valid = _validate_pid_file(pid_file)
 
     if pid is None:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                typer.echo("Stopped Orchestra server tmux session")
+                raise typer.Exit(0)
+            typer.echo("Failed to stop Orchestra tmux session")
+            raise typer.Exit(1)
         typer.echo("Orchestra server is not running (no PID file)")
         raise typer.Exit(0)
 
     if not is_valid:
+        if _orchestra_tmux_session_exists():
+            if _kill_orchestra_tmux_session():
+                pid_file.unlink(missing_ok=True)
+                typer.echo(
+                    "Stopped Orchestra server tmux session "
+                    f"(stale PID file referenced process {pid})"
+                )
+                raise typer.Exit(0)
+            typer.echo(
+                "Failed to stop Orchestra tmux session "
+                f"(stale PID file referenced process {pid})"
+            )
+            raise typer.Exit(1)
         typer.echo(f"Cleaning up stale PID file (process {pid} is not orchestra)")
         pid_file.unlink()
         raise typer.Exit(0)

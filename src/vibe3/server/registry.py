@@ -14,23 +14,22 @@ from loguru import logger
 from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.domain.orchestration_facade import OrchestrationFacade
+from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
     OrchestraStatusService,
 )
-from vibe3.services.session_registry import SessionRegistryService
+
+ORCHESTRA_TMUX_SESSION = "vibe3-orchestra-serve"
 
 
 def _resolve_orchestra_repo_root() -> Path:
@@ -114,28 +113,11 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
-    if config.assignee_dispatch.enabled:
-        heartbeat.register(
-            AssigneeDispatchService(
-                config,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-            )
-        )
     if config.comment_reply.enabled:
         heartbeat.register(
             CommentReplyService(
                 config,
                 github=shared_github,
-            )
-        )
-    if config.pr_review_dispatch.enabled:
-        heartbeat.register(
-            PRReviewDispatchService(
-                config,
-                manager=shared_manager,
-                executor=shared_executor,
             )
         )
     if config.state_label_dispatch.enabled:
@@ -144,7 +126,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.READY,
                 trigger_name="manager",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -156,7 +137,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.HANDOFF,
                 trigger_name="manager",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -168,7 +148,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.CLAIMED,
                 trigger_name="plan",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -180,7 +159,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.IN_PROGRESS,
                 trigger_name="run",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -192,7 +170,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.REVIEW,
                 trigger_name="review",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -200,26 +177,16 @@ def _build_server_with_launch_cwd(
             )
         )
 
-    if config.governance.enabled:
-        heartbeat.register(
-            GovernanceService(
-                config,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-    if config.supervisor_handoff.enabled:
-        heartbeat.register(
-            SupervisorHandoffService(
-                config,
-                github=shared_github,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-            )
-        )
+    # Register OrchestrationFacade as primary domain-first entry point
+    facade = OrchestrationFacade()
+    heartbeat.register(facade)
+
+    # GovernanceService and SupervisorHandoffService are no longer registered
+    # directly to the heartbeat. Their on_tick() methods were stubs delegating
+    # to domain handlers. Governance scans are now triggered via:
+    #   OrchestrationFacade.on_tick() -> GovernanceScanStarted event
+    #   -> governance domain handler -> GovernanceService.run_scan()
+    # Supervisor handoff follows the same domain-event-driven path.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))
@@ -230,15 +197,13 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/status")
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot(queued=shared_manager.queued_issues)
+        return status_service.snapshot()
 
     # Mount MCP server (gracefully degrades if not available)
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(
-            status_service, get_queued=lambda: shared_manager.queued_issues
-        )
+        mcp = create_mcp_server(status_service, get_queued=None)
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
     except ImportError as exc:
@@ -386,6 +351,7 @@ def _build_async_serve_command(
         "src/vibe3/cli.py",
         "serve",
         "start",
+        "--no-async",
         "--interval",
         str(config.polling_interval),
         "--port",
@@ -404,7 +370,7 @@ def _build_async_serve_command(
 
 def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str]:
     """Start serve command in tmux session."""
-    session_name = "vibe3-orchestra-serve"
+    session_name = ORCHESTRA_TMUX_SESSION
     launch_cwd = Path.cwd()
     cmd = _build_async_serve_command(config, verbose, launch_cwd=launch_cwd)
     try:
@@ -434,3 +400,33 @@ def _start_async_serve(config: OrchestraConfig, verbose: int) -> tuple[bool, str
         "Use `uv run python src/vibe3/cli.py serve status` or "
         "`tmux attach -t vibe3-orchestra-serve` to inspect",
     )
+
+
+def _orchestra_tmux_session_exists() -> bool:
+    """Return whether the orchestra tmux session currently exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
+def _kill_orchestra_tmux_session() -> bool:
+    """Kill the orchestra tmux session if it exists."""
+    try:
+        result = subprocess.run(
+            ["tmux", "kill-session", "-t", ORCHESTRA_TMUX_SESSION],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0

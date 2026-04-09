@@ -166,9 +166,15 @@ git diff --cached --stat
 - 哪些内容会被 stash
 - 哪些内容会被 discard
 
-### Step 3.5: Pre-commit 强制验证与格式化
+### Step 3.5: Pre-commit 强制验证与格式化（强制两步流程）
 
-**这是硬规定，不可跳过。**
+**这是硬规定，不可跳过。未经用户明确允许，禁止使用 `--no-verify`。**
+
+**强制两步流程**：
+1. **第一步（temp commit）**：提交临时 commit → pre-commit 自动修复格式问题
+2. **第二步（正式提交）**：soft reset → 按功能模块分组提交（包含格式化修改）
+
+**理由**：防止 E501 等格式问题进入代码库，保证所有提交都经过质量门禁。
 
 在组织任何 commit 之前，必须确保所有待提交文件通过 pre-commit 检查。项目使用 Python pre-commit 框架，配置见 `.pre-commit-config.yaml`。
 

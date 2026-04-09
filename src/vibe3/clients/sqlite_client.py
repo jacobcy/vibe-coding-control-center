@@ -278,6 +278,117 @@ class SQLiteClient:
             ).debug("Retrieved active auto flow count")
             return int(count)
 
+    def delete_flow(self, branch: str) -> None:
+        """Delete all persisted flow records for a branch.
+
+        This removes the branch's flow state, issue links, flow events,
+        runtime session registry entries, and context cache. It is intended
+        for hard scene resets where the next manager pass should recreate
+        the flow from scratch.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM runtime_session WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_events WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_issue_links WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_state WHERE branch = ?", (branch,))
+            cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="delete_flow",
+            branch=branch,
+        ).info("Deleted persisted flow records and cache")
+
+    # ========================================================================
+    # Flow Context Cache Operations
+    # ========================================================================
+
+    def upsert_flow_context_cache(
+        self,
+        branch: str,
+        task_issue_number: int | None,
+        issue_title: str | None,
+        pr_number: int | None,
+        pr_title: str | None,
+    ) -> None:
+        """Insert or replace flow context cache entry.
+
+        Args:
+            branch: Flow branch name
+            task_issue_number: Issue number (if issue branch)
+            issue_title: Issue title (cached for offline access)
+            pr_number: PR number (if PR exists)
+            pr_title: PR title (cached for offline access)
+        """
+        updated_at = datetime.datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO flow_context_cache
+                    (branch, task_issue_number, issue_title,
+                     pr_number, pr_title, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    branch,
+                    task_issue_number,
+                    issue_title,
+                    pr_number,
+                    pr_title,
+                    updated_at,
+                ),
+            )
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="upsert_flow_context_cache",
+            branch=branch,
+        ).debug("Upserted flow context cache")
+
+    def get_flow_context_cache(self, branch: str) -> dict[str, Any] | None:
+        """Get flow context cache by branch.
+
+        Args:
+            branch: Flow branch name
+
+        Returns:
+            Cache dict with task_issue_number, issue_title, pr_number, pr_title,
+            or None if not cached
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM flow_context_cache WHERE branch = ?", (branch,)
+            )
+            row = cursor.fetchone()
+            if row:
+                logger.bind(
+                    external="sqlite",
+                    operation="get_flow_context_cache",
+                    branch=branch,
+                ).debug("Retrieved flow context cache")
+                return dict(row)
+            return None
+
+    def delete_flow_context_cache(self, branch: str) -> None:
+        """Delete flow context cache for a branch.
+
+        Args:
+            branch: Flow branch name
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM flow_context_cache WHERE branch = ?", (branch,))
+            conn.commit()
+        logger.bind(
+            external="sqlite",
+            operation="delete_flow_context_cache",
+            branch=branch,
+        ).debug("Deleted flow context cache")
+
     def get_flows_by_issue(self, issue_number: int, role: str) -> list[dict[str, Any]]:
         """Get all flows linked to a given issue number."""
         with sqlite3.connect(self.db_path) as conn:

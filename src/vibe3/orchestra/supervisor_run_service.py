@@ -8,20 +8,25 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import typer
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.runner import CodeagentExecutionService
 from vibe3.clients.github_client import GitHubClient
-from vibe3.config.settings import VibeConfig
+from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
+from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
-if TYPE_CHECKING:
-    pass
+SUPERVISOR_APPLY_TASK = (
+    "Run supervisor/apply task. "
+    "Process the provided supervisor material or governance issue only, "
+    "perform the minimal allowed actions, then stop. "
+    "Do not switch into governance scan or run/plan/review execution modes."
+)
 
 
 def run_supervisor_mode(
@@ -43,6 +48,7 @@ def run_supervisor_mode(
     governance_cfg = config.governance.model_copy(
         update={
             "supervisor_file": supervisor_file,
+            "prompt_template": config.supervisor_handoff.prompt_template,
             "include_supervisor_content": True,
             "dry_run": dry_run,
         }
@@ -61,38 +67,70 @@ def run_supervisor_mode(
         typer.echo(plan_text)
         return
 
-    runtime_config = VibeConfig.get_defaults()
-    options = CodeagentExecutionService(runtime_config).resolve_agent_options("run")
-    run_task = build_supervisor_task(
-        config=config,
-        issue_number=issue_number,
-    ) or (runtime_config.run.run_prompt or "Execute governance supervisor task")
-    backend = CodeagentBackend()
-
+    options = resolve_supervisor_agent_options(config)
+    run_task = (
+        build_supervisor_task(
+            config=config,
+            issue_number=issue_number,
+        )
+        or SUPERVISOR_APPLY_TASK
+    )
     typer.echo(f"-> Supervisor run: {supervisor_file}")
     if async_mode:
+        store = SQLiteClient()
+        coordinator = ExecutionCoordinator(config, store, CodeagentBackend())
+
         safe_name = Path(supervisor_file).stem.replace("/", "-")
         execution_name = f"vibe3-supervisor-{safe_name}"
         if issue_number is not None:
             execution_name = f"{execution_name}-issue-{issue_number}"
-        handle = backend.start_async(
+
+        request = ExecutionRequest(
+            role="supervisor",
+            target_branch=f"issue-{issue_number}" if issue_number else "supervisor",
+            target_id=issue_number or 0,
+            execution_name=execution_name,
             prompt=plan_text,
             options=options,
-            task=run_task,
-            execution_name=execution_name,
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs={"task": run_task},
+            actor="orchestra:supervisor",
+            mode="async",
         )
-        typer.echo(f"Tmux session: {handle.tmux_session}")
-        typer.echo(f"Session log: {handle.log_path}")
-        return
 
-    result = backend.run(
+        try:
+            result = coordinator.dispatch_execution(request)
+            if not result.launched:
+                typer.echo(f"Supervisor dispatch queued/throttled: {result.reason}")
+                return
+
+            typer.echo(f"Tmux session: {result.tmux_session}")
+            typer.echo(f"Session log: {result.log_path}")
+            return
+        except BaseException as exc:
+            typer.echo(f"Error: supervisor async start failed: {exc}", err=True)
+            raise typer.Exit(1) from exc
+
+    sync_request = ExecutionRequest(
+        role="supervisor",
+        target_branch=f"issue-{issue_number}" if issue_number else "supervisor",
+        target_id=issue_number or 0,
+        execution_name=(
+            f"vibe3-supervisor-{Path(supervisor_file).stem.replace('/', '-')}"
+        ),
         prompt=plan_text,
         options=options,
-        task=run_task,
+        refs={"task": run_task},
+        actor="orchestra:supervisor",
+        mode="sync",
         dry_run=False,
     )
-    if not result.is_success():
+    sync_result = ExecutionCoordinator(
+        config,
+        SQLiteClient(),
+        CodeagentBackend(),
+    ).dispatch_execution(sync_request)
+    if not sync_result.launched:
         raise typer.Exit(1)
 
 

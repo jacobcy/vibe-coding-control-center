@@ -1,112 +1,73 @@
-"""Event handlers for manager events.
-
-Handlers for manager execution and flow dispatching.
-"""
+"""Event handlers for manager dispatch."""
 
 from typing import Callable
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
-from vibe3.domain.events.manager import (
-    DomainEvent,
-    ManagerExecutionCompleted,
-    ManagerExecutionStarted,
-    ManagerFlowDispatched,
-    ManagerFlowQueued,
-)
-from vibe3.services.flow_service import FlowService
+from vibe3.domain.events import DomainEvent
+from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.models.orchestra_config import OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
 
 
-def handle_manager_execution_started(event: ManagerExecutionStarted) -> None:
-    """Handle ManagerExecutionStarted event.
+def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
+    """Dispatch manager when an issue enters claimed state."""
+    if event.to_state != "claimed":
+        return
 
-    Logs manager execution start and updates flow state.
-    """
     logger.bind(
-        domain="events",
-        event="manager_execution_started",
-        issue=event.issue_number,
-        branch=event.branch,
-    ).info("Manager execution started")
+        domain="manager_handler",
+        issue_number=event.issue_number,
+        from_state=event.from_state,
+        to_state=event.to_state,
+    ).info("Manager handler triggered for claimed issue")
 
-    # Record event in flow history
-    flow_service = FlowService()
-    flow_service.store.add_event(
-        event.branch,
-        "manager_started",
-        event.actor,
-        detail=f"Manager started processing issue #{event.issue_number}",
-        refs={"issue": str(event.issue_number)},
-    )
+    config = OrchestraConfig.from_settings()
+    github_client = GitHubClient()
+    issue_data = github_client.view_issue(event.issue_number)
 
+    if issue_data is None or isinstance(issue_data, str):
+        logger.bind(
+            domain="manager_handler",
+            issue_number=event.issue_number,
+            error="issue_not_found",
+        ).error("Failed to fetch issue details from GitHub")
+        return
 
-def handle_manager_execution_completed(event: ManagerExecutionCompleted) -> None:
-    """Handle ManagerExecutionCompleted event.
+    issue_info = IssueInfo.from_github_payload(issue_data)
 
-    Logs manager execution completion and updates flow state.
-    """
-    logger.bind(
-        domain="events",
-        event="manager_execution_completed",
-        issue=event.issue_number,
-        branch=event.branch,
-    ).success("Manager execution completed")
+    if issue_info is None:
+        logger.bind(
+            domain="manager_handler",
+            issue_number=event.issue_number,
+            error="invalid_issue_data",
+        ).error("Failed to parse issue data from GitHub response")
+        return
 
-    # Record event in flow history
-    flow_service = FlowService()
-    flow_service.store.add_event(
-        event.branch,
-        "manager_completed",
-        event.actor,
-        detail=f"Manager completed processing issue #{event.issue_number}",
-        refs={"issue": str(event.issue_number)},
-    )
+    issue_info.state = IssueState.CLAIMED
+    manager_executor = ManagerExecutor(config)
 
+    try:
+        dispatch_result = manager_executor.dispatch_manager(issue_info)
 
-def handle_manager_flow_dispatched(event: ManagerFlowDispatched) -> None:
-    """Handle ManagerFlowDispatched event.
+        if dispatch_result:
+            logger.bind(
+                domain="manager_handler",
+                issue_number=event.issue_number,
+            ).success("Manager execution completed via domain event")
+        else:
+            logger.bind(
+                domain="manager_handler",
+                issue_number=event.issue_number,
+            ).warning("Manager dispatch returned False")
 
-    Logs flow dispatch and adds comment to issue.
-    """
-    logger.bind(
-        domain="events",
-        event="manager_flow_dispatched",
-        issue=event.issue_number,
-        branch=event.branch,
-        tmux=event.tmux_session,
-    ).info("Manager flow dispatched")
-
-    # Add comment to issue
-    GitHubClient().add_comment(
-        event.issue_number,
-        f"🚀 Manager dispatched flow to tmux session: `{event.tmux_session}`\n\n"
-        f"Branch: `{event.branch}`",
-    )
-
-
-def handle_manager_flow_queued(event: ManagerFlowQueued) -> None:
-    """Handle ManagerFlowQueued event.
-
-    Logs flow queue and adds comment to issue.
-    """
-    logger.bind(
-        domain="events",
-        event="manager_flow_queued",
-        issue=event.issue_number,
-        reason=event.reason,
-        active_flows=event.active_flows,
-        capacity=event.max_capacity,
-    ).warning("Manager flow queued due to capacity")
-
-    # Add comment to issue
-    GitHubClient().add_comment(
-        event.issue_number,
-        f"⏳ Flow queued due to capacity limit\n\n"
-        f"**Reason**: {event.reason}\n"
-        f"**Active flows**: {event.active_flows}/{event.max_capacity}\n\n"
-        f"Flow will be dispatched when capacity becomes available.",
-    )
+    except Exception as exc:
+        logger.bind(
+            domain="manager_handler",
+            issue_number=event.issue_number,
+        ).exception(f"Manager dispatch failed: {exc}")
 
 
 def register_manager_handlers() -> None:
@@ -115,21 +76,10 @@ def register_manager_handlers() -> None:
 
     from vibe3.domain.publisher import subscribe
 
+    # Subscribe to IssueStateChanged for manager trigger
     subscribe(
-        "ManagerExecutionStarted",
-        cast(Callable[[DomainEvent], None], handle_manager_execution_started),
-    )
-    subscribe(
-        "ManagerExecutionCompleted",
-        cast(Callable[[DomainEvent], None], handle_manager_execution_completed),
-    )
-    subscribe(
-        "ManagerFlowDispatched",
-        cast(Callable[[DomainEvent], None], handle_manager_flow_dispatched),
-    )
-    subscribe(
-        "ManagerFlowQueued",
-        cast(Callable[[DomainEvent], None], handle_manager_flow_queued),
+        "IssueStateChanged",
+        cast(Callable[[DomainEvent], None], handle_issue_state_changed_for_manager),
     )
 
     logger.bind(domain="events").info("Manager event handlers registered")

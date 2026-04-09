@@ -1,11 +1,11 @@
 """Tests for SessionRegistryService."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.services.session_registry import SessionRegistryService
+from vibe3.environment.session_registry import SessionRegistryService
 
 
 @pytest.fixture()
@@ -217,6 +217,39 @@ def test_count_live_worker_sessions_with_role_filter(
 
     count = registry.count_live_worker_sessions(role="executor")
     assert count == 1
+
+
+def test_reconcile_live_state_releases_supervisor_temp_worktree(
+    store: SQLiteClient, backend: MagicMock
+) -> None:
+    registry = SessionRegistryService(store=store, backend=backend)
+
+    store.create_runtime_session(
+        role="supervisor",
+        target_type="issue",
+        target_id="42",
+        branch="issue-42",
+        session_name="vibe3-supervisor-issue-42",
+        status="running",
+        tmux_session="vibe3-supervisor-issue-42",
+    )
+
+    backend.has_tmux_session.return_value = False
+
+    with (
+        patch("vibe3.models.orchestra_config.OrchestraConfig") as mock_config_cls,
+        patch("vibe3.clients.git_client.GitClient") as mock_git_cls,
+        patch("vibe3.environment.worktree.WorktreeManager") as mock_wt_cls,
+    ):
+        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_git_cls.return_value.get_git_common_dir.return_value = "/tmp/repo/.git"
+        mock_wt = MagicMock()
+        mock_wt_cls.return_value = mock_wt
+
+        orphaned = registry.reconcile_live_state()
+
+    assert len(orphaned) == 1
+    mock_wt.release_temporary_worktree.assert_called_once()
 
 
 def test_reconcile_live_state_marks_orphaned(

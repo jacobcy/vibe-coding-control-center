@@ -8,9 +8,6 @@ from typing import Protocol
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
-from vibe3.models.pr import PRResponse
-
 
 class IssueLabelPort(Protocol):
     """Port for issue label read/write operations."""
@@ -35,24 +32,6 @@ class IssueLabelPort(Protocol):
         description: str,
     ) -> bool:
         """Ensure a repository label exists."""
-        ...
-
-
-class PrStatePort(Protocol):
-    """Port for PR fact confirmation and transition operations."""
-
-    def get_pr(
-        self, pr_number: int | None = None, branch: str | None = None
-    ) -> PRResponse | None:
-        """Read PR fact by number or branch."""
-        ...
-
-    def mark_ready(self, pr_number: int) -> PRResponse:
-        """Mark PR ready for review."""
-        ...
-
-    def merge_pr(self, pr_number: int) -> PRResponse:
-        """Merge PR."""
         ...
 
 
@@ -161,21 +140,3 @@ class GhIssueLabelPort:
             logger.bind(external="github", label=label).warning("gh command not found")
             return False
         return result.returncode == 0
-
-
-class GitHubPrStatePort:
-    """Default PR state port backed by GitHubClient."""
-
-    def __init__(self, github_client: GitHubClient | None = None) -> None:
-        self.github_client = github_client or GitHubClient()
-
-    def get_pr(
-        self, pr_number: int | None = None, branch: str | None = None
-    ) -> PRResponse | None:
-        return self.github_client.get_pr(pr_number=pr_number, branch=branch)
-
-    def mark_ready(self, pr_number: int) -> PRResponse:
-        return self.github_client.mark_ready(pr_number)
-
-    def merge_pr(self, pr_number: int) -> PRResponse:
-        return self.github_client.merge_pr(pr_number)

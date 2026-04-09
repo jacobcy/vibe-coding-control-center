@@ -27,8 +27,8 @@ related_docs:
 ## 版本与依赖
 
 ### Python 版本
-- **最低版本**：Python 3.10+
-- **类型语法**：使用 Python 3.10+ 类型语法（`str | None` 而非 `Optional[str]`）
+- **最低版本**：Python 3.12+
+- **类型语法**：使用 Python 3.12+ 类型语法（`str | None` 而非 `Optional[str]`）
 
 ### 依赖管理（强制）
 
@@ -103,7 +103,7 @@ pip install requests
 
 **要求**：
 1. 所有公共函数必须有类型注解
-2. 使用 Python 3.10+ 类型语法
+2. 使用 Python 3.12+ 类型语法
 3. 禁止使用 `Any` 类型
 
 **示例**：

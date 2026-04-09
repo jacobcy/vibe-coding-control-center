@@ -111,6 +111,24 @@ class TestReadCurrentHandoff:
             handoff_service.read_current_handoff()
 
 
+class TestClearHandoffForBranch:
+    """Tests for clearing branch handoff history."""
+
+    def test_clear_handoff_for_branch_removes_directory(
+        self, handoff_service, temp_git_dir, mock_git_client
+    ):
+        mock_git_client.get_git_common_dir.return_value = str(temp_git_dir)
+        mock_git_client.get_current_branch.return_value = "task/issue-329"
+
+        handoff_path = handoff_service.ensure_current_handoff()
+        assert handoff_path.exists()
+
+        removed_dir = handoff_service.clear_handoff_for_branch("task/issue-329")
+
+        assert removed_dir == handoff_path.parent
+        assert not removed_dir.exists()
+
+
 class TestAppendCurrentHandoff:
     """Tests for append_current_handoff method."""
 

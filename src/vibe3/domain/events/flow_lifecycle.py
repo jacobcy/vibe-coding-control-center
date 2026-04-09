@@ -109,6 +109,19 @@ class PlanCompleted(DomainEvent):
 
 
 @dataclass(frozen=True)
+class ExecutionCompleted(DomainEvent):
+    """Execution phase completed event.
+
+    Published when executor completes successfully.
+    """
+
+    issue_number: int
+    branch: str
+    actor: str = "agent:executor"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
 class ReviewCompleted(DomainEvent):
     """Review phase completed event.
 
@@ -119,4 +132,54 @@ class ReviewCompleted(DomainEvent):
     branch: str
     verdict: str
     actor: str = "agent:review"
+    timestamp: str | None = None
+
+
+# Dispatch-intent events (authoritative dispatch signals)
+
+
+@dataclass(frozen=True)
+class PlannerDispatched(DomainEvent):
+    """Planner dispatch intent event.
+
+    Authoritative signal that planner should be dispatched for an issue.
+    Published by StateLabelDispatchService when trigger_name="plan".
+    """
+
+    issue_number: int
+    branch: str
+    trigger_state: str  # "claimed"
+    actor: str = "system:dispatcher"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ExecutorDispatched(DomainEvent):
+    """Executor dispatch intent event.
+
+    Authoritative signal that executor should be dispatched for an issue.
+    Published by StateLabelDispatchService when trigger_name="run".
+    """
+
+    issue_number: int
+    branch: str
+    trigger_state: str  # "in-progress"
+    plan_ref: str | None = None
+    actor: str = "system:dispatcher"
+    timestamp: str | None = None
+
+
+@dataclass(frozen=True)
+class ReviewerDispatched(DomainEvent):
+    """Reviewer dispatch intent event.
+
+    Authoritative signal that reviewer should be dispatched for an issue.
+    Published by StateLabelDispatchService when trigger_name="review".
+    """
+
+    issue_number: int
+    branch: str
+    trigger_state: str  # "review"
+    report_ref: str | None = None
+    actor: str = "system:dispatcher"
     timestamp: str | None = None
