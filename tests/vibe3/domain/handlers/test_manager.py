@@ -65,30 +65,38 @@ class TestManagerHandlerGuardLogic:
         # No services should be created for non-claimed states
         mock_config_cls.from_settings.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager._build_manager_executor")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.manager._build_manager_adapter")
     @patch("vibe3.domain.handlers.manager.OrchestraConfig")
     def test_processes_ready_state(
         self,
         mock_config_cls: MagicMock,
-        mock_build_executor: MagicMock,
+        mock_build_adapter: MagicMock,
+        mock_coordinator_cls: MagicMock,
     ) -> None:
         """Handler should process events with to_state='ready' via fast path."""
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
-        mock_executor = MagicMock()
-        mock_executor.dispatch_manager.return_value = True
-        mock_build_executor.return_value = mock_executor
+        mock_adapter = MagicMock()
+        mock_request = MagicMock()
+        mock_request.role = "manager"
+        mock_adapter.prepare_execution_request.return_value = mock_request
+        mock_build_adapter.return_value = mock_adapter
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = MagicMock(
+            launched=True, reason=None
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
         # Provide issue_title to use the fast path (no view_issue call)
         event = _make_event(to_state="ready", issue_title="Test issue")
 
         handle_issue_state_changed_for_manager(event)
 
-        mock_executor.dispatch_manager.assert_called_once()
-        dispatched_issue = mock_executor.dispatch_manager.call_args[0][0]
-        assert dispatched_issue.number == 42
-        assert dispatched_issue.state == IssueState.READY
+        mock_adapter.prepare_execution_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
 
 
 class TestManagerHandlerIssueFetching:
@@ -98,14 +106,14 @@ class TestManagerHandlerIssueFetching:
     (i.e., webhook-triggered events that don't carry the title).
     """
 
-    @patch("vibe3.domain.handlers.manager._build_manager_executor")
+    @patch("vibe3.domain.handlers.manager._build_manager_adapter")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.manager.OrchestraConfig")
     def test_records_failed_on_github_none(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_build_executor: MagicMock,
+        mock_build_adapter: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns None (slow path)."""
         mock_config_cls.from_settings.return_value = MagicMock()
@@ -119,16 +127,16 @@ class TestManagerHandlerIssueFetching:
         handle_issue_state_changed_for_manager(event)
 
         # Should NOT dispatch
-        mock_build_executor.return_value.dispatch_manager.assert_not_called()
+        mock_build_adapter.return_value.prepare_execution_request.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager._build_manager_executor")
+    @patch("vibe3.domain.handlers.manager._build_manager_adapter")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.manager.OrchestraConfig")
     def test_records_failed_on_network_error(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_build_executor: MagicMock,
+        mock_build_adapter: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GitHub returns network error
         (slow path)."""
@@ -141,16 +149,16 @@ class TestManagerHandlerIssueFetching:
         event = _make_event(issue_title=None)
         handle_issue_state_changed_for_manager(event)
 
-        mock_build_executor.return_value.dispatch_manager.assert_not_called()
+        mock_build_adapter.return_value.dispatch_manager.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager._build_manager_executor")
+    @patch("vibe3.domain.handlers.manager._build_manager_adapter")
     @patch("vibe3.clients.github_client.GitHubClient")
     @patch("vibe3.domain.handlers.manager.OrchestraConfig")
     def test_records_failed_on_invalid_issue_data(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_build_executor: MagicMock,
+        mock_build_adapter: MagicMock,
     ) -> None:
         """Handler should skip dispatch when from_github_payload returns
         None (slow path)."""
@@ -168,34 +176,44 @@ class TestManagerHandlerIssueFetching:
         ):
             handle_issue_state_changed_for_manager(event)
 
-        mock_build_executor.return_value.dispatch_manager.assert_not_called()
+        mock_build_adapter.return_value.prepare_execution_request.assert_not_called()
 
 
 class TestManagerHandlerDispatch:
     """Test ManagerExecutor dispatch via fast path (issue_title present)."""
 
-    @patch("vibe3.domain.handlers.manager._build_manager_executor")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.manager._build_manager_adapter")
     @patch("vibe3.domain.handlers.manager.OrchestraConfig")
     def test_dispatch_success(
         self,
         mock_config_cls: MagicMock,
-        mock_build_executor: MagicMock,
+        mock_build_adapter: MagicMock,
+        mock_coordinator_cls: MagicMock,
     ) -> None:
-        """Handler should call dispatch_manager with correct IssueInfo."""
+        """Handler should call prepare_execution_request with correct IssueInfo."""
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
-        mock_executor = MagicMock()
-        mock_executor.dispatch_manager.return_value = True
-        mock_build_executor.return_value = mock_executor
+        mock_adapter = MagicMock()
+        mock_request = MagicMock()
+        mock_request.role = "manager"
+        mock_adapter.prepare_execution_request.return_value = mock_request
+        mock_build_adapter.return_value = mock_adapter
+
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = MagicMock(
+            launched=True, reason=None
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
         event = _make_event(issue_title="Test issue")
 
         handle_issue_state_changed_for_manager(event)
 
-        # Verify dispatch was called with IssueInfo
-        mock_executor.dispatch_manager.assert_called_once()
-        dispatched_issue = mock_executor.dispatch_manager.call_args[0][0]
+        # Verify prepare_execution_request was called with IssueInfo
+        mock_adapter.prepare_execution_request.assert_called_once()
+        dispatched_issue = mock_adapter.prepare_execution_request.call_args[0][0]
         assert dispatched_issue.number == 42
         assert dispatched_issue.title == "Test issue"
         assert dispatched_issue.state == IssueState.READY

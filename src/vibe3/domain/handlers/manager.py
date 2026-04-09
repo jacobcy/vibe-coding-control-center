@@ -2,13 +2,12 @@
 
 import asyncio
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from loguru import logger
 
 from vibe3.domain.events import DomainEvent
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
@@ -28,21 +27,21 @@ def _resolve_repo_root() -> Path:
     return Path.cwd()
 
 
-def _build_manager_executor(config: OrchestraConfig) -> ManagerExecutor:
-    """Build a ManagerExecutor with a fully constructed SessionRegistryService.
+def _build_manager_adapter(config: OrchestraConfig) -> Any:
+    """Build a ManagerRoleAdapter for manager-specific requirements.
 
-    Creates fresh clients (SQLiteClient / CodeagentBackend / SessionRegistryService)
-    that all read from the shared on-disk state, so the handler is self-sufficient
-    without needing access to the server's shared singleton instances.
+    The adapter handles flow/worktree/command preparation,
+    while ExecutionCoordinator handles capacity/lifecycle/launch.
     """
     from vibe3.agents.backends.codeagent import CodeagentBackend
     from vibe3.clients.sqlite_client import SQLiteClient
     from vibe3.environment.session_registry import SessionRegistryService
+    from vibe3.execution.role_adapters import ManagerRoleAdapter
 
     store = SQLiteClient()
     backend = CodeagentBackend()
     registry = SessionRegistryService(store=store, backend=backend)
-    return ManagerExecutor(
+    return ManagerRoleAdapter(
         config,
         registry=registry,
         repo_path=_resolve_repo_root(),
@@ -120,23 +119,42 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
             ).error("Issue info is None, cannot dispatch manager")
             return
 
-        manager_executor = _build_manager_executor(config)
+        # Use unified ExecutionCoordinator path
+        from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.execution.coordinator import ExecutionCoordinator
+
+        manager_adapter = _build_manager_adapter(config)
+        store = SQLiteClient()
+        coordinator = ExecutionCoordinator(config, store)
 
         try:
-            dispatch_result = await loop.run_in_executor(
-                None, lambda: manager_executor.dispatch_manager(issue_info)
+            # Prepare manager-specific request
+            request = await loop.run_in_executor(
+                None, lambda: manager_adapter.prepare_execution_request(issue_info)
             )
 
-            if dispatch_result:
+            if request is None:
                 logger.bind(
                     domain="manager_handler",
                     issue_number=event.issue_number,
-                ).success("Manager execution completed via domain event")
+                ).error("Failed to prepare manager execution request")
+                return
+
+            # Dispatch via unified coordinator
+            result = await loop.run_in_executor(
+                None, lambda: coordinator.dispatch_execution(request)
+            )
+
+            if result.launched:
+                logger.bind(
+                    domain="manager_handler",
+                    issue_number=event.issue_number,
+                ).success("Manager execution launched via ExecutionCoordinator")
             else:
                 logger.bind(
                     domain="manager_handler",
                     issue_number=event.issue_number,
-                ).warning("Manager dispatch returned False")
+                ).warning(f"Manager dispatch failed: {result.reason}")
 
         except Exception as exc:
             logger.bind(
