@@ -25,6 +25,7 @@ from vibe3.domain.events.supervisor_apply import (
     SupervisorIssueIdentified,
     SupervisorPromptRendered,
 )
+from vibe3.domain.publisher import publish
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.supervisor_handoff import (
     SupervisorHandoffIssue,
@@ -36,7 +37,7 @@ from vibe3.services.capacity_service import CapacityService
 def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None:
     """Handle SupervisorIssueIdentified event.
 
-    Logs the detection of a governance issue requiring supervisor attention.
+    Promote identification into the actual apply-dispatch intent.
     """
     logger.bind(
         domain="events",
@@ -44,6 +45,15 @@ def handle_supervisor_issue_identified(event: SupervisorIssueIdentified) -> None
         issue=event.issue_number,
         supervisor=event.supervisor_file,
     ).info("Supervisor issue identified")
+
+    publish(
+        SupervisorApplyDispatched(
+            issue_number=event.issue_number,
+            tmux_session=f"vibe3-supervisor-issue-{event.issue_number}",
+            supervisor_file=event.supervisor_file,
+            actor="system:supervisor",
+        )
+    )
 
 
 def handle_supervisor_prompt_rendered(event: SupervisorPromptRendered) -> None:
@@ -94,14 +104,6 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
     # Mark in-flight
     capacity.mark_in_flight(role="supervisor", target_id=event.issue_number)
 
-    # Record execution started
-    lifecycle.record_started(
-        role="supervisor",
-        target=f"issue-{event.issue_number}",
-        actor="orchestra:supervisor",
-        refs={"issue_number": str(event.issue_number)},
-    )
-
     logger.bind(
         domain="supervisor_handler",
         issue=event.issue_number,
@@ -137,23 +139,34 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         # Dispatch handoff (sync method)
         handoff_service.dispatch_handoff(handoff_issue)
 
-        # Record completion
-        lifecycle.record_completed(
+        # Async wrapper has only been launched here; child apply execution remains
+        # responsible for terminal lifecycle events.
+        lifecycle.record_started(
             role="supervisor",
             target=f"issue-{event.issue_number}",
             actor="orchestra:supervisor",
-            detail=f"Supervisor handoff completed for issue #{event.issue_number}",
-            refs={"issue_number": str(event.issue_number)},
+            refs={
+                "issue_number": str(event.issue_number),
+                "tmux_session": event.tmux_session,
+            },
         )
 
-        # Add comment to issue
-        github.add_comment(
-            event.issue_number,
-            f"🔄 Supervisor apply agent dispatched\n\n"
-            f"**Supervisor file**: `{event.supervisor_file}`\n"
-            f"**Session**: `{event.tmux_session}`\n\n"
-            f"Apply agent will execute governance actions in an isolated worktree.",
-        )
+        try:
+            github.add_comment(
+                event.issue_number,
+                f"🔄 Supervisor apply agent dispatched\n\n"
+                f"**Supervisor file**: `{event.supervisor_file}`\n"
+                f"**Session**: `{event.tmux_session}`\n\n"
+                "Apply agent will execute governance actions in an isolated worktree.",
+            )
+        except Exception as comment_exc:
+            logger.bind(
+                domain="supervisor_handler",
+                issue=event.issue_number,
+            ).warning(
+                f"Supervisor dispatch launched but failed to post comment: "
+                f"{comment_exc}"
+            )
 
         logger.bind(
             domain="supervisor_handler",

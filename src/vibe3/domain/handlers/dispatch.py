@@ -51,14 +51,6 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
     store = SQLiteClient()
     lifecycle = ExecutionLifecycleService(store)
 
-    # Record execution started
-    lifecycle.record_started(
-        role="planner",
-        target=event.branch,
-        actor="orchestra:planner",
-        refs={"issue_number": str(event.issue_number)},
-    )
-
     try:
         # Build CLI command
         cli_entry = _current_cli_entry()
@@ -116,12 +108,12 @@ def handle_planner_dispatched(event: PlannerDispatched) -> None:
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
 
-        # Record completion
-        lifecycle.record_completed(
+        # Async wrapper has only been launched here; child CLI remains responsible
+        # for terminal lifecycle events when execution actually ends.
+        lifecycle.record_started(
             role="planner",
             target=event.branch,
             actor="orchestra:planner",
-            detail=f"Planner dispatched to tmux session {handle.tmux_session}",
             refs={
                 "issue_number": str(event.issue_number),
                 "tmux_session": handle.tmux_session,
@@ -167,17 +159,6 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
     lifecycle = ExecutionLifecycleService(store)
-
-    # Record execution started
-    lifecycle.record_started(
-        role="executor",
-        target=event.branch,
-        actor="orchestra:executor",
-        refs={
-            "issue_number": str(event.issue_number),
-            "plan_ref": event.plan_ref or "",
-        },
-    )
 
     try:
         # Build CLI command
@@ -239,12 +220,12 @@ def handle_executor_dispatched(event: ExecutorDispatched) -> None:
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
 
-        # Record completion
-        lifecycle.record_completed(
+        # Async wrapper has only been launched here; child CLI remains responsible
+        # for terminal lifecycle events when execution actually ends.
+        lifecycle.record_started(
             role="executor",
             target=event.branch,
             actor="orchestra:executor",
-            detail=f"Executor dispatched to tmux session {handle.tmux_session}",
             refs={
                 "issue_number": str(event.issue_number),
                 "tmux_session": handle.tmux_session,
@@ -294,17 +275,6 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
     lifecycle = ExecutionLifecycleService(store)
-
-    # Record execution started
-    lifecycle.record_started(
-        role="reviewer",
-        target=event.branch,
-        actor="orchestra:reviewer",
-        refs={
-            "issue_number": str(event.issue_number),
-            "report_ref": event.report_ref or "",
-        },
-    )
 
     try:
         # Build CLI command
@@ -366,12 +336,12 @@ def handle_reviewer_dispatched(event: ReviewerDispatched) -> None:
             env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
         )
 
-        # Record completion
-        lifecycle.record_completed(
+        # Async wrapper has only been launched here; child CLI remains responsible
+        # for terminal lifecycle events when execution actually ends.
+        lifecycle.record_started(
             role="reviewer",
             target=event.branch,
             actor="orchestra:reviewer",
-            detail=f"Reviewer dispatched to tmux session {handle.tmux_session}",
             refs={
                 "issue_number": str(event.issue_number),
                 "tmux_session": handle.tmux_session,

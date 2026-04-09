@@ -9,6 +9,7 @@ Usage Guide: docs/v3/architecture/infrastructure-guide.md#capacityservice
 from __future__ import annotations
 
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -46,6 +47,8 @@ class CapacityService:
             service.prune_in_flight("manager", {issue_number})
     """
 
+    _shared_in_flight_dispatches: dict[str, dict[str, set[int]]] = {}
+
     def __init__(
         self,
         config: OrchestraConfig,
@@ -63,8 +66,14 @@ class CapacityService:
         self._store = store
         self._backend = backend
         self._registry = SessionRegistryService(store, backend)
-        # Track in-flight dispatches per role
-        self._in_flight_dispatches: dict[str, set[int]] = defaultdict(set)
+        # Track in-flight dispatches per role, shared by the underlying handoff DB
+        # so separate handlers/ticks see the same dispatch truth.
+        shared_key = str(Path(store.db_path).resolve())
+        shared = self._shared_in_flight_dispatches.get(shared_key)
+        if shared is None:
+            shared = defaultdict(set)
+            self._shared_in_flight_dispatches[shared_key] = shared
+        self._in_flight_dispatches = shared
 
     def can_dispatch(self, role: str, target_id: int) -> bool:
         """Check if role can dispatch target given current capacity.

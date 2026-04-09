@@ -207,24 +207,77 @@ class StateLabelDispatchService(ServiceBase):
 
         for issue in ready:
             try:
-                # Domain-first: emit IssueStateChanged via facade.
+                # Domain-first: emit dispatch-intent event via facade.
+                # Each trigger emits its authoritative dispatch-intent event.
                 # Domain handlers handle dispatch, capacity, and lifecycle
                 # via unified ExecutionRolePolicyService / CapacityService /
                 # ExecutionLifecycleService — no direct dispatch here.
+
+                # Get branch for dispatch-intent events
+                flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
+                branch = str(flow.get("branch") or "").strip() if flow else ""
+
                 append_orchestra_event(
                     "dispatcher",
-                    f"{self.service_name} emitting domain event for #{issue.number}",
+                    f"{self.service_name} emitting dispatch-intent event "
+                    f"for #{issue.number}",
                     level="DEBUG",
                 )
-                self._facade.on_issue_state_changed(
-                    issue_info=issue,
-                    from_state=None,
-                )
+
+                # Emit trigger-specific dispatch-intent event
+                if self.trigger_name == "manager":
+                    # Manager uses IssueStateChanged for backward compatibility
+                    # with existing handlers that listen to this event
+                    self._facade.on_issue_state_changed(
+                        issue_info=issue,
+                        from_state=None,
+                    )
+                elif self.trigger_name == "plan":
+                    # Plan trigger emits PlannerDispatched
+                    self._facade.on_planner_dispatch(
+                        issue_info=issue,
+                        branch=branch,
+                    )
+                elif self.trigger_name == "run":
+                    # Run trigger emits ExecutorDispatched
+                    # Get plan_ref from flow_state if available
+                    plan_ref = None
+                    if branch:
+                        flow_state = self._store.get_flow_state(branch)
+                        plan_ref = flow_state.get("plan_ref") if flow_state else None
+
+                    self._facade.on_executor_dispatch(
+                        issue_info=issue,
+                        branch=branch,
+                        plan_ref=plan_ref,
+                    )
+                elif self.trigger_name == "review":
+                    # Review trigger emits ReviewerDispatched
+                    # Get report_ref from flow_state if available
+                    report_ref = None
+                    if branch:
+                        flow_state = self._store.get_flow_state(branch)
+                        report_ref = (
+                            flow_state.get("report_ref") if flow_state else None
+                        )
+
+                    self._facade.on_reviewer_dispatch(
+                        issue_info=issue,
+                        branch=branch,
+                        report_ref=report_ref,
+                    )
+                else:
+                    # Fallback to IssueStateChanged for unknown triggers
+                    self._facade.on_issue_state_changed(
+                        issue_info=issue,
+                        from_state=None,
+                    )
+
                 logger.bind(
                     domain="orchestra",
                     trigger=self.trigger_name,
                     issue=issue.number,
-                ).debug("Domain event emitted for issue, handler will dispatch")
+                ).debug("Dispatch-intent event emitted, handler will dispatch")
             except Exception as exc:
                 append_orchestra_event(
                     "dispatcher",

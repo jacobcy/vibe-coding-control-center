@@ -216,3 +216,20 @@ def test_mark_in_flight_separates_roles(
     assert 20 in service.in_flight_dispatches["planner"]
     assert 10 not in service.in_flight_dispatches.get("planner", set())
     assert 20 not in service.in_flight_dispatches.get("manager", set())
+
+
+def test_in_flight_is_shared_across_instances_for_same_db(
+    config: MagicMock,
+    store: SQLiteClient,
+    backend: MagicMock,
+) -> None:
+    """Multiple CapacityService instances over the same DB share in-flight truth."""
+    first = CapacityService(config, store, backend)
+    second = CapacityService(config, store, backend)
+
+    first.mark_in_flight("manager", 42)
+
+    assert 42 in second.in_flight_dispatches["manager"]
+
+    second.prune_in_flight("manager", {42})
+    assert 42 not in first.in_flight_dispatches["manager"]

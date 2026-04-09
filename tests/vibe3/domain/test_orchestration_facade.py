@@ -11,6 +11,7 @@ from vibe3.domain.events import (
 )
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.runtime.event_bus import GitHubEvent
 
 
 @pytest.fixture
@@ -27,6 +28,10 @@ def sample_issue_info() -> IssueInfo:
 
 class TestOrchestrationFacade:
     """Tests for OrchestrationFacade."""
+
+    def test_facade_subscribes_to_issue_events(self) -> None:
+        facade = OrchestrationFacade()
+        assert "issues" in facade.event_types
 
     @patch("vibe3.domain.orchestration_facade.publish")
     def test_on_issue_state_changed_emits_event(
@@ -123,3 +128,50 @@ class TestOrchestrationFacade:
                 event,
                 (IssueStateChanged, GovernanceScanStarted, GovernanceDecisionRequired),
             )
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    async def test_handle_event_converts_issue_payload_to_domain_event(
+        self,
+        mock_publish: MagicMock,
+    ) -> None:
+        facade = OrchestrationFacade()
+        event = GitHubEvent(
+            event_type="issues",
+            action="labeled",
+            payload={
+                "issue": {
+                    "number": 42,
+                    "title": "Test issue",
+                    "labels": [{"name": "state/claimed"}],
+                    "assignees": [],
+                }
+            },
+            source="webhook",
+        )
+
+        await facade.handle_event(event)
+
+        mock_publish.assert_called_once()
+        published = mock_publish.call_args.args[0]
+        assert isinstance(published, IssueStateChanged)
+        assert published.issue_number == 42
+        assert published.to_state == "claimed"
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    async def test_handle_event_ignores_non_issue_events(
+        self,
+        mock_publish: MagicMock,
+    ) -> None:
+        facade = OrchestrationFacade()
+        event = GitHubEvent(
+            event_type="issue_comment",
+            action="created",
+            payload={},
+            source="webhook",
+        )
+
+        await facade.handle_event(event)
+
+        mock_publish.assert_not_called()

@@ -83,8 +83,12 @@ class TestSupervisorApplyHandlerDispatch:
             role="supervisor",
             target="issue-42",
             actor="orchestra:supervisor",
-            refs={"issue_number": "42"},
+            refs={
+                "issue_number": "42",
+                "tmux_session": "vibe-supervisor-42",
+            },
         )
+        mock_lifecycle.record_completed.assert_not_called()
 
     @patch("vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService")
     @patch("vibe3.domain.handlers.supervisor_apply.CapacityService")
@@ -187,3 +191,39 @@ class TestSupervisorApplyHandlerDispatch:
 
         # Verify mark_in_flight was NOT called
         mock_capacity.mark_in_flight.assert_not_called()
+
+    @patch("vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService")
+    @patch("vibe3.domain.handlers.supervisor_apply.GitHubClient")
+    @patch("vibe3.domain.handlers.supervisor_apply.CapacityService")
+    @patch("vibe3.domain.handlers.supervisor_apply.ExecutionLifecycleService")
+    @patch("vibe3.domain.handlers.supervisor_apply.OrchestraConfig")
+    def test_comment_failure_does_not_mark_dispatch_failed(
+        self,
+        mock_config_cls: MagicMock,
+        mock_lifecycle_cls: MagicMock,
+        mock_capacity_cls: MagicMock,
+        mock_github_cls: MagicMock,
+        mock_supervisor_service_cls: MagicMock,
+    ) -> None:
+        """Post-launch comment failure should not rewrite lifecycle as failed."""
+        from vibe3.domain.handlers.supervisor_apply import (
+            handle_supervisor_apply_dispatched,
+        )
+
+        mock_config_cls.from_settings.return_value = MagicMock()
+        mock_lifecycle = MagicMock()
+        mock_lifecycle_cls.return_value = mock_lifecycle
+        mock_capacity = MagicMock()
+        mock_capacity.can_dispatch.return_value = True
+        mock_capacity_cls.return_value = mock_capacity
+        mock_github = MagicMock()
+        mock_github.add_comment.side_effect = RuntimeError("comment failed")
+        mock_github_cls.return_value = mock_github
+        mock_service = MagicMock()
+        mock_supervisor_service_cls.return_value = mock_service
+
+        handle_supervisor_apply_dispatched(_make_supervisor_apply_dispatched_event())
+
+        mock_service.dispatch_handoff.assert_called_once()
+        mock_lifecycle.record_started.assert_called_once()
+        mock_lifecycle.record_failed.assert_not_called()
