@@ -8,6 +8,8 @@ independent from the main L3 agent chain (Manager/Plan/Run/Review).
 Reference: docs/standards/vibe3-worktree-ownership-standard.md §二 (L2)
 """
 
+import asyncio
+import os
 from typing import Callable
 
 from loguru import logger
@@ -73,107 +75,113 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
 
     Triggers supervisor handoff execution via SupervisorHandoffService
     and ExecutionCoordinator. Uses unified infrastructure services.
+
+    Schedules the actual dispatch as an async task to avoid blocking the
+    event loop with synchronous I/O (build_handoff_payload, acquire_temporary_worktree,
+    and coordinator.dispatch_execution are all blocking operations).
     """
     logger.bind(
         domain="events",
         event="supervisor_apply_dispatched",
         issue=event.issue_number,
         tmux=event.tmux_session,
-    ).info("Supervisor apply dispatched")
+    ).info("Supervisor apply dispatched, scheduling async task")
 
-    config = OrchestraConfig.from_settings()
-    store = SQLiteClient()
+    def _dispatch_sync() -> None:
+        config = OrchestraConfig.from_settings()
+        store = SQLiteClient()
+        coordinator = ExecutionCoordinator(config, store)
+        github = GitHubClient()
+        handoff_service = SupervisorHandoffService.from_config(config)
 
-    coordinator = ExecutionCoordinator(config, store)
-    github = GitHubClient()
-    handoff_service = SupervisorHandoffService.from_config(config)
+        logger.bind(
+            domain="supervisor_handler",
+            issue=event.issue_number,
+        ).debug("Supervisor handler dispatching handoff via ExecutionCoordinator")
 
-    logger.bind(
-        domain="supervisor_handler",
-        issue=event.issue_number,
-    ).debug("Supervisor handler dispatching handoff via ExecutionCoordinator")
-
-    wt_context = None
-
-    try:
-        # Create handoff issue payload
-        handoff_issue = SupervisorHandoffIssue(
-            number=event.issue_number,
-            title=f"Supervisor handoff for issue #{event.issue_number}",
-        )
-
-        if config.dry_run:
-            logger.bind(domain="supervisor_handler").info(
-                "Dry run: skipping supervisor dispatch"
-            )
-            return
-
-        # Build payload (sync)
-        prompt, options, task = handoff_service.build_handoff_payload(handoff_issue)
-
-        wt_context = handoff_service.acquire_temporary_worktree(event.issue_number)
-
-        import os
-
-        request = ExecutionRequest(
-            role="supervisor",
-            target_branch=f"issue-{event.issue_number}",
-            target_id=event.issue_number,
-            execution_name=event.tmux_session,
-            prompt=prompt,
-            options=options,
-            cwd=str(wt_context.path),
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            refs={"task": task, "issue_number": str(event.issue_number)},
-            actor="orchestra:supervisor",
-            mode="async",
-        )
-
-        result = coordinator.dispatch_execution(request)
-
-        if not result.launched:
-            raise RuntimeError(
-                f"Failed to launch supervisor execution: {result.reason}"
-            )
+        wt_context = None
 
         try:
-            github.add_comment(
-                event.issue_number,
-                f"🔄 Supervisor apply agent dispatched\n\n"
-                f"**Supervisor file**: `{event.supervisor_file}`\n"
-                f"**Session**: `{result.tmux_session}`\n\n"
-                "Apply agent will execute governance actions in an isolated worktree.",
+            handoff_issue = SupervisorHandoffIssue(
+                number=event.issue_number,
+                title=f"Supervisor handoff for issue #{event.issue_number}",
             )
-        except Exception as comment_exc:
+
+            if config.dry_run:
+                logger.bind(domain="supervisor_handler").info(
+                    "Dry run: skipping supervisor dispatch"
+                )
+                return
+
+            prompt, options, task = handoff_service.build_handoff_payload(handoff_issue)
+            wt_context = handoff_service.acquire_temporary_worktree(event.issue_number)
+
+            request = ExecutionRequest(
+                role="supervisor",
+                target_branch=f"issue-{event.issue_number}",
+                target_id=event.issue_number,
+                execution_name=event.tmux_session,
+                prompt=prompt,
+                options=options,
+                cwd=str(wt_context.path),
+                env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+                refs={"task": task, "issue_number": str(event.issue_number)},
+                actor="orchestra:supervisor",
+                mode="async",
+            )
+
+            result = coordinator.dispatch_execution(request)
+
+            if not result.launched:
+                raise RuntimeError(
+                    f"Failed to launch supervisor execution: {result.reason}"
+                )
+
+            try:
+                github.add_comment(
+                    event.issue_number,
+                    f"🔄 Supervisor apply agent dispatched\n\n"
+                    f"**Supervisor file**: `{event.supervisor_file}`\n"
+                    f"**Session**: `{result.tmux_session}`\n\n"
+                    "Apply agent will execute governance actions "
+                    "in an isolated worktree.",
+                )
+            except Exception as comment_exc:
+                logger.bind(
+                    domain="supervisor_handler",
+                    issue=event.issue_number,
+                ).warning(
+                    f"Supervisor dispatch launched but failed to post comment: "
+                    f"{comment_exc}"
+                )
+
             logger.bind(
                 domain="supervisor_handler",
                 issue=event.issue_number,
-            ).warning(
-                f"Supervisor dispatch launched but failed to post comment: "
-                f"{comment_exc}"
-            )
+            ).success("Supervisor handoff completed successfully")
 
-        logger.bind(
-            domain="supervisor_handler",
-            issue=event.issue_number,
-        ).success("Supervisor handoff completed successfully")
+        except Exception as exc:
+            if wt_context:
+                handoff_service.release_temporary_worktree(event.issue_number)
 
-    except Exception as exc:
-        if wt_context:
-            handoff_service.release_temporary_worktree(event.issue_number)
+            logger.bind(
+                domain="supervisor_handler",
+                issue=event.issue_number,
+            ).exception(f"Supervisor handoff failed: {exc}")
 
-        logger.bind(
-            domain="supervisor_handler",
-            issue=event.issue_number,
-        ).exception(f"Supervisor handoff failed: {exc}")
+    async def _do_dispatch() -> None:
+        await asyncio.to_thread(_dispatch_sync)
 
-        # Note: If coordinator.dispatch_execution failed, it would have already
-        # recorded the failure lifecycle event. If build_handoff_payload
-        # failed before coordinator was called, we aren't tracking capacity.
-        # Coordinator handles checking and taking capacity.
-        # So we don't need to manually clean up capacity.
-
-        raise
+    try:
+        # Called from within heartbeat's async event loop — schedule as task.
+        loop = asyncio.get_running_loop()
+        loop.create_task(
+            _do_dispatch(),
+            name=f"supervisor-dispatch-{event.issue_number}",
+        )
+    except RuntimeError:
+        # No running loop (e.g. tests, direct CLI call) — safe to use asyncio.run().
+        asyncio.run(_do_dispatch())
 
 
 def handle_supervisor_apply_started(event: SupervisorApplyStarted) -> None:

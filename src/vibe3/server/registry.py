@@ -7,6 +7,7 @@ import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI
 from loguru import logger
@@ -22,7 +23,10 @@ from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.orchestra.services.state_label_dispatch import (
+    StateLabelDispatchService,
+    TriggerName,
+)
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
@@ -120,65 +124,37 @@ def _build_server_with_launch_cwd(
                 github=shared_github,
             )
         )
-    if config.state_label_dispatch.enabled:
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.READY,
-                trigger_name="manager",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.HANDOFF,
-                trigger_name="manager",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.CLAIMED,
-                trigger_name="plan",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.IN_PROGRESS,
-                trigger_name="run",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.REVIEW,
-                trigger_name="review",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
 
-    # Register OrchestrationFacade as primary domain-first entry point
-    facade = OrchestrationFacade()
+    # Build dispatch services for all trigger states.
+    # These are NOT registered directly with the heartbeat — instead they are
+    # passed to OrchestrationFacade and called concurrently from its on_tick(),
+    # reducing heartbeat services from 6 to 1 (the facade itself).
+    dispatch_services = []
+    if config.state_label_dispatch.enabled:
+        _trigger_map: list[tuple[IssueState, TriggerName]] = [
+            (IssueState.READY, "manager"),
+            (IssueState.HANDOFF, "manager"),
+            (IssueState.CLAIMED, "plan"),
+            (IssueState.IN_PROGRESS, "run"),
+            (IssueState.REVIEW, "review"),
+        ]
+        for trigger_state, trigger_name in _trigger_map:
+            dispatch_services.append(
+                StateLabelDispatchService(
+                    config,
+                    trigger_state=trigger_state,
+                    trigger_name=cast(TriggerName, trigger_name),
+                    manager=shared_manager,
+                    github=shared_github,
+                    executor=shared_executor,
+                    registry=shared_registry,
+                )
+            )
+
+    # Register OrchestrationFacade as the single domain-first
+    # heartbeat entry point. It incorporates governance scan,
+    # supervisor scan, and issue-label dispatch polling.
+    facade = OrchestrationFacade(dispatch_services=dispatch_services)
     heartbeat.register(facade)
 
     # GovernanceService and SupervisorHandoffService are no longer registered

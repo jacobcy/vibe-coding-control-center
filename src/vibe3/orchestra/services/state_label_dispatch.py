@@ -104,6 +104,7 @@ class StateLabelDispatchService(ServiceBase):
                     state="open",
                     assignee=None,
                     repo=self.config.repo,
+                    label=self.trigger_state.to_label(),
                 ),
             )
 

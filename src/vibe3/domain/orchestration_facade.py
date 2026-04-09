@@ -3,6 +3,10 @@
 将 runtime 层的观察转换为 domain events，由 domain handlers 处理具体链路逻辑。
 """
 
+import asyncio
+import time
+from collections.abc import Sequence
+
 from loguru import logger
 
 from vibe3.domain import publish
@@ -17,6 +21,7 @@ from vibe3.domain.events import (
 )
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
+from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 
@@ -33,24 +38,62 @@ class OrchestrationFacade(ServiceBase):
 
     event_types = ["issues"]
 
-    def __init__(self, tick_count: int = 0) -> None:
+    def __init__(
+        self,
+        tick_count: int = 0,
+        dispatch_services: Sequence[ServiceBase] | None = None,
+    ) -> None:
         """Initialize facade with tick counter.
 
         Args:
             tick_count: Initial tick count for governance scan tracking
+            dispatch_services: Optional list of issue-polling dispatch services
+                (StateLabelDispatchService instances). When provided, their
+                on_tick() methods are called concurrently from this facade's
+                on_tick(), replacing the need to register them separately in
+                the heartbeat server.
         """
         self._tick_count = tick_count
         self._config = OrchestraConfig.from_settings()
+        self._created_at = time.monotonic()
+        self._last_governance_started_at: float | None = None
+        self._dispatch_services = list(dispatch_services or [])
 
     async def on_tick(self) -> None:
-        """Heartbeat polling -> trigger governance scan.
+        """Heartbeat polling -> trigger governance scan and issue dispatch.
 
-        Called by runtime heartbeat periodically, triggering governance chain.
+        Called by runtime heartbeat periodically:
+        1. Emits GovernanceScanStarted for governance chain
+        2. Scans for supervisor candidates
+        3. Polls issue labels for all dispatch services (replaces separate
+           StateLabelDispatchService heartbeat registrations)
         """
         self.on_heartbeat_tick()
 
-        # Also scan for supervisor candidates
+        # Scan for supervisor candidates
         await self.on_supervisor_scan()
+
+        # Poll issue labels for all trigger states concurrently
+        if self._dispatch_services:
+            await self._run_dispatch_services()
+
+    async def _run_dispatch_services(self) -> None:
+        """Run all dispatch services and surface failures in orchestra logs."""
+        results = await asyncio.gather(
+            *(service.on_tick() for service in self._dispatch_services),
+            return_exceptions=True,
+        )
+        for service, result in zip(self._dispatch_services, results, strict=False):
+            if not isinstance(result, Exception):
+                continue
+            append_orchestra_event(
+                "server",
+                f"tick error in {service.service_name}: {result}",
+            )
+            logger.bind(
+                domain="orchestration_facade",
+                service=service.service_name,
+            ).error(f"Dispatch service tick failed: {result}")
 
     async def handle_event(self, event: GitHubEvent) -> None:
         """React to a GitHub event.
@@ -101,6 +144,7 @@ class OrchestrationFacade(ServiceBase):
             issue_number=issue_info.number,
             from_state=from_state,
             to_state=to_state,
+            issue_title=issue_info.title if issue_info.title else None,
         )
 
         logger.bind(
@@ -133,7 +177,22 @@ class OrchestrationFacade(ServiceBase):
             )
             return
 
+        min_interval_seconds = self._config.polling_interval * interval
+        now = time.monotonic()
+        last_started_at = self._last_governance_started_at or self._created_at
+        elapsed = now - last_started_at
+        if elapsed < min_interval_seconds:
+            logger.bind(
+                domain="orchestration_facade",
+                tick_count=self._tick_count,
+                interval=interval,
+                min_interval_seconds=min_interval_seconds,
+                elapsed_seconds=round(elapsed, 2),
+            ).debug("Skipping governance scan (min interval not reached)")
+            return
+
         event = GovernanceScanStarted(tick_count=self._tick_count)
+        self._last_governance_started_at = now
 
         logger.bind(
             domain="orchestration_facade",

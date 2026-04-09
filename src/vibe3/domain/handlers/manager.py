@@ -1,20 +1,66 @@
 """Event handlers for manager dispatch."""
 
+import asyncio
+from pathlib import Path
 from typing import Callable
 
 from loguru import logger
 
-from vibe3.clients.github_client import GitHubClient
 from vibe3.domain.events import DomainEvent
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
+_MANAGER_TRIGGER_STATES: frozenset[str] = frozenset({"ready", "handoff"})
+
+
+def _resolve_repo_root() -> Path:
+    """Resolve main repo root (git common-dir parent), same as server/registry.py."""
+    try:
+        from vibe3.clients.git_client import GitClient
+
+        git_common_dir = GitClient().get_git_common_dir()
+        if git_common_dir:
+            return Path(git_common_dir).parent
+    except Exception:
+        pass
+    return Path.cwd()
+
+
+def _build_manager_executor(config: OrchestraConfig) -> ManagerExecutor:
+    """Build a ManagerExecutor with a fully constructed SessionRegistryService.
+
+    Creates fresh clients (SQLiteClient / CodeagentBackend / SessionRegistryService)
+    that all read from the shared on-disk state, so the handler is self-sufficient
+    without needing access to the server's shared singleton instances.
+    """
+    from vibe3.agents.backends.codeagent import CodeagentBackend
+    from vibe3.clients.sqlite_client import SQLiteClient
+    from vibe3.environment.session_registry import SessionRegistryService
+
+    store = SQLiteClient()
+    backend = CodeagentBackend()
+    registry = SessionRegistryService(store=store, backend=backend)
+    return ManagerExecutor(
+        config,
+        registry=registry,
+        repo_path=_resolve_repo_root(),
+    )
+
 
 def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
-    """Dispatch manager when an issue enters claimed state."""
-    if event.to_state != "claimed":
+    """Dispatch manager when an issue enters a manager-consumable state.
+
+    Schedules the actual dispatch as an async task on the running event loop
+    to avoid blocking the loop with synchronous I/O (same pattern as
+    handle_governance_scan_started).
+
+    Uses issue_title carried in the event payload (populated by OrchestrationFacade
+    from the polling IssueInfo) to avoid a redundant view_issue GitHub API call.
+    Falls back to fetching from GitHub only when the title is absent (webhook path).
+    """
+    if event.to_state not in _MANAGER_TRIGGER_STATES:
         return
 
     logger.bind(
@@ -22,52 +68,92 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
         issue_number=event.issue_number,
         from_state=event.from_state,
         to_state=event.to_state,
-    ).info("Manager handler triggered for claimed issue")
+    ).info("Manager handler triggered, scheduling async dispatch")
 
-    config = OrchestraConfig.from_settings()
-    github_client = GitHubClient()
-    issue_data = github_client.view_issue(event.issue_number)
+    async def _do_dispatch() -> None:
+        loop = asyncio.get_event_loop()
+        config = OrchestraConfig.from_settings()
 
-    if issue_data is None or isinstance(issue_data, str):
-        logger.bind(
-            domain="manager_handler",
-            issue_number=event.issue_number,
-            error="issue_not_found",
-        ).error("Failed to fetch issue details from GitHub")
-        return
+        target_state = (
+            IssueState.READY if event.to_state == "ready" else IssueState.HANDOFF
+        )
 
-    issue_info = IssueInfo.from_github_payload(issue_data)
+        if event.issue_title is not None:
+            # Fast path: polling events carry the title → no GitHub API call needed.
+            issue_info: IssueInfo | None = IssueInfo(
+                number=event.issue_number,
+                title=event.issue_title,
+                state=target_state,
+            )
+        else:
+            # Slow path: webhook events don't carry the title → fetch from GitHub.
+            from vibe3.clients.github_client import GitHubClient
 
-    if issue_info is None:
-        logger.bind(
-            domain="manager_handler",
-            issue_number=event.issue_number,
-            error="invalid_issue_data",
-        ).error("Failed to parse issue data from GitHub response")
-        return
+            github_client = GitHubClient()
+            issue_data = await loop.run_in_executor(
+                None, lambda: github_client.view_issue(event.issue_number)
+            )
 
-    issue_info.state = IssueState.CLAIMED
-    manager_executor = ManagerExecutor(config)
+            if issue_data is None or isinstance(issue_data, str):
+                logger.bind(
+                    domain="manager_handler",
+                    issue_number=event.issue_number,
+                    error="issue_not_found",
+                ).error("Failed to fetch issue details from GitHub")
+                return
+
+            issue_info = IssueInfo.from_github_payload(issue_data)
+            if issue_info is None:
+                logger.bind(
+                    domain="manager_handler",
+                    issue_number=event.issue_number,
+                    error="invalid_issue_data",
+                ).error("Failed to parse issue data from GitHub response")
+                return
+
+            issue_info.state = target_state
+
+        if issue_info is None:
+            logger.bind(
+                domain="manager_handler",
+                issue_number=event.issue_number,
+            ).error("Issue info is None, cannot dispatch manager")
+            return
+
+        manager_executor = _build_manager_executor(config)
+
+        try:
+            dispatch_result = await loop.run_in_executor(
+                None, lambda: manager_executor.dispatch_manager(issue_info)
+            )
+
+            if dispatch_result:
+                logger.bind(
+                    domain="manager_handler",
+                    issue_number=event.issue_number,
+                ).success("Manager execution completed via domain event")
+            else:
+                logger.bind(
+                    domain="manager_handler",
+                    issue_number=event.issue_number,
+                ).warning("Manager dispatch returned False")
+
+        except Exception as exc:
+            logger.bind(
+                domain="manager_handler",
+                issue_number=event.issue_number,
+            ).exception(f"Manager dispatch failed: {exc}")
 
     try:
-        dispatch_result = manager_executor.dispatch_manager(issue_info)
-
-        if dispatch_result:
-            logger.bind(
-                domain="manager_handler",
-                issue_number=event.issue_number,
-            ).success("Manager execution completed via domain event")
-        else:
-            logger.bind(
-                domain="manager_handler",
-                issue_number=event.issue_number,
-            ).warning("Manager dispatch returned False")
-
-    except Exception as exc:
-        logger.bind(
-            domain="manager_handler",
-            issue_number=event.issue_number,
-        ).exception(f"Manager dispatch failed: {exc}")
+        # Called from within heartbeat's async event loop — schedule as task.
+        loop = asyncio.get_running_loop()
+        loop.create_task(
+            _do_dispatch(),
+            name=f"manager-dispatch-{event.issue_number}-{event.to_state}",
+        )
+    except RuntimeError:
+        # No running loop (e.g. tests, direct CLI call) — safe to use asyncio.run().
+        asyncio.run(_do_dispatch())
 
 
 def register_manager_handlers() -> None:

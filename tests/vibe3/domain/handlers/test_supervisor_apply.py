@@ -5,7 +5,10 @@ Tests cover:
 - ExecutionCoordinator dispatch
 """
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from vibe3.domain.events.supervisor_apply import SupervisorApplyDispatched
 from vibe3.execution.contracts import ExecutionLaunchResult
@@ -107,3 +110,24 @@ class TestSupervisorApplyHandlerDispatch:
 
         mock_service.build_handoff_payload.assert_not_called()
         mock_coordinator.dispatch_execution.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch(
+        "vibe3.domain.handlers.supervisor_apply.asyncio.to_thread",
+        new_callable=AsyncMock,
+    )
+    async def test_handler_uses_to_thread_when_loop_is_running(
+        self,
+        mock_to_thread: AsyncMock,
+    ) -> None:
+        """Handler should offload blocking supervisor dispatch to a worker thread."""
+        from vibe3.domain.handlers.supervisor_apply import (
+            handle_supervisor_apply_dispatched,
+        )
+
+        event = _make_supervisor_apply_dispatched_event()
+
+        handle_supervisor_apply_dispatched(event)
+        await asyncio.sleep(0)
+
+        mock_to_thread.assert_called_once()
