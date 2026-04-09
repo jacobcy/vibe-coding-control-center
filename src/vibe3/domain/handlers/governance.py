@@ -3,6 +3,7 @@
 Handlers for governance service and supervisor execution.
 """
 
+import asyncio
 from typing import Callable
 
 from loguru import logger
@@ -22,96 +23,34 @@ from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.services.capacity_service import CapacityService
 
 
-def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
-    """Handle GovernanceScanStarted event.
+async def _run_governance_scan_async(
+    governance_service: GovernanceService,
+    lifecycle: ExecutionLifecycleService,
+    capacity: CapacityService,
+    tick_count: int,
+) -> None:
+    """Run governance scan with unified lifecycle and capacity tracking.
 
-    Triggers governance scan execution via GovernanceService.
-    Uses unified infrastructure services for lifecycle and capacity.
+    Designed to be scheduled as an asyncio task from the sync handler,
+    so it never blocks the heartbeat event loop.
     """
-    logger.bind(
-        domain="events",
-        event="governance_scan_started",
-        tick=event.tick_count,
-    ).info("Governance scan started")
-
-    # Initialize unified infrastructure services
-    config = OrchestraConfig.from_settings()
-    store = SQLiteClient()
-
-    # Setup ExecutionLifecycleService for lifecycle recording
-    lifecycle = ExecutionLifecycleService(store)
-
-    # Setup CapacityService for capacity control
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-
-    backend = CodeagentBackend()
-    capacity = CapacityService(config, store, backend)
-
-    # Check capacity before dispatching
-    if not capacity.can_dispatch(role="governance", target_id=1):
-        logger.bind(
-            domain="governance_handler",
-            tick=event.tick_count,
-        ).info("Governance capacity full, skipping scan")
-        return
-
-    # Mark in-flight
-    capacity.mark_in_flight(role="governance", target_id=1)
-
-    # Record execution started
-    lifecycle.record_started(
-        role="governance",
-        target="governance_scan",
-        actor="orchestra:governance",
-        refs={},
-    )
-
-    logger.bind(
-        domain="governance_handler",
-        tick=event.tick_count,
-    ).debug("Governance handler dispatching scan via GovernanceService")
-
-    # Dispatch governance scan
     try:
-        # Initialize dependencies for GovernanceService
-        from vibe3.manager.manager_executor import ManagerExecutor
-        from vibe3.services.orchestra_status_service import OrchestraStatusService
+        await governance_service.run_scan()
 
-        github = GitHubClient()
-        manager = ManagerExecutor(config, dry_run=config.dry_run)
-        status_service = OrchestraStatusService(
-            config,
-            github=github,
-            orchestrator=manager.flow_manager,
-        )
-
-        governance_service = GovernanceService(
-            config,
-            status_service=status_service,
-            manager=manager,
-        )
-
-        # Run async scan in new event loop (avoids deprecation warning)
-        import asyncio
-
-        asyncio.run(governance_service.run_scan())
-
-        # Record completion
         lifecycle.record_completed(
             role="governance",
             target="governance_scan",
             actor="orchestra:governance",
-            detail=f"Governance scan completed for tick {event.tick_count}",
+            detail=f"Governance scan completed for tick {tick_count}",
             refs={},
         )
 
         logger.bind(
             domain="governance_handler",
-            tick=event.tick_count,
+            tick=tick_count,
         ).success("Governance scan completed successfully")
 
     except Exception as exc:
-        # Record failure
         lifecycle.record_failed(
             role="governance",
             target="governance_scan",
@@ -122,14 +61,87 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
 
         logger.bind(
             domain="governance_handler",
-            tick=event.tick_count,
+            tick=tick_count,
         ).exception(f"Governance scan failed: {exc}")
 
-        raise
-
     finally:
-        # Clear in-flight marker
         capacity.prune_in_flight(role="governance", target_ids={1})
+
+
+def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
+    """Handle GovernanceScanStarted event.
+
+    Triggers governance scan execution via GovernanceService.
+    Uses unified infrastructure services for lifecycle and capacity.
+
+    Schedules the async scan as a task on the running event loop to avoid
+    calling asyncio.run() inside an already-running loop (heartbeat context).
+    """
+    logger.bind(
+        domain="events",
+        event="governance_scan_started",
+        tick=event.tick_count,
+    ).info("Governance scan started")
+
+    # Initialize unified infrastructure services
+    config = OrchestraConfig.from_settings()
+    store = SQLiteClient()
+    lifecycle = ExecutionLifecycleService(store)
+
+    from vibe3.agents.backends.codeagent import CodeagentBackend
+
+    backend = CodeagentBackend()
+    capacity = CapacityService(config, store, backend)
+
+    # Capacity check (sync, before scheduling any async work)
+    if not capacity.can_dispatch(role="governance", target_id=1):
+        logger.bind(
+            domain="governance_handler",
+            tick=event.tick_count,
+        ).info("Governance capacity full, skipping scan")
+        return
+
+    capacity.mark_in_flight(role="governance", target_id=1)
+
+    lifecycle.record_started(
+        role="governance",
+        target="governance_scan",
+        actor="orchestra:governance",
+        refs={},
+    )
+
+    logger.bind(
+        domain="governance_handler",
+        tick=event.tick_count,
+    ).debug("Governance handler scheduling scan via GovernanceService")
+
+    from vibe3.manager.manager_executor import ManagerExecutor
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+    github = GitHubClient()
+    manager = ManagerExecutor(config, dry_run=config.dry_run)
+    status_service = OrchestraStatusService(
+        config,
+        github=github,
+        orchestrator=manager.flow_manager,
+    )
+    governance_service = GovernanceService(
+        config,
+        status_service=status_service,
+        manager=manager,
+    )
+
+    coro = _run_governance_scan_async(
+        governance_service, lifecycle, capacity, event.tick_count
+    )
+
+    try:
+        # Called from within heartbeat's async event loop — schedule as task.
+        loop = asyncio.get_running_loop()
+        loop.create_task(coro, name=f"governance-scan-tick-{event.tick_count}")
+    except RuntimeError:
+        # No running loop (e.g. tests, direct CLI call) — safe to use asyncio.run().
+        asyncio.run(coro)
 
 
 def handle_governance_scan_completed(event: GovernanceScanCompleted) -> None:

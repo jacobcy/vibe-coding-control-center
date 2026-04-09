@@ -199,9 +199,13 @@ class TestGovernanceService:
         )
 
     @pytest.mark.asyncio
-    async def test_on_tick_skips_when_existing_governance_session(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_on_tick_is_stub_does_not_dispatch(self, tmp_path, monkeypatch):
+        """on_tick() is a stub and must NOT call start_async or _run_governance.
+
+        Governance skipping when a live session exists is now handled by
+        CapacityService in the domain handler (GovernanceScanStarted).
+        on_tick() only increments the tick counter and logs — no dispatch.
+        """
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -220,8 +224,19 @@ class TestGovernanceService:
             manager=_make_dispatcher(repo_path=tmp_path),
             backend=backend,
         )
-        monkeypatch.setattr(service, "_has_live_dispatch", lambda: True)
+
+        run_called = {"count": 0}
+
+        async def fake_run() -> None:
+            run_called["count"] += 1
+
+        monkeypatch.setattr(service, "_run_governance", fake_run)
 
         await service.on_tick()
 
+        # Domain-first: on_tick() is a stub — must NOT dispatch
+        assert run_called["count"] == 0, (
+            "on_tick() should not dispatch directly. "
+            "Governance is triggered via OrchestrationFacade -> GovernanceScanStarted."
+        )
         backend.start_async.assert_not_called()

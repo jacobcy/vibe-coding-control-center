@@ -12,33 +12,25 @@ Usage Guide: docs/v3/architecture/infrastructure-guide.md
 from __future__ import annotations
 
 import asyncio
-import os
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.execution_lifecycle import persist_execution_lifecycle_event
 from vibe3.agents.execution_role_policy import ExecutionRolePolicyService
-from vibe3.agents.review_runner import format_agent_actor
-from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
-from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import (
     IssueInfo,
     IssueState,
 )
-from vibe3.models.review_runner import AgentOptions
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
-from vibe3.runtime.no_progress_policy import snapshot_progress
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -51,16 +43,6 @@ _TRIGGER_STATUS_FIELD: dict[TriggerName, str | None] = {
     "plan": "planner_status",
     "run": "executor_status",
     "review": "reviewer_status",
-}
-
-_TRIGGER_EXECUTION_ROLE: dict[
-    TriggerName,
-    Literal["planner", "executor", "reviewer"] | None,
-] = {
-    "manager": None,
-    "plan": "planner",
-    "run": "executor",
-    "review": "reviewer",
 }
 
 # Map trigger_name to registry role for live session queries
@@ -86,16 +68,6 @@ def _normalize_labels(raw_labels: object) -> list[str]:
 
 def _is_auto_task_branch(branch: str) -> bool:
     return branch.startswith("task/issue-")
-
-
-def _current_cli_entry() -> str:
-    """Return the canonical CLI entry from the current baseline worktree."""
-    return str(Path(__file__).resolve().parents[4] / "src" / "vibe3" / "cli.py")
-
-
-def _current_repo_root() -> str:
-    """Return the canonical repository root for uv project resolution."""
-    return str(Path(__file__).resolve().parents[4])
 
 
 class StateLabelDispatchService(ServiceBase):
@@ -133,7 +105,6 @@ class StateLabelDispatchService(ServiceBase):
         self._registry = registry
         self._policy_service = ExecutionRolePolicyService(config)
         self._dispatch_guard = asyncio.Lock()
-        self._progress_snapshots: dict[int, dict[str, object]] = {}
         self._facade = OrchestrationFacade()  # Domain-first entry point
 
     async def handle_event(self, event: GitHubEvent) -> None:
@@ -152,7 +123,6 @@ class StateLabelDispatchService(ServiceBase):
                 ),
             )
 
-            self._prune_in_flight(raw_issues)
             ready = self._select_ready_issues(raw_issues)
             ready_count = len(ready)
 
@@ -237,82 +207,35 @@ class StateLabelDispatchService(ServiceBase):
 
         for issue in ready:
             try:
-                # Domain-first: emit event via facade
-                # This triggers domain handlers which will dispatch
-                # via unified framework
+                # Domain-first: emit IssueStateChanged via facade.
+                # Domain handlers handle dispatch, capacity, and lifecycle
+                # via unified ExecutionRolePolicyService / CapacityService /
+                # ExecutionLifecycleService — no direct dispatch here.
+                append_orchestra_event(
+                    "dispatcher",
+                    f"{self.service_name} emitting domain event for #{issue.number}",
+                    level="DEBUG",
+                )
                 self._facade.on_issue_state_changed(
                     issue_info=issue,
-                    from_state=None,  # Unknown previous state
+                    from_state=None,
                 )
-
-                # TODO: Remove legacy dispatch after domain handler migration complete
-                # The above facade call should be sufficient once domain handlers
-                # are fully wired to CapacityService and ExecutionLifecycleService
                 logger.bind(
                     domain="orchestra",
                     trigger=self.trigger_name,
                     issue=issue.number,
-                ).warning(
-                    "Using legacy dispatch path. "
-                    "Domain handlers should handle dispatch via facade events."
-                )
-
-                # DEBUG: dispatching attempt
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} dispatching #{issue.number}",
-                    level="DEBUG",
-                )
-                await asyncio.get_event_loop().run_in_executor(
-                    self._executor,
-                    self._dispatch_issue,
-                    issue,
-                )
+                ).debug("Domain event emitted for issue, handler will dispatch")
             except Exception as exc:
                 append_orchestra_event(
                     "dispatcher",
-                    f"{self.service_name} dispatch failed for #{issue.number}: {exc}",
+                    f"{self.service_name} failed to emit event "
+                    f"for #{issue.number}: {exc}",
                 )
                 logger.bind(
                     domain="orchestra",
                     trigger=self.trigger_name,
                     issue=issue.number,
                 ).warning(f"State dispatch failed: {exc}")
-
-    def _prune_in_flight(self, raw_issues: list[dict[str, object]]) -> None:
-        """Prune progress snapshots for issues that have left the trigger state.
-
-        This method no longer manages in-flight dispatches
-        (CapacityService handles that).
-        It only cleans up progress snapshots for issues that have
-        transitioned away from the trigger state.
-        """
-        states_by_issue = {
-            item["number"]: _normalize_labels(item.get("labels"))
-            for item in raw_issues
-            if isinstance(item.get("number"), int)
-        }
-
-        # Clean up progress snapshots for issues that have left the trigger state
-        stale_snapshots: set[int] = set()
-        for issue_number in list(self._progress_snapshots.keys()):
-            labels = states_by_issue.get(issue_number, [])
-
-            # If issue no longer has the trigger label, remove snapshot
-            if self.trigger_state.to_label() not in labels:
-                stale_snapshots.add(issue_number)
-                continue
-
-            # If issue was closed, remove snapshot
-            issue_state = next(
-                (item for item in raw_issues if item.get("number") == issue_number),
-                None,
-            )
-            if issue_state and issue_state.get("state") == "closed":
-                stale_snapshots.add(issue_number)
-
-        for issue_number in stale_snapshots:
-            self._progress_snapshots.pop(issue_number, None)
 
     def _select_ready_issues(
         self, raw_issues: list[dict[str, object]]
@@ -397,187 +320,6 @@ class StateLabelDispatchService(ServiceBase):
             and not flow_state.get("audit_ref")
             and not has_live_session
         )
-
-    def _dispatch_issue(self, issue: IssueInfo) -> None:
-        # Capture before snapshot for progress detection (unified for all triggers)
-        flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
-        branch = str(flow.get("branch") or "").strip() if flow else ""
-        before_snapshot = snapshot_progress(
-            issue_number=issue.number,
-            branch=branch,
-            store=self._store,
-            github=self._github,
-            repo=self.config.repo,
-        )
-        self._progress_snapshots[issue.number] = before_snapshot
-
-        if self.trigger_name == "manager":
-            dispatched = self._manager.dispatch_manager(issue)
-            if not dispatched:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} deferred #{issue.number} (dispatch rejected)",
-                )
-                self._progress_snapshots.pop(issue.number, None)
-            else:
-                append_orchestra_event(
-                    "dispatcher",
-                    f"{self.service_name} started #{issue.number}",
-                )
-            return
-
-        if not flow:
-            raise RuntimeError(f"No task flow for issue #{issue.number}")
-        if not branch:
-            raise RuntimeError(f"Flow branch missing for issue #{issue.number}")
-        if self.trigger_name != "manager" and not _is_auto_task_branch(branch):
-            raise RuntimeError(
-                f"State trigger only supports canonical task scenes, got '{branch}'"
-            )
-
-        cwd = self._resolve_cwd(issue.number, branch)
-        handle = self._backend.start_async_command(
-            self._build_command(issue.number),
-            execution_name=f"vibe3-{self.trigger_name}-issue-{issue.number}",
-            cwd=cwd,
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-        )
-        refs = {
-            "issue": str(issue.number),
-            "tmux_session": handle.tmux_session,
-            "log_path": str(handle.log_path),
-            "state": self.trigger_state.value,
-        }
-        actor = format_agent_actor(self._resolve_agent_options())
-        execution_role = _TRIGGER_EXECUTION_ROLE[self.trigger_name]
-        if execution_role is not None:
-            persist_execution_lifecycle_event(
-                self._store,
-                branch,
-                execution_role,
-                "started",
-                actor,
-                detail=(
-                    f"Started async {self.trigger_name} for issue #{issue.number} "
-                    f"in tmux session: {handle.tmux_session}"
-                ),
-                refs=refs,
-                extra_state_updates={"latest_actor": actor},
-            )
-        else:
-            self._store.update_flow_state(branch, latest_actor=actor)
-        if execution_role is None:
-            self._store.add_event(
-                branch,
-                f"{self.trigger_name}_dispatched",
-                "orchestra:state-trigger",
-                detail=(
-                    f"Triggered {self.trigger_name} for issue #{issue.number} "
-                    f"from {self.trigger_state.to_label()}"
-                ),
-                refs=refs,
-            )
-        # INFO: issue started
-        append_orchestra_event(
-            "dispatcher",
-            f"{self.service_name} started #{issue.number}",
-        )
-        # DEBUG: session and log details
-        append_orchestra_event(
-            "dispatcher",
-            (
-                f"{self.service_name} issue #{issue.number} "
-                f"(session={handle.tmux_session}, log={handle.log_path})"
-            ),
-            level="DEBUG",
-        )
-
-    def _resolve_cwd(self, issue_number: int, branch: str) -> Path:
-        repo_root = getattr(self._manager, "repo_path", None)
-        if not isinstance(repo_root, Path):
-            repo_root = Path(GitClient().get_git_common_dir()).parent
-        cwd, _ = WorktreeManager(self.config, repo_root).resolve_manager_cwd(
-            issue_number,
-            branch,
-        )
-        return cwd or repo_root
-
-    def _build_command(self, issue_number: int) -> list[str]:
-        cli_entry = _current_cli_entry()
-        if self.trigger_name == "plan":
-            return [
-                "uv",
-                "run",
-                "--project",
-                _current_repo_root(),
-                "python",
-                "-I",
-                cli_entry,
-                "plan",
-                "--issue",
-                str(issue_number),
-                "--no-async",
-            ]
-        if self.trigger_name == "manager":
-            # 彻底走向新的 internal 路由
-            return [
-                "uv",
-                "run",
-                "--project",
-                _current_repo_root(),
-                "python",
-                "-I",
-                cli_entry,
-                "internal",
-                "manager",
-                str(issue_number),
-                "--no-async",
-            ]
-        if self.trigger_name == "run":
-            return [
-                "uv",
-                "run",
-                "--project",
-                _current_repo_root(),
-                "python",
-                "-I",
-                cli_entry,
-                "run",
-                "--no-async",
-            ]
-        return [
-            "uv",
-            "run",
-            "--project",
-            _current_repo_root(),
-            "python",
-            "-I",
-            cli_entry,
-            "review",
-            "base",
-            "--no-async",
-        ]
-
-    def _resolve_agent_options(self) -> AgentOptions:
-        """Resolve agent options using ExecutionRolePolicyService."""
-        role = _TRIGGER_TO_REGISTRY_ROLE.get(self.trigger_name, self.trigger_name)
-        return self._policy_service.resolve_agent_options(role)
-
-    def _resolve_execution_config(
-        self, role: str
-    ) -> tuple[str, str, Literal["tmux", "inline", "async"]]:
-        """Resolve execution config for a role using ExecutionRolePolicyService.
-
-        Args:
-            role: Execution role (planner/executor/reviewer)
-
-        Returns:
-            Tuple of (backend, prompt_template, session_mode)
-        """
-        backend = self._policy_service.resolve_backend(role)
-        prompt_contract = self._policy_service.resolve_prompt_contract(role)
-        session_strategy = self._policy_service.resolve_session_strategy(role)
-        return (backend, prompt_contract.template, session_strategy.mode)
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         if self._registry is None:

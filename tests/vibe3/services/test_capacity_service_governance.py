@@ -37,12 +37,6 @@ def config() -> MagicMock:
     cfg.max_concurrent_flows = 3  # default for manager
     cfg.governance_max_concurrent = 1
     cfg.supervisor_max_concurrent = 2
-    # Mock __getattr__ to return these values
-    cfg.__getattr__ = lambda name: {
-        "max_concurrent_flows": 3,
-        "governance_max_concurrent": 1,
-        "supervisor_max_concurrent": 2,
-    }.get(name)
     return cfg
 
 

@@ -63,6 +63,9 @@ class TestSupervisorApplyHandlerDispatch:
         )
 
         mock_config = MagicMock()
+        mock_config.max_concurrent_flows = 3
+        mock_config.supervisor_max_concurrent = 2
+        mock_config.governance_max_concurrent = 1
         mock_config_cls.from_settings.return_value = mock_config
 
         mock_lifecycle = MagicMock()

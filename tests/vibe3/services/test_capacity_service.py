@@ -27,6 +27,8 @@ def backend() -> MagicMock:
 def config() -> MagicMock:
     cfg = MagicMock(spec=OrchestraConfig)
     cfg.max_concurrent_flows = 3
+    cfg.governance_max_concurrent = 1
+    cfg.supervisor_max_concurrent = 2
     return cfg
 
 

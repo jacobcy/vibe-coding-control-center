@@ -23,10 +23,8 @@ from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
-from vibe3.orchestra.services.supervisor_handoff import SupervisorHandoffService
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
@@ -207,26 +205,12 @@ def _build_server_with_launch_cwd(
     facade = OrchestrationFacade()
     heartbeat.register(facade)
 
-    if config.governance.enabled:
-        heartbeat.register(
-            GovernanceService(
-                config,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-    if config.supervisor_handoff.enabled:
-        heartbeat.register(
-            SupervisorHandoffService(
-                config,
-                github=shared_github,
-                status_service=status_service,
-                manager=shared_manager,
-                executor=shared_executor,
-            )
-        )
+    # GovernanceService and SupervisorHandoffService are no longer registered
+    # directly to the heartbeat. Their on_tick() methods were stubs delegating
+    # to domain handlers. Governance scans are now triggered via:
+    #   OrchestrationFacade.on_tick() -> GovernanceScanStarted event
+    #   -> governance domain handler -> GovernanceService.run_scan()
+    # Supervisor handoff follows the same domain-event-driven path.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

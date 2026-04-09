@@ -81,21 +81,6 @@ class SupervisorHandoffService(ServiceBase):
     async def handle_event(self, event: GitHubEvent) -> None:
         return
 
-    async def on_tick(self) -> None:
-        """Periodic handoff issue scan (emits events via facade).
-
-        Note: Capacity and lifecycle tracking are now handled by domain
-        handlers using unified infrastructure services (CapacityService,
-        ExecutionLifecycleService).
-        """
-        # Supervisor handoff is now triggered by domain events
-        # (e.g., SupervisorApplyDispatched event from OrchestrationFacade)
-        # This on_tick method is kept for backward compatibility
-        # but should be removed after full migration to domain-first architecture
-        logger.bind(domain="orchestra").debug(
-            "Supervisor handoff service on_tick (delegated to domain handlers)"
-        )
-
     def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
         raw = self._github.list_issues(
             limit=100,
@@ -122,10 +107,6 @@ class SupervisorHandoffService(ServiceBase):
                 )
             )
         return candidates
-
-    def _process_issue(self, issue: SupervisorHandoffIssue) -> None:
-        """Internal method for processing handoff issues (legacy on_tick path)."""
-        self.dispatch_handoff(issue)
 
     def dispatch_handoff(self, issue: SupervisorHandoffIssue) -> None:
         """Dispatch supervisor handoff execution (callable from domain handlers).

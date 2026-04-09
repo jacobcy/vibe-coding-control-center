@@ -109,25 +109,6 @@ class GovernanceService(ServiceBase):
     async def handle_event(self, event: GitHubEvent) -> None:
         pass
 
-    async def on_tick(self) -> None:
-        """Periodic governance tick (emits GovernanceScanStarted event via facade).
-
-        Note: Capacity and lifecycle tracking are now handled by domain
-        handlers using unified infrastructure services (CapacityService,
-        ExecutionLifecycleService).
-        """
-        self._tick_count += 1
-        if self._tick_count % self.config.governance.interval_ticks != 0:
-            return
-
-        log = logger.bind(domain="orchestra", action="governance")
-        log.info(f"Governance tick #{self._tick_count}")
-
-        # Governance scan is now triggered by OrchestrationFacade.on_tick()
-        # which emits GovernanceScanStarted event, handled by domain handlers
-        # This service's on_tick is kept for backward compatibility
-        # but should be removed after full migration to domain-first architecture
-
     async def run_once(self) -> None:
         """Run governance exactly once for manual debugging."""
         await self._run_governance()
@@ -179,9 +160,7 @@ class GovernanceService(ServiceBase):
             # Clean up reserved session on dispatch failure
             if self._registry is not None and session_id is not None:
                 self._registry.mark_failed(session_id)
-            self._in_flight = False
             raise
-        self._in_flight = True
         if self._registry is not None and session_id is not None:
             self._registry.mark_started(session_id, tmux_session=handle.tmux_session)
         log.info(

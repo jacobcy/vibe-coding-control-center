@@ -275,10 +275,18 @@ class TestGovernanceService:
         assert dispatcher.method_calls == []
 
     @pytest.mark.asyncio
-    async def test_on_tick_runs_on_interval_and_respects_dry_run(
+    async def test_on_tick_is_stub_does_not_call_run_governance(
         self, monkeypatch, tmp_path
     ):
-        """Governance runs on interval and uses governance.dry_run."""
+        """GovernanceService.on_tick() is now a stub delegating to domain handlers.
+
+        Governance scans are triggered by:
+          OrchestrationFacade.on_tick() -> GovernanceScanStarted event
+          -> governance domain handler -> GovernanceService.run_scan()
+
+        on_tick() must NOT call _run_governance() directly to avoid
+        bypassing the unified CapacityService / ExecutionLifecycleService.
+        """
         snapshot = OrchestraSnapshot(
             timestamp=0.0,
             server_running=True,
@@ -296,8 +304,7 @@ class TestGovernanceService:
             manager=_make_dispatcher(),
         )
         service._manager.repo_path = tmp_path
-        # Force tick boundary
-        service._tick_count = 1
+        service._tick_count = 1  # At tick boundary
 
         called = {"count": 0}
 
@@ -307,4 +314,8 @@ class TestGovernanceService:
         monkeypatch.setattr(service, "_run_governance", fake_run)
 
         await service.on_tick()
-        assert called["count"] == 1
+        # Domain-first: on_tick() is a stub and must NOT call _run_governance()
+        assert called["count"] == 0, (
+            "on_tick() should not dispatch directly. "
+            "Governance is now triggered via OrchestrationFacade -> domain events."
+        )
