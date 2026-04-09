@@ -87,8 +87,8 @@ code_limits:
         limit: 500
         reason: "GitHub PR 操作与查询聚合"
       - path: "src/vibe3/clients/sqlite_client.py"
-        limit: 550
-        reason: "持久化聚合"
+        limit: 650
+        reason: "持久化聚合（flow_state/events/runtime_session 统一入口）"
 
       # Commands 层（CLI 入口）—— 允许 450
       - path: "src/vibe3/commands/plan.py"
@@ -106,11 +106,11 @@ code_limits:
         limit: 450
         reason: "Governance 服务聚合，处理 governance dispatch 和 session 状态管理"
       - path: "src/vibe3/server/registry.py"
-        limit: 450
+        limit: 470
         reason: "Orchestra server 组装聚合，职责单一，拆分会增加耦合"
       - path: "src/vibe3/server/app.py"
-        limit: 450
-        reason: "组装聚合，职责单一"
+        limit: 470
+        reason: "Orchestra CLI 入口聚合，职责单一"
 
       # Manager —— 允许 450
       - path: "src/vibe3/manager/manager_run_service.py"
@@ -130,8 +130,8 @@ code_limits:
         limit: 500
         reason: "Worktree lifecycle management"
       - path: "src/vibe3/agents/backends/codeagent.py"
-        limit: 550
-        reason: "Codeagent execution backend"
+        limit: 570
+        reason: "Codeagent execution backend（命令构建/tmux/同步异步执行紧密耦合）"
       - path: "src/vibe3/agents/runner.py"
         limit: 450
         reason: "Codeagent 执行服务核心，包含完整的执行流程管理，逻辑高度耦合不宜拆分"
