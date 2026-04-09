@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
 
-from vibe3.environment.worktree_manager_compat import ManagerCompatMixin
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
@@ -28,7 +27,7 @@ class WorktreeContext:
     issue_number: Optional[int] = None  # For tracking temporary worktrees
 
 
-class WorktreeManager(ManagerCompatMixin):
+class WorktreeManager:
     """Unified manager for issue worktrees (L3) and temporary worktrees (L2).
 
     This manager is the SINGLE AUTHORITY for worktree allocation in vibe3.
@@ -56,7 +55,6 @@ class WorktreeManager(ManagerCompatMixin):
         self.config = config
         self.repo_path = repo_path
         self.flow_manager = flow_manager
-        self._capability_cache: dict[Path, bool] = {}
 
     # --- Issue Worktree Methods (L3) ---
 
@@ -183,6 +181,107 @@ class WorktreeManager(ManagerCompatMixin):
             issue=context.issue_number,
         )
         self._recycle_worktree_path(context.path)
+
+    # --- Manager Execution Compatibility ---
+
+    def resolve_manager_cwd(
+        self,
+        issue_number: int,
+        flow_branch: str,
+    ) -> tuple[Optional[Path], bool]:
+        """Resolve manager cwd using canonical worktree ownership."""
+        try:
+            ctx = self.acquire_issue_worktree(issue_number, flow_branch)
+            return ctx.path, False
+        except Exception:
+            return None, False
+
+    def _resolve_manager_cwd(
+        self,
+        issue_number: int,
+        flow_branch: str,
+    ) -> tuple[Optional[Path], bool]:
+        """Resolve manager cwd for role execution."""
+        if self._is_current_branch(flow_branch):
+            return self.repo_path, False
+
+        existing = self._find_worktree_for_branch(flow_branch)
+        if existing:
+            return existing, False
+
+        return self.resolve_manager_cwd(issue_number, flow_branch)
+
+    def align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:
+        """Align auto task scenes to configured base ref when safe."""
+        if not flow_branch.startswith("task/issue-"):
+            return True
+
+        base_ref = str(getattr(self.config, "scene_base_ref", "origin/main") or "")
+        if not base_ref.strip():
+            return True
+
+        try:
+            result = subprocess.run(
+                ["git", "log", "--oneline", "-n", "1", flow_branch],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            has_commits = result.returncode == 0 and bool(result.stdout.strip())
+        except Exception:
+            has_commits = False
+
+        commands = [["git", "fetch", "--all", "--prune"]]
+        if not has_commits:
+            commands.extend(
+                [
+                    ["git", "checkout", flow_branch],
+                    ["git", "reset", "--hard", base_ref],
+                    ["git", "clean", "-fd"],
+                ]
+            )
+        else:
+            logger.info(
+                "Skipping destructive alignment for existing task branch with commits",
+                branch=flow_branch,
+                cwd=str(cwd),
+            )
+
+        for cmd in commands:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to align auto scene: {exc}",
+                    branch=flow_branch,
+                    cwd=str(cwd),
+                    base_ref=base_ref,
+                )
+                return False
+            if result.returncode != 0:
+                logger.warning(
+                    "Failed to align auto scene to base ref: "
+                    f"{(result.stderr or result.stdout).strip()}",
+                    branch=flow_branch,
+                    cwd=str(cwd),
+                    base_ref=base_ref,
+                )
+                return False
+
+        logger.info(
+            "Aligned auto scene to configured base ref",
+            branch=flow_branch,
+            cwd=str(cwd),
+            base_ref=base_ref,
+        )
+        return True
 
     # --- Internal Implementation ---
 
@@ -463,3 +562,19 @@ class WorktreeManager(ManagerCompatMixin):
                     return current_path
 
         return None
+
+    def _is_current_branch(self, branch: str) -> bool:
+        """Check whether repo_path currently points at the target branch."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except Exception:
+            return False
+        if result.returncode != 0:
+            return False
+        return result.stdout.strip() == branch

@@ -12,8 +12,6 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
     append_governance_event,
@@ -39,7 +37,7 @@ from vibe3.services.orchestra_status_service import (
 )
 
 if TYPE_CHECKING:
-    from vibe3.manager.manager_executor import ManagerExecutor
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 # Runtime variable keys that come from the snapshot (resolved as providers).
 _GOVERNANCE_RUNTIME_VARS = (
@@ -79,34 +77,58 @@ class GovernanceService(ServiceBase):
         self,
         config: OrchestraConfig,
         status_service: OrchestraStatusService,
-        manager: ManagerExecutor | None = None,
+        manager: Any | None = None,
+        repo_path: Path | None = None,
         executor: ThreadPoolExecutor | None = None,
         prompts_path: Path | None = None,
-        backend: CodeagentBackend | None = None,
-        registry: SessionRegistryService | None = None,
     ) -> None:
         self.config = config
         self._status_service = status_service
-        if manager is None:
-            from vibe3.manager.manager_executor import (
-                ManagerExecutor as _ManagerExecutor,
-            )
-
-            manager = _ManagerExecutor(config, dry_run=config.dry_run)
-        self._manager = manager
+        self._repo_path = (
+            repo_path
+            or getattr(manager, "repo_path", None)
+            or self._resolve_repo_path()
+        )
         self._executor = executor or ThreadPoolExecutor(max_workers=1)
-        self._tick_count = 0
         self._supervisor_file = config.governance.supervisor_file
         self._prompt_template = config.governance.prompt_template
         self._include_supervisor_content = config.governance.include_supervisor_content
         self._dry_run = config.governance.dry_run
         self._prompts_path = prompts_path or DEFAULT_PROMPTS_PATH
-        self._backend = backend or CodeagentBackend()
-        self._registry = registry
         self.last_render_result: PromptRenderResult | None = None
+
+    @classmethod
+    def from_config(
+        cls,
+        config: OrchestraConfig,
+        *,
+        repo_path: Path | None = None,
+        executor: ThreadPoolExecutor | None = None,
+        prompts_path: Path | None = None,
+    ) -> GovernanceService:
+        """Build a governance service with default read-model dependencies."""
+        from vibe3.manager.flow_manager import FlowManager
+        from vibe3.services.orchestra_status_service import OrchestraStatusService
+
+        flow_manager = FlowManager(config)
+        status_service = OrchestraStatusService(config, orchestrator=flow_manager)
+        return cls(
+            config=config,
+            status_service=status_service,
+            repo_path=repo_path,
+            executor=executor,
+            prompts_path=prompts_path,
+        )
 
     async def handle_event(self, event: GitHubEvent) -> None:
         pass
+
+    @staticmethod
+    def _resolve_repo_path() -> Path:
+        from vibe3.clients.git_client import GitClient
+
+        git_common_dir = GitClient().get_git_common_dir()
+        return Path(git_common_dir).parent if git_common_dir else Path.cwd()
 
     def render_current_plan(self) -> str:
         """Render governance plan from the current live snapshot."""
@@ -178,7 +200,7 @@ class GovernanceService(ServiceBase):
         return result.rendered_text
 
     def _write_dry_run_plan(self, plan_content: str) -> Path:
-        output_dir = governance_dry_run_dir(self._manager.repo_path)
+        output_dir = governance_dry_run_dir(self._repo_path)
         with tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".md",
@@ -220,14 +242,14 @@ class GovernanceService(ServiceBase):
         log.info(f"Dry run plan file: {plan_path}")
         append_governance_event(
             f"dry-run plan written: {plan_path}",
-            repo_root=self._manager.repo_path,
+            repo_root=self._repo_path,
         )
         log.info("Dry run rendered governance plan:")
         log.info(f"\n{plan_content}")
 
-    def _governance_execution_name(self) -> str:
+    def build_execution_name(self, tick_count: int) -> str:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        return f"vibe3-governance-scan-{timestamp}-t{self._tick_count}"
+        return f"vibe3-governance-scan-{timestamp}-t{tick_count}"
 
     def _build_prompt_context(self, snapshot: OrchestraSnapshot) -> dict[str, Any]:
         active_entries = snapshot.active_issues

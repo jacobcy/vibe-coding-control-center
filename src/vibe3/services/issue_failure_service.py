@@ -100,10 +100,6 @@ def resume_failed_issue_to_handoff(
     )
 
 
-# Backward compatibility alias
-recover_failed_issue_to_handoff = resume_failed_issue_to_handoff
-
-
 def resume_failed_issue_to_ready(
     *,
     issue_number: int,

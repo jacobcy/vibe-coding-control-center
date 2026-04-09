@@ -10,13 +10,11 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.manager.command_builder import CommandBuilder
 from vibe3.manager.flow_manager import FlowManager
-from vibe3.manager.result_handler import DispatchResultHandler
 from vibe3.manager.session_naming import get_manager_session_name
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.models.orchestration import IssueInfo
 from vibe3.runtime.circuit_breaker import CircuitBreaker
-from vibe3.runtime.executor import run_command
-from vibe3.services.orchestra_status_service import OrchestraStatusService
+from vibe3.services.issue_failure_service import fail_manager_issue
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
@@ -44,10 +42,6 @@ class ManagerExecutor:
             config, self.repo_path, self._flow_manager
         )
         self.command_builder = CommandBuilder(config, prompts_path=prompts_path)
-        self.result_handler = DispatchResultHandler(config, self._flow_manager)
-        self.status_service = OrchestraStatusService(
-            config, orchestrator=self._flow_manager
-        )
         self._backend = CodeagentBackend()
 
         self._registry = registry
@@ -60,8 +54,6 @@ class ManagerExecutor:
                 half_open_max_tests=config.circuit_breaker.half_open_max_tests,
             )
 
-        self._last_error_category: str | None = None
-        self._queued_issues: set[int] = set()
         self._active_dispatch_locks: set[int] = set()
 
     @property
@@ -73,20 +65,8 @@ class ManagerExecutor:
         self._flow_manager = value
 
     @property
-    def queued_issues(self) -> set[int]:
-        return self._queued_issues
-
-    @property
     def last_manager_render_result(self) -> "PromptRenderResult | None":
         return self.command_builder.last_manager_render_result
-
-    def _run_command(self, cmd: list[str], cwd: Path, label: str) -> bool:
-        """Execute a command via the dispatcher machinery."""
-        success, category = run_command(
-            cmd, cwd, label, circuit_breaker=self._circuit_breaker
-        )
-        self._last_error_category = category
-        return success
 
     def _mark_manager_start_failed(self, issue: IssueInfo, reason: str) -> None:
         """Record a manager startup failure as state/failed.
@@ -94,11 +74,11 @@ class ManagerExecutor:
         Also marks the flow as stale so the issue can be re-dispatched
         after the failure is resolved.
         """
-        self.result_handler.post_failure_comment(
-            issue.number,
-            f"Manager 启动失败，已切换为 state/failed。\n\n原因：{reason}",
+        fail_manager_issue(
+            issue_number=issue.number,
+            reason=f"Manager 启动失败: {reason}",
+            actor="orchestra:manager",
         )
-        self.result_handler.update_state_label(issue.number, IssueState.FAILED)
         # Release the flow lock so issue can be re-dispatched after recovery
         try:
             flow = self._flow_manager.get_flow_for_issue(issue.number)
@@ -248,69 +228,10 @@ class ManagerExecutor:
             log.error(f"Dispatch failed: {exc}")
             self._mark_manager_start_failed(issue, str(exc))
             return False
-        finally:
-            # Note: worktree cleanup is best-effort, handled by recycle logic if needed
-            pass
-
-    def dispatch_pr_review(self, pr_number: int) -> bool:
-        """Complete lifecycle for PR review dispatch with queuing."""
-        log = logger.bind(
-            domain="orchestra",
-            action="review_dispatch",
-            pr_number=pr_number,
-        )
-
-        active_count = self.status_service.get_active_flow_count()
-        capacity = self.config.max_concurrent_flows
-
-        if active_count >= capacity:
-            log.warning(
-                f"Throttled: Capacity reached ({active_count}/{capacity}). "
-                f"Queueing review for #{pr_number}"
-            )
-            # Use negative numbers for PRs in queue
-            self._queued_issues.add(-pr_number)
-            return False
-
-        self._queued_issues.discard(-pr_number)
-
-        cmd = self.command_builder.build_pr_review_command(pr_number)
-
-        review_cwd = self._resolve_review_cwd_for_dispatch(pr_number)
-
-        log.info(f"Dispatching review: {' '.join(cmd)} (cwd={review_cwd})")
-
-        if self.dry_run:
-            log.info("Dry run, skipping execution")
-            return True
-
-        return self._run_command(cmd, review_cwd, "Review execution")
-
-    def _resolve_review_cwd_for_dispatch(self, pr_number: int) -> Path:
-        """Helper to resolve PR review cwd based on config."""
-        if self.config.pr_review_dispatch.use_worktree:
-            return self.repo_path
-        return self._resolve_review_cwd(pr_number)
 
     def _resolve_cli_entry(self) -> Path:
         """Return the canonical CLI entry in the current baseline worktree."""
         return (self.repo_path / "src" / "vibe3" / "cli.py").resolve()
-
-    def _should_recycle(self, issue_number: int) -> bool:
-        """Decide if we should recycle the worktree now."""
-        try:
-            from vibe3.services.label_service import LabelService
-
-            state = LabelService(repo=self.config.repo).get_state(issue_number)
-            return state not in {
-                IssueState.CLAIMED,
-                IssueState.IN_PROGRESS,
-                IssueState.HANDOFF,
-                IssueState.REVIEW,
-                IssueState.MERGE_READY,
-            }
-        except Exception:
-            return False
 
     # --- Methods that delegate to worktree_manager, allowing subclass override ---
 
@@ -318,14 +239,3 @@ class ManagerExecutor:
         self, issue_number: int, flow_branch: str
     ) -> tuple[Path | None, bool]:
         return self.worktree_manager._resolve_manager_cwd(issue_number, flow_branch)
-
-    def _normalize_manager_command(self, cmd: list[str], cwd: Path) -> list[str]:
-        return self.worktree_manager._normalize_manager_command(cmd, cwd)
-
-    def _ensure_manager_worktree(
-        self, issue_number: int, branch: str
-    ) -> tuple[Path | None, bool]:
-        return self.worktree_manager._ensure_manager_worktree(issue_number, branch)
-
-    def _resolve_review_cwd(self, pr_number: int) -> Path:
-        return self.worktree_manager._resolve_review_cwd(pr_number)

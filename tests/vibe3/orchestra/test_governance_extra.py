@@ -130,7 +130,6 @@ class TestGovernanceService:
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=True)),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=MagicMock(),
         )
 
         prompt, options, task = await service.build_governance_execution_payload()
@@ -159,7 +158,6 @@ class TestGovernanceService:
             config=OrchestraConfig(governance=GovernanceConfig(dry_run=False)),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=MagicMock(),
         )
 
         prompt, options, task = await service.build_governance_execution_payload()
@@ -190,7 +188,6 @@ class TestGovernanceService:
             ),
             status_service=MockStatusService(snapshot),
             manager=_make_dispatcher(repo_path=tmp_path),
-            backend=MagicMock(),
         )
 
         run_called = {"count": 0}

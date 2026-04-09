@@ -13,14 +13,16 @@ from vibe3.execution.contracts import ExecutionLaunchResult
 class TestPlannerDispatchHandler:
     """Planner dispatch should invoke ExecutionCoordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.ManagerExecutor")
+    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
+    @patch("vibe3.domain.handlers.dispatch.FlowManager")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
     def test_planner_async_launch(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_manager_cls: MagicMock,
+        mock_flow_manager_cls: MagicMock,
+        mock_worktree_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_planner_dispatched
 
@@ -31,10 +33,13 @@ class TestPlannerDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        mock_manager = MagicMock()
-        mock_manager.flow_manager.get_flow_for_issue.return_value = None
-        mock_manager._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_manager_cls.return_value = mock_manager
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.get_flow_for_issue.return_value = None
+        mock_flow_manager_cls.return_value = mock_flow_manager
+
+        mock_worktree = MagicMock()
+        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
+        mock_worktree_cls.return_value = mock_worktree
 
         handle_planner_dispatched(
             PlannerDispatched(
@@ -60,14 +65,16 @@ class TestPlannerDispatchHandler:
 class TestExecutorDispatchHandler:
     """Executor dispatch should invoke ExecutionCoordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.ManagerExecutor")
+    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
+    @patch("vibe3.domain.handlers.dispatch.FlowManager")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
     def test_executor_async_launch(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_manager_cls: MagicMock,
+        mock_flow_manager_cls: MagicMock,
+        mock_worktree_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_executor_dispatched
 
@@ -80,10 +87,13 @@ class TestExecutorDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        mock_manager = MagicMock()
-        mock_manager.flow_manager.get_flow_for_issue.return_value = None
-        mock_manager._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_manager_cls.return_value = mock_manager
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.get_flow_for_issue.return_value = None
+        mock_flow_manager_cls.return_value = mock_flow_manager
+
+        mock_worktree = MagicMock()
+        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
+        mock_worktree_cls.return_value = mock_worktree
 
         handle_executor_dispatched(
             ExecutorDispatched(
@@ -111,14 +121,16 @@ class TestExecutorDispatchHandler:
 class TestReviewerDispatchHandler:
     """Reviewer dispatch should invoke ExecutionCoordinator."""
 
-    @patch("vibe3.domain.handlers.dispatch.ManagerExecutor")
+    @patch("vibe3.domain.handlers.dispatch.WorktreeManager")
+    @patch("vibe3.domain.handlers.dispatch.FlowManager")
     @patch("vibe3.domain.handlers.dispatch.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.dispatch.OrchestraConfig")
     def test_reviewer_async_launch(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_manager_cls: MagicMock,
+        mock_flow_manager_cls: MagicMock,
+        mock_worktree_cls: MagicMock,
     ) -> None:
         from vibe3.domain.handlers.dispatch import handle_reviewer_dispatched
 
@@ -131,10 +143,13 @@ class TestReviewerDispatchHandler:
         )
         mock_coordinator_cls.return_value = mock_coordinator
 
-        mock_manager = MagicMock()
-        mock_manager.flow_manager.get_flow_for_issue.return_value = None
-        mock_manager._resolve_manager_cwd.return_value = ("/tmp/wt", None)
-        mock_manager_cls.return_value = mock_manager
+        mock_flow_manager = MagicMock()
+        mock_flow_manager.get_flow_for_issue.return_value = None
+        mock_flow_manager_cls.return_value = mock_flow_manager
+
+        mock_worktree = MagicMock()
+        mock_worktree._resolve_manager_cwd.return_value = ("/tmp/wt", None)
+        mock_worktree_cls.return_value = mock_worktree
 
         handle_reviewer_dispatched(
             ReviewerDispatched(

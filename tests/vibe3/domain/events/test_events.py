@@ -5,7 +5,6 @@ from vibe3.domain.events.flow_lifecycle import (
     PlanCompleted,
     ReviewCompleted,
 )
-from vibe3.domain.events.manager import ManagerFlowDispatched
 
 
 def test_execution_completed_event_structure() -> None:
@@ -60,18 +59,3 @@ def test_review_completed_event_structure() -> None:
     assert event.branch == "task/issue-42"
     assert event.verdict == "approved"
     assert event.actor == "agent:review"
-
-
-def test_manager_flow_dispatched_event_structure() -> None:
-    """Test ManagerFlowDispatched event has correct structure."""
-    event = ManagerFlowDispatched(
-        issue_number=42,
-        branch="task/issue-42",
-        tmux_session="vibe3-manager-42",
-        actor="agent:manager",
-    )
-
-    assert event.issue_number == 42
-    assert event.branch == "task/issue-42"
-    assert event.tmux_session == "vibe3-manager-42"
-    assert event.actor == "agent:manager"

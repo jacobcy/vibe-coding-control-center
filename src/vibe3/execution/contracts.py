@@ -20,6 +20,7 @@ class ExecutionRequest:
     refs: Dict[str, str] = field(default_factory=dict)
     actor: str = "orchestra:system"
     mode: Literal["sync", "async"] = "async"
+    dry_run: bool = False
 
 
 @dataclass

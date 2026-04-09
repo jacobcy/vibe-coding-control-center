@@ -1,7 +1,7 @@
-"""Orchestra - GitHub assignee-driven agent orchestration.
+"""Orchestra - GitHub event-driven orchestration shell.
 
 Primary entry point: HeartbeatServer (vibe3 serve start)
-  - AssigneeDispatchService: dispatches manager on issues/assigned webhook
+  - StateLabelDispatchService: emits domain dispatch intents from issue states
   - CommentReplyService: acknowledges @vibe-manager-agent (or configured) mentions
   - Polling fallback every 15 min via on_tick()
 """

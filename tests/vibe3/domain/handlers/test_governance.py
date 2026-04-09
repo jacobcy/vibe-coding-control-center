@@ -22,14 +22,14 @@ def _make_governance_scan_started_event(
 class TestGovernanceHandlerScanStarted:
     """Test GovernanceScanStarted event handling."""
 
-    @patch("vibe3.domain.handlers.governance.GovernanceService")
+    @patch("vibe3.domain.handlers.governance.GovernanceService.from_config")
     @patch("vibe3.domain.handlers.governance.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.governance.OrchestraConfig")
     def test_handler_calls_coordinator_dispatch(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_governance_service_cls: MagicMock,
+        mock_service_factory: MagicMock,
     ) -> None:
         """Handler should call ExecutionCoordinator.dispatch_execution()."""
         from vibe3.domain.handlers.governance import handle_governance_scan_started
@@ -44,14 +44,14 @@ class TestGovernanceHandlerScanStarted:
         mock_coordinator_cls.return_value = mock_coordinator
 
         mock_service = MagicMock()
-        mock_service._governance_execution_name.return_value = "vibe3-gov-scan"
+        mock_service.build_execution_name.return_value = "vibe3-gov-scan"
 
         # Async mock for build_governance_execution_payload
         async def mock_payload():
             return "test prompt", {"agent": "claude"}, "test task"
 
         mock_service.build_governance_execution_payload.side_effect = mock_payload
-        mock_governance_service_cls.return_value = mock_service
+        mock_service_factory.return_value = mock_service
 
         event = _make_governance_scan_started_event()
 
@@ -74,14 +74,14 @@ class TestGovernanceHandlerScanStarted:
         assert request.refs["task"] == "test task"
         assert request.mode == "async"
 
-    @patch("vibe3.domain.handlers.governance.GovernanceService")
+    @patch("vibe3.domain.handlers.governance.GovernanceService.from_config")
     @patch("vibe3.domain.handlers.governance.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.governance.OrchestraConfig")
     def test_handler_skips_when_no_payload(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_governance_service_cls: MagicMock,
+        mock_service_factory: MagicMock,
     ) -> None:
         """Handler should skip dispatch when GovernanceService returns empty payload."""
         from vibe3.domain.handlers.governance import handle_governance_scan_started
@@ -99,7 +99,7 @@ class TestGovernanceHandlerScanStarted:
             return None, None, ""
 
         mock_service.build_governance_execution_payload.side_effect = mock_payload
-        mock_governance_service_cls.return_value = mock_service
+        mock_service_factory.return_value = mock_service
 
         event = _make_governance_scan_started_event()
 

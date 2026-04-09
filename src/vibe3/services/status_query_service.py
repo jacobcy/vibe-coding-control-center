@@ -373,27 +373,3 @@ class StatusQueryService:
                         resumable.append({**issue, "resume_kind": "aborted"})
 
         return resumable
-
-    def fetch_failed_resume_candidates(
-        self,
-        flows: list[FlowStatusResponse],
-    ) -> list[dict[str, object]]:
-        """Fetch open issues with state/failed label for resume candidates.
-
-        DEPRECATED: Use fetch_resume_candidates() instead.
-
-        This method is kept for backward compatibility and filters
-        fetch_resume_candidates() results for FAILED state only.
-
-        Args:
-            flows: Active flow status responses to cross-reference
-
-        Returns:
-            List of failed issue dicts with number, title, state, flow, failed_reason
-        """
-        candidates = self.fetch_resume_candidates(flows, stale_flows=[])
-        return [
-            candidate
-            for candidate in candidates
-            if candidate.get("resume_kind") == "failed"
-        ]

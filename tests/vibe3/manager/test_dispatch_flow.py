@@ -120,30 +120,29 @@ class TestManagerDispatchIntegration:
                     "align_auto_scene_to_base",
                     return_value=True,
                 ):
-                    with patch.object(manager.result_handler, "update_state_label"):
-                        with patch.object(
-                            manager.flow_manager.store,
-                            "add_event",
-                            return_value=None,
-                        ) as mock_add_event:
-                            handle = AsyncExecutionHandle(
-                                tmux_session="vibe3-manager-102",
-                                log_path=Path("temp/logs/vibe3-manager-102.async.log"),
-                                prompt_file_path=Path("/tmp/prompt.md"),
-                            )
-                            mock_backend = MagicMock()
-                            start_async_command = mock_backend.start_async_command
-                            start_async_command.return_value = handle
-                            manager._backend = mock_backend
+                    with patch.object(
+                        manager.flow_manager.store,
+                        "add_event",
+                        return_value=None,
+                    ) as mock_add_event:
+                        handle = AsyncExecutionHandle(
+                            tmux_session="vibe3-manager-102",
+                            log_path=Path("temp/logs/vibe3-manager-102.async.log"),
+                            prompt_file_path=Path("/tmp/prompt.md"),
+                        )
+                        mock_backend = MagicMock()
+                        start_async_command = mock_backend.start_async_command
+                        start_async_command.return_value = handle
+                        manager._backend = mock_backend
 
-                            # Mock agent options resolution
-                            with patch(
-                                "vibe3.runtime.agent_resolver.resolve_manager_agent_options"
-                            ) as mock_resolve:
-                                mock_resolve.return_value = MagicMock(
-                                    backend="claude", model=None
-                                )
-                                result = manager.dispatch_manager(issue)
+                        # Mock agent options resolution
+                        with patch(
+                            "vibe3.runtime.agent_resolver.resolve_manager_agent_options"
+                        ) as mock_resolve:
+                            mock_resolve.return_value = MagicMock(
+                                backend="claude", model=None
+                            )
+                            result = manager.dispatch_manager(issue)
 
         assert result is True
         # Async dispatch only records "started" event via coordinator

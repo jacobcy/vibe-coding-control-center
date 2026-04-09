@@ -20,10 +20,8 @@ from vibe3.domain.events.governance import (
 )
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.manager.manager_executor import ManagerExecutor
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
-from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 
 def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
@@ -46,21 +44,7 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
     store = SQLiteClient()
     coordinator = ExecutionCoordinator(config, store)
 
-    github = GitHubClient()
-    manager = ManagerExecutor(config, dry_run=config.dry_run)
-    status_service = OrchestraStatusService(
-        config,
-        github=github,
-        orchestrator=manager.flow_manager,
-    )
-
-    # We assign tick count to the service so it can use it for execution name
-    governance_service = GovernanceService(
-        config,
-        status_service=status_service,
-        manager=manager,
-    )
-    governance_service._tick_count = event.tick_count
+    governance_service = GovernanceService.from_config(config)
 
     async def _do_scan() -> None:
         try:
@@ -75,7 +59,9 @@ def handle_governance_scan_started(event: GovernanceScanStarted) -> None:
                 role="governance",
                 target_branch="governance",
                 target_id=1,
-                execution_name=governance_service._governance_execution_name(),
+                execution_name=governance_service.build_execution_name(
+                    event.tick_count
+                ),
                 prompt=prompt,
                 options=options,
                 refs={"task": task},
@@ -163,10 +149,7 @@ def handle_supervisor_execution_completed(event: SupervisorExecutionCompleted) -
         success=event.success,
     ).info("Supervisor execution completed")
 
-    # If supervisor execution failed on an issue, add a comment
     if not event.success and event.issue_number is not None:
-        from vibe3.clients.github_client import GitHubClient
-
         GitHubClient().add_comment(
             event.issue_number,
             f"❌ Supervisor execution failed for `{event.supervisor_file}`\n\n"

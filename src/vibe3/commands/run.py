@@ -1,7 +1,8 @@
 """Run command."""
 
+import os
 from pathlib import Path
-from typing import Annotated, Callable, Optional
+from typing import Annotated, Optional
 
 import typer
 from loguru import logger
@@ -12,6 +13,7 @@ from vibe3.agents.runner import (
     CodeagentExecutionService,
     create_codeagent_command,
 )
+from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -22,6 +24,9 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.config.settings import VibeConfig
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -37,34 +42,36 @@ def _find_skill_file(skill_name: str) -> Path | None:
     return RunUsecase.find_skill_file(skill_name)
 
 
-def _execute_run_command(
+def _dispatch_async_run_command(
     *,
-    config: VibeConfig,
     branch: str,
-    instructions: str | None,
-    context_builder: Callable[[], str],
-    dry_run: bool,
-    async_mode: bool,
-    agent: str | None,
-    backend: str | None,
-    model: str | None,
+    cli_args: list[str],
+    issue_number: int | None,
+    execution_name: str,
     handoff_metadata: dict[str, object] | None,
-) -> object:
-    run_prompt = config.run.run_prompt if getattr(config, "run", None) else None
-    command = create_codeagent_command(
-        role="executor",
-        context_builder=context_builder,
-        task=instructions or run_prompt,
-        dry_run=dry_run,
-        handoff_kind="run",
-        handoff_metadata=handoff_metadata,
-        agent=agent,
-        backend=backend,
-        model=model,
-        config=config,
-        branch=branch,
+) -> None:
+    refs: dict[str, str] = {}
+    if issue_number is not None:
+        refs["issue_number"] = str(issue_number)
+    if handoff_metadata:
+        refs.update({k: str(v) for k, v in handoff_metadata.items()})
+    ExecutionCoordinator(
+        OrchestraConfig.from_settings(),
+        SQLiteClient(),
+    ).dispatch_execution(
+        ExecutionRequest(
+            role="executor",
+            target_branch=branch,
+            target_id=issue_number or 0,
+            execution_name=execution_name,
+            cmd=CodeagentExecutionService.build_self_invocation(cli_args),
+            cwd=str(Path.cwd()),
+            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
+            refs=refs,
+            actor="agent:run",
+            mode="async",
+        )
     )
-    return CodeagentExecutionService(config).execute(command, async_mode=async_mode)
 
 
 def _ensure_plan_file_exists(plan_file: str | None) -> None:
@@ -111,6 +118,7 @@ def run_command(
     config = VibeConfig.get_defaults()
     flow_service, branch = ensure_flow_for_current_branch()
     usecase = RunUsecase(flow_service=flow_service)
+    issue_number = usecase.transition_issue(branch)
 
     if skill:
         skill_file = _find_skill_file(skill)
@@ -123,18 +131,38 @@ def run_command(
 
         typer.echo(f"-> Skill: {skill_file}")
         skill_content = skill_file.read_text(encoding="utf-8")
-        _execute_run_command(
-            config=config,
-            branch=branch,
-            instructions=instructions or f"Execute skill: {skill}",
+        if not dry_run and not no_async:
+            _dispatch_async_run_command(
+                branch=branch,
+                cli_args=[
+                    "run",
+                    "--skill",
+                    skill,
+                    *([instructions] if instructions else []),
+                ],
+                issue_number=int(issue_number) if issue_number else None,
+                execution_name=(
+                    f"vibe3-executor-issue-{issue_number}"
+                    if issue_number
+                    else f"vibe3-executor-{branch.replace('/', '-')}"
+                ),
+                handoff_metadata={"skill": skill},
+            )
+            return
+        command = create_codeagent_command(
+            role="executor",
             context_builder=make_skill_context_builder(skill_content),
+            task=instructions or f"Execute skill: {skill}",
             dry_run=dry_run,
-            async_mode=not no_async,
+            handoff_kind="run",
+            handoff_metadata={"skill": skill},
             agent=agent,
             backend=backend,
             model=model,
-            handoff_metadata={"skill": skill},
+            config=config,
+            branch=branch,
         )
+        CodeagentExecutionService(config).execute_sync(command)
         return
 
     try:
@@ -183,23 +211,53 @@ def run_command(
         branch=branch,
     )
 
-    # Build lifecycle callbacks if issue is linked
-    issue_number = usecase.transition_issue(branch)
+    execution_service = CodeagentExecutionService(config)
+    if not dry_run and not no_async:
+        if skill:
+            cli_args = [
+                "run",
+                "--skill",
+                skill,
+                *([instructions] if instructions else []),
+            ]
+        elif summary.mode == "plan":
+            cli_args = [
+                "run",
+                "--plan",
+                str(plan_file),
+                *([instructions] if instructions else []),
+            ]
+        elif summary.mode == "lightweight":
+            cli_args = ["run", *([instructions] if instructions else [])]
+        else:
+            cli_args = ["run"]
+        _dispatch_async_run_command(
+            branch=branch,
+            cli_args=cli_args,
+            issue_number=int(issue_number) if issue_number else None,
+            execution_name=(
+                f"vibe3-executor-issue-{issue_number}"
+                if issue_number
+                else f"vibe3-executor-{branch.replace('/', '-')}"
+            ),
+            handoff_metadata={"plan_ref": plan_file} if plan_file else None,
+        )
+        return
     if not dry_run and no_async and issue_number:
         on_success, on_failure = usecase.build_lifecycle_callbacks(
             int(issue_number), branch, flow_service
         )
-
-        # Execute with callbacks - CLI no longer handles Issue state transitions!
-        CodeagentExecutionService(config).execute_with_callbacks(
-            command=command,
-            on_success=on_success,
-            on_failure=on_failure,
-            async_mode=not no_async,
-        )
+        try:
+            result = execution_service.execute_sync(command)
+            if result.success:
+                on_success(result)
+            else:
+                on_failure(Exception(result.stderr or "Execution failed"))
+        except Exception as error:
+            on_failure(error)
+            raise
     else:
-        # No issue linked or dry-run/async mode - execute without callbacks
-        CodeagentExecutionService(config).execute(command, async_mode=not no_async)
+        execution_service.execute_sync(command)
 
 
 @app.callback(invoke_without_command=True)

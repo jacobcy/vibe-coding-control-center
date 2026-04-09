@@ -67,6 +67,12 @@ def _plan_issue_impl(
         issue_number=task_input.issue_number,
         branch=task_input.branch,
         async_mode=not no_async,
+        cli_args=[
+            "plan",
+            "issue",
+            str(task_input.issue_number),
+            *([instructions] if instructions else []),
+        ],
     )
 
 
@@ -104,33 +110,27 @@ def _plan_spec_impl(
         typer.echo("Plan dry run for specification")
         return
 
-    # For spec planning, we don't have a task issue number to link lifecycle
-    # Plan agent will run but won't trigger automated transitions without an issue.
-    # Note: PlanUsecase.execute_plan requires an issue_number.
-    # If no issue is linked, we should probably use a lower-level execution call or
-    # handle the missing issue number in PlanUsecase.
-    # For now, if no issue is available, we use a dummy or fallback.
-    # But resolve_task_plan already handles flow-linked issue.
-
     flow = flow_service.get_flow_status(branch)
     issue_number = flow.task_issue_number if flow else None
 
     if not issue_number:
-        # If no issue linked, we still execute the agent but skip lifecycle events
-        # This part might need PlanUsecase refinement, but for now we follow its API.
         typer.echo(
             "Warning: No issue linked to flow. Lifecycle events will be skipped.",
             err=True,
         )
-        # We pass a dummy issue number 0 to satisfy the current API,
-        # but this is a design gap.
-        issue_number = 0
 
     usecase.execute_plan(
         request=spec_input.request,
         issue_number=issue_number,
         branch=branch,
         async_mode=not no_async,
+        cli_args=[
+            "plan",
+            "spec",
+            *(["--file", str(file)] if file else []),
+            *(["--msg", msg] if msg else []),
+            *([instructions] if instructions else []),
+        ],
     )
 
 

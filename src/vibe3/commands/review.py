@@ -9,10 +9,6 @@ from vibe3.agents.review_agent import ReviewUsecase
 from vibe3.agents.review_parser import parse_codex_review
 from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
 from vibe3.agents.review_prompt import make_review_context_builder
-from vibe3.agents.runner import (
-    CodeagentExecutionService,
-    create_codeagent_command,
-)
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
@@ -52,8 +48,6 @@ def _build_review_usecase(
         snapshot_diff_builder=build_snapshot_diff,
         review_parser=parse_codex_review,
         context_builder=make_review_context_builder,
-        execution_service_factory=CodeagentExecutionService,
-        command_builder=create_codeagent_command,
     )
 
 

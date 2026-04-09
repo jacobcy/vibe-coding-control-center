@@ -23,16 +23,16 @@ def _make_supervisor_apply_dispatched_event() -> SupervisorApplyDispatched:
 class TestSupervisorApplyHandlerDispatch:
     """Test SupervisorApplyDispatched event handling."""
 
-    @patch("vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService")
+    @patch(
+        "vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService.from_config"
+    )
     @patch("vibe3.domain.handlers.supervisor_apply.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_apply.OrchestraConfig")
-    @patch("vibe3.environment.worktree.WorktreeManager")
     def test_handler_calls_coordinator(
         self,
-        mock_worktree_manager_cls: MagicMock,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_supervisor_service_cls: MagicMock,
+        mock_service_factory: MagicMock,
     ) -> None:
         """Handler should call ExecutionCoordinator."""
         from vibe3.domain.handlers.supervisor_apply import (
@@ -50,20 +50,16 @@ class TestSupervisorApplyHandlerDispatch:
         mock_coordinator_cls.return_value = mock_coordinator
 
         mock_service = MagicMock()
-
         wt_context = MagicMock()
         wt_context.path = "/tmp/wt"
-
-        mock_worktree_manager = MagicMock()
-        mock_worktree_manager.acquire_temporary_worktree.return_value = wt_context
-        mock_worktree_manager_cls.return_value = mock_worktree_manager
+        mock_service.acquire_temporary_worktree.return_value = wt_context
 
         mock_service.build_handoff_payload.return_value = (
             "test prompt",
             {"agent": "claude"},
             "test task",
         )
-        mock_supervisor_service_cls.return_value = mock_service
+        mock_service_factory.return_value = mock_service
 
         event = _make_supervisor_apply_dispatched_event()
 
@@ -79,14 +75,16 @@ class TestSupervisorApplyHandlerDispatch:
         assert request.prompt == "test prompt"
         assert request.cwd == "/tmp/wt"
 
-    @patch("vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService")
+    @patch(
+        "vibe3.domain.handlers.supervisor_apply.SupervisorHandoffService.from_config"
+    )
     @patch("vibe3.domain.handlers.supervisor_apply.ExecutionCoordinator")
     @patch("vibe3.domain.handlers.supervisor_apply.OrchestraConfig")
     def test_handler_skips_on_dry_run(
         self,
         mock_config_cls: MagicMock,
         mock_coordinator_cls: MagicMock,
-        mock_supervisor_service_cls: MagicMock,
+        mock_service_factory: MagicMock,
     ) -> None:
         """Handler should skip dispatch on dry run."""
         from vibe3.domain.handlers.supervisor_apply import (
@@ -101,7 +99,7 @@ class TestSupervisorApplyHandlerDispatch:
         mock_coordinator_cls.return_value = mock_coordinator
 
         mock_service = MagicMock()
-        mock_supervisor_service_cls.return_value = mock_service
+        mock_service_factory.return_value = mock_service
 
         event = _make_supervisor_apply_dispatched_event()
 

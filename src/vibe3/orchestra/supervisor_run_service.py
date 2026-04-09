@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import typer
 
@@ -21,10 +20,6 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
 from vibe3.services.orchestra_status_service import OrchestraStatusService
-
-if TYPE_CHECKING:
-    pass
-
 
 SUPERVISOR_APPLY_TASK = (
     "Run supervisor/apply task. "
@@ -80,12 +75,10 @@ def run_supervisor_mode(
         )
         or SUPERVISOR_APPLY_TASK
     )
-    backend = CodeagentBackend()
-
     typer.echo(f"-> Supervisor run: {supervisor_file}")
     if async_mode:
         store = SQLiteClient()
-        coordinator = ExecutionCoordinator(config, store, backend)
+        coordinator = ExecutionCoordinator(config, store, CodeagentBackend())
 
         safe_name = Path(supervisor_file).stem.replace("/", "-")
         execution_name = f"vibe3-supervisor-{safe_name}"
@@ -118,13 +111,26 @@ def run_supervisor_mode(
             typer.echo(f"Error: supervisor async start failed: {exc}", err=True)
             raise typer.Exit(1) from exc
 
-    sync_result = backend.run(
+    sync_request = ExecutionRequest(
+        role="supervisor",
+        target_branch=f"issue-{issue_number}" if issue_number else "supervisor",
+        target_id=issue_number or 0,
+        execution_name=(
+            f"vibe3-supervisor-{Path(supervisor_file).stem.replace('/', '-')}"
+        ),
         prompt=plan_text,
         options=options,
-        task=run_task,
+        refs={"task": run_task},
+        actor="orchestra:supervisor",
+        mode="sync",
         dry_run=False,
     )
-    if not sync_result.is_success():
+    sync_result = ExecutionCoordinator(
+        config,
+        SQLiteClient(),
+        CodeagentBackend(),
+    ).dispatch_execution(sync_request)
+    if not sync_result.launched:
         raise typer.Exit(1)
 
 

@@ -160,16 +160,15 @@ def test_resolve_manager_execution_cwd_falls_back_without_worktree(
     mock_launch.assert_called_once()
 
 
-@patch("vibe3.manager.manager_run_coordinator.AbandonFlowService")
+@patch("vibe3.manager.manager_run_service.AbandonFlowService")
 def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service):
     """Closed HANDOFF issue should finalize PR close + flow abort.
 
     Uses abandon service for cleanup.
     """
-    from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
+    from vibe3.manager.manager_run_service import _handle_closed_issue_post_run
 
     store = MagicMock()
-    coordinator = ManagerRunCoordinator(store=store)
     actor = "agent:manager"
     before_snapshot = {
         "state_label": "state/handoff",
@@ -182,11 +181,11 @@ def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service)
         "flow_status": "active",
     }
 
-    handled = coordinator.handle_post_run_outcome(
+    handled = _handle_closed_issue_post_run(
+        store=store,
         issue_number=123,
         branch="task/issue-123",
         actor=actor,
-        repo="jacobcy/vibe-coding-control-center",
         before_snapshot=before_snapshot,
         after_snapshot=after_snapshot,
     )
@@ -203,8 +202,8 @@ def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service)
     )
 
 
-@patch("vibe3.manager.manager_run_coordinator.block_manager_noop_issue")
-@patch("vibe3.manager.manager_run_coordinator.AbandonFlowService")
+@patch("vibe3.manager.manager_run_service.block_manager_noop_issue")
+@patch("vibe3.manager.manager_run_service.AbandonFlowService")
 def test_handle_closed_issue_retries_cleanup_when_flow_already_aborted(
     mock_abandon_service, mock_block_noop
 ):
@@ -212,15 +211,14 @@ def test_handle_closed_issue_retries_cleanup_when_flow_already_aborted(
 
     Uses abandon service even when flow is already aborted.
     """
-    from vibe3.manager.manager_run_coordinator import ManagerRunCoordinator
+    from vibe3.manager.manager_run_service import _handle_closed_issue_post_run
 
     store = MagicMock()
-    coordinator = ManagerRunCoordinator(store=store)
-    handled = coordinator.handle_post_run_outcome(
+    handled = _handle_closed_issue_post_run(
+        store=store,
         issue_number=123,
         branch="task/issue-123",
         actor="agent:manager",
-        repo="jacobcy/vibe-coding-control-center",
         before_snapshot={
             "state_label": "state/ready",
             "issue_state": "open",

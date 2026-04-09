@@ -136,11 +136,11 @@ class ExecutionCoordinator:
 
                 # Execute sync
                 try:
-                    # Backend.run() doesn't accept dry_run; production use assumed
                     result = self.backend.run(
                         prompt=request.prompt,
                         options=request.options,
                         task=task,
+                        dry_run=request.dry_run,
                         session_id=request.refs.get("session_id"),
                         cwd=cwd_path,
                     )

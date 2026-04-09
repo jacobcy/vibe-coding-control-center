@@ -21,9 +21,7 @@ from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.orchestra.services.assignee_dispatch import AssigneeDispatchService
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.pr_review_dispatch import PRReviewDispatchService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
@@ -115,28 +113,11 @@ def _build_server_with_launch_cwd(
         failed_gate=failed_gate,
     )
 
-    if config.assignee_dispatch.enabled:
-        heartbeat.register(
-            AssigneeDispatchService(
-                config,
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-            )
-        )
     if config.comment_reply.enabled:
         heartbeat.register(
             CommentReplyService(
                 config,
                 github=shared_github,
-            )
-        )
-    if config.pr_review_dispatch.enabled:
-        heartbeat.register(
-            PRReviewDispatchService(
-                config,
-                manager=shared_manager,
-                executor=shared_executor,
             )
         )
     if config.state_label_dispatch.enabled:
@@ -145,7 +126,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.READY,
                 trigger_name="manager",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -157,7 +137,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.HANDOFF,
                 trigger_name="manager",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -169,7 +148,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.CLAIMED,
                 trigger_name="plan",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -181,7 +159,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.IN_PROGRESS,
                 trigger_name="run",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -193,7 +170,6 @@ def _build_server_with_launch_cwd(
                 config,
                 trigger_state=IssueState.REVIEW,
                 trigger_name="review",
-                status_service=status_service,
                 manager=shared_manager,
                 github=shared_github,
                 executor=shared_executor,
@@ -221,15 +197,13 @@ def _build_server_with_launch_cwd(
     @fastapi_app.get("/status")
     def get_status() -> OrchestraSnapshot:
         """Get current orchestra status snapshot."""
-        return status_service.snapshot(queued=shared_manager.queued_issues)
+        return status_service.snapshot()
 
     # Mount MCP server (gracefully degrades if not available)
     try:
         from vibe3.server.mcp import create_mcp_server
 
-        mcp = create_mcp_server(
-            status_service, get_queued=lambda: shared_manager.queued_issues
-        )
+        mcp = create_mcp_server(status_service, get_queued=None)
         fastapi_app.mount("/mcp", mcp.sse_app())
         logger.bind(domain="orchestra").info("MCP server mounted at /mcp")
     except ImportError as exc:

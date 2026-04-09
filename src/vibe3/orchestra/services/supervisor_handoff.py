@@ -1,4 +1,4 @@
-"""Supervisor handoff service: consume governance issues and execute supervisors."""
+"""Supervisor handoff payload adapter for L2 supervisor execution."""
 
 from __future__ import annotations
 
@@ -9,17 +9,15 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.clients.github_client import GitHubClient
-from vibe3.environment.worktree import WorktreeManager
+from vibe3.clients.git_client import GitClient
+from vibe3.environment.worktree import WorktreeContext, WorktreeManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.services.governance_service import GovernanceService
 from vibe3.runtime.agent_resolver import resolve_supervisor_agent_options
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 if TYPE_CHECKING:
-    from vibe3.manager.manager_executor import ManagerExecutor
+    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 
 @dataclass(frozen=True)
@@ -30,82 +28,36 @@ class SupervisorHandoffIssue:
     title: str
 
 
-def _normalize_labels(raw_labels: object) -> list[str]:
-    labels: list[str] = []
-    if not isinstance(raw_labels, list):
-        return labels
-    for item in raw_labels:
-        if isinstance(item, dict):
-            name = item.get("name")
-            if isinstance(name, str) and name:
-                labels.append(name)
-        elif isinstance(item, str) and item:
-            labels.append(item)
-    return labels
-
-
-class SupervisorHandoffService(ServiceBase):
-    """Consume governance handoff issues and recycle them after execution."""
-
-    event_types: list[str] = []
+class SupervisorHandoffService:
+    """Build supervisor prompt payload from orchestration context."""
 
     def __init__(
         self,
         config: OrchestraConfig,
-        github: GitHubClient | None = None,
         status_service: OrchestraStatusService | None = None,
-        manager: ManagerExecutor | None = None,
         executor: ThreadPoolExecutor | None = None,
-        backend: CodeagentBackend | None = None,
     ) -> None:
         self.config = config
-        self._github = github or GitHubClient()
         from vibe3.manager.flow_manager import FlowManager
 
         flow_manager = FlowManager(config)
+        self._flow_manager = flow_manager
         self._status_service = status_service or OrchestraStatusService(
-            config, github=self._github, orchestrator=flow_manager
+            config, orchestrator=flow_manager
         )
-        self._manager = manager
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
-        self._backend = backend or CodeagentBackend()
-        self._worktree_manager = WorktreeManager(
-            config=config,
-            repo_path=Path.cwd(),
-            flow_manager=flow_manager,
-        )
 
-    async def handle_event(self, event: GitHubEvent) -> None:
-        return
-
-    def _list_handoff_issues(self) -> list[SupervisorHandoffIssue]:
-        raw = self._github.list_issues(
-            limit=100,
-            state="open",
-            assignee=None,
-            repo=self.config.repo,
-        )
-        issue_label = self.config.supervisor_handoff.issue_label
-        handoff_label = self.config.supervisor_handoff.handoff_state_label
-
-        candidates: list[SupervisorHandoffIssue] = []
-        for item in raw:
-            number = item.get("number")
-            title = item.get("title")
-            if not isinstance(number, int) or not isinstance(title, str):
-                continue
-            labels = _normalize_labels(item.get("labels"))
-            if issue_label not in labels or handoff_label not in labels:
-                continue
-            candidates.append(
-                SupervisorHandoffIssue(
-                    number=number,
-                    title=title,
-                )
-            )
-        return candidates
+    @classmethod
+    def from_config(
+        cls,
+        config: OrchestraConfig,
+        *,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> SupervisorHandoffService:
+        """Build a supervisor handoff adapter with default read-model dependencies."""
+        return cls(config=config, executor=executor)
 
     def build_handoff_payload(
         self, issue: SupervisorHandoffIssue
@@ -143,7 +95,6 @@ class SupervisorHandoffService(ServiceBase):
         service = GovernanceService(
             config=config,
             status_service=self._status_service,
-            manager=self._manager,
             executor=self._executor,
         )
         return service.render_current_plan()
@@ -159,3 +110,29 @@ class SupervisorHandoffService(ServiceBase):
             "allowed actions, "
             "comment the outcome on the same issue, and close it when complete."
         )
+
+    def acquire_temporary_worktree(self, issue_number: int) -> WorktreeContext:
+        """Acquire the isolated temporary worktree for supervisor apply."""
+        return self._make_worktree_manager().acquire_temporary_worktree(
+            issue_number=issue_number,
+            base_branch="main",
+        )
+
+    def release_temporary_worktree(self, issue_number: int) -> None:
+        """Release the isolated temporary worktree for supervisor apply."""
+        wt_path = self._repo_root() / ".worktrees" / "tmp" / str(issue_number)
+        context = WorktreeContext(
+            path=wt_path,
+            is_temporary=True,
+            branch=None,
+            issue_number=issue_number,
+        )
+        self._make_worktree_manager().release_temporary_worktree(context)
+
+    def _make_worktree_manager(self) -> WorktreeManager:
+        return WorktreeManager(self.config, self._repo_root(), self._flow_manager)
+
+    @staticmethod
+    def _repo_root() -> Path:
+        git_common_dir = GitClient().get_git_common_dir()
+        return Path(git_common_dir).parent if git_common_dir else Path.cwd()

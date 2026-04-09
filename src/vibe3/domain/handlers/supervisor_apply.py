@@ -81,44 +81,17 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         tmux=event.tmux_session,
     ).info("Supervisor apply dispatched")
 
-    # Initialize unified infrastructure services
     config = OrchestraConfig.from_settings()
     store = SQLiteClient()
 
     coordinator = ExecutionCoordinator(config, store)
-
-    from vibe3.manager.manager_executor import ManagerExecutor
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
-
     github = GitHubClient()
-    manager = ManagerExecutor(config, dry_run=config.dry_run)
-    status_service = OrchestraStatusService(
-        config,
-        github=github,
-        orchestrator=manager.flow_manager,
-    )
-
-    handoff_service = SupervisorHandoffService(
-        config,
-        github=github,
-        status_service=status_service,
-        manager=manager,
-    )
+    handoff_service = SupervisorHandoffService.from_config(config)
 
     logger.bind(
         domain="supervisor_handler",
         issue=event.issue_number,
     ).debug("Supervisor handler dispatching handoff via ExecutionCoordinator")
-
-    # Setup WorktreeManager to acquire temporary worktree for L2 apply execution
-    from pathlib import Path
-
-    from vibe3.clients.git_client import GitClient
-    from vibe3.environment.worktree import WorktreeManager
-
-    git_common_dir = GitClient().get_git_common_dir()
-    repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
-    worktree_manager = WorktreeManager(config, repo_root, manager.flow_manager)
 
     wt_context = None
 
@@ -138,11 +111,7 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
         # Build payload (sync)
         prompt, options, task = handoff_service.build_handoff_payload(handoff_issue)
 
-        # Acquire temporary worktree for L2 apply execution
-        wt_context = worktree_manager.acquire_temporary_worktree(
-            issue_number=event.issue_number,
-            base_branch="main",
-        )
+        wt_context = handoff_service.acquire_temporary_worktree(event.issue_number)
 
         import os
 
@@ -191,7 +160,7 @@ def handle_supervisor_apply_dispatched(event: SupervisorApplyDispatched) -> None
 
     except Exception as exc:
         if wt_context:
-            worktree_manager.release_temporary_worktree(wt_context)
+            handoff_service.release_temporary_worktree(event.issue_number)
 
         logger.bind(
             domain="supervisor_handler",
@@ -256,29 +225,11 @@ def handle_supervisor_apply_completed(event: SupervisorApplyCompleted) -> None:
 
     GitHubClient().add_comment(event.issue_number, comment)
 
-    # Release temporary worktree after execution completes
     try:
-        from pathlib import Path
-
-        from vibe3.clients.git_client import GitClient
-        from vibe3.environment.worktree import WorktreeContext, WorktreeManager
-        from vibe3.manager.manager_executor import ManagerExecutor
-
         config = OrchestraConfig.from_settings()
-        git_common_dir = GitClient().get_git_common_dir()
-        repo_root = Path(git_common_dir).parent if git_common_dir else Path.cwd()
-
-        wt_path = repo_root / ".worktrees" / "tmp" / str(event.issue_number)
-        context = WorktreeContext(
-            path=wt_path,
-            is_temporary=True,
-            branch=None,
-            issue_number=event.issue_number,
+        SupervisorHandoffService.from_config(config).release_temporary_worktree(
+            event.issue_number
         )
-
-        manager = ManagerExecutor(config)
-        worktree_manager = WorktreeManager(config, repo_root, manager.flow_manager)
-        worktree_manager.release_temporary_worktree(context)
         log.info(f"Released temporary worktree for issue #{event.issue_number}")
     except Exception as exc:
         log.warning(f"Failed to release temporary worktree: {exc}")

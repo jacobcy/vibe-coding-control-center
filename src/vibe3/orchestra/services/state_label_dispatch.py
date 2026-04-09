@@ -1,13 +1,4 @@
-"""State-driven trigger service for manager/plan/run/review execution.
-
-Uses unified infrastructure services:
-- ExecutionRolePolicyService for configuration resolution
-- CapacityService for capacity control
-- ExecutionLifecycleService for lifecycle events
-- OrchestrationFacade for domain-first event publishing
-
-Usage Guide: docs/v3/architecture/infrastructure-guide.md
-"""
+"""State-driven trigger service for manager/plan/run/review intent emission."""
 
 from __future__ import annotations
 
@@ -17,8 +8,6 @@ from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
-from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.execution_role_policy import ExecutionRolePolicyService
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
@@ -34,7 +23,6 @@ from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.services.orchestra_status_service import OrchestraStatusService
 
 TriggerName = Literal["manager", "plan", "run", "review"]
 
@@ -87,7 +75,6 @@ class StateLabelDispatchService(ServiceBase):
         trigger_name: TriggerName,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
-        status_service: OrchestraStatusService | None = None,
         manager: ManagerExecutor | None = None,
         registry: "SessionRegistryService | None" = None,
     ) -> None:
@@ -98,14 +85,11 @@ class StateLabelDispatchService(ServiceBase):
             max_workers=config.max_concurrent_flows,
         )
         self._github = github or GitHubClient()
-        self._status_service = status_service
         self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
-        self._backend = CodeagentBackend()
         self._store = SQLiteClient()
         self._registry = registry
-        self._policy_service = ExecutionRolePolicyService(config)
         self._dispatch_guard = asyncio.Lock()
-        self._facade = OrchestrationFacade()  # Domain-first entry point
+        self._facade = OrchestrationFacade()
 
     async def handle_event(self, event: GitHubEvent) -> None:
         return
@@ -140,77 +124,15 @@ class StateLabelDispatchService(ServiceBase):
                     level="DEBUG",
                 )
 
-        # Note: Unified capacity control is now handled by ExecutionCoordinator.
-        # state_label_dispatch only emits intent events. If capacity is full,
-        # coordinator rejects the launch and issue remains in current state.
-
         for issue in ready:
             try:
-                # Domain-first: emit dispatch-intent event via facade.
-                # Each trigger emits its authoritative dispatch-intent event.
-                # Domain handlers handle dispatch, capacity, and lifecycle
-                # via unified ExecutionRolePolicyService / CapacityService /
-                # ExecutionLifecycleService — no direct dispatch here.
-
-                # Get branch for dispatch-intent events
-                flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
-                branch = str(flow.get("branch") or "").strip() if flow else ""
-
                 append_orchestra_event(
                     "dispatcher",
                     f"{self.service_name} emitting dispatch-intent event "
                     f"for #{issue.number}",
                     level="DEBUG",
                 )
-
-                # Emit trigger-specific dispatch-intent event
-                if self.trigger_name == "manager":
-                    # Manager uses IssueStateChanged for backward compatibility
-                    # with existing handlers that listen to this event
-                    self._facade.on_issue_state_changed(
-                        issue_info=issue,
-                        from_state=None,
-                    )
-                elif self.trigger_name == "plan":
-                    # Plan trigger emits PlannerDispatched
-                    self._facade.on_planner_dispatch(
-                        issue_info=issue,
-                        branch=branch,
-                    )
-                elif self.trigger_name == "run":
-                    # Run trigger emits ExecutorDispatched
-                    # Get plan_ref from flow_state if available
-                    plan_ref = None
-                    if branch:
-                        flow_state = self._store.get_flow_state(branch)
-                        plan_ref = flow_state.get("plan_ref") if flow_state else None
-
-                    self._facade.on_executor_dispatch(
-                        issue_info=issue,
-                        branch=branch,
-                        plan_ref=plan_ref,
-                    )
-                elif self.trigger_name == "review":
-                    # Review trigger emits ReviewerDispatched
-                    # Get report_ref from flow_state if available
-                    report_ref = None
-                    if branch:
-                        flow_state = self._store.get_flow_state(branch)
-                        report_ref = (
-                            flow_state.get("report_ref") if flow_state else None
-                        )
-
-                    self._facade.on_reviewer_dispatch(
-                        issue_info=issue,
-                        branch=branch,
-                        report_ref=report_ref,
-                    )
-                else:
-                    # Fallback to IssueStateChanged for unknown triggers
-                    self._facade.on_issue_state_changed(
-                        issue_info=issue,
-                        from_state=None,
-                    )
+                self._emit_dispatch_intent(issue)
 
                 logger.bind(
                     domain="orchestra",
@@ -229,6 +151,39 @@ class StateLabelDispatchService(ServiceBase):
                     issue=issue.number,
                 ).warning(f"State dispatch failed: {exc}")
 
+    def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
+        branch, flow_state = self._flow_context(issue.number)
+        if self.trigger_name == "manager":
+            self._facade.on_issue_state_changed(issue_info=issue, from_state=None)
+            return
+        if self.trigger_name == "plan":
+            self._facade.on_planner_dispatch(issue_info=issue, branch=branch)
+            return
+        if self.trigger_name == "run":
+            plan_ref = flow_state.get("plan_ref") if flow_state else None
+            self._facade.on_executor_dispatch(
+                issue_info=issue,
+                branch=branch,
+                plan_ref=str(plan_ref) if plan_ref else None,
+            )
+            return
+        if self.trigger_name == "review":
+            report_ref = flow_state.get("report_ref") if flow_state else None
+            self._facade.on_reviewer_dispatch(
+                issue_info=issue,
+                branch=branch,
+                report_ref=str(report_ref) if report_ref else None,
+            )
+            return
+        self._facade.on_issue_state_changed(issue_info=issue, from_state=None)
+
+    def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
+        flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
+        branch = str(flow.get("branch") or "").strip() if flow else ""
+        if not branch:
+            return "", None
+        return branch, self._store.get_flow_state(branch)
+
     def _select_ready_issues(
         self, raw_issues: list[dict[str, object]]
     ) -> list[IssueInfo]:
@@ -243,40 +198,28 @@ class StateLabelDispatchService(ServiceBase):
             if issue is None:
                 continue
             if self.trigger_name == "manager":
-                flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
-                if flow:
-                    branch = str(flow.get("branch") or "").strip()
-                    flow_state = self._store.get_flow_state(branch) if branch else None
-                else:
-                    branch = ""
-                    flow_state = None
-                # For handoff resume: only dispatch for canonical task flows
+                branch, flow_state = self._flow_context(issue.number)
                 if self.trigger_state == IssueState.HANDOFF:
-                    if not flow:
+                    if (
+                        not branch
+                        or not _is_auto_task_branch(branch)
+                        or not flow_state
+                        or not self._should_dispatch_from_state(
+                            issue.number, flow_state
+                        )
+                    ):
                         continue
-                    if not _is_auto_task_branch(branch):
-                        continue
-                    if not flow_state:
-                        continue
-                    if not self._should_dispatch_from_state(issue.number, flow_state):
-                        continue
-                # For state/ready: no flow check required (manager can start fresh)
                 selected.append(issue)
                 continue
-            flow = self._manager.flow_manager.get_flow_for_issue(issue.number)
-            if not flow:
-                continue
-            branch = str(flow.get("branch") or "").strip()
-            if not _is_auto_task_branch(branch):
-                continue
-            flow_state = self._store.get_flow_state(branch) if branch else None
-            if not flow_state:
-                continue
-            if not self._should_dispatch_from_state(issue.number, flow_state):
+            branch, flow_state = self._flow_context(issue.number)
+            if (
+                not branch
+                or not _is_auto_task_branch(branch)
+                or not flow_state
+                or not self._should_dispatch_from_state(issue.number, flow_state)
+            ):
                 continue
             selected.append(issue)
-        # Sort selected issues by queue ordering rules
-        # (milestone -> roadmap -> priority)
         return sort_ready_issues(selected)
 
     def _should_dispatch_from_state(
@@ -289,24 +232,15 @@ class StateLabelDispatchService(ServiceBase):
         has_live_session = is_running and self._has_live_dispatch(issue_number)
 
         if self.trigger_name == "manager":
-            # For state/ready and state/handoff: dispatch based on registry
-            # live session status only. manager_session_id is a legacy field
-            # and no longer used for dispatch decisions.
             return not has_live_session
         if self.trigger_name == "plan":
-            # Dispatch if no plan_ref AND no live session running.
-            # planner_session_id is a resume hint, not a dispatch gate.
             return not flow_state.get("plan_ref") and not has_live_session
         if self.trigger_name == "run":
-            # Dispatch if plan_ref exists AND no report_ref AND no live session.
-            # executor_session_id is a resume hint, not a dispatch gate.
             return (
                 bool(flow_state.get("plan_ref"))
                 and not flow_state.get("report_ref")
                 and not has_live_session
             )
-        # Dispatch if report_ref exists AND no audit_ref AND no live session.
-        # reviewer_session_id is a resume hint, not a dispatch gate.
         return (
             bool(flow_state.get("report_ref"))
             and not flow_state.get("audit_ref")
@@ -319,13 +253,10 @@ class StateLabelDispatchService(ServiceBase):
                 "SessionRegistryService is required to check live dispatch"
             )
 
-        # Map trigger_name to registry role
         registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
             self.trigger_name, self.trigger_name
         )
-        # Use canonical SessionRegistryService API with branch filter
-        flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
-        branch = str(flow.get("branch") or "").strip() if flow else ""
+        branch, _ = self._flow_context(issue_number)
         if not branch:
             return False
         sessions = self._registry.get_truly_live_sessions_for_target(

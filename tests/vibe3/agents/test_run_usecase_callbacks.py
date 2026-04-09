@@ -158,7 +158,7 @@ class TestBuildLifecycleCallbacks:
         assert event.issue_number == issue_number
 
     def test_callback_errors_propagate_to_caller(self) -> None:
-        """Callback errors should propagate to execute_with_callbacks for handling."""
+        """Callback errors should propagate to the caller for handling."""
         issue_number = 111
         branch = "dev/test-111"
         mock_flow_service = MagicMock(spec=FlowService)
@@ -182,7 +182,7 @@ class TestBuildLifecycleCallbacks:
         with patch.object(EventPublisher, "publish") as mock_publish:
             mock_publish.side_effect = RuntimeError("Publisher failed")
 
-            # Callback should raise, execute_with_callbacks should handle
+            # Callback should raise, and the caller should handle it
             with pytest.raises(RuntimeError):
                 on_success(result)
 
