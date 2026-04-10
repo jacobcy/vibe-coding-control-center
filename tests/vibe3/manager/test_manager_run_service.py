@@ -23,11 +23,13 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
             "vibe3.runtime.agent_resolver.resolve_manager_agent_options",
             side_effect=fake_resolve_manager_agent_options,
         ),
-        patch("vibe3.manager.manager_run_service.OrchestraConfig") as mock_config,
-        patch("vibe3.manager.manager_run_service.GitHubClient") as mock_gh,
-        patch("vibe3.manager.manager_run_service.SQLiteClient"),
-        patch("vibe3.manager.manager_run_service.GitClient"),
-        patch("vibe3.manager.manager_run_service.CodeagentBackend") as mock_backend,
+        patch("vibe3.execution.issue_role_sync_runner.OrchestraConfig") as mock_config,
+        patch("vibe3.execution.issue_role_sync_runner.GitHubClient") as mock_gh,
+        patch("vibe3.execution.issue_role_sync_runner.SQLiteClient"),
+        patch("vibe3.execution.issue_role_sync_runner.GitClient"),
+        patch(
+            "vibe3.execution.issue_role_sync_runner.CodeagentBackend"
+        ) as mock_backend,
     ):
 
         mock_config.from_settings.return_value = MagicMock(repo=None)
@@ -43,13 +45,16 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
             tmux_session="test-session", log_path="/tmp/test.log"
         )
 
-        from vibe3.manager.manager_run_service import run_manager_issue_mode
+        from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+        from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
         try:
-            run_manager_issue_mode(
+            run_issue_role_mode(
                 issue_number=301,
                 dry_run=False,
                 async_mode=True,
+                fresh_session=False,
+                spec=MANAGER_SYNC_SPEC,
             )
         except Exception:
             pass
@@ -63,28 +68,24 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
 def test_run_manager_capacity_full_does_not_fail_issue() -> None:
     """Capacity rejection should not mark the issue as failed."""
     with (
-        patch("vibe3.manager.manager_run_service.OrchestraConfig") as mock_config,
-        patch("vibe3.manager.manager_run_service.GitHubClient") as mock_gh,
-        patch("vibe3.manager.manager_run_service.SQLiteClient") as mock_store_cls,
-        patch("vibe3.manager.manager_run_service.GitClient") as mock_git_cls,
-        patch("vibe3.manager.manager_run_service.CodeagentBackend"),
+        patch("vibe3.execution.issue_role_sync_runner.OrchestraConfig") as mock_config,
+        patch("vibe3.execution.issue_role_sync_runner.GitHubClient") as mock_gh,
+        patch("vibe3.execution.issue_role_sync_runner.SQLiteClient") as mock_store_cls,
+        patch("vibe3.execution.issue_role_sync_runner.GitClient") as mock_git_cls,
+        patch("vibe3.execution.issue_role_sync_runner.CodeagentBackend"),
         patch(
-            "vibe3.manager.manager_run_service.ExecutionCoordinator"
+            "vibe3.execution.issue_role_sync_runner.ExecutionCoordinator"
         ) as mock_coord_cls,
+        patch("vibe3.roles.manager.build_manager_request") as mock_prepare_request,
+        patch("vibe3.roles.manager.fail_manager_issue") as mock_fail,
         patch(
-            "vibe3.manager.manager_run_service.build_manager_dispatch_request"
-        ) as mock_prepare_request,
-        patch("vibe3.manager.manager_run_service.fail_manager_issue") as mock_fail,
-        patch("vibe3.manager.manager_run_service.load_session_id", return_value=None),
-        patch(
-            "vibe3.manager.manager_run_service.render_manager_prompt",
-            return_value=MagicMock(rendered_text="prompt"),
+            "vibe3.execution.issue_role_sync_runner.load_session_id", return_value=None
         ),
         patch(
-            "vibe3.manager.manager_run_service.format_agent_actor",
+            "vibe3.execution.issue_role_sync_runner.format_agent_actor",
             return_value="agent:manager",
         ),
-        patch("vibe3.manager.manager_run_service.typer.echo"),
+        patch("vibe3.execution.issue_role_sync_runner.typer.echo"),
     ):
         mock_config.from_settings.return_value = MagicMock(repo=None)
         mock_gh.return_value.view_issue.return_value = {
@@ -106,12 +107,15 @@ def test_run_manager_capacity_full_does_not_fail_issue() -> None:
         mock_coord_cls.return_value = mock_coord
         mock_prepare_request.return_value = MagicMock()
 
-        from vibe3.manager.manager_run_service import run_manager_issue_mode
+        from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+        from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
-        run_manager_issue_mode(
+        run_issue_role_mode(
             issue_number=301,
             dry_run=False,
             async_mode=True,
+            fresh_session=False,
+            spec=MANAGER_SYNC_SPEC,
         )
 
         mock_fail.assert_not_called()
@@ -120,24 +124,24 @@ def test_run_manager_capacity_full_does_not_fail_issue() -> None:
 def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
     """Sync manager should delegate permanent worktree resolution to execution."""
     with (
-        patch("vibe3.manager.manager_run_service.OrchestraConfig") as mock_config,
-        patch("vibe3.manager.manager_run_service.GitHubClient") as mock_gh,
-        patch("vibe3.manager.manager_run_service.SQLiteClient") as mock_store_cls,
-        patch("vibe3.manager.manager_run_service.GitClient") as mock_git_cls,
-        patch("vibe3.manager.manager_run_service.CodeagentBackend"),
+        patch("vibe3.execution.issue_role_sync_runner.OrchestraConfig") as mock_config,
+        patch("vibe3.execution.issue_role_sync_runner.GitHubClient") as mock_gh,
+        patch("vibe3.execution.issue_role_sync_runner.SQLiteClient") as mock_store_cls,
+        patch("vibe3.execution.issue_role_sync_runner.GitClient") as mock_git_cls,
+        patch("vibe3.execution.issue_role_sync_runner.CodeagentBackend"),
         patch(
-            "vibe3.manager.manager_run_service.ExecutionCoordinator"
+            "vibe3.execution.issue_role_sync_runner.ExecutionCoordinator"
         ) as mock_coord_cls,
         patch(
-            "vibe3.manager.manager_run_service.render_manager_prompt",
-            return_value=MagicMock(rendered_text="prompt"),
-        ),
-        patch(
-            "vibe3.manager.manager_run_service.format_agent_actor",
+            "vibe3.execution.issue_role_sync_runner.format_agent_actor",
             return_value="agent:manager",
         ),
         patch(
-            "vibe3.manager.manager_run_service.snapshot_progress",
+            "vibe3.roles.manager.render_manager_prompt",
+            return_value=MagicMock(rendered_text="prompt"),
+        ),
+        patch(
+            "vibe3.roles.manager.snapshot_manager_progress",
             side_effect=[
                 {
                     "state_label": "state/ready",
@@ -151,7 +155,7 @@ def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
                 },
             ],
         ),
-        patch("vibe3.manager.manager_run_service.typer.echo"),
+        patch("vibe3.execution.issue_role_sync_runner.typer.echo"),
     ):
         mock_config.from_settings.return_value = MagicMock(repo=None)
         mock_gh.return_value.view_issue.return_value = {
@@ -173,12 +177,15 @@ def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
         mock_coord.dispatch_execution.side_effect = _capture
         mock_coord_cls.return_value = mock_coord
 
-        from vibe3.manager.manager_run_service import run_manager_issue_mode
+        from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+        from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
-        run_manager_issue_mode(
+        run_issue_role_mode(
             issue_number=302,
             dry_run=False,
             async_mode=False,
+            fresh_session=False,
+            spec=MANAGER_SYNC_SPEC,
         )
 
         request = captured["request"]
@@ -186,13 +193,13 @@ def test_run_manager_sync_uses_execution_worktree_requirement() -> None:
         assert request.cwd is None
 
 
-@patch("vibe3.manager.manager_run_service.AbandonFlowService")
+@patch("vibe3.roles.manager.AbandonFlowService")
 def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service):
     """Closed HANDOFF issue should finalize PR close + flow abort.
 
     Uses abandon service for cleanup.
     """
-    from vibe3.manager.manager_run_service import _handle_closed_issue_post_run
+    from vibe3.roles.manager import handle_closed_issue_post_run
 
     store = MagicMock()
     actor = "agent:manager"
@@ -207,7 +214,7 @@ def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service)
         "flow_status": "active",
     }
 
-    handled = _handle_closed_issue_post_run(
+    handled = handle_closed_issue_post_run(
         store=store,
         issue_number=123,
         branch="task/issue-123",
@@ -228,7 +235,7 @@ def test_handle_closed_issue_finalizes_abandon_for_handoff(mock_abandon_service)
     )
 
 
-@patch("vibe3.manager.manager_run_service.AbandonFlowService")
+@patch("vibe3.roles.manager.AbandonFlowService")
 def test_handle_closed_issue_retries_cleanup_when_flow_already_aborted(
     mock_abandon_service,
 ):
@@ -236,10 +243,10 @@ def test_handle_closed_issue_retries_cleanup_when_flow_already_aborted(
 
     Uses abandon service even when flow is already aborted.
     """
-    from vibe3.manager.manager_run_service import _handle_closed_issue_post_run
+    from vibe3.roles.manager import handle_closed_issue_post_run
 
     store = MagicMock()
-    handled = _handle_closed_issue_post_run(
+    handled = handle_closed_issue_post_run(
         store=store,
         issue_number=123,
         branch="task/issue-123",

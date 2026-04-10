@@ -1,9 +1,10 @@
 """Execution-time gate policies shared by role services."""
 
 from vibe3.clients.sqlite_client import SQLiteClient
+from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.role_contracts import CompletionContract
-from vibe3.execution.roles import RoleDefinition
 from vibe3.models.orchestration import IssueState
+from vibe3.roles.definitions import RoleDefinition
 from vibe3.runtime.no_progress_policy import has_progress_changed
 from vibe3.services.issue_failure_service import block_manager_noop_issue
 
@@ -53,6 +54,35 @@ def source_state_from_label(state_label: object) -> IssueState | None:
     if state_label == "state/handoff":
         return IssueState.HANDOFF
     return None
+
+
+def apply_request_completion_gate(
+    *,
+    request: ExecutionRequest,
+    store: SQLiteClient,
+    repo: str | None,
+    before_snapshot: dict[str, object],
+    after_snapshot: dict[str, object],
+) -> bool:
+    """Apply the completion gate declared on an ExecutionRequest.
+
+    This is the unified entry point for post-sync gate checks.
+    Returns True when the gate handled the completion and execution should stop.
+    """
+    gate = request.completion_gate
+    if gate is None:
+        return False
+    if gate == CompletionContract.MUST_CHANGE_LABEL:
+        return block_if_manager_noop(
+            store=store,
+            issue_number=request.target_id,
+            branch=request.target_branch,
+            actor=request.actor,
+            repo=repo,
+            before_snapshot=before_snapshot,
+            after_snapshot=after_snapshot,
+        )
+    return False
 
 
 def apply_completion_gate(

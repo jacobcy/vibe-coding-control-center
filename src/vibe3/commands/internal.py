@@ -26,13 +26,15 @@ def internal_manager_dispatch(
     fresh_session: bool = False,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
-    from vibe3.manager.manager_run_service import run_manager_issue_mode
+    from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+    from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
-    run_manager_issue_mode(
+    run_issue_role_mode(
         issue_number=issue,
         dry_run=dry_run,
         async_mode=not no_async,
         fresh_session=fresh_session,
+        spec=MANAGER_SYNC_SPEC,
     )
 
 

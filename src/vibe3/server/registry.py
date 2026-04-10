@@ -17,12 +17,12 @@ from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.flow_dispatch import FlowManager
-from vibe3.execution.roles import LABEL_DISPATCH_ROLES
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.roles import LABEL_DISPATCH_ROLES
 from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (

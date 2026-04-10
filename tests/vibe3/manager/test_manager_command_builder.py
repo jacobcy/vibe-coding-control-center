@@ -6,9 +6,9 @@ from unittest.mock import patch
 from tests.vibe3.conftest import CompletedProcess
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.flow_dispatch import FlowManager
-from vibe3.manager.prompts import build_manager_command, render_manager_prompt
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.roles.manager import build_manager_command, render_manager_prompt
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:

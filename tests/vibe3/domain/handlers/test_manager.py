@@ -1,4 +1,4 @@
-"""Tests for manager event handlers.
+"""Tests for issue-state role dispatch handlers.
 
 Tests cover:
 - Guard logic (only handle manager trigger states)
@@ -10,7 +10,9 @@ Tests cover:
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-from vibe3.domain.handlers.manager import handle_issue_state_changed_for_manager
+from vibe3.domain.handlers.issue_state_dispatch import (
+    handle_issue_state_changed_for_roles,
+)
 from vibe3.models.orchestration import IssueState
 
 
@@ -49,32 +51,32 @@ def _make_github_response(
 class TestManagerHandlerGuardLogic:
     """Test guard: only handle manager trigger states."""
 
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_ignores_non_manager_trigger_state(
         self,
         mock_config_cls: MagicMock,
     ) -> None:
-        """Handler should return early when to_state is not ready/handoff."""
+        """Handler should return early when to_state is not a supported role trigger."""
         mock_config_cls.from_settings.return_value = MagicMock()
 
         event = _make_event(to_state="claimed")
 
         # Should not raise and should not create any services
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         # No services should be created for non-claimed states
         mock_config_cls.from_settings.assert_not_called()
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.manager.build_manager_dispatch_request")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_processes_ready_state(
         self,
         mock_config_cls: MagicMock,
         mock_build_request: MagicMock,
         mock_coordinator_cls: MagicMock,
     ) -> None:
-        """Handler should process events with to_state='ready' via fast path."""
+        """Handler should process ready events via fast path."""
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
@@ -91,7 +93,7 @@ class TestManagerHandlerGuardLogic:
         # Provide issue_title to use the fast path (no view_issue call)
         event = _make_event(to_state="ready", issue_title="Test issue")
 
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         mock_build_request.assert_called_once()
         mock_coordinator.dispatch_execution.assert_called_once()
@@ -104,9 +106,9 @@ class TestManagerHandlerIssueFetching:
     (i.e., webhook-triggered events that don't carry the title).
     """
 
-    @patch("vibe3.domain.handlers.manager.build_manager_dispatch_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_github_none(
         self,
         mock_config_cls: MagicMock,
@@ -122,14 +124,14 @@ class TestManagerHandlerIssueFetching:
 
         # No issue_title → slow path → calls view_issue
         event = _make_event(issue_title=None)
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         # Should NOT dispatch
         mock_build_request.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager.build_manager_dispatch_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_network_error(
         self,
         mock_config_cls: MagicMock,
@@ -145,13 +147,13 @@ class TestManagerHandlerIssueFetching:
         mock_github_cls.return_value = mock_github
 
         event = _make_event(issue_title=None)
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         mock_build_request.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager.build_manager_dispatch_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
     @patch("vibe3.clients.github_client.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_invalid_issue_data(
         self,
         mock_config_cls: MagicMock,
@@ -172,7 +174,7 @@ class TestManagerHandlerIssueFetching:
             "vibe3.models.orchestration.IssueInfo.from_github_payload",
             return_value=None,
         ):
-            handle_issue_state_changed_for_manager(event)
+            handle_issue_state_changed_for_roles(event)
 
         mock_build_request.assert_not_called()
 
@@ -181,8 +183,8 @@ class TestManagerHandlerDispatch:
     """Test manager role service dispatch via fast path (issue_title present)."""
 
     @patch("vibe3.execution.coordinator.ExecutionCoordinator")
-    @patch("vibe3.domain.handlers.manager.build_manager_dispatch_request")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_dispatch_success(
         self,
         mock_config_cls: MagicMock,
@@ -205,7 +207,7 @@ class TestManagerHandlerDispatch:
 
         event = _make_event(issue_title="Test issue")
 
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         # Verify prepare_execution_request was called with IssueInfo
         mock_build_request.assert_called_once()

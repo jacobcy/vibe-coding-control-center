@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
-from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.execution.role_contracts import CompletionContract, WorktreeRequirement
 
 
 @dataclass
@@ -25,6 +25,7 @@ class ExecutionRequest:
     mode: Literal["sync", "async"] = "async"
     dry_run: bool = False
     worktree_requirement: WorktreeRequirement = WorktreeRequirement.NONE
+    completion_gate: Optional[CompletionContract] = None
 
 
 @dataclass

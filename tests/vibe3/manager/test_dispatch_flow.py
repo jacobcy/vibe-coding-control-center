@@ -4,9 +4,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from vibe3.execution.role_contracts import WorktreeRequirement
-from vibe3.execution.role_services import build_manager_dispatch_request
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.roles.manager import build_manager_request as build_manager_dispatch_request
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -29,7 +29,7 @@ class TestManagerRoleServicePreparation:
         issue = make_issue()
 
         with patch(
-            "vibe3.execution.role_services.FlowManager.create_flow_for_issue",
+            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
             return_value={"branch": ""},
         ):
             assert (
@@ -45,7 +45,7 @@ class TestManagerRoleServicePreparation:
         issue = make_issue(number=102, title="Manager real dispatch")
 
         with patch(
-            "vibe3.execution.role_services.FlowManager.create_flow_for_issue",
+            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
             return_value={"branch": "task/issue-102"},
         ):
             request = build_manager_dispatch_request(

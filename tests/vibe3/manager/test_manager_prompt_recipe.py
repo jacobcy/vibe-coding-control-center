@@ -2,14 +2,14 @@
 
 import yaml
 
-from vibe3.manager.prompts import (
+from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
+from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.prompts.models import PromptRecipe, VariableSourceKind
+from vibe3.roles.manager import (
     build_manager_command,
     build_manager_recipe,
     render_manager_prompt,
 )
-from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.prompts.models import PromptRecipe, VariableSourceKind
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
