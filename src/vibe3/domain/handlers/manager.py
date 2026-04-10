@@ -1,51 +1,20 @@
 """Event handlers for manager dispatch."""
 
 import asyncio
-from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 from loguru import logger
 
 from vibe3.domain.events import DomainEvent
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+from vibe3.execution.role_services import (
+    build_manager_dispatch_request,
+    resolve_orchestra_repo_root,
+)
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
 _MANAGER_TRIGGER_STATES: frozenset[str] = frozenset({"ready", "handoff"})
-
-
-def _resolve_repo_root() -> Path:
-    """Resolve main repo root (git common-dir parent), same as server/registry.py."""
-    try:
-        from vibe3.clients.git_client import GitClient
-
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
-    return Path.cwd()
-
-
-def _build_manager_adapter(config: OrchestraConfig) -> Any:
-    """Build a ManagerRoleAdapter for manager-specific requirements.
-
-    The adapter handles flow/worktree/command preparation,
-    while ExecutionCoordinator handles capacity/lifecycle/launch.
-    """
-    from vibe3.agents.backends.codeagent import CodeagentBackend
-    from vibe3.clients.sqlite_client import SQLiteClient
-    from vibe3.environment.session_registry import SessionRegistryService
-    from vibe3.execution.role_adapters import ManagerRoleAdapter
-
-    store = SQLiteClient()
-    backend = CodeagentBackend()
-    registry = SessionRegistryService(store=store, backend=backend)
-    return ManagerRoleAdapter(
-        config,
-        registry=registry,
-        repo_path=_resolve_repo_root(),
-    )
 
 
 def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
@@ -120,17 +89,26 @@ def handle_issue_state_changed_for_manager(event: IssueStateChanged) -> None:
             return
 
         # Use unified ExecutionCoordinator path
+        from vibe3.agents.backends.codeagent import CodeagentBackend
         from vibe3.clients.sqlite_client import SQLiteClient
+        from vibe3.environment.session_registry import SessionRegistryService
         from vibe3.execution.coordinator import ExecutionCoordinator
 
-        manager_adapter = _build_manager_adapter(config)
         store = SQLiteClient()
+        backend = CodeagentBackend()
+        registry = SessionRegistryService(store=store, backend=backend)
         coordinator = ExecutionCoordinator(config, store)
 
         try:
             # Prepare manager-specific request
             request = await loop.run_in_executor(
-                None, lambda: manager_adapter.prepare_execution_request(issue_info)
+                None,
+                lambda: build_manager_dispatch_request(
+                    config,
+                    issue_info,
+                    registry=registry,
+                    repo_path=resolve_orchestra_repo_root(),
+                ),
             )
 
             if request is None:

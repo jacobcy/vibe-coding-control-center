@@ -224,7 +224,7 @@ class TestStaleFlowHandling:
         mock_github_client.list_prs_for_branch.return_value = []
 
         with patch(
-            "vibe3.manager.flow_manager.FlowManager.create_flow_for_issue",
+            "vibe3.execution.flow_dispatch.FlowManager.create_flow_for_issue",
             return_value={"branch": "task/issue-431", "flow_status": "active"},
         ) as mock_create_flow:
             with patch.object(

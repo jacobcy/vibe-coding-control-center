@@ -10,7 +10,9 @@ from vibe3.agents.backends.codeagent import CodeagentBackend
 from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
+from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.services.capacity_service import CapacityService
 
@@ -34,6 +36,32 @@ class ExecutionCoordinator:
         self.lifecycle = lifecycle or ExecutionLifecycleService(store)
         self.registry = SessionRegistryService(store, self.backend)
 
+    def _resolve_cwd(self, request: ExecutionRequest) -> Optional[Path]:
+        """Resolve execution cwd from explicit request or environment policy."""
+        if request.cwd:
+            return Path(request.cwd)
+
+        if request.worktree_requirement == WorktreeRequirement.NONE:
+            return None
+
+        if request.worktree_requirement != WorktreeRequirement.PERMANENT:
+            raise ValueError(
+                f"Unsupported worktree requirement: {request.worktree_requirement}"
+            )
+
+        repo_path = Path(request.repo_path) if request.repo_path else Path.cwd()
+        worktree_manager = WorktreeManager(self.config, repo_path)
+        manager_cwd, _ = worktree_manager.resolve_manager_cwd(
+            request.target_id,
+            request.target_branch,
+        )
+        if manager_cwd is None:
+            raise ValueError(
+                f"Failed to resolve permanent worktree for "
+                f"{request.role}:{request.target_id}"
+            )
+        return manager_cwd
+
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
         """Dispatch an execution request."""
         logger.bind(
@@ -56,7 +84,7 @@ class ExecutionCoordinator:
 
         try:
             # 4. Launch
-            cwd_path = Path(request.cwd) if request.cwd else None
+            cwd_path = self._resolve_cwd(request)
             env = request.env or dict(os.environ)
 
             # Ensure we launch async

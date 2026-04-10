@@ -1,10 +1,12 @@
-"""Tests for Orchestra ManagerExecutor - command building and utility functions."""
+"""Tests for manager command/prompt helpers without ManagerExecutor shell."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 from tests.vibe3.conftest import CompletedProcess
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.environment.worktree import WorktreeManager
+from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.manager.prompts import build_manager_command, render_manager_prompt
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 
@@ -19,43 +21,28 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
 
 
 class TestManagerCommandBuilding:
-    """Tests for command building."""
-
     def test_build_manager_command_formats_issue_prompt(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
         issue = make_issue(number=88, title="Improve parser")
 
-        cmd = manager.command_builder.build_manager_command(issue)
+        rendered = render_manager_prompt(OrchestraConfig(), issue)
+        cmd = build_manager_command(OrchestraConfig(), rendered.rendered_text)
 
         assert cmd[:6] == ["uv", "run", "python", "-m", "vibe3", "run"]
         assert "--async" in cmd
-        # --worktree flag removed after refactoring (worktree is self-managed)
         assert "--worktree" not in cmd
         assert "Manage issue #88: Improve parser" in cmd[-1]
         assert "## Role" in cmd[-1]
         assert "状态控制器" in cmd[-1]
         assert "不是实现 agent" in cmd[-1]
 
-    def test_build_manager_command_can_disable_worktree_mode(self):
-        config = OrchestraConfig()
-        config.assignee_dispatch.use_worktree = False
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        issue = make_issue(number=89, title="Run in current flow")
-
-        cmd = manager.command_builder.build_manager_command(issue)
-
-        assert "--async" in cmd
-        assert "--worktree" not in cmd
-        assert "Manage issue #89: Run in current flow" in cmd[-1]
-
-
-class TestManagerWorktreeResolution:
-    """Tests for worktree and branch resolution utilities."""
-
     def test_find_worktree_for_branch_parses_porcelain_output(self):
         config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
+        flow_manager = FlowManager(config)
+        worktree_manager = WorktreeManager(
+            config,
+            repo_path=Path("/tmp/repo"),
+            flow_manager=flow_manager,
+        )
         output = (
             "worktree /tmp/repo\n"
             "HEAD abcdef0\n"
@@ -71,7 +58,7 @@ class TestManagerWorktreeResolution:
             "subprocess.run",
             return_value=CompletedProcess(returncode=0, stdout=output),
         ):
-            wt = manager.worktree_manager._find_worktree_for_branch(
+            wt = worktree_manager._find_worktree_for_branch(
                 "task/issue250-orchestra-manager"
             )
 

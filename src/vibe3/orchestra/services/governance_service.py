@@ -107,7 +107,7 @@ class GovernanceService(ServiceBase):
         prompts_path: Path | None = None,
     ) -> GovernanceService:
         """Build a governance service with default read-model dependencies."""
-        from vibe3.manager.flow_manager import FlowManager
+        from vibe3.execution.flow_dispatch import FlowManager
         from vibe3.services.orchestra_status_service import OrchestraStatusService
 
         flow_manager = FlowManager(config)

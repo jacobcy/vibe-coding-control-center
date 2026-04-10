@@ -13,7 +13,7 @@ from vibe3.orchestra.supervisor_run_service import (
 @patch("vibe3.orchestra.supervisor_run_service.ExecutionCoordinator")
 @patch("vibe3.orchestra.supervisor_run_service.SQLiteClient")
 @patch("vibe3.orchestra.supervisor_run_service.OrchestraStatusService")
-@patch("vibe3.manager.flow_manager.FlowManager")
+@patch("vibe3.execution.flow_dispatch.FlowManager")
 @patch("vibe3.orchestra.supervisor_run_service.GovernanceService")
 @patch("vibe3.orchestra.supervisor_run_service.CodeagentBackend")
 @patch("vibe3.orchestra.supervisor_run_service.resolve_supervisor_agent_options")

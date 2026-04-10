@@ -13,7 +13,7 @@ from loguru import logger
 from vibe3.exceptions import SystemError
 
 if TYPE_CHECKING:
-    from vibe3.manager.flow_manager import FlowManager
+    from vibe3.execution.flow_dispatch import FlowManager
     from vibe3.models.orchestra_config import OrchestraConfig
 
 
@@ -190,9 +190,20 @@ class WorktreeManager:
         flow_branch: str,
     ) -> tuple[Optional[Path], bool]:
         """Resolve manager cwd using canonical worktree ownership."""
+        if self._is_current_branch(flow_branch):
+            return self.repo_path, False
+
+        existing = self._find_worktree_for_branch(flow_branch)
+        if existing:
+            if self.align_auto_scene_to_base(existing, flow_branch):
+                return existing, False
+            return None, False
+
         try:
             ctx = self.acquire_issue_worktree(issue_number, flow_branch)
-            return ctx.path, False
+            if self.align_auto_scene_to_base(ctx.path, flow_branch):
+                return ctx.path, False
+            return None, False
         except Exception:
             return None, False
 
@@ -202,13 +213,6 @@ class WorktreeManager:
         flow_branch: str,
     ) -> tuple[Optional[Path], bool]:
         """Resolve manager cwd for role execution."""
-        if self._is_current_branch(flow_branch):
-            return self.repo_path, False
-
-        existing = self._find_worktree_for_branch(flow_branch)
-        if existing:
-            return existing, False
-
         return self.resolve_manager_cwd(issue_number, flow_branch)
 
     def align_auto_scene_to_base(self, cwd: Path, flow_branch: str) -> bool:

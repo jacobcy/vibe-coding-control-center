@@ -54,7 +54,7 @@ def run_supervisor_mode(
         }
     )
     config = config.model_copy(update={"governance": governance_cfg})
-    from vibe3.manager.flow_manager import FlowManager
+    from vibe3.execution.flow_dispatch import FlowManager
 
     service = GovernanceService(
         config=config,

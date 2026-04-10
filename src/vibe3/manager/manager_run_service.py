@@ -23,18 +23,22 @@ from vibe3.clients.git_client import GitClient
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.config.settings import VibeConfig
+from vibe3.environment.session_naming import get_manager_session_name
+from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.gates import apply_completion_gate, source_state_from_label
+from vibe3.execution.role_contracts import WorktreeRequirement
+from vibe3.execution.role_services import (
+    build_manager_dispatch_request,
+    resolve_orchestra_repo_root,
+)
+from vibe3.execution.roles import MANAGER_ROLE
 from vibe3.manager.prompts import render_manager_prompt
-from vibe3.manager.session_naming import (
-    get_manager_session_name,
-)
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.runtime.no_progress_policy import has_progress_changed, snapshot_progress
+from vibe3.models.orchestration import IssueInfo
+from vibe3.runtime.no_progress_policy import snapshot_progress
 from vibe3.services.abandon_flow_service import AbandonFlowService
-from vibe3.services.issue_failure_service import (
-    block_manager_noop_issue,
-    fail_manager_issue,
-)
+from vibe3.services.issue_failure_service import fail_manager_issue
 
 
 def _handle_closed_issue_post_run(
@@ -51,11 +55,7 @@ def _handle_closed_issue_post_run(
         return False
 
     before_state_label = before_snapshot.get("state_label", "")
-    source_state: IssueState | None = None
-    if before_state_label == "state/ready":
-        source_state = IssueState.READY
-    elif before_state_label == "state/handoff":
-        source_state = IssueState.HANDOFF
+    source_state = source_state_from_label(before_state_label)
 
     if source_state is None:
         store.add_event(
@@ -90,44 +90,6 @@ def _handle_closed_issue_post_run(
             f"flow={abandon_result.get('flow')})"
         ),
         refs={"issue": str(issue_number), "result": str(abandon_result)},
-    )
-    return True
-
-
-def _block_manager_if_noop(
-    *,
-    store: SQLiteClient,
-    issue_number: int,
-    branch: str,
-    actor: str,
-    repo: str | None,
-    before_snapshot: dict[str, object],
-    after_snapshot: dict[str, object],
-) -> bool:
-    """Block manager runs that do not make required state progress."""
-    current_state_label = before_snapshot.get("state_label", "")
-    allow_close = current_state_label in ("state/ready", "state/handoff")
-    if has_progress_changed(
-        before_snapshot,
-        after_snapshot,
-        require_state_transition=True,
-        allow_close_as_progress=allow_close,
-    ):
-        return False
-
-    reason = "manager 本轮未产生状态迁移（must leave READY/HANDOFF per contract）"
-    store.add_event(
-        branch,
-        "manager_noop_blocked",
-        actor,
-        detail=f"Manager auto-blocked issue #{issue_number}: {reason}",
-        refs={"issue": str(issue_number), "reason": reason},
-    )
-    block_manager_noop_issue(
-        issue_number=issue_number,
-        repo=repo,
-        reason=reason,
-        actor=actor,
     )
     return True
 
@@ -175,7 +137,6 @@ def run_manager_issue_mode(
         ]
         issue = IssueInfo(number=issue_number, title=title, labels=labels)
 
-    runtime_config = VibeConfig.get_defaults()
     store = SQLiteClient()
     current_branch = GitClient().get_current_branch()
     branch = resolve_manager_branch(
@@ -184,13 +145,7 @@ def run_manager_issue_mode(
         current_branch=current_branch,
     )
     session_id = None if fresh_session else load_session_id("manager", branch=branch)
-    launch_cwd = resolve_manager_execution_cwd(
-        orchestra_config=orchestra_config,
-        issue_number=issue_number,
-        target_branch=branch,
-        current_branch=current_branch,
-        session_id=session_id,
-    )
+    runtime_config = VibeConfig.get_defaults()
     # Prefer dispatcher-injected backend/model over local config resolution.
     # This ensures task worktrees use the dispatcher's resolved config regardless
     # of which branch the task worktree is on.
@@ -212,45 +167,22 @@ def run_manager_issue_mode(
         )
     actor = format_agent_actor(options)
     backend = CodeagentBackend()
-    rendered = render_manager_prompt(orchestra_config, issue)
-    prompt = rendered.rendered_text
-    before_snapshot = snapshot_progress(
-        issue_number=issue_number,
-        branch=branch,
-        store=store,
-        github=GitHubClient(),
-        repo=orchestra_config.repo,
-    )
-    manager_task = (
-        f"Manage issue #{issue_number}: {issue.title}\n"
-        "Act as the manager state controller for this issue. "
-        "Inspect the scene, read issue comments and handoff, update labels/comments/"
-        "handoff when allowed, and stop when the current state rule requires exit."
-    )
 
     if async_mode and not dry_run:
-        from vibe3.execution.contracts import ExecutionRequest
-        from vibe3.execution.coordinator import ExecutionCoordinator
-
         coordinator = ExecutionCoordinator(orchestra_config, store, backend)
-
-        refs = {"task": manager_task}
-        if session_id:
-            refs["session_id"] = session_id
-
-        request = ExecutionRequest(
-            role="manager",
-            target_branch=branch,
-            target_id=issue_number,
-            execution_name=get_manager_session_name(issue_number),
-            prompt=prompt,
-            options=options,
-            cwd=str(launch_cwd),
-            env={**os.environ, "VIBE3_ASYNC_CHILD": "1"},
-            refs=refs,
+        request = build_manager_dispatch_request(
+            orchestra_config,
+            issue,
+            repo_path=resolve_orchestra_repo_root(),
             actor=actor,
-            mode="async",
         )
+
+        if request is None:
+            fail_manager_issue(
+                issue_number=issue_number,
+                reason="manager async request preparation failed",
+            )
+            raise typer.Exit(1)
 
         try:
             result = coordinator.dispatch_execution(request)
@@ -279,6 +211,22 @@ def run_manager_issue_mode(
             )
             raise typer.Exit(1) from exc
 
+    rendered = render_manager_prompt(orchestra_config, issue)
+    prompt = rendered.rendered_text
+    before_snapshot = snapshot_progress(
+        issue_number=issue_number,
+        branch=branch,
+        store=store,
+        github=GitHubClient(),
+        repo=orchestra_config.repo,
+    )
+    manager_task = (
+        f"Manage issue #{issue_number}: {issue.title}\n"
+        "Act as the manager state controller for this issue. "
+        "Inspect the scene, read issue comments and handoff, update labels/comments/"
+        "handoff when allowed, and stop when the current state rule requires exit."
+    )
+
     sync_request = ExecutionRequest(
         role="manager",
         target_branch=branch,
@@ -286,7 +234,8 @@ def run_manager_issue_mode(
         execution_name=get_manager_session_name(issue_number),
         prompt=prompt,
         options=options,
-        cwd=str(launch_cwd),
+        cwd=str(Path.cwd()) if session_id else None,
+        repo_path=str(resolve_manager_launch_cwd(session_id=session_id)),
         refs={
             "task": manager_task,
             **({"session_id": session_id} if session_id else {}),
@@ -294,6 +243,9 @@ def run_manager_issue_mode(
         actor=actor,
         mode="sync",
         dry_run=dry_run,
+        worktree_requirement=(
+            WorktreeRequirement.NONE if session_id else WorktreeRequirement.PERMANENT
+        ),
     )
     sync_result = ExecutionCoordinator(
         orchestra_config, store, backend
@@ -328,7 +280,8 @@ def run_manager_issue_mode(
     ):
         return
 
-    if _block_manager_if_noop(
+    if apply_completion_gate(
+        role=MANAGER_ROLE,
         store=store,
         issue_number=issue_number,
         branch=branch,
@@ -391,50 +344,3 @@ def resolve_manager_branch(
     )
     branch = str(prioritized[0].get("branch") or "").strip()
     return branch or current_branch
-
-
-def resolve_manager_execution_cwd(
-    *,
-    orchestra_config: OrchestraConfig,
-    issue_number: int,
-    target_branch: str,
-    current_branch: str,
-    session_id: str | None,
-) -> Path:
-    """Resolve execution CWD for manager run.
-
-    Args:
-        orchestra_config: Orchestra configuration
-        issue_number: GitHub issue number
-        target_branch: Target branch for execution
-        current_branch: Current git branch
-        session_id: Existing session ID (if resuming)
-
-    Returns:
-        Path: Resolved CWD path
-    """
-    from vibe3.environment.worktree import WorktreeManager
-
-    # For session resume, use current directory
-    if session_id:
-        return Path.cwd()
-
-    # For current branch execution
-    if target_branch == current_branch:
-        return resolve_manager_launch_cwd(
-            session_id=session_id,
-        )
-
-    # Use WorktreeManager for foreign branch execution
-    repo_root = Path(GitClient().get_git_common_dir()).parent
-    manager_cwd, _ = WorktreeManager(orchestra_config, repo_root).resolve_manager_cwd(
-        issue_number,
-        target_branch,
-    )
-    if manager_cwd is not None:
-        return manager_cwd
-
-    # Fallback: use launch cwd resolver
-    return resolve_manager_launch_cwd(
-        session_id=session_id,
-    )

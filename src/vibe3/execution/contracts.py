@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
+from vibe3.execution.role_contracts import WorktreeRequirement
+
 
 @dataclass
 class ExecutionRequest:
@@ -16,11 +18,13 @@ class ExecutionRequest:
     prompt: Optional[str] = None
     options: Optional[Any] = None
     cwd: Optional[str] = None
+    repo_path: Optional[str] = None
     env: Optional[Dict[str, str]] = None
     refs: Dict[str, str] = field(default_factory=dict)
     actor: str = "orchestra:system"
     mode: Literal["sync", "async"] = "async"
     dry_run: bool = False
+    worktree_requirement: WorktreeRequirement = WorktreeRequirement.NONE
 
 
 @dataclass

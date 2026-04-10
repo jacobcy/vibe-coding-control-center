@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from vibe3.manager.session_naming import get_manager_session_name
+from vibe3.environment.session_naming import get_manager_session_name
 from vibe3.models.orchestration import IssueState
 from vibe3.services.handoff_service import HandoffService
 from vibe3.services.issue_failure_service import (

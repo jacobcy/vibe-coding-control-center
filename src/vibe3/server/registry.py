@@ -7,7 +7,6 @@ import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import cast
 
 from fastapi import FastAPI
 from loguru import logger
@@ -17,16 +16,14 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.execution.flow_dispatch import FlowManager
+from vibe3.execution.roles import LABEL_DISPATCH_ROLES
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
-from vibe3.orchestra.services.state_label_dispatch import (
-    StateLabelDispatchService,
-    TriggerName,
-)
+from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
@@ -101,19 +98,21 @@ def _build_server_with_launch_cwd(
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_manager = ManagerExecutor(
-        config,
-        dry_run=config.dry_run,
-        repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
-        registry=shared_registry,
-    )
+    shared_flow_manager = FlowManager(config, registry=shared_registry)
+    shared_circuit_breaker = None
+    if config.circuit_breaker.enabled:
+        shared_circuit_breaker = CircuitBreaker(
+            failure_threshold=config.circuit_breaker.failure_threshold,
+            cooldown_seconds=config.circuit_breaker.cooldown_seconds,
+            half_open_max_tests=config.circuit_breaker.half_open_max_tests,
+        )
 
     # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
-        orchestrator=shared_manager.flow_manager,
-        circuit_breaker=shared_manager._circuit_breaker,
+        orchestrator=shared_flow_manager,
+        circuit_breaker=shared_circuit_breaker,
         failed_gate=failed_gate,
     )
 
@@ -131,22 +130,15 @@ def _build_server_with_launch_cwd(
     # reducing heartbeat services from 6 to 1 (the facade itself).
     dispatch_services = []
     if config.state_label_dispatch.enabled:
-        _trigger_map: list[tuple[IssueState, TriggerName]] = [
-            (IssueState.READY, "manager"),
-            (IssueState.HANDOFF, "manager"),
-            (IssueState.CLAIMED, "plan"),
-            (IssueState.IN_PROGRESS, "run"),
-            (IssueState.REVIEW, "review"),
-        ]
-        for trigger_state, trigger_name in _trigger_map:
+        for role_service in LABEL_DISPATCH_ROLES:
             dispatch_services.append(
                 StateLabelDispatchService(
                     config,
-                    trigger_state=trigger_state,
-                    trigger_name=cast(TriggerName, trigger_name),
-                    manager=shared_manager,
+                    trigger_state=role_service.trigger_state,
+                    trigger_name=role_service.trigger_name,
                     github=shared_github,
                     executor=shared_executor,
+                    flow_manager=shared_flow_manager,
                     registry=shared_registry,
                 )
             )

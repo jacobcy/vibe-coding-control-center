@@ -38,7 +38,7 @@ class SupervisorHandoffService:
         executor: ThreadPoolExecutor | None = None,
     ) -> None:
         self.config = config
-        from vibe3.manager.flow_manager import FlowManager
+        from vibe3.execution.flow_dispatch import FlowManager
 
         flow_manager = FlowManager(config)
         self._flow_manager = flow_manager

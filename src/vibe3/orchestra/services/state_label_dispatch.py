@@ -11,7 +11,7 @@ from loguru import logger
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import (
     IssueInfo,
@@ -75,7 +75,7 @@ class StateLabelDispatchService(ServiceBase):
         trigger_name: TriggerName,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
-        manager: ManagerExecutor | None = None,
+        flow_manager: FlowManager | None = None,
         registry: "SessionRegistryService | None" = None,
     ) -> None:
         self.config = config
@@ -85,7 +85,7 @@ class StateLabelDispatchService(ServiceBase):
             max_workers=config.max_concurrent_flows,
         )
         self._github = github or GitHubClient()
-        self._manager = manager or ManagerExecutor(config, dry_run=config.dry_run)
+        self._flow_manager = flow_manager or FlowManager(config, registry=registry)
         self._store = SQLiteClient()
         self._registry = registry
         self._dispatch_guard = asyncio.Lock()
@@ -179,7 +179,7 @@ class StateLabelDispatchService(ServiceBase):
         self._facade.on_issue_state_changed(issue_info=issue, from_state=None)
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
-        flow = self._manager.flow_manager.get_flow_for_issue(issue_number)
+        flow = self._flow_manager.get_flow_for_issue(issue_number)
         branch = str(flow.get("branch") or "").strip() if flow else ""
         if not branch:
             return "", None

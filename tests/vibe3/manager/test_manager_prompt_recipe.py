@@ -1,10 +1,12 @@
-"""Tests for manager recipe-driven prompt assembly."""
-
-from pathlib import Path
+"""Tests for manager recipe-driven prompt assembly without executor shell."""
 
 import yaml
 
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.manager.prompts import (
+    build_manager_command,
+    build_manager_recipe,
+    render_manager_prompt,
+)
 from vibe3.models.orchestra_config import AssigneeDispatchConfig, OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.prompts.models import PromptRecipe, VariableSourceKind
@@ -20,12 +22,8 @@ def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
 
 
 class TestManagerRecipeDrivenPrompt:
-    """Assert manager dispatch uses recipe-driven prompt assembly."""
-
     def test_build_manager_recipe_returns_prompt_recipe(self):
-        config = OrchestraConfig()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        recipe = manager.command_builder.build_manager_recipe()
+        recipe = build_manager_recipe(OrchestraConfig())
         assert isinstance(recipe, PromptRecipe)
 
     def test_build_manager_recipe_uses_configured_template_key(self):
@@ -34,8 +32,7 @@ class TestManagerRecipeDrivenPrompt:
                 prompt_template="orchestra.assignee_dispatch.manager"
             )
         )
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        recipe = manager.command_builder.build_manager_recipe()
+        recipe = build_manager_recipe(config)
         assert recipe.template_key == "orchestra.assignee_dispatch.manager"
 
     def test_build_manager_command_still_produces_correct_last_arg(self, tmp_path):
@@ -54,11 +51,9 @@ class TestManagerRecipeDrivenPrompt:
                 prompt_template="orchestra.assignee_dispatch.manager"
             )
         )
-        manager = ManagerExecutor(
-            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
         issue = make_issue(number=88, title="Improve parser")
-        cmd = manager.command_builder.build_manager_command(issue)
+        rendered = render_manager_prompt(config, issue, prompts_path=prompts_path)
+        cmd = build_manager_command(config, rendered.rendered_text)
         assert cmd[-1] == "Implement issue #88: Improve parser"
 
     def test_dispatch_manager_dry_run_logs_rendered_prompt(self, tmp_path):
@@ -73,20 +68,15 @@ class TestManagerRecipeDrivenPrompt:
         prompts_path.write_text(yaml.dump(templates), encoding="utf-8")
 
         config = OrchestraConfig(
-            dry_run=True,
             assignee_dispatch=AssigneeDispatchConfig(
                 prompt_template="orchestra.assignee_dispatch.manager"
             ),
         )
-        manager = ManagerExecutor(
-            config, dry_run=True, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
         issue = make_issue(number=42, title="Dry run test")
-        manager.command_builder.build_manager_command(issue)
-        assert manager.last_manager_render_result is not None
-        assert "Implement issue #42: Dry run test" in (
-            manager.last_manager_render_result.rendered_text
-        )
+        rendered = render_manager_prompt(config, issue, prompts_path=prompts_path)
+        build_manager_command(config, rendered.rendered_text)
+        assert rendered is not None
+        assert "Implement issue #42: Dry run test" in (rendered.rendered_text)
 
     def test_manager_recipe_uses_file_source_for_supervisor_content(self, tmp_path):
         templates = {
@@ -110,10 +100,7 @@ class TestManagerRecipeDrivenPrompt:
             ),
         )
 
-        manager = ManagerExecutor(
-            config, repo_path=Path("/tmp/repo"), prompts_path=prompts_path
-        )
-        recipe = manager.command_builder.build_manager_recipe()
+        recipe = build_manager_recipe(config)
 
         supervisor_src = recipe.variables.get("supervisor_content")
         assert supervisor_src is not None

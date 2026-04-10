@@ -1,32 +1,36 @@
 # Manager
 
-Orchestra 的执行代理层，负责将 issue 映射到 flow，构建和执行 agent 命令，管理 worktree 生命周期。
+`manager/` 现在只保留 manager 角色自身的最小业务壳，不再拥有独立执行框架。
 
-## 职责
+统一主线已经变成：
 
-- Issue → Flow 映射与创建
-- Agent 命令构建（plan/review/run）
-- Worktree 生命周期管理（创建、复用、回收）
-- 命令执行与事件记录
-- 执行结果处理
+- runtime/server: 注册角色服务并触发 polling
+- domain: 把事件翻译成 manager request
+- execution: 处理 flow scene / worktree / lifecycle / capacity / launch / completion gate
+- environment: 提供 worktree 与 session 原语
 
-## 关键组件
+## 当前仅保留的 manager 职责
 
-| 文件 | 职责 |
-|------|------|
-| flow_manager.py | Issue-to-flow 映射和 flow 创建 |
-| command_builder.py | 构建可执行的 agent 命令 |
-| manager_executor.py | 命令执行 + 事件日志 |
-| worktree_manager.py | Worktree 创建/查找/回收 |
-| result_handler.py | Agent 执行结果处理 |
-| prompts.py | Manager 专用 prompt 构建 |
+- `manager_run_service.py`
+  - `internal manager` 同步入口
+  - 调用 execution 主线后回收同步执行结果
+- `prompts.py`
+  - manager prompt / recipe / command 渲染
 
-## 与 orchestra 的关系
+## 已迁出的职责
 
-- **orchestra**: 决策层 — 决定对 issue 做什么（分诊、调度）
-- **manager**: 执行层 — 执行 orchestra 的决策（创建 flow、跑 agent、管 worktree）
+- flow scene orchestration → `execution/flow_dispatch.py`
+- session naming → `environment/session_naming.py`
+- manager async dispatch request → `execution/role_services.py`
+- completion gate → `execution/gates.py`
+- manager executor shell → 已删除
+- worktree 启动控制 → `execution + environment`
 
-## 依赖关系
+## 迁移目标
 
-- 依赖: services (FlowService), clients (Git/GitHub), agents, models, config
-- 被依赖: orchestra (dispatcher 调用 manager)
+后续继续收敛后，`manager/` 应进一步退化为：
+
+- manager prompt 业务规则
+- 一个很薄的同步 CLI 壳
+
+当同类角色都迁完后，`manager/` 目录本身也应可被移除或并入更通用模块。

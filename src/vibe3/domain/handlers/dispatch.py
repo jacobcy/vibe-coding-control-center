@@ -20,7 +20,7 @@ from vibe3.domain.events.flow_lifecycle import DomainEvent
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
-from vibe3.manager.flow_manager import FlowManager
+from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 
 
