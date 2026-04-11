@@ -169,9 +169,12 @@ vibe_doctor() {
     [[ -n "$GH_TOKEN" ]] && \
         echo "  ${GREEN}✓${NC} GH_TOKEN              configured" || \
         echo "  ${YELLOW}!${NC} GH_TOKEN              not set"
-    [[ -n "$BRAVE_API_KEY" ]] && \
-        echo "  ${GREEN}✓${NC} BRAVE_API_KEY         configured" || \
-        echo "  ${YELLOW}!${NC} BRAVE_API_KEY         not set"
+    [[ -n "$EXA_API_KEY" ]] && \
+        echo "  ${GREEN}✓${NC} EXA_API_KEY            configured" || \
+        echo "  ${YELLOW}!${NC} EXA_API_KEY            not set"
+    [[ -n "$CONTEXT7_API_KEY" ]] && \
+        echo "  ${GREEN}✓${NC} CONTEXT7_API_KEY       configured" || \
+        echo "  ${YELLOW}!${NC} CONTEXT7_API_KEY       not set"
     echo ""
 
     # Summary

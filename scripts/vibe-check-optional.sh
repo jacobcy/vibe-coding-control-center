@@ -59,6 +59,28 @@ check_ai_backends() {
     echo ""
 }
 
+# ── API Keys Check ─────────────────────────────────────
+check_api_keys() {
+    echo "${BOLD}API密钥配置:${NC}"
+    echo ""
+
+    # Check environment or keys.env
+    if [[ -n "$EXA_API_KEY" ]]; then
+        printf "  ${GREEN}✓${NC} %-15s configured\n" "EXA_API_KEY"
+    else
+        printf "  ${YELLOW}!${NC} %-15s 未配置\n" "EXA_API_KEY"
+        echo "      获取: https://exa.ai"
+    fi
+
+    if [[ -n "$CONTEXT7_API_KEY" ]]; then
+        printf "  ${GREEN}✓${NC} %-15s configured\n" "CONTEXT7_API_KEY"
+    else
+        printf "  ${YELLOW}!${NC} %-15s 未配置\n" "CONTEXT7_API_KEY"
+        echo "      获取: https://context7.com"
+    fi
+    echo ""
+}
+
 # ── Development Helpers ─────────────────────────────────
 check_dev_helpers() {
     echo "${BOLD}开发辅助工具:${NC}"
@@ -81,16 +103,20 @@ vibe_check_optional() {
         ai)
             check_ai_backends
             ;;
+        keys)
+            check_api_keys
+            ;;
         helpers)
             check_dev_helpers
             ;;
         all|"")
             check_remote_dev_tools
             check_ai_backends
+            check_api_keys
             check_dev_helpers
             ;;
         *)
-            echo "用法: vibe-check-optional [remote|ai|helpers|all]"
+            echo "用法: vibe-check-optional [remote|ai|keys|helpers|all]"
             return 1
             ;;
     esac
@@ -108,6 +134,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo "Categories:"
     echo "  remote    远程开发工具（tailscale、ncat、ssh-agent等）"
     echo "  ai        AI后端扩展（gemini CLI、mcp等）"
+    echo "  keys      API密钥配置（EXA_API_KEY、CONTEXT7_API_KEY等）"
     echo "  helpers   开发辅助工具（direnv、pre-commit、supervisor等）"
     echo "  all       检查所有可选组件（默认）"
     echo ""
