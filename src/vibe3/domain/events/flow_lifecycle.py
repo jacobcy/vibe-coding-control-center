@@ -17,11 +17,15 @@ class IssueStateChanged(DomainEvent):
     """Issue state transition event.
 
     Published when an issue's state label changes.
+
+    issue_title is optionally carried from polling (avoids redundant GitHub
+    API calls in handlers that need to dispatch manager commands).
     """
 
     issue_number: int
     from_state: str | None
     to_state: str
+    issue_title: str | None = None
     reason: str | None = None
     actor: str = "system"
     timestamp: str | None = None

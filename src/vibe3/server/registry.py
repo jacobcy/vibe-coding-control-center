@@ -16,13 +16,14 @@ from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
-from vibe3.models.orchestration import IssueState
 from vibe3.orchestra.failed_gate import FailedGate
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
 from vibe3.orchestra.services.comment_reply import CommentReplyService
 from vibe3.orchestra.services.state_label_dispatch import StateLabelDispatchService
+from vibe3.roles import LABEL_DISPATCH_ROLES
+from vibe3.runtime.circuit_breaker import CircuitBreaker
 from vibe3.runtime.heartbeat import HeartbeatServer
 from vibe3.services.orchestra_status_service import (
     OrchestraSnapshot,
@@ -97,19 +98,21 @@ def _build_server_with_launch_cwd(
     heartbeat = HeartbeatServer(config, failed_gate=failed_gate)
 
     shared_executor = ThreadPoolExecutor(max_workers=config.max_concurrent_flows)
-    shared_manager = ManagerExecutor(
-        config,
-        dry_run=config.dry_run,
-        repo_path=_resolve_dispatcher_repo_root(config, launch_cwd),
-        registry=shared_registry,
-    )
+    shared_flow_manager = FlowManager(config, registry=shared_registry)
+    shared_circuit_breaker = None
+    if config.circuit_breaker.enabled:
+        shared_circuit_breaker = CircuitBreaker(
+            failure_threshold=config.circuit_breaker.failure_threshold,
+            cooldown_seconds=config.circuit_breaker.cooldown_seconds,
+            half_open_max_tests=config.circuit_breaker.half_open_max_tests,
+        )
 
     # Pass circuit_breaker from manager for status reporting
     status_service = OrchestraStatusService(
         config,
         github=shared_github,
-        orchestrator=shared_manager.flow_manager,
-        circuit_breaker=shared_manager._circuit_breaker,
+        orchestrator=shared_flow_manager,
+        circuit_breaker=shared_circuit_breaker,
         failed_gate=failed_gate,
     )
 
@@ -120,73 +123,36 @@ def _build_server_with_launch_cwd(
                 github=shared_github,
             )
         )
-    if config.state_label_dispatch.enabled:
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.READY,
-                trigger_name="manager",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.HANDOFF,
-                trigger_name="manager",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.CLAIMED,
-                trigger_name="plan",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.IN_PROGRESS,
-                trigger_name="run",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
-        heartbeat.register(
-            StateLabelDispatchService(
-                config,
-                trigger_state=IssueState.REVIEW,
-                trigger_name="review",
-                manager=shared_manager,
-                github=shared_github,
-                executor=shared_executor,
-                registry=shared_registry,
-            )
-        )
 
-    # Register OrchestrationFacade as primary domain-first entry point
-    facade = OrchestrationFacade()
+    # Build dispatch services for all trigger states.
+    # These are NOT registered directly with the heartbeat — instead they are
+    # passed to OrchestrationFacade and called concurrently from its on_tick(),
+    # reducing heartbeat services from 6 to 1 (the facade itself).
+    dispatch_services = []
+    if config.state_label_dispatch.enabled:
+        for role_service in LABEL_DISPATCH_ROLES:
+            dispatch_services.append(
+                StateLabelDispatchService(
+                    config,
+                    trigger_state=role_service.trigger_state,
+                    trigger_name=role_service.trigger_name,
+                    github=shared_github,
+                    executor=shared_executor,
+                    flow_manager=shared_flow_manager,
+                    registry=shared_registry,
+                )
+            )
+
+    # Register OrchestrationFacade as the single domain-first
+    # heartbeat entry point. It incorporates governance scan,
+    # supervisor scan, and issue-label dispatch polling.
+    facade = OrchestrationFacade(dispatch_services=dispatch_services)
     heartbeat.register(facade)
 
-    # GovernanceService and SupervisorHandoffService are no longer registered
-    # directly to the heartbeat. Their on_tick() methods were stubs delegating
-    # to domain handlers. Governance scans are now triggered via:
-    #   OrchestrationFacade.on_tick() -> GovernanceScanStarted event
-    #   -> governance domain handler -> GovernanceService.run_scan()
-    # Supervisor handoff follows the same domain-event-driven path.
+    # GovernanceService and SupervisorHandoffService are deleted.
+    # Governance and supervisor dispatch are now handled inline by
+    # OrchestrationFacade via roles/governance.py and roles/supervisor.py
+    # through ExecutionCoordinator — no per-role service or handler needed.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

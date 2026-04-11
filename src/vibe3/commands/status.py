@@ -73,7 +73,7 @@ def status(
             # Fallback if server is not running
             from dataclasses import replace
 
-            from vibe3.manager.flow_manager import FlowManager
+            from vibe3.execution.flow_dispatch import FlowManager
 
             orch_service = OrchestraStatusService(
                 config, orchestrator=FlowManager(config)

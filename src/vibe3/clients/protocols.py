@@ -91,6 +91,7 @@ class GitHubClientProtocol(Protocol):
         state: str = "open",
         assignee: str | None = None,
         repo: str | None = None,
+        label: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -98,6 +99,7 @@ class GitHubClientProtocol(Protocol):
             limit: Maximum number of issues to fetch
             state: Issue state filter (open, closed, all)
             assignee: Filter by assignee username
+            label: Server-side label filter (reduces payload vs client-side filtering)
         """
         ...
 

@@ -1,12 +1,13 @@
 """Tests for execution coordinator."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe3.execution.contracts import ExecutionRequest
 from vibe3.execution.coordinator import ExecutionCoordinator
+from vibe3.execution.role_contracts import WorktreeRequirement
 
 
 @pytest.fixture
@@ -164,3 +165,49 @@ def test_coordinator_dispatch_launch_fails(mock_dependencies):
 
     # Verify capacity in-flight pruned even on error
     capacity.prune_in_flight.assert_called_once_with("planner", {42})
+
+
+@patch("vibe3.execution.coordinator.WorktreeManager")
+def test_coordinator_resolves_permanent_worktree_for_manager(
+    mock_worktree_cls, mock_dependencies, tmp_path
+):
+    """Coordinator should own permanent worktree resolution for manager-like roles."""
+    config, store, backend, capacity, lifecycle = mock_dependencies
+    capacity.can_dispatch.return_value = True
+
+    handle = MagicMock()
+    handle.tmux_session = "manager-session"
+    handle.log_path = Path("/tmp/manager.log")
+    backend.start_async_command.return_value = handle
+
+    mock_worktree = MagicMock()
+    mock_worktree.resolve_manager_cwd.return_value = (tmp_path, False)
+    mock_worktree_cls.return_value = mock_worktree
+
+    coordinator = ExecutionCoordinator(
+        config=config,
+        store=store,
+        backend=backend,
+        capacity=capacity,
+        lifecycle=lifecycle,
+    )
+    request = ExecutionRequest(
+        role="manager",
+        target_branch="task/issue-7",
+        target_id=7,
+        execution_name="vibe3-manager-issue-7",
+        cmd=["echo", "manager"],
+        repo_path="/tmp/repo",
+        worktree_requirement=WorktreeRequirement.PERMANENT,
+    )
+
+    result = coordinator.dispatch_execution(request)
+
+    assert result.launched is True
+    mock_worktree_cls.assert_called_once_with(config, Path("/tmp/repo"))
+    mock_worktree.resolve_manager_cwd.assert_called_once_with(7, "task/issue-7")
+    backend.start_async_command.assert_called_once()
+    call = backend.start_async_command.call_args
+    assert call.args[0] == ["echo", "manager"]
+    assert call.kwargs["execution_name"] == "vibe3-manager-issue-7"
+    assert call.kwargs["cwd"] == tmp_path

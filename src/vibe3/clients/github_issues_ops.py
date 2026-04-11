@@ -115,6 +115,7 @@ class IssuesMixin(IssueAdminMixin):
         state: str = "open",
         assignee: str | None = None,
         repo: str | None = None,
+        label: str | None = None,
     ) -> list[dict[str, Any]]:
         """List GitHub issues.
 
@@ -122,6 +123,9 @@ class IssuesMixin(IssueAdminMixin):
             limit: Maximum number of issues to fetch
             state: Issue state filter (open, closed, all)
             assignee: Filter by assignee username
+            label: Server-side label filter — passed as ``--label`` to the GitHub
+                CLI so GitHub returns only matching issues, reducing both network
+                payload and client-side filtering work.
         """
         logger.bind(
             external="github",
@@ -129,6 +133,7 @@ class IssuesMixin(IssueAdminMixin):
             limit=limit,
             state=state,
             assignee=assignee,
+            label=label,
         ).debug("Calling GitHub API: list_issues")
         cmd = [
             "gh",
@@ -143,6 +148,8 @@ class IssuesMixin(IssueAdminMixin):
         ]
         if assignee:
             cmd.extend(["--assignee", assignee])
+        if label:
+            cmd.extend(["--label", label])
         if repo:
             cmd.extend(["--repo", repo])
         result = subprocess.run(cmd, capture_output=True, text=True)

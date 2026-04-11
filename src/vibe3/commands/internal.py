@@ -1,6 +1,6 @@
 """Internal system commands for Orchestra routing (hidden from users)."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -26,22 +26,21 @@ def internal_manager_dispatch(
     fresh_session: bool = False,
 ) -> None:
     """L3: Dispatch the State Manager agent."""
-    from vibe3.manager.manager_run_service import run_manager_issue_mode
+    from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+    from vibe3.roles.manager import MANAGER_SYNC_SPEC
 
-    run_manager_issue_mode(
+    run_issue_role_mode(
         issue_number=issue,
         dry_run=dry_run,
         async_mode=not no_async,
         fresh_session=fresh_session,
+        spec=MANAGER_SYNC_SPEC,
     )
 
 
 @app.command("apply")
 def internal_apply_dispatch(
-    supervisor: Annotated[str, typer.Argument(help="Supervisor handoff file")],
-    issue: Annotated[
-        Optional[int], typer.Option(help="Associated issue (optional)")
-    ] = None,
+    issue: Annotated[int, typer.Argument(help="Issue number to process")],
     dry_run: bool = False,
     no_async: Annotated[
         bool,
@@ -51,12 +50,14 @@ def internal_apply_dispatch(
         ),
     ] = False,
 ) -> None:
-    """L2: Dispatch the Supervisor/Apply agent."""
-    from vibe3.orchestra.supervisor_run_service import run_supervisor_mode
+    """L2: Dispatch the Supervisor/Apply agent for a governance issue."""
+    from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
+    from vibe3.roles.supervisor import SUPERVISOR_CLI_SYNC_SPEC
 
-    run_supervisor_mode(
-        supervisor_file=supervisor,
+    run_issue_role_mode(
         issue_number=issue,
         dry_run=dry_run,
         async_mode=not no_async,
+        fresh_session=True,
+        spec=SUPERVISOR_CLI_SYNC_SPEC,
     )

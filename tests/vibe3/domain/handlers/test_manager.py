@@ -1,28 +1,33 @@
-"""Tests for manager event handlers.
+"""Tests for issue-state role dispatch handlers.
 
 Tests cover:
-- Guard logic (only handle 'claimed' state)
-- GitHub issue fetching
-- ManagerExecutor dispatch
+- Guard logic (only handle manager trigger states)
+- Fast path: event carries issue_title, no GitHub fetch needed
+- Slow path: event missing issue_title, falls back to view_issue
+- manager role service dispatch
 """
 
 from unittest.mock import MagicMock, patch
 
 from vibe3.domain.events.flow_lifecycle import IssueStateChanged
-from vibe3.domain.handlers.manager import handle_issue_state_changed_for_manager
-from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.domain.handlers.issue_state_dispatch import (
+    handle_issue_state_changed_for_roles,
+)
+from vibe3.models.orchestration import IssueState
 
 
 def _make_event(
     issue_number: int = 42,
-    from_state: str | None = "ready",
-    to_state: str = "claimed",
+    from_state: str | None = "blocked",
+    to_state: str = "ready",
+    issue_title: str | None = None,
 ) -> IssueStateChanged:
     """Create a sample IssueStateChanged event."""
     return IssueStateChanged(
         issue_number=issue_number,
         from_state=from_state,
         to_state=to_state,
+        issue_title=issue_title,
     )
 
 
@@ -37,177 +42,176 @@ def _make_github_response(
         "title": title,
         "state": state,
         "body": "Test body",
-        "labels": [{"name": "state/claimed"}],
+        "labels": [{"name": "state/ready"}],
         "assignees": [],
         "milestone": None,
     }
 
 
 class TestManagerHandlerGuardLogic:
-    """Test guard: only handle 'claimed' state."""
+    """Test guard: only handle manager trigger states."""
 
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
-    def test_ignores_non_claimed_state(
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    def test_ignores_non_manager_trigger_state(
         self,
         mock_config_cls: MagicMock,
     ) -> None:
-        """Handler should return early when to_state is not 'claimed'."""
+        """Handler should return early when to_state is not a supported role trigger."""
         mock_config_cls.from_settings.return_value = MagicMock()
 
-        event = _make_event(to_state="in-progress")
+        event = _make_event(to_state="claimed")
 
         # Should not raise and should not create any services
-        handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
         # No services should be created for non-claimed states
         mock_config_cls.from_settings.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager.ManagerExecutor")
-    @patch("vibe3.domain.handlers.manager.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
-    def test_processes_claimed_state(
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
+    def test_processes_ready_state(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
-        mock_executor_cls: MagicMock,
+        mock_build_request: MagicMock,
+        mock_coordinator_cls: MagicMock,
     ) -> None:
-        """Handler should process events with to_state='claimed'."""
+        """Handler should process ready events via fast path."""
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
-        mock_github = MagicMock()
-        mock_github.view_issue.return_value = _make_github_response()
-        mock_github_cls.return_value = mock_github
+        mock_request = MagicMock()
+        mock_request.role = "manager"
+        mock_build_request.return_value = mock_request
 
-        mock_executor = MagicMock()
-        mock_executor.dispatch_manager.return_value = True
-        mock_executor_cls.return_value = mock_executor
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = MagicMock(
+            launched=True, reason=None
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
-        event = _make_event(to_state="claimed")
+        # Provide issue_title to use the fast path (no view_issue call)
+        event = _make_event(to_state="ready", issue_title="Test issue")
 
-        with patch(
-            "vibe3.domain.handlers.manager.IssueInfo.from_github_payload"
-        ) as mock_from_payload:
-            mock_from_payload.return_value = IssueInfo(
-                number=42,
-                title="Test issue",
-                state=IssueState.CLAIMED,
-            )
-            handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
-        mock_executor.dispatch_manager.assert_called_once()
+        mock_build_request.assert_called_once()
+        mock_coordinator.dispatch_execution.assert_called_once()
 
 
 class TestManagerHandlerIssueFetching:
-    """Test GitHub issue fetching and error handling."""
+    """Test slow-path GitHub issue fetching and error handling.
 
-    @patch("vibe3.domain.handlers.manager.ManagerExecutor")
-    @patch("vibe3.domain.handlers.manager.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    These tests exercise the fallback when event.issue_title is None
+    (i.e., webhook-triggered events that don't carry the title).
+    """
+
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_github_none(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_executor_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
-        """Handler should skip dispatch when GitHub returns None."""
+        """Handler should skip dispatch when GitHub returns None (slow path)."""
         mock_config_cls.from_settings.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = None
         mock_github_cls.return_value = mock_github
 
-        event = _make_event()
-        handle_issue_state_changed_for_manager(event)
+        # No issue_title → slow path → calls view_issue
+        event = _make_event(issue_title=None)
+        handle_issue_state_changed_for_roles(event)
 
         # Should NOT dispatch
-        mock_executor_cls.assert_not_called()
+        mock_build_request.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager.ManagerExecutor")
-    @patch("vibe3.domain.handlers.manager.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_network_error(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_executor_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
-        """Handler should skip dispatch when GitHub returns network error."""
+        """Handler should skip dispatch when GitHub returns network error
+        (slow path)."""
         mock_config_cls.from_settings.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = "network_error"
         mock_github_cls.return_value = mock_github
 
-        event = _make_event()
-        handle_issue_state_changed_for_manager(event)
+        event = _make_event(issue_title=None)
+        handle_issue_state_changed_for_roles(event)
 
-        # Should NOT dispatch
-        mock_executor_cls.assert_not_called()
+        mock_build_request.assert_not_called()
 
-    @patch("vibe3.domain.handlers.manager.ManagerExecutor")
-    @patch("vibe3.domain.handlers.manager.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.clients.github_client.GitHubClient")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_records_failed_on_invalid_issue_data(
         self,
         mock_config_cls: MagicMock,
         mock_github_cls: MagicMock,
-        mock_executor_cls: MagicMock,
+        mock_build_request: MagicMock,
     ) -> None:
-        """Handler should skip dispatch when from_github_payload returns None."""
+        """Handler should skip dispatch when from_github_payload returns
+        None (slow path)."""
         mock_config_cls.from_settings.return_value = MagicMock()
 
         mock_github = MagicMock()
         mock_github.view_issue.return_value = _make_github_response()
         mock_github_cls.return_value = mock_github
 
-        event = _make_event()
+        event = _make_event(issue_title=None)
 
         with patch(
-            "vibe3.domain.handlers.manager.IssueInfo.from_github_payload",
+            "vibe3.models.orchestration.IssueInfo.from_github_payload",
             return_value=None,
         ):
-            handle_issue_state_changed_for_manager(event)
+            handle_issue_state_changed_for_roles(event)
 
-        # Should NOT dispatch
-        mock_executor_cls.assert_not_called()
+        mock_build_request.assert_not_called()
 
 
 class TestManagerHandlerDispatch:
-    """Test ManagerExecutor dispatch."""
+    """Test manager role service dispatch via fast path (issue_title present)."""
 
-    @patch("vibe3.domain.handlers.manager.ManagerExecutor")
-    @patch("vibe3.domain.handlers.manager.GitHubClient")
-    @patch("vibe3.domain.handlers.manager.OrchestraConfig")
+    @patch("vibe3.execution.coordinator.ExecutionCoordinator")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.build_issue_state_request")
+    @patch("vibe3.domain.handlers.issue_state_dispatch.OrchestraConfig")
     def test_dispatch_success(
         self,
         mock_config_cls: MagicMock,
-        mock_github_cls: MagicMock,
-        mock_executor_cls: MagicMock,
+        mock_build_request: MagicMock,
+        mock_coordinator_cls: MagicMock,
     ) -> None:
-        """Handler should call dispatch."""
+        """Handler should call prepare_execution_request with correct IssueInfo."""
         mock_config = MagicMock()
         mock_config_cls.from_settings.return_value = mock_config
 
-        mock_github = MagicMock()
-        mock_github.view_issue.return_value = _make_github_response()
-        mock_github_cls.return_value = mock_github
+        mock_request = MagicMock()
+        mock_request.role = "manager"
+        mock_build_request.return_value = mock_request
 
-        mock_executor = MagicMock()
-        mock_executor.dispatch_manager.return_value = True
-        mock_executor_cls.return_value = mock_executor
+        mock_coordinator = MagicMock()
+        mock_coordinator.dispatch_execution.return_value = MagicMock(
+            launched=True, reason=None
+        )
+        mock_coordinator_cls.return_value = mock_coordinator
 
-        event = _make_event()
+        event = _make_event(issue_title="Test issue")
 
-        with patch(
-            "vibe3.domain.handlers.manager.IssueInfo.from_github_payload"
-        ) as mock_from_payload:
-            mock_from_payload.return_value = IssueInfo(
-                number=42,
-                title="Test issue",
-                state=IssueState.CLAIMED,
-            )
-            handle_issue_state_changed_for_manager(event)
+        handle_issue_state_changed_for_roles(event)
 
-        # Verify dispatch was called with IssueInfo
-        mock_executor.dispatch_manager.assert_called_once()
+        # Verify prepare_execution_request was called with IssueInfo
+        mock_build_request.assert_called_once()
+        dispatched_issue = mock_build_request.call_args[0][1]
+        assert dispatched_issue.number == 42
+        assert dispatched_issue.title == "Test issue"
+        assert dispatched_issue.state == IssueState.READY

@@ -1,15 +1,12 @@
-"""Tests for orchestra manager dispatch flow, locking and worktree management."""
+"""Tests for manager role service request preparation."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from vibe3.agents.backends.codeagent import AsyncExecutionHandle
-from vibe3.environment.session_registry import SessionRegistryService
-from vibe3.manager.manager_executor import ManagerExecutor
+from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
+from vibe3.roles.manager import build_manager_request as build_manager_dispatch_request
 
 
 def make_issue(number: int = 42, title: str = "Test issue") -> IssueInfo:
@@ -25,130 +22,47 @@ def make_config() -> OrchestraConfig:
     return OrchestraConfig(pid_file=Path(".git/vibe3/orchestra.pid"))
 
 
-@pytest.fixture(autouse=True)
-def mock_failed_gate():
-    """Patch FailedGate to always pass by default in tests."""
-    with patch("vibe3.orchestra.failed_gate.FailedGate.check") as mock_check:
-        mock_check.return_value = MagicMock(blocked=False)
-        yield mock_check
+class TestManagerRoleServicePreparation:
+    """Manager dispatch should be reduced to request preparation only."""
 
+    def test_prepare_dispatch_request_returns_none_when_flow_missing_branch(self):
+        issue = make_issue()
 
-class TestManagerDispatchConcurrency:
-    """Tests for concurrent dispatch protection."""
-
-    def test_dispatch_manager_acquires_global_lock(self):
-        """Verify that dispatch_manager uses _active_dispatch_locks
-        to prevent re-entry.
-        """
-        config = make_config()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-        manager._registry = MagicMock(spec=SessionRegistryService)
-        manager._registry.count_live_worker_sessions.return_value = 0
-
-        issue = make_issue(123)
-
-        # Simulate a slow dispatch by making _dispatch_manager_impl check the lock
-        def slow_impl(iss):
-            assert iss.number in manager._active_dispatch_locks
-            # While this is running, a second call should fail
-            assert manager.dispatch_manager(iss) is False
-            return True
-
-        with patch.object(manager, "_dispatch_manager_impl", side_effect=slow_impl):
-            result = manager.dispatch_manager(issue)
-            assert result is True
-
-        # Lock should be released after completion
-        assert 123 not in manager._active_dispatch_locks
-
-
-class TestManagerCwdResolution:
-    """Tests for ManagerExecutor worktree management methods."""
-
-    def test_resolve_manager_cwd_uses_current_branch(self):
-        config = make_config()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-
-        with patch.object(
-            manager.worktree_manager, "_is_current_branch", return_value=True
+        with patch(
+            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
+            return_value={"branch": ""},
         ):
-            cwd, is_temp = manager._resolve_manager_cwd(88, "task/issue-88")
+            assert (
+                build_manager_dispatch_request(
+                    make_config(),
+                    issue,
+                    repo_path=Path("/tmp/repo"),
+                )
+                is None
+            )
 
-        assert cwd == Path("/tmp/repo")
-        assert is_temp is False
-
-    def test_resolve_manager_cwd_uses_existing_branch_worktree(self):
-        config = make_config()
-        manager = ManagerExecutor(config, repo_path=Path("/tmp/repo"))
-
-        with patch.object(
-            manager.worktree_manager, "_is_current_branch", return_value=False
-        ):
-            with patch.object(
-                manager.worktree_manager,
-                "_find_worktree_for_branch",
-                return_value=Path("/tmp/wt-issue-88"),
-            ):
-                cwd, is_temp = manager._resolve_manager_cwd(88, "task/issue-88")
-
-        assert cwd == Path("/tmp/wt-issue-88")
-        assert is_temp is False
-
-
-class TestManagerDispatchIntegration:
-    """Integration tests for full manager dispatch flow with ManagerExecutor."""
-
-    def test_dispatch_manager_executes_in_resolved_manager_cwd(self):
-        config = make_config()
-        manager = ManagerExecutor(config, dry_run=False, repo_path=Path("/tmp/repo"))
-        manager._registry = MagicMock()
-        manager._registry.count_live_worker_sessions.return_value = 0
+    def test_prepare_dispatch_request_builds_self_invocation(self):
         issue = make_issue(number=102, title="Manager real dispatch")
 
-        with patch.object(
-            manager.flow_manager,
-            "create_flow_for_issue",
+        with patch(
+            "vibe3.roles.manager.FlowManager.create_flow_for_issue",
             return_value={"branch": "task/issue-102"},
         ):
-            with patch.object(
-                manager,
-                "_resolve_manager_cwd",
-                return_value=(Path("/tmp/wt-issue-102"), False),
-            ):
-                with patch.object(
-                    manager.worktree_manager,
-                    "align_auto_scene_to_base",
-                    return_value=True,
-                ):
-                    with patch.object(
-                        manager.flow_manager.store,
-                        "add_event",
-                        return_value=None,
-                    ) as mock_add_event:
-                        handle = AsyncExecutionHandle(
-                            tmux_session="vibe3-manager-102",
-                            log_path=Path("temp/logs/vibe3-manager-102.async.log"),
-                            prompt_file_path=Path("/tmp/prompt.md"),
-                        )
-                        mock_backend = MagicMock()
-                        start_async_command = mock_backend.start_async_command
-                        start_async_command.return_value = handle
-                        manager._backend = mock_backend
+            request = build_manager_dispatch_request(
+                make_config(),
+                issue,
+                repo_path=Path("/tmp/repo"),
+            )
 
-                        # Mock agent options resolution
-                        with patch(
-                            "vibe3.runtime.agent_resolver.resolve_manager_agent_options"
-                        ) as mock_resolve:
-                            mock_resolve.return_value = MagicMock(
-                                backend="claude", model=None
-                            )
-                            result = manager.dispatch_manager(issue)
-
-        assert result is True
-        # Async dispatch only records "started" event via coordinator
-        mock_add_event.assert_called_once()
-        assert mock_add_event.call_args.args[1] == "manager_started"
-        mock_backend.start_async_command.assert_called_once()
-        assert mock_backend.start_async_command.call_args.kwargs["cwd"] == Path(
-            "/tmp/wt-issue-102"
-        )
+        assert request is not None
+        assert request.role == "manager"
+        assert request.target_id == 102
+        assert request.target_branch == "task/issue-102"
+        assert request.cwd is None
+        assert request.repo_path == str(Path("/tmp/repo").resolve())
+        assert request.mode == "async"
+        assert request.worktree_requirement == WorktreeRequirement.PERMANENT
+        assert request.cmd is not None
+        assert request.cmd[-2:] == ["102", "--no-async"]
+        assert "VIBE3_ASYNC_CHILD" in request.env
+        assert request.refs["issue_title"] == "Manager real dispatch"

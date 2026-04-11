@@ -1,14 +1,14 @@
 """Tests for OrchestrationFacade."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from vibe3.domain.events import (
-    GovernanceDecisionRequired,
-    GovernanceScanStarted,
     IssueStateChanged,
 )
+from vibe3.domain.events.governance import GovernanceScanStarted
+from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.runtime.event_bus import GitHubEvent
@@ -47,10 +47,8 @@ class TestOrchestrationFacade:
             from_state="ready",
         )
 
-        # Verify publish was called
         assert mock_publish.called
 
-        # Verify event structure
         event = mock_publish.call_args.args[0]
         assert isinstance(event, IssueStateChanged)
         assert event.issue_number == 42
@@ -58,76 +56,108 @@ class TestOrchestrationFacade:
         assert event.to_state == "claimed"
 
     @patch("vibe3.domain.orchestration_facade.publish")
-    def test_on_heartbeat_tick_emits_event(
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    def test_on_heartbeat_tick_publishes_governance_scan_started(
         self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
         mock_publish: MagicMock,
     ) -> None:
-        """Test that on_heartbeat_tick emits GovernanceScanStarted event."""
+        """Test that on_heartbeat_tick publishes GovernanceScanStarted."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+        )
+        mock_monotonic.side_effect = [0.0, 1.0, 2.0]
         facade = OrchestrationFacade(tick_count=0)
 
         facade.on_heartbeat_tick()
 
-        # Verify publish was called
-        assert mock_publish.called
-
-        # Verify event structure
+        assert mock_publish.call_count == 1
         event = mock_publish.call_args.args[0]
         assert isinstance(event, GovernanceScanStarted)
         assert event.tick_count == 1
 
-        # Second tick should increment counter
+        mock_publish.reset_mock()
         facade.on_heartbeat_tick()
-        event = mock_publish.call_args.args[0]
-        assert event.tick_count == 2
+        assert mock_publish.call_count == 1
+        event2 = mock_publish.call_args.args[0]
+        assert isinstance(event2, GovernanceScanStarted)
+        assert event2.tick_count == 2
 
     @patch("vibe3.domain.orchestration_facade.publish")
-    def test_on_governance_decision_emits_event(
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    def test_on_heartbeat_tick_respects_absolute_governance_interval(
         self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
         mock_publish: MagicMock,
+    ) -> None:
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=900,
+            governance=MagicMock(interval_ticks=1),
+        )
+        mock_monotonic.side_effect = [0.0, 60.0, 901.0]
+
+        facade = OrchestrationFacade(tick_count=0)
+
+        facade.on_heartbeat_tick()
+        mock_publish.assert_not_called()
+
+        facade.on_heartbeat_tick()
+        assert mock_publish.call_count == 1
+        event = mock_publish.call_args.args[0]
+        assert isinstance(event, GovernanceScanStarted)
+        assert event.tick_count == 2
+
+    @patch("vibe3.clients.github_client.GitHubClient.add_comment")
+    def test_on_governance_decision_posts_comment(
+        self,
+        mock_add_comment: MagicMock,
         sample_issue_info: IssueInfo,
     ) -> None:
-        """Test that on_governance_decision emits GovernanceDecisionRequired event."""
+        """Test that on_governance_decision posts a GitHub comment directly."""
         facade = OrchestrationFacade()
-
         facade.on_governance_decision(
             issue_info=sample_issue_info,
             reason="Manual review required",
             suggested_action="Assign to reviewer",
         )
 
-        # Verify publish was called
-        assert mock_publish.called
-
-        # Verify event structure
-        event = mock_publish.call_args.args[0]
-        assert isinstance(event, GovernanceDecisionRequired)
-        assert event.issue_number == 42
-        assert event.reason == "Manual review required"
-        assert event.suggested_action == "Assign to reviewer"
+        mock_add_comment.assert_called_once()
+        call_args = mock_add_comment.call_args
+        assert call_args.args[0] == 42
+        assert "Manual review required" in call_args.args[1]
 
     @patch("vibe3.domain.orchestration_facade.publish")
-    def test_facade_does_not_dispatch_directly(
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    def test_facade_publishes_only_events_not_dispatch(
         self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
         mock_publish: MagicMock,
         sample_issue_info: IssueInfo,
     ) -> None:
-        """Test that facade only publishes events, doesn't dispatch chains."""
+        """Test facade only publishes domain events, never does execution assembly."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+        )
+        mock_monotonic.side_effect = [0.0, 1.0]
         facade = OrchestrationFacade()
 
-        # Call all methods
         facade.on_issue_state_changed(sample_issue_info, from_state="ready")
         facade.on_heartbeat_tick()
-        facade.on_governance_decision(sample_issue_info, reason="Test")
 
-        # Verify only publish was called (no direct dispatch)
-        assert mock_publish.call_count == 3
-        # Verify all events are domain events
-        for call in mock_publish.call_args_list:
-            event = call.args[0]
-            assert isinstance(
-                event,
-                (IssueStateChanged, GovernanceScanStarted, GovernanceDecisionRequired),
-            )
+        # Both calls produce exactly one publish each.
+        assert mock_publish.call_count == 2
+        events = [call.args[0] for call in mock_publish.call_args_list]
+        event_types = {type(e).__name__ for e in events}
+        assert "IssueStateChanged" in event_types
+        assert "GovernanceScanStarted" in event_types
 
     @pytest.mark.asyncio
     @patch("vibe3.domain.orchestration_facade.publish")
@@ -175,3 +205,192 @@ class TestOrchestrationFacade:
         await facade.handle_event(event)
 
         mock_publish.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.clients.github_client.GitHubClient.list_issues")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_on_supervisor_scan_publishes_supervisor_issue_identified(
+        self,
+        mock_config_cls: MagicMock,
+        mock_list_issues: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """Test that on_supervisor_scan publishes SupervisorIssueIdentified events."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            repo="owner/repo",
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+                supervisor_file="supervisor.md",
+            ),
+        )
+        mock_list_issues.return_value = [
+            {
+                "number": 99,
+                "title": "Governance issue",
+                "labels": [
+                    {"name": "supervisor"},
+                    {"name": "state/handoff"},
+                ],
+            }
+        ]
+
+        facade = OrchestrationFacade()
+        await facade.on_supervisor_scan()
+
+        assert mock_publish.call_count == 1
+        event = mock_publish.call_args.args[0]
+        assert isinstance(event, SupervisorIssueIdentified)
+        assert event.issue_number == 99
+        assert event.issue_title == "Governance issue"
+        assert event.supervisor_file == "supervisor.md"
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.clients.github_client.GitHubClient.list_issues")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_on_supervisor_scan_skips_missing_labels(
+        self,
+        mock_config_cls: MagicMock,
+        mock_list_issues: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """Test that on_supervisor_scan skips issues without both required labels."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            repo="owner/repo",
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+                supervisor_file="supervisor.md",
+            ),
+        )
+        mock_list_issues.return_value = [
+            {
+                "number": 1,
+                "title": "Only supervisor label",
+                "labels": [{"name": "supervisor"}],
+            },
+            {
+                "number": 2,
+                "title": "Only handoff label",
+                "labels": [{"name": "state/handoff"}],
+            },
+        ]
+
+        facade = OrchestrationFacade()
+        await facade.on_supervisor_scan()
+
+        mock_publish.assert_not_called()
+
+
+class TestOrchestrationFacadeDispatchServices:
+    """Tests for dispatch_services integration (P2: unified heartbeat registration)."""
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_on_tick_calls_all_dispatch_services(
+        self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """on_tick() should call on_tick() on each dispatch service concurrently."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+            ),
+        )
+        mock_monotonic.side_effect = [float(i) for i in range(20)]
+
+        mock_service1 = MagicMock()
+        mock_service1.on_tick = AsyncMock()
+        mock_service2 = MagicMock()
+        mock_service2.on_tick = AsyncMock()
+
+        facade = OrchestrationFacade(
+            tick_count=0,
+            dispatch_services=[mock_service1, mock_service2],
+        )
+
+        with patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock):
+            await facade.on_tick()
+
+        mock_service1.on_tick.assert_awaited_once()
+        mock_service2.on_tick.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.domain.orchestration_facade.time.monotonic")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_on_tick_no_dispatch_services_by_default(
+        self,
+        mock_config_cls: MagicMock,
+        mock_monotonic: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """on_tick() should work normally when no dispatch_services are provided."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+            ),
+        )
+        mock_monotonic.side_effect = [float(i) for i in range(20)]
+
+        facade = OrchestrationFacade(tick_count=0)
+
+        with patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock):
+            await facade.on_tick()
+
+    @pytest.mark.asyncio
+    @patch("vibe3.domain.orchestration_facade.publish")
+    @patch("vibe3.domain.orchestration_facade.OrchestraConfig")
+    async def test_on_tick_continues_when_dispatch_service_fails(
+        self,
+        mock_config_cls: MagicMock,
+        mock_publish: MagicMock,
+    ) -> None:
+        """on_tick() should not propagate exceptions from dispatch services."""
+        mock_config_cls.from_settings.return_value = MagicMock(
+            polling_interval=1,
+            governance=MagicMock(interval_ticks=1),
+            supervisor_handoff=MagicMock(
+                issue_label="supervisor",
+                handoff_state_label="state/handoff",
+            ),
+        )
+
+        failing_service = MagicMock()
+        failing_service.service_name = "failing-dispatch"
+        failing_service.on_tick = AsyncMock(side_effect=RuntimeError("GitHub down"))
+        healthy_service = MagicMock()
+        healthy_service.service_name = "healthy-dispatch"
+        healthy_service.on_tick = AsyncMock()
+
+        facade = OrchestrationFacade(
+            tick_count=0,
+            dispatch_services=[failing_service, healthy_service],
+        )
+
+        with (
+            patch.object(facade, "on_supervisor_scan", new_callable=AsyncMock),
+            patch.object(facade, "on_heartbeat_tick"),
+            patch(
+                "vibe3.domain.orchestration_facade.append_orchestra_event"
+            ) as mock_append,
+        ):
+            await facade.on_tick()
+
+        healthy_service.on_tick.assert_awaited_once()
+        mock_append.assert_any_call(
+            "server",
+            "tick error in failing-dispatch: GitHub down",
+        )

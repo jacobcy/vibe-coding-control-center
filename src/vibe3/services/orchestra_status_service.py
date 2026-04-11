@@ -109,7 +109,7 @@ class OrchestraStatusService:
     Data sources:
     - GitHub Issues (via GitHubClient)
     - State labels (via LabelService)
-    - Flow state (via FlowManager)
+    - Flow state (via execution flow dispatch service)
     - Worktrees (via GitClient)
     - Circuit Breaker (via CircuitBreaker)
     """
@@ -125,11 +125,11 @@ class OrchestraStatusService:
         self.config = config
         self._github = github or GitHubClient()
 
-        # Internal orchestrator (FlowManager)
+        # Internal orchestrator (flow reader)
         if orchestrator is None:
             raise ValueError(
-                "orchestrator must be provided; "
-                "pass a FlowReader-compatible object (e.g. FlowManager)"
+                "orchestrator must be provided; pass a FlowReader-compatible "
+                "object (e.g. execution flow dispatch service)"
             )
         self._orchestrator = orchestrator
 

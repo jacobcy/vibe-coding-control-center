@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from vibe3.clients.protocols import BackendProtocol
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.manager.session_naming import build_session_name
+from vibe3.environment.session_naming import build_session_name
 
 if TYPE_CHECKING:
     pass
