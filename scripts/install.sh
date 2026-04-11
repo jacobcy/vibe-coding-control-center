@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
-# Vibe Coding Control Center - Minimalist Installer (v2)
-# Replaces 300+ lines of legacy logic with a streamlined bootstrapper.
+# Vibe Coding Control Center - Minimal Installer (v3)
+# 只做最基础的安装和环境配置，全面检查和引导由 /vibe-onboard skill 完成
 
-set -e
+set -euo pipefail
 
 # --- Configuration ---
 INSTALL_DIR="$HOME/.vibe"
@@ -13,19 +13,21 @@ SOURCE_ROOT="$(cd "$(dirname "${(%):-%x}")/.." && pwd)"
 _usage() {
     echo "${BOLD}Vibe Coding Control Center - Installer${NC}"
     echo ""
-    echo "此脚本负责 Vibe 的全局分发与环境初始化："
-    echo "  1. 建立分发轨道：同步核心组件 (bin/lib/config/scripts) 到 ${CYAN}~/.vibe${NC}"
+    echo "此脚本负责 Vibe 的基础环境初始化："
+    echo "  1. 建立分发轨道：同步核心组件到 ${CYAN}~/.vibe${NC}"
     echo "  2. 密钥托管：从模板初始化全局 ${CYAN}keys.env${NC} 配置文件"
-    echo "  3. 注入加载器：在 ${CYAN}.zshrc/.bashrc${NC} 中建立全量加载链路 (loader.sh)"
+    echo "  3. 依赖安装：安装 uv 与基础 Python 环境"
+    echo "  4. 注入加载器：在 shell 配置文件中建立全量加载链路"
     echo ""
     echo "Usage: ${CYAN}scripts/install.sh${NC} [options]"
     echo ""
     echo "Options:"
-    echo "  -h, --help    显示此帮助信息"
+    echo "  -h, --help        显示此帮助信息"
     echo ""
     exit 0
 }
 
+# 解析参数
 for arg in "$@"; do
     case "$arg" in
         -h|--help) _usage ;;
@@ -48,28 +50,10 @@ _get_shell_rc() {
     case "$SHELL" in
         */zsh) echo "$HOME/.zshrc" ;;
         */bash) echo "$HOME/.bashrc" ;;
+        */fish) echo "$HOME/.config/fish/config.fish" ;;
+        */nu) echo "$HOME/.config/nushell/config.nu" ;;
         *) echo "$HOME/.zshrc" ;; # Default to zsh
     esac
-}
-
-_get_direnv_hook() {
-    case "$SHELL" in
-        */bash) echo 'eval "$(direnv hook bash)"' ;;
-        *) echo 'eval "$(direnv hook zsh)"' ;;
-    esac
-}
-
-_setup_gh_noninteractive() {
-    log_step "Setting up GitHub CLI defaults..."
-
-    if ! command -v gh &> /dev/null; then
-        log_info "gh not installed, skipping non-interactive setup"
-        return 0
-    fi
-
-    gh config set prompt disabled >/dev/null 2>&1 || log_warn "Failed to set gh prompt=disabled"
-    gh config set pager cat >/dev/null 2>&1 || log_warn "Failed to set gh pager=cat"
-    log_success "Configured gh for non-interactive mode"
 }
 
 VIBE_UV_BIN=""
@@ -117,18 +101,46 @@ _ensure_uv_cli() {
         return 0
     fi
 
-    log_warn "uv installation finished but executable not found at $local_uv"
+    log_error "uv installation failed, cannot proceed with Python environment setup"
     return 1
 }
+
+# --- Pre-flight checks ---
+log_step "Performing pre-flight checks..."
+# 检查写入权限
+if ! touch "$HOME/.vibe_test_write" 2>/dev/null; then
+    log_error "No write permission to home directory, cannot proceed with installation"
+    exit 1
+fi
+rm -f "$HOME/.vibe_test_write"
+
+# 检查基本系统依赖
+for cmd in git curl; do
+    if ! command -v $cmd &> /dev/null; then
+        log_error "Required command '$cmd' not found, please install it first"
+        exit 1
+    fi
+done
+log_success "All pre-flight checks passed"
 
 # --- Main Flow ---
 log_step "Installing Vibe Center (Global)"
 
-# 1. Create directory structure
+# 1. 同步git子模块
+log_step "Updating git submodules..."
+if [[ -f "$SOURCE_ROOT/.gitmodules" ]]; then
+    cd "$SOURCE_ROOT"
+    git submodule update --init --recursive
+    log_success "Git submodules updated"
+else
+    log_info "No git submodules found, skipping"
+fi
+
+# 2. Create directory structure
 log_info "Setting up $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/config" "$INSTALL_DIR/scripts" "$INSTALL_DIR/alias"
 
-# 2. Sync core components (Copying to ensure global persistence)
+# 3. Sync core components (Copying to ensure global persistence)
 log_info "Syncing core modules..."
 for dir in bin lib lib3 config scripts alias; do
     [[ -d "$SOURCE_ROOT/$dir" ]] || continue
@@ -136,80 +148,56 @@ for dir in bin lib lib3 config scripts alias; do
     # Copy directory contents portably so GNU/BSD cp do not create nested dir/dir trees.
     cp -R "$SOURCE_ROOT/$dir/." "$INSTALL_DIR/$dir/"
 done
+log_success "Core modules synced"
 
-# 3. Handle Key Template
+# 4. Handle Key Template
 if [[ ! -f "$INSTALL_DIR/keys.env" ]]; then
     log_info "Initializing keys.env from template..."
     cp "$SOURCE_ROOT/config/keys.template.env" "$INSTALL_DIR/keys.env"
     chmod 600 "$INSTALL_DIR/keys.env"
 fi
 
-# 4. Bootstrap loader.sh
+# 5. Bootstrap loader.sh
 LOADER_DST="$INSTALL_DIR/loader.sh"
 log_info "Installing loader at $LOADER_DST..."
 cp "$SOURCE_ROOT/config/loader.sh" "$LOADER_DST"
 chmod 755 "$LOADER_DST"
+log_success "Loader installed"
 
-# 5. Shell Integration
+# 6. Shell Integration
 RC_FILE="$(_get_shell_rc)"
 log_info "Updating $RC_FILE..."
 
-# Cleanup old markers if they exist (Basic cleanup for transition)
+# Cleanup old markers if they exist
 if [[ -f "$RC_FILE" ]]; then
-    sed -i '' '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || sed -i '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || true
-    sed -i '' '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || sed -i '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
+    # 兼容macOS和Linux的sed语法
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sed -i '' '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '' '/Vibe Local Bin/d' "$RC_FILE" 2>/dev/null || true
+    else
+        sed -i '/# Vibe Coding Control Center/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/source .*\/loader.sh/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/VIBE_ROOT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/UV_PROJECT_ENVIRONMENT/d' "$RC_FILE" 2>/dev/null || true
+        sed -i '/Vibe Local Bin/d' "$RC_FILE" 2>/dev/null || true
+    fi
 fi
 
-_append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center"
+# 添加环境变量
+_append_to_rc "$RC_FILE" "export VIBE_ROOT=\"$SOURCE_ROOT\"" "Vibe Coding Control Center - Root"
+_append_to_rc "$RC_FILE" "[ -f \"$INSTALL_DIR/loader.sh\" ] && source \"$INSTALL_DIR/loader.sh\"" "Vibe Coding Control Center - Loader"
+_append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
 
-# 6. GitHub CLI defaults (non-interactive)
-_setup_gh_noninteractive
-
-# 7. Direnv Setup (auto-configure if direnv is installed)
-_setup_direnv() {
-    log_step "Setting up direnv..."
-
-    # Check if direnv is installed
-    if ! command -v direnv &> /dev/null; then
-        log_info "direnv not installed, skipping direnv integration"
-        return 0
-    fi
-
-    # Add direnv hook to RC file
-    local direnv_hook
-    direnv_hook="$(_get_direnv_hook)"
-    if ! grep -qF 'direnv hook zsh' "$RC_FILE" 2>/dev/null; then
-        _append_to_rc "$RC_FILE" "$direnv_hook" "direnv"
-        log_info "Added direnv hook to $RC_FILE"
-    else
-        log_info "direnv hook already present in $RC_FILE"
-    fi
-
-    # Create .envrc in source root if not exists
-    local envrc_path="$SOURCE_ROOT/.envrc"
-    if [[ ! -f "$envrc_path" ]]; then
-        log_info "Creating $envrc_path..."
-        echo 'source "$HOME/.venvs/vibe-center/bin/activate"' > "$envrc_path"
-    else
-        log_info ".envrc already exists at $envrc_path"
-    fi
-
-    # Allow direnv (in source root)
-    log_info "Running direnv allow..."
-    cd "$SOURCE_ROOT"
-    direnv allow 2>/dev/null || log_warn "direnv allow failed (may need manual approval)"
-
-    log_success "direnv setup complete!"
-}
-
+# 7. uv环境与Python依赖安装
 _setup_uv_environment() {
     log_step "Setting up uv environment..."
 
-    _append_to_rc "$RC_FILE" 'export PATH="$HOME/.local/bin:$PATH"' "Vibe Local Bin"
-
     if ! _ensure_uv_cli; then
-        log_warn "uv setup incomplete; skipping venv bootstrap."
-        return 0
+        log_error "uv setup failed, cannot proceed with Python environment"
+        exit 1
     fi
 
     local venv_path="$HOME/.venvs/vibe-center"
@@ -224,24 +212,26 @@ _setup_uv_environment() {
     local uv_env_export='export UV_PROJECT_ENVIRONMENT="$HOME/.venvs/vibe-center"'
     _append_to_rc "$RC_FILE" "$uv_env_export" "UV_PROJECT_ENVIRONMENT"
 
-    if [[ -n "$UV_PROJECT_ENVIRONMENT" && "$UV_PROJECT_ENVIRONMENT" != "$venv_path" && "$UV_PROJECT_ENVIRONMENT" != "\$HOME/.venvs/vibe-center" ]]; then
-        log_warn "Current UV_PROJECT_ENVIRONMENT differs: $UV_PROJECT_ENVIRONMENT"
-        log_warn "Recommended value: $venv_path"
-    fi
+    # 安装项目依赖
+    log_info "Installing Python dependencies..."
+    cd "$SOURCE_ROOT"
+    "$VIBE_UV_BIN" sync --all-extras
+    log_success "Python dependencies installed"
 
-    log_success "uv environment setup complete."
+    # 安装项目本身
+    log_info "Installing Vibe CLI package..."
+    "$VIBE_UV_BIN" pip install -e .
+    log_success "Vibe CLI installed successfully"
 }
 
-# Auto-run uv + direnv setup
 _setup_uv_environment
-_setup_direnv
 
 # 8. Finalize
 chmod +x "$INSTALL_DIR/bin/vibe"
-log_success "Installation complete!"
+log_success "Base installation complete!"
 
 echo -e "\n${BOLD}NEXT STEPS:${NC}"
 echo "1. Reload shell: ${CYAN}source $RC_FILE${NC}"
-echo "2. Run diagnostics: ${CYAN}vibe doctor${NC}"
-echo "3. Happy Coding! ${CYAN}vibe --help${NC}"
+echo "2. 运行 onboard 引导完成全部配置与检查：${CYAN}/vibe-onboard${NC}"
+echo "3. 查看帮助：${CYAN}vibe --help${NC}"
 echo "----------------------------------------"
