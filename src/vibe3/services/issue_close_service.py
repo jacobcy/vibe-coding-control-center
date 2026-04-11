@@ -62,7 +62,21 @@ class IssueCloseService:
 
         # Check if already closed (avoid unnecessary API call)
         if issue_payload is None:
-            issue_payload_raw = self._github.view_issue(issue_number, repo=self._repo)
+            try:
+                issue_payload_raw = self._github.view_issue(
+                    issue_number, repo=self._repo
+                )
+            except (FileNotFoundError, OSError, RuntimeError) as exc:
+                logger.bind(
+                    domain="orchestra",
+                    issue_number=issue_number,
+                    error=str(exc),
+                ).warning(
+                    "Failed to fetch issue payload before close, "
+                    "proceeding with close operation"
+                )
+                issue_payload_raw = None
+
             if isinstance(issue_payload_raw, dict):
                 issue_payload = issue_payload_raw
 
