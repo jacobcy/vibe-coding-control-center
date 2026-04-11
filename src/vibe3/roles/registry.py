@@ -26,6 +26,8 @@ PLANNER_ROLE = TriggerableRoleDefinition(
     gate_config=GOVERNANCE_GATE_CONFIG,
     trigger_name="plan",
     trigger_state=IssueState.CLAIMED,
+    status_field="planner_status",
+    dispatch_predicate=lambda fs, live: not fs.get("plan_ref") and not live,
 )
 
 EXECUTOR_ROLE = TriggerableRoleDefinition(
@@ -34,6 +36,10 @@ EXECUTOR_ROLE = TriggerableRoleDefinition(
     gate_config=GOVERNANCE_GATE_CONFIG,
     trigger_name="run",
     trigger_state=IssueState.IN_PROGRESS,
+    status_field="executor_status",
+    dispatch_predicate=lambda fs, live: (
+        bool(fs.get("plan_ref")) and not fs.get("report_ref") and not live
+    ),
 )
 
 REVIEWER_ROLE = TriggerableRoleDefinition(
@@ -42,6 +48,10 @@ REVIEWER_ROLE = TriggerableRoleDefinition(
     gate_config=GOVERNANCE_GATE_CONFIG,
     trigger_name="review",
     trigger_state=IssueState.REVIEW,
+    status_field="reviewer_status",
+    dispatch_predicate=lambda fs, live: (
+        bool(fs.get("report_ref")) and not fs.get("audit_ref") and not live
+    ),
 )
 
 LABEL_DISPATCH_ROLES: tuple[TriggerableRoleDefinition, ...] = (

@@ -44,6 +44,9 @@ class ExecutionCoordinator:
         if request.worktree_requirement == WorktreeRequirement.NONE:
             return None
 
+        if request.worktree_requirement == WorktreeRequirement.TEMPORARY:
+            return self._acquire_temporary_worktree(request.target_id)
+
         if request.worktree_requirement != WorktreeRequirement.PERMANENT:
             raise ValueError(
                 f"Unsupported worktree requirement: {request.worktree_requirement}"
@@ -61,6 +64,27 @@ class ExecutionCoordinator:
                 f"{request.role}:{request.target_id}"
             )
         return manager_cwd
+
+    def _acquire_temporary_worktree(self, issue_number: int) -> Path:
+        """Acquire a temporary worktree for supervisor apply execution.
+
+        The worktree persists for the duration of the async execution.
+        It is cleaned up automatically on the next dispatch for the same issue.
+        """
+        from vibe3.clients.git_client import GitClient
+
+        try:
+            git_common = GitClient().get_git_common_dir()
+            repo_path = Path(git_common).parent if git_common else Path.cwd()
+        except Exception:
+            repo_path = Path.cwd()
+
+        worktree_manager = WorktreeManager(self.config, repo_path)
+        ctx = worktree_manager.acquire_temporary_worktree(
+            issue_number=issue_number,
+            base_branch="main",
+        )
+        return ctx.path
 
     def dispatch_execution(self, request: ExecutionRequest) -> ExecutionLaunchResult:
         """Dispatch an execution request."""

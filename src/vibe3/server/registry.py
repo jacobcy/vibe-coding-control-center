@@ -149,12 +149,10 @@ def _build_server_with_launch_cwd(
     facade = OrchestrationFacade(dispatch_services=dispatch_services)
     heartbeat.register(facade)
 
-    # GovernanceService and SupervisorHandoffService are no longer registered
-    # directly to the heartbeat. Their on_tick() methods were stubs delegating
-    # to domain handlers. Governance scans are now triggered via:
-    #   OrchestrationFacade.on_tick() -> GovernanceScanStarted event
-    #   -> governance domain handler -> GovernanceService.run_scan()
-    # Supervisor handoff follows the same domain-event-driven path.
+    # GovernanceService and SupervisorHandoffService are deleted.
+    # Governance and supervisor dispatch are now handled inline by
+    # OrchestrationFacade via roles/governance.py and roles/supervisor.py
+    # through ExecutionCoordinator — no per-role service or handler needed.
 
     fastapi_app = FastAPI(title="vibe3 Orchestra", version="1.0")
     fastapi_app.include_router(make_webhook_router(heartbeat, config.webhook_secret))

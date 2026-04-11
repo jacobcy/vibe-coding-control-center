@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from vibe3.clients.github_client import GitHubClient
 from vibe3.clients.sqlite_client import SQLiteClient
-from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.execution.flow_dispatch import FlowManager
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import (
@@ -19,27 +18,11 @@ from vibe3.models.orchestration import (
 )
 from vibe3.orchestra.logging import append_orchestra_event
 from vibe3.orchestra.queue_ordering import sort_ready_issues
+from vibe3.roles.definitions import TriggerableRoleDefinition
 from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.environment.session_registry import SessionRegistryService
-
-TriggerName = Literal["manager", "plan", "run", "review"]
-
-_TRIGGER_STATUS_FIELD: dict[TriggerName, str | None] = {
-    "manager": None,
-    "plan": "planner_status",
-    "run": "executor_status",
-    "review": "reviewer_status",
-}
-
-# Map trigger_name to registry role for live session queries
-_TRIGGER_TO_REGISTRY_ROLE: dict[TriggerName, str] = {
-    "manager": "manager",
-    "plan": "planner",
-    "run": "executor",
-    "review": "reviewer",
-}
 
 
 def _normalize_labels(raw_labels: object) -> list[str]:
@@ -59,28 +42,35 @@ def _is_auto_task_branch(branch: str) -> bool:
 
 
 class StateLabelDispatchService(ServiceBase):
-    """Dispatch manager or downstream agents from issue state labels."""
+    """Dispatch manager or downstream agents from issue state labels.
+
+    The per-role dispatch logic (status_field, dispatch_predicate) is owned by
+    TriggerableRoleDefinition. This service is a thin runtime loop that polls
+    GitHub, filters using role-declared predicates, and publishes domain events.
+    """
 
     event_types: list[str] = []
 
     @property
     def service_name(self) -> str:
-        return f"{type(self).__name__}({self.trigger_name}:{self.trigger_state.value})"
+        return (
+            f"{type(self).__name__}("
+            f"{self.role_def.trigger_name}:{self.role_def.trigger_state.value})"
+        )
 
     def __init__(
         self,
         config: OrchestraConfig,
         *,
         trigger_state: IssueState,
-        trigger_name: TriggerName,
+        trigger_name: str,
         github: GitHubClient | None = None,
         executor: ThreadPoolExecutor | None = None,
         flow_manager: FlowManager | None = None,
         registry: "SessionRegistryService | None" = None,
+        role_def: TriggerableRoleDefinition | None = None,
     ) -> None:
         self.config = config
-        self.trigger_state = trigger_state
-        self.trigger_name: TriggerName = trigger_name
         self._executor = executor or ThreadPoolExecutor(
             max_workers=config.max_concurrent_flows,
         )
@@ -89,7 +79,22 @@ class StateLabelDispatchService(ServiceBase):
         self._store = SQLiteClient()
         self._registry = registry
         self._dispatch_guard = asyncio.Lock()
-        self._facade = OrchestrationFacade()
+
+        # Resolve role definition: prefer explicit role_def, fall back to
+        # legacy trigger_name/trigger_state lookup for backwards compatibility.
+        if role_def is not None:
+            self.role_def = role_def
+        else:
+            self.role_def = _find_role_def(trigger_name, trigger_state)
+
+    # trigger_name / trigger_state kept as properties for callers that access them.
+    @property
+    def trigger_name(self) -> str:
+        return self.role_def.trigger_name
+
+    @property
+    def trigger_state(self) -> IssueState:
+        return self.role_def.trigger_state
 
     async def handle_event(self, event: GitHubEvent) -> None:
         return
@@ -104,19 +109,17 @@ class StateLabelDispatchService(ServiceBase):
                     state="open",
                     assignee=None,
                     repo=self.config.repo,
-                    label=self.trigger_state.to_label(),
+                    label=self.role_def.trigger_state.to_label(),
                 ),
             )
 
             ready = self._select_ready_issues(raw_issues)
             ready_count = len(ready)
 
-            # Log at INFO level: just the count
             append_orchestra_event(
                 "dispatcher",
                 f"{self.service_name} tick: {ready_count} ready issues",
             )
-            # Log at DEBUG level: full list
             if ready:
                 ready_numbers = ", ".join(f"#{issue.number}" for issue in ready)
                 append_orchestra_event(
@@ -137,7 +140,7 @@ class StateLabelDispatchService(ServiceBase):
 
                 logger.bind(
                     domain="orchestra",
-                    trigger=self.trigger_name,
+                    trigger=self.role_def.trigger_name,
                     issue=issue.number,
                 ).debug("Dispatch-intent event emitted, handler will dispatch")
             except Exception as exc:
@@ -148,35 +151,73 @@ class StateLabelDispatchService(ServiceBase):
                 )
                 logger.bind(
                     domain="orchestra",
-                    trigger=self.trigger_name,
+                    trigger=self.role_def.trigger_name,
                     issue=issue.number,
                 ).warning(f"State dispatch failed: {exc}")
 
     def _emit_dispatch_intent(self, issue: IssueInfo) -> None:
+        from vibe3.domain import publish
+        from vibe3.domain.events.flow_lifecycle import IssueStateChanged
+
+        trigger = self.role_def.trigger_name
         branch, flow_state = self._flow_context(issue.number)
-        if self.trigger_name == "manager":
-            self._facade.on_issue_state_changed(issue_info=issue, from_state=None)
+        if trigger == "manager":
+            to_state = self.role_def.trigger_state.value
+            publish(
+                IssueStateChanged(
+                    issue_number=issue.number,
+                    from_state=None,
+                    to_state=to_state,
+                    issue_title=issue.title if issue.title else None,
+                )
+            )
             return
-        if self.trigger_name == "plan":
-            self._facade.on_planner_dispatch(issue_info=issue, branch=branch)
+        if trigger == "plan":
+            from vibe3.domain.events import PlannerDispatched
+
+            publish(
+                PlannerDispatched(
+                    issue_number=issue.number,
+                    branch=branch,
+                    trigger_state="claimed",
+                )
+            )
             return
-        if self.trigger_name == "run":
+        if trigger == "run":
+            from vibe3.domain.events import ExecutorDispatched
+
             plan_ref = flow_state.get("plan_ref") if flow_state else None
-            self._facade.on_executor_dispatch(
-                issue_info=issue,
-                branch=branch,
-                plan_ref=str(plan_ref) if plan_ref else None,
+            publish(
+                ExecutorDispatched(
+                    issue_number=issue.number,
+                    branch=branch,
+                    trigger_state="in-progress",
+                    plan_ref=str(plan_ref) if plan_ref else None,
+                )
             )
             return
-        if self.trigger_name == "review":
+        if trigger == "review":
+            from vibe3.domain.events import ReviewerDispatched
+
             report_ref = flow_state.get("report_ref") if flow_state else None
-            self._facade.on_reviewer_dispatch(
-                issue_info=issue,
-                branch=branch,
-                report_ref=str(report_ref) if report_ref else None,
+            publish(
+                ReviewerDispatched(
+                    issue_number=issue.number,
+                    branch=branch,
+                    trigger_state="review",
+                    report_ref=str(report_ref) if report_ref else None,
+                )
             )
             return
-        self._facade.on_issue_state_changed(issue_info=issue, from_state=None)
+        to_state = self.role_def.trigger_state.value
+        publish(
+            IssueStateChanged(
+                issue_number=issue.number,
+                from_state=None,
+                to_state=to_state,
+                issue_title=issue.title if issue.title else None,
+            )
+        )
 
     def _flow_context(self, issue_number: int) -> tuple[str, dict[str, object] | None]:
         flow = self._flow_manager.get_flow_for_issue(issue_number)
@@ -193,21 +234,19 @@ class StateLabelDispatchService(ServiceBase):
             labels = _normalize_labels(item.get("labels"))
             if IssueState.BLOCKED.to_label() in labels:
                 continue
-            if self.trigger_state.to_label() not in labels:
+            if self.role_def.trigger_state.to_label() not in labels:
                 continue
             issue = IssueInfo.from_github_payload(item)
             if issue is None:
                 continue
-            if self.trigger_name == "manager":
+            if self.role_def.trigger_name == "manager":
                 branch, flow_state = self._flow_context(issue.number)
-                if self.trigger_state == IssueState.HANDOFF:
+                if self.role_def.trigger_state == IssueState.HANDOFF:
                     if (
                         not branch
                         or not _is_auto_task_branch(branch)
                         or not flow_state
-                        or not self._should_dispatch_from_state(
-                            issue.number, flow_state
-                        )
+                        or not self._should_dispatch(issue.number, flow_state)
                     ):
                         continue
                 selected.append(issue)
@@ -217,36 +256,22 @@ class StateLabelDispatchService(ServiceBase):
                 not branch
                 or not _is_auto_task_branch(branch)
                 or not flow_state
-                or not self._should_dispatch_from_state(issue.number, flow_state)
+                or not self._should_dispatch(issue.number, flow_state)
             ):
                 continue
             selected.append(issue)
         return sort_ready_issues(selected)
 
-    def _should_dispatch_from_state(
+    def _should_dispatch(
         self,
         issue_number: int,
         flow_state: dict[str, object],
     ) -> bool:
-        status_field = _TRIGGER_STATUS_FIELD[self.trigger_name]
+        """Use role definition's status_field + dispatch_predicate."""
+        status_field = self.role_def.status_field
         is_running = bool(status_field and flow_state.get(status_field) == "running")
         has_live_session = is_running and self._has_live_dispatch(issue_number)
-
-        if self.trigger_name == "manager":
-            return not has_live_session
-        if self.trigger_name == "plan":
-            return not flow_state.get("plan_ref") and not has_live_session
-        if self.trigger_name == "run":
-            return (
-                bool(flow_state.get("plan_ref"))
-                and not flow_state.get("report_ref")
-                and not has_live_session
-            )
-        return (
-            bool(flow_state.get("report_ref"))
-            and not flow_state.get("audit_ref")
-            and not has_live_session
-        )
+        return self.role_def.dispatch_predicate(flow_state, has_live_session)
 
     def _has_live_dispatch(self, issue_number: int) -> bool:
         if self._registry is None:
@@ -254,15 +279,39 @@ class StateLabelDispatchService(ServiceBase):
                 "SessionRegistryService is required to check live dispatch"
             )
 
-        registry_role = _TRIGGER_TO_REGISTRY_ROLE.get(
-            self.trigger_name, self.trigger_name
-        )
         branch, _ = self._flow_context(issue_number)
         if not branch:
             return False
         sessions = self._registry.get_truly_live_sessions_for_target(
-            role=registry_role,
+            role=self.role_def.registry_role,
             branch=branch,
             target_id=str(issue_number),
         )
         return len(sessions) > 0
+
+
+def _find_role_def(
+    trigger_name: str,
+    trigger_state: IssueState,
+) -> TriggerableRoleDefinition:
+    """Resolve a TriggerableRoleDefinition by trigger_name and trigger_state.
+
+    Used as a backwards-compatibility fallback when role_def is not passed
+    directly to StateLabelDispatchService.__init__.
+    """
+    from vibe3.roles.registry import LABEL_DISPATCH_ROLES
+
+    for role in LABEL_DISPATCH_ROLES:
+        if role.trigger_name == trigger_name and role.trigger_state == trigger_state:
+            return role
+
+    # Construct a minimal definition so callers don't break.
+    from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
+
+    return TriggerableRoleDefinition(
+        name=trigger_name,
+        registry_role=trigger_name,
+        gate_config=GOVERNANCE_GATE_CONFIG,
+        trigger_name=trigger_name,  # type: ignore[arg-type]
+        trigger_state=trigger_state,
+    )

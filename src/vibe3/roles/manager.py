@@ -39,6 +39,8 @@ MANAGER_ROLE = TriggerableRoleDefinition(
     gate_config=MANAGER_GATE_CONFIG,
     trigger_name="manager",
     trigger_state=IssueState.READY,
+    status_field=None,
+    dispatch_predicate=lambda _fs, has_live: not has_live,
 )
 
 HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
@@ -47,6 +49,8 @@ HANDOFF_MANAGER_ROLE = TriggerableRoleDefinition(
     gate_config=MANAGER_GATE_CONFIG,
     trigger_name="manager",
     trigger_state=IssueState.HANDOFF,
+    status_field=None,
+    dispatch_predicate=lambda _fs, has_live: not has_live,
 )
 
 
