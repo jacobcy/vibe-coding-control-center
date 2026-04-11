@@ -20,8 +20,8 @@ from vibe3.clients.git_client import GitClient
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.observability.logger import setup_logging
 from vibe3.orchestra.logging import orchestra_events_log_path, orchestra_log_dir
-from vibe3.runtime.event_bus import GitHubEvent
 from vibe3.runtime.heartbeat import HeartbeatServer
+from vibe3.runtime.service_protocol import GitHubEvent
 from vibe3.server.registry import (
     _build_server_with_launch_cwd,
     _kill_orchestra_tmux_session,

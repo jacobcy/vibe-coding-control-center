@@ -15,7 +15,7 @@ from vibe3.orchestra.logging import (
     append_orchestra_event,
     append_orchestra_run_separator,
 )
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 if TYPE_CHECKING:
     from vibe3.orchestra.failed_gate import FailedGate

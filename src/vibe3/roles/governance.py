@@ -10,7 +10,9 @@ from typing import Any
 
 from loguru import logger
 
+from vibe3.execution.agent_resolver import resolve_governance_agent_options
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.execution.role_contracts import GOVERNANCE_GATE_CONFIG
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.orchestra.logging import (
@@ -27,7 +29,6 @@ from vibe3.prompts.models import (
 from vibe3.prompts.provider_registry import ProviderRegistry
 from vibe3.prompts.template_loader import DEFAULT_PROMPTS_PATH
 from vibe3.roles.definitions import RoleDefinition
-from vibe3.runtime.agent_resolver import resolve_governance_agent_options
 from vibe3.services.orchestra_status_service import (
     format_issue_runtime_line,
     format_issue_summary_line,
@@ -196,7 +197,7 @@ def build_governance_request(
     plan_content = render_result.rendered_text
 
     if config.governance.dry_run:
-        root = repo_path or _resolve_repo_path()
+        root = repo_path or resolve_orchestra_repo_root()
         dry_run_plan_path = _write_dry_run_plan(root, plan_content)
         log.info("Dry run: governance plan prepared")
         log.info(f"Dry run plan file: {dry_run_plan_path}")
@@ -235,16 +236,3 @@ def _write_dry_run_plan(repo_path: Path, plan_content: str) -> Path:
     ) as handle:
         handle.write(plan_content)
         return Path(handle.name)
-
-
-def _resolve_repo_path() -> Path:
-    """Resolve shared repo root anchored at git common dir."""
-    from vibe3.clients.git_client import GitClient
-
-    try:
-        git_common_dir = GitClient().get_git_common_dir()
-        if git_common_dir:
-            return Path(git_common_dir).parent
-    except Exception:
-        pass
-    return Path.cwd()

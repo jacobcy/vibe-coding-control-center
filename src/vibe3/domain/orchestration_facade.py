@@ -16,7 +16,7 @@ from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo
 from vibe3.orchestra.logging import append_orchestra_event
-from vibe3.runtime.event_bus import GitHubEvent, ServiceBase
+from vibe3.runtime.service_protocol import GitHubEvent, ServiceBase
 
 
 class OrchestrationFacade(ServiceBase):

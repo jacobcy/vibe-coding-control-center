@@ -31,13 +31,20 @@ def _patch_spec_runtime(monkeypatch) -> MagicMock:
         "vibe3.commands.command_options.ensure_flow_for_current_branch",
         lambda: (MagicMock(), "task/test-branch"),
     )
-    mock_usecase = MagicMock()
-    mock_usecase_cls = MagicMock(return_value=mock_usecase)
     monkeypatch.setattr(
-        "vibe3.commands.plan.PlanUsecase",
-        mock_usecase_cls,
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        MagicMock(),
     )
-    return mock_usecase
+    monkeypatch.setattr(
+        "vibe3.commands.plan.bind_plan_spec",
+        MagicMock(),
+    )
+    mock_execute = MagicMock()
+    monkeypatch.setattr(
+        "vibe3.commands.plan.execute_spec_plan",
+        mock_execute,
+    )
+    return mock_execute
 
 
 def test_plan_help_shows_options() -> None:
@@ -77,8 +84,11 @@ def test_plan_spec_msg_basic_flow(monkeypatch) -> None:
 
 
 def test_plan_spec_file_not_found(monkeypatch) -> None:
-    mock_usecase = _patch_spec_runtime(monkeypatch)
-    mock_usecase.resolve_spec_plan.side_effect = FileNotFoundError("File not found")
+    _patch_spec_runtime(monkeypatch)
+    monkeypatch.setattr(
+        "vibe3.commands.plan.resolve_spec_plan_input",
+        MagicMock(side_effect=FileNotFoundError("File not found")),
+    )
 
     result = runner.invoke(plan_app, ["spec", "--file", "nonexistent.md"])
     assert result.exit_code != 0

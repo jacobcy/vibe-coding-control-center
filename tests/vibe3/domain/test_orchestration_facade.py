@@ -11,7 +11,7 @@ from vibe3.domain.events.governance import GovernanceScanStarted
 from vibe3.domain.events.supervisor_apply import SupervisorIssueIdentified
 from vibe3.domain.orchestration_facade import OrchestrationFacade
 from vibe3.models.orchestration import IssueInfo, IssueState
-from vibe3.runtime.event_bus import GitHubEvent
+from vibe3.runtime.service_protocol import GitHubEvent
 
 
 @pytest.fixture

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.execution.contracts import ExecutionRequest
+from vibe3.execution.issue_role_support import resolve_orchestra_repo_root
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.models.orchestration import IssueInfo, IssueState
 from vibe3.roles.definitions import TriggerableRoleDefinition
@@ -13,7 +14,6 @@ from vibe3.roles.manager import (
     HANDOFF_MANAGER_ROLE,
     MANAGER_ROLE,
     build_manager_request,
-    resolve_orchestra_repo_root,
 )
 from vibe3.roles.plan import (
     PLANNER_ROLE,
@@ -60,6 +60,6 @@ def build_issue_state_request(
             config,
             issue,
             registry=registry,
-            repo_path=repo_path or resolve_orchestra_repo_root(),
+            _repo_path=repo_path or resolve_orchestra_repo_root(),
         )
     return None

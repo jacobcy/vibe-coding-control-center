@@ -20,7 +20,7 @@ def test_run_manager_reads_backend_from_env(monkeypatch):
 
     with (
         patch(
-            "vibe3.runtime.agent_resolver.resolve_manager_agent_options",
+            "vibe3.execution.agent_resolver.resolve_manager_agent_options",
             side_effect=fake_resolve_manager_agent_options,
         ),
         patch("vibe3.execution.issue_role_sync_runner.OrchestraConfig") as mock_config,

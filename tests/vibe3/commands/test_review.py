@@ -37,11 +37,8 @@ class TestReviewContextBuilderUsesAssembler:
             mod, "build_review_context"
         ), "build_review_context should be deleted; use build_review_prompt_body"
 
-    def test_review_usecase_context_builder_uses_assembler(self) -> None:
-        """ReviewUsecase should build context through assembler-backed callable."""
-        from vibe3.agents.review_agent import ReviewUsecase
-        from vibe3.agents.review_prompt import make_review_context_builder
+    def test_execute_manual_review_lives_in_role_layer(self) -> None:
+        """Manual review execution should now be owned by roles.review."""
+        import vibe3.roles.review as mod
 
-        usecase = ReviewUsecase()
-        # The default context_builder should be make_review_context_builder
-        assert usecase.context_builder is make_review_context_builder
+        assert hasattr(mod, "execute_manual_review")

@@ -5,10 +5,6 @@ from typing import Annotated, Optional
 import typer
 from loguru import logger
 
-from vibe3.agents.review_agent import ReviewUsecase
-from vibe3.agents.review_parser import parse_codex_review
-from vibe3.agents.review_pipeline_helpers import build_snapshot_diff, run_inspect_json
-from vibe3.agents.review_prompt import make_review_context_builder
 from vibe3.commands.command_options import (
     _ASYNC_OPT,
     _DRY_RUN_OPT,
@@ -17,8 +13,12 @@ from vibe3.commands.command_options import (
 )
 from vibe3.commands.pr_helpers import build_base_resolution_usecase
 from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
-from vibe3.roles.review import REVIEW_SYNC_SPEC
-from vibe3.services.flow_service import FlowService
+from vibe3.roles.review import (
+    REVIEW_SYNC_SPEC,
+    build_base_review_request,
+    build_pr_review_request,
+    execute_manual_review,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -38,19 +38,6 @@ def _emit_review_result(verdict: str, handoff_file: str | None) -> None:
     typer.echo(f"\n=== Verdict: {verdict} ===")
     if handoff_file:
         typer.echo(f"→ Review saved to: {handoff_file}")
-
-
-def _build_review_usecase(
-    flow_service: FlowService | None = None,
-) -> ReviewUsecase:
-    """Construct review usecase with command-local dependencies."""
-    return ReviewUsecase(
-        flow_service=flow_service,
-        inspect_runner=run_inspect_json,
-        snapshot_diff_builder=build_snapshot_diff,
-        review_parser=parse_codex_review,
-        context_builder=make_review_context_builder,
-    )
 
 
 def _review_issue_impl(
@@ -154,8 +141,7 @@ def pr(
     log = logger.bind(domain="review", action="pr", pr_number=pr_number)
     log.info("Starting PR review")
     typer.echo(f"→ Review: PR #{pr_number}")
-    usecase = _build_review_usecase()
-    request, issue_number, head_branch = usecase.build_pr_review(pr_number)
+    request, issue_number, head_branch = build_pr_review_request(pr_number)
 
     if not head_branch and not dry_run:
         typer.echo(
@@ -164,10 +150,10 @@ def pr(
         raise typer.Exit(1)
     branch = head_branch
 
-    result = usecase.execute_review(
-        request,
-        dry_run,
-        instructions,
+    result = execute_manual_review(
+        request=request,
+        dry_run=dry_run,
+        instructions=instructions,
         issue_number=issue_number,
         pr_number=pr_number,
         branch=branch,
@@ -235,15 +221,15 @@ def base(
     log.info("Starting branch review")
     typer.echo(f"→ Review: {current_branch} vs {resolved_base.base_branch}")
 
-    usecase = _build_review_usecase(flow_service=flow_service)
-    request, issue_number = usecase.build_base_review(
+    request, issue_number = build_base_review_request(
         current_branch,
         resolved_base.base_branch,
+        flow_service=flow_service,
     )
-    result = usecase.execute_review(
-        request,
-        dry_run,
-        instructions,
+    result = execute_manual_review(
+        request=request,
+        dry_run=dry_run,
+        instructions=instructions,
         issue_number=issue_number,
         branch=current_branch,
         async_mode=not no_async,

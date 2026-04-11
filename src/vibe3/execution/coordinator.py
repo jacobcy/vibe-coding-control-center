@@ -7,11 +7,11 @@ from typing import Optional
 from loguru import logger
 
 from vibe3.agents.backends.codeagent import CodeagentBackend
-from vibe3.agents.execution_lifecycle import ExecutionLifecycleService
 from vibe3.clients.sqlite_client import SQLiteClient
 from vibe3.environment.session_registry import SessionRegistryService
 from vibe3.environment.worktree import WorktreeManager
 from vibe3.execution.contracts import ExecutionLaunchResult, ExecutionRequest
+from vibe3.execution.execution_lifecycle import ExecutionLifecycleService
 from vibe3.execution.role_contracts import WorktreeRequirement
 from vibe3.models.orchestra_config import OrchestraConfig
 from vibe3.services.capacity_service import CapacityService

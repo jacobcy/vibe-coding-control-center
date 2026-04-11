@@ -1,4 +1,4 @@
-from vibe3.agents.review_runner import extract_session_id
+from vibe3.agents.backends.codeagent import extract_session_id
 
 
 def test_extract_session_id_valid():

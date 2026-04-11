@@ -5,7 +5,6 @@ from typing import Annotated, Optional
 
 import typer
 
-from vibe3.agents.plan_agent import PlanUsecase
 from vibe3.commands.command_options import (
     _AGENT_OPT,
     _ASYNC_OPT,
@@ -16,7 +15,12 @@ from vibe3.commands.command_options import (
     ensure_flow_for_current_branch,
 )
 from vibe3.execution.issue_role_sync_runner import run_issue_role_mode
-from vibe3.roles.plan import PLAN_SYNC_SPEC
+from vibe3.roles.plan import (
+    PLAN_SYNC_SPEC,
+    bind_plan_spec,
+    execute_spec_plan,
+    resolve_spec_plan_input,
+)
 from vibe3.utils.trace import enable_trace
 
 app = typer.Typer(
@@ -70,20 +74,15 @@ def _plan_spec_impl(
     _ = agent, backend, model
 
     flow_service, branch = ensure_flow_for_current_branch()
-    usecase = PlanUsecase(flow_service=flow_service)
-
-    # 1. Resolve spec input
     try:
-        spec_input = usecase.resolve_spec_plan(branch, file=file, msg=msg)
+        spec_input = resolve_spec_plan_input(branch, file=file, msg=msg)
     except (ValueError, FileNotFoundError) as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
-    # 2. Bind spec if not dry-run
     if not dry_run and spec_input.spec_path:
-        usecase.bind_spec(branch, spec_input.spec_path)
+        bind_plan_spec(branch, spec_input.spec_path)
 
-    # 3. Execute
     if dry_run:
         typer.echo("Plan dry run for specification")
         return
@@ -97,7 +96,7 @@ def _plan_spec_impl(
             err=True,
         )
 
-    usecase.execute_plan(
+    execute_spec_plan(
         request=spec_input.request,
         issue_number=issue_number,
         branch=branch,
